@@ -252,6 +252,11 @@ async def reverify_and_stage_existing_exit_v1(
            .order_by(NodeInstallProgressV1.created_at.desc()).first())
     if job is None:
         raise HTTPException(status_code=409, detail="CENTRAL_STAGE_INSTALL_JOB_MISSING")
+    if job.stage not in {"failed", "verified_ready", "completed"}:
+        raise HTTPException(
+            status_code=409,
+            detail="CENTRAL_STAGE_INSTALL_STILL_RUNNING",
+        )
 
     live = await verify_new_exit_readiness(db, int(node_id))
     if live.get("ok") is not True:
