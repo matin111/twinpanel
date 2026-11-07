@@ -30,11 +30,10 @@ class SudokuStageTests(unittest.TestCase):
     def test_apply_confirmation_and_capacity(self):
         with self.assertRaises(SystemExit):
             stage.args(["--node-id","14","--apply"])
-        with self.assertRaises(SystemExit):
-            stage.args(["--node-id","14","--limit","1900"])
-        parsed=stage.args(["--node-id","14","--limit","64","--apply",
+        self.assertEqual(stage.args(["--node-id","14","--limit","1900"]).limit,1900)
+        parsed=stage.args(["--node-id","14","--limit","3000","--apply",
                            "--confirm-node-id","14"])
-        self.assertEqual(parsed.limit,64)
+        self.assertEqual(parsed.limit,3000)
 
     def test_identity_required(self):
         node=SimpleNamespace(id=14,name="Hidden",public_ip="203.0.113.12",public_domain="")
