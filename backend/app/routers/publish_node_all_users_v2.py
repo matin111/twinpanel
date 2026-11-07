@@ -48,6 +48,8 @@ async def publish_node_to_all_users_v2(
     if node.node_type != NodeType.EXIT:
         raise HTTPException(status_code=409, detail="انتشار عمومی فقط برای سرور خروجی مجاز است")
 
+    from ..services.node_stage_publish_guard_v1 import require_staged_node_publish_ready
+    require_staged_node_publish_ready(db, node_id)
     now = datetime.utcnow()
     params = {"node_id": int(node.id), "now": now}
     try:
@@ -88,9 +90,13 @@ async def publish_node_to_all_users_v2(
                     ),0)+100,
                     :now,:now
                 FROM subscription_nodes sn
+                JOIN subscriptions s ON s.id=sn.subscription_id
                 JOIN subscription_delivery_policy_state p
                   ON p.subscription_id=sn.subscription_id AND p.mode='explicit'
                 WHERE sn.node_id=:node_id
+                  AND s.status='ACTIVE'
+                  AND (s.expires_at IS NULL OR s.expires_at>:now)
+                  AND (s.traffic_limit_bytes<=0 OR s.traffic_used_bytes<s.traffic_limit_bytes)
                 ON CONFLICT (subscription_node_id) DO NOTHING
             """), params,
         )
@@ -102,9 +108,13 @@ async def publish_node_to_all_users_v2(
                   AND subscription_node_id IN (
                     SELECT sn.id
                     FROM subscription_nodes sn
+                    JOIN subscriptions s ON s.id=sn.subscription_id
                     JOIN subscription_delivery_policy_state p
                       ON p.subscription_id=sn.subscription_id AND p.mode='explicit'
                     WHERE sn.node_id=:node_id
+                      AND s.status='ACTIVE'
+                      AND (s.expires_at IS NULL OR s.expires_at>:now)
+                      AND (s.traffic_limit_bytes<=0 OR s.traffic_used_bytes<s.traffic_limit_bytes)
                   )
             """), params,
         )

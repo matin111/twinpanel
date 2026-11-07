@@ -1,0 +1,40 @@
+name: Staged Exit Publish Safety V1
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/routers/provision.py"
+      - "backend/app/routers/publish_node_all_users_v1.py"
+      - "backend/app/routers/publish_node_all_users_v2.py"
+      - "backend/app/services/new_node_readiness_v1.py"
+      - "backend/app/services/node_stage_publish_guard_v1.py"
+      - "backend/app/services/node_install_progress_v1.py"
+      - "backend/app/routers/account_delivery.py"
+      - "components/node-add-modal-bridge.tsx"
+      - "backend/tests/test_staged_exit_publish_safety_v1.py"
+      - ".github/workflows/staged-exit-publish-safety-v1.yml"
+  workflow_dispatch:
+
+jobs:
+  staged-exit-regression:
+    runs-on: ubuntu-latest
+    env:
+      PYTHONPATH: backend
+      APP_SECRET_KEY: staged-exit-ci-test-only
+      DATABASE_URL: sqlite:///./staged-exit-ci.sqlite3
+      NODE_AGENT_SHARED_SECRET: staged-exit-ci-agent-only
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install test dependencies
+        run: python -m pip install --disable-pip-version-check -r backend/requirements.txt pytest
+      - name: Compile staged installer and publication
+        run: |
+          python -m py_compile backend/app/routers/provision.py backend/app/routers/publish_node_all_users_v1.py backend/app/routers/publish_node_all_users_v2.py backend/app/services/new_node_readiness_v1.py backend/app/services/node_stage_publish_guard_v1.py
+      - name: Test staged publication rejection, eligible accounts and 16-protocol readiness
+        run: |
+          python -m pytest -q backend/tests/test_staged_exit_publish_safety_v1.py backend/tests/test_fast_node_publishing_v1.py

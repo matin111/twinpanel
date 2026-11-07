@@ -88,6 +88,8 @@ class InstallIn(SSHBase, ProtocolSettings):
     node_type: NodeType
     country_code: str = "IR"
     capacity_users: int = Field(default=1000, gt=0)
+    # Staged Exit install: keep node unpublished and defer all legacy per-user SSH sync.
+    defer_subscription_sync: bool = False
 
 
 class RepairProtocolsIn(SSHBase, ProtocolSettings):
@@ -2353,7 +2355,7 @@ async def install_node(
         os_id=await cmd(conn,". /etc/os-release && printf '%s' \"$ID\"")
         if os_id not in ("ubuntu","debian"): raise HTTPException(status_code=400,detail="فعلاً Ubuntu/Debian پشتیبانی می‌شود")
         await ensure_base(conn)
-        node=Node(name=payload.name,node_type=payload.node_type,country_code="IR" if payload.node_type==NodeType.IRAN else payload.country_code.upper(),public_ip=payload.host,agent_url=f"https://{payload.host}:9443",status=NodeStatus.OFFLINE,capacity_users=payload.capacity_users,enable_cisco=False,enable_openvpn=False,enable_wireguard=False,enable_l2tp=False,enable_v2ray=False)
+        node=Node(name=payload.name,node_type=payload.node_type,country_code="IR" if payload.node_type==NodeType.IRAN else payload.country_code.upper(),public_ip=payload.host,agent_url=f"https://{payload.host}:9443",status=NodeStatus.OFFLINE,show_to_users=(payload.node_type != NodeType.EXIT or not payload.defer_subscription_sync),capacity_users=payload.capacity_users,enable_cisco=False,enable_openvpn=False,enable_wireguard=False,enable_l2tp=False,enable_v2ray=False)
         db.add(node); db.commit(); db.refresh(node)
         results, failed, secrets_out = await provision_protocols(
             conn,
@@ -2546,37 +2548,24 @@ async def install_node(
                 if "quota" not in failed:
                     failed.append("quota")
 
-        # TWINPANEL_INSTALLED_NODE_SUBSCRIPTION_AUTOSYNC_CALL_V1
-        #
-        # Every successfully installed Node is synchronized with
-        # existing subscriptions. Iran Nodes only receive membership;
-        # Exit Nodes also receive missing user credentials.
+        # Never enumerate/SSH-sync 2000+ existing subscriptions while a new
+        # Exit is still installing. The bounded central queue takes over
+        # only after installation and health validation have succeeded.
         subscription_sync = {
-            "ok": True,
-            "skipped": True,
-            "reason": "not_run",
+            "ok": True, "skipped": True, "reason": "not_run",
         }
-
-        try:
-            from .account_delivery import (
-                sync_installed_node_to_subscriptions,
-            )
-
-            subscription_sync = (
-                await sync_installed_node_to_subscriptions(
-                    db,
-                    node,
-                )
-            )
-
-        except Exception as exc:
-            db.rollback()
-
-            subscription_sync = {
-                "ok": False,
-                "error":
-                    str(exc)[:1200],
-            }
+        if payload.defer_subscription_sync:
+            subscription_sync["reason"] = "deferred_to_central_publisher"
+        else:
+            try:
+                from .account_delivery import sync_installed_node_to_subscriptions
+                subscription_sync = await sync_installed_node_to_subscriptions(db, node)
+            except Exception as exc:
+                db.rollback()
+                subscription_sync = {
+                    "ok": False,
+                    "error": type(exc).__name__,
+                }
 
         # TWINPANEL_MANUAL_IRAN_EXIT_TUNNEL_V2
         # Tunnel creation is controlled from Admin -> Tunnels.

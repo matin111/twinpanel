@@ -462,12 +462,15 @@ def _dec(value: str | None) -> Any:
 
 
 def _nodes(db: Session, sub: Subscription) -> list[Node]:
-    # TWINPANEL_GLOBAL_NODE_DELIVERY_V1
-    #
-    # Servers are global infrastructure, not subscription-owned.
-    # Every subscription receives every Node from the panel.
+    # Global node selection must still honor visibility. An Exit node under
+    # installation is never a usable client endpoint, even if a legacy bare
+    # SubscriptionNode row has already been created for this subscription.
+    # Existing visible nodes preserve the legacy delivery behavior.
     return (
-        db.query(Node).filter(Node.retired_at.is_(None))
+        db.query(Node).filter(
+            Node.retired_at.is_(None),
+            Node.show_to_users.is_(True),
+        )
         .order_by(Node.id.asc())
         .all()
     )

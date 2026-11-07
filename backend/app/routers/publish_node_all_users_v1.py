@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -43,6 +44,8 @@ async def publish_node_to_all_users(
     if node.node_type != NodeType.EXIT:
         raise HTTPException(status_code=409, detail="نمایش برای همه کاربران فقط برای سرور خروجی قابل استفاده است")
 
+    from ..services.node_stage_publish_guard_v1 import require_staged_node_publish_ready
+    require_staged_node_publish_ready(db, node_id)
     node.show_to_users = True
     explicit_ids = [
         int(row[0])
@@ -58,7 +61,10 @@ async def publish_node_to_all_users(
 
     for subscription_id in explicit_ids:
         sub = db.get(Subscription, subscription_id)
-        if not sub:
+        if (not sub or sub.status != SubscriptionStatus.ACTIVE
+                or (sub.expires_at is not None and sub.expires_at <= datetime.utcnow())
+                or (sub.traffic_limit_bytes > 0
+                    and sub.traffic_used_bytes >= sub.traffic_limit_bytes)):
             continue
         membership = db.query(SubscriptionNode).filter(
             SubscriptionNode.subscription_id == sub.id,
@@ -124,14 +130,14 @@ class BackgroundNodeInstallIn(BaseModel):
     node_type: NodeType
     country_code: str = "IR"
     capacity_users: int = Field(default=1000, gt=0)
-    install_cisco: bool = False
+    install_cisco: bool = True
     cisco_port: int = Field(default=443, ge=1, le=65535)
-    install_openvpn: bool = False
+    install_openvpn: bool = True
     openvpn_port: int = Field(default=1194, ge=1, le=65535)
     openvpn_transport: str = "udp"
-    install_wireguard: bool = False
+    install_wireguard: bool = True
     wireguard_port: int = Field(default=51820, ge=1, le=65535)
-    install_l2tp: bool = False
+    install_l2tp: bool = True
     install_v2ray: bool = False
     xray_port: int = Field(default=8443, ge=1, le=65535)
     publish_to_all_users: bool = False
@@ -167,7 +173,10 @@ async def _install_node_in_background(
     try:
         _safe_install_progress(job_id, "installing_base")
         request = Request(request_scope)
-        install_payload = InstallIn(**payload.model_dump(exclude={"publish_to_all_users"}))
+        install_payload = InstallIn(
+            **payload.model_dump(exclude={"publish_to_all_users"}),
+            defer_subscription_sync=payload.node_type == NodeType.EXIT,
+        )
         result = await install_node(install_payload, request, db)
         node_id = int(result.get("node_id") or 0)
         base_ok = bool(result.get("ok"))
@@ -227,8 +236,35 @@ async def _install_node_in_background(
                 "node_id": node_id, "error_type": type(exc).__name__,
             }, flush=True)
 
-        ready = base_ok and xray_ok and modern_ok and installed_count == 16
+        # Installer return values and database online flags alone are not proof.
+        # Read-only check of all 16 current live listeners fails closed.
+        live = {"ok": False, "reason": "base_install_failed"}
+        if base_ok and xray_ok and modern_ok:
+            from ..services.new_node_readiness_v1 import verify_new_exit_readiness
+            live = await verify_new_exit_readiness(db, node_id)
+        quota = result.get("quota") or {}
+        fabric = result.get("fabric") or {}
+        ready = (
+            base_ok and xray_ok and modern_ok and installed_count == 16
+            and bool(live.get("ok"))
+            and quota.get("ok") is not False
+            and fabric.get("ok") is not False
+        )
+        if not ready:
+            _safe_install_progress(
+                job_id, "failed", node_id=node_id,
+                installed_protocols=installed_count,
+                error_code="PROTOCOL_SETUP_INCOMPLETE",
+            )
+            print("TWINPANEL_NODE_AUTO_ENROLL_BLOCKED_NOT_READY", {
+                "node_id": node_id, "installed_count": installed_count,
+                "missing_live_protocols": live.get("missing", []),
+                "reason": live.get("reason"),
+            }, flush=True)
+            return
 
+        _safe_install_progress(job_id, "verified_ready", node_id=node_id,
+                               installed_protocols=installed_count)
         if payload.publish_to_all_users:
             _safe_install_progress(job_id, "enrolling_users", node_id=node_id,
                                    installed_protocols=installed_count)

@@ -17,7 +17,7 @@ from ..node_install_progress_models_v1 import NodeInstallProgressV1
 TERMINAL = {"completed", "failed", "waiting_backfill"}
 STAGES = {
     "queued", "installing_base", "installing_xray",
-    "installing_modern", "enrolling_users", "users_queued", "completed", "failed",
+    "installing_modern", "verified_ready", "enrolling_users", "users_queued", "completed", "failed",
 }
 STALE_AFTER = timedelta(minutes=50)
 
