@@ -226,6 +226,80 @@ _SCRIPT = r"""
      if(advanced&&advanced.parentNode===apps.parentNode)advanced.insertAdjacentElement('beforebegin',apps);
    }
  }
+ // Keep protocol-specific download actions alongside the selected protocol.
+ // Prefer the existing V34 client link for the detected OS; when V13 has no
+ // mapping (notably Linux), reuse ONLY links actually present in the existing
+ // server-rendered device downloads. Never invent an application URL.
+ const patterns={
+   cisco:/openconnect|cisco|anyconnect/i,
+   openvpn:/openvpn/i,
+   wireguard:/wireguard/i,
+   amneziawg:/amnezia/i,
+   v2ray:/hiddify|v2ray|karing|nekoray/i,
+   hysteria2:/karing|hiddify|sing-box/i,
+   tuic:/karing|hiddify|sing-box/i,
+   anytls:/karing|hiddify|sing-box/i,
+   naive:/karing|hiddify|sing-box/i,
+   shadowtls:/karing|hiddify|sing-box/i,
+   snell:/sing-box|karing/i,
+   mieru:/karing|mieru/i,
+   trusttunnel:/trusttunnel/i,
+   sudoku:/sudoku|anywhere proxy/i,
+   socks5:/sing-box|karing|hiddify/i
+ };
+ function showPerProtocolDownloadLinks(){
+   for(const choice of document.querySelectorAll('.protocol-choice[data-protocol]')){
+     const panel=document.getElementById(choice.dataset.protocol);
+     if(!panel)continue;
+     const key=String(choice.dataset.protocolKey||panel.dataset.v34Protocol||'').toLowerCase();
+     const head=panel.querySelector('.panel-head');
+     if(!head)continue;
+     const existing=panel.querySelector('.v34-client-card a[href]');
+     if(existing){
+       const clientCard=existing.closest('.v34-client-card');
+       if(clientCard&&clientCard.previousElementSibling!==head)
+         head.insertAdjacentElement('afterend',clientCard);
+       // V34 owns the exact matching download URL for the detected OS.
+       continue;
+     }
+     if(panel.querySelector('.ref70-app-card'))continue;
+     const card=document.createElement('div');
+     card.className='ref70-app-card';
+     const label=document.createElement('span');label.textContent='برنامه اتصال '+(choice.querySelector('.protocol-text b')?.textContent||key);
+     card.appendChild(label);
+     const group=groups.find(row=>row.dataset.platform===selected);
+     const appsList=group?[...group.querySelectorAll('a.app-card[href]')]:[];
+     // For direct uploads, prefer the user's existing download URL to the
+     // default project listing, but only when the app name matches protocol.
+     const rx=patterns[key];
+     const applicable=rx?appsList.filter(row=>rx.test(row.querySelector('b')?.textContent||'')):[];
+     const source=applicable.find(row=>row.classList.contains('uploaded'))||applicable[0]||null;
+     const link=document.createElement('a');
+     link.href=source?.getAttribute('href')||'#apps';
+     if(source){
+       link.textContent='↓ دانلود '+(source.querySelector('b')?.textContent||'برنامه');
+       if(/^https?:\/\//i.test(link.href)){link.target='_blank';link.rel='noopener noreferrer'}
+     }else if(key==='l2tp'){
+       link.textContent='راهنمای اتصال دستگاه';
+       const note=document.createElement('small');note.className='ref70-app-note';
+       note.textContent='L2TP / IPsec معمولاً از تنظیمات VPN داخلی سیستم استفاده می‌کند.';
+       card.appendChild(note);
+     }else{
+       link.textContent='↓ مشاهده برنامه‌های '+(names[selected]||'اتصال');
+     }
+     if(!source)link.addEventListener('click',event=>{
+       event.preventDefault();apps.scrollIntoView({behavior:'smooth',block:'start'});
+     });
+     card.appendChild(link);
+     head.insertAdjacentElement('afterend',card);
+   }
+ }
+ showPerProtocolDownloadLinks();
+ let perProtocolAttempts=0;
+ const appTimer=setInterval(()=>{
+   showPerProtocolDownloadLinks();
+   if(++perProtocolAttempts>=9)clearInterval(appTimer);
+ },250);
  // A visible affordance above the long list, rather than another fake app link.
  if(!document.querySelector('.ref69-app-jump')){
    const jump=document.createElement('a');
