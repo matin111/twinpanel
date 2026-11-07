@@ -76,15 +76,15 @@ body.tp80-connection .tp80-native .tp77-native-row{direction:ltr!important;paddi
 body.tp80-connection .tp80-native .tp77-native-label{min-width:0!important;text-align:left!important;direction:ltr!important;gap:9px!important}
 body.tp80-connection .tp80-native .tp77-native-row.active{background:#1c2746!important}
 body.tp80-connection .tp80-native .tp77-native-row button{min-height:36px!important;border-radius:9px!important}
-body.tp80-connection .tp80-native .server-views,
-body.tp80-connection .tp80-native details.v34-mobile-servers .server-views{
+html body.tp80-connection .protocol-panel.tp80-native[data-ref67-native-protocol] .server-views,
+html body.tp80-connection .protocol-panel.tp80-native[data-ref67-native-protocol] details.v34-mobile-servers .server-views{
   display:none!important;grid-template-columns:none!important;order:8!important;
   padding:0!important;margin:6px 16px 10px!important;gap:0!important;background:transparent!important;
 }
-body.tp80-connection .tp80-native.tp80-detail-open .server-views,
-body.tp80-connection .tp80-native.tp80-detail-open details.v34-mobile-servers .server-views{display:block!important}
-body.tp80-connection .tp80-native .server-view{display:none!important;max-width:100%!important;width:100%!important}
-body.tp80-connection .tp80-native.tp80-detail-open .server-view.active{display:block!important}
+html body.tp80-connection .protocol-panel.tp80-native.tp80-detail-open[data-ref67-native-protocol] .server-views,
+html body.tp80-connection .protocol-panel.tp80-native.tp80-detail-open[data-ref67-native-protocol] details.v34-mobile-servers .server-views{display:block!important}
+html body.tp80-connection .protocol-panel.tp80-native[data-ref67-native-protocol] .server-view{display:none!important;max-width:100%!important;width:100%!important}
+html body.tp80-connection .protocol-panel.tp80-native.tp80-detail-open[data-ref67-native-protocol] .server-view.active{display:block!important}
 body.tp80-connection .tp80-native details.v34-mobile-servers{display:contents!important}
 body.tp80-connection .tp80-native details.v34-mobile-servers>summary,
 body.tp80-connection .tp80-native .v34-single-label{display:none!important}
@@ -150,8 +150,8 @@ body.tp80-connection .protocol-panel .v52-multi-card{order:28!important}
  body.tp80-connection .protocol-panel .v54-v2ray-server-head,
  body.tp80-connection .protocol-panel .ref67-row,
  body.tp80-connection .protocol-panel .tp77-native-row{min-height:56px!important}
- body.tp80-connection .tp80-native .server-views,
- body.tp80-connection .tp80-native details.v34-mobile-servers .server-views{margin:6px 7px 8px!important}
+ body.tp80-connection .protocol-panel.tp80-native[data-ref67-native-protocol] .server-views,
+ body.tp80-connection .protocol-panel.tp80-native[data-ref67-native-protocol] details.v34-mobile-servers .server-views{margin:6px 7px 8px!important}
  body.tp80-connection .tp80-credentials{margin:8px 7px 3px!important}
  body.tp80-connection .protocol-panel .tp78-action-footer{grid-template-columns:repeat(3,minmax(0,1fr))!important;margin:12px 7px 12px!important;gap:7px!important}
  body.tp80-connection .tp78-action-footer>.tp78-footer-action{min-height:75px!important;flex-direction:column!important;gap:7px!important;font-size:10px!important}
@@ -291,7 +291,7 @@ _SCRIPT = r"""
      if(node){tail.append(node);return}
      const missing=el('button','tp78-footer-action tp80-unavailable',slot.label);
      missing.type='button';missing.disabled=true;
-     missing.dataset.kind='unavailable';
+     missing.dataset.kind=slot.kind==='primary'?'download':slot.kind;
      missing.title='این عملیات برای این پروتکل در دسترس نیست';
      tail.append(missing);
    });
