@@ -8,14 +8,14 @@ import {useI18n} from "../lib/i18n";
 
 type NodeDraft={host:string;port:number;username:string;password:string;name:string;node_type:"iran"|"exit";country_code:string;capacity_users:number;};
 const defaultDraft:NodeDraft={host:"",port:22,username:"root",password:"",name:"",node_type:"exit",country_code:"DE",capacity_users:1000};
-const NO_PROTOCOLS={install_cisco:false,cisco_port:443,install_openvpn:false,openvpn_port:1194,openvpn_transport:"udp" as const,install_wireguard:false,wireguard_port:51820,install_l2tp:false,install_v2ray:false,xray_port:8443};
-function payloadOf(draft:NodeDraft):ProvisionInstallPayload{return {...draft,country_code:draft.node_type==="iran"?"IR":draft.country_code.trim().toUpperCase(),...NO_PROTOCOLS};}
+const AUTO_INSTALL_PROTOCOLS={install_cisco:true,cisco_port:443,install_openvpn:true,openvpn_port:1194,openvpn_transport:"udp" as const,install_wireguard:true,wireguard_port:51820,install_l2tp:true,install_v2ray:true,xray_port:8443};
+function payloadOf(draft:NodeDraft):ProvisionInstallPayload{return {...draft,country_code:draft.node_type==="iran"?"IR":draft.country_code.trim().toUpperCase(),...AUTO_INSTALL_PROTOCOLS};}
 
 export function NodeAddModalBridge(){
   const {pick}=useI18n();
   const [open,setOpen]=useState(false);
   const [draft,setDraft]=useState<NodeDraft>(defaultDraft);
-  const [publishToAll,setPublishToAll]=useState(false);
+  const [publishToAll,setPublishToAll]=useState(true);
   const [busy,setBusy]=useState("");
   const [error,setError]=useState("");
   const [ok,setOk]=useState("");
@@ -54,7 +54,7 @@ export function NodeAddModalBridge(){
       const raw=await response.text();
       if(!response.ok)throw new Error(raw||`API error ${response.status}`);
       setOpen(false);
-      setOk(pick("ثبت سرور شروع شد؛ آماده‌سازی و نمایش برای همه کاربران در پس‌زمینه ادامه دارد. صفحه را باز نگه ندارید؛ Job روی سرور ادامه می‌یابد.","Server registration started; preparation and publishing to all users continue in the backend."));
+      setOk(pick("ثبت نود شروع شد. ابتدا پروتکل‌ها نصب می‌شوند؛ سپس کاربران واجد شرایط برای همگام‌سازی روی نود به صف می‌روند. نتیجه نهایی را از مدیریت نود بررسی کنید.","Node registration started. Protocol setup comes first, followed by queued activation of eligible existing users. Check the node status for completion."));
     }catch(reason){
       setError(reason instanceof Error?reason.message:String(reason));
     }finally{
@@ -83,7 +83,7 @@ export function NodeAddModalBridge(){
           <label className="field"><span>{pick("ظرفیت کاربر","User capacity")}</span><input type="number" min={1} value={draft.capacity_users} onChange={e=>setDraft(v=>({...v,capacity_users:Number(e.target.value)||1}))}/></label>
         </div>
         {draft.node_type==="exit"?<div className="runtime-choice-section"><label className="toggle module-toggle"><span>{pick("نمایش برای همه کاربران سایت","Show for all site users")}</span><input type="checkbox" checked={publishToAll} onChange={e=>setPublishToAll(e.target.checked)}/><i/></label><small>{pick("با فعال‌کردن این گزینه، نود فقط به اشتراک‌های فعال قبلی که منقضی نشده‌اند و حجم دارند اضافه می‌شود. برای خریداران جدید، نود را جداگانه در پلن اقتصادی یا ویژه انتخاب کنید. کانفیگ‌های ناقص کاربران قبلی به‌صورت خودکار در صف پایدار ساخته می‌شوند و پیشرفت از مدیریت نود قابل مشاهده است.","When enabled, the node is assigned to eligible existing active subscriptions only. Select it separately in Economy/Premium plans for new purchases. Missing existing-account credentials are automatically queued and tracked under node management.")}</small></div>:null}
-        <div className="runtime-warning">{pick("پروتکل‌ها بعد از ثبت از صفحه «پروتکل‌ها» مدیریت می‌شوند. برای Exit، Xray baseline به‌صورت خودکار آماده می‌شود.","Protocols are managed from Protocols after registration. Exit nodes automatically receive the Xray baseline.")}</div>
+        <div className="runtime-warning">{pick("روی نود خروجی، پروتکل‌های اصلی ابتدا نصب و بررسی می‌شوند؛ سپس پروتکل‌های مدرن قابل‌نصب آماده و کاربران فعال به صف همگام‌سازی اضافه می‌شوند. فعال‌شدن واقعی کانفیگ‌ها پس از تأیید نود است.","Exit nodes install and check the core protocols first, then available modern protocols. Active users are centrally enrolled afterward; connection configs appear after node confirmation.")}</div>
         <div className="action-row"><button type="button" className="ghost" disabled={Boolean(busy)||!draft.host||!draft.password} onClick={()=>void test()}>{busy==="test"?"…":pick("تست SSH","Test SSH")}</button><button className="primary" disabled={Boolean(busy)||!draft.host||!draft.password||!draft.name}>{busy==="register"?pick("در حال ثبت...","Registering..."):pick("ثبت و آماده‌سازی سرور","Register & prepare server")}</button></div>
       </form>
     </div>
