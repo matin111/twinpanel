@@ -52,7 +52,7 @@ class RuntimeReconciliationTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["runtime_families"],10)
         self.assertEqual(len(started),10)
         self.assertEqual(len(result["succeeded"]),10)
-        self.assertEqual(peak,3)
+        self.assertEqual(peak,1)
         self.assertIn("sudoku_shared_v2",str(started[-1]))
         self.assertEqual(active,0)
 
