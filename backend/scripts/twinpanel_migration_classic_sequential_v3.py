@@ -45,7 +45,7 @@ def healthy():
         if attempt < 3:
             time.sleep(2)
     return False
-async def one_node(db,node_id,*,subscription_id: int | None = None):
+async def one_node(db,node_id,*,subscription_id: int | None = None,include_all_active: bool = False):
     node=db.get(Node,node_id)
     now=datetime.utcnow()
     eligible_query=(db.query(Subscription)
@@ -56,8 +56,10 @@ async def one_node(db,node_id,*,subscription_id: int | None = None):
                   Subscription.status==SubscriptionStatus.ACTIVE,
                   or_(Subscription.expires_at.is_(None),Subscription.expires_at>now),
                   or_(Subscription.traffic_limit_bytes<=0,Subscription.traffic_used_bytes<Subscription.traffic_limit_bytes)))
-    if PROTOCOL != 'v2ray':
-        # Classic backfill stays imported-only; the V2Ray family is a
+    if PROTOCOL != 'v2ray' and not include_all_active:
+        # Legacy/manual mode stays imported-only; unified new-node mode is all active.
+        # The V2Ray family was already all-active and keeps its UUID guard.
+        # The V2Ray family is a
         # missing-profile repair for every active account on this Exit.
         eligible_query=eligible_query.join(
             MigrationImportRecord,
