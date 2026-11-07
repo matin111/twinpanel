@@ -171,7 +171,10 @@ async def main() -> None:
     await patch_activation_case()
 
     source = PATCH_PATH.read_text(encoding="utf-8")
-    assert "RESULT_WAIT_SECONDS = 3.0" in source
+    assert "RESULT_WAIT_SECONDS = 12.0" in source
+    # TP27 GRE-native paths can finalize after the original 3s window.
+    # Keep a finite wait below the 15s receiver process cap.
+    assert 9 <= v355.RESULT_WAIT_SECONDS <= 12
     assert "RESULT_POLL_INTERVAL_SECONDS = 0.25" in source
     assert "systemctl" not in source
     assert "iptables" not in source
