@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.677",
+  "version": "1.1.0-rc.678",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-07T23:03:28Z",
+  "released_at": "2026-11-07T23:41:13Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "19e90a95829148746e4ef54d51be2bc4c6158cd8",
+  "source_sha": "1c6906624c774b1b423665d723773b551b307896",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.677/twinpanel-1.1.0-rc.677-linux-x86_64.tar.gz",
-    "sha256": "370b416ae1f40cc1b2a4567dcf15190c3b2c8a6e6bb0245138f8bc6006765a0e",
-    "size_bytes": 29619422
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.678/twinpanel-1.1.0-rc.678-linux-x86_64.tar.gz",
+    "sha256": "7e7d1261d81f9fcb3134f53598b45f0efdbeca1c89f330b8cea2ebb780313ebf",
+    "size_bytes": 29629121
   },
   "notes": {
-    "fa": "نسخه rc.677: بهینه‌سازی واقعی سرعت بازشدن صفحه Connection با حذف صدها کوئری تکراری دیتابیس از طریق حافظه موقت محدود به همان درخواست؛ یکجاخوانی مشخصات نود و پروتکل‌ها؛ QR کدهای PNG کم‌حجم و قابل اسکن به جای SVG حجیم؛ حفظ کانفیگ‌ها، اطلاعات کاربران، تمام پروتکل‌ها، دکمه‌های کپی و دانلود و آمار آنلاین زنده. تست‌های رگرسیون اضافه شد.",
-    "en": "rc.677: Speed up public Connection first render using request-scoped node/eligibility/tunnel caches, one bulk node-protocol readiness query, and compact scannable QR PNG rather than enormous inline SVG. Keep all protocol cards, copying/download controls, live uncached telemetry, subscriptions, credentials, quota and expiry unchanged. Includes repeatable regression tests."
+    "fa": "نسخه rc.678: اصلاح کامل مسیر افزودن نود Exit به Bootstrap مستقل مدیریت مرکزی. حذف فراخوانی نصب‌کننده قدیمی برای نود Exit جدید و عدم کپی پورت، رمز یا تنظیمات پروتکل از نودهای قدیمی. نصب مستقل پروتکل‌های مدرن از کاتالوگ رسمی با تنظیمات پیشنهادی، آماده‌سازی WireGuard برای ساخت دسته‌ای کاربران با محدوده 10.96/21 و NAT بدون ری‌استارت اینترفیس فعال، و نگه‌داشتن نود مخفی تا تکمیل تأیید واقعی و ساخت مرکزی. نصب نود ایران از مسیر پیشین باقی می‌ماند و اطلاعات اشتراک‌های موجود تغییر نمی‌کنند.",
+    "en": "rc.678: Route brand-new Exit add-server requests through dedicated central-first daemon bootstrap instead of legacy install_node. Install modern protocol listeners from catalog-recommended presets without cloning settings or secrets from other Exits. Safely prepare fresh empty WireGuard interfaces for central 10.96/21 peer pool with persistent NAT and no interface restart. Retain hidden-node publication gate, central bulk account ownership, existing Iran relay pathway and existing customer subscription records."
   }
 }
