@@ -1,0 +1,32 @@
+name: Node Agent IP HTTPS pin smoke
+
+on:
+  push:
+    paths:
+      - "backend/app/agent_controller_ip_v1.py"
+      - "backend/app/routers/provision.py"
+      - "backend/app/node_bootstrap_control_v66.py"
+      - "backend/app/twinpanel_agent.py.tpl"
+      - "backend/tests/agent_controller_ip_v1_smoke.py"
+      - ".github/workflows/agent-controller-ip-v1-smoke.yml"
+  pull_request:
+    paths:
+      - "backend/app/agent_controller_ip_v1.py"
+      - "backend/app/routers/provision.py"
+      - "backend/app/node_bootstrap_control_v66.py"
+      - "backend/app/twinpanel_agent.py.tpl"
+      - "backend/tests/agent_controller_ip_v1_smoke.py"
+      - ".github/workflows/agent-controller-ip-v1-smoke.yml"
+  workflow_dispatch:
+
+jobs:
+  pinned-ip-agent:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Verify pinned IP agent renderer and fail-closed settings
+        run: python backend/tests/agent_controller_ip_v1_smoke.py
