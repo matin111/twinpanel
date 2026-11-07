@@ -107,8 +107,11 @@ with open(lock,"a+") as mutex:
                 timeout=20,check=False)
             if restarted.returncode or status.returncode:
                 raise RuntimeError("TRUST_BULK_RESTART_FAILED")
-        links={}
-        for row in incoming:
+        # Export client profile links on the node; the service was already
+        # restarted once for the whole user list. Export operations are
+        # independent, so avoid thousands of serial CLI startups.
+        from concurrent.futures import ThreadPoolExecutor
+        def export_one(row):
             name=row["username"]
             exported=subprocess.run(
                 [str(BINARY),str(VPN),str(HOSTS),"-c",name,"-a",endpoint,
@@ -118,7 +121,9 @@ with open(lock,"a+") as mutex:
                        if line.strip().startswith("tt://")),"")
             if exported.returncode or not link or len(link)>16384:
                 raise RuntimeError("TRUST_BULK_EXPORT_FAILED")
-            links[name]=link
+            return name,link
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            links=dict(executor.map(export_one,incoming))
     except BaseException:
         if changed:
             for target,data in originals.items():
