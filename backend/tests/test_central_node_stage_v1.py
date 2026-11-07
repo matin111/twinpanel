@@ -9,7 +9,7 @@ from app.models import NodeStatus, NodeType
 
 def desired_state(count):
     return SimpleNamespace(
-        count=count, pair_count=count, fingerprint="fixed-snapshot",
+        count=count, pair_count=count, fingerprint="0"*64,
         entitled_pairs=((1,"sudoku"),) if count else (),
         invalid_protocols=(), without_entitlements=(),
     )
@@ -46,7 +46,7 @@ class CentralNodeStageTests(unittest.TestCase):
             session.return_value.__enter__.return_value = db
             with self.assertRaisesRegex(RuntimeError, "HIDDEN_ONLINE_EXIT"):
                 stage.run(14, 3000, False)
-        db.execute.assert_not_called()
+        db.commit.assert_not_called()
 
     def test_dry_run_does_not_write_or_start_protocols(self):
         fake = MagicMock()
