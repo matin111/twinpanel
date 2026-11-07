@@ -116,6 +116,70 @@ body.tp80-connection .tp80-country-bar img{
   width:24px!important;height:18px!important;object-fit:cover!important;border-radius:4px!important;
 }
 body.tp80-connection .tp80-country-flag{font-size:20px!important;line-height:1!important}
+
+/* Manual-style proxy facts use the same node/credential presentation. */
+html body.tp80-connection .tp80-modern-detail[hidden]{display:none!important}
+html body.tp80-connection .tp80-modern-detail:not([hidden]){
+  display:block!important;position:relative!important;
+  background:#16233c!important;border-bottom:1px solid #384968!important;
+  margin:0!important;padding:10px!important;
+}
+html body.tp80-connection .tp80-socks5-detail .server-view[hidden]{display:none!important}
+html body.tp80-connection .tp80-socks5-detail .facts{
+ display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;
+ gap:9px!important;align-items:stretch!important;width:100%!important;
+}
+html body.tp80-connection .tp80-socks5-detail .fact{
+ min-width:0!important;max-width:100%!important;width:100%!important;
+ text-align:center!important;word-break:break-word!important;padding:11px!important;
+}
+html body.tp80-connection .tp80-socks5-detail .fact strong{overflow-wrap:anywhere!important}
+@media(max-width:720px){
+ html body.tp80-connection .tp80-socks5-detail .facts{grid-template-columns:1fr!important}
+}
+
+/* Shared native nodes: one compact 62px row for OpenVPN, WireGuard,
+   Cisco, L2TP and AmneziaWG. Only the selected node expands directly below. */
+html body.tp80-connection .protocol-panel.tp80-native .tp77-native-list{
+  display:block!important;align-self:stretch!important;
+}
+html body.tp80-connection .protocol-panel.tp80-native .tp77-native-row{
+  display:flex!important;flex-direction:row!important;align-items:center!important;
+  justify-content:space-between!important;gap:10px!important;
+  min-height:62px!important;max-height:82px!important;height:auto!important;
+  padding:8px 12px!important;box-sizing:border-box!important;
+}
+html body.tp80-connection .protocol-panel.tp80-native .tp77-native-label{
+  display:flex!important;flex-direction:row!important;align-items:center!important;
+  min-width:0!important;flex:1!important;
+}
+html body.tp80-connection .tp80-country-image{width:25px!important;height:18px!important;
+ object-fit:cover!important;flex-shrink:0!important;border-radius:3px!important}
+html body.tp80-connection .tp80-inline-native-detail[hidden]{display:none!important}
+html body.tp80-connection .protocol-panel.tp80-native .tp80-inline-native-detail:not([hidden]){
+  display:block!important;position:relative!important;margin:0!important;padding:12px!important;
+  background:#16233c!important;border-bottom:1px solid #384968!important;
+}
+html body.tp80-connection .protocol-panel.tp80-native .tp80-inline-native-detail:not([hidden]) .server-view{
+  display:block!important;width:100%!important;max-width:100%!important;
+  margin:0!important;padding:0!important;background:transparent!important;
+}
+html body.tp80-connection .protocol-panel.tp80-native .tp80-inline-native-detail .facts{
+  display:grid!important;grid-template-columns:repeat(auto-fit,minmax(170px,1fr))!important;
+  gap:8px!important;
+}
+html body.tp80-connection .protocol-panel.tp80-native .tp80-inline-native-detail .fact{
+  min-height:65px!important;min-width:0!important;
+}
+@media(max-width:720px){
+ html body.tp80-connection .protocol-panel.tp80-native .tp77-native-row{
+   min-height:58px!important;max-height:80px!important;padding:8px!important;
+ }
+ html body.tp80-connection .protocol-panel.tp80-native .tp80-inline-native-detail .facts{
+   grid-template-columns:repeat(2,minmax(0,1fr))!important
+ }
+}
+
 html body.tp80-connection .protocol-panel.tp80-native > .tp80-credentials{
   display:block!important;visibility:visible!important;padding:10px!important;
 }
@@ -124,6 +188,20 @@ html body.tp80-connection .protocol-panel.tp80-native .tp80-credentials > .v35-m
   border:none!important;margin:0!important;padding:4px!important;background:transparent!important;
 }
 body.tp80-connection .tp80-credentials .v35-manual-head{margin-bottom:10px!important}
+
+/* V69/V34 sometimes regenerate the same client as a separate banner.
+   Retain the source link in the footer, suppress repeated UI only. */
+html body.tp80-connection .protocol-panel:has(> .tp78-action-footer [data-kind="app"])
+  > .v34-client-card,
+html body.tp80-connection .protocol-panel:has(> .tp78-action-footer [data-kind="app"])
+  > .ref70-app-card,
+html body.tp80-connection .protocol-panel:has(> .tp78-action-footer [data-kind="app"])
+  > .ref69-download-cta{
+    display:none!important;
+}
+html body.tp80-connection .protocol-panel .tp78-action-footer > [data-kind="app"]{
+   display:flex!important;align-items:center!important;justify-content:center!important;
+}
 
 body.tp80-connection .protocol-panel .tp78-action-footer{
   order:30!important;display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;
@@ -412,6 +490,34 @@ _SCRIPT = r"""
    span.textContent=String(tab.textContent||'').trim();
    return span;
  }
+ // Local vector flags avoid Windows rendering a country code instead of an
+ // emoji and still work when flagcdn is inaccessible. Unknown ISO codes retain
+ // the existing CDN artwork as a graceful extension.
+ function knownFlag(code){
+   const bands=(colors,vertical=false)=>colors.map((color,i)=>{
+     const d=vertical?{x:i*12,y:0,w:12,h:24}:{x:0,y:i*8,w:36,h:8};
+     return '<rect x="'+d.x+'" y="'+d.y+'" width="'+d.w+'" height="'+d.h+'" fill="'+color+'"/>';
+   }).join('');
+   const star='<polygon points="28,7 29.1,10.2 32.5,10.2 29.8,12.2 30.8,15.7 28,13.7 25.2,15.7 26.2,12.2 23.5,10.2 26.9,10.2" fill="#fff"/>';
+   const paths={
+     DE:bands(['#171717','#dd1e2d','#ffce00']),
+     NL:bands(['#ae1c28','#fff','#21468b']),
+     FR:bands(['#0055a4','#fff','#ef4135'],true),
+     TR:'<rect width="36" height="24" fill="#e30a17"/><circle cx="15" cy="12" r="7" fill="#fff"/><circle cx="17.5" cy="12" r="5.6" fill="#e30a17"/>'+star,
+     US:'<rect width="36" height="24" fill="#fff"/>'+Array.from({length:7},(_,i)=>'<rect y="'+i*3.6923+'" width="36" height="1.85" fill="#b22234"/>').join('')+'<rect width="16" height="13" fill="#3c3b6e"/>'+Array.from({length:15},(_,i)=>'<circle cx="'+(2+i%5*3)+'" cy="'+(2+Math.floor(i/5)*4)+'" r=".7" fill="#fff"/>').join(''),
+     GB:'<rect width="36" height="24" fill="#012169"/><path d="M0 0L36 24M36 0L0 24" stroke="#fff" stroke-width="6"/><path d="M0 0L36 24M36 0L0 24" stroke="#c8102e" stroke-width="2.5"/><path d="M18 0V24M0 12H36" stroke="#fff" stroke-width="9"/><path d="M18 0V24M0 12H36" stroke="#c8102e" stroke-width="4.5"/>'
+   };
+   if(!paths[code])return '';
+   const svg='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 24" width="36" height="24">'+paths[code]+'</svg>';
+   return 'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);
+ }
+ function countryImage(country){
+   const img=el('img','tp80-country-image');
+   img.alt=country;img.loading='eager';
+   img.src=knownFlag(country)||'https://flagcdn.com/w40/'+country.toLowerCase()+'.png';
+   img.onerror=()=>{img.replaceWith(el('span','tp80-country-fallback',country))};
+   return img;
+ }
  function normalizeNative(panel){
    const type=String(panel.dataset.ref67NativeProtocol||panel.dataset.v34Protocol||'').toLowerCase();
    if(!Native.has(type)||!panel.querySelector('.tp77-native-list'))return;
@@ -444,6 +550,13 @@ _SCRIPT = r"""
          const visible=country==='ALL'||row.dataset.tp80CountryCode===country;
          row.hidden=!visible;
          row.dataset.tp80CountryHidden=visible?'0':'1';
+         const detail=row.nextElementSibling;
+         if(detail?.classList.contains('tp80-inline-native-detail')){
+           detail.hidden=true;
+           detail.dataset.tp80Expanded='0';
+         }
+         row.querySelector('.tp80-detail-toggle')?.setAttribute('aria-expanded','false');
+         row.querySelector('.tp80-detail-toggle')?.replaceChildren('نمایش اطلاعات');
        });
        choices.forEach(btn=>btn.classList.toggle('active',btn.dataset.tp80Country===country));
        // Filtering must not invoke tab.click(): older scripts reset the view.
@@ -451,11 +564,19 @@ _SCRIPT = r"""
      };
      for(const [country,group] of groups){
        const btn=el('button','');btn.type='button';btn.dataset.tp80Country=country;
-       const source=group.tab.querySelector('img');
-       if(source){const img=source.cloneNode(true);img.alt=country;btn.append(img)}
-       else if(country!=='OTHER'){
-         const flag=[...country].map(c=>String.fromCodePoint(127397+c.charCodeAt(0))).join('');
-         btn.append(el('span','tp80-country-flag',flag));
+       // Flags must render as images on Windows too (regional Unicode is often
+       // displayed as DE/US/TR letters, not the flag artwork). Prefer the
+       // actual icon already in the visible node row.
+       const index=group.indices[0];
+       if(country!=='OTHER')btn.append(countryImage(country));
+       // Use exactly the same artwork inside each node row as the filter.
+       for(const index of group.indices){
+         const label=rows[index]?.querySelector('.tp77-native-label');
+         if(!label)continue;
+         const flag=label.querySelector('img');
+         const uri=knownFlag(country);
+         if(flag&&uri){flag.src=uri;flag.alt=country}
+         else if(!flag)label.prepend(countryImage(country));
        }
        btn.append(document.createTextNode(' '+country+(group.indices.length>1?' ('+group.indices.length+')':'')));
        btn.addEventListener('click',()=>filterByCountry(country));
@@ -465,13 +586,12 @@ _SCRIPT = r"""
      const head=panel.querySelector(':scope > .panel-head');
      head?.insertAdjacentElement('afterend',bar);
      filterByCountry('ALL');
+     const inline=[];
      rows.forEach((row,index)=>{
        const tab=tabs[index];
        const view=tab?panel.querySelector('.server-view[id="'+tab.dataset.server+'"]'):null;
        const show=row.querySelector(':scope > button');
        const isFile=type==='openvpn'||type==='wireguard'||type==='amneziawg';
-       // Move the real per-node file action; preserve its data-target, filename
-       // and original document click handler. Never duplicate a profile card.
        const download=isFile&&view?view.querySelector('button.download-config[data-target],a.tp-v16-safe-download[href]'):null;
        if(download){
          if(show)show.remove();
@@ -510,10 +630,34 @@ _SCRIPT = r"""
          }
          row.append(tools);
          row.dataset.tp80FileRow='1';
-       }else if(show){
-         // Cisco/L2TP and non-file material show only this server's details.
-         show.textContent='نمایش اطلاعات';
-         show.addEventListener('click',()=>{panel.classList.add('tp80-detail-open')});
+       }else if(show&&view){
+         // Move the ORIGINAL facts and copy controls directly below this node.
+         // We never clone credentials/config or depend on a distant global box.
+         const detail=el('section','tp80-inline-native-detail');
+         detail.hidden=true;detail.dataset.tp80Expanded='0';
+         detail.append(view);
+         row.insertAdjacentElement('afterend',detail);
+         const toggle=show;
+         toggle.classList.add('tp80-detail-toggle');
+         toggle.textContent='نمایش اطلاعات';
+         toggle.setAttribute('aria-expanded','false');
+         inline.push({row,detail,toggle,view,tab});
+         toggle.addEventListener('click',event=>{
+           // V77's old handler calls tab.click() and reveals the detail at the
+           // bottom; intercept it to preserve the inline disclosure contract.
+           event.preventDefault();event.stopImmediatePropagation();
+           const opening=detail.hidden;
+           inline.forEach(entry=>{
+             entry.detail.hidden=true;entry.detail.dataset.tp80Expanded='0';
+             entry.toggle.textContent='نمایش اطلاعات';
+             entry.toggle.setAttribute('aria-expanded','false');
+             entry.view.classList.remove('active');
+           });
+           detail.hidden=!opening;detail.dataset.tp80Expanded=opening?'1':'0';
+           toggle.textContent=opening?'بستن':'نمایش اطلاعات';
+           toggle.setAttribute('aria-expanded',opening?'true':'false');
+           if(opening)view.classList.add('active');
+         },true);
        }
      });
      panel.dataset.tp80NativeReady='1';
@@ -560,8 +704,20 @@ _SCRIPT = r"""
      toggle.type='button';
      const holder=el('section','tp80-modern-detail');
      holder.hidden=true;
-     // Reuse the ORIGINAL details/buttons. A clone would lose their handlers.
-     holder.append(view);
+     // SOCKS5 often carries both a human-readable raw credential block and
+     // canonical .facts. Keep the actual copyable facts, not two copies of
+     // the same secrets or a large raw text canvas.
+     const socks=keyForPanel(panel)==='socks5';
+     const realFacts=socks?view.querySelector('.facts'):null;
+     if(realFacts){
+       holder.classList.add('tp80-socks5-detail');
+       view.hidden=true;
+       holder.append(view,realFacts);
+       toggle.textContent='نمایش اطلاعات';
+     }else{
+       // Reuse the ORIGINAL details/buttons. A clone would lose their handlers.
+       holder.append(view);
+     }
      row.insertAdjacentElement('afterend',holder);
      row.append(toggle);
      sections.push({row,holder,toggle});
@@ -569,10 +725,10 @@ _SCRIPT = r"""
        const opening=holder.hidden;
        sections.forEach(section=>{
          section.holder.hidden=true;
-         section.toggle.textContent='نمایش کانفیگ';
+         section.toggle.textContent=section.holder.classList.contains('tp80-socks5-detail')?'نمایش اطلاعات':'نمایش کانفیگ';
        });
        holder.hidden=!opening;
-       toggle.textContent=opening?'بستن':'نمایش کانفیگ';
+       toggle.textContent=opening?'بستن':(holder.classList.contains('tp80-socks5-detail')?'نمایش اطلاعات':'نمایش کانفیگ');
      });
    });
    if(sections.length){
@@ -603,12 +759,70 @@ _SCRIPT = r"""
      });
    });
  }
+ function keyForPanel(panel){
+   const raw=panel.dataset.ref67NativeProtocol||panel.dataset.v34Protocol;
+   if(raw)return String(raw).trim().toLowerCase();
+   const choice=[...document.querySelectorAll('.protocol-choice[data-protocol]')]
+     .find(node=>node.dataset.protocol===panel.id);
+   return String(choice?.dataset.protocolKey||'').trim().toLowerCase();
+ }
+ function createSudokuClientAction(){
+   const os=String(document.body.dataset.tpPlatform||'').toLowerCase();
+   const mobile=/Android/i.test(navigator.userAgent);
+   const ios=/iPhone|iPad|iPod/i.test(navigator.userAgent);
+   let target='https://github.com/SUDOKU-ASCII/sudoku-desktop/releases';
+   let title='دانلود Sudoku Desktop';
+   if(os==='android'||mobile){
+     target='https://github.com/SUDOKU-ASCII/sudoku-android/releases';
+     title='دانلود Sudodroid';
+   }else if(os==='ios'||ios){
+     target='https://apps.apple.com/us/app/anywhere-proxy/id6758235178';
+     title='دانلود Anywhere Proxy';
+   }
+   const app=el('a','tp78-footer-action',title);
+   app.href=target;app.target='_blank';app.rel='noopener noreferrer';
+   app.dataset.kind='app';app.dataset.tp80OfficialSudoku='1';
+   return app;
+ }
+ function ensureCanonicalApp(panel){
+   // V69 may mount a real OS app AFTER V78/V80 has finalized the footer.
+   // Rehome its original live link; don't display a second download card.
+   const footer=panel.querySelector(':scope > .tp78-action-footer');
+   if(!footer||footer.querySelector(':scope > [data-kind="app"]'))return;
+   const source=panel.querySelector(':scope > .v34-client-card a[href],:scope > .ref70-app-card a[href]');
+   const url=source?.getAttribute('href')||'';
+   if(!source||!/^(https?:\/\/|\/(?!\/))/i.test(url))return;
+   source.dataset.kind='app';source.classList.add('tp78-footer-action');
+   footer.append(source);
+ }
+ function ensureSudokuClient(panel){
+   const key=keyForPanel(panel);
+   if(key!=='sudoku')return;
+   let footer=panel.querySelector(':scope > .tp78-action-footer');
+   if(!footer){
+     footer=el('nav','tp78-action-footer');footer.setAttribute('aria-label','عملیات اشتراک');
+     panel.append(footer);
+   }
+   const present=footer.querySelector(':scope > [data-kind="app"]');
+   if(!present)footer.append(createSudokuClientAction());
+ }
  function alignFooter(panel){
    const footer=panel.querySelector(':scope > .tp78-action-footer');
    if(!footer||footer.dataset.tp80Ready==='1')return;
    const children=[...footer.querySelectorAll(':scope > .tp78-footer-action')];
    const find=kind=>children.find(node=>node.dataset.kind===kind);
-   const key=String(panel.dataset.ref67NativeProtocol||panel.dataset.v34Protocol||'').toLowerCase();
+   const key=keyForPanel(panel);
+   // One verified device-specific app link in the SAME footer for all protocols.
+   // Reuse genuine installed links instead of displaying the same client twice.
+   if(!find('app')){
+     const app=panel.querySelector(':scope > .v34-client-card a[href],:scope > .ref70-app-card a[href]');
+     const url=app?.getAttribute('href')||'';
+     if(app&&/^(https?:\/\/|\/(?!\/))/i.test(url)){
+       app.dataset.kind='app';app.classList.add('tp78-footer-action');
+       children.push(app);
+     }
+   }
+   if(key==='sudoku'&&!find('app'))children.push(createSudokuClientAction());
    const fileProtocol=new Set(['openvpn','wireguard','amneziawg']).has(key);
    let primary=find('add')||find('download');
    const previousPrimary=primary;
@@ -650,6 +864,8 @@ _SCRIPT = r"""
      normalizeV2ray(panel);
      normalizeModern(panel);
      alignFooter(panel);
+     ensureCanonicalApp(panel);
+     ensureSudokuClient(panel);
    });
  }
  check();

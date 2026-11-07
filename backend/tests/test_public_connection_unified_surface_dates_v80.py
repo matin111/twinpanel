@@ -44,10 +44,12 @@ def test_native_only_one_node_detail_may_appear():
     ui = code("public_connection_unified_surface_dates_v80.py")
     assert "html body.tp80-connection .protocol-panel.tp80-native[data-ref67-native-protocol] .server-view{display:none!important" in ui
     assert ".protocol-panel.tp80-native.tp80-detail-open[data-ref67-native-protocol] .server-view.active{display:block!important}" in ui
-    assert "panel.classList.add('tp80-detail-open')" in ui
     assert "panel.classList.remove('tp80-detail-open')" in ui
+    assert "const detail=el('section','tp80-inline-native-detail')" in ui
+    assert "row.insertAdjacentElement('afterend',detail)" in ui
+    assert "detail.hidden=!opening" in ui
+    assert "event.stopImmediatePropagation()" in ui
     assert "views.forEach(view=>view.classList.toggle('active',view===target))" in ui
-    assert "tab.click()" in ui
     # Never rewrite original server IDs, credentials, endpoint addresses, or URI.
     assert "view.dataset.serverId=" not in ui
     assert "fetch(" not in ui
@@ -121,6 +123,57 @@ def test_v40_cannot_hide_real_v39_mobile_protocol_choice():
     assert "protocol-choice:not(.v40-real-protocol):not(.v39-real-protocol)" in authority
     assert "protocol-choice:not(.v40-real-protocol){" not in authority
 
+
+
+def test_compact_inline_native_node_details_and_flags_for_all_countries():
+    ui=code("public_connection_unified_surface_dates_v80.py")
+    assert "max-height:82px!important" in ui
+    assert "max-height:80px!important" in ui
+    assert ".tp80-inline-native-detail:not([hidden]) .server-view" in ui
+    assert "row.insertAdjacentElement('afterend',detail)" in ui
+    assert "detail.append(view)" in ui
+    assert "entry.detail.hidden=true" in ui
+    assert "filterByCountry('ALL')" in ui
+    assert "for(const index of group.indices)" in ui
+    assert "label.prepend(countryImage(country))" in ui
+    assert "img.src=knownFlag(country)||'https://flagcdn.com/w40/'+country.toLowerCase()+'.png'" in ui
+    assert "data:image/svg+xml;charset=utf-8," in ui
+    assert "tp80-country-image" in ui
+    assert "tp80-country-fallback" in ui
+
+def test_socks5_compact_real_credential_facts_no_duplicate_dump():
+    ui=code("public_connection_unified_surface_dates_v80.py")
+    assert 'if protocol in {"cisco", "socks5"}:' in code("public_connection_hub_v5.py")
+    assert "view.querySelector('.facts')" in ui
+    assert "holder.classList.add('tp80-socks5-detail')" in ui
+    assert "holder.append(view,realFacts)" in ui
+    assert "view.hidden=true" in ui
+    assert ".tp80-socks5-detail .server-view[hidden]{display:none!important}" in ui
+
+
+def test_socks5_uses_dedicated_outbound_not_subscription_password():
+    from app.routers.public_connection_hub_v5 import _item_detail
+    body=_item_detail("socks5",{
+        "server":"legacy-server.invalid","port":999,
+        "outbound":{"server":"node.example.test","server_port":38013,
+                    "username":"real-socks-user","password":"dedicated-secret"}
+    },"account-user","account-password",0,"test")
+    assert "node.example.test:38013" in body
+    assert "real-socks-user" in body
+    assert "dedicated-secret" in body
+    assert "account-password" not in body
+    assert "999" not in body
+
+
+def test_exactly_one_real_device_aware_app_action_with_sudoku_fallback():
+    ui=code("public_connection_unified_surface_dates_v80.py")
+    assert "if(!find('app'))" in ui
+    assert "app.classList.add('tp78-footer-action')" in ui
+    assert "if(key==='sudoku'&&!find('app'))" in ui
+    assert "https://github.com/SUDOKU-ASCII/sudoku-android/releases" in ui
+    assert "https://github.com/SUDOKU-ASCII/sudoku-desktop/releases" in ui
+    assert "https://apps.apple.com/us/app/anywhere-proxy/id6758235178" in ui
+    assert ":has(> .tp78-action-footer [data-kind=\"app\"])" in ui
 
 def test_refiner_last_idempotent_and_js_valid():
     chain=code("public_connection_canonical_mobile_v26.py")
