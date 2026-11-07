@@ -237,11 +237,34 @@ def _wanted_modern_protocols(
 
 
 def _modern_item_is_usable(ad: Any, db, protocol: str, item: dict[str, Any]) -> bool:
-    if not ad._delivery_item_is_usable(db, protocol, item):
-        return False
+    """Preserve staged central credentials without revealing a hidden Exit.
+
+    Customer delivery must reject hidden nodes. The legacy topology worker,
+    however, must not prune a hidden Exit already registered as central.
+    Read the same durable ownership marker used by central staging; the
+    production release does not yet include the new central engine module.
+    """
     node_id = _item_node_id(ad, item)
     if node_id <= 0:
         return False
+    node = db.get(Node, node_id)
+    if (node is None or node.retired_at is not None
+            or node.node_type != NodeType.EXIT
+            or node.status != NodeStatus.ONLINE):
+        return False
+    if node.show_to_users:
+        if not ad._delivery_item_is_usable(db, protocol, item):
+            return False
+    else:
+        from .mother_access import get_value
+        # One ownership lookup per Exit and DB session, not per credential.
+        cache = db.info.setdefault("_central_hidden_exit_ownership", {})
+        if node_id not in cache:
+            cache[node_id] = (
+                get_value(db, f"vpn.central_runtime.exit.{node_id}", "") == "v1"
+            )
+        if not cache[node_id]:
+            return False
     cfg = (
         db.query(NodeProtocolConfig)
         .filter(
