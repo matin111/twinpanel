@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.669",
-  "source_sha": "62465989b181f0e9f196fe7017272293ac722ca3",
+  "version": "1.1.0-rc.670",
+  "source_sha": "ff4961cf6dfb2819c74cd17b5dcb60d8c81782b4",
   "notes": {
-    "fa": "نسخه rc.669: حذف ساختاری نوار مشکی خالی بالای دکمه‌های پایین پاپ‌آپ تمام پروتکل‌ها، هم در لایت‌مود و هم در دارک‌مود. قاب‌های قدیمی خالی v51/v52 بعد از انتقال دکمه‌ها به فوتر اصلی حذف می‌شوند؛ هیچ دکمه واقعی دانلود، افزودن یا کپی حذف نمی‌شود. خوانایی نوشته‌های روشن روی زمینه روشن (نام سرورها، هدر پروتکل و دکمه‌های ثانویه) اصلاح شد. تست DOM تمام ۱۶ پروتکل بدون قاب خالی، پاپ‌آپ ۱۶/۱۶ و حفظ چهار دکمه V2Ray موفق بود. تست بصری مرورگر واقعی هنوز باقی است.",
-    "en": "rc.669 structurally removes the empty legacy v51/v52 black footer strip above protocol popup buttons in both light and dark themes; preserves all download/copy/import action nodes. Improves light-theme foreground contrast for protocol headings, server labels and secondary actions. DOM verification: zero blank legacy bars across 16 protocols, 16/16 popup clicks passed, V2Ray footer retained four actions and Add All extras. Real browser visual verification remains pending."
+    "fa": "نسخه rc.670: رفع مشکل بدون واکنش ماندن دکمه «ارسال فایل به برنامه» در مرورگرهای اندروید و آیفون. اگر Web Share از فایل‌های VPN پشتیبانی کند، منوی اشتراک‌گذاری با لمس مستقیم باز می‌شود. اگر مرورگر پشتیبانی نکند یا کانفیگ آماده Share نباشد، دانلود فایل واقعی OpenVPN .ovpn یا WireGuard/AmneziaWG .conf با لمس همان دکمه شروع می‌شود و پنجره راهنمای انتخاب و ارسال فایل از Downloads/Files به برنامه نمایش داده می‌شود. خطاهای ارسال هم پنجره دانلود مشخص دارند و لغو کردن Share خطا شمرده نمی‌شود. بدون تغییر سرویس‌های VPN، کاربران، پروتکل‌ها و حجم اشتراک.",
+    "en": "rc.670: Fix silent mobile file Share actions. When Web Share supports VPN files, invoke it synchronously from the original tap. For unsupported browsers or missing prepared configs, trigger the real .ovpn/.conf attachment download in the tap and present a visible Files/Downloads guide and manual download button. Show clear fallback for Share failures, distinguish user cancellation. Preserve all existing VPN data, nodes and subscriptions."
   }
 }
