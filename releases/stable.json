@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.663",
+  "version": "1.1.0-rc.664",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-07T20:14:48Z",
+  "released_at": "2026-11-07T20:21:06Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "21512f35c003ff97447137da14b8a98c96938be9",
+  "source_sha": "f8e46d64fbda7de72218ea92d7df96ab11407180",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.663/twinpanel-1.1.0-rc.663-linux-x86_64.tar.gz",
-    "sha256": "cc964f44687b1605b3a5fb65c33977593dd9eb03c4ce0b7d3f8b06199d155ad0",
-    "size_bytes": 29345411
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.664/twinpanel-1.1.0-rc.664-linux-x86_64.tar.gz",
+    "sha256": "f6db984b660eb058f96481a0348c2722ec73e93fd555097a448de1df59e8f2b0",
+    "size_bytes": 29344121
   },
   "notes": {
-    "fa": "نسخه rc.663: دکمه «کپی همه کانفیگ‌ها» برای V2Ray در ویندوز به ردیف چهار دکمه اصلی برگشت؛ کنار کپی لینک اشتراک، دانلود Karing و دانلود v2rayN. گزینه واقعی «افزودن همه به Karing» همراه رویداد اصلی خود در عملیات اضافی حفظ شد. کد ترتیب‌دهی فوتر اصلاح شد تا هنگام اجرای مجدد، دکمه‌های داخل سایر عملیات حذف یا مخفی نشوند. تست DOM ردیف چهار دکمه و حفظ افزودن همه موفق بود. به اطلاعات کاربر، نودها و سرویس VPN تغییری داده نشد.",
-    "en": "rc.663 restores V2Ray Windows Copy all configurations as one of four main footer buttons alongside Copy subscription link, Download Karing and Download v2rayN. Retains the real Add all to Karing action with its original event handler in secondary actions. Footer reconciliation now includes previously nested actions to avoid losing them across passes. DOM smoke verified four actions and retained add-all. No changes to VPN runtime or account data."
+    "fa": "نسخه rc.664: با زدن روی خود کارت هر یک از ۱۶ پروتکل، کل پنل همان پروتکل داخل پاپ‌آپ مستقل و قابل پیمایش باز می‌شود، نه در زیر کارت‌ها. دکمه بستن، کلیک بیرون و Escape پنجره را می‌بندند و عنصر اصلی با تمام لینک‌ها و عملکردهای دانلود/کپی/فیلتر به محل اولیه برمی‌گردد. اصلاحات rc.663 مانند چهار دکمه V2Ray شامل کپی همه کانفیگ‌ها، کپی لینک اشتراک، دانلود Karing و دانلود v2rayN حفظ شده است. تست کلیک همه ۱۶ کارت در DOM موفق و صفحه سرور HTTP 200 است؛ تست بصری گوشی واقعی هنوز کامل نشده است.",
+    "en": "rc.664: clicking each of 16 protocol cards opens the entire original protocol panel inside a responsive scrollable popup, not an inline section below the grid. Close, backdrop and Escape restore the exact original panel and preserve copy, download, filtering and event handlers. Retains rc.663 V2Ray four-button footer, including visible Copy all configurations. Synthetic DOM click tests passed for all 16 cards; complete live-device browser visual testing pending."
   }
 }
