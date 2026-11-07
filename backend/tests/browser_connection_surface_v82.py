@@ -17,7 +17,7 @@ from playwright.sync_api import sync_playwright
 PROTOCOLS=[
     "v2ray","wireguard","openvpn","l2tp","amneziawg",
     "hysteria2","anytls","shadowtls","trusttunnel","mieru",
-    "naive","tuic","snell","cisco","sudoku",
+    "naive","tuic","snell","cisco","sudoku","socks5",
 ]
 
 def mock_page():
@@ -37,6 +37,10 @@ def mock_page():
               "uri":f"vless://synthetic@198.51.100.{n}:443?encryption=none",
               "username":"DEMO","password":"dummy","port":443,"psk":"fake-test-key",
             })
+            if protocol=="socks5":
+                items[-1]["outbound"]={"server":f"198.51.100.{n}",
+                    "server_port":38000+n,"username":"SOCKS-ONLY",
+                    "password":"socks-specific-test-secret"}
         creds.append({"protocol":protocol,"items":items})
     fake_payload={"account":{"username":"DEMO","password":"dummy"},
                   "subscription_link":"https://mock.panel/v1/connect/demo/sub","credentials":creds}
@@ -134,6 +138,13 @@ def verify(context,html,device,outfile):
     assert panel.locator(".tp77-native-row:visible").count()==1,(device,"TR must show only its node")
     panel.locator('.tp80-country-bar button[data-tp80-country="ALL"]').click()
     assert panel.locator(".tp77-native-row:visible").count()==4,(device,"ALL must restore every node")
+    sizes=panel.locator(".tp77-native-row:visible").evaluate_all(
+       "(nodes)=>nodes.map(node=>Math.round(node.getBoundingClientRect().height))")
+    assert max(sizes)<=83,(device,"oversized file rows",sizes)
+    for code in ("DE","TR","US"):
+        assert panel.locator('.tp80-country-bar button[data-tp80-country="'+code+'"] img[src]').count()==1,(device,code,"flag image missing")
+    if panel.locator('.tp78-action-footer [data-kind="app"]').count():
+        assert panel.locator(':scope > .ref70-app-card:visible,:scope > .v34-client-card:visible').count()==0,(device,"duplicate app download")
     assert panel.locator(".server-view:visible").count()==0,f"{device}: duplicate large native file cards still displayed"
     assert panel.locator(".tp78-ping:visible,.ref71-rtt:visible").count()==0
     if device=="mobile":
@@ -166,6 +177,22 @@ def verify(context,html,device,outfile):
         assert pane.locator(".tp77-native-row:visible").count()==1,(device,protocol,"wrong country filtering")
         pane.locator('.tp80-country-bar button[data-tp80-country="ALL"]').click()
         assert pane.locator(".tp77-native-row:visible").count()>=2,(device,protocol,"ALL broken")
+        # A node's detail must appear directly under that row, never after
+        # the whole list when dozens of nodes exist.
+        rows=pane.locator(".tp77-native-row:visible")
+        rows.first.locator(".tp80-detail-toggle").click()
+        inline=rows.first.locator("xpath=following-sibling::*[1]")
+        assert inline.get_attribute("class") and "tp80-inline-native-detail" in inline.get_attribute("class")
+        assert inline.is_visible(),(device,protocol,"detail is not inline")
+        assert inline.locator(".server-view:visible").count()==1,(device,protocol,"real facts not visible")
+        if rows.count()>1:
+            rows.nth(1).locator(".tp80-detail-toggle").click()
+            assert not inline.is_visible(),(device,protocol,"previous detail still expanded")
+            second=rows.nth(1).locator("xpath=following-sibling::*[1]")
+            assert second.is_visible(),(device,protocol,"second server detail missing")
+        pane.screenshot(path=str(outfile).replace("openvpn",protocol+"-inline"),animations="disabled")
+        if pane.locator('.tp78-action-footer [data-kind="app"]').count():
+            assert pane.locator(':scope > .ref70-app-card:visible,:scope > .v34-client-card:visible').count()==0,(device,protocol,"duplicate app")
     # Visit each one of the fifteen customer-facing protocols, not just the
     # OpenVPN screenshot. All share the same node-row/real-action contract.
     native={"wireguard","openvpn","l2tp","amneziawg","cisco"}
@@ -200,6 +227,35 @@ def verify(context,html,device,outfile):
             assert button.is_enabled(),(device,protocol,"dead footer button")
             href=button.get_attribute("href")
             assert not href or not href.startswith("#"),(device,protocol,"broken app link")
+    # Validate newest SOCKS5 card and the official Sudoku application.
+    sudoku_choice=page.locator('.protocol-choice[data-protocol-key="sudoku"]')
+    sudoku_choice.click()
+    page.wait_for_timeout(450)
+    sudoku=page.locator("#"+sudoku_choice.get_attribute("data-protocol"))
+    app=sudoku.locator('.tp78-action-footer [data-kind="app"]')
+    if app.count()!=1 or not app.is_visible():
+        debug=sudoku.evaluate("""el=>({key:el.dataset.v34Protocol,footer:!!el.querySelector('.tp78-action-footer'),
+          footerClass:el.querySelector('.tp78-action-footer')?.className,
+          appNodes:[...el.querySelectorAll('[data-kind="app"]')].map(n=>({outer:n.outerHTML.slice(0,280),display:getComputedStyle(n).display})),
+          appCards:[...el.querySelectorAll('.ref70-app-card,.v34-client-card')].map(n=>({html:n.outerHTML.slice(0,180),display:getComputedStyle(n).display}))})""")
+        print("SUDOKU_CLIENT_DEBUG",device,debug,flush=True)
+    assert app.count()==1 and app.is_visible(),(device,"missing Sudoku download")
+    assert "github.com/SUDOKU-ASCII/sudoku-" in app.get_attribute("href") or "apps.apple.com" in app.get_attribute("href"),(device,"unofficial client")
+    assert sudoku.locator(':scope > .ref70-app-card:visible,:scope > .v34-client-card:visible').count()==0,(device,"duplicate Sudoku download")
+    socks_choice=page.locator('.protocol-choice[data-protocol-key="socks5"]')
+    socks_choice.click()
+    page.wait_for_timeout(450)
+    socks=page.locator("#"+socks_choice.get_attribute("data-protocol"))
+    details=socks.locator(".tp80-socks5-detail")
+    assert details.count()>=1,(device,"no compact SOCKS5 details")
+    first=socks.locator(".tp80-detail-toggle").first
+    first.click()
+    assert details.first.is_visible(),(device,"SOCKS5 details not opened under node")
+    assert details.first.locator(".facts:visible .fact").count()>=3,(device,"SOCKS5 credentials unavailable")
+    assert "socks-specific-test-secret" in details.first.inner_text(),(device,"SOCKS outbound password must override account password")
+    assert "38013" in details.first.inner_text(),(device,"SOCKS port must come from actual outbound")
+    assert details.first.locator(".server-view:visible").count()==0,(device,"duplicate raw SOCKS5 data displayed")
+    socks.screenshot(path=str(outfile).replace("openvpn","socks5"),animations="disabled")
     page.close()
 
 def main():
