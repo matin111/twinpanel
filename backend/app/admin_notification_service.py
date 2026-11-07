@@ -615,10 +615,11 @@ async def notification_watch_loop():
     iteration = 0
 
     while True:
-        maybe_process_subscription_expiry_notifications()
-        maybe_process_reseller_expiry_notifications()
-
         try:
+            # Expiry notification delivery performs synchronous DB/network I/O.
+            # Never block the sole ASGI event loop while it runs.
+            await asyncio.to_thread(maybe_process_subscription_expiry_notifications)
+            await asyncio.to_thread(maybe_process_reseller_expiry_notifications)
             await asyncio.to_thread(
                 _watch_once_sync,
                 iteration % 5 == 0,
