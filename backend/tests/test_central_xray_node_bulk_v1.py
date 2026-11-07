@@ -36,12 +36,15 @@ class CentralXrayTests(unittest.TestCase):
               patch.object(mod,"allow_central_node",return_value=True),
               patch.object(mod,"verify_new_exit_readiness",
                            new_callable=AsyncMock) as health,
+              patch.object(mod,"bootstrap_same_node_template",
+                           new_callable=AsyncMock,return_value=0) as bootstrap,
               patch.object(mod,"run_one",new_callable=AsyncMock,
                            return_value=0) as run_one):
             session.return_value.__enter__.return_value=db
             import asyncio
             asyncio.run(mod.run(14,100,True,True))
             health.assert_not_awaited()
+            bootstrap.assert_awaited_once_with(db,14)
             run_one.assert_awaited_once()
 
     def test_hidden_xray_preserves_initial_protocol_readiness_guard(self):
@@ -89,6 +92,33 @@ class CentralXrayTests(unittest.TestCase):
                                         "PAID_ACCOUNT_PROVISIONING_HAS_PRIORITY"):
                 asyncio.run(mod.run_one(db,14,100,True))
             connect.assert_not_awaited()
+
+    def test_first_exit_without_template_calls_runtime_seed_once(self):
+        import asyncio
+        db=MagicMock()
+        node=MagicMock(show_to_users=False)
+        db.get.return_value=node
+        with (patch.object(mod,"SessionLocal") as session,
+              patch.object(mod,"allow_central_node",return_value=True),
+              patch.object(mod,"verify_new_exit_readiness",
+                           new_callable=AsyncMock,return_value={"ok":True}),
+              patch.object(mod,"bootstrap_same_node_template",
+                           new_callable=AsyncMock,return_value=1) as seed,
+              patch.object(mod,"run_one",new_callable=AsyncMock,return_value=0)):
+            session.return_value.__enter__.return_value=db
+            asyncio.run(mod.run(15,100,True,True))
+            seed.assert_awaited_once_with(db,15)
+
+    def test_first_exit_dry_run_does_not_seed(self):
+        import asyncio
+        db=MagicMock()
+        with (patch.object(mod,"SessionLocal") as session,
+              patch.object(mod,"bootstrap_same_node_template",
+                           new_callable=AsyncMock) as seed,
+              patch.object(mod,"run_one",new_callable=AsyncMock,return_value=0)):
+            session.return_value.__enter__.return_value=db
+            asyncio.run(mod.run(15,100,False,False))
+            seed.assert_not_awaited()
 
     def test_prefer_node_owned_uuid_when_repairing_partial(self):
         uuids=[str(uuid4()) for _ in range(3)]
