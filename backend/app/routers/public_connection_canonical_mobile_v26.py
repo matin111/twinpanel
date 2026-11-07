@@ -47,6 +47,9 @@ from .public_connection_apps_inline_v69 import (
 from .public_connection_protocol_icons_flags_v73 import (
     refine_public_connection_protocol_icons_flags_v73,
 )
+from .public_connection_approved_phone_v74 import (
+    refine_public_connection_approved_phone_v74,
+)
 
 
 def refine_public_connection_reference_layout_v38(source: str) -> str:
@@ -59,7 +62,8 @@ def refine_public_connection_reference_layout_v38(source: str) -> str:
     source = refine_public_connection_approved_responsive_ui_v65(source)
     source = refine_public_connection_reference_desktop_mobile_v67(source)
     source = refine_public_connection_apps_inline_v69(source)
-    return refine_public_connection_protocol_icons_flags_v73(source)
+    source = refine_public_connection_protocol_icons_flags_v73(source)
+    return refine_public_connection_approved_phone_v74(source)
 
 
 _MARKER = "TWINPANEL_PUBLIC_CONNECT_CANONICAL_MOBILE_V26"
