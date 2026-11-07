@@ -53,7 +53,7 @@ def args_parser(argv=None):
     return args
 
 
-def selected_subscriptions(db, node_id: int, limit: int) -> list[Subscription]:
+def selected_subscriptions(db, node_id: int, limit: int, protocol: str = "l2tp") -> list[Subscription]:
     now = datetime.utcnow()
     return (
         db.query(Subscription)
@@ -61,7 +61,7 @@ def selected_subscriptions(db, node_id: int, limit: int) -> list[Subscription]:
         .join(SubscriptionProtocol, SubscriptionProtocol.subscription_id == Subscription.id)
         .filter(
             SubscriptionNode.node_id == int(node_id),
-            SubscriptionProtocol.protocol == "l2tp",
+            SubscriptionProtocol.protocol == protocol,
             Subscription.status == SubscriptionStatus.ACTIVE,
             or_(Subscription.expires_at.is_(None), Subscription.expires_at > now),
             or_(
