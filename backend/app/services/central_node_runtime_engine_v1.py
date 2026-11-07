@@ -67,7 +67,7 @@ def adapter_command(family: RuntimeFamily, node_id: int, limit: int,
 
 async def reconcile_runtime_families(
     node_id: int, limit: int, backend: Path,
-    *, families=FAMILIES, timeout_seconds=1200,
+    *, families=FAMILIES, timeout_seconds=1200, max_concurrent_families=3,
 ):
     """One remote protocol-wide operation per daemon family; nothing per user.
 
@@ -75,24 +75,28 @@ async def reconcile_runtime_families(
     A nonzero return is not interpreted as customer-ready state.
     """
     validate_runtime_families(families)
-    if node_id <= 0 or limit <= 0:
+    if node_id <= 0 or limit <= 0 or max_concurrent_families < 1:
         raise ValueError("CENTRAL_RUNTIME_INVALID_TARGET")
+    # Limit contention on the controller and on shared remote SSH/database
+    # resources. This is concurrency across DAEMONS, never a per-user queue.
+    throttle = asyncio.Semaphore(max_concurrent_families)
     async def run_family(family):
         command=adapter_command(family,node_id,limit,backend)
-        proc=await asyncio.create_subprocess_exec(
-            *command,cwd=str(backend),
-            env={**os.environ,"PYTHONPATH":str(backend)},
-            stdout=asyncio.subprocess.DEVNULL,
-            stderr=asyncio.subprocess.DEVNULL,
-        )
-        try:
-            code=await asyncio.wait_for(proc.wait(),timeout_seconds)
-        except (asyncio.TimeoutError,asyncio.CancelledError):
-            proc.terminate()
-            try:await asyncio.wait_for(proc.wait(),10)
-            except asyncio.TimeoutError:proc.kill();await proc.wait()
-            raise
-        return family.name,int(code)
+        async with throttle:
+            proc=await asyncio.create_subprocess_exec(
+                *command,cwd=str(backend),
+                env={**os.environ,"PYTHONPATH":str(backend)},
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.DEVNULL,
+            )
+            try:
+                code=await asyncio.wait_for(proc.wait(),timeout_seconds)
+            except (asyncio.TimeoutError,asyncio.CancelledError):
+                proc.terminate()
+                try:await asyncio.wait_for(proc.wait(),10)
+                except asyncio.TimeoutError:proc.kill();await proc.wait()
+                raise
+            return family.name,int(code)
     results=await asyncio.gather(
         *(run_family(family) for family in families),
         return_exceptions=True,
