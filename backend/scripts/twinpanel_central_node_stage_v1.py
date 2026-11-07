@@ -21,7 +21,7 @@ from sqlalchemy import text
 BACKEND = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND))
 
-from app.services.central_runtime_ownership_v1 import allow_central_node, mark_central_node
+from app.services.central_runtime_ownership_v1 import allow_central_node, mark_central_node, mark_central_applied
 from app.database import SessionLocal
 from app.models import Node, NodeStatus, NodeType
 from app.services.new_node_readiness_v1 import verify_new_exit_readiness
@@ -199,6 +199,7 @@ def _run_locked(node_id, limit, apply):
         if not allow_central_node(db,node):
             raise RuntimeError("CENTRAL_RUNTIME_NODE_OWNERSHIP_CHANGED")
         mark_central_node(db,node_id)
+        mark_central_applied(db,node_id,desired.fingerprint)
         db.commit()
     print("CENTRAL_RUNTIME_OWNERSHIP_REGISTERED",json.dumps({
         "node_id":node_id,"engine":"central","published":bool(node.show_to_users),
