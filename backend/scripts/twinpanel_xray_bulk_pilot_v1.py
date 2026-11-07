@@ -26,6 +26,8 @@ from app.models import (Node, ProtocolCredential, Subscription, SubscriptionNode
                         SubscriptionProtocol, SubscriptionStatus, User)
 from app.routers import account_delivery as ad
 from app.xray_bulk_hot_sync_pilot_v1 import bulk_hot_sync_script
+from app.xray_bulk_profile_factory_v1 import build_node_item_from_template
+from app.xray_adaptive_three_profiles_v47 import _required_profiles_v47
 
 logging.getLogger("asyncssh").setLevel(logging.ERROR)
 
@@ -80,12 +82,54 @@ async def run(node_id: int, limit: int, apply: bool):
                 or str(getattr(node.status, "value", node.status)).lower() != "online"):
             raise RuntimeError("selected node not an active published Xray Exit")
         chosen, eligible = candidates(db, node_id, limit)
+        # Read a validated complete profile set from this same Exit. Do not
+        # derive Reality keys, SNI or ports from guesses or another node.
+        from app.routers import account_delivery
+        required = _required_profiles_v47(node)
+        template = None
+        template_uuid = None
+        for cred in db.query(ProtocolCredential).filter(
+            ProtocolCredential.protocol == "v2ray",
+            ProtocolCredential.is_active.is_(True),
+        ).order_by(ProtocolCredential.subscription_id.desc()):
+            for row in account_delivery._autosync_credential_items(cred):
+                if not isinstance(row, dict) or account_delivery._autosync_item_node_id(row) != node_id:
+                    continue
+                profile_ids = {str(p.get("id") or "").strip().lower()
+                               for p in (row.get("profiles") or [])
+                               if isinstance(p, dict) and str(p.get("uri") or "").strip()}
+                if not required.issubset(profile_ids):
+                    continue
+                raw_id = str(row.get("uuid") or "")
+                try:
+                    from uuid import UUID
+                    template_uuid = str(UUID(raw_id))
+                except (ValueError, TypeError, AttributeError):
+                    continue
+                template = row
+                break
+            if template is not None:
+                break
         print("BULK_XRAY_PILOT_PLAN", json.dumps({
             "node_id": node_id, "eligible": eligible, "selected": len(chosen),
             "mode": "apply" if apply else "dry_run",
         }), flush=True)
         if not apply or not chosen:
             return
+        if template is None or template_uuid is None:
+            raise RuntimeError("no complete same-node profile template; refuse bulk apply")
+        # Prepare and validate every profile locally before touching Xray.
+        prepared = {}
+        for sid, ident, _ in chosen:
+            sub = db.get(Subscription, sid)
+            if sub is None:
+                raise RuntimeError("selected subscription missing")
+            label = str(sub.account_username or f"user{sid}")
+            prepared[sid] = build_node_item_from_template(
+                template, node_id=node_id, template_uuid=template_uuid,
+                client_uuid=ident, account_label=label,
+                required_profile_ids=required,
+            )
         if node_id != 13:
             raise RuntimeError("pilot apply restricted to canary node 13")
         from app.services.central_backfill_priority_v1 import new_account_work_has_priority
@@ -117,47 +161,48 @@ async def run(node_id: int, limit: int, apply: bool):
             if not outcome.get("ok") or (outcome.get("changed")
                                        and not outcome.get("hot_applied")):
                 raise RuntimeError("bulk hot apply not confirmed")
+            # Validate all entitlements and lock the selected credential rows
+            # before persisting. A single transaction replaces per-user SSH
+            # regeneration and five independent database commits.
             saved = 0
+            db.expire_all()
+            now = datetime.utcnow()
             for sid, ident, _mail in chosen:
-                # Re-read every entitlement after network operations. Stale,
-                # exhausted, suspended or already-present rows are skipped.
-                db.expire_all()
                 sub = db.get(Subscription, sid)
                 cred = (db.query(ProtocolCredential)
                         .filter(ProtocolCredential.subscription_id == sid,
-                                ProtocolCredential.protocol == "v2ray").one_or_none())
-                if (sub is None or cred is None or
-                        sub.status != SubscriptionStatus.ACTIVE or
-                        (sub.expires_at is not None
-                         and sub.expires_at <= datetime.utcnow()) or
-                        (sub.traffic_limit_bytes > 0
-                         and sub.traffic_used_bytes >= sub.traffic_limit_bytes)):
-                    continue
-                current = ad._autosync_credential_items(cred)
-                if any(ad._autosync_item_node_id(x) == node_id for x in current):
-                    continue
-                known = {str(i.get("uuid") or "").strip()
-                         for i in current if isinstance(i, dict)}
-                if known != {ident}:
-                    continue
-                user = db.get(User, sub.user_id)
-                if user is None:
-                    continue
-                try:
-                    item = await asyncio.wait_for(
-                        ad._xray(db, node, sub, user, ident,
-                                 reusable_connection=conn), timeout=65)
-                    if str(item.get("uuid") or "") != ident:
-                        raise RuntimeError("unexpected Xray UUID change")
-                    current.append(item)
-                    cred.config_text_encrypted = ad._enc(current)
-                    cred.is_active = True
-                    db.commit()
-                    saved += 1
-                except Exception:
+                                ProtocolCredential.protocol == "v2ray")
+                        .with_for_update().one_or_none())
+                if (sub is None or cred is None
+                        or sub.status != SubscriptionStatus.ACTIVE
+                        or (sub.expires_at is not None and sub.expires_at <= now)
+                        or (sub.traffic_limit_bytes > 0
+                            and sub.traffic_used_bytes >= sub.traffic_limit_bytes)
+                        or not db.query(SubscriptionNode).filter_by(
+                            subscription_id=sid, node_id=node_id).first()
+                        or not db.query(SubscriptionProtocol).filter_by(
+                            subscription_id=sid, protocol="v2ray").first()):
                     db.rollback()
-                    raise RuntimeError("bulk applied but durable publish incomplete; "
-                                       "idempotent repair required")
+                    raise RuntimeError("entitlement changed during bulk; retry missing-only")
+                current = ad._autosync_credential_items(cred)
+                original_ids = {str(i.get("uuid") or "").strip()
+                                for i in current if isinstance(i, dict)}
+                if original_ids != {ident}:
+                    db.rollback()
+                    raise RuntimeError("UUID changed during bulk; refusing commit")
+                if any(ad._autosync_item_node_id(x) == node_id for x in current):
+                    # Another worker completed this node while bulk was in flight.
+                    continue
+                current.append(prepared[sid])
+                cred.config_text_encrypted = ad._enc(current)
+                cred.is_active = True
+                saved += 1
+            try:
+                db.commit()
+            except Exception:
+                db.rollback()
+                raise RuntimeError("bulk hot applied but atomic central commit failed; "
+                                   "idempotent repair required")
             print("BULK_XRAY_PILOT_RESULT", json.dumps({
                 "node_id": node_id, "selected": len(chosen),
                 "hot_applied": bool(outcome.get("hot_applied")),
