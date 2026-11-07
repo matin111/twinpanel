@@ -13,6 +13,7 @@ from unittest.mock import patch
 from fastapi import HTTPException
 
 from app.routers import publish_node_all_users_v1 as installer
+from app.routers import publish_node_all_users_v2 as central_publish
 from app.services import node_stage_publish_guard_v1 as guard
 
 
@@ -29,6 +30,10 @@ class NewNodeInstallerCutoverTests(unittest.TestCase):
         self.assertIn('"CENTRAL_RUNTIME_COVERAGE_INCOMPLETE"',src)
         self.assertNotIn("enqueue_node_backfill(",src)
         self.assertNotIn('and fabric.get("ok") is not False',src)
+
+    def test_real_installer_publishes_through_audited_v2_handler(self):
+        self.assertIs(installer.publish_node_to_all_users,
+                      central_publish.publish_node_to_all_users_v2)
 
     def test_only_verified_enrollment_coverage_can_publish(self):
         class Query:
