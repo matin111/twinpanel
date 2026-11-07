@@ -230,7 +230,21 @@ async def _install_node_in_background(
                 "node_id": node_id, "error_type": type(exc).__name__,
             }, flush=True)
 
-        ready = base_ok and xray_ok and modern_ok and installed_count == 16
+        # Counted installer callbacks are not sufficient proof of readiness.
+        # Re-check all saved protocol states and current listeners without
+        # reloading the healthy services or touching existing credentials.
+        live = {"ok": False, "reason": "base_install_failed"}
+        if base_ok and xray_ok and modern_ok:
+            from ..services.new_node_readiness_v1 import verify_new_exit_readiness
+            live = await verify_new_exit_readiness(db, node_id)
+        quota = result.get("quota") or {}
+        fabric = result.get("fabric") or {}
+        ready = (
+            base_ok and xray_ok and modern_ok
+            and installed_count == 16 and bool(live.get("ok"))
+            and quota.get("ok") is not False
+            and fabric.get("ok") is not False
+        )
 
         # Enrolling accounts before the service graph is ready exposes
         # dead links and produces years-long repair queues. Fail closed.
@@ -242,6 +256,8 @@ async def _install_node_in_background(
             )
             print("TWINPANEL_NODE_AUTO_ENROLL_BLOCKED_NOT_READY", {
                 "node_id": node_id, "installed_count": installed_count,
+                "failed_live_protocols": live.get("missing", []),
+                "health_reason": live.get("reason"),
             }, flush=True)
             return
 
