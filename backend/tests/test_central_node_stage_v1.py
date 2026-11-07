@@ -115,7 +115,7 @@ class CentralNodeStageTests(unittest.TestCase):
             self.assertEqual(stage._run_locked(14, 3000, True), 0)
             invoke.assert_awaited_once()
             bootstrap.assert_awaited_once()
-            db.commit.assert_called_once()
+            self.assertEqual(db.commit.call_count,2)
 
 
     def test_missing_shared_binary_blocks_all_writes_before_runtime(self):
