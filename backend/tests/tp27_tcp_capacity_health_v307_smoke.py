@@ -9,11 +9,12 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[2]
 REPAIR = ROOT / "backend/app/tp27_self_repair_v265.py"
+TP27 = ROOT / "backend/app/transport_candidates/tp27_fast.py"
 
 
-def _load_capacity_function(name: str = "_tcp_throughput_health"):
-    source = REPAIR.read_text(encoding="utf-8")
-    compile(source, str(REPAIR), "exec")
+def _load_capacity_function(name: str = "_tcp_throughput_health", path: Path = REPAIR):
+    source = path.read_text(encoding="utf-8")
+    compile(source, str(path), "exec")
     node = next(
         item for item in ast.parse(source).body
         if isinstance(item, ast.FunctionDef) and item.name == name
@@ -26,7 +27,7 @@ def _load_capacity_function(name: str = "_tcp_throughput_health"):
         "STABILITY_REVISION": 304,
         "tp27_fast": SimpleNamespace(MTU=1400),
     }
-    exec(compile(ast.Module(body=[node], type_ignores=[]), str(REPAIR), "exec"), namespace)
+    exec(compile(ast.Module(body=[node], type_ignores=[]), str(path), "exec"), namespace)
     return namespace[name]
 
 
@@ -71,6 +72,16 @@ def main() -> None:
 
     retained = repair_meta(existing, profile="gre-fou", **args)
     assert retained["smart_auto_v21"]["throughput"]["download_mbps"] == 0.3
+
+    installer = _load_capacity_function("_invalidate_profile_throughput", TP27)
+    out = installer({"selected_profile": "gre-native"}, "gre-fou")
+    assert out["smart_auto_v21"]["throughput"] is None
+    assert installer({"selected_profile": "gre-native"}, "gre-native") == {
+        "selected_profile": "gre-native",
+    }
+    assert installer({"selected_profile": "gre-native"}, None) == {
+        "selected_profile": "gre-native",
+    }
 
     repair_source = REPAIR.read_text(encoding="utf-8")
     assert "and not quality[\"confirmed_slow\"]" in repair_source
