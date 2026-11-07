@@ -1465,7 +1465,7 @@ _SCRIPT = r"""
      // Legacy node label starts with a Unicode flag; remove that duplicate,
      // keeping the server code / name untouched.
      [...label.childNodes].filter(node=>node.nodeType===3).forEach(node=>{
-       node.textContent=node.textContent.replace(/[\\u{1F1E6}-\\u{1F1FF}]{2}/gu,'').replace(/^\\s+/,' ');
+       node.textContent=node.textContent.replace(/[🇦-🇿]{2}/gu,'').replace(/^\s+/,' ');
      });
    });
  }
