@@ -9,7 +9,13 @@ from . import smart_transport_auto_v21 as smart
 
 
 MARKER = "TWINPANEL_TRANSPORT_BENCHMARK_RECEIVER_WAIT_V355"
-RESULT_WAIT_SECONDS = 3.0
+# Long-RTT GRE-native TP27 links (tunnel #30/#32) can finish TX before
+# the receiver has drained four parallel TCP streams and flushed RX_MBPS.
+# A 3-second deadline systematically yielded only `READY` on these healthy
+# links. The receiver is itself capped at 15s; allow bounded finalization
+# without altering user routes, the stream count, benchmark payload or
+# tunnel selection. Confirmed live: 12s allowed valid results on both nodes.
+RESULT_WAIT_SECONDS = 12.0
 RESULT_POLL_INTERVAL_SECONDS = 0.25
 
 _applied = False
@@ -27,11 +33,11 @@ async def _one_direction_v355(
 ) -> float:
     """Run the existing bounded benchmark and wait for receiver finalization.
 
-    Production Tunnel #8 proved that a healthy Spoof WG upload can finish on the
-    sender while the receiver needs about one additional second to join its
-    worker threads and flush RX_MBPS. V21 read and removed the receiver log after
-    a fixed 0.5 second sleep, producing a false
-    throughput_receiver_result_missing error.
+    The sender can complete before the receiver has joined all four workers
+    and flushed RX_MBPS, particularly on high-latency GRE-native tunnels.
+    The old 3-second result window falsely rejected tunnel #30 and #32 while
+    the actual TCP dataplane was live. Allow up to 12 seconds to collect
+    the receiver result (bounded beneath its 15-second process timeout).
 
     V355 changes only result collection. Sender/receiver programs, byte limits,
     duration, stream count, transport routing, candidate health and production
