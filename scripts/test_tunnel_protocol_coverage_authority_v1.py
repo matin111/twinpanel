@@ -93,6 +93,7 @@ def main() -> None:
         "naive",
         "shadowtls",
         "snell",
+        "socks5",
         "mieru",
         "trusttunnel",
         "amneziawg",
