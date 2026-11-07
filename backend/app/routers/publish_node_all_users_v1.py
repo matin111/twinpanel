@@ -44,6 +44,8 @@ async def publish_node_to_all_users(
     if node.node_type != NodeType.EXIT:
         raise HTTPException(status_code=409, detail="نمایش برای همه کاربران فقط برای سرور خروجی قابل استفاده است")
 
+    from ..services.node_stage_publish_guard_v1 import require_staged_node_publish_ready
+    require_staged_node_publish_ready(db, node_id)
     node.show_to_users = True
     explicit_ids = [
         int(row[0])
@@ -261,6 +263,8 @@ async def _install_node_in_background(
             }, flush=True)
             return
 
+        _safe_install_progress(job_id, "verified_ready", node_id=node_id,
+                               installed_protocols=installed_count)
         if payload.publish_to_all_users:
             _safe_install_progress(job_id, "enrolling_users", node_id=node_id,
                                    installed_protocols=installed_count)
