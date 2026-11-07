@@ -1701,7 +1701,7 @@ async def _watchdog_repair_tunnel(
             db.close()
 
 
-async def _tunnel_watchdog_pass() -> None:
+def _tunnel_watchdog_scan() -> list[tuple[int, str]]:
     db = SessionLocal()
 
     repair_candidates: list[
@@ -1972,6 +1972,15 @@ async def _tunnel_watchdog_pass() -> None:
 
     finally:
         db.close()
+
+    return repair_candidates
+
+
+async def _tunnel_watchdog_pass() -> None:
+    # SQLAlchemy DB reads/commits are synchronous and may wait on PostgreSQL.
+    # Run only the scan in a worker thread, preserving the repair decisions
+    # and async tunnel repair behavior on the original event loop.
+    repair_candidates = await asyncio.to_thread(_tunnel_watchdog_scan)
 
     for tunnel_id, reason in repair_candidates:
         await _watchdog_repair_tunnel(
