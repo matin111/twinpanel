@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.637",
-  "source_sha": "f0c73f1807591382dc8d438b7c0b4f7f634b6616",
+  "version": "1.1.0-rc.638",
+  "source_sha": "e099ff13973ea1711a9c002f24cc915586707080",
   "notes": {
-    "fa": "اصلاح نمایش دانلود و آپلود در تونل‌های TP27 Fast با افزایش مهلت محدود دریافت نتیجه تست TCP از ۳ به ۱۲ ثانیه؛ مشکل ثبت‌نشدن نتیجه در مسیرهای با تأخیر بالا رفع می‌شود. بدون تغییر هسته تونل، مسیر GRE، NAT، پروتکل‌ها یا تنظیمات کاربران.",
-    "en": "Fix TP27 Fast download/upload benchmark results on long-RTT tunnels: extend the bounded TCP receiver finalization window from 3 to 12 seconds after sender completion. No GRE carrier, NAT, port mapping, protocol, credential, or customer config change."
+    "fa": "بازگردانی لینک‌های دانلود مستقیم برنامه‌ها به صفحه Connection با تشخیص هوشمند سیستم‌عامل شامل اندروید، ویندوز، آیفون، مک و لینوکس؛ حذف پنجره تکراری V2Ray و ضربدر بدون تغییر کانفیگ‌ها یا آدرس سرورها.",
+    "en": "Restore official and uploaded direct app downloads with device-based Windows, macOS, Android, iOS and Linux selection; remove redundant legacy V2Ray mobile sheet and duplicated selector. Preserve all VPN config content, endpoints, ports, SNI and credentials."
   }
 }
