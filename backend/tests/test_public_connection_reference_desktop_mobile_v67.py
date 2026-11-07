@@ -8,7 +8,7 @@ def test_reference_design_is_present_and_is_final_refiner():
     canonical = (ROOT / "public_connection_canonical_mobile_v26.py").read_text(encoding="utf-8")
     compile(ui, "reference-v67", "exec")
     assert "TWINPANEL_PUBLIC_CONNECTION_REFERENCE_DESKTOP_MOBILE_V67" in ui
-    assert "return refine_public_connection_reference_desktop_mobile_v67(source)" in canonical
+    assert "source = refine_public_connection_reference_desktop_mobile_v67(source)" in canonical
     assert "source = refine_public_connection_approved_responsive_ui_v65(source)" in canonical
     for part in (".ref67-user", ".ref67-categories", ".ref67-list", ".ref67-chip",
                  ".ref67-row", ".ref67-row-actions", ".ref67-footer",
