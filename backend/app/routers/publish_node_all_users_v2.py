@@ -50,6 +50,28 @@ async def publish_node_to_all_users_v2(
 
     from ..services.node_stage_publish_guard_v1 import require_staged_node_publish_ready
     require_staged_node_publish_ready(db, node_id)
+    # Staged nodes must already have all purchased node credentials before
+    # publication; listener health alone is not enough. Existing/manual nodes
+    # (which have no installation progress row) keep the legacy queue path.
+    from ..node_install_progress_models_v1 import NodeInstallProgressV1
+    staged_install = (
+        db.query(NodeInstallProgressV1)
+        .filter(NodeInstallProgressV1.node_id == int(node_id))
+        .order_by(NodeInstallProgressV1.created_at.desc())
+        .first()
+    )
+    if staged_install is not None:
+        from ..central_node_stage_audit_v1 import verify_coverage
+        coverage = verify_coverage(db, int(node_id))
+        if not coverage["ok"]:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "error": "CENTRAL_NODE_CREDENTIAL_COVERAGE_INCOMPLETE",
+                    "missing_protocol_pairs": coverage["missing_protocol_pairs"],
+                    "missing_node_memberships": coverage["missing_node_memberships"],
+                },
+            )
     now = datetime.utcnow()
     params = {"node_id": int(node.id), "now": now}
     try:
@@ -125,7 +147,12 @@ async def publish_node_to_all_users_v2(
         # Queue missing credentials in the SAME transaction as user
         # memberships. The independent timer worker does the actual SSH and
         # retries; this HTTP request remains fast for thousands of accounts.
-        queued_jobs = enqueue_node_backfill(db, int(node.id))
+        # Central-staged exits have already materialized their credentials.
+        # Never add the legacy per-user queue after a successful central audit.
+        queued_jobs = (
+            [] if staged_install is not None
+            else enqueue_node_backfill(db, int(node.id))
+        )
         db.commit()
     except Exception:
         db.rollback()
@@ -155,17 +182,18 @@ async def publish_node_to_all_users_v2(
         "active_subscriptions_reconciled": 0,
         "classic_pairs_provisioned": 0,
         "modern_pairs_provisioned": 0,
-        "active_memberships_awaiting_background_sync": None,
+        "active_memberships_awaiting_background_sync": 0 if staged_install is not None else None,
         "backfill": {
-            "queued": True,
+            "queued": bool(queued_jobs),
             "families": len(queued_jobs),
             "status_url": f"/v1/nodes/{int(node.id)}/backfill-status",
         },
         "failed": [],
+        "central_coverage_verified": bool(staged_install is not None),
         "message": (
-            "نود برای اشتراک‌های فعال منتشر و ساخت کانفیگ کاربران قبلی به صف پایدار سپرده شد. "
-            "از مدیریت نود می‌توان پیشرفت یا تلاش مجدد را دید؛ "
-            "محدودیت سرورهای پلن اقتصادی و ویژه جداگانه حفظ می‌شود"
+            "پوشش کانفیگ‌های نود مرکزی بررسی و نود بدون صف قدیمی منتشر شد"
+            if staged_install is not None
+            else "نود برای اشتراک‌های فعال منتشر و ساخت کانفیگ کاربران قبلی به صف پایدار سپرده شد"
         ),
     }
 
