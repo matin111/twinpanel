@@ -58,5 +58,24 @@ class CentralNodeStageTests(unittest.TestCase):
             db.commit.assert_not_called()
 
 
+    def test_unhealthy_protocols_block_membership_changes(self):
+        fake = MagicMock()
+        fake.retired_at = None
+        fake.node_type = NodeType.EXIT
+        fake.status = NodeStatus.ONLINE
+        fake.show_to_users = False
+        db = MagicMock()
+        db.get.return_value = fake
+        with (patch.object(stage, "SessionLocal") as session,
+              patch.object(stage, "eligible_count", return_value=1183),
+              patch.object(stage, "verify_new_exit_readiness", return_value={"ok": False}),
+              patch.object(stage, "establish_hidden_memberships") as insert):
+            session.return_value.__enter__.return_value = db
+            with self.assertRaisesRegex(RuntimeError, "PROTOCOLS_NOT_READY"):
+                stage._run_locked(14, 3000, True)
+            insert.assert_not_called()
+            db.commit.assert_not_called()
+
+
 if __name__ == "__main__":
     unittest.main()
