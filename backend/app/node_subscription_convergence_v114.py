@@ -40,6 +40,7 @@ _INITIAL_DELAY_SECONDS = 20
 
 _applied = False
 _task: asyncio.Task | None = None
+_central_task: asyncio.Task | None = None
 _last_topology_signature: str | None = None
 
 
@@ -77,7 +78,12 @@ def _eligible_exit_node_ids() -> list[int]:
             .all()
         )
         result: list[int] = []
+        from .services.central_runtime_ownership_v1 import is_central_node
         for node_id, access_created_at in rows:
+            # New-generation nodes have ONE daemon-wide reconciler.
+            # Never send them to old per-user classic/modern loops.
+            if is_central_node(db,int(node_id)):
+                continue
             if access_created_at is not None:
                 age = _age_seconds(access_created_at)
                 if age < _NEW_ACCESS_GRACE_SECONDS:
@@ -237,12 +243,12 @@ def _wanted_modern_protocols(
 
 
 def _modern_item_is_usable(ad: Any, db, protocol: str, item: dict[str, Any]) -> bool:
-    """Preserve staged central credentials without revealing a hidden Exit.
+    """Keep staged central-Exit items without making them customer-visible.
 
-    Customer delivery must reject hidden nodes. The legacy topology worker,
-    however, must not prune a hidden Exit already registered as central.
-    Read the same durable ownership marker used by central staging; the
-    production release does not yet include the new central engine module.
+    Customer delivery intentionally rejects hidden nodes, but this topology
+    reconciler must NEVER use that presentation rule to erase credential items
+    of an already centrally-owned hidden Exit. The central stage verifies
+    those items separately before publication.
     """
     node_id = _item_node_id(ad, item)
     if node_id <= 0:
@@ -256,14 +262,14 @@ def _modern_item_is_usable(ad: Any, db, protocol: str, item: dict[str, Any]) -> 
         if not ad._delivery_item_is_usable(db, protocol, item):
             return False
     else:
-        from .mother_access import get_value
-        # One ownership lookup per Exit and DB session, not per credential.
-        cache = db.info.setdefault("_central_hidden_exit_ownership", {})
-        if node_id not in cache:
-            cache[node_id] = (
-                get_value(db, f"vpn.central_runtime.exit.{node_id}", "") == "v1"
-            )
-        if not cache[node_id]:
+        from .services.central_runtime_ownership_v1 import is_central_node
+        # A topology scan may check thousands of credentials against the same
+        # hidden Exit. Query its ownership marker once per SQLAlchemy Session,
+        # not once per subscription/protocol item.
+        ownership = db.info.setdefault("_central_hidden_exit_ownership", {})
+        if node_id not in ownership:
+            ownership[node_id] = bool(is_central_node(db, node_id))
+        if not ownership[node_id]:
             return False
     cfg = (
         db.query(NodeProtocolConfig)
@@ -714,26 +720,33 @@ async def _convergence_loop() -> None:
 
 
 async def _startup() -> None:
-    global _task
-    if _task is not None and not _task.done():
-        return
-    _task = asyncio.create_task(
-        _convergence_loop(),
-        name="node-subscription-convergence-v299",
-    )
+    global _task, _central_task
+    if _task is None or _task.done():
+        _task = asyncio.create_task(
+            _convergence_loop(),
+            name="node-subscription-convergence-v299",
+        )
+    # A separate bounded daemon-level reconciler for all published central
+    # Exits. The old loop above filters them out entirely.
+    if _central_task is None or _central_task.done():
+        from .services.central_runtime_visible_convergence_v1 import loop
+        _central_task = asyncio.create_task(
+            loop(), name="central-runtime-visible-convergence-v1",
+        )
 
 
 async def _shutdown() -> None:
-    global _task
-    task = _task
+    global _task, _central_task
+    tasks=[t for t in (_task,_central_task) if t is not None]
     _task = None
-    if task is None:
-        return
-    task.cancel()
-    try:
-        await task
-    except asyncio.CancelledError:
-        pass
+    _central_task = None
+    for task in tasks:
+        task.cancel()
+    for task in tasks:
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
 
 
 def apply_node_subscription_convergence_v114() -> None:

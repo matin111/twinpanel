@@ -2542,10 +2542,10 @@ async def install_node(
                     str(exc)[:1800],
             }
 
-            if "tunnel_fabric" not in failed:
-                failed.append(
-                    "tunnel_fabric"
-                )
+            # Tunnel fabric is optional for an Exit with working direct
+            # listeners. Keep the error in fabric diagnostics, but NEVER
+            # fail direct node installation merely because an IR->Exit
+            # tunnel has not been established yet.
 
 
         # TWINPANEL_AUTO_QUOTA_AFTER_NODE_INSTALL_V1
@@ -2621,8 +2621,12 @@ async def install_node(
         subscription_sync = {
             "ok": True, "skipped": True, "reason": "not_run",
         }
-        if payload.defer_subscription_sync:
-            subscription_sync["reason"] = "deferred_to_central_publisher"
+        if payload.defer_subscription_sync or node.node_type == NodeType.EXIT:
+            # No Exit installation path may enter the legacy per-user
+            # provisioning function, even if a caller forgot to set
+            # defer_subscription_sync. The central daemon-level engine
+            # owns registration after health validation.
+            subscription_sync["reason"] = "deferred_to_central_runtime"
         else:
             try:
                 from .account_delivery import sync_installed_node_to_subscriptions
