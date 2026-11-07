@@ -22,6 +22,7 @@ from sqlalchemy import or_
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
+from app.services.central_runtime_ownership_v1 import allow_central_node
 from app.database import SessionLocal
 from app.models import (
     Node, NodeProtocolConfig, NodeStatus, NodeType,
@@ -148,7 +149,7 @@ async def run(node_id: int, limit: int, apply: bool) -> None:
         if (
             node is None or node.node_type != NodeType.EXIT
             or node.retired_at is not None or node.status != NodeStatus.ONLINE
-            or bool(node.show_to_users) or not bool(node.enable_cisco)
+            or not allow_central_node(db,node) or not bool(node.enable_cisco)
         ):
             raise RuntimeError("REQUIRES_HIDDEN_READY_EXIT")
         cfg = db.query(NodeProtocolConfig).filter_by(
@@ -176,7 +177,7 @@ async def run(node_id: int, limit: int, apply: bool) -> None:
         if not {int(r["id"]) for r in rows}.issubset(valid):
             raise RuntimeError("ELIGIBILITY_CHANGED_DURING_CISCO_STAGE")
         node = db.get(Node, node_id)
-        if not node or node.show_to_users:
+        if not node or not allow_central_node(db,node):
             raise RuntimeError("CISCO_NODE_VISIBILITY_CHANGED")
         host, port = ad._tunnel_access_endpoint(db, node, "cisco")
         creds = {
