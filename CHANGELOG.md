@@ -1,5 +1,14 @@
 # TwinPanel Changelog
 
+## 1.1.0-rc.659 — 2026-11-07
+
+### Connection client-download button restored
+- Stop moving hidden legacy client-card anchors into the active Connection footer. Instead create a clean, visible, keyboard-accessible action with the actual platform-specific download endpoint and no inherited hidden/inline display styles.
+- Preserve the original protocol actions and four equal-width Windows footer buttons; retain Android one full-width primary action and three secondary actions.
+- Verified with a synthetic DOM containing a hidden legacy app anchor that all 14 tested protocols display a distinct **دانلود برنامه** action with a valid protocol/device-specific endpoint, class and text, no `hidden` attribute or inline display suppression.
+- Download endpoints for Karing, OpenVPN, WireGuard, AmneziaWG, OpenConnect, TrustTunnel and Sudoku were checked from the running server. L2TP/IPsec uses an operating-system built-in client and does not require a standalone application installer.
+- This patch does not change VPN credentials, tunnels, protocol runtime or database schema. Interactive browser testing of every action remains pending.
+
 ## 1.1.0-rc.658 — 2026-11-07
 
 ### HTTP request database pool stability
