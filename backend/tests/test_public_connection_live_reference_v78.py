@@ -130,7 +130,6 @@ def test_unused_live_ping_is_not_publicly_registered():
         None,
     )
     assert route is None
-    assert "GET" in route.methods
     # app.main mounts the live hub, not the legacy hub_v5 router.
     main = (ROOT.parent / "main.py").read_text(encoding="utf-8")
     assert "app.include_router(public_connection_hub_live_v5_router)" in main
