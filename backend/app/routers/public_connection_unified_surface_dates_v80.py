@@ -1426,20 +1426,27 @@ _SCRIPT = r"""
          // A browser cannot force OpenVPN Connect into the OS Share targets.
          const shareFile=el('button','tp80-file-share','ارسال فایل به برنامه');
          shareFile.type='button';
-         shareFile.addEventListener('click',async event=>{
+         shareFile.addEventListener('click',event=>{
            event.preventDefault();event.stopPropagation();
-           const match=String(download.dataset.target||'')
-             .match(/^(?:hub-protocol-\d+-|cfg-|download-source-)(openvpn|wireguard|amneziawg)-(\d+)$/);
-           const token=location.pathname.split('/')[3]||'';
-           if(!match||!token)return;
+           // navigator.share must run while this tap still has user activation:
+           // no fetch/await and no programmatic second click in between.
+           const target=String(download.dataset.target||'');
+           const match=target.match(/^(?:hub-protocol-\d+-|cfg-|download-source-)(openvpn|wireguard|amneziawg)-(\d+)$/);
+           const config=document.getElementById(target)?.value;
+           if(!match||typeof config!=='string'||!config.trim()){
+             window.tpNativeShareMessage?.('فایل این سرور آماده نیست؛ از دکمه دانلود فایل استفاده کنید.');
+             return;
+           }
            const extension=match[1]==='openvpn'?'ovpn':'conf';
            const fallback=match[1]+'-'+(Number(match[2])+1)+'.'+extension;
            const rawName=String(download.dataset.filename||fallback);
            const filename=rawName.toLowerCase().endsWith('.'+extension)?rawName:rawName+'.'+extension;
            const mime=match[1]==='openvpn'?'application/x-openvpn-profile':'application/octet-stream';
-           const url='/v1/connect/'+token+'/file/'+match[1]+'/'+match[2];
-           if(typeof window.tpNativeShareFile==='function'){
-             await window.tpNativeShareFile(url,filename,mime);
+           if(typeof File==='function'&&typeof window.tpNativeShareFile==='function'){
+             const file=new File([config],filename,{type:mime});
+             window.tpNativeShareFile(file);
+           }else{
+             window.tpNativeShareMessage?.('مرورگر از ارسال مستقیم فایل پشتیبانی نمی‌کند؛ فایل را دانلود کنید.');
            }
          });
          // Web Share files is a mobile feature. Desktop Windows Chrome
