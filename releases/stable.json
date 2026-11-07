@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.632",
+  "version": "1.1.0-rc.633",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-07T00:21:05Z",
+  "released_at": "2026-11-07T00:24:02Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "e2f0046c18fc034c337145fb773608574112b425",
+  "source_sha": "886c92933582c7ed31e593131cc7741974826d35",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.632/twinpanel-1.1.0-rc.632-linux-x86_64.tar.gz",
-    "sha256": "2e3abd849d35007a444753412b856175c237fd36aa16a2b2d80bf0bb0b38ae9a",
-    "size_bytes": 29034263
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.633/twinpanel-1.1.0-rc.633-linux-x86_64.tar.gz",
+    "sha256": "98f1d0b4301972efd488843b0cd542f9c6961fc3ac7d54cd6f0b0a779198d876",
+    "size_bytes": 29034803
   },
   "notes": {
-    "fa": "پایلوت ایمن Bulk V2Ray با اجرای دستی ۱ تا ۱۰ کاربر و پیش‌فرض Dry-run؛ ثبت گروهی کاربران با Xray HandlerService، ذخیره پایدار Credential در مدیریت مرکزی و اصلاح Wrapper قدیمی Workerهای مستقل. پاکسازی لاگ آرشیوی نودها به‌صورت مستقل انجام شد؛ هیچ کانفیگ یا کاربری حذف نشد.",
-    "en": "Add opt-in bounded VLESS Bulk pilot (1-10 clients, dry-run default), no Xray restart, atomic config plus durable central publication; fix standalone workers to use production V47 hot-client composition instead of the legacy import hook. Existing users and UUIDs preserved."
+    "fa": "طراحی موبایل و دسکتاپ صفحه Connection مطابق طرح تأییدشده، بهبود دکمه‌های افزودن تکی با لینک‌های واقعی و حفظ کامل کانفیگ‌ها، پروتکل‌ها و آدرس سرورها.",
+    "en": "Approved responsive desktop/mobile Connection UI with existing-link single add controls; strictly no VPN config, protocol, endpoint or credentials changes."
   }
 }
