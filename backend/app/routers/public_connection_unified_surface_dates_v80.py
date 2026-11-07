@@ -166,6 +166,16 @@ body.tp80-connection .protocol-panel .v52-multi-card{order:28!important}
  body.tp80-connection .tp78-action-footer>.tp78-footer-action[data-kind="extra"]{grid-row:auto!important;grid-column:auto!important}
 }
 
+/* Legacy V36/V38 mobile accordion must never hide the selected active panel. */
+@media(max-width:720px){
+ html body.tp80-connection.v36-mobile-compact.v38-reference .protocol-panel.active,
+ html body.tp80-connection.v36-mobile-compact .protocol-panel.active{
+   display:flex!important;flex-direction:column!important;visibility:visible!important;
+ }
+ html body.tp80-connection.v36-mobile-compact.v38-reference .protocol-panel:not(.active),
+ html body.tp80-connection.v36-mobile-compact .protocol-panel:not(.active){display:none!important}
+}
+
 /* Shared minimal views: no stale RTT/presence, no extra prepared-file banners. */
 html body.tp80-connection .ref71-rtt,
 html body.tp80-connection .ref67-status,
@@ -342,8 +352,21 @@ _SCRIPT = r"""
    const panel=panels().find(item=>item.id===chosen?.dataset.protocol);
    if(!panel)return;
    selectedProtocol=chosen.dataset.protocol;
-   choices.forEach(choice=>choice.classList.toggle('active',choice===chosen));
-   panels().forEach(item=>item.classList.toggle('active',item===panel));
+   choices.forEach(choice=>{
+     const active=choice===chosen;
+     choice.classList.toggle('active',active);
+     choice.setAttribute('aria-expanded',active?'true':'false');
+   });
+   const compact=document.body.classList.contains('v36-mobile-compact');
+   panels().forEach(item=>{
+     const active=item===panel;
+     item.classList.toggle('active',active);
+     // Legacy V36/V38 require v36-open AND active on phones. Keep both
+     // synchronized; otherwise the selected mobile panel stays display:none.
+     if(compact)item.classList.toggle('v36-open',active);
+     else item.classList.remove('v36-open');
+     item.setAttribute('aria-hidden',active?'false':'true');
+   });
  }
  document.addEventListener('click',event=>{
    const card=event.target.closest('.protocol-choice[data-protocol]');
