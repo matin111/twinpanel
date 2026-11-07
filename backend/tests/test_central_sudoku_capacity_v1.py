@@ -4,7 +4,7 @@ from __future__ import annotations
 import unittest
 
 from app.services.central_sudoku_capacity_v1 import (
-    MAX_LEGACY_SUDOKU_SERVICES, sudoku_port, capacity_report,
+    MAX_SUDOKU_STAGE_SERVICES, sudoku_port, capacity_report,
 )
 
 
@@ -20,16 +20,21 @@ class SudokuCapacityTests(unittest.TestCase):
         self.assertEqual(report["reason"],"PORT_COLLISION")
         self.assertEqual(report["port_collisions"],1)
 
-    def test_unvalidated_thousands_of_services_are_rejected(self):
+    def test_1900_users_pass_port_preflight_but_still_require_remote_ram(self):
         report=capacity_report(range(1,1901))
-        self.assertFalse(report["ok"])
-        self.assertEqual(report["reason"],"TOO_MANY_PER_USER_SERVICES")
+        self.assertTrue(report["ok"])
+        self.assertTrue(report["node_runtime_admission_required"])
         self.assertEqual(report["eligible"],1900)
 
     def test_small_unambiguous_canary_passes_capacity_preflight(self):
-        report=capacity_report(range(1,MAX_LEGACY_SUDOKU_SERVICES+1))
+        report=capacity_report(range(1,MAX_SUDOKU_STAGE_SERVICES+1))
         self.assertTrue(report["ok"])
         self.assertEqual(report["reason"],"CAPACITY_PRECHECK_OK")
+
+    def test_stage_above_hard_limit_rejected(self):
+        report=capacity_report(range(1,MAX_SUDOKU_STAGE_SERVICES+2))
+        self.assertFalse(report["ok"])
+        self.assertEqual(report["reason"],"TOO_MANY_PER_USER_SERVICES")
 
     def test_invalid_subscription_id_fails(self):
         with self.assertRaises(ValueError):
