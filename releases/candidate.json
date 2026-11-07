@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.674",
-  "source_sha": "7ddea97b81d9e5f1b90de93687e3960fa7721c72",
+  "version": "1.1.0-rc.675",
+  "source_sha": "f6be64ba32b4789993fc3bf9fe49f8b38922632a",
   "notes": {
-    "fa": "نسخه rc.674: اصلاح دائمی ثبت آنلاین و حجم مصرفی OpenVPN/Cisco/L2TP و Xray با پردازش بهینه و خطایابی مجزای هر کاربر؛ اصلاح نمایش فعالیت اخیر V2Ray با توجه به تناوب جمع‌آوری واقعی؛ سبزشدن پروتکل و کشور تنها بر پایه نشست یا ترافیک واقعی؛ اعداد انگلیسی در سراسر رابط Connection موبایل و دسکتاپ؛ تست‌های رگرسیون. بدون تغییر در کاربران، رمزها، پلن‌ها، مدت و حجم اشتراک‌ها.",
-    "en": "rc.674: Persist optimized live OpenVPN/Cisco/L2TP/Xray telemetry and per-client accounting fault isolation; correctly display V2Ray's recently observed traffic across the slower collector cadence, with truthful active country highlighting; render English digits in the public desktop/mobile Connection UI without modifying configuration payloads. Include regression tests; keep all user credentials, plans, durations and quotas untouched."
+    "fa": "نسخه rc.675: اصلاح ریشه‌ای خطای نصب نود جدید پس از آماده‌شدن ۱۶ پروتکل. حذف اجرای quota_bootstrap_v1.py و محیط Python ناموجود؛ راه‌اندازی quota با سرویس مرکزی معتبر agent-pull و سیاست fail-closed، جلوگیری از پاک‌کردن سهمیه نودهای دارای کاربر و تفکیک خطای quota از خرابی واقعی پروتکل. بدون تغییر رمز، مدت و حجم اشتراک‌ها یا مالکیت نودهای قدیمی.",
+    "en": "rc.675 fixes the new Exit installer false PROTOCOL_SETUP_INCOMPLETE after 16/16 healthy listeners. Replaces a missing quota bootstrap script and missing interpreter path with canonical agent-pull quota configuration, safe only for a fresh hidden Exit without assigned subscriptions and with fail-closed telemetry. Exposes quota failures separately; preserves users, credentials, quotas and old node ownership."
   }
 }
