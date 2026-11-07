@@ -134,7 +134,7 @@ async def stage(node_id: int, limit: int, apply: bool):
             pending.append((sub, cred, items, secret))
         print("CENTRAL_SUDOKU_PLAN", json.dumps({
             "node_id": node_id, "eligible": len(subs), "missing": len(pending),
-            "write_enabled": apply, "one_remote_restart": bool(pending),
+            "write_enabled": apply, "max_bounded_services": MAX_USERS,
         }), flush=True)
         if not apply or not pending:
             db.rollback()
@@ -143,31 +143,33 @@ async def stage(node_id: int, limit: int, apply: bool):
             verify_new_exit_readiness(db, node_id), timeout=510)
         if not health.get("ok"):
             raise RuntimeError("SUDOKU_STAGE_16_PROTOCOLS_NOT_READY")
-        # Record the secrets BEFORE remote apply to preserve retry identity.
-        identities = {}
-        for sub, cred, items, secret in pending:
-            if secret is None:
-                secret = await new_account_secret(conn, "sudoku", int(sub.id))
-                if cred is None:
-                    cred = ProtocolCredential(
-                        subscription_id=sub.id, protocol="sudoku")
-                    db.add(cred)
-                cred.secret_encrypted = ad._enc(secret_to_dict(secret))
-                cred.username = secret.username
-                cred.is_active = True
-            identities[int(sub.id)] = secret
-        db.refresh(node)
-        if node.show_to_users:
-            raise RuntimeError("SUDOKU_NODE_PUBLISHED_DURING_IDENTITY_STAGE")
-        db.commit()
-        rows = [
-            {"subscription_id":int(value.subscription_id),
-             "port":int(value.sudoku_port),
-             "master_public":value.sudoku_master_public_key}
-            for value in identities.values()
-        ]
-        verify_accounts(rows)
+        # Use one management connection for keygen and service bulk apply.
+        conn = await asyncio.wait_for(connect_protocol_runtime(node, db), timeout=25)
         try:
+            # Record the secrets BEFORE remote apply to preserve retry identity.
+            identities = {}
+            for sub, cred, items, secret in pending:
+                if secret is None:
+                    secret = await new_account_secret(conn, "sudoku", int(sub.id))
+                    if cred is None:
+                        cred = ProtocolCredential(
+                            subscription_id=sub.id, protocol="sudoku")
+                        db.add(cred)
+                    cred.secret_encrypted = ad._enc(secret_to_dict(secret))
+                    cred.username = secret.username
+                    cred.is_active = True
+                identities[int(sub.id)] = secret
+            db.refresh(node)
+            if node.show_to_users:
+                raise RuntimeError("SUDOKU_NODE_PUBLISHED_DURING_IDENTITY_STAGE")
+            db.commit()
+            rows = [
+                {"subscription_id":int(value.subscription_id),
+                 "port":int(value.sudoku_port),
+                 "master_public":value.sudoku_master_public_key}
+                for value in identities.values()
+            ]
+            verify_accounts(rows)
             ack = await apply_bulk(conn, rows)
         finally:
             conn.close()
