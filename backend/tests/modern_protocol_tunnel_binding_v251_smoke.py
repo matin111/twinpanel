@@ -16,6 +16,7 @@ EXPECTED = {
     "naive",
     "shadowtls",
     "snell",
+    "socks5",
     "mieru",
     "trusttunnel",
     "amneziawg",
@@ -32,6 +33,7 @@ FIXED_EXPECTED_EXIT6 = {
     "mieru": 35006,
     "trusttunnel": 36006,
     "amneziawg": 37006,
+    "socks5": 38006,
 }
 
 
@@ -102,7 +104,7 @@ def test_registry() -> None:
 
     fixed_ports = set(actual.values())
     assert len(fixed_ports) == len(actual)
-    assert all(28000 <= value <= 37999 for value in fixed_ports)
+    assert all(28000 <= value <= 38999 for value in fixed_ports)
     assert not any(30000 <= value <= 30999 for value in fixed_ports)
     assert not any(20000 <= value <= 27999 for value in fixed_ports)
     assert binding.SUDOKU_PUBLIC_PORT_START == 40000
@@ -157,6 +159,72 @@ def test_singbox_rewrite_preserves_tls_identity() -> None:
     assert outbound["server"] == "193.39.9.222"
     assert outbound["server_port"] == 28006
     assert outbound["tls"]["server_name"] == "exit.example.invalid"
+
+
+def test_socks5_tunnel_route_and_authentication() -> None:
+    # SOCKS5 is supported by the normal sing-box runtime; tunnel binding
+    # must forward only to an online managed listener, using a unique ingress
+    # port rather than opening an anonymous proxy on the Iran host.
+    exit_node = SimpleNamespace(
+        id=6, public_domain=None, public_ip="204.10.192.96",
+    )
+    iran = SimpleNamespace(
+        id=2, public_domain=None, public_ip="193.39.9.222",
+    )
+    online = SimpleNamespace(port=10808, transport="tcp", status="online")
+    offline = SimpleNamespace(port=10808, transport="tcp", status="not_installed")
+    original_cfg = binding._configured_modern_protocols
+    original_iran = binding._selected_iran_node
+    try:
+        binding._configured_modern_protocols = lambda db, node_id: {"socks5": online}
+        binding._selected_iran_node = lambda db, node: iran
+
+        routes = binding._modern_routes_for_exit(None, exit_node, "10.253.0.26")
+        assert len(routes) == 1
+        assert routes[0] == {
+            "protocol": "socks5", "exit_node_id": 6,
+            "public_port": 38006, "target_ip": "10.253.0.26",
+            "target_port": 10808, "transport": "tcp", "client_subnet": None,
+        }
+        assert binding._modern_tunnel_endpoint(None, exit_node, "socks5", 21) == (
+            "193.39.9.222", 38006,
+        )
+        item = {
+            "server": "204.10.192.96",
+            "port": 10808,
+            "outbound": {
+                "type": "socks", "tag": "twinpanel-socks5",
+                "version": "5", "network": "tcp",
+                "server": "204.10.192.96", "server_port": 10808,
+                "username": "subscription-21", "password": "do-not-rewrite",
+            },
+        }
+        unrelated = {"type": "direct", "tag": "direct"}
+        item["config"] = json.dumps({
+            "outbounds": [dict(item["outbound"]), unrelated],
+            "route": {"final": "twinpanel-socks5"},
+        })
+        binding._rewrite_modern_item(item, "socks5", "193.39.9.222", 38006)
+        assert item["server"] == "193.39.9.222"
+        assert item["port"] == 38006
+        assert item["outbound"]["server"] == "193.39.9.222"
+        assert item["outbound"]["server_port"] == 38006
+        assert item["outbound"]["type"] == "socks"
+        assert item["outbound"]["username"] == "subscription-21"
+        assert item["outbound"]["password"] == "do-not-rewrite"
+        doc = json.loads(item["config"])
+        assert doc["outbounds"][0] == item["outbound"]
+        assert doc["outbounds"][1] == unrelated
+
+        binding._configured_modern_protocols = lambda db, node_id: {"socks5": offline}
+        assert binding._modern_routes_for_exit(None, exit_node, "10.253.0.26") == []
+        assert binding._modern_tunnel_endpoint(None, exit_node, "socks5", 21) is None
+        binding._configured_modern_protocols = lambda db, node_id: {}
+        assert binding._modern_routes_for_exit(None, exit_node, "10.253.0.26") == []
+        assert binding._modern_tunnel_endpoint(None, exit_node, "socks5", 21) is None
+    finally:
+        binding._configured_modern_protocols = original_cfg
+        binding._selected_iran_node = original_iran
 
 
 def test_mieru_rewrite() -> None:
@@ -285,6 +353,7 @@ def main() -> None:
     test_exit_domain_over_iran_hostname()
     test_transport_normalisation()
     test_singbox_rewrite_preserves_tls_identity()
+    test_socks5_tunnel_route_and_authentication()
     test_mieru_rewrite()
     test_amneziawg_rewrite()
     test_sudoku_rewrite()
@@ -293,7 +362,7 @@ def main() -> None:
 
     print(
         "TWINPANEL_MODERN_PROTOCOL_TUNNEL_BINDING_V251_SMOKE_OK "
-        "protocols=hysteria2,tuic,anytls,naive,shadowtls,snell,mieru,trusttunnel,amneziawg,sudoku "
+        "protocols=hysteria2,tuic,anytls,naive,shadowtls,snell,socks5,mieru,trusttunnel,amneziawg,sudoku "
         "legacy_five=preserved delivery=iran-ingress active_transport=unified-l3"
     )
 

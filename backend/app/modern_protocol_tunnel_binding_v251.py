@@ -32,7 +32,7 @@ from .standalone_subscription_accounts import _sudoku_port
 # Public-port ranges intentionally follow the existing per-Exit convention:
 #   legacy service ports : 20000..23999
 #   Xray public profiles : 24000..27999
-#   modern fixed ports   : 28000..37999 (30000 block intentionally unused)
+#   modern fixed ports   : 28000..38999 (30000 block intentionally unused)
 #   Sudoku dynamic ports : 40000..49999
 #
 # Sudoku is different: each subscription owns a distinct listener on the Exit,
@@ -54,6 +54,9 @@ FIXED_PUBLIC_PORT_BASE: dict[str, int] = {
     "mieru": 35000,
     "trusttunnel": 36000,
     "amneziawg": 37000,
+    # Authenticated SOCKS5 ingress on the selected Iran->Exit tunnel.
+    # Reserve 38000..38999 for Exit IDs 1..999; no existing route shares it.
+    "socks5": 38000,
 }
 
 MODERN_TUNNEL_PROTOCOLS = frozenset({
@@ -68,6 +71,7 @@ SINGBOX_TUNNEL_PROTOCOLS = frozenset({
     "naive",
     "shadowtls",
     "snell",
+    "socks5",
 })
 
 SUDOKU_PUBLIC_PORT_START = 40000
@@ -242,6 +246,11 @@ def _modern_routes_for_exit(db, exit_node: Node, exit_tunnel_ip: str) -> list[di
         cfg = configs.get(protocol)
         if cfg is None:
             continue
+        # A SOCKS proxy should never have an ingress port forwarded unless
+        # the managed, authenticated sing-box listener is actually installed.
+        # Other protocols retain their existing route lifecycle unchanged.
+        if protocol == "socks5" and _enum_value(cfg.status) != "online":
+            continue
 
         definition = PROTOCOL_CATALOG.get(protocol) or {}
         target_port = int(cfg.port or definition.get("default_port") or 0)
@@ -335,6 +344,14 @@ def _modern_tunnel_endpoint(
     if protocol not in MODERN_TUNNEL_PROTOCOLS:
         return None
 
+    # Do not publish a tunnel endpoint until the authenticated listener is
+    # online and its matching ingress NAT mapping is desired. This prevents
+    # exposing a dead route or a stale port from a removed SOCKS5 service.
+    if protocol == "socks5":
+        config = _configured_modern_protocols(db, int(exit_node.id)).get("socks5")
+        if config is None or _enum_value(config.status) != "online":
+            return None
+
     iran = _selected_iran_node(db, exit_node)
     if iran is None:
         return None
@@ -365,8 +382,12 @@ def _modern_tunnel_endpoint(
 
 
 def _rewrite_singbox_item(result: dict[str, Any], protocol: str, host: str, port: int) -> None:
+    # SOCKS5 is the catalog/provisioning name; sing-box outbound type is
+    # `socks`. Match the actual schema or credentials keep pointing at the
+    # Exit server even after the top-level endpoint is tunnel-rewritten.
+    outbound_type = "socks" if protocol == "socks5" else protocol
     outbound = result.get("outbound")
-    if isinstance(outbound, dict) and _enum_value(outbound.get("type")) == protocol:
+    if isinstance(outbound, dict) and _enum_value(outbound.get("type")) == outbound_type:
         updated = dict(outbound)
         updated["server"] = host
         updated["server_port"] = int(port)
@@ -389,7 +410,7 @@ def _rewrite_singbox_item(result: dict[str, Any], protocol: str, host: str, port
     for candidate in outbounds:
         if not isinstance(candidate, dict):
             continue
-        if _enum_value(candidate.get("type")) != protocol:
+        if _enum_value(candidate.get("type")) != outbound_type:
             continue
         candidate["server"] = host
         candidate["server_port"] = int(port)
@@ -660,6 +681,7 @@ def apply_modern_protocol_tunnel_binding_v251() -> None:
             "naive": "NaiveProxy",
             "shadowtls": "ShadowTLS",
             "snell": "Snell",
+            "socks5": "SOCKS5 Proxy",
             "mieru": "Mieru",
             "trusttunnel": "TrustTunnel",
             "amneziawg": "AmneziaWG",
@@ -671,7 +693,7 @@ def apply_modern_protocol_tunnel_binding_v251() -> None:
     _RUNTIME_APPLIED = True
     print(
         "TWINPANEL_MODERN_PROTOCOL_TUNNEL_BINDING_V251_ACTIVE "
-        "fixed=hysteria2,tuic,anytls,naive,shadowtls,snell,mieru,trusttunnel,amneziawg "
+        "fixed=hysteria2,tuic,anytls,naive,shadowtls,snell,socks5,mieru,trusttunnel,amneziawg "
         "dynamic=sudoku authority=active-logical-tunnel delivery=iran-ingress",
         flush=True,
     )
