@@ -82,6 +82,12 @@ def test_manual_credentials_rehydration_preserves_actual_copy_controls():
     assert "panel.querySelector(':scope > .tp80-credentials')" in ui
     assert "panel.dataset.tp80NativeReady='1'" in ui
 
+def test_v40_cannot_hide_real_v39_mobile_protocol_choice():
+    authority=code("public_connection_mobile_authority_v40.py")
+    assert "protocol-choice:not(.v40-real-protocol):not(.v39-real-protocol)" in authority
+    assert "protocol-choice:not(.v40-real-protocol){" not in authority
+
+
 def test_refiner_last_idempotent_and_js_valid():
     chain=code("public_connection_canonical_mobile_v26.py")
     assert "source = refine_public_connection_live_reference_v78(source)" in chain
