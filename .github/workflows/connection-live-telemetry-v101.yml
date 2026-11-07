@@ -11,6 +11,10 @@ on:
       - 'backend/app/services/quota_runtime_reconcile.py'
       - 'backend/app/services/l2tp_quota_runtime_v113.py'
       - 'backend/tests/test_connection_live_telemetry_v101.py'
+      - 'backend/tests/test_connection_render_fast_v103.py'
+      - 'backend/app/routers/public_connection_payload_fast_v1.py'
+      - 'backend/app/routers/account_delivery.py'
+      - 'backend/app/mother_subscription_delivery_policy_v108.py'
   pull_request:
     paths:
       - 'backend/app/routers/public_connection_live_v4.py'
@@ -20,6 +24,10 @@ on:
       - 'backend/app/services/quota_runtime_reconcile.py'
       - 'backend/app/services/l2tp_quota_runtime_v113.py'
       - 'backend/tests/test_connection_live_telemetry_v101.py'
+      - 'backend/tests/test_connection_render_fast_v103.py'
+      - 'backend/app/routers/public_connection_payload_fast_v1.py'
+      - 'backend/app/routers/account_delivery.py'
+      - 'backend/app/mother_subscription_delivery_policy_v108.py'
   workflow_dispatch:
 
 permissions:
@@ -39,3 +47,5 @@ jobs:
           node-version: '22'
       - name: Verify Connection telemetry and English-number UI
         run: python -m unittest discover -s backend/tests -p 'test_connection_live_telemetry_v101.py' -v
+      - name: Verify Connection rendering/SQL cache/PNG QR regressions
+        run: python -m unittest discover -s backend/tests -p 'test_connection_render_fast_v103.py' -v
