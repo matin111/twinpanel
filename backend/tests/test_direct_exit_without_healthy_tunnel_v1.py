@@ -2,12 +2,19 @@
 from __future__ import annotations
 
 import os
+import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
-# CI uses an in-memory database. No customer data or network access.
+# The application bootstrap requires a real SQLite file and QueuePool options.
+# All tests below use a separate in-memory SQLite engine, with no customer data.
+_ci_bootstrap = tempfile.TemporaryDirectory(prefix="direct-exit-fallback-ci-")
 os.environ.setdefault("APP_SECRET_KEY", "ci-only-direct-fallback-key")
-os.environ.setdefault("DATABASE_URL", "sqlite+pysqlite:///:memory:")
+os.environ.setdefault(
+    "DATABASE_URL",
+    f"sqlite+pysqlite:///{Path(_ci_bootstrap.name) / 'bootstrap.sqlite3'}",
+)
 os.environ.setdefault("NODE_AGENT_SHARED_SECRET", "ci-only-direct-fallback-secret")
 
 from sqlalchemy import create_engine
