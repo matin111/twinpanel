@@ -224,7 +224,7 @@ async def _collect_l2tp_sessions(
 
 
 def _l2tp_device_map(db, node_id: int) -> dict[str, dict]:
-    devices = build_node_devices(db, int(node_id))
+    devices = build_node_devices(db, int(node_id), source_protocols={'l2tp'})
     result: dict[str, dict] = {}
 
     for item in devices:
