@@ -490,6 +490,34 @@ _SCRIPT = r"""
    span.textContent=String(tab.textContent||'').trim();
    return span;
  }
+ // Local vector flags avoid Windows rendering a country code instead of an
+ // emoji and still work when flagcdn is inaccessible. Unknown ISO codes retain
+ // the existing CDN artwork as a graceful extension.
+ function knownFlag(code){
+   const bands=(colors,vertical=false)=>colors.map((color,i)=>{
+     const d=vertical?{x:i*12,y:0,w:12,h:24}:{x:0,y:i*8,w:36,h:8};
+     return '<rect x="'+d.x+'" y="'+d.y+'" width="'+d.w+'" height="'+d.h+'" fill="'+color+'"/>';
+   }).join('');
+   const star='<polygon points="28,7 29.1,10.2 32.5,10.2 29.8,12.2 30.8,15.7 28,13.7 25.2,15.7 26.2,12.2 23.5,10.2 26.9,10.2" fill="#fff"/>';
+   const paths={
+     DE:bands(['#171717','#dd1e2d','#ffce00']),
+     NL:bands(['#ae1c28','#fff','#21468b']),
+     FR:bands(['#0055a4','#fff','#ef4135'],true),
+     TR:'<rect width="36" height="24" fill="#e30a17"/><circle cx="15" cy="12" r="7" fill="#fff"/><circle cx="17.5" cy="12" r="5.6" fill="#e30a17"/>'+star,
+     US:'<rect width="36" height="24" fill="#fff"/>'+Array.from({length:7},(_,i)=>'<rect y="'+i*3.6923+'" width="36" height="1.85" fill="#b22234"/>').join('')+'<rect width="16" height="13" fill="#3c3b6e"/>'+Array.from({length:15},(_,i)=>'<circle cx="'+(2+i%5*3)+'" cy="'+(2+Math.floor(i/5)*4)+'" r=".7" fill="#fff"/>').join(''),
+     GB:'<rect width="36" height="24" fill="#012169"/><path d="M0 0L36 24M36 0L0 24" stroke="#fff" stroke-width="6"/><path d="M0 0L36 24M36 0L0 24" stroke="#c8102e" stroke-width="2.5"/><path d="M18 0V24M0 12H36" stroke="#fff" stroke-width="9"/><path d="M18 0V24M0 12H36" stroke="#c8102e" stroke-width="4.5"/>'
+   };
+   if(!paths[code])return '';
+   const svg='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 24" width="36" height="24">'+paths[code]+'</svg>';
+   return 'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);
+ }
+ function countryImage(country){
+   const img=el('img','tp80-country-image');
+   img.alt=country;img.loading='eager';
+   img.src=knownFlag(country)||'https://flagcdn.com/w40/'+country.toLowerCase()+'.png';
+   img.onerror=()=>{img.replaceWith(el('span','tp80-country-fallback',country))};
+   return img;
+ }
  function normalizeNative(panel){
    const type=String(panel.dataset.ref67NativeProtocol||panel.dataset.v34Protocol||'').toLowerCase();
    if(!Native.has(type)||!panel.querySelector('.tp77-native-list'))return;
@@ -540,17 +568,15 @@ _SCRIPT = r"""
        // displayed as DE/US/TR letters, not the flag artwork). Prefer the
        // actual icon already in the visible node row.
        const index=group.indices[0];
-       const source=rows[index]?.querySelector('.tp77-native-label img')||
-         group.tab.querySelector('img');
-       if(source){
-         const img=source.cloneNode(true);
-         img.classList.add('tp80-country-image');img.alt=country;btn.append(img);
-       }else if(country!=='OTHER'){
-         const img=el('img','tp80-country-image');
-         img.alt=country;img.loading='lazy';
-         img.src='https://flagcdn.com/w40/'+country.toLowerCase()+'.png';
-         img.onerror=()=>{img.replaceWith(el('span','tp80-country-fallback',country))};
-         btn.append(img);
+       if(country!=='OTHER')btn.append(countryImage(country));
+       // Use exactly the same artwork inside each node row as the filter.
+       for(const index of group.indices){
+         const label=rows[index]?.querySelector('.tp77-native-label');
+         if(!label)continue;
+         const flag=label.querySelector('img');
+         const uri=knownFlag(country);
+         if(flag&&uri){flag.src=uri;flag.alt=country}
+         else if(!flag)label.prepend(countryImage(country));
        }
        btn.append(document.createTextNode(' '+country+(group.indices.length>1?' ('+group.indices.length+')':'')));
        btn.addEventListener('click',()=>filterByCountry(country));
