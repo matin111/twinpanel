@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import re
-from io import BytesIO
-from zipfile import ZIP_DEFLATED, ZipFile
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -18,7 +16,6 @@ router = APIRouter(tags=["public-connection-files-v9"])
 _FILE_TYPES = {
     "openvpn": ("ovpn", "application/x-openvpn-profile"),
     "wireguard": ("conf", "application/octet-stream"),
-    "amneziawg": ("conf", "application/octet-stream"),
 }
 
 
@@ -98,61 +95,6 @@ def public_connection_file_v9(
         media_type=media_type,
         headers={
             "Content-Disposition": f'attachment; filename="{filename}"',
-            "Cache-Control": "private, no-store",
-            "X-Content-Type-Options": "nosniff",
-        },
-    )
-
-
-@router.get(
-    "/{token}/files/{protocol}",
-    name="public_connection_files_zip_v81",
-)
-def public_connection_files_zip_v81(
-    token: str,
-    protocol: str,
-    db: Session = Depends(get_db),
-):
-    """One real ZIP archive containing only existing entitled protocol config files.
-
-    The file content is read directly from the authenticated subscription
-    payload, just like individual /file/ downloads. No conversion, mutations,
-    synthetic credentials, or failed/blank profile placeholders.
-    """
-    protocol = str(protocol or "").strip().lower()
-    if protocol not in _FILE_TYPES:
-        raise HTTPException(status_code=404, detail="دانلود گروهی این پروتکل پشتیبانی نمی‌شود")
-    payload = _active_payload(token, db)
-    items = _items_for_protocol(payload, protocol)
-    valid = []
-    seen = set()
-    for index, item in enumerate(items):
-        config = str(item.get("config") or "").strip()
-        if not config:
-            continue
-        # Per-subscription bounded output, protects memory and large ZIP downloads.
-        if len(valid) >= 200 or sum(len(body) for _, body in valid) + len(config) > 10_000_000:
-            raise HTTPException(status_code=413, detail="حجم فایل‌های خروجی بیش از حد مجاز است")
-        filename = _safe_filename(item.get("filename"), protocol, index)
-        base, dot, extension = filename.rpartition(".")
-        target = filename
-        suffix = 2
-        while target.lower() in seen:
-            target = f"{base}-{suffix}.{extension}" if dot else f"{filename}-{suffix}"
-            suffix += 1
-        seen.add(target.lower())
-        valid.append((target, config))
-    if not valid:
-        raise HTTPException(status_code=404, detail="فایل آماده‌ای برای این پروتکل وجود ندارد")
-    output = BytesIO()
-    with ZipFile(output, "w", compression=ZIP_DEFLATED, compresslevel=6) as archive:
-        for filename, content in valid:
-            archive.writestr(filename, content.encode("utf-8"))
-    return Response(
-        content=output.getvalue(),
-        media_type="application/zip",
-        headers={
-            "Content-Disposition": f'attachment; filename="{protocol}-configs.zip"',
             "Cache-Control": "private, no-store",
             "X-Content-Type-Options": "nosniff",
         },
