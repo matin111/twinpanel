@@ -21,7 +21,7 @@ from pathlib import Path
 BACKEND = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND))
 
-PROTOCOLS = ("singbox", "openvpn", "cisco", "wireguard", "l2tp", "v2ray")
+PROTOCOLS = ("singbox", "openvpn", "cisco", "wireguard", "l2tp", "v2ray", "standalone")
 SOURCES = ("eylan", "sanaei", "marzban", "pasargad")
 
 
@@ -87,7 +87,14 @@ def eligible_count(db, node_id: int, protocol: str, subscription_id: int | None 
     if protocol != "singbox":
         query = query.join(
             SubscriptionProtocol, SubscriptionProtocol.subscription_id == Subscription.id
-        ).filter(SubscriptionProtocol.protocol == protocol)
+        )
+        if protocol == "standalone":
+            from app.standalone_subscription_accounts import STANDALONE_ACCOUNT_PROTOCOLS
+            query = query.filter(SubscriptionProtocol.protocol.in_(
+                tuple(STANDALONE_ACCOUNT_PROTOCOLS),
+            ))
+        else:
+            query = query.filter(SubscriptionProtocol.protocol == protocol)
     return int(query.scalar() or 0)
 
 
@@ -113,6 +120,14 @@ async def apply_cycle(
     node_id: int, protocol: str, max_pairs: int, subscription_id: int | None = None,
     *, include_all_active: bool = False,
 ) -> tuple[int, int]:
+    if protocol == "standalone":
+        from scripts.twinpanel_standalone_node_backfill_v1 import run_one_node
+        count = await run_one_node(
+            node_id, subscription_id=subscription_id,
+            include_all_active=include_all_active, max_pairs=max_pairs,
+        )
+        return 0, int(count)
+
     if protocol == "singbox":
         # Same lock that the existing standalone migration worker uses.
         os.environ["MIGRATION_SINGBOX_BATCH_SIZE"] = str(max_pairs)
@@ -180,6 +195,7 @@ def main(argv: list[str] | None = None) -> int:
     # bounded. Never start it inside FastAPI or during node HTTP publishing.
     lock_name = (
         "/run/twinpanel-migration-singbox-batch.lock" if args.protocol == "singbox"
+        else "/run/twinpanel-standalone-account-backfill.lock" if args.protocol == "standalone"
         else "/run/twinpanel-migration-classic-direct.lock"
     )
     with open(lock_name, "a+") as lock:

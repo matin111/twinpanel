@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..deps import require_admin
 from ..models import Node, NodeType
+from ..node_backfill_scope_models_v1 import NodeBackfillScopeV1
 from ..services.node_auto_backfill_v1 import enqueue_node_backfill, job_status
 from . import modern_legacy_reconcile_lockfix_v2 as _modern_lockfix  # noqa: F401
 from . import publish_node_all_users_v1 as legacy_publish
@@ -115,6 +116,16 @@ async def publish_node_to_all_users_v2(
         # Queue missing credentials in the SAME transaction as user
         # memberships. The independent timer worker does the actual SSH and
         # retries; this HTTP request remains fast for thousands of accounts.
+        # Explicit admin publication activates ONE scope for migrated and
+        # newly created eligible subscriptions. The scope is persisted in
+        # this transaction, not a global switch affecting old nodes.
+        scope = db.get(NodeBackfillScopeV1, int(node.id), with_for_update=True)
+        if scope is None:
+            scope = NodeBackfillScopeV1(node_id=int(node.id), include_all_active=True)
+            db.add(scope)
+        else:
+            scope.include_all_active = True
+        db.flush()  # Persist the scope before the queue reads it.
         queued_jobs = enqueue_node_backfill(db, int(node.id))
         db.commit()
     except Exception:

@@ -13,6 +13,7 @@ from sqlalchemy.pool import StaticPool
 from app.database import Base
 from app.models import Node, NodeStatus, NodeType
 from app.node_backfill_job_models_v1 import NodeBackfillJobV1
+from app.node_backfill_scope_models_v1 import NodeBackfillScopeV1
 from app.routers.publish_node_all_users_v2 import publish_node_to_all_users_v2
 
 
@@ -25,7 +26,7 @@ class SetBasedPublishContracts(unittest.TestCase):
             "sqlite://", connect_args={"check_same_thread": False},
             poolclass=StaticPool,
         )
-        Base.metadata.create_all(self.engine, tables=[Node.__table__, NodeBackfillJobV1.__table__])
+        Base.metadata.create_all(self.engine, tables=[Node.__table__, NodeBackfillJobV1.__table__, NodeBackfillScopeV1.__table__])
         with self.engine.begin() as conn:
             conn.exec_driver_sql("""
                 CREATE TABLE subscriptions (

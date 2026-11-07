@@ -21,6 +21,7 @@ sys.path.insert(0, str(BACKEND))
 
 from app.database import SessionLocal
 from app.services.node_auto_backfill_v1 import claim_next, finish_claim, repair_missing_v2ray_jobs
+from app.node_backfill_scope_models_v1 import NodeBackfillScopeV1
 from app.services.central_backfill_priority_v1 import new_account_work_has_priority
 from scripts.twinpanel_existing_node_backfill_v1 import api_healthy
 
@@ -92,9 +93,26 @@ def sanitized_backfill_error(stdout: str, exit_code: int) -> str:
     return f"BACKFILL_EXIT_{int(exit_code)}"
 
 
-def _unified_all_active_enabled() -> bool:
-    """Opt-in first: do not change live migrated-account handling on upgrade."""
-    return os.getenv("TWINPANEL_UNIFIED_NODE_BACKFILL_V1", "0") == "1"
+def _unified_all_active_enabled(node_id: int | None = None) -> bool:
+    """Unify newly published nodes without changing historical legacy jobs.
+
+    The emergency/global opt-in remains supported. A new node's explicit
+    publish action records a per-node scope; a release alone does not alter
+    existing node selections.
+    """
+    if os.getenv("TWINPANEL_UNIFIED_NODE_BACKFILL_V1", "0") == "1":
+        return True
+    if node_id is None:
+        return False
+    try:
+        with SessionLocal() as db:
+            scope = db.get(NodeBackfillScopeV1, int(node_id))
+            return bool(scope and scope.include_all_active)
+    except Exception:
+        # During a mixed-version rolling update or a CI SQLite fixture without
+        # the additive table, keep the previous imported-only behavior.
+        # Never widen account selection on a DB/rollout error.
+        return False
 
 
 def _central_xray_bulk_enabled(node_id: int, protocol: str) -> bool:
@@ -179,16 +197,21 @@ def execute_one(node_id: int, protocol: str) -> tuple[int, str | None]:
         # A node can also have users without reusable V2Ray UUIDs.
         # Continue through the existing narrowly scoped repair path.
 
+    # Standalone protocols require per-account service changes. Do not run
+    # a 20-user restart storm: one pair per supervisor tick until a native
+    # atomic protocol batch executor is validated on a staging Exit.
+    pair_limit = 1 if protocol == "standalone" else PAIR_LIMIT
+    cycles = 1 if protocol == "standalone" else CYCLES_PER_BATCH
     cmd = [
         sys.executable,
         str(BACKEND / "scripts/twinpanel_existing_node_backfill_v1.py"),
         "--node-id", str(node_id),
         "--protocol", str(protocol),
         "--apply", "--confirm-node-id", str(node_id),
-        "--max-pairs", str(PAIR_LIMIT), "--max-cycles", str(CYCLES_PER_BATCH),
+        "--max-pairs", str(pair_limit), "--max-cycles", str(cycles),
         "--max-load", "7",
     ]
-    if _unified_all_active_enabled():
+    if _unified_all_active_enabled(node_id):
         # One queue/selection for migrated and native active accounts.
         # Existing live credentials remain missing-only and unchanged.
         cmd.append("--include-all-active")

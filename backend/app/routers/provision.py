@@ -88,6 +88,9 @@ class InstallIn(SSHBase, ProtocolSettings):
     node_type: NodeType
     country_code: str = "IR"
     capacity_users: int = Field(default=1000, gt=0)
+    # Only the new-Exit async installer sets this. Prevents a slow
+    # unbounded per-user SSH loop before all protocols have finished installing.
+    defer_subscription_sync: bool = False
 
 
 class RepairProtocolsIn(SSHBase, ProtocolSettings):
@@ -2353,7 +2356,7 @@ async def install_node(
         os_id=await cmd(conn,". /etc/os-release && printf '%s' \"$ID\"")
         if os_id not in ("ubuntu","debian"): raise HTTPException(status_code=400,detail="فعلاً Ubuntu/Debian پشتیبانی می‌شود")
         await ensure_base(conn)
-        node=Node(name=payload.name,node_type=payload.node_type,country_code="IR" if payload.node_type==NodeType.IRAN else payload.country_code.upper(),public_ip=payload.host,agent_url=f"https://{payload.host}:9443",status=NodeStatus.OFFLINE,capacity_users=payload.capacity_users,enable_cisco=False,enable_openvpn=False,enable_wireguard=False,enable_l2tp=False,enable_v2ray=False)
+        node=Node(name=payload.name,node_type=payload.node_type,country_code="IR" if payload.node_type==NodeType.IRAN else payload.country_code.upper(),public_ip=payload.host,agent_url=f"https://{payload.host}:9443",status=NodeStatus.OFFLINE,show_to_users=(payload.node_type != NodeType.EXIT or not payload.defer_subscription_sync),capacity_users=payload.capacity_users,enable_cisco=False,enable_openvpn=False,enable_wireguard=False,enable_l2tp=False,enable_v2ray=False)
         db.add(node); db.commit(); db.refresh(node)
         results, failed, secrets_out = await provision_protocols(
             conn,
@@ -2557,26 +2560,22 @@ async def install_node(
             "reason": "not_run",
         }
 
-        try:
-            from .account_delivery import (
-                sync_installed_node_to_subscriptions,
-            )
-
-            subscription_sync = (
-                await sync_installed_node_to_subscriptions(
-                    db,
-                    node,
+        if payload.defer_subscription_sync:
+            subscription_sync["reason"] = "deferred_to_central_publisher"
+        else:
+            try:
+                from .account_delivery import (
+                    sync_installed_node_to_subscriptions,
                 )
-            )
-
-        except Exception as exc:
-            db.rollback()
-
-            subscription_sync = {
-                "ok": False,
-                "error":
-                    str(exc)[:1200],
-            }
+                subscription_sync = await sync_installed_node_to_subscriptions(
+                    db, node,
+                )
+            except Exception as exc:
+                db.rollback()
+                subscription_sync = {
+                    "ok": False,
+                    "error": type(exc).__name__,
+                }
 
         # TWINPANEL_MANUAL_IRAN_EXIT_TUNNEL_V2
         # Tunnel creation is controlled from Admin -> Tunnels.

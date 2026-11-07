@@ -9,10 +9,11 @@ from sqlalchemy.orm import Session
 
 from ..models import Node, NodeStatus, NodeType
 from ..node_backfill_job_models_v1 import NodeBackfillJobV1
+from ..node_backfill_scope_models_v1 import NodeBackfillScopeV1
 
 # Imported-account missing-only workers. V2Ray uses existing hot-client sync;
 # never changes inbound definitions, REALITY, SNI, or restarts Xray.
-FAMILIES = ("singbox", "openvpn", "cisco", "wireguard", "l2tp", "v2ray")
+FAMILIES = ("singbox", "openvpn", "cisco", "wireguard", "l2tp", "v2ray", "standalone")
 LEASE_MINUTES = 12
 MAX_ATTEMPTS = 8
 
@@ -35,7 +36,13 @@ def enqueue_node_backfill(
         raise ValueError("NODE_NOT_PUBLISHED")
     now = datetime.utcnow()
     rows: list[NodeBackfillJobV1] = []
+    unified = db.get(NodeBackfillScopeV1, int(node_id))
     for protocol in FAMILIES:
+        # Pre-existing production nodes retain their original six workers.
+        # Only explicitly published unified nodes schedule the four standalone
+        # account drivers as one bounded family.
+        if protocol == "standalone" and not (unified and unified.include_all_active):
+            continue
         row = db.get(NodeBackfillJobV1, (int(node_id), protocol), with_for_update=True)
         if row is None:
             row = NodeBackfillJobV1(
