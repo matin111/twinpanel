@@ -62,6 +62,7 @@ body.ref67 .ref67-filter{height:42px;padding:0 19px;border:1px solid #293658;bor
 body.ref67 .ref67-filter.active{background:linear-gradient(120deg,#5426df,#902eff);border-color:#b07bff;
  box-shadow:0 0 0 1px #ad68fc70,0 0 19px #813afc6b;color:white}
 body.ref67 .v51-mobile-categories{display:none!important}
+body.ref67 .protocol-toolbar{display:none!important}
 body.ref67 .protocols{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;
  gap:11px!important;margin:14px 0 20px!important}
 body.ref67 .protocol-choice{display:flex!important;align-items:center!important;flex-direction:row!important;
@@ -128,6 +129,14 @@ body.ref67 .ref67-row:last-child{border-bottom:0}
 body.ref67 .ref67-row[hidden]{display:none!important}
 body.ref67 .ref67-row-name{display:flex;gap:12px;align-items:center;min-width:0}
 body.ref67 .ref67-flag{font-size:25px;line-height:1}
+body.ref67 .ref67-flag img,body.ref67 .ref67-chip img,
+body.ref67 .protocol-panel[data-ref67-native-protocol] .server-tab img{
+ width:23px;height:17px;object-fit:cover;border-radius:3px;display:inline-block;
+ vertical-align:middle;box-shadow:0 1px 4px #0005;flex:0 0 auto;
+}
+body.ref67 .ref67-chip{display:inline-flex;align-items:center;gap:6px}
+body.ref67 .ref67-flag{display:inline-flex;align-items:center;justify-content:center;min-width:25px}
+
 body.ref67 .ref67-row-name b{display:block;color:white;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 body.ref67 .ref67-row-name small{display:block;color:#b5c4e0;font-size:10px;margin-top:4px}
 body.ref67 .ref67-status{font-size:11px;font-weight:900;color:#49f5a3}
@@ -139,6 +148,58 @@ body.ref67 .ref67-row-actions a,body.ref67 .ref67-row-actions button{min-height:
 body.ref67 .ref67-row-actions a.ref67-primary{border-color:#b874ff}
 body.ref67 .ref67-row-actions button:disabled{opacity:.5}
 body.ref67 .protocol-panel[data-ref67-mounted="1"] .server-views{display:none!important}
+/* Never replace native file downloads or manual Cisco/L2TP details with
+   fabricated URI-only server rows. These remain real per-node operations. */
+body.ref67 .protocol-panel[data-ref67-native-protocol] .server-tabs{
+  display:flex!important;overflow-x:auto!important;flex-wrap:nowrap!important;
+  max-width:100%!important;gap:8px!important;scrollbar-width:none!important;
+}
+body.ref67 .protocol-panel[data-ref67-native-protocol] .server-views,
+body.ref67 .protocol-panel[data-ref67-native-protocol] details.v34-mobile-servers .server-views{
+  display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;
+  padding:12px 16px!important;gap:10px!important;
+}
+body.ref67 .protocol-panel[data-ref67-native-protocol] .server-view{
+  display:block!important;min-width:0!important;border:1px solid #344665!important;
+  border-radius:14px!important;background:#141d34!important;
+  margin:0!important;padding:12px!important;
+}
+body.ref67 .protocol-panel[data-ref67-native-protocol] .server-view .facts{
+  display:grid!important;gap:9px!important;grid-template-columns:1fr!important;
+}
+body.ref67 .protocol-panel[data-ref67-native-protocol] .server-view .v34-server-actions{
+  display:flex!important;gap:8px!important;flex-wrap:wrap!important;
+}
+body.ref67 .protocol-panel[data-ref67-native-protocol] .server-view .download-config,
+body.ref67 .protocol-panel[data-ref67-native-protocol] .server-view a.tp-v16-safe-download,
+body.ref67 .protocol-panel[data-ref67-native-protocol] .server-view .v34-server-actions>button,
+body.ref67 .protocol-panel[data-ref67-native-protocol] .server-view .v34-server-actions>a{
+  min-height:44px!important;border-radius:11px!important;
+}
+body.ref67 .protocol-panel[data-ref67-native-protocol] .v34-single-label{
+  display:block!important;margin:12px 16px 4px!important;color:#d4ddf6!important;
+}
+body.ref67 .protocol-panel[data-ref67-native-protocol] .v34-client-card{
+  display:flex!important;align-items:center!important;justify-content:space-between!important;
+  margin:12px 16px!important;padding:12px!important;border:1px solid #534879!important;
+  border-radius:12px!important;background:linear-gradient(110deg,#201d48,#15213c)!important;
+}
+body.ref67 .protocol-panel[data-ref67-native-protocol] .server-tab span{
+  white-space:nowrap!important;font-size:12px!important;
+}
+@media(max-width:720px){
+ body.ref67 .protocol-panel[data-ref67-native-protocol] .server-views,
+ body.ref67 .protocol-panel[data-ref67-native-protocol] details.v34-mobile-servers .server-views{
+   grid-template-columns:1fr!important;padding:9px!important;gap:8px!important;
+ }
+ body.ref67 .protocol-panel[data-ref67-native-protocol] .server-view{
+   padding:10px!important;
+ }
+ body.ref67 .protocol-panel[data-ref67-native-protocol] .v34-client-card{
+   margin:9px!important;align-items:stretch!important;flex-direction:column!important;
+ }
+}
+
 body.ref67 .protocol-panel[data-ref67-mounted="1"]:not([data-v34-protocol="v2ray"]) .v54-v2ray-groups{display:none!important}
 body.ref67 .protocol-panel[data-ref67-mounted="1"] .v54-v2ray-groups{margin:9px 17px;padding:6px;border-radius:14px}
 body.ref67 .ref67-footer{margin:12px 17px 18px;display:flex;gap:10px;justify-content:stretch}
@@ -300,6 +361,33 @@ _SCRIPT = r"""
   protocols.parentNode.insertBefore(wrapper,protocols);
   wrapper.querySelector('[data-ref67-filter="all"]')?.click();
  }
+ function flagImageOrEmoji(code,cls){
+  const wrapper=document.createElement('span');
+  wrapper.className=cls||'ref67-flag';
+  wrapper.textContent=FLAG(code);
+  if(!/^[A-Z]{2}$/.test(String(code||'')))return wrapper;
+  // Windows does not render regional-indicator emoji flags reliably.
+  // Load the actual ISO country flag; retain emoji if image access fails.
+  const image=document.createElement('img');
+  image.alt=code;
+  image.loading='lazy';
+  image.decoding='async';
+  image.addEventListener('load',()=>{wrapper.replaceChildren(image)});
+  image.src='https://flagcdn.com/w40/'+code.toLowerCase()+'.png';
+  return wrapper;
+ }
+ function decorateNativeTabs(panel){
+  if(panel.dataset.ref67Flags==='1')return;
+  panel.dataset.ref67Flags='1';
+  [...panel.querySelectorAll('.server-tab')].forEach((tab,i)=>{
+   const d=serverDescriptor(tab,i);
+   if(!/^[A-Z]{2}$/.test(d.code))return;
+   const span=tab.querySelector('span');
+   if(!span)return;
+   span.textContent=' '+d.code+' '+d.num;
+   span.prepend(flagImageOrEmoji(d.code,'ref67-native-flag'));
+  });
+ }
  function serverDescriptor(tab,index){
   const raw=tab.querySelector('span')?.textContent?.trim()||tab.textContent.trim();
   // V5 tabs are rendered as "🇩🇪 · 13" (flag, then separator, then node id).
@@ -319,6 +407,20 @@ _SCRIPT = r"""
   return {deep,copy};
  }
  function mountPanel(panel){
+  // Native files and manual protocols have legitimate per-node payloads that
+  // are not share URIs. Keep the canonical download buttons and credential
+  // facts, instead of replacing them with fake 'no single link' rows.
+  const choice=[...document.querySelectorAll('.protocol-choice')].find(
+    node=>String(node.dataset.protocol||'')===String(panel.id||'')
+  );
+  const protocol=String(choice?.dataset.protocolKey||panel.dataset.v34Protocol||'').toLowerCase();
+  if(new Set(['openvpn','wireguard','amneziawg','cisco','l2tp']).has(protocol)){
+    panel.dataset.ref67NativeProtocol=protocol;
+    const folds=panel.querySelectorAll('details.v34-mobile-servers');
+    folds.forEach(fold=>{fold.open=true});
+    decorateNativeTabs(panel);
+    return;
+  }
   if(panel.dataset.ref67Mounted==='1')return;
   const tabs=[...panel.querySelectorAll('.server-tab')];
   const views=[...panel.querySelectorAll('.server-view')];
@@ -332,13 +434,13 @@ _SCRIPT = r"""
   tabs.forEach((tab,i)=>{
    const d=serverDescriptor(tab,i);
    const c=document.createElement('button');c.type='button';c.className='ref67-chip';
-   c.textContent=d.flag+' '+(d.code||'—')+' '+d.num;
+   c.append(flagImageOrEmoji(d.code,'ref67-flag'),document.createTextNode(' '+(d.code||'—')+' '+d.num));
    c.addEventListener('click',()=>{bar.querySelectorAll('button').forEach(x=>x.classList.toggle('active',x===c));
     rows.forEach((row,j)=>row.hidden=i!==j);tab.click();});
    bar.appendChild(c);
    const row=document.createElement('div');row.className='ref67-row';
    const name=document.createElement('div');name.className='ref67-row-name';
-   const flag=document.createElement('span');flag.className='ref67-flag';flag.textContent=d.flag;
+   const flag=flagImageOrEmoji(d.code,'ref67-flag');
    const info=document.createElement('div');const b=document.createElement('b');
    b.textContent=d.name+' - '+d.num;const sub=document.createElement('small');
    sub.textContent=panel.querySelector('.panel-head h3')?.textContent?.trim()||'Connection';
