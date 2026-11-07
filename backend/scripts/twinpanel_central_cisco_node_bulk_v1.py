@@ -31,7 +31,7 @@ from app.models import (
 )
 from app.node_runtime_connection import connect_protocol_runtime
 from app.routers import account_delivery as ad
-from app.services.new_node_readiness_v1 import verify_new_exit_readiness
+from app.services.central_family_readiness_v1 import verify_central_family_readiness
 from scripts.twinpanel_central_l2tp_node_bulk_v1 import (
     account_rows, selected_subscriptions,
 )
@@ -166,7 +166,7 @@ async def run(node_id: int, limit: int, apply: bool) -> None:
         if not apply or not rows:
             return
         readiness = await asyncio.wait_for(
-            verify_new_exit_readiness(db, node_id), timeout=510,
+            verify_central_family_readiness(db, node_id, {"cisco"}), timeout=510,
         )
         if not readiness.get("ok"):
             raise RuntimeError("16_PROTOCOL_READINESS_FAILED")

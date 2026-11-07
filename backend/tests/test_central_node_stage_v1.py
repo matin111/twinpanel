@@ -326,6 +326,77 @@ class CentralNodeStageTests(unittest.TestCase):
                                         "AUDIT_NOT_RECONCILABLE"):
                 stage.missing_runtime_families(14, 3000)
 
+    def test_published_delta_selects_only_missing_family_on_first_pass(self):
+        node = MagicMock()
+        node.id = 14
+        node.show_to_users = True
+        node.retired_at = None
+        node.node_type = NodeType.EXIT
+        node.status = NodeStatus.ONLINE
+        db = MagicMock()
+        db.get.return_value = node
+        selected = (stage.FAMILIES[5],)
+        with (patch.object(stage, "SessionLocal") as session,
+              patch.object(stage, "allow_central_node", return_value=True),
+              patch.object(stage, "is_central_node", return_value=True),
+              patch.object(stage, "missing_runtime_families",
+                           return_value=selected) as missing,
+              patch.object(stage, "_run_locked", return_value=0) as execute):
+            session.return_value.__enter__.return_value = db
+            self.assertEqual(stage.run(14, 3000, True, delta_only=True), 0)
+            missing.assert_called_once_with(14, 3000)
+            execute.assert_called_once_with(
+                14, 3000, True, families=selected, delta_only=True,
+            )
+
+    def test_unregistered_or_hidden_delta_cannot_bypass_initial_checks(self):
+        node = MagicMock()
+        node.id = 14
+        node.show_to_users = False
+        node.retired_at = None
+        node.node_type = NodeType.EXIT
+        node.status = NodeStatus.ONLINE
+        db = MagicMock()
+        db.get.return_value = node
+        with (patch.object(stage, "SessionLocal") as session,
+              patch.object(stage, "allow_central_node", return_value=True),
+              patch.object(stage, "is_central_node", return_value=True),
+              patch.object(stage, "_run_locked") as execute):
+            session.return_value.__enter__.return_value = db
+            with self.assertRaisesRegex(RuntimeError, "REGISTERED_VISIBLE_EXIT"):
+                stage.run(14, 3000, True, delta_only=True)
+            execute.assert_not_called()
+
+    def test_visible_delta_skips_full_bootstrap_but_audits_coverage(self):
+        node = MagicMock()
+        node.id = 14
+        node.retired_at = None
+        node.node_type = NodeType.EXIT
+        node.status = NodeStatus.ONLINE
+        node.show_to_users = True
+        db = MagicMock()
+        db.get.return_value = node
+        with (patch.object(stage, "SessionLocal") as session,
+              patch.object(stage, "allow_central_node", return_value=True),
+              patch.object(stage, "is_central_node", return_value=True),
+              patch.object(stage, "load_desired_state", return_value=desired_state(3)),
+              patch.object(stage, "establish_hidden_memberships", return_value=0),
+              patch.object(stage, "verify_coverage",
+                           return_value={"ok": True}),
+              patch.object(stage, "verify_new_exit_readiness",
+                           new_callable=AsyncMock) as listener_check,
+              patch.object(stage, "ensure_shared_binary",
+                           new_callable=AsyncMock) as bootstrap,
+              patch.object(stage, "reconcile_runtime_families",
+                           new_callable=AsyncMock) as engine):
+            session.return_value.__enter__.return_value = db
+            self.assertEqual(stage._run_locked(
+                14, 3000, True, families=(), delta_only=True,
+            ), 0)
+            listener_check.assert_not_awaited()
+            bootstrap.assert_not_awaited()
+            engine.assert_not_awaited()
+
     def test_shared_sudoku_adapter_replaces_per_user_units(self):
         self.assertIn("twinpanel_central_sudoku_shared_v2.py",stage.ADAPTERS)
         self.assertNotIn("twinpanel_central_sudoku_node_bulk_v1.py",stage.ADAPTERS)

@@ -6,7 +6,7 @@ import os
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock, AsyncMock
 from uuid import uuid4
 
 tmp=tempfile.TemporaryDirectory(prefix="tp-central-xray-test-")
@@ -27,6 +27,68 @@ class CentralXrayTests(unittest.TestCase):
             mod.parser(["--node-id","14","--apply"])
         with self.assertRaises(SystemExit):
             mod.parser(["--node-id","14","--apply","--confirm-node-id","13"])
+
+    def test_published_xray_runs_without_repeated_sixteen_protocol_audit(self):
+        db=MagicMock()
+        node=MagicMock(show_to_users=True)
+        db.get.return_value=node
+        with (patch.object(mod,"SessionLocal") as session,
+              patch.object(mod,"allow_central_node",return_value=True),
+              patch.object(mod,"verify_new_exit_readiness",
+                           new_callable=AsyncMock) as health,
+              patch.object(mod,"run_one",new_callable=AsyncMock,
+                           return_value=0) as run_one):
+            session.return_value.__enter__.return_value=db
+            import asyncio
+            asyncio.run(mod.run(14,100,True,True))
+            health.assert_not_awaited()
+            run_one.assert_awaited_once()
+
+    def test_hidden_xray_preserves_initial_protocol_readiness_guard(self):
+        db=MagicMock()
+        node=MagicMock(show_to_users=False)
+        db.get.return_value=node
+        with (patch.object(mod,"SessionLocal") as session,
+              patch.object(mod,"allow_central_node",return_value=True),
+              patch.object(mod,"verify_new_exit_readiness",
+                           new_callable=AsyncMock,return_value={"ok":False}) as health,
+              patch.object(mod,"run_one",new_callable=AsyncMock) as run_one):
+            session.return_value.__enter__.return_value=db
+            import asyncio
+            with self.assertRaisesRegex(RuntimeError,
+                                        "16_PROTOCOL_READINESS_NOT_VERIFIED"):
+                asyncio.run(mod.run(14,100,True,True))
+            health.assert_awaited_once()
+            run_one.assert_not_awaited()
+
+    def test_published_xray_is_not_starved_by_legacy_priority_flag(self):
+        import asyncio
+        db=MagicMock()
+        live=MagicMock(show_to_users=True)
+        selection=[(1,str(uuid4()),{"node_id":14})]
+        with (patch.object(mod,"plan",return_value=(live,1,selection,{"tcp_reality"})),
+              patch.object(mod,"new_account_work_has_priority",
+                           return_value=True),
+              patch.object(mod.ad,"ssh_connect_saved",
+                           new_callable=AsyncMock,
+                           side_effect=RuntimeError("XRAY_HOT_APPLY_REACHED"))):
+            with self.assertRaisesRegex(RuntimeError,"XRAY_HOT_APPLY_REACHED"):
+                asyncio.run(mod.run_one(db,14,100,True))
+
+    def test_hidden_initial_xray_import_keeps_customer_priority(self):
+        import asyncio
+        db=MagicMock()
+        hidden=MagicMock(show_to_users=False)
+        selection=[(1,str(uuid4()),{"node_id":14})]
+        with (patch.object(mod,"plan",return_value=(hidden,1,selection,{"tcp_reality"})),
+              patch.object(mod,"new_account_work_has_priority",
+                           return_value=True),
+              patch.object(mod.ad,"ssh_connect_saved",
+                           new_callable=AsyncMock) as connect):
+            with self.assertRaisesRegex(RuntimeError,
+                                        "PAID_ACCOUNT_PROVISIONING_HAS_PRIORITY"):
+                asyncio.run(mod.run_one(db,14,100,True))
+            connect.assert_not_awaited()
 
     def test_prefer_node_owned_uuid_when_repairing_partial(self):
         uuids=[str(uuid4()) for _ in range(3)]

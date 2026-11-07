@@ -34,7 +34,7 @@ from app.models import (
 from app.node_runtime_connection import connect_protocol_runtime
 from app.routers import account_delivery as ad
 from app.standalone_subscription_accounts import _node_host,_sudoku_endpoint,_sudoku_share_uri
-from app.services.new_node_readiness_v1 import verify_new_exit_readiness
+from app.services.central_family_readiness_v1 import verify_central_family_readiness
 
 logging.getLogger("asyncssh").setLevel(logging.CRITICAL)
 
@@ -145,7 +145,7 @@ async def stage(node_id,limit,write):
             "daemon_count":1,"port":SHARED_PORT,"apply":bool(write),
         }),flush=True)
         if not write:return 0
-        readiness=await verify_new_exit_readiness(db,node_id)
+        readiness=await verify_central_family_readiness(db, node_id, {"sudoku"})
         if not readiness.get("ok"):
             raise RuntimeError("SUDOKU_SHARED_LISTENERS_NOT_READY")
         conn=await asyncio.wait_for(connect_protocol_runtime(node,db),timeout=25)

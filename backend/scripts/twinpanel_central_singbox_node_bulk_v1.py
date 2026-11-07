@@ -33,7 +33,7 @@ from app.routers.modern_account_delivery_v1 import (
     _singbox_secret, _stored_singbox_secret, _credential_identity,
 )
 from app.central_singbox_bulk_runtime_v1 import apply_bulk
-from app.services.new_node_readiness_v1 import verify_new_exit_readiness
+from app.services.central_family_readiness_v1 import verify_central_family_readiness
 from app.singbox_subscription_accounts import (
     SINGBOX_PROTOCOLS, _naive_tls_trust_material, client_item, read_inbound,
     secret_to_dict,
@@ -133,7 +133,7 @@ async def run(node_id:int,limit:int,apply:bool):
         if not apply or not work:
             return
         verified=await asyncio.wait_for(
-            verify_new_exit_readiness(db,node_id),timeout=510,
+            verify_central_family_readiness(db, node_id, SINGBOX_PROTOCOLS),timeout=510,
         )
         if not verified.get("ok"):
             raise RuntimeError("STAGED_16_PROTOCOL_READINESS_FAILED")
