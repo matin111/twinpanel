@@ -1608,7 +1608,10 @@ _SCRIPT = r"""
  // Provide an actual action in mobile browsers that cannot share native files.
  // Browsers cannot read an already-downloaded file back from Downloads, so
  // the user downloads it, then selects it through Files/Downloads manually.
- function showNativeFileShareFallback(download,protocol,reason){
+ function showNativeFileShareFallback(download,protocol,reason,downloadNow=false){
+   // On unsupported browsers, start the real attachment download while
+   // still within the original tap (important for mobile download policies).
+   if(downloadNow&&download)download.click();
    const overlay=document.getElementById('tp-help-overlay');
    const message=reason||'این مرورگر امکان ارسال مستقیم فایل را ندارد.';
    if(!overlay){window.alert(message);return;}
@@ -1729,7 +1732,7 @@ _SCRIPT = r"""
            const config=document.getElementById(target)?.value;
            if(!match||typeof config!=='string'||!config.trim()){
              showNativeFileShareFallback(download,protocol,
-               'فایل آماده برای ارسال مستقیم پیدا نشد. می‌توانید فایل واقعی همین سرور را دانلود کنید.');
+               'فایل آماده برای ارسال مستقیم پیدا نشد. فایل واقعی همین سرور دانلود می‌شود.',true);
              return;
            }
            const extension=protocol==='openvpn'?'ovpn':'conf';
@@ -1740,7 +1743,7 @@ _SCRIPT = r"""
            if(!window.isSecureContext||typeof navigator.share!=='function'||typeof File!=='function'
                ||typeof window.tpNativeShareFile!=='function'){
              showNativeFileShareFallback(download,protocol,
-               'مرورگر فعلی منوی اشتراک‌گذاری فایل را پشتیبانی نمی‌کند.');
+               'مرورگر فعلی امکان Share مستقیم ندارد؛ فایل دانلود می‌شود. سپس آن را در Files یا Downloads به برنامه بدهید.',true);
              return;
            }
            try{
