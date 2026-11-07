@@ -16,6 +16,20 @@ def central_key(node_id: int) -> str:
     return f"vpn.central_runtime.exit.{int(node_id)}"
 
 
+def last_applied_key(node_id: int) -> str:
+    return central_key(node_id) + ".last_applied"
+
+
+def last_applied(db, node_id: int) -> str:
+    return get_value(db,last_applied_key(node_id),"")
+
+
+def mark_central_applied(db, node_id: int, fingerprint: str) -> None:
+    if len(fingerprint) != 64 or any(ch not in "0123456789abcdef" for ch in fingerprint):
+        raise ValueError("CENTRAL_RUNTIME_INVALID_FINGERPRINT")
+    set_value(db,last_applied_key(node_id),fingerprint)
+
+
 def is_central_node(db, node_id: int) -> bool:
     return get_value(db, central_key(node_id), "") == "v1"
 
