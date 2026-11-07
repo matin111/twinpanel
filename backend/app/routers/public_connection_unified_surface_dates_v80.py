@@ -178,11 +178,11 @@ html body.tp80-connection .v51-single-title,
 html body.tp80-connection .v38-server-list-title,
 html body.tp80-connection .protocol-panel .panel-head >div:first-child>span:not(.tp78-protocol-emblem),
 html body.tp80-connection .v54-v2ray-server-head >span:nth-child(2),
-html body.tp80-connection .protocol-panel .v34-client-card,
-html body.tp80-connection .protocol-panel .ref70-app-card,
-html body.tp80-connection .protocol-panel .v51-multi-card,
-html body.tp80-connection .protocol-panel .v52-multi-card,
-html body.tp80-connection .protocol-panel .v34-subscription-card{
+html body.tp80-connection .protocol-panel[data-tp78-action-ready="1"] > .v34-client-card,
+html body.tp80-connection .protocol-panel[data-tp78-action-ready="1"] > .ref70-app-card,
+html body.tp80-connection .protocol-panel[data-tp78-action-ready="1"] > .v51-multi-card,
+html body.tp80-connection .protocol-panel[data-tp78-action-ready="1"] > .v52-multi-card,
+html body.tp80-connection .protocol-panel[data-tp78-action-ready="1"] > .v34-subscription-card{
   display:none!important;
 }
 html body.tp80-connection .protocol-panel .ref67-row{
