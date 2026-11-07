@@ -17,7 +17,7 @@ from ..node_install_progress_models_v1 import NodeInstallProgressV1
 TERMINAL = {"completed", "failed"}
 STAGES = {
     "queued", "installing_base", "installing_xray",
-    "installing_modern", "enrolling_users", "completed", "failed",
+    "installing_modern", "enrolling_users", "users_queued", "completed", "failed",
 }
 STALE_AFTER = timedelta(minutes=50)
 
@@ -43,7 +43,7 @@ def set_install_progress(job_id: str, stage: str, *, node_id: int | None = None,
         if job is None or job.state in TERMINAL:
             return
         job.stage = stage
-        job.state = "completed" if stage == "completed" else "failed" if stage == "failed" else "running"
+        job.state = "completed" if stage in {"completed", "users_queued"} else "failed" if stage == "failed" else "running"
         if node_id is not None:
             job.node_id = int(node_id)
         if installed_protocols is not None:
@@ -72,6 +72,7 @@ def public_install_progress(job: NodeInstallProgressV1, now: datetime | None = N
         "installed_protocols": job.installed_protocols,
         "expected_protocols": job.expected_protocols,
         "users_assigned": job.users_assigned,
+        "backfill_pending": stage == "users_queued",
         "error_code": job.error_code,
         "created_at": job.created_at.isoformat() + "Z",
         "updated_at": job.updated_at.isoformat() + "Z",
