@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[1] / "app" / "routers"
 def test_unified_identity_applied_after_legacy_refiners():
     canonical=(ROOT/"public_connection_canonical_mobile_v26.py").read_text(encoding="utf-8")
     assert "source = refine_public_connection_footer_layout_v75(source)" in canonical
-    assert "return refine_public_connection_unified_node_identity_v76(source)" in canonical
+    assert "source = refine_public_connection_unified_node_identity_v76(source)" in canonical
 
 def test_node_identity_uses_real_metadata_not_array_index():
     ui=(ROOT/"public_connection_unified_node_identity_v76.py").read_text(encoding="utf-8")
