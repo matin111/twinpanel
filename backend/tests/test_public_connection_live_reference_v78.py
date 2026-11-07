@@ -30,7 +30,8 @@ def test_reference_injection_and_mobile_cards_and_real_actions():
     assert "const extras=candidates.filter" in ui  # retain ShadowTLS YAML/JSON, etc.
     assert "extras.forEach(el=>" in ui
     assert "const actionRoot=multi?.querySelector('.v51-multi-actions')" in ui
-    assert "if(appHref&&!appHref.startsWith('#'))" not in ui or "appHref&&!appHref.startsWith('#')" in ui
+    assert "appHref&&!appHref.startsWith('#')" in ui
+    assert "!/^javascript:/i.test(appHref)" in ui
     assert "data-kind=\"add\"" in ui
     assert "data-kind=\"app\"" in ui
     assert "data-kind=\"copy\"" in ui
