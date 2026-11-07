@@ -191,13 +191,18 @@ def execute_one(node_id: int, protocol: str) -> tuple[int, str | None]:
         # A node can also have users without reusable V2Ray UUIDs.
         # Continue through the existing narrowly scoped repair path.
 
+    # Standalone protocols require per-account service changes. Do not run
+    # a 20-user restart storm: one pair per supervisor tick until a native
+    # atomic protocol batch executor is validated on a staging Exit.
+    pair_limit = 1 if protocol == "standalone" else PAIR_LIMIT
+    cycles = 1 if protocol == "standalone" else CYCLES_PER_BATCH
     cmd = [
         sys.executable,
         str(BACKEND / "scripts/twinpanel_existing_node_backfill_v1.py"),
         "--node-id", str(node_id),
         "--protocol", str(protocol),
         "--apply", "--confirm-node-id", str(node_id),
-        "--max-pairs", str(PAIR_LIMIT), "--max-cycles", str(CYCLES_PER_BATCH),
+        "--max-pairs", str(pair_limit), "--max-cycles", str(cycles),
         "--max-load", "7",
     ]
     if _unified_all_active_enabled(node_id):
