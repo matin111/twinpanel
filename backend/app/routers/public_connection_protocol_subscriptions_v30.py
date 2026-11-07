@@ -143,7 +143,7 @@ def public_protocol_subscription_v30(
     db: Session = Depends(get_db),
 ):
     """Return one standard Base64 subscription feed for all real nodes of a protocol."""
-    content, normalized, count = _protocol_subscription_content(token, protocol, db)
+    # V2Ray must use the same lightweight canonical feed as /sub and /multi/v2ray.\n    # The legacy generic path can fetch unrelated credentials and time out.\n    if _normalize_protocol(protocol) == "v2ray":\n        from .public_connection_multilink_v7 import _subscription_response\n        return _subscription_response(token, db)\n    content, normalized, count = _protocol_subscription_content(token, protocol, db)
     sub = _subscription_from_share_token(token, db)
     profile_title = f"{_account_name(sub)}-{normalized}"
     return Response(
@@ -195,7 +195,7 @@ _SCRIPT = r"""
   const text=el=>String(el?.textContent||'').trim();
   const normalize=value=>{const p=String(value||'').trim().toLowerCase();return p==='xray'?'v2ray':p;};
   function panelProtocol(panel){const modern=normalize(panel?.dataset?.modernProtocol||'');if(modern)return modern;const choice=[...document.querySelectorAll('.protocol-choice')].find(item=>String(item.dataset.protocol||'')===String(panel?.id||''));return normalize(choice?.dataset?.protocolKey||choice?.dataset?.protocol||'');}
-  function subscriptionUrl(protocol){return window.location.origin+'/v1/connect/'+encodeURIComponent(token)+'/sub/'+encodeURIComponent(protocol);}
+  function subscriptionUrl(protocol){const base=window.location.origin+'/v1/connect/'+encodeURIComponent(token);return normalize(protocol)==='v2ray'?base+'/sub':base+'/sub/'+encodeURIComponent(protocol);}
   function namedSubscriptionUrl(url,title){const clean=String(url||'').split('#',1)[0];const name=String(title||'').trim();return name?clean+'#'+encodeURIComponent(name):clean;}
   async function subscriptionIdentity(protocol,url){
     try{
