@@ -122,7 +122,7 @@ def test_progress_is_durable_and_never_claims_backfill_finished():
         with Maker() as db:
             row = db.get(NodeInstallProgressV1, job_id)
             value = progress.public_install_progress(row)
-            assert value["state"] == "completed"
+            assert value["state"] == "waiting_backfill"
             assert value["stage"] == "users_queued"
             assert value["backfill_pending"] is True
             assert value["users_assigned"] == 1700
