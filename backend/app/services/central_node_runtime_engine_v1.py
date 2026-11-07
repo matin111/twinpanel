@@ -8,8 +8,10 @@ are disjoint. No legacy user-level worker, queue or per-user SSH.
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import sys
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -89,20 +91,32 @@ async def reconcile_runtime_families(
     async def run_family(family):
         command=adapter_command(family,node_id,limit,backend)
         async with throttle:
-            proc=await asyncio.create_subprocess_exec(
-                *command,cwd=str(backend),
-                env={**os.environ,"PYTHONPATH":str(backend)},
-                stdout=asyncio.subprocess.DEVNULL,
-                stderr=asyncio.subprocess.DEVNULL,
-            )
+            started=time.monotonic()
             try:
-                code=await asyncio.wait_for(proc.wait(),timeout_seconds)
-            except (asyncio.TimeoutError,asyncio.CancelledError):
-                proc.terminate()
-                try:await asyncio.wait_for(proc.wait(),10)
-                except asyncio.TimeoutError:proc.kill();await proc.wait()
-                raise
-            return family.name,int(code)
+                proc=await asyncio.create_subprocess_exec(
+                    *command,cwd=str(backend),
+                    env={**os.environ,"PYTHONPATH":str(backend)},
+                    stdout=asyncio.subprocess.DEVNULL,
+                    stderr=asyncio.subprocess.DEVNULL,
+                )
+                try:
+                    code=await asyncio.wait_for(proc.wait(),timeout_seconds)
+                except (asyncio.TimeoutError,asyncio.CancelledError):
+                    proc.terminate()
+                    try:await asyncio.wait_for(proc.wait(),10)
+                    except asyncio.TimeoutError:proc.kill();await proc.wait()
+                    raise
+                return family.name,int(code)
+            finally:
+                # Only fixed family identifier, process return status and
+                # elapsed time are logged. Adapter stdout/stderr can contain
+                # customer credentials and MUST remain suppressed.
+                print("CENTRAL_RUNTIME_FAMILY_TIMING",json.dumps({
+                    "node_id":node_id,"family":family.name,
+                    "seconds":round(time.monotonic()-started,2),
+                    "return_code":(proc.returncode
+                                   if "proc" in locals() else None),
+                }),flush=True)
     # Sudoku's live whitelist update/verification is a single shared
     # service-wide restart. Other adapters can saturate the controller's
     # SSH/DB and cause a false timeout. Finish the other daemon families
