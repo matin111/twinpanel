@@ -34,7 +34,9 @@ def test_fresh_exit_install_keeps_historical_subscription_autosync():
     provision = _text("backend/app/routers/provision.py")
     delivery = _text("backend/app/routers/account_delivery.py")
 
-    assert "TWINPANEL_INSTALLED_NODE_SUBSCRIPTION_AUTOSYNC_CALL_V1" in provision
+    assert "defer_subscription_sync" in provision
+    assert "if payload.defer_subscription_sync:" in provision
+    assert "deferred_to_central_publisher" in provision
     assert "sync_installed_node_to_subscriptions" in provision
     assert "await sync_installed_node_to_subscriptions" in provision
 
