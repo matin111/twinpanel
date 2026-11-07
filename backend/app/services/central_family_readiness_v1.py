@@ -1,8 +1,9 @@
 """Scoped live listener verification for centrally owned published Exits.
 
-Initial hidden-node onboarding always uses the strict full-protocol audit.
-After publication, a daemon-family delta verifies only its purchased protocol
-listeners before mutation, not all 16 listeners on every purchase.
+The top-level hidden-node Stage performs the strict 16-protocol admission
+audit ONCE before launching daemon-family adapters. Each adapter verifies its
+own live listeners, on hidden or published Exits, without repeating all 16
+probes for every daemon. No adapter can publish a hidden Exit.
 No credentials, subscriber data or service state are changed here.
 """
 from __future__ import annotations
@@ -15,7 +16,7 @@ from ..node_runtime_connection import connect_protocol_runtime
 from ..modern_protocol_dispatch import profile_health
 from ..routers.provision import _protocol_live_health
 from .central_runtime_ownership_v1 import allow_central_node, is_central_node
-from .new_node_readiness_v1 import verify_new_exit_readiness, _online
+from .new_node_readiness_v1 import _online
 
 
 async def verify_central_family_readiness(db, node_id: int, protocols) -> dict:
@@ -27,11 +28,10 @@ async def verify_central_family_readiness(db, node_id: int, protocols) -> dict:
     if not allow_central_node(db, node):
         return {"ok": False, "reason": "unowned_exit", "missing": list(keys)}
 
-    if not node.show_to_users:
-        # Hidden Exits have never passed the initial customer-release gate.
-        return await verify_new_exit_readiness(db, node_id)
-
-    if not is_central_node(db, node_id):
+    # Hidden Exits remain unpublished until the top-level Stage has passed
+    # its full 16-listener preflight and post-apply coverage audit. Individual
+    # adapters only need a *live* probe for their own selected family.
+    if node.show_to_users and not is_central_node(db, node_id):
         return {"ok": False, "reason": "unregistered_visible_exit",
                 "missing": list(keys)}
 
