@@ -38,6 +38,9 @@ def test_no_css_layer_hides_start_and_expiry():
     assert ".traffic .stat:nth-child(n+4){display:flex!important;" in ui
 
 def test_native_only_one_node_detail_may_appear():
+    v67 = code("public_connection_reference_desktop_mobile_v67.py")
+    assert "display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))" not in v67
+    assert "server-view.active{display:block!important}" in v67
     ui = code("public_connection_unified_surface_dates_v80.py")
     assert "html body.tp80-connection .protocol-panel.tp80-native[data-ref67-native-protocol] .server-view{display:none!important" in ui
     assert ".protocol-panel.tp80-native.tp80-detail-open[data-ref67-native-protocol] .server-view.active{display:block!important}" in ui
