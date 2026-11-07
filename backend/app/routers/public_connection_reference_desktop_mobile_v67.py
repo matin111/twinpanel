@@ -128,7 +128,8 @@ body.ref67 .ref67-row-actions a,body.ref67 .ref67-row-actions button{min-height:
 body.ref67 .ref67-row-actions a.ref67-primary{border-color:#b874ff}
 body.ref67 .ref67-row-actions button:disabled{opacity:.5}
 body.ref67 .protocol-panel[data-ref67-mounted="1"] .server-views{display:none!important}
-body.ref67 .protocol-panel[data-ref67-mounted="1"] .v54-v2ray-groups{display:none!important}
+body.ref67 .protocol-panel[data-ref67-mounted="1"]:not([data-v34-protocol="v2ray"]) .v54-v2ray-groups{display:none!important}
+body.ref67 .protocol-panel[data-ref67-mounted="1"] .v54-v2ray-groups{margin:9px 17px;padding:6px;border-radius:14px}
 body.ref67 .ref67-footer{margin:12px 17px 18px;display:flex;gap:10px;justify-content:stretch}
 body.ref67 .ref67-footer>*{min-height:51px;flex:1;display:flex;align-items:center;justify-content:center;
  border-radius:13px;border:1px solid #3a4971;background:#17213d;color:#f2f5ff;text-decoration:none;
@@ -267,8 +268,8 @@ _SCRIPT = r"""
  function linkToOriginal(view){
   const deep=[...view.querySelectorAll('a[href]')].find(x=>
     /^(karing|hiddify|v2rayng|v2box|trusttunnel|sudoku):\/\//i.test(x.getAttribute('href')||''));
-  const copy=[...view.querySelectorAll('button,a')].find(x=>
-    /کپی|copy/i.test(x.textContent||'')&&!/همه/.test(x.textContent||''));
+  const copy=view.querySelector('.tp-v15-copy-config,.v15-standard-link,.tp65-single-actions button,.v34-server-actions button')
+    ||[...view.querySelectorAll('button')].find(x=>/کپی کانفیگ|کپی لینک اتصال/.test(x.textContent||''));
   return {deep,copy};
  }
  function mountPanel(panel){
