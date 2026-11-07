@@ -81,13 +81,24 @@ def pending_for_node(db, node: Node, max_pairs: int, *,
     if subscription_id is not None:
         query = query.filter(Subscription.id == int(subscription_id))
 
+    selected = query.order_by(
+        Subscription.id.asc(), SubscriptionProtocol.protocol.asc(),
+    ).all()
+    sub_ids = sorted({int(sub.id) for sub, _ in selected})
+    # One bounded credential prefetch per 500 subscriptions, not N SELECTs
+    # on every timer tick when thousands of old credentials already exist.
+    credentials: dict[tuple[int, str], ProtocolCredential] = {}
+    for offset in range(0, len(sub_ids), 500):
+        for cred in db.query(ProtocolCredential).filter(
+            ProtocolCredential.subscription_id.in_(sub_ids[offset:offset + 500]),
+            ProtocolCredential.protocol.in_(list(config_by_protocol)),
+        ).all():
+            credentials[(int(cred.subscription_id), str(cred.protocol))] = cred
+
     work: list[tuple[Subscription, str, ProtocolCredential | None, list[dict[str, Any]], int]] = []
-    for sub, protocol in query.order_by(Subscription.id.asc(), SubscriptionProtocol.protocol.asc()).all():
+    for sub, protocol in selected:
         protocol = str(protocol)
-        cred = db.query(ProtocolCredential).filter(
-            ProtocolCredential.subscription_id == sub.id,
-            ProtocolCredential.protocol == protocol,
-        ).first()
+        cred = credentials.get((int(sub.id), protocol))
         items = ad._autosync_credential_items(cred) if cred is not None else []
         if cred is not None and cred.config_text_encrypted and not items:
             # A malformed/non-decryptable old config is not permission to replace it.
