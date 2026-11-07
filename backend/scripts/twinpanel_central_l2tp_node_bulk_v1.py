@@ -23,6 +23,7 @@ from sqlalchemy import or_
 BACKEND = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND))
 
+from app.services.central_runtime_ownership_v1 import allow_central_node
 from app.database import SessionLocal
 from app.models import (
     Node, NodeProtocolConfig, NodeStatus, NodeType, ProtocolCredential,
@@ -219,7 +220,7 @@ async def run(node_id: int, limit: int, apply: bool) -> None:
         if (
             node is None or node.node_type != NodeType.EXIT
             or node.retired_at is not None or node.status != NodeStatus.ONLINE
-            or bool(node.show_to_users) or not bool(node.enable_l2tp)
+            or not allow_central_node(db,node) or not bool(node.enable_l2tp)
         ):
             raise RuntimeError("REQUIRES_HIDDEN_ONLINE_PREPARED_EXIT")
         cfg = db.query(NodeProtocolConfig).filter_by(
