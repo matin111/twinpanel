@@ -1,21 +1,22 @@
 """Read-only Sudoku capacity gate for central Exit staging.
 
-Current Sudoku requires a dedicated service and TCP listener per subscriber.
-Do not auto-enroll thousands of users until node-level capacity and a bounded
-bulk launcher are explicitly validated. This gate makes the limitation
-machine-checkable before any central membership or protocol write.
+Sudoku requires a dedicated service and TCP listener per subscription.
+Controller preflight checks uniqueness and a hard operation bound; target Exit
+resource admission must also pass before the first remote write.
 """
 from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import func, or_
+from sqlalchemy import or_
 
 from app.models import Subscription, SubscriptionProtocol, SubscriptionStatus
 
-# Conservative temporary ceiling, NOT a performance promise. It applies to
-# the existing one-process/one-listener-per-user implementation.
-MAX_LEGACY_SUDOKU_SERVICES = 64
+# One distinct per-user listener per eligible subscription.
+# Memory/CPU admission is checked on the TARGET Exit immediately before
+# launching services (not guessed using the controller's available RAM).
+MAX_SUDOKU_STAGE_SERVICES = 3000
+MAX_LEGACY_SUDOKU_SERVICES = MAX_SUDOKU_STAGE_SERVICES
 SUDOKU_PORT_MIN = 30000
 SUDOKU_PORT_COUNT = 30000
 
@@ -55,13 +56,14 @@ def capacity_report(subscription_ids):
         else:
             ports[port] = sid
     return {
-        "ok": len(ids) <= MAX_LEGACY_SUDOKU_SERVICES and not collisions,
+        "ok": len(ids) <= MAX_SUDOKU_STAGE_SERVICES and not collisions,
         "eligible": len(ids),
-        "safe_legacy_limit": MAX_LEGACY_SUDOKU_SERVICES,
+        "node_runtime_admission_required": True,
+        "hard_stage_limit": MAX_SUDOKU_STAGE_SERVICES,
         "port_collisions": len(collisions),
         "reason": ("PORT_COLLISION" if collisions
                    else "TOO_MANY_PER_USER_SERVICES"
-                   if len(ids) > MAX_LEGACY_SUDOKU_SERVICES else "CAPACITY_PRECHECK_OK"),
+                   if len(ids) > MAX_SUDOKU_STAGE_SERVICES else "CAPACITY_PRECHECK_OK"),
     }
 
 
