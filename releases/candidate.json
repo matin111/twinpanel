@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.632",
-  "source_sha": "e2f0046c18fc034c337145fb773608574112b425",
+  "version": "1.1.0-rc.633",
+  "source_sha": "886c92933582c7ed31e593131cc7741974826d35",
   "notes": {
-    "fa": "پایلوت ایمن Bulk V2Ray با اجرای دستی ۱ تا ۱۰ کاربر و پیش‌فرض Dry-run؛ ثبت گروهی کاربران با Xray HandlerService، ذخیره پایدار Credential در مدیریت مرکزی و اصلاح Wrapper قدیمی Workerهای مستقل. پاکسازی لاگ آرشیوی نودها به‌صورت مستقل انجام شد؛ هیچ کانفیگ یا کاربری حذف نشد.",
-    "en": "Add opt-in bounded VLESS Bulk pilot (1-10 clients, dry-run default), no Xray restart, atomic config plus durable central publication; fix standalone workers to use production V47 hot-client composition instead of the legacy import hook. Existing users and UUIDs preserved."
+    "fa": "طراحی موبایل و دسکتاپ صفحه Connection مطابق طرح تأییدشده، بهبود دکمه‌های افزودن تکی با لینک‌های واقعی و حفظ کامل کانفیگ‌ها، پروتکل‌ها و آدرس سرورها.",
+    "en": "Approved responsive desktop/mobile Connection UI with existing-link single add controls; strictly no VPN config, protocol, endpoint or credentials changes."
   }
 }
