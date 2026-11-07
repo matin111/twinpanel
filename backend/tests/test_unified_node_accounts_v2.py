@@ -18,6 +18,7 @@ from app.models import (
 )
 from app.migration_import_models import MigrationImportRecord
 from app.services.node_auto_backfill_v1 import FAMILIES, enqueue_node_backfill
+from app.node_backfill_job_models_v1 import NodeBackfillJobV1
 from scripts.twinpanel_node_auto_backfill_v1 import (
     _unified_all_active_enabled, execute_one,
 )
@@ -38,6 +39,7 @@ def fixture():
         Subscription.__table__, SubscriptionNode.__table__,
         SubscriptionProtocol.__table__, ProtocolCredential.__table__,
         NodeProtocolConfig.__table__, MigrationImportRecord.__table__,
+        NodeBackfillJobV1.__table__,
     ])
     db = Session(engine)
     db.add(Node(
