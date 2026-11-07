@@ -74,7 +74,12 @@ async def reconcile_runtime_families(
     All failures keep the Exit hidden. No returned log contains credentials.
     A nonzero return is not interpreted as customer-ready state.
     """
-    validate_runtime_families(families)
+    # Global protocol parity is checked against the authoritative registry,
+    # while delta retries may execute a strict subset of those exact families.
+    validate_runtime_families()
+    if (len(families) != len(set(families))
+            or any(family not in FAMILIES for family in families)):
+        raise RuntimeError("CENTRAL_RUNTIME_UNKNOWN_DELTA_FAMILY")
     if node_id <= 0 or limit <= 0 or max_concurrent_families < 1:
         raise ValueError("CENTRAL_RUNTIME_INVALID_TARGET")
     # One daemon family at a time avoids CPU/SSH/DB thrashing on small
