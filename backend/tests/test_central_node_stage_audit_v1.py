@@ -6,11 +6,13 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 from app.central_node_stage_audit_v1 import verify_coverage
+from app.models import NodeType,NodeStatus
 
 
 def fake_db(active, attached, requested, credentials):
     db=MagicMock()
-    db.get.return_value=SimpleNamespace(retired_at=None,show_to_users=False)
+    db.get.return_value=SimpleNamespace(id=14,retired_at=None,show_to_users=False,
+                                        node_type=NodeType.EXIT,status=NodeStatus.ONLINE)
     groups=[]
     for values in (active,attached,requested,credentials):
         query=MagicMock()
