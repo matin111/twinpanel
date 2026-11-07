@@ -1476,13 +1476,14 @@ _SCRIPT = r"""
    if(!cards.length)return;
    const previous=panel.querySelector(':scope > .tp92-v2-country-bar');
    const signature=cards.map(card=>card.dataset.countryCode||'').join('|');
-   if(previous?.dataset.signature===signature)return;
+   if(previous?.dataset.signature===signature&&cards.every(card=>card.dataset.tp92Scoped==='1'))return;
    previous?.remove();
    const groups=new Map();
    cards.forEach(card=>{
      const code=String(card.dataset.countryCode||'').toUpperCase();
      const country=/^[A-Z]{2}$/.test(code)?code:'OTHER';
      card.dataset.tp92Country=country;
+     card.dataset.tp92Scoped='1';
      if(!groups.has(country))groups.set(country,[]);
      groups.get(country).push(card);
      const head=card.querySelector(':scope > .v54-v2ray-server-head');
@@ -1727,17 +1728,19 @@ _SCRIPT = r"""
    }
    panel.querySelectorAll('.v34-client-card,.ref70-app-card,.v13-client-only').forEach(card=>card.remove());
    panel.querySelectorAll(':scope > .ref69-download-cta').forEach(node=>node.remove());
-   // Explicit second Windows client for V2Ray, alongside the Karing installer.
+   // Merge canonical actions first: V80 rebuilds footer children.
+   alignFooter(panel);
+   // v2rayN is an additional named Windows installer, not a copy/import button.
+   // Mount it AFTER alignFooter so the reconciliation does not discard it.
    const oldExtra=footer.querySelector(':scope > .tp92-v2rayn');
    if(key==='v2ray'&&platform==='windows'){
      let extra=oldExtra;
      if(!extra){extra=el('a','tp92-v2rayn','دانلود v2rayN')}
      extra.href='https://github.com/2dust/v2rayN/releases/latest';
      extra.target='_blank';extra.rel='noopener noreferrer';
+     extra.dataset.tp92Client='v2rayn';
      if(extra.parentElement!==footer)footer.append(extra);
    }else oldExtra?.remove();
-   // Merge action builders after the genuine app link is available.
-   alignFooter(panel);
    footer.dataset.tp92OnlyApp=footer.querySelectorAll(':scope > .tp78-footer-action').length===1?'1':'0';
    const actions=[...footer.querySelectorAll(':scope > .tp78-footer-action')];
    const count=actions.length;
