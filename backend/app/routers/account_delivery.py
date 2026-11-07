@@ -481,7 +481,24 @@ def _protocols(db: Session, sub: Subscription) -> list[str]:
 
 
 def _cfg(db: Session, node_id: int, protocol: str) -> NodeProtocolConfig | None:
-    return db.query(NodeProtocolConfig).filter(NodeProtocolConfig.node_id == node_id, NodeProtocolConfig.protocol == protocol).first()
+    # The public Connection page builds multiple presentation stages from one
+    # read-only snapshot. Cache only within its SQLAlchemy Session (never
+    # globally); admin, provisioning and other mutable paths stay uncached.
+    cache = db.info.get("_tp_public_connection_cfg_cache_v102")
+    key = (int(node_id), str(protocol or "").strip().lower())
+    if isinstance(cache, dict) and key in cache:
+        return cache[key]
+    result = (
+        db.query(NodeProtocolConfig)
+        .filter(
+            NodeProtocolConfig.node_id == node_id,
+            NodeProtocolConfig.protocol == protocol,
+        )
+        .first()
+    )
+    if isinstance(cache, dict):
+        cache[key] = result
+    return result
 
 
 def _port(db: Session, node_id: int, protocol: str) -> int:
