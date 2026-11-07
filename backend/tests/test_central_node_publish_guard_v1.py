@@ -45,6 +45,7 @@ class CentralPublishSafetyTests(unittest.TestCase):
         with (patch("app.services.node_stage_publish_guard_v1.require_staged_node_publish_ready"),
               patch("app.central_node_stage_audit_v1.verify_coverage",
                     return_value={"ok":True}),
+              patch("app.services.central_runtime_ownership_v1.is_central_node",return_value=True),
               patch("app.routers.publish_node_all_users_v2.enqueue_node_backfill") as queue):
             result=asyncio.run(publish_node_to_all_users_v2(14,db=db))
         self.assertTrue(node.show_to_users)
