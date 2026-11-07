@@ -2542,10 +2542,10 @@ async def install_node(
                     str(exc)[:1800],
             }
 
-            if "tunnel_fabric" not in failed:
-                failed.append(
-                    "tunnel_fabric"
-                )
+            # Tunnel fabric is optional for an Exit with working direct
+            # listeners. Keep the error in fabric diagnostics, but NEVER
+            # fail direct node installation merely because an IR->Exit
+            # tunnel has not been established yet.
 
 
         # TWINPANEL_AUTO_QUOTA_AFTER_NODE_INSTALL_V1
