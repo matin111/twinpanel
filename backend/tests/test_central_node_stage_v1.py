@@ -164,6 +164,31 @@ class CentralNodeStageTests(unittest.TestCase):
         self.assertNotIn("with_for_update", calls_during_health[0].kwargs)
 
 
+    def test_new_subscriptions_mid_apply_trigger_bounded_resnapshot(self):
+        with patch.object(stage,"_run_locked",side_effect=[
+            RuntimeError("CENTRAL_NODE_DESIRED_STATE_CHANGED_DURING_APPLY"),0
+        ]) as apply:
+            self.assertEqual(stage.run(14,3000,True),0)
+            self.assertEqual(apply.call_count,2)
+            apply.assert_any_call(14,3000,True)
+
+    def test_delta_coverage_retries_without_per_user_queue(self):
+        with patch.object(stage,"_run_locked",side_effect=[3,0]) as apply:
+            self.assertEqual(stage.run(14,3000,True),0)
+            self.assertEqual(apply.call_count,2)
+
+    def test_other_runtime_failures_are_not_retried(self):
+        with patch.object(stage,"_run_locked",return_value=2) as apply:
+            self.assertEqual(stage.run(14,3000,True),2)
+            apply.assert_called_once()
+
+    def test_continuous_writes_fail_closed_after_three_snapshots(self):
+        with patch.object(stage,"_run_locked",
+                          side_effect=RuntimeError("CENTRAL_NODE_DESIRED_STATE_CHANGED_DURING_APPLY")) as apply:
+            with self.assertRaisesRegex(RuntimeError,"STILL_CHANGING"):
+                stage.run(14,3000,True)
+            self.assertEqual(apply.call_count,3)
+
     def test_shared_sudoku_adapter_replaces_per_user_units(self):
         self.assertIn("twinpanel_central_sudoku_shared_v2.py",stage.ADAPTERS)
         self.assertNotIn("twinpanel_central_sudoku_node_bulk_v1.py",stage.ADAPTERS)
