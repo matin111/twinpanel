@@ -25,6 +25,7 @@ sys.path.insert(0,str(ROOT))
 from app.central_sudoku_shared_runtime_v2 import (
     SHARED_PORT, prepare, apply, users_manifest,
 )
+from app.services.central_runtime_ownership_v1 import allow_central_node
 from app.database import SessionLocal
 from app.models import (
     Node,NodeProtocolConfig,NodeType,NodeStatus,Subscription,
@@ -54,7 +55,7 @@ def check_node(db,node_id):
     node=db.get(Node,int(node_id))
     if (node is None or node.retired_at is not None
         or node.node_type!=NodeType.EXIT or node.status!=NodeStatus.ONLINE
-        or node.show_to_users):
+        or not allow_central_node(db,node)):
         raise RuntimeError("SUDOKU_SHARED_REQUIRES_HIDDEN_ONLINE_EXIT")
     cfg=(db.query(NodeProtocolConfig)
          .filter_by(node_id=int(node_id),protocol="sudoku").one_or_none())
