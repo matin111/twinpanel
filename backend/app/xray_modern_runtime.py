@@ -135,6 +135,33 @@ def _clean_domain(value: Any) -> str:
     return domain
 
 
+def _reality_server_names(state: dict[str, Any]) -> list[str]:
+    """Preserve previously published SNI values during a REALITY target swap.
+
+    New subscriptions receive only the primary, currently applied SNI; already
+    issued links keep their original UUID, public key, short ID and SNI and
+    remain valid until clients refresh their subscription link.  Do not accept
+    arbitrary whitespace/wildcards or grow an unbounded acceptance list.
+    """
+    primary = (
+        _clean_domain(state.get("reality_server_name"))
+        or _clean_domain(XRAY_REALITY_SERVER_NAME)
+    )
+    if not primary or "." not in primary or ".." in primary:
+        raise RuntimeError("REALITY primary server name is invalid")
+
+    names = [primary]
+    aliases = state.get("reality_legacy_server_names")
+    if isinstance(aliases, list):
+        for raw in aliases[:8]:
+            alias = _clean_domain(raw)
+            if alias and "." in alias and ".." not in alias and alias not in names:
+                names.append(alias)
+                if len(names) >= 5:
+                    break
+    return names
+
+
 def _target_port(base_port: int, profile: str) -> int:
     port = int(base_port) + int(PROFILE_META[str(profile)]["offset"])
 
@@ -299,6 +326,26 @@ if state_path.exists():
 # never reset an admin-applied REALITY target/SNI to global process defaults.
 reality_target = str(state.get("reality_target") or default_reality_target)
 reality_server_name = str(state.get("reality_server_name") or default_reality_server_name)
+# Preserve previously issued clients' SNI values across node reconciliation.
+# This is only an acceptance alias, not a new credential/secret or client
+# delivery field. Keep the list small, stable and strictly hostname-shaped.
+import re
+legacy_reality_names = []
+legacy_raw = state.get("reality_legacy_server_names")
+if isinstance(legacy_raw, list):
+    for candidate in legacy_raw[:8]:
+        name = str(candidate or "").strip().lower()
+        if (
+            4 <= len(name) <= 253
+            and re.fullmatch(r"[a-z0-9](?:[a-z0-9.-]*[a-z0-9])", name)
+            and ".." not in name
+            and "." in name
+            and name != reality_server_name.lower()
+            and name not in legacy_reality_names
+        ):
+            legacy_reality_names.append(name)
+        if len(legacy_reality_names) >= 4:
+            break
 
 
 def parse_x25519(output):
@@ -459,6 +506,10 @@ state = {{
     "reality_password": password,
     "reality_target": reality_target,
     "reality_server_name": reality_server_name,
+    "reality_legacy_server_names": legacy_reality_names,
+    # Only explicitly opted-in nodes set BBR for Xray listener sockets.
+    # Never change the host-wide TCP default or unrelated VPN processes.
+    "vless_tcp_congestion": "bbr" if str(state.get("vless_tcp_congestion") or "").lower() == "bbr" else "",
     "tls_sni_tcp": str(state.get("tls_sni_tcp") or ""),
     "tls_sni_ws": str(state.get("tls_sni_ws") or ""),
     "short_id_xhttp": short_id_xhttp,
@@ -773,12 +824,7 @@ async def _ensure_modern_xray(
         "show": False,
         "target": str(state.get("reality_target") or XRAY_REALITY_TARGET),
         "xver": 0,
-        "serverNames": [
-            str(
-                state.get("reality_server_name")
-                or XRAY_REALITY_SERVER_NAME
-            )
-        ],
+        "serverNames": _reality_server_names(state),
         "privateKey": private_key,
     }
 
@@ -809,6 +855,7 @@ async def _ensure_modern_xray(
             "streamSettings": {
                 "network": "xhttp",
                 "security": "reality",
+                **({"sockopt": {"tcpcongestion": "bbr"}} if state.get("vless_tcp_congestion") == "bbr" else {}),
                 "xhttpSettings": {
                     "path": str(state["xhttp_path"]),
                     "mode": "stream-up",
@@ -835,6 +882,7 @@ async def _ensure_modern_xray(
                 "streamSettings": {
                     "network": "ws",
                     "security": "tls",
+                    **({"sockopt": {"tcpcongestion": "bbr"}} if state.get("vless_tcp_congestion") == "bbr" else {}),
                     "wsSettings": {
                         "path": str(state["ws_path"]),
                     },

@@ -95,6 +95,13 @@ if not os.path.isfile(cert) or not os.path.isfile(key):
 with path.open("r", encoding="utf-8") as handle:
     doc = json.load(handle)
 
+# The modern runtime owns the per-node TCP tuning preference. Read it rather
+# than changing global sysctls or silently resetting an admin-tested BBR
+# listener whenever the independent TCP+TLS profile is reconciled.
+state_path = Path("/usr/local/etc/xray/twinpanel-modern-state.json")
+node_state = json.loads(state_path.read_text()) if state_path.is_file() else {{}}
+vless_bbr = str(node_state.get("vless_tcp_congestion") or "").lower() == "bbr"
+
 inbounds = doc.setdefault("inbounds", [])
 if not isinstance(inbounds, list):
     raise RuntimeError("invalid Xray inbounds")
@@ -134,6 +141,8 @@ expected = {{
         }},
     }},
 }}
+if vless_bbr:
+    expected["streamSettings"]["sockopt"] = {{"tcpcongestion": "bbr"}}
 
 changed = False
 found_index = None

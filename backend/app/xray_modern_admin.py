@@ -814,9 +814,28 @@ for entry in inbounds:
     if not reality.get("privateKey") or not reality.get("shortIds"):
         raise RuntimeError("Existing REALITY keys are missing")
     reality["target"] = target
-    reality["serverNames"] = [name]
+    # A previously published REALITY URI may still use the old SNI. Keep its
+    # name in the allowed list until subscribers update; credentials, keys,
+    # XHTTP path, ports and the public endpoint remain unchanged.
+    old_names = reality.get("serverNames") or []
+    legacy_names = state.get("reality_legacy_server_names") or []
+    aliases = []
+    import re
+    for candidate in [*old_names, *legacy_names]:
+        candidate = str(candidate or "").strip().lower()
+        if (
+            candidate and candidate != name
+            and len(candidate) <= 253 and "." in candidate and ".." not in candidate
+            and re.fullmatch(r"[a-z0-9](?:[a-z0-9.-]*[a-z0-9])", candidate)
+            and candidate not in aliases
+        ):
+            aliases.append(candidate)
+        if len(aliases) >= 4:
+            break
+    reality["serverNames"] = [name, *aliases]
 state["reality_target"] = target
 state["reality_server_name"] = name
+state["reality_legacy_server_names"] = aliases
 # TLS SNI may change only when the currently installed certificate covers it.
 for tag, server_name, state_key in (
     ("vless-tcp-tls", tcp_tls_sni, "tls_sni_tcp"),

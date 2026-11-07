@@ -7,6 +7,9 @@ on:
       - 'backend/app/service_connections_jobs_v28.py'
       - 'backend/app/self_hosted_runtime.py'
       - 'backend/app/xray_modern_runtime.py'
+      - 'backend/app/xray_modern_admin.py'
+      - 'backend/app/xray_tcp_tls_v39.py'
+      - 'tests/test_xray_reality_target_sni_alias_v1.py'
       - 'backend/app/xray_customer_profile_policy_v30.py'
       - 'scripts/xray-customer-xhttp-v46-smoke.py'
       - '.github/workflows/xray-customer-xhttp-v46-smoke.yml'
@@ -17,6 +20,9 @@ on:
       - 'backend/app/service_connections_jobs_v28.py'
       - 'backend/app/self_hosted_runtime.py'
       - 'backend/app/xray_modern_runtime.py'
+      - 'backend/app/xray_modern_admin.py'
+      - 'backend/app/xray_tcp_tls_v39.py'
+      - 'tests/test_xray_reality_target_sni_alias_v1.py'
       - 'backend/app/xray_customer_profile_policy_v30.py'
       - 'scripts/xray-customer-xhttp-v46-smoke.py'
       - '.github/workflows/xray-customer-xhttp-v46-smoke.yml'
@@ -37,3 +43,5 @@ jobs:
             scripts/xray-customer-xhttp-v46-smoke.py
       - name: Run Xray V46 smoke
         run: python scripts/xray-customer-xhttp-v46-smoke.py
+      - name: Verify REALITY target alias preservation
+        run: python tests/test_xray_reality_target_sni_alias_v1.py
