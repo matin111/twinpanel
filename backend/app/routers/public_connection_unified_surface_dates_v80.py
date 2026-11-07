@@ -271,6 +271,33 @@ html body.tp80-connection .tp80-extra-list>.tp78-footer-action{
  html body.tp80-connection .protocol-panel .tp80-file-actions .tp80-file-download,
  html body.tp80-connection .protocol-panel .tp80-file-copy{min-height:33px!important;padding:6px 7px!important;font-size:10px!important}
 }
+
+html body.tp80-connection .protocol-panel .tp80-modern-detail[hidden]{display:none!important}
+html body.tp80-connection .protocol-panel .tp80-modern-detail{
+  padding:11px 14px!important;background:#15233e!important;
+  border-bottom:1px solid #354869!important;min-width:0!important;
+}
+html body.tp80-connection .protocol-panel .tp80-modern-detail>.server-view{
+  display:block!important;margin:0!important;padding:0!important;background:transparent!important;
+}
+html body.tp80-connection .protocol-panel .tp80-modern-detail .facts{
+  display:grid!important;grid-template-columns:repeat(auto-fit,minmax(170px,1fr))!important;
+  gap:8px!important;
+}
+html body.tp80-connection .protocol-panel .tp80-modern-detail .fact{
+  border:1px solid #405072!important;border-radius:10px!important;
+  background:#1b2a47!important;color:#eff5ff!important;padding:10px!important;
+}
+html body.tp80-connection .protocol-panel .tp80-detail-toggle{
+  margin-inline-start:auto!important;flex:0 0 auto!important;
+  min-height:36px!important;padding:7px 12px!important;border-radius:10px!important;
+  background:#28385a!important;color:white!important;border:1px solid #53648c!important;
+  font-size:11px!important;font-weight:850!important;
+}
+@media(max-width:720px){
+ html body.tp80-connection .protocol-panel .tp80-modern-detail{padding:8px!important}
+ html body.tp80-connection .protocol-panel .tp80-detail-toggle{min-height:32px!important;padding:6px 8px!important;font-size:10px!important}
+}
 """
 
 _SCRIPT = r"""
@@ -404,6 +431,46 @@ _SCRIPT = r"""
      }
    }
  }
+ function normalizeModern(panel){
+   if(panel.dataset.tp80ModernReady==='1'||panel.dataset.v54V2ray==='1')return;
+   if(panel.classList.contains('tp80-native')||panel.dataset.ref67NativeProtocol)return;
+   const list=panel.querySelector(':scope > .ref67-list');
+   const tabs=[...panel.querySelectorAll('.server-tab[data-server]')];
+   const rows=[...list?.querySelectorAll(':scope > .ref67-row')||[]];
+   if(!list||!tabs.length||!rows.length)return;
+   const sections=[];
+   rows.forEach((row,index)=>{
+     const actions=row.querySelector('.ref67-row-actions');
+     if(actions&&actions.querySelector('a[href],button'))return;
+     const tab=tabs[index];
+     const view=tab?panel.querySelector('.server-view[id="'+tab.dataset.server+'"]'):null;
+     if(!view||!view.textContent.trim())return;
+     const toggle=el('button','tp80-detail-toggle','نمایش کانفیگ');
+     toggle.type='button';
+     const holder=el('section','tp80-modern-detail');
+     holder.hidden=true;
+     // Reuse the ORIGINAL details/buttons. A clone would lose their handlers.
+     holder.append(view);
+     row.insertAdjacentElement('afterend',holder);
+     row.append(toggle);
+     sections.push({row,holder,toggle});
+     toggle.addEventListener('click',()=>{
+       const opening=holder.hidden;
+       sections.forEach(section=>{
+         section.holder.hidden=true;
+         section.toggle.textContent='نمایش کانفیگ';
+       });
+       holder.hidden=!opening;
+       toggle.textContent=opening?'بستن':'نمایش کانفیگ';
+     });
+   });
+   if(sections.length){
+     panel.querySelector('.ref67-tabs')?.addEventListener('click',()=>{
+       sections.forEach(section=>{section.holder.hidden=true;section.toggle.textContent='نمایش کانفیگ'});
+     });
+   }
+   panel.dataset.tp80ModernReady='1';
+ }
  function normalizeV2ray(panel){
    if(panel.dataset.v54V2ray!=='1'&&panel.dataset.v54V2ray!==true)return;
    const cards=[...panel.querySelectorAll('.v54-v2ray-server')];
@@ -453,6 +520,7 @@ _SCRIPT = r"""
    panels().forEach(panel=>{
      normalizeNative(panel);
      normalizeV2ray(panel);
+     normalizeModern(panel);
      alignFooter(panel);
    });
  }
