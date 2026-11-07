@@ -1331,68 +1331,79 @@ _SCRIPT = r"""
    const noApp=/^l2tp(?:[\\/_-]?ipsec)?$/.test(key);
    let footer=panel.querySelector(':scope > .tp78-action-footer');
    if(!footer){
-     footer=el('nav','tp78-action-footer');footer.setAttribute('aria-label','عملیات اشتراک');
+     footer=el('nav','tp78-action-footer');
+     footer.setAttribute('aria-label','عملیات اشتراک');
      panel.append(footer);
    }
    const platform=(()=>{
      const os=String(document.body.dataset.tpPlatform||'').toLowerCase();
      if(['windows','android','ios','macos','linux'].includes(os))return os;
-     const ua=navigator.userAgent||'';
-     if(/android/i.test(ua))return'android';
-     if(/iphone|ipad|ipod/i.test(ua))return'ios';
-     if(/macintosh|mac os/i.test(ua))return'macos';
-     if(/linux/i.test(ua))return'linux';
+     const ua=String(navigator.userAgent||'').toLowerCase();
+     if(/android/.test(ua))return'android';
+     if(/iphone|ipad|ipod/.test(ua))return'ios';
+     if(/macintosh|mac os/.test(ua))return'macos';
+     if(/linux/.test(ua))return'linux';
      return'windows';
    })();
-   const client={openvpn:'openvpn',wireguard:'wireguard',amneziawg:'amneziawg',
-     trusttunnel:'trusttunnel',cisco:'openconnect',openconnect:'openconnect'};
-   const cards=[...panel.querySelectorAll('.v34-client-card,.ref70-app-card,.v13-client-only')];
-   // Keep a genuine installed link from existing client components whenever possible.
-   const source=cards.map(card=>card.querySelector('a[href]')).find(Boolean);
+   // Reuse actual OS-specific app URLs from earlier Connection layers.
+   // Never use the #apps placeholder as a download.
+   const candidates=[...panel.querySelectorAll('.v34-client-card a[href],.ref70-app-card a[href],.v13-client-only a[href]')];
+   const original=candidates.find(a=>{
+     const u=String(a.getAttribute('href')||'');
+     return /^https?:\\/\\//i.test(u)||u.startsWith('/v1/connect/app-download/');
+   });
+   const appTypes={
+     cisco:'openconnect',openconnect:'openconnect',openvpn:'openvpn',
+     wireguard:'wireguard',amneziawg:'amneziawg',trusttunnel:'trusttunnel',
+     sudoku:'sudoku',v2ray:'karing',hysteria2:'karing',
+     tuic:'karing',anytls:'karing',naive:'karing',
+     shadowtls:'karing',snell:'karing',mieru:'karing',
+     socks5:'karing'
+   };
+   const appName=appTypes[key];
+   const supportedPlatforms={
+     openconnect:['windows','android','ios'],
+     openvpn:['windows','android','ios'],
+     wireguard:['windows','android','ios','macos'],
+     amneziawg:['windows','android','ios','macos'],
+     trusttunnel:['windows','android','ios','macos'],
+     sudoku:['windows','android','ios','macos'],
+     karing:['windows','android','ios','macos','linux']
+   };
+   const canonical=appName&&supportedPlatforms[appName]?.includes(platform)
+     ?'/v1/connect/app-download/'+appName+'/'+platform:null;
    const existing=[...footer.querySelectorAll('[data-kind="app"]')];
-   let app=existing.find(a=>a.tagName==='A')||source||null;
-   if(noApp){
+   let app=existing.find(a=>a.tagName==='A')||null;
+   const existingUrl=String(app?.getAttribute('href')||'');
+   const validExisting=/^https?:\\/\\//i.test(existingUrl)||existingUrl.startsWith('/v1/connect/app-download/');
+   // Canonical supported client is preferred for consistency; otherwise
+   // preserve an existing verified direct link for this device.
+   const href=canonical||(original?.getAttribute('href'))||(validExisting?existingUrl:null);
+   if(noApp||!href){
      existing.forEach(node=>node.remove());
-     app=null;
    }else{
-     if(!app && client[key]){
-       app=el('a','tp78-footer-action','دانلود برنامه');
-     }
-     if(app){
-       app.dataset.kind='app';app.classList.add('tp78-footer-action');
-       if(client[key]){
-         app.href='/v1/connect/app-download/'+client[key]+'/'+platform;
-         app.target='_blank';app.rel='noopener noreferrer';
-       }
-       app.textContent='دانلود برنامه';
-       if(app.parentElement!==footer || footer.lastElementChild!==app)footer.append(app);
-       existing.filter(n=>n!==app).forEach(node=>node.remove());
-     }
+     if(!app){app=original||el('a','tp78-footer-action','دانلود برنامه');}
+     app.dataset.kind='app';
+     app.classList.add('tp78-footer-action');
+     app.setAttribute('href',href);
+     app.setAttribute('target','_blank');
+     app.setAttribute('rel','noopener noreferrer');
+     app.textContent='دانلود برنامه';
+     // DOM move, not a second standalone card, preserves a single action.
+     if(app.parentElement!==footer||footer.lastElementChild!==app)footer.append(app);
+     existing.filter(a=>a!==app).forEach(a=>a.remove());
    }
-   // Eliminate a second download bar regardless of mounting level.
-   cards.forEach(card=>card.remove());
-   panel.querySelectorAll('.ref69-download-cta').forEach(node=>{
-     if(!footer.contains(node))node.remove();
-   });
-   [...panel.children].forEach(node=>{
-     if(node===footer||node.classList.contains('panel-head'))return;
-     if(node.classList.contains('tp78-action-footer'))return;
-     if((node.textContent||'').trim()==='دانلود برنامه' &&
-        !node.classList.contains('protocol-choice'))node.remove();
-   });
-   // Footer must always be physically the last operation block, not a
-   // full-width standalone client banner before the original footer.
-   footer.querySelectorAll('.tp80-extra-actions [data-kind="app"]').forEach(node=>node.remove());
-   const children=[...footer.children].filter(node=>node.classList.contains('tp78-footer-action'));
-   if(app&&app.parentElement===footer&&children[children.length-1]!==app)footer.append(app);
-   const count=[...footer.children].filter(node=>node.classList.contains('tp78-footer-action')).length;
+   panel.querySelectorAll('.v34-client-card,.ref70-app-card,.v13-client-only').forEach(card=>card.remove());
+   panel.querySelectorAll(':scope > .ref69-download-cta').forEach(node=>node.remove());
+   // Protect the original config/copy/add actions.
+   const actions=[...footer.querySelectorAll(':scope > .tp78-footer-action')];
+   const count=actions.length;
    footer.style.setProperty('--tp80-cols',String(Math.max(1,Math.min(4,count))));
    footer.dataset.tp80Ready='1';
    panel.querySelectorAll('.tp77-native-label').forEach(label=>{
      [...label.querySelectorAll('img')].slice(1).forEach(img=>img.remove());
    });
  }
-
  function installMobileDetailsDialog(){
    if(document.getElementById('tp84-dialog'))return;
    const overlay=el('div','tp84-dialog');overlay.id='tp84-dialog';overlay.hidden=true;
