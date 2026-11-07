@@ -26,7 +26,7 @@ from app.models import Node, NodeStatus, NodeType
 from app.services.new_node_readiness_v1 import verify_new_exit_readiness
 from app.protocol_account_registry import ALL_PROTOCOL_KEYS
 from app.singbox_subscription_accounts import SINGBOX_PROTOCOLS
-from app.services.central_sudoku_capacity_v1 import capacity_report
+from app.services.central_sudoku_capacity_v1 import capacity_report, assert_target_sudoku_capacity
 from app.services.central_node_desired_state_v1 import load_desired_state, require_valid_desired_state
 from app.services.central_node_runtime_engine_v1 import (
     FAMILIES, reconcile_runtime_families,
@@ -113,6 +113,15 @@ def _run_locked(node_id, limit, apply):
         readiness = asyncio.run(verify_new_exit_readiness(db, node_id))
         if not readiness.get("ok"):
             raise RuntimeError("CENTRAL_NODE_STAGE_PROTOCOLS_NOT_READY")
+        # This runs before memberships and any protocol family is applied.
+        # Do not partially change other runtimes if Sudoku cannot fit.
+        sudoku_target = asyncio.run(assert_target_sudoku_capacity(
+            node, db, [
+                sid for sid, protocol in desired.entitled_pairs
+                if protocol == "sudoku"
+            ],
+        ))
+        print("CENTRAL_SUDOKU_TARGET_PREFLIGHT", json.dumps(sudoku_target), flush=True)
         # Re-read after the potentially slow listener audit and serialize only
         # the short membership transaction, never the network health checks.
         db.expire_all()
