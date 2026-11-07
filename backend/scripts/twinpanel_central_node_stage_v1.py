@@ -21,6 +21,7 @@ from sqlalchemy import text
 BACKEND = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND))
 
+from app.services.central_runtime_ownership_v1 import allow_central_node, mark_central_node
 from app.database import SessionLocal
 from app.models import Node, NodeStatus, NodeType
 from app.services.new_node_readiness_v1 import verify_new_exit_readiness
@@ -114,7 +115,7 @@ def _run_locked(node_id, limit, apply):
         node = db.get(Node, node_id)
         if (node is None or node.retired_at is not None
                 or node.node_type != NodeType.EXIT
-                or node.status != NodeStatus.ONLINE or node.show_to_users):
+                or node.status != NodeStatus.ONLINE or not allow_central_node(db,node)):
             raise RuntimeError("STAGE_REQUIRES_HIDDEN_ONLINE_EXIT")
         desired = require_valid_desired_state(
             load_desired_state(db, node_id), max_users=limit,
@@ -147,7 +148,7 @@ def _run_locked(node_id, limit, apply):
         node = db.get(Node, node_id, with_for_update=True)
         if (node is None or node.retired_at is not None or
                 node.node_type != NodeType.EXIT or
-                node.status != NodeStatus.ONLINE or node.show_to_users):
+                node.status != NodeStatus.ONLINE or not allow_central_node(db,node)):
             raise RuntimeError("NODE_CHANGED_DURING_STAGE")
         added = establish_hidden_memberships(db, node_id)
         db.commit()
@@ -191,6 +192,17 @@ def _run_locked(node_id, limit, apply):
         "node_id": node_id, "node_remains_hidden": True,
         "real_connection_canary_verified": False,
     }), flush=True)
+    # Durable marker authorizes the SAME daemon family reconciler after
+    # publication. No legacy subscription queue can claim this Exit.
+    with SessionLocal() as db:
+        node=db.get(Node,node_id)
+        if not allow_central_node(db,node):
+            raise RuntimeError("CENTRAL_RUNTIME_NODE_OWNERSHIP_CHANGED")
+        mark_central_node(db,node_id)
+        db.commit()
+    print("CENTRAL_RUNTIME_OWNERSHIP_REGISTERED",json.dumps({
+        "node_id":node_id,"engine":"central","published":bool(node.show_to_users),
+    }),flush=True)
     # Credentials and installed listeners are ready; publication is a separate
     # guarded transition. Exit 0 only for full materialization, never partial.
     return 0
