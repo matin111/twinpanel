@@ -61,6 +61,21 @@ class ExistingExitRecoveryTests(unittest.IsolatedAsyncioTestCase):
         start.assert_not_called()
         db.commit.assert_not_called()
 
+    async def test_installer_still_running_cannot_trigger_parallel_recovery(self):
+        db,job=self.db()
+        job.stage="installing_modern"
+        with (
+            patch("app.services.new_node_readiness_v1.verify_new_exit_readiness",
+                  new_callable=AsyncMock) as probe,
+            patch("app.services.central_node_stage_launcher_v1.launch") as start,
+        ):
+            with self.assertRaises(HTTPException) as err:
+                await routes.reverify_and_stage_existing_exit_v1(14,db=db)
+        self.assertEqual(err.exception.status_code,409)
+        probe.assert_not_awaited()
+        start.assert_not_called()
+        db.commit.assert_not_called()
+
     async def test_systemd_dispatch_failure_rolls_back_progress(self):
         db,_=self.db()
         with (
