@@ -139,6 +139,58 @@ body.ref67 .ref67-row-actions a,body.ref67 .ref67-row-actions button{min-height:
 body.ref67 .ref67-row-actions a.ref67-primary{border-color:#b874ff}
 body.ref67 .ref67-row-actions button:disabled{opacity:.5}
 body.ref67 .protocol-panel[data-ref67-mounted="1"] .server-views{display:none!important}
+/* Never replace native file downloads or manual Cisco/L2TP details with
+   fabricated URI-only server rows. These remain real per-node operations. */
+body.ref67 .protocol-panel[data-ref67-native-protocol] .server-tabs{
+  display:flex!important;overflow-x:auto!important;flex-wrap:nowrap!important;
+  max-width:100%!important;gap:8px!important;scrollbar-width:none!important;
+}
+body.ref67 .protocol-panel[data-ref67-native-protocol] .server-views,
+body.ref67 .protocol-panel[data-ref67-native-protocol] details.v34-mobile-servers .server-views{
+  display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;
+  padding:12px 16px!important;gap:10px!important;
+}
+body.ref67 .protocol-panel[data-ref67-native-protocol] .server-view{
+  display:block!important;min-width:0!important;border:1px solid #344665!important;
+  border-radius:14px!important;background:#141d34!important;
+  margin:0!important;padding:12px!important;
+}
+body.ref67 .protocol-panel[data-ref67-native-protocol] .server-view .facts{
+  display:grid!important;gap:9px!important;grid-template-columns:1fr!important;
+}
+body.ref67 .protocol-panel[data-ref67-native-protocol] .server-view .v34-server-actions{
+  display:flex!important;gap:8px!important;flex-wrap:wrap!important;
+}
+body.ref67 .protocol-panel[data-ref67-native-protocol] .server-view .download-config,
+body.ref67 .protocol-panel[data-ref67-native-protocol] .server-view a.tp-v16-safe-download,
+body.ref67 .protocol-panel[data-ref67-native-protocol] .server-view .v34-server-actions>button,
+body.ref67 .protocol-panel[data-ref67-native-protocol] .server-view .v34-server-actions>a{
+  min-height:44px!important;border-radius:11px!important;
+}
+body.ref67 .protocol-panel[data-ref67-native-protocol] .v34-single-label{
+  display:block!important;margin:12px 16px 4px!important;color:#d4ddf6!important;
+}
+body.ref67 .protocol-panel[data-ref67-native-protocol] .v34-client-card{
+  display:flex!important;align-items:center!important;justify-content:space-between!important;
+  margin:12px 16px!important;padding:12px!important;border:1px solid #534879!important;
+  border-radius:12px!important;background:linear-gradient(110deg,#201d48,#15213c)!important;
+}
+body.ref67 .protocol-panel[data-ref67-native-protocol] .server-tab span{
+  white-space:nowrap!important;font-size:12px!important;
+}
+@media(max-width:720px){
+ body.ref67 .protocol-panel[data-ref67-native-protocol] .server-views,
+ body.ref67 .protocol-panel[data-ref67-native-protocol] details.v34-mobile-servers .server-views{
+   grid-template-columns:1fr!important;padding:9px!important;gap:8px!important;
+ }
+ body.ref67 .protocol-panel[data-ref67-native-protocol] .server-view{
+   padding:10px!important;
+ }
+ body.ref67 .protocol-panel[data-ref67-native-protocol] .v34-client-card{
+   margin:9px!important;align-items:stretch!important;flex-direction:column!important;
+ }
+}
+
 body.ref67 .protocol-panel[data-ref67-mounted="1"]:not([data-v34-protocol="v2ray"]) .v54-v2ray-groups{display:none!important}
 body.ref67 .protocol-panel[data-ref67-mounted="1"] .v54-v2ray-groups{margin:9px 17px;padding:6px;border-radius:14px}
 body.ref67 .ref67-footer{margin:12px 17px 18px;display:flex;gap:10px;justify-content:stretch}
@@ -319,6 +371,19 @@ _SCRIPT = r"""
   return {deep,copy};
  }
  function mountPanel(panel){
+  // Native files and manual protocols have legitimate per-node payloads that
+  // are not share URIs. Keep the canonical download buttons and credential
+  // facts, instead of replacing them with fake 'no single link' rows.
+  const choice=[...document.querySelectorAll('.protocol-choice')].find(
+    node=>String(node.dataset.protocol||'')===String(panel.id||'')
+  );
+  const protocol=String(choice?.dataset.protocolKey||panel.dataset.v34Protocol||'').toLowerCase();
+  if(new Set(['openvpn','wireguard','amneziawg','cisco','l2tp']).has(protocol)){
+    panel.dataset.ref67NativeProtocol=protocol;
+    const folds=panel.querySelectorAll('details.v34-mobile-servers');
+    folds.forEach(fold=>{fold.open=true});
+    return;
+  }
   if(panel.dataset.ref67Mounted==='1')return;
   const tabs=[...panel.querySelectorAll('.server-tab')];
   const views=[...panel.querySelectorAll('.server-view')];
