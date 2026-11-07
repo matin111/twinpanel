@@ -179,8 +179,6 @@ _SCRIPT = r"""
      const row=document.createElement('div');row.className='tp77-native-row';
      const label=document.createElement('div');label.className='tp77-native-label';
      label.appendChild(identity(tab));
-     const latency=tab.querySelector('.ref71-rtt');
-     if(latency)label.appendChild(latency.cloneNode(true));
      const show=document.createElement('button');show.type='button';
      show.textContent='نمایش کانفیگ';
      show.addEventListener('click',()=>{tab.click();rows.forEach(x=>x.row.classList.toggle('active',x.tab===tab));});
