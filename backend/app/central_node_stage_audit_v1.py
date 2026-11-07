@@ -16,12 +16,13 @@ from .models import (
     SubscriptionProtocol, SubscriptionStatus,
 )
 from .protocol_account_registry import ALL_PROTOCOL_SET
+from .services.central_runtime_ownership_v1 import allow_central_node
 from .routers import account_delivery as ad
 
 
 def verify_coverage(db, node_id: int, *, max_pairs: int = 50000) -> dict:
     node = db.get(Node, int(node_id))
-    if node is None or node.retired_at is not None or bool(node.show_to_users):
+    if not allow_central_node(db,node):
         raise RuntimeError("CENTRAL_AUDIT_REQUIRES_HIDDEN_NODE")
     now = datetime.utcnow()
     active = db.query(Subscription.id).filter(
