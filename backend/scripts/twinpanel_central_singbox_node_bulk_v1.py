@@ -170,6 +170,17 @@ async def run(node_id:int,limit:int,apply:bool):
         if not allow_central_node(db,db.get(Node,node_id)):
             raise RuntimeError("STAGED_NODE_WAS_PUBLISHED_EARLY")
         ids={sid for sid,_,_ in work}
+        current_entitlements=set((int(sid),str(protocol)) for sid,protocol in
+            db.query(
+                SubscriptionProtocol.subscription_id,
+                SubscriptionProtocol.protocol,
+            ).filter(
+                SubscriptionProtocol.subscription_id.in_(list(ids)),
+                SubscriptionProtocol.protocol.in_(list(SINGBOX_PROTOCOLS)),
+            ).all())
+        if any((sid,protocol) not in current_entitlements
+               for sid,protocol,_ in work):
+            raise RuntimeError("CENTRAL_SINGBOX_ENTITLEMENT_CHANGED")
         existing={(int(c.subscription_id),str(c.protocol)):c for c in db.query(
             ProtocolCredential
         ).filter(
@@ -178,10 +189,6 @@ async def run(node_id:int,limit:int,apply:bool):
         ).with_for_update().all()}
         writes=0
         for sid,protocol,secret in work:
-            if db.query(SubscriptionProtocol).filter_by(
-                subscription_id=sid,protocol=protocol,
-            ).first() is None:
-                raise RuntimeError("CENTRAL_SINGBOX_ENTITLEMENT_CHANGED")
             cred=existing.get((sid,protocol))
             if cred is None:
                 cred=ProtocolCredential(subscription_id=sid,protocol=protocol)
