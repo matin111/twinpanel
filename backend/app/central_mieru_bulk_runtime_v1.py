@@ -156,7 +156,13 @@ async def apply_bulk(conn: Any, accounts: list[dict[str, str]]) -> dict[str, Any
     process.stdin.write_eof()
     result = await asyncio.wait_for(process.wait(), timeout=300)
     if result.exit_status:
-        raise RuntimeError("CENTRAL_MIERU_REMOTE_APPLY_FAILED")
+        # Only accept a fixed error-code token from the remote process.
+        # Never include stdout/stderr or credentials in logs.
+        import re
+        diagnostics = str(result.stderr or "")
+        tokens = re.findall(r"\\b(?:MIERU_[A-Z0-9_]+|MIERU_[A-Z0-9_]+)\\b", diagnostics)
+        code = tokens[-1] if tokens else "REMOTE_UNKNOWN"
+        raise RuntimeError("CENTRAL_MIERU_REMOTE_APPLY_FAILED:"+code)
     try:
         value = json.loads((result.stdout or "").strip().splitlines()[-1])
     except (ValueError, IndexError) as exc:
