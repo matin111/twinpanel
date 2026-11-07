@@ -12,6 +12,8 @@ on:
       - "backend/tests/test_new_node_install_then_auto_enroll_v1.py"
       - "backend/app/routers/provision.py"
       - "backend/app/services/new_node_modern_bootstrap_v1.py"
+      - "backend/app/services/new_node_readiness_v1.py"
+      - "backend/app/routers/modern_protocol_admin_v3.py"
       - "backend/app/protocol_account_registry.py"
       - ".github/workflows/fast-node-publish-v1.yml"
   workflow_dispatch:
