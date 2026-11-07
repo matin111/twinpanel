@@ -87,6 +87,9 @@ body.ref67 .protocol-choice[data-protocol-key="tuic"]{--ref67-icon:#0ab4da}
 body.ref67 .protocol-choice[data-protocol-key="cisco"]{--ref67-icon:#00b9ba}
 body.ref67 .protocol-choice[data-protocol-key="amneziawg"]{--ref67-icon:#7823db}
 body.ref67 .protocol-choice .protocol-icon{background:linear-gradient(135deg,var(--ref67-icon,var(--pc,#8943f5)),color-mix(in srgb,var(--ref67-icon,var(--pc,#8943f5)) 65%,#23184d))!important}
+body.ref67 .protocol-choice .protocol-icon img{width:25px;height:25px;object-fit:contain;display:block}
+body.ref67 .ref71-rtt{display:inline-flex;align-items:center;min-height:22px;margin-inline-start:4px;padding:2px 6px;border:1px solid #315e56;border-radius:8px;background:#15423955;color:#7ff3c2;font-size:10px;font-weight:900;direction:ltr}
+
 body.ref67 .protocol-choice .protocol-text{min-width:0;text-align:right}
 body.ref67 .protocol-choice .protocol-text b{display:block!important;font-size:14px!important;
  color:white;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -376,6 +379,23 @@ _SCRIPT = r"""
   image.src='https://flagcdn.com/w40/'+code.toLowerCase()+'.png';
   return wrapper;
  }
+ function applyOfficialProtocolIcons(){
+  const logos={openvpn:'openvpn',wireguard:'wireguard',cisco:'cisco'};
+  document.querySelectorAll('.protocol-choice[data-protocol-key]').forEach(choice=>{
+    const key=String(choice.dataset.protocolKey||'').toLowerCase();
+    const slug=logos[key];
+    const icon=choice.querySelector('.protocol-icon');
+    if(!slug||!icon||icon.dataset.ref71OfficialIcon)return;
+    icon.dataset.ref71OfficialIcon='1';
+    const img=document.createElement('img');
+    img.alt=key+' official logo';
+    img.loading='lazy';
+    img.decoding='async';
+    img.addEventListener('load',()=>icon.replaceChildren(img));
+    // Preserve the existing label if the external static logo cannot load.
+    img.src='https://cdn.simpleicons.org/'+slug+'/FFFFFF';
+  });
+ }
  function decorateNativeTabs(panel){
   if(panel.dataset.ref67Flags==='1')return;
   panel.dataset.ref67Flags='1';
@@ -386,6 +406,12 @@ _SCRIPT = r"""
    if(!span)return;
    span.textContent=' '+d.code+' '+d.num;
    span.prepend(flagImageOrEmoji(d.code,'ref67-native-flag'));
+   const latency=Number(tab.dataset.latencyMs||'');
+   if(tab.dataset.latencyMs&&Number.isFinite(latency)&&latency>0){
+     const badge=document.createElement('span');badge.className='ref71-rtt';
+     badge.textContent=latency+' ms';badge.title='تأخیر واقعی مسیر تونل';
+     tab.appendChild(badge);
+   }
   });
  }
  function serverDescriptor(tab,index){
@@ -435,6 +461,12 @@ _SCRIPT = r"""
    const d=serverDescriptor(tab,i);
    const c=document.createElement('button');c.type='button';c.className='ref67-chip';
    c.append(flagImageOrEmoji(d.code,'ref67-flag'),document.createTextNode(' '+(d.code||'—')+' '+d.num));
+   const rtt=Number(tab.dataset.latencyMs||'');
+   if(tab.dataset.latencyMs&&Number.isFinite(rtt)&&rtt>0){
+     const badge=document.createElement('span');badge.className='ref71-rtt';
+     badge.textContent=rtt+' ms';badge.title='تأخیر واقعی مسیر تونل';
+     c.appendChild(badge);
+   }
    c.addEventListener('click',()=>{bar.querySelectorAll('button').forEach(x=>x.classList.toggle('active',x===c));
     rows.forEach((row,j)=>row.hidden=i!==j);tab.click();});
    bar.appendChild(c);
@@ -446,6 +478,7 @@ _SCRIPT = r"""
    sub.textContent=panel.querySelector('.panel-head h3')?.textContent?.trim()||'Connection';
    info.append(b,sub);name.append(flag,info);
    const status=document.createElement('div');status.className='ref67-status';
+   status.title='تأخیر مسیر نود از پایش تونل؛ نه پینگ مستقیم گوشی کاربر';
    const latency=tab.dataset.latencyMs||views[i]?.dataset.latencyMs||'';
    const numeric=Number(latency);
    status.textContent='● '+(tab.dataset.online==='false'?'آفلاین':'آماده')+
@@ -495,7 +528,7 @@ _SCRIPT = r"""
    mark.dataset.ref67BrandIcon='1';
    mark.innerHTML='<svg viewBox="0 0 24 24" width="27" height="27" fill="none" stroke="white" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.07 0l3-3a5 5 0 1 0-7.07-7.07l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.07 0l-3 3A5 5 0 1 0 11 21.07l1.7-1.7"/></svg>';
   }
-  addUser();reorderProtocols();categories();
+  addUser();reorderProtocols();categories();applyOfficialProtocolIcons();
   if(!document.body.dataset.ref67InitialSelection){
    document.body.dataset.ref67InitialSelection='1';
    document.querySelector('.protocol-choice[data-protocol-key="v2ray"]')?.click();

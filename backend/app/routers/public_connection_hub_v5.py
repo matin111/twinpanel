@@ -3,6 +3,7 @@ from __future__ import annotations
 import html
 import json
 import re
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends
@@ -11,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from ..branding_models import BrandingSettings
 from ..database import get_db
-from ..models import Node, User
+from ..models import Node, TunnelPeerState, User
 from .account_delivery import (
     DOWNLOADS,
     _public_payload,
@@ -194,7 +195,51 @@ def render_smart_connect(payload: dict[str, Any], username: str, password: str, 
     )
 
 
-def render_protocols(payload: dict[str, Any], username: str, password: str, node_names: dict[int, str]) -> tuple[str, str]:
+def _recent_node_latency(db: Session, payload: dict[str, Any]) -> dict[int, int]:
+    """Recent measured Iran→Exit tunnel RTT for only already-delivered nodes.
+
+    This is NOT browser-to-server ping. Missing or stale metrics are omitted
+    (the public UI then shows a dash). Query is strictly read-only.
+    """
+    ids: set[int] = set()
+    for cred in payload.get("credentials") or []:
+        if not isinstance(cred, dict):
+            continue
+        for item in _items(cred):
+            try:
+                node_id = int(item.get("node_id") or 0)
+            except (TypeError, ValueError):
+                continue
+            if node_id > 0:
+                ids.add(node_id)
+    if not ids:
+        return {}
+    cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(minutes=2)
+    readings = (
+        db.query(TunnelPeerState)
+        .filter(
+            TunnelPeerState.node_id.in_(ids),
+            TunnelPeerState.updated_at >= cutoff,
+            TunnelPeerState.tunnel_reachable.is_(True),
+            TunnelPeerState.latency_ms.isnot(None),
+        )
+        .order_by(TunnelPeerState.updated_at.desc())
+        .limit(1000)
+        .all()
+    )
+    result: dict[int, int] = {}
+    for reading in readings:
+        node_id = int(reading.node_id)
+        latency = reading.latency_ms
+        if node_id not in result and latency is not None and 0 < int(latency) <= 30000:
+            result[node_id] = int(latency)
+    return result
+
+
+def render_protocols(
+    payload: dict[str, Any], username: str, password: str,
+    node_names: dict[int, str], latency_by_node: dict[int, int] | None = None,
+) -> tuple[str, str]:
     credentials = payload.get("credentials") or []
     if not isinstance(credentials, list):
         credentials = []
@@ -222,8 +267,14 @@ def render_protocols(payload: dict[str, Any], username: str, password: str, node
             server_id = f"{pane_id}-server-{item_index}"
             server_active = " active" if item_index == 0 else ""
             name = _server_name(item, node_names, item_index)
+            try:
+                node_id = int(item.get("node_id") or 0)
+            except (TypeError, ValueError):
+                node_id = 0
+            latency = (latency_by_node or {}).get(node_id)
+            latency_attr = f' data-latency-ms="{int(latency)}"' if latency is not None else ""
             server_tabs.append(
-                f'<button class="server-tab{server_active}" type="button" data-server="{h(server_id)}"><i></i><span>{h(name)}</span></button>'
+                f'<button class="server-tab{server_active}" type="button" data-server="{h(server_id)}"{latency_attr}><i></i><span>{h(name)}</span></button>'
             )
             body = _item_detail(
                 protocol,
@@ -315,7 +366,8 @@ def public_connection_hub_v5(token: str, db: Session = Depends(get_db)):
 
     safe_payload = payload if status == "active" else {**payload, "credentials": [], "account": {}}
     smart_html = render_smart_connect(safe_payload, username if status == "active" else "", password if status == "active" else "", node_names)
-    protocol_cards, protocol_panels = render_protocols(safe_payload, username if status == "active" else "", password if status == "active" else "", node_names)
+    measured_latency = _recent_node_latency(db, safe_payload)
+    protocol_cards, protocol_panels = render_protocols(safe_payload, username if status == "active" else "", password if status == "active" else "", node_names, measured_latency)
     apps_html = render_apps(public_downloads_by_platform(db))
     share_url = str(payload.get("subscription_link") or "")
     status_html = '<span class="status on"><i></i>اشتراک فعال</span>' if status == "active" else '<span class="status off"><i></i>غیرفعال</span>'
