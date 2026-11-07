@@ -73,8 +73,6 @@ def establish_hidden_memberships(db, node_id):
 def adapter_command(name, node_id, limit, apply):
     cmd = [sys.executable, str(BACKEND / "scripts" / name),
            "--node-id", str(node_id), "--limit", str(limit)]
-    if name == "twinpanel_central_sudoku_node_bulk_v1.py":
-        cmd[cmd.index("--limit") + 1] = "64"
     if name == "twinpanel_central_xray_node_bulk_v1.py":
         cmd[cmd.index("--limit") + 1] = "100"
         cmd.append("--all")
@@ -175,7 +173,9 @@ def _run_locked(node_id, limit, apply):
         "node_id": node_id, "node_remains_hidden": True,
         "real_connection_canary_verified": False,
     }), flush=True)
-    return 3
+    # Credentials and installed listeners are ready; publication is a separate
+    # guarded transition. Exit 0 only for full materialization, never partial.
+    return 0
 
 
 def parse_args(argv=None):
