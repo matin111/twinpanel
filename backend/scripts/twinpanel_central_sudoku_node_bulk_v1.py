@@ -1,4 +1,4 @@
-"""Materialize eligible Sudoku users on one hidden Exit with memory-admitted service waves.
+"""Materialize eligible Sudoku users on one hidden Exit with memory-admitted service-set reconciliation.
 
 Uses the same existing StandaloneAccountSecret and config schema as normal
 account delivery, but persists missing identities in ONE central transaction
