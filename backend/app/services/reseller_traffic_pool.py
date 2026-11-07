@@ -189,6 +189,8 @@ def open_session(
     db: Session,
     node_id: int,
     data: SessionOpenIn,
+    *,
+    observed_telemetry: bool = False,
 ) -> dict:
     link = _reseller_link(db, int(data.subscription_id))
     if link:
@@ -204,7 +206,7 @@ def open_session(
 
     from ..quota_service_v2 import open_session as core_open_session
 
-    return core_open_session(db, node_id, data)
+    return core_open_session(db, node_id, data, observed_telemetry=observed_telemetry)
 
 
 def restore_reseller_pool_subscriptions(
