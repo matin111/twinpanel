@@ -172,10 +172,21 @@ def _run_locked(node_id, limit, apply):
     # Final guard: process exit != all purchased node credentials persisted.
     # This is read-only and never publishes a node or queues legacy work.
     with SessionLocal() as db:
-        latest = load_desired_state(db, node_id)
-        if latest.fingerprint != desired.fingerprint:
-            raise RuntimeError("CENTRAL_NODE_DESIRED_STATE_CHANGED_DURING_APPLY")
+        latest = require_valid_desired_state(
+            load_desired_state(db, node_id), max_users=limit,
+        )
+        # A purchase during bulk reconciliation does not always imply missing
+        # credentials: another safe path may already have converged it. Audit
+        # the CURRENT projection before deciding to rerun every daemon.
         audit = verify_coverage(db, node_id)
+        if latest.fingerprint != desired.fingerprint:
+            if not audit["ok"]:
+                raise RuntimeError("CENTRAL_NODE_DESIRED_STATE_CHANGED_DURING_APPLY")
+            print("CENTRAL_NODE_SNAPSHOT_ADVANCED_WITH_FULL_COVERAGE", json.dumps({
+                "node_id": node_id, "eligible_subscriptions": latest.count,
+                "desired_protocol_pairs": latest.pair_count,
+            }), flush=True)
+            desired = latest
     print("CENTRAL_NODE_COVERAGE_AUDIT", json.dumps({
         "node_id": node_id, **audit,
     }), flush=True)
