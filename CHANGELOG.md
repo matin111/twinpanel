@@ -1,5 +1,20 @@
 # TwinPanel Changelog
 
+## 1.1.0-rc.653 — 2026-11-07
+
+### Official package parity
+- Rebuild the installable release from the latest GitHub source rather than reusing the older rc.652 artifact. This includes the Connection changes that had previously been applied only as production hotfixes.
+- Windows: four available Connection footer actions in one horizontal row; preserve the actual client-download action and the original copy/link/import handlers.
+- Android: when four actions are available, one full-width primary action above three equal actions. No placeholder controls if an action does not exist for a protocol.
+- OpenVPN, WireGuard, AmneziaWG: preserve genuine config-file download and multi-server ZIP routes. Other protocols retain their original compatible-app import actions.
+- Restore the supported protocol-specific client install links (including Karing, Sudoku, TrustTunnel, OpenConnect) with device-aware choices.
+- Retain unified theme colors, server row layouts, and the mobile server-detail modal.
+- No changes intended to VPN runtime, database, node tunnels, or credentials.
+
+### Validation and limits
+- Official prebuilt release workflow is responsible for building and hashing the candidate artifact before stable manifest publication.
+- Complete interactive visual regression across all supported devices and protocols has not been verified.
+
 ## 1.1.0-rc.652 — 2026-11-07
 
 ### Connection — user interface and client delivery
