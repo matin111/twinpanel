@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.644",
+  "version": "1.1.0-rc.645",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-07T05:28:58Z",
+  "released_at": "2026-11-07T05:44:52Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "acd65a6bf2a77f53529e4c0bafe795f8fae0cb42",
+  "source_sha": "d12d0433fc8a8ae23104c492263ed12516d1c72b",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.644/twinpanel-1.1.0-rc.644-linux-x86_64.tar.gz",
-    "sha256": "0c5a3e87c1700c224e438e7f85b50123448801325b7cd9fe5d289b518bf67f70",
-    "size_bytes": 29195126
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.645/twinpanel-1.1.0-rc.645-linux-x86_64.tar.gz",
+    "sha256": "25556e5b1da2c6b60bd5fb1748a709692c43f65ee749c0e31f5788f133325b1d",
+    "size_bytes": 29211141
   },
   "notes": {
-    "fa": "یکسان‌سازی نمایش نام و پرچم نودها در تمام پروتکل‌های Connection در موبایل و ویندوز؛ حفظ شناسه نود، لینک‌ها و کانفیگ‌های اصلی و سه اینباند V2Ray. تغییرات فقط در رابط کاربری هستند.",
-    "en": "Unified country flags and actual node numbers across public Connection protocol panels on desktop and mobile; preserve server identity, original configs, import links and all 3 V2Ray profiles per node. Presentation-only change."
+    "fa": "اصلاح ریشه‌ای نمایش همه پروتکل‌ها زیر هم در Connection: فقط پروتکل انتخابی؛ ظاهر تیره و شبکه چهارتایی مشابه تصویر مرجع در موبایل و ویندوز، نمایش یکنواخت نام و پرچم نودها، دکمه‌های انتهای پنل و اتصال هر کانفیگ به نود واقعی. پروفایل‌های اصلی V2Ray و فایل‌های native بدون تغییر شبکه حفظ شده‌اند.",
+    "en": "Connection V77 visual regression fixes: only selected protocol panel, dark reference-style four-column desktop/mobile cards, consistent country/node identity, original per-node actions and file details, true 3 V2Ray inbounds expandable, bottom native actions and OS-aware client download. No VPN config/data/service mutations."
   }
 }
