@@ -16,7 +16,7 @@ def staged_db():
     node=SimpleNamespace(id=14,name="New Exit",node_type=NodeType.EXIT,
                          retired_at=None,show_to_users=False)
     node_query=MagicMock()
-    node_query.filter.return_value.filter.return_value.first.return_value=node
+    node_query.filter.return_value.first.return_value=node
     job_query=MagicMock()
     job_query.filter.return_value.order_by.return_value.first.return_value=(
         SimpleNamespace(stage="verified_ready")
