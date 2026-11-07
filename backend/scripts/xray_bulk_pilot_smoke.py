@@ -27,7 +27,8 @@ assert "centrally_published" in runner
 assert "db.commit()" in runner
 assert "sub.traffic_used_bytes >= sub.traffic_limit_bytes" in runner
 assert "current.append(prepared[sid])" in runner
-assert "build_node_item_from_template(" in runner\nassert runner.count("db.commit()") == 1
+assert "build_node_item_from_template(" in runner
+assert runner.count("db.commit()") == 1
 assert "if not apply or not chosen:" in runner
 assert "new_account_work_has_priority()" in runner
 assert "if current is not None:" in runner
