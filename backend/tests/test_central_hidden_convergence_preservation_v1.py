@@ -14,6 +14,7 @@ def _db(*, hidden=True, retired=False, status=NodeStatus.ONLINE):
         node_type=NodeType.EXIT, status=status, show_to_users=not hidden,
     )
     db = MagicMock()
+    db.info = {}
     db.get.return_value = node
     db.query.return_value.filter.return_value.first.return_value = (
         SimpleNamespace(status="online")
@@ -38,6 +39,18 @@ class HiddenCentralItemPreservationTests(unittest.TestCase):
             self.assertTrue(convergence._modern_item_is_usable(
                 ad, _db(hidden=True), "hysteria2", self._item()
             ))
+        ad._delivery_item_is_usable.assert_not_called()
+
+    def test_central_ownership_is_read_only_once_per_session(self):
+        db = _db(hidden=True)
+        ad = self._ad(customer_usable=False)
+        with patch.object(central_runtime_ownership_v1, "is_central_node",
+                          return_value=True) as lookup:
+            for protocol in ("anytls", "hysteria2", "naive", "tuic"):
+                self.assertTrue(convergence._modern_item_is_usable(
+                    ad, db, protocol, self._item()
+                ))
+            lookup.assert_called_once_with(db, 14)
         ad._delivery_item_is_usable.assert_not_called()
 
     def test_unregistered_hidden_node_is_not_implicitly_trusted(self):
