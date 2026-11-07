@@ -35,7 +35,7 @@ def test_no_css_layer_hides_start_and_expiry():
     ui = code("public_connection_unified_surface_dates_v80.py")
     assert "grid-template-columns:repeat(5,minmax(0,1fr))" in ui
     assert "stats>.stat:nth-child(n+4){grid-column:span 3" in ui
-    assert ".stat:nth-child(n+4){display:flex!important}" in ui
+    assert ".traffic .stat:nth-child(n+4){display:flex!important;" in ui
 
 def test_native_only_one_node_detail_may_appear():
     ui = code("public_connection_unified_surface_dates_v80.py")
