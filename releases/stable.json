@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.647",
+  "version": "1.1.0-rc.648",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-07T06:07:56Z",
+  "released_at": "2026-11-07T06:25:23Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "dfdb130cd8659c77730df95c6e1bfd452b4bc890",
+  "source_sha": "9f3c9fddcc1821985b6c51d0f37a2f869b2e064c",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.647/twinpanel-1.1.0-rc.647-linux-x86_64.tar.gz",
-    "sha256": "b3bab34f2ec006f3637496c42220038dfd86abf0e64b3c49f5a2f16471ab9afe",
-    "size_bytes": 29239317
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.648/twinpanel-1.1.0-rc.648-linux-x86_64.tar.gz",
+    "sha256": "37f19cf0a82aa96b2ba2acdb427f015670dda755e34bc8a5dbc2e60173f7d3e8",
+    "size_bytes": 29242509
   },
   "notes": {
-    "fa": "اصلاح رابط عمومی Connection مطابق نمونه موبایل و ویندوز: نام پروتکل زیر آیکن در موبایل، دکمه‌های اصلی واقعی در پایین پنل، کپی و افزودن کانفیگ‌های مربوط به هر نود، نمایش وضعیت فعال اشتراک، سنجش تازه واقعی ICMP/TCP از سرور پنل به نود با کلیک روی پینگ و نمایش — به‌جای عدد ساختگی در صورت نرسیدن پاسخ. کانفیگ‌ها و سرویس‌های VPN تغییری نمی‌کنند.",
-    "en": "Connection mobile/desktop reference V78: protocol names below icons on mobile; original add/copy/share/client-download controls at the bottom; original node actions and three V2Ray profiles; subscription active status and on-click fresh panel-to-entitled-node bounded ICMP/TCP RTT. No fabricated latency, no VPN configuration or node/service mutation."
+    "fa": "رفع عدم ثبت مسیر سنجش زنده پینگ در روتر واقعی Hub Live V5؛ فعال‌سازی تست مجدد ICMP/TCP از سرور پنل به نودهای مجاز اشتراک، بدون عدد ساختگی. تغییرات صفحه Connection و چینش موبایل نسخه قبلی حفظ می‌شوند؛ هیچ پورت، کانفیگ، تونل یا سرویس VPN تغییر نمی‌کند.",
+    "en": "Register the V78 authenticated real node RTT refresh endpoint in the actual Hub Live V5 router used by the FastAPI app. Real panel-to-node ICMP/TCP refresh, no fabricated RTT, preserving all rc.647 connection UI and VPN configs, services and tunnels."
   }
 }
