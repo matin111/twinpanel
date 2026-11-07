@@ -1068,6 +1068,43 @@ html body.tp80-connection .protocol-panel.active > .tp78-action-footer > a.tp92-
  color:var(--tp-brand-text,var(--text))!important;font-weight:800!important;
  text-decoration:none!important;
 }
+
+/* TWINPANEL_CONNECTION_SINGLE_COUNTRY_MODAL_FOOTER_V93 */
+html body.tp80-connection .protocol-panel[data-v54-v2ray="1"] > .ref67-tabs,
+html body.tp80-connection .protocol-panel[data-v54-v2ray="1"] > .tp74-country-bar,
+html body.tp80-connection .protocol-panel[data-v54-v2ray="1"] > .tp80-country-bar,
+html body.tp80-connection .protocol-panel[data-v54-v2ray="1"] > .server-tabs{
+ display:none!important;
+}
+html body.tp80-connection .protocol-panel.active > .tp92-v2-country-bar{order:2!important;flex-wrap:nowrap!important;overflow-x:auto!important;direction:ltr!important}
+html body.tp80-connection .protocol-panel.active > .tp78-action-footer > a.tp92-v2rayn{
+ grid-column:auto!important;min-width:0!important;min-height:54px!important;
+}
+html body.tp80-connection .protocol-panel.active > .tp78-action-footer:has(> a.tp92-v2rayn){
+ grid-template-columns:repeat(4,minmax(0,1fr))!important;
+}
+html body.tp80-connection .protocol-panel.active > .tp93-country-bar{order:2!important}
+html body.tp80-connection .protocol-panel.active .tp93-country-bar .active{
+ background:linear-gradient(110deg,var(--p),var(--s))!important;color:white!important;
+}
+html body.tp80-connection .protocol-panel .tp93-country-bar + .ref67-list .ref67-row[hidden],
+html body.tp80-connection .protocol-panel .tp93-country-bar + .ref67-list .tp80-modern-detail[hidden]{display:none!important}
+html body.tp80-connection #tp84-dialog:not([hidden]){
+ display:flex!important;position:fixed!important;inset:0!important;z-index:2147483000!important;
+ background:#070b19cc!important;align-items:center!important;justify-content:center!important;padding:16px!important;
+}
+html body.tp80-connection #tp84-dialog[hidden]{display:none!important}
+html body.tp80-connection #tp84-dialog .tp84-dialog-card{
+ width:min(660px,96vw)!important;max-height:86dvh!important;overflow:hidden!important;
+ display:flex!important;flex-direction:column!important;position:relative!important;
+}
+html body.tp80-connection #tp84-dialog .tp84-dialog-body{overflow:auto!important;min-height:0!important}
+html body.tp80-connection #tp84-dialog .tp84-dialog-body > .tp80-inline-native-detail,
+html body.tp80-connection #tp84-dialog .tp84-dialog-body > .tp80-modern-detail,
+html body.tp80-connection #tp84-dialog .tp84-dialog-body > .v54-v2ray-profiles{
+ display:block!important;visibility:visible!important;position:static!important;
+ max-height:none!important;opacity:1!important;
+}
 """
 
 
@@ -1504,14 +1541,65 @@ _SCRIPT = r"""
      textNodes.forEach(strip);
    });
  }
+ function normalizeRef67CountryFilters(panel){
+   if(panel.dataset.v54V2ray==='1'||panel.classList.contains('tp80-native'))return;
+   const source=panel.querySelector(':scope > .ref67-tabs');
+   const rows=[...panel.querySelectorAll(':scope > .ref67-list > .ref67-row')];
+   const originals=[...panel.querySelectorAll('.server-tab[data-server]')];
+   if(!source||!rows.length||!originals.length)return;
+   const key=originals.map(tab=>String(tab.dataset.countryCode||'').toUpperCase()).join(',');
+   const existing=panel.querySelector(':scope > .tp93-country-bar');
+   if(existing?.dataset.signature===key&&rows.length===Number(existing.dataset.rowCount))return;
+   existing?.remove();
+   const bar=el('nav','tp80-country-bar tp93-country-bar');
+   bar.dataset.signature=key;bar.dataset.rowCount=String(rows.length);
+   bar.setAttribute('aria-label','فیلتر کشورها');
+   const groups=new Map();
+   rows.forEach((row,i)=>{
+     const t=originals[i];let country=String(t?.dataset.countryCode||'').toUpperCase();
+     if(!/^[A-Z]{2}$/.test(country)){
+       const raw=t?.textContent||'';
+       country=(raw.match(/\\b(TR|DE|US|NL|FR|GB|CA|IT|SE|FI|CH|AT|JP|SG|AE)\\b/i)||[])[1]?.toUpperCase()||'OTHER';
+     }
+     row.dataset.tp93Country=country;
+     if(!groups.has(country))groups.set(country,[]);
+     groups.get(country).push(row);
+   });
+   const buttons=[];
+   const filter=code=>{
+     rows.forEach(row=>{
+       const visible=code==='ALL'||row.dataset.tp93Country===code;
+       row.hidden=!visible;
+       const details=row.nextElementSibling;
+       if(details?.classList.contains('tp80-modern-detail'))details.hidden=true;
+     });
+     buttons.forEach(btn=>btn.classList.toggle('active',btn.dataset.country===code));
+     panel.dataset.tp93Selected=code;
+   };
+   const all=el('button','active','همه');all.type='button';all.dataset.country='ALL';
+   all.addEventListener('click',()=>filter('ALL'));buttons.push(all);bar.append(all);
+   for(const [country,items] of groups){
+     const btn=el('button','');btn.type='button';btn.dataset.country=country;
+     if(country!=='OTHER')btn.append(countryImage(country));
+     btn.append(document.createTextNode(' '+country+(items.length>1?' ('+items.length+')':'')));
+     btn.addEventListener('click',()=>filter(country));buttons.push(btn);bar.append(btn);
+   }
+   source.style.setProperty('display','none','important');source.hidden=true;
+   panel.querySelector(':scope > .panel-head')?.insertAdjacentElement('afterend',bar);
+   filter(panel.dataset.tp93Selected&&buttons.some(btn=>btn.dataset.country===panel.dataset.tp93Selected)?panel.dataset.tp93Selected:'ALL');
+ }
  function normalizeV2rayCountries(panel){
    if(panel.dataset.v54V2ray!=='1')return;
    const holder=panel.querySelector(':scope > .v54-v2ray-groups');
    const cards=[...holder?.querySelectorAll(':scope > .v54-v2ray-server')||[]];
    if(!cards.length)return;
    const previous=panel.querySelector(':scope > .tp92-v2-country-bar');
+   panel.querySelectorAll(':scope > .ref67-tabs,:scope > .tp74-country-bar,:scope > .tp80-country-bar').forEach(node=>{
+     node.hidden=true;node.style.setProperty('display','none','important');
+   });
    const signature=cards.map(card=>card.dataset.countryCode||'').join('|');
    if(previous?.dataset.signature===signature&&cards.every(card=>card.dataset.tp92Scoped==='1'))return;
+   const selected=panel.dataset.tp93V2Selected||'ALL';
    previous?.remove();
    const groups=new Map();
    cards.forEach(card=>{
@@ -1538,6 +1626,7 @@ _SCRIPT = r"""
    function filter(code){
      cards.forEach(card=>{card.hidden=code!=='ALL'&&card.dataset.tp92Country!==code});
      buttons.forEach(b=>b.classList.toggle('active',b.dataset.country===code));
+     panel.dataset.tp93V2Selected=code;
    }
    const all=el('button','active','همه');
    all.type='button';all.dataset.country='ALL';all.addEventListener('click',()=>filter('ALL'));
@@ -1555,7 +1644,7 @@ _SCRIPT = r"""
    const head=panel.querySelector(':scope > .panel-head,:scope > .protocol-panel-head');
    if(head)head.insertAdjacentElement('afterend',bar);
    else holder.insertAdjacentElement('beforebegin',bar);
-   filter('ALL');
+   filter(buttons.some(btn=>btn.dataset.country===selected)?selected:'ALL');
  }
 
  function keyForPanel(panel){
@@ -1668,7 +1757,8 @@ _SCRIPT = r"""
    }
    // Preserve existing working download-all from V51. ZIP route is already
    // represented by that real <a> element. Do not replace it with placeholders.
-   const ordered=[primary,link,copy,app].filter(Boolean);
+   const client=key==='v2ray'?nodes.find(node=>node.dataset.kind==='client'&&node.classList.contains('tp92-v2rayn')):null;
+   const ordered=[primary,link,copy,app,client].filter(Boolean);
    const extra=nodes.filter(node=>!ordered.includes(node)&&node.dataset.kind!=='app');
    const previous=[...footer.querySelectorAll(':scope > .tp80-extra-actions .tp78-footer-action')];
    // Do not discard buttons: keep original source nodes and secondary actions.
@@ -1770,10 +1860,12 @@ _SCRIPT = r"""
    const oldExtra=footer.querySelector(':scope > .tp92-v2rayn');
    if(key==='v2ray'&&platform==='windows'){
      let extra=oldExtra;
-     if(!extra){extra=el('a','tp92-v2rayn','دانلود v2rayN')}
+     if(!extra){extra=el('a','tp92-v2rayn tp78-footer-action','دانلود v2rayN')}
      extra.href='https://github.com/2dust/v2rayN/releases/latest';
      extra.target='_blank';extra.rel='noopener noreferrer';
      extra.dataset.tp92Client='v2rayn';
+     extra.dataset.kind='client';
+     extra.classList.add('tp78-footer-action');
      if(extra.parentElement!==footer)footer.append(extra);
    }else oldExtra?.remove();
    footer.dataset.tp92OnlyApp=footer.querySelectorAll(':scope > .tp78-footer-action').length===1?'1':'0';
@@ -1791,7 +1883,7 @@ _SCRIPT = r"""
    const overlay=el('div','tp84-dialog');overlay.id='tp84-dialog';overlay.hidden=true;
    overlay.setAttribute('role','dialog');overlay.setAttribute('aria-modal','true');
    const card=el('div','tp84-dialog-card'),head=el('div','tp84-dialog-head');
-   const title=el('strong','','اطلاعات سرور'),close=el('button','tp84-dialog-close','بستن');
+   const title=el('strong','','اطلاعات اتصال'),close=el('button','tp84-dialog-close','بستن');
    close.type='button';const body=el('div','tp84-dialog-body');
    head.append(title,close);card.append(head,body);overlay.append(card);document.body.append(overlay);
    let selected=null,placeholder=null,previousFocus=null,previousOverflow='';
@@ -1799,47 +1891,47 @@ _SCRIPT = r"""
      if(overlay.hidden)return;
      if(selected&&placeholder?.parentNode){
        placeholder.replaceWith(selected);
-       if(selected.classList.contains('tp80-inline-native-detail')||selected.classList.contains('tp80-modern-detail')){
-         selected.hidden=true;selected.dataset.tp80Expanded='0';
-       }
+       selected.hidden=true;
+       selected.classList.remove('active');
      }
      body.replaceChildren();selected=null;placeholder=null;overlay.hidden=true;
      document.body.style.overflow=previousOverflow;
      if(previousFocus?.isConnected)previousFocus.focus({preventScroll:true});
    }
    function reveal(content,label,trigger){
-     if(!content)return;
+     if(!content||!content.parentNode)return;
      shut();previousFocus=trigger;previousOverflow=document.body.style.overflow;
      placeholder=document.createComment('tp84-original-detail');
      content.parentNode.insertBefore(placeholder,content);
      selected=content;content.hidden=false;
-     title.textContent=label||'اطلاعات سرور';
+     content.classList.add('active');
+     title.textContent=label||'اطلاعات اتصال';
      body.append(content);overlay.hidden=false;document.body.style.overflow='hidden';close.focus();
    }
    close.addEventListener('click',shut);
    overlay.addEventListener('click',event=>{if(event.target===overlay)shut()});
    document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!overlay.hidden){event.preventDefault();shut()}});
+   // Capture the click BEFORE V77/V80 inline-expansion listeners run.
+   // Move the genuine view node; cloning would lose its copy handlers.
    document.addEventListener('click',event=>{
-     if(!overlay.hidden)return;
-     const trigger=event.target.closest('.tp80-detail-toggle,.v54-v2ray-server-head,.tp77-native-row > button');
-     if(!trigger||!trigger.closest('.protocol-panel.active'))return;
-     const panel=trigger.closest('.protocol-panel'),row=trigger.closest('.tp77-native-row,.ref67-row,.v54-v2ray-server');
+     const target=event.target.closest('.tp80-detail-toggle,.v54-v2ray-server-head');
+     if(!target||!target.closest('.protocol-panel.active'))return;
+     if(target.closest('.v54-v2ray-server-head')&&event.target.closest('button,a'))return;
+     const row=target.closest('.tp77-native-row,.ref67-row,.v54-v2ray-server');
      if(!row)return;
-     setTimeout(()=>{
-       if(!overlay.hidden)return;
-       let detail=null;
-       if(row.classList.contains('v54-v2ray-server')){
-         detail=row.querySelector('.v54-v2ray-profiles');
-         if(!row.classList.contains('open'))return;
-       }else{
-         const following=row.nextElementSibling;
-         if(following?.matches('.tp80-inline-native-detail,.tp80-modern-detail')&&!following.hidden)detail=following;
-       }
-       if(detail)reveal(detail,row.querySelector('.tp77-native-label,.ref67-row-name,.v54-v2ray-server-name')?.textContent.trim(),trigger);
-     },0);
+     let detail=null;
+     if(row.classList.contains('v54-v2ray-server')){
+       detail=row.querySelector(':scope > .v54-v2ray-profiles');
+     }else{
+       const next=row.nextElementSibling;
+       if(next?.matches('.tp80-inline-native-detail,.tp80-modern-detail'))detail=next;
+     }
+     if(!detail)return;
+     event.preventDefault();event.stopImmediatePropagation();
+     const label=row.querySelector('.tp77-native-label,.ref67-row-name,.tp92-country-label')?.textContent.trim()||'اطلاعات اتصال';
+     reveal(detail,label,target);
    },true);
  }
-
  function watchAsyncV2rayNodes(){
    if(document.body.dataset.tp90V2rayWatch==='1')return;
    document.body.dataset.tp90V2rayWatch='1';
@@ -1879,6 +1971,7 @@ _SCRIPT = r"""
      normalizeV2rayCountries(panel);
      reconcileV2rayCopyActions(panel);
      normalizeModern(panel);
+     normalizeRef67CountryFilters(panel);
      alignFooter(panel);
      ensureCanonicalApp(panel);
      ensureSudokuClient(panel);
