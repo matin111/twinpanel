@@ -33,6 +33,10 @@ jobs:
         run: python -m py_compile backend/tests/test_central_node_stage_v1.py backend/scripts/twinpanel_central_node_stage_v1.py backend/scripts/twinpanel_central_l2tp_node_bulk_v1.py backend/tests/test_central_l2tp_node_bulk_v1.py backend/scripts/twinpanel_central_cisco_node_bulk_v1.py backend/tests/test_central_cisco_node_bulk_v1.py backend/app/central_singbox_bulk_runtime_v1.py backend/scripts/twinpanel_central_singbox_node_bulk_v1.py backend/tests/test_central_singbox_bulk_v1.py backend/scripts/twinpanel_central_xray_node_bulk_v1.py backend/tests/test_central_xray_node_bulk_v1.py
       - name: Exercise one-batch no-restart credentials and safety
         working-directory: backend
+        env:
+          APP_SECRET_KEY: "ci-central-bulk-local-only-not-for-production"
+          DATABASE_URL: "sqlite:///./central-bulk-test.db"
+          NODE_AGENT_SHARED_SECRET: "ci-central-bulk-node-agent-local-only"
         run: |
           PYTHONPATH=. python -m unittest discover -s tests -p 'test_central_node_stage_v1.py' -v
           PYTHONPATH=. python -m unittest discover -s tests -p 'test_central_l2tp_node_bulk_v1.py' -v
