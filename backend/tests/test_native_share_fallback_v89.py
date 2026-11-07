@@ -11,11 +11,11 @@ def test_unsupported_browser_has_download_but_no_bogus_share():
     assert "tools.append(download);" in UI
 
 def test_rejected_share_stays_available_and_displays_diagnostic():
-    assert "Promise.resolve(navigator.share(current)).catch(error=>" in UI
+    assert "const task=navigator.share(payload);" in UI
     assert "shareFile.remove();" not in UI
     assert "NotAllowedError" in UI
-    assert "window.tpNativeShareMessage?.(message);" in UI
+    assert "report(message+' ('+name+').'+info);" in UI
 
 def test_cancellation_is_not_treated_as_failure():
-    assert "if(error?.name!=='AbortError')explain(error);" in UI
-    assert "shareFile.addEventListener('click',event=>" in UI
+    assert "name==='AbortError'" in UI
+    assert "const button=event.target?.closest?.('.tp80-file-share');" in UI

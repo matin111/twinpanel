@@ -6,7 +6,7 @@ def test_native_share_follows_can_share_preflight_not_user_agent():
     assert "typeof navigator.canShare==='function'" in SOURCE
     assert "typeof navigator.share==='function'" in SOURCE
     assert "if(payload){" in SOURCE
-    assert "tools.append(shareFile);" in SOURCE
+    assert "tools.append(shareFile,note);" in SOURCE
     assert "tools.append(download);" in SOURCE
 
 def test_mobile_native_rows_cannot_clip_supported_share():
@@ -18,5 +18,5 @@ def test_mobile_native_rows_cannot_clip_supported_share():
     assert ".tp80-file-share" in SOURCE
 
 def test_share_is_direct():
-    assert "shareFile.addEventListener('click',event=>" in SOURCE
-    assert "navigator.share(current).catch(error=>" in SOURCE
+    assert "const button=event.target?.closest?.('.tp80-file-share');" in SOURCE
+    assert "const task=navigator.share(payload);" in SOURCE
