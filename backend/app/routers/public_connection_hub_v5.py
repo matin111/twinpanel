@@ -136,6 +136,14 @@ def _item_detail(protocol: str, item: dict[str, Any], username: str, password: s
     port = item.get("port")
     user = item.get("username") or username
     secret = item.get("password") or password
+    if protocol == "socks5":
+        # SOCKS5 has its own outbound credentials; using the subscription's
+        # generic password produces an invalid connection. Match V13's source.
+        outbound = item.get("outbound") if isinstance(item.get("outbound"), dict) else {}
+        host = outbound.get("server") or host
+        port = outbound.get("server_port") or port
+        user = outbound.get("username") or user
+        secret = outbound.get("password") or secret
     if protocol == "openvpn":
         return _file_action(protocol, item, index, prefix)
     if protocol in {"wireguard", "amneziawg"}:
