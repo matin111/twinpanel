@@ -1,5 +1,14 @@
 # TwinPanel Changelog
 
+## 1.1.0-rc.669 — 2026-11-08
+
+### Remove empty black strip in Connection popups, light and dark
+- Remove empty legacy `v51-multi-card` / `v52-multi-card` containers after their real download/copy buttons have been relocated into the unified footer. Their old blank background previously appeared as a black horizontal bar above the action buttons in both Light and Dark themes.
+- Provide matching CSS empty-wrapper suppression for both color schemes; **do not remove any real download, copy, add or secondary action**, and retain the responsive protocol popup.
+- Restore sufficient foreground contrast for Light mode protocol headings, server names, labels and secondary action buttons. This is a theme-independent structural removal of the empty containers, not just recoloring.
+- Post-fix DOM tests over all 16 protocol panels: zero leftover `v52-multi-card` containers; all 16 protocol modal open/close tests pass; V2Ray retains Copy All, Copy Link, Download Karing, Download v2rayN and Add All secondary action. Live Connection endpoint returned HTTP 200.
+- Real-browser visual testing remains pending. No VPN node, user, subscription or credential changes.
+
 ## 1.1.0-rc.667 — 2026-11-08
 
 ### Connection panel theme parity and real light/dark rendering
