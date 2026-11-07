@@ -16,7 +16,7 @@ from .subscription_override_models import (
 )
 
 
-def open_session(db: Session, node_id: int, data: SessionOpenIn) -> dict:
+def open_session(db: Session, node_id: int, data: SessionOpenIn, *, observed_telemetry: bool = False) -> dict:
     """Open a VPN session with per-subscription connection/time limits.
 
     Compatibility rules:
@@ -104,14 +104,27 @@ def open_session(db: Session, node_id: int, data: SessionOpenIn) -> dict:
                 or 0
             )
             if duration_days <= 0:
-                raise HTTPException(
-                    status_code=409,
-                    detail="subscription_activation_duration_missing",
+                # Some migrated subscriptions are explicitly ACTIVE but have
+                # no plan and no stored duration. A trusted daemon OBSERVED
+                # their VPN connection on a real node. Permit the telemetry
+                # ledger to account that already-established connection
+                # without inventing an expiry, granting unlimited duration,
+                # or relaxing any status/quota/device/concurrency checks.
+                # New user/node session API requests retain strict validation.
+                legacy_presence = (
+                    observed_telemetry
+                    and subscription.plan_id is None
+                    and subscription.activation_duration_days is None
                 )
-
-            subscription.activation_duration_days = duration_days
-            subscription.starts_at = now
-            subscription.expires_at = now + timedelta(days=duration_days)
+                if not legacy_presence:
+                    raise HTTPException(
+                        status_code=409,
+                        detail="subscription_activation_duration_missing",
+                    )
+            else:
+                subscription.activation_duration_days = duration_days
+                subscription.starts_at = now
+                subscription.expires_at = now + timedelta(days=duration_days)
 
         db.flush()
 
