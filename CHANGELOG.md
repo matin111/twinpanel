@@ -1,5 +1,14 @@
 # TwinPanel Changelog
 
+## 1.1.0-rc.665 — 2026-11-08
+
+### Mobile protocol popup only, typography refresh
+- Fix mobile legacy inline protocol-panel expansion that remained visible below the grid despite the popup. Window-level capture intercepts protocol-card clicks before legacy document handlers, routing to the original panel's modal exclusively.
+- Hide every unmounted protocol panel with high-specificity CSS, including panels retaining legacy `active` or `v36-open` classes. The original panel is visible only inside the protocol modal; close restores it without losing configuration actions.
+- Refresh protocol card title typography using system font stack Inter/Segoe UI/Tahoma, stronger balanced text, improved spacing and responsive phone sizing. No font files or external webfont dependencies.
+- Live page responded HTTP 200. Synthetic DOM click/open/close test passed for all 16 protocols. Real mobile-browser visual validation is still pending.
+- Retains rc.664 protocol modal, per-country filters and rc.663 four-action V2Ray footer. No account, VPN runtime or node mutations.
+
 ## 1.1.0-rc.664 — 2026-11-07
 
 ### Protocol cards open full interactive popup
