@@ -15,11 +15,11 @@ class SudokuCentralBulkTests(unittest.TestCase):
     def test_remote_code_compiles_and_waves_are_bounded(self):
         source=remote_source()
         compile(source,"<sudoku-bulk-remote>","exec")
-        self.assertIn("range(0,len(newly_created),4)",source)
+        self.assertIn('["systemctl","start","--no-block",*units]',source)\n        self.assertIn('["systemctl","enable",*units]',source)\n        self.assertIn('["systemctl","list-units","--type=service"',source)\n        self.assertNotIn("systemctl\",\"is-active",source)
         self.assertIn("SUDOKU_TARGET_MEMORY_ADMISSION_FAILED",source)
         self.assertIn("SUDOKU_TARGET_SERVICE_CAPACITY_EXCEEDED",source)
         self.assertIn('["systemctl","daemon-reload"]',source)
-        self.assertIn('["systemctl","disable","--now",name]',source)
+        self.assertIn('["systemctl","stop","--no-block",*units]',source)
 
     def test_capacity_limit_and_collision(self):
         verify_accounts([self.row(1),self.row(2)])
