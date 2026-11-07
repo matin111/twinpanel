@@ -431,43 +431,6 @@ html body.tp80-connection .protocol-panel .tp80-detail-toggle{
 """
 
 
-/* Connection final unified download placement and row sizes */
-html body.tp80-connection .protocol-panel.tp80-native .tp77-native-row {
- height:62px!important;min-height:62px!important;max-height:62px!important;
- padding:7px 12px!important;overflow:hidden!important;
-}
-html body.tp80-connection .protocol-panel.tp80-native .tp80-file-actions {
- display:flex!important;flex-direction:row!important;align-items:center!important;
- gap:7px!important;flex:0 0 auto!important;
-}
-html body.tp80-connection .protocol-panel.tp80-native .tp80-file-actions button,
-html body.tp80-connection .protocol-panel.tp80-native .tp80-file-actions a{
- min-height:36px!important;height:36px!important;padding:6px 10px!important;
-}
-html body.tp80-connection .protocol-panel > .v34-client-card,
-html body.tp80-connection .protocol-panel > .ref70-app-card,
-html body.tp80-connection .protocol-panel > .v13-client-only {
- display:none!important;
-}
-html body.tp80-connection .protocol-panel .tp78-action-footer{
- grid-template-columns:repeat(var(--tp80-cols,3),minmax(0,1fr))!important;
-}
-html body.tp80-connection .protocol-panel .tp78-action-footer > [data-kind="app"]{
- min-height:70px!important;text-decoration:none!important;display:flex!important;
-}
-@media(max-width:720px){
- html body.tp80-connection .protocol-panel.tp80-native .tp77-native-row{
-  height:58px!important;min-height:58px!important;max-height:58px!important;
-  padding:5px 8px!important;
- }
- html body.tp80-connection .protocol-panel .tp78-action-footer{
-  grid-template-columns:repeat(2,minmax(0,1fr))!important;
- }
- html body.tp80-connection .protocol-panel .tp78-action-footer > [data-kind="app"]{
-  min-height:46px!important;
- }
-}
-
 _SCRIPT = r"""
 <script id="twinpanelConnectionUnifiedSurfaceDatesV80">
 (function(){
