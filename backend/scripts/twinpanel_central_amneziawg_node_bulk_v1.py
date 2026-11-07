@@ -33,7 +33,7 @@ from app.standalone_subscription_accounts import (
     StandaloneAccountSecret, account_username, _awg_address,
     secret_from_dict, secret_to_dict, _node_host,
 )
-from app.services.new_node_readiness_v1 import verify_new_exit_readiness
+from app.services.central_family_readiness_v1 import verify_central_family_readiness
 
 logging.getLogger("asyncssh").setLevel(logging.CRITICAL)
 MAX_USERS = 3000
@@ -157,7 +157,7 @@ async def stage(node_id: int, limit: int, apply: bool):
             db.rollback()
             return 0
         health = await asyncio.wait_for(
-            verify_new_exit_readiness(db, node_id), timeout=510)
+            verify_central_family_readiness(db, node_id, {"amneziawg"}), timeout=510)
         if not health.get("ok"):
             raise RuntimeError("AMNEZIAWG_STAGE_16_PROTOCOLS_NOT_READY")
         # Record the secrets BEFORE remote apply to preserve retry identity.
