@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.638",
-  "source_sha": "e099ff13973ea1711a9c002f24cc915586707080",
+  "version": "1.1.0-rc.639",
+  "source_sha": "9312891817298f2be1da89da9bd2c2d302957e7b",
   "notes": {
-    "fa": "بازگردانی لینک‌های دانلود مستقیم برنامه‌ها به صفحه Connection با تشخیص هوشمند سیستم‌عامل شامل اندروید، ویندوز، آیفون، مک و لینوکس؛ حذف پنجره تکراری V2Ray و ضربدر بدون تغییر کانفیگ‌ها یا آدرس سرورها.",
-    "en": "Restore official and uploaded direct app downloads with device-based Windows, macOS, Android, iOS and Linux selection; remove redundant legacy V2Ray mobile sheet and duplicated selector. Preserve all VPN config content, endpoints, ports, SNI and credentials."
+    "fa": "بازگردانی دانلود فایل OpenVPN و WireGuard، نمایش واقعی سرور و اطلاعات Cisco و L2TP، لینک دانلود برنامه مخصوص پروتکل با تشخیص دستگاه، پرچم واقعی کشورها در ویندوز و حذف دسته‌بندی تکراری؛ بدون تغییر کانفیگ‌ها و آدرس سرورها.",
+    "en": "Restore actual per-node OpenVPN/WireGuard file downloads and Cisco/L2TP server credentials, preserve per-protocol app download links for Windows/macOS/iOS/Android/Linux, fix Windows country flags and duplicate category strip; no VPN config, endpoint, port, SNI, UUID or subscription changes."
   }
 }
