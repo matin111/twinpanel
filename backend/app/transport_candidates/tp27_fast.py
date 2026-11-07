@@ -81,6 +81,24 @@ def _with_repair_state(meta: dict, repair_state: dict | None) -> dict:
     return out
 
 
+def _invalidate_profile_throughput(meta: dict, previous_profile: str | None) -> dict:
+    """Clear prior carrier speed after a real native-GRE/FoU profile change.
+
+    common.mark merges the previous SmartAuto metadata over new installers.
+    An explicit None is needed to suppress the stale throughput result while
+    retaining SmartAuto retry/cooldown/ownership state.
+    """
+
+    out = dict(meta)
+    profile = str(out.get("selected_profile") or "").strip()
+    if previous_profile is not None and previous_profile != profile:
+        smart = out.get("smart_auto_v21")
+        smart = dict(smart) if isinstance(smart, dict) else {}
+        smart["throughput"] = None
+        out["smart_auto_v21"] = smart
+    return out
+
+
 async def _reset_pair(ci, ce, rt: dict) -> None:
     await asyncio.gather(
         ci.run(
@@ -280,6 +298,19 @@ async def install(tunnel_id: int, db: Session) -> dict:
         str(exit_node.public_ip),
     )
     repair_state = _existing_repair_state(db, tunnel_id)
+    previous_row = (
+        db.query(TunnelTransport)
+        .filter(
+            TunnelTransport.tunnel_id == int(tunnel_id),
+            TunnelTransport.transport == NAME,
+        )
+        .first()
+    )
+    previous_meta = _meta_dict(previous_row.config_text) if previous_row else None
+    previous_profile = (
+        str((previous_meta or {}).get("selected_profile") or "").strip()
+        if previous_row is not None else None
+    )
 
     mark(
         db,
@@ -341,6 +372,7 @@ async def install(tunnel_id: int, db: Session) -> dict:
                 },
                 repair_state,
             )
+            meta = _invalidate_profile_throughput(meta, previous_profile)
             mark(
                 db,
                 tunnel_id,
@@ -408,6 +440,7 @@ async def install(tunnel_id: int, db: Session) -> dict:
                     },
                     repair_state,
                 )
+                meta = _invalidate_profile_throughput(meta, previous_profile)
                 mark(
                     db,
                     tunnel_id,
