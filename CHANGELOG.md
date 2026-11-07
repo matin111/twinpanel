@@ -1,5 +1,19 @@
 # TwinPanel Changelog
 
+## 1.1.0-rc.660 — 2026-11-07
+
+### Unified Connection countries, information dialogs, and named client downloads
+- Open the existing server-connection details modal on desktop as well as mobile, without copying secrets or changing the original controls.
+- Restore country-code tabs and one country flag per V2Ray/Xray node, using live public /sub/meta country codes. The **All** tab shows all delivered nodes; country tabs correctly filter only matching nodes.
+- Preserve dynamically reloaded V2Ray node lists, and rebuild filters if new nodes replace existing cards.
+- Normalize duplicated legacy Unicode/image flag displays for classic protocol nodes.
+- Make the sole Cisco/OpenConnect client installer action span the entire footer row.
+- Give every supported install action a clear client name (OpenVPN, WireGuard, AmneziaWG, OpenConnect, TrustTunnel, Sudoku or Karing) instead of generic "Download app".
+- Provide a separate visible **Download v2rayN** link on Windows alongside V2Ray's existing Karing client action. The v2rayN link points to the project's release downloads.
+- Retain original copy/import/download buttons, desktop four-column actions, Android 1+3 footer and panel branding.
+- JavaScript syntax passed, the Connection endpoint returned HTTP 200 and a synthetic DOM test verified country filtering (4 total nodes, 2 DE nodes), V2Ray flag buttons, v2rayN link, Cisco full-width action marker and named native client buttons.
+- Complete interactive browser visual testing across all protocols remains pending. No changes to VPN nodes, tunnels, credentials or config generation.
+
 ## 1.1.0-rc.659 — 2026-11-07
 
 ### Connection client-download button restored
