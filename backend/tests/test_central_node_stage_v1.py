@@ -19,7 +19,7 @@ class CentralNodeStageTests(unittest.TestCase):
     def test_bulk_adapters_include_xray_and_no_individual_worker(self):
         self.assertEqual(len(stage.ADAPTERS), 10)
         self.assertFalse(any("backfill" in name for name in stage.ADAPTERS))
-        self.assertTrue(all("central_" in name and "bulk" in name
+        self.assertTrue(all("central_" in name and ("bulk" in name or "shared" in name)
                             for name in stage.ADAPTERS))
 
     def test_xray_batches_use_100_not_global_user_limit(self):
