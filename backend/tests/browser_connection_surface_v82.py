@@ -229,6 +229,12 @@ def verify(context,html,device,outfile):
     page.wait_for_timeout(450)
     sudoku=page.locator("#"+sudoku_choice.get_attribute("data-protocol"))
     app=sudoku.locator('.tp78-action-footer [data-kind="app"]')
+    if app.count()!=1 or not app.is_visible():
+        debug=sudoku.evaluate("""el=>({key:el.dataset.v34Protocol,footer:!!el.querySelector('.tp78-action-footer'),
+          footerClass:el.querySelector('.tp78-action-footer')?.className,
+          appNodes:[...el.querySelectorAll('[data-kind="app"]')].map(n=>({outer:n.outerHTML.slice(0,280),display:getComputedStyle(n).display})),
+          appCards:[...el.querySelectorAll('.ref70-app-card,.v34-client-card')].map(n=>({html:n.outerHTML.slice(0,180),display:getComputedStyle(n).display}))})""")
+        print("SUDOKU_CLIENT_DEBUG",device,debug,flush=True)
     assert app.count()==1 and app.is_visible(),(device,"missing Sudoku download")
     assert "github.com/SUDOKU-ASCII/sudoku-" in app.get_attribute("href") or "apps.apple.com" in app.get_attribute("href"),(device,"unofficial client")
     assert sudoku.locator(':scope > .ref70-app-card:visible,:scope > .v34-client-card:visible').count()==0,(device,"duplicate Sudoku download")
