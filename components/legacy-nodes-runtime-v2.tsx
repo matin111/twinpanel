@@ -27,7 +27,7 @@ type NodeOverviewRow={node_id:number;status:string;users_total:number;traffic_by
 type NodeOverviewPayload={ok:boolean;items:NodeOverviewRow[];updated_at?:string};
 const bytes=(value:number|undefined):string=>{
   if(value===undefined||!Number.isFinite(value))return "—";
-  const units=["B","KB","GB","TB","PB"];
+  const units=["B","KB","MB","GB","TB","PB"];
   let n=value;
   let unit=0;
   while(n>=1024&&unit<units.length-1){n/=1024;unit++;}
