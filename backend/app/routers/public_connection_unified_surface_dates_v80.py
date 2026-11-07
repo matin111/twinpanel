@@ -1732,7 +1732,7 @@ _SCRIPT = r"""
            const rawName=String(download.dataset.filename||fallback);
            const filename=rawName.toLowerCase().endsWith('.'+extension)?rawName:rawName+'.'+extension;
            const preferred=match[1]==='openvpn'?'application/x-openvpn-profile':'application/octet-stream';
-           for(const mime of [preferred,'application/octet-stream']){
+           for(const mime of [...new Set(['application/octet-stream',preferred,'text/plain'])]){
              const file=new File([config],filename,{type:mime});
              const payload={files:[file]};
              try{if(navigator.canShare(payload))return payload}catch(_error){}
@@ -1747,20 +1747,36 @@ _SCRIPT = r"""
              event.preventDefault();event.stopPropagation();
              const current=buildSharePayload();
              if(!current){
-               shareFile.remove();
+               window.tpNativeShareMessage?.('مرورگر اجازه ارسال این فایل را نمی‌دهد؛ گزینه دانلود فایل همچنان در دسترس است.');
                return;
              }
-             // The Web Share API runs synchronously inside this tap.
+             const explain=error=>{
+               const name=String(error?.name||'UnknownError');
+               const browser=/telegram|instagram|fbav|fban|wv\b|webview/i.test(navigator.userAgent||'')
+                 ?' این صفحه را در Chrome یا Safari باز کنید.':'';
+               // Do not remove the button or claim the profile is invalid.
+               const reason=name==='NotAllowedError'?'مجوز اشتراک‌گذاری فایل مسدود شده'
+                 :name==='InvalidStateError'?'مرورگر مشغول اشتراک‌گذاری دیگری است'
+                 :name==='TypeError'?'نوع فایل توسط مرورگر رد شده'
+                 :'مرورگر از ارسال فایل جلوگیری کرد';
+               const message=reason+' ('+name+').'+browser+' اگر ادامه داشت فایل را دانلود و از برنامه مقصد Import File کنید.';
+               window.tpNativeShareMessage?.(message);
+               // Existing transient toast is too short for the explanation.
+               const toast=document.getElementById('toast');
+               if(toast){
+                 toast.textContent=message;
+                 toast.classList.add('show');
+                 window.clearTimeout(window.__hubToast);
+                 window.__hubToast=window.setTimeout(()=>toast.classList.remove('show'),6500);
+               }
+             };
              try{
-               navigator.share(current).catch(error=>{
-                 if(error?.name==='AbortError')return;
-                 // The browser rejected file sharing: don't advertise it again.
-                 shareFile.remove();
-                 window.tpNativeShareMessage?.('این مرورگر فایل را به برنامه ارسال نمی‌کند؛ از دانلود فایل استفاده کنید.');
+               // Call directly from the click; no await, fetch or synthetic click.
+               Promise.resolve(navigator.share(current)).catch(error=>{
+                 if(error?.name!=='AbortError')explain(error);
                });
-             }catch(_error){
-               shareFile.remove();
-               window.tpNativeShareMessage?.('امکان ارسال مستقیم فایل وجود ندارد؛ از دانلود فایل استفاده کنید.');
+             }catch(error){
+               if(error?.name!=='AbortError')explain(error);
              }
            });
            tools.append(shareFile);
