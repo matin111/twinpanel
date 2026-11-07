@@ -72,10 +72,10 @@ def test_same_node_rows_countries_and_real_action_footer_for_every_protocol():
     assert "const copy=find('copy')" in ui
     assert "const link=find('link')" in ui
     assert "const app=find('app')" in ui
-    assert "if(node){tail.append(node);return}" in ui  # original buttons, not proxy actions
-    assert "missing.disabled=true" in ui  # unsupported action is not fake-clickable
-    assert "این عملیات برای این پروتکل در دسترس نیست" in ui
-    assert "children.forEach(node=>" in ui  # extra JSON/YAML controls preserved
+    assert "footer.replaceChildren(...ordered)" in ui  # move original buttons
+    assert "missing.disabled=true" not in ui  # no dead placeholders
+    assert "const extra=children.filter(node=>!ordered.includes(node))" in ui
+    assert "tp80-extra-actions" in ui  # extra formats collapsed, but retained
 
 def test_manual_credentials_rehydration_preserves_actual_copy_controls():
     ui = code("public_connection_unified_surface_dates_v80.py")
