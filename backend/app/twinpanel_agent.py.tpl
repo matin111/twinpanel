@@ -2,6 +2,7 @@ import asyncio
 import os
 import re
 import socket
+import ssl
 import subprocess
 from pathlib import Path
 
@@ -12,9 +13,25 @@ import psutil
 API = __API_LITERAL__
 NODE_ID = __NODE_ID__
 SECRET = __SECRET_LITERAL__
+CONTROLLER_CA_PEM = __CONTROLLER_CA_PEM_LITERAL__
 
 STATE_DIR = Path("/var/lib/twinpanel-agent")
 WG_DIR = STATE_DIR / "wireguard"
+
+
+def agent_https_verification():
+    """Use an in-memory, controller-pinned CA for the direct-IP agent route.
+
+    TLS peer certificate validation and IP SAN matching remain mandatory.
+    Domain-based installations without a direct-IP config keep the system
+    trust store.
+    """
+    if not CONTROLLER_CA_PEM:
+        return True
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    context.load_verify_locations(cadata=CONTROLLER_CA_PEM)
+    return context
+
 
 
 # ============================================================
@@ -1706,7 +1723,7 @@ async def main():
     async with httpx.AsyncClient(
         timeout=timeout,
         limits=limits,
-        verify=True,
+        verify=agent_https_verification(),
     ) as client:
 
         await asyncio.gather(
