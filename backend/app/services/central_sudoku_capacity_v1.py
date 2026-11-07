@@ -6,6 +6,7 @@ resource admission must also pass before the first remote write.
 """
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime
 
 from sqlalchemy import or_
@@ -72,3 +73,44 @@ def assert_capacity(db):
     if not report["ok"]:
         raise RuntimeError("SUDOKU_CENTRAL_STAGE_CAPACITY_NOT_SUPPORTED")
     return report
+
+
+async def assert_target_sudoku_capacity(node, db, subscription_ids):
+    """Read-only remote RAM preflight *before* any membership or protocol write.
+
+    Dedicated Sudoku listeners require one process each on the target Exit.
+    Reserve 16 MiB per requested service plus 512 MiB spare. This is
+    intentionally conservative: the per-service systemd operation has its
+    own exact admission check before modifying the target.
+    """
+    ids = sorted(set(int(i) for i in subscription_ids))
+    if not ids:
+        return {"ok": True, "requested": 0, "required_kib": 0}
+    from ..node_runtime_connection import connect_protocol_runtime
+    conn = await asyncio.wait_for(connect_protocol_runtime(node, db), timeout=20)
+    try:
+        result = await asyncio.wait_for(conn.run(
+            "awk '/^MemAvailable:/{print $2}' /proc/meminfo",
+            check=False,
+        ), timeout=12)
+    finally:
+        conn.close()
+        await conn.wait_closed()
+    if result.exit_status != 0:
+        raise RuntimeError("SUDOKU_TARGET_MEMORY_PROBE_FAILED")
+    try:
+        available_kib = int(result.stdout.strip())
+    except (ValueError, TypeError) as exc:
+        raise RuntimeError("SUDOKU_TARGET_MEMORY_PROBE_INVALID") from exc
+    required_kib = 512 * 1024 + len(ids) * 16 * 1024
+    if available_kib < required_kib:
+        raise RuntimeError(
+            "SUDOKU_TARGET_MEMORY_ADMISSION_FAILED"
+            f": available_kib={available_kib},required_kib={required_kib}"
+        )
+    return {
+        "ok": True,
+        "requested": len(ids),
+        "available_kib": available_kib,
+        "required_kib": required_kib,
+    }
