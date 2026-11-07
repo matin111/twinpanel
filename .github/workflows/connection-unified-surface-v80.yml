@@ -1,0 +1,30 @@
+name: Connection Unified Surface and Dates V80
+
+on:
+  pull_request:
+    paths:
+      - 'backend/app/routers/public_connection_*.py'
+      - 'backend/tests/test_public_connection_*v80.py'
+      - '.github/workflows/connection-unified-surface-v80.yml'
+
+jobs:
+  single-surface:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate Python and JavaScript, then assert five subscription fields and shared protocol layout
+        run: |
+          python -m pip install --disable-pip-version-check pytest
+          python -m py_compile \
+            backend/app/routers/public_connection_reference_desktop_mobile_v67.py \
+            backend/app/routers/public_connection_approved_phone_v74.py \
+            backend/app/routers/public_connection_reference_active_v77.py \
+            backend/app/routers/public_connection_unified_surface_dates_v80.py \
+            backend/app/routers/public_connection_canonical_mobile_v26.py
+          python -m pytest -q backend/tests/test_public_connection_unified_surface_dates_v80.py
