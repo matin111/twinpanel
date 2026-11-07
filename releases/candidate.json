@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.652",
-  "source_sha": "acc60db8ecdb282fa65ae41b0c58b4f4c7d2a08a",
+  "version": "1.1.0-rc.653",
+  "source_sha": "9b184ca2b30a9b6e3ec1a13b7207f9c5212fdfd2",
   "notes": {
-    "fa": "نسخه 1.1.0-rc.652: یکپارچه‌سازی رنگ‌های صفحه Connection با تم و برند پنل در پس‌زمینه، هدر، فوتر، کارت‌ها، پاپ‌آپ و دکمه‌ها؛ انتقال دانلود برنامه به دکمه‌های پایین و حذف دانلود تکراری؛ افزودن مسیر دانلود کلاینت AmneziaWG و TrustTunnel و حذف دانلود برنامه L2TP؛ اصلاح نمایش آیکون و نام پروتکل در موبایل، ارتفاع سرورها، دکمه‌های کپی/افزودن بدون هم‌پوشانی و نمایش جزئیات سرور در پاپ‌آپ موبایل. پیکربندی‌ها، نودها، پروتکل‌ها و تونل‌ها دست‌نخورده باقی می‌مانند. تست خودکار بصری همه پروتکل‌ها هنوز تکمیل نشده است.",
-    "en": "TwinPanel 1.1.0-rc.652: align Connection backgrounds, headers, footers, cards, dialogs and controls with the configured panel brand palette; consolidate device-specific app downloads into the footer and remove duplicate client banners; provide AmneziaWG and TrustTunnel client download actions and omit L2TP app downloads; improve the mobile icon/name grid, consistent server row heights, non-overlapping copy/add buttons and mobile server-detail dialog. No intended modifications to protocol configurations, nodes, tunnels or VPN runtime. Full automated cross-protocol visual testing remains incomplete."
+    "fa": "نسخه rc.653: انتشار بسته رسمی از سورس کامل و جدید گیت‌هاب، به‌جای اصلاح موقت سرور. اصلاح چهار دکمه کنار هم در ویندوز، یک دکمه تمام‌عرض و سه دکمه کنار هم در اندروید، بازگردانی لینک واقعی دانلود کلاینت برای پروتکل‌های پشتیبانی‌شده و حفظ عملکرد دکمه افزودن به برنامه. برای OpenVPN، WireGuard و AmneziaWG دانلود فایل واقعی و ZIP باقی می‌ماند. چیدمان یکسان، رنگ برند پنل، اصلاح کپی/افزودن و پاپ‌آپ اطلاعات موبایل نیز داخل بسته قرار می‌گیرند. تغییر عمدی در تونل، نود، کانفیگ یا دیتابیس VPN صورت نگرفته است. تست بصری تمام پروتکل‌ها تکمیل نشده است.",
+    "en": "rc.653 official prebuilt release from the latest GitHub source to preserve Connection fixes through installation and updates: four horizontal footer actions on Windows, one full-width primary and three secondary actions on Android, restore real protocol-specific client download links, preserve compatible app import actions and genuine OpenVPN/WireGuard/AmneziaWG file/ZIP downloads, retain panel-branded colors and mobile server-detail modal. No intended changes to VPN tunnels, nodes, configurations or database. Full device/protocol browser regression remains incomplete."
   }
 }
