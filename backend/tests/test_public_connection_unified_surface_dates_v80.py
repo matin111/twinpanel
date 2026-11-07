@@ -68,7 +68,8 @@ def test_same_node_rows_countries_and_real_action_footer_for_every_protocol():
     assert "const type=String(panel.dataset.ref67NativeProtocol" in ui
     assert "tp80-country-bar" in ui
     assert "tp78-action-footer" in ui
-    assert "const primary=find('add')||find('download')" in ui
+    assert "let primary=find('add')||find('download')" in ui
+    assert "const fileProtocol=new Set(['openvpn','wireguard','amneziawg']).has(key)" in ui
     assert "const ordered=[primary,find('link'),find('copy'),find('app')].filter(Boolean)" in ui
     assert "footer.replaceChildren(...ordered)" in ui  # move original buttons
     assert "missing.disabled=true" not in ui  # no dead placeholders
