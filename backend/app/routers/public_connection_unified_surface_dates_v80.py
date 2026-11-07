@@ -1531,6 +1531,13 @@ html[data-theme] body.tp80-connection.ref67 .protocol-panel .tp92-v2-country-bar
  border-color:#10b981!important;
  box-shadow:0 0 0 1px color-mix(in srgb,#10b981 25%,transparent)!important;
 }
+/* TWINPANEL_CONNECTION_ENGLISH_UI_DIGITS_V101 */
+html body.tp80-connection .traffic,
+html body.tp80-connection .protocol-panel,
+html body.tp80-connection .protocols,
+html body.tp80-connection .tp96-protocol-modal{
+ font-variant-numeric:lining-nums tabular-nums;
+}
 """
 
 
@@ -2604,6 +2611,46 @@ _SCRIPT = r"""
    document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!overlay.hidden)shut()});
  }
 
+ // Visible interface digits are English on mobile and desktop. Do not
+ // mutate raw configuration text, input values, URLs, scripts, or source data.
+ function installEnglishInterfaceDigits(){
+   if(document.body.dataset.tp101EnglishDigits==='1')return;
+   document.body.dataset.tp101EnglishDigits='1';
+   const persian='۰۱۲۳۴۵۶۷۸۹';
+   const arabic='٠١٢٣٤٥٦٧٨٩';
+   const nonAscii=/[۰-۹٠-٩]/;
+   const digits=/[۰-۹٠-٩]/g;
+   const skip='script,style,noscript,textarea,input,pre,code,samp,kbd,svg,[contenteditable="true"],[data-raw-config]';
+   function updateText(node){
+     if(node.nodeType!==3 || !node.nodeValue || !nonAscii.test(node.nodeValue))return;
+     const el=node.parentElement;
+     if(!el || el.closest(skip))return;
+     // Never rewrite a URI or embedded configuration that an import/copy
+     // handler might need byte-for-byte unchanged.
+     if(/(?:vless|vmess|trojan|hysteria2|wireguard|ss):\/\//i.test(node.nodeValue))return;
+     node.nodeValue=node.nodeValue.replace(digits,ch=>{
+       const n=persian.indexOf(ch);
+       return String(n>=0?n:arabic.indexOf(ch));
+     });
+   }
+   function scan(root){
+     if(!root)return;
+     if(root.nodeType===3){updateText(root);return}
+     if(root.nodeType!==1 || root.matches(skip))return;
+     const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);
+     let textNode;
+     while((textNode=walker.nextNode()))updateText(textNode);
+   }
+   scan(document.body);
+   const observer=new MutationObserver(records=>{
+     for(const record of records){
+       if(record.type==='characterData'){updateText(record.target);continue}
+       for(const node of record.addedNodes)scan(node);
+     }
+   });
+   observer.observe(document.body,{childList:true,subtree:true,characterData:true});
+ }
+
  function check(){
    installHelpOverlay();
    installProtocolCategoryFilters();
@@ -2627,6 +2674,7 @@ _SCRIPT = r"""
    });
  }
  check();
+ installEnglishInterfaceDigits();
  // Older client-card mount scripts may run after first paint. Keep their
  // single client action reconciled without reloading the whole Connection page.
  let n=0;
