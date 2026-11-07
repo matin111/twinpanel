@@ -166,6 +166,24 @@ body.tp80-connection .protocol-panel .v52-multi-card{order:28!important}
  body.tp80-connection .tp78-action-footer>.tp78-footer-action[data-kind="extra"]{grid-row:auto!important;grid-column:auto!important}
 }
 
+/* Shared minimal views: no stale RTT/presence, no extra prepared-file banners. */
+html body.tp80-connection .ref71-rtt,
+html body.tp80-connection .ref67-status,
+html body.tp80-connection .tp78-ping,
+html body.tp80-connection .tp78-reach,
+html body.tp80-connection .tp77-native-row .tp78-native-meta,
+html body.tp80-connection .tp78-node-tools .tp78-ping,
+html body.tp80-connection .v34-single-label,
+html body.tp80-connection .action-copy,
+html body.tp80-connection .ref67-row-name small,
+html body.tp80-connection .tp80-native .tp77-detail-title{display:none!important}
+html body.tp80-connection .tp80-files-zip{
+  background:linear-gradient(115deg,var(--p),var(--s))!important;
+  text-decoration:none!important;border-color:#ad7cfa!important;color:#fff!important;
+}
+/* Nothing in Connection needs the legacy 'ping' cursor or empty ms placeholders. */
+html body.tp80-connection .protocol-panel .ref67-list .ref67-row .tp78-ping{display:none!important}
+
 /* Minimal common surface: no RTT indicators, no duplicate descriptions. */
 html body.tp80-connection .ref71-rtt,
 html body.tp80-connection .tp78-ping,
@@ -497,10 +515,25 @@ _SCRIPT = r"""
    if(!footer||footer.dataset.tp80Ready==='1')return;
    const children=[...footer.querySelectorAll(':scope > .tp78-footer-action')];
    const find=kind=>children.find(node=>node.dataset.kind===kind);
-   const primary=find('add')||find('download');
-   const ordered=[primary,find('link'),find('copy'),find('app')].filter(Boolean);
+   const key=String(panel.dataset.ref67NativeProtocol||panel.dataset.v34Protocol||'').toLowerCase();
+   const fileProtocol=new Set(['openvpn','wireguard','amneziawg']).has(key);
+   let primary=find('add')||find('download');
+   if(fileProtocol){
+     // A single verified ZIP of the original files. Do not present a vague
+     // "download all" button that may download only one selected server.
+     const token=location.pathname.match(/^\/v1\/connect\/([^/]+)/)?.[1];
+     if(token){
+       const zip=el('a','tp78-footer-action tp80-files-zip','دانلود همه فایل‌ها ZIP');
+       zip.dataset.kind='download';
+       zip.setAttribute('download',key+'-configs.zip');
+       zip.href=location.origin+'/v1/connect/'+token+'/files/'+encodeURIComponent(key);
+       if(primary)primary.remove();
+       primary=zip;
+     }
+   }
+   const ordered=[primary,find('link'),fileProtocol?null:find('copy'),find('app')].filter(Boolean);
    // Do not render dead placeholders. Every button must perform a real action.
-   const extra=children.filter(node=>!ordered.includes(node));
+   const extra=children.filter(node=>!ordered.includes(node)&&node!==primary&&(!fileProtocol||node.dataset.kind!=='copy'));
    footer.replaceChildren(...ordered);
    if(extra.length){
      const details=el('details','tp80-extra-actions');
