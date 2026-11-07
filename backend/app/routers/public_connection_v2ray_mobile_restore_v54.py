@@ -210,6 +210,10 @@ _SCRIPT = r"""
     if(profiles.length!==3)return null;
     const card=el('section','v54-v2ray-server');
     card.dataset.serverIndex=String(index);
+    // Expose presentation-only country/node metadata from the existing /sub/meta
+    // response. Do not change profile URIs, generated configs or network state.
+    card.dataset.countryCode=String(server?.country_code||'').toUpperCase();
+    card.dataset.nodeId=String(server?.node_id??'');
     const head=el('div','v54-v2ray-server-head');
     head.setAttribute('role','button');head.setAttribute('tabindex','0');head.setAttribute('aria-expanded','false');
     head.append(el('span','',serverLabel(server,index)),el('span','', '۳ اتصال'));
