@@ -6,7 +6,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from ..models import Node, Subscription
+from ..models import Node, NodeProtocolConfig, Subscription
 from .account_delivery import _qr_data_uri, _share_url, _stored_info
 
 
@@ -52,7 +52,26 @@ def public_connection_payload_fast_v1(
             for node in db.query(Node).all()
         }
     db.info.setdefault("_tp_public_delivery_tunnels", {})
-    db.info.setdefault("_tp_public_connection_cfg_cache_v102", {})
+    if "_tp_public_connection_cfg_cache_v102" not in db.info:
+        # An account can reference the same protocol on four or more nodes;
+        # avoid 50-100 individual readiness checks on the same SQL snapshot.
+        # Query only those nodes retained for this request and keep the
+        # lowest-id row, matching the original unordered .first() behavior.
+        ids = list(db.info["_tp_public_connect_node_refs_v102"])
+        configs = (
+            db.query(NodeProtocolConfig)
+            .filter(NodeProtocolConfig.node_id.in_(ids))
+            .order_by(NodeProtocolConfig.id.asc())
+            .all()
+        ) if ids else []
+        mapping: dict[tuple[int, str], NodeProtocolConfig] = {}
+        for config in configs:
+            mapping.setdefault(
+                (int(config.node_id), str(config.protocol or "")),
+                config,
+            )
+        db.info["_tp_public_connection_cfg_cache_v102"] = mapping
+        db.info["_tp_public_connection_cfg_prefetched_v103"] = True
     db.info.setdefault("_tp_public_connection_item_cache_v102", {})
 
     info = _stored_info(db, sub)
