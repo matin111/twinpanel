@@ -20,6 +20,7 @@ from typing import Any
 
 import qrcode
 import qrcode.image.svg
+import qrcode.image.pil
 
 from cryptography.fernet import Fernet, InvalidToken
 from fastapi import Body, APIRouter, Depends, HTTPException
@@ -422,10 +423,23 @@ def _share_url(db, sub: Subscription) -> str:
 
 
 def _qr_data_uri(value: str) -> str:
-    image = qrcode.make(value, image_factory=qrcode.image.svg.SvgPathImage, box_size=6, border=2)
+    """Return a standards-compliant scannable PNG QR without huge inline SVG.
+
+    qrcode[pil] (a pinned app dependency) produces the same QR matrix and
+    default best-mask selection as SvgPathImage, but each inline image is
+    usually ~1-3 KB rather than ~40-70 KB of SVG path markup. Preserve every
+    URI/config byte and QR error-correction semantics; only the image encoding
+    changes. The browser can scan it via the existing <img src=...> tags.
+    """
+    image = qrcode.make(
+        value,
+        image_factory=qrcode.image.pil.PilImage,
+        box_size=6,
+        border=2,
+    )
     out = io.BytesIO()
-    image.save(out)
-    return "data:image/svg+xml;base64," + base64.b64encode(out.getvalue()).decode()
+    image.save(out, format="PNG")
+    return "data:image/png;base64," + base64.b64encode(out.getvalue()).decode()
 
 
 def _public_payload(db: Session, sub: Subscription) -> dict[str, Any]:
