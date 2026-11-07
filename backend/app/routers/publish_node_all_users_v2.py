@@ -72,6 +72,16 @@ async def publish_node_to_all_users_v2(
                     "missing_node_memberships": coverage["missing_node_memberships"],
                 },
             )
+    if staged_install is not None:
+        # A successful coverage audit is not enough: the post-publication
+        # daemon-level worker must be installed/registered too. Otherwise
+        # newly purchased accounts could silently fall into the old queue.
+        from ..services.central_runtime_ownership_v1 import is_central_node
+        if not is_central_node(db,int(node_id)):
+            raise HTTPException(
+                status_code=409,
+                detail="CENTRAL_RUNTIME_NOT_REGISTERED_FOR_LIVE_PURCHASES",
+            )
     now = datetime.utcnow()
     params = {"node_id": int(node.id), "now": now}
     try:
