@@ -13,13 +13,13 @@ def test_only_ready_real_files_are_offered_for_share():
     assert "typeof navigator.canShare==='function'" in UI
     assert "try{if(navigator.canShare(payload))return payload}catch(_error){}" in UI
     assert "if(payload){" in UI
-    assert "tools.append(shareFile);" in UI
+    assert "tools.append(shareFile,note);" in UI
 
 def test_web_share_runs_synchronously_in_the_original_tap():
-    assert "shareFile.addEventListener('click',event=>" in UI
-    assert "shareFile.addEventListener('click',async event=>" not in UI
-    assert "Promise.resolve(navigator.share(current)).catch(error=>" in UI
-    assert "if(error?.name!=='AbortError')explain(error);" in UI
+    assert "const button=event.target?.closest?.('.tp80-file-share');" in UI
+    assert "window.addEventListener('click',event=>" in UI
+    assert "const task=navigator.share(payload);" in UI
+    assert "name==='AbortError'" in UI
     assert "application/x-openvpn-profile" in UI
     assert "application/octet-stream" in UI
     assert "new File([config],filename,{type:mime})" in UI
