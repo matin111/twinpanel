@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.638",
+  "version": "1.1.0-rc.639",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-07T01:40:59Z",
+  "released_at": "2026-11-07T02:04:49Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "e099ff13973ea1711a9c002f24cc915586707080",
+  "source_sha": "9312891817298f2be1da89da9bd2c2d302957e7b",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.638/twinpanel-1.1.0-rc.638-linux-x86_64.tar.gz",
-    "sha256": "6492ddb46b94b83e57732f3f1b60980e28e70ae62916a0156e1adf8b33461fe0",
-    "size_bytes": 29079290
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.639/twinpanel-1.1.0-rc.639-linux-x86_64.tar.gz",
+    "sha256": "38503ed08f4d8a5e400d3e2c8c6c56c006326d2e1b938802976d7c0bd1183b32",
+    "size_bytes": 29126427
   },
   "notes": {
-    "fa": "بازگردانی لینک‌های دانلود مستقیم برنامه‌ها به صفحه Connection با تشخیص هوشمند سیستم‌عامل شامل اندروید، ویندوز، آیفون، مک و لینوکس؛ حذف پنجره تکراری V2Ray و ضربدر بدون تغییر کانفیگ‌ها یا آدرس سرورها.",
-    "en": "Restore official and uploaded direct app downloads with device-based Windows, macOS, Android, iOS and Linux selection; remove redundant legacy V2Ray mobile sheet and duplicated selector. Preserve all VPN config content, endpoints, ports, SNI and credentials."
+    "fa": "بازگردانی دانلود فایل OpenVPN و WireGuard، نمایش واقعی سرور و اطلاعات Cisco و L2TP، لینک دانلود برنامه مخصوص پروتکل با تشخیص دستگاه، پرچم واقعی کشورها در ویندوز و حذف دسته‌بندی تکراری؛ بدون تغییر کانفیگ‌ها و آدرس سرورها.",
+    "en": "Restore actual per-node OpenVPN/WireGuard file downloads and Cisco/L2TP server credentials, preserve per-protocol app download links for Windows/macOS/iOS/Android/Linux, fix Windows country flags and duplicate category strip; no VPN config, endpoint, port, SNI, UUID or subscription changes."
   }
 }
