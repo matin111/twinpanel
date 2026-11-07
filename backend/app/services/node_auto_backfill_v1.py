@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from uuid import uuid4
 
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, or_, text
 from sqlalchemy.orm import Session
 
 from ..models import Node, NodeStatus, NodeType
@@ -33,6 +33,9 @@ def enqueue_node_backfill(
         raise ValueError("NODE_EXIT_NOT_FOUND")
     if not node.show_to_users:
         raise ValueError("NODE_NOT_PUBLISHED")
+    from .central_runtime_ownership_v1 import is_central_node
+    if is_central_node(db,int(node_id)):
+        raise ValueError("CENTRAL_EXIT_LEGACY_BACKFILL_FORBIDDEN")
     now = datetime.utcnow()
     rows: list[NodeBackfillJobV1] = []
     for protocol in FAMILIES:
@@ -136,6 +139,15 @@ def claim_next(db: Session, now: datetime | None = None) -> tuple[int, str, str]
             Node.node_type == NodeType.EXIT,
             Node.status == NodeStatus.ONLINE,
             Node.show_to_users.is_(True),
+            # Previously queued jobs must not run once an Exit has been
+            # migrated to the shared central runtime.
+            # SQLite tests have no central settings table. The deployed
+            # PostgreSQL worker MUST exclude all centrally owned Exits.
+            (text("1=1") if db.get_bind().dialect.name == "sqlite"
+             else text("NOT EXISTS (SELECT 1 FROM vpnshop_runtime_settings s "
+                       "WHERE s.setting_key = 'vpn.central_runtime.exit.' || "
+                       "CAST(node_backfill_jobs_v1.node_id AS TEXT) "
+                       "AND s.setting_value = 'v1')")),
             or_(
                 and_(
                     NodeBackfillJobV1.state.in_(("queued", "retry")),

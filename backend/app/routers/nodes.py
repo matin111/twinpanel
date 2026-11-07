@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from ..config import settings
 from ..database import get_db
 from ..deps import require_admin
-from ..models import Node, NodeProtocolConfig, NodeStatus, Subscription, SubscriptionNode, Tunnel, TunnelPeerState, TunnelTransport, TunnelStatus, CleanupJob
+from ..models import Node, NodeType, NodeProtocolConfig, NodeStatus, Subscription, SubscriptionNode, Tunnel, TunnelPeerState, TunnelTransport, TunnelStatus, CleanupJob
 from ..mother_access import admin_can_use_mother
 from ..schemas import NodeCreate, NodeHeartbeatIn, NodeOut, NodeUpdate
 
@@ -151,6 +151,11 @@ def create_node(payload: NodeCreate, db: Session = Depends(get_db)):
 
     data = payload.model_dump()
     data["public_ip"] = public_ip
+    # A new Exit must not become customer-visible before listener and
+    # actual credential coverage verification. An explicit publish action
+    # handles the hidden -> visible transition after central staging.
+    if payload.node_type == NodeType.EXIT:
+        data["show_to_users"] = False
 
     if not data.get("agent_url"):
         data["agent_url"] = f"https://{public_ip}:9443"
@@ -207,6 +212,26 @@ def update_node(node_id: int, payload: NodeUpdate, db: Session = Depends(get_db)
             )
 
         data["public_ip"] = new_ip
+
+    if data.get("show_to_users") is True and not node.show_to_users:
+        from ..node_install_progress_models_v1 import NodeInstallProgressV1
+        staged_job = (
+            db.query(NodeInstallProgressV1)
+            .filter(NodeInstallProgressV1.node_id == int(node_id))
+            .order_by(NodeInstallProgressV1.created_at.desc())
+            .first()
+        )
+        if staged_job is not None:
+            from ..services.node_stage_publish_guard_v1 import (
+                require_staged_node_publish_ready,
+            )
+            from ..central_node_stage_audit_v1 import verify_coverage
+            require_staged_node_publish_ready(db, node_id)
+            if not verify_coverage(db, node_id)["ok"]:
+                raise HTTPException(
+                    status_code=409,
+                    detail="CENTRAL_NODE_CREDENTIAL_COVERAGE_INCOMPLETE",
+                )
 
     for key, value in data.items():
         setattr(node, key, value)

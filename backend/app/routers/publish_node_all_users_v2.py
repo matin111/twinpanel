@@ -50,6 +50,38 @@ async def publish_node_to_all_users_v2(
 
     from ..services.node_stage_publish_guard_v1 import require_staged_node_publish_ready
     require_staged_node_publish_ready(db, node_id)
+    # Staged nodes must already have all purchased node credentials before
+    # publication; listener health alone is not enough. Existing/manual nodes
+    # (which have no installation progress row) keep the legacy queue path.
+    from ..node_install_progress_models_v1 import NodeInstallProgressV1
+    staged_install = (
+        db.query(NodeInstallProgressV1)
+        .filter(NodeInstallProgressV1.node_id == int(node_id))
+        .order_by(NodeInstallProgressV1.created_at.desc())
+        .first()
+    )
+    if staged_install is not None:
+        from ..central_node_stage_audit_v1 import verify_coverage
+        coverage = verify_coverage(db, int(node_id))
+        if not coverage["ok"]:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "error": "CENTRAL_NODE_CREDENTIAL_COVERAGE_INCOMPLETE",
+                    "missing_protocol_pairs": coverage["missing_protocol_pairs"],
+                    "missing_node_memberships": coverage["missing_node_memberships"],
+                },
+            )
+    if staged_install is not None:
+        # A successful coverage audit is not enough: the post-publication
+        # daemon-level worker must be installed/registered too. Otherwise
+        # newly purchased accounts could silently fall into the old queue.
+        from ..services.central_runtime_ownership_v1 import is_central_node
+        if not is_central_node(db,int(node_id)):
+            raise HTTPException(
+                status_code=409,
+                detail="CENTRAL_RUNTIME_NOT_REGISTERED_FOR_LIVE_PURCHASES",
+            )
     now = datetime.utcnow()
     params = {"node_id": int(node.id), "now": now}
     try:
@@ -57,6 +89,11 @@ async def publish_node_to_all_users_v2(
         # The unique (subscription_id,node_id) constraint protects retries and
         # concurrent publish requests. Postgres executes this as one INSERT,
         # rather than thousands of ORM flushes.
+        # Centrally staged exits have already had their full eligible
+        # membership materialized and audited. Do NOT perform a fresh
+        # all-active INSERT after that audit: purchases occurring during
+        # the publish HTTP request would become visible without credentials.
+        # The next desired-state reconciliation is responsible for new users.
         memberships = db.execute(
             text("""
                 INSERT INTO subscription_nodes (subscription_id,node_id,created_at)
@@ -72,7 +109,7 @@ async def publish_node_to_all_users_v2(
                   )
                 ON CONFLICT (subscription_id,node_id) DO NOTHING
             """), params,
-        )
+        ) if staged_install is None else None
         # Explicit routing policies need one direct route to the new node.
         # Insert only missing policies and preserve priorities of older routes.
         explicit = db.execute(
@@ -125,7 +162,12 @@ async def publish_node_to_all_users_v2(
         # Queue missing credentials in the SAME transaction as user
         # memberships. The independent timer worker does the actual SSH and
         # retries; this HTTP request remains fast for thousands of accounts.
-        queued_jobs = enqueue_node_backfill(db, int(node.id))
+        # Central-staged exits have already materialized their credentials.
+        # Never add the legacy per-user queue after a successful central audit.
+        queued_jobs = (
+            [] if staged_install is not None
+            else enqueue_node_backfill(db, int(node.id))
+        )
         db.commit()
     except Exception:
         db.rollback()
@@ -134,7 +176,7 @@ async def publish_node_to_all_users_v2(
     # Do not call sync_installed_node_to_subscriptions or _sync_modern_node
     # here. Those are unbounded per-account network operations and previously
     # froze the API, especially with 2000+ migrated subscriptions.
-    added = max(0, int(memberships.rowcount or 0))
+    added = max(0, int(memberships.rowcount or 0)) if memberships is not None else 0
     print(
         "TWINPANEL_NODE_PUBLISH_SET_BASED_V1",
         {
@@ -155,18 +197,109 @@ async def publish_node_to_all_users_v2(
         "active_subscriptions_reconciled": 0,
         "classic_pairs_provisioned": 0,
         "modern_pairs_provisioned": 0,
-        "active_memberships_awaiting_background_sync": None,
+        "active_memberships_awaiting_background_sync": 0 if staged_install is not None else None,
         "backfill": {
-            "queued": True,
+            "queued": bool(queued_jobs),
             "families": len(queued_jobs),
             "status_url": f"/v1/nodes/{int(node.id)}/backfill-status",
         },
         "failed": [],
+        "central_coverage_verified": bool(staged_install is not None),
         "message": (
-            "نود برای اشتراک‌های فعال منتشر و ساخت کانفیگ کاربران قبلی به صف پایدار سپرده شد. "
-            "از مدیریت نود می‌توان پیشرفت یا تلاش مجدد را دید؛ "
-            "محدودیت سرورهای پلن اقتصادی و ویژه جداگانه حفظ می‌شود"
+            "پوشش کانفیگ‌های نود مرکزی بررسی و نود بدون صف قدیمی منتشر شد"
+            if staged_install is not None
+            else "نود برای اشتراک‌های فعال منتشر و ساخت کانفیگ کاربران قبلی به صف پایدار سپرده شد"
         ),
+    }
+
+
+@router.post("/{node_id}/central-stage")
+def start_central_stage_v1(
+    node_id: int, db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """Admin-controlled staged materialization; no inline SSH or old queue."""
+    from ..services.central_node_stage_launcher_v1 import (
+        launch, CentralStageLaunchError,
+    )
+    try:
+        return launch(db, node_id)
+    except CentralStageLaunchError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@router.get("/{node_id}/central-stage-coverage")
+def read_central_stage_coverage_v1(
+    node_id: int, db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """Read-only node-specific progress; never returns client credentials."""
+    from ..central_node_stage_audit_v1 import verify_coverage
+    try:
+        return verify_coverage(db, node_id)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@router.post("/{node_id}/central-stage/reverify")
+async def reverify_and_stage_existing_exit_v1(
+    node_id: int, db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """Recover a hidden failed install using REAL 16-listener health.
+
+    An old 12/16 progress counter must not force a manual SQL change if
+    every service is now healthy. This does not publish or enqueue users.
+    """
+    from ..models import NodeStatus
+    from ..node_install_progress_models_v1 import NodeInstallProgressV1
+    from ..services.new_node_readiness_v1 import verify_new_exit_readiness
+    from ..services.central_node_stage_launcher_v1 import (
+        launch, CentralStageLaunchError,
+    )
+
+    node = db.get(Node, int(node_id))
+    if (node is None or node.retired_at is not None or
+            node.node_type != NodeType.EXIT or
+            node.status != NodeStatus.ONLINE or node.show_to_users):
+        raise HTTPException(
+            status_code=409, detail="CENTRAL_STAGE_REQUIRES_HIDDEN_ONLINE_EXIT",
+        )
+    job = (db.query(NodeInstallProgressV1)
+           .filter(NodeInstallProgressV1.node_id == int(node_id))
+           .order_by(NodeInstallProgressV1.created_at.desc()).first())
+    if job is None:
+        raise HTTPException(status_code=409, detail="CENTRAL_STAGE_INSTALL_JOB_MISSING")
+    if job.stage not in {"failed", "verified_ready", "completed"}:
+        raise HTTPException(
+            status_code=409,
+            detail="CENTRAL_STAGE_INSTALL_STILL_RUNNING",
+        )
+
+    live = await verify_new_exit_readiness(db, int(node_id))
+    if live.get("ok") is not True:
+        raise HTTPException(status_code=409, detail={
+            "error": "CENTRAL_STAGE_LIVE_READINESS_FAILED",
+            "ready_count": int(live.get("ready_count") or 0),
+            "missing": live.get("missing") or [],
+        })
+
+    job.stage = "verified_ready"
+    job.state = "running"
+    job.installed_protocols = int(live["ready_count"])
+    job.error_code = None
+    try:
+        # Launch sees the verified job within this transaction. If systemd
+        # rejects dispatch, neither the old install state nor user
+        # visibility changes.
+        response = launch(db, int(node_id))
+        db.commit()
+    except CentralStageLaunchError as exc:
+        db.rollback()
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except Exception:
+        db.rollback()
+        raise
+    return {
+        **response, "live_protocols": int(live["ready_count"]),
+        "progress_reverified": True,
     }
 
 
