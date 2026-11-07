@@ -13,7 +13,7 @@ function payloadOf(draft:NodeDraft):ProvisionInstallPayload{return {...draft,cou
 
 type NodeInstallJob={
   job_id:string;node_name:string;node_id:number|null;
-  state:"queued"|"running"|"completed"|"failed"|"interrupted";
+  state:"queued"|"running"|"waiting_backfill"|"completed"|"failed"|"interrupted";
   stage:string;installed_protocols:number|null;expected_protocols:number|null;
   users_assigned:number|null;backfill_pending:boolean;error_code:string|null;
   updated_at:string;
@@ -54,19 +54,20 @@ function NodeInstallProgress({job,error}:{job:NodeInstallJob|null;error:string})
   const index=phases.findIndex(([key])=>key===job?.stage);
   const finished=job?.state==="completed";
   const failed=job?.state==="failed"||job?.state==="interrupted";
+  const waiting=job?.state==="waiting_backfill";
   const pending=job?.state==="queued"||job?.state==="running"||!job;
   return <div className="node-install-progress" aria-live="polite" aria-busy={pending}>
     <div className="node-install-progress-head">
       <div className={"node-install-orb "+(failed?"is-failed":finished?"is-done":"is-working")} aria-hidden="true">◉</div>
       <div>
         <b>{job?.node_name||pick("آماده‌سازی سرور","Preparing server")}</b>
-        <small>{failed?pick("نصب کامل تأیید نشده است","Installation is not confirmed"):finished?job?.backfill_pending?pick("نصب ثبت شد؛ ساخت کانفیگ‌های کاربران هنوز در صف است","Setup recorded; user configuration backfill is still queued"):pick("مرحله نصب پایان یافت","Installation stage completed"):pick("وضعیت مراحل مستقیماً از سرور خوانده می‌شود","Stages are read directly from the server")}</small>
+        <small>{failed?pick("نصب کامل تأیید نشده است","Installation is not confirmed"):waiting?pick("کاربران به نود منتسب شده‌اند؛ اعمال کانفیگ‌ها هنوز در صف مرکزی است","Accounts are assigned; configuration application is still queued centrally"):finished?pick("مرحله نصب تأیید شد","Installation stage verified"):pick("وضعیت مراحل مستقیماً از سرور خوانده می‌شود","Stages are read directly from the server")}</small>
       </div>
     </div>
     <div className={"node-install-running-line "+(pending?"is-active":"")} aria-hidden="true"><span/></div>
     <div className="node-install-steps">
       {phases.map(([key,fa,en],i)=>{
-        const done=finished||index>i;
+        const done=finished||waiting||index>i;
         const current=index===i&&!finished&&!failed;
         return <div key={key} className={"node-install-step "+(done?"is-done":current?"is-current":"")}>
           <span className="node-install-step-icon">{done?"✓":current?"●":(i+1).toLocaleString("fa-IR")}</span>
