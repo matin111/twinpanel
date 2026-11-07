@@ -16,7 +16,7 @@ def test_approved_ui_is_presentation_only():
     assert ".v34-server-actions.tp65-replaced" in ui
     assert "if(!direct&&!fallback)return" in ui
     assert "validDeep(a.getAttribute('href')" in ui
-    assert "const fallback=stored||copyLink?.getAttribute('href')||''" in ui
+    assert "uri.test(stored)?stored" in ui
     assert 'item["config"] =' not in ui
     assert "db.commit(" not in ui
     assert "UPDATE nodes" not in ui
