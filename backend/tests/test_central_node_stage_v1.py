@@ -189,6 +189,69 @@ class CentralNodeStageTests(unittest.TestCase):
                 stage.run(14,3000,True)
             self.assertEqual(apply.call_count,3)
 
+
+    def test_snapshot_churn_already_covered_does_not_reapply_all_families(self):
+        fake = MagicMock()
+        fake.id = 14
+        fake.retired_at = None
+        fake.node_type = NodeType.EXIT
+        fake.status = NodeStatus.ONLINE
+        fake.show_to_users = False
+        db = MagicMock()
+        db.get.return_value = fake
+        before = desired_state(3)
+        after = SimpleNamespace(**{**vars(before), "count": 4,
+                                   "pair_count": 4, "fingerprint": "1" * 64})
+        with (patch.object(stage, "SessionLocal") as session,
+              patch.object(stage, "load_desired_state",
+                           side_effect=[before, before, after]),
+              patch.object(stage, "verify_new_exit_readiness", new_callable=AsyncMock,
+                           return_value={"ok": True}),
+              patch.object(stage, "ensure_shared_binary", new_callable=AsyncMock,
+                           return_value={"ok": True}),
+              patch.object(stage, "establish_hidden_memberships", return_value=4),
+              patch.object(stage, "verify_coverage",
+                           return_value={"ok": True, "missing_protocol_pairs": 0,
+                                         "missing_node_memberships": 0}),
+              patch.object(stage, "reconcile_runtime_families", new_callable=AsyncMock,
+                           return_value={"ok": True, "failed": [], "succeeded": []}) as apply,
+              patch.object(stage, "mark_central_applied") as mark):
+            session.return_value.__enter__.return_value = db
+            self.assertEqual(stage._run_locked(14, 3000, True), 0)
+            apply.assert_awaited_once()
+            self.assertEqual(mark.call_args.args[2], after.fingerprint)
+
+    def test_snapshot_churn_with_missing_coverage_still_blocks_publishing(self):
+        fake = MagicMock()
+        fake.id = 14
+        fake.retired_at = None
+        fake.node_type = NodeType.EXIT
+        fake.status = NodeStatus.ONLINE
+        fake.show_to_users = False
+        db = MagicMock()
+        db.get.return_value = fake
+        before = desired_state(3)
+        after = SimpleNamespace(**{**vars(before), "count": 4,
+                                   "pair_count": 4, "fingerprint": "1" * 64})
+        with (patch.object(stage, "SessionLocal") as session,
+              patch.object(stage, "load_desired_state",
+                           side_effect=[before, before, after]),
+              patch.object(stage, "verify_new_exit_readiness", new_callable=AsyncMock,
+                           return_value={"ok": True}),
+              patch.object(stage, "ensure_shared_binary", new_callable=AsyncMock,
+                           return_value={"ok": True}),
+              patch.object(stage, "establish_hidden_memberships", return_value=4),
+              patch.object(stage, "verify_coverage",
+                           return_value={"ok": False, "missing_protocol_pairs": 16,
+                                         "missing_node_memberships": 1}),
+              patch.object(stage, "reconcile_runtime_families", new_callable=AsyncMock,
+                           return_value={"ok": True, "failed": [], "succeeded": []}),
+              patch.object(stage, "mark_central_applied") as mark):
+            session.return_value.__enter__.return_value = db
+            with self.assertRaisesRegex(RuntimeError, "CHANGED_DURING_APPLY"):
+                stage._run_locked(14, 3000, True)
+            mark.assert_not_called()
+
     def test_shared_sudoku_adapter_replaces_per_user_units(self):
         self.assertIn("twinpanel_central_sudoku_shared_v2.py",stage.ADAPTERS)
         self.assertNotIn("twinpanel_central_sudoku_node_bulk_v1.py",stage.ADAPTERS)
