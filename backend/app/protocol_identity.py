@@ -912,6 +912,8 @@ def _certificate_matches_private_key(
 def get_or_create_openvpn_client_identity(
     db: Session,
     subscription_id: int,
+    *,
+    commit: bool = True,
 ) -> dict[str, str]:
     """
     یک Identity پایدار برای هر Subscription.
@@ -1024,7 +1026,8 @@ def get_or_create_openvpn_client_identity(
         ],
     )
 
-    db.commit()
+    if commit:
+        db.commit()
 
     return identity
 
