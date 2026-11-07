@@ -24,6 +24,53 @@ body.ref69-inline.ref67 .protocol-panel .server-tabs,
 body.ref69-inline.ref67.v54-v2ray-restore .protocol-panel[data-v54-v2ray="1"] .panel-head .server-tabs,
 body.ref69-inline.ref67 .protocol-panel .v57-v2ray-server-tabs{display:none!important}
 body.ref69-inline.ref67 .protocol-panel .ref67-tabs{display:flex!important}
+
+/* Native/manual protocols need the original per-node server tabs and widgets:
+   Cisco/L2TP = real server/user/password facts; OpenVPN/WireGuard/AWG =
+   original downloadable files, not URI-copy placeholders. */
+body.ref69-inline.ref67 .protocol-panel[data-ref67-native-protocol] .panel-head .server-tabs{
+ display:flex!important;overflow-x:auto!important;flex-wrap:nowrap!important;gap:7px!important;
+}
+body.ref69-inline.ref67 .protocol-panel[data-ref67-native-protocol] .server-views,
+body.ref69-inline.ref67 .protocol-panel[data-ref67-native-protocol] details.v34-mobile-servers .server-views{
+ display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;
+}
+body.ref69-inline.ref67 .protocol-panel[data-ref67-native-protocol] .server-view{
+ display:block!important;min-width:0!important;
+}
+body.ref69-inline.ref67 .protocol-panel .v34-client-card,
+body.ref69-inline.ref67 .protocol-panel .ref70-app-card{
+ display:flex!important;align-items:center!important;justify-content:space-between!important;
+ gap:10px!important;min-height:62px!important;margin:12px 17px!important;
+ padding:12px 15px!important;border:1px solid #56447d!important;
+ border-radius:14px!important;background:linear-gradient(120deg,#241d4d,#141f3c)!important;
+ color:#f3f4ff!important;
+}
+body.ref69-inline.ref67 .protocol-panel .v34-client-card>a,
+body.ref69-inline.ref67 .protocol-panel .ref70-app-card>a{
+ display:inline-flex!important;align-items:center!important;justify-content:center!important;
+ min-height:42px!important;padding:9px 13px!important;border-radius:11px!important;
+ background:linear-gradient(115deg,#6b2cef,#8b3bf1)!important;border:1px solid #aa77ff!important;
+ font-size:12px!important;font-weight:850!important;color:white!important;text-decoration:none!important;
+}
+body.ref69-inline.ref67 .protocol-panel .ref70-app-note{
+ color:#bcc8ec;font-size:11px;line-height:1.6;
+}
+@media(max-width:720px){
+ body.ref69-inline.ref67 .protocol-panel[data-ref67-native-protocol] .server-views,
+ body.ref69-inline.ref67 .protocol-panel[data-ref67-native-protocol] details.v34-mobile-servers .server-views{
+  grid-template-columns:1fr!important;
+ }
+ body.ref69-inline.ref67 .protocol-panel .v34-client-card,
+ body.ref69-inline.ref67 .protocol-panel .ref70-app-card{
+  margin:9px!important;padding:10px!important;gap:8px!important;flex-wrap:wrap!important;
+ }
+ body.ref69-inline.ref67 .protocol-panel .v34-client-card>a,
+ body.ref69-inline.ref67 .protocol-panel .ref70-app-card>a{
+  min-height:40px!important;font-size:11px!important;
+ }
+}
+
 body.ref69-inline .apps{
   display:block!important;visibility:visible!important;opacity:1!important;
   margin:18px 0 22px!important;border:1px solid #62409b!important;
