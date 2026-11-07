@@ -132,12 +132,13 @@ def run(node_id, limit, apply, *, delta_only=False):
             delta_families = None
         for attempt in range(3):
             try:
+                stage_kwargs = {"delta_only": True} if delta_only else {}
                 if delta_families is None:
-                    status = _run_locked(node_id, limit, True, delta_only=delta_only)
+                    status = _run_locked(node_id, limit, True, **stage_kwargs)
                 else:
                     status = _run_locked(
                         node_id, limit, True, families=delta_families,
-                        delta_only=delta_only,
+                        **stage_kwargs,
                     )
             except RuntimeError as exc:
                 if str(exc) not in {
