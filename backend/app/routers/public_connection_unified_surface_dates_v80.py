@@ -1330,9 +1330,9 @@ _SCRIPT = r"""
        primary=zip;
      }
    }
-   const ordered=[primary,find('link'),fileProtocol?null:find('copy'),find('app')].filter(Boolean);
+   const ordered=[primary,find('link'),find('copy'),find('app')].filter(Boolean);
    // Do not render dead placeholders. Every button must perform a real action.
-   const extra=children.filter(node=>!ordered.includes(node)&&node!==primary&&node!==previousPrimary&&(!fileProtocol||node.dataset.kind!=='copy'));
+   const extra=children.filter(node=>!ordered.includes(node)&&node!==primary&&node!==previousPrimary);
    footer.replaceChildren(...ordered);
    if(extra.length){
      const details=el('details','tp80-extra-actions');
