@@ -34,7 +34,7 @@ FAMILIES = (
     RuntimeFamily("mieru","twinpanel_central_mieru_node_bulk_v1.py",frozenset({"mieru"})),
     RuntimeFamily("trusttunnel","twinpanel_central_trusttunnel_node_bulk_v1.py",frozenset({"trusttunnel"})),
     RuntimeFamily("amneziawg","twinpanel_central_amneziawg_node_bulk_v1.py",frozenset({"amneziawg"})),
-    RuntimeFamily("sudoku","twinpanel_central_sudoku_node_bulk_v1.py",frozenset({"sudoku"})),
+    RuntimeFamily("sudoku","twinpanel_central_sudoku_shared_v2.py",frozenset({"sudoku"})),
 )
 
 
