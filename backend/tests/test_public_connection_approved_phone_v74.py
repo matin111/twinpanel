@@ -16,7 +16,7 @@ def test_mobile_matches_compact_reference_grid_and_auto_device_only():
     assert ".ref69-protocol-os {display:none!important}" in ui
     assert "document.querySelectorAll('.ref69-protocol-os').forEach(x=>x.hidden=true)" in ui
     assert "let os=platformKeys.includes(selected)?selected:'android'" in apps
-    assert "return refine_public_connection_approved_phone_v74(source)" in canonical
+    assert "source = refine_public_connection_approved_phone_v74(source)" in canonical
 
 def test_exactly_three_original_v2ray_profiles_per_node_are_shown():
     ui=(ROOT/"public_connection_approved_phone_v74.py").read_text(encoding="utf-8")
