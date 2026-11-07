@@ -77,5 +77,18 @@ class CentralNodeStageTests(unittest.TestCase):
             db.commit.assert_not_called()
 
 
+    def test_partial_engine_has_explicit_missing_protocols(self):
+        self.assertTrue({"openvpn", "wireguard"}.issubset(
+            set(stage.MISSING_BULK_PROTOCOLS)
+        ))
+        self.assertTrue({"mieru", "trusttunnel", "amneziawg", "sudoku"}.issubset(
+            set(stage.MISSING_BULK_PROTOCOLS)
+        ))
+        self.assertEqual(
+            set(stage.ALL_PROTOCOL_KEYS),
+            set(stage.BULK_PROTOCOLS) | set(stage.MISSING_BULK_PROTOCOLS),
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
