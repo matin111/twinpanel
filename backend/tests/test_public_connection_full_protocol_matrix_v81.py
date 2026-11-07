@@ -93,5 +93,6 @@ def test_real_download_url_and_all_protocol_app_controls():
     assert '"/{token}/multi/{protocol}"' in endpoint
     assert 'media_type="application/zip"' in endpoint
     assert "const actionRoot=multi?.querySelector('.v51-multi-actions')" in ui
-    assert "if(appHref&&!appHref.startsWith('#'))" not in ui or "appHref&&!appHref.startsWith('#')" in ui
+    assert "appHref&&!appHref.startsWith('#')" in ui
+    assert "!/^javascript:/i.test(appHref)" in ui
     assert "footer.append(el)" in ui
