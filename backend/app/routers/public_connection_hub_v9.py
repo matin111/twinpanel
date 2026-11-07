@@ -326,13 +326,10 @@ _V9_SCRIPT_TEMPLATE = r"""
         const url=fileUrl(key,index);
         const dl=actionLink('download','دانلود فایل واقعی',url);dl.download=filename;
         if(key==='openvpn'){
-          // OpenVPN Connect's documented profile-import URL scheme.
-          // It fetches the existing HTTPS .ovpn endpoint directly; unlike
-          // navigator.share, this does not depend on browser file sharing.
-          const profileUrl=new URL(url,location.href).href;
-          const importUrl='openvpn://import-profile/'+profileUrl;
-          const phone=actionLink('phone','وارد کردن مستقیم در OpenVPN Connect',importUrl);
-          phone.addEventListener('click',()=>notify('اگر برنامه باز نشد، فایل .ovpn را دانلود و از بخش Import File در OpenVPN Connect انتخاب کنید.'));
+          // Share the actual .ovpn file with the native app. A custom-scheme
+          // URL may open the raw HTTPS response as browser text instead.
+          const phone=actionButton('phone','باز کردن فایل با OpenVPN Connect');
+          phone.addEventListener('click',()=>sendRealFile(url,filename,key));
           row.append(dl,phone);
         }else{
           const phone=actionButton('phone','باز کردن با WireGuard');
