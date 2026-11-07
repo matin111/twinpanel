@@ -130,7 +130,14 @@ def _protocol_subscription_content(token: str, protocol: str, db: Session) -> tu
     protocol = _normalize_protocol(protocol)
     if protocol not in SUPPORTED_PROTOCOLS:
         raise HTTPException(status_code=404, detail="برای این پروتکل لینک اشتراک مشترک ارائه نمی‌شود")
-    sub, payload = _active_subscription_payload(token, db)
+    info = getattr(db, "info", None)
+    if isinstance(info, dict):
+        info["_tp_public_feed_only_protocol"] = protocol
+    try:
+        sub, payload = _active_subscription_payload(token, db)
+    finally:
+        if isinstance(info, dict):
+            info.pop("_tp_public_feed_only_protocol", None)
     uris = _protocol_uris_from_payload(sub, payload, protocol, db=db)
     if not uris:
         raise HTTPException(status_code=404, detail="لینک اشتراک این پروتکل هنوز آماده نیست")
