@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.671",
-  "source_sha": "08b1023ac2815cb48c0d4fee1907b984274c3cfd",
+  "version": "1.1.0-rc.672",
+  "source_sha": "3b6544f9c33f8e53c4a4398850d8212ab4483997",
   "notes": {
-    "fa": "نسخه rc.671: حذف کامل دکمه نمایشی «ارسال فایل به برنامه» و پاپ‌آپ راهنمای جایگزین از OpenVPN، WireGuard و AmneziaWG. دکمه Share فقط زمانی نشان داده می‌شود که مرورگر گوشی با navigator.canShare پشتیبانی واقعی از فایل .ovpn یا .conf را تأیید کند؛ در بقیه مرورگرها فقط دکمه دانلود واقعی فایل نمایش داده می‌شود. در صورت رد ارسال توسط مرورگر، دکمه غیرفعال حذف می‌شود. دانلود، راهنمای مستقل پروتکل‌ها و تنظیمات کاربران بدون تغییر.",
-    "en": "rc.671: Remove fake native VPN profile Share action and its misleading help fallback. Render the Share button only when navigator.canShare confirms support for the actual .ovpn/.conf File; otherwise keep only the real attachment download. If the browser rejects sharing, retire that Share button. Preserve profiles, user accounts, VPN runtime and independent protocol help."
+    "fa": "نسخه rc.672: یکپارچه‌سازی معماری مدیریت مرکزی جدید برای نودها، پشتیبانی مرکزی از تمام ۱۶ پروتکل شامل SOCKS5، ساخت دسته‌ای کانفیگ‌ها، همگام‌سازی انتخابی تغییرات اکانت و نود بدون تکرار نصب کامل، تأیید سلامت پروتکل‌های موردنیاز و جلوگیری از پاک‌شدن کانفیگ نود مخفی توسط مدیریت قدیمی. نودهای قدیمی بدون مهاجرت تأییدشده تغییر مالکیت نمی‌دهند؛ کاربران، حجم و انقضای اشتراک‌ها حفظ می‌شوند. نود تازه پیش از انتشار برای کاربران باید مراحل نصب، پوشش کانفیگ‌ها و تست اتصال را طی کند.",
+    "en": "rc.672: Integrate the new central node runtime management for all 16 protocol keys including SOCKS5, batched credential materialization, first-pass selective account/node delta reconciliation, family-scoped listener health checks, and preservation of centrally owned hidden Exit credentials against legacy pruning. Legacy production nodes retain their existing ownership until validated migration; subscription quota, expiry and credentials remain unchanged. New Exits require staged health, coverage and real-connection checks before public rollout."
   }
 }
