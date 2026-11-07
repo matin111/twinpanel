@@ -90,5 +90,25 @@ class CentralNodeStageTests(unittest.TestCase):
         )
 
 
+    def test_successful_four_adapter_stage_still_returns_partial(self):
+        fake = MagicMock()
+        fake.retired_at = None
+        fake.node_type = NodeType.EXIT
+        fake.status = NodeStatus.ONLINE
+        fake.show_to_users = False
+        db = MagicMock()
+        db.get.return_value = fake
+        with (patch.object(stage, "SessionLocal") as session,
+              patch.object(stage, "eligible_count", return_value=3),
+              patch.object(stage, "verify_new_exit_readiness", return_value={"ok": True}),
+              patch.object(stage, "establish_hidden_memberships", return_value=3),
+              patch.object(stage.subprocess, "run") as invoke):
+            session.return_value.__enter__.return_value = db
+            invoke.return_value.returncode = 0
+            self.assertEqual(stage._run_locked(14, 3000, True), 3)
+            self.assertEqual(invoke.call_count, len(stage.ADAPTERS))
+            db.commit.assert_called_once()
+
+
 if __name__ == "__main__":
     unittest.main()
