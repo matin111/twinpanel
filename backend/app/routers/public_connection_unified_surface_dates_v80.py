@@ -229,14 +229,19 @@ _SCRIPT = r"""
          show.addEventListener('click',()=>{panel.classList.add('tp80-detail-open')});
        }
      });
-     const shared=panel.querySelector(':scope > .v35-manual-credentials');
-     if(shared){
-       const disclosure=el('details','tp80-credentials');
-       const summary=el('summary','','اطلاعات ورود مشترک');
-       shared.insertAdjacentElement('beforebegin',disclosure);
-       disclosure.append(summary,shared);
-     }
      panel.dataset.tp80NativeReady='1';
+   }
+   // V35 may regenerate shared credentials after page load. Re-home the live
+   // copy buttons on every check, keeping them only once and without cloning.
+   const shared=panel.querySelector(':scope > .v35-manual-credentials');
+   if(shared){
+     let disclosure=panel.querySelector(':scope > .tp80-credentials');
+     if(!disclosure){
+       disclosure=el('details','tp80-credentials');
+       disclosure.append(el('summary','','اطلاعات ورود مشترک'));
+       shared.insertAdjacentElement('beforebegin',disclosure);
+     }
+     disclosure.append(shared);
    }
    // Restore semantic active-only details even if V67's obsolete grid CSS exists.
    const views=[...panel.querySelectorAll('.server-view')];
