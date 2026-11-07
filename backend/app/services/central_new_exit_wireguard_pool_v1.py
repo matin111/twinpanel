@@ -51,15 +51,15 @@ LOCK.parent.mkdir(parents=True,exist_ok=True)
 with open(LOCK,"a+") as lock:
     fcntl.flock(lock,fcntl.LOCK_EX)
     original=CONF.read_text(encoding="utf-8")
-    addr=re.findall(r"(?mi)^\\s*Address\\s*=\\s*([^\\n]+)",original)
+    addr=re.findall(r"(?mi)^\s*Address\s*=\s*([^\n]+)",original)
     if len(addr)!=1:
         raise RuntimeError("WG_CENTRAL_POOL_ADDRESS_AMBIGUOUS")
     currently={str(x.strip()) for x in addr[0].split(",")}
     if OLD not in currently or not currently.issubset({OLD,NEW}):
         raise RuntimeError("WG_CENTRAL_POOL_UNEXPECTED_ADDRESS")
-    if re.search(r"(?mi)^\\s*(PostUp|PostDown)\\s*=",original):
+    if re.search(r"(?mi)^\s*(PostUp|PostDown)\s*=",original):
         raise RuntimeError("WG_CENTRAL_POOL_UNMANAGED_NAT_RULES")
-    if re.search(r"(?mi)^\\s*SaveConfig\\s*=\\s*true\\b",original):
+    if re.search(r"(?mi)^\s*SaveConfig\s*=\s*true\b",original):
         raise RuntimeError("WG_CENTRAL_POOL_SAVECONFIG_UNSAFE")
     if not original.lstrip().startswith("[Interface]"):
         raise RuntimeError("WG_CENTRAL_POOL_INVALID_INTERFACE")
@@ -72,7 +72,7 @@ with open(LOCK,"a+") as lock:
         raise RuntimeError("WG_CENTRAL_POOL_BASE_ADDRESS_NOT_LIVE")
     route=must(["ip","-4","route","show","default"],
                "WG_CENTRAL_POOL_NO_PUBLIC_EGRESS")
-    match=re.search(r"\\bdev\\s+([a-zA-Z0-9_.-]+)",route)
+    match=re.search(r"\bdev\s+([a-zA-Z0-9_.-]+)",route)
     if not match:
         raise RuntimeError("WG_CENTRAL_POOL_NO_EGRESS_INTERFACE")
     public_dev=match.group(1)
@@ -85,7 +85,7 @@ with open(LOCK,"a+") as lock:
 
     new_address=OLD+", "+NEW
     updated=re.sub(
-        r"(?mi)^(\\s*Address\\s*=\\s*)[^\\n]+",
+        r"(?mi)^(\s*Address\s*=\s*)[^\n]+",
         lambda m:m.group(1)+new_address,
         original,count=1,
     )
@@ -98,13 +98,13 @@ with open(LOCK,"a+") as lock:
             " -o "+public_dev+" -j MASQUERADE",
         ))
     additions="".join(
-        "PostUp = "+up+"\\nPostDown = "+down+"\\n"
+        "PostUp = "+up+"\nPostDown = "+down+"\n"
         for up,down in rules
     )
     # Insert directives INSIDE [Interface], not after [Peer].
-    begin=updated.find("\\n[Peer]")
+    begin=updated.find("\n[Peer]")
     if begin<0:begin=len(updated)
-    updated=updated[:begin].rstrip()+"\\n"+additions+updated[begin:]
+    updated=updated[:begin].rstrip()+"\n"+additions+updated[begin:]
     backup=CONF.with_suffix(".central-pool-preinstall.bak")
     if not backup.exists():
         shutil.copy2(CONF,backup)
