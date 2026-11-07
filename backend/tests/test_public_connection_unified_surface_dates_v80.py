@@ -69,9 +69,7 @@ def test_same_node_rows_countries_and_real_action_footer_for_every_protocol():
     assert "tp80-country-bar" in ui
     assert "tp78-action-footer" in ui
     assert "const primary=find('add')||find('download')" in ui
-    assert "const copy=find('copy')" in ui
-    assert "const link=find('link')" in ui
-    assert "const app=find('app')" in ui
+    assert "const ordered=[primary,find('link'),find('copy'),find('app')].filter(Boolean)" in ui
     assert "footer.replaceChildren(...ordered)" in ui  # move original buttons
     assert "missing.disabled=true" not in ui  # no dead placeholders
     assert "const extra=children.filter(node=>!ordered.includes(node))" in ui
