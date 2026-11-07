@@ -299,10 +299,9 @@ async def install_node_background_v1(
     job_id = create_install_progress(db, payload.name, payload.node_type == NodeType.EXIT)
     _NODE_INSTALL_PENDING.add(name_key)
     try:
-        task = asyncio.create_task(
-            _install_node_in_background(payload, dict(request.scope), job_id),
-            name=f"node-install:{payload.name}",
-        )
+        task = asyncio.create_task(_install_node_in_background(
+            payload, dict(request.scope), job_id,
+        ), name=f"node-install:{payload.name}")
     except Exception:
         _NODE_INSTALL_PENDING.discard(name_key)
         _safe_install_progress(job_id, "failed", error_code="TASK_CREATE_FAILED")
