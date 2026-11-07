@@ -415,8 +415,8 @@ document.querySelectorAll('.server-tab').forEach(b=>b.onclick=function(){const p
 document.addEventListener('click',function(e){
   const source=e.target.closest('button.download-config[data-target]');
   if(!source)return;
-  const match=String(source.dataset.target||'').match(/^(?:cfg|download-source)-(openvpn|wireguard|amneziawg)-(\\d+)$/);
-  const tokenMatch=location.pathname.match(/^\\/v1\\/connect\\/([^/]+)/);
+  const match=String(source.dataset.target||'').match(/^(?:cfg|download-source)-(openvpn|wireguard|amneziawg)-(\d+)$/);
+  const tokenMatch=location.pathname.match(/^\/v1\/connect\/([^/]+)/);
   if(!match||!tokenMatch)return;
   e.preventDefault();e.stopImmediatePropagation();
   const url='/v1/connect/'+tokenMatch[1]+'/file/'+match[1]+'/'+match[2];
