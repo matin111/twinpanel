@@ -19,6 +19,7 @@ from sqlalchemy import or_
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
+from app.services.central_runtime_ownership_v1 import allow_central_node
 from app.database import SessionLocal
 from app.models import (
     Node, NodeProtocolConfig, NodeStatus, NodeType, ProtocolCredential,
@@ -190,7 +191,7 @@ async def run(node_id, limit, apply):
             writes+=1
         # Recheck hidden status immediately before the only commit.
         db.refresh(node)
-        if node.show_to_users:
+        if not allow_central_node(db,node):
             raise RuntimeError("OPENVPN_NODE_PUBLISHED_DURING_STAGE")
         db.commit()
         print("CENTRAL_OPENVPN_RESULT", json.dumps({
