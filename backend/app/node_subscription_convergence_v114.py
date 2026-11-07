@@ -77,7 +77,12 @@ def _eligible_exit_node_ids() -> list[int]:
             .all()
         )
         result: list[int] = []
+        from .services.central_runtime_ownership_v1 import is_central_node
         for node_id, access_created_at in rows:
+            # New-generation nodes have ONE daemon-wide reconciler.
+            # Never send them to old per-user classic/modern loops.
+            if is_central_node(db,int(node_id)):
+                continue
             if access_created_at is not None:
                 age = _age_seconds(access_created_at)
                 if age < _NEW_ACCESS_GRACE_SECONDS:
