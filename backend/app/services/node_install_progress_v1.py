@@ -42,6 +42,10 @@ def set_install_progress(job_id: str, stage: str, *, node_id: int | None = None,
         job = db.get(NodeInstallProgressV1, str(job_id))
         if job is None or job.state in TERMINAL:
             return
+        if job.stage == "users_queued" and stage not in {"users_queued", "completed"}:
+            # Installer already handed ownership to the durable backfill
+            # queue. A late/cancelled in-process callback cannot erase it.
+            return
         job.stage = stage
         job.state = "completed" if stage == "completed" else "failed" if stage == "failed" else "running"
         if node_id is not None:
