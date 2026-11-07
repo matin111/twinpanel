@@ -37,6 +37,9 @@ class CentralFirstExitBootstrapTests(unittest.IsolatedAsyncioTestCase):
             patch.object(prov,"ensure_base",new_callable=AsyncMock),
             patch.object(prov,"provision_protocols",new_callable=AsyncMock,
                          return_value=({"openvpn":{"ok":True}},[],{})) as daemons,
+            patch("app.services.central_new_exit_wireguard_pool_v1.prepare_hidden_exit_wireguard_pool",
+                  new_callable=AsyncMock,
+                  return_value={"ok":True,"pool":"10.96/21"}) as wgpool,
             patch.object(prov,"_install_or_upgrade_agent",
                          new_callable=AsyncMock,return_value={"ok":True}),
             patch.object(prov,"_ensure_node_key_on_remote",
@@ -57,6 +60,7 @@ class CentralFirstExitBootstrapTests(unittest.IsolatedAsyncioTestCase):
             daemons.assert_awaited_once()
             self.assertIs(daemons.await_args.args[4],False)
             quota.assert_called_once_with(db,15)
+            wgpool.assert_awaited_once_with(conn)
             legacy.assert_not_awaited()
             conn.close.assert_called_once()
             conn.wait_closed.assert_awaited_once()
