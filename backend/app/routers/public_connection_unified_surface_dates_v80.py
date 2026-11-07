@@ -1025,6 +1025,49 @@ html body.tp80-connection .protocol-panel.active > .tp78-action-footer > a.tp91-
  padding:12px!important;align-items:center!important;justify-content:center!important;
  text-decoration:none!important;font-weight:800!important;
 }
+
+/* TWINPANEL_CONNECTION_ALL_PROTOCOL_PARITY_V92 */
+html body.tp80-connection .protocol-panel.active .tp92-v2-country-bar{
+ display:flex!important;flex-wrap:wrap!important;gap:7px!important;
+ padding:10px 15px!important;margin:0!important;align-items:center!important;
+}
+html body.tp80-connection .protocol-panel.active .tp92-v2-country-bar button{
+ display:inline-flex!important;align-items:center!important;gap:5px!important;
+ padding:7px 10px!important;min-height:36px!important;border-radius:10px!important;
+ border:1px solid var(--tp-brand-stroke,var(--line))!important;
+ background:var(--tp-brand-raised,var(--surface2))!important;
+ color:var(--tp-brand-text,var(--text))!important;font-weight:800!important;
+}
+html body.tp80-connection .protocol-panel.active .tp92-v2-country-bar button.active{
+ background:linear-gradient(110deg,var(--p),var(--s))!important;color:#fff!important;
+}
+html body.tp80-connection .protocol-panel.active .tp92-v2-country-bar img,
+html body.tp80-connection .protocol-panel.active .tp92-node-flag{
+ display:inline-block!important;width:24px!important;height:16px!important;
+ object-fit:cover!important;vertical-align:middle!important;margin-inline-end:5px!important;
+}
+html body.tp80-connection .protocol-panel.active .v54-v2ray-server-head .tp92-country-label{
+ display:inline-flex!important;gap:5px!important;align-items:center!important;
+ min-width:0!important;white-space:nowrap!important;
+}
+html body.tp80-connection .protocol-panel.active .v54-v2ray-server[hidden]{display:none!important}
+html body.tp80-connection .protocol-panel.active .tp80-native .tp77-native-row .tp92-node-flag{
+ width:24px!important;height:16px!important;
+}
+html body.tp80-connection .protocol-panel.active > .tp78-action-footer[data-tp92-only-app="1"]{
+ grid-template-columns:1fr!important;
+}
+html body.tp80-connection .protocol-panel.active > .tp78-action-footer[data-tp92-only-app="1"] > a[data-kind="app"]{
+ grid-column:1/-1!important;
+}
+html body.tp80-connection .protocol-panel.active > .tp78-action-footer > a.tp92-v2rayn{
+ grid-column:1/-1!important;display:flex!important;justify-content:center!important;
+ min-height:45px!important;align-items:center!important;
+ border:1px solid var(--tp-brand-stroke,var(--line))!important;
+ border-radius:10px!important;background:var(--tp-brand-raised,var(--surface2))!important;
+ color:var(--tp-brand-text,var(--text))!important;font-weight:800!important;
+ text-decoration:none!important;
+}
 """
 
 
@@ -1406,6 +1449,79 @@ _SCRIPT = r"""
    });
  }
 
+
+ function normalizeClassicFlags(panel){
+   if(!panel.classList.contains('tp80-native'))return;
+   panel.querySelectorAll('.tp77-native-label').forEach(label=>{
+     const country=label.closest('.tp77-native-row')?.dataset.tp80CountryCode||'';
+     if(!/^[A-Z]{2}$/.test(country))return;
+     const images=[...label.querySelectorAll('img')];
+     let first=images[0];
+     if(!first){first=countryImage(country);label.prepend(first)}
+     first.src=knownFlag(country)||'https://flagcdn.com/w40/'+country.toLowerCase()+'.png';
+     first.alt=country;
+     first.classList.add('tp92-node-flag');
+     images.slice(1).forEach(img=>img.remove());
+     // Legacy node label starts with a Unicode flag; remove that duplicate,
+     // keeping the server code / name untouched.
+     [...label.childNodes].filter(node=>node.nodeType===3).forEach(node=>{
+       node.textContent=node.textContent.replace(/[\\u{1F1E6}-\\u{1F1FF}]{2}/gu,'').replace(/^\\s+/,' ');
+     });
+   });
+ }
+ function normalizeV2rayCountries(panel){
+   if(panel.dataset.v54V2ray!=='1')return;
+   const holder=panel.querySelector(':scope > .v54-v2ray-groups');
+   const cards=[...holder?.querySelectorAll(':scope > .v54-v2ray-server')||[]];
+   if(!cards.length)return;
+   const previous=panel.querySelector(':scope > .tp92-v2-country-bar');
+   const signature=cards.map(card=>card.dataset.countryCode||'').join('|');
+   if(previous?.dataset.signature===signature)return;
+   previous?.remove();
+   const groups=new Map();
+   cards.forEach(card=>{
+     const code=String(card.dataset.countryCode||'').toUpperCase();
+     const country=/^[A-Z]{2}$/.test(code)?code:'OTHER';
+     card.dataset.tp92Country=country;
+     if(!groups.has(country))groups.set(country,[]);
+     groups.get(country).push(card);
+     const head=card.querySelector(':scope > .v54-v2ray-server-head');
+     if(!head)return;
+     const name=head.querySelector(':scope > span:first-child');
+     if(name&&!name.querySelector('.tp92-country-label')){
+       const title=el('span','tp92-country-label');
+       if(country!=='OTHER')title.append(countryImage(country));
+       title.append(document.createTextNode(country==='OTHER'?'سرور':country+' · '+name.textContent.trim()));
+       name.replaceWith(title);
+     }
+   });
+   const bar=el('nav','tp92-v2-country-bar');
+   bar.dataset.signature=signature;
+   bar.setAttribute('aria-label','فیلتر کشورها');
+   const buttons=[];
+   function filter(code){
+     cards.forEach(card=>{card.hidden=code!=='ALL'&&card.dataset.tp92Country!==code});
+     buttons.forEach(b=>b.classList.toggle('active',b.dataset.country===code));
+   }
+   const all=el('button','active','همه');
+   all.type='button';all.dataset.country='ALL';all.addEventListener('click',()=>filter('ALL'));
+   buttons.push(all);bar.append(all);
+   for(const [code,items] of groups){
+     const btn=el('button','');
+     btn.type='button';btn.dataset.country=code;
+     if(code!=='OTHER')btn.append(countryImage(code));
+     btn.append(document.createTextNode(' '+code+(items.length>1?' ('+items.length+')':'')));
+     btn.addEventListener('click',()=>filter(code));
+     buttons.push(btn);bar.append(btn);
+   }
+   const original=panel.querySelector(':scope > .panel-head .server-tabs,:scope > .protocol-panel-head .server-tabs');
+   if(original){original.hidden=true;original.style.setProperty('display','none','important')}
+   const head=panel.querySelector(':scope > .panel-head,:scope > .protocol-panel-head');
+   if(head)head.insertAdjacentElement('afterend',bar);
+   else holder.insertAdjacentElement('beforebegin',bar);
+   filter('ALL');
+ }
+
  function keyForPanel(panel){
    const raw=panel.dataset.ref67NativeProtocol||panel.dataset.v34Protocol;
    if(raw)return String(raw).trim().toLowerCase();
@@ -1601,7 +1717,8 @@ _SCRIPT = r"""
      app.setAttribute('href',href);
      app.setAttribute('target','_blank');
      app.setAttribute('rel','noopener noreferrer');
-     app.textContent='دانلود برنامه';
+     const appLabels={openvpn:'OpenVPN',wireguard:'WireGuard',amneziawg:'AmneziaWG',openconnect:'OpenConnect',trusttunnel:'TrustTunnel',sudoku:'Sudoku',karing:'Karing'};
+     app.textContent='دانلود '+(appLabels[appName]||appName);
      app.removeAttribute('hidden');
      app.removeAttribute('style');
      app.setAttribute('aria-label','دانلود برنامه اتصال '+key);
@@ -1610,8 +1727,18 @@ _SCRIPT = r"""
    }
    panel.querySelectorAll('.v34-client-card,.ref70-app-card,.v13-client-only').forEach(card=>card.remove());
    panel.querySelectorAll(':scope > .ref69-download-cta').forEach(node=>node.remove());
+   // Explicit second Windows client for V2Ray, alongside the Karing installer.
+   const oldExtra=footer.querySelector(':scope > .tp92-v2rayn');
+   if(key==='v2ray'&&platform==='windows'){
+     let extra=oldExtra;
+     if(!extra){extra=el('a','tp92-v2rayn','دانلود v2rayN')}
+     extra.href='https://github.com/2dust/v2rayN/releases/latest';
+     extra.target='_blank';extra.rel='noopener noreferrer';
+     if(extra.parentElement!==footer)footer.append(extra);
+   }else oldExtra?.remove();
    // Merge action builders after the genuine app link is available.
    alignFooter(panel);
+   footer.dataset.tp92OnlyApp=footer.querySelectorAll(':scope > .tp78-footer-action').length===1?'1':'0';
    const actions=[...footer.querySelectorAll(':scope > .tp78-footer-action')];
    const count=actions.length;
    footer.dataset.tp88Layout=count>=4?'four':count===3?'three':count===2?'two':'one';
@@ -1655,7 +1782,7 @@ _SCRIPT = r"""
    overlay.addEventListener('click',event=>{if(event.target===overlay)shut()});
    document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!overlay.hidden){event.preventDefault();shut()}});
    document.addEventListener('click',event=>{
-     if(!matchMedia('(max-width:720px)').matches||!overlay.hidden)return;
+     if(!overlay.hidden)return;
      const trigger=event.target.closest('.tp80-detail-toggle,.v54-v2ray-server-head,.tp77-native-row > button');
      if(!trigger||!trigger.closest('.protocol-panel.active'))return;
      const panel=trigger.closest('.protocol-panel'),row=trigger.closest('.tp77-native-row,.ref67-row,.v54-v2ray-server');
@@ -1692,9 +1819,11 @@ _SCRIPT = r"""
            node.nodeType===1&&(node.matches?.('.v54-v2ray-server')||node.querySelector?.('.v54-v2ray-server'))
          )))return;
          reconcileV2rayCopyActions(panel);
+         normalizeV2rayCountries(panel);
        });
        observer.observe(holder,{childList:true,subtree:true});
        reconcileV2rayCopyActions(panel);
+       normalizeV2rayCountries(panel);
      });
    };
    scan();
@@ -1707,7 +1836,9 @@ _SCRIPT = r"""
    watchAsyncV2rayNodes();
    panels().forEach(panel=>{
      normalizeNative(panel);
+     normalizeClassicFlags(panel);
      normalizeV2ray(panel);
+     normalizeV2rayCountries(panel);
      reconcileV2rayCopyActions(panel);
      normalizeModern(panel);
      alignFooter(panel);
