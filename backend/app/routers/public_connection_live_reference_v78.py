@@ -33,6 +33,8 @@ body.tp78-ui .ref67-status{display:flex!important;align-items:center!important;g
 body.tp78-ui .ref67-status.tp78-ready{font-size:0!important}
 body.tp78-ui .ref67-status.tp78-ready .tp78-reach{font-size:11px!important}
 body.tp78-ui .ref67-chip .ref71-rtt,body.tp78-ui .server-tab .ref71-rtt{display:none!important}
+body.tp78-ui .tp77-native-row .ref71-rtt{display:none!important}
+body.tp78-ui .ref67-status:not(.tp78-ready){visibility:hidden!important}
 /* The original buttons, not recreated links: one uniform four-action footer. */
 body.tp78-ui .protocol-panel[data-tp78-action-ready="1"] > .v52-multi-card,
 body.tp78-ui .protocol-panel[data-tp78-action-ready="1"] > .v51-multi-card,
