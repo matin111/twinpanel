@@ -58,7 +58,9 @@ def test_one_protocol_selection_wins_over_legacy_mobile_handlers():
     assert "function reconcileProtocolSelection()" in ui
     assert "selectedProtocol=card.dataset.protocol" in ui
     assert "queueMicrotask(reconcileProtocolSelection)" in ui
-    assert "panels().forEach(item=>item.classList.toggle('active',item===panel))" in ui
+    assert "item.classList.toggle('active',active)" in ui
+    assert "item.classList.toggle('v36-open',active)" in ui
+    assert "body.tp80-connection.v36-mobile-compact.v38-reference .protocol-panel.active" in ui
     assert "function check(){\n   reconcileProtocolSelection();" in ui
 
 
