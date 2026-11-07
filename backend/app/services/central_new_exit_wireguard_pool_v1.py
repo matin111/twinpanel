@@ -109,7 +109,7 @@ with open(LOCK,"a+") as lock:
     if not backup.exists():
         shutil.copy2(CONF,backup)
         os.chmod(backup,0o600)
-    fd,tmp=tempfile.mkstemp(prefix=".tp-central-pool-",dir=str(CONF.parent))
+    fd,tmp=tempfile.mkstemp(prefix="tpw-",suffix=".conf",dir=str(CONF.parent))
     added_ip=False
     added_nat=[]
     try:
