@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.651",
-  "source_sha": "89e4cf6c321692aec11d3c914df8038e214a17a0",
+  "version": "1.1.0-rc.652",
+  "source_sha": "acc60db8ecdb282fa65ae41b0c58b4f4c7d2a08a",
   "notes": {
-    "fa": "رفع ایرادهای رابط Connection برای ۱۶ پروتکل: نمایش پرچم‌های تصویری واقعی و هماهنگ، ردیف‌های نود با ارتفاع یکسان، باز شدن اطلاعات همان سرور درست زیر ردیف در Cisco/OpenConnect و L2TP/IPsec، یک دکمه دانلود برنامه متناسب با دستگاه برای هر پروتکل، لینک برنامه رسمی Sudoku، و نمایش فشرده داده‌های SOCKS5 بدون تکرار اطلاعات خام. فایل‌های اصلی و مسیر دانلود گروهی OpenVPN/WireGuard/AmneziaWG و رمزهای واقعی و نودها حفظ می‌شوند؛ بدون دستکاری Runtime، پورت، تونل و دیتابیس VPN.",
-    "en": "Connection 16-protocol consistency: self-contained image country flags, compact matching native node rows, inline original Cisco/L2TP node details and copy actions, one OS-specific app download per protocol with verified official Sudoku clients, and compact SOCKS5 details without redundant raw credentials. Preserve all real OpenVPN/WireGuard/AmneziaWG files and ZIP endpoints, protocols, credentials, node configuration, ports and tunnels."
+    "fa": "نسخه 1.1.0-rc.652: یکپارچه‌سازی رنگ‌های صفحه Connection با تم و برند پنل در پس‌زمینه، هدر، فوتر، کارت‌ها، پاپ‌آپ و دکمه‌ها؛ انتقال دانلود برنامه به دکمه‌های پایین و حذف دانلود تکراری؛ افزودن مسیر دانلود کلاینت AmneziaWG و TrustTunnel و حذف دانلود برنامه L2TP؛ اصلاح نمایش آیکون و نام پروتکل در موبایل، ارتفاع سرورها، دکمه‌های کپی/افزودن بدون هم‌پوشانی و نمایش جزئیات سرور در پاپ‌آپ موبایل. پیکربندی‌ها، نودها، پروتکل‌ها و تونل‌ها دست‌نخورده باقی می‌مانند. تست خودکار بصری همه پروتکل‌ها هنوز تکمیل نشده است.",
+    "en": "TwinPanel 1.1.0-rc.652: align Connection backgrounds, headers, footers, cards, dialogs and controls with the configured panel brand palette; consolidate device-specific app downloads into the footer and remove duplicate client banners; provide AmneziaWG and TrustTunnel client download actions and omit L2TP app downloads; improve the mobile icon/name grid, consistent server row heights, non-overlapping copy/add buttons and mobile server-detail dialog. No intended modifications to protocol configurations, nodes, tunnels or VPN runtime. Full automated cross-protocol visual testing remains incomplete."
   }
 }
