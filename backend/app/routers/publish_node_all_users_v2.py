@@ -48,6 +48,8 @@ async def publish_node_to_all_users_v2(
     if node.node_type != NodeType.EXIT:
         raise HTTPException(status_code=409, detail="انتشار عمومی فقط برای سرور خروجی مجاز است")
 
+    from ..services.node_stage_publish_guard_v1 import require_staged_node_publish_ready
+    require_staged_node_publish_ready(db, node_id)
     now = datetime.utcnow()
     params = {"node_id": int(node.id), "now": now}
     try:
