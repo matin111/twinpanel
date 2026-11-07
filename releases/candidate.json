@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.664",
-  "source_sha": "f8e46d64fbda7de72218ea92d7df96ab11407180",
+  "version": "1.1.0-rc.665",
+  "source_sha": "062166f2a1590c712de74330e8b08e9fd373b53d",
   "notes": {
-    "fa": "نسخه rc.664: با زدن روی خود کارت هر یک از ۱۶ پروتکل، کل پنل همان پروتکل داخل پاپ‌آپ مستقل و قابل پیمایش باز می‌شود، نه در زیر کارت‌ها. دکمه بستن، کلیک بیرون و Escape پنجره را می‌بندند و عنصر اصلی با تمام لینک‌ها و عملکردهای دانلود/کپی/فیلتر به محل اولیه برمی‌گردد. اصلاحات rc.663 مانند چهار دکمه V2Ray شامل کپی همه کانفیگ‌ها، کپی لینک اشتراک، دانلود Karing و دانلود v2rayN حفظ شده است. تست کلیک همه ۱۶ کارت در DOM موفق و صفحه سرور HTTP 200 است؛ تست بصری گوشی واقعی هنوز کامل نشده است.",
-    "en": "rc.664: clicking each of 16 protocol cards opens the entire original protocol panel inside a responsive scrollable popup, not an inline section below the grid. Close, backdrop and Escape restore the exact original panel and preserve copy, download, filtering and event handlers. Retains rc.663 V2Ray four-button footer, including visible Copy all configurations. Synthetic DOM click tests passed for all 16 cards; complete live-device browser visual testing pending."
+    "fa": "نسخه rc.665: حذف کامل نمایش هم‌زمان پنل پروتکل در پایین صفحه موبایل و داخل پاپ‌آپ؛ کلیک روی کارت پروتکل قبل از هندلر قدیمی مستقیماً پاپ‌آپ را باز می‌کند و فقط محتوای داخل پنجره نمایان است. بهبود فونت و تایپوگرافی نام ۱۶ پروتکل با وزن خواناتر، فاصله و اندازه واکنش‌گرا؛ بدون وابستگی به فونت خارجی. تست بازوبسته‌شدن ۱۶ کارت در DOM و وضعیت HTTP 200 موفق بود، تست بصری گوشی واقعی هنوز انجام نشده است. تغییرات نسخه‌های قبلی V2Ray، کپی همه، فیلتر کشورها و دانلود برنامه‌ها حفظ شده‌اند.",
+    "en": "rc.665: eliminate duplicate inline protocol panels below the mobile grid while modal is open. Use window-capture click routing to modal before legacy inline handlers and enforce non-modal panel visibility hiding. Improve protocol name typography using local/system font stack, balanced weight, spacing and responsive sizes without external font assets. All 16 modal open/close synthetic DOM tests passed and Connection HTTP 200. Full real-device visual validation pending; preserve existing V2Ray footer, country filters and downloads."
   }
 }
