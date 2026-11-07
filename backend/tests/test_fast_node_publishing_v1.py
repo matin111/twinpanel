@@ -13,6 +13,7 @@ from sqlalchemy.pool import StaticPool
 from app.database import Base
 from app.models import Node, NodeStatus, NodeType
 from app.node_backfill_job_models_v1 import NodeBackfillJobV1
+from app.node_install_progress_models_v1 import NodeInstallProgressV1
 from app.routers.publish_node_all_users_v2 import publish_node_to_all_users_v2
 
 
@@ -25,7 +26,7 @@ class SetBasedPublishContracts(unittest.TestCase):
             "sqlite://", connect_args={"check_same_thread": False},
             poolclass=StaticPool,
         )
-        Base.metadata.create_all(self.engine, tables=[Node.__table__, NodeBackfillJobV1.__table__])
+        Base.metadata.create_all(self.engine, tables=[Node.__table__, NodeBackfillJobV1.__table__, NodeInstallProgressV1.__table__])
         with self.engine.begin() as conn:
             conn.exec_driver_sql("""
                 CREATE TABLE subscriptions (
@@ -172,7 +173,7 @@ class SetBasedPublishContracts(unittest.TestCase):
         self.assertNotIn("INSERT INTO plan_nodes", publish)
         self.assertIn("s.traffic_used_bytes < s.traffic_limit_bytes", publish)
         ui = (ROOT.parent / "components/node-add-modal-bridge.tsx").read_text()
-        self.assertIn("useState(false)", ui)
+        self.assertIn("const [publishToAll,setPublishToAll]=useState(true)", ui)
 
 
 if __name__ == "__main__":
