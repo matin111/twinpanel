@@ -1627,9 +1627,36 @@ _SCRIPT = r"""
    },true);
  }
 
+ function watchAsyncV2rayNodes(){
+   if(document.body.dataset.tp90V2rayWatch==='1')return;
+   document.body.dataset.tp90V2rayWatch='1';
+   const seen=new WeakSet();
+   const scan=()=>{
+     panels().forEach(panel=>{
+       if(panel.dataset.v54V2ray!=='1')return;
+       const holder=panel.querySelector(':scope > .v54-v2ray-groups');
+       if(!holder||seen.has(holder))return;
+       seen.add(holder);
+       const observer=new MutationObserver(records=>{
+         // Observe newly mounted server cards only. Appending the copy button
+         // itself must never cause an endless mutation/reconciliation loop.
+         if(!records.some(record=>[...record.addedNodes].some(node=>
+           node.nodeType===1&&(node.matches?.('.v54-v2ray-server')||node.querySelector?.('.v54-v2ray-server'))
+         )))return;
+         reconcileV2rayCopyActions(panel);
+       });
+       observer.observe(holder,{childList:true,subtree:true});
+       reconcileV2rayCopyActions(panel);
+     });
+   };
+   scan();
+   let tries=0;
+   const timer=setInterval(()=>{scan();if(++tries>=45)clearInterval(timer)},500);
+ }
  function check(){
    reconcileProtocolSelection();
    installMobileDetailsDialog();
+   watchAsyncV2rayNodes();
    panels().forEach(panel=>{
      normalizeNative(panel);
      normalizeV2ray(panel);
