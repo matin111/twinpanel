@@ -1,5 +1,15 @@
 # TwinPanel Changelog
 
+## 1.1.0-rc.667 — 2026-11-08
+
+### Connection panel theme parity and real light/dark rendering
+- Restore a genuinely readable **Light mode**. The page previously stayed navy despite the theme switch because the older reference layout hard-coded many background and text colors with `!important`.
+- Harmonize the complete Connection surface with TwinPanel's configurable primary/secondary brand colors, already provided as `--p` and `--s` from the server's branding settings. No hard-coded purple or blue accents in the new skin.
+- Use matching theme surfaces for body, top header, subscriber/traffic block, category tabs, protocol cards, flags/rows, protocol popup, detail popup, client/footer controls, and text states in **both** light and dark.
+- Keep the existing persisted theme-switch behavior and user preference. Preserve all protocol interaction handlers, copy/download buttons, category and country filters, and mobile popup-only layout.
+- Tested Python/JavaScript validity, live Connection HTTP 200 with the branded root colors, active API/web HTTP 200 and synthetic popup click/close for all 16 protocols. Full browser screenshot verification of light/dark colors remains pending.
+- No changes to subscriptions, credential data, nodes, tunnels, or transport configuration.
+
 ## 1.1.0-rc.665 — 2026-11-08
 
 ### Mobile protocol popup only, typography refresh
