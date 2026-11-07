@@ -123,11 +123,8 @@ def refine_public_connection_request_backpressure_v1(source: str) -> str:
     source = source.replace(_V34_ASYNC_COUNT_OLD, "", 1)
 
     source = source.replace(_V37_MULTI_META_OLD, _V37_MULTI_META_NEW, 1)
-    source = source.replace(
-        "  async function buildMulti(panel){",
-        "  function buildMulti(panel){",
-        1,
-    )
+    # Keep buildMulti async: the client import URL resolver awaits a fetch.
+    # multiMeta itself can be synchronous without stripping async from builder.
     source = source.replace(
         "    const meta=await multiMeta(protocol);",
         "    const meta=multiMeta(panel);",
