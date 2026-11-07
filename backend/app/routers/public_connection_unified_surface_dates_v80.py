@@ -599,6 +599,79 @@ html body.tp80-connection .protocol-panel.active > .tp78-action-footer > [data-k
  min-height:48px!important;
  }
 }
+
+/* TWINPANEL_CONNECTION_MOBILE_ACTIONS_DIALOG_V84 */
+@media(max-width:720px){
+ html body.tp80-connection .protocol-panel.active .ref67-row,
+ html body.tp80-connection .protocol-panel.active .tp77-native-row,
+ html body.tp80-connection .protocol-panel.active .v54-v2ray-server-head{
+  box-sizing:border-box!important;width:100%!important;min-width:0!important;
+  display:flex!important;flex-direction:row!important;justify-content:space-between!important;
+  align-items:center!important;gap:5px!important;padding:6px 8px!important;overflow:hidden!important;
+ }
+ html body.tp80-connection .protocol-panel.active .ref67-row-name,
+ html body.tp80-connection .protocol-panel.active .tp77-native-label,
+ html body.tp80-connection .protocol-panel.active .v54-v2ray-server-name{
+  flex:1 1 auto!important;min-width:0!important;max-width:100%!important;overflow:hidden!important;
+ }
+ html body.tp80-connection .protocol-panel.active .ref67-row-actions,
+ html body.tp80-connection .protocol-panel.active .tp80-file-actions{
+  display:flex!important;flex:0 1 auto!important;flex-direction:row!important;
+  width:auto!important;max-width:56%!important;min-width:0!important;
+  gap:5px!important;margin-inline-start:auto!important;padding:0!important;
+  align-items:center!important;justify-content:flex-end!important;overflow:hidden!important;
+ }
+ html body.tp80-connection .protocol-panel.active .ref67-row-actions > *,
+ html body.tp80-connection .protocol-panel.active .tp80-file-actions > *,
+ html body.tp80-connection .protocol-panel.active .tp80-detail-toggle{
+  box-sizing:border-box!important;position:static!important;flex:0 1 auto!important;
+  width:auto!important;min-width:48px!important;max-width:100%!important;
+  height:36px!important;min-height:36px!important;max-height:36px!important;
+  margin:0!important;padding:5px 8px!important;font-size:10px!important;
+  white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;
+  display:inline-flex!important;align-items:center!important;justify-content:center!important;
+ }
+ html body.tp80-connection .protocol-panel.active > .tp78-action-footer{
+  order:99!important;display:grid!important;width:auto!important;
+  grid-template-columns:repeat(2,minmax(0,1fr))!important;grid-auto-flow:row!important;
+  align-items:stretch!important;gap:7px!important;margin:10px 8px 12px!important;
+ }
+ html body.tp80-connection .protocol-panel.active > .tp78-action-footer > *,
+ html body.tp80-connection .protocol-panel.active > .tp78-action-footer > .tp78-footer-action,
+ html body.tp80-connection .protocol-panel.active > .tp78-action-footer > [data-kind="app"]{
+  grid-column:auto!important;grid-row:auto!important;order:initial!important;
+  box-sizing:border-box!important;min-width:0!important;max-width:100%!important;width:100%!important;
+  min-height:48px!important;height:auto!important;padding:8px 5px!important;margin:0!important;
+  text-align:center!important;font-size:10px!important;white-space:normal!important;overflow-wrap:anywhere!important;
+ }
+ html body.tp80-connection .protocol-panel.active > .tp78-action-footer > .tp80-extra-actions{
+  grid-column:1/-1!important;
+ }
+}
+/* Mounted on body to avoid clipped/hidden protocol containers. */
+body .tp84-dialog[hidden]{display:none!important}
+body .tp84-dialog{position:fixed!important;inset:0!important;z-index:2147483000!important;
+ display:flex!important;align-items:center!important;justify-content:center!important;
+ padding:14px!important;box-sizing:border-box!important;background:#030716d9!important}
+body .tp84-dialog-card{display:flex!important;flex-direction:column!important;gap:0!important;
+ width:min(480px,100%)!important;max-height:min(85dvh,760px)!important;min-height:0!important;
+ border:1px solid #7453b7!important;border-radius:18px!important;overflow:hidden!important;
+ background:#101b33!important;color:#f8faff!important;box-shadow:0 25px 80px #000a!important}
+body .tp84-dialog-head{display:flex!important;align-items:center!important;justify-content:space-between!important;
+ padding:12px 15px!important;border-bottom:1px solid #384765!important;font-weight:850!important}
+body .tp84-dialog-close{border:1px solid #536080!important;border-radius:9px!important;
+ background:#253453!important;color:white!important;padding:7px 12px!important}
+body .tp84-dialog-body{overflow:auto!important;overscroll-behavior:contain!important;padding:12px!important;
+ direction:rtl!important;min-height:0!important}
+body .tp84-dialog-body > .tp80-inline-native-detail,
+body .tp84-dialog-body > .tp80-modern-detail,
+body .tp84-dialog-body > .v54-v2ray-profiles{
+ display:block!important;position:static!important;width:100%!important;max-width:100%!important;
+ margin:0!important;padding:0!important;background:transparent!important;
+}
+body .tp84-dialog-body .server-view{display:block!important;max-width:100%!important;width:100%!important}
+body .tp84-dialog-body .facts{display:grid!important;grid-template-columns:1fr!important;gap:9px!important}
+body .tp84-dialog-body .fact{min-width:0!important;max-width:100%!important;overflow-wrap:anywhere!important}
 """
 
 
@@ -1100,8 +1173,64 @@ _SCRIPT = r"""
      [...label.querySelectorAll('img')].slice(1).forEach(img=>img.remove());
    });
  }
+
+ function installMobileDetailsDialog(){
+   if(document.getElementById('tp84-dialog'))return;
+   const overlay=el('div','tp84-dialog');overlay.id='tp84-dialog';overlay.hidden=true;
+   overlay.setAttribute('role','dialog');overlay.setAttribute('aria-modal','true');
+   const card=el('div','tp84-dialog-card'),head=el('div','tp84-dialog-head');
+   const title=el('strong','','اطلاعات سرور'),close=el('button','tp84-dialog-close','بستن');
+   close.type='button';const body=el('div','tp84-dialog-body');
+   head.append(title,close);card.append(head,body);overlay.append(card);document.body.append(overlay);
+   let selected=null,placeholder=null,previousFocus=null,previousOverflow='';
+   function shut(){
+     if(overlay.hidden)return;
+     if(selected&&placeholder?.parentNode){
+       placeholder.replaceWith(selected);
+       if(selected.classList.contains('tp80-inline-native-detail')||selected.classList.contains('tp80-modern-detail')){
+         selected.hidden=true;selected.dataset.tp80Expanded='0';
+       }
+     }
+     body.replaceChildren();selected=null;placeholder=null;overlay.hidden=true;
+     document.body.style.overflow=previousOverflow;
+     if(previousFocus?.isConnected)previousFocus.focus({preventScroll:true});
+   }
+   function reveal(content,label,trigger){
+     if(!content)return;
+     shut();previousFocus=trigger;previousOverflow=document.body.style.overflow;
+     placeholder=document.createComment('tp84-original-detail');
+     content.parentNode.insertBefore(placeholder,content);
+     selected=content;content.hidden=false;
+     title.textContent=label||'اطلاعات سرور';
+     body.append(content);overlay.hidden=false;document.body.style.overflow='hidden';close.focus();
+   }
+   close.addEventListener('click',shut);
+   overlay.addEventListener('click',event=>{if(event.target===overlay)shut()});
+   document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!overlay.hidden){event.preventDefault();shut()}});
+   document.addEventListener('click',event=>{
+     if(!matchMedia('(max-width:720px)').matches||!overlay.hidden)return;
+     const trigger=event.target.closest('.tp80-detail-toggle,.v54-v2ray-server-head,.tp77-native-row > button');
+     if(!trigger||!trigger.closest('.protocol-panel.active'))return;
+     const panel=trigger.closest('.protocol-panel'),row=trigger.closest('.tp77-native-row,.ref67-row,.v54-v2ray-server');
+     if(!row)return;
+     setTimeout(()=>{
+       if(!overlay.hidden)return;
+       let detail=null;
+       if(row.classList.contains('v54-v2ray-server')){
+         detail=row.querySelector('.v54-v2ray-profiles');
+         if(!row.classList.contains('open'))return;
+       }else{
+         const following=row.nextElementSibling;
+         if(following?.matches('.tp80-inline-native-detail,.tp80-modern-detail')&&!following.hidden)detail=following;
+       }
+       if(detail)reveal(detail,row.querySelector('.tp77-native-label,.ref67-row-name,.v54-v2ray-server-name')?.textContent.trim(),trigger);
+     },0);
+   },true);
+ }
+
  function check(){
    reconcileProtocolSelection();
+   installMobileDetailsDialog();
    panels().forEach(panel=>{
      normalizeNative(panel);
      normalizeV2ray(panel);
