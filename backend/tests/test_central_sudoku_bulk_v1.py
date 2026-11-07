@@ -16,13 +16,16 @@ class SudokuCentralBulkTests(unittest.TestCase):
         source=remote_source()
         compile(source,"<sudoku-bulk-remote>","exec")
         self.assertIn("range(0,len(newly_created),4)",source)
+        self.assertIn("SUDOKU_TARGET_MEMORY_ADMISSION_FAILED",source)
+        self.assertIn("SUDOKU_TARGET_SERVICE_CAPACITY_EXCEEDED",source)
         self.assertIn('["systemctl","daemon-reload"]',source)
         self.assertIn('["systemctl","disable","--now",name]',source)
 
     def test_capacity_limit_and_collision(self):
         verify_accounts([self.row(1),self.row(2)])
+        verify_accounts([self.row(x) for x in range(1,1901)])
         with self.assertRaisesRegex(ValueError,"CAPACITY"):
-            verify_accounts([self.row(x) for x in range(1,66)])
+            verify_accounts([self.row(x) for x in range(1,3002)])
         with self.assertRaisesRegex(ValueError,"INVALID_PORT"):
             verify_accounts([self.row(1),self.row(30001)])
 
