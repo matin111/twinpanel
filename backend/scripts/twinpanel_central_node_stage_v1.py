@@ -89,9 +89,13 @@ def missing_runtime_families(node_id, limit):
                    if int(count) > 0}
         selected = tuple(f for f in FAMILIES if f.protocols & missing)
         mapped = set().union(*(f.protocols for f in selected)) if selected else set()
-        if (not missing or not missing.issubset(mapped)
+        if (not missing.issubset(mapped)
                 or audit["subscriptions_without_entitlements"]
                 or audit["unknown_protocols"]):
+            raise RuntimeError("CENTRAL_DELTA_AUDIT_NOT_RECONCILABLE")
+        # Only membership drift can be repaired by the next bounded
+        # _run_locked membership INSERT, without restarting any daemon.
+        if not selected and not audit["missing_node_memberships"]:
             raise RuntimeError("CENTRAL_DELTA_AUDIT_NOT_RECONCILABLE")
         return selected
 
