@@ -1,7 +1,7 @@
 """Bounded Sudoku service staging over ONE SSH connection.
 
 Sudoku's current revocation model requires one TCP listener/systemd unit per
-subscription. This adapter stages at most 64 dedicated instances and starts
+subscription. This adapter stages at most 3000 dedicated instances and starts
 them in controlled groups. It does NOT assert 1900-user capacity or 3-minute
 activation. It never restarts existing instances, and never publishes nodes.
 Only master *public* keys are sent to the node, not client private keys.
@@ -56,7 +56,7 @@ BASE=Path(__BASE__)
 UNIT_DIR=Path(__UNIT__)
 PROGRAM=Path(__PROGRAM__)
 incoming=json.load(sys.stdin)
-if not isinstance(incoming,list) or not 1<=len(incoming)<=64:
+if not isinstance(incoming,list) or not 1<=len(incoming)<=3000:
     raise SystemExit("SUDOKU_BULK_COUNT")
 if not PROGRAM.is_file() or PROGRAM.is_symlink():
     raise SystemExit("SUDOKU_RUNTIME_MISSING")
@@ -73,6 +73,27 @@ for row in incoming:
     seen.add(sid);ports.add(port)
 if BASE.is_symlink() or UNIT_DIR.is_symlink():
     raise SystemExit("SUDOKU_UNSAFE_BASE")
+# Strict resource admission on the TARGET node, not the controller.
+# Running Sudoku averages ~10 MB RSS in an observed installation; reserve
+# 16 MiB per additional process and 512 MiB headroom. No network mutations
+# or filesystem writes occur before this check.
+new_count=sum(
+    1 for row in incoming
+    if not (UNIT_DIR/("twinpanel-sudoku-sub-"+str(row["subscription_id"])+".service")).exists()
+)
+meminfo={}
+for line in Path("/proc/meminfo").read_text().splitlines():
+    bits=line.split()
+    if len(bits)>=2 and bits[0].endswith(":"):
+        try:meminfo[bits[0][:-1]]=int(bits[1])
+        except ValueError:pass
+available_kib=meminfo.get("MemAvailable",0)
+minimum_kib=512*1024 + new_count*16*1024
+if available_kib<minimum_kib:
+    raise SystemExit("SUDOKU_TARGET_MEMORY_ADMISSION_FAILED")
+installed_count=sum(1 for _ in UNIT_DIR.glob("twinpanel-sudoku-sub-*.service"))
+if installed_count+new_count>3000:
+    raise SystemExit("SUDOKU_TARGET_SERVICE_CAPACITY_EXCEEDED")
 BASE.mkdir(parents=True,exist_ok=True)
 newly_created=[]
 try:
