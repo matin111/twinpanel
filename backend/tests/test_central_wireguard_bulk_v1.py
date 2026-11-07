@@ -61,7 +61,13 @@ class CentralWireguardTests(unittest.TestCase):
         self.tool.chmod(0o700)
         self.quick=self.root/"wg-quick"
         self.quick.write_text(
-            "#!/bin/sh\nif [ \"$1\" = strip ]; then cat \"$2\";else exit 1;fi\n",
+            "#!/usr/bin/env python3\n"
+            "import os,re,sys,pathlib\n"
+            "if len(sys.argv)!=3 or sys.argv[1]!='strip': sys.exit(1)\n"
+            "path=pathlib.Path(sys.argv[2])\n"
+            "if not re.fullmatch(r'[A-Za-z0-9_=+.-]{1,15}\\.conf',path.name):\n"
+            "  print('invalid WireGuard filename',file=sys.stderr);sys.exit(1)\n"
+            "print(path.read_text(),end='')\n",
             encoding="utf-8",
         )
         self.quick.chmod(0o700)
