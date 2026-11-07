@@ -107,12 +107,39 @@ class CentralNodeStageTests(unittest.TestCase):
               patch.object(stage, "verify_new_exit_readiness", new_callable=AsyncMock, return_value={"ok": True}),
               patch.object(stage, "establish_hidden_memberships", return_value=3),
               patch.object(stage, "verify_coverage", return_value={"ok": True}),
+              patch.object(stage, "assert_target_sudoku_capacity", new_callable=AsyncMock,
+                           return_value={"ok":True,"requested":1}) as memory_preflight,
               patch.object(stage, "reconcile_runtime_families", new_callable=AsyncMock) as invoke):
             session.return_value.__enter__.return_value = db
             invoke.return_value = {"ok": True, "failed": [], "succeeded": []}
             self.assertEqual(stage._run_locked(14, 3000, True), 0)
             invoke.assert_awaited_once()
+            memory_preflight.assert_awaited_once()
             db.commit.assert_called_once()
+
+
+    def test_low_memory_blocks_all_writes_before_any_runtime_family(self):
+        fake = MagicMock()
+        fake.retired_at = None
+        fake.node_type = NodeType.EXIT
+        fake.status = NodeStatus.ONLINE
+        fake.show_to_users = False
+        db = MagicMock()
+        db.get.return_value = fake
+        with (patch.object(stage,"SessionLocal") as session,
+              patch.object(stage,"load_desired_state",return_value=desired_state(1206)),
+              patch.object(stage,"verify_new_exit_readiness",new_callable=AsyncMock,
+                           return_value={"ok":True}),
+              patch.object(stage,"assert_target_sudoku_capacity",new_callable=AsyncMock,
+                           side_effect=RuntimeError("SUDOKU_TARGET_MEMORY_ADMISSION_FAILED")),
+              patch.object(stage,"establish_hidden_memberships") as insert,
+              patch.object(stage,"reconcile_runtime_families",new_callable=AsyncMock) as run):
+            session.return_value.__enter__.return_value=db
+            with self.assertRaisesRegex(RuntimeError,"SUDOKU_TARGET_MEMORY_ADMISSION_FAILED"):
+                stage._run_locked(14,3000,True)
+            insert.assert_not_called()
+            run.assert_not_awaited()
+            db.commit.assert_not_called()
 
 
     def test_listener_probe_runs_without_row_lock(self):
