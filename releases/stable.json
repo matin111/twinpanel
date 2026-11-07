@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.653",
+  "version": "1.1.0-rc.654",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-07T17:08:50Z",
+  "released_at": "2026-11-07T17:22:11Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "9b184ca2b30a9b6e3ec1a13b7207f9c5212fdfd2",
+  "source_sha": "173332da8dc654f9f66cc7bbef71448558df3d0a",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.653/twinpanel-1.1.0-rc.653-linux-x86_64.tar.gz",
-    "sha256": "1b52edaf068195219082415ec16976593a6a638859eba4ff6dffa165369d8a01",
-    "size_bytes": 29303394
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.654/twinpanel-1.1.0-rc.654-linux-x86_64.tar.gz",
+    "sha256": "a73c8245a324603130dc5e92dfb1e555bd4f4699981ed63ca7ffeab10fe4c6d9",
+    "size_bytes": 29309215
   },
   "notes": {
-    "fa": "نسخه rc.653: انتشار بسته رسمی از سورس کامل و جدید گیت‌هاب، به‌جای اصلاح موقت سرور. اصلاح چهار دکمه کنار هم در ویندوز، یک دکمه تمام‌عرض و سه دکمه کنار هم در اندروید، بازگردانی لینک واقعی دانلود کلاینت برای پروتکل‌های پشتیبانی‌شده و حفظ عملکرد دکمه افزودن به برنامه. برای OpenVPN، WireGuard و AmneziaWG دانلود فایل واقعی و ZIP باقی می‌ماند. چیدمان یکسان، رنگ برند پنل، اصلاح کپی/افزودن و پاپ‌آپ اطلاعات موبایل نیز داخل بسته قرار می‌گیرند. تغییر عمدی در تونل، نود، کانفیگ یا دیتابیس VPN صورت نگرفته است. تست بصری تمام پروتکل‌ها تکمیل نشده است.",
-    "en": "rc.653 official prebuilt release from the latest GitHub source to preserve Connection fixes through installation and updates: four horizontal footer actions on Windows, one full-width primary and three secondary actions on Android, restore real protocol-specific client download links, preserve compatible app import actions and genuine OpenVPN/WireGuard/AmneziaWG file/ZIP downloads, retain panel-branded colors and mobile server-detail modal. No intended changes to VPN tunnels, nodes, configurations or database. Full device/protocol browser regression remains incomplete."
+    "fa": "نسخه rc.654: اصلاح رابط V2Ray/Xray صفحه Connection با افزودن دکمه کپی همه کانفیگ‌های واقعی هر سرور و رفع محدودیت ارتفاع و مخفی‌شدن ردیف‌های اینباند. حفظ چیدمان دکمه‌های ویندوز و اندروید و رنگ‌بندی پنل. این اصلاح فقط نمایش و کپی کانفیگ‌های موجود را درست می‌کند؛ اگر اینباندها در داده سرور ساخته نشده باشند، افزودن آن‌ها نیازمند بررسی جداگانه پروویژن است.",
+    "en": "rc.654: restore per-node V2Ray/Xray copy-all configurations action and expand all delivered inbound/profile rows without clipping. Retain Windows/Android footer layout and panel theme. This UI update does not fabricate or provision missing runtime inbounds; the tested account currently has 1/1/1/2 profiles across four nodes."
   }
 }
