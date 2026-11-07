@@ -22,7 +22,7 @@ def test_exactly_three_original_v2ray_profiles_per_node_are_shown():
     ui=(ROOT/"public_connection_approved_phone_v74.py").read_text(encoding="utf-8")
     v54=(ROOT/"public_connection_v2ray_mobile_restore_v54.py").read_text(encoding="utf-8")
     assert "cards.every(x=>x.querySelectorAll('.v54-v2ray-profile').length===3)" in ui
-    assert "card.classList.add('open')" in ui
+    # The server summary is collapsed by default; the user can expand to its three actual inbounds.\n    assert "card.classList.add('open')" not in ui\n    assert "card.classList.toggle('open')" in v54
     assert "panel.dataset.v54GroupsLoaded='1'" in ui
     assert 'card.dataset.countryCode=String(server?.country_code||\'\').toUpperCase()' in v54
     assert "card.dataset.nodeId=String(server?.node_id??'')" in v54
