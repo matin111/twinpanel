@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.631",
-  "source_sha": "3f4f03e87cc6c6f34cd9ec07f35038cfd83be7f5",
+  "version": "1.1.0-rc.632",
+  "source_sha": "e2f0046c18fc034c337145fb773608574112b425",
   "notes": {
-    "fa": "اصلاح ریشه‌ای انتخاب هسته TP27: اولویت GRE مستقیم پیش از FOU در ترمیم خودکار؛ حفظ مسیر پشتیبان و تشخیص سرعت TCP واقعی، اعتبارسنجی تازگی نمونه‌ها و حذف امتیاز سرعت قدیمی پس از تغییر مسیر. بدون بازسازی خودکار تونل‌های فعال.",
-    "en": "TP27 carrier recovery now qualifies native GRE before FoU fallbacks, retains quarantine and failover, exposes fresh TCP-capacity diagnostics, and invalidates old throughput when switching carriers. No active tunnel rebuild on update."
+    "fa": "پایلوت ایمن Bulk V2Ray با اجرای دستی ۱ تا ۱۰ کاربر و پیش‌فرض Dry-run؛ ثبت گروهی کاربران با Xray HandlerService، ذخیره پایدار Credential در مدیریت مرکزی و اصلاح Wrapper قدیمی Workerهای مستقل. پاکسازی لاگ آرشیوی نودها به‌صورت مستقل انجام شد؛ هیچ کانفیگ یا کاربری حذف نشد.",
+    "en": "Add opt-in bounded VLESS Bulk pilot (1-10 clients, dry-run default), no Xray restart, atomic config plus durable central publication; fix standalone workers to use production V47 hot-client composition instead of the legacy import hook. Existing users and UUIDs preserved."
   }
 }
