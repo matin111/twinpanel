@@ -124,6 +124,16 @@ def verify(context,html,device,outfile):
     assert panel.locator(".tp80-file-download").count()==4,f"{device}: missing actual per-node file buttons"
     assert panel.locator(".tp80-file-download").first.is_visible()
     assert panel.locator('.tp78-action-footer a[href*="/multi/openvpn"]').count()==1,f"{device}: missing real all-files ZIP"
+    # Only one country navigation; Germany has two distinct native files.
+    assert panel.locator(":scope > .tp80-country-bar").count()==1,(device,"duplicate country navigation")
+    assert panel.locator(".panel-head .server-tabs:visible").count()==0,(device,"duplicate header country flags")
+    assert panel.locator(".tp80-country-bar button").count()==4,(device,"country dedupe")
+    panel.locator('.tp80-country-bar button[data-tp80-country="DE"]').click()
+    assert panel.locator(".tp77-native-row:visible").count()==2,(device,"DE must show both nodes")
+    panel.locator('.tp80-country-bar button[data-tp80-country="TR"]').click()
+    assert panel.locator(".tp77-native-row:visible").count()==1,(device,"TR must show only its node")
+    panel.locator('.tp80-country-bar button[data-tp80-country="ALL"]').click()
+    assert panel.locator(".tp77-native-row:visible").count()==4,(device,"ALL must restore every node")
     assert panel.locator(".server-view:visible").count()==0,f"{device}: duplicate large native file cards still displayed"
     assert panel.locator(".tp78-ping:visible,.ref71-rtt:visible").count()==0
     if device=="mobile":
@@ -141,6 +151,21 @@ def verify(context,html,device,outfile):
         pane=page.locator("#"+target.get_attribute("data-protocol"))
         assert pane.locator(".tp77-native-row").count()>=1,f"{device} {protocol}: no server rows"
         assert pane.locator(".tp78-ping:visible").count()==0
+        assert pane.locator(":scope > .tp80-country-bar").count()==1,(device,protocol,"duplicate flags")
+        assert pane.locator(".panel-head .server-tabs:visible").count()==0,(device,protocol,"old flags still visible")
+        shared=pane.locator(".tp80-credentials")
+        assert shared.count()==1 and shared.is_visible(),(device,protocol,"login info hidden")
+        assert shared.evaluate("(e)=>e.tagName")=="SECTION",(device,protocol,"credentials collapsed")
+        fields=shared.locator(".v35-manual-item small").all_inner_texts()
+        for required in (["نام کاربری","رمز عبور","IPsec Secret"] if protocol=="l2tp" else ["نام کاربری","رمز عبور"]):
+            assert required in fields,(device,protocol,required,fields)
+        assert shared.locator(".v35-manual-item button:visible").count()>=len(fields),(device,protocol,"copy action missing")
+        country=pane.locator('.tp80-country-bar button[data-tp80-country="DE"]')
+        assert country.count()==1,(device,protocol,"DE country button missing")
+        country.click()
+        assert pane.locator(".tp77-native-row:visible").count()==1,(device,protocol,"wrong country filtering")
+        pane.locator('.tp80-country-bar button[data-tp80-country="ALL"]').click()
+        assert pane.locator(".tp77-native-row:visible").count()>=2,(device,protocol,"ALL broken")
     # Visit each one of the fifteen customer-facing protocols, not just the
     # OpenVPN screenshot. All share the same node-row/real-action contract.
     native={"wireguard","openvpn","l2tp","amneziawg","cisco"}
