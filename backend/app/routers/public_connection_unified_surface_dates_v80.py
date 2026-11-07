@@ -1350,7 +1350,7 @@ _SCRIPT = r"""
    const candidates=[...panel.querySelectorAll('.v34-client-card a[href],.ref70-app-card a[href],.v13-client-only a[href]')];
    const original=candidates.find(a=>{
      const u=String(a.getAttribute('href')||'');
-     return /^https?:\\/\\//i.test(u)||u.startsWith('/v1/connect/app-download/');
+     return u.startsWith('https://')||u.startsWith('http://')||u.startsWith('/v1/connect/app-download/');
    });
    const appTypes={
      cisco:'openconnect',openconnect:'openconnect',openvpn:'openvpn',
@@ -1375,7 +1375,7 @@ _SCRIPT = r"""
    const existing=[...footer.querySelectorAll('[data-kind="app"]')];
    let app=existing.find(a=>a.tagName==='A')||null;
    const existingUrl=String(app?.getAttribute('href')||'');
-   const validExisting=/^https?:\\/\\//i.test(existingUrl)||existingUrl.startsWith('/v1/connect/app-download/');
+   const validExisting=existingUrl.startsWith('https://')||existingUrl.startsWith('http://')||existingUrl.startsWith('/v1/connect/app-download/');
    // Canonical supported client is preferred for consistency; otherwise
    // preserve an existing verified direct link for this device.
    const href=canonical||(original?.getAttribute('href'))||(validExisting?existingUrl:null);
