@@ -1435,6 +1435,38 @@ html[data-theme] body.tp80-connection.ref67 .protocol-panel .tp80-extra-actions 
  background:var(--surface)!important;color:var(--text)!important;
  border-color:var(--line)!important;
 }
+/* Show file actions in two compact rows, never clip Share on small touch screens. */
+@media(max-width:820px),(pointer:coarse){
+ html body.tp80-connection .protocol-panel.active.tp80-native .tp77-native-row[data-tp80-file-row='1']{
+  display:flex!important;flex-wrap:wrap!important;align-content:center!important;
+  height:auto!important;max-height:none!important;min-height:96px!important;
+  overflow:visible!important;gap:7px!important;padding:9px!important;
+ }
+ html body.tp80-connection .protocol-panel.active.tp80-native .tp77-native-row[data-tp80-file-row='1'] .tp77-native-label{
+  flex:1 1 100%!important;width:100%!important;max-width:100%!important;
+  min-width:0!important;overflow:hidden!important;
+ }
+ html body.tp80-connection .protocol-panel.active.tp80-native .tp77-native-row[data-tp80-file-row='1'] .tp80-file-actions{
+  display:flex!important;flex-flow:row wrap!important;justify-content:stretch!important;
+  align-items:stretch!important;flex:1 1 100%!important;
+  width:100%!important;max-width:100%!important;min-width:0!important;
+  overflow:visible!important;gap:6px!important;margin:0!important;
+ }
+ html body.tp80-connection .protocol-panel.active.tp80-native .tp77-native-row[data-tp80-file-row='1'] .tp80-file-actions > button,
+ html body.tp80-connection .protocol-panel.active.tp80-native .tp77-native-row[data-tp80-file-row='1'] .tp80-file-actions > a{
+  display:inline-flex!important;flex:1 1 88px!important;width:auto!important;
+  min-width:0!important;max-width:none!important;min-height:36px!important;
+  height:auto!important;padding:7px 6px!important;overflow:visible!important;
+  white-space:normal!important;text-overflow:clip!important;line-height:1.3!important;
+ }
+ html body.tp80-connection .protocol-panel.active.tp80-native .tp77-native-row[data-tp80-file-row='1'] .tp80-file-share{
+  border:1px solid var(--p,#7455e8)!important;border-radius:9px!important;
+  color:var(--tp-brand-text,#fff)!important;
+  background:var(--tp-brand-raised,#263450)!important;font-weight:750!important;
+  cursor:pointer!important;
+ }
+}
+
 """
 
 
@@ -1642,11 +1674,11 @@ _SCRIPT = r"""
          // Web Share files is a mobile feature. Desktop Windows Chrome
          // cannot present an OpenVPN/WireGuard file receiver chooser.
          // Keep the working attachment download; show actionable file guidance.
+         // Desktop-mode browsers on phones often omit a mobile user agent.
          const device=String(navigator.userAgent||'').toLowerCase();
-         const isMobileDevice=/android|iphone|ipad|ipod/.test(device);
-         if(isMobileDevice){
-           tools.append(shareFile);
-         }
+         const isMobileDevice=/android|iphone|ipad|ipod|mobile/.test(device)
+           ||(navigator.maxTouchPoints>0&&matchMedia('(pointer:coarse)').matches);
+         if(isMobileDevice)tools.append(shareFile);
          const target=download.dataset.target;
          const source=target?document.getElementById(target):null;
          if(source&&source.value.trim()){
