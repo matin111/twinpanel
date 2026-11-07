@@ -264,8 +264,8 @@ def public_connection_hub_live_v5(
             '<small>باقی‌مانده</small><strong id="liveRemaining">',
         '<small>حجم کل</small><strong>':
             '<small>حجم کل</small><strong id="liveTotal">',
-        '<small>تاریخ شروع</small><strong>':
-            '<small>تاریخ شروع</small><strong id="liveStart">',
+        '<small>تاریخ اولین اتصال</small><strong>':
+            '<small>تاریخ اولین اتصال</small><strong id="liveStart">',
         '<small>تاریخ انقضا</small><strong>':
             '<small>تاریخ انقضا</small><strong id="liveExpire">',
     }
