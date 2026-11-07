@@ -8,6 +8,7 @@ on:
       - "backend/app/node_bootstrap_control_v66.py"
       - "backend/app/twinpanel_agent.py.tpl"
       - "backend/tests/agent_controller_ip_v1_smoke.py"
+      - "scripts/enable-agent-ip-controller-v1.sh"
       - ".github/workflows/agent-controller-ip-v1-smoke.yml"
   pull_request:
     paths:
@@ -16,6 +17,7 @@ on:
       - "backend/app/node_bootstrap_control_v66.py"
       - "backend/app/twinpanel_agent.py.tpl"
       - "backend/tests/agent_controller_ip_v1_smoke.py"
+      - "scripts/enable-agent-ip-controller-v1.sh"
       - ".github/workflows/agent-controller-ip-v1-smoke.yml"
   workflow_dispatch:
 
@@ -30,3 +32,5 @@ jobs:
           python-version: "3.12"
       - name: Verify pinned IP agent renderer and fail-closed settings
         run: python backend/tests/agent_controller_ip_v1_smoke.py
+      - name: Check idempotent IP HTTPS setup script syntax
+        run: bash -n scripts/enable-agent-ip-controller-v1.sh
