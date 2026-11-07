@@ -47,6 +47,7 @@ body.tp78-ui .tp78-action-footer>.tp78-footer-action[data-kind="copy"]{order:2!i
 body.tp78-ui .tp78-action-footer>.tp78-footer-action[data-kind="link"]{order:3!important}
 body.tp78-ui .tp78-action-footer>.tp78-footer-action[data-kind="add"]{order:4!important}
 body.tp78-ui .tp78-action-footer>.tp78-footer-action[data-kind="download"]{order:4!important}
+body.tp78-ui .tp78-action-footer>.tp78-extra-action{order:8!important;background:#1a2845!important;font-size:11px!important}
 body.tp78-ui .tp78-action-footer .tp78-icon{display:flex!important;align-items:center;justify-content:center;flex:0 0 auto}
 body.tp78-ui .tp78-action-footer .tp78-icon svg{width:25px;height:25px;display:block;color:currentColor}
 body.tp78-ui .tp78-action-footer .tp78-action-text{font-weight:850}
@@ -169,6 +170,9 @@ _SCRIPT = r"""
       ||panel.querySelector(':scope > .v34-client-card a[href]');
    if(download&&download.getAttribute('href'))selected.push({kind:'app',el:download});
    if(!selected.length)return;
+   // Never discard protocol-specific extra actions (e.g. ShadowTLS YAML/JSON).
+   // Keep them as secondary real controls below the approved four main buttons.
+   const extras=candidates.filter(el=>!selected.some(item=>item.el===el));
    const footer=document.createElement('nav');footer.className='tp78-action-footer';
    footer.setAttribute('aria-label','عملیات اشتراک');
    selected.forEach(item=>{
@@ -188,6 +192,7 @@ _SCRIPT = r"""
      el.append(text);
      footer.append(el);
    });
+   extras.forEach(el=>{el.classList.add('tp78-footer-action','tp78-extra-action');el.dataset.kind='extra';footer.append(el)});
    panel.append(footer);
    panel.dataset.tp78ActionReady='1';
  }
