@@ -17,7 +17,7 @@ def test_real_first_use_and_expiry_dates_present_in_source():
     assert 'expires = getattr(sub, "expires_at", None)' in source
     assert 'start_label = starts.strftime("%Y/%m/%d") if starts else "—"' in source
     assert 'expire_label = expires.strftime("%Y/%m/%d") if expires else "—"' in source
-    assert '<small>تاریخ شروع</small><strong>__START__</strong>' in source
+    assert '<small>تاریخ اولین اتصال</small><strong>__START__</strong>' in source
     assert '<small>تاریخ انقضا</small><strong>__EXPIRE__</strong>' in source
     ui = code("public_connection_unified_surface_dates_v80.py")
     assert "label.textContent='تاریخ اولین اتصال'" in ui
