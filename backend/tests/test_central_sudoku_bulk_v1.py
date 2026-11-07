@@ -19,7 +19,7 @@ class SudokuCentralBulkTests(unittest.TestCase):
         self.assertIn("SUDOKU_TARGET_MEMORY_ADMISSION_FAILED",source)
         self.assertIn("SUDOKU_TARGET_SERVICE_CAPACITY_EXCEEDED",source)
         self.assertIn('["systemctl","daemon-reload"]',source)
-        self.assertIn('["systemctl","stop","--no-block",*units]',source)
+        self.assertIn('["systemctl","stop",*units]',source)
 
     def test_capacity_limit_and_collision(self):
         verify_accounts([self.row(1),self.row(2)])
