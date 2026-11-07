@@ -68,13 +68,13 @@ def set_install_progress(job_id: str, stage: str, *, node_id: int | None = None,
     # never in the installer process or the legacy per-account queue.
     if stage == "verified_ready" and node_id is not None:
         from .central_node_stage_launcher_v1 import (
-            auto_stage_enabled, launch, CentralStageLaunchError,
+            auto_stage_enabled, launch,
         )
         if auto_stage_enabled():
             try:
                 with SessionLocal() as staged_db:
                     launch(staged_db, int(node_id))
-            except CentralStageLaunchError:
+            except Exception:
                 # Keep the Exit hidden and report launch failure separately;
                 # installation readiness is not credential readiness.
                 print("CENTRAL_STAGE_AUTO_DISPATCH_NOT_STARTED", {
