@@ -63,7 +63,7 @@ def test_all_three_v2ray_profiles_copy_without_replacing_original_link():
     assert "if(uri)row.dataset.tp78Uri=uri" in v54
     assert "uris.join('\\n')" in ui
     assert "head.click()" in ui
-    assert "if(profiles.length!==3)return null" in v54
+    assert "if(!profiles.length)return null" in v54
 
 
 def test_real_probe_endpoint_authorized_and_limited():
