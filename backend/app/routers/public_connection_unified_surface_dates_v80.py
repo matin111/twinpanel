@@ -329,6 +329,26 @@ _SCRIPT = r"""
  if(statItems[3]){const label=statItems[3].querySelector('small');if(label)label.textContent='تاریخ اولین اتصال'}
  if(statItems[4]){const label=statItems[4].querySelector('small');if(label)label.textContent='تاریخ انقضا'}
  const panels=()=>[...document.querySelectorAll('.protocol-panel')];
+ // Many legacy mobile scripts change the selected card asynchronously. One
+ // final selection state owns both the card and the panel on every device.
+ let selectedProtocol='';
+ function reconcileProtocolSelection(){
+   const choices=[...document.querySelectorAll('.protocol-choice[data-protocol]')];
+   if(!choices.length)return;
+   const chosen=choices.find(choice=>choice.dataset.protocol===selectedProtocol)
+     ||choices.find(choice=>choice.classList.contains('active'))||choices[0];
+   const panel=panels().find(item=>item.id===chosen?.dataset.protocol);
+   if(!panel)return;
+   selectedProtocol=chosen.dataset.protocol;
+   choices.forEach(choice=>choice.classList.toggle('active',choice===chosen));
+   panels().forEach(item=>item.classList.toggle('active',item===panel));
+ }
+ document.addEventListener('click',event=>{
+   const card=event.target.closest('.protocol-choice[data-protocol]');
+   if(!card)return;
+   selectedProtocol=card.dataset.protocol;
+   queueMicrotask(reconcileProtocolSelection);
+ },true);
  const Native=new Set(['openvpn','wireguard','amneziawg','cisco','l2tp']);
  function el(type,classes,txt){
    const node=document.createElement(type);
@@ -551,6 +571,7 @@ _SCRIPT = r"""
    else footer.dataset.tp80Ready='1';
  }
  function check(){
+   reconcileProtocolSelection();
    panels().forEach(panel=>{
      normalizeNative(panel);
      normalizeV2ray(panel);
