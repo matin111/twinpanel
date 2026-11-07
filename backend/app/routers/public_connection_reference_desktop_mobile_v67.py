@@ -163,10 +163,12 @@ body.ref67 .protocol-panel[data-ref67-native-protocol] details.v34-mobile-server
   padding:12px 16px!important;gap:10px!important;
 }
 body.ref67 .protocol-panel[data-ref67-native-protocol] .server-view{
-  display:block!important;min-width:0!important;border:1px solid #344665!important;
+  display:none!important;min-width:0!important;border:1px solid #344665!important;
   border-radius:14px!important;background:#141d34!important;
   margin:0!important;padding:12px!important;
 }
+/* Respect the Hub V5 selected node. Never expose every server's credentials under a different country's tab. */
+body.ref67 .protocol-panel[data-ref67-native-protocol] .server-view.active{display:block!important}
 body.ref67 .protocol-panel[data-ref67-native-protocol] .server-view .facts{
   display:grid!important;gap:9px!important;grid-template-columns:1fr!important;
 }
@@ -479,12 +481,17 @@ _SCRIPT = r"""
    info.append(b,sub);name.append(flag,info);
    const status=document.createElement('div');status.className='ref67-status';
    status.title='تأخیر مسیر نود از پایش تونل؛ نه پینگ مستقیم گوشی کاربر';
-   const latency=tab.dataset.latencyMs||views[i]?.dataset.latencyMs||'';
+   const selectedView=views.find(view=>view.id===tab.dataset.server);
+   const latency=tab.dataset.latencyMs||selectedView?.dataset.latencyMs||'';
    const numeric=Number(latency);
    status.textContent='● '+(tab.dataset.online==='false'?'آفلاین':'آماده')+
      '  ·  '+(latency&&Number.isFinite(numeric)&&numeric>=0?numeric+' ms':'—');
    const actions=document.createElement('div');actions.className='ref67-row-actions';
-   const original=linkToOriginal(views[i]||document.createElement('div'));
+   // Resolve by the real Hub V5 tab data-server -> view id, not visual position.
+   // Older presentation layers can reorder server tabs independently of views.
+   const targetId=tab.dataset.server||'';
+   const matchingView=targetId?views.find(view=>view.id===targetId):null;
+   const original=linkToOriginal(matchingView||document.createElement('div'));
    if(original.copy){
     const btn=document.createElement('button');btn.type='button';btn.textContent='⧉ کپی';
     btn.addEventListener('click',()=>copyExisting(original.copy));actions.appendChild(btn);
