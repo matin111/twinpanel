@@ -171,9 +171,12 @@ with open(LOCK,"a+") as lock:
     backup=backup_dir/("pre-bulk-"+str(time.time_ns())+".conf")
     shutil.copy2(CONF,backup)
     os.chmod(backup,0o600)
-    fd,temp=tempfile.mkstemp(prefix=".central-wg-",dir=str(CONF.parent))
+    # wg-quick requires a .conf basename of at most 15 characters.
+    # Long random stage/backup filenames make real wg-quick strip fail.
+    fd,temp=tempfile.mkstemp(prefix="tpw-",suffix=".conf",dir=str(CONF.parent))
     stripped=None
     previous_strip=None
+    previous_conf=None
     sync_attempted=False
     try:
         os.fchmod(fd,0o600)
@@ -181,9 +184,17 @@ with open(LOCK,"a+") as lock:
             out.write(new_text)
             out.flush()
             os.fsync(out.fileno())
+        # The immutable backup has a long audit filename, so use a
+        # short-name 0600 copy for wg-quick's strict config parser.
+        pfd,previous_conf=tempfile.mkstemp(
+            prefix="tpb-",suffix=".conf",dir=str(CONF.parent),
+        )
+        os.close(pfd)
+        os.chmod(previous_conf,0o600)
+        shutil.copyfile(backup,previous_conf)
         result=subprocess.run(["wg-quick","strip",temp],capture_output=True,
             text=True,timeout=20,check=False)
-        previous=subprocess.run(["wg-quick","strip",str(backup)],
+        previous=subprocess.run(["wg-quick","strip",previous_conf],
             capture_output=True,text=True,timeout=20,check=False)
         if result.returncode or previous.returncode:
             raise SystemExit("WG_STAGED_CONFIG_INVALID")
@@ -223,7 +234,7 @@ with open(LOCK,"a+") as lock:
                 raise SystemExit("WG_LIVE_SYNC_ROLLBACK_FAILED")
         raise
     finally:
-        for path in (temp,stripped,previous_strip):
+        for path in (temp,stripped,previous_strip,previous_conf):
             if path and os.path.exists(path):
                 os.unlink(path)
 print(json.dumps({"ok":True,"applied":len(peers),
