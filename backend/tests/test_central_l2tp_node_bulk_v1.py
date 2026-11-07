@@ -65,10 +65,24 @@ class CentralL2TPTests(unittest.TestCase):
             mod.account_rows([FakeSubscription(1, "msabt1", "")])
         with self.assertRaises(RuntimeError):
             mod.account_rows([FakeSubscription(1, "user", "a\nb")])
-        with self.assertRaises(RuntimeError):
+        duplicate_rows = mod.account_rows([
+            FakeSubscription(1, "same", "pass1"),
+            FakeSubscription(2, "same", "pass2"),
+        ])
+        self.assertEqual(
+            [item["username"] for item in duplicate_rows],
+            ["same", "tp-sub-2"],
+        )
+        self.assertEqual(
             mod.account_rows([
                 FakeSubscription(1, "same", "pass1"),
                 FakeSubscription(2, "same", "pass2"),
+            ]), duplicate_rows,
+        )
+        with self.assertRaisesRegex(RuntimeError,"DUPLICATE_CENTRAL_SUBSCRIPTION_ID"):
+            mod.account_rows([
+                FakeSubscription(1, "same", "pass1"),
+                FakeSubscription(1, "same", "pass1"),
             ])
 
     def test_remote_merge_preserves_unrelated_users_and_is_idempotent(self):
