@@ -1,5 +1,14 @@
 # TwinPanel Changelog
 
+## 1.1.0-rc.663 — 2026-11-07
+
+### Restore V2Ray copy-all in the four-button Windows footer
+- Display **Copy all configurations** directly alongside **Copy subscription link**, **Download Karing**, and **Download v2rayN**; no longer hide copy-all under "Other configuration formats".
+- Preserve the actual import-all to Karing control in expandable secondary actions without removing its original event handler.
+- When normalizing buttons, include previously nested secondary actions to prevent repeated reconciliation from dropping copy-all or import-all.
+- Live Connection endpoint returned HTTP 200. DOM smoke test confirmed the four visible actions are exactly `copy, link, app, client`, with real Karing and v2rayN download URLs, and `add` retained under extras.
+- No VPN nodes, config-generation routines, accounts or database values changed.
+
 ## 1.1.0-rc.662 — 2026-11-07
 
 ### Connection mobile category, country selector, popup and V2Ray footer parity
