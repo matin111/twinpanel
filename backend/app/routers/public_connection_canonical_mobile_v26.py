@@ -38,6 +38,9 @@ from .public_connection_v2ray_mobile_restore_v54 import (
 from .public_connection_approved_responsive_ui_v65 import (
     refine_public_connection_approved_responsive_ui_v65,
 )
+from .public_connection_status_dashboard_v66 import (
+    refine_public_connection_status_dashboard_v66,
+)
 
 
 def refine_public_connection_reference_layout_v38(source: str) -> str:
@@ -47,7 +50,8 @@ def refine_public_connection_reference_layout_v38(source: str) -> str:
     source = refine_public_connection_multilink_persistence_v52(source)
     source = refine_public_connection_mobile_modern_surface_v53(source)
     source = refine_public_connection_v2ray_mobile_restore_v54(source)
-    return refine_public_connection_approved_responsive_ui_v65(source)
+    source = refine_public_connection_approved_responsive_ui_v65(source)
+    return refine_public_connection_status_dashboard_v66(source)
 
 
 _MARKER = "TWINPANEL_PUBLIC_CONNECT_CANONICAL_MOBILE_V26"
