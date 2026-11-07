@@ -90,9 +90,13 @@ async def publish_node_to_all_users_v2(
                     ),0)+100,
                     :now,:now
                 FROM subscription_nodes sn
+                JOIN subscriptions s ON s.id=sn.subscription_id
                 JOIN subscription_delivery_policy_state p
                   ON p.subscription_id=sn.subscription_id AND p.mode='explicit'
                 WHERE sn.node_id=:node_id
+                  AND s.status='ACTIVE'
+                  AND (s.expires_at IS NULL OR s.expires_at>:now)
+                  AND (s.traffic_limit_bytes<=0 OR s.traffic_used_bytes<s.traffic_limit_bytes)
                 ON CONFLICT (subscription_node_id) DO NOTHING
             """), params,
         )
@@ -104,9 +108,13 @@ async def publish_node_to_all_users_v2(
                   AND subscription_node_id IN (
                     SELECT sn.id
                     FROM subscription_nodes sn
+                    JOIN subscriptions s ON s.id=sn.subscription_id
                     JOIN subscription_delivery_policy_state p
                       ON p.subscription_id=sn.subscription_id AND p.mode='explicit'
                     WHERE sn.node_id=:node_id
+                      AND s.status='ACTIVE'
+                      AND (s.expires_at IS NULL OR s.expires_at>:now)
+                      AND (s.traffic_limit_bytes<=0 OR s.traffic_used_bytes<s.traffic_limit_bytes)
                   )
             """), params,
         )
