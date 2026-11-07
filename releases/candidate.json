@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.676",
-  "source_sha": "2f9a6d7f15e2904f543a7b5d7919c9c2d19c9c33",
+  "version": "1.1.0-rc.677",
+  "source_sha": "19e90a95829148746e4ef54d51be2bc4c6158cd8",
   "notes": {
-    "fa": "نسخه rc.676: اصلاح بی‌واکنش ماندن دکمه ارسال فایل OpenVPN و WireGuard در موبایل. رویداد Share در مرحله Capture و پیش از handlerهای قدیمی صفحه دریافت می‌شود، navigator.share مستقیماً هنگام لمس اجرا می‌شود، وضعیت و خطای واقعی از جمله AbortError به‌صورت پیام ماندگار زیر همان دکمه نشان داده می‌شود. دکمه دانلود فایل‌های .ovpn/.conf و تمام اطلاعات کاربران و سرویس‌های VPN بدون تغییر باقی مانده‌اند.",
-    "en": "rc.676: Capture native OpenVPN/WireGuard/AmneziaWG File Share actions at window level before legacy page click listeners, invoke navigator.share synchronously on the trusted tap, and show persistent per-row status including AbortError (cancelled or no share targets), NotAllowedError and TypeError. Real .ovpn/.conf downloads and all user/account/VPN runtime data stay unchanged."
+    "fa": "نسخه rc.677: بهینه‌سازی واقعی سرعت بازشدن صفحه Connection با حذف صدها کوئری تکراری دیتابیس از طریق حافظه موقت محدود به همان درخواست؛ یکجاخوانی مشخصات نود و پروتکل‌ها؛ QR کدهای PNG کم‌حجم و قابل اسکن به جای SVG حجیم؛ حفظ کانفیگ‌ها، اطلاعات کاربران، تمام پروتکل‌ها، دکمه‌های کپی و دانلود و آمار آنلاین زنده. تست‌های رگرسیون اضافه شد.",
+    "en": "rc.677: Speed up public Connection first render using request-scoped node/eligibility/tunnel caches, one bulk node-protocol readiness query, and compact scannable QR PNG rather than enormous inline SVG. Keep all protocol cards, copying/download controls, live uncached telemetry, subscriptions, credentials, quota and expiry unchanged. Includes repeatable regression tests."
   }
 }
