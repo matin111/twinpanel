@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.642",
-  "source_sha": "c43c4ffed33e0325a55ae9a2346ef45d5f78db24",
+  "version": "1.1.0-rc.643",
+  "source_sha": "37b4ef74c4ca844aa4ae247bf1fa7fad50e2a8a3",
   "notes": {
-    "fa": "اصلاح صفحه Connection: آیکن واقعی WireGuard و OpenVPN و Cisco، نماد مجزا برای سایر پروتکل‌ها، نمایش پرچم‌های داخلی کشور روی ویندوز و پشتیبانی کشورهای جدید، دانلود برنامه اختصاصی هر پروتکل برای Android/Windows/iOS/macOS/Linux، رنگ‌بندی دکمه‌ها مطابق برند پنل؛ بدون تغییر کانفیگ یا آدرس سرور.",
-    "en": "Public Connection: embedded verified OpenVPN/WireGuard/Cisco logos, protocol-specific symbols, Windows-compatible inline flags, dynamic additional countries, per-protocol OS-aware direct app download links and branding-driven buttons. No VPN config, server IP/port, SNI or subscription payload changes."
+    "fa": "چیدمان Connection مطابق مرجع در موبایل و دسکتاپ: نمایش کانفیگ‌ها و سرورها پیش از دکمه‌های افزودن همه، کپی لینک، کپی/دانلود همه و دانلود برنامه مناسب دستگاه در پایین پنل؛ نمایش سه اینباند V2Ray و پرچم‌های یکپارچه. بدون تغییر کانفیگ‌ها، پروتکل‌ها، پورت‌ها و آدرس‌ها.",
+    "en": "Approved reference placement: display real per-node configs first, then native Add All, Copy Subscription Link, Copy All/Download All and detected-platform app download at the bottom, on desktop and mobile. Preserve all three genuine V2Ray inbounds per node, unified flags and native OpenVPN/WireGuard files. VPN configs, hosts, SNI, ports and credentials unchanged."
   }
 }
