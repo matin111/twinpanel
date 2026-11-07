@@ -142,7 +142,9 @@ def _item_detail(protocol: str, item: dict[str, Any], username: str, password: s
         return _file_action(protocol, item, index, prefix)
     if protocol in {"v2ray", "xray"}:
         return _v2ray_action(item)
-    if protocol == "cisco":
+    if protocol in {"cisco", "socks5"}:
+        # Both clients require a host AND port; hiding the old raw SOCKS5
+        # block must not silently discard the real TCP port.
         address = f"{host}:{port}" if port else str(host)
         facts = [_fact("Server & Port", address), _fact("Username", user), _fact("Password", secret)]
     else:
