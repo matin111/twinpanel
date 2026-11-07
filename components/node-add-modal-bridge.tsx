@@ -89,7 +89,7 @@ export function NodeAddModalBridge(){
   const {pick}=useI18n();
   const [open,setOpen]=useState(false);
   const [draft,setDraft]=useState<NodeDraft>(defaultDraft);
-  const [publishToAll,setPublishToAll]=useState(false);
+  const [publishToAll,setPublishToAll]=useState(true);
   const [busy,setBusy]=useState("");
   const [error,setError]=useState("");
   const [ok,setOk]=useState("");
@@ -141,7 +141,7 @@ export function NodeAddModalBridge(){
   const resetInstall=()=>{
     try{window.localStorage.removeItem(NODE_JOB_STORAGE);}catch{}
     setJobId("");setJob(null);setJobError("");setError("");setOk("");
-    setDraft(defaultDraft);setPublishToAll(false);setOpen(true);
+    setDraft(defaultDraft);setPublishToAll(true);setOpen(true);
   };
 
   const test=async()=>{
@@ -207,7 +207,7 @@ export function NodeAddModalBridge(){
           <label className="field"><span>{pick("ظرفیت کاربر","User capacity")}</span><input type="number" min={1} value={draft.capacity_users} onChange={e=>setDraft(v=>({...v,capacity_users:Number(e.target.value)||1}))}/></label>
         </div>
         {draft.node_type==="exit"?<div className="runtime-choice-section"><label className="toggle module-toggle"><span>{pick("نمایش برای همه کاربران سایت","Show for all site users")}</span><input type="checkbox" checked={publishToAll} onChange={e=>setPublishToAll(e.target.checked)}/><i/></label><small>{pick("با فعال‌کردن این گزینه، نود فقط به اشتراک‌های فعال قبلی که منقضی نشده‌اند و حجم دارند اضافه می‌شود. برای خریداران جدید، نود را جداگانه در پلن اقتصادی یا ویژه انتخاب کنید. کانفیگ‌های ناقص کاربران قبلی به‌صورت خودکار در صف پایدار ساخته می‌شوند و پیشرفت از مدیریت نود قابل مشاهده است.","When enabled, the node is assigned to eligible existing active subscriptions only. Select it separately in Economy/Premium plans for new purchases. Missing existing-account credentials are automatically queued and tracked under node management.")}</small></div>:null}
-        <div className="runtime-warning">{pick("پروتکل‌ها بعد از ثبت از صفحه «پروتکل‌ها» مدیریت می‌شوند. برای Exit، Xray baseline به‌صورت خودکار آماده می‌شود.","Protocols are managed from Protocols after registration. Exit nodes automatically receive the Xray baseline.")}</div>
+        <div className="runtime-warning">{pick("برای نود خروجی ابتدا سرویس‌های ۱۶ پروتکل نصب و سلامت‌سنجی می‌شوند، سپس کاربران انتقالی و جدید در یک صف مرکزی به نود اضافه می‌شوند. پایان نصب به معنی تکمیل ساخت همه کانفیگ‌ها نیست.","New Exit nodes prepare and verify all 16 protocol services before eligible migrated and new users enter one central backfill queue. Installation completion is not the same as credential activation.")}</div>
         <div className="action-row"><button type="button" className="ghost" disabled={Boolean(busy)||!draft.host||!draft.password} onClick={()=>void test()}>{busy==="test"?"…":pick("تست SSH","Test SSH")}</button><button className="primary" disabled={Boolean(busy)||!draft.host||!draft.password||!draft.name}>{busy==="register"?pick("در حال ثبت...","Registering..."):pick("ثبت و آماده‌سازی سرور","Register & prepare server")}</button></div>
       </form>}
     </div>
