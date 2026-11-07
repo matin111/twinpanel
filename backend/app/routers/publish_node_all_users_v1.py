@@ -124,14 +124,14 @@ class BackgroundNodeInstallIn(BaseModel):
     node_type: NodeType
     country_code: str = "IR"
     capacity_users: int = Field(default=1000, gt=0)
-    install_cisco: bool = False
+    install_cisco: bool = True
     cisco_port: int = Field(default=443, ge=1, le=65535)
-    install_openvpn: bool = False
+    install_openvpn: bool = True
     openvpn_port: int = Field(default=1194, ge=1, le=65535)
     openvpn_transport: str = "udp"
-    install_wireguard: bool = False
+    install_wireguard: bool = True
     wireguard_port: int = Field(default=51820, ge=1, le=65535)
-    install_l2tp: bool = False
+    install_l2tp: bool = True
     install_v2ray: bool = False
     xray_port: int = Field(default=8443, ge=1, le=65535)
     publish_to_all_users: bool = False
@@ -167,7 +167,10 @@ async def _install_node_in_background(
     try:
         _safe_install_progress(job_id, "installing_base")
         request = Request(request_scope)
-        install_payload = InstallIn(**payload.model_dump(exclude={"publish_to_all_users"}))
+        install_payload = InstallIn(
+            **payload.model_dump(exclude={"publish_to_all_users"}),
+            defer_subscription_sync=payload.node_type == NodeType.EXIT,
+        )
         result = await install_node(install_payload, request, db)
         node_id = int(result.get("node_id") or 0)
         base_ok = bool(result.get("ok"))
@@ -228,6 +231,19 @@ async def _install_node_in_background(
             }, flush=True)
 
         ready = base_ok and xray_ok and modern_ok and installed_count == 16
+
+        # Enrolling accounts before the service graph is ready exposes
+        # dead links and produces years-long repair queues. Fail closed.
+        if not ready:
+            _safe_install_progress(
+                job_id, "failed", node_id=node_id,
+                installed_protocols=installed_count,
+                error_code="PROTOCOL_SETUP_INCOMPLETE",
+            )
+            print("TWINPANEL_NODE_AUTO_ENROLL_BLOCKED_NOT_READY", {
+                "node_id": node_id, "installed_count": installed_count,
+            }, flush=True)
+            return
 
         if payload.publish_to_all_users:
             _safe_install_progress(job_id, "enrolling_users", node_id=node_id,
