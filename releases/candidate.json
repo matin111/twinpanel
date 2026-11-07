@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.660",
-  "source_sha": "f0397648849892a7bb0293593012586ecf37b3e5",
+  "version": "1.1.0-rc.661",
+  "source_sha": "d0949e359578066266dfc0866703b115562b1aad",
   "notes": {
-    "fa": "نسخه rc.660: نمایش اطلاعات اتصال در پاپ‌آپ دسکتاپ و موبایل؛ اضافه‌شدن تب همه و فیلتر کشورهای واقعی با پرچم یکسان به V2Ray، حذف پرچم تکراری کلاسیک‌ها، تمام‌عرض شدن دانلود OpenConnect در Cisco، نمایش نام واقعی کلاینت در دانلود برنامه‌ها (OpenVPN، WireGuard، AmneziaWG، OpenConnect، TrustTunnel، Sudoku و Karing) و لینک مجزای دانلود v2rayN در ویندوز. چیدمان چهار دکمه ویندوز و یک به‌علاوه سه دکمه اندروید و عملکردهای اصلی کپی/افزودن/دانلود حفظ شدند. تست نحوی جاوااسکریپت و آزمون فیلتر کشورها موفق بوده؛ تست بصری و کلیک همه حالت‌ها در مرورگر واقعی هنوز کامل نشده است.",
-    "en": "rc.660: desktop/mobile server-connection information modals; real V2Ray country/flag tabs with working All and country filters; remove duplicate classic node flags; full-width sole Cisco/OpenConnect installer action; named platform-specific client downloads (OpenVPN, WireGuard, AmneziaWG, OpenConnect, TrustTunnel, Sudoku, Karing); distinct Windows v2rayN download. Retain four desktop footer actions and Android 1+3 layout and real config handlers. JS syntax and synthetic country filtering checked; full interactive browser regression remains incomplete."
+    "fa": "نسخه rc.661: اصلاح قطعی دو پرچم کنار هم در OpenVPN، WireGuard، AmneziaWG و Cisco با حفظ پرچم اصلی SVG و جلوگیری از ساخت پرچم دوم. رفع timeout نصب از طریق جایگزینی بررسی دسترسی Next.js مبتنی بر runuser با setpriv. تمام امکانات rc.660 از جمله پاپ‌آپ اطلاعات اتصال، تب همه/فیلتر کشورهای V2Ray و پرچم‌ها، دانلود OpenConnect تمام‌عرض، نام واقعی برنامه‌ها و دانلود v2rayN ویندوز حفظ شدند. تست نحوی و بررسی دسترسی موفق؛ تست کامل بصری همه دستگاه‌ها هنوز انجام نشده است.",
+    "en": "rc.661: fix duplicated native V76 country SVG plus V80 flag images on OpenVPN, WireGuard, AmneziaWG and Cisco rows; replace PAM-backed runuser installer permissions checks with setpriv to prevent five-second Next.js cache probe timeouts. Includes rc.660 desktop/mobile connection-info modals, V2Ray country tabs/flags, full-width Cisco installer, named client downloads and Windows v2rayN. JavaScript/Python and permission checks passed; full browser regression remains incomplete."
   }
 }
