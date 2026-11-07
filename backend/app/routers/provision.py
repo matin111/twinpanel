@@ -976,8 +976,6 @@ SaveConfig = false
 
 # TWINPANEL_CENTRAL_L2TP_PSK_V1
 async def install_l2tp(conn, psk: str):
-    await cmd(conn, "export DEBIAN_FRONTEND=noninteractive; apt-get install -y strongswan xl2tpd ppp >/dev/null", timeout=600)
-
     psk = str(psk or "").strip()
     if not psk:
         raise RuntimeError("Central L2TP PSK is empty")
@@ -1000,6 +998,8 @@ async def install_l2tp(conn, psk: str):
             "done"
         ),
     )
+
+    await cmd(conn, "export DEBIAN_FRONTEND=noninteractive; apt-get install -y strongswan xl2tpd ppp >/dev/null", timeout=600)
 
     configs = {
         "/etc/ipsec.conf": '''config setup
