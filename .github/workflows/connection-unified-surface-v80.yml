@@ -6,6 +6,7 @@ on:
       - 'backend/app/routers/public_connection_*.py'
       - 'backend/tests/test_public_connection_*v80.py'
       - 'backend/tests/test_public_connection_full_protocol_matrix_v81.py'
+      - 'backend/tests/browser_connection_surface_v82.py'
       - '.github/workflows/connection-unified-surface-v80.yml'
 
 jobs:
@@ -40,3 +41,32 @@ jobs:
             backend/tests/test_public_connection_full_protocol_matrix_v81.py \
             backend/tests/test_public_connection_reference_desktop_mobile_v67.py \
             backend/tests/test_public_connection_real_latency_and_logos_v71.py
+
+  browser-surface:
+    runs-on: ubuntu-24.04
+    env:
+      APP_NAME: TwinPanel-CI
+      APP_ENV: test
+      APP_SECRET_KEY: ci-only-key-ci-only-key-ci-only-key
+      NODE_AGENT_SHARED_SECRET: ci-node-agent-key-ci-node-agent-key
+      DATABASE_URL: sqlite:///./connection-browser-ci.sqlite3
+      CONNECTION_TEST_ARTIFACTS: connection-browser-artifacts
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Playwright and backend dependencies
+        run: |
+          python -m pip install --disable-pip-version-check -r backend/requirements.txt playwright
+          python -m playwright install --with-deps chromium
+      - name: Render real desktop and mobile screens and inspect every critical UI contract
+        run: |
+          PYTHONPATH=backend python backend/tests/browser_connection_surface_v82.py
+      - name: Upload real Chromium screenshots (synthetic credentials only)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: connection-v82-desktop-mobile
+          path: connection-browser-artifacts/*.png
+          if-no-files-found: ignore
