@@ -248,7 +248,8 @@ async def _install_node_in_background(
             base_ok and xray_ok and modern_ok and installed_count == 16
             and bool(live.get("ok"))
             and quota.get("ok") is not False
-            and fabric.get("ok") is not False
+            # The IR->Exit tunnel is optional. Direct node delivery must
+            # activate as soon as the VPN listeners and credentials are ready.
         )
         if not ready:
             _safe_install_progress(
