@@ -30,13 +30,14 @@ def _load_age_seconds():
     return _load_helper("_age_seconds", {"datetime": datetime})
 
 
-def test_fresh_exit_install_keeps_historical_subscription_autosync():
+def test_fresh_exit_install_uses_central_daemon_engine_without_legacy_sync():
     provision = _text("backend/app/routers/provision.py")
     delivery = _text("backend/app/routers/account_delivery.py")
 
     assert "defer_subscription_sync" in provision
-    assert "if payload.defer_subscription_sync:" in provision
-    assert "deferred_to_central_publisher" in provision
+    assert "if payload.defer_subscription_sync or node.node_type == NodeType.EXIT:" in provision
+    assert "deferred_to_central_runtime" in provision
+    assert "central_runtime_owner" in delivery
     assert "sync_installed_node_to_subscriptions" in provision
     assert "await sync_installed_node_to_subscriptions" in provision
 
