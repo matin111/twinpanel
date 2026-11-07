@@ -479,6 +479,98 @@ html body.tp80-connection .protocol-panel .tp78-action-footer > [data-kind="app"
   min-height:47px!important;max-width:100%!important;font-size:11px!important;
  }
 }
+
+/* TWINPANEL_CONNECTION_VISUAL_PARITY_V82: uniform cards for every protocol */
+html body.tp80-connection .protocol-panel.active{
+ display:flex!important;flex-direction:column!important;align-items:stretch!important;
+ gap:0!important;overflow:hidden!important;
+}
+html body.tp80-connection .protocol-panel.active > .panel-head{
+ min-height:94px!important;display:flex!important;align-items:center!important;
+ box-sizing:border-box!important;margin:0!important;
+}
+html body.tp80-connection .protocol-panel.active > .tp80-country-bar,
+html body.tp80-connection .protocol-panel.active > .ref67-tabs{
+ order:2!important;margin:0!important;box-sizing:border-box!important;
+}
+html body.tp80-connection .protocol-panel.active > .ref67-list,
+html body.tp80-connection .protocol-panel.active > .tp77-native-list,
+html body.tp80-connection .protocol-panel.active > .v54-v2ray-groups{
+ order:4!important;margin:8px 16px 12px!important;border:1px solid #344563!important;
+ border-radius:15px!important;overflow:hidden!important;align-self:stretch!important;
+ background:#111c33!important;box-sizing:border-box!important;
+}
+html body.tp80-connection .protocol-panel.active .ref67-row,
+html body.tp80-connection .protocol-panel.active .tp77-native-row,
+html body.tp80-connection .protocol-panel.active .v54-v2ray-server-head{
+ box-sizing:border-box!important;height:62px!important;min-height:62px!important;
+ max-height:62px!important;padding:8px 12px!important;margin:0!important;
+ display:flex!important;align-items:center!important;justify-content:space-between!important;
+ border-radius:0!important;border:0!important;border-bottom:1px solid #344360!important;
+ background:#111c33!important;gap:10px!important;
+}
+html body.tp80-connection .protocol-panel.active .ref67-row-actions,
+html body.tp80-connection .protocol-panel.active .tp80-file-actions{
+ display:flex!important;align-items:center!important;gap:7px!important;flex-shrink:0!important;
+}
+html body.tp80-connection .protocol-panel.active .ref67-row-actions button,
+html body.tp80-connection .protocol-panel.active .ref67-row-actions a,
+html body.tp80-connection .protocol-panel.active .tp80-file-actions button,
+html body.tp80-connection .protocol-panel.active .tp80-file-actions a,
+html body.tp80-connection .protocol-panel.active .tp80-detail-toggle{
+ height:36px!important;min-height:36px!important;max-height:36px!important;
+ box-sizing:border-box!important;border-radius:9px!important;padding:6px 11px!important;
+ font-size:11px!important;white-space:nowrap!important;
+}
+html body.tp80-connection .protocol-panel.active > .tp78-action-footer{
+ order:30!important;display:grid!important;
+ grid-template-columns:repeat(var(--tp80-cols,3),minmax(0,1fr))!important;
+ margin:12px 16px 16px!important;padding:0!important;gap:9px!important;
+ align-items:stretch!important;direction:ltr!important;
+}
+html body.tp80-connection .protocol-panel.active > .tp78-action-footer > .tp78-footer-action{
+ margin:0!important;width:100%!important;min-width:0!important;box-sizing:border-box!important;
+ min-height:64px!important;height:auto!important;border-radius:12px!important;
+ font-size:12px!important;text-align:center!important;
+}
+@media(max-width:720px){
+ html body.tp80-connection .protocols .protocol-choice{
+  display:flex!important;flex-direction:column!important;justify-content:center!important;
+  align-items:center!important;gap:7px!important;text-align:center!important;
+ }
+ html body.tp80-connection .protocols .protocol-choice .protocol-icon{
+  order:0!important;margin:0 auto!important;flex:0 0 43px!important;
+ }
+ html body.tp80-connection .protocols .protocol-choice .protocol-text{
+  order:1!important;display:block!important;flex:0 0 auto!important;
+  width:100%!important;text-align:center!important;
+ }
+ html body.tp80-connection .protocols .protocol-choice .protocol-text b{
+  display:block!important;text-align:center!important;font-size:10px!important;
+  line-height:1.3!important;overflow-wrap:anywhere!important;
+ }
+ html body.tp80-connection .protocol-panel.active > .panel-head{
+  min-height:78px!important;padding:12px!important;
+ }
+ html body.tp80-connection .protocol-panel.active > .ref67-list,
+ html body.tp80-connection .protocol-panel.active > .tp77-native-list,
+ html body.tp80-connection .protocol-panel.active > .v54-v2ray-groups{
+  margin:7px 8px 10px!important;border-radius:12px!important;
+ }
+ html body.tp80-connection .protocol-panel.active .ref67-row,
+ html body.tp80-connection .protocol-panel.active .tp77-native-row,
+ html body.tp80-connection .protocol-panel.active .v54-v2ray-server-head{
+  height:58px!important;min-height:58px!important;max-height:58px!important;
+  padding:6px 8px!important;gap:6px!important;
+ }
+ html body.tp80-connection .protocol-panel.active > .tp78-action-footer{
+  grid-template-columns:repeat(2,minmax(0,1fr))!important;
+  margin:10px 8px 12px!important;gap:7px!important;
+ }
+ html body.tp80-connection .protocol-panel.active > .tp78-action-footer > .tp78-footer-action{
+  min-height:48px!important;font-size:10px!important;padding:7px!important;
+ }
+}
 """
 
 
