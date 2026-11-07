@@ -21,6 +21,7 @@ sys.path.insert(0, str(BACKEND))
 
 from app.database import SessionLocal
 from app.services.node_auto_backfill_v1 import claim_next, finish_claim, repair_missing_v2ray_jobs
+from app.node_backfill_scope_models_v1 import NodeBackfillScopeV1
 from app.services.central_backfill_priority_v1 import new_account_work_has_priority
 from scripts.twinpanel_existing_node_backfill_v1 import api_healthy
 
@@ -92,9 +93,20 @@ def sanitized_backfill_error(stdout: str, exit_code: int) -> str:
     return f"BACKFILL_EXIT_{int(exit_code)}"
 
 
-def _unified_all_active_enabled() -> bool:
-    """Opt-in first: do not change live migrated-account handling on upgrade."""
-    return os.getenv("TWINPANEL_UNIFIED_NODE_BACKFILL_V1", "0") == "1"
+def _unified_all_active_enabled(node_id: int | None = None) -> bool:
+    """Unify newly published nodes without changing historical legacy jobs.
+
+    The emergency/global opt-in remains supported. A new node's explicit
+    publish action records a per-node scope; a release alone does not alter
+    existing node selections.
+    """
+    if os.getenv("TWINPANEL_UNIFIED_NODE_BACKFILL_V1", "0") == "1":
+        return True
+    if node_id is None:
+        return False
+    with SessionLocal() as db:
+        scope = db.get(NodeBackfillScopeV1, int(node_id))
+        return bool(scope and scope.include_all_active)
 
 
 def _central_xray_bulk_enabled(node_id: int, protocol: str) -> bool:
@@ -188,7 +200,7 @@ def execute_one(node_id: int, protocol: str) -> tuple[int, str | None]:
         "--max-pairs", str(PAIR_LIMIT), "--max-cycles", str(CYCLES_PER_BATCH),
         "--max-load", "7",
     ]
-    if _unified_all_active_enabled():
+    if _unified_all_active_enabled(node_id):
         # One queue/selection for migrated and native active accounts.
         # Existing live credentials remain missing-only and unchanged.
         cmd.append("--include-all-active")
