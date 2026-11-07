@@ -20,9 +20,11 @@ from .account_delivery import (
     _usage_payload,
 )
 from .download_assets import public_downloads_by_platform
+from .public_connection_ping_v78 import router as _live_ping_router
 
 
 router = APIRouter(prefix="/v1/connect", tags=["public-connection-hub-v5"])
+router.include_router(_live_ping_router)
 
 
 def h(value: Any) -> str:
@@ -273,6 +275,8 @@ def render_protocols(
                 node_id = 0
             latency = (latency_by_node or {}).get(node_id)
             latency_attr = f' data-latency-ms="{int(latency)}"' if latency is not None else ""
+            # Identity is authoritative for live node probes and unified per-country actions.
+            latency_attr += f' data-node-id="{node_id}" data-country-code="{h(item.get("country_code") or "")}"' if node_id > 0 else ""
             server_tabs.append(
                 f'<button class="server-tab{server_active}" type="button" data-server="{h(server_id)}"{latency_attr}><i></i><span>{h(name)}</span></button>'
             )

@@ -201,6 +201,7 @@ _SCRIPT = r"""
     info.appendChild(el('small','v54-v2ray-profile-meta',details||'V2Ray / Xray'));
     const actions=el('div','v54-v2ray-profile-actions');
     const uri=String(profile?.uri||'').trim();
+    if(uri)row.dataset.tp78Uri=uri; // Reuse all three real URIs for the compact per-node copy action.
     if(uri)addProfileAction(actions,uri);
     row.append(info,actions);return row;
   }
