@@ -147,7 +147,7 @@ def _reality_server_names(state: dict[str, Any]) -> list[str]:
         _clean_domain(state.get("reality_server_name"))
         or _clean_domain(XRAY_REALITY_SERVER_NAME)
     )
-    if not primary:
+    if not primary or "." not in primary or ".." in primary:
         raise RuntimeError("REALITY primary server name is invalid")
 
     names = [primary]
@@ -155,7 +155,7 @@ def _reality_server_names(state: dict[str, Any]) -> list[str]:
     if isinstance(aliases, list):
         for raw in aliases[:8]:
             alias = _clean_domain(raw)
-            if alias and alias not in names:
+            if alias and "." in alias and ".." not in alias and alias not in names:
                 names.append(alias)
                 if len(names) >= 5:
                     break
