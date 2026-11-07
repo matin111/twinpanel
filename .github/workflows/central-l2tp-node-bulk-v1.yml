@@ -1,0 +1,27 @@
+name: Central L2TP Node Bulk V1
+
+on:
+  pull_request:
+    paths:
+      - "backend/scripts/twinpanel_central_l2tp_node_bulk_v1.py"
+      - "backend/tests/test_central_l2tp_node_bulk_v1.py"
+      - ".github/workflows/central-l2tp-node-bulk-v1.yml"
+
+jobs:
+  central-bulk:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install isolated backend dependencies
+        run: python -m pip install -r backend/requirements.txt
+      - name: Compile central materializer
+        run: python -m py_compile backend/scripts/twinpanel_central_l2tp_node_bulk_v1.py backend/tests/test_central_l2tp_node_bulk_v1.py
+      - name: Exercise one-batch no-restart credentials and safety
+        working-directory: backend
+        run: PYTHONPATH=. python -m unittest discover -s tests -p 'test_central_l2tp_node_bulk_v1.py' -v
