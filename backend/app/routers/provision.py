@@ -2572,12 +2572,10 @@ async def install_node(
                 )
             except Exception as exc:
                 db.rollback()
-
-            subscription_sync = {
-                "ok": False,
-                "error":
-                    str(exc)[:1200],
-            }
+                subscription_sync = {
+                    "ok": False,
+                    "error": type(exc).__name__,
+                }
 
         # TWINPANEL_MANUAL_IRAN_EXIT_TUNNEL_V2
         # Tunnel creation is controlled from Admin -> Tunnels.
