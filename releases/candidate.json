@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.644",
-  "source_sha": "acd65a6bf2a77f53529e4c0bafe795f8fae0cb42",
+  "version": "1.1.0-rc.645",
+  "source_sha": "d12d0433fc8a8ae23104c492263ed12516d1c72b",
   "notes": {
-    "fa": "یکسان‌سازی نمایش نام و پرچم نودها در تمام پروتکل‌های Connection در موبایل و ویندوز؛ حفظ شناسه نود، لینک‌ها و کانفیگ‌های اصلی و سه اینباند V2Ray. تغییرات فقط در رابط کاربری هستند.",
-    "en": "Unified country flags and actual node numbers across public Connection protocol panels on desktop and mobile; preserve server identity, original configs, import links and all 3 V2Ray profiles per node. Presentation-only change."
+    "fa": "اصلاح ریشه‌ای نمایش همه پروتکل‌ها زیر هم در Connection: فقط پروتکل انتخابی؛ ظاهر تیره و شبکه چهارتایی مشابه تصویر مرجع در موبایل و ویندوز، نمایش یکنواخت نام و پرچم نودها، دکمه‌های انتهای پنل و اتصال هر کانفیگ به نود واقعی. پروفایل‌های اصلی V2Ray و فایل‌های native بدون تغییر شبکه حفظ شده‌اند.",
+    "en": "Connection V77 visual regression fixes: only selected protocol panel, dark reference-style four-column desktop/mobile cards, consistent country/node identity, original per-node actions and file details, true 3 V2Ray inbounds expandable, bottom native actions and OS-aware client download. No VPN config/data/service mutations."
   }
 }
