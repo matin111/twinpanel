@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import HTMLResponse
-from sqlalchemy import func
+from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session
 
 from ..database import get_db
@@ -23,6 +23,10 @@ router = APIRouter(prefix="/v1/connect", tags=["public-connection-live-v4"])
 # Collector sweeps take 15-90s across remote nodes; 30s caused false
 # offline results between valid positive-traffic observations.
 _LIVE_ACTIVITY_SECONDS = 180
+# Xray StatsService reports cumulative per-user counters on the slower quota
+# sweep, not session-open events. 180s falsely marks activity offline between
+# the roughly five-minute samplings. This means RECENT TRAFFIC, not live socket.
+_XRAY_TRAFFIC_ACTIVITY_SECONDS = 660
 
 
 def _iso_utc(value: datetime | None) -> str | None:
@@ -58,6 +62,7 @@ def _protocol_stats(
     subscription_id: int,
     online_protocols: set[str],
     activity_cutoff: datetime,
+    xray_activity_cutoff: datetime,
 ) -> dict[str, dict]:
     selected = {
         _normalized_protocol(row[0])
@@ -184,7 +189,16 @@ def _protocol_stats(
         .filter(
             QuotaUsageEvent.subscription_id == int(subscription_id),
             QuotaUsageEvent.accepted_bytes > 0,
-            QuotaUsageEvent.reported_at >= activity_cutoff,
+            or_(
+                and_(
+                    QuotaUsageEvent.protocol == "xray",
+                    QuotaUsageEvent.reported_at >= xray_activity_cutoff,
+                ),
+                and_(
+                    QuotaUsageEvent.protocol != "xray",
+                    QuotaUsageEvent.reported_at >= activity_cutoff,
+                ),
+            ),
         )
         .distinct()
         .all()
@@ -251,6 +265,7 @@ def public_connection_live(token: str, db: Session = Depends(get_db)):
     sub = _subscription_from_share_token(token, db)
     usage = _usage_payload(db, sub)
     activity_cutoff = datetime.utcnow() - timedelta(seconds=_LIVE_ACTIVITY_SECONDS)
+    xray_activity_cutoff = datetime.utcnow() - timedelta(seconds=_XRAY_TRAFFIC_ACTIVITY_SECONDS)
 
     active_session_rows = (
         db.query(
@@ -287,6 +302,21 @@ def public_connection_live(token: str, db: Session = Depends(get_db)):
         .group_by(QuotaUsageEvent.protocol)
         .all()
     )
+    # Xray has no authoritative session-open signal. Recently accepted
+    # traffic is evidence of activity over the slower collector interval.
+    xray_recent = (
+        db.query(func.max(QuotaUsageEvent.reported_at))
+        .filter(
+            QuotaUsageEvent.subscription_id == sub.id,
+            QuotaUsageEvent.protocol == "xray",
+            QuotaUsageEvent.accepted_bytes > 0,
+            QuotaUsageEvent.reported_at >= xray_activity_cutoff,
+        )
+        .scalar()
+    )
+    if xray_recent is not None:
+        recent_activity_rows.append(("xray", xray_recent))
+
     last_counter_activity: datetime | None = None
     for raw_protocol, reported_at in recent_activity_rows:
         protocol = _normalized_protocol(raw_protocol)
@@ -302,6 +332,7 @@ def public_connection_live(token: str, db: Session = Depends(get_db)):
         subscription_id=int(sub.id),
         online_protocols=online_protocols,
         activity_cutoff=activity_cutoff,
+        xray_activity_cutoff=xray_activity_cutoff,
     )
 
     status = str(getattr(sub.status, "value", sub.status)).lower()
@@ -340,7 +371,7 @@ _LIVE_SCRIPT = r"""
 (function(){
   const token=__TOKEN__;
   const endpoint='/v1/connect/'+encodeURIComponent(token)+'/live';
-  const nf=new Intl.NumberFormat('fa-IR',{maximumFractionDigits:2});
+  const nf=new Intl.NumberFormat('en-US',{maximumFractionDigits:2});
   const gib=1024*1024*1024, mib=1024*1024, kib=1024;
   const byId=(id)=>document.getElementById(id);
   const used=byId('liveUsed'),remaining=byId('liveRemaining'),total=byId('liveTotal');
@@ -350,7 +381,7 @@ _LIVE_SCRIPT = r"""
 
   function bytes(value){
     const n=Math.max(0,Number(value||0));
-    if(n===0)return '۰ MB';
+    if(n===0)return '0 MB';
     if(n<mib)return nf.format(n/kib)+' KB';
     if(n<gib)return nf.format(n/mib)+' MB';
     return nf.format(n/gib)+' GB';
