@@ -181,10 +181,10 @@ _SCRIPT = r"""
      // generated config formats and OS-aware app source. No fake proxy button.
      el.classList.add('tp78-footer-action');
      el.dataset.kind=item.kind;
-     if(item.kind==='app')el.textContent='دانلود برنامه';
+     if(item.kind==='app')el.textContent='دانلود '+String(el.textContent||'برنامه').trim().replace(/^↓\s*(?:دانلود\s*)?/,'').trim();
      else if(item.kind==='copy')el.textContent='کپی همه کانفیگ‌ها';
      else if(item.kind==='link')el.textContent='کپی لینک اشتراک';
-     else if(item.kind==='add')el.textContent='افزودن همه به برنامه';
+     // Preserve the live client name (Karing, etc.) exactly as the original action.
      el.prepend(icon(item.kind));
      const text=document.createElement('span');text.className='tp78-action-text';
      // Wrap only the button's known text node; do not replace the live action.
