@@ -190,7 +190,7 @@ except BaseException:
     if newly_created:
         units=["twinpanel-sudoku-sub-"+str(sid)+".service"
                for sid,_,_,_ in newly_created]
-        subprocess.run(["systemctl","stop","--no-block",*units],timeout=90,
+        subprocess.run(["systemctl","stop",*units],timeout=90,
             check=False,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
         subprocess.run(["systemctl","disable",*units],timeout=90,
             check=False,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
