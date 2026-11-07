@@ -22,6 +22,7 @@ sys.path.insert(0,str(ROOT))
 
 from app.central_wireguard_bulk_runtime_v1 import new_keypair, apply_bulk
 from app.services.central_runtime_ownership_v1 import allow_central_node
+from app.services.central_node_identity_store_v1 import load as load_node_identity, store_once as store_node_identity
 from app.database import SessionLocal
 from app.models import (
     Node,NodeProtocolConfig,NodeStatus,NodeType,ProtocolCredential,
@@ -103,24 +104,26 @@ def prepare_persistent_identities(db, node_id: int, subscriptions):
             cred = ProtocolCredential(subscription_id=sid, protocol="wireguard")
             db.add(cred)
             credentials[sid] = cred
-        existing = ad._dec(cred.secret_encrypted) if cred.secret_encrypted else {}
-        if not isinstance(existing, dict):
-            raise RuntimeError("WG_STAGED_SECRET_UNREADABLE")
-        all_nodes = existing.get(STAGED_SECRET_KEY) or {}
-        if not isinstance(all_nodes, dict):
+        # Never mutate an unreadable imported secret_encrypted field. Its
+        # legacy node profiles can remain valid despite failing _dec().
+        legacy = ad._dec(cred.secret_encrypted) if cred.secret_encrypted else {}
+        old_nodes = legacy.get(STAGED_SECRET_KEY) if isinstance(legacy,dict) else {}
+        if old_nodes is not None and not isinstance(old_nodes,dict):
             raise RuntimeError("WG_STAGED_SECRET_CORRUPT")
-        record = all_nodes.get(str(node_id))
+        old_record = (old_nodes or {}).get(str(node_id))
+        record = load_node_identity(db,"wireguard",sid,node_id)
+        if old_record is not None:
+            if record is not None and record != old_record:
+                raise RuntimeError("WG_STAGED_KEYPAIR_ROTATION_BLOCKED")
+            record = old_record
         if record is None:
-            private, public = new_keypair()
-            record = {"private": private, "public": public}
-            all_nodes = {**all_nodes, str(node_id): record}
-            existing = {**existing, STAGED_SECRET_KEY: all_nodes}
-            cred.secret_encrypted = ad._enc(existing)
-        else:
-            if (not isinstance(record, dict)
-                    or not isinstance(record.get("private"), str)
-                    or not isinstance(record.get("public"), str)):
-                raise RuntimeError("WG_STAGED_KEYPAIR_INVALID")
+            private,public = new_keypair()
+            record = {"private":private,"public":public}
+        if (not isinstance(record,dict)
+                or not isinstance(record.get("private"),str)
+                or not isinstance(record.get("public"),str)):
+            raise RuntimeError("WG_STAGED_KEYPAIR_INVALID")
+        store_node_identity(db,"wireguard",sid,node_id,record)
         identities[sid] = (record["private"], record["public"])
     db.commit()
     return identities
@@ -212,8 +215,7 @@ PersistentKeepalive = 25
             if cred is None:
                 cred=ProtocolCredential(subscription_id=sid,protocol="wireguard")
                 db.add(cred)
-            stored=ad._dec(cred.secret_encrypted)
-            saved=((stored or {}).get(STAGED_SECRET_KEY) or {}).get(str(node_id))
+            saved=load_node_identity(db,"wireguard",sid,node_id)
             if not isinstance(saved,dict) or (saved.get("private"),saved.get("public"))!=identities[sid]:
                 raise RuntimeError("WG_STAGED_IDENTITY_CHANGED")
             items=ad._autosync_credential_items(cred)
