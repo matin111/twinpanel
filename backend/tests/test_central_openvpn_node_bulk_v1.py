@@ -42,6 +42,12 @@ class CentralOpenVPNTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "HIDDEN_ONLINE"):
             bulk.validate_node(db, 14)
 
+    def test_imported_account_login_is_not_overwritten(self):
+        import inspect
+        implementation=inspect.getsource(bulk.run)
+        self.assertNotIn('cred.username=',implementation)
+        self.assertIn('store_node_identity',implementation)
+
     def test_apply_requires_exact_node_confirmation(self):
         with self.assertRaises(SystemExit):
             bulk.parse_args(["--node-id", "14", "--apply"])
