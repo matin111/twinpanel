@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.670",
-  "source_sha": "ff4961cf6dfb2819c74cd17b5dcb60d8c81782b4",
+  "version": "1.1.0-rc.671",
+  "source_sha": "08b1023ac2815cb48c0d4fee1907b984274c3cfd",
   "notes": {
-    "fa": "نسخه rc.670: رفع مشکل بدون واکنش ماندن دکمه «ارسال فایل به برنامه» در مرورگرهای اندروید و آیفون. اگر Web Share از فایل‌های VPN پشتیبانی کند، منوی اشتراک‌گذاری با لمس مستقیم باز می‌شود. اگر مرورگر پشتیبانی نکند یا کانفیگ آماده Share نباشد، دانلود فایل واقعی OpenVPN .ovpn یا WireGuard/AmneziaWG .conf با لمس همان دکمه شروع می‌شود و پنجره راهنمای انتخاب و ارسال فایل از Downloads/Files به برنامه نمایش داده می‌شود. خطاهای ارسال هم پنجره دانلود مشخص دارند و لغو کردن Share خطا شمرده نمی‌شود. بدون تغییر سرویس‌های VPN، کاربران، پروتکل‌ها و حجم اشتراک.",
-    "en": "rc.670: Fix silent mobile file Share actions. When Web Share supports VPN files, invoke it synchronously from the original tap. For unsupported browsers or missing prepared configs, trigger the real .ovpn/.conf attachment download in the tap and present a visible Files/Downloads guide and manual download button. Show clear fallback for Share failures, distinguish user cancellation. Preserve all existing VPN data, nodes and subscriptions."
+    "fa": "نسخه rc.671: حذف کامل دکمه نمایشی «ارسال فایل به برنامه» و پاپ‌آپ راهنمای جایگزین از OpenVPN، WireGuard و AmneziaWG. دکمه Share فقط زمانی نشان داده می‌شود که مرورگر گوشی با navigator.canShare پشتیبانی واقعی از فایل .ovpn یا .conf را تأیید کند؛ در بقیه مرورگرها فقط دکمه دانلود واقعی فایل نمایش داده می‌شود. در صورت رد ارسال توسط مرورگر، دکمه غیرفعال حذف می‌شود. دانلود، راهنمای مستقل پروتکل‌ها و تنظیمات کاربران بدون تغییر.",
+    "en": "rc.671: Remove fake native VPN profile Share action and its misleading help fallback. Render the Share button only when navigator.canShare confirms support for the actual .ovpn/.conf File; otherwise keep only the real attachment download. If the browser rejects sharing, retire that Share button. Preserve profiles, user accounts, VPN runtime and independent protocol help."
   }
 }
