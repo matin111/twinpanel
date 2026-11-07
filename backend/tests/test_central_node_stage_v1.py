@@ -129,5 +129,27 @@ class CentralNodeStageTests(unittest.TestCase):
         self.assertNotIn("with_for_update", calls_during_health[0].kwargs)
 
 
+    def test_sudoku_capacity_blocks_all_memberships_and_subprocesses(self):
+        fake = MagicMock()
+        fake.retired_at = None
+        fake.node_type = NodeType.EXIT
+        fake.status = NodeStatus.ONLINE
+        fake.show_to_users = False
+        db = MagicMock()
+        db.get.return_value = fake
+        with (patch.object(stage, "SessionLocal") as session,
+              patch.object(stage, "eligible_count", return_value=1900),
+              patch.object(stage, "assert_capacity",
+                           side_effect=RuntimeError("SUDOKU_CENTRAL_STAGE_CAPACITY_NOT_SUPPORTED")),
+              patch.object(stage, "establish_hidden_memberships") as enroll,
+              patch.object(stage.subprocess, "run") as invoke):
+            session.return_value.__enter__.return_value = db
+            with self.assertRaisesRegex(RuntimeError, "SUDOKU_CENTRAL_STAGE"):
+                stage._run_locked(14, 3000, True)
+            enroll.assert_not_called()
+            invoke.assert_not_called()
+            db.commit.assert_not_called()
+
+
 if __name__ == "__main__":
     unittest.main()
