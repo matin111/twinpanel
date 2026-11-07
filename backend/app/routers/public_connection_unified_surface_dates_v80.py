@@ -1245,6 +1245,196 @@ html body.tp80-connection .protocol-choice:hover{
   font-size:10px!important;letter-spacing:-.15px!important;
  }
 }
+
+/* TWINPANEL_CONNECTION_PANEL_THEME_SYNC_V98
+   Surface colors follow the same theme switch and branding vars (--p/--s)
+   as the public hub. Overrides legacy V67 hard-coded blue/purple in BOTH
+   modes; preserve all protocol interaction/layout styles. */
+html[data-theme="light"]{
+ color-scheme:light;
+ --bg:#f3f6fc;--surface:#ffffff;--surface2:#f5f8fd;--surface3:#eaf0f8;
+ --line:#dbe4f1;--text:#182438;--muted:#617087;
+ --shadow:0 12px 32px rgba(27,47,79,.055);
+}
+html[data-theme="dark"]{
+ color-scheme:dark;
+ --bg:#0b1120;--surface:#111b2c;--surface2:#172337;--surface3:#1e2d44;
+ --line:#34455e;--text:#eef4ff;--muted:#a7b7ce;
+ --shadow:0 16px 40px rgba(0,0,0,.16);
+}
+html[data-theme] body.tp80-connection.ref67{
+ --tp-brand-bg:var(--bg);--tp-brand-card:var(--surface);
+ --tp-brand-raised:var(--surface2);--tp-brand-hover:var(--surface3);
+ --tp-brand-stroke:var(--line);--tp-brand-text:var(--text);
+ --tp-brand-muted:var(--muted);
+ background:var(--bg)!important;color:var(--text)!important;
+ background-image:none!important;
+ transition:background-color .16s ease,color .16s ease;
+}
+html[data-theme] body.tp80-connection.ref67 .top,
+html[data-theme] body.tp80-connection.ref67 .topin{
+ background:var(--surface)!important;color:var(--text)!important;
+ border-color:var(--line)!important;background-image:none!important;
+}
+html[data-theme] body.tp80-connection.ref67 .top .brand b{
+ color:var(--text)!important;
+}
+html[data-theme] body.tp80-connection.ref67 .top .mark{
+ background:linear-gradient(125deg,var(--p),var(--s))!important;
+ box-shadow:0 7px 18px color-mix(in srgb,var(--p) 20%,transparent)!important;
+}
+html[data-theme] body.tp80-connection.ref67 .top .theme{
+ background:var(--surface2)!important;color:var(--text)!important;
+ border:1px solid var(--line)!important;border-radius:12px!important;
+ opacity:1!important;cursor:pointer!important;
+}
+html[data-theme] body.tp80-connection.ref67 .top .theme:hover{
+ border-color:var(--p)!important;
+}
+html[data-theme] body.tp80-connection.ref67 .traffic,
+html[data-theme] body.tp80-connection.ref67 .ref67-user,
+html[data-theme] body.tp80-connection.ref67 .protocol-choice,
+html[data-theme] body.tp80-connection.ref67 .protocol-panel,
+html[data-theme] body.tp80-connection.ref67 .apps,
+html[data-theme] body.tp80-connection.ref67 .advanced,
+html[data-theme] body.tp80-connection.ref67 .smart-card{
+ background:var(--surface)!important;background-image:none!important;
+ border-color:var(--line)!important;color:var(--text)!important;
+ box-shadow:var(--shadow)!important;
+}
+html[data-theme] body.tp80-connection.ref67 .traffic{
+ background:linear-gradient(110deg,color-mix(in srgb,var(--p) 5%,var(--surface)),
+ var(--surface) 38%,color-mix(in srgb,var(--s) 5%,var(--surface)))!important;
+}
+html[data-theme] body.tp80-connection.ref67 .traffic .stat{
+ border-color:var(--line)!important;background:transparent!important;
+}
+html[data-theme] body.tp80-connection.ref67 .traffic .stat strong,
+html[data-theme] body.tp80-connection.ref67 .ref67-user strong,
+html[data-theme] body.tp80-connection.ref67 .protocol-choice .protocol-text b{
+ color:var(--text)!important;
+}
+html[data-theme] body.tp80-connection.ref67 .traffic .stat small,
+html[data-theme] body.tp80-connection.ref67 .protocol-choice .protocol-text small,
+html[data-theme] body.tp80-connection.ref67 .ref67-user .service,
+html[data-theme] body.tp80-connection.ref67 .ref67-user small:not(.status){
+ color:var(--muted)!important;
+}
+html[data-theme] body.tp80-connection.ref67 .ref67-decoration i{
+ background:linear-gradient(110deg,var(--p),var(--s))!important;
+ border-color:color-mix(in srgb,var(--p) 50%,var(--line))!important;
+ box-shadow:4px 4px 0 color-mix(in srgb,var(--p) 18%,var(--surface3))!important;
+}
+html[data-theme] body.tp80-connection.ref67 .ref67-filter,
+html[data-theme] body.tp80-connection.ref67 .ref67-categories .ref67-filter{
+ background:var(--surface2)!important;background-image:none!important;
+ border-color:var(--line)!important;color:var(--text)!important;
+ box-shadow:none!important;
+}
+html[data-theme] body.tp80-connection.ref67 .ref67-filter.active,
+html[data-theme] body.tp80-connection.ref67 .ref67-categories .ref67-filter.active{
+ background:linear-gradient(115deg,var(--p),var(--s))!important;
+ border-color:var(--p)!important;color:#fff!important;
+ box-shadow:0 3px 12px color-mix(in srgb,var(--p) 16%,transparent)!important;
+}
+html[data-theme] body.tp80-connection.ref67 .ref67-categories{
+ border-color:var(--line)!important;
+}
+html[data-theme] body.tp80-connection.ref67 .protocol-choice.active{
+ border-color:var(--p)!important;
+ box-shadow:0 0 0 1px color-mix(in srgb,var(--p) 45%,transparent)!important;
+}
+html[data-theme] body.tp80-connection.ref67 .protocol-choice:hover{
+ background:color-mix(in srgb,var(--p) 5%,var(--surface))!important;
+ border-color:var(--p)!important;
+}
+html[data-theme] body.tp80-connection.ref67 .protocol-choice .protocol-icon{
+ background:linear-gradient(135deg,var(--ref67-icon,var(--pc,var(--p))),
+ color-mix(in srgb,var(--ref67-icon,var(--pc,var(--p))) 55%,var(--surface3)))!important;
+}
+html[data-theme] body.tp80-connection.ref67 #tp96-protocol-modal{
+ color:var(--text)!important;
+}
+html[data-theme] body.tp80-connection.ref67 #tp96-protocol-modal .tp96-protocol-shell,
+html[data-theme] body.tp80-connection.ref67 #tp96-protocol-modal .tp96-protocol-content{
+ background:var(--surface)!important;color:var(--text)!important;
+ border-color:var(--line)!important;
+}
+html[data-theme] body.tp80-connection.ref67 #tp96-protocol-modal .tp96-protocol-top,
+html[data-theme] body.tp80-connection.ref67 #tp84-dialog .tp84-dialog-head,
+html[data-theme] body.tp80-connection.ref67 #tp84-dialog .tp84-dialog-body,
+html[data-theme] body.tp80-connection.ref67 #tp-help-overlay .tp-help-head,
+html[data-theme] body.tp80-connection.ref67 #tp-help-overlay .tp-help-body{
+ background:var(--surface2)!important;color:var(--text)!important;
+ border-color:var(--line)!important;
+}
+html[data-theme] body.tp80-connection.ref67 #tp96-protocol-modal .tp96-protocol-title,
+html[data-theme] body.tp80-connection.ref67 #tp96-protocol-modal .tp96-protocol-close{
+ color:var(--text)!important;
+}
+html[data-theme] body.tp80-connection.ref67 #tp96-protocol-modal .tp96-protocol-close{
+ background:var(--surface3)!important;border-color:var(--line)!important;
+}
+html[data-theme] body.tp80-connection.ref67 #tp96-protocol-modal .protocol-panel.tp96-in-modal,
+html[data-theme] body.tp80-connection.ref67 #tp96-protocol-modal .protocol-panel.tp96-in-modal .panel-head,
+html[data-theme] body.tp80-connection.ref67 .protocol-panel.active > .panel-head{
+ background:var(--surface)!important;
+ color:var(--text)!important;border-color:var(--line)!important;
+}
+html[data-theme] body.tp80-connection.ref67 #tp96-protocol-modal .protocol-panel.tp96-in-modal .panel-head{
+ background:linear-gradient(100deg,color-mix(in srgb,var(--p) 10%,var(--surface)),
+ color-mix(in srgb,var(--s) 9%,var(--surface)))!important;
+}
+html[data-theme] body.tp80-connection.ref67 .protocol-panel .ref67-list,
+html[data-theme] body.tp80-connection.ref67 .protocol-panel .tp77-native-list,
+html[data-theme] body.tp80-connection.ref67 .protocol-panel .v54-v2ray-groups,
+html[data-theme] body.tp80-connection.ref67 .protocol-panel .v54-v2ray-server{
+ background:var(--surface)!important;border-color:var(--line)!important;
+}
+html[data-theme] body.tp80-connection.ref67 .protocol-panel .ref67-row,
+html[data-theme] body.tp80-connection.ref67 .protocol-panel .tp77-native-row,
+html[data-theme] body.tp80-connection.ref67 .protocol-panel .v54-v2ray-server-head,
+html[data-theme] body.tp80-connection.ref67 .protocol-panel .v54-v2ray-profile,
+html[data-theme] body.tp80-connection.ref67 .protocol-panel .tp80-credentials,
+html[data-theme] body.tp80-connection.ref67 .protocol-panel .fact,
+html[data-theme] body.tp80-connection.ref67 .protocol-panel .tp80-inline-native-detail,
+html[data-theme] body.tp80-connection.ref67 .protocol-panel .tp80-modern-detail{
+ background:var(--surface2)!important;color:var(--text)!important;
+ border-color:var(--line)!important;
+}
+html[data-theme] body.tp80-connection.ref67 .protocol-panel .server-tab,
+html[data-theme] body.tp80-connection.ref67 .protocol-panel .ref67-chip,
+html[data-theme] body.tp80-connection.ref67 .protocol-panel .tp74-country-chip,
+html[data-theme] body.tp80-connection.ref67 .protocol-panel .tp78-footer-action,
+html[data-theme] body.tp80-connection.ref67 .protocol-panel .tp92-v2-country-bar button,
+html[data-theme] body.tp80-connection.ref67 .protocol-panel .tp93-country-bar button{
+ background:var(--surface2)!important;color:var(--text)!important;
+ border-color:var(--line)!important;
+}
+html[data-theme] body.tp80-connection.ref67 .protocol-panel .server-tab.active,
+html[data-theme] body.tp80-connection.ref67 .protocol-panel .ref67-chip.active,
+html[data-theme] body.tp80-connection.ref67 .protocol-panel .tp74-country-chip.active,
+html[data-theme] body.tp80-connection.ref67 .protocol-panel .tp92-v2-country-bar button.active,
+html[data-theme] body.tp80-connection.ref67 .protocol-panel .tp93-country-bar button.active,
+html[data-theme] body.tp80-connection.ref67 .protocol-panel .tp78-footer-action[data-kind="add"],
+html[data-theme] body.tp80-connection.ref67 .protocol-panel .tp78-footer-action[data-kind="download"]{
+ background:linear-gradient(115deg,var(--p),var(--s))!important;
+ color:#fff!important;border-color:var(--p)!important;
+}
+html[data-theme="light"] body.tp80-connection.ref67 .traffic .ref67-user small{
+ color:var(--muted)!important;
+}
+html[data-theme="light"] body.tp80-connection.ref67 .protocol-panel .ref67-row-name,
+html[data-theme="light"] body.tp80-connection.ref67 .protocol-panel .tp77-native-label,
+html[data-theme="light"] body.tp80-connection.ref67 .protocol-panel .v54-v2ray-server-head{
+ color:var(--text)!important;
+}
+html[data-theme] body.tp80-connection.ref67 .protocol-panel .tp78-action-footer,
+html[data-theme] body.tp80-connection.ref67 .protocol-panel .tp80-extra-actions,
+html[data-theme] body.tp80-connection.ref67 .protocol-panel .tp80-extra-actions > summary{
+ background:var(--surface)!important;color:var(--text)!important;
+ border-color:var(--line)!important;
+}
 """
 
 
