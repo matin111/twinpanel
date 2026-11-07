@@ -26,6 +26,7 @@ jobs:
           APP_NAME: TwinPanel-CI
           APP_ENV: test
           APP_SECRET_KEY: ci-only-key-ci-only-key-ci-only-key
+          NODE_AGENT_SHARED_SECRET: ci-node-agent-key-ci-node-agent-key
           DATABASE_URL: sqlite:///./public-connect-v78-ci.sqlite3
         run: |
           python -m py_compile \
