@@ -56,7 +56,7 @@ def fixture():
         # Only subscribed protocol entitlements are honored.
         if id != 106:
             db.add(SubscriptionProtocol(id=2000+id, subscription_id=id, protocol="openvpn"))
-        if id in (101, 102, 103, 104, 106):
+        if id in (101, 102, 103, 104):
             db.add(SubscriptionProtocol(id=3000+id, subscription_id=id, protocol="hysteria2"))
     db.add(MigrationImportRecord(
         id=10, source="eylan", source_id="eylan-101",
