@@ -957,6 +957,63 @@ html body.tp80-connection .protocol-panel.active .tp78-action-footer > [data-kin
    grid-column:1/-1!important;grid-row:auto!important;
  }
 }
+
+/* TWINPANEL_V2RAY_VISIBLE_PROFILES_AND_COPY_V89 */
+html body.tp80-connection .protocol-panel.active .v54-v2ray-groups{
+ display:grid!important;gap:0!important;overflow:visible!important;
+}
+html body.tp80-connection .protocol-panel.active .v54-v2ray-server{
+ height:auto!important;max-height:none!important;min-height:62px!important;
+ overflow:visible!important;margin:0!important;
+ border:0!important;border-bottom:1px solid var(--tp-brand-stroke,var(--line))!important;
+ border-radius:0!important;background:var(--tp-brand-raised,var(--surface2))!important;
+}
+html body.tp80-connection .protocol-panel.active .v54-v2ray-server-head{
+ height:auto!important;max-height:none!important;min-height:62px!important;
+ box-sizing:border-box!important;display:flex!important;align-items:center!important;
+ justify-content:space-between!important;flex-wrap:nowrap!important;gap:9px!important;
+ padding:8px 12px!important;overflow:visible!important;
+}
+html body.tp80-connection .protocol-panel.active .v54-v2ray-server.open > .v54-v2ray-profiles{
+ display:grid!important;grid-template-columns:minmax(0,1fr)!important;
+ height:auto!important;min-height:0!important;max-height:none!important;
+ overflow:visible!important;position:static!important;
+}
+html body.tp80-connection .protocol-panel.active .v54-v2ray-server:not(.open) > .v54-v2ray-profiles{
+ display:none!important;
+}
+html body.tp80-connection .protocol-panel.active .v54-v2ray-profile{
+ height:auto!important;max-height:none!important;min-height:52px!important;
+ display:grid!important;grid-template-columns:minmax(0,1fr) auto!important;
+ align-items:center!important;gap:10px!important;padding:9px 12px!important;
+}
+html body.tp80-connection .protocol-panel.active .v54-v2ray-profile-actions{
+ display:flex!important;gap:7px!important;justify-content:flex-end!important;
+}
+html body.tp80-connection .protocol-panel.active .tp89-v2ray-copy{
+ display:inline-flex!important;align-items:center!important;justify-content:center!important;
+ flex:0 0 auto!important;min-width:95px!important;height:37px!important;
+ padding:6px 12px!important;border-radius:10px!important;
+ border:1px solid var(--tp-brand-stroke,var(--line))!important;
+ background:var(--tp-brand-card,var(--surface))!important;
+ color:var(--tp-brand-text,var(--text))!important;
+ font:800 11px Tahoma,Arial,sans-serif!important;cursor:pointer!important;
+}
+html body.tp80-connection .protocol-panel.active .tp89-v2ray-copy:focus-visible{
+ outline:2px solid var(--p)!important;outline-offset:2px!important;
+}
+@media(max-width:720px){
+ html body.tp80-connection .protocol-panel.active .v54-v2ray-server-head{
+  display:flex!important;flex-direction:row!important;min-height:58px!important;
+  padding:7px 9px!important;
+ }
+ html body.tp80-connection .protocol-panel.active .tp89-v2ray-copy{
+  min-width:75px!important;padding:5px 8px!important;font-size:10px!important;
+ }
+ html body.tp80-connection .protocol-panel.active .v54-v2ray-profile{
+  grid-template-columns:1fr!important;
+ }
+}
 """
 
 
@@ -1293,6 +1350,51 @@ _SCRIPT = r"""
      });
    });
  }
+
+ function reconcileV2rayCopyActions(panel){
+   if(panel.dataset.v54V2ray!=='1')return;
+   panel.querySelectorAll('.v54-v2ray-server').forEach(card=>{
+     const head=card.querySelector(':scope > .v54-v2ray-server-head');
+     if(!head)return;
+     if(!head.querySelector('.tp89-v2ray-copy')){
+       const copyButton=el('button','tp89-v2ray-copy','کپی کانفیگ‌ها');
+       copyButton.type='button';
+       copyButton.title='کپی تمام کانفیگ‌های موجود این سرور';
+       copyButton.setAttribute('aria-label','کپی تمام کانفیگ‌های این سرور');
+       copyButton.addEventListener('click',async event=>{
+         event.preventDefault();event.stopPropagation();
+         const urls=[...card.querySelectorAll('.v54-v2ray-profile[data-tp78-uri]')]
+           .map(node=>node.dataset.tp78Uri).filter(Boolean);
+         const unique=[...new Set(urls)];
+         if(!unique.length){
+           const toast=document.getElementById('toast');
+           if(toast){toast.textContent='کانفیگی برای کپی موجود نیست';toast.classList.add('show');setTimeout(()=>toast.classList.remove('show'),1600)}
+           return;
+         }
+         let ok=false;
+         try{
+           if(navigator.clipboard&&window.isSecureContext){
+             await navigator.clipboard.writeText(unique.join('\\n'));ok=true;
+           }
+         }catch(_error){}
+         if(!ok){
+           const area=document.createElement('textarea');
+           area.value=unique.join('\\n');area.style.position='fixed';
+           area.style.left='-9999px';document.body.append(area);area.select();
+           try{ok=document.execCommand('copy')}catch(_error){}
+           area.remove();
+         }
+         const toast=document.getElementById('toast');
+         if(toast){toast.textContent=ok?'کانفیگ‌های سرور کپی شدند':'کپی انجام نشد';toast.classList.add('show');setTimeout(()=>toast.classList.remove('show'),1600)}
+       });
+       head.append(copyButton);
+     }
+     const profiles=card.querySelectorAll(':scope > .v54-v2ray-profiles > .v54-v2ray-profile').length;
+     const label=[...head.children].find(node=>node.tagName==='SPAN'&&/اتصال/.test(node.textContent||''));
+     if(label)label.textContent=String(profiles)+' اتصال';
+   });
+ }
+
  function keyForPanel(panel){
    const raw=panel.dataset.ref67NativeProtocol||panel.dataset.v34Protocol;
    if(raw)return String(raw).trim().toLowerCase();
@@ -1531,6 +1633,7 @@ _SCRIPT = r"""
    panels().forEach(panel=>{
      normalizeNative(panel);
      normalizeV2ray(panel);
+     reconcileV2rayCopyActions(panel);
      normalizeModern(panel);
      alignFooter(panel);
      ensureCanonicalApp(panel);
