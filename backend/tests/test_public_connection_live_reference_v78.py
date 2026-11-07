@@ -69,7 +69,7 @@ def test_all_three_v2ray_profiles_copy_without_replacing_original_link():
 def test_real_probe_endpoint_authorized_and_limited():
     code = source("public_connection_ping_v78.py")
     hub = source("public_connection_hub_v5.py")
-    assert 'router.include_router(_live_ping_router)' in hub
+    assert 'router.include_router(_live_ping_router)' not in hub
     assert 'data-node-id' in hub
     assert '@router.get("/{token}/node-ping/{node_id}")' in code
     assert "_subscription_from_share_token(token, db)" in code
@@ -122,14 +122,14 @@ def test_measured_value_is_not_cached_telemetry(monkeypatch):
 
 
 
-def test_registered_live_router_exposes_refresh_endpoint():
+def test_unused_live_ping_is_not_publicly_registered():
     from app.routers.public_connection_hub_live_v5 import router as live_router
     route = next(
         (route for route in live_router.routes
          if route.path == "/v1/connect/{token}/node-ping/{node_id}"),
         None,
     )
-    assert route is not None
+    assert route is None
     assert "GET" in route.methods
     # app.main mounts the live hub, not the legacy hub_v5 router.
     main = (ROOT.parent / "main.py").read_text(encoding="utf-8")
