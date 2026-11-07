@@ -436,14 +436,14 @@ window.tpNativeShareFile=function(file){
     }
     // Do not await network IO before this call: it needs user activation.
     return navigator.share(payload).then(()=>true).catch(error=>{
-      if(error?.name==='AbortError')return false;
+      if(error?.name==='AbortError')return null;
       notify('ارسال انجام نشد؛ فایل را دانلود کنید و از Files یا Downloads ارسال کنید.');
       return false;
     });
   }catch(error){
     if(error?.name!=='AbortError')
       notify('منوی ارسال باز نشد؛ فایل را دانلود کنید و از Files یا Downloads ارسال کنید.');
-    return Promise.resolve(false);
+    return Promise.resolve(error?.name==='AbortError'?null:false);
   }
 };
 const toast=document.getElementById('toast');function show(t){toast.textContent=t;toast.classList.add('show');clearTimeout(window.__hubToast);window.__hubToast=setTimeout(()=>toast.classList.remove('show'),1200)}

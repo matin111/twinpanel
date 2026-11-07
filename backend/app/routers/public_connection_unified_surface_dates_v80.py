@@ -1605,6 +1605,35 @@ _SCRIPT = r"""
    img.onerror=()=>{img.replaceWith(el('span','tp80-country-fallback',country))};
    return img;
  }
+ // Provide an actual action in mobile browsers that cannot share native files.
+ // Browsers cannot read an already-downloaded file back from Downloads, so
+ // the user downloads it, then selects it through Files/Downloads manually.
+ function showNativeFileShareFallback(download,protocol,reason,downloadNow=false){
+   // On unsupported browsers, start the real attachment download while
+   // still within the original tap (important for mobile download policies).
+   if(downloadNow&&download)download.click();
+   const overlay=document.getElementById('tp-help-overlay');
+   const message=reason||'این مرورگر امکان ارسال مستقیم فایل را ندارد.';
+   if(!overlay){window.alert(message);return;}
+   const title=overlay.querySelector('.tp-help-title');
+   const content=overlay.querySelector('.tp-help-body');
+   if(!content){window.alert(message);return;}
+   if(title)title.textContent='دانلود و ارسال فایل';
+   const extension=protocol==='openvpn'?'.ovpn':'.conf';
+   const note=el('p','tp-help-step',message);
+   const instruction=el('p','tp-help-step',
+     '۱. فایل '+extension+' را دانلود کنید. ۲. در اندروید Downloads یا در آیفون Files را باز کنید. ۳. فایل را Share کنید یا از داخل برنامه مقصد گزینه Import File را بزنید.');
+   const button=el('button','tp-help-close','↓ دانلود فایل');
+   button.type='button';
+   button.style.marginTop='12px';
+   button.addEventListener('click',event=>{
+     event.preventDefault();event.stopPropagation();
+     overlay.hidden=true;
+     download.click();
+   });
+   content.replaceChildren(note,instruction,button);
+   overlay.hidden=false;
+ }
  function normalizeNative(panel){
    const type=String(panel.dataset.ref67NativeProtocol||panel.dataset.v34Protocol||'').toLowerCase();
    if(!Native.has(type)||!panel.querySelector('.tp77-native-list'))return;
@@ -1697,25 +1726,38 @@ _SCRIPT = r"""
          shareFile.type='button';
          shareFile.addEventListener('click',event=>{
            event.preventDefault();event.stopPropagation();
-           // navigator.share must run while this tap still has user activation:
-           // no fetch/await and no programmatic second click in between.
            const target=String(download.dataset.target||'');
            const match=target.match(/^(?:hub-protocol-\d+-|cfg-|download-source-)(openvpn|wireguard|amneziawg)-(\d+)$/);
+           const protocol=match?.[1]||String(panel.dataset.ref67NativeProtocol||'openvpn').toLowerCase();
            const config=document.getElementById(target)?.value;
            if(!match||typeof config!=='string'||!config.trim()){
-             window.tpNativeShareMessage?.('فایل این سرور آماده نیست؛ از دکمه دانلود فایل استفاده کنید.');
+             showNativeFileShareFallback(download,protocol,
+               'فایل آماده برای ارسال مستقیم پیدا نشد. فایل واقعی همین سرور دانلود می‌شود.',true);
              return;
            }
-           const extension=match[1]==='openvpn'?'ovpn':'conf';
-           const fallback=match[1]+'-'+(Number(match[2])+1)+'.'+extension;
+           const extension=protocol==='openvpn'?'ovpn':'conf';
+           const fallback=protocol+'-'+(Number(match[2])+1)+'.'+extension;
            const rawName=String(download.dataset.filename||fallback);
            const filename=rawName.toLowerCase().endsWith('.'+extension)?rawName:rawName+'.'+extension;
-           const mime=match[1]==='openvpn'?'application/x-openvpn-profile':'application/octet-stream';
-           if(typeof File==='function'&&typeof window.tpNativeShareFile==='function'){
+           const mime=protocol==='openvpn'?'application/x-openvpn-profile':'application/octet-stream';
+           if(!window.isSecureContext||typeof navigator.share!=='function'||typeof File!=='function'
+               ||typeof window.tpNativeShareFile!=='function'){
+             showNativeFileShareFallback(download,protocol,
+               'مرورگر فعلی امکان Share مستقیم ندارد؛ فایل دانلود می‌شود. سپس آن را در Files یا Downloads به برنامه بدهید.',true);
+             return;
+           }
+           try{
              const file=new File([config],filename,{type:mime});
-             window.tpNativeShareFile(file);
-           }else{
-             window.tpNativeShareMessage?.('مرورگر از ارسال مستقیم فایل پشتیبانی نمی‌کند؛ فایل را دانلود کنید.');
+             // Must call the Web Share API from the original tap, not after fetch.
+             const promise=window.tpNativeShareFile(file);
+             Promise.resolve(promise).then(result=>{
+               if(result===false)showNativeFileShareFallback(download,protocol,
+                 'منوی ارسال فایل باز نشد. فایل را دانلود و از Files یا Downloads ارسال کنید.');
+             }).catch(()=>{
+               showNativeFileShareFallback(download,protocol,'ارسال مستقیم ممکن نشد.');
+             });
+           }catch(_error){
+             showNativeFileShareFallback(download,protocol,'این دستگاه نتوانست فایل را برای ارسال آماده کند.');
            }
          });
          // Web Share files is a mobile feature. Desktop Windows Chrome
