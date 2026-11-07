@@ -1,0 +1,45 @@
+name: Fast New-Account Quota Batch Smoke
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/services/accounting_device_map_batch_v1.py"
+      - "backend/app/services/quota_node_sync.py"
+      - "backend/app/services/quota_refresh.py"
+      - "backend/app/xray_adaptive_three_profiles_v47.py"
+      - "scripts/smoke-xray-tls-ready-no-domain-v1.py"
+      - "scripts/smoke-fast-provision-quota-batch-v1.py"
+      - ".github/workflows/fast-new-v2ray-quota-batch-v1-smoke.yml"
+  push:
+    paths:
+      - "backend/app/services/accounting_device_map_batch_v1.py"
+      - "backend/app/services/quota_node_sync.py"
+      - "backend/app/services/quota_refresh.py"
+      - "backend/app/xray_adaptive_three_profiles_v47.py"
+      - "scripts/smoke-xray-tls-ready-no-domain-v1.py"
+      - "scripts/smoke-fast-provision-quota-batch-v1.py"
+      - ".github/workflows/fast-new-v2ray-quota-batch-v1-smoke.yml"
+  workflow_dispatch:
+
+jobs:
+  quota-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile quota service modules and regression assertions
+        run: |
+          python -m py_compile \
+            backend/app/services/accounting_device_map_batch_v1.py \
+            backend/app/services/quota_node_sync.py \
+            backend/app/services/quota_refresh.py \
+            scripts/smoke-fast-provision-quota-batch-v1.py
+      - name: Test batch scope, native fallback, and fail-closed result
+        run: python scripts/smoke-fast-provision-quota-batch-v1.py
+      - name: Recheck canonical modern quota contract
+        run: python scripts/smoke-modern-quota-contract-v2.py
+      - name: Verify TLS-ready modern Xray profiles never invoke TCP Reality reinstall
+        run: python scripts/smoke-xray-tls-ready-no-domain-v1.py

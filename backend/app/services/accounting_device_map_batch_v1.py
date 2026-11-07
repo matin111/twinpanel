@@ -64,7 +64,9 @@ def _stored_identity(
     return ""
 
 
-def build_accounting_devices_by_node(db: Session) -> dict[int, list[dict[str, Any]]]:
+def build_accounting_devices_by_node(
+    db: Session, *, selected_node_ids: set[int] | None = None,
+) -> dict[int, list[dict[str, Any]]]:
     """Build every accounting node's device map in one database pass.
 
     The legacy builder is correct but intentionally node-oriented: each call
@@ -74,11 +76,15 @@ def build_accounting_devices_by_node(db: Session) -> dict[int, list[dict[str, An
 
     This batch builder preserves the exact mapping, dedupe, identity and lazy
     QuotaDevice-backfill rules while loading each source set once per worker
-    Session. The dedicated accounting worker creates a fresh Session for every
+    Session. A selected_node_ids subset allows new-account quota refreshes to
+    reuse this single-pass builder without touching unrelated Exit devices. The dedicated accounting worker creates a fresh Session for every
     reconcile pass, so this cache never crosses accounting sweeps.
     """
 
     node_ids = _candidate_node_ids(db)
+    if selected_node_ids is not None:
+        requested = {int(node_id) for node_id in selected_node_ids}
+        node_ids = [node_id for node_id in node_ids if node_id in requested]
     result: dict[int, list[dict[str, Any]]] = {node_id: [] for node_id in node_ids}
     if not node_ids:
         return result

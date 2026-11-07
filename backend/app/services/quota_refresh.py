@@ -11,6 +11,7 @@ from ..models import (
     SubscriptionNode,
 )
 from .quota_node_sync import sync_node_config
+from .accounting_device_map_batch_v1 import build_accounting_devices_by_node
 
 
 def _sync_subscription_quota_nodes_blocking(
@@ -62,6 +63,28 @@ def _sync_subscription_quota_nodes_blocking(
         except Exception:
             pass
 
+    # The legacy per-node builder re-reads and decrypts every active customer
+    # credential once per Exit, then issues one quota-device query per client.
+    # At current production scale a SINGLE node took more than 75 seconds,
+    # exceeding the 20-second new-account quota deadline. Reuse the existing
+    # accounting batch builder and process the selected Exits in one snapshot
+    # without changing quota identities, active/revoked flags, or fail-closed
+    # enforcement rules.
+    try:
+        devices_by_node = (
+            build_accounting_devices_by_node(
+                db, selected_node_ids=node_ids,
+            ) if node_ids else {}
+        )
+    except Exception as exc:
+        return {
+            "ok": False,
+            "subscription_id": int(subscription_id),
+            "nodes": [],
+            "mode": "agent-pull",
+            "error": "quota_batch_generation_failed:" + type(exc).__name__,
+        }
+
     results = []
 
     for node_id in sorted(node_ids):
@@ -80,6 +103,18 @@ def _sync_subscription_quota_nodes_blocking(
         ):
             continue
 
+        if node_id not in devices_by_node:
+            # A selected Exit missing from the snapshot is never a quota
+            # success with zero devices. Preserve the safety gate.
+            results.append({
+                "node_id": int(node.id),
+                "node_name": node.name,
+                "ok": False,
+                "mode": "agent-pull",
+                "reason": "quota_node_not_in_batched_snapshot",
+            })
+            continue
+
         try:
             # An optional QuotaDevice backfill may hit PostgreSQL's short
             # lock_timeout while another quota collector owns the same key.
@@ -89,6 +124,7 @@ def _sync_subscription_quota_nodes_blocking(
                 generated = sync_node_config(
                     db,
                     node_id,
+                    precomputed_devices=devices_by_node[node_id],
                 )
 
             ok = bool(

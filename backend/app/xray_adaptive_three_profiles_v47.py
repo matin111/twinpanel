@@ -219,8 +219,12 @@ async def _ensure_modern_xray_v47(
         bootstrap_done=bootstrap_done,
     )
 
-    # TLS-ready nodes use WS + XHTTP + TCP TLS. Keep TCP Reality internal/off.
-    if _effective_domain(node):
+    # A dedicated TLS certificate is a runtime fact, not a property mapped
+    # by the Node ORM. The database may hold nodes.xray_domain while the
+    # SQLAlchemy Node model does not map that column. Do not reconfigure an
+    # already-healthy TLS node as domainless TCP Reality when its verified
+    # modern Xray state explicitly reports TLS enabled.
+    if _effective_domain(node) or bool(state.get("tls_enabled")):
         return state
 
     target_port = _tcp_reality_target_port(int(base_port))
@@ -350,7 +354,10 @@ async def _xray_account_modern_v47(
         reusable_connection=reusable_connection,
     )
 
-    if _effective_domain(node):
+    # The emitted modern item carries the verified TLS availability.
+    # This prevents adding an unusable TCP Reality link to an existing TLS
+    # node just because xray_domain is not mapped on the Node ORM model.
+    if _effective_domain(node) or bool(item.get("tls_available")):
         return item
 
     profiles = item.get("profiles")
