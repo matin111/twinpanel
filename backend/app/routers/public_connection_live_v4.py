@@ -10,7 +10,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..models import SubscriptionProtocol
+from ..models import Node, SubscriptionProtocol
 from ..quota_models import QuotaCursor, QuotaSession, QuotaUsageEvent
 from ..services.modern_quota_runtime_v257 import capability_payload
 from .account_delivery import _subscription_from_share_token, _usage_payload
@@ -163,6 +163,38 @@ def _protocol_stats(
         cursor_meta[key] = _earliest(cursor_meta.get(key), started_at)
         selected.add(key)
 
+    # Map genuine, recently observed VPN presence to each connected node's
+    # country. This is derived from collector accounting, never from a ping
+    # estimate or a client-selected country tab.
+    online_countries: dict[str, set[str]] = {}
+    session_country_rows = (
+        db.query(QuotaSession.protocol, Node.country_code)
+        .join(Node, Node.id == QuotaSession.node_id)
+        .filter(
+            QuotaSession.subscription_id == int(subscription_id),
+            QuotaSession.status == "active",
+            QuotaSession.last_seen_at >= activity_cutoff,
+        )
+        .distinct()
+        .all()
+    )
+    traffic_country_rows = (
+        db.query(QuotaUsageEvent.protocol, Node.country_code)
+        .join(Node, Node.id == QuotaUsageEvent.node_id)
+        .filter(
+            QuotaUsageEvent.subscription_id == int(subscription_id),
+            QuotaUsageEvent.accepted_bytes > 0,
+            QuotaUsageEvent.reported_at >= activity_cutoff,
+        )
+        .distinct()
+        .all()
+    )
+    for raw_protocol, raw_country in (*session_country_rows, *traffic_country_rows):
+        key = _normalized_protocol(raw_protocol)
+        country = str(raw_country or "").strip().upper()
+        if key and len(country) == 2 and country.isalpha() and country != "XX":
+            online_countries.setdefault(key, set()).add(country)
+
     capabilities = capability_payload()
     stats: dict[str, dict] = {}
     for key in sorted(selected):
@@ -193,6 +225,7 @@ def _protocol_stats(
             "protocol": key,
             "online": key in online_protocols,
             "active_sessions": int(active.get("count") or 0),
+            "online_countries": sorted(online_countries.get(key, set())),
             "presence_available": presence_supported,
             "traffic_accounting_available": traffic_supported,
             "used_bytes": int(usage.get("used") or 0) if traffic_supported else None,
