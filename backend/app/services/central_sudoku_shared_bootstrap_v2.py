@@ -61,14 +61,21 @@ def build_pinned_binary() -> Path:
             root = Path(work)
             source = root / "upstream"
             subprocess.run(
-                ["git", "clone", "--quiet", "--no-checkout", UPSTREAM, str(source)],
+                ["git", "clone", "--quiet", "--depth", "1", "--branch", "main", UPSTREAM, str(source)],
                 check=True, timeout=180, stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
             )
             subprocess.run(
-                ["git", "-C", str(source), "checkout", "--quiet", UPSTREAM_COMMIT],
-                check=True, timeout=60,
+                ["git", "-C", str(source), "rev-parse", "HEAD"],
+                check=True, timeout=60, stdout=subprocess.PIPE,
+                text=True,
             )
+            actual = subprocess.run(
+                ["git", "-C", str(source), "rev-parse", "HEAD"],
+                check=True, timeout=20, capture_output=True, text=True,
+            ).stdout.strip()
+            if actual != UPSTREAM_COMMIT:
+                raise RuntimeError("SUDOKU_SHARED_UPSTREAM_COMMIT_CHANGED")
             built = root / "sudoku-shared"
             subprocess.run(
                 ["go", "build", "-trimpath", "-o", str(built), "./cmd/sudoku-tunnel"],
