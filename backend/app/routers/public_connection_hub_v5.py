@@ -140,7 +140,7 @@ def _item_detail(protocol: str, item: dict[str, Any], username: str, password: s
     secret = item.get("password") or password
     if protocol == "openvpn":
         return _file_action(protocol, item, index, prefix)
-    if protocol == "wireguard":
+    if protocol in {"wireguard", "amneziawg"}:
         return _file_action(protocol, item, index, prefix)
     if protocol in {"v2ray", "xray"}:
         return _v2ray_action(item)
