@@ -238,19 +238,15 @@ async def _install_node_in_background(
 
         # Installer return values and database online flags alone are not proof.
         # Read-only check of all 16 current live listeners fails closed.
-        live = {"ok": False, "reason": "base_install_failed"}
-        if base_ok and xray_ok and modern_ok:
-            from ..services.new_node_readiness_v1 import verify_new_exit_readiness
-            live = await verify_new_exit_readiness(db, node_id)
+        # Measured live listener health, not a running sum of install steps,
+        # determines whether the Exit can enter central account staging.
+        from ..services.new_node_readiness_v1 import verify_new_exit_readiness
+        live = await verify_new_exit_readiness(db, node_id)
+        installed_count = int(live.get("ready_count") or 0)
         quota = result.get("quota") or {}
         fabric = result.get("fabric") or {}
-        ready = (
-            base_ok and xray_ok and modern_ok and installed_count == 16
-            and bool(live.get("ok"))
-            and quota.get("ok") is not False
-            # The IR->Exit tunnel is optional. Direct node delivery must
-            # activate as soon as the VPN listeners and credentials are ready.
-        )
+        ready = bool(live.get("ok")) and quota.get("ok") is not False
+        # Tunnel fabric remains optional for direct Exit connections.
         if not ready:
             _safe_install_progress(
                 job_id, "failed", node_id=node_id,
