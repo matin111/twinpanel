@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.657",
-  "source_sha": "3399f772baca3473d8687ac8a80189ff73ea01e0",
+  "version": "1.1.0-rc.658",
+  "source_sha": "253e6250d96aea56b495fbfb71f9abb33eb82f15",
   "notes": {
-    "fa": "نسخه rc.657: رفع ریشه‌ای ناقص‌شدن نوار عملیات برای همه پروتکل‌های Connection. انتقال بدون حذف دکمه‌های واقعی دانلود کانفیگ یا افزودن به برنامه، کپی لینک و کپی کانفیگ‌ها از سازنده اصلی به یک فوتر مشترک، حفظ دانلود برنامه، اضافه‌شدن کپی همه فایل‌های واقعی OpenVPN/WireGuard/AmneziaWG، حفظ فرمت‌های اضافی. ویندوز: چهار دکمه کنار هم؛ اندروید: یک دکمه تمام‌عرض و سه دکمه پایین. ۸ نمونه پروتکل با DOM شبیه‌سازی‌شده تست شدند، ۴۰ اسکریپت خروجی معتبر بودند. تست تعاملی همه مرورگرها هنوز کامل نیست.",
-    "en": "rc.657: repair shared Connection footer race across all protocols. Preserve and move existing real download/import, subscription link and copy-config actions with original handlers, add platform-specific app download in the same footer, restore copy-all for native file profiles and retain secondary YAML/JSON actions. Windows four equal horizontal buttons, Android one full-width + three below. Synthetic DOM audit passed for eight protocols and 40 live HTML scripts passed syntax checks; complete interactive browser regression remains pending."
+    "fa": "نسخه rc.658: حفظ تمام اصلاحات مشترک دکمه‌های Connection نسخه rc.657 برای همه پروتکل‌ها؛ افزایش محدود و کنترل‌شده ظرفیت استخر دیتابیس درخواست‌های وب از ۱۰+۶ به ۱۶+۱۶ اتصال با مهلت ۱۰ ثانیه به‌منظور کاهش خطای ۵۰۰ هنگام هم‌زمانی درخواست‌های نود و کاربر. سرور، تونل، اطلاعات اشتراک و کانفیگ‌ها تغییر نمی‌کنند. تست تعاملی همه پروتکل‌ها هنوز تکمیل نشده و تراکنش‌های طولانی دیتابیس همچنان نیازمند بررسی ریشه‌ای هستند.",
+    "en": "rc.658: preserves rc.657 universal Connection footer and protocol controls; increases dedicated HTTP request DB pool from 10+6 to 16+16 with 10-second wait to reduce request failures under concurrent node polling/admin/Connection load, without altering VPN nodes, tunnels, credentials, or configs. Full browser regression and root-cause investigation of long-lived DB transactions remain outstanding."
   }
 }
