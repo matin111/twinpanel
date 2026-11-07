@@ -21,6 +21,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from app.central_trusttunnel_bulk_runtime_v1 import apply_bulk
+from app.services.central_runtime_ownership_v1 import allow_central_node
 from app.database import SessionLocal
 from app.models import (Node, NodeProtocolConfig, NodeStatus, NodeType,
                         ProtocolCredential, Subscription, SubscriptionNode,
@@ -55,7 +56,7 @@ def check_node(db, node_id):
     node = db.get(Node, int(node_id))
     if (node is None or node.retired_at is not None
             or node.node_type != NodeType.EXIT or node.status != NodeStatus.ONLINE
-            or node.show_to_users):
+            or not allow_central_node(db,node)):
         raise RuntimeError("TRUSTTUNNEL_HIDDEN_ONLINE_EXIT_REQUIRED")
     cfg = db.query(NodeProtocolConfig).filter_by(
         node_id=int(node_id), protocol="trusttunnel").one_or_none()
@@ -136,7 +137,7 @@ async def stage(node_id: int, limit: int, apply: bool):
                 cred.is_active = True
             identities[int(sub.id)] = secret
         db.refresh(node)
-        if node.show_to_users:
+        if not allow_central_node(db,node):
             raise RuntimeError("TRUSTTUNNEL_NODE_PUBLISHED_DURING_IDENTITY_STAGE")
         db.commit()
         rows = [{"username": value.username, "password": value.password}
