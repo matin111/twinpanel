@@ -151,39 +151,48 @@ body.ref67 .advanced,body.ref67 .apps{border-color:#353d61!important}
  body.ref67 .protocols{grid-template-columns:repeat(3,minmax(0,1fr))!important}
 }
 @media(max-width:720px){
- body.ref67 .page{width:min(96vw,480px)!important;padding-top:12px!important}
+ /* Match approved compact phone layout; render all protocols 4-across. */
+ body.ref67 .page{width:min(94vw,440px)!important;padding-top:9px!important}
  body.ref67 .topin{width:min(96vw,480px)!important;height:62px!important}
  body.ref67 .brand b{font-size:20px!important}
  body.ref67 .top .theme{width:35px;height:35px}
  body.ref67 .traffic{min-height:0!important;display:grid!important;gap:8px!important;
- padding:11px!important;border-radius:17px!important}
- body.ref67 .ref67-user{min-width:0!important;padding:9px 11px!important;gap:9px!important}
+ padding:9px!important;border-radius:17px!important}
+ body.ref67 .ref67-user{min-width:0!important;padding:9px 11px!important;gap:9px!important;width:100%}
  body.ref67 .ref67-usericon{width:38px;height:38px;flex-basis:38px;font-size:20px}
  body.ref67 .ref67-user strong{font-size:15px}
  body.ref67 .ref67-user small{font-size:10px}
  body.ref67 .traffic .stats{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:0}
+ body.ref67 .traffic .stat:nth-child(n+4){display:none!important}
  body.ref67 .traffic .stat{padding:8px 3px!important;min-height:62px}
  body.ref67 .traffic .stat strong{font-size:14px!important}
  body.ref67 .traffic .stat small{font-size:9px!important}
  body.ref67 .ref67-categories{gap:5px;justify-content:space-between;padding:8px 0 10px}
  body.ref67 .ref67-filter{flex:1;min-width:0;height:36px;font-size:10px;padding:0 4px}
  body.ref67 .protocols{grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:6px!important;margin:9px 0 13px!important}
- body.ref67 .protocol-choice{min-height:88px!important;padding:7px 2px!important;
- flex-direction:column!important;justify-content:center!important;gap:7px!important;border-radius:13px!important}
+ body.ref67 .protocol-choice{min-height:76px!important;padding:6px 2px!important;
+ flex-direction:column!important;justify-content:center!important;gap:5px!important;border-radius:13px!important}
  body.ref67 .protocol-choice .protocol-icon{width:38px!important;height:38px!important;flex-basis:38px!important;font-size:18px!important}
  body.ref67 .protocol-choice .protocol-text{text-align:center!important;width:100%}
- body.ref67 .protocol-choice .protocol-text b{font-size:9px!important}
+ body.ref67 .protocol-choice .protocol-text b{font-size:10px!important;letter-spacing:-.25px}
  body.ref67 .protocol-choice .protocol-text small{display:none!important}
  body.ref67 .protocol-panel{border-radius:17px!important}
  body.ref67 .protocol-panel .panel-head{min-height:79px!important;padding:13px!important}
  body.ref67 .protocol-panel .panel-head h3{font-size:17px!important}
  body.ref67 .ref67-tabs{padding:11px 9px 8px;gap:6px}
  body.ref67 .ref67-chip{padding:7px 9px;min-height:34px;font-size:10px;border-radius:10px}
+ body.ref67 .ref67-flag{font-family:system-ui,'Apple Color Emoji','Segoe UI Emoji','Noto Color Emoji',sans-serif}
+ body.ref67 .ref67-row-actions a,body.ref67 .ref67-row-actions button{width:36px!important;min-width:36px!important;height:36px!important;padding:5px!important;font-size:10px!important;border-radius:10px!important}
+ body.ref67 .ref67-row-actions a.ref67-primary{font-size:0!important}
+ body.ref67 .ref67-row-actions a.ref67-primary:after{content:'+';font-size:23px}
+ body.ref67 .ref67-row-actions button{font-size:0!important}
+ body.ref67 .ref67-row-actions button:after{content:'⧉';font-size:20px}
+ body.ref67 .protocol-panel .panel-head{min-height:65px!important}
  body.ref67 .ref67-list{margin:4px 9px 10px;border-radius:13px}
- body.ref67 .ref67-row{grid-template-columns:minmax(0,1fr) auto;gap:7px;min-height:57px;padding:8px}
+ body.ref67 .ref67-row{grid-template-columns:minmax(0,1fr) auto;gap:7px;min-height:52px;padding:7px}
  body.ref67 .ref67-flag{font-size:19px}
  body.ref67 .ref67-row-name{gap:7px}
- body.ref67 .ref67-row-name b{font-size:10px}
+ body.ref67 .ref67-row-name b{font-size:11px}
  body.ref67 .ref67-row-name small{font-size:9px}
  body.ref67 .ref67-status{display:none}
  body.ref67 .ref67-latency{font-size:9px}
@@ -212,9 +221,16 @@ _SCRIPT = r"""
   const x=String(code||'').toUpperCase();
   return /^[A-Z]{2}$/.test(x)?[...x].map(c=>String.fromCodePoint(127397+c.charCodeAt(0))).join(''):'🌐';
  };
- const countries={DE:'Germany',US:'United States',TR:'Türkiye',FR:'France',NL:'Netherlands',GB:'United Kingdom',
-  CA:'Canada',SE:'Sweden',FI:'Finland',AT:'Austria',CH:'Switzerland',PL:'Poland',IT:'Italy',
-  ES:'Spain',IR:'Iran',AE:'United Arab Emirates',SG:'Singapore'};
+ // Use ISO 3166-1 alpha-2 from Node.country_code, not a short country allowlist.
+ // The server-rendered tab already contains the true country flag from Node.
+ const displayCountries=typeof Intl!=='undefined'&&typeof Intl.DisplayNames==='function'
+  ?new Intl.DisplayNames(['en'],{type:'region'}):null;
+ const countryName=(code)=>code?(displayCountries?.of(code)||code):'Server';
+ const flagToCode=(value)=>{
+  const chars=Array.from(String(value||'').match(/[\u{1F1E6}-\u{1F1FF}]{2}/u)?.[0]||'');
+  if(chars.length!==2)return '';
+  return chars.map(x=>String.fromCharCode(x.codePointAt(0)-0x1F1E6+65)).join('');
+ };
  const normalize=(k)=>String(k||'').trim().toLowerCase().replace('xray','v2ray');
  function copyExisting(node){
    if(!node)return false;
@@ -223,7 +239,7 @@ _SCRIPT = r"""
  function addUser(){
    const card=document.querySelector('.traffic'),top=document.querySelector('.top .profile');
    if(!card||card.querySelector('.ref67-user'))return;
-   const user=top?.querySelector('.profile-copy strong')?.textContent?.trim()||
+   const user=top?.querySelector('.service')?.textContent?.trim()||
     document.querySelector('.top .service')?.textContent?.trim()||'Connection';
    const active=top?.querySelector('.status')?.textContent?.trim()||'وضعیت اشتراک';
    const box=document.createElement('div');box.className='ref67-user';
@@ -286,10 +302,14 @@ _SCRIPT = r"""
  }
  function serverDescriptor(tab,index){
   const raw=tab.querySelector('span')?.textContent?.trim()||tab.textContent.trim();
-  const match=raw.match(/\b([A-Z]{2})\s*[·•\-\s]\s*(\d+)\b/);
-  const code=match?.[1]||'';
-  const num=match?.[2]||String(index+1);
-  return {code,num,flag:FLAG(code),name:countries[code]||code||'Server'};
+  // V5 tabs are rendered as "🇩🇪 · 13" (flag, then separator, then node id).
+  // Earlier code expected "DE · 13", discarded the flag and displayed 🌐.
+  const emojiCode=flagToCode(raw);
+  const alphaCode=raw.match(/\b([A-Z]{2})\s*[·•\-\s]\s*\d+\b/)?.[1]||'';
+  const code=emojiCode||alphaCode;
+  const number=raw.match(/(?:·|•|-)\s*(\d+)\s*$/)?.[1]||'';
+  const num=number||String(index+1);
+  return {code,num,flag:code?FLAG(code):'🌐',name:countryName(code)};
  }
  function linkToOriginal(view){
   const deep=[...view.querySelectorAll('a[href]')].find(x=>
