@@ -24,6 +24,8 @@ sys.path.insert(0, str(BACKEND))
 from app.database import SessionLocal
 from app.models import Node, NodeStatus, NodeType
 from app.services.new_node_readiness_v1 import verify_new_exit_readiness
+from app.protocol_account_registry import ALL_PROTOCOL_KEYS
+from app.singbox_subscription_accounts import SINGBOX_PROTOCOLS
 
 ADAPTERS = (
     "twinpanel_central_l2tp_node_bulk_v1.py",
@@ -32,6 +34,10 @@ ADAPTERS = (
     "twinpanel_central_xray_node_bulk_v1.py",
 )
 MAX_USERS = 3000
+# Only these have actual bounded central-bulk materializers. Readiness of
+# installed listeners is not equivalent to subscriber credential coverage.
+BULK_PROTOCOLS = frozenset({"l2tp", "cisco", "v2ray", *SINGBOX_PROTOCOLS})
+MISSING_BULK_PROTOCOLS = tuple(sorted(set(ALL_PROTOCOL_KEYS) - BULK_PROTOCOLS))
 
 
 def eligible_count(db):
@@ -132,8 +138,10 @@ def _run_locked(node_id, limit, apply):
     print("CENTRAL_NODE_STAGE_PARTIAL", json.dumps({
         "node_id": node_id, "node_remains_hidden": True,
         "all_16_protocols_ready_for_users": False,
+        "missing_bulk_protocols": MISSING_BULK_PROTOCOLS,
     }), flush=True)
-    return 0
+    # A partial stage is NEVER a successful node-publish signal.
+    return 3
 
 
 def parse_args(argv=None):
