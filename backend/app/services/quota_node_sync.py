@@ -289,7 +289,10 @@ def build_node_devices(db: Session, node_id: int):
     return result
 
 
-def sync_node_config(db: Session, node_id: int, api_base: str | None = None):
+def sync_node_config(
+    db: Session, node_id: int, api_base: str | None = None,
+    *, precomputed_devices: list[dict[str, Any]] | None = None,
+):
     node = db.get(Node, int(node_id))
 
     if not node:
@@ -298,7 +301,13 @@ def sync_node_config(db: Session, node_id: int, api_base: str | None = None):
             "reason": "node_not_found",
         }
 
-    devices = build_node_devices(db, int(node_id))
+    # Full node inventory is already computed in one pass during a new
+    # subscription's quota refresh. Preserve the legacy per-node path for
+    # all other callers, including quota-agent pulls and accounting.
+    devices = (
+        build_node_devices(db, int(node_id))
+        if precomputed_devices is None else precomputed_devices
+    )
 
     path = Path(f"/tmp/twinpanel-node-{int(node_id)}.json")
 
