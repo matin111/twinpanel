@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..deps import require_admin
-from ..models import Node, NodeProtocolConfig, NodeStatus, SubscriptionNode
+from ..models import Node, NodeProtocolConfig, NodeStatus, Subscription, SubscriptionNode
 from ..mother_access import admin_can_use_mother
 from ..quota_models import QuotaUsageEvent
 
@@ -70,6 +70,19 @@ def node_overview(db: Session = Depends(get_db)) -> dict:
         .group_by(SubscriptionNode.node_id)
         .all()
     )
+    # Two distinct facts: people are unique account owners; memberships
+    # count subscriptions (a single person may own several subscriptions).
+    # Never derive either from Node.current_users: the legacy agent reports 0.
+    users = dict(
+        db.query(
+            SubscriptionNode.node_id,
+            func.count(func.distinct(Subscription.user_id)),
+        )
+        .join(Subscription, Subscription.id == SubscriptionNode.subscription_id)
+        .filter(SubscriptionNode.node_id.in_(ids))
+        .group_by(SubscriptionNode.node_id)
+        .all()
+    )
     usage = dict(
         db.query(
             QuotaUsageEvent.node_id,
@@ -87,14 +100,16 @@ def node_overview(db: Session = Depends(get_db)) -> dict:
     return {
         "ok": True,
         "updated_at": now.isoformat() + "Z",
-        "users_definition": "all_assigned_subscriptions_not_online_sessions",
+        "users_definition": "distinct_user_owners_assigned_to_node_not_online_sessions",
+        "accounts_definition": "all_assigned_subscriptions_including_imported_and_native",
         "traffic_definition": "cumulative_accepted_bytes_recorded_by_quota_agent",
         "ports_definition": "distinct_configured_ports_for_online_protocols",
         "items": [
             {
                 "node_id": int(node.id),
                 "status": reported_status(node, now),
-                "users_total": int(memberships.get(node.id) or 0),
+                "users_total": int(users.get(node.id) or 0),
+                "accounts_total": int(memberships.get(node.id) or 0),
                 "traffic_bytes": int(usage.get(node.id) or 0),
                 "ports_total": len(configured_ports(configs[int(node.id)])),
                 "protocols_online": sum(
