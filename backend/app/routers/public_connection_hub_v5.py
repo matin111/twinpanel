@@ -405,6 +405,33 @@ const key='twinpanel_public_connect_theme',root=document.documentElement,theme=d
 function setTheme(v){const x=v==='dark'?'dark':'light';root.dataset.theme=x;if(theme)theme.textContent=x==='dark'?'☀':'☾'}
 let saved='';try{saved=localStorage.getItem(key)||''}catch(e){}setTheme(saved||(matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'));
 if(theme)theme.onclick=function(){const next=root.dataset.theme==='dark'?'light':'dark';setTheme(next);try{localStorage.setItem(key,next)}catch(e){}};
+// User-triggered optional native file share; never invoke an import deep link.
+window.tpNativeShareFile=async function(url,filename,mime){
+  const notify=message=>{
+    const toast=document.getElementById('toast');
+    if(toast){toast.textContent=message;toast.classList.add('show')}
+  };
+  if(!window.isSecureContext||!navigator.share||typeof File==='undefined'){
+    notify('فایل را دانلود کنید و از Files یا Downloads گزینه اشتراک‌گذاری را بزنید.');
+    return false;
+  }
+  try{
+    const response=await fetch(url,{cache:'no-store'});
+    if(!response.ok)throw new Error('file response failed');
+    const file=new File([await response.arrayBuffer()],filename,{type:mime});
+    const payload={files:[file]};
+    if(navigator.canShare&&!navigator.canShare(payload)){
+      notify('برای ارسال فایل، آن را از Files یا Downloads انتخاب کنید.');
+      return false;
+    }
+    await navigator.share(payload);
+    return true;
+  }catch(error){
+    if(error?.name==='AbortError')return false;
+    notify('ارسال پشتیبانی نشد؛ فایل را دانلود کنید و از Files یا Downloads ارسال کنید.');
+    return false;
+  }
+};
 const toast=document.getElementById('toast');function show(t){toast.textContent=t;toast.classList.add('show');clearTimeout(window.__hubToast);window.__hubToast=setTimeout(()=>toast.classList.remove('show'),1200)}
 function fallbackCopy(t){const a=document.createElement('textarea');a.value=t;a.style.position='fixed';a.style.opacity='0';document.body.appendChild(a);a.select();let ok=false;try{ok=document.execCommand('copy')}catch(e){}a.remove();return ok}
 async function copy(t){if(navigator.clipboard&&window.isSecureContext){try{await navigator.clipboard.writeText(t);return true}catch(e){}}return fallbackCopy(t)}
