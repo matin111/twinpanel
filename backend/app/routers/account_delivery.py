@@ -1865,17 +1865,22 @@ def _stored_info(
     data = []
     current_l2tp_psk = None
 
-    rows = (
-        db.query(
-            ProtocolCredential
-        )
+    rows_query = (
+        db.query(ProtocolCredential)
         .filter(
-            ProtocolCredential.subscription_id
-            == sub.id,
+            ProtocolCredential.subscription_id == sub.id,
             ProtocolCredential.is_active.is_(True),
         )
-        .all()
     )
+    # Public single-protocol feeds need just that credential. The request
+    # marker exists only while compiling a public feed, never during admin
+    # editing, provisioning or ordinary customer connection-info rendering.
+    selected_protocol = getattr(db, "info", {}).get("_tp_public_feed_only_protocol")
+    if selected_protocol:
+        rows_query = rows_query.filter(
+            ProtocolCredential.protocol == selected_protocol
+        )
+    rows = rows_query.all()
 
     # Applied REALITY SNI comes from the central verified node settings.
     # Read it once per public request; never mutate encrypted credentials.
