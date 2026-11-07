@@ -761,6 +761,136 @@ body .tp84-dialog-body .fact{min-width:0!important;max-width:100%!important;over
    min-width:44px!important;max-width:83px!important;padding:6px!important;font-size:10px!important;
  }
 }
+
+/* TWINPANEL_CONNECTION_BRAND_PALETTE_V86
+   Brand colors --p / --s come from the same admin-configured branding
+   as the rest of TwinPanel. No hard-coded purple/blue accents. */
+html body.tp80-connection{
+ --tp-brand-bg:var(--bg,#080a0f);
+ --tp-brand-card:var(--surface,#0f1219);
+ --tp-brand-raised:var(--surface2,#141821);
+ --tp-brand-hover:var(--surface3,#1a1f2a);
+ --tp-brand-stroke:var(--line,#252b37);
+ --tp-brand-text:var(--text,#f5f6f8);
+ --tp-brand-muted:var(--muted,#a6adc0);
+ background:var(--tp-brand-bg)!important;
+ color:var(--tp-brand-text)!important;
+}
+html body.tp80-connection .top,
+html body.tp80-connection .topin{
+ background:var(--tp-brand-card)!important;
+ color:var(--tp-brand-text)!important;
+ border-color:var(--tp-brand-stroke)!important;
+}
+html body.tp80-connection .page,
+html body.tp80-connection .protocol-panel.active{
+ color:var(--tp-brand-text)!important;
+}
+html body.tp80-connection .traffic,
+html body.tp80-connection .ref67-user,
+html body.tp80-connection .protocol-choice,
+html body.tp80-connection .protocol-panel.active,
+html body.tp80-connection .protocol-panel.active .ref67-list,
+html body.tp80-connection .protocol-panel.active .tp77-native-list,
+html body.tp80-connection .protocol-panel.active .v54-v2ray-groups{
+ background:var(--tp-brand-card)!important;
+ border-color:var(--tp-brand-stroke)!important;
+ color:var(--tp-brand-text)!important;
+ box-shadow:none!important;
+}
+html body.tp80-connection .protocol-choice.active,
+html body.tp80-connection .protocol-panel.active{
+ border-color:color-mix(in srgb,var(--p) 65%,var(--tp-brand-stroke))!important;
+}
+html body.tp80-connection .protocol-choice.active{
+ box-shadow:0 0 0 1px color-mix(in srgb,var(--p) 50%,transparent)!important;
+}
+html body.tp80-connection .protocol-panel.active > .panel-head,
+html body.tp80-connection .traffic .traffic-head,
+html body.tp80-connection .apps .apps-head{
+ background:linear-gradient(110deg,
+   color-mix(in srgb,var(--p) 12%,var(--tp-brand-card)),
+   color-mix(in srgb,var(--s) 15%,var(--tp-brand-card)))!important;
+ color:var(--tp-brand-text)!important;
+ border-color:var(--tp-brand-stroke)!important;
+}
+html body.tp80-connection .protocol-panel.active .ref67-row,
+html body.tp80-connection .protocol-panel.active .tp77-native-row,
+html body.tp80-connection .protocol-panel.active .v54-v2ray-server-head,
+html body.tp80-connection .protocol-panel.active .v54-v2ray-profile,
+html body.tp80-connection .protocol-panel.active .v54-v2ray-profiles,
+html body.tp80-connection .protocol-panel.active .tp80-inline-native-detail:not([hidden]),
+html body.tp80-connection .protocol-panel.active .tp80-modern-detail:not([hidden]),
+html body.tp80-connection .protocol-panel.active .tp80-credentials,
+html body.tp80-connection .protocol-panel.active .fact,
+html body.tp80-connection .protocol-panel.active .ref67-row-actions button{
+ background:var(--tp-brand-raised)!important;
+ color:var(--tp-brand-text)!important;
+ border-color:var(--tp-brand-stroke)!important;
+}
+html body.tp80-connection .protocol-panel.active .ref67-row:hover,
+html body.tp80-connection .protocol-panel.active .tp77-native-row:hover{
+ background:var(--tp-brand-hover)!important;
+}
+html body.tp80-connection .protocol-panel.active .tp80-country-bar button,
+html body.tp80-connection .protocol-panel.active .ref67-chip,
+html body.tp80-connection .protocol-panel.active .tp74-country-chip,
+html body.tp80-connection .protocol-panel.active .tp80-file-copy,
+html body.tp80-connection .protocol-panel.active .tp80-detail-toggle,
+html body.tp80-connection .protocol-panel.active .tp78-footer-action,
+html body.tp80-connection .protocol-panel.active .tp78-action-footer > [data-kind="app"],
+html body.tp80-connection .protocol-panel.active .ref67-row-actions > button{
+ background:var(--tp-brand-raised)!important;
+ color:var(--tp-brand-text)!important;
+ border-color:var(--tp-brand-stroke)!important;
+ box-shadow:none!important;
+}
+html body.tp80-connection .protocol-panel.active .tp80-country-bar button.active,
+html body.tp80-connection .protocol-panel.active .ref67-chip.active,
+html body.tp80-connection .protocol-panel.active .tp74-country-chip.active,
+html body.tp80-connection .protocol-panel.active .tp80-file-download,
+html body.tp80-connection .protocol-panel.active .ref67-row-actions a.ref67-primary,
+html body.tp80-connection .protocol-panel.active .tp78-action-footer > [data-kind="add"],
+html body.tp80-connection .protocol-panel.active .tp78-action-footer > [data-kind="download"]{
+ background:linear-gradient(120deg,var(--p),var(--s))!important;
+ color:#fff!important;
+ border-color:color-mix(in srgb,var(--p) 70%,white)!important;
+ box-shadow:none!important;
+}
+html body.tp80-connection .protocol-panel.active .tp78-action-footer{
+ background:transparent!important;
+ border-color:var(--tp-brand-stroke)!important;
+}
+html body.tp80-connection .protocol-panel.active .ref67-row-name small,
+html body.tp80-connection .protocol-panel.active .fact small,
+html body.tp80-connection .protocol-choice small{
+ color:var(--tp-brand-muted)!important;
+}
+body .tp84-dialog{
+ background:color-mix(in srgb,var(--tp-brand-bg,#080a0f) 83%,transparent)!important;
+}
+body .tp84-dialog-card{
+ background:var(--tp-brand-card,var(--surface))!important;
+ color:var(--tp-brand-text,var(--text))!important;
+ border-color:color-mix(in srgb,var(--p) 60%,var(--tp-brand-stroke))!important;
+}
+body .tp84-dialog-head,
+body .tp84-dialog-body{
+ background:var(--tp-brand-card,var(--surface))!important;
+ color:var(--tp-brand-text,var(--text))!important;
+ border-color:var(--tp-brand-stroke,var(--line))!important;
+}
+body .tp84-dialog-close{
+ background:var(--tp-brand-raised,var(--surface2))!important;
+ border-color:var(--tp-brand-stroke,var(--line))!important;
+ color:var(--tp-brand-text,var(--text))!important;
+}
+/* Keep native app buttons visually in the same footer, without changing links. */
+html body.tp80-connection .protocol-panel.active .tp78-action-footer > [data-kind="app"]{
+ background:var(--tp-brand-raised)!important;
+ border-color:var(--tp-brand-stroke)!important;
+ color:var(--tp-brand-text)!important;
+}
 """
 
 
