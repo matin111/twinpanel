@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.637",
+  "version": "1.1.0-rc.638",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-07T01:35:08Z",
+  "released_at": "2026-11-07T01:40:59Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "f0c73f1807591382dc8d438b7c0b4f7f634b6616",
+  "source_sha": "e099ff13973ea1711a9c002f24cc915586707080",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.637/twinpanel-1.1.0-rc.637-linux-x86_64.tar.gz",
-    "sha256": "0be6cf3991ee5c44efbea497ed6fa01f983771c6b614792b0aad6466374a9e30",
-    "size_bytes": 29075949
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.638/twinpanel-1.1.0-rc.638-linux-x86_64.tar.gz",
+    "sha256": "6492ddb46b94b83e57732f3f1b60980e28e70ae62916a0156e1adf8b33461fe0",
+    "size_bytes": 29079290
   },
   "notes": {
-    "fa": "اصلاح نمایش دانلود و آپلود در تونل‌های TP27 Fast با افزایش مهلت محدود دریافت نتیجه تست TCP از ۳ به ۱۲ ثانیه؛ مشکل ثبت‌نشدن نتیجه در مسیرهای با تأخیر بالا رفع می‌شود. بدون تغییر هسته تونل، مسیر GRE، NAT، پروتکل‌ها یا تنظیمات کاربران.",
-    "en": "Fix TP27 Fast download/upload benchmark results on long-RTT tunnels: extend the bounded TCP receiver finalization window from 3 to 12 seconds after sender completion. No GRE carrier, NAT, port mapping, protocol, credential, or customer config change."
+    "fa": "بازگردانی لینک‌های دانلود مستقیم برنامه‌ها به صفحه Connection با تشخیص هوشمند سیستم‌عامل شامل اندروید، ویندوز، آیفون، مک و لینوکس؛ حذف پنجره تکراری V2Ray و ضربدر بدون تغییر کانفیگ‌ها یا آدرس سرورها.",
+    "en": "Restore official and uploaded direct app downloads with device-based Windows, macOS, Android, iOS and Linux selection; remove redundant legacy V2Ray mobile sheet and duplicated selector. Preserve all VPN config content, endpoints, ports, SNI and credentials."
   }
 }
