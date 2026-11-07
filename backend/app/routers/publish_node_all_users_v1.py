@@ -251,12 +251,16 @@ async def _install_node_in_background(
             _safe_install_progress(
                 job_id, "failed", node_id=node_id,
                 installed_protocols=installed_count,
-                error_code="PROTOCOL_SETUP_INCOMPLETE",
+                error_code=("NODE_QUOTA_SETUP_FAILED"
+                            if live.get("ok") and quota.get("ok") is False
+                            else "PROTOCOL_SETUP_INCOMPLETE"),
             )
             print("TWINPANEL_NODE_AUTO_ENROLL_BLOCKED_NOT_READY", {
                 "node_id": node_id, "installed_count": installed_count,
                 "missing_live_protocols": live.get("missing", []),
-                "reason": live.get("reason"),
+                "reason": ("quota_bootstrap_failed"
+                           if live.get("ok") and quota.get("ok") is False
+                           else live.get("reason")),
             }, flush=True)
             return
 
