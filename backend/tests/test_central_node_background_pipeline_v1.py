@@ -45,8 +45,10 @@ class InstallCentralPipelineTests(unittest.IsolatedAsyncioTestCase):
         with (
             patch.object(installer,"SessionLocal",return_value=db),
             patch.object(installer,"_safe_install_progress") as progress,
+            patch("app.services.central_first_exit_bootstrap_v1.bootstrap_hidden_central_exit",
+                  new_callable=AsyncMock,return_value=base) as central_bootstrap,
             patch("app.routers.provision.install_node",
-                  new_callable=AsyncMock,return_value=base),
+                  new_callable=AsyncMock) as legacy_install,
             patch("app.routers.classic_protocol_admin_v1.ensure_classic_protocol",
                   new_callable=AsyncMock,return_value={"ok":True}),
             patch("app.services.new_node_modern_bootstrap_v1.bootstrap_new_exit_modern_protocols",
@@ -62,6 +64,8 @@ class InstallCentralPipelineTests(unittest.IsolatedAsyncioTestCase):
                 payload,{"type":"http","method":"POST","path":"/v1/nodes/install-background-v1",
                          "headers":[]}, "00000000-0000-0000-0000-000000000001",
             )
+            central_bootstrap.assert_awaited_once()
+            legacy_install.assert_not_awaited()
             calls=[x.args[1] for x in progress.call_args_list]
             last_payload=progress.call_args_list[-1].kwargs
         return sequence,calls,db,last_payload

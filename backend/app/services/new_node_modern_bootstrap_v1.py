@@ -6,23 +6,12 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from ..models import Node, NodeProtocolConfig, NodeType
-from ..modern_protocol_models import ModernProtocolSetting
 from ..protocol_account_registry import MODERN_PROTOCOL_KEYS
 from ..protocol_catalog import PROTOCOL_CATALOG
 
 
 def _status_value(value: Any) -> str:
     return str(getattr(value, "value", value) or "").strip().lower()
-
-
-def _settings_dict(row: ModernProtocolSetting | None) -> dict[str, Any]:
-    if row is None:
-        return {}
-    try:
-        value = json.loads(row.settings_json or "{}")
-    except Exception:
-        return {}
-    return value if isinstance(value, dict) else {}
 
 
 def build_modern_bootstrap_plan(db: Session, node_id: int) -> dict[str, Any]:
@@ -43,35 +32,30 @@ def build_modern_bootstrap_plan(db: Session, node_id: int) -> dict[str, Any]:
     skipped_no_template: list[str] = []
     skipped_port_conflict: list[dict[str, Any]] = []
 
-    for key in MODERN_PROTOCOL_KEYS:
+    # Central-first bootstrap owns its runtime; it MUST NOT borrow port
+    # assignments, secrets, cert paths or presets from another customer's
+    # legacy Exit. All modern protocols are provisioned from the canonical
+    # catalog with node-local recommended defaults in one install operation.
+    for key in sorted(MODERN_PROTOCOL_KEYS):
         if key in already_online:
             continue
         definition = PROTOCOL_CATALOG.get(key) or {}
         if definition.get("runtime_status") != "ready":
             continue
-        source = (
-            db.query(NodeProtocolConfig)
-            .join(Node, Node.id == NodeProtocolConfig.node_id)
-            .filter(Node.retired_at.is_(None), Node.node_type == NodeType.EXIT, Node.id != int(target.id), NodeProtocolConfig.protocol == key, NodeProtocolConfig.status == "online", NodeProtocolConfig.port.isnot(None))
-            .order_by(NodeProtocolConfig.checked_at.desc().nullslast(), Node.id.desc())
-            .first()
-        )
-        if source is None:
-            skipped_no_template.append(key)
+        chosen_port = int(definition["default_port"])
+        if chosen_port in occupied_ports:
+            skipped_port_conflict.append({
+                "protocol": key, "default_port": chosen_port,
+            })
             continue
-        preferred_port = int(source.port)
-        default_port = int(definition["default_port"])
-        chosen_port = next((candidate for candidate in (preferred_port, default_port) if candidate not in occupied_ports), None)
-        if chosen_port is None:
-            skipped_port_conflict.append({"protocol": key, "preferred_port": preferred_port, "default_port": default_port})
-            continue
-        setting = db.query(ModernProtocolSetting).filter(ModernProtocolSetting.node_id == int(source.node_id), ModernProtocolSetting.protocol == key).first()
-        preset = str(setting.preset_name or "recommended") if setting else "recommended"
-        saved_settings = _settings_dict(setting)
         protocols.append(key)
         ports[key] = chosen_port
-        profiles[key] = {"preset": preset, "settings": saved_settings}
-        sources[key] = {"node_id": int(source.node_id), "port": preferred_port, "chosen_port": chosen_port, "preset": preset}
+        profiles[key] = {"preset": "recommended", "settings": {}}
+        sources[key] = {
+            "mode": "central_catalog",
+            "chosen_port": chosen_port,
+            "preset": "recommended",
+        }
         occupied_ports.add(chosen_port)
 
     return {"node_id": int(target.id), "protocols": protocols, "ports": ports, "profiles": profiles, "sources": sources, "already_online": sorted(already_online), "skipped_no_template": skipped_no_template, "skipped_port_conflict": skipped_port_conflict}
