@@ -777,6 +777,17 @@ _SCRIPT = r"""
    app.dataset.kind='app';app.dataset.tp80OfficialSudoku='1';
    return app;
  }
+ function ensureCanonicalApp(panel){
+   // V69 may mount a real OS app AFTER V78/V80 has finalized the footer.
+   // Rehome its original live link; don't display a second download card.
+   const footer=panel.querySelector(':scope > .tp78-action-footer');
+   if(!footer||footer.querySelector(':scope > [data-kind="app"]'))return;
+   const source=panel.querySelector(':scope > .v34-client-card a[href],:scope > .ref70-app-card a[href]');
+   const url=source?.getAttribute('href')||'';
+   if(!source||!/^(https?:\/\/|\/(?!\/))/i.test(url))return;
+   source.dataset.kind='app';source.classList.add('tp78-footer-action');
+   footer.append(source);
+ }
  function ensureSudokuClient(panel){
    const key=String(panel.dataset.ref67NativeProtocol||panel.dataset.v34Protocol||'').toLowerCase();
    if(key!=='sudoku')return;
@@ -846,6 +857,7 @@ _SCRIPT = r"""
      normalizeV2ray(panel);
      normalizeModern(panel);
      alignFooter(panel);
+     ensureCanonicalApp(panel);
      ensureSudokuClient(panel);
    });
  }
