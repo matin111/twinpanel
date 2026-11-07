@@ -186,6 +186,18 @@ _SCRIPT_TEMPLATE = r"""
   }
   function cloneAction(source,label,primary){
     if(!source)return null;
+    // Mobile cards must use server attachment files, not text-area Blobs.
+    const target=String(source.dataset?.target||'');
+    const file=target.match(/^(?:hub-protocol-\d+-|cfg-|download-source-)(openvpn|wireguard|amneziawg)-(\d+)$/);
+    const token=location.pathname.match(/^\/v1\/connect\/([^/]+)/);
+    if(file&&token){
+      const link=document.createElement('a');
+      link.href='/v1/connect/'+token[1]+'/file/'+file[1]+'/'+file[2];
+      link.setAttribute('download',String(source.dataset.filename||''));
+      link.className='v17-action'+(primary?' primary':'');
+      link.textContent=label;
+      return link;
+    }
     let out;
     if(source.tagName==='A'){
       out=document.createElement('a');out.href=source.getAttribute('href')||'#';

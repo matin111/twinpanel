@@ -309,7 +309,10 @@ _SCRIPT = r"""
     const href=String(node.getAttribute?.('href')||'').trim();
     if(href&&!/^(?:karing|hiddify):\/\//i.test(href)&&!isUri(href))return href;
     const target=String(node.dataset?.target||node.dataset?.configPath||'').trim();
-    return target;
+    const file=target.match(/^(?:hub-protocol-\d+-|cfg-|download-source-)(openvpn|wireguard|amneziawg)-(\d+)$/);
+    const token=location.pathname.match(/^\/v1\/connect\/([^/]+)/);
+    if(file&&token)return '/v1/connect/'+token[1]+'/file/'+file[1]+'/'+file[2];
+    return target.startsWith('/')?target:'';
   }
 
   function cleanAnchor(href,label,primary){
@@ -317,7 +320,9 @@ _SCRIPT = r"""
     link.href=href;
     link.textContent=label;
     if(primary)link.classList.add('v31-primary');
-    if(/^https?:\/\//i.test(href)){
+    if(/\/(?:file\/(?:openvpn|wireguard|amneziawg)\/\d+|modern-config-v(?:14|16)\/)/.test(href)){
+      link.setAttribute('download','');
+    }else if(/^https?:\/\//i.test(href)){
       link.target='_blank';
       link.rel='noopener noreferrer';
     }
