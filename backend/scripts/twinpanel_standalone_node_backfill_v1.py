@@ -104,11 +104,12 @@ def pending_for_node(db, node: Node, max_pairs: int, *,
 
 async def run_one_node(node_id: int, *, max_pairs: int = 3,
                        subscription_id: int | None = None,
-                       include_all_active: bool = False) -> int:
+                       include_all_active: bool = False) -> tuple[int, bool]:
     logging.getLogger("asyncssh").setLevel(logging.WARNING)
     db = SessionLocal()
     conn = None
     done = 0
+    retry_needed = False
     try:
         node = db.get(Node, int(node_id))
         if (
@@ -117,18 +118,19 @@ async def run_one_node(node_id: int, *, max_pairs: int = 3,
             or node.status != NodeStatus.ONLINE
             or not node.show_to_users
         ):
-            return 0
+            return 0, False
         work = pending_for_node(
             db, node, max_pairs,
             subscription_id=subscription_id,
             include_all_active=include_all_active,
         )
         if not work:
-            return 0
+            return 0, False
         conn = await asyncio.wait_for(ad.ssh_connect_saved(node, db), timeout=30)
         for sub, protocol, cred, old_items, port in work:
             lock = SubscriptionProvisioningGuard(int(sub.id))
             if not lock.acquire():
+                retry_needed = True
                 continue
             try:
                 db.refresh(sub)
@@ -150,6 +152,10 @@ async def run_one_node(node_id: int, *, max_pairs: int = 3,
                 item = await asyncio.wait_for(
                     apply_account(conn, node, secret, port), timeout=190,
                 )
+                if protocol == "amneziawg":
+                    from app.amneziawg_egress_v221 import ensure_amneziawg_egress
+                    egress = await ensure_amneziawg_egress(conn)
+                    item["egress_contract"] = int(egress["contract"])
                 if not isinstance(item, dict) or ad._autosync_item_node_id(item) != int(node.id):
                     raise RuntimeError("unverified_node_account_item")
                 # Idempotent missing-only merge. Other server identities and
@@ -164,6 +170,7 @@ async def run_one_node(node_id: int, *, max_pairs: int = 3,
                 db.commit()
                 done += 1
             except Exception as exc:
+                retry_needed = True
                 db.rollback()
                 print("STANDALONE_NODE_PAIR_ERROR", {
                     "node_id": int(node_id), "protocol": protocol,
@@ -171,7 +178,7 @@ async def run_one_node(node_id: int, *, max_pairs: int = 3,
                 }, flush=True)
             finally:
                 lock.release()
-        return done
+        return done, retry_needed
     finally:
         if conn is not None:
             conn.close()
