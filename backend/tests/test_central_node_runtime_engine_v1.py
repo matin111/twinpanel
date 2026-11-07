@@ -56,6 +56,36 @@ class RuntimeReconciliationTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("sudoku_shared_v2",str(started[-1]))
         self.assertEqual(active,0)
 
+    async def test_delta_runs_only_selected_wireguard_family(self):
+        calls = []
+        class Process:
+            async def wait(self):
+                return 0
+        async def spawn(*cmd, **kwargs):
+            calls.append(cmd)
+            return Process()
+        selected = (next(f for f in engine.FAMILIES
+                         if f.name == "wireguard"),)
+        with patch.object(engine.asyncio, "create_subprocess_exec",
+                          side_effect=spawn):
+            result = await engine.reconcile_runtime_families(
+                14, 3000, Path("/backend"), families=selected)
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["runtime_families"], 1)
+        self.assertEqual(result["succeeded"], ["wireguard"])
+        self.assertEqual(len(calls), 1)
+        self.assertIn("wireguard", str(calls[0]))
+
+    async def test_delta_rejects_unknown_family_before_process_spawn(self):
+        fake = engine.RuntimeFamily("unsafe", "twinpanel_central_fake.py",
+                                    frozenset({"wireguard"}))
+        with patch.object(engine.asyncio, "create_subprocess_exec") as spawn:
+            with self.assertRaisesRegex(RuntimeError,
+                                        "UNKNOWN_DELTA_FAMILY"):
+                await engine.reconcile_runtime_families(
+                    14, 3000, Path("/backend"), families=(fake,))
+            spawn.assert_not_called()
+
     async def test_shared_sudoku_gets_one_isolated_retry_after_nonzero(self):
         calls=[]
         class Process:
