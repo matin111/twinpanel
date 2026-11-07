@@ -227,7 +227,8 @@ body.ref67 .advanced,body.ref67 .apps{border-color:#353d61!important}
  body.ref67 .ref67-user strong{font-size:15px}
  body.ref67 .ref67-user small{font-size:10px}
  body.ref67 .traffic .stats{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:0}
- body.ref67 .traffic .stat:nth-child(n+4){display:none!important}
+ /* Keep first-connection and expiry visible on mobile too. */
+ body.ref67 .traffic .stat:nth-child(n+4){display:flex!important}
  body.ref67 .traffic .stat{padding:8px 3px!important;min-height:62px}
  body.ref67 .traffic .stat strong{font-size:14px!important}
  body.ref67 .traffic .stat small{font-size:9px!important}
