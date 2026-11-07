@@ -1443,57 +1443,89 @@ _SCRIPT = r"""
    if(!present)footer.append(createSudokuClientAction());
  }
  function alignFooter(panel){
-   const footer=panel.querySelector(':scope > .tp78-action-footer');
-   if(!footer||footer.dataset.tp80Ready==='1')return;
-   const children=[...footer.querySelectorAll(':scope > .tp78-footer-action')];
-   const find=kind=>children.find(node=>node.dataset.kind===kind);
+   // All protocol families share one footer. V51, V52 and V78 may arrive in
+   // different orders. Preserve the ORIGINAL nodes and their click handlers.
+   let footer=panel.querySelector(':scope > .tp78-action-footer');
+   if(!footer){
+     footer=el('nav','tp78-action-footer');
+     footer.setAttribute('aria-label','عملیات اشتراک');
+     panel.append(footer);
+   }
+   panel.querySelectorAll(':scope > .tp78-action-footer').forEach(other=>{
+     if(other!==footer){[...other.children].forEach(node=>footer.append(node));other.remove()}
+   });
    const key=keyForPanel(panel);
-   // One verified device-specific app link in the SAME footer for all protocols.
-   // Reuse genuine installed links instead of displaying the same client twice.
-   if(!find('app')){
-     const app=panel.querySelector(':scope > .v34-client-card a[href],:scope > .ref70-app-card a[href]');
-     const url=app?.getAttribute('href')||'';
-     if(app&&/^(https?:\/\/|\/(?!\/))/i.test(url)){
-       app.dataset.kind='app';app.classList.add('tp78-footer-action');
-       children.push(app);
-     }
+   const fileProtocol=['openvpn','wireguard','amneziawg'].includes(key);
+   const classify=node=>{
+     const declared=String(node.dataset.kind||'').toLowerCase();
+     if(['add','download','copy','link','app'].includes(declared))return declared;
+     const label=String(node.textContent||'').trim();
+     if(/افزودن همه|import all/i.test(label))return'add';
+     if(/دانلود همه|download all/i.test(label))return'download';
+     if(/کپی لینک|لینک اشتراک|لینک بسته|subscription link/i.test(label))return'link';
+     if(/کپی همه|کپی JSON|کپی YAML|copy all/i.test(label))return'copy';
+     return'extra';
+   };
+   const source=panel.querySelector(':scope > .v52-multi-card .v51-multi-actions,:scope > .v51-multi-card .v51-multi-actions');
+   if(source){
+     [...source.children].filter(node=>node.matches('a,button')).forEach(node=>{
+       node.dataset.kind=classify(node);
+       node.classList.add('tp78-footer-action');
+       footer.append(node);
+     });
    }
-   if(key==='sudoku'&&!find('app'))children.push(createSudokuClientAction());
-   const fileProtocol=new Set(['openvpn','wireguard','amneziawg']).has(key);
+   const nodes=[...footer.querySelectorAll(':scope > .tp78-footer-action')];
+   const find=kind=>nodes.find(node=>node.dataset.kind===kind);
    let primary=find('add')||find('download');
-   const previousPrimary=primary;
-   if(fileProtocol){
-     // A single verified ZIP of the original files. Do not present a vague
-     // "download all" button that may download only one selected server.
-     const token=location.pathname.match(/^\/v1\/connect\/([^/]+)/)?.[1];
-     if(token){
-       const zip=el('a','tp78-footer-action tp80-files-zip','دانلود همه فایل‌ها ZIP');
-       zip.dataset.kind='download';
-       zip.setAttribute('download',key+'-configs.zip');
-       zip.href=location.origin+'/v1/connect/'+token+'/multi/'+encodeURIComponent(key);
-       if(primary)primary.remove();
-       primary=zip;
+   let link=find('link');
+   let copy=find('copy');
+   let app=find('app');
+   if(fileProtocol&&!copy){
+     const files=[...panel.querySelectorAll('.server-view textarea')];
+     if(files.some(node=>String(node.value||node.textContent||'').trim())){
+       copy=el('button','tp78-footer-action','کپی همه کانفیگ‌ها');copy.type='button';
+       copy.dataset.kind='copy';
+       copy.addEventListener('click',async event=>{
+         event.preventDefault();event.stopPropagation();
+         const value=files.map(node=>String(node.value||node.textContent||'').trim()).filter(Boolean).join('\n\n');
+         if(!value)return;
+         let ok=false;
+         try{if(navigator.clipboard&&window.isSecureContext){await navigator.clipboard.writeText(value);ok=true}}catch(_e){}
+         if(!ok){
+           const area=document.createElement('textarea');area.value=value;
+           area.style.position='fixed';area.style.left='-9999px';
+           document.body.append(area);area.select();
+           try{ok=document.execCommand('copy')}catch(_e){}
+           area.remove();
+         }
+         const toast=document.getElementById('toast');
+         if(toast){toast.textContent=ok?'کانفیگ‌ها کپی شدند':'کپی انجام نشد';toast.classList.add('show');setTimeout(()=>toast.classList.remove('show'),1500)}
+       });
      }
    }
-   const ordered=[primary,find('link'),find('copy'),find('app')].filter(Boolean);
-   // Do not render dead placeholders. Every button must perform a real action.
-   const extra=children.filter(node=>!ordered.includes(node)&&node!==primary&&node!==previousPrimary);
-   footer.replaceChildren(...ordered);
-   if(extra.length){
-     const details=el('details','tp80-extra-actions');
-     details.append(el('summary','','سایر فرمت‌های کانفیگ'));
-     const holder=el('div','tp80-extra-list');
-     extra.forEach(node=>holder.append(node));details.append(holder);
-     footer.append(details);
+   // Preserve existing working download-all from V51. ZIP route is already
+   // represented by that real <a> element. Do not replace it with placeholders.
+   const ordered=[primary,link,copy,app].filter(Boolean);
+   const extra=nodes.filter(node=>!ordered.includes(node)&&node.dataset.kind!=='app');
+   const previous=[...footer.querySelectorAll(':scope > .tp80-extra-actions .tp78-footer-action')];
+   // Do not discard buttons: keep original source nodes and secondary actions.
+   const extras=[...new Set([...extra,...previous])];
+   const expected=[...ordered,...extras];
+   const current=[...footer.querySelectorAll(':scope > .tp78-footer-action')];
+   const same=current.length===ordered.length&&current.every((node,i)=>node===ordered[i]);
+   if(!same||footer.querySelector(':scope > .tp80-extra-actions')){
+     footer.replaceChildren(...ordered);
+     if(extras.length){
+       const details=el('details','tp80-extra-actions');
+       details.append(el('summary','','سایر فرمت‌های کانفیگ'));
+       const holder=el('div','tp80-extra-list');extras.forEach(node=>holder.append(node));
+       details.append(holder);footer.append(details);
+     }
    }
-   // Layout fills the width for 1,2,3,4 available operations, on any device.
-   footer.dataset.hasPrimary=primary?'1':'0';
-   footer.style.setProperty('--tp80-cols',String(Math.min(4,Math.max(1,ordered.length))));
-   footer.style.setProperty('--tp80-secondary-cols',String(Math.min(3,Math.max(1,ordered.length-(primary?1:0)))));
-   if(!ordered.length&&!extra.length)footer.remove();
-   else footer.dataset.tp80Ready='1';
+   footer.dataset.tp80Ready='1';
+   footer.dataset.tp88Layout=ordered.length>=4?'four':ordered.length===3?'three':ordered.length===2?'two':'one';
+   footer.style.setProperty('--tp80-cols',String(Math.max(1,Math.min(4,ordered.length))));
  }
-
  function reconcileClientDownload(panel){
    const key=keyForPanel(panel);
    const noApp=/^l2tp(?:[\\/_-]?ipsec)?$/.test(key);
@@ -1563,7 +1595,8 @@ _SCRIPT = r"""
    }
    panel.querySelectorAll('.v34-client-card,.ref70-app-card,.v13-client-only').forEach(card=>card.remove());
    panel.querySelectorAll(':scope > .ref69-download-cta').forEach(node=>node.remove());
-   // Protect the original config/copy/add actions.
+   // Merge action builders after the genuine app link is available.
+   alignFooter(panel);
    const actions=[...footer.querySelectorAll(':scope > .tp78-footer-action')];
    const count=actions.length;
    footer.dataset.tp88Layout=count>=4?'four':count===3?'three':count===2?'two':'one';
