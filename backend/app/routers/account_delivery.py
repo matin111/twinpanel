@@ -2304,6 +2304,17 @@ async def sync_installed_node_to_subscriptions(
                 "unsupported_node_type",
         }
 
+    # Central Exits are exclusively reconciled by one service-family engine.
+    # Keep the compatibility callable for legacy nodes, but it is never
+    # allowed to start per-user SSH/credential creation on a central Exit.
+    if node_type == "exit":
+        from ..services.central_runtime_ownership_v1 import is_central_node
+        if is_central_node(db,int(node.id)):
+            return {"ok":True,"skipped":True,
+                    "reason":"central_runtime_owner",
+                    "membership_added":0,"provisioned_pairs":0,
+                    "reused_pairs":0,"failed":[]}
+
     all_subscriptions = (
         db.query(
             Subscription
