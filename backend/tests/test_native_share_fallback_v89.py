@@ -27,7 +27,7 @@ def test_direct_share_uses_user_gesture_and_cancel_is_not_failure():
     assert "shareFile.addEventListener('click',event=>" in UI
     assert "shareFile.addEventListener('click',async event=>" not in UI
     assert "new File([config],filename,{type:mime})" in UI
-    assert "window.tpNativeShareFile(file);" not in UI
+    assert "const promise=window.tpNativeShareFile(file);" in UI
     assert "window.tpNativeShareFile=function(file)" in HELPER
     assert "if(error?.name==='AbortError')return null" in HELPER
 
