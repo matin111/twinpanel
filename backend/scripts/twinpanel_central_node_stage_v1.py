@@ -21,7 +21,7 @@ from sqlalchemy import text
 BACKEND = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND))
 
-from app.services.central_runtime_ownership_v1 import allow_central_node, mark_central_node, mark_central_applied
+from app.services.central_runtime_ownership_v1 import allow_central_node, is_central_node, mark_central_node, mark_central_applied
 from app.database import SessionLocal
 from app.models import Node, NodeStatus, NodeType
 from app.services.new_node_readiness_v1 import verify_new_exit_readiness
@@ -100,7 +100,7 @@ def missing_runtime_families(node_id, limit):
         return selected
 
 
-def run(node_id, limit, apply):
+def run(node_id, limit, apply, *, delta_only=False):
     # Prevent two independent staging processes from racing on the same node.
     lock_path = Path(f"/tmp/twinpanel-central-node-stage-{node_id}.lock")
     with lock_path.open("a+", encoding="utf-8") as lock:
@@ -113,15 +113,31 @@ def run(node_id, limit, apply):
         # snapshots* inside the SAME node mutex, never launch a per-user queue.
         # A moving target after the final attempt remains hidden and fails.
         if not apply:
+            if delta_only:
+                raise RuntimeError("CENTRAL_DELTA_REQUIRES_APPLY")
             return _run_locked(node_id, limit, False)
-        delta_families = None
+        # Published nodes already passed the full 16-listener/Sudoku
+        # bootstrap audit before registration. Their FIRST live subscription
+        # change must reconcile only missing runtime families, not reinstall
+        # or restart all ten service families.
+        if delta_only:
+            with SessionLocal() as db:
+                node = db.get(Node, node_id)
+                if (node is None or not bool(node.show_to_users)
+                        or not is_central_node(db, node_id)
+                        or not allow_central_node(db, node)):
+                    raise RuntimeError("CENTRAL_DELTA_REQUIRES_REGISTERED_VISIBLE_EXIT")
+            delta_families = missing_runtime_families(node_id, limit)
+        else:
+            delta_families = None
         for attempt in range(3):
             try:
                 if delta_families is None:
-                    status = _run_locked(node_id, limit, True)
+                    status = _run_locked(node_id, limit, True, delta_only=delta_only)
                 else:
                     status = _run_locked(
                         node_id, limit, True, families=delta_families,
+                        delta_only=delta_only,
                     )
             except RuntimeError as exc:
                 if str(exc) not in {
@@ -153,7 +169,7 @@ def run(node_id, limit, apply):
         return 3
 
 
-def _run_locked(node_id, limit, apply, *, families=None):
+def _run_locked(node_id, limit, apply, *, families=None, delta_only=False):
     with SessionLocal() as db:
         node = db.get(Node, node_id)
         if (node is None or node.retired_at is not None
@@ -176,15 +192,21 @@ def _run_locked(node_id, limit, apply, *, families=None):
         if not apply:
             db.rollback()
             return 0
-        # The original 16 protocol listeners are validated before staging.
-        readiness = asyncio.run(verify_new_exit_readiness(db, node_id))
-        if not readiness.get("ok"):
-            raise RuntimeError("CENTRAL_NODE_STAGE_PROTOCOLS_NOT_READY")
-        # Install ONE pinned multi-user Sudoku binary per Exit. Legacy
-        # services, customer credentials and subscriptions remain untouched.
-        shared = asyncio.run(ensure_shared_binary(node, db))
-        print("CENTRAL_SUDOKU_SHARED_RUNTIME_READY",
-              json.dumps({"node_id":node_id,**shared}),flush=True)
+        if delta_only:
+            # This path is reachable only for a previously registered visible
+            # central Exit. Per-family adapters enforce their own local
+            # readiness when actually needed. Avoid a fleet-wide SSH health
+            # check and Sudoku binary installation on every purchase.
+            if not bool(node.show_to_users) or not is_central_node(db, node_id):
+                raise RuntimeError("CENTRAL_DELTA_REQUIRES_REGISTERED_VISIBLE_EXIT")
+        else:
+            # First hidden-node install must prove all listeners are healthy.
+            readiness = asyncio.run(verify_new_exit_readiness(db, node_id))
+            if not readiness.get("ok"):
+                raise RuntimeError("CENTRAL_NODE_STAGE_PROTOCOLS_NOT_READY")
+            shared = asyncio.run(ensure_shared_binary(node, db))
+            print("CENTRAL_SUDOKU_SHARED_RUNTIME_READY",
+                  json.dumps({"node_id":node_id,**shared}),flush=True)
         # Re-read after the potentially slow listener audit and serialize only
         # the short membership transaction, never the network health checks.
         db.expire_all()
@@ -295,10 +317,14 @@ def parse_args(argv=None):
     p.add_argument("--node-id", type=int, required=True)
     p.add_argument("--limit", type=int, default=MAX_USERS)
     p.add_argument("--apply", action="store_true")
+    p.add_argument("--delta-only", action="store_true",
+                   help="For previously registered visible central Exits only")
     p.add_argument("--confirm-node-id", type=int)
     args = p.parse_args(argv)
     if args.node_id < 1 or not 1 <= args.limit <= MAX_USERS:
         p.error("invalid node-id or limit")
+    if args.delta_only and not args.apply:
+        p.error("--delta-only requires --apply")
     if args.apply and args.confirm_node_id != args.node_id:
         p.error("--apply requires matching --confirm-node-id")
     return args
@@ -307,7 +333,8 @@ def parse_args(argv=None):
 if __name__ == "__main__":
     args = parse_args()
     try:
-        raise SystemExit(run(args.node_id, args.limit, args.apply))
+        raise SystemExit(run(args.node_id, args.limit, args.apply,
+                             delta_only=args.delta_only))
     except Exception as exc:
         print("CENTRAL_NODE_STAGE_SAFE_STOP", json.dumps({
             "node_id": args.node_id, "error_type": type(exc).__name__,
