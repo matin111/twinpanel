@@ -227,7 +227,8 @@ _SCRIPT = r"""
     document.querySelector('.top .service')?.textContent?.trim()||'Connection';
    const active=top?.querySelector('.status')?.textContent?.trim()||'وضعیت اشتراک';
    const box=document.createElement('div');box.className='ref67-user';
-   const avatar=document.createElement('span');avatar.className='ref67-usericon';avatar.textContent='♙';
+   const avatar=document.createElement('span');avatar.className='ref67-usericon';
+   avatar.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true" width="27" height="27" fill="none" stroke="white" stroke-width="2.4" stroke-linecap="round"><circle cx="12" cy="7" r="4"/><path d="M4 21v-2c0-4.2 3.6-6.7 8-6.7s8 2.5 8 6.7v2"/></svg>';
    const info=document.createElement('div');const strong=document.createElement('strong');strong.textContent=user;
    const small=document.createElement('small');small.textContent='● '+active;
    info.append(strong,small);box.append(avatar,info);
@@ -367,6 +368,11 @@ _SCRIPT = r"""
  }
  function apply(){
   document.body.classList.add('ref67');
+  const mark=document.querySelector('.brand .mark');
+  if(mark&&!mark.dataset.ref67BrandIcon){
+   mark.dataset.ref67BrandIcon='1';
+   mark.innerHTML='<svg viewBox="0 0 24 24" width="27" height="27" fill="none" stroke="white" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.07 0l3-3a5 5 0 1 0-7.07-7.07l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.07 0l-3 3A5 5 0 1 0 11 21.07l1.7-1.7"/></svg>';
+  }
   addUser();reorderProtocols();categories();
   if(!document.body.dataset.ref67InitialSelection){
    document.body.dataset.ref67InitialSelection='1';
