@@ -103,7 +103,10 @@ def install() -> None:
     forward_v34._SCRIPT = _canonicalize_v34_subscription_name(forward_v34._SCRIPT)
 
     # HA/reference layouts use the same canonical identity contract.
-    final_v37._SCRIPT = _canonicalize_import_name(final_v37._SCRIPT)
+    final_v37._SCRIPT = _make_async_once(
+        _canonicalize_import_name(final_v37._SCRIPT),
+        "function buildMulti(panel){",
+    )
     reference_v38._SCRIPT = _canonicalize_import_name(reference_v38._SCRIPT, v38=True)
 
 
