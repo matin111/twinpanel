@@ -240,7 +240,7 @@ app.add_middleware(LicenseMutationGuardMiddleware)
 
 
 @app.get("/health")
-def health():
+async def health():
     return {
         "ok": True,
         "service": settings.app_name,
