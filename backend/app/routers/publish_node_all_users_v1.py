@@ -222,6 +222,17 @@ async def _install_node_in_background(payload: BackgroundNodeInstallIn, request_
             }, flush=True)
             return
 
+        # Verify current listeners, not just saved 'online' DB strings.
+        # One read-only management connection, no service restarts.
+        from ..services.new_node_readiness_v1 import verify_new_exit_readiness
+        live = await verify_new_exit_readiness(db, node_id)
+        if not live.get("ok"):
+            print("TWINPANEL_NODE_AUTO_ENROLL_PAUSED_LIVE_HEALTH", {
+                "node_id": node_id, "reason": live.get("reason"),
+                "missing": live.get("missing"),
+            }, flush=True)
+            return
+
         # Stage E: only now mark the node as desired for eligible subscriptions.
         # The SQL set-based publish enqueues the centrally supervised
         # missing-only provisioning transactionally; no 1700-user SSH loop
