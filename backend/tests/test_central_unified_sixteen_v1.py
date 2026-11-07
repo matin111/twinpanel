@@ -112,6 +112,12 @@ def test_same_standalone_scope_for_migrated_native_and_expiry_quota():
 
 def test_missing_only_keeps_old_node_config_and_never_rotates_identity():
     engine, db, node = fixture()
+    # BigInteger PK in production is allocated by Postgres. SQLite test
+    # fixtures use explicit ids so the regression tests avoid AUTOINCREMENT
+    # differences unrelated to the actual node worker.
+    db.add(ProtocolCredential(
+        id=2101, subscription_id=101, protocol="mieru",
+    ))
     db.add(ProtocolCredential(
         id=2102, subscription_id=102, protocol="mieru",
         username="tp-sub-102",
