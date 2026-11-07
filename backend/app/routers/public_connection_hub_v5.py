@@ -410,6 +410,19 @@ function fallbackCopy(t){const a=document.createElement('textarea');a.value=t;a.
 async function copy(t){if(navigator.clipboard&&window.isSecureContext){try{await navigator.clipboard.writeText(t);return true}catch(e){}}return fallbackCopy(t)}
 document.querySelectorAll('.protocol-choice').forEach(b=>b.onclick=function(){const id=b.dataset.protocol;document.querySelectorAll('.protocol-choice').forEach(x=>x.classList.remove('active'));document.querySelectorAll('.protocol-panel').forEach(x=>x.classList.remove('active'));b.classList.add('active');const p=document.getElementById(id);if(p)p.classList.add('active')});
 document.querySelectorAll('.server-tab').forEach(b=>b.onclick=function(){const p=b.closest('.protocol-panel');if(!p)return;p.querySelectorAll('.server-tab').forEach(x=>x.classList.remove('active'));p.querySelectorAll('.server-view').forEach(x=>x.classList.remove('active'));b.classList.add('active');const v=document.getElementById(b.dataset.server);if(v)v.classList.add('active')});
+// Native file profiles must use the server attachment endpoint, never an
+// in-browser text/plain Blob. Capture before legacy bubbling download handlers.
+document.addEventListener('click',function(e){
+  const source=e.target.closest('button.download-config[data-target]');
+  if(!source)return;
+  const match=String(source.dataset.target||'').match(/^(?:cfg|download-source)-(openvpn|wireguard|amneziawg)-(\\d+)$/);
+  const tokenMatch=location.pathname.match(/^\\/v1\\/connect\\/([^/]+)/);
+  if(!match||!tokenMatch)return;
+  e.preventDefault();e.stopImmediatePropagation();
+  const url='/v1/connect/'+tokenMatch[1]+'/file/'+match[1]+'/'+match[2];
+  const a=document.createElement('a');a.href=url;a.download=String(source.dataset.filename||'');
+  a.rel='noopener';document.body.appendChild(a);a.click();a.remove();
+},true);
 document.addEventListener('click',async e=>{const b=e.target.closest('[data-copy]');if(b){show(await copy(b.dataset.copy||'')?'کپی شد ✓':'کپی انجام نشد');return}const d=e.target.closest('.download-config');if(d){const el=document.getElementById(d.dataset.target||'');if(!el)return;const blob=new Blob([el.value||''],{type:'text/plain;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=d.dataset.filename||'config.txt';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);show('دانلود آماده شد')}});
 function detect(){const u=(navigator.userAgent||'').toLowerCase(),p=((navigator.userAgentData&&navigator.userAgentData.platform)||navigator.platform||'').toLowerCase();if(/android/.test(u))return'android';if(/iphone|ipad|ipod/.test(u)||(p==='macintel'&&navigator.maxTouchPoints>1))return'ios';if(/windows|win32|win64/.test(u+' '+p))return'windows';if(/macintosh|mac os|macintel/.test(u+' '+p))return'macos';if(/linux|x11|cros/.test(u+' '+p))return'linux';return'unknown'}
 const names={windows:'Windows',macos:'macOS',android:'Android',ios:'iPhone / iPad',linux:'Linux',unknown:'همه سیستم‌ها'},det=detect(),groups=[...document.querySelectorAll('.platform-group')];function only(){groups.forEach(g=>{g.classList.remove('show-all');g.classList.toggle('device-active',det==='unknown'||g.dataset.platform===det)});document.getElementById('device').textContent=names[det];document.getElementById('all').textContent='همه سیستم‌ها'}only();document.getElementById('all').onclick=function(){const all=groups.some(g=>g.classList.contains('show-all'));if(all){only();return}groups.forEach(g=>{g.classList.remove('device-active');g.classList.add('show-all')});this.textContent='فقط دستگاه من';document.getElementById('device').textContent='همه سیستم‌ها'};
