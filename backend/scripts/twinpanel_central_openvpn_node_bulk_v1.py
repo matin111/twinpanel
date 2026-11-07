@@ -20,6 +20,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from app.services.central_runtime_ownership_v1 import allow_central_node
+from app.services.central_node_identity_store_v1 import load as load_node_identity, store_once as store_node_identity
 from app.database import SessionLocal
 from app.models import (
     Node, NodeProtocolConfig, NodeStatus, NodeType, ProtocolCredential,
@@ -56,7 +57,7 @@ def validate_node(db, node_id):
     node = db.get(Node, int(node_id))
     if (node is None or node.retired_at is not None or
         node.node_type != NodeType.EXIT or node.status != NodeStatus.ONLINE or
-        node.show_to_users or not node.enable_openvpn):
+        not allow_central_node(db,node) or not node.enable_openvpn):
         raise RuntimeError("REQUIRES_HIDDEN_ONLINE_OPENVPN_EXIT")
     cfg = db.query(NodeProtocolConfig).filter_by(
         node_id=int(node_id), protocol="openvpn").one_or_none()
@@ -99,19 +100,26 @@ def build_node_local_client_item(db,node,sub,user,identity):
     }
 
 
-def saved_node_identity(cred,node_id,ca_cert):
-    if cred is None or not cred.secret_encrypted:return None
-    doc=ad._dec(cred.secret_encrypted)
+def saved_node_identity(db,cred,node_id,ca_cert):
+    if cred is None:return None
+    sid=int(cred.subscription_id)
+    stored=load_node_identity(db,"openvpn",sid,node_id)
+    if stored is not None:
+        verify_client_identity(stored,ca_cert,sid,node_id)
+        return stored
+    # Optional migration from a readable previous central identity. Do NOT
+    # interpret an undecodable legacy secret as an empty dict to overwrite.
+    doc=ad._dec(cred.secret_encrypted) if cred.secret_encrypted else None
     if not isinstance(doc,dict):
-        raise RuntimeError("OPENVPN_LOCAL_CA_IDENTITY_UNREADABLE")
+        return None
     mapping=doc.get("central_local_openvpn_nodes") or {}
     if not isinstance(mapping,dict):
         raise RuntimeError("OPENVPN_LOCAL_CA_IDENTITY_MAPPING_INVALID")
     saved=mapping.get(str(node_id))
     if saved is not None:
-        verify_client_identity(saved,ca_cert,int(cred.subscription_id),node_id)
+        verify_client_identity(saved,ca_cert,sid,node_id)
+        store_node_identity(db,"openvpn",sid,node_id,saved)
     return saved
-
 
 async def run(node_id, limit, apply):
     with SessionLocal() as db:
@@ -170,19 +178,14 @@ async def run(node_id, limit, apply):
             if central_pki:
                 item=await ad._openvpn(db,node,sub,user,central_identity_commit=False)
             else:
-                identity=saved_node_identity(cred,node_id,local_ca["cert"])
+                identity=saved_node_identity(db,cred,node_id,local_ca["cert"])
                 if identity is None:
                     identity=issue_client_identity(
                         local_ca["cert"],local_ca["private"],int(sub.id),node_id)
                     verify_client_identity(identity,local_ca["cert"],int(sub.id),node_id)
-                    original=(ad._dec(cred.secret_encrypted)
-                              if cred.secret_encrypted else {})
-                    if not isinstance(original,dict):
-                        raise RuntimeError("OPENVPN_LOCAL_CA_SAVED_SECRET_INVALID")
-                    mapping=dict(original.get("central_local_openvpn_nodes") or {})
-                    mapping[str(node_id)]=identity
-                    original["central_local_openvpn_nodes"]=mapping
-                    cred.secret_encrypted=ad._enc(original)
+                    # Store only this Exit's new identity separately.
+                    # Never rewrite the imported/opaque historical secret.
+                    store_node_identity(db,"openvpn",int(sub.id),node_id,identity)
                     cred.username=f"mv{sub.id}n{node_id}"
                 item=build_node_local_client_item(db,node,sub,user,identity)
             items.append(item)
