@@ -1,5 +1,15 @@
 # TwinPanel Changelog
 
+## 1.1.0-rc.664 — 2026-11-07
+
+### Protocol cards open full interactive popup
+- Clicking any protocol card now opens the **entire protocol's original panel** in a responsive, scrollable modal on both mobile and desktop. Protocol content no longer expands below the grid.
+- Keep the real original DOM node, config-copy buttons, download actions, country filters and live event listeners intact; on closing, move the panel back to its original location.
+- Supports close button, backdrop click and Escape; preserves focus and restores page scrolling.
+- Retains the rc.663 V2Ray four-button footer: Copy all configurations, Copy subscription link, Download Karing and Download v2rayN.
+- Deployed and verified on the live server. Synthetic DOM click test succeeded for all 16 protocol cards (modal opens with the correct original panel and closes/restores).
+- Real-device mobile visual browser validation remains pending. No VPN runtime, account, subscription or node data changed.
+
 ## 1.1.0-rc.663 — 2026-11-07
 
 ### Restore V2Ray copy-all in the four-button Windows footer
