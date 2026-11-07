@@ -17,7 +17,7 @@ body.tp77-reference .brand .theme{order:2!important;margin-left:auto!important;c
 body.tp77-reference .page{width:min(1280px,95vw)!important;max-width:1280px!important;padding:23px 0 45px!important}
 body.tp77-reference .traffic{background:linear-gradient(100deg,#141b35,#151e39 65%,#2b154a)!important;border:1px solid #614099!important;box-shadow:0 12px 30px #090c2060!important;color:#fff!important}
 body.tp77-reference .traffic .stats{grid-template-columns:repeat(3,minmax(0,1fr))!important}
-body.tp77-reference .traffic .stat:nth-child(n+4){display:none!important}
+body.tp77-reference .traffic .stat:nth-child(n+4){display:flex!important}
 body.tp77-reference .traffic .stat strong{color:#fff!important}
 body.tp77-reference .traffic .stat small{color:#b8c4dc!important}
 body.tp77-reference .ref67-user{background:#111a35!important;border-color:#344265!important}
