@@ -103,7 +103,7 @@ _LIVE_SCRIPT = r"""
 (function(){
   const token=__TOKEN__;
   const endpoint='/v1/connect/'+encodeURIComponent(token)+'/live';
-  const nf=new Intl.NumberFormat('fa-IR',{maximumFractionDigits:2});
+  const nf=new Intl.NumberFormat('en-US',{maximumFractionDigits:2});
   const gib=1024*1024*1024,mib=1024*1024,kib=1024;
   const byId=id=>document.getElementById(id);
   const used=byId('liveUsed'),remaining=byId('liveRemaining'),total=byId('liveTotal');
@@ -113,7 +113,7 @@ _LIVE_SCRIPT = r"""
 
   function bytes(value){
     const n=Math.max(0,Number(value||0));
-    if(n===0)return '۰ MB';
+    if(n===0)return '0 MB';
     if(n<mib)return nf.format(n/kib)+' KB';
     if(n<gib)return nf.format(n/mib)+' MB';
     return nf.format(n/gib)+' GB';
@@ -174,7 +174,7 @@ _LIVE_SCRIPT = r"""
 
       const badge=card.querySelector('em');
       if(!badge)return;
-      if(online)badge.textContent='آنلاین';
+      if(online)badge.textContent=key==='xray'?'فعال اخیراً':'آنلاین';
       else if(item&&item.presence_available)badge.textContent='آفلاین';
       else badge.textContent='آماده';
     });
