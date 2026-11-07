@@ -1,5 +1,13 @@
 # TwinPanel Changelog
 
+## 1.1.0-rc.661 — 2026-11-07
+
+### Native flags and official updater reliability
+- Fix duplicate country flags on native OpenVPN, WireGuard, AmneziaWG and Cisco server rows: retain the real V76 SVG artwork and do not add a second V80 image. Remove duplicate legacy Unicode flag glyphs from node labels without changing server IDs.
+- Replace PAM-based `runuser` probes in the official prebuilt updater with direct unprivileged `setpriv` permission checks for Next.js server.js readability and cache writability. This avoids intermittent five-second `runuser` timeouts that caused official rc.659 and rc.660 install rollbacks.
+- Keep all rc.660 changes: desktop/mobile connection-information modals, consistent V2Ray country filter flags, Cisco full-width download, named client installers and the dedicated Windows v2rayN download.
+- Verified `setpriv` checks against the current web installation (both passed); Python and JavaScript syntax checks passed. Full interactive browser regression is still outstanding.
+
 ## 1.1.0-rc.660 — 2026-11-07
 
 ### Unified Connection countries, information dialogs, and named client downloads
