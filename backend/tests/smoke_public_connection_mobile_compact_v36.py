@@ -41,8 +41,8 @@ def main() -> None:
     # Initial state is collapsed; protocol tap is the single accordion authority.
     require("closeAll();" in v36, "initial collapsed state missing")
     require("panel.classList.add('active','v36-open')" in v36, "selected protocol open state missing")
-    require("const wasOpen=panel.classList.contains('v36-open')" in v36,
-            "same-protocol toggle-close state missing")
+    require("if(wasOpen)return" not in v36,
+            "mobile selection must not collapse all panels on repeated tap")
     require("event.stopImmediatePropagation()" in v36,
             "legacy protocol click handler is not isolated in compact view")
     require("},true);" in v36, "capture-phase protocol accordion binding missing")
