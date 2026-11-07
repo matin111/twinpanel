@@ -7,6 +7,8 @@ adapters must be added here, not as another per-user background queue.
 from __future__ import annotations
 
 import argparse
+import asyncio
+import fcntl
 import json
 import os
 import subprocess
@@ -21,6 +23,7 @@ sys.path.insert(0, str(BACKEND))
 
 from app.database import SessionLocal
 from app.models import Node, NodeStatus, NodeType
+from app.services.new_node_readiness_v1 import verify_new_exit_readiness
 
 ADAPTERS = (
     "twinpanel_central_l2tp_node_bulk_v1.py",
@@ -65,6 +68,17 @@ def adapter_command(name, node_id, limit, apply):
 
 
 def run(node_id, limit, apply):
+    # Prevent two independent staging processes from racing on the same node.
+    lock_path = Path(f"/tmp/twinpanel-central-node-stage-{node_id}.lock")
+    with lock_path.open("a+", encoding="utf-8") as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as exc:
+            raise RuntimeError("CENTRAL_NODE_STAGE_ALREADY_RUNNING") from exc
+        return _run_locked(node_id, limit, apply)
+
+
+def _run_locked(node_id, limit, apply):
     with SessionLocal() as db:
         node = db.get(Node, node_id, with_for_update=apply)
         if (node is None or node.retired_at is not None
@@ -82,6 +96,9 @@ def run(node_id, limit, apply):
         if not apply:
             db.rollback()
             return 0
+        readiness = asyncio.run(verify_new_exit_readiness(db, node_id))
+        if not readiness.get("ok"):
+            raise RuntimeError("CENTRAL_NODE_STAGE_PROTOCOLS_NOT_READY")
         added = establish_hidden_memberships(db, node_id)
         if node.show_to_users:
             raise RuntimeError("NODE_PUBLISHED_DURING_STAGE")
