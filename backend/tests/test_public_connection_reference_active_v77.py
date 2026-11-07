@@ -38,6 +38,10 @@ def test_reference_layout_dark_and_four_protocol_columns():
 def test_native_per_node_display_preserves_original_details_and_actions():
     v77 = read("public_connection_reference_active_v77.py")
     assert "tab.dataset.server" in v77
+    v67 = read("public_connection_reference_desktop_mobile_v67.py")
+    assert "views.find(view=>view.id===serverId)" in v67
+    assert "linkToOriginal(matchingView||document.createElement('div'))" in v67
+    assert "linkToOriginal(views[i]" not in v67
     assert "panel.querySelector('.server-view[id=\"'+tab.dataset.server+'\"]')" in v77
     assert "view.prepend(title)" in v77
     assert "show.addEventListener('click',()=>{tab.click()" in v77
