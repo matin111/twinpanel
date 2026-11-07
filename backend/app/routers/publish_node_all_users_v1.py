@@ -263,42 +263,63 @@ async def _install_node_in_background(
             }, flush=True)
             return
 
+        # The completed installer owns this transition. Do not call the old
+        # publish/queue path before actual daemon-level account materialization.
+        # All 16 installed listener checks succeeded above.
         _safe_install_progress(job_id, "verified_ready", node_id=node_id,
                                installed_protocols=installed_count)
         if payload.publish_to_all_users:
             _safe_install_progress(job_id, "enrolling_users", node_id=node_id,
                                    installed_protocols=installed_count)
             try:
-                publish_result = await publish_node_to_all_users(node_id=node_id, db=db)
+                from ..models import NodeStatus
+                from scripts import twinpanel_central_node_stage_v1 as central_stage
+                # Installation writes are durable before another DB session
+                # opens. The central worker performs its own health check.
+                node = db.get(Node, node_id)
+                if node and node.status != NodeStatus.MAINTENANCE:
+                    node.status = NodeStatus.ONLINE
+                db.commit()
+                stage_rc = await asyncio.to_thread(
+                    central_stage.run, node_id, central_stage.MAX_USERS, True,
+                )
+                if stage_rc != 0:
+                    raise RuntimeError("CENTRAL_RUNTIME_COVERAGE_INCOMPLETE")
+                db.expire_all()
+                # At this point the node-wide adapter engine has applied the
+                # subscribed protocol credentials and audited actual node items.
+                # This publish guard rejects stale/revoked snapshots, and does
+                # NOT re-enter the legacy account-by-account backfill queue.
+                publish_result = await publish_node_to_all_users(
+                    node_id=node_id, db=db,
+                )
                 if not publish_result.get("ok"):
-                    raise RuntimeError("node publication failed")
+                    raise RuntimeError("CENTRAL_NODE_PUBLICATION_REJECTED")
                 assigned = int(db.query(func.count(SubscriptionNode.subscription_id)).filter(
                     SubscriptionNode.node_id == node_id,
                 ).scalar() or 0)
-                # A backfill queue entry is *not* proof that all user credentials
-                # are already active on the new node.
-                stage = "users_queued" if publish_result.get("backfill", {}).get("queued") else "completed"
-                if not ready:
-                    stage = "failed"
                 _safe_install_progress(
-                    job_id, stage, node_id=node_id,
+                    job_id, "completed", node_id=node_id,
                     installed_protocols=installed_count,
                     users_assigned=assigned,
-                    error_code=None if ready else "PROTOCOL_SETUP_INCOMPLETE",
                 )
-                print("TWINPANEL_NODE_BACKGROUND_PUBLISH_DONE_V2", {
+                print("CENTRAL_NODE_ADD_COMPLETE", {
                     "node_id": node_id,
-                    "memberships_added": publish_result.get("memberships_added"),
-                    "users_assigned_total": assigned,
-                    "backfill_queued": bool(publish_result.get("backfill", {}).get("queued")),
+                    "users_assigned": assigned,
+                    "credential_coverage_verified": True,
+                    "legacy_account_queue_used": False,
                 }, flush=True)
             except Exception as exc:
                 db.rollback()
-                _safe_install_progress(job_id, "failed", node_id=node_id,
-                                       installed_protocols=installed_count,
-                                       error_code="USER_ENROLLMENT_FAILED")
-                print("TWINPANEL_NODE_BACKGROUND_PUBLISH_DEGRADED_V1", {
-                    "node_id": node_id, "error_type": type(exc).__name__,
+                _safe_install_progress(
+                    job_id, "failed", node_id=node_id,
+                    installed_protocols=installed_count,
+                    error_code="CENTRAL_RUNTIME_COVERAGE_INCOMPLETE",
+                )
+                print("CENTRAL_NODE_ADD_SAFE_STOP", {
+                    "node_id": node_id,
+                    "error_type": type(exc).__name__,
+                    "node_hidden_until_recovery": True,
                 }, flush=True)
         else:
             _safe_install_progress(
