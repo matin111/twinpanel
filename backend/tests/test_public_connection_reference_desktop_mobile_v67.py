@@ -37,3 +37,19 @@ def test_legacy_config_inputs_are_unchanged():
     for field in ("__PERCENT__", "__USED__", "__REMAIN__", "__TOTAL__", "__START__", "__EXPIRE__", "__PCARDS__", "__PPANELS__"):
         assert field in main
     assert "render_protocols(" in main
+
+
+def test_embedded_javascript_syntax():
+    import shutil
+    import subprocess
+    import tempfile
+    import pytest
+    node = shutil.which('node')
+    if not node:
+        pytest.skip('Node.js not present')
+    source = (ROOT / 'public_connection_reference_desktop_mobile_v67.py').read_text(encoding='utf-8')
+    js = source.split('<script id="twinpanelPublicConnectionReferenceV67">',1)[1].split('</script>',1)[0]
+    with tempfile.TemporaryDirectory() as path:
+        file = Path(path) / 'reference-v67.js'
+        file.write_text(js, encoding='utf-8')
+        subprocess.run([node, '--check', str(file)], check=True, capture_output=True, text=True)
