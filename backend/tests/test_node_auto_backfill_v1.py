@@ -15,6 +15,7 @@ from sqlalchemy.pool import StaticPool
 from app.database import Base
 from app.models import Node, NodeStatus, NodeType
 from app.node_backfill_job_models_v1 import NodeBackfillJobV1
+from app.node_backfill_scope_models_v1 import NodeBackfillScopeV1
 from app.services.node_auto_backfill_v1 import (
     FAMILIES, claim_next, enqueue_node_backfill, finish_claim, job_status,
 )
@@ -29,7 +30,7 @@ BASE = Path(__file__).resolve().parents[1]
 def fixture_db():
     engine = create_engine("sqlite://", poolclass=StaticPool,
                            connect_args={"check_same_thread": False})
-    Base.metadata.create_all(engine, tables=[Node.__table__, NodeBackfillJobV1.__table__])
+    Base.metadata.create_all(engine, tables=[Node.__table__, NodeBackfillJobV1.__table__, NodeBackfillScopeV1.__table__])
     db = Session(engine)
     db.add(Node(id=13, name="Germany Exit", node_type=NodeType.EXIT,
                 country_code="DE", public_ip="192.0.2.13",
@@ -47,7 +48,7 @@ def test_enqueue_is_idempotent_and_includes_safe_v2ray():
         b = enqueue_node_backfill(db, 13)
         db.commit()
         assert len(a) == len(b) == 6
-        assert set(x.protocol for x in b) == set(FAMILIES)
+        assert set(x.protocol for x in b) == set(FAMILIES) - {"standalone"}
         assert "v2ray" in FAMILIES and not set(FAMILIES).intersection({"xray", "reality"})
         assert db.query(NodeBackfillJobV1).count() == 6
         status = job_status(db, 13)
