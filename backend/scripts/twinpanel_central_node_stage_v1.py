@@ -108,7 +108,11 @@ def _run_locked(node_id, limit, apply):
         if not apply:
             db.rollback()
             return 0
-        # A Sudoku subscription means one dedicated systemd service and TCP\n        # port under the current runtime. Refuse unsafe cardinality or modulo\n        # port collisions before inserting ANY new-node memberships.\n        sudoku_capacity = assert_capacity(db)\n        print("CENTRAL_SUDOKU_CAPACITY_PRECHECK", json.dumps(sudoku_capacity), flush=True)\n        readiness = asyncio.run(verify_new_exit_readiness(db, node_id))
+        # Sudoku currently runs a dedicated service/port for each subscriber.
+        # Refuse unsafe cardinality and modulo port collisions before writes.
+        sudoku_capacity = assert_capacity(db)
+        print("CENTRAL_SUDOKU_CAPACITY_PRECHECK", json.dumps(sudoku_capacity), flush=True)
+        readiness = asyncio.run(verify_new_exit_readiness(db, node_id))
         if not readiness.get("ok"):
             raise RuntimeError("CENTRAL_NODE_STAGE_PROTOCOLS_NOT_READY")
         # Re-read after the potentially slow listener audit and serialize only
