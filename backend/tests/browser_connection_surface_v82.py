@@ -127,6 +127,28 @@ def verify(context,html,device,outfile):
         pane=page.locator("#"+target.get_attribute("data-protocol"))
         assert pane.locator(".tp77-native-row").count()>=1,f"{device} {protocol}: no server rows"
         assert pane.locator(".tp78-ping:visible").count()==0
+    # Visit each one of the fifteen customer-facing protocols, not just the
+    # OpenVPN screenshot. All share the same node-row/real-action contract.
+    native={"wireguard","openvpn","l2tp","amneziawg","cisco"}
+    for protocol in PROTOCOLS:
+        target=page.locator('.protocol-choice[data-protocol-key="'+protocol+'"]')
+        assert target.count()==1,(device,protocol,"choice missing")
+        target.click()
+        page.wait_for_timeout(180)
+        pane=page.locator("#"+target.get_attribute("data-protocol"))
+        assert pane.is_visible(),(device,protocol,"hidden panel")
+        assert page.locator(".protocol-panel.active").count()==1,(device,protocol,"multiple panels")
+        if protocol in native:
+            assert pane.locator(".tp77-native-row").count()>=1,(device,protocol,"missing file/manual nodes")
+        elif protocol=="v2ray":
+            assert pane.locator(".v54-v2ray-server").count()>=1,(device,protocol,"missing profile groups")
+        else:
+            assert pane.locator(".ref67-row").count()>=1,(device,protocol,"missing modern node rows")
+        assert pane.locator(".tp78-ping:visible,.ref71-rtt:visible").count()==0,(device,protocol,"ping visible")
+        for button in pane.locator(".tp78-action-footer > button,.tp78-action-footer > a").all():
+            assert button.is_enabled(),(device,protocol,"dead footer button")
+            href=button.get_attribute("href")
+            assert not href or not href.startswith("#"),(device,protocol,"broken app link")
     page.close()
 
 def main():
