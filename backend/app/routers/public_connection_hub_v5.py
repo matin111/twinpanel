@@ -406,30 +406,44 @@ function setTheme(v){const x=v==='dark'?'dark':'light';root.dataset.theme=x;if(t
 let saved='';try{saved=localStorage.getItem(key)||''}catch(e){}setTheme(saved||(matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'));
 if(theme)theme.onclick=function(){const next=root.dataset.theme==='dark'?'light':'dark';setTheme(next);try{localStorage.setItem(key,next)}catch(e){}};
 // User-triggered optional native file share; never invoke an import deep link.
-window.tpNativeShareFile=async function(url,filename,mime){
-  const notify=message=>{
-    const toast=document.getElementById('toast');
-    if(toast){toast.textContent=message;toast.classList.add('show')}
-  };
-  if(!window.isSecureContext||!navigator.share||typeof File==='undefined'){
-    notify('فایل را دانلود کنید و از Files یا Downloads گزینه اشتراک‌گذاری را بزنید.');
-    return false;
+// Mobile file sharing requires transient activation. Call navigator.share
+// immediately in the originating tap, using the already-rendered config bytes.
+window.tpNativeShareMessage=function(message){
+  const toast=document.getElementById('toast');
+  if(toast){toast.textContent=message;toast.classList.add('show')}
+};
+window.tpNativeShareFile=function(file){
+  const notify=window.tpNativeShareMessage;
+  if(!window.isSecureContext||typeof navigator.share!=='function'||typeof File!=='function'){
+    notify('مرورگر ارسال مستقیم فایل را پشتیبانی نمی‌کند؛ فایل را دانلود و از Files یا Downloads ارسال کنید.');
+    return Promise.resolve(false);
+  }
+  if(!(file instanceof File)||!file.size){
+    notify('فایل آماده نیست؛ لطفاً از دکمه دانلود فایل استفاده کنید.');
+    return Promise.resolve(false);
   }
   try{
-    const response=await fetch(url,{cache:'no-store'});
-    if(!response.ok)throw new Error('file response failed');
-    const file=new File([await response.arrayBuffer()],filename,{type:mime});
-    const payload={files:[file]};
+    let payload={files:[file]};
     if(navigator.canShare&&!navigator.canShare(payload)){
-      notify('برای ارسال فایل، آن را از Files یا Downloads انتخاب کنید.');
-      return false;
+      // Some mobile share sheets reject uncommon VPN MIME types. Keep the
+      // .ovpn/.conf filename and bytes, retry just the MIME synchronously.
+      const generic=new File([file],file.name,{type:'application/octet-stream'});
+      payload={files:[generic]};
+      if(!navigator.canShare(payload)){
+        notify('این مرورگر ارسال فایل را پشتیبانی نمی‌کند؛ از Files یا Downloads ارسال کنید.');
+        return Promise.resolve(false);
+      }
     }
-    await navigator.share(payload);
-    return true;
+    // Do not await network IO before this call: it needs user activation.
+    return navigator.share(payload).then(()=>true).catch(error=>{
+      if(error?.name==='AbortError')return false;
+      notify('ارسال انجام نشد؛ فایل را دانلود کنید و از Files یا Downloads ارسال کنید.');
+      return false;
+    });
   }catch(error){
-    if(error?.name==='AbortError')return false;
-    notify('ارسال پشتیبانی نشد؛ فایل را دانلود کنید و از Files یا Downloads ارسال کنید.');
-    return false;
+    if(error?.name!=='AbortError')
+      notify('منوی ارسال باز نشد؛ فایل را دانلود کنید و از Files یا Downloads ارسال کنید.');
+    return Promise.resolve(false);
   }
 };
 const toast=document.getElementById('toast');function show(t){toast.textContent=t;toast.classList.add('show');clearTimeout(window.__hubToast);window.__hubToast=setTimeout(()=>toast.classList.remove('show'),1200)}
