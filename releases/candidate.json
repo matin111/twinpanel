@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.648",
-  "source_sha": "9f3c9fddcc1821985b6c51d0f37a2f869b2e064c",
+  "version": "1.1.0-rc.649",
+  "source_sha": "4a9b535b66054274085bafd10c534f26dc782d92",
   "notes": {
-    "fa": "رفع عدم ثبت مسیر سنجش زنده پینگ در روتر واقعی Hub Live V5؛ فعال‌سازی تست مجدد ICMP/TCP از سرور پنل به نودهای مجاز اشتراک، بدون عدد ساختگی. تغییرات صفحه Connection و چینش موبایل نسخه قبلی حفظ می‌شوند؛ هیچ پورت، کانفیگ، تونل یا سرویس VPN تغییر نمی‌کند.",
-    "en": "Register the V78 authenticated real node RTT refresh endpoint in the actual Hub Live V5 router used by the FastAPI app. Real panel-to-node ICMP/TCP refresh, no fabricated RTT, preserving all rc.647 connection UI and VPN configs, services and tunnels."
+    "fa": "پاک‌سازی و یکسان‌سازی صفحه Connection برای ۱۵ پروتکل، برگرداندن تاریخ اولین اتصال و انقضا، حذف پینگ‌ها و عددهای غیرقابل اعتماد از رابط، رفع تداخل انتخاب پروتکل در موبایل، نمایش فقط نود و فایل اصلی، و دانلود ZIP همه فایل‌های واقعی OpenVPN/WireGuard/AmneziaWG از مسیر رسمی موجود؛ دکمه‌های واقعی و دانلود برنامه‌ها حفظ می‌شوند؛ بدون تغییر کانفیگ، رمز، پورت و تونل‌های VPN.",
+    "en": "Connection 15-protocol unified clean UI: restore first-use/expiry dates; remove unreliable RTT badges; fix V36/V77 mobile selection race; keep actual node config/file controls; download real native OpenVPN/WireGuard/AmneziaWG ZIP via the existing canonical multi endpoint; retain client downloads, unchanged credentials, ports, nodes and tunnels."
   }
 }
