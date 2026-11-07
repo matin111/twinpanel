@@ -1,5 +1,16 @@
 # TwinPanel Changelog
 
+## 1.1.0-rc.662 — 2026-11-07
+
+### Connection mobile category, country selector, popup and V2Ray footer parity
+- Fix the **Recommended / Modern / Classic / All protocols** mobile category selector: enforce actual protocol-card visibility with `hidden`, a dedicated data flag and a high-specificity display rule that wins over legacy mobile `display:flex!important` declarations. Keep exactly one eligible protocol panel active after category changes.
+- Replace duplicated V2Ray country bars with one consistent tab row and filter the actual V2Ray node cards, retaining selected country through async rerenders.
+- Correct modern protocols (AnyTLS, Naive, TUIC, ShadowTLS, Snell, etc.) to filter the **server rows**, not just style the selected country chip. Resolve real country code from the server tab, its flag or server label. **All** restores every node.
+- Intercept connection-information clicks before old inline expand handlers, and move the actual detail/control nodes to an accessible, closable modal on mobile and desktop; preserve original clipboard actions.
+- Put the Windows v2rayN download link in the same four-action footer row as Karing and connection actions. Preserve copy-all and other formats inside expandable secondary actions rather than creating a fifth footer item.
+- Keep all named client-download actions, one-flag normalization for classic protocols, and rc.661 updater improvements.
+- Live API returned HTTP 200. Node-based synthetic DOM tests: V2Ray DE=2 / all=4; five modern protocols DE=2 / all=4; modal click opens/closes with one real detail node; category counts Classic=5, Modern=11, Recommended=5, All=16 and exactly one active protocol/panel. Browser visual/interaction validation on a real phone is still outstanding.
+
 ## 1.1.0-rc.661 — 2026-11-07
 
 ### Native flags and official updater reliability
