@@ -150,6 +150,21 @@ def test_socks5_compact_real_credential_facts_no_duplicate_dump():
     assert "view.hidden=true" in ui
     assert ".tp80-socks5-detail .server-view[hidden]{display:none!important}" in ui
 
+
+def test_socks5_uses_dedicated_outbound_not_subscription_password():
+    from app.routers.public_connection_hub_v5 import _item_detail
+    body=_item_detail("socks5",{
+        "server":"legacy-server.invalid","port":999,
+        "outbound":{"server":"node.example.test","server_port":38013,
+                    "username":"real-socks-user","password":"dedicated-secret"}
+    },"account-user","account-password",0,"test")
+    assert "node.example.test:38013" in body
+    assert "real-socks-user" in body
+    assert "dedicated-secret" in body
+    assert "account-password" not in body
+    assert "999" not in body
+
+
 def test_exactly_one_real_device_aware_app_action_with_sudoku_fallback():
     ui=code("public_connection_unified_surface_dates_v80.py")
     assert "if(!find('app'))" in ui
