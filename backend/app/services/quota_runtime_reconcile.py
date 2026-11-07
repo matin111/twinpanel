@@ -340,49 +340,61 @@ def _apply_observed_sessions(db, node: Node, observed: list[dict]) -> dict:
             ignored += 1
             continue
         session_key = str(session["session_key"])
-        active_keys.add(session_key)
-        open_result = open_session(
-            db,
-            node_id,
-            SessionOpenIn(
-                session_key=session_key,
-                subscription_id=int(device["subscription_id"]),
-                device_id=int(device["device_id"]),
-                protocol="openconnect",
-                client_ip=session.get("client_ip"),
-            ),
-        )
-        if not bool(open_result.get("duplicate")):
-            opened += 1
-        _touch_session(db, node_id, session_key, now_naive)
-        rx = max(int(session.get("rx") or 0), 0)
-        tx = max(int(session.get("tx") or 0), 0)
-        sequence = sequence_base + index
-        event_id = str(
-            uuid.uuid5(
-                uuid.NAMESPACE_URL,
-                f"twinpanel:ocserv:{node_id}:{session_key}:{sequence}:{rx}:{tx}",
+        try:
+            with db.begin_nested():
+                open_result = open_session(
+                    db,
+                    node_id,
+                    SessionOpenIn(
+                        session_key=session_key,
+                        subscription_id=int(device["subscription_id"]),
+                        device_id=int(device["device_id"]),
+                        protocol="openconnect",
+                        client_ip=session.get("client_ip"),
+                    ),
+                    observed_telemetry=True,
+                )
+                _touch_session(db, node_id, session_key, now_naive)
+                rx = max(int(session.get("rx") or 0), 0)
+                tx = max(int(session.get("tx") or 0), 0)
+                sequence = sequence_base + index
+                event_id = str(
+                    uuid.uuid5(
+                        uuid.NAMESPACE_URL,
+                        f"twinpanel:ocserv:{node_id}:{session_key}:{sequence}:{rx}:{tx}",
+                    )
+                )
+                apply_usage_event(
+                    db,
+                    node_id,
+                    UsageEventIn(
+                        event_id=event_id,
+                        subscription_id=int(device["subscription_id"]),
+                        device_id=int(device["device_id"]),
+                        session_key=session_key,
+                        protocol="openconnect",
+                        source_key=f"ocserv:{session_key}"[:220],
+                        counter_mode="cumulative",
+                        counter_epoch=session_key[:96],
+                        source_sequence=sequence,
+                        uplink_value=tx,
+                        downlink_value=rx,
+                        reported_at=now_aware,
+                    ),
+                )
+            active_keys.add(session_key)
+            if not bool(open_result.get("duplicate")):
+                opened += 1
+            usage_events += 1
+        except Exception as exc:
+            ignored += 1
+            print(
+                "OCSERV_TELEMETRY_SESSION_REJECTED",
+                {"node_id": node_id, "subscription_id": int(device["subscription_id"]),
+                 "error": f"{type(exc).__name__}:{str(exc)[:160]}"},
+                flush=True,
             )
-        )
-        apply_usage_event(
-            db,
-            node_id,
-            UsageEventIn(
-                event_id=event_id,
-                subscription_id=int(device["subscription_id"]),
-                device_id=int(device["device_id"]),
-                session_key=session_key,
-                protocol="openconnect",
-                source_key=f"ocserv:{session_key}"[:220],
-                counter_mode="cumulative",
-                counter_epoch=session_key[:96],
-                source_sequence=sequence,
-                uplink_value=tx,
-                downlink_value=rx,
-                reported_at=now_aware,
-            ),
-        )
-        usage_events += 1
+
 
     open_rows = (
         db.query(QuotaSession)
@@ -444,64 +456,78 @@ def _apply_xray_stats(db, node: Node, epoch: str, observed: list[dict]) -> dict:
         if uplink <= 0 and downlink <= 0:
             continue
 
-        # StatsService exposes cumulative traffic but not authoritative
-        # connection-open/close events. Use a short accounting session only to
-        # trigger first-use activation; never leave a synthetic Xray session up.
-        if subscription.starts_at is None and subscription.expires_at is None:
-            activation_key = (
-                f"xray-activation:{node_id}:{subscription_id}:{identity}:"
-                f"{epoch}:{sequence_base + index}"
-            )[:160]
-            open_result = open_session(
-                db,
-                node_id,
-                SessionOpenIn(
-                    session_key=activation_key,
-                    subscription_id=subscription_id,
-                    device_id=int(device["device_id"]),
-                    protocol="xray",
-                    client_ip=None,
-                ),
-            )
-            if not bool(open_result.get("duplicate")):
+        try:
+            activated_now = False
+            with db.begin_nested():
+                # StatsService exposes cumulative traffic but not authoritative
+                # connection-open/close events. Use a short accounting session only to
+                # trigger first-use activation; never leave a synthetic Xray session up.
+                if subscription.starts_at is None and subscription.expires_at is None:
+                    activation_key = (
+                        f"xray-activation:{node_id}:{subscription_id}:{identity}:"
+                        f"{epoch}:{sequence_base + index}"
+                    )[:160]
+                    open_result = open_session(
+                        db,
+                        node_id,
+                        SessionOpenIn(
+                            session_key=activation_key,
+                            subscription_id=subscription_id,
+                            device_id=int(device["device_id"]),
+                            protocol="xray",
+                            client_ip=None,
+                        ),
+                        observed_telemetry=True,
+                    )
+                    activated_now = not bool(open_result.get("duplicate"))
+                    close_session(
+                        db,
+                        node_id,
+                        SessionCloseIn(
+                            session_key=activation_key,
+                            reason="xray_accounting_activation",
+                        ),
+                    )
+
+                sequence = sequence_base + index
+                session_key = f"xray:{node_id}:{subscription_id}:{identity}:{epoch}"[:160]
+                source_key = f"xray-user:{node_id}:{identity}"[:220]
+                event_id = str(
+                    uuid.uuid5(
+                        uuid.NAMESPACE_URL,
+                        f"twinpanel:xray:{source_key}:{epoch}:{sequence}:{uplink}:{downlink}",
+                    )
+                )
+                apply_usage_event(
+                    db,
+                    node_id,
+                    UsageEventIn(
+                        event_id=event_id,
+                        subscription_id=subscription_id,
+                        device_id=int(device["device_id"]),
+                        session_key=session_key,
+                        protocol="xray",
+                        source_key=source_key,
+                        counter_mode="cumulative",
+                        counter_epoch=epoch,
+                        source_sequence=sequence,
+                        uplink_value=uplink,
+                        downlink_value=downlink,
+                        reported_at=now_aware,
+                    ),
+                )
+            if activated_now:
                 activated += 1
-            close_session(
-                db,
-                node_id,
-                SessionCloseIn(
-                    session_key=activation_key,
-                    reason="xray_accounting_activation",
-                ),
+            usage_events += 1
+        except Exception as exc:
+            ignored += 1
+            print(
+                "XRAY_TELEMETRY_SESSION_REJECTED",
+                {"node_id": node_id, "subscription_id": subscription_id,
+                 "error": f"{type(exc).__name__}:{str(exc)[:160]}"},
+                flush=True,
             )
 
-        sequence = sequence_base + index
-        session_key = f"xray:{node_id}:{subscription_id}:{identity}:{epoch}"[:160]
-        source_key = f"xray-user:{node_id}:{identity}"[:220]
-        event_id = str(
-            uuid.uuid5(
-                uuid.NAMESPACE_URL,
-                f"twinpanel:xray:{source_key}:{epoch}:{sequence}:{uplink}:{downlink}",
-            )
-        )
-        apply_usage_event(
-            db,
-            node_id,
-            UsageEventIn(
-                event_id=event_id,
-                subscription_id=subscription_id,
-                device_id=int(device["device_id"]),
-                session_key=session_key,
-                protocol="xray",
-                source_key=source_key,
-                counter_mode="cumulative",
-                counter_epoch=epoch,
-                source_sequence=sequence,
-                uplink_value=uplink,
-                downlink_value=downlink,
-                reported_at=now_aware,
-            ),
-        )
-        usage_events += 1
 
     return {
         "collector": "xray",
