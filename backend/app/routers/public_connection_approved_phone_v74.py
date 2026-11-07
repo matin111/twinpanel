@@ -75,7 +75,8 @@ body.tp74-approved .ref67-row .tp73-flag{width:25px!important;height:19px!import
  body.tp74-approved .traffic .stat{display:flex!important;min-height:65px!important;
   align-items:center!important;justify-content:center!important;gap:6px!important;
   padding:4px 3px!important;text-align:center!important}
- body.tp74-approved .traffic .stat:nth-child(n+4){display:none!important}
+ /* Dates are subscription data, never remove on phones. */
+ body.tp74-approved .traffic .stat:nth-child(n+4){display:flex!important}
  body.tp74-approved .traffic .stat strong{font-size:15px!important;font-weight:850!important;white-space:nowrap}
  body.tp74-approved .traffic .stat small{font-size:10px!important}
  body.tp74-approved .ref67-categories{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;
