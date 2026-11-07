@@ -518,6 +518,7 @@ _SCRIPT = r"""
    const key=String(panel.dataset.ref67NativeProtocol||panel.dataset.v34Protocol||'').toLowerCase();
    const fileProtocol=new Set(['openvpn','wireguard','amneziawg']).has(key);
    let primary=find('add')||find('download');
+   const previousPrimary=primary;
    if(fileProtocol){
      // A single verified ZIP of the original files. Do not present a vague
      // "download all" button that may download only one selected server.
@@ -533,7 +534,7 @@ _SCRIPT = r"""
    }
    const ordered=[primary,find('link'),fileProtocol?null:find('copy'),find('app')].filter(Boolean);
    // Do not render dead placeholders. Every button must perform a real action.
-   const extra=children.filter(node=>!ordered.includes(node)&&node!==primary&&(!fileProtocol||node.dataset.kind!=='copy'));
+   const extra=children.filter(node=>!ordered.includes(node)&&node!==primary&&node!==previousPrimary&&(!fileProtocol||node.dataset.kind!=='copy'));
    footer.replaceChildren(...ordered);
    if(extra.length){
      const details=el('details','tp80-extra-actions');
