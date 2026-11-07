@@ -15,9 +15,10 @@ def test_share_real_attachment_with_filename_extension_and_mime():
     assert "new File([await response.arrayBuffer()],filename,{type:mime})" in src
     assert "await navigator.share(payload)" in src
     assert "navigator.canShare&&!navigator.canShare(payload)" in src
-    assert "application/x-openvpn-profile" in src
-    assert "application/octet-stream" in src
-    assert "'/file/'+match[1]+'/'+match[2]" in src
+    presentation=(ROOT/"public_connection_unified_surface_dates_v80.py").read_text(encoding="utf-8")
+    assert "application/x-openvpn-profile" in presentation
+    assert "application/octet-stream" in presentation
+    assert "'/file/'+match[1]+'/'+match[2]" in presentation
     assert "if(error?.name==='AbortError')return" in src
     assert "openvpn://import-profile" not in src
 
