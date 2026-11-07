@@ -79,8 +79,8 @@ with open(lock,"a+") as mutex:
             "password = "+json.dumps(row["password"]),
             "max_http2_conns = 4", "max_http3_conns = 4", "",
         ]
-    new_state=json.dumps(existing,ensure_ascii=False,separators=(",",":"))+"\\n"
-    new_creds="\\n".join(output)+"\\n"
+    new_state=json.dumps(existing,ensure_ascii=False,separators=(",",":"))+"\n"
+    new_creds="\n".join(output)+"\n"
     changed=(not STATE.exists() or STATE.read_text(encoding="utf-8")!=new_state
              or CREDS.read_text(encoding="utf-8")!=new_creds)
     STATE.parent.mkdir(parents=True,exist_ok=True)
