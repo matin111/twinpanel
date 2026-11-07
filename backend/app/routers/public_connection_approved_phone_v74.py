@@ -185,10 +185,11 @@ _SCRIPT = r"""
      cards.forEach((card,index)=>{
        const code=String(card.dataset.countryCode||'').toUpperCase();
        const nodeId=String(card.dataset.nodeId||index+1);
-       card.classList.add('open');
+       // Keep the node itself compact like the approved reference. Its three
+       // real V2Ray profiles remain available by expanding the server card.
        const head=card.querySelector('.v54-v2ray-server-head');
        if(head&&head.dataset.tp74Styled!=='1'){
-         head.dataset.tp74Styled='1';head.setAttribute('aria-expanded','true');
+         head.dataset.tp74Styled='1';head.setAttribute('aria-expanded',card.classList.contains('open')?'true':'false');
          const name=document.createElement('span');name.className='tp74-node-name';
          const strong=document.createElement('strong');strong.textContent=normalizedName(code)+' - '+nodeId;
          const small=document.createElement('small');small.textContent='V2Ray / Xray · ۳ اتصال';
