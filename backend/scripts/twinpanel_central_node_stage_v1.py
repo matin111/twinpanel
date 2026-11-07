@@ -36,11 +36,12 @@ ADAPTERS = (
     "twinpanel_central_wireguard_node_bulk_v1.py",
     "twinpanel_central_mieru_node_bulk_v1.py",
     "twinpanel_central_trusttunnel_node_bulk_v1.py",
+    "twinpanel_central_amneziawg_node_bulk_v1.py",
 )
 MAX_USERS = 3000
 # Only these have actual bounded central-bulk materializers. Readiness of
 # installed listeners is not equivalent to subscriber credential coverage.
-BULK_PROTOCOLS = frozenset({"l2tp", "cisco", "v2ray", "openvpn", "wireguard", "mieru", "trusttunnel", *SINGBOX_PROTOCOLS})
+BULK_PROTOCOLS = frozenset({"l2tp", "cisco", "v2ray", "openvpn", "wireguard", "mieru", "trusttunnel", "amneziawg", *SINGBOX_PROTOCOLS})
 MISSING_BULK_PROTOCOLS = tuple(sorted(set(ALL_PROTOCOL_KEYS) - BULK_PROTOCOLS))
 
 
