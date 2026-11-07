@@ -500,8 +500,10 @@ def _cfg(db: Session, node_id: int, protocol: str) -> NodeProtocolConfig | None:
     # globally); admin, provisioning and other mutable paths stay uncached.
     cache = db.info.get("_tp_public_connection_cfg_cache_v102")
     key = (int(node_id), str(protocol or "").strip().lower())
-    if isinstance(cache, dict) and key in cache:
-        return cache[key]
+    if isinstance(cache, dict) and (
+        key in cache or db.info.get("_tp_public_connection_cfg_prefetched_v103")
+    ):
+        return cache.get(key)
     result = (
         db.query(NodeProtocolConfig)
         .filter(
