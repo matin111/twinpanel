@@ -208,7 +208,9 @@ def _legacy_subscription_node_ids(db: Session, subscription_id: int) -> set[int]
     }
 
 
-def build_node_devices(db: Session, node_id: int):
+def build_node_devices(
+    db: Session, node_id: int, *, source_protocols: set[str] | None = None,
+):
     """Build canonical runtime identities for one node.
 
     New/current credentials are mapped by the node_id embedded in their stored
@@ -220,15 +222,31 @@ def build_node_devices(db: Session, node_id: int):
     node_id = int(node_id)
     openvpn_central_pki_enabled = is_openvpn_central_pki_enabled(db)
 
-    credentials = (
-        db.query(ProtocolCredential)
-        .filter(ProtocolCredential.is_active.is_(True))
-        .order_by(
-            ProtocolCredential.subscription_id.asc(),
-            ProtocolCredential.id.asc(),
+    query = db.query(ProtocolCredential).filter(ProtocolCredential.is_active.is_(True))
+    if source_protocols is not None:
+        allowed = {str(name).lower() for name in source_protocols}
+        if not allowed:
+            return []
+        query = query.filter(ProtocolCredential.protocol.in_(allowed))
+    credentials = query.order_by(
+        ProtocolCredential.subscription_id.asc(), ProtocolCredential.id.asc()
+    ).all()
+
+    # Pollers only need one protocol at a time, not every installed protocol
+    # on the node. Load existing devices once instead of performing an N+1
+    # round trip for each credential (20k+ queries on large installations).
+    device_map: dict[tuple[int, str], QuotaDevice] = {}
+    if credentials:
+        subscription_ids = {int(c.subscription_id) for c in credentials}
+        quota_query = (
+            db.query(QuotaDevice)
+            .filter(QuotaDevice.subscription_id.in_(subscription_ids))
+            .order_by(QuotaDevice.id.asc())
         )
-        .all()
-    )
+        if source_protocols is not None:
+            quota_query = quota_query.filter(QuotaDevice.protocol.in_(allowed))
+        for row in quota_query.all():
+            device_map.setdefault((int(row.subscription_id), str(row.protocol)), row)
 
     legacy_nodes_by_subscription: dict[int, set[int]] = {}
     seen: set[tuple[int, str]] = set()
@@ -258,7 +276,17 @@ def build_node_devices(db: Session, node_id: int):
             continue
         seen.add(dedupe_key)
 
-        device = _quota_device_for_credential(db, credential)
+        key = (subscription_id, source_protocol)
+        device = device_map.get(key)
+        if device is None:
+            # Preserve the canonical atomic backfill behavior for missing
+            # devices; the common case reads an existing prefetched row.
+            device = _quota_device_for_credential(db, credential)
+            if device is not None:
+                device_map[key] = device
+        elif str(device.status or "").strip().lower() != "active":
+            # Match the old implementation: the earliest device row wins.
+            device = None
         if device is None:
             continue
 
