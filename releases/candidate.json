@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.650",
-  "source_sha": "c348f445682d3a836a15f07ec9d750dd5b463a7e",
+  "version": "1.1.0-rc.651",
+  "source_sha": "89e4cf6c321692aec11d3c914df8038e214a17a0",
   "notes": {
-    "fa": "اصلاح صفحه Connection: حذف ردیف دوم و تکراری پرچم در Cisco/OpenConnect، L2TP/IPsec، OpenVPN، WireGuard و AmneziaWG؛ فیلتر واقعی کشورها با پشتیبانی از چند نود یک کشور (مثل دو آلمان)، دکمه همه برای بازگرداندن تمام نودها؛ نمایش مستقیم نام کاربری و رمز عبور Cisco/L2TP و IPsec Secret با حفظ دکمه‌های کپی اصلی. بدون تغییر اطلاعات حساب، کانفیگ، نود، پورت یا تونل VPN.",
-    "en": "Connection native protocols: exactly one country filter; per-ISO-country grouping and correct multi-node filtering (both German nodes); All restores original nodes. Cisco/OpenConnect and L2TP/IPsec shared real login credentials are visible by default, including L2TP IPsec Secret and original copy actions. Presentation-only: no VPN credential, node, port, transport, subscription or tunnel mutation."
+    "fa": "رفع ایرادهای رابط Connection برای ۱۶ پروتکل: نمایش پرچم‌های تصویری واقعی و هماهنگ، ردیف‌های نود با ارتفاع یکسان، باز شدن اطلاعات همان سرور درست زیر ردیف در Cisco/OpenConnect و L2TP/IPsec، یک دکمه دانلود برنامه متناسب با دستگاه برای هر پروتکل، لینک برنامه رسمی Sudoku، و نمایش فشرده داده‌های SOCKS5 بدون تکرار اطلاعات خام. فایل‌های اصلی و مسیر دانلود گروهی OpenVPN/WireGuard/AmneziaWG و رمزهای واقعی و نودها حفظ می‌شوند؛ بدون دستکاری Runtime، پورت، تونل و دیتابیس VPN.",
+    "en": "Connection 16-protocol consistency: self-contained image country flags, compact matching native node rows, inline original Cisco/L2TP node details and copy actions, one OS-specific app download per protocol with verified official Sudoku clients, and compact SOCKS5 details without redundant raw credentials. Preserve all real OpenVPN/WireGuard/AmneziaWG files and ZIP endpoints, protocols, credentials, node configuration, ports and tunnels."
   }
 }
