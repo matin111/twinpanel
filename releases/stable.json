@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.633",
+  "version": "1.1.0-rc.634",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-07T00:24:02Z",
+  "released_at": "2026-11-07T00:46:02Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "886c92933582c7ed31e593131cc7741974826d35",
+  "source_sha": "9cda8c51681a5de1432fe05ba733cc4d9b3c2da0",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.633/twinpanel-1.1.0-rc.633-linux-x86_64.tar.gz",
-    "sha256": "98f1d0b4301972efd488843b0cd542f9c6961fc3ac7d54cd6f0b0a779198d876",
-    "size_bytes": 29034803
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.634/twinpanel-1.1.0-rc.634-linux-x86_64.tar.gz",
+    "sha256": "e77e4b56b0d7ffdb7b64d4eba572a8b176661459a53b98c6fb61b2da72497efd",
+    "size_bytes": 29040695
   },
   "notes": {
-    "fa": "طراحی موبایل و دسکتاپ صفحه Connection مطابق طرح تأییدشده، بهبود دکمه‌های افزودن تکی با لینک‌های واقعی و حفظ کامل کانفیگ‌ها، پروتکل‌ها و آدرس سرورها.",
-    "en": "Approved responsive desktop/mobile Connection UI with existing-link single add controls; strictly no VPN config, protocol, endpoint or credentials changes."
+    "fa": "بهینه‌سازی واقعی مدیریت مرکزی در ساخت دسته‌ای V2Ray: ساخت محلی پروفایل از مرجع معتبر همان نود، ثبت همه Credentialهای دسته در یک تراکنش، تأیید موازی همه کاربران با کنترل تعداد و Rollback. بدون تغییر UUID یا راه‌اندازی مجدد Xray. حالت پایلوت محدود و دستی باقی می‌ماند.",
+    "en": "Centralized V2Ray batch provisioning: locally materialize per-user Reality profiles from validated same-node template, persist entire batch in one atomic DB transaction, and concurrently verify all hot-added users with bounded read-only Xray API calls. No UUID changes or Xray restart. Pilot remains opt-in and limited."
   }
 }
