@@ -56,6 +56,41 @@ class RuntimeReconciliationTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("sudoku_shared_v2",str(started[-1]))
         self.assertEqual(active,0)
 
+    async def test_shared_sudoku_gets_one_isolated_retry_after_nonzero(self):
+        calls=[]
+        class Process:
+            def __init__(self,code):self.code=code
+            async def wait(self):return self.code
+        async def spawn(*cmd,**kw):
+            name=str(cmd[1])
+            calls.append(name)
+            if "sudoku_shared" in name and sum("sudoku_shared" in c for c in calls)==1:
+                return Process(2)
+            return Process(0)
+        with patch.object(engine.asyncio,"create_subprocess_exec",side_effect=spawn):
+            result=await engine.reconcile_runtime_families(
+                14,3000,Path("/backend"))
+        self.assertTrue(result["ok"])
+        self.assertEqual(len(calls),11)
+        self.assertTrue("sudoku_shared" in calls[-2])
+        self.assertTrue("sudoku_shared" in calls[-1])
+
+    async def test_shared_sudoku_second_failure_blocks_publication(self):
+        calls=[]
+        class Process:
+            def __init__(self,code):self.code=code
+            async def wait(self):return self.code
+        async def spawn(*cmd,**kw):
+            name=str(cmd[1])
+            calls.append(name)
+            return Process(2 if "sudoku_shared" in name else 0)
+        with patch.object(engine.asyncio,"create_subprocess_exec",side_effect=spawn):
+            result=await engine.reconcile_runtime_families(
+                14,3000,Path("/backend"))
+        self.assertFalse(result["ok"])
+        self.assertEqual(result["failed"],["sudoku"])
+        self.assertEqual(len(calls),11)
+
     async def test_single_family_failure_makes_whole_node_unpublishable(self):
         class Process:
             def __init__(self,index):self.index=index
