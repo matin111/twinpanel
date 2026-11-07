@@ -1105,6 +1105,17 @@ html body.tp80-connection #tp84-dialog .tp84-dialog-body > .v54-v2ray-profiles{
  display:block!important;visibility:visible!important;position:static!important;
  max-height:none!important;opacity:1!important;
 }
+
+/* TWINPANEL_MOBILE_PROTOCOL_CATEGORY_FILTER_V94 */
+html body.tp80-connection .protocols .protocol-choice[data-tp94-filtered="1"],
+html body.tp80-connection .protocols .protocol-choice.ref67-hidden,
+html body.tp80-connection .protocols .protocol-choice[hidden]{
+  display:none!important;visibility:hidden!important;
+}
+html body.tp80-connection .ref67-categories .ref67-filter.active{
+  color:#fff!important;border-color:var(--p)!important;
+  background:linear-gradient(110deg,var(--p),var(--s))!important;
+}
 """
 
 
@@ -1552,6 +1563,49 @@ _SCRIPT = r"""
      textNodes.forEach(strip);
    });
  }
+
+ function installProtocolCategoryFilters(){
+   if(document.body.dataset.tp94CategoriesReady==='1')return;
+   document.body.dataset.tp94CategoriesReady='1';
+   const classic=new Set(['openvpn','wireguard','cisco','l2tp','amneziawg']);
+   const recommended=new Set(['v2ray','wireguard','openvpn','hysteria2','tuic']);
+   function applyCategory(category,container){
+     const choices=[...document.querySelectorAll('.protocol-choice[data-protocol]')];
+     if(!choices.length)return;
+     const selected=String(category||'all').toLowerCase();
+     const visible=[];
+     choices.forEach(choice=>{
+       const key=String(choice.dataset.protocolKey||'').trim().toLowerCase().replace(/[\s_]/g,'');
+       const allow=selected==='all'||(selected==='classic'&&classic.has(key))
+         ||(selected==='modern'&&!classic.has(key))
+         ||(selected==='recommended'&&recommended.has(key));
+       choice.dataset.tp94Filtered=allow?'0':'1';
+       choice.classList.toggle('ref67-hidden',!allow);
+       choice.hidden=!allow;
+       if(allow){choice.style.removeProperty('display');visible.push(choice)}
+       else choice.style.setProperty('display','none','important');
+     });
+     container?.querySelectorAll('.ref67-filter[data-ref67-filter]').forEach(btn=>{
+       const active=btn.dataset.ref67Filter===selected;
+       btn.classList.toggle('active',active);
+       btn.setAttribute('aria-pressed',active?'true':'false');
+     });
+     if(!visible.some(choice=>choice.dataset.protocol===selectedProtocol)){
+       selectedProtocol=visible[0]?.dataset.protocol||'';
+     }
+     reconcileProtocolSelection();
+   }
+   document.addEventListener('click',event=>{
+     const button=event.target.closest('.ref67-categories .ref67-filter[data-ref67-filter]');
+     if(!button)return;
+     // V67 handlers can be overwritten by newer mobile CSS. Make exactly
+     // one controller own both protocol-card visibility and selected panel.
+     event.preventDefault();
+     event.stopPropagation();
+     applyCategory(button.dataset.ref67Filter,button.closest('.ref67-categories'));
+   },true);
+ }
+
  function normalizeRef67CountryFilters(panel){
    if(panel.dataset.v54V2ray==='1'||panel.classList.contains('tp80-native'))return;
    const source=panel.querySelector(':scope > .ref67-tabs');
@@ -1980,6 +2034,7 @@ _SCRIPT = r"""
    const timer=setInterval(()=>{scan();if(++tries>=45)clearInterval(timer)},500);
  }
  function check(){
+   installProtocolCategoryFilters();
    reconcileProtocolSelection();
    installMobileDetailsDialog();
    watchAsyncV2rayNodes();
