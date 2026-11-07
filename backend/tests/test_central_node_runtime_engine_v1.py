@@ -53,6 +53,8 @@ class RuntimeReconciliationTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(started),10)
         self.assertEqual(len(result["succeeded"]),10)
         self.assertEqual(peak,3)
+        self.assertIn("sudoku_shared_v2",str(started[-1]))
+        self.assertEqual(active,0)
 
     async def test_single_family_failure_makes_whole_node_unpublishable(self):
         class Process:
