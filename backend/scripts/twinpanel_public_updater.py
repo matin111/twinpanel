@@ -651,7 +651,7 @@ def ensure_web_entry_access(target: Path) -> None:
     mode = server.stat().st_mode & 0o777
     os.chmod(server, mode | 0o044)
     check = subprocess.run(
-        ['runuser', '-u', 'www-data', '--', 'test', '-r', str(server)],
+        ['setpriv', '--reuid=www-data', '--regid=www-data', '--clear-groups', '--', 'test', '-r', str(server)],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
         check=False,
@@ -691,7 +691,7 @@ def ensure_web_cache_access(target: Path) -> None:
             os.chmod(file_path, (file_path.stat().st_mode & 0o777) | 0o020)
 
     check = subprocess.run(
-        ['runuser', '-u', 'www-data', '--', 'test', '-w', str(cache)],
+        ['setpriv', '--reuid=www-data', '--regid=www-data', '--clear-groups', '--', 'test', '-w', str(cache)],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
         check=False,
