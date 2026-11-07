@@ -169,7 +169,9 @@ _SCRIPT = r"""
    });
    const download=panel.querySelector(':scope > .ref70-app-card a.ref69-download-cta[href]:not([hidden])')
       ||panel.querySelector(':scope > .v34-client-card a[href]');
-   if(download&&download.getAttribute('href'))selected.push({kind:'app',el:download});
+   // #apps is the retired hidden global drawer, not an actual download.
+   const appHref=download?.getAttribute('href')||'';
+   if(appHref&&!appHref.startsWith('#')&&!/^javascript:/i.test(appHref))selected.push({kind:'app',el:download});
    if(!selected.length)return;
    // Never discard protocol-specific extra actions (e.g. ShadowTLS YAML/JSON).
    // Keep them as secondary real controls below the approved four main buttons.
