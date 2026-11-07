@@ -5,6 +5,7 @@ on:
     paths:
       - "backend/tests/test_central_node_stage_v1.py"
       - "backend/scripts/twinpanel_central_node_stage_v1.py"
+      - "backend/tests/test_central_openvpn_node_bulk_v1.py"
       - "backend/scripts/twinpanel_central_openvpn_node_bulk_v1.py"
       - "backend/app/protocol_identity.py"
       - "backend/app/routers/account_delivery.py"
@@ -36,7 +37,7 @@ jobs:
       - name: Install isolated backend dependencies
         run: python -m pip install -r backend/requirements.txt
       - name: Compile central materializer
-        run: python -m py_compile backend/scripts/twinpanel_central_openvpn_node_bulk_v1.py backend/tests/test_central_node_stage_v1.py backend/scripts/twinpanel_central_node_stage_v1.py backend/scripts/twinpanel_central_l2tp_node_bulk_v1.py backend/tests/test_central_l2tp_node_bulk_v1.py backend/scripts/twinpanel_central_cisco_node_bulk_v1.py backend/tests/test_central_cisco_node_bulk_v1.py backend/app/central_singbox_bulk_runtime_v1.py backend/scripts/twinpanel_central_singbox_node_bulk_v1.py backend/tests/test_central_singbox_bulk_v1.py backend/scripts/twinpanel_central_xray_node_bulk_v1.py backend/tests/test_central_xray_node_bulk_v1.py backend/app/central_wireguard_bulk_runtime_v1.py backend/scripts/twinpanel_central_wireguard_node_bulk_v1.py backend/tests/test_central_wireguard_bulk_v1.py
+        run: python -m py_compile backend/tests/test_central_openvpn_node_bulk_v1.py backend/scripts/twinpanel_central_openvpn_node_bulk_v1.py backend/tests/test_central_node_stage_v1.py backend/scripts/twinpanel_central_node_stage_v1.py backend/scripts/twinpanel_central_l2tp_node_bulk_v1.py backend/tests/test_central_l2tp_node_bulk_v1.py backend/scripts/twinpanel_central_cisco_node_bulk_v1.py backend/tests/test_central_cisco_node_bulk_v1.py backend/app/central_singbox_bulk_runtime_v1.py backend/scripts/twinpanel_central_singbox_node_bulk_v1.py backend/tests/test_central_singbox_bulk_v1.py backend/scripts/twinpanel_central_xray_node_bulk_v1.py backend/tests/test_central_xray_node_bulk_v1.py backend/app/central_wireguard_bulk_runtime_v1.py backend/scripts/twinpanel_central_wireguard_node_bulk_v1.py backend/tests/test_central_wireguard_bulk_v1.py
       - name: Exercise one-batch no-restart credentials and safety
         working-directory: backend
         env:
@@ -44,6 +45,7 @@ jobs:
           DATABASE_URL: "sqlite:///./central-bulk-test.db"
           NODE_AGENT_SHARED_SECRET: "ci-central-bulk-node-agent-local-only"
         run: |
+          PYTHONPATH=. python -m unittest discover -s tests -p 'test_central_openvpn_node_bulk_v1.py' -v
           PYTHONPATH=. python -m unittest discover -s tests -p 'test_central_node_stage_v1.py' -v
           PYTHONPATH=. python -m unittest discover -s tests -p 'test_central_l2tp_node_bulk_v1.py' -v
           PYTHONPATH=. python -m unittest discover -s tests -p 'test_central_cisco_node_bulk_v1.py' -v
