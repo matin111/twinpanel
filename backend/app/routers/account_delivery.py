@@ -492,6 +492,28 @@ def _transport(db: Session, node_id: int, protocol: str) -> str:
 
 
 
+def _v2ray_iran_public_ip(node: Node) -> str | None:
+    """Use a real Iran ingress IP for VLESS data traffic, never CDN DNS.
+
+    Cloudflare's ordinary HTTP reverse proxy cannot forward arbitrary VLESS
+    TCP ports like 26006/24007/28007. An A record set to Proxied directs
+    clients to Cloudflare anycast instead of the actual Iran tunnel ingress.
+    Only the transport's *address* is changed; TLS SNI, WS Host, REALITY
+    keys/short IDs and all other protocol delivery are kept as before.
+
+    IPv6 and non-global address families keep the existing hostname behavior
+    until their own URI host formatting and ingress routing are validated.
+    """
+    raw = str(getattr(node, "public_ip", "") or "").strip()
+    try:
+        addr = ipaddress.ip_address(raw)
+    except ValueError:
+        return None
+    if isinstance(addr, ipaddress.IPv4Address) and addr.is_global:
+        return str(addr)
+    return None
+
+
 def _node_host(node: Node) -> str:
     domain = (getattr(node, "public_domain", None) or "").strip().lower()
     if domain:
@@ -641,9 +663,14 @@ def _tunnel_access_endpoint(
             ),
         )
 
-    # public_domain takes precedence automatically.
-    # If no domain is configured, public_ip is used.
-    host = _node_host(iran_node)
+    # Only V2Ray over a real Iran tunnel prefers its public IP. This
+    # avoids filtered/poisoned DNS and Cloudflare-proxied unsupported ports,
+    # without altering TLS SNI/Host, users, or other protocols.
+    host = (
+        _v2ray_iran_public_ip(iran_node)
+        if protocol == "v2ray"
+        else None
+    ) or _node_host(iran_node)
 
     if (
         not host
