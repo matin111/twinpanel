@@ -1538,6 +1538,17 @@ html body.tp80-connection .protocols,
 html body.tp80-connection .tp96-protocol-modal{
  font-variant-numeric:lining-nums tabular-nums;
 }
+/* Share status stays inside its own server row; no toast that disappears. */
+html body.tp80-connection .tp80-file-share-status{
+ flex:1 1 100%!important;width:100%!important;max-width:100%!important;
+ margin:2px 0 0!important;padding:7px 9px!important;
+ border-radius:8px!important;background:var(--tp-brand-raised,#273853)!important;
+ color:var(--tp-brand-text,#fff)!important;font-size:12px!important;
+ font-weight:650!important;line-height:1.7!important;text-align:right!important;
+ white-space:normal!important;overflow-wrap:anywhere!important;
+}
+html body.tp80-connection .tp80-file-share-status[hidden]{display:none!important}
+
 """
 
 
@@ -1586,6 +1597,50 @@ _SCRIPT = r"""
    if(!card)return;
    selectedProtocol=card.dataset.protocol;
    queueMicrotask(reconcileProtocolSelection);
+ },true);
+ // Capture SHARE at window level BEFORE legacy document listeners.
+ // A visible row-local diagnostic proves whether the tap reached the handler.
+ const tpNativeSharePayloads=new WeakMap();
+ window.addEventListener('click',event=>{
+   const button=event.target?.closest?.('.tp80-file-share');
+   if(!button||!button.isConnected)return;
+   const data=tpNativeSharePayloads.get(button);
+   if(!data)return;
+   event.preventDefault();
+   event.stopImmediatePropagation();
+   const note=data.note;
+   const report=message=>{if(note){note.textContent=message;note.hidden=false}};
+   report('لمس دکمه دریافت شد؛ درخواست منوی ارسال…');
+   let payload;
+   try{payload=data.build()}catch(error){
+     report('خطا هنگام آماده‌سازی فایل ('+String(error?.name||'Error')+').');
+     return;
+   }
+   if(!payload){
+     report('این مرورگر نوع فایل را برای اشتراک‌گذاری نمی‌پذیرد. گزینه دانلود فایل موجود است.');
+     return;
+   }
+   const ua=String(navigator.userAgent||'');
+   const inApp=/telegram|instagram|fbav|fban|; wv\)|webview/i.test(ua);
+   const info=inApp?' در Chrome یا Safari اصلی باز کنید.':'';
+   const explain=error=>{
+     const name=String(error?.name||'UnknownError');
+     let message=name==='AbortError'
+       ?'اشتراک‌گذاری لغو شد یا برنامه دریافت‌کننده‌ای وجود ندارد'
+       :name==='NotAllowedError'
+         ?'مرورگر مجوز باز کردن منوی اشتراک‌گذاری را نداده'
+         :name==='TypeError'?'مرورگر فایل VPN را برای Share نپذیرفته'
+         :name==='InvalidStateError'?'مرورگر در حال انجام عملیات Share دیگری است'
+         :'مرورگر نتوانست منوی اشتراک‌گذاری را اجرا کند';
+     report(message+' ('+name+').'+info);
+   };
+   try{
+     // No async work before this call; keep transient user activation.
+     const task=navigator.share(payload);
+     Promise.resolve(task).then(()=>{
+       report('فایل به برنامه انتخاب‌شده تحویل داده شد.');
+     }).catch(explain);
+   }catch(error){explain(error)}
  },true);
  const Native=new Set(['openvpn','wireguard','amneziawg','cisco','l2tp']);
  function el(type,classes,txt){
@@ -1743,43 +1798,13 @@ _SCRIPT = r"""
          if(payload){
            const shareFile=el('button','tp80-file-share','ارسال فایل به برنامه');
            shareFile.type='button';
-           shareFile.addEventListener('click',event=>{
-             event.preventDefault();event.stopPropagation();
-             const current=buildSharePayload();
-             if(!current){
-               window.tpNativeShareMessage?.('مرورگر اجازه ارسال این فایل را نمی‌دهد؛ گزینه دانلود فایل همچنان در دسترس است.');
-               return;
-             }
-             const explain=error=>{
-               const name=String(error?.name||'UnknownError');
-               const browser=/telegram|instagram|fbav|fban|wv\b|webview/i.test(navigator.userAgent||'')
-                 ?' این صفحه را در Chrome یا Safari باز کنید.':'';
-               // Do not remove the button or claim the profile is invalid.
-               const reason=name==='NotAllowedError'?'مجوز اشتراک‌گذاری فایل مسدود شده'
-                 :name==='InvalidStateError'?'مرورگر مشغول اشتراک‌گذاری دیگری است'
-                 :name==='TypeError'?'نوع فایل توسط مرورگر رد شده'
-                 :'مرورگر از ارسال فایل جلوگیری کرد';
-               const message=reason+' ('+name+').'+browser+' اگر ادامه داشت فایل را دانلود و از برنامه مقصد Import File کنید.';
-               window.tpNativeShareMessage?.(message);
-               // Existing transient toast is too short for the explanation.
-               const toast=document.getElementById('toast');
-               if(toast){
-                 toast.textContent=message;
-                 toast.classList.add('show');
-                 window.clearTimeout(window.__hubToast);
-                 window.__hubToast=window.setTimeout(()=>toast.classList.remove('show'),6500);
-               }
-             };
-             try{
-               // Call directly from the click; no await, fetch or synthetic click.
-               Promise.resolve(navigator.share(current)).catch(error=>{
-                 if(error?.name!=='AbortError')explain(error);
-               });
-             }catch(error){
-               if(error?.name!=='AbortError')explain(error);
-             }
-           });
-           tools.append(shareFile);
+           // Store the actual prepared File for the top-level capture handler.
+           // This avoids old document handlers swallowing the mobile click.
+           const note=el('span','tp80-file-share-status','');
+           note.hidden=true;note.setAttribute('role','status');
+           note.setAttribute('aria-live','polite');
+           tpNativeSharePayloads.set(shareFile,{build:buildSharePayload,note});
+           tools.append(shareFile,note);
          }
 
          if(source&&source.value.trim()){
