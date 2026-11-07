@@ -20,7 +20,9 @@ _CSS = r"""
     overflow:visible!important;
     padding:0!important;
   }
-  body.v40-mobile-final .protocol-choice:not(.v40-real-protocol){
+  /* Both legacy v40 and later v39 validators mark real, deliverable choices.
+     Never hide a genuine protocol merely because one classifier missed it. */
+  body.v40-mobile-final .protocol-choice:not(.v40-real-protocol):not(.v39-real-protocol){
     display:none!important;
   }
   body.v40-mobile-final .protocol-choice.v40-real-protocol{

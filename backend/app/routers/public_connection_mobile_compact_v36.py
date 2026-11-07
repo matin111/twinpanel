@@ -139,9 +139,9 @@ _SCRIPT = r"""
       event.stopImmediatePropagation();
       const panel=panelFor(choice);
       if(!panel)return;
-      const wasOpen=panel.classList.contains('v36-open');
+      // The Connection page is a single-selected protocol view, not a
+      // collapsible accordion. A second tap must not leave all panels hidden.
       closeAll();
-      if(wasOpen)return;
       choice.classList.add('active');
       choice.setAttribute('aria-expanded','true');
       panel.classList.add('active','v36-open');

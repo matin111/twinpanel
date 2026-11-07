@@ -17,7 +17,7 @@ body.tp77-reference .brand .theme{order:2!important;margin-left:auto!important;c
 body.tp77-reference .page{width:min(1280px,95vw)!important;max-width:1280px!important;padding:23px 0 45px!important}
 body.tp77-reference .traffic{background:linear-gradient(100deg,#141b35,#151e39 65%,#2b154a)!important;border:1px solid #614099!important;box-shadow:0 12px 30px #090c2060!important;color:#fff!important}
 body.tp77-reference .traffic .stats{grid-template-columns:repeat(3,minmax(0,1fr))!important}
-body.tp77-reference .traffic .stat:nth-child(n+4){display:none!important}
+body.tp77-reference .traffic .stat:nth-child(n+4){display:flex!important}
 body.tp77-reference .traffic .stat strong{color:#fff!important}
 body.tp77-reference .traffic .stat small{color:#b8c4dc!important}
 body.tp77-reference .ref67-user{background:#111a35!important;border-color:#344265!important}
@@ -156,8 +156,14 @@ _SCRIPT = r"""
    const candidates=choices();
    const active=candidates.find(c=>c.classList.contains('active'));
    const saved=selection&&candidates.find(c=>c.dataset.protocol===selection);
+   // V36 on phones stops propagation on the protocol button before V77's
+   // document listener sees the click. Respect its actual open panel instead
+   // of re-selecting the saved desktop/default V2Ray every 350ms.
+   const compact=document.body.classList.contains('v36-mobile-compact');
+   const mobileOpen=compact&&candidates.find(c=>
+     document.getElementById(c.dataset.protocol)?.classList.contains('v36-open'));
    const v2ray=candidates.find(c=>c.dataset.protocolKey==='v2ray'&&!c.hidden&&!c.classList.contains('ref67-hidden'));
-   const target=saved||active||v2ray||candidates[0];
+   const target=mobileOpen||saved||active||v2ray||candidates[0];
    if(target)selectProtocol(target.dataset.protocol);
  }
  function identity(tab){
@@ -179,8 +185,6 @@ _SCRIPT = r"""
      const row=document.createElement('div');row.className='tp77-native-row';
      const label=document.createElement('div');label.className='tp77-native-label';
      label.appendChild(identity(tab));
-     const latency=tab.querySelector('.ref71-rtt');
-     if(latency)label.appendChild(latency.cloneNode(true));
      const show=document.createElement('button');show.type='button';
      show.textContent='نمایش کانفیگ';
      show.addEventListener('click',()=>{tab.click();rows.forEach(x=>x.row.classList.toggle('active',x.tab===tab));});

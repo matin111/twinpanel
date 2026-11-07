@@ -160,8 +160,7 @@ _SCRIPT = r"""
    const multi=panel.querySelector(':scope > .v52-multi-card, :scope > .v51-multi-card');
    const sub=panel.querySelector(':scope > .v34-subscription-card');
    const actionRoot=multi?.querySelector('.v51-multi-actions')||sub?.querySelector('.v34-actions');
-   if(!actionRoot||!actionRoot.children.length)return;
-   const candidates=[...actionRoot.children].filter(el=>el.matches('a,button'));
+   const candidates=actionRoot?[...actionRoot.children].filter(el=>el.matches('a,button')):[];
    const seen={};const selected=[];
    candidates.forEach(el=>{
      const kind=actionKind(el);
@@ -170,7 +169,9 @@ _SCRIPT = r"""
    });
    const download=panel.querySelector(':scope > .ref70-app-card a.ref69-download-cta[href]:not([hidden])')
       ||panel.querySelector(':scope > .v34-client-card a[href]');
-   if(download&&download.getAttribute('href'))selected.push({kind:'app',el:download});
+   // #apps is the retired hidden global drawer, not an actual download.
+   const appHref=download?.getAttribute('href')||'';
+   if(appHref&&!appHref.startsWith('#')&&!/^javascript:/i.test(appHref))selected.push({kind:'app',el:download});
    if(!selected.length)return;
    // Never discard protocol-specific extra actions (e.g. ShadowTLS YAML/JSON).
    // Keep them as secondary real controls below the approved four main buttons.
@@ -198,101 +199,9 @@ _SCRIPT = r"""
    panel.append(footer);
    panel.dataset.tp78ActionReady='1';
  }
- const tokenPart=location.pathname.match(/^\/v1\/connect\/([^/]+)/);
- const pingURL=id=>location.origin+'/v1/connect/'+(tokenPart?tokenPart[1]:'')+'/node-ping/'+encodeURIComponent(id);
- const values=new Map(),inflight=new Map(),last=new Map();
- function pingButton(nodeId){
-   if(!/^[1-9]\d*$/.test(String(nodeId||'')))return null;
-   const button=document.createElement('button');button.type='button';
-   button.className='tp78-ping';button.dataset.tp78Node=String(nodeId);
-   button.dataset.live='pending';button.title='تأخیر واقعی از سرور پنل تا نود؛ برای سنجش مجدد کلیک کنید';
-   button.setAttribute('aria-label','سنجش پینگ واقعی نود '+nodeId);
-   const number=document.createElement('span');number.className='tp78-ping-value';number.textContent='— ms';
-   const bars=document.createElement('span');bars.className='tp78-bars';bars.setAttribute('aria-hidden','true');bars.innerHTML='<i></i><i></i><i></i>';
-   button.append(number,bars);
-   button.addEventListener('click',event=>{
-     event.stopPropagation();event.preventDefault();void probe(String(nodeId),true);
-   });
-   return button;
- }
- function paint(id,value){
-   document.querySelectorAll('.tp78-ping[data-tp78-node="'+id+'"]').forEach(button=>{
-     const up=value&&typeof value.ms==='number'&&Number.isFinite(value.ms);
-     button.dataset.live=up?'up':value?'down':'pending';
-     button.querySelector('.tp78-ping-value').textContent=up?(Math.round(value.ms*10)/10)+' ms':'— ms';
-     button.title=up?'سنجش زنده '+(value.method==='icmp'?'ICMP':'TCP')+' از سرور پنل تا نود؛ برای تست مجدد بزنید':'پاسخ معتبر دریافت نشد؛ برای تست مجدد بزنید';
-   });
-   document.querySelectorAll('.tp78-reach[data-tp78-node="'+id+'"]').forEach(label=>{
-     const up=value&&typeof value.ms==='number'&&Number.isFinite(value.ms);
-     label.dataset.live=up?'up':'down';label.textContent=up?'● آنلاین':'● پاسخ ندارد';
-   });
- }
- async function probe(id,manual){
-   if(!tokenPart||inflight.has(id))return;
-   if(Date.now()-(last.get(id)||0)<3100){
-     if(manual)toast('برای تست مجدد چند ثانیه صبر کنید');
-     return;
-   }
-   last.set(id,Date.now());
-   document.querySelectorAll('.tp78-ping[data-tp78-node="'+id+'"]').forEach(el=>el.setAttribute('aria-busy','true'));
-   const task=(async()=>{
-     try{
-       const response=await fetch(pingURL(id),{cache:'no-store',headers:{Accept:'application/json'}});
-       if(!response.ok)throw new Error(String(response.status));
-       const data=await response.json();
-       const valid=data.scope==='panel_to_node'&&data.node_id===Number(id)&&typeof data.ms==='number'&&Number.isFinite(data.ms)&&data.ms>=0;
-       values.set(id,valid?data:{ms:null});
-     }catch(_error){values.set(id,{ms:null});}
-     finally{
-       paint(id,values.get(id));
-       document.querySelectorAll('.tp78-ping[data-tp78-node="'+id+'"]').forEach(el=>el.removeAttribute('aria-busy'));
-       inflight.delete(id);
-     }
-   })();
-   inflight.set(id,task);await task;
- }
- function toast(message){
-   const el=document.getElementById('toast');
-   if(el){el.textContent=message;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),1400)}
- }
- function addReach(host,id){
-   const label=document.createElement('span');label.className='tp78-reach';label.dataset.tp78Node=String(id);
-   label.textContent='● در حال بررسی';host.append(label);return label;
- }
- function modernPings(panel){
-   const tabs=[...panel.querySelectorAll('.server-tab[data-server][data-node-id]')];
-   const rows=[...panel.querySelectorAll('.ref67-list .ref67-row')];
-   tabs.forEach((tab,index)=>{
-     const id=tab.dataset.nodeId;
-     const row=rows[index];
-     if(!row||!id||row.dataset.tp78PingMounted)return;
-     row.dataset.tp78PingMounted='1';
-     let cell=row.querySelector('.ref67-status');
-     if(!cell){cell=document.createElement('div');cell.className='ref67-status';row.append(cell)}
-     cell.classList.add('tp78-ready');cell.replaceChildren();
-     const button=pingButton(id);
-     if(!button)return;
-     const wrapper=document.createElement('div');wrapper.className='tp78-ping-cell';
-     wrapper.append(button);addReach(wrapper,id);cell.append(wrapper);
-     if(values.has(id))paint(id,values.get(id));
-   });
- }
- function nativePings(panel){
-   const tabs=[...panel.querySelectorAll('.server-tab[data-server][data-node-id]')];
-   const rows=[...panel.querySelectorAll('.tp77-native-list .tp77-native-row')];
-   tabs.forEach((tab,index)=>{
-     const row=rows[index],id=tab.dataset.nodeId;
-     if(!id||!row||row.dataset.tp78PingMounted)return;
-     row.dataset.tp78PingMounted='1';
-     const label=row.querySelector('.tp77-native-label');
-     if(!label)return;
-     const meta=document.createElement('div');meta.className='tp78-native-meta';
-     const ping=pingButton(id);
-     if(!ping)return;
-     meta.append(ping);row.insertBefore(meta,row.lastElementChild);
-     if(values.has(id))paint(id,values.get(id));
-   });
- }
+
+ // Preserve original profile URIs (3 per V2Ray node), without rendering a
+ // fabricated/stale ping or probing the public endpoint on page load.
  async function copy(text){
    if(!text)return false;
    try{if(navigator.clipboard&&isSecureContext){await navigator.clipboard.writeText(text);return true}}catch(_e){}
@@ -300,40 +209,43 @@ _SCRIPT = r"""
    area.style.position='fixed';area.style.left='-9999px';document.body.append(area);
    area.select();let ok=false;try{ok=document.execCommand('copy')}catch(_e){}area.remove();return ok;
  }
- function v2rayPings(panel){
-   panel.querySelectorAll('.v54-v2ray-server[data-node-id],.v54-v2ray-server[data-country-code]').forEach(card=>{
-     const id=card.dataset.nodeId;
-     if(!id||card.dataset.tp78PingMounted)return;
+ function toast(message){
+   const el=document.getElementById('toast');
+   if(el){el.textContent=message;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),1400)}
+ }
+ function v2rayActions(panel){
+   panel.querySelectorAll('.v54-v2ray-server').forEach(card=>{
+     if(card.dataset.tp78ActionMounted==='1')return;
      const head=card.querySelector('.v54-v2ray-server-head');
      if(!head)return;
-     card.dataset.tp78PingMounted='1';
+     const profiles=[...card.querySelectorAll('.v54-v2ray-profile[data-tp78-uri]')];
+     if(!profiles.length)return;
+     const uris=profiles.map(node=>node.dataset.tp78Uri).filter(Boolean);
+     if(!uris.length)return;
+     card.dataset.tp78ActionMounted='1';
      const tools=document.createElement('div');tools.className='tp78-node-tools';
-     const ping=pingButton(id);if(ping)tools.append(ping);
-     const copyNode=document.createElement('button');copyNode.type='button';copyNode.className='tp78-copy';copyNode.textContent='⧉';
-     copyNode.title='کپی تمام کانفیگ‌های واقعی این نود';
-     const uris=[...card.querySelectorAll('.v54-v2ray-profile[data-tp78-uri]')].map(x=>x.dataset.tp78Uri).filter(Boolean);
-     copyNode.disabled=uris.length===0;
+     const copyNode=document.createElement('button');
+     copyNode.className='tp78-copy';copyNode.type='button';copyNode.textContent='⧉';
+     copyNode.title='کپی کانفیگ‌های این نود';copyNode.setAttribute('aria-label','کپی کانفیگ‌های این نود');
      copyNode.addEventListener('click',async event=>{
        event.preventDefault();event.stopPropagation();
-       toast((await copy(uris.join('\n')))?'کانفیگ‌های این نود کپی شدند':'کپی انجام نشد');
+       toast(await copy(uris.join('\n'))?'کانفیگ‌ها کپی شدند':'کپی انجام نشد');
      });
-     const add=document.createElement('button');add.className='tp78-add';add.type='button';add.textContent='+';
-     add.title='نمایش سه اتصال واقعی همین نود برای افزودن به برنامه';
-     add.addEventListener('click',event=>{event.preventDefault();event.stopPropagation();head.click()});
-     tools.append(copyNode,add);head.append(tools);
-     if(values.has(id))paint(id,values.get(id));
+     const expand=document.createElement('button');
+     expand.className='tp78-add';expand.type='button';expand.textContent='+';
+     expand.title='نمایش کانفیگ‌های این نود';
+     expand.setAttribute('aria-label','نمایش کانفیگ‌های این نود');
+     expand.addEventListener('click',event=>{event.preventDefault();event.stopPropagation();head.click()});
+     tools.append(copyNode,expand);head.append(tools);
    });
  }
  let ticks=0;
  const timer=setInterval(()=>{
    panels().forEach(panel=>{
      titlePanel(panel);
-     modernPings(panel);nativePings(panel);v2rayPings(panel);
+     v2rayActions(panel);
      actionFooter(panel);
    });
-   const current=document.querySelector('.protocol-panel.active');
-   const ids=new Set([...current?.querySelectorAll('.tp78-ping[data-tp78-node]')||[]].map(b=>b.dataset.tp78Node));
-   ids.forEach(id=>{if(!values.has(id)&&!inflight.has(id))void probe(id,false)});
    if(++ticks>=32)clearInterval(timer);
  },350);
 })();

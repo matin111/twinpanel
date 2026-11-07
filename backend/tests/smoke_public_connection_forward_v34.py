@@ -182,7 +182,7 @@ def main() -> None:
 
     # Compact view is a protocol accordion, with no nested server fold.
     require("panel.classList.add('active','v36-open')" in v36, "compact open state missing")
-    require("const wasOpen=panel.classList.contains('v36-open')" in v36, "toggle-close state missing")
+    require("if(wasOpen)return" not in v36, "mobile selection must not leave all panels closed")
     require("event.stopImmediatePropagation()" in v36, "legacy click isolation missing")
     require("v34-mobile-servers" in v36, "V34 nested fold cleanup missing")
     require(".protocol-panel.v36-open{display:block!important}" in v38,

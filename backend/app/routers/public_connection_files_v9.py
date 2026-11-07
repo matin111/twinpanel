@@ -16,6 +16,7 @@ router = APIRouter(tags=["public-connection-files-v9"])
 _FILE_TYPES = {
     "openvpn": ("ovpn", "application/x-openvpn-profile"),
     "wireguard": ("conf", "application/octet-stream"),
+    "amneziawg": ("conf", "application/octet-stream"),
 }
 
 

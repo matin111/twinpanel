@@ -56,6 +56,9 @@ from .public_connection_reference_active_v77 import (
 from .public_connection_live_reference_v78 import (
     refine_public_connection_live_reference_v78,
 )
+from .public_connection_unified_surface_dates_v80 import (
+    refine_public_connection_unified_surface_dates_v80,
+)
 from .public_connection_unified_node_identity_v76 import (
     refine_public_connection_unified_node_identity_v76,
 )
@@ -79,7 +82,8 @@ def refine_public_connection_reference_layout_v38(source: str) -> str:
     source = refine_public_connection_footer_layout_v75(source)
     source = refine_public_connection_unified_node_identity_v76(source)
     source = refine_public_connection_reference_active_v77(source)
-    return refine_public_connection_live_reference_v78(source)
+    source = refine_public_connection_live_reference_v78(source)
+    return refine_public_connection_unified_surface_dates_v80(source)
 
 
 _MARKER = "TWINPANEL_PUBLIC_CONNECT_CANONICAL_MOBILE_V26"

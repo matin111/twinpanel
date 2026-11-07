@@ -126,7 +126,7 @@ body.ref67 .ref67-primary{background:linear-gradient(105deg,#6327ec,#a532ed)!imp
  color:white!important;box-shadow:0 0 20px #9a39f454}
 body.ref67 .ref67-list{margin:0 17px 13px;border-radius:18px;overflow:hidden;
  border:1px solid #344565;background:linear-gradient(125deg,#111e38,#10182e)}
-body.ref67 .ref67-row{display:grid;grid-template-columns: minmax(130px,1fr) minmax(90px,.85fr) auto;
+body.ref67 .ref67-row{display:grid;grid-template-columns: minmax(130px,1fr) auto;
  gap:12px;align-items:center;min-height:75px;padding:10px 14px;border-bottom:1px solid #34405f}
 body.ref67 .ref67-row:last-child{border-bottom:0}
 body.ref67 .ref67-row[hidden]{display:none!important}
@@ -159,14 +159,15 @@ body.ref67 .protocol-panel[data-ref67-native-protocol] .server-tabs{
 }
 body.ref67 .protocol-panel[data-ref67-native-protocol] .server-views,
 body.ref67 .protocol-panel[data-ref67-native-protocol] details.v34-mobile-servers .server-views{
-  display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;
+  display:block!important;grid-template-columns:none!important;
   padding:12px 16px!important;gap:10px!important;
 }
 body.ref67 .protocol-panel[data-ref67-native-protocol] .server-view{
-  display:block!important;min-width:0!important;border:1px solid #344665!important;
+  display:none!important;min-width:0!important;border:1px solid #344665!important;
   border-radius:14px!important;background:#141d34!important;
   margin:0!important;padding:12px!important;
 }
+body.ref67 .protocol-panel[data-ref67-native-protocol] .server-view.active{display:block!important}
 body.ref67 .protocol-panel[data-ref67-native-protocol] .server-view .facts{
   display:grid!important;gap:9px!important;grid-template-columns:1fr!important;
 }
@@ -227,7 +228,8 @@ body.ref67 .advanced,body.ref67 .apps{border-color:#353d61!important}
  body.ref67 .ref67-user strong{font-size:15px}
  body.ref67 .ref67-user small{font-size:10px}
  body.ref67 .traffic .stats{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:0}
- body.ref67 .traffic .stat:nth-child(n+4){display:none!important}
+ /* Keep first-connection and expiry visible on mobile too. */
+ body.ref67 .traffic .stat:nth-child(n+4){display:flex!important}
  body.ref67 .traffic .stat{padding:8px 3px!important;min-height:62px}
  body.ref67 .traffic .stat strong{font-size:14px!important}
  body.ref67 .traffic .stat small{font-size:9px!important}
@@ -406,12 +408,6 @@ _SCRIPT = r"""
    if(!span)return;
    span.textContent=' '+d.code+' '+d.num;
    span.prepend(flagImageOrEmoji(d.code,'ref67-native-flag'));
-   const latency=Number(tab.dataset.latencyMs||'');
-   if(tab.dataset.latencyMs&&Number.isFinite(latency)&&latency>0){
-     const badge=document.createElement('span');badge.className='ref71-rtt';
-     badge.textContent=latency+' ms';badge.title='تأخیر واقعی مسیر تونل';
-     tab.appendChild(badge);
-   }
   });
  }
  function serverDescriptor(tab,index){
@@ -461,12 +457,6 @@ _SCRIPT = r"""
    const d=serverDescriptor(tab,i);
    const c=document.createElement('button');c.type='button';c.className='ref67-chip';
    c.append(flagImageOrEmoji(d.code,'ref67-flag'),document.createTextNode(' '+(d.code||'—')+' '+d.num));
-   const rtt=Number(tab.dataset.latencyMs||'');
-   if(tab.dataset.latencyMs&&Number.isFinite(rtt)&&rtt>0){
-     const badge=document.createElement('span');badge.className='ref71-rtt';
-     badge.textContent=rtt+' ms';badge.title='تأخیر واقعی مسیر تونل';
-     c.appendChild(badge);
-   }
    c.addEventListener('click',()=>{bar.querySelectorAll('button').forEach(x=>x.classList.toggle('active',x===c));
     rows.forEach((row,j)=>row.hidden=i!==j);tab.click();});
    bar.appendChild(c);
@@ -477,13 +467,6 @@ _SCRIPT = r"""
    b.textContent=d.name+' - '+d.num;const sub=document.createElement('small');
    sub.textContent=panel.querySelector('.panel-head h3')?.textContent?.trim()||'Connection';
    info.append(b,sub);name.append(flag,info);
-   const status=document.createElement('div');status.className='ref67-status';
-   status.title='تأخیر مسیر نود از پایش تونل؛ نه پینگ مستقیم گوشی کاربر';
-   const currentView=views.find(view=>view.id===tab.dataset.server);
-   const latency=tab.dataset.latencyMs||currentView?.dataset.latencyMs||'';
-   const numeric=Number(latency);
-   status.textContent='● '+(tab.dataset.online==='false'?'آفلاین':'آماده')+
-     '  ·  '+(latency&&Number.isFinite(numeric)&&numeric>=0?numeric+' ms':'—');
    const actions=document.createElement('div');actions.className='ref67-row-actions';
    // Bind actions to the real server view id, never a fragile array position.
    const serverId=tab.dataset.server||'';
@@ -499,10 +482,9 @@ _SCRIPT = r"""
     actions.appendChild(a);
    }
    // Do not display a fake action when no actual client URI exists.
-   if(!actions.children.length){
-    const hint=document.createElement('small');hint.textContent='لینک تکی موجود نیست';actions.appendChild(hint);
-   }
-   row.append(name,status,actions);list.appendChild(row);rows.push(row);
+   if(actions.children.length)row.append(name,actions);
+   else row.append(name);
+   list.appendChild(row);rows.push(row);
   });
   all.addEventListener('click',()=>{
    bar.querySelectorAll('button').forEach(x=>x.classList.toggle('active',x===all));
@@ -513,17 +495,7 @@ _SCRIPT = r"""
   const multi=panel.querySelector('.v52-multi-card,.v51-multi-card');
   if(multi)multi.insertAdjacentElement('afterend',list);
   else bar.insertAdjacentElement('afterend',list);
-  const footer=document.createElement('div');footer.className='ref67-footer';
-  const actions=multi?.querySelector('.v51-multi-actions');
-  if(actions){
-   // Reuse genuine actions, do not reconstruct multi-link or app URLs.
-   const matches=[...actions.querySelectorAll('a,button')].filter(x=>/کپی لینک|کپی همه|دانلود/.test(x.textContent||''));
-   matches.slice(0,3).forEach(original=>{
-    const element=document.createElement('button');element.type='button';
-    element.textContent=original.textContent.trim();element.addEventListener('click',()=>original.click());footer.appendChild(element);
-   });
-  }
-  if(footer.children.length)list.insertAdjacentElement('afterend',footer);
+
  }
  function apply(){
   document.body.classList.add('ref67');

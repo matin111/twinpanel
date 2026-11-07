@@ -20,7 +20,8 @@ def source(name):
 def test_reference_injection_and_mobile_cards_and_real_actions():
     canonical = source("public_connection_canonical_mobile_v26.py")
     ui = source("public_connection_live_reference_v78.py")
-    assert "return refine_public_connection_live_reference_v78(source)" in canonical
+    assert "source = refine_public_connection_live_reference_v78(source)" in canonical
+    assert "return refine_public_connection_unified_surface_dates_v80(source)" in canonical
     assert "grid-template-columns:repeat(4,minmax(0,1fr))!important" in ui
     assert "body.tp78-ui .protocol-choice .protocol-text{order:1!important" in ui
     assert 'body.tp78-ui .protocol-choice .protocol-icon{order:0!important' in ui
@@ -29,23 +30,25 @@ def test_reference_injection_and_mobile_cards_and_real_actions():
     assert "const extras=candidates.filter" in ui  # retain ShadowTLS YAML/JSON, etc.
     assert "extras.forEach(el=>" in ui
     assert "const actionRoot=multi?.querySelector('.v51-multi-actions')" in ui
-    assert "if(download&&download.getAttribute('href'))" in ui
+    assert "appHref&&!appHref.startsWith('#')" in ui
+    assert "!/^javascript:/i.test(appHref)" in ui
     assert "data-kind=\"add\"" in ui
     assert "data-kind=\"app\"" in ui
     assert "data-kind=\"copy\"" in ui
     assert "data-kind=\"link\"" in ui
-    assert "row.dataset.tp78PingMounted='1'" in ui
+    assert "v2rayActions(panel)" in ui
+    assert "function pingButton" not in ui
 
 
 def test_no_stale_numbers_or_reachability_lies_in_ui():
     ui = source("public_connection_live_reference_v78.py")
-    assert "node-ping/" in ui
-    assert "fetch(pingURL(id),{cache:'no-store'" in ui
-    assert "data.scope==='panel_to_node'" in ui
-    assert "— ms" in ui
-    assert "پاسخ ندارد" in ui
-    assert "● آنلاین" in ui
-    assert "function probe(id,manual)" in ui
+    assert "node-ping/" not in ui
+    assert "function pingButton" not in ui
+    assert "function probe(" not in ui
+    assert "modernPings(panel)" not in ui
+    assert "nativePings(panel)" not in ui
+    assert "v2rayPings(panel)" not in ui
+    assert "function v2rayActions(panel)" in ui
     assert "36 ms" not in ui
     assert "58 ms" not in ui
     assert "72 ms" not in ui
@@ -66,7 +69,7 @@ def test_all_three_v2ray_profiles_copy_without_replacing_original_link():
 def test_real_probe_endpoint_authorized_and_limited():
     code = source("public_connection_ping_v78.py")
     hub = source("public_connection_hub_v5.py")
-    assert 'router.include_router(_live_ping_router)' in hub
+    assert 'router.include_router(_live_ping_router)' not in hub
     assert 'data-node-id' in hub
     assert '@router.get("/{token}/node-ping/{node_id}")' in code
     assert "_subscription_from_share_token(token, db)" in code
@@ -119,15 +122,14 @@ def test_measured_value_is_not_cached_telemetry(monkeypatch):
 
 
 
-def test_registered_live_router_exposes_refresh_endpoint():
+def test_unused_live_ping_is_not_publicly_registered():
     from app.routers.public_connection_hub_live_v5 import router as live_router
     route = next(
         (route for route in live_router.routes
          if route.path == "/v1/connect/{token}/node-ping/{node_id}"),
         None,
     )
-    assert route is not None
-    assert "GET" in route.methods
+    assert route is None
     # app.main mounts the live hub, not the legacy hub_v5 router.
     main = (ROOT.parent / "main.py").read_text(encoding="utf-8")
     assert "app.include_router(public_connection_hub_live_v5_router)" in main

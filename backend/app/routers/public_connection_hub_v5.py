@@ -20,11 +20,9 @@ from .account_delivery import (
     _usage_payload,
 )
 from .download_assets import public_downloads_by_platform
-from .public_connection_ping_v78 import router as _live_ping_router
 
 
 router = APIRouter(prefix="/v1/connect", tags=["public-connection-hub-v5"])
-router.include_router(_live_ping_router)
 
 
 def h(value: Any) -> str:
@@ -140,7 +138,7 @@ def _item_detail(protocol: str, item: dict[str, Any], username: str, password: s
     secret = item.get("password") or password
     if protocol == "openvpn":
         return _file_action(protocol, item, index, prefix)
-    if protocol == "wireguard":
+    if protocol in {"wireguard", "amneziawg"}:
         return _file_action(protocol, item, index, prefix)
     if protocol in {"v2ray", "xray"}:
         return _v2ray_action(item)
@@ -273,12 +271,10 @@ def render_protocols(
                 node_id = int(item.get("node_id") or 0)
             except (TypeError, ValueError):
                 node_id = 0
-            latency = (latency_by_node or {}).get(node_id)
-            latency_attr = f' data-latency-ms="{int(latency)}"' if latency is not None else ""
-            # Identity is authoritative for live node probes and unified per-country actions.
-            latency_attr += f' data-node-id="{node_id}" data-country-code="{h(item.get("country_code") or "")}"' if node_id > 0 else ""
+            # Identity data only. No cached RTT or fake reachability on user pages.
+            identity_attr = f' data-node-id="{node_id}" data-country-code="{h(item.get("country_code") or "")}"' if node_id > 0 else ""
             server_tabs.append(
-                f'<button class="server-tab{server_active}" type="button" data-server="{h(server_id)}"{latency_attr}><i></i><span>{h(name)}</span></button>'
+                f'<button class="server-tab{server_active}" type="button" data-server="{h(server_id)}"{identity_attr}><i></i><span>{h(name)}</span></button>'
             )
             body = _item_detail(
                 protocol,
@@ -370,8 +366,7 @@ def public_connection_hub_v5(token: str, db: Session = Depends(get_db)):
 
     safe_payload = payload if status == "active" else {**payload, "credentials": [], "account": {}}
     smart_html = render_smart_connect(safe_payload, username if status == "active" else "", password if status == "active" else "", node_names)
-    measured_latency = _recent_node_latency(db, safe_payload)
-    protocol_cards, protocol_panels = render_protocols(safe_payload, username if status == "active" else "", password if status == "active" else "", node_names, measured_latency)
+    protocol_cards, protocol_panels = render_protocols(safe_payload, username if status == "active" else "", password if status == "active" else "", node_names)
     apps_html = render_apps(public_downloads_by_platform(db))
     share_url = str(payload.get("subscription_link") or "")
     status_html = '<span class="status on"><i></i>اشتراک فعال</span>' if status == "active" else '<span class="status off"><i></i>غیرفعال</span>'
@@ -386,7 +381,7 @@ def public_connection_hub_v5(token: str, db: Session = Depends(get_db)):
 </style></head><body>
 <header class="top"><div class="topin"><div class="brand"><button id="themeToggle" class="theme" type="button" aria-label="تغییر حالت">☾</button><span class="mark">__MARK__</span><b>__BRAND__</b></div><div class="profile"><span class="avatar">__AVATAR__</span><div class="profile-copy"><strong>__CUSTOMER__</strong><small>حساب کاربری</small></div><span class="service">__SERVICE__</span>__STATUS__</div></div></header>
 <main class="page">
-<section class="traffic"><div class="visual"><div class="donut" style="--pct:__PERCENT__"><div><b>__PERCENT_LABEL__%</b><small>مصرف شده</small></div></div><div><h2>وضعیت اشتراک</h2><em>LIVE</em></div></div><div class="stats"><div class="stat"><small>مصرف‌شده</small><strong>__USED__</strong></div><div class="stat"><small>باقی‌مانده</small><strong>__REMAIN__</strong></div><div class="stat"><small>حجم کل</small><strong>__TOTAL__</strong></div><div class="stat"><small>تاریخ شروع</small><strong>__START__</strong></div><div class="stat"><small>تاریخ انقضا</small><strong>__EXPIRE__</strong></div></div></section>
+<section class="traffic"><div class="visual"><div class="donut" style="--pct:__PERCENT__"><div><b>__PERCENT_LABEL__%</b><small>مصرف شده</small></div></div><div><h2>وضعیت اشتراک</h2><em>LIVE</em></div></div><div class="stats"><div class="stat"><small>مصرف‌شده</small><strong>__USED__</strong></div><div class="stat"><small>باقی‌مانده</small><strong>__REMAIN__</strong></div><div class="stat"><small>حجم کل</small><strong>__TOTAL__</strong></div><div class="stat"><small>تاریخ اولین اتصال</small><strong>__START__</strong></div><div class="stat"><small>تاریخ انقضا</small><strong>__EXPIRE__</strong></div></div></section>
 <div class="section-head"><div><small>SMART CONNECT</small><h2>اتصال هوشمند</h2></div><p>سریع‌ترین مسیر برای شروع اتصال، بدون درگیرشدن با جزئیات فنی.</p></div>
 __SMART__
 <div class="section-head"><div><small>QUICK CONNECT</small><h2>اتصال سریع</h2></div><p>پروتکل دلخواه را انتخاب کنید؛ فقط گزینه‌های واقعی و آماده نمایش داده می‌شوند.</p></div>

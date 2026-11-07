@@ -21,8 +21,9 @@ def test_real_node_latency_is_read_only_recent_and_scoped():
     assert "TunnelPeerState.latency_ms.isnot(None)" in hub
     assert "cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(minutes=2)" in hub
     assert "0 < int(latency) <= 30000" in hub
-    assert "measured_latency = _recent_node_latency(db, safe_payload)" in hub
-    assert 'latency_attr = f\' data-latency-ms="{int(latency)}"\'' in hub
+    assert "measured_latency = _recent_node_latency(db, safe_payload)" not in hub
+    assert "data-latency-ms" not in hub
+    assert "identity_attr =" in hub
     assert "latency_by_node: dict[int, int] | None = None" in hub
     assert "db.commit(" not in hub
 
@@ -30,11 +31,10 @@ def test_real_node_latency_is_read_only_recent_and_scoped():
 def test_ui_displays_real_rtt_only_and_labels_tunnel_not_client_ping():
     ui=(ROOT/"public_connection_reference_desktop_mobile_v67.py").read_text(encoding="utf-8")
     compile(ui,"reference_v67","exec")
-    assert "const latency=tab.dataset.latencyMs||views[i]?.dataset.latencyMs||'';" in ui
-    assert "if(tab.dataset.latencyMs&&Number.isFinite(rtt)&&rtt>0)" in ui
-    assert "badge.textContent=rtt+' ms'" in ui
-    assert "تأخیر واقعی مسیر تونل" in ui
-    assert "پینگ مستقیم گوشی کاربر" in ui
+    assert "badge.textContent=rtt+' ms'" not in ui
+    assert "const rtt=Number(" not in ui
+    assert "status.textContent=" not in ui
+    assert "پینگ مستقیم گوشی کاربر" not in ui
     assert "https://cdn.simpleicons.org/" in ui
     for protocol in ("openvpn","wireguard","cisco"):
         assert protocol in ui
