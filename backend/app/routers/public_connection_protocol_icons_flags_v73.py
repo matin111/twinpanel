@@ -11,6 +11,7 @@ body.ref73-ready .protocol-icon svg {
   fill:#fff!important;color:#fff!important;stroke-linecap:round;
   stroke-linejoin:round;filter:drop-shadow(0 1px 2px #0002);
 }
+body.ref73-ready .protocol-icon svg[data-tp73-kind="pictogram"]{fill:none!important;stroke:#fff!important;stroke-width:2px!important}
 body.ref73-ready .protocol-choice .protocol-icon:has(svg){
   border-radius:50%!important;
 }
@@ -88,6 +89,7 @@ _SCRIPT = r"""
    svg.setAttribute('aria-hidden','true');
    if(path){const p=document.createElementNS(ns,'path');p.setAttribute('d',path);p.setAttribute('fill','currentColor');svg.appendChild(p);}
    else{
+     svg.dataset.tp73Kind='pictogram';
      svg.setAttribute('fill','none');svg.setAttribute('stroke','currentColor');svg.setAttribute('stroke-width','2');
      svg.innerHTML=shape;
    }
