@@ -263,7 +263,13 @@ def _modern_item_is_usable(ad: Any, db, protocol: str, item: dict[str, Any]) -> 
             return False
     else:
         from .services.central_runtime_ownership_v1 import is_central_node
-        if not is_central_node(db, node_id):
+        # A topology scan may check thousands of credentials against the same
+        # hidden Exit. Query its ownership marker once per SQLAlchemy Session,
+        # not once per subscription/protocol item.
+        ownership = db.info.setdefault("_central_hidden_exit_ownership", {})
+        if node_id not in ownership:
+            ownership[node_id] = bool(is_central_node(db, node_id))
+        if not ownership[node_id]:
             return False
     cfg = (
         db.query(NodeProtocolConfig)
