@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 from .routers import public_connection_final_presentation_v37 as final_v37
 from .routers import public_connection_forward_v34 as forward_v34
 from .routers import public_connection_reference_layout_v38 as reference_v38
@@ -48,13 +50,33 @@ def _remove_panel_brand(value: str) -> str:
     return str(value or "").replace(_HIDDIFY_OLD, _HIDDIFY_NEW).replace(_KARING_OLD, _KARING_NEW)
 
 
+def _make_async_once(source: str, signature: str) -> str:
+    """Upgrade a JS function exactly once, including already-patched source."""
+    # Plain substring replacement also matches inside "async function", leading
+    # to the invalid browser JavaScript "async async function".
+    source = source.replace("async async " + signature, "async " + signature)
+    return re.sub(r"(?<!async )" + re.escape(signature), "async " + signature, source, count=1)
+
+
+def _inject_resolver_once(source: str, async_signature: str) -> str:
+    marker = "let profile=String(protocol||'vpn');"
+    pos = source.find(async_signature)
+    if pos < 0:
+        return source
+    tail = source[pos + len(async_signature):]
+    if marker in tail[:1000]:
+        return source
+    return source[:pos + len(async_signature)] + _PROFILE_RESOLVER + tail
+
+
 def _canonicalize_v34_subscription_name(value: str) -> str:
     source = _remove_panel_brand(value)
     if _V34_USE_OLD not in source:
         return source
 
-    source = source.replace(_V34_USE_OLD, _V34_USE_NEW, 1)
-    source = source.replace(_V34_URL_LINE, _V34_URL_LINE + _PROFILE_RESOLVER, 1)
+    source = _make_async_once(source, _V34_USE_OLD)
+    if _V34_URL_LINE in source and "let profile=String(protocol||'vpn');" not in source:
+        source = source.replace(_V34_URL_LINE, _V34_URL_LINE + _PROFILE_RESOLVER, 1)
     source = source.replace(_V34_HIDDIFY_CLEAN, _V34_HIDDIFY_CANONICAL, 1)
     source = source.replace(_V34_KARING_CLEAN, _V34_KARING_CANONICAL, 1)
     return source
@@ -65,13 +87,13 @@ def _canonicalize_import_name(value: str, *, v38: bool = False) -> str:
     if _ASYNC_IMPORT_OLD not in source:
         return source
 
-    source = source.replace(_ASYNC_IMPORT_OLD, _ASYNC_IMPORT_NEW, 1)
-    source = source.replace(_ASYNC_IMPORT_NEW, _ASYNC_IMPORT_NEW + _PROFILE_RESOLVER, 1)
+    source = _make_async_once(source, _ASYNC_IMPORT_OLD)
+    source = _inject_resolver_once(source, _ASYNC_IMPORT_NEW)
     source = source.replace(_HIDDIFY_CLEAN, _HIDDIFY_CANONICAL)
     source = source.replace(_KARING_CLEAN, _KARING_CANONICAL)
     source = source.replace(_DEEP_OLD, _DEEP_NEW)
     if v38:
-        source = source.replace(_V38_ALL_OLD, _V38_ALL_NEW)
+        source = _make_async_once(source, _V38_ALL_OLD)
     return source
 
 
