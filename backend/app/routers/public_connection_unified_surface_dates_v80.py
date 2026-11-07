@@ -165,6 +165,112 @@ body.tp80-connection .protocol-panel .v52-multi-card{order:28!important}
  body.tp80-connection .tp78-action-footer>.tp78-footer-action[data-kind="link"]{grid-row:2!important;grid-column:3!important}
  body.tp80-connection .tp78-action-footer>.tp78-footer-action[data-kind="extra"]{grid-row:auto!important;grid-column:auto!important}
 }
+
+/* Minimal common surface: no RTT indicators, no duplicate descriptions. */
+html body.tp80-connection .ref71-rtt,
+html body.tp80-connection .tp78-ping,
+html body.tp80-connection .tp78-reach,
+html body.tp80-connection .ref67-status,
+html body.tp80-connection .ref67-latency,
+html body.tp80-connection .ref67-footer,
+html body.tp80-connection .v34-single-label,
+html body.tp80-connection .v51-single-title,
+html body.tp80-connection .v38-server-list-title,
+html body.tp80-connection .protocol-panel .panel-head >div:first-child>span:not(.tp78-protocol-emblem),
+html body.tp80-connection .v54-v2ray-server-head >span:nth-child(2),
+html body.tp80-connection .protocol-panel .v34-client-card,
+html body.tp80-connection .protocol-panel .ref70-app-card,
+html body.tp80-connection .protocol-panel .v51-multi-card,
+html body.tp80-connection .protocol-panel .v52-multi-card,
+html body.tp80-connection .protocol-panel .v34-subscription-card{
+  display:none!important;
+}
+html body.tp80-connection .protocol-panel .ref67-row{
+  display:flex!important;align-items:center!important;justify-content:space-between!important;
+  gap:12px!important;min-height:65px!important;padding:11px 14px!important;direction:ltr!important;
+}
+html body.tp80-connection .protocol-panel .ref67-row-name{flex:1 1 auto!important;min-width:0!important}
+html body.tp80-connection .protocol-panel .ref67-row-actions{flex:0 0 auto!important}
+html body.tp80-connection .protocol-panel .ref67-row-name small{
+  display:none!important;
+}
+html body.tp80-connection .protocol-panel .ref67-row-name b{font-size:13px!important}
+html body.tp80-connection .protocol-panel .ref67-flag img,
+html body.tp80-connection .protocol-panel .ref67-chip img,
+html body.tp80-connection .protocol-panel .ref67-native-flag img,
+html body.tp80-connection .protocol-panel .tp76-flag svg,
+html body.tp80-connection .protocol-panel .tp74-flag svg,
+html body.tp80-connection .protocol-panel .tp74-flag img,
+html body.tp80-connection .protocol-panel .tp77-native-label img{
+  width:25px!important;height:19px!important;min-width:25px!important;
+  flex:0 0 25px!important;object-fit:cover!important;border-radius:4px!important;
+}
+html body.tp80-connection .protocol-panel .tp80-file-actions{
+  margin-inline-start:auto!important;display:flex!important;flex:0 0 auto!important;
+  align-items:center!important;gap:8px!important;direction:ltr!important;
+}
+html body.tp80-connection .protocol-panel .tp80-file-actions .tp80-file-download{
+  border-radius:10px!important;min-height:39px!important;padding:8px 13px!important;
+  display:inline-flex!important;align-items:center!important;justify-content:center!important;
+  background:linear-gradient(125deg,var(--p),var(--s))!important;
+  border:1px solid #9c7cfb!important;color:white!important;cursor:pointer!important;
+  font-size:11px!important;font-weight:850!important;width:auto!important;
+}
+html body.tp80-connection .protocol-panel .tp80-file-copy{
+  border-radius:10px!important;min-height:39px!important;padding:8px 13px!important;
+  border:1px solid #4b5f82!important;background:#25314d!important;
+  color:white!important;font-size:11px!important;font-weight:850!important;
+}
+html body.tp80-connection .protocol-panel.tp80-native .tp77-native-row[data-tp80-file-row='1']{
+  display:flex!important;align-items:center!important;justify-content:space-between!important;
+  gap:10px!important;
+}
+html body.tp80-connection .protocol-panel.tp80-native .tp77-native-row[data-tp80-file-row='1'] .tp77-native-label{
+  flex:1!important;min-width:0!important;
+}
+html body.tp80-connection .protocol-panel .tp78-action-footer{
+ grid-template-columns:repeat(var(--tp80-cols,4),minmax(0,1fr))!important;
+}
+html body.tp80-connection .tp80-extra-actions{
+ order:9!important;grid-column:1/-1!important;border-radius:12px!important;
+ border:1px solid #405078!important;background:#14213d!important;
+}
+html body.tp80-connection .tp80-extra-actions>summary{
+ cursor:pointer!important;list-style:none!important;padding:12px!important;text-align:center!important;
+ color:#e7edff!important;font-size:11px!important;font-weight:800!important;
+}
+html body.tp80-connection .tp80-extra-list{
+ display:flex!important;gap:8px!important;padding:7px!important;flex-wrap:wrap!important;
+}
+html body.tp80-connection .tp80-extra-list>.tp78-footer-action{
+ flex:1 1 130px!important;min-height:42px!important;display:inline-flex!important;
+ justify-content:center!important;align-items:center!important;border:1px solid #435779!important;
+ background:#1e2e4f!important;border-radius:9px!important;color:white!important;
+ font-size:11px!important;padding:8px!important;
+}
+@media(max-width:720px){
+ html body.tp80-connection .protocol-panel .tp78-action-footer{
+   grid-template-columns:repeat(var(--tp80-secondary-cols,3),minmax(0,1fr))!important;
+ }
+ html body.tp80-connection .protocol-panel .tp78-action-footer[data-has-primary='0']{
+   grid-template-columns:repeat(var(--tp80-cols,3),minmax(0,1fr))!important;
+ }
+ html body.tp80-connection .protocol-panel .tp78-action-footer>.tp78-footer-action[data-kind='add'],
+ html body.tp80-connection .protocol-panel .tp78-action-footer>.tp78-footer-action[data-kind='download']{
+   grid-column:1/-1!important;grid-row:1!important;
+ }
+ html body.tp80-connection .protocol-panel .tp78-action-footer>.tp78-footer-action[data-kind='app'],
+ html body.tp80-connection .protocol-panel .tp78-action-footer>.tp78-footer-action[data-kind='copy'],
+ html body.tp80-connection .protocol-panel .tp78-action-footer>.tp78-footer-action[data-kind='link']{
+   grid-column:auto!important;grid-row:auto!important;
+ }
+ html body.tp80-connection .protocol-panel.tp80-native .tp77-native-row[data-tp80-file-row='1']{
+   min-height:58px!important;padding:8px!important;
+ }
+ html body.tp80-connection .protocol-panel .tp80-file-actions{gap:4px!important}
+ html body.tp80-connection .protocol-panel .tp80-file-actions .tp80-file-download,
+ html body.tp80-connection .protocol-panel .tp80-file-copy{min-height:33px!important;padding:6px 7px!important;font-size:10px!important}
+}
 """
 
 _SCRIPT = r"""
@@ -223,9 +329,53 @@ _SCRIPT = r"""
      const head=panel.querySelector(':scope > .panel-head');
      head?.insertAdjacentElement('afterend',bar);
      rows.forEach((row,index)=>{
-       const show=row.querySelector('button:not(.tp78-ping)');
-       if(show){
-         // Keep V77's existing tab-click handler, show only that original node.
+       const tab=tabs[index];
+       const view=tab?panel.querySelector('.server-view[id="'+tab.dataset.server+'"]'):null;
+       const show=row.querySelector(':scope > button');
+       const isFile=type==='openvpn'||type==='wireguard'||type==='amneziawg';
+       // Move the real per-node file action; preserve its data-target, filename
+       // and original document click handler. Never duplicate a profile card.
+       const download=isFile&&view?view.querySelector('button.download-config[data-target],a.tp-v16-safe-download[href]'):null;
+       if(download){
+         if(show)show.remove();
+         const tools=el('div','tp80-file-actions');
+         download.classList.add('tp80-file-download');
+         download.textContent='↓ دانلود فایل';
+         tools.append(download);
+         const target=download.dataset.target;
+         const source=target?document.getElementById(target):null;
+         if(source&&source.value.trim()){
+           const copyFile=el('button','tp80-file-copy','کپی فایل');
+           copyFile.type='button';
+           copyFile.addEventListener('click',async event=>{
+             event.stopPropagation();
+             const data=source.value;
+             if(!data)return;
+             let success=false;
+             try{
+               if(navigator.clipboard&&isSecureContext){
+                 await navigator.clipboard.writeText(data);success=true;
+               }
+             }catch(_error){}
+             if(!success){
+               const input=el('textarea','');
+               input.value=data;input.style.position='fixed';input.style.left='-9999px';
+               document.body.append(input);input.select();
+               try{success=document.execCommand('copy')}catch(_error){}
+               input.remove();
+             }
+             if(success){
+               copyFile.textContent='کپی شد ✓';
+               window.setTimeout(()=>{copyFile.textContent='کپی فایل'},1350);
+             }
+           });
+           tools.append(copyFile);
+         }
+         row.append(tools);
+         row.dataset.tp80FileRow='1';
+       }else if(show){
+         // Cisco/L2TP and non-file material show only this server's details.
+         show.textContent='نمایش اطلاعات';
          show.addEventListener('click',()=>{panel.classList.add('tp80-detail-open')});
        }
      });
@@ -279,32 +429,25 @@ _SCRIPT = r"""
    const footer=panel.querySelector(':scope > .tp78-action-footer');
    if(!footer||footer.dataset.tp80Ready==='1')return;
    const children=[...footer.querySelectorAll(':scope > .tp78-footer-action')];
-   const find=kind=>children.find(x=>x.dataset.kind===kind);
+   const find=kind=>children.find(node=>node.dataset.kind===kind);
    const primary=find('add')||find('download');
-   const copy=find('copy');
-   const link=find('link');
-   const app=find('app');
-   const slots=[
-     {kind:'primary',node:primary,label:'افزودن یا دانلود همه'},
-     {kind:'link',node:link,label:'کپی لینک اشتراک'},
-     {kind:'copy',node:copy,label:'کپی همه کانفیگ‌ها'},
-     {kind:'app',node:app,label:'دانلود برنامه'}
-   ];
-   const tail=document.createDocumentFragment();
-   slots.forEach(slot=>{
-     const node=slot.node;
-     if(node){tail.append(node);return}
-     const missing=el('button','tp78-footer-action tp80-unavailable',slot.label);
-     missing.type='button';missing.disabled=true;
-     missing.dataset.kind=slot.kind==='primary'?'download':slot.kind;
-     missing.title='این عملیات برای این پروتکل در دسترس نیست';
-     tail.append(missing);
-   });
-   children.forEach(node=>{
-     if(!slots.some(slot=>slot.node===node))tail.append(node);
-   });
-   footer.replaceChildren(tail);
-   footer.dataset.tp80Ready='1';
+   const ordered=[primary,find('link'),find('copy'),find('app')].filter(Boolean);
+   // Do not render dead placeholders. Every button must perform a real action.
+   const extra=children.filter(node=>!ordered.includes(node));
+   footer.replaceChildren(...ordered);
+   if(extra.length){
+     const details=el('details','tp80-extra-actions');
+     details.append(el('summary','','سایر فرمت‌های کانفیگ'));
+     const holder=el('div','tp80-extra-list');
+     extra.forEach(node=>holder.append(node));details.append(holder);
+     footer.append(details);
+   }
+   // Layout fills the width for 1,2,3,4 available operations, on any device.
+   footer.dataset.hasPrimary=primary?'1':'0';
+   footer.style.setProperty('--tp80-cols',String(Math.min(4,Math.max(1,ordered.length))));
+   footer.style.setProperty('--tp80-secondary-cols',String(Math.min(3,Math.max(1,ordered.length-(primary?1:0)))));
+   if(!ordered.length&&!extra.length)footer.remove();
+   else footer.dataset.tp80Ready='1';
  }
  function check(){
    panels().forEach(panel=>{
