@@ -7,6 +7,12 @@ on:
       - "backend/app/routers/node_snapshot_policy_v1.py"
       - "backend/app/routers/publish_node_all_users_v1.py"
       - "backend/app/routers/publish_node_all_users_v2.py"
+      - "backend/app/routers/node_overview_v1.py"
+      - "backend/app/routers/node_install_progress_v1.py"
+      - "backend/app/node_install_progress_models_v1.py"
+      - "backend/app/services/node_install_progress_v1.py"
+      - "backend/tests/test_node_observability_v1.py"
+      - "components/legacy-nodes-runtime-v2.tsx"
       - "components/node-add-modal-bridge.tsx"
       - "backend/tests/test_fast_node_publishing_v1.py"
       - ".github/workflows/fast-node-publish-v1.yml"
@@ -38,11 +44,15 @@ jobs:
           python -m py_compile backend/app/routers/nodes.py \
             backend/app/routers/node_snapshot_policy_v1.py \
             backend/app/routers/publish_node_all_users_v1.py \
-            backend/app/routers/publish_node_all_users_v2.py
+            backend/app/routers/publish_node_all_users_v2.py \
+            backend/app/routers/node_overview_v1.py \
+            backend/app/routers/node_install_progress_v1.py \
+            backend/app/services/node_install_progress_v1.py
       - name: Test node publishing, no bulk churn, safe direct entitlements
         run: |
           python -m pytest -q \
-            backend/tests/test_fast_node_publishing_v1.py
+            backend/tests/test_fast_node_publishing_v1.py \
+            backend/tests/test_node_observability_v1.py
       - name: Existing legacy publish + retirement safety contracts
         run: |
           python backend/tests/nonblocking_node_publish_v601_smoke.py

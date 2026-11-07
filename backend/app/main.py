@@ -29,6 +29,9 @@ from . import subscription_delivery_policy_v1
 from .payment_crypto_schema import ensure_payment_crypto_schema
 from .wallet_crypto_schema import ensure_wallet_crypto_schema
 from .routers import admin, auth, nodes, plans, provision, subscriptions, tunnels, resellers, reseller_portal, domains, branding
+from .routers.node_overview_v1 import router as node_overview_v1_router
+from .routers.node_install_progress_v1 import router as node_install_progress_v1_router
+from . import node_install_progress_models_v1  # register additive install status table before create_all
 from .routers.admin_node_connection_settings_v1 import router as admin_node_connection_settings_v1_router
 from .routers import bootstrap as bootstrap_router_module
 from .routers.two_factor import router as two_factor_router  # TWINPANEL_REAL_2FA_REGISTER_V1
@@ -342,6 +345,8 @@ app.include_router(customer_wallet_admin_router)
 app.include_router(customer_subscription_management_router)
 app.include_router(download_assets_admin_router)
 app.include_router(download_assets_public_router)
+app.include_router(node_overview_v1_router)
+app.include_router(node_install_progress_v1_router)
 app.include_router(nodes.router)
 app.include_router(admin_node_connection_settings_v1_router)
 app.include_router(node_recovery_router)

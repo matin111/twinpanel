@@ -23,6 +23,16 @@ const protocolKeys=["cisco","openvpn","wireguard","l2tp","v2ray"] as const;
 type NodeRole="iran"|"exit"|"mother";
 type NodeModal="manage"|"ssh"|"domain"|"xray-domain"|null;
 type ExtendedNode=AdminNode&{is_mother?:boolean;public_domain?:string|null};
+type NodeOverviewRow={node_id:number;status:string;users_total:number;traffic_bytes:number;ports_total:number;protocols_online:number};
+type NodeOverviewPayload={ok:boolean;items:NodeOverviewRow[];updated_at?:string};
+const bytes=(value:number|undefined):string=>{
+  if(value===undefined||!Number.isFinite(value))return "—";
+  const units=["B","KB","MB","GB","TB","PB"];
+  let n=value;
+  let unit=0;
+  while(n>=1024&&unit<units.length-1){n/=1024;unit++;}
+  return new Intl.NumberFormat("fa-IR",{maximumFractionDigits:unit?1:0}).format(n)+" "+units[unit];
+};
 type NodeBackfillStatus={node_id:number;published:boolean;queued:boolean;completed_pairs:number;families:Array<{protocol:string;state:string;completed_pairs:number;last_batch:number;attempts:number;error_code:string|null}>};
 
 function roleOf(node:ExtendedNode):NodeRole{
@@ -47,6 +57,8 @@ function Modal({title,sub,onClose,children,className=""}:{title:string;sub?:stri
 export function LegacyNodesRuntimePage(){
   const {pick}=useI18n();
   const [nodes,setNodes]=useState<ExtendedNode[]>([]);
+  const [overview,setOverview]=useState<Record<number,NodeOverviewRow>>({});
+  const [overviewAvailable,setOverviewAvailable]=useState(false);
   const [domains,setDomains]=useState<RuntimeRow[]>([]);
   const [selectedId,setSelectedId]=useState(0);
   const [filter,setFilter]=useState<"all"|"iran"|"exit">("all");
@@ -131,6 +143,32 @@ export function LegacyNodesRuntimePage(){
     void load();
     const timer=window.setInterval(()=>void load(true),15000);
     return()=>window.clearInterval(timer);
+  },[]);
+
+  useEffect(()=>{
+    let active=true;
+    const refresh=async()=>{
+      const token=getCustomerToken();
+      if(!token)return;
+      try{
+        const response=await fetch(`${API_BASE}/v1/nodes/overview-v1`,{
+          headers:{Authorization:`Bearer ${token}`},cache:"no-store",
+        });
+        if(!response.ok)throw new Error("node overview unavailable");
+        const payload=await response.json() as NodeOverviewPayload;
+        if(!active)return;
+        const next:Record<number,NodeOverviewRow>={};
+        for(const row of payload.items||[])next[row.node_id]=row;
+        setOverview(next);
+        setOverviewAvailable(true);
+      }catch{
+        // Never replace a missing sample with made-up zero values.
+        if(active)setOverviewAvailable(false);
+      }
+    };
+    void refresh();
+    const timer=window.setInterval(()=>void refresh(),15000);
+    return()=>{active=false;window.clearInterval(timer);};
   },[]);
 
   const selected=nodes.find(row=>row.id===selectedId)||null;
@@ -356,14 +394,21 @@ export function LegacyNodesRuntimePage(){
             <option value="exit">{pick("خارج","Exit")}</option>
           </select>
         </div>
-        <div className="table"><table><thead><tr><th>{pick("نود","Node")}</th><th>{pick("نوع","Type")}</th><th>IP</th><th>{pick("وضعیت","Status")}</th><th>{pick("عملیات","Actions")}</th></tr></thead>
-          <tbody>{filtered.map(node=><tr key={node.id} className={node.id===selectedId&&modal!==null?"is-selected":""}>
-            <td><b>{node.name}</b></td>
-            <td>{roleOf(node)}</td>
-            <td dir="ltr">{node.public_ip||"—"}</td>
-            <td><Badge tone={tone(node.status)}>{node.status||"—"}</Badge></td>
-            <td><button type="button" className="primary-soft" onClick={()=>openManage(node.id)}>{pick("مدیریت","Manage")}</button></td>
-          </tr>)}</tbody>
+        <div className="table"><table><thead><tr><th>{pick("نود","Node")}</th><th>{pick("نوع","Type")}</th><th>IP</th><th>{pick("وضعیت","Status")}</th><th>{pick("کل کاربران","Total users")}</th><th>{pick("مصرف ثبت‌شده","Recorded usage")}</th><th>{pick("پورت‌های تنظیم‌شده","Configured ports")}</th><th>{pick("عملیات","Actions")}</th></tr></thead>
+          <tbody>{filtered.map(node=>{
+            const stats=overviewAvailable?overview[node.id]:undefined;
+            const currentStatus=stats?.status||node.status;
+            return <tr key={node.id} className={node.id===selectedId&&modal!==null?"is-selected":""}>
+              <td><b>{node.name}</b></td>
+              <td>{roleOf(node)}</td>
+              <td dir="ltr">{node.public_ip||"—"}</td>
+              <td><Badge tone={tone(currentStatus)}>{currentStatus||"—"}</Badge></td>
+              <td><b className="node-metric-value">{stats?.users_total===undefined?"—":stats.users_total.toLocaleString("fa-IR")}</b></td>
+              <td><b className="node-metric-value" dir="ltr">{bytes(stats?.traffic_bytes)}</b></td>
+              <td><b className="node-metric-value">{stats?.ports_total===undefined?"—":stats.ports_total.toLocaleString("fa-IR")}</b></td>
+              <td><button type="button" className="primary-soft" onClick={()=>openManage(node.id)}>{pick("مدیریت","Manage")}</button></td>
+            </tr>;
+          })}</tbody>
         </table></div>
       </Card>
 
@@ -381,6 +426,10 @@ export function LegacyNodesRuntimePage(){
           <div><span>{pick("دامنه عمومی","Public domain")}</span><b dir="ltr">{effectiveDomain||"—"}</b></div>
           {selectedRole==="exit"?<div><span>{pick("دامنه Xray / V2Ray","Xray / V2Ray domain")}</span><b dir="ltr">{xrayDomainLoading?"…":displayedXrayDomain||"—"}{xrayDomainMeta?.legacy_public_domain_fallback?` · ${pick("fallback عمومی","public fallback")}`:""}</b></div>:null}
           <div><span>{pick("پروتکل‌های کلاسیک فعال","Enabled classic protocols")}</span><b>{enabledProtocolCount(selected).toLocaleString("fa-IR")}</b></div>
+          <div><span>{pick("کل اکانت‌های منتسب","Total assigned accounts")}</span><b>{overviewAvailable&&overview[selected.id]?overview[selected.id].users_total.toLocaleString("fa-IR"):"—"}</b></div>
+          <div><span>{pick("کل حجم مصرف ثبت‌شده","Recorded total usage")}</span><b dir="ltr">{overviewAvailable?bytes(overview[selected.id]?.traffic_bytes):"—"}</b></div>
+          <div><span>{pick("تعداد پورت‌های تنظیم‌شده","Configured port count")}</span><b>{overviewAvailable&&overview[selected.id]?overview[selected.id].ports_total.toLocaleString("fa-IR"):"—"}</b></div>
+          <div><span>{pick("پروتکل‌های Online","Online protocols")}</span><b>{overviewAvailable&&overview[selected.id]?overview[selected.id].protocols_online.toLocaleString("fa-IR"):"—"}</b></div>
         </div>
         {selectedRole==="exit"?<div className="runtime-choice-section" style={{marginBottom:12}}>
           <div className="card-head"><b>{pick("ساخت خودکار کانفیگ کاربران قبلی","Automatic existing-account provisioning")}</b><Badge tone={backfill?.families.some(row=>row.state==="failed")?"bad":backfill?.queued?"warn":"ok"}>{backfill?.queued?pick("در حال پردازش","Processing"):backfill?.families.length?pick("آماده","Ready"):pick("هنوز شروع نشده","Not queued")}</Badge></div>
