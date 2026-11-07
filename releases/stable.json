@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.634",
+  "version": "1.1.0-rc.635",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-07T00:46:02Z",
+  "released_at": "2026-11-07T00:58:43Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "9cda8c51681a5de1432fe05ba733cc4d9b3c2da0",
+  "source_sha": "123d37effa67fc898264ce1aadf204ef1c7be869",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.634/twinpanel-1.1.0-rc.634-linux-x86_64.tar.gz",
-    "sha256": "e77e4b56b0d7ffdb7b64d4eba572a8b176661459a53b98c6fb61b2da72497efd",
-    "size_bytes": 29040695
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.635/twinpanel-1.1.0-rc.635-linux-x86_64.tar.gz",
+    "sha256": "c8555d499b3c25b170210d8056387acddc2462f2f34f61044877575a6564bf09",
+    "size_bytes": 29071469
   },
   "notes": {
-    "fa": "بهینه‌سازی واقعی مدیریت مرکزی در ساخت دسته‌ای V2Ray: ساخت محلی پروفایل از مرجع معتبر همان نود، ثبت همه Credentialهای دسته در یک تراکنش، تأیید موازی همه کاربران با کنترل تعداد و Rollback. بدون تغییر UUID یا راه‌اندازی مجدد Xray. حالت پایلوت محدود و دستی باقی می‌ماند.",
-    "en": "Centralized V2Ray batch provisioning: locally materialize per-user Reality profiles from validated same-node template, persist entire batch in one atomic DB transaction, and concurrently verify all hot-added users with bounded read-only Xray API calls. No UUID changes or Xray restart. Pilot remains opt-in and limited."
+    "fa": "نسخه rc.635 شامل اصلاح مقصد نامعتبر REALITY آلمان اول، حفظ SNI لینک‌های قدیمی و پایدارسازی BBR برای Xray روی نودهای انتخاب‌شده؛ همچنین رابط Connection تأییدشده در نسخه اصلی. بدون تغییر UUIDها، کلیدها، پروتکل‌های سالم یا هسته تونل.",
+    "en": "rc.635 combines the approved Connection UI with the verified Germany REALITY target/SNI compatibility fix and per-node opt-in Xray BBR persistence. No credential rotation, customer account recreation or tunnel carrier change."
   }
 }
