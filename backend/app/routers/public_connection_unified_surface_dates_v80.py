@@ -759,6 +759,35 @@ _SCRIPT = r"""
      });
    });
  }
+ function createSudokuClientAction(){
+   const os=String(document.body.dataset.tpPlatform||'').toLowerCase();
+   const mobile=/Android/i.test(navigator.userAgent);
+   const ios=/iPhone|iPad|iPod/i.test(navigator.userAgent);
+   let target='https://github.com/SUDOKU-ASCII/sudoku-desktop/releases';
+   let title='دانلود Sudoku Desktop';
+   if(os==='android'||mobile){
+     target='https://github.com/SUDOKU-ASCII/sudoku-android/releases';
+     title='دانلود Sudodroid';
+   }else if(os==='ios'||ios){
+     target='https://apps.apple.com/us/app/anywhere-proxy/id6758235178';
+     title='دانلود Anywhere Proxy';
+   }
+   const app=el('a','tp78-footer-action',title);
+   app.href=target;app.target='_blank';app.rel='noopener noreferrer';
+   app.dataset.kind='app';app.dataset.tp80OfficialSudoku='1';
+   return app;
+ }
+ function ensureSudokuClient(panel){
+   const key=String(panel.dataset.ref67NativeProtocol||panel.dataset.v34Protocol||'').toLowerCase();
+   if(key!=='sudoku')return;
+   let footer=panel.querySelector(':scope > .tp78-action-footer');
+   if(!footer){
+     footer=el('nav','tp78-action-footer');footer.setAttribute('aria-label','عملیات اشتراک');
+     panel.append(footer);
+   }
+   const present=footer.querySelector(':scope > [data-kind="app"]');
+   if(!present)footer.append(createSudokuClientAction());
+ }
  function alignFooter(panel){
    const footer=panel.querySelector(':scope > .tp78-action-footer');
    if(!footer||footer.dataset.tp80Ready==='1')return;
@@ -775,24 +804,7 @@ _SCRIPT = r"""
        children.push(app);
      }
    }
-   if(key==='sudoku'&&!find('app')){
-     // Official Sudoku clients (project upstream), not an unrelated puzzle.
-     const os=String(document.body.dataset.tpPlatform||'').toLowerCase();
-     const mobile=/Android/i.test(navigator.userAgent);
-     const ios=/iPhone|iPad|iPod/i.test(navigator.userAgent);
-     let target='https://github.com/SUDOKU-ASCII/sudoku-desktop/releases';
-     let title='دانلود Sudoku Desktop';
-     if(os==='android'||mobile){
-       target='https://github.com/SUDOKU-ASCII/sudoku-android/releases';
-       title='دانلود Sudodroid';
-     }else if(os==='ios'||ios){
-       target='https://apps.apple.com/us/app/anywhere-proxy/id6758235178';
-       title='دانلود Anywhere Proxy';
-     }
-     const app=el('a','tp78-footer-action',title);
-     app.href=target;app.target='_blank';app.rel='noopener noreferrer';
-     app.dataset.kind='app';app.dataset.tp80OfficialSudoku='1';children.push(app);
-   }
+   if(key==='sudoku'&&!find('app'))children.push(createSudokuClientAction());
    const fileProtocol=new Set(['openvpn','wireguard','amneziawg']).has(key);
    let primary=find('add')||find('download');
    const previousPrimary=primary;
@@ -834,6 +846,7 @@ _SCRIPT = r"""
      normalizeV2ray(panel);
      normalizeModern(panel);
      alignFooter(panel);
+     ensureSudokuClient(panel);
    });
  }
  check();
