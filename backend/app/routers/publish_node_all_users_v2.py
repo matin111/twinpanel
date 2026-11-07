@@ -79,6 +79,11 @@ async def publish_node_to_all_users_v2(
         # The unique (subscription_id,node_id) constraint protects retries and
         # concurrent publish requests. Postgres executes this as one INSERT,
         # rather than thousands of ORM flushes.
+        # Centrally staged exits have already had their full eligible
+        # membership materialized and audited. Do NOT perform a fresh
+        # all-active INSERT after that audit: purchases occurring during
+        # the publish HTTP request would become visible without credentials.
+        # The next desired-state reconciliation is responsible for new users.
         memberships = db.execute(
             text("""
                 INSERT INTO subscription_nodes (subscription_id,node_id,created_at)
@@ -94,7 +99,7 @@ async def publish_node_to_all_users_v2(
                   )
                 ON CONFLICT (subscription_id,node_id) DO NOTHING
             """), params,
-        )
+        ) if staged_install is None else None
         # Explicit routing policies need one direct route to the new node.
         # Insert only missing policies and preserve priorities of older routes.
         explicit = db.execute(
@@ -161,7 +166,7 @@ async def publish_node_to_all_users_v2(
     # Do not call sync_installed_node_to_subscriptions or _sync_modern_node
     # here. Those are unbounded per-account network operations and previously
     # froze the API, especially with 2000+ migrated subscriptions.
-    added = max(0, int(memberships.rowcount or 0))
+    added = max(0, int(memberships.rowcount or 0)) if memberships is not None else 0
     print(
         "TWINPANEL_NODE_PUBLISH_SET_BASED_V1",
         {
