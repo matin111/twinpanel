@@ -1014,6 +1014,17 @@ html body.tp80-connection .protocol-panel.active .tp89-v2ray-copy:focus-visible{
   grid-template-columns:1fr!important;
  }
 }
+
+/* TWINPANEL_VISIBLE_CLIENT_DOWNLOAD_V91 */
+html body.tp80-connection .protocol-panel.active > .tp78-action-footer > a.tp91-client-download{
+ display:flex!important;visibility:visible!important;opacity:1!important;
+ position:relative!important;min-height:58px!important;height:auto!important;
+ color:var(--tp-brand-text,var(--text))!important;
+ background:var(--tp-brand-raised,var(--surface2))!important;
+ border:1px solid var(--tp-brand-stroke,var(--line))!important;
+ padding:12px!important;align-items:center!important;justify-content:center!important;
+ text-decoration:none!important;font-weight:800!important;
+}
 """
 
 
@@ -1573,25 +1584,29 @@ _SCRIPT = r"""
    const canonical=appName&&supportedPlatforms[appName]?.includes(platform)
      ?'/v1/connect/app-download/'+appName+'/'+platform:null;
    const existing=[...footer.querySelectorAll('[data-kind="app"]')];
-   let app=existing.find(a=>a.tagName==='A')||null;
-   const existingUrl=String(app?.getAttribute('href')||'');
-   const validExisting=existingUrl.startsWith('https://')||existingUrl.startsWith('http://')||existingUrl.startsWith('/v1/connect/app-download/');
-   // Canonical supported client is preferred for consistency; otherwise
-   // preserve an existing verified direct link for this device.
-   const href=canonical||(original?.getAttribute('href'))||(validExisting?existingUrl:null);
+   const sourceHref=original?.getAttribute('href')||'';
+   const validSource=sourceHref.startsWith('https://')||sourceHref.startsWith('http://')||sourceHref.startsWith('/v1/connect/app-download/');
+   const href=canonical||(validSource?sourceHref:null);
    if(noApp||!href){
      existing.forEach(node=>node.remove());
    }else{
-     if(!app){app=original||el('a','tp78-footer-action','دانلود برنامه');}
+     // Never move a legacy app anchor from a hidden card into the footer.
+     // Legacy classes/inline styles can keep it invisible even after reparenting.
+     let app=existing.find(node=>node.dataset.tp91App==='1'&&node.tagName==='A');
+     if(!app){
+       app=el('a','tp78-footer-action tp91-client-download','دانلود برنامه');
+       app.dataset.tp91App='1';
+     }
      app.dataset.kind='app';
-     app.classList.add('tp78-footer-action');
      app.setAttribute('href',href);
      app.setAttribute('target','_blank');
      app.setAttribute('rel','noopener noreferrer');
      app.textContent='دانلود برنامه';
-     // DOM move, not a second standalone card, preserves a single action.
-     if(app.parentElement!==footer||footer.lastElementChild!==app)footer.append(app);
-     existing.filter(a=>a!==app).forEach(a=>a.remove());
+     app.removeAttribute('hidden');
+     app.removeAttribute('style');
+     app.setAttribute('aria-label','دانلود برنامه اتصال '+key);
+     if(app.parentElement!==footer)footer.append(app);
+     existing.filter(node=>node!==app).forEach(node=>node.remove());
    }
    panel.querySelectorAll('.v34-client-card,.ref70-app-card,.v13-client-only').forEach(card=>card.remove());
    panel.querySelectorAll(':scope > .ref69-download-cta').forEach(node=>node.remove());
