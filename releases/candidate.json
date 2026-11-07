@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.631",
-  "source_sha": "3f4f03e87cc6c6f34cd9ec07f35038cfd83be7f5",
+  "version": "1.1.0-rc.632",
+  "source_sha": "f3434affd0b5b8e428d605c06213b13ba77458a7",
   "notes": {
-    "fa": "اصلاح ریشه‌ای انتخاب هسته TP27: اولویت GRE مستقیم پیش از FOU در ترمیم خودکار؛ حفظ مسیر پشتیبان و تشخیص سرعت TCP واقعی، اعتبارسنجی تازگی نمونه‌ها و حذف امتیاز سرعت قدیمی پس از تغییر مسیر. بدون بازسازی خودکار تونل‌های فعال.",
-    "en": "TP27 carrier recovery now qualifies native GRE before FoU fallbacks, retains quarantine and failover, exposes fresh TCP-capacity diagnostics, and invalidates old throughput when switching carriers. No active tunnel rebuild on update."
+    "fa": "طراحی واکنش‌گرای حرفه‌ای صفحه Connection برای دسکتاپ و موبایل با دکمه‌های تکی ایمن بر اساس لینک‌های موجود؛ بدون تغییر کانفیگ‌ها، آدرس‌ها و پروتکل‌ها.",
+    "en": "Approved responsive public Connection UI and safe per-server action presentation based on existing canonical links. No VPN protocol, configs, endpoints, credentials or subscription generator changes."
   }
 }
