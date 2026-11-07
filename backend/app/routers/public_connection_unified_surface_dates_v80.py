@@ -101,6 +101,30 @@ body.tp80-connection .tp80-credentials>summary{
 body.tp80-connection .tp80-credentials>summary::after{content:"⌄";float:left}
 body.tp80-connection .tp80-credentials[open]>summary::after{content:"⌃"}
 body.tp80-connection .tp80-credentials>.v35-manual-credentials{margin:0!important;border:0!important;border-top:1px solid #334566!important;background:transparent!important}
+/* One navigation bar per native protocol. Legacy tabs stay in DOM for
+   their existing per-node handlers, but are not exposed as a second bar. */
+html body.tp80-connection .protocol-panel.tp80-native .panel-head .server-tabs,
+html body.tp80-connection .protocol-panel.tp80-native .panel-head .tp74-country-bar,
+html body.tp80-connection .protocol-panel.tp80-native > .ref67-tabs,
+html body.tp80-connection .protocol-panel.tp80-native > .tp74-country-bar{
+  display:none!important;visibility:hidden!important;
+}
+html body.tp80-connection .protocol-panel.tp80-native .tp77-native-row[data-tp80-country-hidden="1"]{
+  display:none!important;visibility:hidden!important;
+}
+body.tp80-connection .tp80-country-bar img{
+  width:24px!important;height:18px!important;object-fit:cover!important;border-radius:4px!important;
+}
+body.tp80-connection .tp80-country-flag{font-size:20px!important;line-height:1!important}
+html body.tp80-connection .protocol-panel.tp80-native > .tp80-credentials{
+  display:block!important;visibility:visible!important;padding:10px!important;
+}
+html body.tp80-connection .protocol-panel.tp80-native .tp80-credentials > .v35-manual-credentials{
+  display:block!important;visibility:visible!important;
+  border:none!important;margin:0!important;padding:4px!important;background:transparent!important;
+}
+body.tp80-connection .tp80-credentials .v35-manual-head{margin-bottom:10px!important}
+
 body.tp80-connection .protocol-panel .tp78-action-footer{
   order:30!important;display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;
   direction:ltr!important;gap:10px!important;margin:18px 16px 18px!important;
@@ -395,29 +419,52 @@ _SCRIPT = r"""
    const rows=[...panel.querySelectorAll('.tp77-native-row')];
    const tabs=[...panel.querySelectorAll('.server-tab[data-server]')];
    if(!panel.dataset.tp80NativeReady&&tabs.length){
-     const bar=el('div','tp80-country-bar');
-     bar.setAttribute('aria-label','فیلتر کشورها');
-     const all=el('button','active','همه');all.type='button';bar.append(all);
-     const choices=[];
+     // The original server-tabs remain only as internal JS controls. The
+     // user sees exactly one country selector, deduplicated by ISO country.
+     const original=panel.querySelector(':scope > .panel-head .server-tabs');
+     if(original){original.hidden=true;original.style.setProperty('display','none','important');}
+     const groups=new Map();
      tabs.forEach((tab,index)=>{
-       const btn=el('button','');btn.type='button';
-       btn.append(idLabel(tab));bar.append(btn);choices.push(btn);
-       btn.addEventListener('click',()=>{
-         rows.forEach((row,i)=>row.hidden=i!==index);
-         choices.forEach((b,i)=>b.classList.toggle('active',i===index));
-         all.classList.remove('active');
-         panel.classList.remove('tp80-detail-open');
-         tab.click();
+       const code=String(tab.dataset.countryCode||'').trim().toUpperCase();
+       const country=/^[A-Z]{2}$/.test(code)?code:'OTHER';
+       if(!groups.has(country))groups.set(country,{tab,indices:[]});
+       groups.get(country).indices.push(index);
+       if(rows[index]){
+         rows[index].dataset.tp80CountryCode=country;
+         rows[index].dataset.tp80ServerId=tab.dataset.server||'';
+       }
+     });
+     const bar=el('nav','tp80-country-bar');
+     bar.setAttribute('aria-label','فیلتر کشورها');
+     const all=el('button','active','همه');
+     all.type='button';all.dataset.tp80Country='ALL';bar.append(all);
+     const choices=[all];
+     const filterByCountry=country=>{
+       rows.forEach(row=>{
+         const visible=country==='ALL'||row.dataset.tp80CountryCode===country;
+         row.hidden=!visible;
+         row.dataset.tp80CountryHidden=visible?'0':'1';
        });
-     });
-     all.addEventListener('click',()=>{
-       rows.forEach(row=>row.hidden=false);
-       choices.forEach(btn=>btn.classList.remove('active'));
-       all.classList.add('active');
+       choices.forEach(btn=>btn.classList.toggle('active',btn.dataset.tp80Country===country));
+       // Filtering must not invoke tab.click(): older scripts reset the view.
        panel.classList.remove('tp80-detail-open');
-     });
+     };
+     for(const [country,group] of groups){
+       const btn=el('button','');btn.type='button';btn.dataset.tp80Country=country;
+       const source=group.tab.querySelector('img');
+       if(source){const img=source.cloneNode(true);img.alt=country;btn.append(img)}
+       else if(country!=='OTHER'){
+         const flag=[...country].map(c=>String.fromCodePoint(127397+c.charCodeAt(0))).join('');
+         btn.append(el('span','tp80-country-flag',flag));
+       }
+       btn.append(document.createTextNode(' '+country+(group.indices.length>1?' ('+group.indices.length+')':'')));
+       btn.addEventListener('click',()=>filterByCountry(country));
+       choices.push(btn);bar.append(btn);
+     }
+     all.addEventListener('click',()=>filterByCountry('ALL'));
      const head=panel.querySelector(':scope > .panel-head');
      head?.insertAdjacentElement('afterend',bar);
+     filterByCountry('ALL');
      rows.forEach((row,index)=>{
        const tab=tabs[index];
        const view=tab?panel.querySelector('.server-view[id="'+tab.dataset.server+'"]'):null;
@@ -473,15 +520,16 @@ _SCRIPT = r"""
    }
    // V35 may regenerate shared credentials after page load. Re-home the live
    // copy buttons on every check, keeping them only once and without cloning.
+   // Cisco and L2TP credentials are essential, never behind a collapsed
+   // accordion. Preserve V35's original real values and native copy handlers.
    const shared=panel.querySelector(':scope > .v35-manual-credentials');
    if(shared){
-     let disclosure=panel.querySelector(':scope > .tp80-credentials');
-     if(!disclosure){
-       disclosure=el('details','tp80-credentials');
-       disclosure.append(el('summary','','اطلاعات ورود مشترک'));
-       shared.insertAdjacentElement('beforebegin',disclosure);
+     let credentials=panel.querySelector(':scope > .tp80-credentials');
+     if(!credentials){
+       credentials=el('section','tp80-credentials');
+       shared.insertAdjacentElement('beforebegin',credentials);
      }
-     disclosure.append(shared);
+     credentials.append(shared);
    }
    // Restore semantic active-only details even if V67's obsolete grid CSS exists.
    const views=[...panel.querySelectorAll('.server-view')];
