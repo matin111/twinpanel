@@ -430,6 +430,44 @@ html body.tp80-connection .protocol-panel .tp80-detail-toggle{
 }
 """
 
+
+/* Connection final unified download placement and row sizes */
+html body.tp80-connection .protocol-panel.tp80-native .tp77-native-row {
+ height:62px!important;min-height:62px!important;max-height:62px!important;
+ padding:7px 12px!important;overflow:hidden!important;
+}
+html body.tp80-connection .protocol-panel.tp80-native .tp80-file-actions {
+ display:flex!important;flex-direction:row!important;align-items:center!important;
+ gap:7px!important;flex:0 0 auto!important;
+}
+html body.tp80-connection .protocol-panel.tp80-native .tp80-file-actions button,
+html body.tp80-connection .protocol-panel.tp80-native .tp80-file-actions a{
+ min-height:36px!important;height:36px!important;padding:6px 10px!important;
+}
+html body.tp80-connection .protocol-panel > .v34-client-card,
+html body.tp80-connection .protocol-panel > .ref70-app-card,
+html body.tp80-connection .protocol-panel > .v13-client-only {
+ display:none!important;
+}
+html body.tp80-connection .protocol-panel .tp78-action-footer{
+ grid-template-columns:repeat(var(--tp80-cols,3),minmax(0,1fr))!important;
+}
+html body.tp80-connection .protocol-panel .tp78-action-footer > [data-kind="app"]{
+ min-height:70px!important;text-decoration:none!important;display:flex!important;
+}
+@media(max-width:720px){
+ html body.tp80-connection .protocol-panel.tp80-native .tp77-native-row{
+  height:58px!important;min-height:58px!important;max-height:58px!important;
+  padding:5px 8px!important;
+ }
+ html body.tp80-connection .protocol-panel .tp78-action-footer{
+  grid-template-columns:repeat(2,minmax(0,1fr))!important;
+ }
+ html body.tp80-connection .protocol-panel .tp78-action-footer > [data-kind="app"]{
+  min-height:46px!important;
+ }
+}
+
 _SCRIPT = r"""
 <script id="twinpanelConnectionUnifiedSurfaceDatesV80">
 (function(){
@@ -861,6 +899,64 @@ _SCRIPT = r"""
    if(!ordered.length&&!extra.length)footer.remove();
    else footer.dataset.tp80Ready='1';
  }
+
+ function reconcileClientDownload(panel){
+   const key=keyForPanel(panel);
+   let footer=panel.querySelector(':scope > .tp78-action-footer');
+   if(!footer){
+     footer=el('nav','tp78-action-footer');
+     footer.setAttribute('aria-label','عملیات اشتراک');
+     panel.append(footer);
+   }
+   const existing=[...footer.querySelectorAll(':scope > [data-kind="app"]')];
+   // L2TP/IPsec uses the OS built-in VPN: never display a download action.
+   if(['l2tp','l2tpipsec','l2tp/ipsec'].includes(key)){
+     existing.forEach(node=>node.remove());
+     footer.querySelectorAll('.tp80-extra-actions [data-kind="app"]').forEach(node=>node.remove());
+     panel.querySelectorAll(':scope > .v34-client-card,:scope > .ref70-app-card').forEach(node=>node.hidden=true);
+   }else{
+     const supported={openvpn:'openvpn',wireguard:'wireguard',
+       amneziawg:'amneziawg',trusttunnel:'trusttunnel',
+       cisco:'openconnect',openconnect:'openconnect'};
+     const platform=(()=>{
+       const os=String(document.body.dataset.tpPlatform||'').toLowerCase();
+       if(['windows','android','ios','macos'].includes(os))return os;
+       const ua=navigator.userAgent||'';
+       if(/android/i.test(ua))return'android';
+       if(/iphone|ipad|ipod/i.test(ua))return'ios';
+       if(/macintosh|mac os/i.test(ua))return'macos';
+       return'windows';
+     })();
+     let app=existing[0]||null;
+     // The canonical /app-download endpoint already maps clients to
+     // actual installers, including AmneziaWG and TrustTunnel.
+     if(supported[key]&&(['amneziawg','trusttunnel'].includes(key)||!app)){
+       if(!app){
+         app=el('a','tp78-footer-action','دانلود برنامه');
+         app.dataset.kind='app';footer.append(app);
+       }
+       app.href='/app-download/'+supported[key]+'/'+platform;
+       app.textContent='دانلود برنامه';
+       app.target='_blank';app.rel='noopener noreferrer';
+     }
+     existing.slice(1).forEach(node=>node.remove());
+     if(app&&app.parentElement!==footer)footer.append(app);
+     if(app)footer.dataset.tp80Ready='1';
+   }
+   // One image flag per row (the original label sometimes contains a
+   // regional emoji and an img, or two separate img flags).
+   panel.querySelectorAll('.tp77-native-label').forEach(label=>{
+     const imgs=[...label.querySelectorAll('img')];
+     imgs.slice(1).forEach(img=>img.remove());
+     [...label.childNodes].forEach(node=>{
+       if(node.nodeType===3&&/^[\\s\\u{1F1E6}-\\u{1F1FF}]+$/u.test(node.textContent||''))
+         node.textContent='';
+     });
+   });
+   const count=[...footer.children].filter(n=>n.matches('.tp78-footer-action')).length;
+   footer.style.setProperty('--tp80-cols',String(Math.max(1,Math.min(4,count))));
+ }
+
  function check(){
    reconcileProtocolSelection();
    panels().forEach(panel=>{
@@ -870,6 +966,7 @@ _SCRIPT = r"""
      alignFooter(panel);
      ensureCanonicalApp(panel);
      ensureSudokuClient(panel);
+     reconcileClientDownload(panel);
    });
  }
  check();
