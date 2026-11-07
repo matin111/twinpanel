@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from ..database import SessionLocal
 from ..node_install_progress_models_v1 import NodeInstallProgressV1
 
-TERMINAL = {"completed", "failed"}
+TERMINAL = {"completed", "failed", "waiting_backfill"}
 STAGES = {
     "queued", "installing_base", "installing_xray",
     "installing_modern", "enrolling_users", "users_queued", "completed", "failed",
@@ -43,7 +43,15 @@ def set_install_progress(job_id: str, stage: str, *, node_id: int | None = None,
         if job is None or job.state in TERMINAL:
             return
         job.stage = stage
-        job.state = "completed" if stage in {"completed", "users_queued"} else "failed" if stage == "failed" else "running"
+        # A queued subscription backfill is not completed account provisioning.
+        # Preserve an explicit non-terminal state until account application is
+        # independently verified by the supervised worker.
+        job.state = (
+            "completed" if stage == "completed"
+            else "waiting_backfill" if stage == "users_queued"
+            else "failed" if stage == "failed"
+            else "running"
+        )
         if node_id is not None:
             job.node_id = int(node_id)
         if installed_protocols is not None:
