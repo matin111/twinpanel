@@ -26,6 +26,8 @@ def test_reference_injection_and_mobile_cards_and_real_actions():
     assert 'body.tp78-ui .protocol-choice .protocol-icon{order:0!important' in ui
     assert 'grid-template-columns:repeat(3,minmax(0,1fr))!important' in ui
     assert "footer.append(el)" in ui  # move real button, never fake handler
+    assert "const extras=candidates.filter" in ui  # retain ShadowTLS YAML/JSON, etc.
+    assert "extras.forEach(el=>" in ui
     assert "const actionRoot=multi?.querySelector('.v51-multi-actions')" in ui
     assert "if(download&&download.getAttribute('href'))" in ui
     assert "data-kind=\"add\"" in ui
