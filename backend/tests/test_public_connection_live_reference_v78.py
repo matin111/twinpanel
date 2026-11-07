@@ -35,18 +35,19 @@ def test_reference_injection_and_mobile_cards_and_real_actions():
     assert "data-kind=\"app\"" in ui
     assert "data-kind=\"copy\"" in ui
     assert "data-kind=\"link\"" in ui
-    assert "row.dataset.tp78PingMounted='1'" in ui
+    assert "v2rayActions(panel)" in ui
+    assert "function pingButton" not in ui
 
 
 def test_no_stale_numbers_or_reachability_lies_in_ui():
     ui = source("public_connection_live_reference_v78.py")
-    assert "node-ping/" in ui
-    assert "fetch(pingURL(id),{cache:'no-store'" in ui
-    assert "data.scope==='panel_to_node'" in ui
-    assert "— ms" in ui
-    assert "پاسخ ندارد" in ui
-    assert "● آنلاین" in ui
-    assert "function probe(id,manual)" in ui
+    assert "node-ping/" not in ui
+    assert "function pingButton" not in ui
+    assert "function probe(" not in ui
+    assert "modernPings(panel)" not in ui
+    assert "nativePings(panel)" not in ui
+    assert "v2rayPings(panel)" not in ui
+    assert "function v2rayActions(panel)" in ui
     assert "36 ms" not in ui
     assert "58 ms" not in ui
     assert "72 ms" not in ui
