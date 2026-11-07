@@ -117,6 +117,27 @@ body.tp80-connection .tp80-country-bar img{
 }
 body.tp80-connection .tp80-country-flag{font-size:20px!important;line-height:1!important}
 
+/* Manual-style proxy facts use the same node/credential presentation. */
+html body.tp80-connection .tp80-modern-detail[hidden]{display:none!important}
+html body.tp80-connection .tp80-modern-detail:not([hidden]){
+  display:block!important;position:relative!important;
+  background:#16233c!important;border-bottom:1px solid #384968!important;
+  margin:0!important;padding:10px!important;
+}
+html body.tp80-connection .tp80-socks5-detail .server-view[hidden]{display:none!important}
+html body.tp80-connection .tp80-socks5-detail .facts{
+ display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;
+ gap:9px!important;align-items:stretch!important;width:100%!important;
+}
+html body.tp80-connection .tp80-socks5-detail .fact{
+ min-width:0!important;max-width:100%!important;width:100%!important;
+ text-align:center!important;word-break:break-word!important;padding:11px!important;
+}
+html body.tp80-connection .tp80-socks5-detail .fact strong{overflow-wrap:anywhere!important}
+@media(max-width:720px){
+ html body.tp80-connection .tp80-socks5-detail .facts{grid-template-columns:1fr!important}
+}
+
 /* Shared native nodes: one compact 62px row for OpenVPN, WireGuard,
    Cisco, L2TP and AmneziaWG. Only the selected node expands directly below. */
 html body.tp80-connection .protocol-panel.tp80-native .tp77-native-list{
@@ -657,8 +678,20 @@ _SCRIPT = r"""
      toggle.type='button';
      const holder=el('section','tp80-modern-detail');
      holder.hidden=true;
-     // Reuse the ORIGINAL details/buttons. A clone would lose their handlers.
-     holder.append(view);
+     // SOCKS5 often carries both a human-readable raw credential block and
+     // canonical .facts. Keep the actual copyable facts, not two copies of
+     // the same secrets or a large raw text canvas.
+     const socks=String(panel.dataset.v34Protocol||'').toLowerCase()==='socks5';
+     const realFacts=socks?view.querySelector('.facts'):null;
+     if(realFacts){
+       holder.classList.add('tp80-socks5-detail');
+       view.hidden=true;
+       holder.append(view,realFacts);
+       toggle.textContent='نمایش اطلاعات';
+     }else{
+       // Reuse the ORIGINAL details/buttons. A clone would lose their handlers.
+       holder.append(view);
+     }
      row.insertAdjacentElement('afterend',holder);
      row.append(toggle);
      sections.push({row,holder,toggle});
@@ -666,10 +699,10 @@ _SCRIPT = r"""
        const opening=holder.hidden;
        sections.forEach(section=>{
          section.holder.hidden=true;
-         section.toggle.textContent='نمایش کانفیگ';
+         section.toggle.textContent=section.holder.classList.contains('tp80-socks5-detail')?'نمایش اطلاعات':'نمایش کانفیگ';
        });
        holder.hidden=!opening;
-       toggle.textContent=opening?'بستن':'نمایش کانفیگ';
+       toggle.textContent=opening?'بستن':(holder.classList.contains('tp80-socks5-detail')?'نمایش اطلاعات':'نمایش کانفیگ');
      });
    });
    if(sections.length){
