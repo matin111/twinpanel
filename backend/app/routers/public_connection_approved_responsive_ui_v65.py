@@ -57,7 +57,7 @@ body.tp65-ready .v54-v2ray-profile-actions button{min-height:40px;border-radius:
 @media(min-width:721px){
   body.tp65-ready .protocol-panel .server-views{display:grid;gap:8px}
   body.tp65-ready .protocol-panel .server-view{margin:0}
-  body.tp65-ready .protocol-panel .server-view:not(.active){display:none}
+  body.tp65-ready .protocol-panel[data-v34-modern="1"] .server-view{display:block!important}
 }
 @media(max-width:1000px) and (min-width:721px){
   body.tp65-ready .protocols{grid-template-columns:repeat(3,minmax(0,1fr))}
