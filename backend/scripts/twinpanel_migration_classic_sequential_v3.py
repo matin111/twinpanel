@@ -25,6 +25,11 @@ SOURCES=('eylan','sanaei','marzban','pasargad')
 PROTOCOL=os.getenv('CLASSIC_ONLY_PROTOCOL','openvpn').strip().lower()
 assert PROTOCOL in {'openvpn','cisco','l2tp','wireguard','v2ray'}
 PROTOCOLS=(PROTOCOL,)
+if PROTOCOL == "v2ray":
+    # Standalone CLI processes do not run API's self-hosted startup hooks.
+    # Bind V47 and HotClient before the first credential operation.
+    from app.xray_standalone_worker_runtime_v1 import activate_standalone_xray_worker
+    activate_standalone_xray_worker()
 PER_NODE=int(os.getenv('CLASSIC_DIRECT_BATCH_PER_NODE','3'))
 NODE_IDS=tuple(int(x) for x in os.getenv('CLASSIC_DIRECT_NODE_IDS','6').split(','))
 def healthy():

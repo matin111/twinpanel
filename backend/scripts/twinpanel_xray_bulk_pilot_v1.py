@@ -91,6 +91,11 @@ async def run(node_id: int, limit: int, apply: bool):
         from app.services.central_backfill_priority_v1 import new_account_work_has_priority
         if new_account_work_has_priority():
             raise RuntimeError("paid/new-account provisioning has priority")
+        # Standalone pilot imports account_delivery through a legacy import
+        # hook. Ensure the same V47/HotClient worker policy as the API
+        # before any live application or central publication.
+        from app.xray_standalone_worker_runtime_v1 import activate_standalone_xray_worker
+        activate_standalone_xray_worker()
         if len(chosen) > 10:
             raise RuntimeError("pilot limit exceeded")
         # The live batch is followed by a bounded, idempotent central commit
