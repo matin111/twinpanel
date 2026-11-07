@@ -1,6 +1,7 @@
 
 
 from ..services.public_urls import api_base_url
+from ..agent_controller_ip_v1 import resolve_agent_controller_connection
 from fastapi import Request
 import asyncio
 import base64
@@ -1265,9 +1266,10 @@ def make_agent(node_id: int, api_base: str) -> str:
 
     text = template_path.read_text()
 
-    api_base = str(
-        api_base or ""
-    ).strip().rstrip("/")
+    # Use the dedicated IP-only HTTPS controller endpoint when provisioned.
+    # The public CA is embedded in the Agent over the authenticated SSH
+    # install channel; DNS/SNI filtering cannot affect its heartbeat.
+    api_base, pinned_ca = resolve_agent_controller_connection(api_base)
 
     if not api_base:
         raise RuntimeError(
@@ -1287,6 +1289,10 @@ def make_agent(node_id: int, api_base: str) -> str:
         .replace(
             "__SECRET_LITERAL__",
             repr(settings.node_agent_shared_secret),
+        )
+        .replace(
+            "__CONTROLLER_CA_PEM_LITERAL__",
+            repr(pinned_ca),
         )
     )
 
