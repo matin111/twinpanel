@@ -309,7 +309,7 @@ _SCRIPT = r"""
     const href=String(node.getAttribute?.('href')||'').trim();
     if(href&&!/^(?:karing|hiddify):\/\//i.test(href)&&!isUri(href))return href;
     const target=String(node.dataset?.target||node.dataset?.configPath||'').trim();
-    const file=target.match(/^(?:cfg|download-source)-(openvpn|wireguard|amneziawg)-(\d+)$/);
+    const file=target.match(/^(?:hub-protocol-\d+-|cfg-|download-source-)(openvpn|wireguard|amneziawg)-(\d+)$/);
     const token=location.pathname.match(/^\/v1\/connect\/([^/]+)/);
     if(file&&token)return '/v1/connect/'+token[1]+'/file/'+file[1]+'/'+file[2];
     return target.startsWith('/')?target:'';
