@@ -79,7 +79,8 @@ class VisibleConvergenceTests(unittest.TestCase):
     def test_published_registered_exit_launches_despite_old_job_label(self):
         db=MagicMock()
         db.get.return_value=node(14,True)
-        with patch.object(launcher,"is_central_node",return_value=True):
+        with (patch.object(launcher,"is_central_node",return_value=True),
+              patch.object(launcher,"allow_central_node",return_value=True)):
             launcher.ensure_launchable(db,14)
         db.query.assert_not_called()
 
