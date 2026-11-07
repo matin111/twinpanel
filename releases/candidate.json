@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.668",
-  "source_sha": "39b26954ab602b690d5ba7495f8f83c56e2e9dc7",
+  "version": "1.1.0-rc.669",
+  "source_sha": "62465989b181f0e9f196fe7017272293ac722ca3",
   "notes": {
-    "fa": "نسخه rc.668: رفع مشکل دیده‌نشدن دکمه «ارسال فایل به برنامه» برای OpenVPN و WireGuard و AmneziaWG در موبایل؛ شناسایی دستگاه‌های لمسی حتی در حالت Desktop Site و اصلاح ارتفاع ثابت و بریده‌شدن دکمه‌های دانلود/ارسال/کپی در کارت سرور. فایل واقعی و قابلیت Share با لمس مستقیم از rc.666 حفظ شده‌اند. تمام اصلاحات برند و طراحی موجود در rc.667 نیز حفظ می‌شوند. هیچ تغییری در کاربران، پروتکل‌های سرور، اشتراک‌ها یا مصرف حجم اعمال نشده است.",
-    "en": "rc.668 fixes invisible Share file buttons for OpenVPN/WireGuard/AmneziaWG on mobile by detecting touch browsers in desktop-site mode and removing fixed-height/overflow clipping in native server rows. Preserves rc.666 immediate file share and rc.667 branding updates; no VPN/dataplane/account changes."
+    "fa": "نسخه rc.669: حذف ساختاری نوار مشکی خالی بالای دکمه‌های پایین پاپ‌آپ تمام پروتکل‌ها، هم در لایت‌مود و هم در دارک‌مود. قاب‌های قدیمی خالی v51/v52 بعد از انتقال دکمه‌ها به فوتر اصلی حذف می‌شوند؛ هیچ دکمه واقعی دانلود، افزودن یا کپی حذف نمی‌شود. خوانایی نوشته‌های روشن روی زمینه روشن (نام سرورها، هدر پروتکل و دکمه‌های ثانویه) اصلاح شد. تست DOM تمام ۱۶ پروتکل بدون قاب خالی، پاپ‌آپ ۱۶/۱۶ و حفظ چهار دکمه V2Ray موفق بود. تست بصری مرورگر واقعی هنوز باقی است.",
+    "en": "rc.669 structurally removes the empty legacy v51/v52 black footer strip above protocol popup buttons in both light and dark themes; preserves all download/copy/import action nodes. Improves light-theme foreground contrast for protocol headings, server labels and secondary actions. DOM verification: zero blank legacy bars across 16 protocols, 16/16 popup clicks passed, V2Ray footer retained four actions and Add All extras. Real browser visual verification remains pending."
   }
 }
