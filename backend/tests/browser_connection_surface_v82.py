@@ -105,7 +105,21 @@ def verify(context,html,device,outfile):
     page.wait_for_timeout(1100)
     panel_id=choice.get_attribute("data-protocol")
     panel=page.locator("#"+panel_id)
-    assert panel.is_visible()
+    if not panel.is_visible():
+        diagnostic=page.evaluate("""(id)=>{
+          const node=document.getElementById(id);
+          const attrs=e=>!e?null:{tag:e.tagName,classes:e.className,style:e.getAttribute('style'),
+            display:getComputedStyle(e).display,visibility:getComputedStyle(e).visibility,
+            hidden:e.hidden,width:e.getBoundingClientRect().width,height:e.getBoundingClientRect().height};
+          return {panel:attrs(node),parent:attrs(node?.parentElement),
+            grandparent:attrs(node?.parentElement?.parentElement),
+            body:attrs(document.body),clicked:attrs(document.querySelector('.protocol-choice[data-protocol-key="openvpn"]')),
+            active:[...document.querySelectorAll('.protocol-panel.active')].map(e=>e.id),
+            classes:[...document.querySelectorAll('.protocol-panel')].slice(0,5).map(e=>({id:e.id,classes:e.className}))};
+        }""",panel_id)
+        print("MOBILE_HIDDEN_PANEL_DIAGNOSTIC",device,diagnostic,flush=True)
+        page.screenshot(path=str(outfile).replace(".png","-hidden.png"),full_page=True)
+    assert panel.is_visible(),f"{device}: panel hidden after selecting OpenVPN"
     assert panel.locator(".tp77-native-row").count()==4,f"{device}: expected four OpenVPN nodes"
     assert panel.locator(".tp80-file-download").count()==4,f"{device}: missing actual per-node file buttons"
     assert panel.locator(".tp80-file-download").first.is_visible()
