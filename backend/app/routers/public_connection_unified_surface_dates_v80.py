@@ -1605,35 +1605,6 @@ _SCRIPT = r"""
    img.onerror=()=>{img.replaceWith(el('span','tp80-country-fallback',country))};
    return img;
  }
- // Provide an actual action in mobile browsers that cannot share native files.
- // Browsers cannot read an already-downloaded file back from Downloads, so
- // the user downloads it, then selects it through Files/Downloads manually.
- function showNativeFileShareFallback(download,protocol,reason,downloadNow=false){
-   // On unsupported browsers, start the real attachment download while
-   // still within the original tap (important for mobile download policies).
-   if(downloadNow&&download)download.click();
-   const overlay=document.getElementById('tp-help-overlay');
-   const message=reason||'این مرورگر امکان ارسال مستقیم فایل را ندارد.';
-   if(!overlay){window.alert(message);return;}
-   const title=overlay.querySelector('.tp-help-title');
-   const content=overlay.querySelector('.tp-help-body');
-   if(!content){window.alert(message);return;}
-   if(title)title.textContent='دانلود و ارسال فایل';
-   const extension=protocol==='openvpn'?'.ovpn':'.conf';
-   const note=el('p','tp-help-step',message);
-   const instruction=el('p','tp-help-step',
-     '۱. فایل '+extension+' را دانلود کنید. ۲. در اندروید Downloads یا در آیفون Files را باز کنید. ۳. فایل را Share کنید یا از داخل برنامه مقصد گزینه Import File را بزنید.');
-   const button=el('button','tp-help-close','↓ دانلود فایل');
-   button.type='button';
-   button.style.marginTop='12px';
-   button.addEventListener('click',event=>{
-     event.preventDefault();event.stopPropagation();
-     overlay.hidden=true;
-     download.click();
-   });
-   content.replaceChildren(note,instruction,button);
-   overlay.hidden=false;
- }
  function normalizeNative(panel){
    const type=String(panel.dataset.ref67NativeProtocol||panel.dataset.v34Protocol||'').toLowerCase();
    if(!Native.has(type)||!panel.querySelector('.tp77-native-list'))return;
@@ -1719,57 +1690,58 @@ _SCRIPT = r"""
          download.classList.add('tp80-file-download');
          download.textContent='↓ دانلود فایل';
          tools.append(download);
-         // Optional native Share sheet: send the real file with its original
-         // extension/MIME. Do not invoke any VPN client or import deep-link.
-         // A browser cannot force OpenVPN Connect into the OS Share targets.
-         const shareFile=el('button','tp80-file-share','ارسال فایل به برنامه');
-         shareFile.type='button';
-         shareFile.addEventListener('click',event=>{
-           event.preventDefault();event.stopPropagation();
-           const target=String(download.dataset.target||'');
-           const match=target.match(/^(?:hub-protocol-\d+-|cfg-|download-source-)(openvpn|wireguard|amneziawg)-(\d+)$/);
-           const protocol=match?.[1]||String(panel.dataset.ref67NativeProtocol||'openvpn').toLowerCase();
-           const config=document.getElementById(target)?.value;
-           if(!match||typeof config!=='string'||!config.trim()){
-             showNativeFileShareFallback(download,protocol,
-               'فایل آماده برای ارسال مستقیم پیدا نشد. فایل واقعی همین سرور دانلود می‌شود.',true);
-             return;
-           }
-           const extension=protocol==='openvpn'?'ovpn':'conf';
-           const fallback=protocol+'-'+(Number(match[2])+1)+'.'+extension;
+         // Native sharing is offered ONLY when this browser can actually share
+         // a real .ovpn/.conf File. Otherwise the genuine Download button is
+         // the only action; never show a dead Share button or a help popup.
+         const target=String(download.dataset.target||'');
+         const match=target.match(/^(?:hub-protocol-\d+-|cfg-|download-source-)(openvpn|wireguard|amneziawg)-(\d+)$/);
+         const source=target?document.getElementById(target):null;
+         const supported=!!(match&&source?.value?.trim()&&window.isSecureContext
+           &&typeof File==='function'&&typeof navigator.share==='function'
+           &&typeof navigator.canShare==='function');
+         const buildSharePayload=()=>{
+           if(!supported)return null;
+           const config=source.value;
+           if(!config||!config.trim())return null;
+           const extension=match[1]==='openvpn'?'ovpn':'conf';
+           const fallback=match[1]+'-'+(Number(match[2])+1)+'.'+extension;
            const rawName=String(download.dataset.filename||fallback);
            const filename=rawName.toLowerCase().endsWith('.'+extension)?rawName:rawName+'.'+extension;
-           const mime=protocol==='openvpn'?'application/x-openvpn-profile':'application/octet-stream';
-           if(!window.isSecureContext||typeof navigator.share!=='function'||typeof File!=='function'
-               ||typeof window.tpNativeShareFile!=='function'){
-             showNativeFileShareFallback(download,protocol,
-               'مرورگر فعلی امکان Share مستقیم ندارد؛ فایل دانلود می‌شود. سپس آن را در Files یا Downloads به برنامه بدهید.',true);
-             return;
-           }
-           try{
+           const preferred=match[1]==='openvpn'?'application/x-openvpn-profile':'application/octet-stream';
+           for(const mime of [preferred,'application/octet-stream']){
              const file=new File([config],filename,{type:mime});
-             // Must call the Web Share API from the original tap, not after fetch.
-             const promise=window.tpNativeShareFile(file);
-             Promise.resolve(promise).then(result=>{
-               if(result===false)showNativeFileShareFallback(download,protocol,
-                 'منوی ارسال فایل باز نشد. فایل را دانلود و از Files یا Downloads ارسال کنید.');
-             }).catch(()=>{
-               showNativeFileShareFallback(download,protocol,'ارسال مستقیم ممکن نشد.');
-             });
-           }catch(_error){
-             showNativeFileShareFallback(download,protocol,'این دستگاه نتوانست فایل را برای ارسال آماده کند.');
+             const payload={files:[file]};
+             try{if(navigator.canShare(payload))return payload}catch(_error){}
            }
-         });
-         // Web Share files is a mobile feature. Desktop Windows Chrome
-         // cannot present an OpenVPN/WireGuard file receiver chooser.
-         // Keep the working attachment download; show actionable file guidance.
-         // Desktop-mode browsers on phones often omit a mobile user agent.
-         const device=String(navigator.userAgent||'').toLowerCase();
-         const isMobileDevice=/android|iphone|ipad|ipod|mobile/.test(device)
-           ||(navigator.maxTouchPoints>0&&matchMedia('(pointer:coarse)').matches);
-         if(isMobileDevice)tools.append(shareFile);
-         const target=download.dataset.target;
-         const source=target?document.getElementById(target):null;
+           return null;
+         };
+         const payload=buildSharePayload();
+         if(payload){
+           const shareFile=el('button','tp80-file-share','ارسال فایل به برنامه');
+           shareFile.type='button';
+           shareFile.addEventListener('click',event=>{
+             event.preventDefault();event.stopPropagation();
+             const current=buildSharePayload();
+             if(!current){
+               shareFile.remove();
+               return;
+             }
+             // The Web Share API runs synchronously inside this tap.
+             try{
+               navigator.share(current).catch(error=>{
+                 if(error?.name==='AbortError')return;
+                 // The browser rejected file sharing: don't advertise it again.
+                 shareFile.remove();
+                 window.tpNativeShareMessage?.('این مرورگر فایل را به برنامه ارسال نمی‌کند؛ از دانلود فایل استفاده کنید.');
+               });
+             }catch(_error){
+               shareFile.remove();
+               window.tpNativeShareMessage?.('امکان ارسال مستقیم فایل وجود ندارد؛ از دانلود فایل استفاده کنید.');
+             }
+           });
+           tools.append(shareFile);
+         }
+
          if(source&&source.value.trim()){
            const copyFile=el('button','tp80-file-copy','کپی فایل');
            copyFile.type='button';
