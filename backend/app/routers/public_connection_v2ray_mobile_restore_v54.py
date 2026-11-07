@@ -207,8 +207,9 @@ _SCRIPT = r"""
   }
 
   function serverCard(server,index){
-    const profiles=Array.isArray(server?.profiles)?server.profiles:[];
-    if(profiles.length!==3)return null;
+    const profiles=(Array.isArray(server?.profiles)?server.profiles:[])
+      .filter(profile=>String(profile?.uri||'').trim());
+    if(!profiles.length)return null;
     const card=el('section','v54-v2ray-server');
     card.dataset.serverIndex=String(index);
     // Expose presentation-only country/node metadata from the existing /sub/meta
@@ -217,7 +218,7 @@ _SCRIPT = r"""
     card.dataset.nodeId=String(server?.node_id??'');
     const head=el('div','v54-v2ray-server-head');
     head.setAttribute('role','button');head.setAttribute('tabindex','0');head.setAttribute('aria-expanded','false');
-    head.append(el('span','',serverLabel(server,index)),el('span','', '۳ اتصال'));
+    head.append(el('span','',serverLabel(server,index)),el('span','', String(profiles.length)+' اتصال'));
     const toggle=()=>{
       const open=card.classList.toggle('open');
       head.setAttribute('aria-expanded',open?'true':'false');
@@ -283,7 +284,7 @@ _SCRIPT = r"""
       if(!response.ok)throw new Error('meta '+response.status);
       const payload=await response.json();
       const servers=(Array.isArray(payload?.servers)?payload.servers:[])
-        .filter(server=>Array.isArray(server?.profiles)&&server.profiles.length===3);
+        .filter(server=>Array.isArray(server?.profiles)&&server.profiles.some(profile=>String(profile?.uri||'').trim()));
       tabs.replaceChildren();holder.replaceChildren();
       if(!servers.length){holder.appendChild(el('div','v54-v2ray-empty','اتصال‌های V2Ray این سرورها هنوز آماده نشده‌اند'))}
       else buildTabs(tabs,holder,servers);

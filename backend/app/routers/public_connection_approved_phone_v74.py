@@ -173,7 +173,7 @@ _SCRIPT = r"""
      if(!groups)return;
      const cards=[...groups.querySelectorAll(':scope > .v54-v2ray-server')];
      if(!cards.length)continue;
-     const enabled=cards.every(x=>x.querySelectorAll('.v54-v2ray-profile').length===3);
+     const enabled=cards.every(x=>x.querySelectorAll('.v54-v2ray-profile').length>0);
      if(!enabled)continue; // Don't hide fallback controls for an incomplete server.
      panel.dataset.v54GroupsLoaded='1';
      const barId='tp74-country-navigation';

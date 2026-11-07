@@ -78,7 +78,7 @@ def test_v2ray_one_group_expanded_but_profiles_preserved():
     assert "card.classList.remove('open')" in ui
     assert "other.classList.remove('open')" in ui
     assert "setAttribute('aria-expanded','false')" in ui
-    assert "if(profiles.length!==3)return null" in v54
+    assert "if(!profiles.length)return null" in v54
     assert "profiles.forEach((profile,profileIndex)=>body.appendChild(profileRow(profile,profileIndex)))" in v54
 
 def test_same_node_rows_countries_and_real_action_footer_for_every_protocol():
