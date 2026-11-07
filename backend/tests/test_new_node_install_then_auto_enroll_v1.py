@@ -247,7 +247,7 @@ def test_hidden_node_is_not_published_when_install_failed():
     body = src.split("async def _install_node_in_background(", 1)[1].split(
         '@router.post("/install-background-v1"', 1
     )[0]
-    assert body.index('if failed_classic:') < body.index(
+    assert body.index('if failed_classic or not result.get("ok"):') < body.index(
         "await publish_node_to_all_users_v2("
     )
     assert body.index('if missing or not modern_bootstrap.get("ok"):') < body.index(
