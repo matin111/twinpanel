@@ -134,8 +134,10 @@ def test_compact_inline_native_node_details_and_flags_for_all_countries():
     assert "detail.append(view)" in ui
     assert "entry.detail.hidden=true" in ui
     assert "filterByCountry('ALL')" in ui
-    assert "const source=rows[index]?.querySelector('.tp77-native-label img')" in ui
-    assert "img.src='https://flagcdn.com/w40/'+country.toLowerCase()+'.png'" in ui
+    assert "for(const index of group.indices)" in ui
+    assert "label.prepend(countryImage(country))" in ui
+    assert "img.src=knownFlag(country)||'https://flagcdn.com/w40/'+country.toLowerCase()+'.png'" in ui
+    assert "data:image/svg+xml;charset=utf-8," in ui
     assert "tp80-country-image" in ui
     assert "tp80-country-fallback" in ui
 
