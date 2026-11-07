@@ -2,9 +2,12 @@
 from __future__ import annotations
 
 import unittest
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from app.services.central_sudoku_capacity_v1 import (
     MAX_SUDOKU_STAGE_SERVICES, sudoku_port, capacity_report,
+    assert_target_sudoku_capacity,
 )
 
 
@@ -39,6 +42,28 @@ class SudokuCapacityTests(unittest.TestCase):
     def test_invalid_subscription_id_fails(self):
         with self.assertRaises(ValueError):
             sudoku_port(0)
+
+class SudokuNodeResourceTests(unittest.IsolatedAsyncioTestCase):
+    async def test_target_with_3gb_free_rejects_1171_services(self):
+        conn=MagicMock()
+        conn.run=AsyncMock(return_value=SimpleNamespace(exit_status=0,stdout="3304128\n"))
+        conn.wait_closed=AsyncMock()
+        with patch("app.node_runtime_connection.connect_protocol_runtime",
+                   new_callable=AsyncMock,return_value=conn):
+            with self.assertRaisesRegex(RuntimeError,"SUDOKU_TARGET_MEMORY_ADMISSION_FAILED"):
+                await assert_target_sudoku_capacity(MagicMock(),MagicMock(),range(1,1172))
+        conn.close.assert_called_once()
+
+    async def test_sufficient_ram_allows_canary(self):
+        conn=MagicMock()
+        conn.run=AsyncMock(return_value=SimpleNamespace(exit_status=0,stdout="6600000\n"))
+        conn.wait_closed=AsyncMock()
+        with patch("app.node_runtime_connection.connect_protocol_runtime",
+                   new_callable=AsyncMock,return_value=conn):
+            report=await assert_target_sudoku_capacity(MagicMock(),MagicMock(),[17,18])
+        self.assertEqual(report["requested"],2)
+        self.assertTrue(report["ok"])
+
 
 
 if __name__=="__main__":
