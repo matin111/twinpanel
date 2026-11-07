@@ -47,7 +47,6 @@ from .public_connection_files_v9 import router as public_connection_files_v9_rou
 from .public_connection_multilink_v7 import router as public_connection_multilink_v7_router
 from . import public_connection_hub_v5 as _public_connection_hub_v5_module
 from .public_connection_hub_v5 import public_connection_hub_v5
-from .public_connection_ping_v78 import router as public_connection_ping_v78_router
 from .public_connection_payload_fast_v1 import public_connection_payload_fast_v1
 
 
@@ -69,7 +68,6 @@ router.include_router(public_connection_modern_names_v14_router)
 router.include_router(public_connection_modern_delivery_v16_router)
 # The live hub is included by app.main; the legacy hub_v5.router is not.
 # Register V78's authenticated live RTT endpoint on the exported router.
-router.include_router(public_connection_ping_v78_router)
 
 
 _LIVE_CSS = r"""
