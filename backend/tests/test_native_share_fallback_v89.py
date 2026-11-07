@@ -10,11 +10,12 @@ def test_unsupported_browser_has_download_but_no_bogus_share():
     assert "if(payload){" in UI
     assert "tools.append(download);" in UI
 
-def test_rejected_share_is_retired_instead_of_opening_help():
-    assert "navigator.share(current).catch(error=>" in UI
-    assert "shareFile.remove();" in UI
-    assert "window.tpNativeShareMessage?.('این مرورگر فایل را به برنامه ارسال نمی‌کند" in UI
+def test_rejected_share_stays_available_and_displays_diagnostic():
+    assert "Promise.resolve(navigator.share(current)).catch(error=>" in UI
+    assert "shareFile.remove();" not in UI
+    assert "NotAllowedError" in UI
+    assert "window.tpNativeShareMessage?.(message);" in UI
 
 def test_cancellation_is_not_treated_as_failure():
-    assert "if(error?.name==='AbortError')return;" in UI
+    assert "if(error?.name!=='AbortError')explain(error);" in UI
     assert "shareFile.addEventListener('click',event=>" in UI
