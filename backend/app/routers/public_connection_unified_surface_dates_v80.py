@@ -1559,7 +1559,12 @@ _SCRIPT = r"""
      const t=originals[i];let country=String(t?.dataset.countryCode||'').toUpperCase();
      if(!/^[A-Z]{2}$/.test(country)){
        const raw=t?.textContent||'';
-       country=(raw.match(/\\b(TR|DE|US|NL|FR|GB|CA|IT|SE|FI|CH|AT|JP|SG|AE)\\b/i)||[])[1]?.toUpperCase()||'OTHER';
+       const flag=raw.match(/[\u{1F1E6}-\u{1F1FF}]{2}/u)?.[0];
+       const fromFlag=flag?Array.from(flag).map(ch=>String.fromCharCode(ch.codePointAt(0)-0x1F1E6+65)).join(''):'';
+       const fromLetters=(raw.match(/(?:^|[^A-Z])(TR|DE|US|NL|FR|GB|CA|IT|SE|FI|CH|AT|JP|SG|AE)(?=[^A-Z]|$)/i)||[])[1]?.toUpperCase()||'';
+       const flagSrc=row.querySelector('.ref67-flag img')?.getAttribute('src')||'';
+       const fromImage=(flagSrc.match(/\/([a-z]{2})\.(?:png|svg|webp)/i)||[])[1]?.toUpperCase()||'';
+       country=fromFlag||fromLetters||fromImage||'OTHER';
      }
      row.dataset.tp93Country=country;
      if(!groups.has(country))groups.set(country,[]);
