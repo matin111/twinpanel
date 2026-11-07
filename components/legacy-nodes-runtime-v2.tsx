@@ -23,7 +23,7 @@ const protocolKeys=["cisco","openvpn","wireguard","l2tp","v2ray"] as const;
 type NodeRole="iran"|"exit"|"mother";
 type NodeModal="manage"|"ssh"|"domain"|"xray-domain"|null;
 type ExtendedNode=AdminNode&{is_mother?:boolean;public_domain?:string|null};
-type NodeOverviewRow={node_id:number;status:string;users_total:number;traffic_bytes:number;ports_total:number;protocols_online:number};
+type NodeOverviewRow={node_id:number;status:string;users_total:number;accounts_total:number;traffic_bytes:number;ports_total:number;protocols_online:number};
 type NodeOverviewPayload={ok:boolean;items:NodeOverviewRow[];updated_at?:string};
 const bytes=(value:number|undefined):string=>{
   if(value===undefined||!Number.isFinite(value))return "—";
@@ -426,7 +426,8 @@ export function LegacyNodesRuntimePage(){
           <div><span>{pick("دامنه عمومی","Public domain")}</span><b dir="ltr">{effectiveDomain||"—"}</b></div>
           {selectedRole==="exit"?<div><span>{pick("دامنه Xray / V2Ray","Xray / V2Ray domain")}</span><b dir="ltr">{xrayDomainLoading?"…":displayedXrayDomain||"—"}{xrayDomainMeta?.legacy_public_domain_fallback?` · ${pick("fallback عمومی","public fallback")}`:""}</b></div>:null}
           <div><span>{pick("پروتکل‌های کلاسیک فعال","Enabled classic protocols")}</span><b>{enabledProtocolCount(selected).toLocaleString("fa-IR")}</b></div>
-          <div><span>{pick("کل اکانت‌های منتسب","Total assigned accounts")}</span><b>{overviewAvailable&&overview[selected.id]?overview[selected.id].users_total.toLocaleString("fa-IR"):"—"}</b></div>
+          <div><span>{pick("کل کاربران منتسب","Total assigned users")}</span><b>{overviewAvailable&&overview[selected.id]?overview[selected.id].users_total.toLocaleString("fa-IR"):"—"}</b></div>
+          <div><span>{pick("کل اشتراک‌ها (انتقالی و جدید)","Total subscriptions (migrated and new)")}</span><b>{overviewAvailable&&overview[selected.id]?overview[selected.id].accounts_total.toLocaleString("fa-IR"):"—"}</b></div>
           <div><span>{pick("کل حجم مصرف ثبت‌شده","Recorded total usage")}</span><b dir="ltr">{overviewAvailable?bytes(overview[selected.id]?.traffic_bytes):"—"}</b></div>
           <div><span>{pick("تعداد پورت‌های تنظیم‌شده","Configured port count")}</span><b>{overviewAvailable&&overview[selected.id]?overview[selected.id].ports_total.toLocaleString("fa-IR"):"—"}</b></div>
           <div><span>{pick("پروتکل‌های Online","Online protocols")}</span><b>{overviewAvailable&&overview[selected.id]?overview[selected.id].protocols_online.toLocaleString("fa-IR"):"—"}</b></div>
