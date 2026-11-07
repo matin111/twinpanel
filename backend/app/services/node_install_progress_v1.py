@@ -63,6 +63,23 @@ def set_install_progress(job_id: str, stage: str, *, node_id: int | None = None,
             job.error_code = re.sub(r"[^A-Z0-9_]", "_", error_code.upper())[:80]
         job.updated_at = datetime.utcnow()
         db.commit()
+    # The installer has finished its real 16-listener verification.
+    # Opt-in central stage runs in its own supervised transient systemd unit,
+    # never in the installer process or the legacy per-account queue.
+    if stage == "verified_ready" and node_id is not None:
+        from .central_node_stage_launcher_v1 import (
+            auto_stage_enabled, launch, CentralStageLaunchError,
+        )
+        if auto_stage_enabled():
+            try:
+                with SessionLocal() as staged_db:
+                    launch(staged_db, int(node_id))
+            except CentralStageLaunchError:
+                # Keep the Exit hidden and report launch failure separately;
+                # installation readiness is not credential readiness.
+                print("CENTRAL_STAGE_AUTO_DISPATCH_NOT_STARTED", {
+                    "node_id": int(node_id), "stage": "verified_ready",
+                }, flush=True)
 
 
 def public_install_progress(job: NodeInstallProgressV1, now: datetime | None = None) -> dict:
