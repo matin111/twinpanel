@@ -273,12 +273,10 @@ def render_protocols(
                 node_id = int(item.get("node_id") or 0)
             except (TypeError, ValueError):
                 node_id = 0
-            latency = (latency_by_node or {}).get(node_id)
-            latency_attr = f' data-latency-ms="{int(latency)}"' if latency is not None else ""
-            # Identity is authoritative for live node probes and unified per-country actions.
-            latency_attr += f' data-node-id="{node_id}" data-country-code="{h(item.get("country_code") or "")}"' if node_id > 0 else ""
+            # Identity data only. No cached RTT or fake reachability on user pages.
+            identity_attr = f' data-node-id="{node_id}" data-country-code="{h(item.get("country_code") or "")}"' if node_id > 0 else ""
             server_tabs.append(
-                f'<button class="server-tab{server_active}" type="button" data-server="{h(server_id)}"{latency_attr}><i></i><span>{h(name)}</span></button>'
+                f'<button class="server-tab{server_active}" type="button" data-server="{h(server_id)}"{identity_attr}><i></i><span>{h(name)}</span></button>'
             )
             body = _item_detail(
                 protocol,
@@ -370,8 +368,7 @@ def public_connection_hub_v5(token: str, db: Session = Depends(get_db)):
 
     safe_payload = payload if status == "active" else {**payload, "credentials": [], "account": {}}
     smart_html = render_smart_connect(safe_payload, username if status == "active" else "", password if status == "active" else "", node_names)
-    measured_latency = _recent_node_latency(db, safe_payload)
-    protocol_cards, protocol_panels = render_protocols(safe_payload, username if status == "active" else "", password if status == "active" else "", node_names, measured_latency)
+    protocol_cards, protocol_panels = render_protocols(safe_payload, username if status == "active" else "", password if status == "active" else "", node_names)
     apps_html = render_apps(public_downloads_by_platform(db))
     share_url = str(payload.get("subscription_link") or "")
     status_html = '<span class="status on"><i></i>اشتراک فعال</span>' if status == "active" else '<span class="status off"><i></i>غیرفعال</span>'
