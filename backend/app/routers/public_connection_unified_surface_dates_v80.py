@@ -527,7 +527,7 @@ _SCRIPT = r"""
        const zip=el('a','tp78-footer-action tp80-files-zip','دانلود همه فایل‌ها ZIP');
        zip.dataset.kind='download';
        zip.setAttribute('download',key+'-configs.zip');
-       zip.href=location.origin+'/v1/connect/'+token+'/files/'+encodeURIComponent(key);
+       zip.href=location.origin+'/v1/connect/'+token+'/multi/'+encodeURIComponent(key);
        if(primary)primary.remove();
        primary=zip;
      }
