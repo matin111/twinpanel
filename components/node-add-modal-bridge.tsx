@@ -49,6 +49,7 @@ function NodeInstallProgress({job,error}:{job:NodeInstallJob|null;error:string})
       ["installing_xray","آماده‌سازی Xray","Preparing Xray"],
       ["installing_modern","نصب پروتکل‌های مدرن","Installing modern protocols"],
       ["enrolling_users","ثبت اکانت‌ها در مدیریت مرکزی","Enrolling accounts"],
+      ["users_queued","ساخت و اعمال کانفیگ کاربران روی نود","Applying user credentials on node"],
     ] as [string,string,string][]:[]),
   ];
   const index=phases.findIndex(([key])=>key===job?.stage);
