@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - 'backend/app/xray_customer_profile_policy_v30.py'
+      - 'backend/app/routers/account_delivery.py'
+      - 'backend/tests/v2ray_iran_ip_delivery_smoke.py'
       - 'backend/app/xray_modern_runtime.py'
       - 'backend/app/xray_tcp_tls_v39.py'
       - 'backend/app/subscription_delivery_policy_v1.py'
@@ -36,9 +38,16 @@ jobs:
         run: |
           python -m py_compile \
             backend/app/xray_customer_profile_policy_v30.py \
+            backend/app/routers/account_delivery.py \
+            backend/tests/v2ray_iran_ip_delivery_smoke.py \
             backend/tests/xray_customer_delivery_v261_smoke.py
 
       - name: Run Xray customer delivery V261 smoke
         env:
           PYTHONPATH: backend
         run: python backend/tests/xray_customer_delivery_v261_smoke.py
+
+      - name: Verify direct Iran IPv4 VLESS routing and explicit tunnel mapping
+        env:
+          PYTHONPATH: backend
+        run: python backend/tests/v2ray_iran_ip_delivery_smoke.py
