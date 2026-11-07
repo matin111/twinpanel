@@ -422,12 +422,15 @@ def _subscription_content(token: str, db: Session) -> tuple[str, int, int]:
 
 def _subscription_response(token: str, db: Session) -> Response:
     content, server_count, profile_count = _subscription_content(token, db)
+    from .public_connection_modern_names_v14 import _account_name
+    sub = account_delivery._subscription_from_share_token(token, db)
+    profile_title = f"{_account_name(sub)}-v2ray"
     return Response(
         content=content,
         media_type="text/plain; charset=utf-8",
         headers={
             "Cache-Control": "no-store",
-            "Profile-Title": "TwinPanel-V2Ray",
+            "Profile-Title": profile_title,
             "Profile-Update-Interval": "12",
             "X-TwinPanel-Server-Count": str(server_count),
             "X-TwinPanel-Profile-Count": str(profile_count),
