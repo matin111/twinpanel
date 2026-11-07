@@ -167,7 +167,16 @@ async def _install_node_in_background(
     try:
         _safe_install_progress(job_id, "installing_base")
         request = Request(request_scope)
-        install_payload = InstallIn(**payload.model_dump(exclude={"publish_to_all_users"}))
+        install_values = payload.model_dump(exclude={"publish_to_all_users"})
+        if payload.node_type == NodeType.EXIT:
+            # Prepare protocol services ONCE, before creating any subscribers.
+            # Xray remains dedicated to its profile-aware installer below.
+            install_values.update(
+                install_cisco=True, install_openvpn=True,
+                install_wireguard=True, install_l2tp=True,
+                install_v2ray=False, defer_subscription_sync=True,
+            )
+        install_payload = InstallIn(**install_values)
         result = await install_node(install_payload, request, db)
         node_id = int(result.get("node_id") or 0)
         base_ok = bool(result.get("ok"))
@@ -227,7 +236,28 @@ async def _install_node_in_background(
                 "node_id": node_id, "error_type": type(exc).__name__,
             }, flush=True)
 
-        ready = base_ok and xray_ok and modern_ok and installed_count == 16
+        # Do not infer service health from accumulated attempt counters.
+        # The read-only gate inspects ALL sixteen live listeners over the
+        # saved node connection; failing a single protocol stops publication.
+        live_ok = False
+        if base_ok and xray_ok and modern_ok:
+            try:
+                from ..services.new_node_readiness_v1 import verify_new_exit_readiness
+                health = await verify_new_exit_readiness(db, node_id)
+                live_ok = bool(health.get("ok"))
+                installed_count = int(health.get("ready_count") or 0)
+            except Exception as exc:
+                print("TWINPANEL_NODE_READINESS_FAILED", {
+                    "node_id": node_id, "error_type": type(exc).__name__,
+                }, flush=True)
+        ready = base_ok and xray_ok and modern_ok and live_ok
+        if not ready:
+            _safe_install_progress(
+                job_id, "failed", node_id=node_id,
+                installed_protocols=installed_count,
+                error_code="PROTOCOL_OR_FABRIC_SETUP_INCOMPLETE",
+            )
+            return
 
         if payload.publish_to_all_users:
             _safe_install_progress(job_id, "enrolling_users", node_id=node_id,
