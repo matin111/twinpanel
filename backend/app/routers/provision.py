@@ -87,6 +87,9 @@ class InstallIn(SSHBase, ProtocolSettings):
     node_type: NodeType
     country_code: str = "IR"
     capacity_users: int = Field(default=1000, gt=0)
+    # Background enrollment must wait until all selected protocols are ready.
+    # Legacy interactive installs retain their existing sync behavior.
+    defer_subscription_sync: bool = False
 
 
 class RepairProtocolsIn(SSHBase, ProtocolSettings):
@@ -2347,7 +2350,11 @@ async def install_node(
         os_id=await cmd(conn,". /etc/os-release && printf '%s' \"$ID\"")
         if os_id not in ("ubuntu","debian"): raise HTTPException(status_code=400,detail="فعلاً Ubuntu/Debian پشتیبانی می‌شود")
         await ensure_base(conn)
-        node=Node(name=payload.name,node_type=payload.node_type,country_code="IR" if payload.node_type==NodeType.IRAN else payload.country_code.upper(),public_ip=payload.host,agent_url=f"https://{payload.host}:9443",status=NodeStatus.OFFLINE,capacity_users=payload.capacity_users,enable_cisco=False,enable_openvpn=False,enable_wireguard=False,enable_l2tp=False,enable_v2ray=False)
+        node=Node(name=payload.name,node_type=payload.node_type,country_code="IR" if payload.node_type==NodeType.IRAN else payload.country_code.upper(),public_ip=payload.host,agent_url=f"https://{payload.host}:9443",status=NodeStatus.OFFLINE,
+                  # Keep fresh Exit invisible until ALL 16 service health
+                  # checks succeed and the central enrollment transaction runs.
+                  show_to_users=(payload.node_type != NodeType.EXIT or not payload.defer_subscription_sync),
+                  capacity_users=payload.capacity_users,enable_cisco=False,enable_openvpn=False,enable_wireguard=False,enable_l2tp=False,enable_v2ray=False)
         db.add(node); db.commit(); db.refresh(node)
         results, failed, secrets_out = await provision_protocols(
             conn,
@@ -2540,37 +2547,26 @@ async def install_node(
                 if "quota" not in failed:
                     failed.append("quota")
 
-        # TWINPANEL_INSTALLED_NODE_SUBSCRIPTION_AUTOSYNC_CALL_V1
-        #
-        # Every successfully installed Node is synchronized with
-        # existing subscriptions. Iran Nodes only receive membership;
-        # Exit Nodes also receive missing user credentials.
+        # TWINPANEL_INSTALL_THEN_AUTO_ENROLL_V1
+        # The background installer must NOT run the old per-user sync here:
+        # it happens before modern protocol bootstrap and can block the API
+        # for hours. A single set-based publication + durable backfill queue
+        # is performed only AFTER the whole node install/health gate.
         subscription_sync = {
             "ok": True,
             "skipped": True,
-            "reason": "not_run",
+            "reason": "deferred_until_node_ready" if payload.defer_subscription_sync else "not_run",
         }
-
-        try:
-            from .account_delivery import (
-                sync_installed_node_to_subscriptions,
-            )
-
-            subscription_sync = (
-                await sync_installed_node_to_subscriptions(
-                    db,
-                    node,
-                )
-            )
-
-        except Exception as exc:
-            db.rollback()
-
-            subscription_sync = {
-                "ok": False,
-                "error":
-                    str(exc)[:1200],
-            }
+        # TWINPANEL_INSTALLED_NODE_SUBSCRIPTION_AUTOSYNC_CALL_V1
+        # Compatibility: explicit/legacy installations retain the original
+        # historical sync; only the 16-protocol background flow defers it.
+        if not payload.defer_subscription_sync:
+            try:
+                from .account_delivery import sync_installed_node_to_subscriptions
+                subscription_sync = await sync_installed_node_to_subscriptions(db, node)
+            except Exception as exc:
+                db.rollback()
+                subscription_sync = {"ok": False, "error": str(exc)[:1200]}
 
         # TWINPANEL_MANUAL_IRAN_EXIT_TUNNEL_V2
         # Tunnel creation is controlled from Admin -> Tunnels.
