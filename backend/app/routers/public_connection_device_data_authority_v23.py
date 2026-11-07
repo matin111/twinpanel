@@ -188,7 +188,7 @@ _SCRIPT_TEMPLATE = r"""
     if(!source)return null;
     // Mobile cards must use server attachment files, not text-area Blobs.
     const target=String(source.dataset?.target||'');
-    const file=target.match(/^(?:cfg|download-source)-(openvpn|wireguard|amneziawg)-(\d+)$/);
+    const file=target.match(/^(?:hub-protocol-\d+-|cfg-|download-source-)(openvpn|wireguard|amneziawg)-(\d+)$/);
     const token=location.pathname.match(/^\/v1\/connect\/([^/]+)/);
     if(file&&token){
       const link=document.createElement('a');
