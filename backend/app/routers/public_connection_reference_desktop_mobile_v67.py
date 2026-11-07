@@ -75,6 +75,17 @@ body.ref67 .protocol-choice .protocol-icon{display:grid!important;place-items:ce
  flex:0 0 51px!important;width:51px!important;height:51px!important;
  border-radius:50%!important;background:linear-gradient(135deg,var(--pc,#8943f5),#5422bc)!important;
  font-size:24px!important;color:white!important;box-shadow:inset 0 -4px 13px #0002}
+body.ref67 .protocol-choice[data-protocol-key="v2ray"]{--ref67-icon:#7525e7}
+body.ref67 .protocol-choice[data-protocol-key="wireguard"]{--ref67-icon:#df1749}
+body.ref67 .protocol-choice[data-protocol-key="openvpn"]{--ref67-icon:#f4941e}
+body.ref67 .protocol-choice[data-protocol-key="l2tp"]{--ref67-icon:#168cf2}
+body.ref67 .protocol-choice[data-protocol-key="hysteria2"]{--ref67-icon:#09bcba}
+body.ref67 .protocol-choice[data-protocol-key="anytls"]{--ref67-icon:#138eea}
+body.ref67 .protocol-choice[data-protocol-key="naive"]{--ref67-icon:#305ad7}
+body.ref67 .protocol-choice[data-protocol-key="tuic"]{--ref67-icon:#0ab4da}
+body.ref67 .protocol-choice[data-protocol-key="cisco"]{--ref67-icon:#00b9ba}
+body.ref67 .protocol-choice[data-protocol-key="amneziawg"]{--ref67-icon:#7823db}
+body.ref67 .protocol-choice .protocol-icon{background:linear-gradient(135deg,var(--ref67-icon,var(--pc,#8943f5)),color-mix(in srgb,var(--ref67-icon,var(--pc,#8943f5)) 65%,#23184d))!important}
 body.ref67 .protocol-choice .protocol-text{min-width:0;text-align:right}
 body.ref67 .protocol-choice .protocol-text b{display:block!important;font-size:14px!important;
  color:white;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -230,6 +241,20 @@ _SCRIPT = r"""
   modern:new Set(['v2ray','hysteria2','tuic','anytls','naive','shadowtls','snell','socks5','mieru','trusttunnel','sudoku'])
  };
  function key(choice){return normalize(choice.dataset.protocolKey||'').replace(/[\s_]/g,'')}
+ function reorderProtocols(){
+  const grid=document.querySelector('.protocols');
+  if(!grid||grid.dataset.ref67Ordered==='1')return;
+  grid.dataset.ref67Ordered='1';
+  const order=['v2ray','wireguard','openvpn','l2tp','amneziawg','hysteria2',
+    'anytls','shadowtls','trusttunnel','mieru','naive','tuic','snell','cisco',
+    'sudoku','socks5'];
+  const choices=[...grid.querySelectorAll('.protocol-choice')];
+  choices.sort((a,b)=>{
+   const x=order.indexOf(key(a)),y=order.indexOf(key(b));
+   return (x<0?99:x)-(y<0?99:y);
+  });
+  choices.forEach(node=>grid.appendChild(node));
+ }
  function categories(){
   const protocols=document.querySelector('.protocols');
   if(!protocols||document.querySelector('.ref67-categories'))return;
@@ -342,7 +367,11 @@ _SCRIPT = r"""
  }
  function apply(){
   document.body.classList.add('ref67');
-  addUser();categories();
+  addUser();reorderProtocols();categories();
+  if(!document.body.dataset.ref67InitialSelection){
+   document.body.dataset.ref67InitialSelection='1';
+   document.querySelector('.protocol-choice[data-protocol-key="v2ray"]')?.click();
+  }
   document.querySelectorAll('.protocol-panel').forEach(mountPanel);
  }
  apply();
