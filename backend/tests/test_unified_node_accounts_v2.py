@@ -157,3 +157,15 @@ def test_install_requires_all_sixteen_real_health_checks_before_publish():
         "await publish_node_to_all_users(node_id=node_id, db=db)"
     )
     assert "defer_subscription_sync=True" in body
+
+
+
+def test_modern_node_ports_match_actual_remapped_listener():
+    src = (ROOT / "app/routers/modern_protocol_admin_v3.py").read_text()
+    start = src.index('remaps = (result.get("core") or {}).get("port_remaps") or {}')
+    end = src.index("        db.commit()", start)
+    body = src[start:end]
+    assert 'applied_port = int(remap.get("to") or health.get("port") or requested_port)' in body
+    assert 'health["port"] = applied_port' in body
+    assert "_save_status(db, node, key, health)" in body
+    assert "_save_setting(db, node.id, key, preset, effective, applied_port)" in body
