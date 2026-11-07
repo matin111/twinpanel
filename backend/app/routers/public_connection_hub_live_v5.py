@@ -154,6 +154,24 @@ _LIVE_SCRIPT = r"""
       const online=item?item.online===true:live.has(key);
       card.classList.toggle('live-online',online);
 
+      // Highlight only countries backed by recent live quota sessions or
+      // positive traffic on the corresponding real node. Never infer a
+      // country from the user's selected filter.
+      const countries=new Set(
+        (Array.isArray(item?.online_countries)?item.online_countries:[])
+          .map(value=>String(value||'').toUpperCase())
+      );
+      const panel=document.getElementById(card.dataset.protocol||'');
+      if(panel){
+        panel.classList.toggle('live-online',online);
+        panel.querySelectorAll(
+          '.tp80-country-bar button,.tp92-v2-country-bar button,.tp93-country-bar button'
+        ).forEach(chip=>{
+          const country=String(chip.dataset.tp80Country||chip.dataset.country||'').toUpperCase();
+          chip.classList.toggle('live-online',online&&country!=='ALL'&&countries.has(country));
+        });
+      }
+
       const badge=card.querySelector('em');
       if(!badge)return;
       if(online)badge.textContent='آنلاین';
@@ -185,6 +203,7 @@ _LIVE_SCRIPT = r"""
         key,
         item?.online,
         item?.presence_available,
+        (item?.online_countries||[]).join('|'),
       ].join(':'))
       .sort()
       .join(',');
