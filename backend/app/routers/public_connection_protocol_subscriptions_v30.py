@@ -9,7 +9,8 @@ from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from .account_delivery import _public_payload, _subscription_from_share_token
+from .account_delivery import _subscription_from_share_token
+from . import account_delivery
 from .public_connection_modern_delivery_v13 import _items
 from .public_connection_modern_import_v15 import standard_share_uri
 from .public_connection_modern_names_v14 import _account_name, _profile_name
@@ -46,7 +47,9 @@ def _active_subscription_payload(token: str, db: Session) -> tuple[Any, dict[str
     status = str(getattr(sub.status, "value", sub.status) or "").strip().lower()
     if status != "active":
         raise HTTPException(status_code=403, detail="اشتراک فعال نیست")
-    payload = _public_payload(db, sub)
+    # Standard subscription feeds need credentials, not QR SVGs / page UI.
+    # Resolve the *current*, policy-aware stored-info hook at request time.
+    payload = account_delivery._stored_info(db, sub)
     if not isinstance(payload, dict):
         raise HTTPException(status_code=404, detail="اطلاعات اتصال آماده نیست")
     return sub, payload
