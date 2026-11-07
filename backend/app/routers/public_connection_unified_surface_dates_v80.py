@@ -712,6 +712,10 @@ _SCRIPT = r"""
      if(realFacts){
        holder.classList.add('tp80-socks5-detail');
        view.hidden=true;
+       // Some V67/V69 rules forcibly display .server-view with !important;
+       // an inline important override keeps the redundant raw SOCKS dump out.
+       view.style.setProperty('display','none','important');
+       view.setAttribute('aria-hidden','true');
        holder.append(view,realFacts);
        toggle.textContent='نمایش اطلاعات';
      }else{
