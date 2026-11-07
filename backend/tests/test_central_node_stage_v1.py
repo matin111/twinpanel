@@ -337,6 +337,7 @@ class CentralNodeStageTests(unittest.TestCase):
         db.get.return_value = node
         selected = (stage.FAMILIES[5],)
         with (patch.object(stage, "SessionLocal") as session,
+              patch.object(stage, "allow_central_node", return_value=True),
               patch.object(stage, "is_central_node", return_value=True),
               patch.object(stage, "missing_runtime_families",
                            return_value=selected) as missing,
@@ -358,6 +359,7 @@ class CentralNodeStageTests(unittest.TestCase):
         db = MagicMock()
         db.get.return_value = node
         with (patch.object(stage, "SessionLocal") as session,
+              patch.object(stage, "allow_central_node", return_value=True),
               patch.object(stage, "is_central_node", return_value=True),
               patch.object(stage, "_run_locked") as execute):
             session.return_value.__enter__.return_value = db
@@ -375,6 +377,7 @@ class CentralNodeStageTests(unittest.TestCase):
         db = MagicMock()
         db.get.return_value = node
         with (patch.object(stage, "SessionLocal") as session,
+              patch.object(stage, "allow_central_node", return_value=True),
               patch.object(stage, "is_central_node", return_value=True),
               patch.object(stage, "load_desired_state", return_value=desired_state(3)),
               patch.object(stage, "establish_hidden_memberships", return_value=0),
