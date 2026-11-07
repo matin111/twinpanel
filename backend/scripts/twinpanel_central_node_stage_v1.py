@@ -76,7 +76,37 @@ def run(node_id, limit, apply):
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError as exc:
             raise RuntimeError("CENTRAL_NODE_STAGE_ALREADY_RUNNING") from exc
-        return _run_locked(node_id, limit, apply)
+        # Newly purchased subscriptions can appear while a full set of daemon
+        # families is reconciling. Drain a *bounded number of changed-state
+        # snapshots* inside the SAME node mutex, never launch a per-user queue.
+        # A moving target after the final attempt remains hidden and fails.
+        if not apply:
+            return _run_locked(node_id, limit, False)
+        for attempt in range(3):
+            try:
+                status = _run_locked(node_id, limit, True)
+            except RuntimeError as exc:
+                if str(exc) not in {
+                    "CENTRAL_NODE_DESIRED_STATE_CHANGED_BEFORE_APPLY",
+                    "CENTRAL_NODE_DESIRED_STATE_CHANGED_DURING_APPLY",
+                }:
+                    raise
+                if attempt == 2:
+                    raise RuntimeError("CENTRAL_NODE_DESIRED_STATE_STILL_CHANGING") from exc
+                print("CENTRAL_NODE_DESIRED_STATE_RETRY",json.dumps({
+                    "node_id":node_id,"attempt":attempt+2,
+                }),flush=True)
+                continue
+            if status == 0:
+                return 0
+            # Failed daemon families aren't automatically retried: this
+            # addresses ONLY the changed desired-state/coverage race.
+            if status != 3 or attempt == 2:
+                return status
+            print("CENTRAL_NODE_COVERAGE_DELTA_RETRY",json.dumps({
+                "node_id":node_id,"attempt":attempt+2,
+            }),flush=True)
+        return 3
 
 
 def _run_locked(node_id, limit, apply):
