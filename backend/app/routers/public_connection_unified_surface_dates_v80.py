@@ -1193,6 +1193,58 @@ html body.tp80-connection #tp96-protocol-modal .protocol-panel.tp96-in-modal{
  html body.tp80-connection #tp96-protocol-modal .tp96-protocol-content{overflow:auto!important}
  html body.tp80-connection #tp96-protocol-modal .protocol-panel.tp96-in-modal{display:flex!important}
 }
+
+/* TWINPANEL_PROTOCOL_POPUP_ONLY_AND_TYPE_V97 */
+/* Legacy mobile classes force .active display:flex; no protocol content
+   may render in the document when it is not mounted in our modal. */
+html body.tp80-connection .page .protocol-panel:not(.tp96-in-modal),
+html body.tp80-connection .page .protocol-panel.active:not(.tp96-in-modal),
+html body.tp80-connection .page .protocol-panel.v36-open:not(.tp96-in-modal),
+html body.tp80-connection .protocol-panel.active:not(.tp96-in-modal),
+html body.tp80-connection .protocol-panel.v36-open:not(.tp96-in-modal){
+ display:none!important;visibility:hidden!important;max-height:0!important;
+ overflow:hidden!important;pointer-events:none!important;
+}
+html body.tp80-connection #tp96-protocol-modal .protocol-panel.tp96-in-modal{
+ display:flex!important;visibility:visible!important;max-height:none!important;
+ overflow:visible!important;pointer-events:auto!important;
+}
+html body.tp80-connection .protocol-choice .protocol-text,
+html body.tp80-connection .protocol-choice .protocol-text b{
+ font-family:Inter,"Segoe UI",Arial,Tahoma,sans-serif!important;
+ font-kerning:normal!important;font-synthesis:none!important;
+ -webkit-font-smoothing:antialiased!important;
+}
+html body.tp80-connection .protocol-choice .protocol-text b{
+ display:block!important;color:var(--tp-brand-text,var(--text))!important;
+ font-size:clamp(11px,1.05vw,13px)!important;font-weight:800!important;
+ line-height:1.45!important;letter-spacing:.1px!important;
+ text-shadow:0 1px 1px #0002!important;overflow-wrap:anywhere!important;
+ text-overflow:clip!important;white-space:normal!important;text-wrap:balance!important;
+}
+html body.tp80-connection .protocol-choice .protocol-text small{
+ font-family:Inter,"Segoe UI",Tahoma,Arial,sans-serif!important;
+ font-size:10px!important;font-weight:600!important;line-height:1.4!important;
+ opacity:.8!important;letter-spacing:0!important;
+}
+html body.tp80-connection .protocol-choice{
+ transition:border-color .18s ease,box-shadow .18s ease,background .18s ease!important;
+}
+html body.tp80-connection .protocol-choice:hover{
+ border-color:var(--p)!important;
+ background:color-mix(in srgb,var(--p) 6%,var(--tp-brand-raised,var(--surface)))!important;
+}
+@media(max-width:720px){
+ html body.tp80-connection .protocol-choice .protocol-text b{
+  font-size:clamp(10px,2.55vw,12px)!important;
+  font-weight:800!important;line-height:1.3!important;
+  letter-spacing:.05px!important;text-align:center!important;
+ }
+ html body.tp80-connection .protocol-choice .protocol-text small{display:none!important}
+ html body.tp80-connection .protocol-choice[data-protocol-key="cisco"] .protocol-text b{
+  font-size:10px!important;letter-spacing:-.15px!important;
+ }
+}
 """
 
 
@@ -2078,11 +2130,21 @@ _SCRIPT = r"""
        event.preventDefault();shut();
      }
    });
-   document.addEventListener('click',event=>{
-     const card=event.target.closest('.protocol-choice[data-protocol]');
-     if(!card||!document.body.contains(card))return;
+   // Window capture precedes every old document/card handler. Those legacy
+   // handlers used to reveal the clicked protocol inline on mobile.
+   // Stop that activation entirely and open only our dedicated popup.
+   window.addEventListener('click',event=>{
+     const card=event.target.closest?.('.protocol-choice[data-protocol]');
+     if(!card||!document.body.contains(card)||card.hidden)return;
      event.preventDefault();event.stopImmediatePropagation();
      open(card);
+   },true);
+   // Keyboard activation on non-button cards.
+   window.addEventListener('keydown',event=>{
+     if(event.key!=='Enter'&&event.key!==' ')return;
+     const card=event.target.closest?.('.protocol-choice[data-protocol]');
+     if(!card||card.hidden)return;
+     event.preventDefault();event.stopImmediatePropagation();open(card);
    },true);
  }
 
