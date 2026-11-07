@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.639",
+  "version": "1.1.0-rc.641",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-07T02:04:49Z",
+  "released_at": "2026-11-07T02:54:45Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "9312891817298f2be1da89da9bd2c2d302957e7b",
+  "source_sha": "6fb6f6511f4fb94ec5b57c94139e03b11843603f",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.639/twinpanel-1.1.0-rc.639-linux-x86_64.tar.gz",
-    "sha256": "38503ed08f4d8a5e400d3e2c8c6c56c006326d2e1b938802976d7c0bd1183b32",
-    "size_bytes": 29126427
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.641/twinpanel-1.1.0-rc.641-linux-x86_64.tar.gz",
+    "sha256": "639e6cd7d0ebab7941b5efd2de2d956e5038c2f219dc00cac8c4dc7fbd792c66",
+    "size_bytes": 29148591
   },
   "notes": {
-    "fa": "بازگردانی دانلود فایل OpenVPN و WireGuard، نمایش واقعی سرور و اطلاعات Cisco و L2TP، لینک دانلود برنامه مخصوص پروتکل با تشخیص دستگاه، پرچم واقعی کشورها در ویندوز و حذف دسته‌بندی تکراری؛ بدون تغییر کانفیگ‌ها و آدرس سرورها.",
-    "en": "Restore actual per-node OpenVPN/WireGuard file downloads and Cisco/L2TP server credentials, preserve per-protocol app download links for Windows/macOS/iOS/Android/Linux, fix Windows country flags and duplicate category strip; no VPN config, endpoint, port, SNI, UUID or subscription changes."
+    "fa": "رفع قطعی وابستگی لینک‌های V2Ray به DNS/CDN فیلترشده: آدرس اتصال VLESS در تونل‌های ایران از IP واقعی نود ایران تحویل می‌شود؛ SNI، Host، مسیرها، کلیدها، UUID و پورت‌ها بدون تغییر. مسیر Agent کنترل مرکزی نیز با HTTPS امن مستقیم روی IP پایدار شده است. اصلاحات و امکانات قبلی حفظ می‌شوند.",
+    "en": "DNS-independent VLESS delivery: use the assigned Iran tunnel ingress public IPv4 for the connection address while retaining TLS SNI, WS Host, REALITY keys, UUIDs, ports and paths. Includes secure IP-pinned Node Agent control plane; no GRE, NAT or other protocol runtime changes."
   }
 }
