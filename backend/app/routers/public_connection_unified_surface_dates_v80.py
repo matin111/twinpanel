@@ -891,6 +891,29 @@ html body.tp80-connection .protocol-panel.active .tp78-action-footer > [data-kin
  border-color:var(--tp-brand-stroke)!important;
  color:var(--tp-brand-text)!important;
 }
+
+/* TWINPANEL_CONNECTION_WINDOWS_FOUR_ACTIONS_V87 */
+@media(min-width:721px){
+ html body.tp80-connection .protocol-panel.active > .tp78-action-footer{
+  display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;
+  grid-auto-flow:row!important;align-items:stretch!important;
+  gap:10px!important;width:auto!important;margin:14px 16px 16px!important;
+  direction:ltr!important;
+ }
+ html body.tp80-connection .protocol-panel.active > .tp78-action-footer > .tp78-footer-action,
+ html body.tp80-connection .protocol-panel.active > .tp78-action-footer > [data-kind="app"]{
+  display:flex!important;grid-column:auto!important;grid-row:auto!important;
+  width:100%!important;max-width:100%!important;min-width:0!important;
+  min-height:64px!important;margin:0!important;padding:10px 7px!important;
+  box-sizing:border-box!important;position:static!important;float:none!important;
+  justify-content:center!important;align-items:center!important;flex:initial!important;
+  white-space:normal!important;overflow-wrap:anywhere!important;
+  text-align:center!important;
+ }
+ html body.tp80-connection .protocol-panel.active > .tp78-action-footer > .tp80-extra-actions{
+  grid-column:1/-1!important;
+ }
+}
 """
 
 
