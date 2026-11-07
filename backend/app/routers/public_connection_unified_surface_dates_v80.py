@@ -1796,7 +1796,9 @@ _SCRIPT = r"""
        footer.append(node);
      });
    }
-   const nodes=[...footer.querySelectorAll(':scope > .tp78-footer-action')];
+   // Include secondary actions too: earlier reconciliation may have parked
+   // copy-all or import-all inside the expandable extras container.
+   const nodes=[...footer.querySelectorAll(':scope > .tp78-footer-action,:scope > .tp80-extra-actions .tp78-footer-action')];
    const find=kind=>nodes.find(node=>node.dataset.kind===kind);
    let primary=find('add')||find('download');
    let link=find('link');
@@ -1828,10 +1830,11 @@ _SCRIPT = r"""
    // Preserve existing working download-all from V51. ZIP route is already
    // represented by that real <a> element. Do not replace it with placeholders.
    const client=key==='v2ray'?nodes.find(node=>node.dataset.kind==='client'&&node.classList.contains('tp92-v2rayn')):null;
-   // Windows V2Ray: four equal footer buttons, including BOTH real clients.
-   // Keep copy-all and secondary formats in expandable actions, not a fifth row.
-   const fourClients=key==='v2ray'&&client&&app;
-   const ordered=(fourClients?[primary,link,app,client]:[primary,link,copy,app]).filter(Boolean);
+   // Windows V2Ray: copy ALL configs, copy subscription link, Karing and
+   // v2rayN are the four visible footer actions. Import-all remains available
+   // inside secondary actions; never discard its real deep-link handler.
+   const fourClients=key==='v2ray'&&client&&app&&copy;
+   const ordered=(fourClients?[copy,link,app,client]:[primary,link,copy,app]).filter(Boolean);
    const extra=nodes.filter(node=>!ordered.includes(node)&&node.dataset.kind!=='app');
    const previous=[...footer.querySelectorAll(':scope > .tp80-extra-actions .tp78-footer-action')];
    // Do not discard buttons: keep original source nodes and secondary actions.
