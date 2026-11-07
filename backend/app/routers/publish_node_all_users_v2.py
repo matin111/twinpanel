@@ -224,6 +224,65 @@ def read_central_stage_coverage_v1(
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
+@router.post("/{node_id}/central-stage/reverify")
+async def reverify_and_stage_existing_exit_v1(
+    node_id: int, db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """Recover a hidden failed install using REAL 16-listener health.
+
+    An old 12/16 progress counter must not force a manual SQL change if
+    every service is now healthy. This does not publish or enqueue users.
+    """
+    from ..models import NodeStatus
+    from ..node_install_progress_models_v1 import NodeInstallProgressV1
+    from ..services.new_node_readiness_v1 import verify_new_exit_readiness
+    from ..services.central_node_stage_launcher_v1 import (
+        launch, CentralStageLaunchError,
+    )
+
+    node = db.get(Node, int(node_id))
+    if (node is None or node.retired_at is not None or
+            node.node_type != NodeType.EXIT or
+            node.status != NodeStatus.ONLINE or node.show_to_users):
+        raise HTTPException(
+            status_code=409, detail="CENTRAL_STAGE_REQUIRES_HIDDEN_ONLINE_EXIT",
+        )
+    job = (db.query(NodeInstallProgressV1)
+           .filter(NodeInstallProgressV1.node_id == int(node_id))
+           .order_by(NodeInstallProgressV1.created_at.desc()).first())
+    if job is None:
+        raise HTTPException(status_code=409, detail="CENTRAL_STAGE_INSTALL_JOB_MISSING")
+
+    live = await verify_new_exit_readiness(db, int(node_id))
+    if live.get("ok") is not True:
+        raise HTTPException(status_code=409, detail={
+            "error": "CENTRAL_STAGE_LIVE_READINESS_FAILED",
+            "ready_count": int(live.get("ready_count") or 0),
+            "missing": live.get("missing") or [],
+        })
+
+    job.stage = "verified_ready"
+    job.state = "running"
+    job.installed_protocols = int(live["ready_count"])
+    job.error_code = None
+    try:
+        # Launch sees the verified job within this transaction. If systemd
+        # rejects dispatch, neither the old install state nor user
+        # visibility changes.
+        response = launch(db, int(node_id))
+        db.commit()
+    except CentralStageLaunchError as exc:
+        db.rollback()
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except Exception:
+        db.rollback()
+        raise
+    return {
+        **response, "live_protocols": int(live["ready_count"]),
+        "progress_reverified": True,
+    }
+
+
 @router.post("/{node_id}/publish-all-users")
 async def publish_node_to_all_users_route_v2(
     node_id: int,
