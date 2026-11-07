@@ -9,6 +9,7 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from .database import SessionLocal
+from .agent_controller_ip_v1 import resolve_agent_controller_connection
 from .models import Node, NodeType
 from .routers import provision
 from . import node_bootstrap_control_v64 as v64
@@ -392,16 +393,26 @@ async def _install_or_upgrade_agent_v70(
         if node is None or node.node_type != NodeType.EXIT:
             return await _BASE_AGENT_INSTALL(conn, node_id, api_base)
 
-        direct_ok = await v63._api_reachable_from_exit(conn, api_base)
+        # Probe the same IP transport the Agent will actually use. The
+        # previous bootstrap checked a potentially poisoned DNS hostname,
+        # incorrectly forcing new Exits through an Iran relay even when the
+        # pinned-IP endpoint was reachable.
+        agent_api, pinned_ca = resolve_agent_controller_connection(api_base)
+        direct_ok = await v63._api_reachable_from_exit(conn, agent_api)
         if direct_ok:
-            result = await _BASE_AGENT_INSTALL(conn, node_id, api_base)
+            result = await _BASE_AGENT_INSTALL(conn, node_id, agent_api)
             if isinstance(result, dict):
                 result["control_plane"] = {
                     "mode": "direct_outbound",
-                    "agent_api_base": api_base,
+                    "agent_api_base": agent_api,
                     "iran_dependency": False,
                 }
             return result
+
+        # An explicitly configured IP controller must not silently downgrade
+        # to a domain/HTTP relay that could expose credentials or fail later.
+        if pinned_ca:
+            raise RuntimeError("pinned_controller_ip_unreachable_from_exit")
 
         # Direct outbound API is genuinely unavailable. Keep the proven V64
         # relay as a bounded fallback so provisioning still succeeds.
