@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.635",
+  "version": "1.1.0-rc.636",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-07T00:58:43Z",
+  "released_at": "2026-11-07T01:21:56Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "123d37effa67fc898264ce1aadf204ef1c7be869",
+  "source_sha": "cd2131c8bdc5e8dbb56fd6dec221d43c3cbc36ed",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.635/twinpanel-1.1.0-rc.635-linux-x86_64.tar.gz",
-    "sha256": "c8555d499b3c25b170210d8056387acddc2462f2f34f61044877575a6564bf09",
-    "size_bytes": 29071469
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.636/twinpanel-1.1.0-rc.636-linux-x86_64.tar.gz",
+    "sha256": "ac3eea16319b00a87e3ead2ae59a24317739f19f9db20ca3602015dc304fed07",
+    "size_bytes": 29075998
   },
   "notes": {
-    "fa": "نسخه rc.635 شامل اصلاح مقصد نامعتبر REALITY آلمان اول، حفظ SNI لینک‌های قدیمی و پایدارسازی BBR برای Xray روی نودهای انتخاب‌شده؛ همچنین رابط Connection تأییدشده در نسخه اصلی. بدون تغییر UUIDها، کلیدها، پروتکل‌های سالم یا هسته تونل.",
-    "en": "rc.635 combines the approved Connection UI with the verified Germany REALITY target/SNI compatibility fix and per-node opt-in Xray BBR persistence. No credential rotation, customer account recreation or tunnel carrier change."
+    "fa": "اصلاح چیدمان موبایل صفحه Connection مطابق مرجع؛ نمایش پرچم خودکار تمام کشورهای نود از country_code؛ نمایش نام اشتراک به‌جای نام ادمین. بدون تغییر کانفیگ، آدرس، پورت یا پروتکل.",
+    "en": "Match approved compact mobile Connection layout; decode all registered node country flags from server-provided ISO codes; display subscription username. No change to VPN configuration contents, hosts, ports, SNI, UUID, protocols or links."
   }
 }
