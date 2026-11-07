@@ -1145,6 +1145,54 @@ html body.tp80-connection .ref67-categories .ref67-filter.active{
   color:#fff!important;border-color:var(--p)!important;
   background:linear-gradient(110deg,var(--p),var(--s))!important;
 }
+
+/* TWINPANEL_PROTOCOL_CARD_OPENS_MODAL_V96 */
+html body.tp80-connection .protocol-panel:not(.tp96-in-modal){
+ display:none!important;
+}
+html body.tp80-connection #tp96-protocol-modal[hidden]{display:none!important}
+html body.tp80-connection #tp96-protocol-modal:not([hidden]){
+ position:fixed!important;inset:0!important;display:flex!important;
+ align-items:center!important;justify-content:center!important;z-index:2147482000!important;
+ padding:clamp(8px,2vw,22px)!important;background:#050919d9!important;
+ backdrop-filter:blur(7px)!important;
+}
+html body.tp80-connection #tp96-protocol-modal .tp96-protocol-shell{
+ display:flex!important;flex-direction:column!important;width:min(1140px,100%)!important;
+ max-height:min(92dvh,100%)!important;overflow:hidden!important;
+ background:var(--tp-brand-bg,#10192e)!important;
+ border:1px solid var(--tp-brand-stroke,#42577e)!important;
+ border-radius:18px!important;box-shadow:0 24px 80px #0009!important;
+}
+html body.tp80-connection #tp96-protocol-modal .tp96-protocol-top{
+ flex:0 0 auto!important;display:flex!important;align-items:center!important;
+ justify-content:space-between!important;padding:10px 14px!important;
+ border-bottom:1px solid var(--tp-brand-stroke,#42577e)!important;
+ background:var(--tp-brand-raised,#172440)!important;
+}
+html body.tp80-connection #tp96-protocol-modal .tp96-protocol-title{
+ color:var(--tp-brand-text,#fff)!important;font-weight:800!important;
+}
+html body.tp80-connection #tp96-protocol-modal .tp96-protocol-close{
+ color:var(--tp-brand-text,#fff)!important;background:#26395c!important;
+ border:1px solid #537097!important;border-radius:10px!important;
+ padding:8px 14px!important;cursor:pointer!important;
+}
+html body.tp80-connection #tp96-protocol-modal .tp96-protocol-content{
+ min-height:0!important;flex:1 1 auto!important;overflow:auto!important;
+ overscroll-behavior:contain!important;scrollbar-gutter:stable!important;
+}
+html body.tp80-connection #tp96-protocol-modal .protocol-panel.tp96-in-modal{
+ display:flex!important;flex-direction:column!important;position:relative!important;
+ width:100%!important;max-width:none!important;min-height:0!important;
+ margin:0!important;border:0!important;border-radius:0!important;box-shadow:none!important;
+}
+@media(max-width:720px){
+ html body.tp80-connection #tp96-protocol-modal:not([hidden]){padding:7px!important;align-items:center!important}
+ html body.tp80-connection #tp96-protocol-modal .tp96-protocol-shell{max-height:94dvh!important;border-radius:14px!important}
+ html body.tp80-connection #tp96-protocol-modal .tp96-protocol-content{overflow:auto!important}
+ html body.tp80-connection #tp96-protocol-modal .protocol-panel.tp96-in-modal{display:flex!important}
+}
 """
 
 
@@ -1979,6 +2027,65 @@ _SCRIPT = r"""
      [...label.querySelectorAll('img')].slice(1).forEach(img=>img.remove());
    });
  }
+
+ function installProtocolCardModal(){
+   if(document.getElementById('tp96-protocol-modal'))return;
+   const overlay=el('div','tp96-protocol-modal');
+   overlay.id='tp96-protocol-modal';overlay.hidden=true;
+   overlay.setAttribute('role','dialog');overlay.setAttribute('aria-modal','true');
+   overlay.setAttribute('aria-label','جزئیات پروتکل');
+   const shell=el('div','tp96-protocol-shell');
+   const top=el('div','tp96-protocol-top');
+   const title=el('strong','tp96-protocol-title','پروتکل');
+   const close=el('button','tp96-protocol-close','بستن ×');close.type='button';
+   close.setAttribute('aria-label','بستن پنجره پروتکل');
+   const content=el('div','tp96-protocol-content');
+   top.append(title,close);shell.append(top,content);overlay.append(shell);
+   document.body.append(overlay);
+   let current=null,anchor=null,lastFocus=null,oldOverflow='';
+   function shut(){
+     if(overlay.hidden)return;
+     // Restore the ORIGINAL panel; cloning it would break copy/download handlers.
+     if(current&&anchor?.parentNode){
+       current.classList.remove('tp96-in-modal');
+       anchor.replaceWith(current);
+     }
+     current=null;anchor=null;content.replaceChildren();overlay.hidden=true;
+     document.body.style.overflow=oldOverflow;
+     if(lastFocus?.isConnected)lastFocus.focus({preventScroll:true});
+   }
+   function open(card){
+     const panel=document.getElementById(card.dataset.protocol);
+     if(!panel||!panel.classList.contains('protocol-panel'))return;
+     shut();
+     lastFocus=card;oldOverflow=document.body.style.overflow;
+     selectedProtocol=card.dataset.protocol;
+     reconcileProtocolSelection();
+     anchor=document.createComment('tp96-protocol-return');
+     panel.parentNode.insertBefore(anchor,panel);
+     current=panel;
+     current.classList.add('tp96-in-modal');
+     title.textContent=card.querySelector('.protocol-text b,.protocol-name,.protocol-text')?.textContent.trim()
+       ||panel.querySelector('.panel-head h3')?.textContent.trim()||'پروتکل';
+     content.append(panel);overlay.hidden=false;
+     document.body.style.overflow='hidden';
+     close.focus();
+   }
+   close.addEventListener('click',shut);
+   overlay.addEventListener('click',event=>{if(event.target===overlay)shut()});
+   document.addEventListener('keydown',event=>{
+     if(event.key==='Escape'&&!overlay.hidden&&document.getElementById('tp84-dialog')?.hidden!==false){
+       event.preventDefault();shut();
+     }
+   });
+   document.addEventListener('click',event=>{
+     const card=event.target.closest('.protocol-choice[data-protocol]');
+     if(!card||!document.body.contains(card))return;
+     event.preventDefault();event.stopImmediatePropagation();
+     open(card);
+   },true);
+ }
+
  function installMobileDetailsDialog(){
    if(document.getElementById('tp84-dialog'))return;
    const overlay=el('div','tp84-dialog');overlay.id='tp84-dialog';overlay.hidden=true;
@@ -2124,6 +2231,7 @@ _SCRIPT = r"""
    installProtocolCategoryFilters();
    reconcileProtocolSelection();
    installMobileDetailsDialog();
+   installProtocolCardModal();
    watchAsyncV2rayNodes();
    panels().forEach(panel=>{
      installProtocolHelp(panel);
