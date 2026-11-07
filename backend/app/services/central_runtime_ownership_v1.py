@@ -54,7 +54,12 @@ def allow_central_node(db, node) -> bool:
         return False
     if not node.show_to_users:
         return True
-    return is_central_node(db, int(node.id))
+    # Incomplete/legacy Node objects must fail closed, not crash the
+    # installer or expose a node without a registered central owner.
+    node_id=getattr(node,"id",None)
+    if not isinstance(node_id,int) or node_id<=0:
+        return False
+    return is_central_node(db, node_id)
 
 
 def require_central_node(db, node) -> None:
