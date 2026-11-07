@@ -16,7 +16,7 @@ def test_real_action_rows_at_bottom_without_link_mutation():
     assert "order:22!important" in s # current OS's existing app downloader
     assert ">.ref67-footer" not in s # there must be no replacement of originals
     assert "body.tp75-footer .protocol-panel:has(> .v52-multi-card) > .ref67-footer" in s
-    assert "return refine_public_connection_footer_layout_v75(source)" in c
+    assert "source = refine_public_connection_footer_layout_v75(source)" in c
     assert "source = refine_public_connection_approved_phone_v74(source)" in c
     assert "document.body.classList.add('tp75-footer')" in s
     assert "appendChild(" not in s
