@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.649",
-  "source_sha": "4a9b535b66054274085bafd10c534f26dc782d92",
+  "version": "1.1.0-rc.650",
+  "source_sha": "c348f445682d3a836a15f07ec9d750dd5b463a7e",
   "notes": {
-    "fa": "پاک‌سازی و یکسان‌سازی صفحه Connection برای ۱۵ پروتکل، برگرداندن تاریخ اولین اتصال و انقضا، حذف پینگ‌ها و عددهای غیرقابل اعتماد از رابط، رفع تداخل انتخاب پروتکل در موبایل، نمایش فقط نود و فایل اصلی، و دانلود ZIP همه فایل‌های واقعی OpenVPN/WireGuard/AmneziaWG از مسیر رسمی موجود؛ دکمه‌های واقعی و دانلود برنامه‌ها حفظ می‌شوند؛ بدون تغییر کانفیگ، رمز، پورت و تونل‌های VPN.",
-    "en": "Connection 15-protocol unified clean UI: restore first-use/expiry dates; remove unreliable RTT badges; fix V36/V77 mobile selection race; keep actual node config/file controls; download real native OpenVPN/WireGuard/AmneziaWG ZIP via the existing canonical multi endpoint; retain client downloads, unchanged credentials, ports, nodes and tunnels."
+    "fa": "اصلاح صفحه Connection: حذف ردیف دوم و تکراری پرچم در Cisco/OpenConnect، L2TP/IPsec، OpenVPN، WireGuard و AmneziaWG؛ فیلتر واقعی کشورها با پشتیبانی از چند نود یک کشور (مثل دو آلمان)، دکمه همه برای بازگرداندن تمام نودها؛ نمایش مستقیم نام کاربری و رمز عبور Cisco/L2TP و IPsec Secret با حفظ دکمه‌های کپی اصلی. بدون تغییر اطلاعات حساب، کانفیگ، نود، پورت یا تونل VPN.",
+    "en": "Connection native protocols: exactly one country filter; per-ISO-country grouping and correct multi-node filtering (both German nodes); All restores original nodes. Cisco/OpenConnect and L2TP/IPsec shared real login credentials are visible by default, including L2TP IPsec Secret and original copy actions. Presentation-only: no VPN credential, node, port, transport, subscription or tunnel mutation."
   }
 }
