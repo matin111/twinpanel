@@ -243,11 +243,34 @@ def _wanted_modern_protocols(
 
 
 def _modern_item_is_usable(ad: Any, db, protocol: str, item: dict[str, Any]) -> bool:
-    if not ad._delivery_item_is_usable(db, protocol, item):
-        return False
+    """Keep staged central-Exit items without making them customer-visible.
+
+    Customer delivery intentionally rejects hidden nodes, but this topology
+    reconciler must NEVER use that presentation rule to erase credential items
+    of an already centrally-owned hidden Exit. The central stage verifies
+    those items separately before publication.
+    """
     node_id = _item_node_id(ad, item)
     if node_id <= 0:
         return False
+    node = db.get(Node, node_id)
+    if (node is None or node.retired_at is not None
+            or node.node_type != NodeType.EXIT
+            or node.status != NodeStatus.ONLINE):
+        return False
+    if node.show_to_users:
+        if not ad._delivery_item_is_usable(db, protocol, item):
+            return False
+    else:
+        from .services.central_runtime_ownership_v1 import is_central_node
+        # A topology scan may check thousands of credentials against the same
+        # hidden Exit. Query its ownership marker once per SQLAlchemy Session,
+        # not once per subscription/protocol item.
+        ownership = db.info.setdefault("_central_hidden_exit_ownership", {})
+        if node_id not in ownership:
+            ownership[node_id] = bool(is_central_node(db, node_id))
+        if not ownership[node_id]:
+            return False
     cfg = (
         db.query(NodeProtocolConfig)
         .filter(
