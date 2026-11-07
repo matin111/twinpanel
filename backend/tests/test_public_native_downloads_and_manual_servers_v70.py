@@ -54,3 +54,13 @@ def test_final_scripts_compile_and_parse():
                 f=Path(tmp)/"view.js"
                 f.write_text(js,encoding="utf-8")
                 subprocess.run([node,"--check",str(f)],check=True,capture_output=True,text=True)
+
+def test_all_iso_country_flags_on_windows_and_no_duplicate_categories():
+    source=(P/"public_connection_reference_desktop_mobile_v67.py").read_text(encoding="utf-8")
+    assert "body.ref67 .protocol-toolbar{display:none!important}" in source
+    assert "const wrapper=document.createElement('span')" in source
+    assert "image.src='https://flagcdn.com/w40/'+code.toLowerCase()+'.png'" in source
+    assert "image.addEventListener('load',()=>{wrapper.replaceChildren(image)})" in source
+    assert "decorateNativeTabs(panel)" in source
+    assert "const flag=flagImageOrEmoji(d.code,'ref67-flag')" in source
+    assert "c.append(flagImageOrEmoji(d.code" in source
