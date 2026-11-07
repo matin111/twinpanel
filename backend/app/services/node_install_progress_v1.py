@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from ..database import SessionLocal
 from ..node_install_progress_models_v1 import NodeInstallProgressV1
 
-TERMINAL = {"completed", "failed"}
+TERMINAL = {"completed", "failed", "waiting_backfill"}
 STAGES = {
     "queued", "installing_base", "installing_xray",
     "installing_modern", "enrolling_users", "users_queued", "completed", "failed",
