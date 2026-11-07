@@ -53,6 +53,15 @@ def test_native_only_one_node_detail_may_appear():
     assert "fetch(" not in ui
     assert "db.commit(" not in ui
 
+def test_one_protocol_selection_wins_over_legacy_mobile_handlers():
+    ui=code("public_connection_unified_surface_dates_v80.py")
+    assert "function reconcileProtocolSelection()" in ui
+    assert "selectedProtocol=card.dataset.protocol" in ui
+    assert "queueMicrotask(reconcileProtocolSelection)" in ui
+    assert "panels().forEach(item=>item.classList.toggle('active',item===panel))" in ui
+    assert "function check(){\n   reconcileProtocolSelection();" in ui
+
+
 def test_v2ray_one_group_expanded_but_profiles_preserved():
     ui = code("public_connection_unified_surface_dates_v80.py")
     v54 = code("public_connection_v2ray_mobile_restore_v54.py")
