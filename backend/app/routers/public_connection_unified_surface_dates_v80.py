@@ -1602,9 +1602,24 @@ _SCRIPT = r"""
        footer.append(node);
      });
    }
-   const nodes=[...footer.querySelectorAll(':scope > .tp78-footer-action')];
+   // Native file-based profiles never trigger an import/deep-link action.
+   // Keep only the real ZIP download, and leave program installation separate.
+   const nodes=[...footer.querySelectorAll(':scope > .tp78-footer-action')]
+     .filter(node=>!fileProtocol||(node.dataset.kind!=='add'&&!/ایمپورت|افزودن به برنامه/i.test(node.textContent||'')));
    const find=kind=>nodes.find(node=>node.dataset.kind===kind);
-   let primary=find('add')||find('download');
+   let primary=fileProtocol?find('download'):(find('add')||find('download'));
+   if(fileProtocol){
+     const token=location.pathname.split('/')[3]||'';
+     const url=token?'/v1/connect/'+token+'/multi/'+encodeURIComponent(key):'';
+     if(url){
+       if(!primary){primary=el('a','tp78-footer-action','دانلود همه فایل‌ها');primary.dataset.kind='download'}
+       primary.setAttribute('href',url);
+       primary.setAttribute('download','');
+       primary.removeAttribute('target');
+       primary.removeAttribute('rel');
+       primary.textContent='دانلود همه فایل‌ها';
+     }
+   }
    let link=find('link');
    let copy=find('copy');
    let app=find('app');

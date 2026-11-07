@@ -250,23 +250,6 @@ _V9_SCRIPT_TEMPLATE = r"""
   function downloadReal(url,filename){
     const a=document.createElement('a');a.href=url;a.download=filename||'';a.rel='noopener';document.body.appendChild(a);a.click();a.remove();
   }
-  async function sendRealFile(url,filename,protocol){
-    const mime=protocol==='openvpn'?'application/x-openvpn-profile':'application/octet-stream';
-    if(window.isSecureContext&&navigator.share&&typeof File!=='undefined'){
-      try{
-        const response=await fetch(url,{cache:'no-store'});
-        if(!response.ok)throw new Error('download failed');
-        const bytes=await response.arrayBuffer();
-        const file=new File([bytes],filename,{type:mime});
-        const payload={files:[file],title:protocol==='openvpn'?'OpenVPN profile':'WireGuard profile'};
-        if(!navigator.canShare||navigator.canShare(payload)){
-          await navigator.share(payload);return;
-        }
-      }catch(error){if(error&&error.name==='AbortError')return;}
-    }
-    downloadReal(url,filename);
-    notify('فایل واقعی دانلود شد؛ روی فایل بزنید و برنامه VPN را انتخاب کنید');
-  }
   function actionButton(kind,label){
     const el=document.createElement('button');el.type='button';el.className='v9-icon-btn '+(kind==='phone'?'mobile':'');el.innerHTML=icons[kind]||icons.info;el.setAttribute('aria-label',label);el.title=label;return el;
   }
@@ -325,17 +308,8 @@ _V9_SCRIPT_TEMPLATE = r"""
         const filename=safeName(download.dataset.filename,key+'-'+(index+1)+'.'+extension);
         const url=fileUrl(key,index);
         const dl=actionLink('download','دانلود فایل واقعی',url);dl.download=filename;
-        if(key==='openvpn'){
-          // Share the actual .ovpn file with the native app. A custom-scheme
-          // URL may open the raw HTTPS response as browser text instead.
-          const phone=actionButton('phone','باز کردن فایل با OpenVPN Connect');
-          phone.addEventListener('click',()=>sendRealFile(url,filename,key));
-          row.append(dl,phone);
-        }else{
-          const phone=actionButton('phone','باز کردن با WireGuard');
-          phone.addEventListener('click',()=>sendRealFile(url,filename,key));
-          row.append(dl,phone);
-        }
+        // File profiles only download. Never share files or open VPN apps.
+        row.append(dl);
       }else if((key==='v2ray'||key==='xray')&&direct){
         const uri=direct.getAttribute('href')||'';
         const copy=actionButton('copy','کپی کانفیگ');copy.addEventListener('click',async()=>notify(await copyText(uri)?'کانفیگ کپی شد':'کپی انجام نشد'));
