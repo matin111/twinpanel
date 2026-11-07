@@ -707,7 +707,7 @@ _SCRIPT = r"""
      // SOCKS5 often carries both a human-readable raw credential block and
      // canonical .facts. Keep the actual copyable facts, not two copies of
      // the same secrets or a large raw text canvas.
-     const socks=String(panel.dataset.v34Protocol||'').toLowerCase()==='socks5';
+     const socks=keyForPanel(panel)==='socks5';
      const realFacts=socks?view.querySelector('.facts'):null;
      if(realFacts){
        holder.classList.add('tp80-socks5-detail');
@@ -759,6 +759,13 @@ _SCRIPT = r"""
      });
    });
  }
+ function keyForPanel(panel){
+   const raw=panel.dataset.ref67NativeProtocol||panel.dataset.v34Protocol;
+   if(raw)return String(raw).trim().toLowerCase();
+   const choice=[...document.querySelectorAll('.protocol-choice[data-protocol]')]
+     .find(node=>node.dataset.protocol===panel.id);
+   return String(choice?.dataset.protocolKey||'').trim().toLowerCase();
+ }
  function createSudokuClientAction(){
    const os=String(document.body.dataset.tpPlatform||'').toLowerCase();
    const mobile=/Android/i.test(navigator.userAgent);
@@ -789,7 +796,7 @@ _SCRIPT = r"""
    footer.append(source);
  }
  function ensureSudokuClient(panel){
-   const key=String(panel.dataset.ref67NativeProtocol||panel.dataset.v34Protocol||'').toLowerCase();
+   const key=keyForPanel(panel);
    if(key!=='sudoku')return;
    let footer=panel.querySelector(':scope > .tp78-action-footer');
    if(!footer){
@@ -804,7 +811,7 @@ _SCRIPT = r"""
    if(!footer||footer.dataset.tp80Ready==='1')return;
    const children=[...footer.querySelectorAll(':scope > .tp78-footer-action')];
    const find=kind=>children.find(node=>node.dataset.kind===kind);
-   const key=String(panel.dataset.ref67NativeProtocol||panel.dataset.v34Protocol||'').toLowerCase();
+   const key=keyForPanel(panel);
    // One verified device-specific app link in the SAME footer for all protocols.
    // Reuse genuine installed links instead of displaying the same client twice.
    if(!find('app')){
