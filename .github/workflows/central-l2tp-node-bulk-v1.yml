@@ -50,6 +50,8 @@ on:
       - "backend/tests/test_central_runtime_visible_convergence_v1.py"
       - "backend/app/services/central_runtime_visible_convergence_v1.py"
       - "backend/app/services/central_runtime_ownership_v1.py"
+      - "backend/app/services/central_node_identity_store_v1.py"
+      - "backend/tests/test_central_node_identity_store_v1.py"
       - "backend/tests/test_central_node_stage_v1.py"
       - "backend/scripts/twinpanel_central_node_stage_v1.py"
       - "backend/app/services/central_openvpn_node_signer_v2.py"
@@ -115,6 +117,7 @@ jobs:
           PYTHONPATH=. python -m unittest discover -s tests -p 'test_central_node_desired_state_v1.py' -v
           PYTHONPATH=. python -m unittest discover -s tests -p 'test_central_node_runtime_engine_v1.py' -v
           PYTHONPATH=. python -m unittest discover -s tests -p 'test_central_runtime_visible_convergence_v1.py' -v
+          PYTHONPATH=. python -m unittest discover -s tests -p 'test_central_node_identity_store_v1.py' -v
           PYTHONPATH=. python -m unittest discover -s tests -p 'test_central_node_stage_v1.py' -v
           PYTHONPATH=. python -m unittest discover -s tests -p 'test_central_l2tp_node_bulk_v1.py' -v
           PYTHONPATH=. python -m unittest discover -s tests -p 'test_central_cisco_node_bulk_v1.py' -v
