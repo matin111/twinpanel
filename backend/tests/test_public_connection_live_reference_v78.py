@@ -118,6 +118,21 @@ def test_measured_value_is_not_cached_telemetry(monkeypatch):
     assert response.headers["cache-control"].startswith("no-store")
 
 
+
+def test_registered_live_router_exposes_refresh_endpoint():
+    from app.routers.public_connection_hub_live_v5 import router as live_router
+    route = next(
+        (route for route in live_router.routes
+         if route.path == "/v1/connect/{token}/node-ping/{node_id}"),
+        None,
+    )
+    assert route is not None
+    assert "GET" in route.methods
+    # app.main mounts the live hub, not the legacy hub_v5 router.
+    main = (ROOT.parent / "main.py").read_text(encoding="utf-8")
+    assert "app.include_router(public_connection_hub_live_v5_router)" in main
+
+
 def test_frontend_javascript_syntax_and_python_compile():
     code = source("public_connection_live_reference_v78.py")
     compile(code, "public_connection_live_reference_v78.py", "exec")
