@@ -39,9 +39,9 @@ def test_real_node_per_protocol_rendered_with_identity_and_deliverable(protocol)
     assert 'data-country-code="DE"' in panels and 'data-country-code="US"' in panels
     assert 'data-latency-ms' not in panels  # no stale RTT surfaced
     assert " ms" not in panels  # no invented latency text
-    assert "198.51.100.13" in panels or protocol in ("openvpn","wireguard"),protocol
-    assert "198.51.100.11" in panels or protocol in ("openvpn","wireguard"),protocol
-    if protocol in ("openvpn","wireguard"):
+    assert "198.51.100.13" in panels or protocol in ("openvpn","wireguard","amneziawg"),protocol
+    assert "198.51.100.11" in panels or protocol in ("openvpn","wireguard","amneziawg"),protocol
+    if protocol in ("openvpn","wireguard","amneziawg"):
         assert panels.count('class="primary-btn download-config"')==2
         assert panels.count('class="hidden-source"')==2
         assert 'data-filename=' in panels
@@ -65,6 +65,14 @@ def test_native_download_all_is_real_zip_not_a_placeholder(protocol,extension):
         assert len(set(names))==4
         assert all(n.endswith(extension) for n in names)
         assert all(b"synthetic" in archive.read(n) for n in names)
+
+def test_native_file_router_supports_each_real_file_type():
+    from app.routers.public_connection_files_v9 import _FILE_TYPES
+    assert set(("openvpn","wireguard","amneziawg")).issubset(_FILE_TYPES)
+    assert _FILE_TYPES["openvpn"][0]=="ovpn"
+    assert _FILE_TYPES["wireguard"][0]=="conf"
+    assert _FILE_TYPES["amneziawg"][0]=="conf"
+
 
 def test_clean_ui_does_not_poll_or_display_fake_node_status():
     ui=(ROUTERS/"public_connection_live_reference_v78.py").read_text(encoding="utf-8")
