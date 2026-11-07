@@ -8,7 +8,7 @@ from app.models import NodeStatus, NodeType
 
 class CentralNodeStageTests(unittest.TestCase):
     def test_bulk_adapters_include_xray_and_no_individual_worker(self):
-        self.assertEqual(len(stage.ADAPTERS), 9)
+        self.assertEqual(len(stage.ADAPTERS), 10)
         self.assertFalse(any("backfill" in name for name in stage.ADAPTERS))
         self.assertTrue(all("central_" in name and "bulk" in name
                             for name in stage.ADAPTERS))
@@ -77,10 +77,8 @@ class CentralNodeStageTests(unittest.TestCase):
             db.commit.assert_not_called()
 
 
-    def test_partial_engine_has_explicit_missing_protocols(self):
-        self.assertTrue({"sudoku"}.issubset(
-            set(stage.MISSING_BULK_PROTOCOLS)
-        ))
+    def test_all_registry_protocols_have_bounded_adapters(self):
+        self.assertEqual(set(stage.MISSING_BULK_PROTOCOLS), set())
         self.assertEqual(
             set(stage.ALL_PROTOCOL_KEYS),
             set(stage.BULK_PROTOCOLS) | set(stage.MISSING_BULK_PROTOCOLS),
