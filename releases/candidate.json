@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.666",
-  "source_sha": "58b368c2e960cb37d8166880dc0269e6e0224fee",
+  "version": "1.1.0-rc.667",
+  "source_sha": "1e5cfdfecd32bca02d29a0d47a9da2bfa6d6d9f4",
   "notes": {
-    "fa": "نسخه rc.666: رفع مشکل کار نکردن «ارسال فایل به برنامه» برای OpenVPN، WireGuard و AmneziaWG در اندروید و آیفون. منوی اشتراک‌گذاری اکنون بلافاصله با لمس کاربر و فایل واقعی .ovpn/.conf باز می‌شود؛ دانلود شبکه‌ای قبل از Share حذف شد تا مجوز لمس مرورگر از بین نرود. پشتیبانی جایگزین MIME عمومی برای فایل‌های VPN حفظ شد؛ دانلود مستقیم و راهنمای پاپ‌آپ تمام پروتکل‌ها بدون تغییر باقی مانده‌اند. هیچ تغییر در کاربران، اشتراک‌ها، نودها یا سرویس VPN اعمال نشده است.",
-    "en": "rc.666: Fix mobile native file Share actions for OpenVPN, WireGuard and AmneziaWG. Create the original .ovpn/.conf file from already available profile contents and invoke navigator.share synchronously in the user's tap, avoiding an awaited network fetch that loses transient activation. Fall back to generic MIME for uncommon VPN extensions. Preserve ordinary downloads and contextual help for all protocols; no VPN dataplane, node or account changes."
+    "fa": "نسخه rc.667: هماهنگ‌سازی واقعی رنگ کل صفحه Connection با رنگ‌های برند پنل (اصلی/دوم از تنظیمات پنل): پس‌زمینه، هدر، کارت کاربران، کارت پروتکل‌ها، دکمه‌های دسته‌بندی، لیست سرورها، پنجره پاپ‌آپ، هدر و فوتر. رفع قطعی ظاهر سرمه‌ای هنگام انتخاب حالت روشن با بازنویسی استایل‌های قدیمی ثابت. لایت‌مود و دارک‌مود هر دو با متن و سطوح خوانا و دکمه تغییر تم با حفظ انتخاب کاربر عمل می‌کنند. تست کد، API/وب، صفحه Connection و پاپ‌آپ ۱۶ پروتکل موفق بوده؛ تست اسکرین‌شات واقعی دو تم در مرورگر هنوز انجام نشده است. هیچ تغییری در داده‌های اشتراک، کاربران، سرورها یا پروتکل‌های VPN داده نشده است.",
+    "en": "rc.667: synchronize the entire Connection page palette to TwinPanel configured primary/secondary branding, including page background, header, subscriber/traffic card, categories, protocol cards, server rows, popup surface, headers/footers and actions. Fix legacy high-specificity dark-only reference CSS so switching to Light genuinely displays readable light colors; Dark retains brand-coordinated surfaces. Preserve persisted theme selector, existing protocol popup-only layout, country/category filters and download/copy handlers. Python/JavaScript checks and HTTP 200 plus 16-modal DOM tests succeeded. Full browser screenshot testing of both themes is pending. No VPN account, node, tunnel or credential data modified."
   }
 }
