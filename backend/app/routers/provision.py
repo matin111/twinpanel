@@ -2553,6 +2553,9 @@ async def install_node(
             "skipped": True,
             "reason": "deferred_until_node_ready" if payload.defer_subscription_sync else "not_run",
         }
+        # TWINPANEL_INSTALLED_NODE_SUBSCRIPTION_AUTOSYNC_CALL_V1
+        # Compatibility: explicit/legacy installations retain the original
+        # historical sync; only the 16-protocol background flow defers it.
         if not payload.defer_subscription_sync:
             try:
                 from .account_delivery import sync_installed_node_to_subscriptions
