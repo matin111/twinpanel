@@ -51,6 +51,12 @@ class RealityNameAliasTests(unittest.TestCase):
         self.assertIn('"reality_private_key": private_key', source)
         self.assertIn('"short_id_xhttp": short_id_xhttp', source)
         self.assertIn('"xhttp_path": xhttp_path', source)
+        self.assertIn('"vless_tcp_congestion": "bbr" if', source)
+        self.assertIn('"sockopt": {"tcpcongestion": "bbr"}', source)
+        tcp_tls = (ROOT / "backend/app/xray_tcp_tls_v39.py").read_text(encoding="utf-8")
+        compile(tcp_tls, "<xray-tcp-tls>", "exec")
+        self.assertIn('vless_bbr = str(node_state.get("vless_tcp_congestion")', tcp_tls)
+        self.assertIn('expected["streamSettings"]["sockopt"]', tcp_tls)
         self.assertIn('("mode", "stream-one")', source)
 
     def test_administration_apply_keeps_old_sni_and_checks_tls13_target(self):
