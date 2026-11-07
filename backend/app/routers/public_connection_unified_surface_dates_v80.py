@@ -1214,9 +1214,13 @@ _SCRIPT = r"""
        for(const index of group.indices){
          const label=rows[index]?.querySelector('.tp77-native-label');
          if(!label)continue;
+         const existingVector=label.querySelector('.tp76-flag svg');
          const flag=label.querySelector('img');
          const uri=knownFlag(country);
-         if(flag&&uri){flag.src=uri;flag.alt=country}
+         if(existingVector){
+           // V76 already provides the country as SVG: a second image is wrong.
+           [...label.querySelectorAll('img')].forEach(img=>img.remove());
+         }else if(flag&&uri){flag.src=uri;flag.alt=country}
          else if(!flag)label.prepend(countryImage(country));
        }
        btn.append(document.createTextNode(' '+country+(group.indices.length>1?' ('+group.indices.length+')':'')));
@@ -1455,18 +1459,27 @@ _SCRIPT = r"""
    panel.querySelectorAll('.tp77-native-label').forEach(label=>{
      const country=label.closest('.tp77-native-row')?.dataset.tp80CountryCode||'';
      if(!/^[A-Z]{2}$/.test(country))return;
-     const images=[...label.querySelectorAll('img')];
-     let first=images[0];
-     if(!first){first=countryImage(country);label.prepend(first)}
-     first.src=knownFlag(country)||'https://flagcdn.com/w40/'+country.toLowerCase()+'.png';
-     first.alt=country;
-     first.classList.add('tp92-node-flag');
-     images.slice(1).forEach(img=>img.remove());
-     // Legacy node label starts with a Unicode flag; remove that duplicate,
-     // keeping the server code / name untouched.
-     [...label.childNodes].filter(node=>node.nodeType===3).forEach(node=>{
-       node.textContent=node.textContent.replace(/[🇦-🇿]{2}/gu,'').replace(/^\s+/,' ');
-     });
+     // Identity V76 already contains a complete vector flag. It must be the
+     // ONLY visible flag. V80 used to prepend an unnecessary PNG beside it.
+     const vector=label.querySelector('.tp76-flag svg');
+     if(vector){
+       [...label.querySelectorAll('img')].forEach(img=>img.remove());
+     }else{
+       const images=[...label.querySelectorAll('img')];
+       let first=images[0];
+       if(!first){first=countryImage(country);label.prepend(first)}
+       first.src=knownFlag(country)||'https://flagcdn.com/w40/'+country.toLowerCase()+'.png';
+       first.alt=country;
+       first.classList.add('tp92-node-flag');
+       images.slice(1).forEach(img=>img.remove());
+     }
+     // Remove duplicate legacy Unicode flag text, but retain the node label.
+     const textNodes=[...label.childNodes];
+     const strip=node=>{
+       if(node.nodeType===3){node.textContent=node.textContent.replace(/[🇦-🇿]{2}/gu,'')}
+       else if(node.nodeType===1&&!node.matches('svg'))[...node.childNodes].forEach(strip);
+     };
+     textNodes.forEach(strip);
    });
  }
  function normalizeV2rayCountries(panel){
