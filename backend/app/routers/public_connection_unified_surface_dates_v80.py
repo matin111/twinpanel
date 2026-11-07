@@ -1763,7 +1763,10 @@ _SCRIPT = r"""
    // Preserve existing working download-all from V51. ZIP route is already
    // represented by that real <a> element. Do not replace it with placeholders.
    const client=key==='v2ray'?nodes.find(node=>node.dataset.kind==='client'&&node.classList.contains('tp92-v2rayn')):null;
-   const ordered=[primary,link,copy,app,client].filter(Boolean);
+   // Windows V2Ray: four equal footer buttons, including BOTH real clients.
+   // Keep copy-all and secondary formats in expandable actions, not a fifth row.
+   const fourClients=key==='v2ray'&&client&&app;
+   const ordered=(fourClients?[primary,link,app,client]:[primary,link,copy,app]).filter(Boolean);
    const extra=nodes.filter(node=>!ordered.includes(node)&&node.dataset.kind!=='app');
    const previous=[...footer.querySelectorAll(':scope > .tp80-extra-actions .tp78-footer-action')];
    // Do not discard buttons: keep original source nodes and secondary actions.
