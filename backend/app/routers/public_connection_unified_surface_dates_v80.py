@@ -1256,12 +1256,12 @@ _SCRIPT = r"""
              return;
            }
            const match=String(download.dataset.target||'')
-             .match(/^(?:hub-protocol-\\d+-|cfg-|download-source-)(openvpn|wireguard|amneziawg)-(\\d+)$/);
+             .match(/^(?:hub-protocol-\d+-|cfg-|download-source-)(openvpn|wireguard|amneziawg)-(\d+)$/);
            const token=location.pathname.split('/')[3]||'';
            if(!match||!token)return;
            const extension=match[1]==='openvpn'?'ovpn':'conf';
            const fallback=match[1]+'-'+(Number(match[2])+1)+'.'+extension;
-           const rawName=String(download.dataset.filename||fallback).split(/[\\\\/]/).pop();
+           const rawName=String(download.dataset.filename||fallback);
            const filename=rawName.toLowerCase().endsWith('.'+extension)?rawName:rawName+'.'+extension;
            const mime=match[1]==='openvpn'?'application/x-openvpn-profile':'application/octet-stream';
            const url='/v1/connect/'+token+'/file/'+match[1]+'/'+match[2];
