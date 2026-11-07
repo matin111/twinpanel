@@ -299,7 +299,8 @@ async def _collect_xray_users(
 
 
 def _device_map(db, node_id: int, protocol: str) -> dict[str, dict]:
-    devices = build_node_devices(db, int(node_id))
+    source = {'openconnect': {'cisco'}, 'xray': {'v2ray'}}.get(protocol)
+    devices = build_node_devices(db, int(node_id), source_protocols=source)
     return {
         str(item.get("identity") or ""): item
         for item in devices
