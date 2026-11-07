@@ -1244,6 +1244,28 @@ _SCRIPT = r"""
          download.classList.add('tp80-file-download');
          download.textContent='↓ دانلود فایل';
          tools.append(download);
+         // Optional native Share sheet: send the real file with its original
+         // extension/MIME. Do not invoke any VPN client or import deep-link.
+         // A browser cannot force OpenVPN Connect into the OS Share targets.
+         const shareFile=el('button','tp80-file-share','ارسال فایل به برنامه');
+         shareFile.type='button';
+         shareFile.addEventListener('click',async event=>{
+           event.preventDefault();event.stopPropagation();
+           const match=String(download.dataset.target||'')
+             .match(/^(?:hub-protocol-\d+-|cfg-|download-source-)(openvpn|wireguard|amneziawg)-(\d+)$/);
+           const token=location.pathname.split('/')[3]||'';
+           if(!match||!token)return;
+           const extension=match[1]==='openvpn'?'ovpn':'conf';
+           const fallback=match[1]+'-'+(Number(match[2])+1)+'.'+extension;
+           const rawName=String(download.dataset.filename||fallback);
+           const filename=rawName.toLowerCase().endsWith('.'+extension)?rawName:rawName+'.'+extension;
+           const mime=match[1]==='openvpn'?'application/x-openvpn-profile':'application/octet-stream';
+           const url='/v1/connect/'+token+'/file/'+match[1]+'/'+match[2];
+           if(typeof window.tpNativeShareFile==='function'){
+             await window.tpNativeShareFile(url,filename,mime);
+           }
+         });
+         tools.append(shareFile);
          const target=download.dataset.target;
          const source=target?document.getElementById(target):null;
          if(source&&source.value.trim()){
