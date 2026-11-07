@@ -365,59 +365,72 @@ def _apply_openvpn_sessions(db, node: Node, observed: list[dict]) -> dict:
         session_key = (
             f"openvpn:{node_id}:{session.get('session_identity') or identity}"
         )[:160]
-        active_keys.add(session_key)
-
-        open_result = open_session(
-            db,
-            node_id,
-            SessionOpenIn(
-                session_key=session_key,
-                subscription_id=subscription_id,
-                device_id=device_id,
-                protocol="openvpn",
-                client_ip=None,
-            ),
-        )
-
-        if not bool(open_result.get("duplicate")):
-            opened += 1
-
-        _touch_session(db, node_id, session_key, now_naive)
-
-        uplink = max(int(session.get("uplink") or 0), 0)
-        downlink = max(int(session.get("downlink") or 0), 0)
-        sequence = sequence_base + index
-        source_key = f"openvpn:{node_id}:{identity}"[:220]
-        counter_epoch = session_key[:96]
-        event_id = str(
-            uuid.uuid5(
-                uuid.NAMESPACE_URL,
-                (
-                    f"twinpanel:openvpn:{source_key}:{counter_epoch}:"
-                    f"{sequence}:{uplink}:{downlink}"
+        try:
+            # A single malformed/expired legacy account must never roll back
+            # the counters and presence of other valid clients on this node.
+            with db.begin_nested():
+    
+            open_result = open_session(
+                db,
+                node_id,
+                SessionOpenIn(
+                    session_key=session_key,
+                    subscription_id=subscription_id,
+                    device_id=device_id,
+                    protocol="openvpn",
+                    client_ip=None,
+                ),
+                observed_telemetry=True,
+            )
+    
+            _touch_session(db, node_id, session_key, now_naive)
+    
+            uplink = max(int(session.get("uplink") or 0), 0)
+            downlink = max(int(session.get("downlink") or 0), 0)
+            sequence = sequence_base + index
+            source_key = f"openvpn:{node_id}:{identity}"[:220]
+            counter_epoch = session_key[:96]
+            event_id = str(
+                uuid.uuid5(
+                    uuid.NAMESPACE_URL,
+                    (
+                        f"twinpanel:openvpn:{source_key}:{counter_epoch}:"
+                        f"{sequence}:{uplink}:{downlink}"
+                    ),
+                )
+            )
+    
+            apply_usage_event(
+                db,
+                node_id,
+                UsageEventIn(
+                    event_id=event_id,
+                    subscription_id=subscription_id,
+                    device_id=device_id,
+                    session_key=session_key,
+                    protocol="openvpn",
+                    source_key=source_key,
+                    counter_mode="cumulative",
+                    counter_epoch=counter_epoch,
+                    source_sequence=sequence,
+                    uplink_value=uplink,
+                    downlink_value=downlink,
+                    reported_at=now_aware,
                 ),
             )
-        )
+            active_keys.add(session_key)
+            if not bool(open_result.get("duplicate")):
+                opened += 1
+            usage_events += 1
+        except Exception as exc:
+            ignored += 1
+            print(
+                "OPENVPN_TELEMETRY_SESSION_REJECTED",
+                {"node_id": node_id, "subscription_id": subscription_id,
+                 "error": f"{type(exc).__name__}:{str(exc)[:160]}"},
+                flush=True,
+            )
 
-        apply_usage_event(
-            db,
-            node_id,
-            UsageEventIn(
-                event_id=event_id,
-                subscription_id=subscription_id,
-                device_id=device_id,
-                session_key=session_key,
-                protocol="openvpn",
-                source_key=source_key,
-                counter_mode="cumulative",
-                counter_epoch=counter_epoch,
-                source_sequence=sequence,
-                uplink_value=uplink,
-                downlink_value=downlink,
-                reported_at=now_aware,
-            ),
-        )
-        usage_events += 1
 
     open_rows = (
         db.query(QuotaSession)
