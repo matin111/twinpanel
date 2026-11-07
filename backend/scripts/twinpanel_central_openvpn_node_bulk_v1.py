@@ -25,6 +25,10 @@ from app.models import (
     Subscription, SubscriptionNode, SubscriptionProtocol, SubscriptionStatus, User,
 )
 from app.protocol_identity import is_openvpn_central_pki_enabled
+from app.node_runtime_connection import connect_protocol_runtime
+from app.services.central_openvpn_node_signer_v2 import (
+    load_or_import_node_ca, issue_client_identity, verify_client_identity,
+)
 from app.services.new_node_readiness_v1 import verify_new_exit_readiness
 from app.routers import account_delivery as ad
 
@@ -57,9 +61,55 @@ def validate_node(db, node_id):
         node_id=int(node_id), protocol="openvpn").one_or_none()
     if cfg is None or str(getattr(cfg.status, "value", cfg.status)).lower() != "online":
         raise RuntimeError("OPENVPN_RUNTIME_NOT_READY")
-    if not is_openvpn_central_pki_enabled(db):
-        raise RuntimeError("OPENVPN_CENTRAL_PKI_REQUIRED_NO_LEGACY_FALLBACK")
     return node
+
+
+def build_node_local_client_item(db,node,sub,user,identity):
+    """Match existing OpenVPN client config contract; signing stays on controller."""
+    host,port=ad._tunnel_access_endpoint(db,node,"openvpn")
+    transport=ad._transport(db,node.id,"openvpn")
+    proto="udp" if "udp" in transport else "tcp-client"
+    config=(
+        "client\n"
+        "dev tun\n"
+        "proto "+proto+"\n"
+        "remote "+str(host)+" "+str(port)+"\n"
+        "redirect-gateway def1\n"
+        "tun-mtu 1200\n"
+        "mssfix 1160\n"
+        "resolv-retry infinite\n"
+        "nobind\n"
+        "persist-key\n"
+        "persist-tun\n"
+        "remote-cert-tls server\n"
+        "verb 3\n"
+        "data-ciphers AES-256-GCM:AES-128-GCM:CHACHA20-POLY1305\n"
+        "auth SHA256\n"
+        "<ca>\n"+identity["ca"]+"\n</ca>\n"
+        "<cert>\n"+identity["client_certificate"]+"\n</cert>\n"
+        "<key>\n"+identity["client_private_key"]+"\n</key>\n"
+    )
+    return {
+        "node_id":node.id,"node":node.name,
+        "server":host,"server_ip":host,"port":port,"transport":transport,
+        "central_pki":False,
+        "filename":ad._account_country_filename(sub,user,node,"ovpn"),
+        "config":config,
+    }
+
+
+def saved_node_identity(cred,node_id,ca_cert):
+    if cred is None or not cred.secret_encrypted:return None
+    doc=ad._dec(cred.secret_encrypted)
+    if not isinstance(doc,dict):
+        raise RuntimeError("OPENVPN_LOCAL_CA_IDENTITY_UNREADABLE")
+    mapping=doc.get("central_local_openvpn_nodes") or {}
+    if not isinstance(mapping,dict):
+        raise RuntimeError("OPENVPN_LOCAL_CA_IDENTITY_MAPPING_INVALID")
+    saved=mapping.get(str(node_id))
+    if saved is not None:
+        verify_client_identity(saved,ca_cert,int(cred.subscription_id),node_id)
+    return saved
 
 
 async def run(node_id, limit, apply):
@@ -84,37 +134,60 @@ async def run(node_id, limit, apply):
         print("CENTRAL_OPENVPN_PLAN", json.dumps({
             "node_id": node_id, "eligible": len(subs),
             "missing_pairs": len(pending), "write_enabled": bool(apply),
-            "central_pki_only": True, "remote_ssh_per_account": False,
+            "central_or_existing_node_ca": True, "remote_ssh_per_account": False,
         }), flush=True)
         if not apply or not pending:
             return 0
         readiness = await asyncio.wait_for(verify_new_exit_readiness(db, node_id), timeout=510)
         if not readiness.get("ok"):
             raise RuntimeError("OPENVPN_STAGE_FULL_READINESS_FAILED")
-        writes = 0
-        # No network calls in this loop; the already-installed node trusts
-        # the central CA, and a client identity is stable across all nodes.
-        # No implicit legacy EasyRSA or per-account service restart.
-        for sub, cred, items in pending:
+        central_pki = is_openvpn_central_pki_enabled(db)
+        local_ca = None
+        if not central_pki:
+            conn=await asyncio.wait_for(connect_protocol_runtime(node,db),timeout=25)
+            try:
+                local_ca=await load_or_import_node_ca(db,node,conn)
+            finally:
+                conn.close()
+                await conn.wait_closed()
+        writes=0
+        # CA is imported once. Client RSA keys are issued on the controller,
+        # never on the Exit. Existing credentials on other nodes are intact.
+        for sub,cred,items in pending:
             db.refresh(sub)
-            now = datetime.utcnow()
+            now=datetime.utcnow()
             if (sub.status != SubscriptionStatus.ACTIVE or
-                (sub.expires_at is not None and sub.expires_at <= now) or
-                (sub.traffic_limit_bytes > 0 and
-                 sub.traffic_used_bytes >= sub.traffic_limit_bytes)):
+                (sub.expires_at is not None and sub.expires_at<=now) or
+                (sub.traffic_limit_bytes>0 and sub.traffic_used_bytes>=sub.traffic_limit_bytes)):
                 continue
-            user = db.get(User, sub.user_id)
+            user=db.get(User,sub.user_id)
             if user is None:
                 raise RuntimeError("OPENVPN_ACTIVE_SUBSCRIBER_USER_MISSING")
-            item = await ad._openvpn(
-                db, node, sub, user, central_identity_commit=False)
             if cred is None:
-                cred = ProtocolCredential(subscription_id=sub.id, protocol="openvpn")
+                cred=ProtocolCredential(subscription_id=sub.id,protocol="openvpn")
                 db.add(cred)
+            if central_pki:
+                item=await ad._openvpn(db,node,sub,user,central_identity_commit=False)
+            else:
+                identity=saved_node_identity(cred,node_id,local_ca["cert"])
+                if identity is None:
+                    identity=issue_client_identity(
+                        local_ca["cert"],local_ca["private"],int(sub.id),node_id)
+                    verify_client_identity(identity,local_ca["cert"],int(sub.id),node_id)
+                    original=(ad._dec(cred.secret_encrypted)
+                              if cred.secret_encrypted else {})
+                    if not isinstance(original,dict):
+                        raise RuntimeError("OPENVPN_LOCAL_CA_SAVED_SECRET_INVALID")
+                    mapping=dict(original.get("central_local_openvpn_nodes") or {})
+                    mapping[str(node_id)]=identity
+                    original["central_local_openvpn_nodes"]=mapping
+                    cred.secret_encrypted=ad._enc(original)
+                    cred.username=f"mv{sub.id}n{node_id}"
+                item=build_node_local_client_item(db,node,sub,user,identity)
             items.append(item)
-            cred.config_text_encrypted = ad._enc(items)
-            cred.is_active = True
-            writes += 1
+            cred.config_text_encrypted=ad._enc(items)
+            cred.is_active=True
+            writes+=1
         # Recheck hidden status immediately before the only commit.
         db.refresh(node)
         if node.show_to_users:
