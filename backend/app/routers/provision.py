@@ -2350,7 +2350,11 @@ async def install_node(
         os_id=await cmd(conn,". /etc/os-release && printf '%s' \"$ID\"")
         if os_id not in ("ubuntu","debian"): raise HTTPException(status_code=400,detail="فعلاً Ubuntu/Debian پشتیبانی می‌شود")
         await ensure_base(conn)
-        node=Node(name=payload.name,node_type=payload.node_type,country_code="IR" if payload.node_type==NodeType.IRAN else payload.country_code.upper(),public_ip=payload.host,agent_url=f"https://{payload.host}:9443",status=NodeStatus.OFFLINE,capacity_users=payload.capacity_users,enable_cisco=False,enable_openvpn=False,enable_wireguard=False,enable_l2tp=False,enable_v2ray=False)
+        node=Node(name=payload.name,node_type=payload.node_type,country_code="IR" if payload.node_type==NodeType.IRAN else payload.country_code.upper(),public_ip=payload.host,agent_url=f"https://{payload.host}:9443",status=NodeStatus.OFFLINE,
+                  # Keep fresh Exit invisible until ALL 16 service health
+                  # checks succeed and the central enrollment transaction runs.
+                  show_to_users=not payload.defer_subscription_sync,
+                  capacity_users=payload.capacity_users,enable_cisco=False,enable_openvpn=False,enable_wireguard=False,enable_l2tp=False,enable_v2ray=False)
         db.add(node); db.commit(); db.refresh(node)
         results, failed, secrets_out = await provision_protocols(
             conn,
