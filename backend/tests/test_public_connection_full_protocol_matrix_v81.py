@@ -38,7 +38,7 @@ def test_real_node_per_protocol_rendered_with_identity_and_deliverable(protocol)
     assert 'data-node-id="13"' in panels and 'data-node-id="11"' in panels
     assert 'data-country-code="DE"' in panels and 'data-country-code="US"' in panels
     assert 'data-latency-ms' not in panels  # no stale RTT surfaced
-    assert 'ms' not in panels or 'ms' in 'Germany'  # status never invents RTT
+    assert " ms" not in panels  # no invented latency text
     assert "198.51.100.13" in panels or protocol in ("openvpn","wireguard"),protocol
     assert "198.51.100.11" in panels or protocol in ("openvpn","wireguard"),protocol
     if protocol in ("openvpn","wireguard"):
