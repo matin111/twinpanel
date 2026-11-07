@@ -7,6 +7,11 @@ on:
       - "backend/scripts/twinpanel_migration_classic_sequential_v3.py"
       - "backend/scripts/twinpanel_existing_node_backfill_v1.py"
       - "backend/scripts/twinpanel_node_auto_backfill_v1.py"
+      - "backend/scripts/twinpanel_standalone_node_backfill_v1.py"
+      - "backend/app/node_backfill_scope_models_v1.py"
+      - "backend/app/services/node_auto_backfill_v1.py"
+      - "backend/app/routers/publish_node_all_users_v2.py"
+      - "backend/tests/test_central_unified_sixteen_v1.py"
       - "backend/tests/test_unified_node_account_scope_v1.py"
       - "backend/tests/test_existing_node_backfill_v1.py"
       - "backend/tests/test_node_auto_backfill_v1.py"
@@ -41,10 +46,13 @@ jobs:
             backend/scripts/twinpanel_migration_singbox_batch.py \
             backend/scripts/twinpanel_migration_classic_sequential_v3.py \
             backend/scripts/twinpanel_existing_node_backfill_v1.py \
-            backend/scripts/twinpanel_node_auto_backfill_v1.py
+            backend/scripts/twinpanel_node_auto_backfill_v1.py \
+            backend/scripts/twinpanel_standalone_node_backfill_v1.py \
+            backend/app/node_backfill_scope_models_v1.py
       - name: Verify imported + new subscriptions use one scope and old workflow stays safe
         run: |
           python -m pytest -q \
             backend/tests/test_unified_node_account_scope_v1.py \
             backend/tests/test_existing_node_backfill_v1.py \
-            backend/tests/test_node_auto_backfill_v1.py
+            backend/tests/test_node_auto_backfill_v1.py \
+            backend/tests/test_central_unified_sixteen_v1.py
