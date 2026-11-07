@@ -43,6 +43,7 @@ def _normalize_protocol(value: Any) -> str:
 
 
 def _active_subscription_payload(token: str, db: Session) -> tuple[Any, dict[str, Any]]:
+    db.info.setdefault("_tp_public_delivery_tunnels", {})
     sub = _subscription_from_share_token(token, db)
     status = str(getattr(sub.status, "value", sub.status) or "").strip().lower()
     if status != "active":

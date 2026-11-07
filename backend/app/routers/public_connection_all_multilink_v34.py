@@ -406,6 +406,7 @@ def _delivery(
     protocol: str,
     db: Session,
 ) -> tuple[str, int, Any, list[dict[str, Any]], Any]:
+    db.info.setdefault("_tp_public_delivery_tunnels", {})
     protocol = _normalize(protocol)
     if protocol not in MULTI_PROTOCOLS:
         raise HTTPException(status_code=404, detail="مولتی‌لینک برای این پروتکل ارائه نمی‌شود")
