@@ -51,7 +51,7 @@ def remote_source() -> str:
     # Stdin is JSON; no client key or master key ever appears in command-line
     # arguments to SSH or systemctl. A local "-more" subprocess uses the master
     # private key only inside this locked-down remote execution session.
-    return r'''import concurrent.futures,json,os,re,hashlib,socket,subprocess,sys,tempfile,time
+    return r'''import concurrent.futures,json,os,re,hashlib,socket,subprocess,sys,tempfile,time,secrets,urllib.request
 from pathlib import Path
 BASE=Path("/etc/twinpanel/standalone/sudoku/shared")
 BINARY=Path("/usr/local/bin/twinpanel-sudoku-shared")
@@ -60,6 +60,7 @@ SERVICE="twinpanel-sudoku-shared.service"
 UNIT=Path("/etc/systemd/system")/SERVICE
 CONF=BASE/"server.config.json"
 MASTER=BASE/"master.json"
+CONTROLLER="127.0.0.1:19095"
 req=json.load(sys.stdin)
 action=req.get("action")
 if action not in ("prepare","apply","probe"):
@@ -141,6 +142,10 @@ else:
         with socket.socket() as sock:
             try:sock.bind(("0.0.0.0",PORT))
             except OSError:raise RuntimeError("SUDOKU_SHARED_PORT_IN_USE")
+    previous_config=json.loads(CONF.read_text()) if CONF.exists() else {}
+    token=previous_config.get("secret") or secrets.token_hex(24)
+    if not re.fullmatch("[0-9a-f]{48}",token):
+        raise RuntimeError("SUDOKU_SHARED_CONTROLLER_SECRET_CONFLICT")
     cfg={"mode":"server","transport":"tcp","local_port":PORT,
          "fallback_address":"127.0.0.1:80",
          "key":master["public"],"aead":"chacha20-poly1305",
@@ -148,6 +153,7 @@ else:
          "padding_min":5,"padding_max":15,"ascii":"prefer_entropy",
          "enable_pure_downlink":True,"multiplex":"off",
          "httpmask":{"disable":False,"mode":"auto"},
+         "external_controller":CONTROLLER,"secret":token,
          "users":clean}
     # No fallback to unrestricted server mode when a whitelist is empty.
     previous=CONF.read_bytes() if CONF.exists() else None
@@ -191,6 +197,23 @@ else:
             if ready:break
             time.sleep(0.15)
         if not ready:raise RuntimeError("SUDOKU_SHARED_LISTENER_NOT_READY")
+        # Query the core's LIVE, localhost-only controller endpoint to
+        # distinguish "service listening" from "all users loaded".
+        verified=False
+        for attempt in range(20):
+            try:
+                request=urllib.request.Request(
+                    "http://"+CONTROLLER+"/users",
+                    headers={"Authorization":"Bearer "+token},
+                )
+                with urllib.request.urlopen(request,timeout=1.0) as response:
+                    snapshot=json.load(response)
+                verified=snapshot.get("count")==len(clean)
+                if verified:break
+            except Exception:pass
+            time.sleep(0.2)
+        if not verified:
+            raise RuntimeError("SUDOKU_SHARED_RUNTIME_USER_COUNT_MISMATCH")
         print(json.dumps({"ok":True,"changed":True,"users":len(clean),"port":PORT}))
     except BaseException:
         if previous is None:
