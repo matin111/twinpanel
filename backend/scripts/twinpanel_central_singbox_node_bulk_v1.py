@@ -20,6 +20,7 @@ from sqlalchemy import or_
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
+from app.services.central_runtime_ownership_v1 import allow_central_node
 from app.database import SessionLocal
 from app.models import (
     Node, NodeProtocolConfig, NodeStatus, NodeType, ProtocolCredential,
@@ -112,7 +113,7 @@ async def run(node_id:int,limit:int,apply:bool):
         if (
             node is None or node.retired_at is not None
             or node.node_type!=NodeType.EXIT or node.status!=NodeStatus.ONLINE
-            or node.show_to_users
+            or not allow_central_node(db,node)
         ):
             raise RuntimeError("REQUIRES_HIDDEN_READY_EXIT")
         ready={str(r.protocol) for r in db.query(NodeProtocolConfig).filter(
@@ -166,7 +167,7 @@ async def run(node_id:int,limit:int,apply:bool):
         eligible_ids={int(sid) for (sid,) in live}
         if not {sid for sid,_,_ in work}.issubset(eligible_ids):
             raise RuntimeError("CENTRAL_SINGBOX_ELIGIBILITY_CHANGED")
-        if db.get(Node,node_id).show_to_users:
+        if not allow_central_node(db,db.get(Node,node_id)):
             raise RuntimeError("STAGED_NODE_WAS_PUBLISHED_EARLY")
         ids={sid for sid,_,_ in work}
         existing={(int(c.subscription_id),str(c.protocol)):c for c in db.query(
