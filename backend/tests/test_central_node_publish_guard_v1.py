@@ -51,6 +51,12 @@ class CentralPublishSafetyTests(unittest.TestCase):
         self.assertTrue(result["central_coverage_verified"])
         self.assertFalse(result["backfill"]["queued"])
         queue.assert_not_called()
+        # A purchase racing with publication must not get a membership
+        # before its node credentials exist in the central stage.
+        commands = [str(entry.args[0]) for entry in db.execute.call_args_list]
+        self.assertFalse(any("INSERT INTO subscription_nodes (" in sql
+                             for sql in commands))
+        self.assertEqual(result["memberships_added"],0)
         db.commit.assert_called_once()
 
 
