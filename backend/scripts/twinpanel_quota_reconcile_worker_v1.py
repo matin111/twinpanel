@@ -46,16 +46,36 @@ async def _main() -> int:
     changed: list[dict] = []
     errors: list[dict] = []
 
+    # Prioritize inexpensive session-presence collectors. The previous order
+    # ran the expensive Cisco/Xray device scan first; if it exceeded the parent
+    # worker deadline, OpenVPN and L2TP were NEVER polled at all.
     collectors = (
-        ("cisco_xray", reconcile_quota_runtime_once),
         ("openvpn", reconcile_openvpn_quota_runtime_once),
         ("l2tp", reconcile_l2tp_quota_runtime_once),
+        ("cisco_xray", reconcile_quota_runtime_once),
     )
 
     for name, reconcile in collectors:
+        started = asyncio.get_running_loop().time()
+        print("QUOTA_COLLECTOR_START", name, flush=True)
         try:
             result = await reconcile()
             changed.extend(_changed_items(result))
+            node_results = result.get("nodes", []) if isinstance(result, dict) else []
+            node_errors = [
+                {"node_id": item.get("node_id"), "error": str(item.get("error") or "")[:240]}
+                for item in node_results
+                if item.get("ok") is False
+            ]
+            for item in node_errors:
+                errors.append({"collector": name, **item})
+            print(
+                "QUOTA_COLLECTOR_DONE", name,
+                "seconds", round(asyncio.get_running_loop().time() - started, 2),
+                "nodes", len(node_results),
+                "errors", len(node_errors),
+                flush=True,
+            )
         except asyncio.CancelledError:
             raise
         except Exception as exc:
