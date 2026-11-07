@@ -578,71 +578,15 @@ def _tunnel_access_endpoint(
             _port(db, node.id, protocol),
         )
 
-    # An Exit can have more than one active Iran tunnel.
-    # Priority decides which Iran entry is delivered to users.
-    tunnels = (
-        db.query(Tunnel)
-        .filter(
-            Tunnel.exit_node_id == node.id,
-            Tunnel.is_active.is_(True),
-        )
-        .order_by(
-            Tunnel.priority.asc(),
-            Tunnel.id.asc(),
-        )
-        .all()
+    # Only a *live and usable* Iran ingress can replace the Exit address.
+    # A tunnel merely assigned in the database must never prevent direct
+    # delivery when the tunnel or Iran node is offline.
+    tunnels = _delivery_active_tunnels(db, node)
+    selected_tunnel = tunnels[0] if tunnels else None
+    iran_node = (
+        db.get(Node, selected_tunnel.iran_node_id)
+        if selected_tunnel is not None else None
     )
-
-    selected_tunnel = None
-    iran_node = None
-
-    for tunnel in tunnels:
-        candidate = db.get(
-            Node,
-            tunnel.iran_node_id,
-        )
-
-        if not candidate:
-            continue
-
-        if candidate.node_type != NodeType.IRAN:
-            continue
-
-        # TWINPANEL_TUNNEL_FIRST_DELIVERY_V2
-        #
-        # Public delivery policy is based on assignment:
-        #
-        #   active tunnel assignment -> Iran/Tunnel endpoint
-        #   no tunnel assignment     -> direct Exit endpoint
-        #
-        # Runtime health is handled separately by monitoring.
-        if (
-            getattr(
-                candidate,
-                "retired_at",
-                None,
-            )
-            is not None
-        ):
-            continue
-
-        # The Twinpanel/API server is Control Plane only.
-        if (
-            getattr(candidate, "agent_url", None)
-            == "local://core"
-        ):
-            continue
-
-        if getattr(
-            candidate,
-            "is_mother",
-            False,
-        ):
-            continue
-
-        selected_tunnel = tunnel
-        iran_node = candidate
-        break
 
     if selected_tunnel is None or iran_node is None:
         # TWINPANEL_DIRECT_EXIT_FALLBACK_V1
@@ -760,23 +704,16 @@ def _l2tp_tunnel_access_host(
     if node.node_type != NodeType.EXIT:
         return _node_host(node)
 
-    # Import at runtime to avoid router import cycles.
+    # A configured or even enabled tunnel is not necessarily routed.
+    # Prefer only live Iran ingress and the primary L2TP forwarding path;
+    # otherwise expose the Exit's own public address.
     from .tunnels import _l2tp_primary_tunnel_id
 
-    tunnels = (
-        db.query(Tunnel)
-        .filter(
-            Tunnel.exit_node_id == node.id,
-            Tunnel.is_active.is_(True),
-        )
-        .order_by(
-            Tunnel.priority.asc(),
-            Tunnel.id.asc(),
-        )
-        .all()
-    )
+    tunnels = _delivery_active_tunnels(db, node)
 
     for tunnel in tunnels:
+        if _l2tp_primary_tunnel_id(db, tunnel.iran_node_id) != int(tunnel.id):
+            continue
 
         # TWINPANEL_L2TP_DELIVERY_ASSIGNMENT_FIRST_V2
         #
@@ -1731,20 +1668,29 @@ def _delivery_active_tunnels(
     return usable
 
 
+def _classic_node_protocol_online(db: Session, node: Node, protocol: str) -> bool:
+    """Live DB readiness guard for direct classic endpoints."""
+    flag = {
+        "cisco": "enable_cisco",
+        "openvpn": "enable_openvpn",
+        "wireguard": "enable_wireguard",
+        "l2tp": "enable_l2tp",
+        "v2ray": "enable_v2ray",
+    }.get(str(protocol or "").lower())
+    if not flag or not bool(getattr(node, flag, False)):
+        return False
+    cfg = _cfg(db, node.id, protocol)
+    return bool(cfg and _delivery_state_value(cfg.status) == "online")
+
+
 def _delivery_item_is_usable(
     db: Session,
     protocol: str,
     item: dict[str, Any],
 ) -> bool:
     """
-    Customer delivery guard.
-
-    Hide:
-      - missing / retired nodes
-      - hidden nodes
-      - offline Exit nodes
-      - Exit nodes without a usable Iran tunnel
-      - non-primary L2TP Exit nodes
+    Customer delivery guard: an online, published Exit with a ready
+    protocol is valid even without a tunnel. Endpoint selection is separate.
 
     Stored credentials are left untouched.
     """
@@ -1824,56 +1770,7 @@ def _delivery_item_is_usable(
     # healthy Exit credential. In that situation the client is
     # delivered the Exit endpoint directly.
     if not tunnels:
-
-        protocol_flag = {
-            "cisco":
-                "enable_cisco",
-            "openvpn":
-                "enable_openvpn",
-            "wireguard":
-                "enable_wireguard",
-            "l2tp":
-                "enable_l2tp",
-            "v2ray":
-                "enable_v2ray",
-        }.get(
-            protocol
-        )
-
-        if not protocol_flag:
-            return False
-
-        if not bool(
-            getattr(
-                node,
-                protocol_flag,
-                False,
-            )
-        ):
-            return False
-
-        cfg = _cfg(
-            db,
-            node.id,
-            protocol,
-        )
-
-        if not cfg:
-            return False
-
-        if (
-            _delivery_state_value(
-                getattr(
-                    cfg,
-                    "status",
-                    None,
-                )
-            )
-            != "online"
-        ):
-            return False
-
-        return True
+        return _classic_node_protocol_online(db, node, protocol)
 
     # UDP 500/4500 cannot be DNATed to multiple Exit nodes
     # behind the same Iran public address at the same time.
@@ -1899,7 +1796,9 @@ def _delivery_item_is_usable(
             ):
                 return True
 
-        return False
+        # No routable primary L2TP tunnel: direct Exit is still allowed,
+        # provided its own L2TP listener/flag is ready (checked below).
+        return _classic_node_protocol_online(db, node, protocol)
 
     return True
 

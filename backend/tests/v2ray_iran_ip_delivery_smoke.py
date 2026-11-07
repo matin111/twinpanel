@@ -17,7 +17,7 @@ os.environ["DATABASE_URL"] = (
 )
 os.environ.setdefault("NODE_AGENT_SHARED_SECRET", "ci-only-node-secret-ci-only-node-secret")
 
-from app.models import Node, NodeType, Tunnel
+from app.models import Node, NodeStatus, NodeType, Tunnel, TunnelStatus
 from app.routers import account_delivery
 from app import xray_customer_profile_policy_v30 as customer_policy
 from app import xray_modern_runtime
@@ -62,7 +62,7 @@ def main():
     iran = SimpleNamespace(
         id=2, node_type=NodeType.IRAN, public_ip="193.39.9.222",
         public_domain="vtray.in88.sbs", agent_url="https://example.test",
-        retired_at=None, is_mother=False,
+        retired_at=None, is_mother=False, status=NodeStatus.ONLINE,
     )
     exit_node = SimpleNamespace(
         id=6, node_type=NodeType.EXIT, public_ip="204.10.192.96",
@@ -70,7 +70,7 @@ def main():
     )
     tunnel = SimpleNamespace(
         id=6, iran_node_id=2, exit_node_id=6,
-        priority=1, is_active=True,
+        priority=1, is_active=True, status=TunnelStatus.ONLINE,
     )
     db = FakeDB([iran, exit_node], [tunnel])
 
@@ -126,11 +126,12 @@ def main():
     alternate = SimpleNamespace(
         id=9, node_type=NodeType.IRAN, public_ip="94.183.231.158",
         public_domain="v2ray2.in88.sbs", retired_at=None, is_mother=False,
+        status=NodeStatus.ONLINE,
     )
     db.nodes[9] = alternate
     db.tunnels[40] = SimpleNamespace(
         id=40, iran_node_id=9, exit_node_id=6,
-        priority=2, is_active=True,
+        priority=2, is_active=True, status=TunnelStatus.ONLINE,
     )
     item["delivery_mode"] = "tunnel"
     item["server"] = "v2ray2.in88.sbs"

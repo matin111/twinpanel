@@ -411,18 +411,25 @@ def compile_explicit_stored_info(ad: Any, db: Session, sub: Subscription) -> dic
             if not node or not _healthy_node(node):
                 continue
 
+            tunnel_item = None
             if mode.tunnel_enabled:
                 tunnel = db.get(Tunnel, mode.tunnel_id) if mode.tunnel_id else None
-                item = _rewrite_item_endpoint(
+                tunnel_item = _rewrite_item_endpoint(
                     ad, db, node, protocol, raw, mode="tunnel", tunnel=tunnel
                 )
-                if item:
-                    output_items.append(item)
+                if tunnel_item:
+                    output_items.append(tunnel_item)
 
-            if mode.direct_enabled:
-                item = _rewrite_item_endpoint(ad, db, node, protocol, raw, mode="direct")
-                if item:
-                    output_items.append(item)
+            # An explicitly selected tunnel-only route must not hide a
+            # healthy Exit when its Iran ingress has not been provisioned,
+            # becomes offline, or is no longer the L2TP primary route.
+            # Preserve both-mode (dual endpoint) and direct-only choices.
+            if mode.direct_enabled or (mode.tunnel_enabled and tunnel_item is None):
+                direct_item = _rewrite_item_endpoint(
+                    ad, db, node, protocol, raw, mode="direct"
+                )
+                if direct_item:
+                    output_items.append(direct_item)
 
         if not output_items:
             continue
