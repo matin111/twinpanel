@@ -149,46 +149,56 @@ try:
         os.chmod(unit,0o644)
     if newly_created:
         reload=subprocess.run(["systemctl","daemon-reload"],
-            timeout=30,check=False,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+            timeout=40,check=False,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
         if reload.returncode: raise RuntimeError("SUDOKU_DAEMON_RELOAD_FAILED")
-    # No unbounded concurrent restarts: only 4 newly created units per wave.
-    def enable_one(item):
-        sid=item[0];service="twinpanel-sudoku-sub-"+str(sid)+".service"
-        result=subprocess.run(["systemctl","enable","--now",service],
-            timeout=90,check=False,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
-        if result.returncode: raise RuntimeError("SUDOKU_START_FAILED")
-        active=subprocess.run(["systemctl","is-active","--quiet",service],
-            timeout=15,check=False,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
-        if active.returncode: raise RuntimeError("SUDOKU_NOT_ACTIVE")
-    for i in range(0,len(newly_created),4):
-        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
-            list(pool.map(enable_one,newly_created[i:i+4]))
-    # A systemd Type=simple process may become active just before TCP bind.
-    # Allow a bounded listener warm-up, without treating "active" as ready.
-    for row in incoming:
-        service="twinpanel-sudoku-sub-"+str(row["subscription_id"])+".service"
-        ready=False
-        for attempt in range(24):
-            active=subprocess.run(["systemctl","is-active","--quiet",service],
-                timeout=15,check=False,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
-            if active.returncode==0:
-                with socket.socket(socket.AF_INET,socket.SOCK_STREAM) as sock:
-                    sock.settimeout(2)
-                    ready=sock.connect_ex(("127.0.0.1",row["port"]))==0
-            if ready: break
-            time.sleep(0.25)
-        if not ready:
-            raise RuntimeError("SUDOKU_LISTENER_NOT_READY")
-except BaseException:
-    for sid,port,directory,unit in reversed(newly_created):
-        name="twinpanel-sudoku-sub-"+str(sid)+".service"
-        subprocess.run(["systemctl","disable","--now",name],timeout=30,
+        # One systemd transaction for the whole desired state, never a
+        # systemctl invocation for each subscription or a four-user wave.
+        units=["twinpanel-sudoku-sub-"+str(sid)+".service"
+               for sid,_,_,_ in newly_created]
+        enabled=subprocess.run(["systemctl","enable",*units],timeout=120,
             check=False,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
-        if unit.exists():unit.unlink()
-        if directory.exists():shutil.rmtree(directory)
+        if enabled.returncode: raise RuntimeError("SUDOKU_ENABLE_SET_FAILED")
+        started=subprocess.run(["systemctl","start","--no-block",*units],
+            timeout=90,check=False,stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL)
+        if started.returncode: raise RuntimeError("SUDOKU_START_SET_FAILED")
+    # Check the whole desired set using a single systemd state listing per
+    # poll, rather than hundreds of per-user status commands. Socket checks
+    # are local to the node, not controller-to-node SSH operations.
+    pending={row["subscription_id"]:row["port"] for row in incoming}
+    deadline=time.monotonic()+90
+    while pending and time.monotonic()<deadline:
+        states=subprocess.run(["systemctl","list-units","--type=service",
+            "--state=running","--no-legend","--plain"],capture_output=True,
+            text=True,timeout=20,check=False)
+        if states.returncode:raise RuntimeError("SUDOKU_SERVICE_AUDIT_FAILED")
+        active={line.split()[0] for line in states.stdout.splitlines()
+                if line.split()}
+        for sid,port in list(pending.items()):
+            service="twinpanel-sudoku-sub-"+str(sid)+".service"
+            if service not in active:continue
+            with socket.socket(socket.AF_INET,socket.SOCK_STREAM) as sock:
+                sock.settimeout(0.35)
+                if sock.connect_ex(("127.0.0.1",port))==0:
+                    del pending[sid]
+        if pending:time.sleep(0.4)
+    if pending:
+        raise RuntimeError("SUDOKU_DESIRED_LISTENERS_NOT_READY")
+except BaseException:
+    # Roll back only units THIS call created. One systemd transaction per
+    # operation; pre-existing subscriber units are never stopped or removed.
     if newly_created:
-        subprocess.run(["systemctl","daemon-reload"],timeout=30,check=False,
-            stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+        units=["twinpanel-sudoku-sub-"+str(sid)+".service"
+               for sid,_,_,_ in newly_created]
+        subprocess.run(["systemctl","stop","--no-block",*units],timeout=90,
+            check=False,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+        subprocess.run(["systemctl","disable",*units],timeout=90,
+            check=False,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+        for _,_,directory,unit in reversed(newly_created):
+            if unit.exists():unit.unlink()
+            if directory.exists():shutil.rmtree(directory)
+        subprocess.run(["systemctl","daemon-reload"],timeout=40,
+            check=False,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
     raise
 print(json.dumps({"ok":True,"applied":len(incoming),
                   "new_units":len(newly_created)},separators=(",",":")))
