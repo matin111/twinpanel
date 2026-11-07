@@ -335,8 +335,10 @@ _SCRIPT = r"""
  function reconcileProtocolSelection(){
    const choices=[...document.querySelectorAll('.protocol-choice[data-protocol]')];
    if(!choices.length)return;
-   const chosen=choices.find(choice=>choice.dataset.protocol===selectedProtocol)
-     ||choices.find(choice=>choice.classList.contains('active'))||choices[0];
+   const visible=choices.filter(choice=>!choice.hidden&&!choice.classList.contains('ref67-hidden'));
+   const eligible=visible.length?visible:choices;
+   const chosen=eligible.find(choice=>choice.dataset.protocol===selectedProtocol)
+     ||eligible.find(choice=>choice.classList.contains('active'))||eligible[0];
    const panel=panels().find(item=>item.id===chosen?.dataset.protocol);
    if(!panel)return;
    selectedProtocol=chosen.dataset.protocol;
