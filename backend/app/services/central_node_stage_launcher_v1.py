@@ -13,6 +13,7 @@ import sys
 from pathlib import Path
 
 from ..models import Node, NodeStatus, NodeType
+from .central_runtime_ownership_v1 import allow_central_node
 from ..node_install_progress_models_v1 import NodeInstallProgressV1
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -29,7 +30,7 @@ def ensure_launchable(db, node_id: int) -> None:
     if (
         node is None or node.retired_at is not None
         or node.node_type != NodeType.EXIT
-        or node.status != NodeStatus.ONLINE or node.show_to_users
+        or node.status != NodeStatus.ONLINE or not allow_central_node(db,node)
     ):
         raise CentralStageLaunchError("CENTRAL_STAGE_REQUIRES_HIDDEN_ONLINE_EXIT")
     job = (
@@ -76,8 +77,9 @@ def launch(db, node_id: int) -> dict:
         # A running unit with this name makes a second launch fail safely.
         raise CentralStageLaunchError("CENTRAL_STAGE_DISPATCH_REJECTED")
     return {"node_id": node_id, "unit": unit,
-            "scheduled": True, "node_remains_hidden": True,
-            "automatic_publication": False}
+            "scheduled": True, "node_remains_hidden": not bool(
+                db.get(Node,node_id).show_to_users
+            ), "automatic_publication": False}
 
 
 def auto_stage_enabled() -> bool:
