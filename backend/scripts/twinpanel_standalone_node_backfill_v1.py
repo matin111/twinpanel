@@ -157,16 +157,35 @@ async def run_one_node(
                     # Share the same PostgreSQL subscription lock as paid account
                     # creation, so initial provisioning cannot race this worker.
                     with SubscriptionProvisioningGuard(int(sub.id)):
+                        # The selection snapshot may be stale: an admin/bot
+                        # provision can finish while this worker opens SSH.
+                        # Re-load the identity and *all* node items under the
+                        # shared subscription lock before any remote mutation.
+                        db.expire_all()
                         db.refresh(sub)
                         if not _eligible(sub, datetime.utcnow()):
                             continue
+                        cred = db.query(ProtocolCredential).filter(
+                            ProtocolCredential.subscription_id == sub.id,
+                            ProtocolCredential.protocol == protocol,
+                        ).first()
                         if cred is None:
                             cred = ProtocolCredential(
                                 subscription_id=sub.id, protocol=protocol,
                             )
                             db.add(cred)
                             db.flush()
-
+                        try:
+                            old_items = ad._autosync_credential_items(cred)
+                        except Exception as exc:
+                            raise RuntimeError("STANDALONE_SAVED_CONFIG_UNREADABLE") from exc
+                        if cred.config_text_encrypted and not old_items:
+                            raise RuntimeError("STANDALONE_SAVED_CONFIG_UNREADABLE")
+                        if any(
+                            ad._autosync_item_node_id(item) == int(node.id)
+                            for item in old_items
+                        ):
+                            continue
                         secret = _stored_standalone_secret(ad, cred, protocol)
                         if secret is None:
                             # Durable identity first, before remote mutation:
