@@ -48,7 +48,7 @@ class ProductionCentralHiddenPreservationTests(unittest.TestCase):
 
     def test_published_node_requires_delivery_guard(self):
         ad = self._ad(customer_usable=False)
-        with patch.object(mother_access, "get_value") as lookup:
+        with patch.object(central_owner, "get_value") as lookup:
             self.assertFalse(convergence._modern_item_is_usable(
                 ad, _db(hidden=False), "hysteria2", self._item()
             ))
@@ -56,7 +56,7 @@ class ProductionCentralHiddenPreservationTests(unittest.TestCase):
         ad._delivery_item_is_usable.assert_called_once()
 
     def test_retired_node_rejected(self):
-        with patch.object(mother_access, "get_value") as lookup:
+        with patch.object(central_owner, "get_value") as lookup:
             self.assertFalse(convergence._modern_item_is_usable(
                 self._ad(), _db(hidden=True, retired=True),
                 "hysteria2", self._item()
