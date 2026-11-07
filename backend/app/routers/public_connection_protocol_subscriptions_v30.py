@@ -143,7 +143,11 @@ def public_protocol_subscription_v30(
     db: Session = Depends(get_db),
 ):
     """Return one standard Base64 subscription feed for all real nodes of a protocol."""
-    # V2Ray must use the same lightweight canonical feed as /sub and /multi/v2ray.\n    # The legacy generic path can fetch unrelated credentials and time out.\n    if _normalize_protocol(protocol) == "v2ray":\n        from .public_connection_multilink_v7 import _subscription_response\n        return _subscription_response(token, db)\n    content, normalized, count = _protocol_subscription_content(token, protocol, db)
+    # V2Ray imports use the canonical lightweight subscription feed.
+    if _normalize_protocol(protocol) == "v2ray":
+        from .public_connection_multilink_v7 import _subscription_response
+        return _subscription_response(token, db)
+    content, normalized, count = _protocol_subscription_content(token, protocol, db)
     sub = _subscription_from_share_token(token, db)
     profile_title = f"{_account_name(sub)}-{normalized}"
     return Response(

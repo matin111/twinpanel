@@ -42,8 +42,33 @@ SessionLocal = sessionmaker(
 Base = declarative_base()
 
 
+# HTTP has a bounded pool independent of long-running background jobs.
+# Keep transaction and credentials semantics identical to the existing engine.
+if settings.database_url.startswith(("postgresql://", "postgresql+psycopg2://")):
+    request_engine = create_engine(
+        settings.database_url,
+        pool_pre_ping=True,
+        pool_size=10,
+        max_overflow=6,
+        pool_timeout=5,
+        pool_recycle=1800,
+        pool_use_lifo=True,
+        connect_args=_DATABASE_CONNECT_ARGS,
+        future=True,
+    )
+else:
+    # SQLite tests and other drivers retain their own compatible default pool.
+    request_engine = engine
+RequestSessionLocal = sessionmaker(
+    bind=request_engine,
+    autoflush=False,
+    autocommit=False,
+    expire_on_commit=False,
+)
+
+
 def get_db():
-    db = SessionLocal()
+    db = RequestSessionLocal()
     try:
         yield db
     finally:
