@@ -1,5 +1,16 @@
 # TwinPanel Changelog
 
+## 1.1.0-rc.674 — 2026-11-08
+
+### Real connection/accounting and English digits on Connection
+- Persist the fast OpenVPN runtime telemetry mapping for genuinely observed node clients. A malformed imported subscription can no longer roll back otherwise valid node usage and live-session records. L2TP, Cisco and Xray reconciliation use per-client savepoints to avoid node-wide account rollback; collectors prioritize OpenVPN/L2TP rather than the expensive general scan.
+- Filter runtime device reconciliation by relevant protocol instead of scanning every protocol for every client. This reduces workload and protects live-session statistics from process timeouts.
+- Repair the L2TP PPP session hooks on existing affected nodes (1 and 14) without resetting VPN services; the versioned hook installation code remains in the repository.
+- Treat Xray (V2Ray) counters correctly as **recent traffic activity**, not a verified live socket. Account for the slower collector cadence, render the honest status «فعال اخیراً», and highlight only country codes supported by recent live session/traffic evidence.
+- Format every visible number on the public Connection UI with English digits on desktop/mobile, preserving raw config links, copyable credentials, and uploaded profile content.
+- Regression suite `backend/tests/test_connection_live_telemetry_v101.py` (five checks, including JavaScript syntax); verify live API and account counters after deployment.
+- Scope: UI and usage telemetry fixes; no plan duration, expiry, limit, subscription credentials, or VPN listener configurations are rewritten.
+
 ## 1.1.0-rc.669 — 2026-11-08
 
 ### Remove empty black strip in Connection popups, light and dark
