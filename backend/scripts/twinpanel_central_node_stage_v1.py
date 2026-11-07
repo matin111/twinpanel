@@ -38,11 +38,12 @@ ADAPTERS = (
     "twinpanel_central_mieru_node_bulk_v1.py",
     "twinpanel_central_trusttunnel_node_bulk_v1.py",
     "twinpanel_central_amneziawg_node_bulk_v1.py",
+    "twinpanel_central_sudoku_node_bulk_v1.py",
 )
 MAX_USERS = 3000
 # Only these have actual bounded central-bulk materializers. Readiness of
 # installed listeners is not equivalent to subscriber credential coverage.
-BULK_PROTOCOLS = frozenset({"l2tp", "cisco", "v2ray", "openvpn", "wireguard", "mieru", "trusttunnel", "amneziawg", *SINGBOX_PROTOCOLS})
+BULK_PROTOCOLS = frozenset({"l2tp", "cisco", "v2ray", "openvpn", "wireguard", "mieru", "trusttunnel", "amneziawg", "sudoku", *SINGBOX_PROTOCOLS})
 MISSING_BULK_PROTOCOLS = tuple(sorted(set(ALL_PROTOCOL_KEYS) - BULK_PROTOCOLS))
 
 
@@ -71,6 +72,8 @@ def establish_hidden_memberships(db, node_id):
 def adapter_command(name, node_id, limit, apply):
     cmd = [sys.executable, str(BACKEND / "scripts" / name),
            "--node-id", str(node_id), "--limit", str(limit)]
+    if name == "twinpanel_central_sudoku_node_bulk_v1.py":
+        cmd[cmd.index("--limit") + 1] = "64"
     if name == "twinpanel_central_xray_node_bulk_v1.py":
         cmd[cmd.index("--limit") + 1] = "100"
         cmd.append("--all")
