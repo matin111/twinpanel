@@ -11,10 +11,10 @@ def test_original_download_remains_next_to_optional_share():
     assert "const shareFile=el('button','tp80-file-share','ارسال فایل به برنامه');" in src
 
 def test_share_real_attachment_with_filename_extension_and_mime():
-    src=(ROOT/"public_connection_unified_surface_dates_v80.py").read_text(encoding="utf-8")
+    src=(ROOT/"public_connection_hub_v5.py").read_text(encoding="utf-8")
     assert "new File([await response.arrayBuffer()],filename,{type:mime})" in src
-    assert "await navigator.share({files:[file]})" in src
-    assert "navigator.canShare&&!navigator.canShare({files:[file]})" in src
+    assert "await navigator.share(payload)" in src
+    assert "navigator.canShare&&!navigator.canShare(payload)" in src
     assert "application/x-openvpn-profile" in src
     assert "application/octet-stream" in src
     assert "'/file/'+match[1]+'/'+match[2]" in src
@@ -26,4 +26,4 @@ def test_no_automatic_share_or_import():
     assert "shareFile.addEventListener('click',async event=>" in src
     assert "const match=String(download.dataset.target||'')" in src
     assert "hub-protocol-\\d+-|cfg-|download-source-" in src
-    assert "navigator.share({files:[file]})" in src
+    assert "window.tpNativeShareFile(url,filename,mime)" in src
