@@ -893,6 +893,7 @@ async def _openvpn(
     user: User,
     *,
     reusable_connection: Any | None = None,
+    central_identity_commit: bool = True,
 ) -> dict[str, Any]:
 
     central_enabled = (
@@ -906,6 +907,7 @@ async def _openvpn(
             get_or_create_openvpn_client_identity(
                 db,
                 sub.id,
+                commit=central_identity_commit,
             )
         )
 
