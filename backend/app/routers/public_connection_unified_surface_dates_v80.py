@@ -914,6 +914,49 @@ html body.tp80-connection .protocol-panel.active .tp78-action-footer > [data-kin
   grid-column:1/-1!important;
  }
 }
+
+/* TWINPANEL_CONNECTION_ANDROID_FOUR_ACTION_LAYOUT_V88 */
+@media(max-width:720px){
+ html body.tp80-connection .protocol-panel.active > .tp78-action-footer{
+   display:grid!important;
+   grid-template-columns:repeat(3,minmax(0,1fr))!important;
+   grid-auto-flow:row!important;
+   gap:7px!important;direction:ltr!important;align-items:stretch!important;
+   padding:0!important;margin:10px 8px 12px!important;min-width:0!important;
+ }
+ html body.tp80-connection .protocol-panel.active > .tp78-action-footer > .tp78-footer-action{
+   grid-column:auto!important;grid-row:auto!important;
+   min-width:0!important;width:100%!important;max-width:100%!important;
+   min-height:48px!important;height:auto!important;max-height:none!important;
+   padding:8px 4px!important;margin:0!important;box-sizing:border-box!important;
+   display:flex!important;align-items:center!important;justify-content:center!important;
+   flex-direction:column!important;gap:4px!important;
+   text-align:center!important;font-size:10px!important;line-height:1.35!important;
+   white-space:normal!important;overflow-wrap:anywhere!important;
+   order:initial!important;
+ }
+ html body.tp80-connection .protocol-panel.active > .tp78-action-footer[data-tp88-layout="four"] > .tp78-footer-action:first-child{
+   grid-column:1/-1!important;grid-row:1!important;
+   flex-direction:row!important;gap:8px!important;min-height:51px!important;
+ }
+ html body.tp80-connection .protocol-panel.active > .tp78-action-footer[data-tp88-layout="four"] > .tp78-footer-action:nth-child(2),
+ html body.tp80-connection .protocol-panel.active > .tp78-action-footer[data-tp88-layout="four"] > .tp78-footer-action:nth-child(3),
+ html body.tp80-connection .protocol-panel.active > .tp78-action-footer[data-tp88-layout="four"] > .tp78-footer-action:nth-child(4){
+   grid-row:2!important;
+ }
+ html body.tp80-connection .protocol-panel.active > .tp78-action-footer[data-tp88-layout="four"] > .tp78-footer-action:nth-child(2){grid-column:1!important}
+ html body.tp80-connection .protocol-panel.active > .tp78-action-footer[data-tp88-layout="four"] > .tp78-footer-action:nth-child(3){grid-column:2!important}
+ html body.tp80-connection .protocol-panel.active > .tp78-action-footer[data-tp88-layout="four"] > .tp78-footer-action:nth-child(4){grid-column:3!important}
+ html body.tp80-connection .protocol-panel.active > .tp78-action-footer[data-tp88-layout="three"]{
+   grid-template-columns:repeat(3,minmax(0,1fr))!important;
+ }
+ html body.tp80-connection .protocol-panel.active > .tp78-action-footer[data-tp88-layout="two"]{
+   grid-template-columns:repeat(2,minmax(0,1fr))!important;
+ }
+ html body.tp80-connection .protocol-panel.active > .tp78-action-footer > .tp80-extra-actions{
+   grid-column:1/-1!important;grid-row:auto!important;
+ }
+}
 """
 
 
@@ -1421,6 +1464,7 @@ _SCRIPT = r"""
    // Protect the original config/copy/add actions.
    const actions=[...footer.querySelectorAll(':scope > .tp78-footer-action')];
    const count=actions.length;
+   footer.dataset.tp88Layout=count>=4?'four':count===3?'three':count===2?'two':'one';
    footer.style.setProperty('--tp80-cols',String(Math.max(1,Math.min(4,count))));
    footer.dataset.tp80Ready='1';
    panel.querySelectorAll('.tp77-native-label').forEach(label=>{
