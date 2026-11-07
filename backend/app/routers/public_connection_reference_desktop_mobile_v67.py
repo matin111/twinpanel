@@ -479,12 +479,16 @@ _SCRIPT = r"""
    info.append(b,sub);name.append(flag,info);
    const status=document.createElement('div');status.className='ref67-status';
    status.title='تأخیر مسیر نود از پایش تونل؛ نه پینگ مستقیم گوشی کاربر';
-   const latency=tab.dataset.latencyMs||views[i]?.dataset.latencyMs||'';
+   const currentView=views.find(view=>view.id===tab.dataset.server);
+   const latency=tab.dataset.latencyMs||currentView?.dataset.latencyMs||'';
    const numeric=Number(latency);
    status.textContent='● '+(tab.dataset.online==='false'?'آفلاین':'آماده')+
      '  ·  '+(latency&&Number.isFinite(numeric)&&numeric>=0?numeric+' ms':'—');
    const actions=document.createElement('div');actions.className='ref67-row-actions';
-   const original=linkToOriginal(views[i]||document.createElement('div'));
+   // Bind actions to the real server view id, never a fragile array position.
+   const serverId=tab.dataset.server||'';
+   const matchingView=serverId?views.find(view=>view.id===serverId):null;
+   const original=linkToOriginal(matchingView||document.createElement('div'));
    if(original.copy){
     const btn=document.createElement('button');btn.type='button';btn.textContent='⧉ کپی';
     btn.addEventListener('click',()=>copyExisting(original.copy));actions.appendChild(btn);
