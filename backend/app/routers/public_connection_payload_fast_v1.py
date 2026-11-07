@@ -6,7 +6,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from ..models import Subscription
+from ..models import Node, Subscription
 from .account_delivery import _qr_data_uri, _share_url, _stored_info
 
 
@@ -37,6 +37,23 @@ def public_connection_payload_fast_v1(
     cached = db.info.get(cache_key)
     if isinstance(cached, dict):
         return deepcopy(cached)
+
+    # TWINPANEL_CONNECT_QUERY_NPLUS1_V102
+    # During public-page construction the same 4-10 Exit nodes are examined
+    # hundreds of times (per protocol, per item, per presentation refiner).
+    # SQLAlchemy's identity map uses weak refs: db.get(Node, id) re-queries
+    # each time unless the model remains strongly referenced. Keep references
+    # on this request's own Session, never globally or between users.
+    # Config, tunnel and eligibility memoization is also request-local and
+    # only enabled for this read-only customer-page renderer.
+    if "_tp_public_connect_node_refs_v102" not in db.info:
+        db.info["_tp_public_connect_node_refs_v102"] = {
+            int(node.id): node
+            for node in db.query(Node).all()
+        }
+    db.info.setdefault("_tp_public_delivery_tunnels", {})
+    db.info.setdefault("_tp_public_connection_cfg_cache_v102", {})
+    db.info.setdefault("_tp_public_connection_item_cache_v102", {})
 
     info = _stored_info(db, sub)
 
