@@ -97,10 +97,11 @@ class CentralNodeStageTests(unittest.TestCase):
               patch.object(stage, "eligible_count", return_value=3),
               patch.object(stage, "verify_new_exit_readiness", return_value={"ok": True}),
               patch.object(stage, "establish_hidden_memberships", return_value=3),
+              patch.object(stage, "verify_coverage", return_value={"ok": True}),
               patch.object(stage.subprocess, "run") as invoke):
             session.return_value.__enter__.return_value = db
             invoke.return_value.returncode = 0
-            self.assertEqual(stage._run_locked(14, 3000, True), 3)
+            self.assertEqual(stage._run_locked(14, 3000, True), 0)
             self.assertEqual(invoke.call_count, len(stage.ADAPTERS))
             db.commit.assert_called_once()
 
