@@ -65,7 +65,7 @@ def adapter_command(name, node_id, limit, apply):
     family = next(f for f in FAMILIES if f.adapter == name)
     cmd = family_adapter_command(family, node_id, limit, BACKEND)
     if not apply:
-        return cmd[:-4]
+        return cmd[:-3]
     return cmd
 
 def run(node_id, limit, apply):
