@@ -8,7 +8,7 @@ import {useI18n} from "../lib/i18n";
 
 type NodeDraft={host:string;port:number;username:string;password:string;name:string;node_type:"iran"|"exit";country_code:string;capacity_users:number;};
 const defaultDraft:NodeDraft={host:"",port:22,username:"root",password:"",name:"",node_type:"exit",country_code:"DE",capacity_users:1000};
-const AUTO_INSTALL_PROTOCOLS={install_cisco:true,cisco_port:443,install_openvpn:true,openvpn_port:1194,openvpn_transport:"udp" as const,install_wireguard:true,wireguard_port:51820,install_l2tp:true,install_v2ray:true,xray_port:8443};
+// Xray is installed once by the dedicated profile-aware bootstrap path.\nconst AUTO_INSTALL_PROTOCOLS={install_cisco:true,cisco_port:443,install_openvpn:true,openvpn_port:1194,openvpn_transport:"udp" as const,install_wireguard:true,wireguard_port:51820,install_l2tp:true,install_v2ray:false,xray_port:8443};
 function payloadOf(draft:NodeDraft):ProvisionInstallPayload{return {...draft,country_code:draft.node_type==="iran"?"IR":draft.country_code.trim().toUpperCase(),...AUTO_INSTALL_PROTOCOLS};}
 
 export function NodeAddModalBridge(){
