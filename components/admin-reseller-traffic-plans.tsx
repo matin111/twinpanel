@@ -37,6 +37,7 @@ async function api<T>(path:string,init:RequestInit={}):Promise<T>{
     if(payload&&typeof payload==="object"){
       const row=payload as {detail?:unknown;message?:unknown};
       if(typeof row.detail==="string")message=row.detail;
+      else if(Array.isArray(row.detail))message=row.detail.map(item=>typeof item==="object"&&item&&"msg" in item?String((item as {msg:unknown}).msg):String(item)).join("، ");
       else if(typeof row.message==="string")message=row.message;
     }
     throw new Error(message);
