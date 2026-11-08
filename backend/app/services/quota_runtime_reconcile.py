@@ -8,6 +8,7 @@ import time
 import uuid
 from datetime import datetime, timezone
 
+from fastapi import HTTPException
 from sqlalchemy import or_, text
 
 from ..database import SessionLocal
@@ -215,6 +216,7 @@ def _parse_occtl_users(raw: str) -> list[dict]:
         sessions.append(
             {
                 "username": username,
+                "ocserv_id": session_id if session_id.isdecimal() else None,
                 "session_key": session_key,
                 "client_ip": client_ip or None,
                 "rx": _int_counter(_value(row, "RX", "raw_rx", default=0)),
@@ -452,6 +454,7 @@ def _apply_observed_sessions(db, node: Node, observed: list[dict]) -> dict:
     usage_events = 0
     ignored = 0
     active_keys: set[str] = set()
+    rejected_session_ids: list[str] = []
 
     for index, session in enumerate(observed):
         device = devices.get(session["username"])
@@ -514,6 +517,13 @@ def _apply_observed_sessions(db, node: Node, observed: list[dict]) -> dict:
             usage_events += 1
         except Exception as exc:
             ignored += 1
+            if (
+                isinstance(exc, HTTPException)
+                and exc.status_code == 409
+                and exc.detail == "concurrent_session_limit"
+                and str(session.get("ocserv_id") or "").isdecimal()
+            ):
+                rejected_session_ids.append(str(session["ocserv_id"]))
             # The observed physical connection may already have a valid
             # active quota row. Keep its freshness even when processing the
             # counter delta failed; the canonical accounting remains retried.
@@ -559,7 +569,45 @@ def _apply_observed_sessions(db, node: Node, observed: list[dict]) -> dict:
         "closed": closed,
         "usage_events": usage_events,
         "ignored": ignored,
+        "rejected_session_ids": list(dict.fromkeys(rejected_session_ids)),
     }
+
+
+async def _disconnect_excess_cisco_sessions(node: Node, db, session_ids: list[str]) -> list[dict]:
+    """Disconnect only rejected numeric ocserv IDs, never the whole user."""
+    ids = list(dict.fromkeys(str(sid) for sid in session_ids if str(sid).isdecimal()))
+    if not ids:
+        return []
+    results = []
+    conn = None
+    try:
+        if not bool(getattr(node, "is_mother", False)):
+            conn = await ssh_connect_saved(node, db)
+        for sid in ids:
+            try:
+                if conn is None:
+                    proc = await asyncio.to_thread(
+                        subprocess.run,
+                        ["occtl", "disconnect", "id", sid],
+                        capture_output=True, text=True, timeout=6, check=False,
+                    )
+                    ok = proc.returncode == 0
+                    error = str(proc.stderr or "")[:200]
+                else:
+                    proc = await conn.run("occtl disconnect id " + sid, check=False, timeout=6)
+                    ok = int(proc.exit_status) == 0
+                    error = str(proc.stderr or "")[:200]
+                results.append({"id": sid, "disconnected": ok, "error": error if not ok else None})
+            except Exception as exc:
+                results.append({"id": sid, "disconnected": False, "error": str(exc)[:200]})
+    finally:
+        if conn is not None:
+            conn.close()
+            try:
+                await conn.wait_closed()
+            except Exception:
+                pass
+    return results
 
 
 def _apply_xray_stats(db, node: Node, epoch: str, observed: list[dict]) -> dict:
@@ -704,6 +752,9 @@ async def reconcile_cisco_quota_runtime_once() -> dict:
             try:
                 result = _apply_observed_sessions(db, node, observed)
                 db.commit()
+                rejected = result.pop("rejected_session_ids", [])
+                if rejected:
+                    result["over_limit_disconnections"] = await _disconnect_excess_cisco_sessions(node, db, rejected)
                 results.append({"ok": True, **result})
             except Exception as exc:
                 db.rollback()
@@ -748,6 +799,9 @@ async def reconcile_quota_runtime_once() -> dict:
                     try:
                         result = _apply_observed_sessions(db, node, observed)
                         db.commit()
+                        rejected = result.pop("rejected_session_ids", [])
+                        if rejected:
+                            result["over_limit_disconnections"] = await _disconnect_excess_cisco_sessions(node, db, rejected)
                         results.append({"ok": True, **result})
                     except Exception as exc:
                         db.rollback()
