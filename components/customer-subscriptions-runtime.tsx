@@ -95,6 +95,15 @@ function Body(){
 
     {loading?<div className="customer-loading"><span className="customer-loader"/></div>:shown.length===0?<Card className="customer-empty"><p>{pick("اشتراکی برای نمایش وجود ندارد.","No subscriptions to show.")}</p></Card>:<div className="customerSubGrid">{shown.map(row=>{
       const usage=pct(row.traffic_used_gb,row.traffic_limit_gb);
+      const exhausted=row.traffic_limit_gb>0 && row.traffic_remaining_gb<=0;
+      const expired=Boolean(row.expires_at && Date.parse(row.expires_at)<=Date.now());
+      const unavailableReason=row.status!=="active"
+        ?pick("این اشتراک فعال نیست.","This subscription is inactive.")
+        :expired
+        ?pick("اعتبار اشتراک تمام شده است؛ برای اتصال تمدید کنید.","Subscription expired. Renew to connect.")
+        :exhausted
+        ?pick("حجم اشتراک تمام شده است؛ برای اتصال تمدید یا شارژ کنید.","Traffic exhausted. Renew or top up to connect.")
+        :"";
       const connection=connections[row.id];
       const link=connection?.subscription_link||"";
       const username=connection?.account?.username||"";
@@ -105,12 +114,14 @@ function Body(){
 
         <div className="customerSubStats">
           <span><small>{pick("روز باقی‌مانده","Days left")}</small><b>{row.days_remaining.toLocaleString("fa-IR")}</b></span>
-          <span><small>{pick("دستگاه","Devices")}</small><b>{row.device_limit.toLocaleString("fa-IR")}</b></span>
+          <span><small>{pick("اتصال هم‌زمان مجاز","Allowed simultaneous devices")}</small><b>{row.device_limit===0?pick("نامحدود","Unlimited"):row.device_limit.toLocaleString("fa-IR")}</b></span>
           <span><small>{pick("حجم باقی‌مانده","Traffic left")}</small><b>{row.traffic_remaining_gb.toLocaleString("fa-IR")} GB</b></span>
         </div>
 
         <div className="customerSubTraffic"><div><span>{pick("مصرف","Usage")}</span><b>{usage}%</b></div><div className="progress"><i style={{width:`${usage}%`}}/></div><small>{row.traffic_used_gb.toLocaleString("fa-IR")} / {row.traffic_limit_gb.toLocaleString("fa-IR")} GB</small></div>
 
+        {unavailableReason&&<div className="runtime-error" role="alert">{unavailableReason}</div>}
+        <small>{pick("اگر ظرفیت دستگاه‌ها پر باشد، اتصال جدید پذیرفته نمی‌شود. برای اتصال از دستگاه دیگر ابتدا یکی را قطع کنید.","If all device slots are occupied, disconnect an existing device before connecting another.")}</small>
         <div className="customerSubProtocols">{row.protocols.map(p=><span key={p}>{protocol(p)}</span>)}</div>
 
         {row.status==="active"&&<section className="customerSubCredentials">
