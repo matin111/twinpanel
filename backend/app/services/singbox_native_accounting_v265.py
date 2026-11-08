@@ -1205,6 +1205,7 @@ async def reconcile_singbox_quota_once() -> dict[str, Any]:
         )
 
         for node in nodes:
+            node_started = time.monotonic()
             grouped = _devices_by_protocol(db, int(node.id))
             if not grouped:
                 continue
@@ -1362,6 +1363,18 @@ async def reconcile_singbox_quota_once() -> dict[str, Any]:
                         await conn.wait_closed()
                     except Exception:
                         pass
+                # No identities/addresses are logged. This reveals a collector
+                # that falls behind on a particular node instead of silently
+                # dropping future nodes' online status and usage accounting.
+                print(
+                    json.dumps({
+                        "event": "singbox_accounting_node_sweep",
+                        "node_id": int(node.id),
+                        "elapsed_ms": int((time.monotonic() - node_started) * 1000),
+                        "protocol_count": len(grouped),
+                    }, separators=(",", ":")),
+                    flush=True,
+                )
 
         return {
             "ok": all(bool(item.get("ok")) for item in results) if results else True,
