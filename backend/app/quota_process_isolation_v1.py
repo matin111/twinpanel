@@ -135,6 +135,47 @@ def install() -> None:
             elapsed = asyncio.get_running_loop().time() - started
             await asyncio.sleep(max(3.0, 20.0 - elapsed))
 
+    async def _fast_openvpn_presence_worker() -> None:
+        # TWINPANEL_OPENVPN_FAST_PRESENCE_V1
+        # The full quota sweep can take minutes because Xray and L2TP follow
+        # it. Run actual management-socket OpenVPN session accounting on its
+        # own 30-second cadence. This task lives in the external worker, never
+        # inside a public/API request. The heavy subprocess must not run the
+        # same collector concurrently.
+        from .services.openvpn_quota_runtime_v106 import (
+            reconcile_openvpn_quota_runtime_once,
+        )
+
+        while True:
+            started = asyncio.get_running_loop().time()
+            try:
+                result = await asyncio.wait_for(
+                    reconcile_openvpn_quota_runtime_once(), timeout=75.0,
+                )
+                failed = [
+                    (item.get("node_id"), str(item.get("error") or "")[:160])
+                    for item in (result.get("nodes") or [])
+                    if not item.get("ok")
+                ]
+                if failed:
+                    print("OPENVPN_FAST_PRESENCE_ERRORS", failed, flush=True)
+                refreshed = [
+                    item for item in (result.get("nodes") or [])
+                    if item.get("opened") or item.get("closed")
+                ]
+                if refreshed:
+                    print("OPENVPN_FAST_PRESENCE_CHANGES", refreshed, flush=True)
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                print(
+                    "OPENVPN_FAST_PRESENCE_ERROR",
+                    f"{type(exc).__name__}:{str(exc)[:300]}",
+                    flush=True,
+                )
+            elapsed = asyncio.get_running_loop().time() - started
+            await asyncio.sleep(max(3.0, 30.0 - elapsed))
+
     async def _process_isolated_quota_runtime_worker() -> None:
         if os.environ.get("TWINPANEL_EXTERNAL_HEAVY_RECONCILE") == "1":
             await asyncio.Event().wait()
@@ -143,6 +184,9 @@ def install() -> None:
         # inside API workers. One fast observer serves all user pages.
         asyncio.create_task(
             _fast_cisco_presence_worker(), name="cisco-fast-presence",
+        )
+        asyncio.create_task(
+            _fast_openvpn_presence_worker(), name="openvpn-fast-presence",
         )
         while True:
             cycle_failed = False
@@ -179,6 +223,6 @@ def install() -> None:
     _installed = True
     print(
         f"{MARKER}_ACTIVE scheduling=worker_process nice=10 "
-        "quota_semantics=unchanged collectors=cisco-xray,openvpn,l2tp",
+        "quota_semantics=unchanged collectors=cisco-xray,l2tp; fast=cisco,openvpn",
         flush=True,
     )
