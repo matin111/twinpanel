@@ -280,6 +280,14 @@ async def ensure_modern_xray_v50(conn, base_port: int, node=None, *,
     )
     if bool(state.get("tls_enabled")):
         return state
+    # The mother/core is diagnostics-only during the Exit-node rollout.
+    # Never introduce a new Xray listener there as a side effect of purchases.
+    if node is not None and (
+        bool(getattr(node,"is_mother",False))
+        or bool(getattr(node,"is_local_core",False))
+        or getattr(node,"agent_url",None)=="local://core"
+    ):
+        return state
     verified = await prepare_domainless_vision(conn, base_port)
     if verified.get("ready") is not True:
         raise RuntimeError("XRAY_VISION_LIVE_INSTALL_NOT_VERIFIED")
@@ -310,7 +318,10 @@ async def _account_modern_v50(db,node,sub,user,client_id:str, *,
         db,node,sub,user,client_id,
         reusable_connection=reusable_connection,
     )
-    if item.get("tls_available") or v47._effective_domain(node):
+    if (item.get("tls_available") or v47._effective_domain(node)
+            or bool(getattr(node,"is_mother",False))
+            or bool(getattr(node,"is_local_core",False))
+            or getattr(node,"agent_url",None)=="local://core"):
         return item
     profiles=item.get("profiles")
     if not isinstance(profiles,list) or not any(
