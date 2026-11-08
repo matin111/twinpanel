@@ -540,18 +540,12 @@ def _customer_xray_item_v47(
     if node is None:
         return None
 
-    desired = (
-        (
-            xray_modern_runtime.PROFILE_WS,
-            xray_modern_runtime.PROFILE_XHTTP,
-            PROFILE_TCP_TLS,
-        )
-        if _effective_domain(node)
-        else (
-            xray_modern_runtime.PROFILE_XHTTP,
-            PROFILE_TCP_REALITY,
-        )
-    )
+    # The live node authority already marks TLS profiles when it built the
+    # credential. Node.xray_domain is NOT mapped on all older SQLAlchemy
+    # models, even when Xray's verified state has TLS enabled. Filtering here
+    # by that ORM attribute silently threw away WS/TCP TLS on valid nodes.
+    # Prefer the *verified stored profile identities*, never synthesize TLS.
+    desired = _customer_order_for_item(item)
 
     by_id: dict[str, dict[str, Any]] = {}
     for raw_profile in raw_profiles:
