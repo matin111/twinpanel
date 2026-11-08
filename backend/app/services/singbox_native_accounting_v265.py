@@ -580,6 +580,34 @@ def _connection_source_key(protocol: str, connection_id: str) -> str:
     return f"singbox:{protocol}:{connection_id}"[:220]
 
 
+def _identity_safe_connection_source_key(
+    db, *, node_id: int, protocol: str, connection_id: str,
+    identity: str, device: dict[str, Any],
+) -> str:
+    """Reuse a legacy cursor only when it belongs to this exact user.
+
+    The old key singbox:<protocol>:<connection_id> was shared across all
+    subscribers on a node. sing-box may reuse IDs after service restarts or
+    account rotation. A differently owned legacy cursor is historical
+    accounting evidence, not proof that the observed connection belongs to
+    its former owner. Never mutate/reassign that historical cursor.
+    """
+    legacy = _connection_source_key(protocol, connection_id)
+    old_cursor = _cursor_for_source(db, node_id=node_id, source_key=legacy)
+    if old_cursor is not None:
+        try:
+            _assert_cursor_identity(old_cursor, device=device, protocol=protocol)
+            return legacy
+        except RuntimeError:
+            pass
+    # Source key is deterministic and user-scoped; no raw credentials logged.
+    digest = hashlib.sha256(identity.encode("utf-8")).hexdigest()[:24]
+    # Include a bounded digest of the full connection ID to avoid truncation
+    # collisions if the node emits an unusually long identifier.
+    connection_digest = hashlib.sha256(connection_id.encode("utf-8")).hexdigest()[:24]
+    return f"singbox:{protocol}:u:{digest}:c:{connection_digest}"
+
+
 def _watermark_source_key(protocol: str, identity: str) -> str:
     return f"singbox-watermark:{protocol}:{identity}"[:220]
 
@@ -856,7 +884,14 @@ def apply_singbox_snapshot(
                 raise RuntimeError("singbox_connection_timestamp_invalid")
             uplink = _safe_int(row.get("uplink_total"))
             downlink = _safe_int(row.get("downlink_total"))
-            source_key = _connection_source_key(protocol, connection_id)
+            source_key = _identity_safe_connection_source_key(
+                db,
+                node_id=int(node.id),
+                protocol=protocol,
+                connection_id=connection_id,
+                identity=identity,
+                device=device,
+            )
             current_source_keys.add(source_key)
 
             cursor = _cursor_for_source(
