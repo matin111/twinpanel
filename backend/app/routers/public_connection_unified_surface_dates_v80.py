@@ -1617,21 +1617,15 @@ _SCRIPT = r"""
  if(!/^\/v1\/connect\/[^/]+\/?$/.test(location.pathname))return;
  document.body.classList.add('tp80-connection');
  const statItems=document.querySelectorAll('.traffic .stats > .stat');
- // The fourth visible stat is the total quota, not a first-connection date.
- // Keep the live quota numbers supplied by the server; combine used / total.
- if(statItems[2]&&statItems[3]){
-   const used=statItems[2].querySelector('strong');
-   const total=statItems[3].querySelector('strong');
+ // Index 3 is remaining quota, NOT total quota. The live refresh supplies
+ // used / total from actual used_bytes / total_bytes every three seconds.
+ if(statItems[2]){
    const label=statItems[2].querySelector('small');
-   if(used&&total){
-     const usedText=used.textContent.trim().replace(/\s*GB\s*/gi,'');
-     const totalText=total.textContent.trim().replace(/\s*GB\s*/gi,'');
-     used.textContent=usedText+' / '+totalText+' GB';
-     used.setAttribute('dir','ltr');
-     if(label)label.textContent='حجم مصرفی / کل';
-     statItems[3].setAttribute('data-tp80-quota-merged','1');
-   }
+   if(label)label.textContent='حجم مصرفی / کل';
+   const value=statItems[2].querySelector('strong');
+   if(value)value.setAttribute('dir','ltr');
  }
+ if(statItems[3])statItems[3].setAttribute('data-tp80-quota-merged','1');
  if(statItems[4]){const label=statItems[4].querySelector('small');if(label)label.textContent='تاریخ انقضا'}
  const panels=()=>[...document.querySelectorAll('.protocol-panel')];
  // Many legacy mobile scripts change the selected card asynchronously. One
