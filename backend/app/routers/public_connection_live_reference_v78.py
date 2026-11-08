@@ -112,10 +112,18 @@ _SCRIPT = r"""
  const account=document.querySelector('.traffic .ref67-user small');
  const status=document.querySelector('.top .profile .status');
  if(account&&status){
-   const valid=status.classList.contains('on');
-   account.textContent=valid?'● اشتراک فعال':'● اشتراک غیرفعال';
-   account.classList.toggle('tp78-active-account',valid);
-   account.classList.toggle('tp78-inactive-account',!valid);
+   // "connected" indicates a live session, not an inactive subscription.
+   // Keep the account badge synchronized with the main status after polling.
+   const syncAccount=()=>{
+     const online=status.classList.contains('connected');
+     const valid=online||status.classList.contains('on');
+     account.textContent=online?'● متصل هستید':valid?'● اشتراک فعال':'● اشتراک غیرفعال';
+     account.classList.toggle('tp78-active-account',valid);
+     account.classList.toggle('tp78-inactive-account',!valid);
+   };
+   syncAccount();
+   const statusObserver=new MutationObserver(syncAccount);
+   statusObserver.observe(status,{attributes:true,attributeFilter:['class']});
  }
  const markup={
   app:'<path d="M12 3v13m-5-5 5 5 5-5M4 18v3h16v-3"/>',
