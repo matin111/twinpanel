@@ -23,9 +23,16 @@ from . import modern_quota_runtime_v257 as canonical
 from .quota_node_sync import build_node_devices
 
 
+# ShadowTLS v3 is authenticated at the outer inbound, but its detour goes
+# through a single shared Shadowsocks credential. The sing-box connection API
+# records the inner user as empty, so it cannot authenticate which subscriber
+# owns a byte or session. NEVER advertise per-subscriber capabilities here.
+# Reenable only after a real identity-preserving, end-to-end tested collector.
+SINGBOX_UNATTRIBUTABLE_PROTOCOLS = frozenset({"shadowtls"})
 SINGBOX_ACCOUNTING_PROTOCOLS = frozenset(
-    {"hysteria2", "tuic", "anytls", "naive", "shadowtls", "snell", "socks5"}
+    {"hysteria2", "tuic", "anytls", "naive", "snell", "socks5"}
 )
+SHADOWTLS_INNER_TAG = "twinpanel-shadowtls-inner"
 SINGBOX_ACCOUNTING_INTERVAL_SECONDS = 5.0
 SINGBOX_ACCOUNTING_LOCK = Path("/run/twinpanel-singbox-quota-v265.lock")
 SINGBOX_API_TAG = "twinpanel-accounting-api"
@@ -43,6 +50,30 @@ def activate_singbox_capabilities() -> None:
     canonical.TRAFFIC_ACCOUNTING_PROTOCOLS = frozenset(
         set(canonical.TRAFFIC_ACCOUNTING_PROTOCOLS) | set(SINGBOX_ACCOUNTING_PROTOCOLS)
     )
+
+
+def shadowtls_attribution_diagnostic(snapshot: dict[str, Any]) -> dict[str, Any]:
+    """Never equate shared-inner flows with authenticated user sessions."""
+    rows = snapshot.get("rows")
+    if not isinstance(rows, list):
+        raise ValueError("singbox_snapshot_contract_invalid")
+    active_inner = [
+        row for row in rows
+        if isinstance(row, dict)
+        and row.get("inbound") == SHADOWTLS_INNER_TAG
+        and row.get("inbound_type") == "shadowsocks"
+        and not _safe_int(row.get("closed_at_ms"))
+    ]
+    missing_identity = sum(not str(row.get("user") or "").strip() for row in active_inner)
+    return {
+        "collector": "shadowtls-attribution-integrity",
+        "status": "unattributable_shared_inner" if missing_identity else "no_unattributed_inner_flows",
+        "active_inner_connections": len(active_inner),
+        "unattributable_connections": missing_identity,
+        "per_subscriber_presence_supported": False,
+        "per_subscriber_traffic_supported": False,
+        "device_limit_verifiable": False,
+    }
 
 
 def _utcnow() -> datetime:
@@ -952,6 +983,18 @@ async def reconcile_singbox_quota_once() -> dict[str, Any]:
                         "error": snapshot_error or "singbox_snapshot_unavailable",
                     })
                     continue
+
+                if grouped.get("shadowtls"):
+                    audit = shadowtls_attribution_diagnostic(snapshot)
+                    results.append({
+                        "ok": audit["unattributable_connections"] == 0,
+                        "node_id": int(node.id),
+                        "error": (
+                            "shadowtls_inner_missing_authenticated_user_identity"
+                            if audit["unattributable_connections"] else None
+                        ),
+                        **audit,
+                    })
 
                 for protocol in sorted(grouped):
                     try:
