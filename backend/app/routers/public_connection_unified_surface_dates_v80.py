@@ -25,7 +25,7 @@ html body.tp80-connection .traffic .stats>.stat:nth-child(3)>strong{
  margin-inline:0!important;padding-inline:0!important;text-align:center!important;
  align-self:center!important;
 }
-html body.tp80-connection .traffic .stats>.stat:nth-child(3)>small{direction:rtl!important;unicode-bidi:plaintext!important}
+html body.tp80-connection .traffic .stats>.stat:nth-child(3)>small{direction:ltr!important;unicode-bidi:isolate!important;flex-direction:row!important}
 html body.tp80-connection .traffic .stats>.stat:nth-child(3)>strong{direction:ltr!important;unicode-bidi:isolate!important}
 
 @media(max-width:720px){
@@ -1640,6 +1640,9 @@ _SCRIPT = r"""
      label.textContent='';
      label.setAttribute('dir','ltr');
      label.style.setProperty('display','flex','important');
+     label.style.setProperty('direction','ltr','important');
+     label.style.setProperty('flex-direction','row','important');
+     label.style.setProperty('unicode-bidi','isolate','important');
      label.style.setProperty('justify-content','center','important');
      label.style.setProperty('align-items','center','important');
      label.style.setProperty('gap','4px','important');
