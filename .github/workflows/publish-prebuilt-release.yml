@@ -67,9 +67,7 @@ jobs:
           # The candidate SHA is pinned and may predate fixes on main.
           # A prebuilt package must not overwrite a live Connection hotfix
           # with older copies of its presentation or quota telemetry files.
-          for path in \\
-            backend/app/routers/public_connection_unified_surface_dates_v80.py \\
-            backend/app/routers/public_connection_hub_live_v5.py; do
+          for path in "backend/app/routers/public_connection_unified_surface_dates_v80.py" "backend/app/routers/public_connection_hub_live_v5.py"; do
             if ! cmp -s "source/$path" "publisher/$path"; then
               echo "::error file=$path::Release candidate is stale for Connection; create a new candidate from current main."
               exit 1
