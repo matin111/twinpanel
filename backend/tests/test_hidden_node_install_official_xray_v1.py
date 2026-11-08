@@ -21,6 +21,8 @@ from app.protocol_account_registry import ALL_PROTOCOL_KEYS
 from app.services import hidden_node_install_supervisor_v1 as supervisor
 from app.services import new_node_modern_bootstrap_v1 as modern
 from app import xray_official_verified_installer_v1 as verified
+from app import verified_github_release_asset_v1 as assets
+from app import standalone_protocol_runtime as standalone
 
 
 def _job(node_id=21, stage="installing_modern", state="running"):
@@ -58,6 +60,50 @@ class OfficialXrayAssetTests(unittest.TestCase):
         method=src[src.index("async def install_xray("):src.index("async def ",src.index("async def install_xray(")+15)]
         self.assertIn("official_xray_install_command()",method)
         self.assertNotIn("github.com/XTLS/Xray-install/raw/main",method)
+
+
+class PinnedStandaloneOfficialAssetTests(unittest.IsolatedAsyncioTestCase):
+    def test_asset_reader_compiles_and_allowlists_three_upstreams(self):
+        compile(assets._REMOTE_ASSET_FETCH,"<verified-standalone-asset>","exec")
+        remote=assets._REMOTE_ASSET_FETCH
+        for repo in ("mieru","trusttunnel","sudoku"):
+            self.assertIn('"' + repo + '"',remote)
+        self.assertIn("hashlib.sha256()",remote)
+        self.assertIn('"digest"',remote)
+        self.assertIn('"application/octet-stream"',remote)
+        self.assertIn("GITHUB_ASSET_SHA256_MISMATCH",remote)
+        self.assertNotIn("ghproxy",remote)
+        self.assertNotIn("github.com/XTLS",remote)
+        self.assertIn("base64 -d | python3 -",assets.official_github_asset_fetch_command('"$url"','"$tmp"'))
+        with self.assertRaises(ValueError):
+            assets.official_github_asset_fetch_command('"$user_supplied_url"','"$tmp"')
+
+    def test_unapproved_origin_fails_before_network_access(self):
+        import sys
+        remote=compile(assets._REMOTE_ASSET_FETCH,"<asset-script>","exec")
+        with (patch.object(sys,"argv",["fetch.py",
+                                      "https://evil.example/malware.zip",
+                                      "/tmp/no-install"]),
+              patch("urllib.request.urlopen") as network):
+            with self.assertRaisesRegex(SystemExit,"GITHUB_ASSET_UNTRUSTED_RELEASE_URL"):
+                exec(remote,{"__name__":"__main__"})
+            network.assert_not_called()
+
+    async def test_all_three_standalone_installers_use_verified_asset_api(self):
+        for name,func in (
+            ("mieru",standalone._install_mieru_binary),
+            ("trusttunnel",standalone._ensure_trusttunnel_binary),
+            ("sudoku",standalone._ensure_sudoku_binary),
+        ):
+            with self.subTest(protocol=name):
+                with patch.object(standalone,"cmd",new_callable=AsyncMock,
+                                  return_value="already checked") as command:
+                    await func(object())
+                shell=command.await_args.args[1]
+                self.assertIn("base64 -d | python3 -",shell)
+                self.assertIn("sha256sum -c -",shell)
+                self.assertNotIn('curl -fL --retry 3',shell)
+                self.assertNotIn("systemctl restart xray",shell)
 
 
 class HiddenNodeSupervisorSafetyTests(unittest.TestCase):
