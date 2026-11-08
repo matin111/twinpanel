@@ -56,8 +56,10 @@ def _write_secret_job(job_id: str, payload: dict) -> Path:
     _secure_dir(_SECRET_DIR)
     path = _SECRET_DIR / (job_id + ".json")
     flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
+    created = False
     try:
         fd = os.open(path, flags, 0o600)
+        created = True
         try:
             data = json.dumps(payload, separators=(",", ":")).encode("utf-8")
             if len(data) > 16384:
@@ -68,7 +70,12 @@ def _write_secret_job(job_id: str, payload: dict) -> Path:
             os.close(fd)
         return path
     except Exception as exc:
-        path.unlink(missing_ok=True)
+        # An existing payload belongs to a different active worker.
+        # Never delete its secret file on an O_EXCL collision.
+        if created:
+            path.unlink(missing_ok=True)
+        if isinstance(exc, FileExistsError):
+            raise NodeInstallDispatchError("NODE_INSTALL_PAYLOAD_ALREADY_QUEUED") from exc
         if isinstance(exc, NodeInstallDispatchError):
             raise
         raise NodeInstallDispatchError("NODE_INSTALL_SECURE_STORAGE_WRITE_FAILED") from exc
