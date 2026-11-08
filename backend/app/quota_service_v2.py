@@ -114,7 +114,11 @@ def open_session(db: Session, node_id: int, data: SessionOpenIn, *, observed_tel
                 legacy_presence = (
                     observed_telemetry
                     and subscription.plan_id is None
-                    and subscription.activation_duration_days is None
+                    # Legacy/manual accounts can store missing duration
+                    # as 0 as well as NULL. Only the authoritative collector
+                    # may account a physically established session in that
+                    # state; public admission still rejects absent duration.
+                    and not subscription.activation_duration_days
                 )
                 if not legacy_presence:
                     raise HTTPException(
