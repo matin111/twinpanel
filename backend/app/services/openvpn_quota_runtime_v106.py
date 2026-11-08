@@ -525,7 +525,10 @@ async def _disconnect_rejected_openvpn_sessions(node: Node, db, rejected: list[d
     conn = None
     try:
         if not local:
-            conn = await ssh_connect_saved(node, db)
+            try:
+                conn = await ssh_connect_saved(node, db)
+            except Exception as exc:
+                return [{"client_id": int(item["client_id"]), "ok": False, "reason": type(exc).__name__} for item in rejected]
         for item in rejected:
             cid = item["client_id"]
             if (cid, item["identity"], item["session_identity"]) not in current:
