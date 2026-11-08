@@ -456,7 +456,19 @@ def _apply_observed_sessions(db, node: Node, observed: list[dict]) -> dict:
     active_keys: set[str] = set()
     rejected_session_ids: list[str] = []
 
-    for index, session in enumerate(observed):
+    # ocserv numeric IDs are allocated in connection order. If a fresh
+    # reconciler has to admit multiple observed sessions at once, reserve
+    # the configured 2/3/4 slots for older connections, not whichever
+    # entry happened to appear first in an unordered JSON response.
+    ordered_sessions = sorted(
+        observed,
+        key=lambda item: (
+            0, int(item["ocserv_id"])
+        ) if str(item.get("ocserv_id") or "").isdecimal() else (
+            1, str(item.get("session_key") or "")
+        ),
+    )
+    for index, session in enumerate(ordered_sessions):
         device = devices.get(session["username"])
         if device is None:
             ignored += 1
