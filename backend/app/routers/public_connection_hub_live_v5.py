@@ -340,6 +340,29 @@ def public_connection_hub_live_v5(
     source = refine_public_connection_protocol_actions_v20(source)
     source = refine_public_connection_xray_profiles_v48(source)
     source = refine_public_connection_canonical_mobile_v26(source)
+    # Canonical desktop skin forces a five-column metrics strip. The older
+    # template already has five cells; appending two produces wrapped/duplicate
+    # rows. Keep exactly the five requested metrics without changing quota data.
+    metrics = (
+        '<div class="stats">'
+        '<div class="stat"><small>تعداد مجاز</small><strong id="liveDeviceLimit">—</strong></div>'
+        '<div class="stat"><small>تعداد متصل</small><strong id="liveActiveSessions">—</strong></div>'
+        '<div class="stat"><small>مصرف‌شده</small><strong id="liveUsed">—</strong></div>'
+        '<div class="stat"><small>باقی‌مانده</small><strong id="liveRemaining">—</strong></div>'
+        '<div class="stat"><small>تاریخ انقضا</small><strong id="liveExpire">—</strong></div>'
+        '</div>'
+        # Preserve invisible legacy bindings that the live-refresh JS expects.
+        '<span id="liveTotal" hidden></span><span id="liveStart" hidden></span>'
+    )
+    source, metric_count = re.subn(
+        r'<div class="stats">(?:(?!</section>).)*?</div></section>',
+        lambda match: metrics + '</section>',
+        source,
+        count=1,
+        flags=re.DOTALL,
+    )
+    if metric_count != 1:
+        print("TWINPANEL_CONNECTION_METRICS_CANONICAL_NOT_FOUND", flush=True)
     source = source.replace(
         "پروتکل برای این اشتراک غیرفعال است",
         "پروتکل فعال است؛ کانفیگ نیاز به ساخت/Repair دارد",
