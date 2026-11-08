@@ -76,6 +76,62 @@ def shadowtls_attribution_diagnostic(snapshot: dict[str, Any]) -> dict[str, Any]
     }
 
 
+def singbox_identity_integrity_audit(
+    snapshot: dict[str, Any],
+    protocol: str,
+    devices: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Read-only attribution audit; never alter client sessions or counters.
+
+    Connection count is intentionally distinct from unique subscriber count.
+    This is telemetry integrity information, NOT an admission decision.
+    """
+    protocol = str(protocol or "").strip().lower()
+    if protocol not in SINGBOX_ACCOUNTING_PROTOCOLS:
+        raise ValueError("unsupported_singbox_identity_audit_protocol")
+    rows = snapshot.get("rows")
+    if not isinstance(rows, list):
+        raise ValueError("singbox_snapshot_contract_invalid")
+    known = {
+        str(d.get("telemetry_identity") or d.get("identity") or "").strip()
+        for d in devices
+    }
+    known.discard("")
+    expected_tag = str(TAGS.get(protocol) or "")
+    expected_type = "socks" if protocol == "socks5" else protocol
+    active = [
+        row for row in rows
+        if isinstance(row, dict)
+        and str(row.get("inbound") or "") == expected_tag
+        and str(row.get("inbound_type") or "").lower() == expected_type
+        and not _safe_int(row.get("closed_at_ms"))
+    ]
+    attributed = [
+        row for row in active
+        if str(row.get("user") or "").strip() in known
+    ]
+    active_identities = {
+        str(row.get("user") or "").strip() for row in attributed
+    }
+    missing_identity = sum(not str(r.get("user") or "").strip() for r in active)
+    unknown_identity = len(active) - len(attributed) - missing_identity
+    # Do not log usernames, client IPs or source credentials.
+    return {
+        "collector": f"singbox-{protocol}-identity-integrity",
+        "protocol": protocol,
+        "active_connections": len(active),
+        "attributed_connections": len(attributed),
+        "distinct_online_credentials": len(active_identities),
+        "multi_connection_count": max(len(attributed) - len(active_identities), 0),
+        "missing_identity": missing_identity,
+        "unknown_identity": unknown_identity,
+        "canonical_session_count_may_understate_connections": (
+            len(attributed) > len(active_identities)
+        ),
+        "per_device_limit_verified": False,
+    }
+
+
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -997,6 +1053,25 @@ async def reconcile_singbox_quota_once() -> dict[str, Any]:
                     })
 
                 for protocol in sorted(grouped):
+                    if protocol in SINGBOX_ACCOUNTING_PROTOCOLS:
+                        integrity = singbox_identity_integrity_audit(
+                            snapshot, protocol, grouped[protocol],
+                        )
+                        # The audit is read-only and never attempts to resolve
+                        # unknown credentials by source IP or NAT address.
+                        if (
+                            integrity["missing_identity"]
+                            or integrity["unknown_identity"]
+                            or integrity["multi_connection_count"]
+                        ):
+                            results.append({
+                                "ok": not (
+                                    integrity["missing_identity"]
+                                    or integrity["unknown_identity"]
+                                ),
+                                "node_id": int(node.id),
+                                **integrity,
+                            })
                     # ShadowTLS identity is lost in the shared inner detour;
                     # do not synthesize or charge per-user sessions from it.
                     if protocol in SINGBOX_UNATTRIBUTABLE_PROTOCOLS:
