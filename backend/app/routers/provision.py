@@ -1114,7 +1114,13 @@ connect-delay 5000
 
 
 async def install_xray(conn, port: int):
-    await cmd(conn, "tmp=$(mktemp); curl -fsSL https://github.com/XTLS/Xray-install/raw/main/install-release.sh -o \"$tmp\" && bash \"$tmp\" install; rc=$?; rm -f \"$tmp\"; exit $rc", timeout=600)
+    # github.com/XTLS/.../raw and GitHub's release UI return HTTP 504 on
+    # some new Exits even though api.github.com and raw.githubusercontent.com
+    # are reachable. Fetch the SHA256-verified official release via GitHub's
+    # Assets API, then let XTLS's own installer consume the local zip. Never
+    # source an untrusted mirror or proxy through the mother panel.
+    from ..xray_official_verified_installer_v1 import official_xray_install_command
+    await cmd(conn, official_xray_install_command(), timeout=600)
     config = {
         "log": {"loglevel": "warning"},
         "api": {
