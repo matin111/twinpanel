@@ -192,6 +192,38 @@ export function TunnelProtocolRuntimeV307(){
     void run(`modern-remove-${row.protocol}`,pick(`${row.name} حذف شد.`,`${row.name} was removed.`),()=>modernRequest(`/v1/settings/vpn/modern-protocols/${selectedTunnel.exit_node_id}/${encodeURIComponent(row.protocol)}`,{method:"DELETE"}));
   };
 
+  // Persist the operation ID so closing the page does not start a second tunnel.
+  const pollTunnelCreation=async(jobId:string)=>{
+    const stages:Record<string,string>={
+      queued:"در صف ساخت",starting:"شروع عملیات",
+      validating_pair:"بررسی نودهای ایران و خارج",
+      bootstrapping_iran:"آماده‌سازی اتصال ایران",
+      bootstrapping_exit:"آماده‌سازی اتصال خروج",
+      installing_transport:"نصب مسیر انتخابی",
+      verifying_bidirectional_connection:"تأیید اتصال دوطرفه",
+      completed:"تکمیل‌شده",
+    };
+    for(let i=0;i<300;i+=1){
+      const job=await modernRequest<{state:string;stage:string;error_code?:string;stale?:boolean;result?:{tunnel?:{id:number}}}>(`/v1/tunnels/create-selected/jobs/${jobId}`);
+      if(job.state==="succeeded"){
+        sessionStorage.removeItem("tp-selected-tunnel-job");
+        const id=Number(job.result?.tunnel?.id||0);
+        if(!id)throw new Error("TUNNEL_JOB_RESULT_MISSING");
+        setCreateOpen(false);await load(true,id);setSelectedId(id);setManageOpen(true);
+        setNotice(pick(`Tunnel #${id} ساخته و تأیید شد.`,`Tunnel #${id} is ready.`));
+        return;
+      }
+      if(job.state==="failed"||job.stale){
+        sessionStorage.removeItem("tp-selected-tunnel-job");
+        throw new Error(job.error_code||"TUNNEL_JOB_FAILED");
+      }
+      setNotice(pick(`ساخت Tunnel: ${stages[job.stage]||job.stage} (شناسه عملیات: ${jobId.slice(0,8)})`,
+                     `Tunnel creation: ${job.stage} (job ${jobId.slice(0,8)})`));
+      await new Promise<void>(resolve=>setTimeout(resolve,3000));
+    }
+    throw new Error("TUNNEL_JOB_STILL_RUNNING_CHECK_STATUS");
+  };
+
   const createTunnel=async(event:FormEvent)=>{
     event.preventDefault();if(busy||!draft.iran_node_id||!draft.exit_node_id)return;
     if(!readyIranNodes.some(node=>node.id===draft.iran_node_id)||!readyExitNodes.some(node=>node.id===draft.exit_node_id)){
@@ -204,12 +236,14 @@ export function TunnelProtocolRuntimeV307(){
     }
     setBusy("create");setError("");setNotice("");
     try{
-      const result=await legacyControlApi.createSelectedTunnel({
+      const payload={
         iran_node_id:draft.iran_node_id,exit_node_id:draft.exit_node_id,priority:draft.priority,initial_transport:draft.initial_transport,
         ...(draft.initial_transport==="spoof_wg"?{iran_spoof_ip:draft.iran_spoof_ip.trim(),exit_spoof_ip:draft.exit_spoof_ip.trim()}:{}),
-      });
-      const id=Number(result?.tunnel?.id||0);if(!id)throw new Error("INVALID_SELECTED_TUNNEL_RESPONSE");
-      setCreateOpen(false);await load(true,id);setSelectedId(id);setManageOpen(true);setNotice(pick(`Tunnel #${id} با مسیر انتخابی ساخته شد.`,`Tunnel #${id} was created with the selected transport.`));
+      };
+      const job=await modernRequest<{id:string}>("/v1/tunnels/create-selected/jobs",{method:"POST",body:JSON.stringify(payload)});
+      if(!/^[0-9a-f]{32}$/.test(job.id))throw new Error("INVALID_TUNNEL_JOB_ID");
+      sessionStorage.setItem("tp-selected-tunnel-job",job.id);
+      await pollTunnelCreation(job.id);
     }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}finally{setBusy("");}
   };
   const toggleTunnel=()=>{if(selectedTunnel)void run(`toggle-${selectedTunnel.id}`,pick("وضعیت Tunnel تغییر کرد.","Tunnel state updated."),()=>legacyControlApi.toggleTunnel(selectedTunnel.id));};
