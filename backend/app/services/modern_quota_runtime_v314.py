@@ -297,7 +297,14 @@ def _retry_failed_protocol_per_device(
     recovered = 0
     failed = 0
     errors: list[str] = []
-    for device in devices:
+    # Avoid a storm of thousands of retry transactions on a busy VPN panel.
+    # Rotate retry windows across sweeps so each affected user is eventually
+    # revisited without starving ordinary accounting.
+    retry_limit = 64
+    windows = max((len(devices) + retry_limit - 1) // retry_limit, 1)
+    window = int(time.time() // max(MODERN_ACCOUNTING_INTERVAL_SECONDS, 1)) % windows
+    candidates = devices[window * retry_limit:(window + 1) * retry_limit]
+    for device in candidates:
         try:
             with db.begin_nested():
                 if protocol in {"wireguard", "amneziawg"}:
@@ -332,6 +339,7 @@ def _retry_failed_protocol_per_device(
     return {
         "recovered_devices": recovered,
         "failed_devices": failed,
+        "deferred_devices": len(devices) - len(candidates),
         "sample_errors": errors,
     }
 
