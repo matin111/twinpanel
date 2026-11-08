@@ -198,9 +198,17 @@ async def _reconcile_subscription_modern_accounts_lockfix(
                     )
                     continue
 
-                items, protocol_errors = await _provision_modern_protocol(
-                    ad, db, sub, protocol, nodes
-                )
+                if protocol == "v2ray":
+                    # This is a classic plan protocol but an incomplete new
+                    # VLESS credential still needs the durable Modern worker.
+                    # Use its idempotent, no-restart HandlerService driver.
+                    items, protocol_errors = await legacy._provision_missing_v2ray(
+                        ad, db, sub, nodes,
+                    )
+                else:
+                    items, protocol_errors = await _provision_modern_protocol(
+                        ad, db, sub, protocol, nodes,
+                    )
                 if protocol_errors:
                     result["ok"] = False
                     result["errors"].extend(dict(item) for item in protocol_errors)
