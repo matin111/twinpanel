@@ -289,6 +289,47 @@ async def preflight(conn, port: int, proto: str, label: str):
         raise RuntimeError(f"پورت {port}/{proto.upper()} برای {label} از قبل در حال استفاده است")
 
 
+# Only brand-new, unpublished Exit nodes may use an alternative when
+# the default Cisco TCP/UDP 443 is owned by another service. The chosen port
+# is saved into NodeProtocolConfig and used in customer delivery. Do not
+# override any manually selected non-default port or restart a live ocserv.
+_CISCO_EXIT_DEFAULT_PORT = 443
+_CISCO_EXIT_FALLBACK_PORTS = (4443, 10443, 11443, 12443)
+
+
+async def select_hidden_exit_cisco_port(
+    conn, settings: ProtocolSettings, node: Node, *, repair: bool = False,
+) -> int:
+    requested = int(settings.cisco_port)
+    if (not settings.install_cisco or node.node_type != NodeType.EXIT
+            or bool(node.show_to_users) or requested != _CISCO_EXIT_DEFAULT_PORT):
+        return requested
+    # Existing healthy installs retain their port, even in repair mode.
+    if repair and await existing_ok(conn, "cisco", settings):
+        return requested
+    if not (await listener(conn, requested, "tcp")
+            or await listener(conn, requested, "udp")):
+        return requested
+    if await active(conn, "ocserv"):
+        # An active historical Cisco service can have live sessions. Never
+        # rotate its port/certificate by silently converting it into a new Exit.
+        raise RuntimeError("CISCO_EXISTING_ACTIVE_SERVICE_MANUAL_REVIEW")
+    # Reserve upcoming requested ports regardless of transport; no fallback
+    # may steal a listener from OpenVPN/WireGuard/Xray or classic L2TP.
+    reserved = {
+        *(int(v) for v in (settings.openvpn_port, settings.wireguard_port,
+                           settings.xray_port)),
+        500, 4500, 1701,
+    }
+    for candidate in _CISCO_EXIT_FALLBACK_PORTS:
+        if candidate in reserved:
+            continue
+        if (not await listener(conn, candidate, "tcp")
+                and not await listener(conn, candidate, "udp")):
+            return candidate
+    raise RuntimeError("CISCO_NO_FREE_TCP_UDP_FALLBACK_PORT")
+
+
 async def preflight_l2tp_ports(conn):
     """Allow existing strongSwan and xl2tpd sockets, but never foreign owners.
 
@@ -1551,14 +1592,26 @@ async def provision_protocols(conn, p: ProtocolSettings, db: Session, node: Node
         if repair and await existing_ok(conn, name, p):
             ok, err = True, None
         else:
-            if port is not None: await preflight(conn, port, proto, name)
+            if port is not None:
+                if name == "cisco":
+                    # Cisco requires both HTTPS TCP and DTLS UDP on the SAME
+                    # port. Preflight each transport, not the pseudo 'tcp+udp'.
+                    await preflight(conn, port, "tcp", "Cisco")
+                    await preflight(conn, port, "udp", "Cisco DTLS")
+                else:
+                    await preflight(conn, port, proto, name)
             ok, err = await installer()
         results[name] = {"ok":ok,"port":port,"port_text":port_text or (str(port) if port else ""),"transport":proto,"error":err}
         save_config(db,node.id,name,port=port,port_text=port_text,transport=proto,service=service,ok=ok,error=err)
 
     if p.install_cisco:
+        requested_cisco_port = int(p.cisco_port)
         try:
-            if not (repair and await existing_ok(conn,"cisco",p)): await preflight(conn,p.cisco_port,"udp","Cisco DTLS")
+            selected_cisco_port = await select_hidden_exit_cisco_port(
+                conn, p, node, repair=repair,
+            )
+            if selected_cisco_port != requested_cisco_port:
+                p = p.model_copy(update={"cisco_port": selected_cisco_port})
             await run_one("cisco",p.cisco_port,"tcp+udp","ocserv",lambda:install_cisco(
                 conn,
                 p.cisco_port,
@@ -1566,6 +1619,9 @@ async def provision_protocols(conn, p: ProtocolSettings, db: Session, node: Node
                 node,
                 repair,
             ))
+            if selected_cisco_port != requested_cisco_port:
+                results["cisco"]["fallback_from_port"] = requested_cisco_port
+                results["cisco"]["selected_port"] = selected_cisco_port
         except Exception as e:
             results["cisco"]={"ok":False,"port":p.cisco_port,"port_text":str(p.cisco_port),"transport":"tcp+udp","error":str(e)}; save_config(db,node.id,"cisco",port=p.cisco_port,transport="tcp+udp",service="ocserv",ok=False,error=str(e))
     if p.install_openvpn:
