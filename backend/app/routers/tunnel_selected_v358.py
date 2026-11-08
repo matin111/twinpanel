@@ -197,13 +197,10 @@ async def _rollback_new_selected_tunnel(
         db.commit()
 
 
-@router.post(
-    "/create-selected",
-    dependencies=[Depends(require_admin)],
-)
 async def create_selected_tunnel_v358(
     payload: SelectedTunnelCreateV358,
-    db: Session = Depends(get_db),
+    db: Session,
+    progress=None,
 ):
     """Create one logical pair and provision exactly one selected modern path.
 
@@ -224,6 +221,7 @@ async def create_selected_tunnel_v358(
             )
 
     async with _iran_provision_lock(int(payload.iran_node_id)):
+        if progress: progress("validating_pair")
         iran, exit_node = _resolve_ready_pair(db, payload)
         tunnel = _create_clean_pair(
             db,
@@ -236,7 +234,9 @@ async def create_selected_tunnel_v358(
         try:
             # Reuse the authoritative controller-driven Agent + Tunnel Fabric
             # bootstrap already used by existing tunnel installers.
+            if progress: progress("bootstrapping_iran")
             iran_bootstrap = await core._ensure_fabric_for_tunnel_node(iran, db)
+            if progress: progress("bootstrapping_exit")
             exit_bootstrap = await core._ensure_fabric_for_tunnel_node(exit_node, db)
 
             if not iran_bootstrap.get("ok") or not exit_bootstrap.get("ok"):
@@ -255,6 +255,7 @@ async def create_selected_tunnel_v358(
                     db,
                 )
 
+            if progress: progress("installing_transport")
             install_result = await install_modern_transport(
                 tunnel_id,
                 selected,
@@ -284,6 +285,7 @@ async def create_selected_tunnel_v358(
             # *both* Agents. Give this first convergence longer than a
             # switch between two already-known carriers; never waive
             # bidirectional Data Plane acceptance or rollback.
+            if progress: progress("verifying_bidirectional_connection")
             selection_result = await select_modern_transport_manual(
                 tunnel_id,
                 selected,
