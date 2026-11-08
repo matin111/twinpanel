@@ -1624,8 +1624,8 @@ _SCRIPT = r"""
    const total=statItems[3].querySelector('strong');
    const label=statItems[2].querySelector('small');
    if(used&&total){
-     const usedText=used.textContent.trim().replace(/\\s*GB\\s*/gi,'');
-     const totalText=total.textContent.trim().replace(/\\s*GB\\s*/gi,'');
+     const usedText=used.textContent.trim().replace(/\s*GB\s*/gi,'');
+     const totalText=total.textContent.trim().replace(/\s*GB\s*/gi,'');
      used.textContent=usedText+' / '+totalText+' GB';
      used.setAttribute('dir','ltr');
      if(label)label.textContent='حجم مصرفی / کل';
