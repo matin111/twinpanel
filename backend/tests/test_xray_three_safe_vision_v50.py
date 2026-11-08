@@ -15,7 +15,7 @@ os.environ.setdefault("APP_SECRET_KEY","ci-xray-v50-only")
 os.environ.setdefault("DATABASE_URL","sqlite+pysqlite:////tmp/ci-xray-v50.sqlite3")
 os.environ.setdefault("NODE_AGENT_SHARED_SECRET","ci-xray-v50-agent")
 
-from app import central_xray_node_authority as authority
+from app import central_xray_node_authority_v1 as authority
 from app import xray_adaptive_three_profiles_v47 as v47
 from app import xray_domainless_vision_v50 as vision
 from app import xray_hot_client_sync_v1 as hot
