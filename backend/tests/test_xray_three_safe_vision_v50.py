@@ -105,6 +105,36 @@ class XrayThreeSafeProfileTests(unittest.TestCase):
             routes=vision._routes_v50(self.db,mother,"10.0.0.2")
         self.assertEqual(len(routes),1)
 
+    def test_all_nonmother_domainless_exits_require_three_safe_profiles(self):
+        node=SimpleNamespace(
+            id=19,name="uk",xray_domain=None,
+            is_mother=False,is_local_core=False,agent_url="https://node",
+        )
+        self.assertEqual(
+            v47._required_profiles_v47(node),
+            {"xhttp_reality","tcp_reality","tcp_reality_vision"},
+        )
+
+    def test_tls_exits_require_exactly_their_three_secure_profiles(self):
+        node=SimpleNamespace(
+            id=7,name="des",xray_domain="v2ray.example.org",
+            is_mother=False,is_local_core=False,
+        )
+        self.assertEqual(
+            v47._required_profiles_v47(node),
+            {"websocket_tls","xhttp_reality","tcp_tls"},
+        )
+
+    def test_mother_remains_diagnostics_only_and_requires_no_new_inbound(self):
+        node=SimpleNamespace(
+            id=1,name="FR",xray_domain=None,
+            is_mother=True,is_local_core=True,agent_url="local://core",
+        )
+        self.assertEqual(
+            v47._required_profiles_v47(node),
+            {"xhttp_reality","tcp_reality"},
+        )
+
     def test_plaintext_legacy_cannot_become_third_public_profile(self):
         item={"node_id":19,"profiles":[{"id":"tcp_simple","uri":"vless://plain@host:8443"}]}
         with patch.object(v47.policy_v30,"_profile_endpoint_v261") as endpoint:
