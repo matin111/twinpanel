@@ -95,6 +95,18 @@ def apply_xray_reality_cli_compat_v83() -> None:
     # future base-runtime drift into an explicit startup failure rather than a
     # recurring provisioning regression.
     probe = current("")
+    # The underlying Modern Xray V2 runtime may already recognize the
+    # punctuation-preserving "password(publickey)" label. That is a valid
+    # working parser contract, not a provisioning regression. Do not crash
+    # the entire API when it has already implemented this compatibility.
+    if _OLD_NORMALIZER in probe and '"password(publickey)"' in probe:
+        _runtime_applied = True
+        print(
+            "TWINPANEL_XRAY_REALITY_CLI_COMPAT_V83_BASE_ALREADY_SUPPORTED",
+            flush=True,
+        )
+        return
+
     if _OLD_NORMALIZER not in probe or _OLD_PUBLIC_KEYS not in probe:
         raise RuntimeError(
             "V83 cannot locate the expected Modern Xray x25519 parser contract"
