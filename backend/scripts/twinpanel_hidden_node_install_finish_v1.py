@@ -85,6 +85,48 @@ async def finish(node_id: int, job_id: str, *, xray_port: int,
         db.expire_all()
         node, _ = require_hidden_job(db, node_id, job_id)
 
+        # Classic Xray package/bootstrap alone can leave a single legacy
+        # plaintext VLESS inbound. It is NOT enough for customer V2Ray.
+        # This is a brand-new HIDDEN Exit with no client memberships: enable
+        # and verify the three real XHTTP/Reality/TCP-or-TLS profiles before
+        # accepting customer traffic. Existing nodes are never touched here.
+        xray_row = db.query(NodeProtocolConfig).filter(
+            NodeProtocolConfig.node_id == node_id,
+            NodeProtocolConfig.protocol == "v2ray",
+        ).first()
+        if (
+            xray_row is not None and node.enable_v2ray
+            and str(getattr(xray_row.status, "value", xray_row.status)).lower()
+            == "online"
+        ):
+            from app import xray_modern_runtime
+            from app.routers import account_delivery as ad
+            conn = None
+            try:
+                conn = await asyncio.wait_for(ad.ssh_connect_saved(node,db),timeout=20)
+                base_port = int(xray_row.port or xray_port)
+                state = await asyncio.wait_for(
+                    xray_modern_runtime._ensure_modern_xray(
+                        conn,base_port,node,
+                    ),timeout=300,
+                )
+                profiles = list(state.get("available_profiles") or [])
+                if len(set(profiles)) < 3:
+                    raise RuntimeError("XRAY_THREE_CUSTOMER_PROFILES_NOT_READY")
+                print("HIDDEN_NODE_XRAY_THREE_INBOUNDS_VERIFIED", {
+                    "node_id":node_id,"count":len(set(profiles)),
+                },flush=True)
+            except Exception as exc:
+                print("HIDDEN_NODE_XRAY_MODERN_PROFILES_DEGRADED", {
+                    "node_id":node_id,"error_type":type(exc).__name__,
+                },flush=True)
+            finally:
+                if conn is not None:
+                    conn.close()
+                    await conn.wait_closed()
+        db.expire_all()
+        node, _ = require_hidden_job(db, node_id, job_id)
+
         stage = "installing_modern"
         _status(job_id, stage, node_id, installed_protocols=_count_staged(db,node_id))
 
