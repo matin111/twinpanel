@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.716",
+  "version": "1.1.0-rc.717",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-08T19:53:26Z",
+  "released_at": "2026-11-08T19:57:43Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "8787999883772f94de46ee0a9c729464df3c383f",
+  "source_sha": "9490aa40fa02f5f8a1afc96f92a39aa0f5a25b89",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.716/twinpanel-1.1.0-rc.716-linux-x86_64.tar.gz",
-    "sha256": "ddc67b3f1df784f0ae20bc40660138c1d593fb125c62b682b82f4f8f03b567f0",
-    "size_bytes": 29869382
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.717/twinpanel-1.1.0-rc.717-linux-x86_64.tar.gz",
+    "sha256": "bbad57936e2f4e6d3a977339dc38d1ae7889dc0a1fb67014b3dd9399da2bd158",
+    "size_bytes": 29874470
   },
   "notes": {
-    "fa": "رفع تأخیر آنلاین Naive با فرایند مستقل و محدود به پایش نشست‌های واقعی احراز هویت‌شده هر ~۲۰ ثانیه، جدا از حسابداری سنگین همه پروتکل‌های sing-box. فرایند جدید فقط نشست‌های واقعی Naive را از API داخلی نود خوانده و وضعیت فعال مدیریت مرکزی را ثبت می‌کند؛ شمارنده حجم، رمز، کانفیگ و سرویس VPN نود را تغییر نمی‌دهد. فرایند اصلی همچنان مالک ثبت حجم است. تنظیم TP_NAIVE_FAST_PRESENCE_WORKER=0 برای بازگشت ایمن وجود دارد. همراه اصلاح کلیدهای هویت‌محور و قابلیت‌های API در RC.715. تست‌ها موفق بودند.",
-    "en": "Add independent, supervised, authenticated Naive live-presence-only worker to avoid false offline status when multi-protocol sing-box accounting is CPU- or cursor-bound. Polls exact node Naive identities, updates only canonical online sessions via existing quota checks, never changes VPN nodes or per-user traffic/counter records. Original sing-box worker remains responsible for byte accounting. Rollback switch TP_NAIVE_FAST_PRESENCE_WORKER=0. Includes verified RC.715 identity-scoped connection cursor and API capability fixes."
+    "fa": "اصلاح نمایش تاریخ و ساعت رسیدهای پرداخت در پنل مشتری و مدیریت براساس Asia/Tehran، با تفسیر صحیح زمان UTC ذخیره‌شده در دیتابیس. همچنین نصب‌های جدید TwinPanel به‌صورت پیش‌فرض منطقه زمانی تهران دارند و امکان تغییر منطقه زمانی وجود دارد. تغییرات قبلی RC.716 حفظ شده‌اند؛ اطلاعات کاربران و کانفیگ‌های VPN دست‌نخورده می‌مانند.",
+    "en": "Display customer/admin payment receipt timestamps correctly in Asia/Tehran while preserving UTC database values; default new self-hosted installations to Tehran with an override. Includes RC.716 fixes, no VPN credential or node changes."
   }
 }
