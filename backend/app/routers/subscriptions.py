@@ -10,6 +10,7 @@ from ..models import (
     SubscriptionProtocol, SubscriptionStatus, ProtocolCredential, User,
 )
 from ..schemas import MySubscriptionOut, SubscriptionCreate, SubscriptionOut
+from ..subscription_override_models import effective_device_limit
 
 from ..services.subscription_factory import create_subscription_core
 
@@ -256,7 +257,7 @@ def my_subscriptions(user: User = Depends(get_current_user), db: Session = Depen
             ),
             traffic_limit_gb=round(limit_gb, 2), traffic_used_gb=round(used_gb, 2),
             traffic_remaining_gb=round(remaining_gb, 2), days_remaining=days_remaining,
-            device_limit=plan.device_limit if plan else 0,
+            device_limit=effective_device_limit(db, sub, plan),
         ))
     return result
 
