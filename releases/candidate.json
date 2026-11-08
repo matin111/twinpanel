@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.698",
-  "source_sha": "916201599b7b83525c5ba60034546ff2762fbf97",
+  "version": "1.1.0-rc.699",
+  "source_sha": "5bcee9e6346d5313f9b4267de1a26ad7f709626c",
   "notes": {
-    "fa": "رفع باگ فیلتر کشور در همه پنجره‌های پروتکل مدرن Connection: انتخاب UK، TR، DE یا US فقط سرورهای کشور انتخاب‌شده را نمایش می‌دهد؛ قوانین قدیمی display:grid!important دیگر نمی‌توانند ردیف hidden را آشکار کنند. اعمال همزمان CSS و کنترل نمایش ردیف‌ها؛ حفظ فیلتر هنگام بازسازی پنجره و همگام‌سازی صفحه. بدون تغییر سرویس VPN، کانفیگ یا اطلاعات کاربر.",
-    "en": "Fix shared country filter in all modern Connection modals: selecting UK/TR/DE/US now hides all nonmatching servers even under legacy display:grid!important; apply strong scoped CSS, per-row display state and reassert filter during reconciliation. No VPN data-plane or customer changes."
+    "fa": "نسخه rc.699: رفع فضای خالی اضافی بالا، بین و پایین ردیف سرورها هنگام فیلتر کشور در OpenVPN، WireGuard و AmneziaWG. سرورهای خارج از کشور انتخاب‌شده به‌صورت واقعی از چیدمان حذف می‌شوند و ارتفاع لیست به تعداد سرورهای نمایشی تنظیم می‌شود. طراحی و عملکرد بقیه پروتکل‌ها، دکمه‌های دانلود/ارسال/کپی و اطلاعات اشتراک‌ها بدون تغییر باقی می‌ماند.",
+    "en": "rc.699: Remove blank vertical slots above/between/below visible server rows when filtering by country in OpenVPN, WireGuard and AmneziaWG. Explicitly remove hidden rows from layout and compact list height to visible row count. Preserve all other protocol layouts, download/share/copy controls and subscription data."
   }
 }
