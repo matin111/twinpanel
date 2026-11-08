@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.725",
+  "version": "1.1.0-rc.726",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-08T23:29:32Z",
+  "released_at": "2026-11-08T23:41:04Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "b18fce81d21c1d494cd0d2b76aafac4f4a9cdce4",
+  "source_sha": "5af6e32603d3d968e1c1ca638189a521586c6a71",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.725/twinpanel-1.1.0-rc.725-linux-x86_64.tar.gz",
-    "sha256": "c2b57a0ec1524cf6754c074df9eb12c6eb45a58daf2d9273aefb4962cb718a8d",
-    "size_bytes": 29931617
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.726/twinpanel-1.1.0-rc.726-linux-x86_64.tar.gz",
+    "sha256": "b2183f6043a31743146824708b107a7ed7e36627d4ba686c4fd5ed6c2dde85b9",
+    "size_bytes": 29932433
   },
   "notes": {
-    "fa": "ادغام تعداد دستگاه متصل و دستگاه مجاز در یک کادر (متصل / مجاز) دقیقاً مثل نمایش مصرف حجم، استفاده از کادر آزاد برای نمایش تعداد روز اشتراک، حفظ تاریخ انقضا و روزهای باقی‌مانده زیر آن. سازگار با دسکتاپ و موبایل، بدون تغییر اطلاعات مصرف، مدت یا محدودیت واقعی دستگاه.",
-    "en": "Combine connected/allowed devices into a single metric (active / limit), reclaim the extra metric for configured subscription duration, keep live expiry and days remaining on public Connect, preserving legacy UI bindings and current quota/expiry enforcement."
+    "fa": "ادغام تعداد متصل و تعداد مجاز در یک کادر و نمایش مدت اشتراک در کادر آزاد. اصلاح اولویت تاریخ انقضای واقعی نسبت به پرچم نامحدود قدیمی و نمایش اولیه روزهای باقی‌مانده حتی قبل از لود جاوااسکریپت. بدون تغییر حجم یا اعتبار حساب‌ها.",
+    "en": "Combine connected and allowed devices in one metric, show configured days in freed cell, prioritize a real finite expiry over a stale unlimited override and prerender remaining days server-side before live polling. Preserves quotas and expiry values."
   }
 }
