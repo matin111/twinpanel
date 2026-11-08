@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.707",
+  "version": "1.1.0-rc.708",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-08T09:34:25Z",
+  "released_at": "2026-11-08T09:51:43Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "caac5c0e4882447fa2baf8926c774a02583d680d",
+  "source_sha": "93569f6f77ed08fd53af551f0ff373acc2ae5d22",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.707/twinpanel-1.1.0-rc.707-linux-x86_64.tar.gz",
-    "sha256": "810cbcc8cf4aed4587551166045dca3198d99881e26ae816d20aa2ad99ed0daf",
-    "size_bytes": 29801227
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.708/twinpanel-1.1.0-rc.708-linux-x86_64.tar.gz",
+    "sha256": "5061347f006d7c15b5ab09b7496eac8c9274afb5fd9397c3fc081c8797566d72",
+    "size_bytes": 29808946
   },
   "notes": {
-    "fa": "کاهش بار پایش آنلاین Mieru با حذف صدها جست‌وجوی غیرضروری برای کاربران آفلاین؛ بررسی فقط حساب‌های دارای فعالیت معتبر یا نشست باز قبلی، حفظ ثبت قطع اتصال و کنترل‌های فعلی. افزایش کارایی فرآیند حسابداری پروتکل‌های مدرن بدون تغییر در دیتاپلین VPN، پورت، رمز یا کانفیگ نودها. بهبود برای تأخیر شدید آمار Mieru؛ پایش مستقل سریع هنوز در این نسخه پیاده‌سازی نشده است. رفع خطای ۵۰۴ مرحله بسته‌بندی با API رسمی GitHub و حفظ بررسی اجباری هش SHA-256 فایل Spoof Tunnel.",
-    "en": "Reduce Mieru online presence reconciliation overhead: inspect only authenticated recently active users and previously open sessions, with a single indexed lookup for active canonical devices instead of hundreds of offline DB roundtrips. Keep all existing disconnect/session/admission logic, credentials and VPN runtimes unchanged. This does not yet provide an independent fast telemetry worker. Release packaging: download the exact pinned Spoof Tunnel asset via GitHub Releases Assets API to avoid intermittent HTTP 504 on the browser-download endpoint; SHA256 pin and binary validation remain mandatory."
+    "fa": "رفع ریشه‌ای تأخیر آنلاین Mieru: راه‌اندازی فرایند مستقل پایش وضعیت Mieru هر ۲۰ ثانیه، جدا از پردازش سنگین WireGuard و سایر پروتکل‌ها؛ جلوگیری از ثبت تکراری توسط پردازشگر قدیمی، حفظ شناسایی معتبر کاربر و ثبت قطع اتصال‌ها، سوییچ بازگشت سریع TP_MIERU_INDEPENDENT_WORKER=0. بدون تغییر سرویس Mieru نودها، پورت‌ها، رمزها، کانفیگ‌ها یا تنظیمات مصرف سایر پروتکل‌ها. تست‌های مستقل Mieru و sing-box موفق شدند.",
+    "en": "Isolate Mieru live-presence collection in a supervised separate Python process, normally every 20 seconds, independent of slow V314 multi-protocol sweeps. Avoid double-writing Mieru sessions in the heavy collector; preserve authoritative username match, original quota/session rules, and a safe rollback switch TP_MIERU_INDEPENDENT_WORKER=0. No changes to node VPN dataplane, credentials, ports or other protocol accounting."
   }
 }
