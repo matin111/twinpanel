@@ -40,7 +40,9 @@ def main() -> None:
     assert 'shadowtls' not in dedicated
     parent = files["parent"]
     assert 'os.environ.setdefault("TP_MIERU_INDEPENDENT_WORKER", "1")' in parent
-    assert '_mieru_fast_subprocess()' in parent
+    assert '_mieru_fast_subprocess(fast_proc)' in parent
+    assert 'fast_proc = await asyncio.create_subprocess_exec(' in parent
+    assert parent.index('fast_proc = await asyncio.create_subprocess_exec(') < parent.index('workers = (')
     assert 'proc.terminate()' in parent
     assert 'proc.kill()' in parent
     slow = files["slow"]
