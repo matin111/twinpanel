@@ -158,6 +158,9 @@ export function NodeAddModalBridge(){
 
   const submit=async(event:FormEvent)=>{
     event.preventDefault();if(busy)return;
+    if(!isSupportedNodeCountry(draft.node_type==="iran"?"IR":draft.country_code)){
+      setError(pick("لطفاً کشور معتبر را از فهرست انتخاب کنید.","Please select a valid country from the list."));return;
+    }
     const token=getCustomerToken();
     if(!token){setError("AUTH_REQUIRED");return;}
     const payload={...payloadOf({...draft,host:draft.host.trim(),username:draft.username.trim()||"root",name:draft.name.trim()}),publish_to_all_users:draft.node_type==="exit"?publishToAll:false};
