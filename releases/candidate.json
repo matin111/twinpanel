@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.686",
-  "source_sha": "0b3b433070cb3064b756becf18c88bfade67cdb6",
+  "version": "1.1.0-rc.687",
+  "source_sha": "3ec13d3e650cd7ff2cf699e91e3aca82983004b3",
   "notes": {
-    "fa": "نسخه rc.686: اصلاح فرم ویرایش اشتراک در پنل ادمین و نماینده شامل سقف دستگاه اختصاصی، مدت، تاریخ انقضا، حجم، پروتکل‌ها، سرورهای مجاز نماینده و اطلاعات اکانت. ثبت سقف دستگاه از زمان ساخت دستی نماینده؛ اعتبارسنجی پروتکل و سرور طبق سطح دسترسی نماینده؛ حفظ تخصیص‌های موجود هنگام ویرایش‌های نامرتبط. همچنین اصلاح صفحه Connection واقعی: نمایش سقف دستگاه و تعداد نشست فعال و سبزشدن حساب هنگام اتصال واقعی. محدودیت قطعی در زمان احراز هویت همه پروتکل‌ها هنوز جداگانه نیازمند آزمون است.",
-    "en": "rc.686: Admin and reseller subscription edit parity for per-account device cap, duration, expiry, volume, tier-authorized protocols/servers and account credentials. Persist reseller manual-create concurrency cap and avoid unintended protocol/server replacement. Fix canonical public Connection account live status and cap/active session display. All-protocol admission-time hard enforcement remains separately unverified."
+    "fa": "اصلاح نوار اطلاعات Connection: فقط یک نمایش از تعداد مجاز، تعداد متصل، مصرف، باقی‌مانده و انقضا؛ رفع غیرفعال نشان دادن اکانت هنگام اتصال واقعی؛ سازگاری با لایه نهایی v80. تعداد کاربر/دستگاه هیچ پلن یا اشتراکی در این آپدیت تغییر داده نمی‌شود. پلن‌هایی با مقدار صفر تنها پس از بازیابی مقدار واقعی یا انتخاب ادمین قابل اصلاح هستند.",
+    "en": "Fix final public Connection strip to render exactly five metrics (allowed, connected, used, remaining, expiry) and keep connected account active in legacy status refiner. No plan or account limit database changes; zero-valued plans need verified previous values or admin correction."
   }
 }
