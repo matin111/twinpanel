@@ -70,6 +70,12 @@ def launch(db, node_id: int, *, initial_full: bool = False) -> dict:
         systemd, "--system", "--no-block", "--collect",
         f"--unit={unit}", f"--working-directory={ROOT}",
         f"--setenv=PYTHONPATH={ROOT}",
+        # Detached transient units do NOT inherit the API service EnvironmentFile.
+        # Without these settings, Pydantic fails before stage startup and the
+        # visible Exit delta reconciler loops every 30 seconds indefinitely.
+        # Pass only file paths (never values/secrets) to systemd.
+        "--property=EnvironmentFile=/etc/twinpanel/backend.env",
+        "--property=EnvironmentFile=-/etc/twinpanel/install.env",
         "--property=Nice=10", "--property=Type=exec",
         sys.executable, str(STAGE),
         "--node-id", str(node_id),
