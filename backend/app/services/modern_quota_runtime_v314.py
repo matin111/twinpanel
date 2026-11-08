@@ -96,11 +96,11 @@ def _apply_collected_node_runtime(
 
     results: list[dict[str, Any]] = []
 
-    try:
-        # Isolate a single protocol's DB accounting. Failed telemetry must
-        # not roll back presence and counters of other protocols on this node.
-        with db.begin_nested():
-            if grouped.get("wireguard"):
+    if grouped.get("wireguard"):
+        try:
+            # Isolate this protocol's accounting without savepoint overhead
+            # for protocols that have no devices on the current node.
+            with db.begin_nested():
                 ok, epoch, peers, error = collected["wireguard"]
                 results.append(
                     {
@@ -123,21 +123,21 @@ def _apply_collected_node_runtime(
                         "error": error or "wireguard_source_unavailable",
                     }
                 )
-    except Exception as exc:
-        recovery = _retry_failed_protocol_per_device(
-            db, node=node, protocol="wireguard", grouped=grouped, collected=collected,
-        )
-        results.append({
-            "ok": False, "collector": "wireguard", "node_id": int(node.id),
-            "error": f"{type(exc).__name__}:{str(exc)[:350]}",
-            **recovery,
-        })
+        except Exception as exc:
+            recovery = _retry_failed_protocol_per_device(
+                db, node=node, protocol="wireguard", grouped=grouped, collected=collected,
+            )
+            results.append({
+                "ok": False, "collector": "wireguard", "node_id": int(node.id),
+                "error": f"{type(exc).__name__}:{str(exc)[:350]}",
+                **recovery,
+            })
 
-    try:
-        # Isolate a single protocol's DB accounting. Failed telemetry must
-        # not roll back presence and counters of other protocols on this node.
-        with db.begin_nested():
-            if grouped.get("amneziawg"):
+    if grouped.get("amneziawg"):
+        try:
+            # Isolate this protocol's accounting without savepoint overhead
+            # for protocols that have no devices on the current node.
+            with db.begin_nested():
                 ok, epoch, peers, error = collected["amneziawg"]
                 results.append(
                     {
@@ -160,21 +160,21 @@ def _apply_collected_node_runtime(
                         "error": error or "amneziawg_source_unavailable",
                     }
                 )
-    except Exception as exc:
-        recovery = _retry_failed_protocol_per_device(
-            db, node=node, protocol="amneziawg", grouped=grouped, collected=collected,
-        )
-        results.append({
-            "ok": False, "collector": "amneziawg", "node_id": int(node.id),
-            "error": f"{type(exc).__name__}:{str(exc)[:350]}",
-            **recovery,
-        })
+        except Exception as exc:
+            recovery = _retry_failed_protocol_per_device(
+                db, node=node, protocol="amneziawg", grouped=grouped, collected=collected,
+            )
+            results.append({
+                "ok": False, "collector": "amneziawg", "node_id": int(node.id),
+                "error": f"{type(exc).__name__}:{str(exc)[:350]}",
+                **recovery,
+            })
 
-    try:
-        # Isolate a single protocol's DB accounting. Failed telemetry must
-        # not roll back presence and counters of other protocols on this node.
-        with db.begin_nested():
-            if grouped.get("trusttunnel"):
+    if grouped.get("trusttunnel"):
+        try:
+            # Isolate this protocol's accounting without savepoint overhead
+            # for protocols that have no devices on the current node.
+            with db.begin_nested():
                 ok, epoch, rows, error = collected["trusttunnel"]
                 results.append(
                     {
@@ -195,21 +195,21 @@ def _apply_collected_node_runtime(
                         "error": error or "trusttunnel_source_unavailable",
                     }
                 )
-    except Exception as exc:
-        recovery = _retry_failed_protocol_per_device(
-            db, node=node, protocol="trusttunnel", grouped=grouped, collected=collected,
-        )
-        results.append({
-            "ok": False, "collector": "trusttunnel", "node_id": int(node.id),
-            "error": f"{type(exc).__name__}:{str(exc)[:350]}",
-            **recovery,
-        })
+        except Exception as exc:
+            recovery = _retry_failed_protocol_per_device(
+                db, node=node, protocol="trusttunnel", grouped=grouped, collected=collected,
+            )
+            results.append({
+                "ok": False, "collector": "trusttunnel", "node_id": int(node.id),
+                "error": f"{type(exc).__name__}:{str(exc)[:350]}",
+                **recovery,
+            })
 
-    try:
-        # Isolate a single protocol's DB accounting. Failed telemetry must
-        # not roll back presence and counters of other protocols on this node.
-        with db.begin_nested():
-            if grouped.get("mieru"):
+    if grouped.get("mieru"):
+        try:
+            # Isolate this protocol's accounting without savepoint overhead
+            # for protocols that have no devices on the current node.
+            with db.begin_nested():
                 ok, rows, error = collected["mieru"]
                 results.append(
                     {
@@ -229,21 +229,21 @@ def _apply_collected_node_runtime(
                         "error": error or "mieru_source_unavailable",
                     }
                 )
-    except Exception as exc:
-        recovery = _retry_failed_protocol_per_device(
-            db, node=node, protocol="mieru", grouped=grouped, collected=collected,
-        )
-        results.append({
-            "ok": False, "collector": "mieru", "node_id": int(node.id),
-            "error": f"{type(exc).__name__}:{str(exc)[:350]}",
-            **recovery,
-        })
+        except Exception as exc:
+            recovery = _retry_failed_protocol_per_device(
+                db, node=node, protocol="mieru", grouped=grouped, collected=collected,
+            )
+            results.append({
+                "ok": False, "collector": "mieru", "node_id": int(node.id),
+                "error": f"{type(exc).__name__}:{str(exc)[:350]}",
+                **recovery,
+            })
 
-    try:
-        # Isolate a single protocol's DB accounting. Failed telemetry must
-        # not roll back presence and counters of other protocols on this node.
-        with db.begin_nested():
-            if grouped.get("sudoku"):
+    if grouped.get("sudoku"):
+        try:
+            # Isolate this protocol's accounting without savepoint overhead
+            # for protocols that have no devices on the current node.
+            with db.begin_nested():
                 ok, ports, error = collected["sudoku"]
                 results.append(
                     {
@@ -263,15 +263,15 @@ def _apply_collected_node_runtime(
                         "error": error or "sudoku_source_unavailable",
                     }
                 )
-    except Exception as exc:
-        recovery = _retry_failed_protocol_per_device(
-            db, node=node, protocol="sudoku", grouped=grouped, collected=collected,
-        )
-        results.append({
-            "ok": False, "collector": "sudoku", "node_id": int(node.id),
-            "error": f"{type(exc).__name__}:{str(exc)[:350]}",
-            **recovery,
-        })
+        except Exception as exc:
+            recovery = _retry_failed_protocol_per_device(
+                db, node=node, protocol="sudoku", grouped=grouped, collected=collected,
+            )
+            results.append({
+                "ok": False, "collector": "sudoku", "node_id": int(node.id),
+                "error": f"{type(exc).__name__}:{str(exc)[:350]}",
+                **recovery,
+            })
 
     return results
 
