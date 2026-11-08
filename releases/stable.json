@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.720",
+  "version": "1.1.0-rc.721",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-08T21:55:14Z",
+  "released_at": "2026-11-08T22:18:09Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "d62163607c426a1dda35f073b4e56c40ca82319a",
+  "source_sha": "3da896011b8a956d823a792ddf42acd192fcc64f",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.720/twinpanel-1.1.0-rc.720-linux-x86_64.tar.gz",
-    "sha256": "7dccf06391ae826161978dce6d4604c1733ac258b1b333b5d3cd6259da0c0002",
-    "size_bytes": 29906621
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.721/twinpanel-1.1.0-rc.721-linux-x86_64.tar.gz",
+    "sha256": "f674c940e240f40faaebd50201e35b36beee6e8208ed9135a5fbdf4678f2c845",
+    "size_bytes": 29917790
   },
   "notes": {
-    "fa": "اصلاح بخش امنیت برای خواندن دقیق محدودیت اختصاصی دستگاه هر اشتراک و حذف نشست‌های قدیمی از شمارش آنلاین. قطع انتخابی نشست اضافه در OpenVPN بر اساس Client ID، همراه بررسی مجدد هویت پیش از قطع؛ اتصال کاربران مجاز، حجم و تاریخ دست‌نخورده می‌مانند. Cisco مسیر قبلی قطع اضافه را حفظ می‌کند. برای پروتکل‌های فاقد شناسه مستقل دستگاه، محدودیت فیزیکی هنوز قابل تأیید نیست.",
-    "en": "Honor per-subscription device override in security monitoring and count only fresh canonical sessions. Selectively disconnect excess OpenVPN management Client IDs after confirming exact session identity, preserving authorized clients. Cisco enforcement unchanged; physical-device enforcement remains unverified for shared-credential protocols. Preserve billing and expiration."
+    "fa": "رفع گلوگاه ثبت حجم و آنلاین پروتکل‌های مدرن: اولویت پردازش اتصال‌های واقعی و نشست‌های بسته‌شده دارای شمارنده نسبت به هزاران اکانت بدون فعالیت، محدودسازی پاکسازی آفلاین و ثبت زمان پردازش هر نود. بدون تغییر کانفیگ‌ها، اعتبارنامه‌ها، محاسبه حجم، تاریخ یا قطعی اتصال. دوره اعتبار حساب‌های انتقالی فاقد اطلاعات همچنان نیازمند تعیین مدت معتبر است.",
+    "en": "Urgent modern sing-box accounting: prioritize every authenticated live and retained closed connection ahead of dormant credential watermark maintenance, bound offline batches and report per-node sweep latency. Preserves canonical quota counter identity, billing, expiry and VPN configuration."
   }
 }
