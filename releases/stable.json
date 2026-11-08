@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.692",
+  "version": "1.1.0-rc.693",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-08T03:55:08Z",
+  "released_at": "2026-11-08T04:30:26Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "f840516167775298974f86cf1c9beaf1c85b8831",
+  "source_sha": "5c6957bc6a19706bf1850ca370b870bd8bf1d7ae",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.692/twinpanel-1.1.0-rc.692-linux-x86_64.tar.gz",
-    "sha256": "6d6c67fba5d7ab7092429c4144d29d3c6b849e2ae75044d9565ef77623908840",
-    "size_bytes": 29692076
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.693/twinpanel-1.1.0-rc.693-linux-x86_64.tar.gz",
+    "sha256": "2185f3a8cec7e95ae4b9a94d54dd652d02b8a995f1807a57ac5b745653d85494",
+    "size_bytes": 29707361
   },
   "notes": {
-    "fa": "رفع تأخیر شمارنده آنلاین OpenVPN: جمع‌آوری نشست واقعی OpenVPN هر حدود ۳۰ ثانیه به‌صورت مستقل از چرخه سنگین Cisco/Xray/L2TP؛ جلوگیری از اجرای هم‌زمان دو نویسنده OpenVPN؛ بدون تغییر اطلاعات اکانت، محدودیت دستگاه و تنظیمات سرویس VPN. خطای آمار یک یا دو دقیقه‌ای قبلی پس از اجرای چرخه سنگین برطرف می‌شود؛ صحت کامل پس از نصب و پایش واقعی بررسی شود.",
-    "en": "Independent authoritative OpenVPN management-socket telemetry every ~30 seconds rather than after the 120-second-plus heavy reconciliation. Single-writer ownership removes duplicate heavy OpenVPN sweeps; no customer data, quota, node configuration or VPN connection changes. Requires post-install live validation."
+    "fa": "رفع ریشه‌ای افزودن نود: ثبت یک‌باره کاربران فعال، همگام‌سازی گروهی Xray از تنظیمات تأییدشده همان نود، رفع برخورد نام ورود Naive/ShadowTLS بدون تغییر رمز یا UUID، هماهنگی قطع/وصل حساب با شناسه همان نود. نودها پس از تأیید ۱۶ سرویس منتشر می‌شوند و کانفیگ‌ها در بک‌اند تکمیل می‌شوند؛ صحت اتصال واقعی باید پس از نصب بررسی شود.",
+    "en": "Root fixes for central node enrollment: verified node-owned Xray public profile materialization; bounded batch hot-sync; deterministic collision-safe Naive/ShadowTLS identities with node-local revoke/restore; preserves mother credentials and old UUIDs. Live 16-family readiness and production canary required."
   }
 }
