@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.704",
-  "source_sha": "b39a90da429276f5051316bf3eaf63d3fb4045bf",
+  "version": "1.1.0-rc.705",
+  "source_sha": "873f319e3d7c6cc0e5e7040a62f1f1e433cd0fcd",
   "notes": {
-    "fa": "افزودن آشکارسازی بحرانی اتصال‌های ShadowTLS فاقد شناسه احراز هویت در لایه مشترک Shadowsocks و جلوگیری از معرفی آمار مصرف، آنلاین و محدودیت دستگاه ShadowTLS به‌عنوان اطلاعات دقیق کاربر تا زمان راه‌اندازی مسیر احراز هویت قابل انتساب. حفظ سرویس و کانفیگ‌های فعلی بدون بازنشانی یا تغییر گذرواژه. این نسخه رفع کامل احراز هویت در لایه داخلی نیست؛ رفع ریشه‌ای نیازمند انتقال شناسه کاربر در دیتاپلین و تست روی حساب آزمایشی است.",
-    "en": "Safety-only: flag unattributable ShadowTLS shared inner connections as critical node accounting integrity errors, fail closed per-user ShadowTLS presence/traffic capability claims, preserve other protocols, existing client configurations and VPN dataplane. This is not a ShadowTLS user-attribution dataplane fix; it requires an authenticated identity bridge and canary verification."
+    "fa": "نسخه rc.705: ترمیم مسیر بررسی سیستم‌عامل نود fin پس از موفقیت SSH و شکست کد ۱ روی فرمان چندخطی شل. اکنون خواندن فقط‌خواندنی با فرمان کوتاه Python3، cat /etc/os-release، cat /usr/lib/os-release و شل POSIX به ترتیب آزمایش می‌شود؛ Python3 الزامی نیست. هر شکست فقط با نام روش، کد خروجی و طول خروجی در لاگ ثبت می‌شود و هیچ مقدار محرمانه SSH نمایش داده نمی‌شود. Ubuntu/Debian همچنان الزامی است. نصب در صورت نامعتبر بودن سیستم‌عامل پیش از ایجاد نود/تغییر سرویس متوقف می‌شود. اصلاحات محافظت از IP نود ایران، قفل نصب هم‌زمان و خطاهای فارسی rc.703 و همچنین تغییرات rc.704 حفظ شده‌اند. برای اثبات نصب موفق فنلاند باید نسخه جدید از GitHub نصب و نتیجه واقعی بررسی شود؛ در صورت شکست همه فرمان‌ها، شل یا سیستم‌عامل VPS باید از کنسول ارائه‌دهنده بررسی شود.",
+    "en": "rc.705: Finland re-add SSH succeeds but multiline remote shell OS preflight exits 1. Add safe OS probes in priority order: short single-line Python3 (optional), plain cat /etc/os-release, plain cat /usr/lib/os-release, and POSIX shell. Diagnose each attempt by probe ID, exit status and byte count only; never log raw remote stdout/stderr or credentials. Fail closed unless genuine Ubuntu/Debian identity is read; do not change customer credentials, node listeners, or the mother host. Includes rc.704 plus rc.703 active-host collision protection and guarded provisioning. Live Finland installation remains unverified until tested from the official GitHub updater."
   }
 }
