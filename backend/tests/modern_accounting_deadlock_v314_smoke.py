@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+from contextlib import nullcontext
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -23,6 +24,10 @@ class _FakeDB:
 
     def rollback(self):
         self.events.append("db.rollback")
+
+    def begin_nested(self):
+        self.events.append("db.savepoint")
+        return nullcontext()
 
     def get(self, _model, node_id):
         assert int(node_id) == int(self.node.id)
@@ -131,6 +136,31 @@ def main() -> None:
         assert events.index("db.commit:1") < events.index("connect")
         assert events.index("connect") < events.index("db.commit:2")
         assert events.index("db.commit:2") < events.index("collect:wireguard")
+        # Every protocol batch gets its own savepoint, preserving other
+        # collectors when one protocol raises a validation/counter error.
+        assert events.count("db.savepoint") == 2
+
+        events.clear()
+        def failing_apply_wg(_db, **kwargs):
+            if kwargs["devices"][0]["device_id"] == 91:
+                raise RuntimeError("bad_wireguard_cursor")
+            events.append("salvaged:wireguard")
+            return {"collector": "wireguard", "node_id": 5}
+        runtime.canonical._apply_wireguard_like = failing_apply_wg
+        runtime.canonical._apply_trusttunnel = fake_apply_tt
+        recovered = runtime._apply_collected_node_runtime(
+            db, node_id=5, grouped=grouped,
+            collected={
+                "wireguard": (True, "epoch-wg", [], None),
+                "trusttunnel": (True, "epoch-tt", [], None),
+            },
+        )
+        assert recovered[0]["collector"] == "wireguard"
+        assert recovered[0]["ok"] is False
+        assert recovered[0]["failed_devices"] == 1
+        assert recovered[1]["collector"] == "trusttunnel"
+        assert recovered[1]["ok"] is True
+
     finally:
         runtime.canonical._devices_by_protocol = old_grouped
         runtime.connect_protocol_runtime = old_connect
