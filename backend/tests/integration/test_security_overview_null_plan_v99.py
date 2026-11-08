@@ -3,6 +3,7 @@ from types import SimpleNamespace
 from app.models import Plan, Subscription, User
 from app.quota_models import QuotaDevice, QuotaSession, QuotaUsageEvent
 from app.routers.admin import security_overview
+from app.subscription_override_models import SubscriptionRuntimeOverride
 
 
 class FakeQuery:
@@ -38,7 +39,9 @@ class FakeDB:
             email="legacy@example.com",
         )
 
-    def query(self, model):
+    def query(self, model, *rest):
+        if rest and getattr(model, "key", None) == "subscription_id" and getattr(model, "table", None) is SubscriptionRuntimeOverride.__table__:
+            return FakeQuery([])
         if model is Subscription:
             return FakeQuery([self.subscription])
         if model is User:

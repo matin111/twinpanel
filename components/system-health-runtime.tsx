@@ -179,7 +179,7 @@ export function SystemHealthRuntimePage(){
             <td><b>{asText(row.user_name)||`User #${asText(row.user_id)}`}</b><small dir="ltr">{asText(row.email)||"—"}</small></td>
             <td><b>#{id||"—"}</b><small>{asText(row.plan_name)||"—"}</small></td>
             <td><Badge tone={riskTone(risk)}>{riskLabel} · {toNumber(row.risk_score)}</Badge>{reasons.length>0&&<details className="runtime-details"><summary>{pick("دلایل","Reasons")} ({reasons.length})</summary><div>{reasons.map((reason,index)=><small key={index}>{reason}{index<reasons.length-1?<br/>:null}</small>)}</div></details>}</td>
-            <td><b>{activeDevices} / {deviceLimit||1}</b><small>{pick(`${toNumber(row.active_sessions)} نشست فعال`,`${toNumber(row.active_sessions)} active sessions`)}</small></td>
+            <td><b>{activeDevices} / {deviceLimit===0?pick("نامحدود","Unlimited"):deviceLimit}</b><small>{pick(`${toNumber(row.active_sessions)} نشست تازه ثبت‌شده (شناسه اعتبارنامه، نه دستگاه فیزیکی)`,`${toNumber(row.active_sessions)} recently observed sessions (credential ID, not physical hardware)`)}</small></td>
             <td><b>{pick(`${toNumber(row.recent_devices_24h)} دستگاه`,`${toNumber(row.recent_devices_24h)} devices`)}</b><small>{pick(`${toNumber(row.recent_ips_24h)} آی‌پی`,`${toNumber(row.recent_ips_24h)} IPs`)}{recentIps.length?` · ${recentIps.slice(0,3).join(", ")}`:""}</small></td>
             <td><b dir="ltr">{formatBytes(row.usage_24h_bytes)}</b><small>{row.has_telemetry===false?pick("بدون داده اخیر","No recent telemetry"):pick("داده ۲۴ ساعت اخیر","Last 24 hours")}</small></td>
             <td><Badge tone={status==="active"?"ok":status==="suspended"?"warn":"violet"}>{statusLabel}</Badge></td>
@@ -192,7 +192,7 @@ export function SystemHealthRuntimePage(){
     </Card>
 
     <Card>
-      <div className="card-head"><div><b>{pick("قوانین تشخیص ریسک","Risk detection rules")}</b><small>{pick(`بازه تحلیل: ${toNumber(security.window_hours)||24} ساعت`,`Analysis window: ${toNumber(security.window_hours)||24} hours`)}</small></div><Badge tone="violet">{pick("تعلیق خودکار خاموش است","Auto-suspend is off")}</Badge></div>
+      <div className="card-head"><div><b>{pick("قوانین تشخیص ریسک","Risk detection rules")}</b><small>{pick("این صفحه صرفاً پایش می‌کند؛ شمارش دستگاه فیزیکی در همه پروتکل‌ها قابل تأیید نیست.","This page is monitoring only; physical device counts are not verifiable on all protocols.")}</small></div><Badge tone="violet">{pick("تعلیق خودکار خاموش است","Auto-suspend is off")}</Badge></div>
       <div className="runtime-info-list">
         <div><span>{pick("عبور از سقف دستگاه هم‌زمان","Concurrent device limit")}</span><b>{asText(rules.device_limit)||"—"}</b></div>
         <div><span>{pick("تغییر زیاد دستگاه","Device churn")}</span><b>{asText(rules.device_churn)||"—"}</b></div>

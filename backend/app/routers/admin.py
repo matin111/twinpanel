@@ -1177,8 +1177,10 @@ def security_overview(
         QuotaSession,
         QuotaUsageEvent,
     )
+    from ..subscription_override_models import SubscriptionRuntimeOverride
 
     now = datetime.utcnow()
+    presence_cutoff = now - timedelta(seconds=180)
     since_24h = now - timedelta(hours=24)
 
     def enum_value(value):
@@ -1269,6 +1271,15 @@ def security_overview(
         )
     }
 
+    # Explicit per-subscription device limits override plan defaults.
+    # Load once; the security page must not issue 2000+ per-row queries.
+    override_rows = (
+        db.query(SubscriptionRuntimeOverride.subscription_id, SubscriptionRuntimeOverride.device_limit)
+        .filter(SubscriptionRuntimeOverride.device_limit.isnot(None))
+        .all()
+    )
+    device_limit_overrides = {int(sid): max(int(value), 0) for sid, value in override_rows}
+
     # -----------------------------------------------------
     # Load telemetry. Attribute selection is defensive so
     # the endpoint follows the installed quota schema.
@@ -1289,11 +1300,9 @@ def security_overview(
     )
 
     if session_time_attr is not None:
-        session_query = (
-            session_query
-            .filter(
-                session_time_attr >= since_24h
-            )
+        # A long-lived active session may have started before the 24h window.
+        session_query = session_query.filter(
+            or_(session_time_attr >= since_24h, QuotaSession.last_seen_at >= since_24h)
         )
 
     sessions = (
@@ -1510,6 +1519,14 @@ def security_overview(
             )
         )
 
+        # Stale active ledger entries must not be treated as current sessions.
+        is_open = bool(
+            is_open
+            and isinstance(getattr(session, "last_seen_at", None), datetime)
+            and session.last_seen_at >= presence_cutoff
+            and closed_at is None
+        )
+
         if is_open:
             bucket[
                 "active_sessions"
@@ -1587,14 +1604,19 @@ def security_overview(
 
         stats = session_stats[sid]
 
-        device_limit = max(
-            0,
-            int(
-                getattr(plan, "device_limit", 1)
-                if getattr(plan, "device_limit", None) is not None
-                else 1
-            ),
-        )
+        device_limit = device_limit_overrides.get(sid)
+        device_limit_source = "subscription" if device_limit is not None else "plan"
+        if device_limit is None:
+            device_limit = max(
+                0,
+                int(
+                    getattr(plan, "device_limit", 1)
+                    if getattr(plan, "device_limit", None) is not None
+                    else 1
+                ),
+            )
+            if plan is None:
+                device_limit_source = "default"
 
         active_sessions = int(
             stats["active_sessions"]
@@ -1724,6 +1746,9 @@ def security_overview(
                     sub.status
                 ),
                 "device_limit": device_limit,
+                "device_limit_source": device_limit_source,
+                # QuotaDevice represents a credential on several protocols.
+                "physical_device_count_verified": False,
                 "active_sessions": active_sessions,
                 "active_devices": active_devices,
                 "recent_devices_24h": recent_devices,
@@ -1802,6 +1827,8 @@ def security_overview(
             "ip_churn":
                 "IPهای متفاوت زیاد در ۲۴ ساعت",
             "automatic_suspend": False,
+            "physical_device_count_verified": False,
+            "monitoring_only": True,
         },
         "items": rows[:500],
     }

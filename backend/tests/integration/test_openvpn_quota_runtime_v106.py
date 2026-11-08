@@ -59,6 +59,7 @@ def main() -> None:
         {
             "identity": "mv11n5",
             "session_identity": "mv11n5:1792481836:0",
+            "client_id": 0,
             "uplink": 5471307,
             "downlink": 41405170,
         }
@@ -69,8 +70,9 @@ def main() -> None:
         runtime_tree,
         "_openvpn_device_map",
     )
-    assert 'item.get("telemetry_identity")' in device_map
-    assert 'item.get("identity")' not in device_map
+    assert "_runtime_identity(" in device_map
+    assert "_credential_node_ids(" in device_map
+    assert 'item.get("identity")' in device_map
 
     apply_source = _function_source(
         runtime,
