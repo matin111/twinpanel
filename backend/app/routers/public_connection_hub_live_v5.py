@@ -114,7 +114,7 @@ _LIVE_SCRIPT = r"""
   const byId=id=>document.getElementById(id);
   const used=byId('liveUsed'),remaining=byId('liveRemaining'),total=byId('liveTotal');
   const start=byId('liveStart'),expire=byId('liveExpire'),expiryDays=byId('liveExpiryDays'),percent=byId('livePercent');
-  const donut=byId('trafficDonut'),status=byId('liveStatus'),traffic=byId('trafficCard'),deviceLimit=byId('liveDeviceLimit'),deviceActive=byId('liveActiveSessions');
+  const donut=byId('trafficDonut'),status=byId('liveStatus'),traffic=byId('trafficCard'),deviceLimit=byId('liveDeviceLimit'),deviceActive=byId('liveActiveSessions'),deviceCombined=byId('liveDeviceCombined'),durationMetric=byId('liveDurationMetric');
   let previous='';
 
   function bytes(value){
@@ -213,6 +213,8 @@ _LIVE_SCRIPT = r"""
     const cap=Number(payload.device_limit||0),activeSessions=Math.max(0,Number(payload.active_sessions||0));
     write(deviceLimit,cap===0?'نامحدود':nf.format(cap)+' دستگاه');
     write(deviceActive,nf.format(activeSessions));
+    write(deviceCombined,nf.format(activeSessions)+' / '+(cap===0?'∞':nf.format(cap)));
+    write(durationMetric,payload.duration_unlimited===true?'نامحدود':Math.max(0,Math.trunc(Number(payload.activation_duration_days||0)))>0?nf.format(Math.trunc(Number(payload.activation_duration_days)))+' روز':'تعیین نشده');
     if(donut)donut.style.setProperty('--pct',String(pct));
 
     const connected=payload.connection_online===true||Number(payload.active_sessions||0)>0;
@@ -364,14 +366,14 @@ def public_connection_hub_live_v5(
     # rows. Keep exactly the five requested metrics without changing quota data.
     metrics = (
         '<div class="stats">'
-        '<div class="stat"><small>تعداد مجاز</small><strong id="liveDeviceLimit">—</strong></div>'
-        '<div class="stat"><small>تعداد متصل</small><strong id="liveActiveSessions">—</strong></div>'
+        '<div class="stat"><small>دستگاه متصل / مجاز</small><strong id="liveDeviceCombined" dir="ltr">—</strong></div>'
+        '<div class="stat"><small>مدت اشتراک</small><strong id="liveDurationMetric">—</strong></div>'
         '<div class="stat"><small>مصرف‌شده</small><strong id="liveUsed">—</strong></div>'
         '<div class="stat"><small>باقی‌مانده</small><strong id="liveRemaining">—</strong></div>'
         '<div class="stat"><small>تاریخ انقضا</small><strong id="liveExpire">—</strong><span id="liveExpiryDays" class="tp-expiry-days" style="display:block;margin-top:5px;font-size:11px;line-height:1.6;color:#b5c7e5;white-space:normal">—</span></div>'
         '</div>'
         # Preserve invisible legacy bindings that the live-refresh JS expects.
-        '<span id="liveTotal" hidden></span><span id="liveStart" hidden></span>'
+        '<span id="liveTotal" hidden></span><span id="liveStart" hidden></span><span id="liveDeviceLimit" hidden></span><span id="liveActiveSessions" hidden></span>'
     )
     source, metric_count = re.subn(
         r'<div class="stats">(?:(?!</section>).)*?</div></section>',
@@ -395,8 +397,17 @@ def public_connection_hub_live_v5(
         cap = int(live.get("device_limit") or 0)
         sessions = max(int(live.get("active_sessions") or 0), 0)
         source = source.replace(
-            '<strong id="liveDeviceLimit">—</strong>',
-            '<strong id="liveDeviceLimit">' + (str(cap) + ' دستگاه' if cap else 'نامحدود') + '</strong>',
+            '<strong id="liveDeviceCombined" dir="ltr">—</strong>',
+            '<strong id="liveDeviceCombined" dir="ltr">' + str(sessions) + ' / ' + (str(cap) if cap else '∞') + '</strong>',
+            1,
+        )
+        valid_days = max(int(live.get("activation_duration_days") or 0), 0)
+        duration_label = 'نامحدود' if live.get("duration_unlimited") is True else (
+            str(valid_days) + ' روز' if valid_days else 'تعیین نشده'
+        )
+        source = source.replace(
+            '<strong id="liveDurationMetric">—</strong>',
+            '<strong id="liveDurationMetric">' + duration_label + '</strong>',
             1,
         )
         source = source.replace(
