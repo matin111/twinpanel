@@ -67,6 +67,10 @@ from .xray_customer_profile_policy_v30 import (
 from .xray_adaptive_three_profiles_v47 import (
     apply_xray_adaptive_three_profiles_v47,
 )
+from .xray_domainless_vision_v50 import (
+    apply_xray_domainless_vision_v50,
+    reattach_service_routes_v50_after_v87,
+)
 from .tunnel_service_connections_admin_runtime import (
     apply_tunnel_service_connections_admin_runtime,
 )
@@ -294,6 +298,7 @@ def apply_self_hosted_runtime(
     apply_xray_reconcile_infra_v41()
     apply_xray_customer_profile_policy_v30()
     apply_xray_adaptive_three_profiles_v47()
+    apply_xray_domainless_vision_v50()
 
     # Hot VLESS credential provisioning: no global Xray restarts on purchases.
     # Keep the original public routes and other VPN protocols unchanged.
@@ -329,6 +334,7 @@ def apply_self_hosted_runtime(
         reattach_service_routes_v47_after_v87,
     )
     reattach_service_routes_v47_after_v87()
+    reattach_service_routes_v50_after_v87()
 
     # ------------------------------------------------------------
     # Unified L3 Core V49 + candidate registry V79
