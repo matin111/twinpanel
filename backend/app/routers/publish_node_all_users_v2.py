@@ -6,16 +6,18 @@ manual-only as configured in TwinPanel.
 """
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from ..database import get_db
+from ..database import SessionLocal, get_db
 from ..deps import require_admin
-from ..models import Node, NodeType
+from ..models import Node, NodeProtocolConfig, NodeStatus, NodeType, SubscriptionNode
 from ..services.node_auto_backfill_v1 import enqueue_node_backfill, job_status
 from . import modern_legacy_reconcile_lockfix_v2 as _modern_lockfix  # noqa: F401
 from . import publish_node_all_users_v1 as legacy_publish
@@ -237,6 +239,152 @@ def read_central_stage_coverage_v1(
         return verify_coverage(db, node_id)
     except RuntimeError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+# Cisco recovery is a bounded BACKGROUND repair, never a second full
+# installation or a per-subscriber SSH loop. Admin explicitly decides whether
+# to publish after the 16-listener check; a failed install did not persist the
+# original publish checkbox, so silently assuming consent is unsafe.
+class HiddenExitCiscoRepairIn(BaseModel):
+    publish_to_all_users: bool = False
+
+
+_CISCO_REPAIR_PENDING: set[int] = set()
+_CISCO_REPAIR_TASKS: set[asyncio.Task[Any]] = set()
+
+
+def _require_hidden_cisco_repair_ready(db: Session, node_id: int):
+    from ..node_install_progress_models_v1 import NodeInstallProgressV1
+
+    node = db.get(Node, int(node_id))
+    if (node is None or node.retired_at is not None
+            or node.node_type != NodeType.EXIT
+            or node.status != NodeStatus.ONLINE or node.show_to_users):
+        raise HTTPException(status_code=409,detail="CISCO_REPAIR_REQUIRES_HIDDEN_ONLINE_EXIT")
+    job = (db.query(NodeInstallProgressV1)
+           .filter(NodeInstallProgressV1.node_id == int(node_id))
+           .order_by(NodeInstallProgressV1.created_at.desc()).first())
+    if (job is None or job.state != "failed" or job.stage != "failed"
+            or job.error_code not in {
+                "PROTOCOL_SETUP_INCOMPLETE", "CISCO_REPAIR_FAILED",
+            }):
+        raise HTTPException(status_code=409,detail="CISCO_REPAIR_REQUIRES_FAILED_INSTALL")
+    if db.query(SubscriptionNode).filter(
+            SubscriptionNode.node_id == int(node_id)).first() is not None:
+        raise HTTPException(status_code=409,detail="CISCO_REPAIR_NODE_HAS_MEMBERSHIPS")
+    rows = db.query(NodeProtocolConfig).filter(
+        NodeProtocolConfig.node_id == int(node_id)).all()
+    status = {str(row.protocol):str(row.status).lower() for row in rows}
+    from ..services.new_node_readiness_v1 import ALL_PROTOCOL_KEYS
+    if set(status) != set(ALL_PROTOCOL_KEYS) or {
+        protocol for protocol,state in status.items() if state != "online"
+    } != {"cisco"}:
+        raise HTTPException(status_code=409,detail="CISCO_REPAIR_ONLY_ONE_FAILED_SERVICE")
+    return job
+
+
+async def _recover_hidden_cisco_node(node_id: int, *, publish: bool) -> None:
+    from ..node_install_progress_models_v1 import NodeInstallProgressV1
+    from .classic_protocol_admin_v1 import (
+        EnsureClassicProtocolIn, ensure_classic_protocol,
+    )
+    from ..services.new_node_readiness_v1 import verify_new_exit_readiness
+
+    try:
+        with SessionLocal() as db:
+            try:
+                # All existing healthy services and account credentials are
+                # left untouched. Only the Cisco service is repaired.
+                repaired = await ensure_classic_protocol(
+                    EnsureClassicProtocolIn(
+                        node_id=int(node_id), protocol="cisco",
+                    ),
+                    db=db,
+                )
+                if not repaired.get("ok") or not repaired.get("enabled"):
+                    raise RuntimeError("CISCO_REPAIR_NOT_CONFIRMED")
+                live = await verify_new_exit_readiness(db, int(node_id))
+                if not live.get("ok") or int(live.get("ready_count") or 0) != 16:
+                    raise RuntimeError("CISCO_REPAIR_ALL_LISTENERS_NOT_READY")
+                job = db.query(NodeInstallProgressV1).filter(
+                    NodeInstallProgressV1.node_id == int(node_id)
+                ).order_by(NodeInstallProgressV1.created_at.desc()).first()
+                if job is None or job.state != "running":
+                    raise RuntimeError("CISCO_REPAIR_INSTALL_STATE_CHANGED")
+                job.stage = "verified_ready"
+                job.installed_protocols = 16
+                job.updated_at = datetime.utcnow()
+                db.commit()
+                if publish:
+                    # Reuse the SAME central, guarded membership + detached
+                    # daemon-family stage as a fresh 16/16 healthy node.
+                    await reverify_and_stage_existing_exit_v1(int(node_id),db)
+                else:
+                    job.state = "completed"
+                    job.stage = "completed"
+                    job.error_code = None
+                    job.updated_at = datetime.utcnow()
+                    db.commit()
+                print("CENTRAL_HIDDEN_CISCO_REPAIR_OK",{
+                    "node_id":int(node_id),"listeners_ready":16,
+                    "published_by_admin_request":bool(publish),
+                    "prior_protocols_reinstalled":0,
+                },flush=True)
+            except Exception as exc:
+                db.rollback()
+                # Never log raw SSH exceptions: they may include credentials.
+                job = db.query(NodeInstallProgressV1).filter(
+                    NodeInstallProgressV1.node_id == int(node_id)
+                ).order_by(NodeInstallProgressV1.created_at.desc()).first()
+                if job is not None and job.state != "completed":
+                    job.state = "failed"
+                    job.stage = "failed"
+                    job.error_code = "CISCO_REPAIR_FAILED"
+                    job.updated_at = datetime.utcnow()
+                    db.commit()
+                print("CENTRAL_HIDDEN_CISCO_REPAIR_FAILED",{
+                    "node_id":int(node_id),"error_type":type(exc).__name__,
+                },flush=True)
+    finally:
+        _CISCO_REPAIR_PENDING.discard(int(node_id))
+
+
+@router.post("/{node_id}/central-stage/repair-cisco",status_code=202)
+async def repair_cisco_and_resume_hidden_exit_v1(
+    node_id: int, payload: HiddenExitCiscoRepairIn,
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """Resume only Cisco on a hidden failed 15/16 Exit; never reinstall others."""
+    if int(node_id) in _CISCO_REPAIR_PENDING:
+        raise HTTPException(status_code=409,detail="CISCO_REPAIR_ALREADY_RUNNING")
+    job = _require_hidden_cisco_repair_ready(db, int(node_id))
+    job.state = "running"
+    job.stage = "installing_base"
+    job.error_code = None
+    job.updated_at = datetime.utcnow()
+    db.commit()
+    _CISCO_REPAIR_PENDING.add(int(node_id))
+    try:
+        task=asyncio.create_task(_recover_hidden_cisco_node(
+            int(node_id),publish=bool(payload.publish_to_all_users),
+        ),name=f"central-cisco-repair:{int(node_id)}")
+    except Exception:
+        _CISCO_REPAIR_PENDING.discard(int(node_id))
+        job.state = "failed"
+        job.stage = "failed"
+        job.error_code = "CISCO_REPAIR_SCHEDULING_FAILED"
+        job.updated_at = datetime.utcnow()
+        db.commit()
+        raise HTTPException(status_code=503,detail="CISCO_REPAIR_SCHEDULING_FAILED")
+    _CISCO_REPAIR_TASKS.add(task)
+    task.add_done_callback(_CISCO_REPAIR_TASKS.discard)
+    return {
+        "ok":True,"queued":True,"node_id":int(node_id),
+        "job_id":job.job_id,
+        "status_url":f"/v1/nodes/install-jobs/{job.job_id}",
+        "publish_after_verification":bool(payload.publish_to_all_users),
+        "repairs_only":["cisco"],"no_account_rebuild":True,
+    }
 
 
 @router.post("/{node_id}/central-stage/reverify")

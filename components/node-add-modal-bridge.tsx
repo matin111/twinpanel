@@ -64,7 +64,7 @@ function NodeInstallProgress({job,error}:{job:NodeInstallJob|null;error:string})
       <div className={"node-install-orb "+(failed?"is-failed":finished?"is-done":"is-working")} aria-hidden="true">◉</div>
       <div>
         <b>{job?.node_name||pick("آماده‌سازی سرور","Preparing server")}</b>
-        <small>{failed?pick("نصب کامل تأیید نشده است","Installation is not confirmed"):waiting?pick("کاربران به نود منتسب شده‌اند؛ اعمال کانفیگ‌ها هنوز در صف مرکزی است","Accounts are assigned; configuration application is still queued centrally"):finished?pick("نود ثبت و نمایش داده شد؛ کانفیگ‌های آماده به‌ترتیب اضافه می‌شوند و تکمیل بقیه در بک‌اند ادامه دارد","Node is visible; ready configs appear progressively while backend sync continues"):pick("وضعیت مراحل مستقیماً از سرور خوانده می‌شود","Stages are read directly from the server")}</small>
+        <small>{failed?pick("نصب کامل تأیید نشده است","Installation is not confirmed"):waiting?pick("کاربران به نود منتسب شده‌اند؛ اعمال کانفیگ‌ها هنوز در صف مرکزی است","Accounts are assigned; configuration application is still queued centrally"):finished?pick("نصب به پایان رسید؛ وضعیت نمایش نود و کانفیگ‌های آماده را بررسی کنید","Installation is complete; check node publication and ready configurations"):pick("وضعیت مراحل مستقیماً از سرور خوانده می‌شود","Stages are read directly from the server")}</small>
       </div>
     </div>
     <div className={"node-install-running-line "+(pending?"is-active":"")} aria-hidden="true"><span/></div>
@@ -100,6 +100,9 @@ export function NodeAddModalBridge(){
   const [jobId,setJobId]=useState("");
   const [job,setJob]=useState<NodeInstallJob|null>(null);
   const [jobError,setJobError]=useState("");
+  // Failed installs do not retain the original publish preference. Require
+  // an explicit fresh choice rather than exposing a node automatically.
+  const [publishAfterRepair,setPublishAfterRepair]=useState(false);
 
 
   useEffect(()=>{
@@ -145,7 +148,7 @@ export function NodeAddModalBridge(){
   const resetInstall=()=>{
     try{window.localStorage.removeItem(NODE_JOB_STORAGE);}catch{}
     setJobId("");setJob(null);setJobError("");setError("");setOk("");
-    setDraft(defaultDraft);setPublishToAll(true);setOpen(true);
+    setDraft(defaultDraft);setPublishToAll(true);setPublishAfterRepair(false);setOpen(true);
   };
 
   const test=async()=>{
@@ -186,6 +189,28 @@ export function NodeAddModalBridge(){
     }
   };
 
+  const repairFailedCisco=async()=>{
+    if(busy||!job?.node_id||!jobId)return;
+    const token=getCustomerToken();
+    if(!token){setError("AUTH_REQUIRED");return;}
+    setBusy("repair");setError("");setOk("");setJobError("");
+    try{
+      const response=await fetch(API_BASE+"/v1/nodes/"+job.node_id+"/central-stage/repair-cisco",{
+        method:"POST",cache:"no-store",
+        headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},
+        body:JSON.stringify({publish_to_all_users:publishAfterRepair}),
+      });
+      const raw=await response.text();
+      if(!response.ok)throw new Error(raw||"Cisco repair HTTP "+response.status);
+      const result=JSON.parse(raw) as {job_id?:string;queued?:boolean};
+      if(!result.queued||result.job_id!==jobId)throw new Error("CISCO_REPAIR_JOB_MISMATCH");
+      setJob(current=>current?{...current,state:"running",stage:"installing_base",error_code:null}:current);
+      setOk(pick("ترمیم Cisco در بک‌اند شروع شد؛ ۱۵ پروتکل سالم تغییر نمی‌کنند.","Cisco-only background repair started; the other 15 services remain unchanged."));
+    }catch(reason){
+      setError(reason instanceof Error?reason.message:String(reason));
+    }finally{setBusy("");}
+  };
+
   return <>
     {!open&&jobId?<button className="node-install-reopen" type="button" onClick={()=>setOpen(true)}>{pick("مشاهده مراحل افزودن نود","View server installation stages")} · {job?.node_name||pick("در حال دریافت وضعیت","Loading status")}{job?.state==="running"?" ●":""}</button>:null}
     {!open&&ok?<div className="runtime-success" style={{marginBottom:12}}>{ok}</div>:null}
@@ -198,6 +223,12 @@ export function NodeAddModalBridge(){
       {ok?<div className="runtime-success">{ok}</div>:null}
       {jobId?<div>
         <NodeInstallProgress job={job} error={jobError}/>
+        {job?.state==="failed"&&["PROTOCOL_SETUP_INCOMPLETE","CISCO_REPAIR_FAILED"].includes(job.error_code||"")&&job.node_id?
+          <div className="runtime-choice-section">
+            <div className="runtime-warning">{pick("نصب یک پروتکل ناقص مانده است. فقط Cisco را ترمیم کن؛ ۱۵ پروتکل سالم دوباره نصب نمی‌شوند.","One protocol is incomplete. Repair only Cisco; do not reinstall the 15 healthy protocols.")}</div>
+            <label className="toggle module-toggle"><span>{pick("بعد از تأیید همه ۱۶ پروتکل، نود برای کاربران مجاز نمایش داده شود","Publish to eligible users after all 16 services pass health checks")}</span><input type="checkbox" checked={publishAfterRepair} onChange={e=>setPublishAfterRepair(e.target.checked)}/><i/></label>
+            <button className="primary-soft" type="button" disabled={Boolean(busy)} onClick={()=>void repairFailedCisco()}>{busy==="repair"?pick("در حال شروع ترمیم...","Starting repair..."):pick("ترمیم Cisco و ادامه نصب همین نود","Repair Cisco and resume this node")}</button>
+          </div>:null}
         <div className="action-row" style={{marginTop:16}}>
           <button className="primary-soft" type="button" onClick={()=>setOpen(false)}>{pick("بستن و ادامه در پس‌زمینه","Close; keep processing")}</button>
           <button className="ghost" type="button" onClick={resetInstall}>{pick("افزودن سرور دیگر","Add another server")}</button>
