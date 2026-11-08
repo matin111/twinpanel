@@ -1422,6 +1422,10 @@ async def reconcile_tunnels(client):
                 "ssh_tun",
                 "ssh_relay",
                 "backhaul",
+                # TP27 Fast is a kernel GRE/FoU data interface, never
+                # a WireGuard device. Reconcile its installed service and
+                # peer reachability instead of running wg set on tp27*.
+                "tp27_fast",
             }
 
             if any(
