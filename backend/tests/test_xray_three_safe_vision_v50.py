@@ -18,12 +18,16 @@ os.environ.setdefault("NODE_AGENT_SHARED_SECRET","ci-xray-v50-agent")
 from app import central_xray_node_authority_v1 as authority
 from app import xray_adaptive_three_profiles_v47 as v47
 from app import xray_domainless_vision_v50 as vision
+from app import xray_tcp_tls_v39 as tcp_tls
 from app import xray_hot_client_sync_v1 as hot
 from app import xray_bulk_hot_sync_pilot_v1 as bulk
 
 class XrayThreeSafeProfileTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        # Production hook order installs TCP TLS metadata and V47 before V50.
+        tcp_tls.apply_xray_tcp_tls_v39()
+        v47.apply_xray_adaptive_three_profiles_v47()
         vision.apply_xray_domainless_vision_v50()
 
     def setUp(self):
