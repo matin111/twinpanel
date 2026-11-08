@@ -5,8 +5,9 @@ Eylan can have different UUIDs across old nodes. Those old identities remain
 untouched. The new Exit gets one stable UUID selected from the same account
 (prefer the node-local UUID when repairing a partial profile).
 
-Required XHTTP/TCP Reality or TLS profiles are materialized from a *verified
-same-node* template. Only the Xray HandlerService hot-client path is used.
+Required XHTTP/TCP Reality or TLS profiles come from a read-only verified
+node-wide Xray authority, never another subscriber's template.
+Only the Xray HandlerService hot-client path is used.
 Default read-only. --apply requires exact node ID confirmation.
 """
 from __future__ import annotations
@@ -35,7 +36,10 @@ from app.models import (
 from app.routers import account_delivery as ad
 from app.xray_adaptive_three_profiles_v47 import _required_profiles_v47
 from app.xray_bulk_hot_sync_pilot_v1 import _REMOTE
-from app.xray_bulk_profile_factory_v1 import build_node_item_from_template
+from app.central_xray_node_authority_v1 import (
+    read_node_public_authority, build_item_from_node_authority,
+    validate_public_authority,
+)
 from app.services.new_node_readiness_v1 import verify_new_exit_readiness
 from app.services.central_backfill_priority_v1 import new_account_work_has_priority
 
@@ -128,26 +132,7 @@ def eligible(db,node_id:int):
     return subs,creds
 
 
-def same_node_template(db,node_id:int,required:set[str]):
-    for cred in db.query(ProtocolCredential).filter(
-        ProtocolCredential.protocol=="v2ray",
-        ProtocolCredential.is_active.is_(True),
-    ).order_by(ProtocolCredential.subscription_id.desc()):
-        for item in ad._autosync_credential_items(cred):
-            if ad._autosync_item_node_id(item)!=node_id:
-                continue
-            ident=uuid_from_item(item)
-            if not ident:
-                continue
-            have={str(p.get("id") or "").strip().lower()
-                  for p in (item.get("profiles") or [])
-                  if isinstance(p,dict) and p.get("uri")}
-            if required.issubset(have):
-                return item,ident
-    raise RuntimeError("XRAY_SAME_NODE_COMPLETE_TEMPLATE_MISSING")
-
-
-def plan(db,node_id:int,limit:int):
+def plan(db,node_id:int,limit:int,*,required_profile_ids:set[str]|None=None):
     node=db.get(Node,node_id)
     if (node is None or node.retired_at is not None
         or node.node_type!=NodeType.EXIT or node.status!=NodeStatus.ONLINE
@@ -157,8 +142,8 @@ def plan(db,node_id:int,limit:int):
         node_id=node_id,protocol="v2ray").first()
     if cfg is None or str(getattr(cfg.status,"value",cfg.status)).lower()!="online":
         raise RuntimeError("XRAY_NODE_PROTOCOL_NOT_READY")
-    required=_required_profiles_v47(node)
-    template,source_uuid=same_node_template(db,node_id,required)
+    required=(set(required_profile_ids) if required_profile_ids is not None
+              else _required_profiles_v47(node))
     subs,creds=eligible(db,node_id)
     selected=[]
     for sub in subs:
@@ -179,16 +164,7 @@ def plan(db,node_id:int,limit:int):
         except RuntimeError:
             continue
         label=str(sub.account_username or f"user{sub.id}")[:100]
-        if ident==source_uuid:
-            # A same-subscription template is already complete and skipped.
-            # Never rotate UUID just to make a template copy succeed.
-            raise RuntimeError("XRAY_TEMPLATE_UUID_COLLISION")
-        item=build_node_item_from_template(
-            template,node_id=node_id,template_uuid=source_uuid,
-            client_uuid=ident,account_label=label,
-            required_profile_ids=required,
-        )
-        selected.append((int(sub.id),ident,item))
+        selected.append((int(sub.id),ident,label))
         if len(selected)>=limit:
             break
     if len({ident for _,ident,_ in selected})!=len(selected):
@@ -203,7 +179,7 @@ async def run_one(db,node_id:int,limit:int,apply:bool)->int:
         "selected":len(selected),"required_profiles":len(required),
         "write_enabled":apply,
     }),flush=True)
-    if not selected or not apply:
+    if not apply:
         return 0
     # A published centrally owned Exit IS the live purchase reconciler.
     # Blocking it because there is new-account work creates a deadlock:
@@ -211,11 +187,28 @@ async def run_one(db,node_id:int,limit:int,apply:bool)->int:
     # During initial hidden-node bulk import, keep the priority guard.
     if not node.show_to_users and new_account_work_has_priority():
         raise RuntimeError("PAID_ACCOUNT_PROVISIONING_HAS_PRIORITY")
-    entries=[(ident,f"mv-{sid}@twinpanel") for sid,ident,_ in selected]
-    remote_script=staged_hot_script(entries)
-    payload=base64.b64encode(remote_script.encode()).decode("ascii")
     conn=await asyncio.wait_for(ad.ssh_connect_saved(node,db),timeout=25)
     try:
+        # One read-only probe supplies the node's actual public settings.
+        # It never returns a private key, full Xray config or client records.
+        authority=await read_node_public_authority(conn)
+        applied_profiles=set(validate_public_authority(authority))
+        if applied_profiles!=required:
+            # Handle nodes whose DB TLS metadata lags the installed service.
+            node,eligible_count,selected,required=plan(
+                db,node_id,limit,required_profile_ids=applied_profiles,
+            )
+        if not selected:
+            return 0
+        prepared=[
+            (sid,ident,build_item_from_node_authority(
+                db,node,client_uuid=ident,account_label=label,
+                authority=authority,
+            )) for sid,ident,label in selected
+        ]
+        entries=[(ident,f"mv-{sid}@twinpanel") for sid,ident,_ in prepared]
+        remote_script=staged_hot_script(entries)
+        payload=base64.b64encode(remote_script.encode()).decode("ascii")
         result=await asyncio.wait_for(
             conn.run("printf '%s' "+shlex.quote(payload)+" | base64 -d | python3",
                      check=False,timeout=220),timeout=235,
@@ -234,18 +227,18 @@ async def run_one(db,node_id:int,limit:int,apply:bool)->int:
     db.expire_all()
     subs,creds=eligible(db,node_id)
     entitled={int(s.id) for s in subs}
-    if not {sid for sid,_,_ in selected}.issubset(entitled):
+    if not {sid for sid,_,_ in prepared}.issubset(entitled):
         raise RuntimeError("XRAY_ENTITLEMENT_CHANGED_DURING_STAGE")
     if not allow_central_node(db,db.get(Node,node_id)):
         raise RuntimeError("XRAY_STAGED_NODE_PUBLISHED_EARLY")
     current_creds={
         int(c.subscription_id):c for c in db.query(ProtocolCredential).filter(
-            ProtocolCredential.subscription_id.in_([sid for sid,_,_ in selected]),
+            ProtocolCredential.subscription_id.in_([sid for sid,_,_ in prepared]),
             ProtocolCredential.protocol=="v2ray",
         ).with_for_update().all()
     }
     saved=0
-    for sid,ident,item in selected:
+    for sid,ident,item in prepared:
         cred=current_creds.get(sid)
         if cred is None:
             raise RuntimeError("XRAY_CENTRAL_CREDENTIAL_REMOVED")
@@ -264,10 +257,11 @@ async def run_one(db,node_id:int,limit:int,apply:bool)->int:
         saved+=1
     db.commit()
     print("CENTRAL_XRAY_RESULT",json.dumps({
-        "node_id":node_id,"selected":len(selected),
+        "node_id":node_id,"selected":len(prepared),
         "verified_hot":bool(outcome.get("ok")),"centrally_saved":saved,
         "original_uuid_on_other_nodes_preserved":True,
-        "node_remains_hidden":True,
+        "node_authority_verified":True,
+        "node_remains_hidden":not bool(node.show_to_users),
     }),flush=True)
     return saved
 

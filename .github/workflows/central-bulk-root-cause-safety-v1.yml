@@ -1,0 +1,54 @@
+name: Central Bulk Root-Cause Identity Safety
+on:
+  pull_request:
+    paths:
+      - "backend/app/central_xray_node_authority_v1.py"
+      - "backend/app/central_singbox_collision_policy_v1.py"
+      - "backend/app/central_singbox_bulk_runtime_v1.py"
+      - "backend/scripts/twinpanel_central_xray_node_bulk_v1.py"
+      - "backend/scripts/twinpanel_central_singbox_node_bulk_v1.py"
+      - "backend/tests/test_central_xray_node_authority_v1.py"
+      - "backend/tests/test_central_singbox_collision_policy_v1.py"
+      - "backend/tests/test_central_singbox_node_enforcement_v1.py"
+      - "backend/app/services/account_enforcement_v2.py"
+      - "backend/app/singbox_subscription_accounts.py"
+      - ".github/workflows/central-bulk-root-cause-safety-v1.yml"
+  workflow_dispatch:
+
+jobs:
+  central-bulk-safety:
+    runs-on: ubuntu-latest
+    env:
+      PYTHONPATH: backend
+      APP_SECRET_KEY: ci-central-bulk-only
+      DATABASE_URL: sqlite:///./central-bulk-test.sqlite3
+      NODE_AGENT_SHARED_SECRET: ci-central-agent-only
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install isolated test dependencies
+        run: python -m pip install --disable-pip-version-check -r backend/requirements.txt pytest
+      - name: Compile all changed runtime scripts and tests
+        run: |
+          python -m py_compile \
+            backend/app/central_xray_node_authority_v1.py \
+            backend/app/central_singbox_collision_policy_v1.py \
+            backend/app/central_singbox_bulk_runtime_v1.py \
+            backend/scripts/twinpanel_central_xray_node_bulk_v1.py \
+            backend/scripts/twinpanel_central_singbox_node_bulk_v1.py \
+            backend/tests/test_central_xray_node_authority_v1.py \
+            backend/tests/test_central_singbox_collision_policy_v1.py \
+            backend/tests/test_central_singbox_node_enforcement_v1.py
+      - name: Verify new-node public identity and no-rotation contracts
+        run: |
+          python -m pytest -q \
+            backend/tests/test_central_xray_node_authority_v1.py \
+            backend/tests/test_central_xray_node_bulk_v1.py \
+            backend/tests/test_central_singbox_collision_policy_v1.py \
+            backend/tests/test_central_singbox_node_enforcement_v1.py \
+            backend/tests/test_central_singbox_bulk_v1.py
+          python backend/scripts/xray_central_bulk_transaction_smoke.py

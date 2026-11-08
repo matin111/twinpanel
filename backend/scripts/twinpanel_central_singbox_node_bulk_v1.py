@@ -33,6 +33,9 @@ from app.routers.modern_account_delivery_v1 import (
     _singbox_secret, _stored_singbox_secret, _credential_identity,
 )
 from app.central_singbox_bulk_runtime_v1 import apply_bulk
+from app.central_singbox_collision_policy_v1 import (
+    BOUND, resolve_node_login_collisions,
+)
 from app.services.central_family_readiness_v1 import verify_central_family_readiness
 from app.singbox_subscription_accounts import (
     SINGBOX_PROTOCOLS, _naive_tls_trust_material, client_item, read_inbound,
@@ -104,7 +107,25 @@ def select_work(db,node_id:int,limit:int):
                 raise RuntimeError("CENTRAL_SINGBOX_EXISTING_SECRET_UNREADABLE")
             secret=_singbox_secret(ad,credential,protocol,sub)
             work.append((int(sub.id),protocol,secret))
-    return work
+    # In migrated data, different subscriptions can share the same mother
+    # account_username. A single duplicate used to abort all ~7k inbounds.
+    # Include inactive entitlements so aliases never change on expiry/renewal.
+    all_names=db.query(
+        SubscriptionProtocol.subscription_id,
+        SubscriptionProtocol.protocol,
+        Subscription.account_username,
+    ).join(
+        Subscription,Subscription.id==SubscriptionProtocol.subscription_id,
+    ).filter(
+        SubscriptionProtocol.protocol.in_(sorted(BOUND)),
+    ).all()
+    resolved,aliased=resolve_node_login_collisions(work,all_names)
+    if aliased:
+        print("CENTRAL_SINGBOX_BOUND_LOGIN_COLLISIONS",json.dumps({
+            "node_id":node_id,"node_scoped_aliases":aliased,
+            "mother_credentials_preserved":True,
+        }),flush=True)
+    return resolved
 
 
 async def run(node_id:int,limit:int,apply:bool):
@@ -170,6 +191,11 @@ async def run(node_id:int,limit:int,apply:bool):
         if not allow_central_node(db,db.get(Node,node_id)):
             raise RuntimeError("STAGED_NODE_WAS_PUBLISHED_EARLY")
         ids={sid for sid,_,_ in work}
+        # Preserve the subscription-bound mother login as the canonical
+        # global credential. Node-only aliases live in the node-local item.
+        bound_mother_names=dict(db.query(
+            Subscription.id,Subscription.account_username,
+        ).filter(Subscription.id.in_(list(ids))).all())
         existing={(int(c.subscription_id),str(c.protocol)):c for c in db.query(
             ProtocolCredential
         ).filter(
@@ -200,8 +226,23 @@ async def run(node_id:int,limit:int,apply:bool):
                     item,node=node,protocol=protocol,username=secret.username,
                 )
             old.append(item)
-            cred.username=_credential_identity(protocol,secret)
-            cred.secret_encrypted=ad._enc(secret_to_dict(secret))
+            if protocol in BOUND:
+                from dataclasses import replace
+                mother_name=str(bound_mother_names.get(sid) or "").strip()
+                if not mother_name:
+                    raise RuntimeError("CENTRAL_SINGBOX_MOTHER_IDENTITY_MISSING")
+                stored=replace(secret,username=mother_name)
+                cred.username=mother_name
+                # Avoid replacing any existing canonical mother secret during
+                # node enrollment; only the node item has an alias.
+                if not cred.secret_encrypted:
+                    cred.secret_encrypted=ad._enc(secret_to_dict(stored))
+            else:
+                # Other protocols preserve their globally stored identity.
+                if not cred.username:
+                    cred.username=_credential_identity(protocol,secret)
+                if not cred.secret_encrypted:
+                    cred.secret_encrypted=ad._enc(secret_to_dict(secret))
             cred.config_text_encrypted=ad._enc(old)
             cred.is_active=True
             writes+=1

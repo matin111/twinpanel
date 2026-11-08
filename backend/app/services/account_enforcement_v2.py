@@ -216,6 +216,41 @@ def _decode_modern_secret(protocol: str, credential: ProtocolCredential):
     return secret
 
 
+def _singbox_node_secret(credential: ProtocolCredential, protocol: str,
+                         node_id: int, primary_secret):
+    """Resolve actual identity provisioned to this node for revoke/restore.
+
+    The central bulk installer may use a node-only unique alias for Naive or
+    ShadowTLS while keeping the mother account password and other-node
+    credentials untouched. Quota telemetry already uses the node item first.
+    """
+    from dataclasses import replace
+    from ..routers import account_delivery as ad
+    decoded = ad._dec(credential.config_text_encrypted)
+    if not isinstance(decoded, list):
+        return primary_secret
+    matches = []
+    for item in decoded:
+        if not isinstance(item, dict):
+            continue
+        try:
+            item_id = int(item.get("node_id") or 0)
+        except (TypeError, ValueError):
+            continue
+        if item_id == int(node_id):
+            matches.append(item)
+    if len(matches)>1:
+        raise RuntimeError("singbox duplicate node delivery identity")
+    if not matches:
+        return primary_secret
+    username = str(matches[0].get("username") or "").strip()
+    if not username:
+        raise RuntimeError("singbox node delivery identity missing")
+    if len(username)>128:
+        raise RuntimeError("singbox node delivery identity invalid")
+    return replace(primary_secret, username=username)
+
+
 def _decoded_classic_items(credential: ProtocolCredential) -> list[dict[str, Any]]:
     from ..routers import account_delivery as account_delivery
 
@@ -587,14 +622,22 @@ async def _execute_command(command: dict[str, Any]) -> None:
 
             if protocol in SINGBOX_MODERN_PROTOCOLS:
                 from ..singbox_subscription_accounts import apply_account, remove_account
+                # Revoke/restore must use the SAME node-local login that the
+                # bulk adapter installed, never derive tp-sub-N blindly.
+                actual_secret = _singbox_node_secret(
+                    credential,protocol,node_id,secret,
+                )
 
                 if command_type == "revoke_subscription":
-                    await remove_account(conn, protocol, subscription_id)
+                    await remove_account(
+                        conn, protocol, subscription_id,
+                        node_username=actual_secret.username,
+                    )
                     result_code = "controller_modern_revoked"
                 elif command_type == "restore_subscription":
                     if not bool(credential.is_active):
                         raise RuntimeError("active protocol credential is unavailable")
-                    await apply_account(conn, node, secret)
+                    await apply_account(conn, node, actual_secret)
                     result_code = "controller_modern_restored"
                 else:
                     raise RuntimeError(f"unsupported command type: {command_type}")
