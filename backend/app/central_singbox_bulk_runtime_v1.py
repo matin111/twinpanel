@@ -102,6 +102,12 @@ with open(LOCK,"a+") as lock:
             u.get(key):u for u in previous
             if isinstance(u,dict) and isinstance(u.get(key),str)
         }
+        # Central bulk is missing-only enrollment. Never replace a live
+        # customer record which happens to share a legacy login name.
+        for username,new_record in records.items():
+            old_record=current.get(username)
+            if old_record is not None and old_record != new_record:
+                raise SystemExit("CENTRAL_SINGBOX_EXISTING_IDENTITY_MISMATCH")
         unchanged = (
             len(current) == len(previous)
             and not any(str(k).startswith(SENTINEL) for k in current)
@@ -238,6 +244,20 @@ async def apply_bulk(
     process.stdin.write_eof()
     outcome = await asyncio.wait_for(process.wait(), timeout=550)
     if outcome.exit_status:
+        # Never surface raw SSH stderr: it can contain client records.
+        # Emit only an explicit allowlisted machine-readable failure code.
+        stderr=str(outcome.stderr or "")
+        for reason in (
+            "CENTRAL_SINGBOX_EXISTING_IDENTITY_MISMATCH",
+            "DUPLICATE_SINGBOX_IDENTITY",
+            "MANAGED_SINGBOX_INBOUND_NOT_FOUND",
+            "SINGBOX_BATCH_CONFIG_INVALID",
+            "SINGBOX_BATCH_RESTART_FAILED_ROLLED_BACK",
+            "SINGBOX_CONFIG_NOT_A_REGULAR_FILE",
+            "INVALID_SINGBOX_BATCH",
+        ):
+            if reason in stderr:
+                raise RuntimeError(reason)
         raise RuntimeError("CENTRAL_SINGBOX_REMOTE_STAGE_FAILED")
     try:
         result = json.loads((outcome.stdout or "").strip().splitlines()[-1])
