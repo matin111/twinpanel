@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from ..database import SessionLocal, get_db
+from ..services.node_os_preflight_v1 import safe_node_install_error_code
 from ..deps import require_admin
 from ..models import Node, NodeType, Subscription, SubscriptionNode, SubscriptionStatus
 from ..subscription_delivery_policy_v1 import (
@@ -336,10 +337,14 @@ async def _install_node_in_background(
             )
     except Exception as exc:
         db.rollback()
+        safe_code = safe_node_install_error_code(exc)
         _safe_install_progress(job_id, "failed", node_id=node_id or None,
-                               error_code=type(exc).__name__)
+                               error_code=safe_code)
+        # Stable diagnostic code, never raw SSH output/password/private keys.
         print("TWINPANEL_NODE_BACKGROUND_INSTALL_FAILED_V1", {
             "name": payload.name, "error_type": type(exc).__name__,
+            "error_code": safe_code,
+            "node_id": node_id or None,
         }, flush=True)
     finally:
         _NODE_INSTALL_PENDING.discard(payload.name.strip().casefold())
@@ -353,9 +358,25 @@ async def install_node_background_v1(
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
     name_key = payload.name.strip().casefold()
-    existing = db.query(Node).filter(Node.retired_at.is_(None), Node.name == payload.name).first()
+    # Reject a duplicate active name (case/whitespace insensitive).
+    # Reusing a retired name is explicitly allowed.
+    from sqlalchemy import func
+    existing = db.query(Node).filter(
+        Node.retired_at.is_(None),
+        func.lower(func.trim(Node.name)) == name_key,
+    ).first()
     if existing:
-        raise HTTPException(status_code=409, detail="نام سرور قبلاً ثبت شده است")
+        raise HTTPException(status_code=409, detail="NODE_NAME_ALREADY_REGISTERED")
+    # Most importantly: never start a new EXIT installation on an already
+    # managed IRAN/EXIT node, even if the supplied name is different.
+    # This previously reached an active Iran relay IP during a Fin retry.
+    # A retired host is not blocked; it must still pass SSH/OS preflight.
+    host_in_use = db.query(Node).filter(
+        Node.retired_at.is_(None),
+        Node.public_ip == payload.host.strip(),
+    ).first()
+    if host_in_use:
+        raise HTTPException(status_code=409, detail="NODE_HOST_ALREADY_REGISTERED")
     if name_key in _NODE_INSTALL_PENDING:
         raise HTTPException(status_code=409, detail="ثبت این سرور در حال انجام است")
 
