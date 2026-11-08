@@ -22,6 +22,45 @@ type NodeInstallJob={
 };
 type BackfillJobs={queued:boolean;completed_pairs:number;families:Array<{protocol:string;state:string;completed_pairs:number}>};
 const NODE_JOB_STORAGE="twinpanel-last-node-install-v1";
+// The backend persists stable codes, never raw SSH stderr or private details.
+const NODE_INSTALL_FAILURE_GUIDANCE:Record<string,[string,string]>={
+  NODE_OS_RELEASE_UNREADABLE:[
+    "SSH وصل شد، اما سیستم‌عامل از /etc/os-release یا مسیر جایگزین قابل شناسایی نیست. فایل‌های سیستم‌عامل نود را بررسی کنید؛ نصب هنوز شروع نشده است.",
+    "SSH succeeded, but the node OS cannot be identified from os-release or fallback. Inspect OS metadata; installation has not started.",
+  ],
+  NODE_OS_UNSUPPORTED:[
+    "سیستم‌عامل این سرور پشتیبانی نمی‌شود؛ برای نصب نود، Ubuntu یا Debian لازم است.",
+    "Unsupported node OS; Ubuntu or Debian is required.",
+  ],
+  NODE_OS_PREFLIGHT_COMMAND_FAILED:[
+    "SSH برقرار شد، اما فرمان فقط‌خواندنی بررسی سیستم‌عامل اجرا نشد. دسترسی شل و فایل‌های OS را بررسی کنید.",
+    "SSH connected, but the read-only OS check could not run. Check the remote shell and OS metadata.",
+  ],
+  NODE_OS_PREFLIGHT_TIMEOUT:[
+    "سرور هنگام بررسی سیستم‌عامل پاسخ نداد؛ وضعیت SSH و بار سرور را بررسی کنید.",
+    "Node OS preflight timed out. Inspect SSH responsiveness and server load.",
+  ],
+  NODE_HOST_ALREADY_REGISTERED:[
+    "این IP قبلاً به نود فعالی در پنل اختصاص یافته است. برای جلوگیری از آسیب به نود ایران یا سایر کاربران، نصب تکراری مسدود شد.",
+    "This IP already belongs to an active panel node. Reinstallation is blocked to protect the existing Iran/Exit service.",
+  ],
+  NODE_NAME_ALREADY_REGISTERED:[
+    "نودی با همین نام از قبل فعال است؛ نام متفاوتی انتخاب کنید.",
+    "An active node already has this name. Choose another name.",
+  ],
+  NODE_SSH_OR_OS_REJECTED:[
+    "بررسی SSH یا سیستم‌عامل سرور رد شد. از «تست اتصال» برای دیدن مشکل استفاده کنید.",
+    "SSH or node OS check was rejected. Use Test Connection to inspect it.",
+  ],
+  NODE_REMOTE_PREFLIGHT_REJECTED:[
+    "سرور در بررسی اولیه مجاز به نصب جدید نبود؛ سرویس‌های موجود نباید بازنویسی شوند.",
+    "Remote safety preflight rejected the install to protect existing services.",
+  ],
+  NODE_INSTALL_REMOTE_COMMAND_FAILED:[
+    "فرمان نصب روی سرور ناموفق بود. سرویس‌های فعلی را حذف نکنید؛ لاگ نصب نود باید بررسی شود.",
+    "A remote installation command failed. Keep existing services intact and inspect the node installation log.",
+  ],
+};
 
 function NodeInstallProgress({job,error}:{job:NodeInstallJob|null;error:string}){
   const {pick}=useI18n();
@@ -82,7 +121,10 @@ function NodeInstallProgress({job,error}:{job:NodeInstallJob|null;error:string})
     {job?.installed_protocols!==null&&job?.installed_protocols!==undefined&&job?.expected_protocols!==null&&job?.expected_protocols!==undefined?<div className="node-install-count">{pick("پروتکل‌های گزارش‌شده","Protocols reported")}: <b>{job.installed_protocols.toLocaleString("fa-IR")} / {job.expected_protocols.toLocaleString("fa-IR")}</b></div>:null}
     {job?.users_assigned!==null&&job?.users_assigned!==undefined?<div className="node-install-count">{pick("کل اکانت‌های منتسب به نود","Total accounts assigned to node")}: <b>{job.users_assigned.toLocaleString("fa-IR")}</b></div>:null}
     {job?.backfill_pending?<div className="node-install-count">{pick("جفت‌کانفیگ‌های پردازش‌شده در صف موجود","Processed credential pairs in existing queue")}: <b>{backfill?backfill.completed_pairs.toLocaleString("fa-IR"):"—"}</b> {backfill?.queued?<span className="node-install-live-tag">{pick("صف فعال","Queue active")}</span>:null}</div>:null}
-    {job?.error_code?<div className="runtime-warning">{pick("کد وضعیت","Status code")}: <code dir="ltr">{job.error_code}</code></div>:null}
+    {job?.error_code?<div className="runtime-warning">
+      {pick("کد وضعیت","Status code")}: <code dir="ltr">{job.error_code}</code>
+      {NODE_INSTALL_FAILURE_GUIDANCE[job.error_code]?<p>{pick(...NODE_INSTALL_FAILURE_GUIDANCE[job.error_code])}</p>:null}
+    </div>:null}
     {error?<div className="runtime-warning">{error}</div>:null}
     {job?.state==="interrupted"?<div className="runtime-warning">{pick("به‌روزرسانی این کار متوقف شده؛ وضعیت واقعی نود را بررسی کنید. فرایند را خودکار موفق فرض نکنید.","Job updates are stale. Verify the node before retrying; completion cannot be assumed.")}</div>:null}
     <small>{pick("این نمایش از داده‌های واقعی API استفاده می‌کند؛ حرکت نوار به معنی درصد پیشرفت نیست.","Stages come from the API. The moving indicator is not a percent-complete estimate.")}</small>
@@ -175,7 +217,12 @@ export function NodeAddModalBridge(){
         body:JSON.stringify(payload),
       });
       const raw=await response.text();
-      if(!response.ok)throw new Error(raw||`API error ${response.status}`);
+      if(!response.ok){
+        let detail="";
+        try{const parsed=JSON.parse(raw) as {detail?:string};detail=String(parsed.detail||"");}catch{}
+        const guidance=NODE_INSTALL_FAILURE_GUIDANCE[detail];
+        throw new Error(guidance?pick(...guidance):(raw||`API error ${response.status}`));
+      }
       const accepted=JSON.parse(raw) as {job_id?:string};
       if(!accepted.job_id)throw new Error("Install job ID missing from API response");
       try{window.localStorage.setItem(NODE_JOB_STORAGE,accepted.job_id);}catch{}
