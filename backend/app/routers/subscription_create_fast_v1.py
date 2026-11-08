@@ -99,9 +99,19 @@ def _persist_subscription(payload: dict[str, Any]) -> tuple[int, list[str], dict
             else 1
         )
 
-        # A zero-day limit represents an unlimited-duration subscription.
-        # Negative values remain invalid at the request schema boundary.
-        duration_unlimited = duration_days == 0
+        # Manual subscriptions MUST declare finite validity at creation.
+        # Previously a missing duration became zero and silently created
+        # unlimited accounts with no expiry and no visible days remaining.
+        # Match the existing validated synchronous creation contract.
+        if duration_days <= 0:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    "مدت اعتبار اشتراک دستی را به روز وارد کنید؛ باید بیشتر از صفر باشد"
+                    if manual else "مدت اعتبار پلن یا اشتراک باید بیشتر از صفر باشد"
+                ),
+            )
+        duration_unlimited = False
 
         sub = create_subscription_core(
             db=db,

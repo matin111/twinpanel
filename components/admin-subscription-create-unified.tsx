@@ -90,7 +90,7 @@ export function AdminSubscriptionCreateUnified(){
     const trafficValue=traffic.trim()===""?0:clean(traffic),durationValue=duration.trim()===""?0:clean(duration),deviceValue=clean(deviceLimit);
     if(!userId){setError(pick("کاربر را انتخاب کنید","Select a user"));return;}
     if(trafficValue===null||trafficValue<0){setError(pick("حجم معتبر نیست","Invalid traffic"));return;}
-    if(durationValue===null||durationValue<0||!Number.isInteger(durationValue)){setError(pick("مدت معتبر نیست","Invalid duration"));return;}
+    if(durationValue===null||durationValue<=0||!Number.isInteger(durationValue)){setError(pick("مدت معتبر نیست","Invalid duration"));return;}
     if(deviceValue===null||deviceValue<1||!Number.isInteger(deviceValue)){setError(pick("اتصال همزمان معتبر نیست","Invalid device limit"));return;}
     if(!protocols.length){setError(pick("حداقل یک پروتکل انتخاب کنید","Select at least one protocol"));return;}
     if(!nodeIds.length){setError(pick("حداقل یک سرور انتخاب کنید","Select at least one server"));return;}
