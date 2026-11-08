@@ -5,12 +5,13 @@ import {API_BASE} from "../lib/api";
 import {getCustomerToken} from "../lib/customer-api";
 import {parityApi,type ProvisionInstallPayload} from "../lib/admin-parity-api";
 import {useI18n} from "../lib/i18n";
+import {NodeCountryPicker,isSupportedNodeCountry,normalizeNodeCountry} from "./node-country-picker";
 
 type NodeDraft={host:string;port:number;username:string;password:string;name:string;node_type:"iran"|"exit";country_code:string;capacity_users:number;};
 const defaultDraft:NodeDraft={host:"",port:22,username:"root",password:"",name:"",node_type:"exit",country_code:"DE",capacity_users:1000};
 const NO_PROTOCOLS={install_cisco:false,cisco_port:443,install_openvpn:false,openvpn_port:1194,openvpn_transport:"udp" as const,install_wireguard:false,wireguard_port:51820,install_l2tp:false,install_v2ray:false,xray_port:8443};
 const EXIT_BASE_PROTOCOLS={...NO_PROTOCOLS,install_cisco:true,install_openvpn:true,install_wireguard:true,install_l2tp:true};
-function payloadOf(draft:NodeDraft):ProvisionInstallPayload{return {...draft,country_code:draft.node_type==="iran"?"IR":draft.country_code.trim().toUpperCase(),...(draft.node_type==="exit"?EXIT_BASE_PROTOCOLS:NO_PROTOCOLS)};}
+function payloadOf(draft:NodeDraft):ProvisionInstallPayload{return {...draft,country_code:draft.node_type==="iran"?"IR":normalizeNodeCountry(draft.country_code),...(draft.node_type==="exit"?EXIT_BASE_PROTOCOLS:NO_PROTOCOLS)};}
 
 type NodeInstallJob={
   job_id:string;node_name:string;node_id:number|null;
@@ -203,7 +204,7 @@ export function NodeAddModalBridge(){
           <label className="field"><span>{pick("نام سرور","Server name")}</span><input required value={draft.name} onChange={e=>setDraft(v=>({...v,name:e.target.value}))}/></label>
           <label className="field"><span>IP / Host</span><input required dir="ltr" value={draft.host} onChange={e=>setDraft(v=>({...v,host:e.target.value}))}/></label>
           <label className="field"><span>{pick("نوع نود","Node type")}</span><select value={draft.node_type} onChange={e=>setDraft(v=>{const node_type=e.target.value as "iran"|"exit";return {...v,node_type,country_code:node_type==="iran"?"IR":v.country_code==="IR"?"DE":v.country_code};})}><option value="iran">Iran</option><option value="exit">Exit</option></select></label>
-          <label className="field"><span>{pick("کشور","Country")}</span><input dir="ltr" maxLength={2} value={draft.country_code} onChange={e=>setDraft(v=>({...v,country_code:e.target.value.toUpperCase()}))}/></label>
+          <div className="field"><NodeCountryPicker label={pick("کشور و پرچم سرور","Server country & flag")} value={draft.node_type==="iran"?"IR":draft.country_code} disabled={draft.node_type==="iran"} onChange={country_code=>setDraft(v=>({...v,country_code}))} language={pick("fa","en") as "fa"|"en"}/></div>
           <label className="field"><span>SSH Port</span><input type="number" min={1} max={65535} value={draft.port} onChange={e=>setDraft(v=>({...v,port:Number(e.target.value)||22}))}/></label>
           <label className="field"><span>SSH Username</span><input dir="ltr" value={draft.username} onChange={e=>setDraft(v=>({...v,username:e.target.value}))}/></label>
           <label className="field"><span>SSH Password</span><input type="password" autoComplete="new-password" required value={draft.password} onChange={e=>setDraft(v=>({...v,password:e.target.value}))}/></label>
