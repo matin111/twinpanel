@@ -7,6 +7,7 @@ import type {ResellerRow} from "./reseller-runtime-api";
 export type ResellerManualSubscriptionPayload={
   traffic_gb:number;
   duration_days:number;
+  device_limit:number;
   node_ids:number[];
   protocols:string[];
   username:string|null;
