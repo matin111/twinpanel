@@ -36,6 +36,25 @@ if command -v lsb_release >/dev/null 2>&1; then
   printf '%s\n' 'TP_OS_FILE_END'
 fi
 """
+# First try a short, single-line Python command: the prior multiline shell
+# preflight returned exit status 1 immediately on a re-added Finnish Exit.
+# Python is a convenience, not a requirement: read-only cat probes follow it.
+# The probe never executes os-release, updates packages, or changes the node.
+_REMOTE_PYTHON_OS_READ_ONLY = (
+    """python3 -c 'import pathlib,sys;"""
+    """p=next((x for x in (pathlib.Path("/etc/os-release"),"""
+    """pathlib.Path("/usr/lib/os-release")) if x.is_file()),None);"""
+    """s=p.read_text(errors="replace")[:8192] if p else "";"""
+    """sys.stdout.write("TP_OS_FILE_START\\n"+s+"""
+    """("\\n" if s and not s.endswith("\\n") else "")+"""
+    """"TP_OS_FILE_END\\n")'"""
+)
+# No shell compound control structures, file writes, or dependency on Python.
+_REMOTE_SINGLE_FILE_PROBES = (
+    ("cat_etc", "cat /etc/os-release"),
+    ("cat_usr_lib", "cat /usr/lib/os-release"),
+)
+
 _FIELD = re.compile(r"^\s*([A-Z][A-Z0-9_]*)\s*=\s*(.*?)\s*$")
 
 
@@ -77,22 +96,71 @@ def _parse_os_blocks(raw: str) -> dict[str, str]:
 
 
 async def remote_supported_os_info(conn: Any) -> dict[str, str]:
-    """Read OS release via a non-mutating command; fail closed before install."""
-    try:
-        result = await asyncio.wait_for(
-            conn.run(_REMOTE_OS_READ_ONLY, check=False), timeout=22,
-        )
-    except asyncio.TimeoutError as exc:
-        raise NodeOSPreflightError("NODE_OS_PREFLIGHT_TIMEOUT") from exc
-    except Exception as exc:
-        raise NodeOSPreflightError("NODE_OS_PREFLIGHT_COMMAND_FAILED") from exc
-    if getattr(result, "exit_status", 1) != 0:
-        raise NodeOSPreflightError("NODE_OS_PREFLIGHT_COMMAND_FAILED")
-    info = _parse_os_blocks(str(getattr(result, "stdout", "") or ""))
-    if info["id"] not in _SAFE_IDS:
-        raise NodeOSPreflightError("NODE_OS_UNSUPPORTED")
-    return info
+    """Safely detect Ubuntu/Debian from multiple read-only SSH commands.
 
+    A non-zero exit from one remote command is *not* a reason to abandon
+    alternative readers: for a retired Finnish node the old multiline OS
+    script exited 1, but no evidence established whether the file itself was
+    unreadable or the remote command executor rejected that script.
+
+    No raw stderr/stdout (and no SSH credentials) are logged.
+    """
+    attempts = (
+        ("python_single", _REMOTE_PYTHON_OS_READ_ONLY, False),
+        *((name, cmd, True) for name, cmd in _REMOTE_SINGLE_FILE_PROBES),
+        ("posix_shell", _REMOTE_OS_READ_ONLY, False),
+    )
+    failed_commands = 0
+    successful_commands = 0
+    timeouts = 0
+    for name, command, plain_text in attempts:
+        try:
+            result = await asyncio.wait_for(
+                conn.run(command, check=False), timeout=12,
+            )
+        except asyncio.TimeoutError:
+            timeouts += 1
+            print("NODE_OS_PREFLIGHT_DIAGNOSTIC", {
+                "probe": name, "status": "timeout",
+            }, flush=True)
+            continue
+        except Exception:
+            failed_commands += 1
+            print("NODE_OS_PREFLIGHT_DIAGNOSTIC", {
+                "probe": name, "status": "ssh_command_exception",
+            }, flush=True)
+            continue
+
+        exit_code = getattr(result, "exit_status", None)
+        stdout = str(getattr(result, "stdout", "") or "")[:16384]
+        print("NODE_OS_PREFLIGHT_DIAGNOSTIC", {
+            "probe": name,
+            "exit_code": exit_code if isinstance(exit_code, int) else None,
+            "stdout_bytes": len(stdout),
+            # Do not log stderr: it can include host-provided private text.
+            "stderr_present": bool(getattr(result, "stderr", None)),
+        }, flush=True)
+        if exit_code != 0:
+            failed_commands += 1
+            continue
+        successful_commands += 1
+        if plain_text:
+            stdout = _MARKER_START + "\n" + stdout.rstrip("\n") + "\n" + _MARKER_END + "\n"
+        try:
+            info = _parse_os_blocks(stdout)
+        except NodeOSPreflightError:
+            continue
+        if info["id"] not in _SAFE_IDS:
+            # Never reinterpret a real unsupported distribution as Ubuntu
+            # based on secondary evidence.
+            raise NodeOSPreflightError("NODE_OS_UNSUPPORTED")
+        return info
+
+    if successful_commands:
+        raise NodeOSPreflightError("NODE_OS_RELEASE_UNREADABLE")
+    if timeouts and not failed_commands:
+        raise NodeOSPreflightError("NODE_OS_PREFLIGHT_TIMEOUT")
+    raise NodeOSPreflightError("NODE_OS_PREFLIGHT_COMMAND_FAILED")
 
 async def remote_supported_os_id(conn: Any) -> str:
     return (await remote_supported_os_info(conn))["id"]
