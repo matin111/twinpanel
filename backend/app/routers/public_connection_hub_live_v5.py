@@ -187,7 +187,7 @@ _LIVE_SCRIPT = r"""
   }
   function apply(payload){
     const pct=payload.unlimited?0:Math.max(0,Math.min(100,Number(payload.percent||0)));
-    write(used,bytes(payload.used_bytes));
+    write(used,bytes(payload.used_bytes)+' / '+quota(payload.total_bytes,payload.unlimited));
     write(remaining,quota(payload.remaining_bytes,payload.unlimited));
     write(total,quota(payload.total_bytes,payload.unlimited));
     write(start,date(payload.starts_at));
