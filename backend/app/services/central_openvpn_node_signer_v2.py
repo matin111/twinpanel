@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
@@ -85,10 +87,13 @@ PY_OVPN_CA'''
     return {"cert":cert,"private":key,"imported":True}
 
 
-def issue_client_identity(ca_cert_pem:str,ca_key_pem:str,sub_id:int,node_id:int):
+def _issue_client_identity_with_validated_ca(
+    ca_cert_pem:str, cert, key, sub_id:int, node_id:int,
+):
+    # Identity and certificate algorithms deliberately remain unchanged:
+    # RSA-2048 leaf, the EXACT CA already trusted by this Exit, unique CN.
     if sub_id<=0 or node_id<=0:
         raise ValueError("OPENVPN_CLIENT_INVALID_SUBSCRIPTION_ID")
-    cert,key=validate_ca(ca_cert_pem,ca_key_pem)
     client_key=rsa.generate_private_key(public_exponent=65537,key_size=2048)
     subject=x509.Name([
         x509.NameAttribute(NameOID.COMMON_NAME,f"mv{sub_id}n{node_id}"),
@@ -122,6 +127,45 @@ def issue_client_identity(ca_cert_pem:str,ca_key_pem:str,sub_id:int,node_id:int)
         ).decode(),
         "common_name":f"mv{sub_id}n{node_id}",
     }
+
+
+def issue_client_identity(ca_cert_pem:str,ca_key_pem:str,sub_id:int,node_id:int):
+    cert,key=validate_ca(ca_cert_pem,ca_key_pem)
+    return _issue_client_identity_with_validated_ca(
+        ca_cert_pem,cert,key,int(sub_id),int(node_id),
+    )
+
+
+def issue_client_identities_batch(
+    ca_cert_pem:str, ca_key_pem:str, subscription_ids, node_id:int,
+    *, max_workers:int=8,
+):
+    """One controller-side PKI batch; no per-user SSH or service restart.
+
+    Reuses the node CA and its validity check once. Cryptography's OpenSSL
+    RSA generation releases the GIL so independent leaf key pairs can be
+    signed concurrently on available CPU cores, while the caller alone
+    writes the transaction. The result order is deterministic and failures
+    prevent any credential writes from this batch.
+    """
+    ids=[int(sid) for sid in subscription_ids]
+    if not ids:
+        return {}
+    if (len(ids)>3000 or len(ids)!=len(set(ids))
+        or any(sid<=0 for sid in ids) or int(node_id)<=0):
+        raise ValueError("OPENVPN_BATCH_INVALID_SUBSCRIPTIONS")
+    if not 1<=int(max_workers)<=16:
+        raise ValueError("OPENVPN_BATCH_INVALID_WORKER_COUNT")
+    cert,key=validate_ca(ca_cert_pem,ca_key_pem)
+    workers=min(max_workers,max(1,os.cpu_count() or 1),len(ids))
+    def make(sid):
+        return _issue_client_identity_with_validated_ca(
+            ca_cert_pem,cert,key,sid,int(node_id),
+        )
+    with ThreadPoolExecutor(max_workers=workers,
+                            thread_name_prefix="ovpn-identity") as executor:
+        identities=list(executor.map(make,ids))
+    return dict(zip(ids,identities))
 
 
 def verify_client_identity(doc,ca_cert_pem,sub_id,node_id):
