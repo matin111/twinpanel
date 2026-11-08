@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.695",
+  "version": "1.1.0-rc.696",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-08T06:26:07Z",
+  "released_at": "2026-11-08T06:34:50Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "f675ff7d98b39906fcfea2b335fb74111617a727",
+  "source_sha": "1a77a49d700327858cebe79e17050c5646cbd428",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.695/twinpanel-1.1.0-rc.695-linux-x86_64.tar.gz",
-    "sha256": "f232c0a52ab1fb46a7cb1b340318351a6353b1621eb5e85e89cce46d0a367210",
-    "size_bytes": 29720397
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.696/twinpanel-1.1.0-rc.696-linux-x86_64.tar.gz",
+    "sha256": "81f40284458e21795d27cc87476da00910f30e8b4ce5fe497835da9f61e4d695",
+    "size_bytes": 29729438
   },
   "notes": {
-    "fa": "افزودن انتخابگر کشور و پرچم با جست‌وجوی نام فارسی/انگلیسی یا کد استاندارد ISO برای همه کشورها در افزودن و ویرایش نود؛ نمایش پرچم در جدول نودها؛ اعتبارسنجی کشور پیش از نصب؛ سازگاری پرچم بریتانیا برای نودهای قدیمی UK با کد GB. هیچ اتصال، اطلاعات کاربری یا سهمیه تغییر نمی‌کند. نودهای نصب‌نشده تا تأیید ۱۶/۱۶ پروتکل همچنان مخفی می‌مانند.",
-    "en": "Add searchable ISO country-and-flag selector to Add Server and Edit Node; validate country code, show real flags in admin node table and normalize legacy UK to GB in public flag rendering. No customer, node network or VPN dataplane changes. Incomplete node installations remain hidden until healthy."
+    "fa": "رفع ریشه‌ای نصب نود خروجی هنگام اشغال بودن UDP 443 برای Cisco: انتخاب امن پورت آزاد مشترک TCP/UDP فقط برای پورت پیش‌فرض نود مخفی، حفظ پورت سفارشی مدیر، ذخیره پورت انتخاب‌شده برای فایل اتصال، ممنوعیت تغییر سرویس Cisco فعال. افزودن قابلیت ترمیم Cisco و ادامه همان نصب ۱۵/۱۶، بدون نصب دوباره ۱۵ پروتکل سالم و بدون تغییر اطلاعات کاربران؛ انتشار نود فقط پس از تأیید ۱۶ سرویس و انتخاب صریح ادمین.\n\nافزودن انتخابگر کشور و پرچم با جست‌وجوی نام فارسی/انگلیسی یا کد استاندارد ISO برای همه کشورها در افزودن و ویرایش نود؛ نمایش پرچم در جدول نودها؛ اعتبارسنجی کشور پیش از نصب؛ سازگاری پرچم بریتانیا برای نودهای قدیمی UK با کد GB. هیچ اتصال، اطلاعات کاربری یا سهمیه تغییر نمی‌کند. نودهای نصب‌نشده تا تأیید ۱۶/۱۶ پروتکل همچنان مخفی می‌مانند.",
+    "en": "Root fix: safe paired TCP/UDP Cisco fallback when default UDP 443 is occupied on a hidden Exit. Preserve custom ports and active Cisco services; persist actual selected port. Add guarded Cisco-only repair/resume for an existing 15/16 failed node with explicit admin-controlled publication and no subscriber re-creation.\n\nAdd searchable ISO country-and-flag selector to Add Server and Edit Node; validate country code, show real flags in admin node table and normalize legacy UK to GB in public flag rendering. No customer, node network or VPN dataplane changes. Incomplete node installations remain hidden until healthy."
   }
 }
