@@ -212,12 +212,66 @@ export function NodeAddModalBridge(){
   };
 
   return <>
+
+    <style>{`
+      .tp-add-node-modal .tp-add-node-card{width:min(720px,calc(100vw - 24px))!important;padding:0!important;
+        border:1px solid #2c4268!important;border-radius:21px!important;
+        background:linear-gradient(165deg,#131e33 0%,#0e1627 100%)!important;
+        box-shadow:0 30px 80px rgba(0,0,0,.53)!important;overflow-y:auto!important;overflow-x:hidden!important}
+      .tp-add-node-card>.card-head{position:sticky;top:0;z-index:15;padding:19px 22px!important;margin:0!important;
+        border-bottom:1px solid rgba(136,165,218,.16)!important;
+        background:linear-gradient(115deg,#152a4b,#111c31)!important}
+      .tp-add-node-card>.card-head b{font-size:17px!important;font-weight:850!important;color:#f0f5ff!important}
+      .tp-add-node-card>.card-head small{color:#9db1d2!important;display:block;margin-top:5px;font-size:12px}
+      .tp-add-node-card>.card-head>.icon-button{border-radius:10px!important;background:#1e304d!important;color:#d7e7ff!important}
+      .tp-add-node-card form{padding:16px 22px 20px;display:flex;flex-direction:column;gap:14px}
+      .tp-node-section-title{display:flex;align-items:center;gap:9px;color:#e3edff;font-size:13px;font-weight:850;letter-spacing:.05px}
+      .tp-node-section-number{width:25px;height:25px;display:grid;place-items:center;background:#284b81;color:#9fcbff;
+        border-radius:8px;flex:none;font:800 12px ui-monospace,monospace}
+      .tp-node-section-note{margin-inline-start:auto;font-size:11px;font-weight:500;color:#829bbd}
+      .tp-add-node-card .tp-node-form-grid{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;
+        gap:12px 14px!important;margin:0!important}
+      .tp-add-node-card .tp-node-form-grid>.field{min-width:0;display:flex!important;flex-direction:column;gap:6px!important;margin:0!important}
+      .tp-add-node-card .tp-node-form-grid>.field>span{font-size:12px!important;color:#a9b9d2!important;font-weight:700}
+      .tp-add-node-card .tp-node-form-grid>.field>input,.tp-add-node-card .tp-node-form-grid>.field>select{
+        width:100%!important;min-height:44px!important;height:44px!important;padding:0 12px!important;
+        border:1px solid #304360!important;border-radius:11px!important;background:#121d30!important;color:#eff5ff!important;
+        box-shadow:none!important;outline:none!important;font-size:13px!important;box-sizing:border-box}
+      .tp-add-node-card .tp-node-form-grid>.field>input:focus,.tp-add-node-card .tp-node-form-grid>.field>select:focus{
+        border-color:#4788f5!important;box-shadow:0 0 0 3px rgba(58,120,237,.13)!important}
+      .tp-add-node-card .tp-node-separator{border:0;border-top:1px solid rgba(146,168,204,.14);margin:1px 0 0}
+      .tp-add-node-card form .runtime-choice-section{padding:11px 13px!important;border-radius:12px!important;
+        background:rgba(31,49,78,.55)!important;border:1px solid rgba(128,157,205,.18)!important}
+      .tp-add-node-card form .runtime-warning{border-radius:11px!important;font-size:11px!important;line-height:1.7!important;
+        padding:10px 12px!important;margin:0!important}
+      .tp-add-node-card form>.action-row{position:sticky;bottom:-20px;z-index:12;display:flex;flex-wrap:wrap;
+        gap:10px!important;padding:13px 0 0!important;margin:0!important;
+        border-top:1px solid rgba(146,168,204,.18);background:#0e1627!important}
+      .tp-add-node-card form>.action-row button{border-radius:11px!important;min-height:42px!important}
+      .tp-add-node-card form>.action-row .primary{background:linear-gradient(110deg,#2566dc,#108fcb)!important;
+        box-shadow:0 6px 18px rgba(23,99,212,.2)!important}
+      html[data-theme="light"] .tp-add-node-modal .tp-add-node-card{background:#fff!important;border-color:#dae2ec!important}
+      html[data-theme="light"] .tp-add-node-card>.card-head{background:linear-gradient(110deg,#edf5ff,#fff)!important}
+      html[data-theme="light"] .tp-add-node-card>.card-head b{color:#233653!important}
+      html[data-theme="light"] .tp-node-section-title{color:#243b59}
+      html[data-theme="light"] .tp-add-node-card .tp-node-form-grid>.field>input,
+      html[data-theme="light"] .tp-add-node-card .tp-node-form-grid>.field>select{background:#f8faff!important;color:#1f3456!important}
+      html[data-theme="light"] .tp-add-node-card form>.action-row{background:#fff!important}
+      @media(max-width:640px){
+        .tp-add-node-card form{padding:13px!important}
+        .tp-add-node-card>.card-head{padding:15px!important}
+        .tp-add-node-card .tp-node-form-grid{grid-template-columns:minmax(0,1fr)!important}
+        .tp-node-section-note{display:none}
+        .tp-add-node-card form>.action-row button{flex:1;min-width:120px}
+      }
+    `}</style>
+
     {!open&&jobId?<button className="node-install-reopen" type="button" onClick={()=>setOpen(true)}>{pick("مشاهده مراحل افزودن نود","View server installation stages")} · {job?.node_name||pick("در حال دریافت وضعیت","Loading status")}{job?.state==="running"?" ●":""}</button>:null}
     {!open&&ok?<div className="runtime-success" style={{marginBottom:12}}>{ok}</div>:null}
     {!open&&error?<div className="runtime-error" style={{marginBottom:12}}>{error}</div>:null}
-    {open?<div className="runtime-modal" role="dialog" aria-modal="true">
+    {open?<div className="runtime-modal tp-add-node-modal" role="dialog" aria-modal="true">
     <button type="button" className="runtime-modal-bg" aria-label="close" onClick={()=>setOpen(false)}/>
-    <div className="runtime-modal-card" style={{width:"min(760px,100%)"}}>
+    <div className="runtime-modal-card tp-add-node-card">
       <div className="card-head"><div><b>{pick("افزودن سرور","Add server")}</b><small>{pick("ثبت نود، SSH و زیرساخت پایه","Node registration, SSH and base infrastructure")}</small></div><button type="button" className="icon-button" onClick={()=>setOpen(false)}>×</button></div>
       {error?<div className="runtime-error">{error}</div>:null}
       {ok?<div className="runtime-success">{ok}</div>:null}
@@ -234,11 +288,16 @@ export function NodeAddModalBridge(){
           <button className="ghost" type="button" onClick={resetInstall}>{pick("افزودن سرور دیگر","Add another server")}</button>
         </div>
       </div>:<form onSubmit={submit}>
-        <div className="setting-grid">
+        <div className="tp-node-section-title"><span className="tp-node-section-number">01</span>{pick("مشخصات سرور","Server details")}<small className="tp-node-section-note">{pick("نام، میزبان و موقعیت","Identity & location")}</small></div>
+        <div className="setting-grid tp-node-form-grid">
           <label className="field"><span>{pick("نام سرور","Server name")}</span><input required value={draft.name} onChange={e=>setDraft(v=>({...v,name:e.target.value}))}/></label>
           <label className="field"><span>IP / Host</span><input required dir="ltr" value={draft.host} onChange={e=>setDraft(v=>({...v,host:e.target.value}))}/></label>
           <label className="field"><span>{pick("نوع نود","Node type")}</span><select value={draft.node_type} onChange={e=>setDraft(v=>{const node_type=e.target.value as "iran"|"exit";return {...v,node_type,country_code:node_type==="iran"?"IR":v.country_code==="IR"?"DE":v.country_code};})}><option value="iran">Iran</option><option value="exit">Exit</option></select></label>
           <div className="field"><NodeCountryPicker label={pick("کشور و پرچم سرور","Server country & flag")} value={draft.node_type==="iran"?"IR":draft.country_code} disabled={draft.node_type==="iran"} onChange={country_code=>setDraft(v=>({...v,country_code}))} language={pick("fa","en") as "fa"|"en"}/></div>
+        </div>
+        <hr className="tp-node-separator"/>
+        <div className="tp-node-section-title"><span className="tp-node-section-number">02</span>{pick("دسترسی و ظرفیت","Access & capacity")}<small className="tp-node-section-note">{pick("اطلاعات SSH سرور","SSH credentials")}</small></div>
+        <div className="setting-grid tp-node-form-grid">
           <label className="field"><span>SSH Port</span><input type="number" min={1} max={65535} value={draft.port} onChange={e=>setDraft(v=>({...v,port:Number(e.target.value)||22}))}/></label>
           <label className="field"><span>SSH Username</span><input dir="ltr" value={draft.username} onChange={e=>setDraft(v=>({...v,username:e.target.value}))}/></label>
           <label className="field"><span>SSH Password</span><input type="password" autoComplete="new-password" required value={draft.password} onChange={e=>setDraft(v=>({...v,password:e.target.value}))}/></label>
