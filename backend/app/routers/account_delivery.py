@@ -29,6 +29,9 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..config import settings
+from ..openvpn_profile_delivery_guard_v1 import (
+    disambiguate_openvpn_filenames, validate_openvpn_profile,
+)
 from ..database import get_db
 from ..deps import require_admin, get_current_user
 from ..quota_models import QuotaUsageEvent
@@ -444,6 +447,9 @@ def _qr_data_uri(value: str) -> str:
 
 def _public_payload(db: Session, sub: Subscription) -> dict[str, Any]:
     info = _stored_info(db, sub)
+    # Duplicate countries (two German Exits, etc.) must have distinct on-disk
+    # filenames. Do not modify the saved certs, client config or identifiers.
+    disambiguate_openvpn_filenames(info)
     for cred in info["credentials"]:
         for item in cred.get("items", []):
             if cred["protocol"] == "wireguard" and item.get("config"):
@@ -5506,6 +5512,13 @@ def public_config_file(token: str, protocol: str, node_id: int, db: Session = De
     config = item.get("config")
     if not config:
         raise HTTPException(status_code=404, detail="فایل کانفیگ موجود نیست")
+    if protocol == "openvpn":
+        try:
+            validate_openvpn_profile(config)
+        except ValueError as exc:
+            # Do not serve an .ovpn missing the required remote directive.
+            # Do not include potentially sensitive config in the response.
+            raise HTTPException(status_code=409, detail=str(exc)) from None
     # Always expose account + country as the downloaded filename,
     # including credentials provisioned before this change.
     node = db.query(Node).filter(Node.retired_at.is_(None), Node.id == node_id).first()
@@ -5530,8 +5543,15 @@ def public_config_file(token: str, protocol: str, node_id: int, db: Session = De
             f"user{sub.id}",
         )
         filename = f"{username}-Server.{extension}"
+    if protocol == "openvpn" and item.get("filename"):
+        # This is already disambiguated in the read-time payload.
+        filename = re.sub(r"[^A-Za-z0-9._-]", "-", str(item["filename"]))[:120]
     media = "application/x-openvpn-profile" if protocol == "openvpn" else "text/plain; charset=utf-8"
-    return Response(config, media_type=media, headers={"Content-Disposition": f'attachment; filename="{filename}"'})
+    return Response(config, media_type=media, headers={
+        "Content-Disposition": f'attachment; filename="{filename}"',
+        "Cache-Control":"private, no-store",
+        "X-Content-Type-Options":"nosniff",
+    })
 
 # TWINPANEL_SUB_MANUAL_LIMITS_V16
 @router.patch("/{subscription_id}/manual-limits")

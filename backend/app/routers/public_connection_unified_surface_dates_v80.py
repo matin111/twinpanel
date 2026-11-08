@@ -1833,6 +1833,10 @@ _SCRIPT = r"""
            if(!supported)return null;
            const config=source.value;
            if(!config||!config.trim())return null;
+           if(match[1]==='openvpn'&&!/^[ \t]*remote[ \t]+\S+[ \t]+[0-9]{1,5}(?:[ \t]+(?:udp|tcp|tcp-client))?[ \t]*$/im.test(config)){
+             // Fail closed: never send a truncated profile to OpenVPN Connect.
+             return null;
+           }
            const extension=match[1]==='openvpn'?'ovpn':'conf';
            const fallback=match[1]+'-'+(Number(match[2])+1)+'.'+extension;
            const rawName=String(download.dataset.filename||fallback);

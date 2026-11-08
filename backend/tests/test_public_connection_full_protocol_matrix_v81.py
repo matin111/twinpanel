@@ -22,12 +22,12 @@ def test_real_node_per_protocol_rendered_with_identity_and_deliverable(protocol)
     payload={"credentials":[{"protocol":protocol,"username":"demo",
              "items":[
                 {"node_id":13,"country_code":"DE","host":"198.51.100.13",
-                 "config":"client\nremote 198.51.100.13 1194\n",
+                 "config":"client\nproto udp\nremote 198.51.100.13 1194\n",
                  "filename":"Germany-13.ovpn" if protocol=="openvpn" else "Germany-13.conf",
                  "uri":"vless://synthetic-user@198.51.100.13:443",
                  "username":"demo","password":"dummy"},
                 {"node_id":11,"country_code":"US","host":"198.51.100.11",
-                 "config":"client\nremote 198.51.100.11 1194\n",
+                 "config":"client\nproto udp\nremote 198.51.100.11 1194\n",
                  "filename":"United-States-11.ovpn" if protocol=="openvpn" else "United-States-11.conf",
                  "uri":"vless://synthetic-user@198.51.100.11:443",
                  "username":"demo","password":"dummy"},
@@ -56,7 +56,8 @@ def test_native_download_all_is_real_zip_not_a_placeholder(protocol,extension):
     from app.routers.public_connection_all_multilink_v34 import _bundle, NATIVE_BUNDLE_PROTOCOLS
     assert protocol in NATIVE_BUNDLE_PROTOCOLS
     items=[{"node_id":i,"filename":f"server-{i}{extension}",
-            "config":f"# synthetic {protocol} config {i}\n"} for i in (6,7,11,13)]
+            "config":(f"client\nproto udp\nremote 198.51.100.{i} 1194\n# synthetic {protocol} config {i}\n"
+                       if protocol=="openvpn" else f"# synthetic {protocol} config {i}\n")} for i in (6,7,11,13)]
     archive_bytes=_bundle(protocol,object(),items)
     assert archive_bytes.startswith(b"PK")
     with zipfile.ZipFile(BytesIO(archive_bytes)) as archive:

@@ -15,10 +15,14 @@ BASE=Path(__file__).resolve().parents[1]/"app"/"routers"
 @pytest.mark.parametrize("protocol,ext",[("openvpn","ovpn"),("wireguard","conf"),("amneziawg","conf")])
 def test_real_native_configs_download_together(protocol,ext):
     inputs=[
-        {"filename":f"DE-13.{ext}","config":"first node\n"},
-        {"filename":f"US-11.{ext}","config":"second node\n"},
-        {"filename":f"TR-6.{ext}","config":"third node\n"},
-        {"filename":f"DE-7.{ext}","config":"fourth node\n"},
+        {"filename":f"DE-13.{ext}","config":("client\nproto udp\nremote 198.51.100.13 1194\n"
+                                               if protocol=="openvpn" else "first node\n")},
+        {"filename":f"US-11.{ext}","config":("client\nproto udp\nremote 198.51.100.11 1194\n"
+                                               if protocol=="openvpn" else "second node\n")},
+        {"filename":f"TR-6.{ext}","config":("client\nproto udp\nremote 198.51.100.6 1194\n"
+                                               if protocol=="openvpn" else "third node\n")},
+        {"filename":f"DE-7.{ext}","config":("client\nproto udp\nremote 198.51.100.7 1194\n"
+                                               if protocol=="openvpn" else "fourth node\n")},
     ]
     assert protocol in NATIVE_BUNDLE_PROTOCOLS
     data=_bundle(protocol,object(),inputs)
@@ -29,7 +33,8 @@ def test_real_native_configs_download_together(protocol,ext):
 
 def test_duplicate_named_native_nodes_still_get_unique_files():
     data=_bundle("openvpn",object(),[
-        {"filename":"DE.ovpn","config":"first"},{"filename":"DE.ovpn","config":"second"}])
+        {"filename":"DE.ovpn","config":"client\nproto udp\nremote 198.51.100.13 1194\n"},
+        {"filename":"DE.ovpn","config":"client\nproto udp\nremote 198.51.100.7 1194\n"}])
     with ZipFile(BytesIO(data)) as archive:
         assert archive.namelist()==["DE.ovpn","DE-2.ovpn"]
 

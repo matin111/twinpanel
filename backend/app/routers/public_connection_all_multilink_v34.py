@@ -14,6 +14,7 @@ from fastapi.responses import JSONResponse, Response
 from sqlalchemy.orm import Session
 
 from ..database import get_db
+from ..openvpn_profile_delivery_guard_v1 import validate_openvpn_profile
 from .account_delivery import _public_payload, _subscription_from_share_token
 from .public_connection_modern_delivery_v13 import _items, _sudoku_uri
 from .public_connection_modern_import_v15 import _outbound, standard_share_uri
@@ -360,6 +361,11 @@ def _bundle_item(
     name = _safe_name(_item_name(item, index), f"server-{index + 1}")
 
     if protocol == "openvpn" and raw_config:
+        try:
+            validate_openvpn_profile(raw_config)
+        except ValueError as exc:
+            # Do not embed a missing-remote profile into the bulk ZIP.
+            raise HTTPException(status_code=409, detail=str(exc)) from None
         filename = str(item.get("filename") or f"{name}.ovpn")
         return _safe_name(filename, f"{name}.ovpn"), raw_config.encode("utf-8")
 

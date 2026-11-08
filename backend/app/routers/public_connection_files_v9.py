@@ -8,6 +8,7 @@ from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
 from ..database import get_db
+from ..openvpn_profile_delivery_guard_v1 import validate_openvpn_profile
 from .account_delivery import _public_payload, _subscription_from_share_token
 
 
@@ -88,6 +89,12 @@ def public_connection_file_v9(
     config = str(item.get("config") or "").strip()
     if not config:
         raise HTTPException(status_code=404, detail="کانفیگ هنوز آماده نیست")
+    if protocol == "openvpn":
+        try:
+            validate_openvpn_profile(config)
+        except ValueError as exc:
+            # A malformed profile must never be delivered as a valid .ovpn.
+            raise HTTPException(status_code=409, detail=str(exc)) from None
 
     filename = _safe_filename(item.get("filename"), protocol, item_index)
     media_type = _FILE_TYPES[protocol][1]

@@ -1,0 +1,48 @@
+name: OpenVPN Profile Delivery Integrity V1
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/openvpn_profile_delivery_guard_v1.py"
+      - "backend/app/routers/account_delivery.py"
+      - "backend/app/routers/public_connection_payload_fast_v1.py"
+      - "backend/app/routers/public_connection_files_v9.py"
+      - "backend/app/routers/public_connection_hub_v5.py"
+      - "backend/app/routers/public_connection_v3.py"
+      - "backend/app/routers/public_connection_all_multilink_v34.py"
+      - "backend/app/routers/public_connection_unified_surface_dates_v80.py"
+      - "backend/tests/test_openvpn_profile_delivery_guard_v1.py"
+      - ".github/workflows/openvpn-profile-delivery-integrity-v1.yml"
+  workflow_dispatch:
+
+jobs:
+  verify-native-profile:
+    runs-on: ubuntu-latest
+    env:
+      PYTHONPATH: backend
+      APP_SECRET_KEY: ci-ovpn-integrity-only
+      DATABASE_URL: sqlite:///./ci-ovpn-file-integrity.sqlite3
+      NODE_AGENT_SHARED_SECRET: ci-ovpn-agent-only
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install backend test requirements
+        run: python -m pip install -r backend/requirements.txt
+      - name: Compile changed Python modules
+        run: |
+          python -m py_compile \
+            backend/app/openvpn_profile_delivery_guard_v1.py \
+            backend/app/routers/account_delivery.py \
+            backend/app/routers/public_connection_payload_fast_v1.py \
+            backend/app/routers/public_connection_files_v9.py \
+            backend/app/routers/public_connection_hub_v5.py \
+            backend/app/routers/public_connection_v3.py \
+            backend/app/routers/public_connection_all_multilink_v34.py \
+            backend/app/routers/public_connection_unified_surface_dates_v80.py \
+            backend/tests/test_openvpn_profile_delivery_guard_v1.py
+      - name: Validate remote directive and all file delivery paths
+        run: python -m unittest discover -s backend/tests -p "test_openvpn_profile_delivery_guard_v1.py" -v

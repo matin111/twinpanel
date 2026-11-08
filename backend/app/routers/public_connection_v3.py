@@ -9,6 +9,7 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
 from ..branding_models import BrandingSettings
+from ..openvpn_profile_delivery_guard_v1 import validate_openvpn_profile
 from ..database import get_db
 from ..models import Node, User
 from .account_delivery import (
@@ -98,6 +99,16 @@ def file_download_card(protocol: str, index: int, server_name: str, item: dict[s
             '<span>کانفیگ هنوز آماده نشده است.</span>'
             '</div>'
         )
+    if protocol == "openvpn":
+        try:
+            validate_openvpn_profile(config)
+        except ValueError:
+            return (
+                '<div class="delivery-card empty">'
+                f'<div><small>سرور</small><strong>{h(server_name)}</strong></div>'
+                '<span>فایل OpenVPN نامعتبر است؛ کانفیگ باید بازسازی شود.</span>'
+                '</div>'
+            )
 
     source_id = f"cfg-{protocol}-{index}"
     filename = str(item.get("filename") or "").strip()
