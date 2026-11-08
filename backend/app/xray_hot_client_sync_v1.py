@@ -114,7 +114,7 @@ def _sync():
         # Never apply Vision to XHTTP, WS, TLS or legacy TCP clients.
         if tag == "vless-tcp-reality-vision":
             client["flow"] = "xtls-rprx-vision"
-        clients.append(client
+        clients.append(client)
         updated.append((tag, port, client))
 
     if found < 3:
@@ -196,8 +196,16 @@ def hot_client_sync_script(client_id: str, email: str) -> str:
     uuid.UUID(str(client_id))
     if not email or len(email) > 320 or "\n" in email or "\r" in email:
         raise ValueError("Invalid Xray client email")
-    return (_REMOTE.replace("__CLIENT_ID__", repr(str(client_id)))
-                   .replace("__EMAIL__", repr(email)))
+    script = (_REMOTE.replace("__CLIENT_ID__", repr(str(client_id)))
+                     .replace("__EMAIL__", repr(email)))
+    # Remote Python lives inside a string, so py_compile of this module does
+    # NOT validate the generated executable. Fail safely before opening an
+    # SSH connection whenever the node-side helper has a syntax regression.
+    try:
+        compile(script, "<xray-hot-client-sync>", "exec")
+    except SyntaxError as exc:
+        raise RuntimeError("XRAY_HOT_CLIENT_SCRIPT_SYNTAX_INVALID") from exc
+    return script
 
 
 _applied = False
