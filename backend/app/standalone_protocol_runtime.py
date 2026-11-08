@@ -224,9 +224,15 @@ async def _apply_mieru(conn, node: Node, port: int, settings: dict[str, Any]) ->
         f"install -d -m 700 {shlex.quote(BASE_DIR + '/mieru')}; "
         f"mita describe config > {shlex.quote(rollback)} 2>/dev/null || true; "
         "mita stop >/dev/null 2>&1 || true; "
-        f"if ! mita replace config {shlex.quote(config_path)} >/dev/null 2>&1 || ! mita start >/dev/null 2>&1; then "
+        f"if ! mita replace config {shlex.quote(config_path)} >/dev/null 2>&1; then "
+        "  echo MIERU_CONFIG_REPLACE_FAILED >&2; "
         f"  if [ -s {shlex.quote(rollback)} ]; then mita replace config {shlex.quote(rollback)} >/dev/null 2>&1 || true; mita start >/dev/null 2>&1 || true; fi; "
         "  exit 72; "
+        "fi; "
+        "if ! mita start >/dev/null 2>&1; then "
+        "  echo MIERU_SERVICE_START_FAILED >&2; "
+        f"  if [ -s {shlex.quote(rollback)} ]; then mita replace config {shlex.quote(rollback)} >/dev/null 2>&1 || true; mita start >/dev/null 2>&1 || true; fi; "
+        "  exit 73; "
         "fi",
         timeout=120,
     )
