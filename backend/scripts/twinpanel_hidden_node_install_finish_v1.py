@@ -30,14 +30,6 @@ from app.services.hidden_node_install_supervisor_v1 import require_hidden_job
 from app.services.node_install_progress_v1 import set_install_progress
 from app.services.new_node_modern_bootstrap_v1 import bootstrap_new_exit_modern_protocols
 from app.services.new_node_readiness_v1 import verify_new_exit_readiness
-from app.xray_modern_runtime import apply_xray_modern_runtime
-from app.xray_adaptive_three_profiles_v47 import apply_xray_adaptive_three_profiles_v47
-from app.xray_domainless_vision_v50 import apply_xray_domainless_vision_v50
-
-# Standalone systemd finisher must use the same 3-profile runtime as the API.
-apply_xray_modern_runtime()
-apply_xray_adaptive_three_profiles_v47()
-apply_xray_domainless_vision_v50()
 
 
 def _status(job_id: str, stage: str, node_id: int, **kwargs) -> None:
