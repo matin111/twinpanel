@@ -74,7 +74,11 @@ def _effective_domain_from_db(db, node: Node | None) -> str:
         return known
     try:
         value=db.execute(
-            text("SELECT xray_domain FROM nodes WHERE id = :node_id"),
+            # to_jsonb(row) does not reference a possibly absent legacy
+            # column at SQL parse time; missing xray_domain simply yields
+            # NULL. Avoid aborting the caller's PostgreSQL transaction.
+            text("SELECT to_jsonb(n)->>'xray_domain' FROM nodes n "
+                 "WHERE n.id = :node_id"),
             {"node_id":int(node.id)},
         ).scalar()
     except Exception:
