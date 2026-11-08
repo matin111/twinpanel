@@ -99,19 +99,17 @@ def _persist_subscription(payload: dict[str, Any]) -> tuple[int, list[str], dict
             else 1
         )
 
-        # Manual subscriptions MUST declare finite validity at creation.
-        # Previously a missing duration became zero and silently created
-        # unlimited accounts with no expiry and no visible days remaining.
-        # Match the existing validated synchronous creation contract.
-        if duration_days <= 0:
+        # Explicit zero days is a legitimate unlimited-duration subscription.
+        # Missing duration is not the same as a deliberate zero selection.
+        # Preserve plans whose configured duration is zero (unlimited).
+        if manual and request.duration_days is None:
             raise HTTPException(
                 status_code=422,
-                detail=(
-                    "مدت اعتبار اشتراک دستی را به روز وارد کنید؛ باید بیشتر از صفر باشد"
-                    if manual else "مدت اعتبار پلن یا اشتراک باید بیشتر از صفر باشد"
-                ),
+                detail="مدت اعتبار را مشخص کنید؛ برای اشتراک نامحدود عدد صفر وارد کنید",
             )
-        duration_unlimited = False
+        if duration_days < 0:
+            raise HTTPException(status_code=422, detail="مدت اعتبار نمی‌تواند منفی باشد")
+        duration_unlimited = duration_days == 0
 
         sub = create_subscription_core(
             db=db,
