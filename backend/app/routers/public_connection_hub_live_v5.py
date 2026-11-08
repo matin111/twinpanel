@@ -418,6 +418,31 @@ def public_connection_hub_live_v5(
             '<strong id="liveDurationMetric">' + duration_label + '</strong>',
             1,
         )
+        # The canonical layout replaces the old expiry-days element. Render
+        # an initial DB-backed label before the live polling script starts.
+        from datetime import datetime, timezone
+        import math
+        expiry_raw = live.get("expires_at")
+        if expiry_raw:
+            expiry_dt = datetime.fromisoformat(str(expiry_raw).replace("Z", "+00:00"))
+            if expiry_dt.tzinfo is None:
+                expiry_dt = expiry_dt.replace(tzinfo=timezone.utc)
+            left = max(0, math.ceil(
+                (expiry_dt - datetime.now(timezone.utc)).total_seconds() / 86400
+            ))
+            remaining_label = str(left) + " روز باقی‌مانده"
+        elif live.get("duration_unlimited") is True:
+            remaining_label = "مدت نامحدود"
+        elif valid_days and not live.get("starts_at"):
+            remaining_label = str(valid_days) + " روز · شروع با اولین اتصال"
+        else:
+            remaining_label = "مدت تعیین نشده"
+        source = re.sub(
+            r'(<span id="liveExpiryDays"[^>]*>)[^<]*(</span>)',
+            lambda match: match.group(1) + remaining_label + match.group(2),
+            source,
+            count=1,
+        )
         source = source.replace(
             '<strong id="liveActiveSessions">—</strong>',
             '<strong id="liveActiveSessions">' + str(sessions) + '</strong>',
