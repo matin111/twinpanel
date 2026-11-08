@@ -226,19 +226,21 @@ async def run(node_id:int,limit:int,apply:bool):
                     item,node=node,protocol=protocol,username=secret.username,
                 )
             old.append(item)
-            cred.username=_credential_identity(protocol,secret)
             if protocol in BOUND:
                 from dataclasses import replace
                 mother_name=str(bound_mother_names.get(sid) or "").strip()
                 if not mother_name:
                     raise RuntimeError("CENTRAL_SINGBOX_MOTHER_IDENTITY_MISSING")
                 stored=replace(secret,username=mother_name)
+                cred.username=mother_name
                 # Avoid replacing any existing canonical mother secret during
                 # node enrollment; only the node item has an alias.
                 if not cred.secret_encrypted:
                     cred.secret_encrypted=ad._enc(secret_to_dict(stored))
             else:
                 # Other protocols preserve their globally stored identity.
+                if not cred.username:
+                    cred.username=_credential_identity(protocol,secret)
                 if not cred.secret_encrypted:
                     cred.secret_encrypted=ad._enc(secret_to_dict(secret))
             cred.config_text_encrypted=ad._enc(old)
