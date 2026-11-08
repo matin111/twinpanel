@@ -7,6 +7,9 @@ on:
       - "backend/app/services/central_first_exit_bootstrap_v1.py"
       - "backend/app/routers/provision.py"
       - "backend/app/routers/publish_node_all_users_v1.py"
+      - "backend/app/routers/classic_protocol_admin_v1.py"
+      - "backend/app/provision_resilience_v278.py"
+      - "backend/app/standalone_protocol_runtime.py"
       - "components/node-add-modal-bridge.tsx"
       - "backend/tests/test_node_os_preflight_v1.py"
       - "backend/tests/test_central_first_exit_bootstrap_v1.py"
@@ -37,6 +40,9 @@ jobs:
             backend/app/services/central_first_exit_bootstrap_v1.py \
             backend/app/routers/provision.py \
             backend/app/routers/publish_node_all_users_v1.py \
+            backend/app/routers/classic_protocol_admin_v1.py \
+            backend/app/provision_resilience_v278.py \
+            backend/app/standalone_protocol_runtime.py \
             backend/tests/test_node_os_preflight_v1.py \
             backend/tests/test_central_first_exit_bootstrap_v1.py
       - name: OS fallback and managed-node IP safety tests
@@ -45,5 +51,5 @@ jobs:
         run: python -m unittest discover -s backend/tests -p 'test_central_first_exit_bootstrap_v1.py' -v
       - name: Never source remote OS metadata or reenable legacy sync
         run: |
-          ! grep -n '\. /etc/os-release' backend/app/routers/provision.py backend/app/services/central_first_exit_bootstrap_v1.py
+          ! grep -n '\. /etc/os-release' backend/app/routers/provision.py backend/app/services/central_first_exit_bootstrap_v1.py backend/app/routers/classic_protocol_admin_v1.py backend/app/provision_resilience_v278.py backend/app/standalone_protocol_runtime.py
           ! grep -n 'sync_installed_node_to_subscriptions' backend/app/services/central_first_exit_bootstrap_v1.py
