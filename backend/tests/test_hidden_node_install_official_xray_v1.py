@@ -17,6 +17,7 @@ os.environ.setdefault("DATABASE_URL","sqlite+pysqlite:////tmp/ci-hidden-node-ins
 os.environ.setdefault("NODE_AGENT_SHARED_SECRET","ci-hidden-node-install-agent")
 
 from app.models import NodeType
+from app.protocol_account_registry import ALL_PROTOCOL_KEYS
 from app.services import hidden_node_install_supervisor_v1 as supervisor
 from app.services import new_node_modern_bootstrap_v1 as modern
 from app import xray_official_verified_installer_v1 as verified
@@ -105,6 +106,46 @@ class HiddenNodeSupervisorSafetyTests(unittest.TestCase):
         with self.assertRaises(SystemExit):
             worker.parse(["--node-id","21","--apply",
                           "--confirm-node-id","19","--job-id",self.job.job_id])
+
+
+class ThreeInboundReadinessGateTests(unittest.IsolatedAsyncioTestCase):
+    async def _check(self, profiles):
+        from app.services import new_node_readiness_v1 as readiness
+        db=MagicMock()
+        db.get.return_value=SimpleNamespace(
+            id=21,node_type=NodeType.EXIT,retired_at=None,
+        )
+        db.query.return_value.filter.return_value.all.return_value=[
+            SimpleNamespace(protocol=p,status="online",port=9000+i)
+            for i,p in enumerate(ALL_PROTOCOL_KEYS)
+        ]
+        conn=MagicMock()
+        conn.wait_closed=AsyncMock()
+        with (patch.object(readiness,"connect_protocol_runtime",
+                           new_callable=AsyncMock,return_value=conn),
+              patch.object(readiness,"_protocol_live_health",
+                           new_callable=AsyncMock,return_value={"ok":True}),
+              patch.object(readiness,"profile_health",
+                           new_callable=AsyncMock,return_value={"ok":True}),
+              patch("app.central_xray_node_authority_v1.read_node_public_authority",
+                    new_callable=AsyncMock,
+                    return_value={"profiles":profiles})):
+            result=await readiness.verify_new_exit_readiness(db,21)
+        conn.close.assert_called_once()
+        conn.wait_closed.assert_awaited_once()
+        return result
+
+    async def test_two_legacy_inbounds_do_not_publish_hidden_exit(self):
+        result=await self._check(["xhttp_reality","tcp_reality"])
+        self.assertFalse(result["ok"])
+        self.assertIn("v2ray",result["missing"])
+
+    async def test_three_actual_authoritative_inbounds_pass_with_other_15(self):
+        result=await self._check([
+            "xhttp_reality","tcp_reality","tcp_reality_vision",
+        ])
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["ready_count"],len(ALL_PROTOCOL_KEYS))
 
 
 class ModernGroupIsolationTests(unittest.IsolatedAsyncioTestCase):
