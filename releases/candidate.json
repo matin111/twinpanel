@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.702",
-  "source_sha": "35beefb98050498d4f85d2ebd95cdba15d38f39d",
+  "version": "1.1.0-rc.703",
+  "source_sha": "0067427e0bad362cae73546670203af9743f7910",
   "notes": {
-    "fa": "اصلاح ریشه‌ای ثبت آنلاین پروتکل‌های مدرن از جمله AnyTLS برای اشتراک‌های فعال قدیمی که مدت اعتبار ثبت‌شده ندارند: نشست فقط در صورت مشاهده مستقیم توسط API معتبر نود ثبت می‌شود. خطای subscription_activation_duration_missing دیگر نباید ثبت همه کاربران نود را متوقف کند. محدودیت دستگاه، حجم و وضعیت اشتراک رعایت می‌شوند؛ پذیرش اتصال جدید بدون مدت همچنان اعتبارسنجی مستقل دارد. بدون تغییر کانفیگ VPN یا اطلاعات اشتراک.",
-    "en": "Correct authoritative AnyTLS/sing-box modern live presence for active legacy subscriptions lacking stored duration. Trusted node-observed sessions use observed_telemetry=True; strict ordinary admission, device, traffic and subscription enforcement unchanged. Do not modify VPN credentials or node configuration."
+    "fa": "نسخه rc.703: رفع ریشه‌ای خطای RUNTIMEERROR هنگام افزودن دوباره نود fin پس از ورود موفق SSH. در لاگ نود فنلاند دستور source کردن /etc/os-release با کد ۱ شکست خورد؛ اکنون مشخصات سیستم‌عامل بدون اجرای آن فایل، به‌صورت فقط‌خواندنی از /etc/os-release یا /usr/lib/os-release یا lsb_release خوانده می‌شود و فقط Ubuntu/Debian مجاز است. این بررسی در نصب نود خروجی، نود ایران، تست SSH، تعمیر کلاسیک، نصب AmneziaWG و ارتقای Agent یکسان است. IP نود فعال ایران/خروجی از نصب مجدد محفوظ است و نصب هم‌زمان روی یک IP مجاز نیست. پیام‌های دقیق و امن به فارسی/انگلیسی نمایش داده می‌شود و خطای خام SSH/اطلاعات حساس گزارش نمی‌شود. نصب پیش از تغییر سرویس‌ها در صورت نامعتبر بودن OS متوقف می‌شود؛ حساب‌ها، گواهی‌ها و نود مادر دست نخورده‌اند. این نسخه تغییرات rc.702 را نیز حفظ می‌کند. وضعیت اتصال واقعی سرور فنلاند نیاز به آزمون پس از نصب رسمی دارد.",
+    "en": "rc.703: Fix fresh/re-added node installs failing with opaque RUNTIMEERROR when SSH succeeds but sourcing /etc/os-release returns exit 1. Shared non-mutating Ubuntu/Debian detector reads /etc/os-release, /usr/lib/os-release, or lsb_release with fail-closed stable diagnostic codes across Exit/Iran bootstrap, SSH test, classic repair, AmneziaWG install and Agent upgrade. Block installations against an already-managed Iran/Exit IP and simultaneous duplicate host installs. Localized, sanitized errors instead of raw SSH messages. No customer credentials, server configurations, or mother-panel data modified. Preserves rc.702 improvements; real node connectivity must be independently reverified after installing."
   }
 }
