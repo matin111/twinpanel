@@ -523,7 +523,7 @@ async def collect_singbox_snapshot(
     ok, output = await _run_node_command(
         conn,
         f"printf '%s' {shlex.quote(encoded)} | base64 -d | python3",
-        timeout=10,
+        timeout=20,
     )
     if not ok:
         return False, None, output[-1200:] or "singbox_snapshot_failed"
@@ -781,6 +781,13 @@ def apply_singbox_snapshot(
         and str(row.get("inbound_type") or "").strip().lower() == ("socks" if protocol == "socks5" else protocol)
         and str(row.get("user") or "").strip()
     ]
+    # Index authenticated connections once per snapshot instead of scanning
+    # every connection for every provisioned device (O(devices + rows)).
+    # Preserve encounter order, closed rows, and each original counter.
+    connections_by_user: dict[str, list[dict[str, Any]]] = {}
+    for row in protocol_rows:
+        connections_by_user.setdefault(str(row["user"]), []).append(row)
+
     closed_retained = sum(1 for row in rows if _safe_int(row.get("closed_at_ms")) > 0)
     retention_saturated = closed_retained >= SINGBOX_CLOSED_RETENTION_LIMIT
     if retention_saturated:
@@ -796,7 +803,7 @@ def apply_singbox_snapshot(
         if not identity:
             raise RuntimeError("singbox_device_identity_missing")
 
-        matching = [row for row in protocol_rows if str(row.get("user") or "") == identity]
+        matching = connections_by_user.get(identity, [])
         active_rows = [row for row in matching if _safe_int(row.get("closed_at_ms")) == 0]
         online = bool(active_rows)
         representative = (active_rows or matching or [{}])[0]
