@@ -997,6 +997,10 @@ async def reconcile_singbox_quota_once() -> dict[str, Any]:
                     })
 
                 for protocol in sorted(grouped):
+                    # ShadowTLS identity is lost in the shared inner detour;
+                    # do not synthesize or charge per-user sessions from it.
+                    if protocol in SINGBOX_UNATTRIBUTABLE_PROTOCOLS:
+                        continue
                     try:
                         applied = apply_singbox_snapshot(
                             db,
