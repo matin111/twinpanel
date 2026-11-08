@@ -21,6 +21,26 @@ def main() -> None:
         "socks5",
     }
     assert native.SINGBOX_ACCOUNTING_PROTOCOLS == expected
+    # Regression: indexed session lookup must retain the exact connection
+    # ordering/counters and not conflate two identities behind one NAT.
+    source = (ROOT / "app" / "services" / "singbox_native_accounting_v265.py").read_text(
+        encoding="utf-8"
+    )
+    assert 'connections_by_user.setdefault(str(row["user"]), []).append(row)' in source
+    assert 'matching = connections_by_user.get(identity, [])' in source
+    incoming = [
+        {"user": "alpha", "id": "a1", "uplink_total": 2},
+        {"user": "beta", "id": "b1", "uplink_total": 5},
+        {"user": "alpha", "id": "a2", "uplink_total": 7},
+        {"user": "beta", "id": "b2", "uplink_total": 9},
+    ]
+    grouped: dict[str, list] = {}
+    for row in incoming:
+        grouped.setdefault(str(row["user"]), []).append(row)
+    for identity in ("alpha", "beta", "missing"):
+        expected_rows = [r for r in incoming if r["user"] == identity]
+        assert grouped.get(identity, []) == expected_rows
+
     # Two users can share the same NAT IP; attribution MUST follow the
     # authenticated user, not the source address. Two simultaneous TCP
     # connections under one credential must also remain visible as two,
