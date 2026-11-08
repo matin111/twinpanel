@@ -34,6 +34,9 @@ class CentralFirstExitBootstrapTests(unittest.IsolatedAsyncioTestCase):
                          return_value=conn),
             patch.object(prov,"cmd",new_callable=AsyncMock,
                          return_value="ubuntu"),
+            patch.object(prov,"remote_supported_os_id",
+                         new_callable=AsyncMock,
+                         return_value="ubuntu") as remote_os,
             patch.object(prov,"ensure_base",new_callable=AsyncMock),
             patch.object(prov,"provision_protocols",new_callable=AsyncMock,
                          return_value=({"openvpn":{"ok":True}},[],{})) as daemons,
@@ -57,6 +60,7 @@ class CentralFirstExitBootstrapTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(result["subscription_sync"]["reason"],
                              "central_runtime_owns_all_subscriptions")
             self.assertFalse(db.add.call_args.args[0].show_to_users)
+            remote_os.assert_awaited_once_with(conn)
             daemons.assert_awaited_once()
             self.assertIs(daemons.await_args.args[4],False)
             quota.assert_called_once_with(db,15)

@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field, model_validator
 from sqlalchemy.orm import Session
 
 from ..database import get_db
+from ..services.node_os_preflight_v1 import remote_supported_os_id
 from ..deps import require_admin
 from ..models import Node, NodeProtocolConfig
 from ..node_runtime_connection import (
@@ -337,19 +338,9 @@ async def ensure_classic_protocol(
 
     conn = await connect_protocol_runtime(node, db)
     try:
-        os_id = (
-            await cmd(
-                conn,
-                ". /etc/os-release && printf '%s' \"$ID\"",
-                check=False,
-            )
-        ).strip().lower()
-        if os_id not in {"ubuntu", "debian"}:
-            raise HTTPException(
-                status_code=400,
-                detail="نصب مدیریت‌شده پروتکل فعلاً روی Ubuntu/Debian پشتیبانی می‌شود",
-            )
-
+        # Repair must not fail after bootstrap on the same damaged
+        # /etc/os-release. The shared read-only preflight owns the decision.
+        await remote_supported_os_id(conn)
         await ensure_base(conn)
 
         results, failed, _secrets = await provision_protocols(

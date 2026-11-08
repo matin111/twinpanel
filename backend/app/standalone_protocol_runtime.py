@@ -419,8 +419,23 @@ export DEBIAN_FRONTEND=noninteractive
 if ! command -v awg >/dev/null 2>&1 || ! command -v awg-quick >/dev/null 2>&1; then
   apt-get -o DPkg::Lock::Timeout=300 update -y >/dev/null
   apt-get -o DPkg::Lock::Timeout=300 install -y software-properties-common python3-launchpadlib gnupg2 ca-certificates "linux-headers-$(uname -r)" >/dev/null
-  . /etc/os-release
-  if [ "${ID:-}" = "ubuntu" ]; then
+  # The base installer verified Ubuntu/Debian without sourcing OS files.
+  # Reuse the same safe fallback in this independent AmneziaWG setup script.
+  TP_OS_ID=''
+  for TP_OS_FILE in /etc/os-release /usr/lib/os-release; do
+    if [ -r "$TP_OS_FILE" ]; then
+      TP_OS_ID=$(sed -n '/^[[:space:]]*ID[[:space:]]*=/ {s/^[^=]*=//;p;q;}' "$TP_OS_FILE" | tr -d '"' | tr '[:upper:]' '[:lower:]')
+      [ -n "$TP_OS_ID" ] && break
+    fi
+  done
+  if [ -z "$TP_OS_ID" ] && command -v lsb_release >/dev/null 2>&1; then
+    TP_OS_ID=$(lsb_release -si | tr '[:upper:]' '[:lower:]')
+  fi
+  if [ "$TP_OS_ID" != 'ubuntu' ] && [ "$TP_OS_ID" != 'debian' ]; then
+    echo 'NODE_OS_RELEASE_UNREADABLE' >&2
+    exit 65
+  fi
+  if [ "$TP_OS_ID" = "ubuntu" ]; then
     add-apt-repository -y ppa:amnezia/ppa >/dev/null
   else
     apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 57290828 >/dev/null 2>&1

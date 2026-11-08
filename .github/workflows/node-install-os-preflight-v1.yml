@@ -1,0 +1,55 @@
+name: Node Install OS Read-only Preflight V1
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/services/node_os_preflight_v1.py"
+      - "backend/app/services/central_first_exit_bootstrap_v1.py"
+      - "backend/app/routers/provision.py"
+      - "backend/app/routers/publish_node_all_users_v1.py"
+      - "backend/app/routers/classic_protocol_admin_v1.py"
+      - "backend/app/provision_resilience_v278.py"
+      - "backend/app/standalone_protocol_runtime.py"
+      - "components/node-add-modal-bridge.tsx"
+      - "backend/tests/test_node_os_preflight_v1.py"
+      - "backend/tests/test_central_first_exit_bootstrap_v1.py"
+      - ".github/workflows/node-install-os-preflight-v1.yml"
+  workflow_dispatch:
+
+jobs:
+  safe-node-install:
+    runs-on: ubuntu-latest
+    env:
+      PYTHONPATH: backend
+      APP_SECRET_KEY: ci-node-install-only
+      DATABASE_URL: sqlite:///./ci-node-install.sqlite3
+      NODE_AGENT_SHARED_SECRET: ci-node-agent-only
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install dependencies
+        run: python -m pip install -r backend/requirements.txt
+      - name: Compile modified backend source
+        run: |
+          python -m py_compile \
+            backend/app/services/node_os_preflight_v1.py \
+            backend/app/services/central_first_exit_bootstrap_v1.py \
+            backend/app/routers/provision.py \
+            backend/app/routers/publish_node_all_users_v1.py \
+            backend/app/routers/classic_protocol_admin_v1.py \
+            backend/app/provision_resilience_v278.py \
+            backend/app/standalone_protocol_runtime.py \
+            backend/tests/test_node_os_preflight_v1.py \
+            backend/tests/test_central_first_exit_bootstrap_v1.py
+      - name: OS fallback and managed-node IP safety tests
+        run: python -m unittest discover -s backend/tests -p 'test_node_os_preflight_v1.py' -v
+      - name: Central-first installer regression tests
+        run: python -m unittest discover -s backend/tests -p 'test_central_first_exit_bootstrap_v1.py' -v
+      - name: Never source remote OS metadata or reenable legacy sync
+        run: |
+          ! grep -n '\. /etc/os-release' backend/app/routers/provision.py backend/app/services/central_first_exit_bootstrap_v1.py backend/app/routers/classic_protocol_admin_v1.py backend/app/provision_resilience_v278.py backend/app/standalone_protocol_runtime.py
+          ! grep -n 'sync_installed_node_to_subscriptions' backend/app/services/central_first_exit_bootstrap_v1.py

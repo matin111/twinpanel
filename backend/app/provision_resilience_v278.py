@@ -312,15 +312,9 @@ async def install_node_v278(
     stage = "ssh_connected"
 
     try:
-        os_id = await provision.cmd(
-            conn,
-            ". /etc/os-release && printf '%s' \"$ID\"",
-        )
-        if os_id not in ("ubuntu", "debian"):
-            raise HTTPException(
-                status_code=400,
-                detail="فعلاً Ubuntu/Debian پشتیبانی می‌شود",
-            )
+        # Iran relay bootstrap uses the same read-only OS detection as
+        # Exit bootstrap. Never bypass fail-closed Ubuntu/Debian validation.
+        await provision.remote_supported_os_id(conn)
 
         stage = "ensure_base"
         await provision.ensure_base(conn)

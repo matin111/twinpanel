@@ -25,14 +25,11 @@ async def bootstrap_hidden_central_exit(payload, request, db) -> dict:
 
     conn = await prov.ssh_connect(payload)
     try:
-        os_id = await prov.cmd(
-            conn, '. /etc/os-release && printf "%s" "$ID"',
-        )
-        if os_id not in {"ubuntu","debian"}:
-            raise HTTPException(
-                status_code=400,
-                detail="فعلاً Ubuntu/Debian پشتیبانی می‌شود",
-            )
+        # Previous Exit installs sourced /etc/os-release and aborted in
+        # ~2 seconds on an otherwise reachable Finnish node. Use the same
+        # read-only /etc -> /usr/lib -> lsb_release fallback as SSH Test.
+        # No remote mutation and no DB node creation before this succeeds.
+        await prov.remote_supported_os_id(conn)
         await prov.ensure_base(conn)
         node = Node(
             name=payload.name, node_type=NodeType.EXIT,
