@@ -284,7 +284,8 @@ _SCRIPT = r"""
  'use strict';
  if(!/^\/v1\/connect\/[^/]+\/?$/.test(location.pathname))return;
  const FLAG=(code)=>{
-  const x=String(code||'').toUpperCase();
+  const raw=String(code||'').toUpperCase();
+  const x=raw==='UK'?'GB':raw;
   return /^[A-Z]{2}$/.test(x)?[...x].map(c=>String.fromCodePoint(127397+c.charCodeAt(0))).join(''):'🌐';
  };
  // Use ISO 3166-1 alpha-2 from Node.country_code, not a short country allowlist.
