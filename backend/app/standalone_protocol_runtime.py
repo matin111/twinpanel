@@ -9,6 +9,7 @@ from typing import Any
 
 from .models import Node
 from .protocol_catalog import PROTOCOL_CATALOG
+from .verified_github_release_asset_v1 import official_github_asset_fetch_command
 from .routers.provision import active, cmd, ufw_allow
 
 
@@ -191,7 +192,7 @@ if ! command -v mita >/dev/null 2>&1 || ! mita version 2>&1 | grep -q {shlex.quo
   apt-get -o DPkg::Lock::Timeout=300 install -y ca-certificates curl >/dev/null
   tmp="$(mktemp --suffix=.deb)"
   trap 'rm -f "$tmp"' EXIT
-  curl -fL --retry 3 --connect-timeout 20 "$url" -o "$tmp"
+  {official_github_asset_fetch_command('"$url"', '"$tmp"')}
   echo "$sha  $tmp" | sha256sum -c -
   dpkg -i "$tmp" >/dev/null || apt-get -o DPkg::Lock::Timeout=300 -f install -y >/dev/null
 fi
@@ -278,7 +279,8 @@ if [ ! -x /opt/twinpanel/trusttunnel/trusttunnel_endpoint ] || ! /opt/twinpanel/
   tmp="$(mktemp --suffix=.tar.gz)"
   dir="$(mktemp -d)"
   trap 'rm -f "$tmp"; rm -rf "$dir"' EXIT
-  curl -fL --retry 3 --connect-timeout 20 "https://github.com/TrustTunnel/TrustTunnel/releases/download/v{TRUSTTUNNEL_VERSION}/$asset" -o "$tmp"
+  asset_url="https://github.com/TrustTunnel/TrustTunnel/releases/download/v{TRUSTTUNNEL_VERSION}/$asset"
+  {official_github_asset_fetch_command('"$asset_url"', '"$tmp"')}
   echo "$sha  $tmp" | sha256sum -c -
   tar -xzf "$tmp" -C "$dir"
   bin="$(find "$dir" -type f -name trusttunnel_endpoint -perm -u+x | head -n1)"
@@ -545,7 +547,8 @@ if [ ! -x /usr/local/bin/twinpanel-sudoku ]; then
   tmp="$(mktemp --suffix=.tar.gz)"
   dir="$(mktemp -d)"
   trap 'rm -f "$tmp"; rm -rf "$dir"' EXIT
-  curl -fL --retry 3 --connect-timeout 20 "https://github.com/SUDOKU-ASCII/sudoku/releases/download/v{SUDOKU_VERSION}/$asset" -o "$tmp"
+  asset_url="https://github.com/SUDOKU-ASCII/sudoku/releases/download/v{SUDOKU_VERSION}/$asset"
+  {official_github_asset_fetch_command('"$asset_url"', '"$tmp"')}
   echo "$sha  $tmp" | sha256sum -c -
   tar -xzf "$tmp" -C "$dir"
   bin="$(find "$dir" -type f \\( -name sudoku -o -name sudoku-tunnel \\) -perm -u+x | head -n1)"
