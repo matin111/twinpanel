@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.714",
+  "version": "1.1.0-rc.715",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-08T18:56:19Z",
+  "released_at": "2026-11-08T19:39:45Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "33580f89fbceeccc7eb5d3086af2bcbbf10a4f73",
+  "source_sha": "aecaa9c29410acbe61954d4b8efcd581aebf7730",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.714/twinpanel-1.1.0-rc.714-linux-x86_64.tar.gz",
-    "sha256": "381ede3d7313badad5c778ee1d2f944884f602e259ceffed24d0ca2a363d0140",
-    "size_bytes": 29857970
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.715/twinpanel-1.1.0-rc.715-linux-x86_64.tar.gz",
+    "sha256": "55d4f629e1f621a2663b8a3bc77a157aed1dc1ea61ad0eb55da86bba6bb06019",
+    "size_bytes": 29860733
   },
   "notes": {
-    "fa": "اصلاح بحرانی راه‌اندازی API: در صورتی که Modern Xray از قبل برچسب Password (PublicKey) را پشتیبانی کند، لایه سازگاری V83 دیگر باعث توقف کامل پنل نمی‌شود. همراه اصلاحات RC.713: همسان‌سازی وضعیت آنلاین پنل و سابلینک، ثبت کاربران احرازشده sing-box پیش از حسابداری کند، و پایش مستقل Sudoku. تست Xray/V83، sing-box و وضعیت آنلاین پاس شد؛ بدون تغییر در پورت، کانفیگ و سرویس‌های VPN نودها.",
-    "en": "Critical API startup regression fix: Xray V83 compatibility recognizes an already-supported Password (PublicKey) parser rather than crashing process startup. Includes rc.713 admin/public online freshness parity, authenticated sing-box pre-commit presence and isolated Sudoku monitor. Tested Xray/V83, sing-box and presence regression checks. No VPN node, client credential, service or port changes."
+    "fa": "رفع ریشه‌ای تداخل شناسه شمارنده Naive و پروتکل‌های sing-box: حفظ رکوردهای قدیمی متعلق به همان کاربر، و تخصیص کلید پایدار و جداگانه مبتنی بر هش هویت احراز‌شده برای اتصال جدید یا شناسه تکراری؛ جلوگیری از انتقال یا حذف شمارنده سایر کاربران. اصلاح نمایش قابلیت پایش آنلاین و حجم در API برای Naive، Hysteria2، AnyTLS، TUIC، Snell و SOCKS5 پس از جداسازی فرایند پردازشگر. بدون تغییر کانفیگ، رمز، پورت یا سرویس VPN روی نودها. ShadowTLS همچنان نیازمند انتساب هویت مستقل است.",
+    "en": "Fix Naive/sing-box reused connection-ID identity conflicts by retaining same-user legacy cursors and using deterministic authenticated-user-scoped connection keys for new or conflicting IDs. Never reassign or delete historical users' counters; preserve billing snapshots and quotas. Declare native per-user presence and traffic capabilities in the API process independently of isolated sing-box worker. Tests for Naive, native collector and active-first recovery pass. No changes to VPN nodes, ports, client credentials or configs; ShadowTLS remains unattributable."
   }
 }
