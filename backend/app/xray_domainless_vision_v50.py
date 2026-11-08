@@ -217,6 +217,13 @@ def do_install():
             XRAY,"api","adi",SERVER,"-timeout=18",str(add_payload)
         ],timeout=23)
         if added_response.returncode:
+            # The gRPC request may have succeeded even if its CLI transport
+            # timed out. Check whether the new tag appeared before rolling
+            # back; NEVER leave an unpersisted live listener behind.
+            try:
+                added = TAG in live_tags()
+            except Exception:
+                added = False
             raise RuntimeError("XRAY_VISION_HOT_ADD_FAILED")
         added=True
         if TAG not in live_tags() or not listening():
