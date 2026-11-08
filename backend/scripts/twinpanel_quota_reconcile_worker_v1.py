@@ -36,9 +36,6 @@ def _changed_items(result: dict) -> list[dict]:
 
 async def _main() -> int:
     from app.services.quota_runtime_reconcile import reconcile_quota_runtime_once
-    from app.services.openvpn_quota_runtime_v106 import (
-        reconcile_openvpn_quota_runtime_once,
-    )
     from app.services.l2tp_quota_runtime_v113 import (
         reconcile_l2tp_quota_runtime_once,
     )
@@ -46,11 +43,10 @@ async def _main() -> int:
     changed: list[dict] = []
     errors: list[dict] = []
 
-    # Prioritize inexpensive session-presence collectors. The previous order
-    # ran the expensive Cisco/Xray device scan first; if it exceeded the parent
-    # worker deadline, OpenVPN and L2TP were NEVER polled at all.
+    # OpenVPN is now owned by the independent 30-second fast observer in
+    # quota_process_isolation_v1. Never run two simultaneous OpenVPN writers:
+    # the heavy sweep remains for L2TP and Cisco/Xray only.
     collectors = (
-        ("openvpn", reconcile_openvpn_quota_runtime_once),
         ("l2tp", reconcile_l2tp_quota_runtime_once),
         ("cisco_xray", reconcile_quota_runtime_once),
     )
