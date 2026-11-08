@@ -6,6 +6,8 @@ import shlex
 from typing import Any
 from urllib.parse import parse_qs, quote, urlencode, urlsplit
 
+from sqlalchemy import text
+
 from . import (
     tunnel_service_connections_admin_runtime,
     xray_customer_profile_policy_v30 as policy_v30,
@@ -52,11 +54,58 @@ _original_admin_status_remote = None
 def _effective_domain(node: Node | None) -> str:
     if node is None:
         return ""
-    # The node's public_domain can be an Iran-tunnel host shared with other
-    # Exits. It is not proof of a dedicated TLS Xray endpoint/certificate.
-    # Only explicit xray_domain enables WS/TCP TLS profiles. New Exits without
-    # one must use the existing XHTTP/TCP REALITY path instead.
-    return str(getattr(node, "xray_domain", None) or "").strip().lower()
+    # public_domain is often a shared Iran-tunnel host and is NOT proof of
+    # node-owned TLS. Legacy Node SQLAlchemy models omit xray_domain even
+    # though the real PostgreSQL nodes table has it. Read that column only
+    # for real ORM Nodes, once per Session instance, with a safe JSONB
+    # projection (the column may not exist on very old installations).
+    direct=str(getattr(node,"xray_domain",None) or "").strip().lower()
+    if direct or not isinstance(node,Node):
+        return direct
+    marker="_tp_xray_domain_for_profile_policy_v50"
+    cached=getattr(node,marker,None)
+    if isinstance(cached,str):
+        return cached
+    try:
+        from .database import SessionLocal
+        with SessionLocal() as db:
+            result=db.execute(
+                text("SELECT to_jsonb(n)->>'xray_domain' FROM nodes n "
+                     "WHERE n.id = :node_id"),
+                {"node_id":int(node.id)},
+            ).scalar()
+        domain=str(result or "").strip().lower() if isinstance(result,(str,type(None))) else ""
+    except Exception:
+        domain=""
+    setattr(node,marker,domain)
+    return domain
+
+
+def _effective_domain_from_db(db, node: Node | None) -> str:
+    """Read the dedicated Xray TLS domain from the canonical DB column.
+
+    Some deployed Node ORM models do not map nodes.xray_domain even though
+    the migration has already added it. Without this check, the route builder
+    blindly added domainless REALITY routes to TLS Exits. This is metadata
+    only; never infer TLS from shared public_domain or untrusted customer URI.
+    """
+    known=_effective_domain(node)
+    if known or node is None:
+        return known
+    try:
+        value=db.execute(
+            # to_jsonb(row) does not reference a possibly absent legacy
+            # column at SQL parse time; missing xray_domain simply yields
+            # NULL. Avoid aborting the caller's PostgreSQL transaction.
+            text("SELECT to_jsonb(n)->>'xray_domain' FROM nodes n "
+                 "WHERE n.id = :node_id"),
+            {"node_id":int(node.id)},
+        ).scalar()
+    except Exception:
+        # Do not block existing legacy/self-hosted installations without the
+        # optional column. Live Xray authority remains the delivery gate.
+        return ""
+    return str(value).strip().lower() if isinstance(value,str) else ""
 
 
 def _tcp_reality_target_port(base_port: int) -> int:
@@ -421,7 +470,7 @@ def _service_routes_v47(
 
     routes = list(_original_service_routes(db, exit_node, exit_tunnel_ip))
 
-    if _effective_domain(exit_node):
+    if _effective_domain_from_db(db,exit_node):
         return routes
 
     cfg = (
@@ -470,10 +519,22 @@ def _required_profiles_v47(node: Node) -> set[str]:
             xray_modern_runtime.PROFILE_XHTTP,
             PROFILE_TCP_TLS,
         }
-    return {
+    required={
         xray_modern_runtime.PROFILE_XHTTP,
         PROFILE_TCP_REALITY,
     }
+    # A mother/core is diagnostics-only during rollout. Never require a
+    # third inbound there (which would trigger unexpected maintenance).
+    if not (
+        bool(getattr(node,"is_mother",False))
+        or bool(getattr(node,"is_local_core",False))
+        or getattr(node,"agent_url",None)=="local://core"
+    ):
+        # All customer-facing non-TLS Exits require an actually verified
+        # third secure profile. Existing two-profile items are incomplete
+        # and must be reconciled, never mislabeled "fully ready".
+        required.add("tcp_reality_vision")
+    return required
 
 
 def _customer_order_for_item(item: dict[str, Any]) -> tuple[str, ...]:
@@ -540,18 +601,12 @@ def _customer_xray_item_v47(
     if node is None:
         return None
 
-    desired = (
-        (
-            xray_modern_runtime.PROFILE_WS,
-            xray_modern_runtime.PROFILE_XHTTP,
-            PROFILE_TCP_TLS,
-        )
-        if _effective_domain(node)
-        else (
-            xray_modern_runtime.PROFILE_XHTTP,
-            PROFILE_TCP_REALITY,
-        )
-    )
+    # The live node authority already marks TLS profiles when it built the
+    # credential. Node.xray_domain is NOT mapped on all older SQLAlchemy
+    # models, even when Xray's verified state has TLS enabled. Filtering here
+    # by that ORM attribute silently threw away WS/TCP TLS on valid nodes.
+    # Prefer the *verified stored profile identities*, never synthesize TLS.
+    desired = _customer_order_for_item(item)
 
     by_id: dict[str, dict[str, Any]] = {}
     for raw_profile in raw_profiles:

@@ -101,13 +101,20 @@ def _sync():
         if previous is not None:
             if (str(previous.get("id") or "") == CLIENT_ID
                 and int(previous.get("level") or 0) == 0):
+                if (tag == "vless-tcp-reality-vision"
+                        and previous.get("flow") != "xtls-rprx-vision"):
+                    raise RuntimeError("XRAY_VISION_EXISTING_FLOW_MISMATCH")
                 continue
             # Rotations need a separate user-scoped maintenance workflow.
             # Never remove an active customer's UUID during provisioning:
             # a failed re-add would break that one customer's connections.
             raise RuntimeError("VLESS UUID rotation requires explicit user-scoped migration")
         client = {"id": CLIENT_ID, "email": EMAIL, "level": 0}
-        clients.append(client)
+        # Vision flow belongs ONLY to its dedicated TCP+REALITY listener.
+        # Never apply Vision to XHTTP, WS, TLS or legacy TCP clients.
+        if tag == "vless-tcp-reality-vision":
+            client["flow"] = "xtls-rprx-vision"
+        clients.append(client
         updated.append((tag, port, client))
 
     if found < 3:

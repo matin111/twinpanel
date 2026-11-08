@@ -40,6 +40,7 @@ from app.central_xray_node_authority_v1 import (
     read_node_public_authority, build_item_from_node_authority,
     validate_public_authority,
 )
+from app.xray_domainless_vision_v50 import prepare_domainless_vision
 from app.services.new_node_readiness_v1 import verify_new_exit_readiness
 from app.services.central_backfill_priority_v1 import new_account_work_has_priority
 
@@ -189,8 +190,17 @@ async def run_one(db,node_id:int,limit:int,apply:bool)->int:
         raise RuntimeError("PAID_ACCOUNT_PROVISIONING_HAS_PRIORITY")
     conn=await asyncio.wait_for(ad.ssh_connect_saved(node,db),timeout=25)
     try:
-        # One read-only probe supplies the node's actual public settings.
-        # It never returns a private key, full Xray config or client records.
+        # Central-owned Exit convergence installs a missing *secure* Vision
+        # inbound via Xray HandlerService (no restart), reusing on-node
+        # REALITY identity and existing UUIDs. TLS nodes are skipped.
+        # Must succeed before delivering any new Vision URI.
+        base_port=int(ad._port(db,node.id,"v2ray"))
+        vision_state=await prepare_domainless_vision(conn,base_port)
+        if not (vision_state.get("ready") is True or
+                vision_state.get("reason")=="tls_exit_uses_three_tls_profiles"):
+            raise RuntimeError("XRAY_VISION_CONVERGENCE_NOT_READY")
+        # Read-only public authority is the only basis for customer links:
+        # it never returns node private keys or existing user records.
         authority=await read_node_public_authority(conn)
         applied_profiles=set(validate_public_authority(authority))
         if applied_profiles!=required:

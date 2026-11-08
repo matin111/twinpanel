@@ -16,6 +16,10 @@ from urllib.parse import quote, urlencode
 
 from . import xray_modern_runtime as xr
 from .xray_adaptive_three_profiles_v47 import _tcp_reality_uri
+from .xray_domainless_vision_v50 import (
+    build_uri as vision_uri, public_port as vision_public_port,
+    target_port as vision_target_port,
+)
 from .xray_tcp_tls_v39 import _tcp_tls_public_port, _tcp_tls_target_port
 
 # This code executes on the authorized node over its saved management SSH.
@@ -89,6 +93,42 @@ else:
     if name not in settings.get("serverNames",[]) or sid not in settings.get("shortIds",[]):
         raise SystemExit("XRAY_NODE_TCP_REALITY_MISMATCH")
     profiles=["xhttp_reality","tcp_reality"]
+    if "vless-tcp-reality-vision" in inbounds:
+        import subprocess
+        vision=must("vless-tcp-reality-vision","tcp","reality")
+        expected=inbounds["vless-tcp-reality"]
+        reality_vision=vision.get("realitySettings") or {}
+        baseline_reality=expected.get("streamSettings",{}).get("realitySettings") or {}
+        if (reality_vision.get("privateKey") != baseline_reality.get("privateKey")
+                or name not in reality_vision.get("serverNames",[])
+                or sid not in reality_vision.get("shortIds",[])
+                or inbounds["vless-tcp-reality-vision"]["port"] != expected["port"]+5):
+            raise SystemExit("XRAY_NODE_VISION_REALITY_MISMATCH")
+        users=inbounds["vless-tcp-reality-vision"].get("settings",{}).get("clients")
+        if not isinstance(users,list) or any(
+            not isinstance(u,dict) or u.get("flow")!="xtls-rprx-vision"
+            for u in users
+        ):
+            raise SystemExit("XRAY_NODE_VISION_USER_FLOW_INVALID")
+        tags=subprocess.run([
+            "/usr/local/bin/xray","api","lsi",
+            "--server=127.0.0.1:10085","-isOnlyTags=true",
+            "-timeout=5",
+        ],capture_output=True,text=True,check=False,timeout=9)
+        try:
+            running=(
+                tags.returncode==0 and
+                any(x.get("tag")=="vless-tcp-reality-vision"
+                    for x in json.loads(tags.stdout).get("inbounds",[]))
+            )
+        except (ValueError,TypeError,AttributeError):
+            running=False
+        listener=subprocess.run([
+            "ss","-H","-ltn",
+            "sport = :"+str(inbounds["vless-tcp-reality-vision"]["port"]),
+        ],capture_output=True,text=True,check=False,timeout=6)
+        if running and listener.returncode==0 and listener.stdout.strip():
+            profiles.append("tcp_reality_vision")
 print(json.dumps({
     "profiles":profiles,"reality_server_name":name,
     "reality_password":public_key,"short_id_xhttp":sid,
@@ -100,7 +140,7 @@ print(json.dumps({
 },separators=(",",":")))
 '''
 
-_SUPPORTED = frozenset({"xhttp_reality","tcp_reality","websocket_tls","tcp_tls"})
+_SUPPORTED = frozenset({"xhttp_reality","tcp_reality","tcp_reality_vision","websocket_tls","tcp_tls"})
 
 
 def validate_public_authority(authority: dict) -> frozenset[str]:
@@ -111,10 +151,19 @@ def validate_public_authority(authority: dict) -> frozenset[str]:
     if not isinstance(profiles,list) or len(profiles)!=len(set(profiles)):
         raise RuntimeError("XRAY_NODE_PROFILE_SET_INVALID")
     actual=frozenset(profiles)
-    expected=(frozenset({"websocket_tls","xhttp_reality","tcp_tls"})
-              if authority.get("tls_enabled") is True else
-              frozenset({"xhttp_reality","tcp_reality"}))
-    if actual != expected or not actual.issubset(_SUPPORTED):
+    if authority.get("tls_enabled") is True:
+        allowed={frozenset({"websocket_tls","xhttp_reality","tcp_tls"})}
+    elif authority.get("tls_enabled") is False:
+        # Existing nodes are upgraded in-place through HandlerService, with
+        # no downtime. A third link is delivered only after the node verifies
+        # that the Vision inbound really exists and accepts Vision clients.
+        allowed={
+            frozenset({"xhttp_reality","tcp_reality"}),
+            frozenset({"xhttp_reality","tcp_reality","tcp_reality_vision"}),
+        }
+    else:
+        raise RuntimeError("XRAY_NODE_TLS_STATE_INVALID")
+    if actual not in allowed or not actual.issubset(_SUPPORTED):
         raise RuntimeError("XRAY_NODE_PROFILE_SET_INVALID")
     for key in ("xhttp_path","reality_password","reality_server_name","short_id_xhttp"):
         value=authority.get(key)
@@ -156,6 +205,9 @@ def _endpoint(db,node,profile):
     elif profile=="tcp_tls":
         public=_tcp_tls_public_port(node.id)
         target=_tcp_tls_target_port(base_port)
+    elif profile=="tcp_reality_vision":
+        public=vision_public_port(node.id)
+        target=vision_target_port(base_port)
     else:
         raise RuntimeError("XRAY_NODE_PROFILE_UNSUPPORTED")
     return host,(public if int(legacy_port)==23000+int(node.id) else target)
@@ -169,7 +221,9 @@ def build_item_from_node_authority(db,node,*,client_uuid:str,
     if not account_label or len(account_label)>100:
         raise ValueError("XRAY_ACCOUNT_LABEL_INVALID")
     chosen=("websocket_tls","xhttp_reality","tcp_tls") if authority["tls_enabled"] else (
-        "xhttp_reality","tcp_reality")
+        "xhttp_reality","tcp_reality",
+        *(( "tcp_reality_vision", ) if "tcp_reality_vision" in profiles_required else ()),
+    )
     rendered=[]
     for key in chosen:
         host,port=_endpoint(db,node,key)
@@ -185,6 +239,13 @@ def build_item_from_node_authority(db,node,*,client_uuid:str,
                 sni=authority["reality_server_name"],
                 public_key=authority["reality_password"],
                 short_id=authority["short_id_xhttp"])
+        elif key=="tcp_reality_vision":
+            uri=vision_uri(
+                client_id=ident,host=host,port=int(port),
+                name=account_label,
+                sni=authority["reality_server_name"],
+                public_key=authority["reality_password"],
+                short_id=authority["short_id_xhttp"])
         else:
             tls_name=authority["tls_sni_tcp"] or authority["tls_domain"]
             query=urlencode([
@@ -192,6 +253,7 @@ def build_item_from_node_authority(db,node,*,client_uuid:str,
                 ("sni",tls_name),("fp","chrome"),("alpn","http/1.1")])
             uri=f"vless://{ident}@{host}:{int(port)}?{query}#{quote(account_label+'-VLESS-TCP-TLS',safe='')}"
         metadata=({"tcp_reality":("VLESS TCP Reality","reality","tcp"),
+                   "tcp_reality_vision":("VLESS TCP Reality Vision","reality","tcp"),
                    "tcp_tls":("VLESS TCP TLS","tls","tcp")}.get(key))
         if metadata is None:
             meta=xr.PROFILE_META[key]
