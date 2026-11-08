@@ -25,6 +25,9 @@ if str(BACKEND_ROOT) not in sys.path:
 os.environ.setdefault("TP_MIERU_INDEPENDENT_WORKER", "1")
 # Restore the legacy shared coroutine by setting this explicitly to 0.
 os.environ.setdefault("TP_SINGBOX_INDEPENDENT_WORKER", "1")
+# The narrow Naive poller is presence-only; the full sing-box process remains
+# authoritative for counters. Set to 0 for immediate safe rollback.
+os.environ.setdefault("TP_NAIVE_FAST_PRESENCE_WORKER", "1")
 os.environ.setdefault("TP_SUDOKU_INDEPENDENT_WORKER", "1")
 
 from app.services.modern_quota_runtime_v257 import modern_quota_runtime_loop as legacy_modern_quota_runtime_loop
@@ -104,6 +107,21 @@ async def _sudoku_fast_subprocess(proc: asyncio.subprocess.Process) -> None:
                 await proc.wait()
 
 
+async def _naive_fast_subprocess(proc: asyncio.subprocess.Process) -> None:
+    """Supervise independent Naive live state while preserving byte collector."""
+    try:
+        code = await proc.wait()
+        raise RuntimeError(f"naive_fast_presence_worker_exited:{code}")
+    finally:
+        if proc.returncode is None:
+            proc.terminate()
+            try:
+                await asyncio.wait_for(proc.wait(), timeout=7)
+            except asyncio.TimeoutError:
+                proc.kill()
+                await proc.wait()
+
+
 async def _serve() -> None:
     stop = asyncio.Event()
     loop = asyncio.get_running_loop()
@@ -142,7 +160,24 @@ async def _serve() -> None:
             str(BACKEND_ROOT / "scripts/twinpanel_sudoku_fast_presence_worker.py"),
         )
 
+    naive_proc = None
+    if os.environ.get("TP_NAIVE_FAST_PRESENCE_WORKER") == "1":
+        naive_proc = await asyncio.create_subprocess_exec(
+            sys.executable,
+            str(BACKEND_ROOT / "scripts/twinpanel_naive_fast_presence_worker.py"),
+        )
+
     workers = (
+        *(
+            (
+                asyncio.create_task(
+                    _naive_fast_subprocess(naive_proc),
+                    name="twinpanel-naive-fast-presence",
+                ),
+            )
+            if os.environ.get("TP_NAIVE_FAST_PRESENCE_WORKER") == "1"
+            else ()
+        ),
         *(
             (
                 asyncio.create_task(
