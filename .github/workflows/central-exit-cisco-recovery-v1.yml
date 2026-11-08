@@ -1,0 +1,45 @@
+name: Central Exit Cisco Recovery Safety
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/routers/provision.py"
+      - "backend/app/routers/publish_node_all_users_v2.py"
+      - "components/node-add-modal-bridge.tsx"
+      - "backend/tests/test_hidden_exit_cisco_fallback_recovery_v1.py"
+      - ".github/workflows/central-exit-cisco-recovery-v1.yml"
+  workflow_dispatch:
+
+jobs:
+  cisco-guarded-recovery:
+    runs-on: ubuntu-latest
+    env:
+      PYTHONPATH: backend
+      APP_SECRET_KEY: ci-cisco-exit-port-recovery-only
+      DATABASE_URL: sqlite:///./central-exit-cisco-ci.sqlite3
+      NODE_AGENT_SHARED_SECRET: ci-cisco-agent-only
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install Python test dependencies
+        run: python -m pip install --disable-pip-version-check -r backend/requirements.txt pytest
+      - name: Compile changed code
+        run: |
+          python -m py_compile \
+            backend/app/routers/provision.py \
+            backend/app/routers/publish_node_all_users_v2.py \
+            backend/tests/test_hidden_exit_cisco_fallback_recovery_v1.py
+      - name: Test Cisco port selection and safe recovery
+        run: |
+          python -m unittest discover -s backend/tests \
+            -p "test_hidden_exit_cisco_fallback_recovery_v1.py" -v
+      - name: Regression test central Add Server and staged admission
+        run: |
+          python -m unittest discover -s backend/tests \
+            -p "test_central_node_background_pipeline_v1.py" -v
+          python -m unittest discover -s backend/tests \
+            -p "test_central_node_stage_systemd_env_v1.py" -v
