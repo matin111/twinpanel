@@ -16,6 +16,7 @@ from .protocol_account_registry import normalize_protocols
 from .reseller_tier_policy import allowed_protocols, allowed_nodes
 from .services.reseller_traffic_pool import _suspend_reseller_pool
 from .services.subscription_factory import create_subscription_core
+from .subscription_override_models import SubscriptionRuntimeOverride
 # Importing this module normalizes metadata and repairs legacy PostgreSQL schema
 # before request authentication opens an ORM transaction.
 from . import subscription_plan_schema as _subscription_plan_schema
@@ -81,6 +82,7 @@ def create_manual_reseller_subscription(
     traffic_gb: float,
     duration_days: int,
     protocols: list[str],
+    device_limit: int = 1,
     idempotency_key: str,
     node_ids: list[int] | None = None,
     username: str | None = None,
@@ -108,6 +110,8 @@ def create_manual_reseller_subscription(
         raise HTTPException(status_code=422, detail="حجم باید بیشتر از صفر باشد")
     if days <= 0:
         raise HTTPException(status_code=422, detail="مدت باید بیشتر از صفر باشد")
+    if not 0 <= int(device_limit) <= 1000:
+        raise HTTPException(status_code=422, detail="تعداد دستگاه نامعتبر است")
 
     balance_before = int(reseller.traffic_balance_bytes or 0)
     credit = int(reseller.traffic_credit_bytes or 0)
@@ -126,6 +130,7 @@ def create_manual_reseller_subscription(
             password=(str(password).strip() if password else None),
         )
         db.flush()
+        db.add(SubscriptionRuntimeOverride(subscription_id=int(subscription.id), device_limit=int(device_limit)))
 
         db.add(
             ResellerSubscription(
@@ -181,6 +186,7 @@ def create_manual_reseller_subscription(
         "plan_name": "دستی",
         "traffic_gb": traffic,
         "duration_days": days,
+        "device_limit": int(device_limit),
         "sell_price_toman": 0,
         "traffic_balance_bytes": int(reseller.traffic_balance_bytes or 0),
         "traffic_available_bytes": max(
