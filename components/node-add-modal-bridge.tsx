@@ -48,6 +48,14 @@ const NODE_INSTALL_FAILURE_GUIDANCE:Record<string,[string,string]>={
     "نودی با همین نام از قبل فعال است؛ نام متفاوتی انتخاب کنید.",
     "An active node already has this name. Choose another name.",
   ],
+  NODE_HOST_INSTALL_ALREADY_RUNNING:[
+    "نصب همین IP در حال اجراست. برای جلوگیری از نصب هم‌زمان سرویس‌ها، وضعیت کار فعلی را بررسی کنید.",
+    "This IP already has an installation running. Inspect its existing job instead of installing twice.",
+  ],
+  NODE_NAME_INSTALL_ALREADY_RUNNING:[
+    "نصب سروری با این نام در حال اجراست؛ نتیجه همان درخواست را بررسی کنید.",
+    "An installation with this name is already running. Check the existing job.",
+  ],
   NODE_SSH_OR_OS_REJECTED:[
     "بررسی SSH یا سیستم‌عامل سرور رد شد. از «تست اتصال» برای دیدن مشکل استفاده کنید.",
     "SSH or node OS check was rejected. Use Test Connection to inspect it.",
