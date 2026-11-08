@@ -1634,7 +1634,26 @@ _SCRIPT = r"""
  // used / total from actual used_bytes / total_bytes every three seconds.
  if(statItems[2]){
    const label=statItems[2].querySelector('small');
-   if(label)label.textContent='حجم مصرفی / کل';
+   if(label){
+     // Explicit LTR visual order of two RTL labels around a slash.
+     // A plain RTL string reverses the visual order under the English quota.
+     label.textContent='';
+     label.setAttribute('dir','ltr');
+     label.style.setProperty('display','flex','important');
+     label.style.setProperty('justify-content','center','important');
+     label.style.setProperty('align-items','center','important');
+     label.style.setProperty('gap','4px','important');
+     const usedCaption=document.createElement('span');
+     usedCaption.dir='rtl';
+     usedCaption.textContent='حجم مصرفی';
+     const separator=document.createElement('span');
+     separator.dir='ltr';
+     separator.textContent='/';
+     const totalCaption=document.createElement('span');
+     totalCaption.dir='rtl';
+     totalCaption.textContent='کل';
+     label.append(usedCaption,separator,totalCaption);
+   }
    const value=statItems[2].querySelector('strong');
    if(value)value.setAttribute('dir','ltr');
  }
