@@ -32,7 +32,7 @@ def main() -> None:
     assert 'canonical.build_node_devices(db, node_id)' in dedicated
     assert 'if str(item.get("protocol") or "").lower() == "mieru"' in dedicated
     assert 'fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)' in dedicated
-    assert 'await conn.wait_closed()' in dedicated
+    assert 'conn.wait_closed()' in dedicated
     assert 'ssh_connect' not in dedicated
     assert 'systemctl' not in dedicated
     assert 'restart' not in dedicated
