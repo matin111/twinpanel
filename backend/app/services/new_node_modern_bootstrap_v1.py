@@ -23,7 +23,15 @@ def build_modern_bootstrap_plan(db: Session, node_id: int) -> dict[str, Any]:
 
     target_rows = {str(row.protocol): row for row in db.query(NodeProtocolConfig).filter(NodeProtocolConfig.node_id == int(target.id)).all()}
     already_online = {key for key, row in target_rows.items() if key in MODERN_PROTOCOL_KEYS and _status_value(row.status) == "online"}
-    occupied_ports = {int(row.port) for row in target_rows.values() if row.port is not None}
+    # A failed initial installation leaves an error row for its OWN port.
+    # That reservation must not block a safe retry for the same protocol,
+    # but every other protocol's port (including failed rows) remains
+    # reserved to avoid accidental listener hijacking.
+    occupied_ports: dict[int, set[str]] = {}
+    for protocol, row in target_rows.items():
+        if row.port is not None:
+            occupied_ports.setdefault(int(row.port), set()).add(protocol)
+    selected_ports: set[int] = set()
 
     protocols: list[str] = []
     ports: dict[str, int] = {}
@@ -42,10 +50,16 @@ def build_modern_bootstrap_plan(db: Session, node_id: int) -> dict[str, Any]:
         definition = PROTOCOL_CATALOG.get(key) or {}
         if definition.get("runtime_status") != "ready":
             continue
-        chosen_port = int(definition["default_port"])
-        if chosen_port in occupied_ports:
+        own_row = target_rows.get(key)
+        chosen_port = (
+            int(own_row.port) if own_row and own_row.port is not None
+            else int(definition["default_port"])
+        )
+        blockers = occupied_ports.get(chosen_port, set()) - {key}
+        if blockers or chosen_port in selected_ports:
             skipped_port_conflict.append({
                 "protocol": key, "default_port": chosen_port,
+                "reason": "reserved_by_other_protocol",
             })
             continue
         protocols.append(key)
@@ -56,25 +70,82 @@ def build_modern_bootstrap_plan(db: Session, node_id: int) -> dict[str, Any]:
             "chosen_port": chosen_port,
             "preset": "recommended",
         }
-        occupied_ports.add(chosen_port)
+        selected_ports.add(chosen_port)
 
     return {"node_id": int(target.id), "protocols": protocols, "ports": ports, "profiles": profiles, "sources": sources, "already_online": sorted(already_online), "skipped_no_template": skipped_no_template, "skipped_port_conflict": skipped_port_conflict}
 
 
 async def bootstrap_new_exit_modern_protocols(db: Session, node_id: int) -> dict[str, Any]:
+    """Install fresh Exit runtimes by independent daemon family.
+
+    One failed standalone adapter (Sudoku, Mieru, etc.) must NEVER cause
+    a healthy sing-box family or another standalone adapter to be
+    collectively marked failed. Each group is applied using the normal
+    vetted admin installer and its persisted per-protocol health checks.
+    """
     plan = build_modern_bootstrap_plan(db, int(node_id))
     protocols = list(plan.get("protocols") or [])
     if not protocols:
-        return {**plan, "ok": True, "attempted": 0, "installed": [], "failed": []}
+        blocked = bool(plan.get("skipped_port_conflict") or
+                       plan.get("skipped_no_template"))
+        return {**plan, "ok": not blocked, "attempted": 0,
+                "installed": [], "failed": [], "errors": {}}
 
-    from ..routers.modern_protocol_admin_v3 import ModernInstallV3In, ProtocolProfileIn, install
-
-    payload = ModernInstallV3In(
-        protocols=protocols,
-        ports={key: int(value) for key, value in (plan.get("ports") or {}).items()},
-        profiles={key: ProtocolProfileIn(preset=str(value.get("preset") or "recommended"), settings=dict(value.get("settings") or {})) for key, value in (plan.get("profiles") or {}).items()},
+    from fastapi import HTTPException
+    from ..modern_protocol_runtime_v2 import SINGBOX_PROTOCOLS
+    from ..routers.modern_protocol_admin_v3 import (
+        ModernInstallV3In, ProtocolProfileIn, install,
     )
-    result = await install(node_id=int(node_id), payload=payload, db=db)
-    failed = list(result.get("failed_protocols") or [])
-    installed = [key for key in protocols if key not in set(failed)]
-    return {**plan, "ok": not failed, "attempted": len(protocols), "installed": installed, "failed": failed, "installer": result}
+
+    singbox = [key for key in protocols if key in SINGBOX_PROTOCOLS]
+    standalone = [key for key in protocols if key not in SINGBOX_PROTOCOLS]
+    groups = ([singbox] if singbox else []) + [[key] for key in standalone]
+    installed: list[str] = []
+    failed: list[str] = []
+    errors: dict[str, str] = {}
+    for group in groups:
+        payload = ModernInstallV3In(
+            protocols=group,
+            ports={key: int(plan["ports"][key]) for key in group},
+            profiles={
+                key: ProtocolProfileIn(
+                    preset=str(plan["profiles"][key].get("preset") or
+                               "recommended"),
+                    settings=dict(plan["profiles"][key].get("settings") or {}),
+                )
+                for key in group
+            },
+        )
+        try:
+            result = await install(node_id=int(node_id), payload=payload, db=db)
+            group_failed = set(result.get("failed_protocols") or [])
+            for key in group:
+                if key in group_failed:
+                    failed.append(key)
+                    errors[key] = "listener_not_healthy"
+                else:
+                    installed.append(key)
+        except HTTPException as exc:
+            db.rollback()
+            failed.extend(group)
+            for key in group:
+                errors[key] = f"install_http_{int(exc.status_code)}"
+        except Exception as exc:
+            db.rollback()
+            failed.extend(group)
+            for key in group:
+                errors[key] = f"install_error_{type(exc).__name__}"
+        # Only non-sensitive telemetry: names and opaque error classes;
+        # never print a remote command, private key, password or config.
+        print("CENTRAL_EXIT_MODERN_INSTALL_GROUP",json.dumps({
+            "node_id":int(node_id), "protocols":group,
+            "installed":[key for key in group if key in installed],
+            "failed":[key for key in group if key in failed],
+            "errors":{key:errors[key] for key in group if key in errors},
+        },sort_keys=True),flush=True)
+
+    blocked = bool(plan.get("skipped_port_conflict") or
+                   plan.get("skipped_no_template"))
+    return {**plan, "ok":not failed and not blocked,
+            "attempted":len(protocols), "installed":installed,
+            "failed":failed, "errors":errors}
