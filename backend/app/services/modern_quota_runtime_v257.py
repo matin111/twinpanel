@@ -993,6 +993,10 @@ async def _reconcile_node(db, node: Node) -> list[dict[str, Any]]:
     results: list[dict[str, Any]] = []
     try:
         conn = await connect_protocol_runtime(node, db)
+        # Release credential-map and connection-setup read transactions before
+        # slow SSH telemetry. Canonical quota mutations below retain their
+        # existing per-node commit and idempotency rules.
+        db.commit()
 
         if grouped.get("wireguard"):
             ok, epoch, peers, error = await _collect_wireguard_like(
