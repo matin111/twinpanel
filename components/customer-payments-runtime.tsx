@@ -7,6 +7,7 @@ import {Card,PageHead,Badge} from "./ui";
 import {useCustomerSession} from "../lib/customer-session";
 import {customerApi,PaymentIntent,StoreOrder} from "../lib/customer-api";
 import {useI18n} from "../lib/i18n";
+import {paymentDateTehran} from "../lib/payment-date-tehran";
 
 type Method={
   id:string;title?:string;card_number?:string;card_holder?:string;address?:string;
@@ -201,7 +202,7 @@ function CustomerPaymentsBody(){
       </form>}
     </Card>}
 
-    <section className="paymentHistorySection"><div className="sectionMiniHead"><b>{pick("تاریخچه پرداخت","Payment history")}</b></div>{intents.length===0?<Card><p className="muted">{pick("پرداختی ثبت نشده است.","No payments yet.")}</p></Card>:<div className="customer-list">{intents.map(x=>{const asset=String(x.crypto_asset||(String(x.method||"").startsWith("usdt_")?"USDT":""));const amount=x.crypto_amount||x.crypto_amount_usdt;return <Card key={x.id} className="customer-list-row"><div><b>#{x.id}</b><small>{x.created_at?new Date(x.created_at).toLocaleString("fa-IR"):"—"}</small></div><div><span>{pick("سفارش","Order")}</span><b>#{x.order_id||"—"}</b></div><div><span>{pick("روش","Method")}</span><b>{x.method||x.payment_method||"—"}</b>{amount&&asset&&<small dir="ltr">{amount} {asset}</small>}{Number(x.crypto_discount_percent||0)>0&&<small>{Number(x.crypto_discount_percent).toLocaleString("fa-IR")}% {pick("تخفیف کریپتو","crypto discount")} · {money(x.discounted_amount_toman||x.base_amount_toman)}</small>}</div>{x.has_receipt&&<div><span>{pick("رسید","Receipt")}</span><b className="receiptHistoryOk">✓ {pick("ثبت شده","Uploaded")}</b></div>}<Badge tone={["approved","auto_verified"].includes(x.status)?"ok":["rejected"].includes(x.status)?"bad":"warn"}>{statusFa(x.status)}</Badge></Card>})}</div>}</section>
+    <section className="paymentHistorySection"><div className="sectionMiniHead"><b>{pick("تاریخچه پرداخت","Payment history")}</b></div>{intents.length===0?<Card><p className="muted">{pick("پرداختی ثبت نشده است.","No payments yet.")}</p></Card>:<div className="customer-list">{intents.map(x=>{const asset=String(x.crypto_asset||(String(x.method||"").startsWith("usdt_")?"USDT":""));const amount=x.crypto_amount||x.crypto_amount_usdt;return <Card key={x.id} className="customer-list-row"><div><b>#{x.id}</b><small>{paymentDateTehran(x.created_at)}</small></div><div><span>{pick("سفارش","Order")}</span><b>#{x.order_id||"—"}</b></div><div><span>{pick("روش","Method")}</span><b>{x.method||x.payment_method||"—"}</b>{amount&&asset&&<small dir="ltr">{amount} {asset}</small>}{Number(x.crypto_discount_percent||0)>0&&<small>{Number(x.crypto_discount_percent).toLocaleString("fa-IR")}% {pick("تخفیف کریپتو","crypto discount")} · {money(x.discounted_amount_toman||x.base_amount_toman)}</small>}</div>{x.has_receipt&&<div><span>{pick("رسید","Receipt")}</span><b className="receiptHistoryOk">✓ {pick("ثبت شده","Uploaded")}</b></div>}<Badge tone={["approved","auto_verified"].includes(x.status)?"ok":["rejected"].includes(x.status)?"bad":"warn"}>{statusFa(x.status)}</Badge></Card>})}</div>}</section>
     <div className="customer-actions"><Link href="/panel/orders" className="ghost">{pick("سفارش‌ها","Orders")}</Link><Link href="/panel/buy" className="primary">{pick("خرید اشتراک","Buy subscription")}</Link></div>
   </div>;
 }
