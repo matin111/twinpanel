@@ -247,6 +247,31 @@ with LOCK.open("a+") as stream:
 '''
 
 
+async def prepare_domainless_vision(conn, base_port: int) -> dict[str, Any]:
+    """Idempotent hot-add on node, without calling the legacy Xray installer.
+
+    Return a clean TLS skip when the node already has three TLS profiles.
+    Never alter existing VLESS listeners or restart Xray for paid users.
+    """
+    script = _install_script(target_port(base_port))
+    encoded = base64.b64encode(script.encode()).decode()
+    result = await provision.cmd(
+        conn, "printf '%s' " + shlex.quote(encoded)
+        + " | base64 -d | python3", timeout=90,
+    )
+    try:
+        response = json.loads(result.strip().splitlines()[-1])
+    except (ValueError, IndexError) as exc:
+        raise RuntimeError("XRAY_VISION_REMOTE_RESPONSE_INVALID") from exc
+    if not isinstance(response,dict):
+        raise RuntimeError("XRAY_VISION_REMOTE_RESPONSE_INVALID")
+    if response.get("ready") is True:
+        await provision.ufw_allow(conn, target_port(base_port), "tcp")
+    elif response.get("reason") != "tls_exit_uses_three_tls_profiles":
+        raise RuntimeError("XRAY_VISION_LIVE_INSTALL_NOT_VERIFIED")
+    return response
+
+
 async def ensure_modern_xray_v50(conn, base_port: int, node=None, *,
                                bootstrap_done: bool = False):
     assert _original_ensure is not None
@@ -255,19 +280,9 @@ async def ensure_modern_xray_v50(conn, base_port: int, node=None, *,
     )
     if bool(state.get("tls_enabled")):
         return state
-    script = _install_script(target_port(base_port))
-    encoded = base64.b64encode(script.encode()).decode()
-    result = await provision.cmd(
-        conn, "printf '%s' " + shlex.quote(encoded)
-        + " | base64 -d | python3", timeout=90,
-    )
-    try:
-        ready = json.loads(result.strip().splitlines()[-1])
-    except (ValueError, IndexError) as exc:
-        raise RuntimeError("XRAY_VISION_REMOTE_RESPONSE_INVALID") from exc
-    if ready.get("ready") is not True:
+    verified = await prepare_domainless_vision(conn, base_port)
+    if verified.get("ready") is not True:
         raise RuntimeError("XRAY_VISION_LIVE_INSTALL_NOT_VERIFIED")
-    await provision.ufw_allow(conn, target_port(base_port), "tcp")
     available = list(state.get("available_profiles") or [])
     if PROFILE not in available:
         available.append(PROFILE)
