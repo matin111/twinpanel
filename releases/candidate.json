@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.711",
-  "source_sha": "4149b80ae4a8ca1644d94e62fb7eb3e604eaf2e6",
+  "version": "1.1.0-rc.712",
+  "source_sha": "7cc32d618e37ccdf439677ad64375c80a64fbe49",
   "notes": {
-    "fa": "رفع ناقص بودن آنلاین پروتکل‌های مدرن: وقتی یک حساب قدیمی باعث خطای اعتبار یا تداخل شمارنده sing-box شود، ابتدا همه کاربران دارای اتصال واقعی و هویت احرازشده در همان نود/پروتکل با savepoint مستقل پردازش می‌شوند؛ سهمیه و شمارنده هیچ حساب دیگری تغییر غیرمعتبر نمی‌کند و پاک‌سازی کاربران آفلاین همچنان محدود باقی می‌ماند. این تغییر برای AnyTLS/Hysteria2/TUIC/Naive/Snell/Socks5 بوده و اتصال VPN، پورت‌ها یا کانفیگ‌های کاربران را تغییر نمی‌دهد. ShadowTLS هنوز شناسه لایه داخلی ندارد و رفع کامل آن جداست.",
-    "en": "Fix modern-protocol online starvation on sing-box protocol batch errors: recovery first processes every authenticated live identity, even among >800 legacy accounts; only offline cleanup uses bounded rotating windows. Per-device savepoints isolate bad legacy subscription duration and cursor identity conflicts; preserve exact per-subscriber traffic/quota behavior, no VPN node, port or credential changes. ShadowTLS shared-inner identity remains unsupported."
+    "fa": "جداسازی پردازشگر آنلاین و حجم پروتکل‌های مدرن sing-box شامل AnyTLS، TUIC، Hysteria2، Naive، Snell و SOCKS5 به فرایند مستقل؛ جلوگیری از قفل شدن چرخه آمار توسط پردازش سنگین WireGuard و دیگر پروتکل‌ها. حفظ تمامی محدودیت‌ها، ثبت حجم و شمارنده‌ها، جلوگیری از ثبت هم‌زمان با قفل sing-box و سوییچ بازگشت TP_SINGBOX_INDEPENDENT_WORKER=0. ادامه اصلاح RC.711 برای ثبت همه کاربران واقعاً آنلاین حتی در صورت خرابی اعتبار بعضی حساب‌های قدیمی. بدون تغییر رمز، کانفیگ، پورت یا ری‌استارت سرویس‌های VPN نودها. ShadowTLS همچنان مشکل انتساب شناسه کاربری مستقل دارد.",
+    "en": "Run authenticated sing-box online/traffic collector for AnyTLS, TUIC, Hysteria2, Naive, Snell and SOCKS5 in an isolated supervised OS process. Start before CPU/SQLAlchemy-bound V314, preserve the 45s cadence, existing lock-based single-writer, quotas, watermark and counter rules; environment rollback TP_SINGBOX_INDEPENDENT_WORKER=0. Includes RC.711 active-first per-device recovery. No VPN node/dataplane, credential or port changes. ShadowTLS shared-inner user identity is still unsupported."
   }
 }
