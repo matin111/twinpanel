@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.685",
+  "version": "1.1.0-rc.686",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-08T02:17:04Z",
+  "released_at": "2026-11-08T02:29:18Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "e98018ce4c98f8a15f762e5562a0e0ea7268fb42",
+  "source_sha": "0b3b433070cb3064b756becf18c88bfade67cdb6",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.685/twinpanel-1.1.0-rc.685-linux-x86_64.tar.gz",
-    "sha256": "7cd7f0070cb6516b1c75dda75f24646bd25fc850994cdb61db8ba87e7026bc28",
-    "size_bytes": 29655187
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.686/twinpanel-1.1.0-rc.686-linux-x86_64.tar.gz",
+    "sha256": "29c1cc3e7312ee95825f58aec4a7d1a042671ed12320bd826c0d6dbdbb0d8c2c",
+    "size_bytes": 29670017
   },
   "notes": {
-    "fa": "رفع نمایش تعداد دستگاه و وضعیت سبز اتصال در مسیر واقعی public Connection. رندر اولیه و تازه‌سازی وضعیت از API زنده، نمایش تعداد اتصال مجاز و نشست فعال بر اساس تنظیم خود اکانت. بدون دستکاری تونل‌ها، دیتابیس کاربران یا تعداد مجاز ثبت‌شده. اعمال قطعی محدودیت هم‌زمان بین تمام پروتکل‌ها نیازمند بررسی جداگانه است.",
-    "en": "Fix real canonical public Connection hub: SSR-like first response and live-poll account green connected badge, effective per-account allowed connections and active sessions. No VPN core changes; all-protocol hard admission enforcement remains separate."
+    "fa": "نسخه rc.686: اصلاح فرم ویرایش اشتراک در پنل ادمین و نماینده شامل سقف دستگاه اختصاصی، مدت، تاریخ انقضا، حجم، پروتکل‌ها، سرورهای مجاز نماینده و اطلاعات اکانت. ثبت سقف دستگاه از زمان ساخت دستی نماینده؛ اعتبارسنجی پروتکل و سرور طبق سطح دسترسی نماینده؛ حفظ تخصیص‌های موجود هنگام ویرایش‌های نامرتبط. همچنین اصلاح صفحه Connection واقعی: نمایش سقف دستگاه و تعداد نشست فعال و سبزشدن حساب هنگام اتصال واقعی. محدودیت قطعی در زمان احراز هویت همه پروتکل‌ها هنوز جداگانه نیازمند آزمون است.",
+    "en": "rc.686: Admin and reseller subscription edit parity for per-account device cap, duration, expiry, volume, tier-authorized protocols/servers and account credentials. Persist reseller manual-create concurrency cap and avoid unintended protocol/server replacement. Fix canonical public Connection account live status and cap/active session display. All-protocol admission-time hard enforcement remains separately unverified."
   }
 }
