@@ -56,10 +56,8 @@ singbox_native_accounting_v265_module.SINGBOX_ACCOUNTING_INTERVAL_SECONDS = (
 install_accounting_device_batch_cache()
 
 
-async def _mieru_fast_subprocess() -> None:
-    """Supervise Mieru in its own interpreter, isolated from V314 CPU stalls."""
-    worker = BACKEND_ROOT / "scripts/twinpanel_mieru_fast_presence_worker.py"
-    proc = await asyncio.create_subprocess_exec(sys.executable, str(worker))
+async def _mieru_fast_subprocess(proc: asyncio.subprocess.Process) -> None:
+    """Supervise the already-started fast worker without waiting on V314."""
     try:
         status = await proc.wait()
         raise RuntimeError(f"mieru_fast_presence_worker_exited:{status}")
@@ -83,6 +81,17 @@ async def _serve() -> None:
         except (NotImplementedError, RuntimeError):
             pass
 
+    # IMPORTANT: start this OS process *before* scheduling the heavyweight
+    # V314 and sing-box tasks. Their synchronous SQLAlchemy work can monopolize
+    # the asyncio loop for minutes; if subprocess creation is merely scheduled
+    # as another coroutine, the fast worker never even starts.
+    fast_proc = None
+    if os.environ.get("TP_MIERU_INDEPENDENT_WORKER") == "1":
+        fast_proc = await asyncio.create_subprocess_exec(
+            sys.executable,
+            str(BACKEND_ROOT / "scripts/twinpanel_mieru_fast_presence_worker.py"),
+        )
+
     workers = (
         asyncio.create_task(
             modern_quota_runtime_loop(),
@@ -95,7 +104,7 @@ async def _serve() -> None:
         *(
             (
                 asyncio.create_task(
-                    _mieru_fast_subprocess(),
+                    _mieru_fast_subprocess(fast_proc),
                     name="twinpanel-mieru-fast-presence",
                 ),
             )
