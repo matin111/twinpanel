@@ -139,6 +139,14 @@ async def upload_wallet_topup_receipt(
 
     previous = _local_path(str(row.receipt_file_marker or ""))
     row.receipt_file_marker = f"local:{filename}"
+    # A receipt is proof submitted for review, never proof of payment.
+    # SMS matching/admin approval remains the only wallet credit authority.
+    if row.status in {"pending_payment", "rejected"}:
+        from datetime import datetime, timezone
+        row.status = "awaiting_review"
+        row.submitted_at = datetime.now(timezone.utc).replace(tzinfo=None)
+        row.rejected_at = None
+        row.review_note = None
     db.commit()
     db.refresh(row)
 
