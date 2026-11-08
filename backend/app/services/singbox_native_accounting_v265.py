@@ -19,7 +19,7 @@ from ..models import Node, NodeType
 from ..modern_protocol_runtime import CONFIG_PATH, SERVICE_NAME, STATE_PATH
 from ..modern_protocol_runtime_v2 import TAGS
 from ..node_runtime_connection import connect_protocol_runtime
-from ..quota_models import QuotaCursor
+from ..quota_models import QuotaCursor, QuotaSession
 from . import modern_quota_runtime_v257 as canonical
 from .quota_node_sync import build_node_devices
 
@@ -1128,6 +1128,68 @@ def _salvage_singbox_devices(
     }
 
 
+def _priority_snapshot_devices(
+    db,
+    *,
+    node_id: int,
+    protocol: str,
+    devices: list[dict[str, Any]],
+    snapshot: dict[str, Any],
+    offline_window: int = 32,
+) -> list[dict[str, Any]]:
+    """Process authenticated traffic first; bound offline cursor maintenance.
+
+    Previously each 45s reconciliation visited every provisioned user on
+    every protocol, including thousands with no traffic or live session.
+    Each visit performed cursor and watermark SQL; later nodes missed whole
+    telemetry windows. Include ALL observed (open or retained closed)
+    identities and ALL previously active canonical sessions. Only the
+    maintenance of truly offline, never-observed credentials is windowed.
+    Preserve original input order within each priority group.
+    """
+    expected_tag = str(TAGS.get(protocol) or "")
+    expected_type = "socks" if protocol == "socks5" else protocol
+    seen = {
+        str(row.get("user") or "").strip()
+        for row in snapshot.get("rows", [])
+        if isinstance(row, dict)
+        and str(row.get("inbound") or "") == expected_tag
+        and str(row.get("inbound_type") or "").lower() == expected_type
+        and str(row.get("user") or "").strip()
+    }
+    live_device_ids = {
+        int(device_id) for (device_id,) in (
+            db.query(QuotaSession.device_id)
+            .filter(
+                QuotaSession.node_id == int(node_id),
+                QuotaSession.protocol == protocol,
+                QuotaSession.status == "active",
+                QuotaSession.device_id.isnot(None),
+            )
+            .distinct()
+            .all()
+        )
+    }
+    priority: list[dict[str, Any]] = []
+    offline: list[dict[str, Any]] = []
+    for device in devices:
+        identity = str(
+            device.get("telemetry_identity") or device.get("identity") or ""
+        ).strip()
+        if identity in seen or int(device["device_id"]) in live_device_ids:
+            priority.append(device)
+        else:
+            offline.append(device)
+    # Keep watermarks for dormant new accounts progressing in small slices;
+    # never drop active/closed connections or accounts with open sessions.
+    size = max(int(offline_window), 1)
+    if offline:
+        windows = max((len(offline) + size - 1) // size, 1)
+        turn = int(time.time() // max(SINGBOX_ACCOUNTING_INTERVAL_SECONDS, 1)) % windows
+        priority.extend(offline[turn * size:(turn + 1) * size])
+    return priority
+
+
 async def reconcile_singbox_quota_once() -> dict[str, Any]:
     db = SessionLocal()
     results: list[dict[str, Any]] = []
@@ -1223,17 +1285,25 @@ async def reconcile_singbox_quota_once() -> dict[str, Any]:
                     if protocol in SINGBOX_UNATTRIBUTABLE_PROTOCOLS:
                         continue
                     try:
+                        prioritized_devices = _priority_snapshot_devices(
+                            db,
+                            node_id=int(node.id),
+                            protocol=protocol,
+                            devices=grouped[protocol],
+                            snapshot=snapshot,
+                        )
                         applied = apply_singbox_snapshot(
                             db,
                             node=node,
                             protocol=protocol,
-                            devices=grouped[protocol],
+                            devices=prioritized_devices,
                             snapshot=snapshot,
                         )
                         db.commit()
                         results.append({
                             "ok": not bool(applied.get("retention_saturated")),
                             "api_changed": api_changed,
+                            "deferred_offline_devices": len(grouped[protocol]) - len(prioritized_devices),
                             **applied,
                             **(
                                 {"error": "singbox_closed_retention_saturated"}
