@@ -118,7 +118,7 @@ async def reconcile_runtime_families(
                 )):
                     # Only consume a bounded, strictly allowlisted diagnostic.
                     import re
-                    hit=re.search(r"['\\\"]reason['\\\"]\\s*:\\s*['\\\"]([A-Z0-9_]{5,90})",line)
+                    hit=re.search(r"reason.{0,6}([A-Z][A-Z0-9_]{4,89})",line)
                     if hit:markers.append(hit.group(1))
                     else:markers.append("SAFE_STOP_UNCLASSIFIED")
             print("CENTRAL_FAMILY_RESULT",json.dumps({
