@@ -4,7 +4,7 @@ import {useEffect} from "react";
 import {API_BASE} from "../lib/api";
 import {getCustomerToken} from "../lib/customer-api";
 
-type LiveItem={subscription_id:number;online:boolean;protocols?:string[];last_seen_at?:string|null};
+type LiveItem={subscription_id:number;online:boolean;presence_state?:"online"|"offline"|"unknown";uncertain_protocols?:string[];protocols?:string[];last_seen_at?:string|null};
 type LivePayload={items?:LiveItem[];generated_at?:string};
 type BulkOperation="add_traffic"|"subtract_traffic"|"add_days"|"subtract_days";
 type BulkResult={ok?:boolean;operation?:BulkOperation;amount?:number;total?:number;updated?:number;skipped?:number;clamped?:number};
@@ -270,18 +270,19 @@ export function AdminSubscriptionLiveTable(){
         const online=Boolean(state?.online);
         const protocols=(state?.protocols||[]).map(protocolLabel).filter(Boolean);
         const stale=loaded&&(!lastSuccessAt||Date.now()-lastSuccessAt>STALE_AFTER_MS);
-        const signature=loaded?`${stale?"stale":online?"1":"0"}:${protocols.join(",")}`:"loading";
+        const unknown=stale||state?.presence_state==="unknown";
+        const signature=loaded?`${unknown?"unknown":online?"1":"0"}:${protocols.join(",")}`:"loading";
         if(host.dataset.liveSignature===signature)continue;
         host.dataset.liveSignature=signature;
         host.replaceChildren();
 
         const badge=document.createElement("span");
-        badge.className=`badge ${loaded?(stale?"violet":online?"ok":"bad"):"violet"}`;
-        badge.textContent=!loaded?tr("در حال بررسی…","Checking…"):stale?tr("وضعیت نامشخص","Status unknown"):online?tr("آنلاین","Online"):tr("آفلاین","Offline");
-        badge.title=stale?tr("گزارش وضعیت آنلاین به‌موقع دریافت نشده؛ قطع اتصال تأیید نشده است","Live telemetry is delayed; disconnection is not confirmed"):tr("وضعیت اتصال","Connection status");
+        badge.className=`badge ${loaded?(unknown?"violet":online?"ok":"bad"):"violet"}`;
+        badge.textContent=!loaded?tr("در حال بررسی…","Checking…"):unknown?tr("وضعیت نامشخص","Status unknown"):online?tr("آنلاین","Online"):tr("آفلاین","Offline");
+        badge.title=unknown?tr("اطلاعات اتصال قدیمی یا ناقص است؛ قطع اتصال تأیید نشده است","Connection telemetry is stale or incomplete; disconnection is not confirmed"):tr("وضعیت اتصال","Connection status");
         host.appendChild(badge);
 
-        if(loaded&&!stale&&online&&protocols.length){
+        if(loaded&&!unknown&&online&&protocols.length){
           const detail=document.createElement("small");
           detail.style.opacity=".72";
           detail.dir="ltr";
