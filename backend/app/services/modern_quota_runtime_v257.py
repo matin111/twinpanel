@@ -1246,6 +1246,15 @@ async def modern_quota_runtime_loop() -> None:
 
 
 def capability_payload() -> dict[str, dict[str, bool]]:
+    # The sing-box collector now runs in a separate OS process. Modifying
+    # canonical module globals in that process does NOT modify the API's
+    # globals. Declare supported native per-user capabilities deterministically
+    # in both processes; never claim ShadowTLS shared-inner attribution.
+    native_singbox = frozenset({
+        "hysteria2", "tuic", "anytls", "naive", "snell", "socks5",
+    })
+    presence = PRESENCE_ACCOUNTING_PROTOCOLS | native_singbox
+    traffic = TRAFFIC_ACCOUNTING_PROTOCOLS | native_singbox
     protocols = {
         "wireguard",
         "amneziawg",
@@ -1262,8 +1271,8 @@ def capability_payload() -> dict[str, dict[str, bool]]:
     }
     return {
         protocol: {
-            "presence": protocol in PRESENCE_ACCOUNTING_PROTOCOLS,
-            "traffic": protocol in TRAFFIC_ACCOUNTING_PROTOCOLS,
+            "presence": protocol in presence,
+            "traffic": protocol in traffic,
         }
         for protocol in sorted(protocols)
     }
