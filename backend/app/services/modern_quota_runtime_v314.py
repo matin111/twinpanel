@@ -22,6 +22,7 @@ MODERN_ACCOUNTING_LOCK = canonical.MODERN_ACCOUNTING_LOCK
 # heavyweight V314 sweeps to avoid duplicate writes and false offline closes.
 # A missing independent-worker flag preserves the old collector for rollback.
 MIERU_INDEPENDENT_WORKER = os.getenv("TP_MIERU_INDEPENDENT_WORKER", "") == "1"
+SUDOKU_INDEPENDENT_WORKER = os.getenv("TP_SUDOKU_INDEPENDENT_WORKER", "") == "1"
 
 
 async def _collect_node_runtime(
@@ -73,7 +74,7 @@ async def _collect_node_runtime(
         if grouped.get("mieru") and not MIERU_INDEPENDENT_WORKER:
             collected["mieru"] = await canonical._collect_mieru(conn)
 
-        if grouped.get("sudoku"):
+        if grouped.get("sudoku") and not SUDOKU_INDEPENDENT_WORKER:
             collected["sudoku"] = await canonical._collect_established_tcp_ports(conn)
 
         return collected
@@ -244,7 +245,7 @@ def _apply_collected_node_runtime(
                 **recovery,
             })
 
-    if grouped.get("sudoku"):
+    if grouped.get("sudoku") and not SUDOKU_INDEPENDENT_WORKER:
         try:
             # Isolate this protocol's accounting without savepoint overhead
             # for protocols that have no devices on the current node.
