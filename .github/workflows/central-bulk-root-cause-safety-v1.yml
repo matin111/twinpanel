@@ -9,6 +9,9 @@ on:
       - "backend/scripts/twinpanel_central_singbox_node_bulk_v1.py"
       - "backend/tests/test_central_xray_node_authority_v1.py"
       - "backend/tests/test_central_singbox_collision_policy_v1.py"
+      - "backend/tests/test_central_singbox_node_enforcement_v1.py"
+      - "backend/app/services/account_enforcement_v2.py"
+      - "backend/app/singbox_subscription_accounts.py"
       - ".github/workflows/central-bulk-root-cause-safety-v1.yml"
   workflow_dispatch:
 
@@ -38,12 +41,14 @@ jobs:
             backend/scripts/twinpanel_central_xray_node_bulk_v1.py \
             backend/scripts/twinpanel_central_singbox_node_bulk_v1.py \
             backend/tests/test_central_xray_node_authority_v1.py \
-            backend/tests/test_central_singbox_collision_policy_v1.py
+            backend/tests/test_central_singbox_collision_policy_v1.py \
+            backend/tests/test_central_singbox_node_enforcement_v1.py
       - name: Verify new-node public identity and no-rotation contracts
         run: |
           python -m pytest -q \
             backend/tests/test_central_xray_node_authority_v1.py \
             backend/tests/test_central_xray_node_bulk_v1.py \
             backend/tests/test_central_singbox_collision_policy_v1.py \
+            backend/tests/test_central_singbox_node_enforcement_v1.py \
             backend/tests/test_central_singbox_bulk_v1.py
           python backend/scripts/xray_central_bulk_transaction_smoke.py
