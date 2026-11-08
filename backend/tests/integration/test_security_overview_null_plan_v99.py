@@ -39,8 +39,8 @@ class FakeDB:
             email="legacy@example.com",
         )
 
-    def query(self, model):
-        if isinstance(model, tuple) and model and getattr(model[0], "key", None) == "subscription_id" and getattr(model[0], "table", None) is SubscriptionRuntimeOverride.__table__:
+    def query(self, model, *rest):
+        if rest and getattr(model, "key", None) == "subscription_id" and getattr(model, "table", None) is SubscriptionRuntimeOverride.__table__:
             return FakeQuery([])
         if model is Subscription:
             return FakeQuery([self.subscription])
