@@ -55,6 +55,9 @@ def _node_name(item: dict[str, Any]) -> str:
 def _country_flag(code: Any) -> str:
     """Only valid ISO-style two-letter codes can become flag emojis."""
     value = str(code or "").strip().upper()
+    # Historical TwinPanel nodes saved United Kingdom as UK; ISO flag code is GB.
+    if value == "UK":
+        value = "GB"
     if len(value) != 2 or not value.isascii() or not value.isalpha():
         return "🌐"
     return "".join(chr(0x1F1E6 + ord(letter) - ord("A")) for letter in value)
