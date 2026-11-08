@@ -47,6 +47,7 @@ from .public_connection_files_v9 import router as public_connection_files_v9_rou
 from .public_connection_multilink_v7 import router as public_connection_multilink_v7_router
 from . import public_connection_hub_v5 as _public_connection_hub_v5_module
 from .public_connection_hub_v5 import public_connection_hub_v5
+from .public_connection_live_v4 import public_connection_live
 from .public_connection_payload_fast_v1 import public_connection_payload_fast_v1
 
 
@@ -343,6 +344,34 @@ def public_connection_hub_live_v5(
         "پروتکل برای این اشتراک غیرفعال است",
         "پروتکل فعال است؛ کانفیگ نیاز به ساخت/Repair دارد",
     )
+
+    # Pre-render canonical DB-backed presence as well as client polling.
+    # This avoids showing a stale "اشتراک فعال" badge while scripts load,
+    # and also works when a browser extension delays JavaScript.
+    try:
+        live = public_connection_live(token, db)
+        cap = int(live.get("device_limit") or 0)
+        sessions = max(int(live.get("active_sessions") or 0), 0)
+        source = source.replace(
+            '<strong id="liveDeviceLimit">—</strong>',
+            '<strong id="liveDeviceLimit">' + (str(cap) + ' دستگاه' if cap else 'نامحدود') + '</strong>',
+            1,
+        )
+        source = source.replace(
+            '<strong id="liveActiveSessions">—</strong>',
+            '<strong id="liveActiveSessions">' + str(sessions) + '</strong>',
+            1,
+        )
+        connected = live.get("connection_online") is True or sessions > 0
+        if connected:
+            source = re.sub(
+                r'<span id="liveStatus" class="status (?:on|off)">[^<]*<i></i>[^<]*</span>',
+                '<span id="liveStatus" class="status connected"><i></i>متصل هستید</span>',
+                source, count=1,
+            )
+    except Exception:
+        # Presentation hydration must never block config delivery.
+        pass
 
     return HTMLResponse(
         content=source,
