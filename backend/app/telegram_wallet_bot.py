@@ -303,15 +303,13 @@ def create_wallet_router(request_fn, session_fn):
         # Resolve the method against this user's actual topup: the inline
         # button must keep working after a bot restart or expired FSM state.
         try:
-            token = await _token(session_fn, callback.from_user.id)
-            rows = await request_fn("GET", "/v1/wallet/topups/me", token=token)
-            matched = next(
-                (row for row in rows if int(row.get("id") or 0) == topup_id),
-                None,
-            ) if isinstance(rows, list) else None
-            if not matched:
-                await callback.answer("درخواست شارژ پیدا نشد", show_alert=True)
-                return
+            import asyncio
+            from .services.telegram_wallet_receipt_store_v1 import get_linked_wallet_topup
+            matched = await asyncio.to_thread(
+                get_linked_wallet_topup,
+                telegram_id=int(callback.from_user.id),
+                topup_id=topup_id,
+            )
             if matched.get("status") == "approved":
                 await callback.answer("این شارژ قبلاً تأیید شده است.", show_alert=True)
                 return
@@ -372,11 +370,14 @@ def create_wallet_router(request_fn, session_fn):
             if not raw or len(raw) > limit:
                 await message.answer("❌ فایل رسید خالی یا بزرگ‌تر از ۱۲ مگابایت است.")
                 return
-            token = await _token(session_fn, message.from_user.id)
-            result = await request_fn(
-                "POST", f"/v1/wallet/topups/{topup_id}/receipt-upload",
-                token=token,
-                files={"receipt": (filename, raw, content_type)},
+            import asyncio
+            from .services.telegram_wallet_receipt_store_v1 import store_telegram_wallet_receipt
+            result = await asyncio.to_thread(
+                store_telegram_wallet_receipt,
+                telegram_id=int(message.from_user.id),
+                topup_id=topup_id,
+                content=raw,
+                content_type=content_type,
             )
         except Exception:
             await message.answer(
