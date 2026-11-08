@@ -118,6 +118,10 @@ class NodeSafeErrorTests(unittest.TestCase):
             safe_node_install_error_code(RuntimeError("CENTRAL_RUNTIME_COVERAGE_INCOMPLETE")),
             "CENTRAL_RUNTIME_COVERAGE_INCOMPLETE",
         )
+        self.assertEqual(
+            safe_node_install_error_code(RuntimeError("SUPPOSED_SECRET_TOKEN_123")),
+            "NODE_INSTALL_REMOTE_COMMAND_FAILED",
+        )
 
 
 class NodeStandaloneOSGuardTests(unittest.IsolatedAsyncioTestCase):
