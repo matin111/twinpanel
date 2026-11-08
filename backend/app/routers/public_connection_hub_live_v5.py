@@ -214,7 +214,7 @@ _LIVE_SCRIPT = r"""
     write(deviceLimit,cap===0?'نامحدود':nf.format(cap)+' دستگاه');
     write(deviceActive,nf.format(activeSessions));
     write(deviceCombined,nf.format(activeSessions)+' / '+(cap===0?'∞':nf.format(cap)));
-    write(durationMetric,payload.duration_unlimited===true?'نامحدود':Math.max(0,Math.trunc(Number(payload.activation_duration_days||0)))>0?nf.format(Math.trunc(Number(payload.activation_duration_days)))+' روز':'تعیین نشده');
+    write(durationMetric,payload.expires_at&&Number(payload.activation_duration_days||0)>0?nf.format(Math.trunc(Number(payload.activation_duration_days)))+' روز':payload.duration_unlimited===true&&!payload.expires_at?'نامحدود':Number(payload.activation_duration_days||0)>0?nf.format(Math.trunc(Number(payload.activation_duration_days)))+' روز':'تعیین نشده');
     if(donut)donut.style.setProperty('--pct',String(pct));
 
     const connected=payload.connection_online===true||Number(payload.active_sessions||0)>0;
@@ -402,13 +402,46 @@ def public_connection_hub_live_v5(
             1,
         )
         valid_days = max(int(live.get("activation_duration_days") or 0), 0)
-        duration_label = 'نامحدود' if live.get("duration_unlimited") is True else (
-            str(valid_days) + ' روز' if valid_days else 'تعیین نشده'
+        # An actual expiry timestamp takes precedence over a stale legacy
+        # unlimited override. Never label a finite account as unlimited.
+        duration_label = (
+            str(valid_days) + ' روز'
+            if valid_days and live.get("expires_at")
+            else 'نامحدود'
+            if live.get("duration_unlimited") is True and not live.get("expires_at")
+            else str(valid_days) + ' روز'
+            if valid_days
+            else 'تعیین نشده'
         )
         source = source.replace(
             '<strong id="liveDurationMetric">—</strong>',
             '<strong id="liveDurationMetric">' + duration_label + '</strong>',
             1,
+        )
+        # The canonical layout replaces the old expiry-days element. Render
+        # an initial DB-backed label before the live polling script starts.
+        from datetime import datetime, timezone
+        import math
+        expiry_raw = live.get("expires_at")
+        if expiry_raw:
+            expiry_dt = datetime.fromisoformat(str(expiry_raw).replace("Z", "+00:00"))
+            if expiry_dt.tzinfo is None:
+                expiry_dt = expiry_dt.replace(tzinfo=timezone.utc)
+            left = max(0, math.ceil(
+                (expiry_dt - datetime.now(timezone.utc)).total_seconds() / 86400
+            ))
+            remaining_label = str(left) + " روز باقی‌مانده"
+        elif live.get("duration_unlimited") is True:
+            remaining_label = "مدت نامحدود"
+        elif valid_days and not live.get("starts_at"):
+            remaining_label = str(valid_days) + " روز · شروع با اولین اتصال"
+        else:
+            remaining_label = "مدت تعیین نشده"
+        source = re.sub(
+            r'(<span id="liveExpiryDays"[^>]*>)[^<]*(</span>)',
+            lambda match: match.group(1) + remaining_label + match.group(2),
+            source,
+            count=1,
         )
         source = source.replace(
             '<strong id="liveActiveSessions">—</strong>',
