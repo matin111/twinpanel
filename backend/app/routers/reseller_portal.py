@@ -2114,6 +2114,8 @@ async def reseller_edit_subscription(
         existing_node_ids = {int(n[0]) for n in db.query(SubscriptionNode.node_id).filter(
             SubscriptionNode.subscription_id == sub.id
         ).all()}
+        if not existing_node_ids and sub.exit_node_id:
+            existing_node_ids.add(int(sub.exit_node_id))
         requested = list(dict.fromkeys(int(node_id) for node_id in payload.node_ids))
         newly_added = [node_id for node_id in requested if node_id not in existing_node_ids]
         if newly_added:
@@ -2396,6 +2398,8 @@ async def reseller_edit_subscription(
             old_node_ids = {n[0] for n in db.query(SubscriptionNode.node_id).filter(
                 SubscriptionNode.subscription_id == sub.id
             ).all()}
+            if not old_node_ids and sub.exit_node_id:
+                old_node_ids.add(int(sub.exit_node_id))
             removed_nodes = old_node_ids - set(target_node_ids)
             db.query(SubscriptionNode).filter(
                 SubscriptionNode.subscription_id == sub.id
