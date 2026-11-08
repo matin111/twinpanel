@@ -7,6 +7,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from ..models import Node, NodeProtocolConfig, Subscription
+from ..openvpn_profile_delivery_guard_v1 import disambiguate_openvpn_filenames
 from .account_delivery import _qr_data_uri, _share_url, _stored_info
 
 
@@ -75,6 +76,7 @@ def public_connection_payload_fast_v1(
     db.info.setdefault("_tp_public_connection_item_cache_v102", {})
 
     info = _stored_info(db, sub)
+    disambiguate_openvpn_filenames(info)
 
     for cred in info.get("credentials", []):
         if not isinstance(cred, dict):
