@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.687",
+  "version": "1.1.0-rc.688",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-08T02:54:02Z",
+  "released_at": "2026-11-08T03:08:50Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "3ec13d3e650cd7ff2cf699e91e3aca82983004b3",
+  "source_sha": "344a912057a6eae39decf7bfb2c94462e88d21f1",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.687/twinpanel-1.1.0-rc.687-linux-x86_64.tar.gz",
-    "sha256": "8bae79a2de66c610793f333b571c080d0406feade83e6b63350f776bd227f4d0",
-    "size_bytes": 29670034
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.688/twinpanel-1.1.0-rc.688-linux-x86_64.tar.gz",
+    "sha256": "fdb81ce41b9269a4f4cb990ccd2a1f1a747eea869b05a11378ae7107398c87ee",
+    "size_bytes": 29670883
   },
   "notes": {
-    "fa": "اصلاح نوار اطلاعات Connection: فقط یک نمایش از تعداد مجاز، تعداد متصل، مصرف، باقی‌مانده و انقضا؛ رفع غیرفعال نشان دادن اکانت هنگام اتصال واقعی؛ سازگاری با لایه نهایی v80. تعداد کاربر/دستگاه هیچ پلن یا اشتراکی در این آپدیت تغییر داده نمی‌شود. پلن‌هایی با مقدار صفر تنها پس از بازیابی مقدار واقعی یا انتخاب ادمین قابل اصلاح هستند.",
-    "en": "Fix final public Connection strip to render exactly five metrics (allowed, connected, used, remaining, expiry) and keep connected account active in legacy status refiner. No plan or account limit database changes; zero-valued plans need verified previous values or admin correction."
+    "fa": "اصلاح قطعی رنگ سبز برچسب «متصل هستید» در قالب نهایی Connection. شمارش «تعداد متصل» فقط بر مبنای نشست‌های واقعی و تأییدشده سرویس است و عدد حدسی برای پروتکل فاقد حضور قابل‌اعتماد نمایش داده نمی‌شود؛ داده‌ها و محدودیت دستگاه تغییر نکرده‌اند.",
+    "en": "Ensure active Connected status appears bright green in final Connection theme; active count remains based on verified telemetry, without fabricating unobservable sessions. No quota or customer data modified."
   }
 }
