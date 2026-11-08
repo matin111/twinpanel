@@ -132,6 +132,7 @@ async def _install_peer(
     local_public: str,
     remote_public: str,
     local_addr: str,
+    network: str,
     gre_key: int,
     profile: str,
     fou_port: int | None,
@@ -180,6 +181,7 @@ IFACE={interface}
 LOCAL={local_public}
 REMOTE={remote_public}
 ADDR={local_addr}
+NET={network}
 KEY={int(gre_key)}
 COMMENT={comment}
 
@@ -195,6 +197,12 @@ cleanup_rules() {{
       iptables -D INPUT -p udp --dport "$p" -s "$REMOTE" -m comment --comment "$COMMENT" -j ACCEPT || break
     done
   done
+  # UFW may deny RFC1918 traffic even on a verified tunnel. Remove only
+  # this interface and its dedicated /30, never global firewall policies.
+  iptables -D INPUT -i "$IFACE" -s "$NET" -m comment --comment "$COMMENT" -j ACCEPT 2>/dev/null || true
+  iptables -D OUTPUT -o "$IFACE" -d "$NET" -m comment --comment "$COMMENT" -j ACCEPT 2>/dev/null || true
+  iptables -D FORWARD -i "$IFACE" -s "$NET" -m comment --comment "$COMMENT" -j ACCEPT 2>/dev/null || true
+  iptables -D FORWARD -o "$IFACE" -d "$NET" -m conntrack --ctstate RELATED,ESTABLISHED -m comment --comment "$COMMENT" -j ACCEPT 2>/dev/null || true
 }}
 
 if [ "$ACTION" = stop ]; then
@@ -213,6 +221,12 @@ fi
 {link}
 ip addr add "$ADDR" dev "$IFACE"
 ip link set dev "$IFACE" mtu {MTU} txqueuelen {TXQUEUELEN} up
+if command -v iptables >/dev/null 2>&1; then
+  iptables -I INPUT -i "$IFACE" -s "$NET" -m comment --comment "$COMMENT" -j ACCEPT
+  iptables -I OUTPUT -o "$IFACE" -d "$NET" -m comment --comment "$COMMENT" -j ACCEPT
+  iptables -I FORWARD -i "$IFACE" -s "$NET" -m comment --comment "$COMMENT" -j ACCEPT
+  iptables -I FORWARD -o "$IFACE" -d "$NET" -m conntrack --ctstate RELATED,ESTABLISHED -m comment --comment "$COMMENT" -j ACCEPT
+fi
 EOF
 
 chmod 755 {shlex.quote(helper)}
@@ -265,6 +279,7 @@ async def _install_profile(
             local_public=iran_public,
             remote_public=exit_public,
             local_addr=rt["iran_addr"],
+            network=rt["network"],
             gre_key=gre_key,
             profile=profile,
             fou_port=fou_port,
@@ -278,6 +293,7 @@ async def _install_profile(
             local_public=exit_public,
             remote_public=iran_public,
             local_addr=rt["exit_addr"],
+            network=rt["network"],
             gre_key=gre_key,
             profile=profile,
             fou_port=fou_port,
