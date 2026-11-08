@@ -11,6 +11,7 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 
 from ..branding_models import BrandingSettings
+from ..openvpn_profile_delivery_guard_v1 import validate_openvpn_profile
 from ..database import get_db
 from ..models import Node, TunnelPeerState, User
 from .account_delivery import (
@@ -99,6 +100,11 @@ def _file_action(protocol: str, item: dict[str, Any], index: int, prefix: str) -
     config = str(item.get("config") or "").strip()
     if not config:
         return '<div class="empty-inline">کانفیگ هنوز آماده نشده است.</div>'
+    if protocol == "openvpn":
+        try:
+            validate_openvpn_profile(config)
+        except ValueError:
+            return '<div class="empty-inline">فایل OpenVPN نامعتبر است؛ بازسازی کانفیگ لازم است.</div>'
     ext = "ovpn" if protocol == "openvpn" else "conf"
     filename = str(item.get("filename") or f"{protocol}-{index + 1}.{ext}")
     source_id = f"{prefix}-{protocol}-{index}"
