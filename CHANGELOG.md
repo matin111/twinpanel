@@ -1,5 +1,15 @@
 # TwinPanel Changelog
 
+## 1.1.0-rc.680 — 2026-11-08
+
+### Fast Cisco / AnyConnect online status and green country indicators
+- Cisco live sessions are now polled independently of the slow Xray/OpenVPN/L2TP quota sweep, targeting roughly 20-second intervals rather than multi-minute delays. The existing external heavy-reconcile process owns the fast task; the public API and client VPN services are not restarted by the poller.
+- Fast collection reads authoritative `occtl --json show users` sessions on each enabled Cisco node and posts them to the **existing** quota session/usage ledger. Only currently observed usernames are matched first; legacy aliases fall back to canonical mapping. No synthetic online states or fabricated usage.
+- Use a PostgreSQL per-node transaction advisory lock to serialize Cisco accounting with the original collector, avoiding duplicate or conflicting updates. Remote collector failures do not mark all users offline.
+- The original Connection page uses `.server-tabs button[data-country-code]` for Cisco, which the prior live status painter omitted. Green Cisco country flags now reflect `protocol_stats.cisco.online_countries`, and the connected protocol card has a theme-compatible green surface in light and dark modes.
+- `ali222` verified active on Turkey Cisco node 6 in ocserv and the public /live endpoint reported `online=true`, `online_countries=['TR']`. The database Cisco presence advanced within seconds of server time in staged testing.
+- Expanded GitHub CI regression suite to 7 checks, plus syntax validation. No subscription expiration, usage limits, credentials, VPN server processes or tunnel settings modified.
+
 ## 1.1.0-rc.677 — 2026-11-08
 
 ### Faster public Connection page, preserving all protocols and account data
