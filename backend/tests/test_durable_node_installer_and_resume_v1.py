@@ -53,6 +53,7 @@ class DurableSecretLifecycleTests(unittest.TestCase):
         secret = "ci-only-not-a-real-password"
         with tempfile.TemporaryDirectory() as td:
             with (patch.object(launch, "_SECRET_DIR",Path(td)/"secrets"),
+                  patch.object(launch, "_HOST_CLAIMS",Path(td)/"host-claims"),
                   patch.object(launch,"_dispatch",return_value="unit") as dispatch):
                 result=launch.launch_initial(
                     JOB,{"name":"fin","host":"192.0.2.21","password":secret},
@@ -78,13 +79,32 @@ class DurableSecretLifecycleTests(unittest.TestCase):
                 self.assertTrue(file.exists())
                 self.assertEqual(launch.consume_secret_job(JOB)["payload"]["password"],"original")
 
+    def test_duplicate_host_with_different_job_id_is_rejected_before_ssh(self):
+        other=str(uuid.uuid4())
+        with tempfile.TemporaryDirectory() as td:
+            with (patch.object(launch,"_SECRET_DIR",Path(td)/"secrets"),
+                  patch.object(launch,"_HOST_CLAIMS",Path(td)/"host-claims"),
+                  patch.object(launch,"_dispatch",return_value="unit")):
+                launch.launch_initial(JOB,{"host":"192.0.2.21","password":"first"})
+                with self.assertRaises(launch.NodeInstallDispatchError) as err:
+                    launch.launch_initial(other,{
+                        "host":"192.0.2.21","name":"different name",
+                        "password":"second",
+                    })
+                self.assertEqual(str(err.exception),
+                                 "NODE_HOST_INSTALL_ALREADY_RUNNING")
+                self.assertFalse((launch._SECRET_DIR/(other+".json")).exists())
+                launch.release_job_claim(JOB)
+                self.assertFalse(launch._host_claim_path("192.0.2.21").exists())
+
     def test_dispatch_error_scrubs_unsent_payload_file(self):
         with tempfile.TemporaryDirectory() as td:
             with (patch.object(launch,"_SECRET_DIR",Path(td)/"secrets"),
+                  patch.object(launch,"_HOST_CLAIMS",Path(td)/"host-claims"),
                   patch.object(launch,"_dispatch",side_effect=launch.NodeInstallDispatchError(
                       "NODE_INSTALL_DISPATCH_REJECTED"))):
                 with self.assertRaises(launch.NodeInstallDispatchError):
-                    launch.launch_initial(JOB,{"password":"secret"})
+                    launch.launch_initial(JOB,{"host":"192.0.2.21","password":"secret"})
                 self.assertFalse((launch._SECRET_DIR/(JOB+".json")).exists())
 
 
