@@ -49,14 +49,15 @@ def main(argv=None) -> int:
     from app.services.durable_node_install_launcher_v1 import consume_secret_job
     from app.routers.publish_node_all_users_v1 import (
         BackgroundNodeInstallIn, _install_node_in_background,
-        _resume_hidden_exit_in_background, _safe_install_progress,
+        _safe_install_progress,
     )
 
     try:
         if args.resume_node_id:
             if args.resume_node_id<1:
                 raise RuntimeError("NODE_INSTALL_RESUME_NODE_INVALID")
-            asyncio.run(_resume_hidden_exit_in_background(
+            from app.services.hidden_exit_install_resume_v1 import resume_hidden_exit
+            asyncio.run(resume_hidden_exit(
                 node_id=args.resume_node_id,
                 job_id=args.job_id,
                 publish_to_all_users=args.publish=="1",
