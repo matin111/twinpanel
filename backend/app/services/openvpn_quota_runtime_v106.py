@@ -215,6 +215,7 @@ def _parse_openvpn_status(raw: str) -> list[dict]:
             {
                 "identity": common_name,
                 "session_identity": session_identity[:140],
+                "client_id": int(client_id) if client_id.isdecimal() else None,
                 "uplink": _int_counter(row[5] if len(row) > 5 else 0),
                 "downlink": _int_counter(row[6] if len(row) > 6 else 0),
             }
@@ -349,6 +350,7 @@ def _apply_openvpn_sessions(db, node: Node, observed: list[dict]) -> dict:
     usage_events = 0
     ignored = 0
     matched = 0
+    rejected_sessions: list[dict] = []
     active_keys: set[str] = set()
 
     for index, session in enumerate(observed):
@@ -423,6 +425,21 @@ def _apply_openvpn_sessions(db, node: Node, observed: list[dict]) -> dict:
             usage_events += 1
         except Exception as exc:
             ignored += 1
+            # Canonical admission rejects over-limit sessions, but these
+            # clients may already be physically connected. The background
+            # worker must disconnect ONLY the rejected OpenVPN client ID,
+            # never all clients sharing the subscription's common name.
+            if (
+                getattr(exc, "status_code", None) == 409
+                and getattr(exc, "detail", None) == "concurrent_session_limit"
+                and isinstance(session.get("client_id"), int)
+                and int(session["client_id"]) >= 0
+            ):
+                rejected_sessions.append({
+                    "client_id": int(session["client_id"]),
+                    "identity": identity,
+                    "session_identity": str(session.get("session_identity") or ""),
+                })
             print(
                 "OPENVPN_TELEMETRY_SESSION_REJECTED",
                 {"node_id": node_id, "subscription_id": subscription_id,
@@ -464,7 +481,87 @@ def _apply_openvpn_sessions(db, node: Node, observed: list[dict]) -> dict:
         "closed": closed,
         "usage_events": usage_events,
         "ignored": ignored,
+        "rejected_sessions": rejected_sessions,
     }
+
+
+def _send_openvpn_client_kill_local(client_id: int) -> bool:
+    """Kill precisely one numeric management client id, never a common name."""
+    if not isinstance(client_id, int) or not 0 <= client_id <= 2**31 - 1:
+        return False
+    sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    sock.settimeout(3)
+    try:
+        sock.connect(OPENVPN_MANAGEMENT_SOCKET)
+        try:
+            sock.recv(4096)
+        except socket.timeout:
+            pass
+        sock.sendall(f"client-kill {client_id}\n".encode("ascii"))
+        response = sock.recv(4096).decode("utf-8", errors="replace")
+        return "SUCCESS" in response
+    finally:
+        sock.close()
+
+
+async def _disconnect_rejected_openvpn_sessions(node: Node, db, rejected: list[dict]) -> list[dict]:
+    """Re-check identity before selectively disconnecting rejected clients.
+
+    A late poll or a reused client-id must never disconnect an unrelated user.
+    This is invoked only *after* the collector committed its successful billing
+    and session updates. An unreachable node leaves sessions unchanged.
+    """
+    if not rejected:
+        return []
+    local = bool(getattr(node, "is_mother", False)) or str(getattr(node, "agent_url", "") or "") == "local://core"
+    ok, fresh, _error = await _collect_openvpn_sessions(node, db)
+    if not ok:
+        return [{"client_id": int(item["client_id"]), "ok": False, "reason": "recheck_unavailable"} for item in rejected]
+    current = {
+        (item.get("client_id"), item.get("identity"), item.get("session_identity"))
+        for item in fresh
+    }
+    results: list[dict] = []
+    conn = None
+    try:
+        if not local:
+            conn = await ssh_connect_saved(node, db)
+        for item in rejected:
+            cid = item["client_id"]
+            if (cid, item["identity"], item["session_identity"]) not in current:
+                results.append({"client_id": cid, "ok": False, "reason": "session_changed"})
+                continue
+            try:
+                if local:
+                    killed = await asyncio.to_thread(_send_openvpn_client_kill_local, cid)
+                else:
+                    # Only a validated decimal integer is interpolated.
+                    script = (
+                        "python3 - <<'PY'\n"
+                        "import socket\n"
+                        "s=socket.socket(socket.AF_UNIX);s.settimeout(3)\n"
+                        "try:\n"
+                        " s.connect('/run/openvpn-server/twinpanel-mgmt.sock')\n"
+                        " try:s.recv(4096)\n"
+                        " except socket.timeout:pass\n"
+                        f" s.sendall(b'client-kill {cid}\\n')\n"
+                        " print('SUCCESS' in s.recv(4096).decode('utf-8','replace'))\n"
+                        "finally:s.close()\n"
+                        "PY"
+                    )
+                    process = await conn.run(script, check=False, timeout=8)
+                    killed = int(process.exit_status) == 0 and str(process.stdout or "").strip() == "True"
+                results.append({"client_id": cid, "ok": bool(killed)})
+            except Exception as exc:
+                results.append({"client_id": cid, "ok": False, "reason": type(exc).__name__})
+    finally:
+        if conn is not None:
+            conn.close()
+            try:
+                await conn.wait_closed()
+            except Exception:
+                pass
+    return results
 
 
 async def reconcile_openvpn_quota_runtime_once() -> dict:
@@ -500,6 +597,11 @@ async def reconcile_openvpn_quota_runtime_once() -> dict:
             try:
                 result = _apply_openvpn_sessions(db, node, observed)
                 db.commit()
+                rejected = result.pop("rejected_sessions", [])
+                if rejected:
+                    result["over_limit_disconnections"] = await _disconnect_rejected_openvpn_sessions(
+                        node, db, rejected
+                    )
                 results.append({"ok": True, **result})
 
             except Exception as exc:
