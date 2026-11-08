@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.680",
-  "source_sha": "f7a62e9f35e09be0c504e3d0c6d6c902d6e5a1b6",
+  "version": "1.1.0-rc.681",
+  "source_sha": "615a0944ad609ef0cbb16f09d4b8d0e89033a3f7",
   "notes": {
-    "fa": "نسخه rc.680: رفع تأخیر چنددقیقه‌ای نمایش آنلاین Cisco / AnyConnect با ثبت مستقل و سریع نشست‌های واقعی (حدود ۲۰ ثانیه) از ocserv در همان سامانه سهمیه‌بندی مرکزی. جلوگیری از تداخل پردازشگر سریع و قدیمی با قفل تراکنش هر نود. سبزشدن واقعی کارت Cisco و پرچم کشور متصل در صفحه Connection برای موبایل و دسکتاپ، با پشتیبانی از لایت و دارک مود. تست زنده اکانت ali222، فعال در نود ترکیه، و ۷ تست رگرسیون موفق. بدون تغییر اطلاعات کاربران، تاریخ انقضا، رمز، حجم، سرویس‌های VPN یا تانل.",
-    "en": "rc.680: Fix Cisco/AnyConnect online-state latency by independently polling real ocserv sessions about every 20 seconds, safely synchronized with the existing quota collector by per-node transaction advisory locks. Mark the actual Cisco country server-tab and protocol card green in light/dark mode based on verified live telemetry. Live tested Turkey Cisco account ali222 and 7 regression checks. No changes to subscriptions, usage limits, credentials, VPN listeners or tunnels."
+    "fa": "نسخه rc.681: رفع ریشه‌ای نمایش آفلاین اشتباه Cisco با وجود اتصال واقعی؛ جلوگیری از بسته‌شدن نشست‌های مشاهده‌شده به‌خاطر خطای قفل دیتابیس، بازیابی امن نشست بسته‌شده با شناسه حسابداری جدید بدون تغییر نشست قدیمی و بدون دوباره‌شماری حجم. دریافت وضعیت واقعی Cisco تقریبا هر ۲۰ ثانیه و سبزشدن کارت Cisco و کشور متصل در لایت‌مود و دارک‌مود. تست واقعی ali222 روی نود ترکیه موفق بوده. هیچ تغییری در اطلاعات کاربران، رمز، حجم و تاریخ انقضا یا سرویس VPN انجام نشده است.",
+    "en": "rc.681 fixes false Cisco/AnyConnect offline reports after transient quota DB lock contention. Preserve physically observed ocserv sessions on usage ledger exceptions and safely resume closed accounting rows with new validated session keys while retaining original cumulative counter source and epoch (no duplicated traffic billing). Includes fast ~20s Cisco collector and green connected-country UI from rc.680. Live verified ali222 on Turkey node 6. No changes to subscriptions, credentials, quota, expiry, VPN listeners or tunnels."
   }
 }
