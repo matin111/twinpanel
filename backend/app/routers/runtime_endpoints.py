@@ -43,6 +43,9 @@ class BotTextsResetIn(BaseModel):
 # Collector sweeps take 15-90s across remote nodes; 30s caused false
 # offline results between valid positive-traffic observations.
 _LIVE_ACTIVITY_SECONDS = 180
+# Transitional uncertainty after a missed authenticated presence sweep.
+# This is a UI hint only: billing, admission, and expiration are unchanged.
+_LIVE_UNCERTAIN_SECONDS = 900
 
 
 def _active_api_domain(db: Session) -> Domain | None:
@@ -132,6 +135,39 @@ def _subscription_live_states(db: Session) -> dict[int, dict]:
         ):
             item["last_seen_at"] = reported_at
 
+    # An active session last seen outside the freshness window can mean the
+    # collector is late. Report uncertainty for a bounded interval instead of
+    # telling clients there is authoritative evidence of a disconnection.
+    # Never charge usage, re-open a session, or extend expiry from this hint.
+    uncertain_cutoff = datetime.utcnow() - timedelta(seconds=_LIVE_UNCERTAIN_SECONDS)
+    for subscription_id, protocol, seen_at in (
+        db.query(
+            QuotaSession.subscription_id,
+            QuotaSession.protocol,
+            func.max(QuotaSession.last_seen_at),
+        )
+        .join(Subscription, Subscription.id == QuotaSession.subscription_id)
+        .filter(
+            Subscription.status == SubscriptionStatus.ACTIVE,
+            QuotaSession.status == "active",
+            QuotaSession.last_seen_at < cutoff,
+            QuotaSession.last_seen_at >= uncertain_cutoff,
+        )
+        .group_by(QuotaSession.subscription_id, QuotaSession.protocol)
+        .all()
+    ):
+        sid = int(subscription_id)
+        item = states.setdefault(
+            sid,
+            {"subscription_id": sid, "online": False, "protocols": set(), "last_seen_at": None},
+        )
+        if not item["online"]:
+            item.setdefault("uncertain_protocols", set()).add(_normalized_protocol(protocol))
+            if seen_at is not None and (
+                item["last_seen_at"] is None or seen_at > item["last_seen_at"]
+            ):
+                item["last_seen_at"] = seen_at
+
     return states
 
 
@@ -143,9 +179,12 @@ def _live_item(subscription_id: int, states: dict[int, dict]) -> dict:
     state = states.get(subscription_id)
     protocols = sorted(state["protocols"]) if state else []
     last_seen_at = state["last_seen_at"] if state else None
+    uncertain = bool(state and state.get("uncertain_protocols") and not state["online"])
     return {
         "subscription_id": subscription_id,
         "online": bool(state and state["online"]),
+        "presence_state": "online" if state and state["online"] else ("unknown" if uncertain else "offline"),
+        "uncertain_protocols": sorted(state.get("uncertain_protocols", set())) if uncertain else [],
         "protocols": protocols,
         "last_seen_at": last_seen_at.isoformat() + "Z" if last_seen_at else None,
     }
