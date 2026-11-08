@@ -5,6 +5,7 @@ import hashlib
 import base64
 import fcntl
 import json
+import re
 import shlex
 import time
 from datetime import datetime, timezone
@@ -1003,6 +1004,72 @@ def _devices_by_protocol(db, node_id: int) -> dict[str, list[dict[str, Any]]]:
     return grouped
 
 
+def _observed_devices_by_protocol(
+    db,
+    node_id: int,
+    snapshot: dict[str, Any],
+) -> dict[str, list[dict[str, Any]]]:
+    """Resolve only real authenticated sing-box identities against saved node credentials.
+
+    The previous all-credential inventory decrypted roughly 20,000 credentials
+    before inspecting even one live connection on the node. On a loaded
+    controller this prevented later nodes' online and usage from ever arriving.
+    Subscription IDs are only candidate selectors; canonical active
+    credentials and the exact node's stored delivery membership are verified
+    by quota_node_sync.build_node_devices.
+    """
+    from . import quota_node_sync
+    observed_names: set[str] = set()
+    observed_ids: set[int] = set()
+    for row in snapshot.get("rows", []):
+        if not isinstance(row, dict):
+            continue
+        identity = str(row.get("user") or "").strip()
+        protocol = str(row.get("inbound_type") or "").lower()
+        if protocol == "socks":
+            protocol = "socks5"
+        if protocol not in SINGBOX_ACCOUNTING_PROTOCOLS:
+            continue
+        if str(row.get("inbound") or "") != str(TAGS.get(protocol) or ""):
+            continue
+        if not identity:
+            continue
+        observed_names.add(identity)
+        match = re.fullmatch(r"tp-sub-([0-9]+)", identity)
+        if match:
+            observed_ids.add(int(match.group(1)))
+
+    # A session that disappeared from the current snapshot still requires
+    # authoritative close, even if it was created in a previous sweep.
+    previously_active = (
+        db.query(QuotaSession.subscription_id)
+        .filter(
+            QuotaSession.node_id == int(node_id),
+            QuotaSession.protocol.in_(SINGBOX_ACCOUNTING_PROTOCOLS),
+            QuotaSession.status == "active",
+        )
+        .distinct()
+        .all()
+    )
+    observed_ids.update(int(sub_id) for (sub_id,) in previously_active if sub_id is not None)
+    if not observed_ids and not observed_names:
+        return {}
+
+    candidates = quota_node_sync.build_node_devices(
+        db,
+        int(node_id),
+        source_protocols=set(SINGBOX_ACCOUNTING_PROTOCOLS) | {"naiveproxy"},
+        observed_subscription_ids=observed_ids,
+        observed_usernames=observed_names,
+    )
+    grouped: dict[str, list[dict[str, Any]]] = {}
+    for device in candidates:
+        protocol = str(device.get("protocol") or "").strip().lower()
+        if protocol in SINGBOX_ACCOUNTING_PROTOCOLS:
+            grouped.setdefault(protocol, []).append(dict(device))
+    return grouped
+
+
 def _refresh_authenticated_live_presence(
     db: Session,
     *,
@@ -1206,10 +1273,7 @@ async def reconcile_singbox_quota_once() -> dict[str, Any]:
 
         for node in nodes:
             node_started = time.monotonic()
-            grouped = _devices_by_protocol(db, int(node.id))
-            if not grouped:
-                continue
-
+            grouped: dict[str, list[dict[str, Any]]] = {}
             conn = None
             try:
                 conn = await connect_protocol_runtime(node, db)
@@ -1234,6 +1298,11 @@ async def reconcile_singbox_quota_once() -> dict[str, Any]:
                         "api_changed": api_changed,
                         "error": snapshot_error or "singbox_snapshot_unavailable",
                     })
+                    continue
+
+                grouped = _observed_devices_by_protocol(db, int(node.id), snapshot)
+                if not grouped:
+                    db.rollback()
                     continue
 
                 if grouped.get("shadowtls"):
