@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.684",
-  "source_sha": "99c5bc79f7c739306ebd569641394573355337f9",
+  "version": "1.1.0-rc.685",
+  "source_sha": "e98018ce4c98f8a15f762e5562a0e0ea7268fb42",
   "notes": {
-    "fa": "نمایش تعداد اتصال هم‌زمان مجاز واقعی بر اساس مقدار اختصاصی اشتراک یا پلن در صفحه عمومی Connection؛ برچسب سبز متصل هستید براساس تله‌متری واقعی؛ حفظ پیام اشتراک فعال هنگام عدم تشخیص اتصال. شامل اصلاحات قبلی نود rc.683. این انتشار به‌تنهایی اجرای محدودیت در لحظه اتصال برای همه پروتکل‌ها را تضمین نمی‌کند.",
-    "en": "Show effective account concurrent-connection limit in public Connection view and a distinct green Connected status based on observed session activity; includes rc.683 node improvements. All-protocol admission-time concurrency enforcement is a separate unverified requirement."
+    "fa": "رفع نمایش تعداد دستگاه و وضعیت سبز اتصال در مسیر واقعی public Connection. رندر اولیه و تازه‌سازی وضعیت از API زنده، نمایش تعداد اتصال مجاز و نشست فعال بر اساس تنظیم خود اکانت. بدون دستکاری تونل‌ها، دیتابیس کاربران یا تعداد مجاز ثبت‌شده. اعمال قطعی محدودیت هم‌زمان بین تمام پروتکل‌ها نیازمند بررسی جداگانه است.",
+    "en": "Fix real canonical public Connection hub: SSR-like first response and live-poll account green connected badge, effective per-account allowed connections and active sessions. No VPN core changes; all-protocol hard admission enforcement remains separate."
   }
 }
