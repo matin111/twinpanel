@@ -245,5 +245,7 @@ if __name__=="__main__":
     except Exception as exc:
         print("CENTRAL_WIREGUARD_SAFE_STOP",{
             "node_id":args.node_id,"error_type":type(exc).__name__,
+            "reason": (str(exc) if isinstance(exc,RuntimeError) and
+                       __import__("re").fullmatch(r"[A-Z0-9_]{5,90}",str(exc)) else "UNCLASSIFIED"),
         },flush=True)
         raise SystemExit(2)
