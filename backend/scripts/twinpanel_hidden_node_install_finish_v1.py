@@ -248,8 +248,52 @@ def parse(argv=None):
     return args
 
 
+def _activate_xray_install_runtime() -> None:
+    """Compose the same Xray installers as the API in this independent worker.
+
+    The systemd finisher imports app but not app.main, so the API-only
+    self_hosted_runtime composition is otherwise absent. In particular,
+    domainless TCP Reality and Vision never get installed by the raw
+    xray_modern_runtime implementation. Do not activate the entire API
+    runtime here: it manages unrelated transport services.
+    """
+    from app import xray_modern_runtime
+    from app.xray_modern_config_compat_v45 import apply_xray_modern_config_compat_v45
+    from app.xray_modern_repair_runtime import apply_xray_modern_repair_runtime
+    from app.xray_node_domain_runtime import apply_xray_node_domain_runtime
+    from app.xray_public_delivery_runtime import apply_xray_public_delivery_runtime
+    from app.xray_profile_reconcile_v36 import apply_xray_profile_reconcile_v36
+    from app.xray_tcp_tls_v39 import apply_xray_tcp_tls_v39
+    from app.xray_tcp_tls_compat_v44 import apply_xray_tcp_tls_compat_v44
+    from app.xray_reconcile_infra_v41 import apply_xray_reconcile_infra_v41
+    from app.xray_customer_profile_policy_v30 import apply_xray_customer_profile_policy_v30
+    from app.xray_adaptive_three_profiles_v47 import apply_xray_adaptive_three_profiles_v47
+    from app.xray_domainless_vision_v50 import (
+        apply_xray_domainless_vision_v50, ensure_modern_xray_v50,
+    )
+
+    for activate in (
+        apply_xray_modern_config_compat_v45,
+        apply_xray_modern_repair_runtime,
+        apply_xray_node_domain_runtime,
+        apply_xray_public_delivery_runtime,
+        apply_xray_profile_reconcile_v36,
+        apply_xray_tcp_tls_v39,
+        apply_xray_tcp_tls_compat_v44,
+        apply_xray_reconcile_infra_v41,
+        apply_xray_customer_profile_policy_v30,
+        apply_xray_adaptive_three_profiles_v47,
+        apply_xray_domainless_vision_v50,
+    ):
+        activate()
+    if xray_modern_runtime._ensure_modern_xray is not ensure_modern_xray_v50:
+        raise RuntimeError("XRAY_NODE_WORKER_RUNTIME_NOT_COMPOSED")
+    print("HIDDEN_NODE_XRAY_THREE_PROFILE_RUNTIME_ACTIVE", flush=True)
+
+
 def main(argv=None):
     args=parse(argv)
+    _activate_xray_install_runtime()
     result=asyncio.run(finish(
         args.node_id,args.job_id,xray_port=args.xray_port,
         publish_to_all_users=args.publish_to_all_users,
