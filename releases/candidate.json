@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.719",
-  "source_sha": "c20e994e23941210d2cdc057e3a38755447c44c9",
+  "version": "1.1.0-rc.720",
+  "source_sha": "d62163607c426a1dda35f073b4e56c40ca82319a",
   "notes": {
-    "fa": "اصلاح فعال‌سازی مدت اشتراک از اولین مصرف واقعی تأییدشده، حتی در صورت تأخیر ثبت نشست؛ جلوگیری از تغییر مجدد تاریخ در رویداد تکراری؛ نمایش هشدار مدت تعیین‌نشده برای اشتراک‌های انتقالی فاقد قرارداد معتبر. شمارنده مصرف و تاریخ ثبت‌شده کاربران بدون بازنویسی باقی می‌مانند. اصلاحات نسخه RC.718 حفظ شده‌اند.",
-    "en": "Activate configured first-use validity from the first accepted authenticated usage when session telemetry is delayed; preserve replay idempotency, existing expiry, and legacy records with missing duration. Highlight missing-duration imports in admin UI; includes RC.718."
+    "fa": "اصلاح بخش امنیت برای خواندن دقیق محدودیت اختصاصی دستگاه هر اشتراک و حذف نشست‌های قدیمی از شمارش آنلاین. قطع انتخابی نشست اضافه در OpenVPN بر اساس Client ID، همراه بررسی مجدد هویت پیش از قطع؛ اتصال کاربران مجاز، حجم و تاریخ دست‌نخورده می‌مانند. Cisco مسیر قبلی قطع اضافه را حفظ می‌کند. برای پروتکل‌های فاقد شناسه مستقل دستگاه، محدودیت فیزیکی هنوز قابل تأیید نیست.",
+    "en": "Honor per-subscription device override in security monitoring and count only fresh canonical sessions. Selectively disconnect excess OpenVPN management Client IDs after confirming exact session identity, preserving authorized clients. Cisco enforcement unchanged; physical-device enforcement remains unverified for shared-credential protocols. Preserve billing and expiration."
   }
 }
