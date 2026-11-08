@@ -33,6 +33,7 @@ CANDIDATE_L3_TRANSPORTS = frozenset(
         "gost_tun",
         "amneziawg",
         "netrix",
+        "tp27_fast",
     }
 )
 
@@ -54,6 +55,7 @@ _INTERFACE_PREFIX = {
     "gost_tun": "tpgs",
     "amneziawg": "tpaw",
     "netrix": "tpnx",
+    "tp27_fast": "tp27",
 }
 
 
