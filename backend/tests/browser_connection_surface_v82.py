@@ -33,7 +33,9 @@ def mock_page():
             items.append({
               "node_id":n,"country_code":code,"host":f"198.51.100.{n}",
               "filename":f"{code}-{n}." + ("ovpn" if protocol=="openvpn" else "conf"),
-              "config":f"# synthetic profile {protocol} {n}\n",
+              "config":(f"client\nproto udp\nremote 198.51.100.{n} 1194\n"
+                        if protocol=="openvpn"
+                        else f"# synthetic profile {protocol} {n}\n"),
               "uri":f"vless://synthetic@198.51.100.{n}:443?encryption=none",
               "username":"DEMO","password":"dummy","port":443,"psk":"fake-test-key",
             })
