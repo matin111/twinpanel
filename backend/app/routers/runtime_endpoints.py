@@ -172,7 +172,8 @@ def _subscription_live_states(db: Session) -> dict[int, dict]:
 
 
 def _online_subscription_ids(db: Session) -> set[int]:
-    return set(_subscription_live_states(db))
+    # Unknown presence must never inflate the confirmed online dashboard count.
+    return {sid for sid, item in _subscription_live_states(db).items() if item["online"]}
 
 
 def _live_item(subscription_id: int, states: dict[int, dict]) -> dict:
