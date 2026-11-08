@@ -28,6 +28,8 @@ router = APIRouter(
 
 _NODE_INSTALL_TASKS: set[asyncio.Task[Any]] = set()
 _NODE_INSTALL_PENDING: set[str] = set()
+# Do not let two different names install concurrently on the same remote IP.
+_NODE_INSTALL_HOSTS_PENDING: set[str] = set()
 
 
 @router.post("/{node_id}/publish-all-users")
@@ -348,6 +350,7 @@ async def _install_node_in_background(
         }, flush=True)
     finally:
         _NODE_INSTALL_PENDING.discard(payload.name.strip().casefold())
+        _NODE_INSTALL_HOSTS_PENDING.discard(payload.host.strip().lower())
         db.close()
 
 
@@ -378,17 +381,22 @@ async def install_node_background_v1(
     if host_in_use:
         raise HTTPException(status_code=409, detail="NODE_HOST_ALREADY_REGISTERED")
     if name_key in _NODE_INSTALL_PENDING:
-        raise HTTPException(status_code=409, detail="ثبت این سرور در حال انجام است")
+        raise HTTPException(status_code=409, detail="NODE_NAME_INSTALL_ALREADY_RUNNING")
+    host_key = payload.host.strip().lower()
+    if host_key in _NODE_INSTALL_HOSTS_PENDING:
+        raise HTTPException(status_code=409, detail="NODE_HOST_INSTALL_ALREADY_RUNNING")
 
     from ..services.node_install_progress_v1 import create_install_progress
     job_id = create_install_progress(db, payload.name, payload.node_type == NodeType.EXIT)
     _NODE_INSTALL_PENDING.add(name_key)
+    _NODE_INSTALL_HOSTS_PENDING.add(host_key)
     try:
         task = asyncio.create_task(_install_node_in_background(
             payload, dict(request.scope), job_id,
         ), name=f"node-install:{payload.name}")
     except Exception:
         _NODE_INSTALL_PENDING.discard(name_key)
+        _NODE_INSTALL_HOSTS_PENDING.discard(host_key)
         _safe_install_progress(job_id, "failed", error_code="TASK_CREATE_FAILED")
         raise
     _NODE_INSTALL_TASKS.add(task)
