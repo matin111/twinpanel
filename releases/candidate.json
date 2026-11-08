@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.712",
-  "source_sha": "7cc32d618e37ccdf439677ad64375c80a64fbe49",
+  "version": "1.1.0-rc.713",
+  "source_sha": "643e7a973f3a2cad7efe38932e34626be271c021",
   "notes": {
-    "fa": "جداسازی پردازشگر آنلاین و حجم پروتکل‌های مدرن sing-box شامل AnyTLS، TUIC، Hysteria2، Naive، Snell و SOCKS5 به فرایند مستقل؛ جلوگیری از قفل شدن چرخه آمار توسط پردازش سنگین WireGuard و دیگر پروتکل‌ها. حفظ تمامی محدودیت‌ها، ثبت حجم و شمارنده‌ها، جلوگیری از ثبت هم‌زمان با قفل sing-box و سوییچ بازگشت TP_SINGBOX_INDEPENDENT_WORKER=0. ادامه اصلاح RC.711 برای ثبت همه کاربران واقعاً آنلاین حتی در صورت خرابی اعتبار بعضی حساب‌های قدیمی. بدون تغییر رمز، کانفیگ، پورت یا ری‌استارت سرویس‌های VPN نودها. ShadowTLS همچنان مشکل انتساب شناسه کاربری مستقل دارد.",
-    "en": "Run authenticated sing-box online/traffic collector for AnyTLS, TUIC, Hysteria2, Naive, Snell and SOCKS5 in an isolated supervised OS process. Start before CPU/SQLAlchemy-bound V314, preserve the 45s cadence, existing lock-based single-writer, quotas, watermark and counter rules; environment rollback TP_SINGBOX_INDEPENDENT_WORKER=0. Includes RC.711 active-first per-device recovery. No VPN node/dataplane, credential or port changes. ShadowTLS shared-inner user identity is still unsupported."
+    "fa": "یکسان‌سازی معیار تازه‌بودن آنلاین در پنل و سابلینک (نشست active قدیمی دیگر آنلاین فرض نمی‌شود)؛ ثبت نشست‌های واقعی احراز هویت‌شده AnyTLS/TUIC/Hysteria2/Naive/Snell/SOCKS5 قبل از پردازش سنگین شمارنده‌ها، با جداسازی خطاهای حساب‌های قدیمی؛ پایش مستقل Sudoku هر حدود ۲۰ ثانیه بر اساس پورت TCP اختصاصی و جلوگیری از ثبت همزمان آن توسط V314. کنترل‌های موجود حجم/محدودیت حفظ شده‌اند. هیچ تغییر در رمز، پورت یا کانفیگ VPN و هیچ ری‌استارت نود انجام نمی‌شود. ShadowTLS هنوز به دیتاپلین قابل‌انتساب به کاربر نیاز دارد.",
+    "en": "Align admin subscriber online badges with public Connect 180s freshness; pre-commit real authenticated sing-box live presence before expensive cursor and traffic reconciliation with per-user savepoint isolation, and isolate Sudoku presence-only poller from slow V314 while disabling duplicate ownership. Keep counter and admission rules, node VPN services, ports and credentials unchanged. ShadowTLS user identity remains un-attributable and no synthetic traffic is recorded."
   }
 }
