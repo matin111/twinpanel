@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.724",
+  "version": "1.1.0-rc.725",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-08T23:14:23Z",
+  "released_at": "2026-11-08T23:29:32Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "d09b74ce60234920af90a28f8eda5f7e2feb8ff6",
+  "source_sha": "b18fce81d21c1d494cd0d2b76aafac4f4a9cdce4",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.724/twinpanel-1.1.0-rc.724-linux-x86_64.tar.gz",
-    "sha256": "6426ccf9ca7fd3d324bac99acb323a047db2dc5264b1389e3bcd3de98c806cf8",
-    "size_bytes": 29930918
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.725/twinpanel-1.1.0-rc.725-linux-x86_64.tar.gz",
+    "sha256": "c2b57a0ec1524cf6754c074df9eb12c6eb45a58daf2d9273aefb4962cb718a8d",
+    "size_bytes": 29931617
   },
   "notes": {
-    "fa": "اصلاح فوری اشتراک زمان نامحدود: عدد صفرِ صریح دوباره به‌عنوان مدت نامحدود پشتیبانی می‌شود؛ تنها مدت خالی یا منفی نامعتبر است. فرم ساخت از پلن نامحدود مقدار صفر را حفظ می‌کند. نمایش تاریخ و تعداد روز باقی‌مانده نسخه قبل بدون دستکاری حساب‌های موجود باقی است.",
-    "en": "Urgent fix: restore explicitly selected zero-day unlimited-duration subscriptions in both fast creation API and unified admin form. Reject only missing/negative validity, preserve plan zero-duration. Existing account dates/usage unchanged; retain expiry/days labels from RC.723."
+    "fa": "ادغام تعداد دستگاه متصل و دستگاه مجاز در یک کادر (متصل / مجاز) دقیقاً مثل نمایش مصرف حجم، استفاده از کادر آزاد برای نمایش تعداد روز اشتراک، حفظ تاریخ انقضا و روزهای باقی‌مانده زیر آن. سازگار با دسکتاپ و موبایل، بدون تغییر اطلاعات مصرف، مدت یا محدودیت واقعی دستگاه.",
+    "en": "Combine connected/allowed devices into a single metric (active / limit), reclaim the extra metric for configured subscription duration, keep live expiry and days remaining on public Connect, preserving legacy UI bindings and current quota/expiry enforcement."
   }
 }
