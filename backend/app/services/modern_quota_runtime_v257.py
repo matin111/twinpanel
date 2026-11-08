@@ -713,6 +713,8 @@ def _apply_trusttunnel(
         ).strip()
         row = by_user.get(username)
         if row is None:
+            if int(device["device_id"]) not in previously_active_devices:
+                continue
             presence = _mark_presence(
                 db,
                 node_id=int(node.id),
@@ -828,6 +830,26 @@ def _apply_mieru_presence(
     now = _utcnow()
     opened = closed = online_count = matched = 0
 
+    # The Mieru CLI returns hundreds of provisioned users, but only a small
+    # subset have recently authenticated. Previously every offline account
+    # did its own QuotaSession lookup, turning one sweep into hundreds of
+    # transactions and delaying every other protocol's presence.
+    # Fetch only previously active devices once. Offline devices without an
+    # open session need no write, while every live or previously live device
+    # keeps exactly the original session state-machine behavior.
+    previously_active_devices = {
+        int(device_id) for (device_id,) in (
+            db.query(QuotaSession.device_id)
+            .filter(
+                QuotaSession.node_id == int(node.id),
+                QuotaSession.protocol == "mieru",
+                QuotaSession.status == "active",
+            )
+            .distinct()
+            .all()
+        )
+    }
+
     for device in devices:
         username = str(
             device.get("telemetry_identity") or device.get("identity") or ""
@@ -851,6 +873,8 @@ def _apply_mieru_presence(
         last_active = row["last_active"]
         age = (now - last_active).total_seconds()
         online = 0 <= age <= PRESENCE_STALE_SECONDS
+        if not online and int(device["device_id"]) not in previously_active_devices:
+            continue
         presence = _mark_presence(
             db,
             node_id=int(node.id),
