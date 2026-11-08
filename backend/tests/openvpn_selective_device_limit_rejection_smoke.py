@@ -48,9 +48,9 @@ def main():
                 assert check is False and timeout <= 8
                 assert "client-kill 42" in script
                 assert "kill mv7n2" not in script
-                script_body = script.split("python3 - <<'PY'\\n", 1)[1].rsplit("\\nPY", 1)[0]
+                script_body = script.split("python3 - <<'PY'\n", 1)[1].rsplit("\nPY", 1)[0]
                 ast.parse(script_body)
-                return SimpleNamespace(exit_status=0, stdout="True\\n")
+                return SimpleNamespace(exit_status=0, stdout="True\n")
             def close(self):
                 pass
             async def wait_closed(self):
