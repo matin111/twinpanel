@@ -1118,6 +1118,12 @@ html body.tp80-connection .protocol-panel.active .tp93-country-bar .active{
 }
 html body.tp80-connection .protocol-panel .tp93-country-bar + .ref67-list .ref67-row[hidden],
 html body.tp80-connection .protocol-panel .tp93-country-bar + .ref67-list .tp80-modern-detail[hidden]{display:none!important}
+/* Modern country selection overrides legacy display:grid!important on rows. */
+html body.tp80-connection .protocol-panel .ref67-list > .ref67-row[data-tp93-country-hidden="1"],
+html body.tp80-connection .protocol-panel .ref67-list > .ref67-row[hidden],
+html body.tp80-connection .protocol-panel .ref67-list > .tp80-modern-detail[hidden]{
+ display:none!important;
+}
 html body.tp80-connection #tp84-dialog:not([hidden]){
  display:flex!important;position:fixed!important;inset:0!important;z-index:2147483000!important;
  background:#070b19cc!important;align-items:center!important;justify-content:center!important;padding:16px!important;
@@ -2117,7 +2123,17 @@ _SCRIPT = r"""
    if(!source||!rows.length||!originals.length)return;
    const key=originals.map(tab=>String(tab.dataset.countryCode||'').toUpperCase()).join(',');
    const existing=panel.querySelector(':scope > .tp93-country-bar');
-   if(existing?.dataset.signature===key&&rows.length===Number(existing.dataset.rowCount))return;
+   if(existing?.dataset.signature===key&&rows.length===Number(existing.dataset.rowCount)){
+     const selected=panel.dataset.tp93Selected||'ALL';
+     rows.forEach(row=>{
+       const visible=selected==='ALL'||row.dataset.tp93Country===selected;
+       row.hidden=!visible;
+       row.dataset.tp93CountryHidden=visible?'0':'1';
+       if(visible)row.style.removeProperty('display');
+       else row.style.setProperty('display','none','important');
+     });
+     return;
+   }
    existing?.remove();
    const bar=el('nav','tp80-country-bar tp93-country-bar');
    bar.dataset.signature=key;bar.dataset.rowCount=String(rows.length);
@@ -2143,6 +2159,10 @@ _SCRIPT = r"""
      rows.forEach(row=>{
        const visible=code==='ALL'||row.dataset.tp93Country===code;
        row.hidden=!visible;
+       row.dataset.tp93CountryHidden=visible?'0':'1';
+       // Legacy TP78 styles force grid display with !important.
+       if(visible)row.style.removeProperty('display');
+       else row.style.setProperty('display','none','important');
        const details=row.nextElementSibling;
        if(details?.classList.contains('tp80-modern-detail'))details.hidden=true;
      });
