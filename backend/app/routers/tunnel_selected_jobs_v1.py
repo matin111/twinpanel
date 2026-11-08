@@ -84,7 +84,17 @@ def enqueue_selected_tunnel(payload: SelectedTunnelCreateV358, db: Session = Dep
     ):
         raise HTTPException(status_code=422, detail="SPOOF_ADDRESSES_REQUIRED")
     ensure_table(db)
-    # Reject invalid or preexisting pairs before scheduling remote mutation.
+    # Idempotency wins over pair validation: a first attempt may have already
+    # created the Tunnel before the browser lost its HTTP response.
+    previous=db.execute(text("""
+        SELECT id FROM twinpanel_selected_tunnel_jobs_v1
+        WHERE iran_node_id=:iran AND exit_node_id=:exit
+          AND state IN ('queued','running','succeeded')
+        ORDER BY created_at DESC LIMIT 1
+    """), {"iran":payload.iran_node_id, "exit":payload.exit_node_id}).first()
+    if previous:
+        return _view(db,str(previous[0]))
+    # A preexisting pair with no matching job still requires admin review.
     existing = db.execute(text("""
         SELECT id FROM tunnels WHERE iran_node_id=:iran AND exit_node_id=:exit LIMIT 1
     """), {"iran":payload.iran_node_id, "exit":payload.exit_node_id}).first()
