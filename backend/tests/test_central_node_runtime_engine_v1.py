@@ -44,7 +44,9 @@ class RuntimeReconciliationTests(unittest.IsolatedAsyncioTestCase):
             active+=1
             peak=max(peak,active)
             return Process()
-        with patch.object(engine.asyncio,"create_subprocess_exec",side_effect=spawn):
+        with (patch.object(engine.os,"cpu_count",return_value=4),
+              patch.object(engine.asyncio,"create_subprocess_exec",
+                           side_effect=spawn)):
             result=await asyncio.wait_for(
                 engine.reconcile_runtime_families(14,3000,Path("/backend")),2,
             )
@@ -55,6 +57,35 @@ class RuntimeReconciliationTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(peak,1)
         self.assertIn("sudoku_shared_v2",str(started[-1]))
         self.assertEqual(active,0)
+
+    async def test_fast_controller_runs_two_independent_bulk_families(self):
+        active=0
+        peak=0
+        spawned=[]
+        class Process:
+            async def wait(self):
+                nonlocal active
+                await asyncio.sleep(0.025)
+                active-=1
+                return 0
+        async def spawn(*command,**kwargs):
+            nonlocal active,peak
+            active+=1
+            peak=max(peak,active)
+            spawned.append(str(command[1]))
+            return Process()
+        with (patch.object(engine.os,"cpu_count",return_value=16),
+              patch.object(engine.asyncio,"create_subprocess_exec",
+                           side_effect=spawn)):
+            result=await asyncio.wait_for(
+                engine.reconcile_runtime_families(
+                    14,3000,Path("/backend")),3,
+            )
+        self.assertTrue(result["ok"])
+        self.assertEqual(peak,2)
+        self.assertEqual(active,0)
+        self.assertEqual(len(spawned),10)
+        self.assertIn("sudoku_shared_v2",spawned[-1])
 
     async def test_delta_runs_only_selected_wireguard_family(self):
         calls = []
