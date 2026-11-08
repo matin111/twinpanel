@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.706",
-  "source_sha": "a2adce7288541b9835fb2901a47b1a6453a798c8",
+  "version": "1.1.0-rc.707",
+  "source_sha": "caac5c0e4882447fa2baf8926c774a02583d680d",
   "notes": {
-    "fa": "بهینه‌سازی ایمن ثبت آمار پروتکل‌های مدرن: ایندکس نشست‌های sing-box بر اساس هویت احراز‌شده به‌جای جست‌وجوی مکرر همه نشست‌ها، افزایش محدود مهلت خواندن Snapshot فقط‌خواندنی و ثبت تشخیص تعداد اتصال‌های هم‌زمان و شناسه‌های غیرقابل انتساب. حفظ ترتیب نشست‌ها، مصرف و محدودیت‌های موجود؛ بدون دستکاری کانفیگ‌ها، پورت‌ها، رمزها یا ری‌استارت نودها. دقت انتساب ShadowTLS همچنان نیازمند اصلاح جداگانه دیتاپلین است.",
-    "en": "Safe modern accounting acceleration: index authenticated sing-box session rows once per snapshot, bound read-only snapshot timeout to 20s, track per-protocol unknown/missing identities and multiple connections without changing session/admission/byte semantics, nodes, ports, credentials or VPN runtime. ShadowTLS identity-preserving dataplane integration remains out of scope."
+    "fa": "کاهش بار پایش آنلاین Mieru با حذف صدها جست‌وجوی غیرضروری برای کاربران آفلاین؛ بررسی فقط حساب‌های دارای فعالیت معتبر یا نشست باز قبلی، حفظ ثبت قطع اتصال و کنترل‌های فعلی. افزایش کارایی فرآیند حسابداری پروتکل‌های مدرن بدون تغییر در دیتاپلین VPN، پورت، رمز یا کانفیگ نودها. بهبود برای تأخیر شدید آمار Mieru؛ پایش مستقل سریع هنوز در این نسخه پیاده‌سازی نشده است.",
+    "en": "Reduce Mieru online presence reconciliation overhead: inspect only authenticated recently active users and previously open sessions, with a single indexed lookup for active canonical devices instead of hundreds of offline DB roundtrips. Keep all existing disconnect/session/admission logic, credentials and VPN runtimes unchanged. This does not yet provide an independent fast telemetry worker."
   }
 }
