@@ -4,7 +4,8 @@ import json
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import or_\nfrom sqlalchemy.orm import Session
+from sqlalchemy import or_
+from sqlalchemy.orm import Session
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from ..models import Node, ProtocolCredential, SubscriptionNode
