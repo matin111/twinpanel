@@ -39,6 +39,9 @@ export function AdminSubscriptionLiveTable(){
     let observedBody:HTMLTableSectionElement|null=null;
     let frame:number|undefined;
     let loaded=false;
+    let lastSuccessAt=0;
+    // A failed or delayed poll must not masquerade as a confirmed disconnect.
+    const STALE_AFTER_MS=45000;
     let inFlight=false;
     let controller:AbortController|undefined;
     let bulkModal:HTMLDivElement|null=null;
@@ -266,18 +269,19 @@ export function AdminSubscriptionLiveTable(){
         const state=states.get(id);
         const online=Boolean(state?.online);
         const protocols=(state?.protocols||[]).map(protocolLabel).filter(Boolean);
-        const signature=loaded?`${online?"1":"0"}:${protocols.join(",")}`:"loading";
+        const stale=loaded&&(!lastSuccessAt||Date.now()-lastSuccessAt>STALE_AFTER_MS);
+        const signature=loaded?`${stale?"stale":online?"1":"0"}:${protocols.join(",")}`:"loading";
         if(host.dataset.liveSignature===signature)continue;
         host.dataset.liveSignature=signature;
         host.replaceChildren();
 
         const badge=document.createElement("span");
-        badge.className=`badge ${loaded?(online?"ok":"bad"):"violet"}`;
-        badge.textContent=english()?loaded?(online?"Online":"Offline"):"Checking…":loaded?(online?"آنلاین":"آفلاین"):"در حال بررسی…";
-        badge.title=tr("وضعیت اتصال","Connection status");
+        badge.className=`badge ${loaded?(stale?"violet":online?"ok":"bad"):"violet"}`;
+        badge.textContent=!loaded?tr("در حال بررسی…","Checking…"):stale?tr("وضعیت نامشخص","Status unknown"):online?tr("آنلاین","Online"):tr("آفلاین","Offline");
+        badge.title=stale?tr("گزارش وضعیت آنلاین به‌موقع دریافت نشده؛ قطع اتصال تأیید نشده است","Live telemetry is delayed; disconnection is not confirmed"):tr("وضعیت اتصال","Connection status");
         host.appendChild(badge);
 
-        if(loaded&&online&&protocols.length){
+        if(loaded&&!stale&&online&&protocols.length){
           const detail=document.createElement("small");
           detail.style.opacity=".72";
           detail.dir="ltr";
@@ -320,9 +324,14 @@ export function AdminSubscriptionLiveTable(){
         if(!response.ok)return;
         const payload=await response.json() as LivePayload;
         if(disposed)return;
+        // Do not accept malformed/partial results as an all-offline snapshot.
+        if(!Array.isArray(payload.items))return;
         states.clear();
-        for(const item of payload.items||[])states.set(Number(item.subscription_id),item);
+        for(const item of payload.items){
+          if(item&&Number.isFinite(Number(item.subscription_id)))states.set(Number(item.subscription_id),item);
+        }
         loaded=true;
+        lastSuccessAt=Date.now();
         scheduleDecorate();
       }catch{}
       finally{
@@ -336,7 +345,7 @@ export function AdminSubscriptionLiveTable(){
       if(ensureBulkButton()&&bulkTimer!==undefined){window.clearInterval(bulkTimer);bulkTimer=undefined;}
     },500);
     void refresh();
-    timer=window.setInterval(()=>{void refresh();},15000);
+    timer=window.setInterval(()=>{void refresh();scheduleDecorate();},15000);
     const onVisibilityChange=()=>{if(document.visibilityState==="visible")void refresh();};
     document.addEventListener("visibilitychange",onVisibilityChange);
 
