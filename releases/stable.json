@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.689",
+  "version": "1.1.0-rc.690",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-08T03:22:39Z",
+  "released_at": "2026-11-08T03:32:59Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "b2e248b7de193ae753ebd603ec882cdbf75053e7",
+  "source_sha": "467511614d3067d6800b9ab91be40471fd2e181d",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.689/twinpanel-1.1.0-rc.689-linux-x86_64.tar.gz",
-    "sha256": "6a68b8ed9014f9e366aa3b83ac47cf874c5e04f50df586d6e7ee1c4ebeaca138",
-    "size_bytes": 29678903
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.690/twinpanel-1.1.0-rc.690-linux-x86_64.tar.gz",
+    "sha256": "6e1610ece7dde442ca0f274dd9da3ec1050dc43f8196aa59fdc7f3a35212b0aa",
+    "size_bytes": 29679975
   },
   "notes": {
-    "fa": "رفع ریشه‌ای شمارش ناقص OpenVPN در اکانت‌های دستی قدیمی که مدت اعتبار آنها صفر ذخیره شده است: فقط تله‌متری قابل‌اعتمادِ اتصال برقرارشده اجازه ثبت نشست واقعی را می‌گیرد، در حالی که پذیرش عادی اتصال همچنان اعتبار مدت را بررسی می‌کند. تست تراکنشی بدون تغییر دیتابیس: ثبت مشاهده‌شده قبول و پذیرش عادی رد شد. هیچ سقف دستگاه یا وضعیت اشتراک تغییر نمی‌کند.",
-    "en": "Fix omitted live OpenVPN session telemetry for legacy manual subscriptions with a stored zero duration; authoritative physically observed sessions may be accounted while ordinary new-session admission remains strictly validated. Verified in rollback-only DB test; no user quotas or statuses changed."
+    "fa": "نسخه rc.690: تفکیک پلن‌های شارژ حجم نمایندگی در پنل ادمین به دو دسته «ویتوری» (economic_v2ray) و «ویژه» (premium_static_ip)، قیمت مستقل برای هر دسته، فیلتر و ستون نوع نمایندگی، انتخاب نوع در ساخت و حفظ آن در ویرایش، و رفع خطای 422 از طریق ارسال reseller_tier اجباری به API. فهرست خرید نماینده و محدودیت سرور/پروتکل کماکان مطابق نوع نمایندگی و پلن‌های فعال پنل اصلی است؛ موجودی و سوابق خرید قدیمی دست‌نخورده‌اند.",
+    "en": "rc.690: Split admin reseller traffic-recharge packages into V2Ray and Premium tiers, with distinct per-tier prices, filtering, tier selector in create/edit and required reseller_tier in API writes (fixes 422). The reseller portal keeps tier-scoped purchases and inherits allowed nodes/protocols from active primary plans. No change to balances, historical purchases, nodes or VPN configurations."
   }
 }
