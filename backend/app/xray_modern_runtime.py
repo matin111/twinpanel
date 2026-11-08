@@ -360,7 +360,7 @@ def parse_x25519(output):
             continue
         if key in {{"privatekey", "private"}}:
             parsed["private_key"] = value
-        elif key in {{"password", "publickey", "public"}}:
+        elif key in {{"password", "publickey", "public", "password(publickey)"}}:
             parsed["password"] = value
     return parsed
 
