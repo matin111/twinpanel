@@ -190,6 +190,9 @@ async def finish(node_id: int, job_id: str, *, xray_port: int,
             db.commit()
             stage = "enrolling_users"
             _status(job_id,stage,node_id,installed_protocols=ready_count)
+            # Progress is committed by an independent SessionLocal. Drop the
+            # stale job identity before admission re-checks its stage.
+            db.expire_all()
             try:
                 # Concurrent quota/account workers may temporarily hold row locks
                 # on subscriptions. Retry only PostgreSQL lock timeouts, never
