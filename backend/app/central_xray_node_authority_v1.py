@@ -75,7 +75,13 @@ if (name not in reality.get("serverNames",[])
 public_key=required("reality_password")
 if not re.fullmatch(r"[A-Za-z0-9_-]{40,64}",public_key):
     raise SystemExit("XRAY_NODE_PUBLIC_KEY_INVALID")
-tls_enabled=bool(state.get("tls_enabled"))
+# A stale TLS metadata bit must not hide fully verified live REALITY
+# listeners. Require BOTH TLS inbounds before claiming TLS coverage; the
+# domainless branch below independently verifies XHTTP/TCP REALITY, matching
+# keys, and Vision runtime/listener readiness. Never issue fake TLS URLs.
+tls_enabled=(bool(state.get("tls_enabled"))
+             and "vless-ws-tls" in inbounds
+             and "vless-tcp-tls" in inbounds)
 tls_domain=state.get("tls_domain") if tls_enabled else ""
 if tls_enabled:
     tls_domain=domain(required("tls_domain"))
