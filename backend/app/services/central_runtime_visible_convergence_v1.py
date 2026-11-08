@@ -1,8 +1,9 @@
 """Automatic desired-state reconciliation for PUBLISHED central Exits.
 
 Runs from the existing API startup lifecycle; the actual work is detached
-systemd central-node staging, never the per-user legacy backfill. The central
-registration marker is written only after a full hidden-node coverage audit.
+systemd central-node staging, never the per-user legacy backfill. Central ownership is registered after the 16-listener live-readiness and
+bulk-membership admission; individual credentials reconcile progressively.
+The desired fingerprint is marked applied only after FULL credential audit.
 For each new subscription/protocol change, exactly the existing daemon-family
 engine is dispatched, protected by one lock per node and fixed unit name.
 """

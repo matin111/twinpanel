@@ -256,6 +256,7 @@ def _run_locked(node_id, limit, apply, *, families=None, delta_only=False):
         # credentials: another safe path may already have converged it. Audit
         # the CURRENT projection before deciding to rerun every daemon.
         audit = verify_coverage(db, node_id)
+        current_node_visible = bool(db.get(Node,node_id).show_to_users)
         if latest.fingerprint != desired.fingerprint:
             if not audit["ok"]:
                 raise RuntimeError("CENTRAL_NODE_DESIRED_STATE_CHANGED_DURING_APPLY")
@@ -269,7 +270,8 @@ def _run_locked(node_id, limit, apply, *, families=None, delta_only=False):
     }), flush=True)
     if not audit["ok"]:
         print("CENTRAL_NODE_STAGE_PARTIAL", json.dumps({
-            "node_id": node_id, "node_remains_hidden": True,
+            "node_id": node_id, "node_remains_hidden": not current_node_visible,
+            "node_visible": current_node_visible,
             "missing_protocol_pairs": audit["missing_protocol_pairs"],
             "missing_node_memberships": audit["missing_node_memberships"],
         }), flush=True)
@@ -277,7 +279,8 @@ def _run_locked(node_id, limit, apply, *, families=None, delta_only=False):
     # A complete DB projection still needs a real connection/traffic canary
     # and the safe publish transition before user-facing availability.
     print("CENTRAL_NODE_STAGE_COVERAGE_VERIFIED_HIDDEN", json.dumps({
-        "node_id": node_id, "node_remains_hidden": True,
+        "node_id": node_id, "node_remains_hidden": not current_node_visible,
+        "node_visible": current_node_visible,
         "real_connection_canary_verified": False,
     }), flush=True)
     # Durable marker authorizes the SAME daemon family reconciler after

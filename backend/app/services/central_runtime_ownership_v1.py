@@ -1,7 +1,8 @@
 """Single authority for centralized Exit runtime ownership.
 
-A hidden Exit may be staged. A published Exit can be reconciled only after
-full staged credential coverage explicitly registered that node as central.
+A hidden Exit may be staged. A published Exit can be reconciled only after 16 LIVE listeners and a bulk
+eligible-membership transaction have registered central ownership. Individual
+protocol credentials may continue converging in the detached backend.
 Older production Exits do not gain central ownership implicitly.
 """
 from __future__ import annotations
@@ -44,7 +45,11 @@ def is_central_node(db, node_id: int) -> bool:
 
 
 def mark_central_node(db, node_id: int) -> None:
-    """Only call this after the hidden-node full 16-protocol audit succeeds."""
+    """Register central authority after live listener + membership admission.
+
+    Do not mark last_applied here. Full credential coverage is audited by
+    the independent central worker before it marks the desired fingerprint.
+    """
     set_value(db, central_key(node_id), "v1")
 
 

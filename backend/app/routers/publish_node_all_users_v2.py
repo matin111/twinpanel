@@ -254,6 +254,9 @@ async def reverify_and_stage_existing_exit_v1(
     from ..services.central_node_stage_launcher_v1 import (
         launch, CentralStageLaunchError,
     )
+    from ..services.central_progressive_exit_admission_v1 import (
+        admit_verified_exit, hide_after_dispatch_failure,
+    )
 
     node = db.get(Node, int(node_id))
     if (node is None or node.retired_at is not None or
@@ -281,25 +284,47 @@ async def reverify_and_stage_existing_exit_v1(
             "missing": live.get("missing") or [],
         })
 
+    # A prior attempt may already have materialized thousands of node-local
+    # credential pairs. Reuse them and sync ONLY missing daemon families;
+    # never rebuild successful per-user identities on recovery.
+    resume_missing_only = (
+        job.error_code == "CENTRAL_RUNTIME_COVERAGE_INCOMPLETE"
+    )
     job.stage = "verified_ready"
     job.state = "running"
     job.installed_protocols = int(live["ready_count"])
     job.error_code = None
+    admitted = False
     try:
-        # Launch sees the verified job within this transaction. If systemd
-        # rejects dispatch, neither the old install state nor user
-        # visibility changes.
-        response = launch(db, int(node_id))
+        # Reuse the EXACT same fast set-based enrollment as a fresh Exit.
+        # Missing protocol credentials remain private until the detached
+        # central worker proves their individual remote readiness.
+        admission = admit_verified_exit(db, int(node_id))
+        admitted = True
+        response = launch(
+            db, int(node_id), initial_full=not resume_missing_only,
+        )
+        job.stage = "completed"
+        job.state = "completed"
+        job.users_assigned = int(admission["eligible_users"])
+        job.error_code = None
         db.commit()
     except CentralStageLaunchError as exc:
         db.rollback()
+        if admitted:
+            hide_after_dispatch_failure(db, int(node_id))
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     except Exception:
         db.rollback()
+        if admitted:
+            hide_after_dispatch_failure(db, int(node_id))
         raise
     return {
         **response, "live_protocols": int(live["ready_count"]),
         "progress_reverified": True,
+        "node_visible": True,
+        "users_assigned": int(admission["eligible_users"]),
+        "credential_building_in_background": True,
     }
 
 

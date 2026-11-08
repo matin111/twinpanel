@@ -17,7 +17,10 @@ class DirectExitWithoutTunnelTests(unittest.TestCase):
     def test_new_exit_materialization_does_not_wait_for_tunnel(self):
         src=inspect.getsource(install._install_node_in_background)
         self.assertNotIn('and fabric.get("ok") is not False',src)
-        self.assertIn("central_stage.run",src)
+        self.assertIn("admit_verified_exit(",src)
+        self.assertIn("launch_central_stage(",src)
+        self.assertLess(src.index("admission=admit_verified_exit("),
+                        src.index("dispatched=launch_central_stage("))
         self.assertIn("verify_new_exit_readiness",src)
 
 

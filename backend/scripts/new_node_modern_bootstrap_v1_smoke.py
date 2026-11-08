@@ -14,13 +14,17 @@ registry=(ROOT/'backend/app/protocol_account_registry.py').read_text()
 assert "await bootstrap_hidden_central_exit(install_payload, request, db)" in worker
 assert "if install_payload.node_type == NodeType.EXIT" in worker
 assert "else await install_node(install_payload, request, db)" in worker
-assert "central_stage.run" in worker
-assert "stage_rc = await asyncio.to_thread(" in worker
-assert "publish_result = await publish_node_to_all_users(" in worker
+assert "admit_verified_exit(db,node_id)" in worker
+assert "launch_central_stage(" in worker
+assert "initial_full=True" in worker
+assert "hide_after_dispatch_failure(db,node_id)" in worker
 assert worker.index("bootstrap_hidden_central_exit(install_payload") < worker.index(
-    "stage_rc = await asyncio.to_thread(") < worker.index(
-    "publish_result = await publish_node_to_all_users(")
-assert "if stage_rc != 0:" in worker
+    "admission=admit_verified_exit(db,node_id)") < worker.index(
+    "dispatched=launch_central_stage(")
+assert "central_stage.run" not in worker
+assert "stage_rc = await asyncio.to_thread(" not in worker
+assert "enqueue_node_backfill(" not in worker
+
 
 # The new Exit builder uses canonical catalog presets; importing secret
 # settings or port mappings from a different Exit is forbidden.

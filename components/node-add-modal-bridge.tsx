@@ -63,7 +63,7 @@ function NodeInstallProgress({job,error}:{job:NodeInstallJob|null;error:string})
       <div className={"node-install-orb "+(failed?"is-failed":finished?"is-done":"is-working")} aria-hidden="true">◉</div>
       <div>
         <b>{job?.node_name||pick("آماده‌سازی سرور","Preparing server")}</b>
-        <small>{failed?pick("نصب کامل تأیید نشده است","Installation is not confirmed"):waiting?pick("کاربران به نود منتسب شده‌اند؛ اعمال کانفیگ‌ها هنوز در صف مرکزی است","Accounts are assigned; configuration application is still queued centrally"):finished?pick("مرحله نصب تأیید شد","Installation stage verified"):pick("وضعیت مراحل مستقیماً از سرور خوانده می‌شود","Stages are read directly from the server")}</small>
+        <small>{failed?pick("نصب کامل تأیید نشده است","Installation is not confirmed"):waiting?pick("کاربران به نود منتسب شده‌اند؛ اعمال کانفیگ‌ها هنوز در صف مرکزی است","Accounts are assigned; configuration application is still queued centrally"):finished?pick("نود ثبت و نمایش داده شد؛ کانفیگ‌های آماده به‌ترتیب اضافه می‌شوند و تکمیل بقیه در بک‌اند ادامه دارد","Node is visible; ready configs appear progressively while backend sync continues"):pick("وضعیت مراحل مستقیماً از سرور خوانده می‌شود","Stages are read directly from the server")}</small>
       </div>
     </div>
     <div className={"node-install-running-line "+(pending?"is-active":"")} aria-hidden="true"><span/></div>
@@ -144,7 +144,7 @@ export function NodeAddModalBridge(){
   const resetInstall=()=>{
     try{window.localStorage.removeItem(NODE_JOB_STORAGE);}catch{}
     setJobId("");setJob(null);setJobError("");setError("");setOk("");
-    setDraft(defaultDraft);setPublishToAll(false);setOpen(true);
+    setDraft(defaultDraft);setPublishToAll(true);setOpen(true);
   };
 
   const test=async()=>{
@@ -209,8 +209,8 @@ export function NodeAddModalBridge(){
           <label className="field"><span>SSH Password</span><input type="password" autoComplete="new-password" required value={draft.password} onChange={e=>setDraft(v=>({...v,password:e.target.value}))}/></label>
           <label className="field"><span>{pick("ظرفیت کاربر","User capacity")}</span><input type="number" min={1} value={draft.capacity_users} onChange={e=>setDraft(v=>({...v,capacity_users:Number(e.target.value)||1}))}/></label>
         </div>
-        {draft.node_type==="exit"?<div className="runtime-choice-section"><label className="toggle module-toggle"><span>{pick("نمایش برای همه کاربران سایت","Show for all site users")}</span><input type="checkbox" checked={publishToAll} onChange={e=>setPublishToAll(e.target.checked)}/><i/></label><small>{pick("با فعال‌کردن این گزینه، نود فقط به اشتراک‌های فعال قبلی که منقضی نشده‌اند و حجم دارند اضافه می‌شود. برای خریداران جدید، نود را جداگانه در پلن اقتصادی یا ویژه انتخاب کنید. پس از نصب پروتکل‌ها، موتور مرکزی اطلاعات کاربران فعال را یکجا روی سرویس‌های نود اعمال می‌کند؛ نود فقط بعد از تأیید کانفیگ‌های واقعی منتشر می‌شود.","When enabled, the node is assigned to eligible existing active subscriptions only. Select it separately in Economy/Premium plans for new purchases. The central runtime applies eligible accounts by service family and publishes only after real credential coverage is verified.")}</small></div>:null}
-        <div className="runtime-warning">{pick("سرور خروجی ابتدا ۱۶ پروتکل را آماده و سلامت آن‌ها را بررسی می‌کند؛ فقط پس از تأیید، اشتراک‌های فعال به صف مرکزی اضافه می‌شوند.","Exit nodes install and verify all 16 protocols first. Eligible active subscriptions are queued centrally only after successful validation.")}</div>
+        {draft.node_type==="exit"?<div className="runtime-choice-section"><label className="toggle module-toggle"><span>{pick("نمایش برای همه کاربران سایت","Show for all site users")}</span><input type="checkbox" checked={publishToAll} onChange={e=>setPublishToAll(e.target.checked)}/><i/></label><small>{pick("با فعال‌کردن این گزینه، نود فقط به اشتراک‌های فعال قبلی که منقضی نشده‌اند و حجم دارند اضافه می‌شود. برای خریداران جدید، نود را جداگانه در پلن اقتصادی یا ویژه انتخاب کنید. پس از تأیید سلامت ۱۶ پروتکل، نود و عضویت کاربران فعال بلافاصله نمایش داده می‌شود؛ کانفیگ‌های آماده به‌تدریج قابل دریافت‌اند و بقیه در بک‌اند تکمیل می‌شوند.","When enabled, the node is assigned to eligible existing active subscriptions only. Select it separately in Economy/Premium plans for new purchases. Once all 16 live listeners are verified, the node becomes visible immediately. Ready configs are delivered progressively while the backend syncs the rest.")}</small></div>:null}
+        <div className="runtime-warning">{pick("سرور خروجی ابتدا سلامت ۱۶ پروتکل را بررسی می‌کند؛ سپس کاربران فعال گروهی ثبت و نود نمایش داده می‌شود. ساخت کانفیگ‌ها در بک‌اند ادامه دارد، بدون اینکه افزودن سرور منتظر آن بماند.","Exit nodes verify all 16 protocols, then enroll active users in bulk and become visible immediately. Credential generation continues separately in the backend.")}</div>
         <div className="action-row"><button type="button" className="ghost" disabled={Boolean(busy)||!draft.host||!draft.password} onClick={()=>void test()}>{busy==="test"?"…":pick("تست SSH","Test SSH")}</button><button className="primary" disabled={Boolean(busy)||!draft.host||!draft.password||!draft.name}>{busy==="register"?pick("در حال ثبت...","Registering..."):pick("ثبت و آماده‌سازی سرور","Register & prepare server")}</button></div>
       </form>}
     </div>

@@ -18,17 +18,18 @@ from app.services import node_stage_publish_guard_v1 as guard
 
 
 class NewNodeInstallerCutoverTests(unittest.TestCase):
-    def test_real_install_background_uses_runtime_engine_before_publish(self):
+    def test_add_server_enrolls_users_before_detached_runtime_build(self):
         src=inspect.getsource(installer._install_node_in_background)
-        self.assertIn("central_stage.run",src)
-        self.assertIn("asyncio.to_thread(",src)
-        self.assertLess(
-            src.index("stage_rc = await asyncio.to_thread("),
-            src.index("publish_result = await publish_node_to_all_users("),
-        )
-        self.assertIn('if stage_rc != 0:',src)
-        self.assertIn('"CENTRAL_RUNTIME_COVERAGE_INCOMPLETE"',src)
+        self.assertIn("admit_verified_exit(",src)
+        self.assertIn("launch_central_stage(",src)
+        self.assertIn("initial_full=True",src)
+        self.assertLess(src.index("admission=admit_verified_exit("),
+                        src.index("dispatched=launch_central_stage("))
+        self.assertIn("hide_after_dispatch_failure(",src)
+        self.assertNotIn("central_stage.run",src)
+        self.assertNotIn("asyncio.to_thread(",src)
         self.assertNotIn("enqueue_node_backfill(",src)
+        self.assertNotIn("CENTRAL_RUNTIME_COVERAGE_INCOMPLETE",src)
         self.assertNotIn('and fabric.get("ok") is not False',src)
 
     def test_real_installer_publishes_through_audited_v2_handler(self):
