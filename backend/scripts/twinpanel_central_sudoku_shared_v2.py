@@ -148,6 +148,11 @@ async def stage(node_id,limit,write):
         readiness=await verify_central_family_readiness(db, node_id, {"sudoku"})
         if not readiness.get("ok"):
             raise RuntimeError("SUDOKU_SHARED_LISTENERS_NOT_READY")
+        # New Exit and recovered nodes must share the SAME pinned binary.
+        # Verify/install once at node level, never per subscriber; skip
+        # automatically when the verified artifact is already present.
+        from app.services.central_sudoku_shared_bootstrap_v2 import ensure_shared_binary
+        await ensure_shared_binary(node,db)
         conn=await asyncio.wait_for(connect_protocol_runtime(node,db),timeout=25)
         try:
             prepared=await prepare(conn,missing)
