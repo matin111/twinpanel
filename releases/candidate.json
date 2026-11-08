@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.693",
-  "source_sha": "5c6957bc6a19706bf1850ca370b870bd8bf1d7ae",
+  "version": "1.1.0-rc.694",
+  "source_sha": "23fbc2f6e548fe4f6a8111e8350879ec93a56101",
   "notes": {
-    "fa": "رفع ریشه‌ای افزودن نود: ثبت یک‌باره کاربران فعال، همگام‌سازی گروهی Xray از تنظیمات تأییدشده همان نود، رفع برخورد نام ورود Naive/ShadowTLS بدون تغییر رمز یا UUID، هماهنگی قطع/وصل حساب با شناسه همان نود. نودها پس از تأیید ۱۶ سرویس منتشر می‌شوند و کانفیگ‌ها در بک‌اند تکمیل می‌شوند؛ صحت اتصال واقعی باید پس از نصب بررسی شود.",
-    "en": "Root fixes for central node enrollment: verified node-owned Xray public profile materialization; bounded batch hot-sync; deterministic collision-safe Naive/ShadowTLS identities with node-local revoke/restore; preserves mother credentials and old UUIDs. Live 16-family readiness and production canary required."
+    "fa": "تکمیل پایدار مدیریت مرکزی نود: اصلاح اجرای detached systemd با بارگذاری امن فایل‌های محیطی، رفع توقف صف delta بعد از انتشار نود، و حفظ اصلاحات دسته‌ای Xray و sing-box نسخه قبل. این تغییر فقط مسیر راه‌اندازی پردازش خودکار را اصلاح می‌کند و اطلاعات اتصال کاربران را تغییر نمی‌دهد.",
+    "en": "Persist central node-stage EnvironmentFile inheritance in detached systemd-run workers, fixing post-publication delta reconciliation and repeated Pydantic startup failures. Preserves rc.693 Xray and sing-box root fixes, customer UUIDs and live daemon configuration."
   }
 }
