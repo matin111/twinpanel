@@ -23,6 +23,8 @@ if str(BACKEND_ROOT) not in sys.path:
 # presence. This flag also disables Mieru in heavy V314 sweeps. Setting it
 # explicitly to 0 is a safe rollback to the original V314 behavior.
 os.environ.setdefault("TP_MIERU_INDEPENDENT_WORKER", "1")
+# Restore the legacy shared coroutine by setting this explicitly to 0.
+os.environ.setdefault("TP_SINGBOX_INDEPENDENT_WORKER", "1")
 
 from app.services.modern_quota_runtime_v257 import modern_quota_runtime_loop as legacy_modern_quota_runtime_loop
 from app.services.modern_quota_runtime_v314 import modern_quota_runtime_loop
@@ -71,6 +73,21 @@ async def _mieru_fast_subprocess(proc: asyncio.subprocess.Process) -> None:
                 await proc.wait()
 
 
+async def _singbox_isolated_subprocess(proc: asyncio.subprocess.Process) -> None:
+    """Supervise already-started sing-box worker without stalling V314."""
+    try:
+        status = await proc.wait()
+        raise RuntimeError(f"singbox_isolated_worker_exited:{status}")
+    finally:
+        if proc.returncode is None:
+            proc.terminate()
+            try:
+                await asyncio.wait_for(proc.wait(), timeout=7)
+            except asyncio.TimeoutError:
+                proc.kill()
+                await proc.wait()
+
+
 async def _serve() -> None:
     stop = asyncio.Event()
     loop = asyncio.get_running_loop()
@@ -92,14 +109,34 @@ async def _serve() -> None:
             str(BACKEND_ROOT / "scripts/twinpanel_mieru_fast_presence_worker.py"),
         )
 
+    # Launch sing-box before slow V314 takes the event loop. A separately
+    # enforced flock in the native collector prevents concurrent writers.
+    singbox_proc = None
+    if os.environ.get("TP_SINGBOX_INDEPENDENT_WORKER") == "1":
+        singbox_proc = await asyncio.create_subprocess_exec(
+            sys.executable,
+            str(BACKEND_ROOT / "scripts/twinpanel_singbox_isolated_worker.py"),
+        )
+
     workers = (
         asyncio.create_task(
             modern_quota_runtime_loop(),
             name="twinpanel-modern-accounting",
         ),
-        asyncio.create_task(
-            singbox_native_accounting_loop(),
-            name="twinpanel-singbox-native-accounting-v265",
+        *(
+            (
+                asyncio.create_task(
+                    _singbox_isolated_subprocess(singbox_proc),
+                    name="twinpanel-singbox-isolated-accounting",
+                ),
+            )
+            if os.environ.get("TP_SINGBOX_INDEPENDENT_WORKER") == "1"
+            else (
+                asyncio.create_task(
+                    singbox_native_accounting_loop(),
+                    name="twinpanel-singbox-native-accounting-v265",
+                ),
+            )
         ),
         *(
             (
