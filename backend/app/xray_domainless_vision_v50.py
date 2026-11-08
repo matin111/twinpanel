@@ -30,6 +30,7 @@ from . import (
     xray_modern_runtime as xr, xray_profile_reconcile_v36,
     xray_public_delivery_runtime,
 )
+from .database import SessionLocal
 from .models import Node, NodeProtocolConfig
 from .routers import account_delivery, provision, tunnels
 
@@ -385,8 +386,27 @@ def _routes_v50(db,exit_node,exit_tunnel_ip:str)->list[dict]:
 def _admin_rows_v50(node,base_port:int)->list[dict]:
     assert _original_admin_rows is not None
     rows=list(_original_admin_rows(node,base_port))
-    if v47._effective_domain(node):
-        return rows
+    # The admin view runs outside a request-scoped DB Session. Older Node ORM
+    # models omit xray_domain; load the canonical DB column explicitly so TLS
+    # nodes show WS/XHTTP/TCP TLS, not a phantom Vision listener.
+    tls_domain=v47._effective_domain(node)
+    if not tls_domain:
+        try:
+            with SessionLocal() as db:
+                tls_domain=v47._effective_domain_from_db(db,node)
+        except Exception:
+            tls_domain=""
+    if tls_domain:
+        wanted=("websocket_tls","xhttp_reality","tcp_tls")
+        return [{
+            "id":profile,"title":xr.PROFILE_META[profile]["title"],
+            "security":xr.PROFILE_META[profile]["security"],
+            "transport":xr.PROFILE_META[profile]["transport"],
+            "recommended":bool(xr.PROFILE_META[profile]["recommended"]),
+            "requires_tls_domain":profile!="xhttp_reality",
+            "target_port":xr._target_port(base_port,profile),
+            "tunnel_public_port":xr._public_port(node.id,profile),
+        } for profile in wanted]
     if not any(str(x.get("id") or "")==PROFILE for x in rows):
         rows.append({
             "id":PROFILE,"title":"VLESS TCP Reality Vision",
