@@ -21,6 +21,10 @@ from pydantic import BaseModel, Field, model_validator
 from sqlalchemy.orm import Session
 
 from ..config import settings
+from ..services.node_os_preflight_v1 import (
+    remote_supported_os_info,
+    remote_supported_os_id,
+)
 from ..database import get_db
 from ..models import Tunnel, TunnelPeerState, TunnelStatus
 from ..deps import require_admin
@@ -259,11 +263,13 @@ async def cmd(conn, command: str, timeout: int = 180, check: bool = True):
 async def test_connection(payload: TestIn):
     conn = await ssh_connect(payload)
     try:
+        # Exactly the same fail-closed OS preflight as the real installer.
+        os_info = await remote_supported_os_info(conn)
         return {
             "ok": True,
             "hostname": await cmd(conn, "hostname"),
-            "os_name": await cmd(conn, ". /etc/os-release && printf '%s' \"$NAME\""),
-            "os_version": await cmd(conn, ". /etc/os-release && printf '%s' \"$VERSION_ID\""),
+            "os_name": os_info["name"],
+            "os_version": os_info["version_id"],
             "cpu_cores": int(await cmd(conn, "nproc")),
             "memory_mb": int(await cmd(conn, "awk '/MemTotal/ {print int($2/1024)}' /proc/meminfo")),
             "disk_gb": int(await cmd(conn, "df -BG / | awk 'NR==2 {gsub(/G/,\"\",$2); print $2}'")),
@@ -1552,9 +1558,8 @@ async def upgrade_agent(
         raise HTTPException(status_code=404, detail="سرور پیدا نشد")
     conn = await ssh_connect_saved(node, db)
     try:
-        os_id = await cmd(conn, ". /etc/os-release && printf '%s' \"$ID\"")
-        if os_id not in ("ubuntu", "debian"):
-            raise HTTPException(status_code=400, detail="فعلاً Upgrade Agent روی Ubuntu/Debian پشتیبانی می‌شود")
+        # Do not source potentially damaged/absent os-release.
+        await remote_supported_os_id(conn)
         hostname = await cmd(conn, "hostname", check=False)
         result = await _install_or_upgrade_agent(
             conn,
@@ -2475,8 +2480,10 @@ async def install_node(
 
     conn=await ssh_connect(payload); node=None
     try:
-        os_id=await cmd(conn,". /etc/os-release && printf '%s' \"$ID\"")
-        if os_id not in ("ubuntu","debian"): raise HTTPException(status_code=400,detail="فعلاً Ubuntu/Debian پشتیبانی می‌شود")
+        # Fail before writing a node record or installing ANY service.
+        # A retired Exit can be re-added even when /etc/os-release moved;
+        # /usr/lib/os-release and lsb_release are read-only fallbacks.
+        await remote_supported_os_id(conn)
         await ensure_base(conn)
         node=Node(name=payload.name,node_type=payload.node_type,country_code="IR" if payload.node_type==NodeType.IRAN else payload.country_code.upper(),public_ip=payload.host,agent_url=f"https://{payload.host}:9443",status=NodeStatus.OFFLINE,show_to_users=(payload.node_type != NodeType.EXIT or not payload.defer_subscription_sync),capacity_users=payload.capacity_users,enable_cisco=False,enable_openvpn=False,enable_wireguard=False,enable_l2tp=False,enable_v2ray=False)
         db.add(node); db.commit(); db.refresh(node)
