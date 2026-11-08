@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.697",
-  "source_sha": "628d33c6b652b516c323650f9c67460465c10390",
+  "version": "1.1.0-rc.698",
+  "source_sha": "916201599b7b83525c5ba60034546ff2762fbf97",
   "notes": {
-    "fa": "اصلاح واقعی جست‌وجوی کشور در افزودن و ویرایش نود؛ نتیجه‌ها با نام فارسی، نام انگلیسی و کد کشور مثل NL فیلتر می‌شوند و انتخاب با Enter، کلیدهای جهت‌دار یا کلیک انجام می‌شود. بازطراحی جمع‌وجور و واکنش‌گرای فرم افزودن سرور با تفکیک اطلاعات سرور و دسترسی SSH، چیدمان و اندازه‌های یکدست و نمایش بهتر کشور و پرچم. حفظ تمام تغییرات RC.696 از جمله ترمیم Cisco و نصب نود ناقص؛ عدم تغییر دیتابیس اشتراک‌ها و سرویس‌های VPN.",
-    "en": "Fix real filtered searchable country picker with keyboard/click selection and ISO code search (NL etc). Refresh Add Server modal with compact responsive two-section grid, balanced controls and country/flag selector. Preserve RC.696 Cisco node-install repairs and safety gates; no VPN or user data migrations."
+    "fa": "رفع باگ فیلتر کشور در همه پنجره‌های پروتکل مدرن Connection: انتخاب UK، TR، DE یا US فقط سرورهای کشور انتخاب‌شده را نمایش می‌دهد؛ قوانین قدیمی display:grid!important دیگر نمی‌توانند ردیف hidden را آشکار کنند. اعمال همزمان CSS و کنترل نمایش ردیف‌ها؛ حفظ فیلتر هنگام بازسازی پنجره و همگام‌سازی صفحه. بدون تغییر سرویس VPN، کانفیگ یا اطلاعات کاربر.",
+    "en": "Fix shared country filter in all modern Connection modals: selecting UK/TR/DE/US now hides all nonmatching servers even under legacy display:grid!important; apply strong scoped CSS, per-row display state and reassert filter during reconciliation. No VPN data-plane or customer changes."
   }
 }
