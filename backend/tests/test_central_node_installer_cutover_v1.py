@@ -13,6 +13,7 @@ from unittest.mock import patch
 from fastapi import HTTPException
 
 from app.routers import publish_node_all_users_v1 as installer
+from scripts import twinpanel_hidden_node_install_finish_v1 as finisher
 from app.routers import publish_node_all_users_v2 as central_publish
 from app.services import node_stage_publish_guard_v1 as guard
 
@@ -20,17 +21,20 @@ from app.services import node_stage_publish_guard_v1 as guard
 class NewNodeInstallerCutoverTests(unittest.TestCase):
     def test_add_server_enrolls_users_before_detached_runtime_build(self):
         src=inspect.getsource(installer._install_node_in_background)
-        self.assertIn("admit_verified_exit(",src)
-        self.assertIn("launch_central_stage(",src)
-        self.assertIn("initial_full=True",src)
-        self.assertLess(src.index("admission=admit_verified_exit("),
-                        src.index("dispatched=launch_central_stage("))
-        self.assertIn("hide_after_dispatch_failure(",src)
+        phase2=inspect.getsource(finisher.finish)
+        self.assertIn("launch_hidden_node_finisher(",src)
+        self.assertNotIn("admit_verified_exit(",src)
+        self.assertIn("admit_verified_exit(",phase2)
+        self.assertIn("initial_full=True",phase2)
+        self.assertLess(phase2.index("admission=admit_verified_exit("),
+                        phase2.index("scheduled=launch("))
+        self.assertIn("hide_after_dispatch_failure(",phase2)
+        self.assertIn("verify_new_exit_readiness(",phase2)
         self.assertNotIn("central_stage.run",src)
-        self.assertNotIn("asyncio.to_thread(",src)
         self.assertNotIn("enqueue_node_backfill(",src)
         self.assertNotIn("CENTRAL_RUNTIME_COVERAGE_INCOMPLETE",src)
         self.assertNotIn('and fabric.get("ok") is not False',src)
+        self.assertNotIn('fabric.get(',phase2)
 
     def test_real_installer_publishes_through_audited_v2_handler(self):
         self.assertIs(installer.publish_node_to_all_users,
