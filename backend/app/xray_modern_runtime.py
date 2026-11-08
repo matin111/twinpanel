@@ -960,7 +960,7 @@ async def _ensure_modern_xray(
     ).decode()
     merge_b64 = base64.b64encode(_merge_clients_script().encode()).decode()
 
-    temp_path = "/usr/local/etc/xray/config.twinpanel-modern.json"
+    temp_path = "/usr/local/etc/xray/config.json.twinpanel-modern"
 
     await provision.cmd(
         conn,
