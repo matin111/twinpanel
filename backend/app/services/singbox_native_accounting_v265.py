@@ -1277,6 +1277,10 @@ async def reconcile_singbox_quota_once() -> dict[str, Any]:
             conn = None
             try:
                 conn = await connect_protocol_runtime(node, db)
+                # Connection setup may read node credentials through this Session.
+                # Release the read transaction before network-bound API probes;
+                # otherwise the collector can hold a DB snapshot for 20+ sec.
+                db.commit()
                 api_ok, api_changed, api_error = await ensure_singbox_accounting_api(conn)
                 if not api_ok:
                     db.commit()
