@@ -31,6 +31,8 @@ class InstallCentralPipelineTests(unittest.IsolatedAsyncioTestCase):
         job=SimpleNamespace(job_id="00000000-0000-0000-0000-000000000001")
         sequence=[]
         stages=[]
+        fake_remote=MagicMock()
+        fake_remote.wait_closed=AsyncMock()
         payload=installer.BackgroundNodeInstallIn(
             host="203.0.113.12",password="dummy-for-mock",
             name="New Test Exit",node_type=NodeType.EXIT,
@@ -80,6 +82,14 @@ class InstallCentralPipelineTests(unittest.IsolatedAsyncioTestCase):
             patch.object(finisher,"_status",side_effect=record_finish),
             patch.object(finisher,"bootstrap_new_exit_modern_protocols",
                   new_callable=AsyncMock,return_value=modern),
+            patch("app.routers.account_delivery.ssh_connect_saved",
+                  new_callable=AsyncMock,return_value=fake_remote),
+            patch("app.xray_modern_runtime._ensure_modern_xray",
+                  new_callable=AsyncMock,return_value={
+                      "available_profiles":[
+                          "xhttp_reality","tcp_reality","tcp_reality_vision"
+                      ],
+                  }),
             patch.object(finisher,"verify_new_exit_readiness",
                   new_callable=AsyncMock,return_value={
                       "ok":live_ok,"ready_count":16 if live_ok else 12,
