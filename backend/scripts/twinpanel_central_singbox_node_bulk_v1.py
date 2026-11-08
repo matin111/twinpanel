@@ -191,6 +191,11 @@ async def run(node_id:int,limit:int,apply:bool):
         if not allow_central_node(db,db.get(Node,node_id)):
             raise RuntimeError("STAGED_NODE_WAS_PUBLISHED_EARLY")
         ids={sid for sid,_,_ in work}
+        # Preserve the subscription-bound mother login as the canonical
+        # global credential. Node-only aliases live in the node-local item.
+        bound_mother_names=dict(db.query(
+            Subscription.id,Subscription.account_username,
+        ).filter(Subscription.id.in_(list(ids))).all())
         existing={(int(c.subscription_id),str(c.protocol)):c for c in db.query(
             ProtocolCredential
         ).filter(
@@ -222,7 +227,20 @@ async def run(node_id:int,limit:int,apply:bool):
                 )
             old.append(item)
             cred.username=_credential_identity(protocol,secret)
-            cred.secret_encrypted=ad._enc(secret_to_dict(secret))
+            if protocol in BOUND:
+                from dataclasses import replace
+                mother_name=str(bound_mother_names.get(sid) or "").strip()
+                if not mother_name:
+                    raise RuntimeError("CENTRAL_SINGBOX_MOTHER_IDENTITY_MISSING")
+                stored=replace(secret,username=mother_name)
+                # Avoid replacing any existing canonical mother secret during
+                # node enrollment; only the node item has an alias.
+                if not cred.secret_encrypted:
+                    cred.secret_encrypted=ad._enc(secret_to_dict(stored))
+            else:
+                # Other protocols preserve their globally stored identity.
+                if not cred.secret_encrypted:
+                    cred.secret_encrypted=ad._enc(secret_to_dict(secret))
             cred.config_text_encrypted=ad._enc(old)
             cred.is_active=True
             writes+=1
