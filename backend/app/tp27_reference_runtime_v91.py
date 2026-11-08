@@ -63,8 +63,9 @@ def apply_protocol_settings(node: Node, settings) -> None:
         settings.cisco_port = preserved_port(node.id, "cisco")
     if bool(settings.install_openvpn):
         settings.openvpn_port = preserved_port(node.id, "openvpn")
-    if bool(settings.install_wireguard):
-        settings.wireguard_port = preserved_port(node.id, "wireguard")
+    # The Iran-facing public WireGuard port is 22000+node.id, but the
+    # Exit's actual WireGuard UDP listener is independent (often 51820).
+    # Never force the public DNAT port onto a healthy Exit daemon.
 
 
 async def _provision_protocols_tp27(
@@ -143,7 +144,8 @@ def _needs_port_migration(node: Node, configs: dict[str, NodeProtocolConfig]) ->
     checks = (
         ("cisco", "enable_cisco"),
         ("openvpn", "enable_openvpn"),
-        ("wireguard", "enable_wireguard"),
+        # WireGuard's public port belongs to Iran DNAT; the Exit target
+        # may legitimately listen on 51820 or a configured custom UDP port.
     )
     for protocol, attr in checks:
         if not bool(getattr(node, attr, False)):
@@ -172,8 +174,9 @@ def _repair_settings(node: Node, configs: dict[str, NodeProtocolConfig]):
         install_openvpn=bool(node.enable_openvpn and configs.get("openvpn")),
         openvpn_port=preserved_port(node.id, "openvpn"),
         openvpn_transport=transport,
-        install_wireguard=bool(node.enable_wireguard and configs.get("wireguard")),
-        wireguard_port=preserved_port(node.id, "wireguard"),
+        install_wireguard=False,
+        wireguard_port=int(configs["wireguard"].port or 51820)
+                       if configs.get("wireguard") else 51820,
         install_l2tp=False,
         install_v2ray=False,
     )
@@ -235,7 +238,7 @@ async def reconcile_preserved_ports_once() -> dict:
                 for protocol, attr in (
                     ("cisco", "enable_cisco"),
                     ("openvpn", "enable_openvpn"),
-                    ("wireguard", "enable_wireguard"),
+                    # Exit WireGuard target is not the Iran public DNAT port.
                 ):
                     if not bool(getattr(node, attr, False)) or protocol not in after:
                         continue
@@ -251,7 +254,7 @@ async def reconcile_preserved_ports_once() -> dict:
                     f"{MARKER}_PORTS node={int(node.id)} "
                     f"cisco={preserved_port(node.id, 'cisco')} "
                     f"openvpn={preserved_port(node.id, 'openvpn')} "
-                    f"wireguard={preserved_port(node.id, 'wireguard')} "
+                    f"wireguard_public={preserved_port(node.id, 'wireguard')} "
                     "result=converged",
                     flush=True,
                 )
