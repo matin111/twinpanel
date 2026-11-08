@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.717",
-  "source_sha": "9490aa40fa02f5f8a1afc96f92a39aa0f5a25b89",
+  "version": "1.1.0-rc.718",
+  "source_sha": "8670f9b9c87139ca078b8c3fab8dc51a4903fbb0",
   "notes": {
-    "fa": "اصلاح نمایش تاریخ و ساعت رسیدهای پرداخت در پنل مشتری و مدیریت براساس Asia/Tehran، با تفسیر صحیح زمان UTC ذخیره‌شده در دیتابیس. همچنین نصب‌های جدید TwinPanel به‌صورت پیش‌فرض منطقه زمانی تهران دارند و امکان تغییر منطقه زمانی وجود دارد. تغییرات قبلی RC.716 حفظ شده‌اند؛ اطلاعات کاربران و کانفیگ‌های VPN دست‌نخورده می‌مانند.",
-    "en": "Display customer/admin payment receipt timestamps correctly in Asia/Tehran while preserving UTC database values; default new self-hosted installations to Tehran with an override. Includes RC.716 fixes, no VPN credential or node changes."
+    "fa": "اصلاح مسیر آماده‌سازی SSL اختصاصی Xray: بررسی اتصال نود به Let's Encrypt پیش از هرگونه نصب بسته یا تغییر فایروال، بازگشت سریع خطای مشخص هنگام مسدود بودن ACME، محدودسازی زمان اجرای عملیات طولانی و نمایش دقیق خطای صدور در پنل. بدون تغییر خودکار دامنه‌ها، گواهی‌های سالم، پورت Cisco و تنظیمات VPN. همراه اصلاحات RC.717.",
+    "en": "Fast-fail Xray TLS ACME outbound connectivity preflight before node mutation; bounded certificate issuance and package install timeouts; actionable admin diagnostics on blocked Let's Encrypt. Preserves existing domains, healthy certificates and VPN services. Includes rc.717."
   }
 }
