@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.690",
-  "source_sha": "467511614d3067d6800b9ab91be40471fd2e181d",
+  "version": "1.1.0-rc.691",
+  "source_sha": "13d6fdfc14be7887eb9ce6b9752e095ce6cf9b21",
   "notes": {
-    "fa": "نسخه rc.690: تفکیک پلن‌های شارژ حجم نمایندگی در پنل ادمین به دو دسته «ویتوری» (economic_v2ray) و «ویژه» (premium_static_ip)، قیمت مستقل برای هر دسته، فیلتر و ستون نوع نمایندگی، انتخاب نوع در ساخت و حفظ آن در ویرایش، و رفع خطای 422 از طریق ارسال reseller_tier اجباری به API. فهرست خرید نماینده و محدودیت سرور/پروتکل کماکان مطابق نوع نمایندگی و پلن‌های فعال پنل اصلی است؛ موجودی و سوابق خرید قدیمی دست‌نخورده‌اند.",
-    "en": "rc.690: Split admin reseller traffic-recharge packages into V2Ray and Premium tiers, with distinct per-tier prices, filtering, tier selector in create/edit and required reseller_tier in API writes (fixes 422). The reseller portal keeps tier-scoped purchases and inherits allowed nodes/protocols from active primary plans. No change to balances, historical purchases, nodes or VPN configurations."
+    "fa": "نسخه RC.691: افزایش پایداری پایش واقعی WireGuard، AmneziaWG، TrustTunnel، Mieru، Sudoku و هفت پروتکل sing-box با ایزوله‌سازی خطاهای دیتابیس هر پروتکل/کاربر، حفظ آمار کاربران سالم در صورت خطای شناسه آماری یک کاربر، و بازیابی مرحله‌ای محدود برای جلوگیری از فشار بیش از حد. هیچ مقدار سهمیه، تاریخ، اشتراک یا اتصال کاربر عمداً تغییر داده نمی‌شود. شمارش چند اتصال تحت یک شناسه در تمام پروتکل‌ها و اجرای محدودیت دستگاه در نقطه احراز هویت هنوز نیازمند توسعه و تست مستقل است. شامل تغییرات RC.690.",
+    "en": "RC.691: fault-isolated, bounded recovery of authentic presence/traffic telemetry for WireGuard, AmneziaWG, TrustTunnel, Mieru, Sudoku and seven sing-box protocols; preserve healthy users when a cursor/account fails and avoid retry storms. No account, plan, quotas or VPN dataplane modifications. Multi-connection counting under one identity and admission-time cross-protocol device caps remain separate unverified work. Includes rc.690."
   }
 }
