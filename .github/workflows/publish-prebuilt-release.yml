@@ -74,6 +74,28 @@ jobs:
             fi
           done
 
+      - name: Prevent regression of detached Xray node installer
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          # Release builds use a pinned source SHA; do not ship an earlier
+          # detached installer that lacks TCP Reality + Vision composition.
+          path="backend/scripts/twinpanel_hidden_node_install_finish_v1.py"
+          test -s "publisher/$path"
+          test -s "source/$path"
+          if ! cmp -s "source/$path" "publisher/$path"; then
+            echo "::error file=$path::Pinned release source differs from main. Recreate the candidate from current main to preserve the Xray 3-profile worker fix."
+            exit 1
+          fi
+          grep -q 'HIDDEN_NODE_XRAY_THREE_PROFILE_RUNTIME_ACTIVE' "source/$path" || {
+            echo "::error file=$path::Detached Xray worker runtime guard is missing."
+            exit 1
+          }
+          test -s source/backend/tests/test_hidden_node_xray_runtime_composition_v1.py || {
+            echo "::error::Release source is missing the detached Xray runtime regression test."
+            exit 1
+          }
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
