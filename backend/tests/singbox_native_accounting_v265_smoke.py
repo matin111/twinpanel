@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import nullcontext
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -167,6 +168,34 @@ def main() -> None:
     assert "connect_protocol_runtime" not in live
     assert "ssh_connect_saved" not in live
     assert "deliberately DB-only" in live
+
+    # One corrupt cursor must not block every other user in the same
+    # sing-box protocol. This is a no-database deterministic regression test.
+    class FakeDb:
+        def begin_nested(self):
+            return nullcontext()
+
+    old_apply_snapshot = native.apply_singbox_snapshot
+    successful = []
+    try:
+        def fake_apply(_db, *, devices, **kwargs):
+            key = devices[0]["device_id"]
+            if key == 2:
+                raise RuntimeError("corrupt_cursor")
+            successful.append(key)
+            return {"collector": "singbox-naive"}
+        native.apply_singbox_snapshot = fake_apply
+        report = native._salvage_singbox_devices(
+            FakeDb(), node=SimpleNamespace(id=1), protocol="naive",
+            devices=[{"device_id": 1}, {"device_id": 2}, {"device_id": 3}],
+            snapshot={"epoch": "t", "snapshot_ms": 1, "rows": []},
+        )
+        assert report["recovered_devices"] == 2
+        assert report["failed_devices"] == 1
+        assert successful == [1, 3]
+    finally:
+        native.apply_singbox_snapshot = old_apply_snapshot
+    print("SINGBOX_NATIVE_FAILED_DEVICE_ISOLATION=PASS")
 
     print("SINGBOX_NATIVE_API_LOOPBACK=PASS")
     print("SINGBOX_NATIVE_PROTOBUF_EXACT_COUNTERS=PASS")
