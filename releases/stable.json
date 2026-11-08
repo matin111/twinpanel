@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.718",
+  "version": "1.1.0-rc.719",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-08T20:46:11Z",
+  "released_at": "2026-11-08T21:25:14Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "8670f9b9c87139ca078b8c3fab8dc51a4903fbb0",
+  "source_sha": "c20e994e23941210d2cdc057e3a38755447c44c9",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.718/twinpanel-1.1.0-rc.718-linux-x86_64.tar.gz",
-    "sha256": "53d84b5fc591293ae03bbf642551bb9e4380b7e5491fc474ae5d7da2e4b8c7de",
-    "size_bytes": 29887993
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.719/twinpanel-1.1.0-rc.719-linux-x86_64.tar.gz",
+    "sha256": "2da3e29a9f8787de6a56e51324c95deccd611f03b498b5ece30579310d959e1e",
+    "size_bytes": 29892111
   },
   "notes": {
-    "fa": "اصلاح مسیر آماده‌سازی SSL اختصاصی Xray: بررسی اتصال نود به Let's Encrypt پیش از هرگونه نصب بسته یا تغییر فایروال، بازگشت سریع خطای مشخص هنگام مسدود بودن ACME، محدودسازی زمان اجرای عملیات طولانی و نمایش دقیق خطای صدور در پنل. بدون تغییر خودکار دامنه‌ها، گواهی‌های سالم، پورت Cisco و تنظیمات VPN. همراه اصلاحات RC.717.",
-    "en": "Fast-fail Xray TLS ACME outbound connectivity preflight before node mutation; bounded certificate issuance and package install timeouts; actionable admin diagnostics on blocked Let's Encrypt. Preserves existing domains, healthy certificates and VPN services. Includes rc.717."
+    "fa": "اصلاح فعال‌سازی مدت اشتراک از اولین مصرف واقعی تأییدشده، حتی در صورت تأخیر ثبت نشست؛ جلوگیری از تغییر مجدد تاریخ در رویداد تکراری؛ نمایش هشدار مدت تعیین‌نشده برای اشتراک‌های انتقالی فاقد قرارداد معتبر. شمارنده مصرف و تاریخ ثبت‌شده کاربران بدون بازنویسی باقی می‌مانند. اصلاحات نسخه RC.718 حفظ شده‌اند.",
+    "en": "Activate configured first-use validity from the first accepted authenticated usage when session telemetry is delayed; preserve replay idempotency, existing expiry, and legacy records with missing duration. Highlight missing-duration imports in admin UI; includes RC.718."
   }
 }
