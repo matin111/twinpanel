@@ -39,6 +39,35 @@ def _counter_delta(data: UsageEventIn, cursor: QuotaCursor | None, epoch_changed
     return up_delta, down_delta
 
 
+def _activate_from_accepted_traffic(db: Session, subscription: Subscription, *, accepted: int, now: datetime) -> bool:
+    """Start the subscription clock once, from authenticated, accepted traffic.
+
+    Some protocols expose billable counters before an authenticated session
+    open event reaches the central collector. Their first positive usage must
+    still activate a *configured* validity period. This runs under the existing
+    subscription row lock in apply_usage_event; replays are discarded earlier.
+    Incomplete legacy imports with no duration are intentionally NOT assigned
+    an invented expiry.
+    """
+    if int(accepted) <= 0 or subscription.starts_at is not None or subscription.expires_at is not None:
+        return False
+
+    from .subscription_override_models import duration_is_unlimited
+    if duration_is_unlimited(db, subscription):
+        subscription.starts_at = now
+        return True
+
+    plan = db.get(Plan, subscription.plan_id) if subscription.plan_id is not None else None
+    days = int(subscription.activation_duration_days or (plan.duration_days if plan else 0) or 0)
+    if days <= 0:
+        return False
+
+    subscription.activation_duration_days = days
+    subscription.starts_at = now
+    subscription.expires_at = now + timedelta(days=days)
+    return True
+
+
 def apply_usage_event(db: Session, node_id: int, data: UsageEventIn) -> dict:
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     reported_at = data.reported_at.astimezone(timezone.utc).replace(tzinfo=None)
@@ -131,6 +160,12 @@ def apply_usage_event(db: Session, node_id: int, data: UsageEventIn) -> dict:
         accepted = min(remaining, billable)
         overage = billable - accepted
         new_used = used_before + accepted
+
+    # Protect first-use expiry even if presence/session reporting is delayed.
+    # Only actual accepted bytes can activate time; quota rejects and duplicate
+    # counter events never do. No change to amount charged or enforcement.
+    if not blocked:
+        _activate_from_accepted_traffic(db, subscription, accepted=accepted, now=now)
 
     became_exhausted = not blocked and limit > 0 and new_used >= limit
     subscription.traffic_used_bytes = new_used
