@@ -329,7 +329,7 @@ export function AdminSubscriptionLiveTable(){
         // An empty/truncated response is not evidence that every subscriber disconnected.
         if(loaded&&states.size>0&&payload.items.length===0)return;
         const generatedMs=payload.generated_at?Date.parse(payload.generated_at):NaN;
-        if(!Number.isFinite(generatedMs)||Math.abs(Date.now()-generatedMs)>STALE_AFTER_MS)return;
+        if(!Number.isFinite(generatedMs)||Math.abs(Date.now()-generatedMs)>300000)return;
         states.clear();
         for(const item of payload.items){
           if(item&&Number.isFinite(Number(item.subscription_id)))states.set(Number(item.subscription_id),item);
