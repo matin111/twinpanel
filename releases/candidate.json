@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.687",
-  "source_sha": "3ec13d3e650cd7ff2cf699e91e3aca82983004b3",
+  "version": "1.1.0-rc.688",
+  "source_sha": "344a912057a6eae39decf7bfb2c94462e88d21f1",
   "notes": {
-    "fa": "اصلاح نوار اطلاعات Connection: فقط یک نمایش از تعداد مجاز، تعداد متصل، مصرف، باقی‌مانده و انقضا؛ رفع غیرفعال نشان دادن اکانت هنگام اتصال واقعی؛ سازگاری با لایه نهایی v80. تعداد کاربر/دستگاه هیچ پلن یا اشتراکی در این آپدیت تغییر داده نمی‌شود. پلن‌هایی با مقدار صفر تنها پس از بازیابی مقدار واقعی یا انتخاب ادمین قابل اصلاح هستند.",
-    "en": "Fix final public Connection strip to render exactly five metrics (allowed, connected, used, remaining, expiry) and keep connected account active in legacy status refiner. No plan or account limit database changes; zero-valued plans need verified previous values or admin correction."
+    "fa": "اصلاح قطعی رنگ سبز برچسب «متصل هستید» در قالب نهایی Connection. شمارش «تعداد متصل» فقط بر مبنای نشست‌های واقعی و تأییدشده سرویس است و عدد حدسی برای پروتکل فاقد حضور قابل‌اعتماد نمایش داده نمی‌شود؛ داده‌ها و محدودیت دستگاه تغییر نکرده‌اند.",
+    "en": "Ensure active Connected status appears bright green in final Connection theme; active count remains based on verified telemetry, without fabricating unobservable sessions. No quota or customer data modified."
   }
 }
