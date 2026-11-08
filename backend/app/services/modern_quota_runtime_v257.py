@@ -187,6 +187,11 @@ def _mark_presence(
                         protocol=protocol,
                         client_ip=(str(client_ip).strip()[:64] if client_ip else None),
                     ),
+                    # These sessions come from a read-only, authenticated
+                    # node telemetry snapshot. Legacy active accounts with
+                    # no stored duration must not poison the entire collector.
+                    # Ordinary user session admission stays strict.
+                    observed_telemetry=True,
                 )
             except HTTPException as exc:
                 if exc.status_code != 409 or exc.detail != "concurrent_session_limit":
