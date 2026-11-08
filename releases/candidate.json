@@ -2,7 +2,7 @@
   "version": "1.1.0-rc.707",
   "source_sha": "caac5c0e4882447fa2baf8926c774a02583d680d",
   "notes": {
-    "fa": "کاهش بار پایش آنلاین Mieru با حذف صدها جست‌وجوی غیرضروری برای کاربران آفلاین؛ بررسی فقط حساب‌های دارای فعالیت معتبر یا نشست باز قبلی، حفظ ثبت قطع اتصال و کنترل‌های فعلی. افزایش کارایی فرآیند حسابداری پروتکل‌های مدرن بدون تغییر در دیتاپلین VPN، پورت، رمز یا کانفیگ نودها. بهبود برای تأخیر شدید آمار Mieru؛ پایش مستقل سریع هنوز در این نسخه پیاده‌سازی نشده است.",
-    "en": "Reduce Mieru online presence reconciliation overhead: inspect only authenticated recently active users and previously open sessions, with a single indexed lookup for active canonical devices instead of hundreds of offline DB roundtrips. Keep all existing disconnect/session/admission logic, credentials and VPN runtimes unchanged. This does not yet provide an independent fast telemetry worker."
+    "fa": "کاهش بار پایش آنلاین Mieru با حذف صدها جست‌وجوی غیرضروری برای کاربران آفلاین؛ بررسی فقط حساب‌های دارای فعالیت معتبر یا نشست باز قبلی، حفظ ثبت قطع اتصال و کنترل‌های فعلی. افزایش کارایی فرآیند حسابداری پروتکل‌های مدرن بدون تغییر در دیتاپلین VPN، پورت، رمز یا کانفیگ نودها. بهبود برای تأخیر شدید آمار Mieru؛ پایش مستقل سریع هنوز در این نسخه پیاده‌سازی نشده است. رفع خطای ۵۰۴ مرحله بسته‌بندی با API رسمی GitHub و حفظ بررسی اجباری هش SHA-256 فایل Spoof Tunnel.",
+    "en": "Reduce Mieru online presence reconciliation overhead: inspect only authenticated recently active users and previously open sessions, with a single indexed lookup for active canonical devices instead of hundreds of offline DB roundtrips. Keep all existing disconnect/session/admission logic, credentials and VPN runtimes unchanged. This does not yet provide an independent fast telemetry worker. Release packaging: download the exact pinned Spoof Tunnel asset via GitHub Releases Assets API to avoid intermittent HTTP 504 on the browser-download endpoint; SHA256 pin and binary validation remain mandatory."
   }
 }
