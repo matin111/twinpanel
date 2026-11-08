@@ -1578,6 +1578,24 @@ html body.tp80-connection .tp80-file-share-status{
 }
 html body.tp80-connection .tp80-file-share-status[hidden]{display:none!important}
 
+/* Compact country-filtered native file servers. Hidden rows must not reserve
+   their old vertical slots; the list grows only with the displayed rows. */
+html body.tp80-connection .protocol-panel.active.tp80-native[data-ref67-native-protocol="openvpn"] > .tp77-native-list,
+html body.tp80-connection .protocol-panel.active.tp80-native[data-ref67-native-protocol="wireguard"] > .tp77-native-list,
+html body.tp80-connection .protocol-panel.active.tp80-native[data-ref67-native-protocol="amneziawg"] > .tp77-native-list{
+ display:block!important;height:auto!important;min-height:0!important;
+ max-height:none!important;align-content:start!important;
+ grid-auto-rows:auto!important;grid-template-rows:none!important;
+ overflow:hidden!important;
+}
+html body.tp80-connection .protocol-panel.active.tp80-native[data-ref67-native-protocol="openvpn"] .tp77-native-row[data-tp80-country-hidden="1"],
+html body.tp80-connection .protocol-panel.active.tp80-native[data-ref67-native-protocol="wireguard"] .tp77-native-row[data-tp80-country-hidden="1"],
+html body.tp80-connection .protocol-panel.active.tp80-native[data-ref67-native-protocol="amneziawg"] .tp77-native-row[data-tp80-country-hidden="1"]{
+ display:none!important;height:0!important;min-height:0!important;
+ max-height:0!important;margin:0!important;padding:0!important;
+ border:0!important;visibility:hidden!important;
+}
+
 """
 
 
@@ -1745,6 +1763,10 @@ _SCRIPT = r"""
          const visible=country==='ALL'||row.dataset.tp80CountryCode===country;
          row.hidden=!visible;
          row.dataset.tp80CountryHidden=visible?'0':'1';
+         // Legacy Connection styles can override [hidden] with display:flex !important.
+         // Ensure filtered-out native rows are removed from layout, not merely invisible.
+         if(visible)row.style.removeProperty('display');
+         else row.style.setProperty('display','none','important');
          const detail=row.nextElementSibling;
          if(detail?.classList.contains('tp80-inline-native-detail')){
            detail.hidden=true;
