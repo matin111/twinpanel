@@ -204,6 +204,17 @@ mita version 2>&1 | head -n1
 
 async def _apply_mieru(conn, node: Node, port: int, settings: dict[str, Any]) -> dict[str, Any]:
     core = await _install_mieru_binary(conn)
+    # A fresh .deb installation may leave mita.service disabled/inactive
+    # (reproduced on hidden UK Exit #18). Both mita replace config and
+    # mita start require the daemon to be active. The daemon starts IDLE
+    # before any client configuration is applied. No existing user profile
+    # is touched and we NEVER restart a healthy daemon at this point.
+    await cmd(
+        conn,
+        "systemctl enable --now mita.service >/dev/null && "
+        "systemctl is-active --quiet mita.service",
+        timeout=60,
+    )
     secret = await _ensure_bootstrap_secret(conn, "mieru")
     config_path = f"{BASE_DIR}/mieru/server.json"
     config = {
