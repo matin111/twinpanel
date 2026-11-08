@@ -80,7 +80,13 @@ async def resume_hidden_exit(
         from .new_node_modern_bootstrap_v1 import bootstrap_new_exit_modern_protocols
         try:
             modern=await asyncio.wait_for(
-                bootstrap_new_exit_modern_protocols(db=db,node_id=node_id),
+                bootstrap_new_exit_modern_protocols(
+                    db=db,node_id=node_id,
+                    on_group_complete=lambda _: _progress(
+                        job_id,"installing_modern",node_id=node_id,
+                        installed_protocols=_ready_count(db,node_id),
+                    ),
+                ),
                 timeout=1800,
             )
             print("NODE_RESUME_MODERN_GROUPS",{
