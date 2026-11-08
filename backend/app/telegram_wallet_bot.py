@@ -279,7 +279,8 @@ def create_wallet_router(request_fn, session_fn):
                 "شماره کارت:\n"
                 f"<code>{escape(str(payment.get('card_number') or '-'))}</code>\n"
                 f"به نام: <b>{escape(str(payment.get('card_holder') or '-'))}</b>\n\n"
-                "⚠️ مبلغ را دقیقاً مطابق عدد بالا پرداخت کنید تا SMS Reader آن را خودکار تأیید کند."
+                "⚠️ مبلغ را دقیقاً مطابق عدد بالا پرداخت کنید تا SMS Reader آن را خودکار تأیید کند.\n"
+                "📷 بعد از پرداخت، روی «ارسال عکس رسید پرداخت» بزنید و تصویر رسید را بفرستید."
             )
         else:
             exact = _crypto_amount(result)
