@@ -7,6 +7,7 @@ import {adminApi,type AdminNode,type RuntimeRow,type XrayDomainState} from "../l
 import {legacyAdminApi} from "../lib/legacy-admin-api";
 import {updateNodeIdentity} from "../lib/node-identity-api";
 import {useI18n} from "../lib/i18n";
+import {NodeCountryPicker,isSupportedNodeCountry,normalizeNodeCountry,nodeCountryFlag} from "./node-country-picker";
 
 const s=(value:unknown)=>String(value??"").trim();
 const n=(value:unknown)=>{const parsed=Number(value??0);return Number.isFinite(parsed)?parsed:0;};
@@ -178,9 +179,9 @@ export function LegacyNodesRuntimePage(){
   const saveIdentity=async()=>{
     if(!selected||busy)return;
     const name=identityDraft.name.trim();
-    const countryCode=identityDraft.country_code.trim().toUpperCase();
+    const countryCode=normalizeNodeCountry(identityDraft.country_code);
     if(!name){setError(pick("نام نود را وارد کنید.","Enter a node name."));return;}
-    if(!/^[A-Z]{2,8}$/.test(countryCode)){setError(pick("کد کشور را با حروف انگلیسی وارد کنید؛ مثل DE یا TR.","Enter a country code such as DE or TR."));return;}
+    if(!isSupportedNodeCountry(countryCode)){setError(pick("یک کشور معتبر از فهرست انتخاب کنید.","Select a valid country from the list."));return;}
     setBusy("identity");setError("");setWarning("");
     try{
       const updated=await updateNodeIdentity(selected.id,{name,country_code:countryCode});
@@ -328,7 +329,7 @@ export function LegacyNodesRuntimePage(){
         </div>
         <div className="table"><table><thead><tr><th>{pick("نود","Node")}</th><th>{pick("کشور","Country")}</th><th>{pick("نوع","Type")}</th><th>IP</th><th>{pick("وضعیت","Status")}</th><th>{pick("عملیات","Actions")}</th></tr></thead>
           <tbody>{filtered.map(node=><tr key={node.id} className={node.id===selectedId&&modal!==null?"is-selected":""}>
-            <td><b>{node.name}</b></td><td dir="ltr">{node.country_code||"—"}</td><td>{roleOf(node)}</td><td dir="ltr">{node.public_ip||"—"}</td><td><Badge tone={tone(node.status)}>{node.status||"—"}</Badge></td>
+            <td><b>{node.name}</b></td><td dir="ltr">{node.country_code?`${nodeCountryFlag(node.country_code)} ${normalizeNodeCountry(node.country_code)}`:"—"}</td><td>{roleOf(node)}</td><td dir="ltr">{node.public_ip||"—"}</td><td><Badge tone={tone(node.status)}>{node.status||"—"}</Badge></td>
             <td><button type="button" className="primary-soft" onClick={()=>openManage(node.id)}>{pick("مدیریت","Manage")}</button></td>
           </tr>)}</tbody>
         </table></div>
@@ -344,7 +345,7 @@ export function LegacyNodesRuntimePage(){
         {success?<div className="runtime-success">{success}</div>:null}
         <div className="runtime-info-list node-manage-info">
           <div><span>{pick("نام نود","Node name")}</span><b>{selected.name}</b></div>
-          <div><span>{pick("کشور","Country")}</span><b dir="ltr">{selected.country_code||"—"}</b></div>
+          <div><span>{pick("کشور","Country")}</span><b dir="ltr">{selected.country_code?`${nodeCountryFlag(selected.country_code)} ${normalizeNodeCountry(selected.country_code)}`:"—"}</b></div>
           <div><span>{pick("نقش","Role")}</span><b>{selectedRole}</b></div>
           <div><span>{pick("دسترسی SSH","SSH access")}</span><Badge tone={accessConfigured?"ok":"warn"}>{accessLoading?"…":accessConfigured?pick("ثبت شده","Saved"):pick("ثبت نشده","Missing")}</Badge></div>
           <div><span>{pick("دامنه عمومی","Public domain")}</span><b dir="ltr">{effectiveDomain||"—"}</b></div>
@@ -367,7 +368,7 @@ export function LegacyNodesRuntimePage(){
         {error?<div className="runtime-error">{error}</div>:null}
         <div className="runtime-form">
           <label>{pick("نام نود","Node name")}<input value={identityDraft.name} onChange={event=>setIdentityDraft(current=>({...current,name:event.target.value}))} placeholder={pick("مثلاً آلمان اصلی","e.g. Germany Main")}/></label>
-          <label>{pick("کد کشور","Country code")}<input dir="ltr" maxLength={8} value={identityDraft.country_code} onChange={event=>setIdentityDraft(current=>({...current,country_code:event.target.value.toUpperCase()}))} placeholder="DE"/></label>
+          <NodeCountryPicker label={pick("کشور و پرچم","Country & flag")} language={pick("fa","en") as "fa"|"en"} value={identityDraft.country_code} onChange={country_code=>setIdentityDraft(current=>({...current,country_code}))}/>
           <small>{pick("در صفحه اشتراک نام کشور نمایش داده می‌شود؛ نام نود فقط برای مدیریت داخلی پنل است.","Public subscription pages show the country label; the node name remains an internal management label.")}</small>
           <button type="button" className="primary" disabled={Boolean(busy)} onClick={()=>void saveIdentity()}>{busy==="identity"?"…":pick("ذخیره نام و کشور","Save name & country")}</button>
         </div>
