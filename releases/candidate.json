@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.681",
-  "source_sha": "615a0944ad609ef0cbb16f09d4b8d0e89033a3f7",
+  "version": "1.1.0-rc.682",
+  "source_sha": "7e928c98addbd01db88a83cdfc24ab3fab4d2416",
   "notes": {
-    "fa": "نسخه rc.681: رفع ریشه‌ای نمایش آفلاین اشتباه Cisco با وجود اتصال واقعی؛ جلوگیری از بسته‌شدن نشست‌های مشاهده‌شده به‌خاطر خطای قفل دیتابیس، بازیابی امن نشست بسته‌شده با شناسه حسابداری جدید بدون تغییر نشست قدیمی و بدون دوباره‌شماری حجم. دریافت وضعیت واقعی Cisco تقریبا هر ۲۰ ثانیه و سبزشدن کارت Cisco و کشور متصل در لایت‌مود و دارک‌مود. تست واقعی ali222 روی نود ترکیه موفق بوده. هیچ تغییری در اطلاعات کاربران، رمز، حجم و تاریخ انقضا یا سرویس VPN انجام نشده است.",
-    "en": "rc.681 fixes false Cisco/AnyConnect offline reports after transient quota DB lock contention. Preserve physically observed ocserv sessions on usage ledger exceptions and safely resume closed accounting rows with new validated session keys while retaining original cumulative counter source and epoch (no duplicated traffic billing). Includes fast ~20s Cisco collector and green connected-country UI from rc.680. Live verified ali222 on Turkey node 6. No changes to subscriptions, credentials, quota, expiry, VPN listeners or tunnels."
+    "fa": "نسخه rc.682: نمایش سقف اتصال هم‌زمان انتخاب‌شده در پلن یا خود اکانت و پیام‌های وضعیت حجم/انقضا در صفحه اشتراک؛ اصلاح جمع‌آوری نشست Cisco برای قطع صرفاً نشست اضافه با شناسه مستقل ocserv در صورت رد شدن به‌دلیل محدودیت اکانت، بدون قطع همگانی نام کاربری. محدودیت توسط سامانه سهمیه مرکزی در ثبت نشست ارزیابی می‌شود. جلوگیری از اتصال از لحظه احراز هویت و محدودیت سراسری در تمام پروتکل‌ها همچنان نیازمند اعتبارسنجی جداگانه است.",
+    "en": "rc.682: Expose effective per-account concurrent connection cap and quota/expiry statuses in customer subscriptions; reconcile Cisco ocserv sessions by disconnecting only individually identified sessions rejected by the central account concurrency limit (not an entire username). Admission-time and all-protocol enforcement still require separate validation."
   }
 }
