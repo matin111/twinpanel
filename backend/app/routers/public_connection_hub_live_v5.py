@@ -79,10 +79,15 @@ _LIVE_CSS = r"""
     var(--shadow);
 }
 .status.connected{
+  font-size:11px;
+  font-weight:900;
   color:var(--ok);
   background:color-mix(in srgb,var(--ok) 10%,transparent);
   border:1px solid color-mix(in srgb,var(--ok) 34%,transparent);
 }
+.profile:has(.status.connected){border:1px solid color-mix(in srgb,var(--ok) 65%,var(--line));border-radius:12px;padding:7px 10px;background:color-mix(in srgb,var(--ok) 7%,var(--surface));box-shadow:0 0 0 1px color-mix(in srgb,var(--ok) 12%,transparent)}
+.traffic .stats{grid-template-columns:repeat(6,minmax(0,1fr));}
+@media(max-width:720px){.traffic .stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .protocol-choice.live-online,
 .protocol-choice.live-online.active{
   border-color:var(--ok);
@@ -108,7 +113,7 @@ _LIVE_SCRIPT = r"""
   const byId=id=>document.getElementById(id);
   const used=byId('liveUsed'),remaining=byId('liveRemaining'),total=byId('liveTotal');
   const start=byId('liveStart'),expire=byId('liveExpire'),percent=byId('livePercent');
-  const donut=byId('trafficDonut'),status=byId('liveStatus'),traffic=byId('trafficCard');
+  const donut=byId('trafficDonut'),status=byId('liveStatus'),traffic=byId('trafficCard'),deviceLimit=byId('liveDeviceLimit'),deviceActive=byId('liveActiveSessions');
   let previous='';
 
   function bytes(value){
@@ -187,6 +192,9 @@ _LIVE_SCRIPT = r"""
     write(start,date(payload.starts_at));
     write(expire,date(payload.expires_at));
     write(percent,payload.unlimited?'∞':nf.format(pct)+'%');
+    const cap=Number(payload.device_limit||0),activeSessions=Math.max(0,Number(payload.active_sessions||0));
+    write(deviceLimit,cap===0?'نامحدود':nf.format(cap)+' دستگاه');
+    write(deviceActive,nf.format(activeSessions));
     if(donut)donut.style.setProperty('--pct',String(pct));
 
     const connected=payload.connection_online===true||Number(payload.active_sessions||0)>0;
@@ -194,7 +202,7 @@ _LIVE_SCRIPT = r"""
     if(traffic)traffic.dataset.connection=connected?'online':'idle';
     if(status){
       status.className='status '+(connected?'connected':active?'on':'off');
-      status.innerHTML='<i></i>'+(connected?'متصل':active?'اشتراک فعال':'غیرفعال');
+      status.innerHTML='<i></i>'+(connected?'متصل هستید':active?'اشتراک فعال':'غیرفعال');
     }
     paintProtocols(payload.online_protocols,payload.protocol_stats);
 
@@ -213,6 +221,7 @@ _LIVE_SCRIPT = r"""
       payload.starts_at,
       payload.expires_at,
       payload.active_sessions,
+      payload.device_limit,
       payload.connection_online,
       (payload.online_protocols||[]).join(','),
       protocolSignature,
@@ -298,6 +307,11 @@ def public_connection_hub_live_v5(
         count=1,
     )
 
+    source = source.replace(
+        '<div class="stats">',
+        '<div class="stats"><div class="stat"><small>اتصال مجاز</small><strong id="liveDeviceLimit">—</strong></div><div class="stat"><small>اتصال فعال</small><strong id="liveActiveSessions">—</strong></div>',
+        1,
+    )
     source = source.replace(
         "</style>",
         _LIVE_CSS + "\n</style>",
