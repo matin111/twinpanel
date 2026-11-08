@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.688",
-  "source_sha": "344a912057a6eae39decf7bfb2c94462e88d21f1",
+  "version": "1.1.0-rc.689",
+  "source_sha": "d001f7939d3aff2f8617c319027d10932a2a51ac",
   "notes": {
-    "fa": "اصلاح قطعی رنگ سبز برچسب «متصل هستید» در قالب نهایی Connection. شمارش «تعداد متصل» فقط بر مبنای نشست‌های واقعی و تأییدشده سرویس است و عدد حدسی برای پروتکل فاقد حضور قابل‌اعتماد نمایش داده نمی‌شود؛ داده‌ها و محدودیت دستگاه تغییر نکرده‌اند.",
-    "en": "Ensure active Connected status appears bright green in final Connection theme; active count remains based on verified telemetry, without fabricating unobservable sessions. No quota or customer data modified."
+    "fa": "نسخه rc.689: افزودن سریع نود خروجی و نمایش آن برای همه اشتراک‌های فعال بلافاصله پس از بررسی زنده سلامت ۱۶ پروتکل و ثبت گروهی تمام کاربران واجدشرایط. افزودن نود دیگر منتظر ساخت هزاران کانفیگ نمی‌ماند. موتور مرکزی برای ۱۰ خانواده پروتکل در واحد جداگانه و دائمی systemd شروع می‌شود؛ لینک و کانفیگ‌ها فقط بعد از ساخته‌شدن واقعی در اطلاعات اتصال نمایش داده می‌شوند. حذف صف‌های قدیمی و عملیات SSH تک‌به‌تک از مسیر افزودن سرور، حفظ اکانت‌های قبلی و حجم و تاریخ انقضا. بازیابی نودهای شکست‌خورده مثل نود ۱۹ با تأیید مجدد سرویس‌ها، انتشار سریع، و ادامه همگام‌سازی فقط خانواده‌های ناقص. حالت پیش‌فرض نمایش در رابط افزودن نود خروجی فعال است و UI پایان افزودن را از ساخت کانفیگ متمایز می‌کند. اگر اجرای مستقل بک‌اند شروع نشود نود فوراً مخفی می‌شود.",
+    "en": "rc.689: Progressive central Exit node publication. After verification of all 16 live protocols and eligibility/quota guard, bulk-assign all eligible subscription memberships in one database transaction, publish the node immediately and finish Add Server. Start the existing central 10-family bulk reconciliation as a supervised detached systemd unit; client connection payloads expose only actually materialized node credentials. No per-user SSH or credential generation in the Add Server critical path; preserve existing users, quotas and expiry. Retry previously failed hidden Exit nodes without re-creating them, reconciling only missing runtime families. Publish-to-all defaults on for new Exit installations. Fail closed by hiding the node if background dispatch fails."
   }
 }
