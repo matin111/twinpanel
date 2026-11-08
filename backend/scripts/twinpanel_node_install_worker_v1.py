@@ -78,6 +78,12 @@ def main(argv=None) -> int:
             "error_code":code,
         },flush=True)
         return 1
+    finally:
+        if not args.resume_node_id:
+            # Claims are only a cross-process mutual exclusion guard; the
+            # detached worker is the sole owner after successful dispatch.
+            from app.services.durable_node_install_launcher_v1 import release_job_claim
+            release_job_claim(args.job_id)
     return 0
 
 
