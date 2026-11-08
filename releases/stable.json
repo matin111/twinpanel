@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.683",
+  "version": "1.1.0-rc.684",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-08T02:03:10Z",
+  "released_at": "2026-11-08T02:05:47Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "4a368b16115436e44e5e4a7bbee2074aedee119f",
+  "source_sha": "99c5bc79f7c739306ebd569641394573355337f9",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.683/twinpanel-1.1.0-rc.683-linux-x86_64.tar.gz",
-    "sha256": "d371432a87806c28357d604446aed968b4a3a6066e1ed99102d24144f204dbfb",
-    "size_bytes": 29654964
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.684/twinpanel-1.1.0-rc.684-linux-x86_64.tar.gz",
+    "sha256": "3166afff643e622bbcf4357f36f741de7c5469a2795f6f885cdf0cbf0feefa1f",
+    "size_bytes": 29656787
   },
   "notes": {
-    "fa": "نسخه rc.683: رفع شکست افزودن نود خروجی هنگام نصب پروتکل‌های مدرن. روی نود تست uk شماره ۱۸، سرویس Mieru نصب ولی systemd آن غیرفعال بود و نصب یکپارچه ۱۱ پروتکل با اولین خطای Mieru همگی را اشتباهاً خطادار نشان می‌داد. اکنون daemon Mieru پیش از کانفیگ فعال و کنترل می‌شود؛ نصب ۷ پروتکل sing-box به صورت یک گروه و چهار سرویس مستقل Mieru، TrustTunnel، AmneziaWG و Sudoku به صورت جداگانه انجام می‌شود. خطای هر سرویس فقط در همان سرویس ثبت می‌شود، پورت واقعی تأییدشده ذخیره می‌شود و استفاده مجدد از پورت اختصاصی یک پروتکل ناموفق بدون تصاحب پورت سایر پروتکل‌ها ممکن است. موفقیت نهایی فقط با سلامت زنده هر ۱۶ پروتکل مجاز است. اطلاعات کاربران، رمزها، حجم و تاریخ انقضا تغییر نمی‌کنند و نود تا تأیید کامل مخفی می‌ماند.",
-    "en": "rc.683 fixes the fresh Exit modern-protocol installation failure reproducible on hidden UK node #18: Mieru package was present but mita.service disabled/inactive; a single Mieru failure caused all 11 modern listeners to be incorrectly marked failed, although 7 sing-box inbound ports and AmneziaWG were already listening. Start/enable and validate the Mieru daemon before configuration; isolate the 7 sing-box listeners into one snapshot and each standalone runtime (Mieru, TrustTunnel, AmneziaWG, Sudoku) into separate fail-closed installation groups. Preserve unrelated healthy listeners, distinguish Mieru config/daemon failures without logging credentials, persist actual verified ports, retry only a protocol's own failed port. No customer credential, quota or expiry changes; node remains hidden until 16/16 live health and central coverage verification."
+    "fa": "نمایش تعداد اتصال هم‌زمان مجاز واقعی بر اساس مقدار اختصاصی اشتراک یا پلن در صفحه عمومی Connection؛ برچسب سبز متصل هستید براساس تله‌متری واقعی؛ حفظ پیام اشتراک فعال هنگام عدم تشخیص اتصال. شامل اصلاحات قبلی نود rc.683. این انتشار به‌تنهایی اجرای محدودیت در لحظه اتصال برای همه پروتکل‌ها را تضمین نمی‌کند.",
+    "en": "Show effective account concurrent-connection limit in public Connection view and a distinct green Connected status based on observed session activity; includes rc.683 node improvements. All-protocol admission-time concurrency enforcement is a separate unverified requirement."
   }
 }
