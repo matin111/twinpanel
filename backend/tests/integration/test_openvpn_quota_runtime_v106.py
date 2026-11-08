@@ -72,7 +72,7 @@ def main() -> None:
     )
     assert "_runtime_identity(" in device_map
     assert "_credential_node_ids(" in device_map
-    assert 'item.get("identity")' not in device_map
+    assert 'item.get("identity")' in device_map
 
     apply_source = _function_source(
         runtime,
