@@ -141,8 +141,40 @@ async def run(node_id:int,limit:int,apply:bool):
         cfg=db.query(NodeProtocolConfig).filter_by(
             node_id=node_id,protocol="wireguard",
         ).first()
-        if cfg is None or str(getattr(cfg.status,"value",cfg.status)).lower()!="online":
+        if cfg is None:
             raise RuntimeError("WIREGUARD_NODE_NOT_READY")
+        if str(getattr(cfg.status,"value",cfg.status)).lower()!="online":
+            # A failed installer may leave a stale DB port while the live
+            # WireGuard interface is healthy. Reconcile verified metadata
+            # only; never restart the interface, overwrite config or keys.
+            from app.routers.provision import _protocol_live_health
+            connection=await asyncio.wait_for(connect_protocol_runtime(node,db),timeout=25)
+            try:
+                live=await asyncio.wait_for(connection.run(
+                    "wg show wg-access0 listen-port",check=False),timeout=12)
+                port_text=(live.stdout or "").strip()
+                if live.exit_status or not port_text.isdecimal():
+                    raise RuntimeError("WIREGUARD_NODE_NOT_READY")
+                port=int(port_text)
+                if not 1<=port<=65535:
+                    raise RuntimeError("WIREGUARD_NODE_NOT_READY")
+                cfg.port=port
+                health=await asyncio.wait_for(
+                    _protocol_live_health(connection,"wireguard",cfg),timeout=35)
+                if not health.get("ok"):
+                    db.rollback()
+                    raise RuntimeError("WIREGUARD_NODE_NOT_READY")
+                cfg.status="online"
+                cfg.last_error=None
+                cfg.checked_at=datetime.utcnow()
+                db.commit()
+                print("CENTRAL_WIREGUARD_LIVE_PORT_RECOVERED",json.dumps({
+                    "node_id":node_id,"verified_port":port,
+                    "service_restarted":False,
+                }),flush=True)
+            finally:
+                connection.close()
+                await connection.wait_closed()
         work=pending(db,node_id,limit)
         print("CENTRAL_WIREGUARD_PLAN",json.dumps({
             "node_id":node_id,"selected":len(work),
