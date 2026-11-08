@@ -80,6 +80,7 @@ class ResellerManualSubscriptionIn(BaseModel):
 
 class ResellerDirectSubscriptionIn(BaseModel):
     traffic_gb: float = Field(gt=0, le=100000)
+    device_limit: int = Field(default=1, ge=0, le=1000)
     duration_days: int = Field(ge=1, le=3650)
     node_ids: list[int] = Field(default_factory=list)
     protocols: list[str] = Field(default_factory=list)
@@ -507,6 +508,7 @@ async def create_reseller_manual_subscription(
         reseller=reseller,
         traffic_gb=payload.traffic_gb,
         duration_days=payload.duration_days,
+        device_limit=payload.device_limit,
         protocols=payload.protocols,
         idempotency_key=payload.idempotency_key,
         node_ids=payload.node_ids,
