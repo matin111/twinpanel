@@ -497,6 +497,11 @@ async def _wait_manual_cutover_acceptance_v257(
                         "waiting_peer_key",
                         "not_installed",
                         "peer_not_ready",
+                        # An early Agent snapshot can predate the TP27
+                        # candidate's published health metadata. It is a
+                        # pending state only for a brand-new pair, never a
+                        # positive acceptance.
+                        "ssh_tun_peer_ip_missing",
                         "manual_cutover_peer_not_reachable",
                     }
                     or (
@@ -510,7 +515,7 @@ async def _wait_manual_cutover_acceptance_v257(
                 if (
                     timeout_seconds > 30.0
                     and bootstrap_transient
-                    and elapsed < min(45.0, timeout_seconds)
+                    and elapsed < min(120.0, timeout_seconds)
                 ):
                     continue
                 return False, last_snapshot, str(reason)[:900]
