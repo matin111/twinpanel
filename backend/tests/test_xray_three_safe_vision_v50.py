@@ -65,6 +65,20 @@ class XrayThreeSafeProfileTests(unittest.TestCase):
             ["xtls-rprx-vision"],
         )
 
+    def test_domain_detection_uses_canonical_db_even_without_orm_attribute(self):
+        self.db.execute.return_value.scalar.return_value="v2ray1.example.org"
+        self.assertEqual(
+            v47._effective_domain_from_db(self.db,self.node),
+            "v2ray1.example.org",
+        )
+
+    def test_tls_node_does_not_receive_false_vision_ingress_route(self):
+        self.db.execute.return_value.scalar.return_value="v2ray1.example.org"
+        with patch.object(vision,"_original_routes",return_value=[]) as original:
+            routes=vision._routes_v50(self.db,self.node,"10.0.0.2")
+        self.assertEqual(routes,[])
+        original.assert_called_once()
+
     def test_plaintext_legacy_cannot_become_third_public_profile(self):
         item={"node_id":19,"profiles":[{"id":"tcp_simple","uri":"vless://plain@host:8443"}]}
         with patch.object(v47.policy_v30,"_profile_endpoint_v261") as endpoint:
