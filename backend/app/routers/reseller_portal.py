@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..reseller_tier_policy import reseller_tier, check_package_tier, tier_entitlements, allowed_nodes, allowed_protocols
 from ..deps import require_reseller
-from ..models import Plan, Subscription, User, SubscriptionProtocol
+from ..models import Plan, Subscription, User, SubscriptionProtocol, SubscriptionNode
 from ..subscription_override_models import SubscriptionRuntimeOverride, effective_device_limit
 from ..protocol_account_registry import normalize_protocols
 from ..services.subscription_factory import create_subscription_core
@@ -335,6 +335,7 @@ def reseller_subscriptions(
                 "device_limit": effective_device_limit(db, sub, plan),
                 "activation_duration_days": int(sub.activation_duration_days or 0),
                 "protocols": [p[0] for p in db.query(SubscriptionProtocol.protocol).filter(SubscriptionProtocol.subscription_id == sub.id).all()],
+                "node_ids": [n[0] for n in db.query(SubscriptionNode.node_id).filter(SubscriptionNode.subscription_id == sub.id).all()],
                 "plan_name": (
                     plan.name
                     if plan
@@ -1459,6 +1460,7 @@ class ResellerExtendIn(BaseModel):
 class ResellerSubscriptionEditIn(BaseModel):
     device_limit: int | None = Field(default=None, ge=0, le=1000)
     protocols: list[str] | None = None
+    node_ids: list[int] | None = None
     traffic_gb: float = Field(
         gt=0,
         le=100000,
@@ -2105,6 +2107,12 @@ async def reseller_edit_subscription(
             detail="اشتراک حذف شده قابل ویرایش نیست",
         )
 
+    target_node_ids = None
+    if payload.node_ids is not None:
+        if not payload.node_ids:
+            raise HTTPException(status_code=422, detail="حداقل یک سرور خروجی انتخاب کنید")
+        target_node_ids = allowed_nodes(db, reseller, payload.node_ids)
+
     # Reseller changes may only use protocols authorized by their own tier.
     selected_protocols = None
     if payload.protocols is not None:
@@ -2375,6 +2383,24 @@ async def reseller_edit_subscription(
                 override = SubscriptionRuntimeOverride(subscription_id=int(sub.id))
                 db.add(override)
             override.device_limit = int(payload.device_limit)
+        if target_node_ids is not None:
+            old_node_ids = {n[0] for n in db.query(SubscriptionNode.node_id).filter(
+                SubscriptionNode.subscription_id == sub.id
+            ).all()}
+            removed_nodes = old_node_ids - set(target_node_ids)
+            db.query(SubscriptionNode).filter(
+                SubscriptionNode.subscription_id == sub.id
+            ).delete(synchronize_session=False)
+            for node_id in target_node_ids:
+                db.add(SubscriptionNode(subscription_id=int(sub.id), node_id=int(node_id)))
+            sub.exit_node_id = int(target_node_ids[0])
+            if removed_nodes:
+                from ..subscription_enforcement import queue_subscription_enforcement
+                queue_subscription_enforcement(
+                    db, sub, command_type="revoke_subscription",
+                    reason="reseller_node_removed",
+                    node_ids=sorted(removed_nodes),
+                )
         if selected_protocols is not None:
             old_protocols = {p[0] for p in db.query(SubscriptionProtocol.protocol).filter(
                 SubscriptionProtocol.subscription_id == sub.id
