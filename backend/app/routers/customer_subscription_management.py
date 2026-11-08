@@ -7,6 +7,7 @@ from fastapi import (
     HTTPException,
 )
 from pydantic import BaseModel, Field
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..database import get_db
@@ -18,6 +19,8 @@ from ..models import (
     SubscriptionStatus,
     User,
 )
+from ..quota_models import QuotaSession
+from ..subscription_override_models import effective_device_limit
 from ..renewal_models import (
     SubscriptionRenewalOrder,
 )
@@ -183,13 +186,45 @@ def manage_subscription(
                 or ""
             ).strip()
 
-    connection_available = (
-        status == "active"
-        and (
-            not sub.expires_at
-            or sub.expires_at > now
+    device_limit = effective_device_limit(db, sub, plan)
+    active_connections = int(
+        db.query(func.count(QuotaSession.id))
+        .filter(
+            QuotaSession.subscription_id == sub.id,
+            QuotaSession.status == "active",
         )
+        .scalar()
+        or 0
     )
+    # 0 means unlimited. Count active sessions across all protocols/nodes,
+    # not just one credential, so a multi-device account has one shared cap.
+    available_slots = (
+        max(device_limit - active_connections, 0)
+        if device_limit > 0
+        else None
+    )
+    connection_error_code = None
+    if status != "active":
+        connection_error_code = "subscription_inactive"
+    elif sub.expires_at and sub.expires_at <= now:
+        connection_error_code = "subscription_expired"
+    elif limit > 0 and used >= limit:
+        connection_error_code = "traffic_exhausted"
+
+    error_messages = {
+        "subscription_inactive": "اشتراک فعال نیست.",
+        "subscription_expired": "اعتبار اشتراک تمام شده است؛ برای اتصال تمدید کنید.",
+        "traffic_exhausted": "حجم اشتراک تمام شده است؛ برای اتصال تمدید یا شارژ کنید.",
+        "device_limit_reached": "ظرفیت اتصال هم‌زمان این اشتراک تکمیل است؛ یکی از دستگاه‌ها را قطع کنید.",
+    }
+    connection_available = connection_error_code is None
+    new_connection_error_code = connection_error_code
+    if (
+        new_connection_error_code is None
+        and device_limit > 0
+        and active_connections >= device_limit
+    ):
+        new_connection_error_code = "device_limit_reached"
 
     return {
         "id": sub.id,
@@ -233,12 +268,15 @@ def manage_subscription(
                 2,
             ),
 
-        "device_limit":
-            int(
-                plan.device_limit
-                if plan
-                else 0
-            ),
+        "device_limit": device_limit,
+        "active_connections": active_connections,
+        "available_connection_slots": available_slots,
+        "device_limit_unlimited": device_limit == 0,
+        "connection_error_code": connection_error_code,
+        "connection_error_message": error_messages.get(connection_error_code),
+        "new_connection_available": new_connection_error_code is None,
+        "new_connection_error_code": new_connection_error_code,
+        "new_connection_error_message": error_messages.get(new_connection_error_code),
 
         "protocols":
             _protocols(
