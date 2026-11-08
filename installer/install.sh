@@ -52,6 +52,16 @@ apt-get install -y \
   nginx postgresql postgresql-contrib redis-server \
   python3 python3-venv python3-pip build-essential
 
+# Self-hosted installations display local server logs in Tehran time by default.
+# Keep the RTC/NTP clock in UTC; only change the system timezone. Operators
+# outside Iran may override TWINPANEL_TIMEZONE in install.env or environment.
+PANEL_TIMEZONE="${TWINPANEL_TIMEZONE:-Asia/Tehran}"
+[[ -f "/usr/share/zoneinfo/$PANEL_TIMEZONE" && "$PANEL_TIMEZONE" != *..* ]] || fail "Invalid TWINPANEL_TIMEZONE: $PANEL_TIMEZONE"
+if [[ "$(timedatectl show -p Timezone --value)" != "$PANEL_TIMEZONE" ]]; then
+  timedatectl set-timezone "$PANEL_TIMEZONE"
+fi
+info "Server timezone: $(timedatectl show -p Timezone --value) (RTC remains UTC)"
+
 NODE_MAJOR=0
 if command -v node >/dev/null 2>&1; then
   NODE_MAJOR="$(node -p 'Number(process.versions.node.split(".")[0])' 2>/dev/null || echo 0)"
