@@ -260,5 +260,7 @@ if __name__=="__main__":
     except Exception as exc:
         print("SUDOKU_SHARED_SAFE_STOP",json.dumps({
             "node_id":options.node_id,"error_type":type(exc).__name__,
+            "reason": (str(exc) if isinstance(exc,RuntimeError) and
+                       __import__("re").fullmatch(r"[A-Z0-9_]{5,90}",str(exc)) else "UNCLASSIFIED"),
         }),flush=True)
         raise SystemExit(2)
