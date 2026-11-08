@@ -24,7 +24,11 @@ import urllib.request
 from pathlib import Path
 
 BINARY = Path("/usr/local/bin/xray")
-SERVICE = Path("/etc/systemd/system/xray.service")
+SERVICES = (
+    Path("/etc/systemd/system/xray.service"),
+    Path("/lib/systemd/system/xray.service"),
+    Path("/usr/lib/systemd/system/xray.service"),
+)
 API = "https://api.github.com/repos/XTLS/Xray-core/releases/latest"
 ASSET_API = "https://api.github.com/repos/XTLS/Xray-core/releases/assets/"
 INSTALL_SCRIPT = "https://raw.githubusercontent.com/XTLS/Xray-install/main/install-release.sh"
@@ -50,7 +54,7 @@ def download(url, *, accept=None, max_size=MAX_ZIP_SIZE):
 def main():
     # Never unexpectedly upgrade an existing Xray daemon or modify its active
     # customer keys. The normal managed installer owns explicit repair actions.
-    if BINARY.is_file() and SERVICE.is_file():
+    if BINARY.is_file() and any(path.is_file() for path in SERVICES):
         print("XRAY_OFFICIAL_BINARY_ALREADY_PRESENT")
         return
 
@@ -123,7 +127,7 @@ def main():
             # No raw installer output: it may contain remote host details.
             raise RuntimeError("XRAY_OFFICIAL_LOCAL_INSTALL_FAILED")
 
-    if not BINARY.is_file() or not SERVICE.is_file():
+    if not BINARY.is_file() or not any(path.is_file() for path in SERVICES):
         raise RuntimeError("XRAY_OFFICIAL_INSTALL_INCOMPLETE")
     verify = subprocess.run(
         [str(BINARY), "version"], capture_output=True, timeout=10, check=False,
