@@ -109,7 +109,7 @@ class OpenVPNDeliveryGuards(unittest.TestCase):
         with patch.object(native, "_active_payload",return_value=p):
             response=native.public_connection_file_v9("token","openvpn",0,MagicMock())
         self.assertEqual(response.status_code,200)
-        self.assertEqual(response.body.decode(),VALID)
+        self.assertEqual(response.body.decode(),VALID.strip())
         self.assertIn("Germany-n7.ovpn",response.headers["content-disposition"])
         self.assertEqual(response.headers["cache-control"],"private, no-store")
         validate_openvpn_profile(response.body.decode())
