@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import fcntl
 import json
+import os
 import time
 from typing import Any
 
@@ -17,6 +18,10 @@ from . import modern_quota_runtime_v257 as canonical
 
 MODERN_ACCOUNTING_INTERVAL_SECONDS = canonical.MODERN_ACCOUNTING_INTERVAL_SECONDS
 MODERN_ACCOUNTING_LOCK = canonical.MODERN_ACCOUNTING_LOCK
+# When the dedicated subprocess owns Mieru sessions, exclude Mieru from
+# heavyweight V314 sweeps to avoid duplicate writes and false offline closes.
+# A missing independent-worker flag preserves the old collector for rollback.
+MIERU_INDEPENDENT_WORKER = os.getenv("TP_MIERU_INDEPENDENT_WORKER", "") == "1"
 
 
 async def _collect_node_runtime(
@@ -65,7 +70,7 @@ async def _collect_node_runtime(
         if grouped.get("trusttunnel"):
             collected["trusttunnel"] = await canonical._collect_trusttunnel(conn)
 
-        if grouped.get("mieru"):
+        if grouped.get("mieru") and not MIERU_INDEPENDENT_WORKER:
             collected["mieru"] = await canonical._collect_mieru(conn)
 
         if grouped.get("sudoku"):
@@ -205,7 +210,7 @@ def _apply_collected_node_runtime(
                 **recovery,
             })
 
-    if grouped.get("mieru"):
+    if grouped.get("mieru") and not MIERU_INDEPENDENT_WORKER:
         try:
             # Isolate this protocol's accounting without savepoint overhead
             # for protocols that have no devices on the current node.
