@@ -59,6 +59,7 @@ def main() -> None:
         {
             "identity": "mv11n5",
             "session_identity": "mv11n5:1792481836:0",
+            "client_id": 0,
             "uplink": 5471307,
             "downlink": 41405170,
         }
