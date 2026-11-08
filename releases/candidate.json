@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.724",
-  "source_sha": "d09b74ce60234920af90a28f8eda5f7e2feb8ff6",
+  "version": "1.1.0-rc.725",
+  "source_sha": "b18fce81d21c1d494cd0d2b76aafac4f4a9cdce4",
   "notes": {
-    "fa": "اصلاح فوری اشتراک زمان نامحدود: عدد صفرِ صریح دوباره به‌عنوان مدت نامحدود پشتیبانی می‌شود؛ تنها مدت خالی یا منفی نامعتبر است. فرم ساخت از پلن نامحدود مقدار صفر را حفظ می‌کند. نمایش تاریخ و تعداد روز باقی‌مانده نسخه قبل بدون دستکاری حساب‌های موجود باقی است.",
-    "en": "Urgent fix: restore explicitly selected zero-day unlimited-duration subscriptions in both fast creation API and unified admin form. Reject only missing/negative validity, preserve plan zero-duration. Existing account dates/usage unchanged; retain expiry/days labels from RC.723."
+    "fa": "ادغام تعداد دستگاه متصل و دستگاه مجاز در یک کادر (متصل / مجاز) دقیقاً مثل نمایش مصرف حجم، استفاده از کادر آزاد برای نمایش تعداد روز اشتراک، حفظ تاریخ انقضا و روزهای باقی‌مانده زیر آن. سازگار با دسکتاپ و موبایل، بدون تغییر اطلاعات مصرف، مدت یا محدودیت واقعی دستگاه.",
+    "en": "Combine connected/allowed devices into a single metric (active / limit), reclaim the extra metric for configured subscription duration, keep live expiry and days remaining on public Connect, preserving legacy UI bindings and current quota/expiry enforcement."
   }
 }
