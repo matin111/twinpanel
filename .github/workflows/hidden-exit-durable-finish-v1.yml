@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - 'backend/app/xray_official_verified_installer_v1.py'
+      - 'backend/app/verified_github_release_asset_v1.py'
+      - 'backend/app/standalone_protocol_runtime.py'
       - 'backend/app/routers/provision.py'
       - 'backend/app/services/new_node_modern_bootstrap_v1.py'
       - 'backend/app/services/hidden_node_install_supervisor_v1.py'
@@ -34,6 +36,8 @@ jobs:
         run: |
           python -m py_compile \
             backend/app/xray_official_verified_installer_v1.py \
+            backend/app/verified_github_release_asset_v1.py \
+            backend/app/standalone_protocol_runtime.py \
             backend/app/routers/provision.py \
             backend/app/services/new_node_modern_bootstrap_v1.py \
             backend/app/services/hidden_node_install_supervisor_v1.py \
