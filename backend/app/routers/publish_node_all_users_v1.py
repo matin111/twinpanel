@@ -423,3 +423,71 @@ async def install_node_background_v1(
         "publish_to_all_users": bool(payload.publish_to_all_users),
         "message": "ثبت سرور صف شد؛ آماده‌سازی و انتشار برای کاربران داخل بک‌اند ادامه دارد",
     }
+
+
+class ResumeHiddenNodeInstallIn(BaseModel):
+    publish_to_all_users: bool = False
+
+
+@router.post("/{node_id}/resume-install-v1", status_code=202)
+async def resume_hidden_exit_install_v1(
+    node_id: int,
+    payload: ResumeHiddenNodeInstallIn,
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """Resume interrupted hidden Exit from SAVED SSH; never delete/re-add.
+
+    The original API-owned job died on an updater restart after node #21 had
+    already installed its base. Reinstalling the base would risk duplicate
+    services, private key churn and user data. A detached worker verifies the
+    existing Exit and adds only unfinished protocols. Publishing is explicit.
+    """
+    from ..models import Node
+    from ..node_install_progress_models_v1 import NodeInstallProgressV1
+    from ..services.node_install_progress_v1 import (
+        reset_install_progress_for_resume, STALE_AFTER,
+    )
+    from ..services.durable_node_install_launcher_v1 import (
+        launch_resume, worker_alive, NodeInstallDispatchError,
+    )
+
+    node = db.get(Node, int(node_id))
+    if (node is None or node.retired_at is not None
+            or node.node_type != NodeType.EXIT or node.show_to_users):
+        raise HTTPException(status_code=409, detail="NODE_RESUME_REQUIRES_HIDDEN_EXIT")
+
+    job = (db.query(NodeInstallProgressV1).filter(
+        NodeInstallProgressV1.node_id == int(node_id),
+    ).order_by(NodeInstallProgressV1.created_at.desc()).first())
+    if job is None or job.state == "completed":
+        raise HTTPException(status_code=409, detail="NODE_RESUME_JOB_NOT_ELIGIBLE")
+    if worker_alive(job.job_id):
+        raise HTTPException(status_code=409, detail="NODE_INSTALL_ALREADY_RUNNING")
+    if (job.state in {"running", "queued"}
+            and datetime.utcnow() - job.updated_at < STALE_AFTER):
+        raise HTTPException(status_code=409, detail="NODE_INSTALL_RECENTLY_RUNNING")
+
+    # Fail closed until an admin explicitly chooses publication; never infer
+    # an interrupted job's old preference and expose a partial Exit.
+    reset_install_progress_for_resume(job.job_id)
+    try:
+        unit = launch_resume(
+            job.job_id, int(node_id), bool(payload.publish_to_all_users),
+        )
+    except NodeInstallDispatchError as exc:
+        _safe_install_progress(job.job_id,"failed",node_id=node_id,
+                               error_code=str(exc))
+        raise HTTPException(status_code=503, detail=str(exc)) from None
+    except Exception:
+        _safe_install_progress(job.job_id,"failed",node_id=node_id,
+                               error_code="NODE_INSTALL_DISPATCH_FAILED")
+        raise HTTPException(status_code=503, detail="NODE_INSTALL_DISPATCH_FAILED") from None
+
+    return {
+        "ok":True, "queued":True, "detached":True,
+        "job_id":job.job_id,"node_id":int(node_id),
+        "node_remains_hidden":True,
+        "unit":unit,
+        "publish_requested":bool(payload.publish_to_all_users),
+        "message":"Existing Exit resume queued; only missing protocols will be installed.",
+    }
