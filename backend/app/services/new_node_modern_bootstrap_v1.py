@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import Any, Callable
 
 from sqlalchemy.orm import Session
 
@@ -75,7 +75,10 @@ def build_modern_bootstrap_plan(db: Session, node_id: int) -> dict[str, Any]:
     return {"node_id": int(target.id), "protocols": protocols, "ports": ports, "profiles": profiles, "sources": sources, "already_online": sorted(already_online), "skipped_no_template": skipped_no_template, "skipped_port_conflict": skipped_port_conflict}
 
 
-async def bootstrap_new_exit_modern_protocols(db: Session, node_id: int) -> dict[str, Any]:
+async def bootstrap_new_exit_modern_protocols(
+    db: Session, node_id: int,
+    *, on_group_complete: Callable[[dict[str, Any]], None] | None = None,
+) -> dict[str, Any]:
     """Install fresh Exit runtimes by independent daemon family.
 
     One failed standalone adapter (Sudoku, Mieru, etc.) must NEVER cause
@@ -143,6 +146,21 @@ async def bootstrap_new_exit_modern_protocols(db: Session, node_id: int) -> dict
                 errors[key] = f"install_error_{type(exc).__name__}"
         # Only non-sensitive telemetry: names and opaque error classes;
         # never print a remote command, private key, password or config.
+        if on_group_complete is not None:
+            # Progress is emitted ONLY after the real per-family installer
+            # returned (or failed). Never infer percent from animation.
+            try:
+                on_group_complete({
+                    "node_id":int(node_id),"group":list(group),
+                    "installed":[key for key in group if key in installed],
+                    "failed":[key for key in group if key in failed],
+                })
+            except Exception as exc:
+                # A UI/progress write cannot abort a successful daemon install.
+                print("NODE_MODERN_PROGRESS_CALLBACK_FAILED",{
+                    "node_id":int(node_id),
+                    "error_type":type(exc).__name__,
+                },flush=True)
         print("CENTRAL_EXIT_MODERN_INSTALL_GROUP",json.dumps({
             "node_id":int(node_id), "protocols":group,
             "installed":[key for key in group if key in installed],

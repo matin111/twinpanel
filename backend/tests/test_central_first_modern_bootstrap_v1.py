@@ -10,7 +10,7 @@ from unittest.mock import MagicMock
 
 from app.models import NodeType
 from app.services.new_node_modern_bootstrap_v1 import build_modern_bootstrap_plan
-from app.modern_protocol_runtime_v2 import SINGBOX_PROTOCOLS
+from app.protocol_account_registry import MODERN_PROTOCOL_KEYS
 from app.protocol_catalog import PROTOCOL_CATALOG
 
 
@@ -27,7 +27,14 @@ class CentralFirstModernBootstrapTests(unittest.TestCase):
     def test_no_legacy_node_template_required_for_all_modern_protocols(self):
         db=fake_db()
         plan=build_modern_bootstrap_plan(db,15)
-        self.assertEqual(set(plan["protocols"]),set(SINGBOX_PROTOCOLS))
+        # Modern now includes standalone families (Sudoku, Mieru,
+        # TrustTunnel, AmneziaWG), not just sing-box. All catalog-ready
+        # protocols must be offered without borrowing another node's state.
+        expected={
+            key for key in MODERN_PROTOCOL_KEYS
+            if (PROTOCOL_CATALOG.get(key) or {}).get("runtime_status")=="ready"
+        }
+        self.assertEqual(set(plan["protocols"]),expected)
         self.assertEqual(plan["skipped_no_template"],[])
         for protocol in plan["protocols"]:
             self.assertEqual(plan["ports"][protocol],

@@ -19,7 +19,9 @@ STAGES = {
     "queued", "installing_base", "installing_xray",
     "installing_modern", "verified_ready", "enrolling_users", "users_queued", "completed", "failed",
 }
-STALE_AFTER = timedelta(minutes=50)
+# A stopped Uvicorn task must never leave a 50-minute fake "running" state.
+# Detached workers remain running even if no phase changes for a long time.
+STALE_AFTER = timedelta(minutes=2)
 
 
 def create_install_progress(db: Session, name: str, is_exit: bool) -> str:
@@ -65,12 +67,33 @@ def set_install_progress(job_id: str, stage: str, *, node_id: int | None = None,
         db.commit()
 
 
+def reset_install_progress_for_resume(job_id: str) -> None:
+    """Reopen an interrupted/failed job only after the guarded resume dispatch."""
+    with SessionLocal() as db:
+        job = db.get(NodeInstallProgressV1, job_id)
+        if job is None or job.state == "completed":
+            raise ValueError("NODE_RESUME_JOB_NOT_ELIGIBLE")
+        job.state = "queued"
+        job.stage = "queued"
+        job.error_code = None
+        job.updated_at = datetime.utcnow()
+        db.commit()
+
+
 def public_install_progress(job: NodeInstallProgressV1, now: datetime | None = None) -> dict:
     now = now or datetime.utcnow()
     state = job.state
     stage = job.stage
-    if state == "running" and now - job.updated_at > STALE_AFTER:
-        state = "interrupted"
+    error_code = job.error_code
+    if state in {"queued", "running"} and now - job.updated_at > STALE_AFTER:
+        # Node installation now runs as a detached systemd process. A slow
+        # installer does not falsely fail while its actual worker is alive;
+        # jobs orphaned by Uvicorn/updater restarts are reported immediately
+        # instead of showing endless animated progress.
+        from .durable_node_install_launcher_v1 import worker_alive
+        if not worker_alive(job.job_id):
+            state = "interrupted"
+            error_code = "NODE_INSTALL_WORKER_INTERRUPTED"
     return {
         "job_id": job.job_id,
         "node_name": job.node_name,
@@ -81,7 +104,7 @@ def public_install_progress(job: NodeInstallProgressV1, now: datetime | None = N
         "expected_protocols": job.expected_protocols,
         "users_assigned": job.users_assigned,
         "backfill_pending": stage == "users_queued",
-        "error_code": job.error_code,
+        "error_code": error_code,
         "created_at": job.created_at.isoformat() + "Z",
         "updated_at": job.updated_at.isoformat() + "Z",
     }
