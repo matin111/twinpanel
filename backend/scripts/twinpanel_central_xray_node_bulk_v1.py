@@ -179,7 +179,7 @@ async def run_one(db,node_id:int,limit:int,apply:bool)->int:
         "selected":len(selected),"required_profiles":len(required),
         "write_enabled":apply,
     }),flush=True)
-    if not selected or not apply:
+    if not apply:
         return 0
     # A published centrally owned Exit IS the live purchase reconciler.
     # Blocking it because there is new-account work creates a deadlock:
