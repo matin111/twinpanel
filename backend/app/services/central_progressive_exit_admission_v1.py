@@ -49,7 +49,8 @@ def admit_verified_exit(db, node_id: int) -> dict:
         raise RuntimeError("CENTRAL_ADMISSION_NODE_NOT_HIDDEN_READY")
     job=(db.query(NodeInstallProgressV1)
          .filter(NodeInstallProgressV1.node_id==node_id)
-         .order_by(NodeInstallProgressV1.created_at.desc()).first())
+         .order_by(NodeInstallProgressV1.created_at.desc())
+         .populate_existing().first())
     if (job is None or job.stage not in {"verified_ready","enrolling_users"}
             or int(job.installed_protocols or 0)!=16):
         raise RuntimeError("CENTRAL_ADMISSION_LISTENERS_NOT_VERIFIED")
