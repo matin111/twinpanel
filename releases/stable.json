@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.713",
+  "version": "1.1.0-rc.714",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-08T18:41:06Z",
+  "released_at": "2026-11-08T18:56:19Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "643e7a973f3a2cad7efe38932e34626be271c021",
+  "source_sha": "33580f89fbceeccc7eb5d3086af2bcbbf10a4f73",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.713/twinpanel-1.1.0-rc.713-linux-x86_64.tar.gz",
-    "sha256": "965519e2fb17d98fb46e782ef1f0f34d2f34cc418298b2ae3a3de9fb12a7be0c",
-    "size_bytes": 29856554
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.714/twinpanel-1.1.0-rc.714-linux-x86_64.tar.gz",
+    "sha256": "381ede3d7313badad5c778ee1d2f944884f602e259ceffed24d0ca2a363d0140",
+    "size_bytes": 29857970
   },
   "notes": {
-    "fa": "یکسان‌سازی معیار تازه‌بودن آنلاین در پنل و سابلینک (نشست active قدیمی دیگر آنلاین فرض نمی‌شود)؛ ثبت نشست‌های واقعی احراز هویت‌شده AnyTLS/TUIC/Hysteria2/Naive/Snell/SOCKS5 قبل از پردازش سنگین شمارنده‌ها، با جداسازی خطاهای حساب‌های قدیمی؛ پایش مستقل Sudoku هر حدود ۲۰ ثانیه بر اساس پورت TCP اختصاصی و جلوگیری از ثبت همزمان آن توسط V314. کنترل‌های موجود حجم/محدودیت حفظ شده‌اند. هیچ تغییر در رمز، پورت یا کانفیگ VPN و هیچ ری‌استارت نود انجام نمی‌شود. ShadowTLS هنوز به دیتاپلین قابل‌انتساب به کاربر نیاز دارد.",
-    "en": "Align admin subscriber online badges with public Connect 180s freshness; pre-commit real authenticated sing-box live presence before expensive cursor and traffic reconciliation with per-user savepoint isolation, and isolate Sudoku presence-only poller from slow V314 while disabling duplicate ownership. Keep counter and admission rules, node VPN services, ports and credentials unchanged. ShadowTLS user identity remains un-attributable and no synthetic traffic is recorded."
+    "fa": "اصلاح بحرانی راه‌اندازی API: در صورتی که Modern Xray از قبل برچسب Password (PublicKey) را پشتیبانی کند، لایه سازگاری V83 دیگر باعث توقف کامل پنل نمی‌شود. همراه اصلاحات RC.713: همسان‌سازی وضعیت آنلاین پنل و سابلینک، ثبت کاربران احرازشده sing-box پیش از حسابداری کند، و پایش مستقل Sudoku. تست Xray/V83، sing-box و وضعیت آنلاین پاس شد؛ بدون تغییر در پورت، کانفیگ و سرویس‌های VPN نودها.",
+    "en": "Critical API startup regression fix: Xray V83 compatibility recognizes an already-supported Password (PublicKey) parser rather than crashing process startup. Includes rc.713 admin/public online freshness parity, authenticated sing-box pre-commit presence and isolated Sudoku monitor. Tested Xray/V83, sing-box and presence regression checks. No VPN node, client credential, service or port changes."
   }
 }
