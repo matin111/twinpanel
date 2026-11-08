@@ -79,6 +79,28 @@ class XrayThreeSafeProfileTests(unittest.TestCase):
         self.assertEqual(routes,[])
         original.assert_called_once()
 
+    def test_admin_inventory_uses_verified_tls_domain_from_db(self):
+        self.db.execute.return_value.scalar.return_value="v2ray.example.org"
+        with (patch.object(vision,"_original_admin_rows",return_value=[]),
+              patch.object(vision,"SessionLocal") as session_factory):
+            session_factory.return_value.__enter__.return_value=self.db
+            rows=vision._admin_rows_v50(self.node,8443)
+        self.assertEqual(
+            [row["id"] for row in rows],
+            ["websocket_tls","xhttp_reality","tcp_tls"],
+        )
+
+    def test_mother_route_remains_unchanged(self):
+        mother=SimpleNamespace(
+            id=1,name="FR",is_mother=True,is_local_core=True,
+            agent_url="local://core",
+        )
+        with patch.object(vision,"_original_routes",return_value=[
+            {"protocol":"v2ray","profile":"xhttp_reality"},
+        ]):
+            routes=vision._routes_v50(self.db,mother,"10.0.0.2")
+        self.assertEqual(len(routes),1)
+
     def test_plaintext_legacy_cannot_become_third_public_profile(self):
         item={"node_id":19,"profiles":[{"id":"tcp_simple","uri":"vless://plain@host:8443"}]}
         with patch.object(v47.policy_v30,"_profile_endpoint_v261") as endpoint:
