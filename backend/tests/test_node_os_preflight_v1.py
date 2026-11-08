@@ -8,7 +8,7 @@ from __future__ import annotations
 import os
 import unittest
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from fastapi import HTTPException
 
@@ -28,6 +28,9 @@ from app.routers.publish_node_all_users_v1 import (
     install_node_background_v1,
 )
 from app.models import NodeType
+from app.routers import provision as prov
+from app.routers import publish_node_all_users_v1 as node_route
+from app import standalone_protocol_runtime as standalone
 
 
 def remote_result(body: str, status: int = 0):
@@ -117,6 +120,38 @@ class NodeSafeErrorTests(unittest.TestCase):
         )
 
 
+class NodeStandaloneOSGuardTests(unittest.IsolatedAsyncioTestCase):
+    async def test_amneziawg_installer_falls_back_without_sourcing_os_release(self):
+        with patch.object(standalone,"cmd",new_callable=AsyncMock,
+                          return_value="/usr/bin/awg\n/usr/bin/awg-quick") as cmd:
+            result=await standalone._ensure_amneziawg(object())
+        script=cmd.await_args.args[1]
+        self.assertIn("/usr/lib/os-release",script)
+        self.assertIn("lsb_release",script)
+        self.assertNotIn(". /etc/os-release",script)
+        self.assertIn("NODE_OS_RELEASE_UNREADABLE",script)
+        self.assertEqual(result["binary"],"/usr/bin/awg")
+
+    async def test_provision_ssh_test_returns_actionable_422_instead_of_500(self):
+        conn=MagicMock()
+        conn.wait_closed=AsyncMock()
+        with (patch.object(prov,"ssh_connect",new_callable=AsyncMock,
+                           return_value=conn),
+              patch.object(prov,"remote_supported_os_info",
+                           new_callable=AsyncMock,
+                           side_effect=NodeOSPreflightError(
+                               "NODE_OS_RELEASE_UNREADABLE"))):
+            with self.assertRaises(HTTPException) as ctx:
+                await prov.test_connection(prov.TestIn(
+                    host="203.0.113.100",port=22,username="root",
+                    password="ci-not-real",
+                ))
+        self.assertEqual(ctx.exception.status_code,422)
+        self.assertEqual(ctx.exception.detail,"NODE_OS_RELEASE_UNREADABLE")
+        conn.close.assert_called_once()
+        conn.wait_closed.assert_awaited_once()
+
+
 class NodeActiveHostGuardTests(unittest.IsolatedAsyncioTestCase):
     async def test_iran_node_ip_is_rejected_before_any_install_job(self):
         request=MagicMock()
@@ -135,6 +170,25 @@ class NodeActiveHostGuardTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(ctx.exception.detail,"NODE_HOST_ALREADY_REGISTERED")
         db.add.assert_not_called()
         db.commit.assert_not_called()
+
+    async def test_duplicate_concurrent_host_is_rejected_even_under_other_name(self):
+        request=MagicMock()
+        db=MagicMock()
+        db.query.return_value.filter.return_value.first.return_value=None
+        payload=BackgroundNodeInstallIn(
+            host="65.109.210.100",port=22,username="root",
+            password="ci-not-real",name="Fin-Two",node_type=NodeType.EXIT,
+            country_code="FI",
+        )
+        node_route._NODE_INSTALL_HOSTS_PENDING.add(payload.host)
+        try:
+            with self.assertRaises(HTTPException) as ctx:
+                await install_node_background_v1(payload,request,db)
+            self.assertEqual(ctx.exception.detail,
+                             "NODE_HOST_INSTALL_ALREADY_RUNNING")
+            db.commit.assert_not_called()
+        finally:
+            node_route._NODE_INSTALL_HOSTS_PENDING.discard(payload.host)
 
     async def test_existing_name_rejected_before_any_install_job(self):
         request=MagicMock()
