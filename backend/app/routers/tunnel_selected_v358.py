@@ -290,7 +290,7 @@ async def create_selected_tunnel_v358(
                 tunnel_id,
                 selected,
                 db,
-                acceptance_timeout_seconds=90.0,
+                acceptance_timeout_seconds=165.0,
             )
 
             db.expire_all()
