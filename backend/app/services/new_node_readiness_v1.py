@@ -62,6 +62,19 @@ async def verify_new_exit_readiness(db: Session, node_id: int) -> dict[str, Any]
                     )
                 if not bool(status.get("ok")):
                     failed.append(key)
+                elif key == "v2ray":
+                    # Service active + a single legacy port is NOT sufficient.
+                    # The customer requires three real VLESS inbounds, not
+                    # fabricated delivery links or silently missing Vision.
+                    # Read actual node authority only; never repair on GET.
+                    from ..central_xray_node_authority_v1 import (
+                        read_node_public_authority,
+                    )
+                    authority = await asyncio.wait_for(
+                        read_node_public_authority(conn), timeout=65,
+                    )
+                    if len(set(authority.get("profiles") or [])) != 3:
+                        failed.append(key)
             except Exception:
                 # This is a read-only guard. Do not log sensitive command output.
                 failed.append(key)

@@ -1,0 +1,57 @@
+name: Hidden Exit Durable Finish and Official Xray
+
+on:
+  pull_request:
+    paths:
+      - 'backend/app/xray_official_verified_installer_v1.py'
+      - 'backend/app/verified_github_release_asset_v1.py'
+      - 'backend/app/standalone_protocol_runtime.py'
+      - 'backend/app/routers/provision.py'
+      - 'backend/app/services/new_node_modern_bootstrap_v1.py'
+      - 'backend/app/services/hidden_node_install_supervisor_v1.py'
+      - 'backend/scripts/twinpanel_hidden_node_install_finish_v1.py'
+      - 'backend/app/routers/publish_node_all_users_v1.py'
+      - 'backend/tests/test_hidden_node_install_official_xray_v1.py'
+      - '.github/workflows/hidden-exit-durable-finish-v1.yml'
+  workflow_dispatch:
+
+jobs:
+  hidden-exit:
+    runs-on: ubuntu-24.04
+    env:
+      PYTHONPATH: backend
+      APP_SECRET_KEY: ci-durable-node-only
+      DATABASE_URL: sqlite:///./ci-hidden-exit.sqlite3
+      NODE_AGENT_SHARED_SECRET: ci-hidden-node-agent-only
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install backend dependencies
+        run: python -m pip install -r backend/requirements.txt
+      - name: Compile source and external worker
+        run: |
+          python -m py_compile \
+            backend/app/xray_official_verified_installer_v1.py \
+            backend/app/verified_github_release_asset_v1.py \
+            backend/app/standalone_protocol_runtime.py \
+            backend/app/routers/provision.py \
+            backend/app/services/new_node_modern_bootstrap_v1.py \
+            backend/app/services/hidden_node_install_supervisor_v1.py \
+            backend/scripts/twinpanel_hidden_node_install_finish_v1.py \
+            backend/app/routers/publish_node_all_users_v1.py
+      - name: Validate official Xray asset and node-finish safety
+        run: python -m unittest discover -s backend/tests -p 'test_hidden_node_install_official_xray_v1.py' -v
+      - name: Check existing node-readiness regressions
+        run: |
+          python -m unittest discover -s backend/tests -p 'test_central_first_exit_bootstrap_v1.py' -v
+          python -m unittest discover -s backend/tests -p 'test_central_xray_node_bulk_v1.py' -v
+      - name: Forbid legacy unverified Xray installer URL on node bootstrap
+        run: |
+          ! grep -q 'curl -fsSL https://github.com/XTLS/Xray-install/raw' backend/app/routers/provision.py
+          grep -q 'official_xray_install_command' backend/app/routers/provision.py
+          grep -q 'bootstrap_new_exit_modern_protocols' backend/scripts/twinpanel_hidden_node_install_finish_v1.py
+          grep -q 'EnvironmentFile=/etc/twinpanel/backend.env' backend/app/services/hidden_node_install_supervisor_v1.py

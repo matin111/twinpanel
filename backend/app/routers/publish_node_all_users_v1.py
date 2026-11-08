@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Any
 
@@ -19,10 +20,43 @@ from ..subscription_delivery_policy_v1 import (
 )
 
 
+@asynccontextmanager
+async def _hidden_node_recovery_lifespan(_app):
+    # This lightweight loop does NOT install or SSH from the API. It only
+    # re-dispatches abandoned, hidden Exit jobs to supervised systemd units.
+    async def _scan():
+        await asyncio.sleep(30)
+        while True:
+            try:
+                from ..services.hidden_node_install_supervisor_v1 import (
+                    resume_stale_hidden_install_jobs,
+                )
+                result = await asyncio.to_thread(resume_stale_hidden_install_jobs)
+                if result["dispatched"]:
+                    print("HIDDEN_NODE_INSTALL_AUTO_RESUMED", result, flush=True)
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                print("HIDDEN_NODE_INSTALL_RECOVERY_SCAN_FAILED", {
+                    "type": type(exc).__name__,
+                }, flush=True)
+            await asyncio.sleep(90)
+    worker = asyncio.create_task(_scan(), name="hidden-exit-install-resume")
+    try:
+        yield
+    finally:
+        worker.cancel()
+        try:
+            await worker
+        except asyncio.CancelledError:
+            pass
+
+
 router = APIRouter(
     prefix="/v1/nodes",
     tags=["node-publish-all-users-v1"],
     dependencies=[Depends(require_admin)],
+    lifespan=_hidden_node_recovery_lifespan,
 )
 
 
@@ -204,139 +238,26 @@ async def _install_node_in_background(
                                    error_code=None if base_ok else "BASE_INSTALL_PARTIAL")
             return
 
+        # The base installer has created the hidden Exit and persisted its
+        # saved SSH identity. From this point, Xray / slow apt standalone
+        # packages / listener validation / central admission must SURVIVE an
+        # API restart or GitHub updater activation. Only a detached, guarded
+        # systemd process owns this work; the API never creates per-user jobs.
+        from ..services.hidden_node_install_supervisor_v1 import (
+            launch as launch_hidden_node_finisher,
+        )
         _safe_install_progress(job_id, "installing_xray", node_id=node_id,
                                installed_protocols=installed_count)
-        try:
-            await ensure_classic_protocol(
-                EnsureClassicProtocolIn(node_id=node_id, protocol="v2ray", port=install_payload.xray_port),
-                db=db,
-            )
-            if not bool((result.get("protocols") or {}).get("v2ray", {}).get("ok")):
-                installed_count += 1
-        except Exception as exc:
-            xray_ok = False
-            print("TWINPANEL_NODE_BACKGROUND_XRAY_DEGRADED_V1", {
-                "node_id": node_id, "error_type": type(exc).__name__,
-            }, flush=True)
-
-        _safe_install_progress(job_id, "installing_modern", node_id=node_id,
-                               installed_protocols=installed_count)
-        try:
-            from ..services.new_node_modern_bootstrap_v1 import bootstrap_new_exit_modern_protocols
-            modern_bootstrap = await bootstrap_new_exit_modern_protocols(db=db, node_id=node_id)
-            modern_ok = bool(modern_bootstrap.get("ok")) and not bool(
-                modern_bootstrap.get("skipped_no_template") or
-                modern_bootstrap.get("skipped_port_conflict")
-            )
-            installed_count += len(modern_bootstrap.get("installed") or [])
-            installed_count += len(modern_bootstrap.get("already_online") or [])
-            installed_count = min(installed_count, 16)
-            print("TWINPANEL_NODE_BACKGROUND_MODERN_BOOTSTRAP_V1", {
-                "node_id": node_id,
-                "attempted": modern_bootstrap.get("attempted"),
-                "installed": modern_bootstrap.get("installed"),
-                "failed": modern_bootstrap.get("failed"),
-                "skipped_no_template": modern_bootstrap.get("skipped_no_template"),
-                "skipped_port_conflict": modern_bootstrap.get("skipped_port_conflict"),
-            }, flush=True)
-        except Exception as exc:
-            db.rollback()
-            modern_ok = False
-            print("TWINPANEL_NODE_BACKGROUND_MODERN_BOOTSTRAP_DEGRADED_V1", {
-                "node_id": node_id, "error_type": type(exc).__name__,
-            }, flush=True)
-
-        # Installer return values and database online flags alone are not proof.
-        # Read-only check of all 16 current live listeners fails closed.
-        # Measured live listener health, not a running sum of install steps,
-        # determines whether the Exit can enter central account staging.
-        from ..services.new_node_readiness_v1 import verify_new_exit_readiness
-        live = await verify_new_exit_readiness(db, node_id)
-        installed_count = int(live.get("ready_count") or 0)
-        quota = result.get("quota") or {}
-        fabric = result.get("fabric") or {}
-        ready = bool(live.get("ok")) and quota.get("ok") is not False
-        # Tunnel fabric remains optional for direct Exit connections.
-        if not ready:
-            _safe_install_progress(
-                job_id, "failed", node_id=node_id,
-                installed_protocols=installed_count,
-                error_code=("NODE_QUOTA_SETUP_FAILED"
-                            if live.get("ok") and quota.get("ok") is False
-                            else "PROTOCOL_SETUP_INCOMPLETE"),
-            )
-            print("TWINPANEL_NODE_AUTO_ENROLL_BLOCKED_NOT_READY", {
-                "node_id": node_id, "installed_count": installed_count,
-                "missing_live_protocols": live.get("missing", []),
-                "reason": ("quota_bootstrap_failed"
-                           if live.get("ok") and quota.get("ok") is False
-                           else live.get("reason")),
-            }, flush=True)
-            return
-
-        # The completed installer owns this transition. Do not call the old
-        # publish/queue path before actual daemon-level account materialization.
-        # All 16 installed listener checks succeeded above.
-        _safe_install_progress(job_id, "verified_ready", node_id=node_id,
-                               installed_protocols=installed_count)
-        if payload.publish_to_all_users:
-            # Critical path: assign ACTIVE users and publish the node quickly.
-            # Do not run 10 daemon families / 17k credential combinations
-            # inside the Add Server job. The central backend owns this work.
-            from ..models import NodeStatus
-            from ..services.central_progressive_exit_admission_v1 import (
-                admit_verified_exit, hide_after_dispatch_failure,
-            )
-            from ..services.central_node_stage_launcher_v1 import (
-                launch as launch_central_stage,
-            )
-            node = db.get(Node, node_id)
-            if node and node.status != NodeStatus.MAINTENANCE:
-                node.status = NodeStatus.ONLINE
-            db.commit()
-            _safe_install_progress(job_id, "enrolling_users", node_id=node_id,
-                                   installed_protocols=installed_count)
-            try:
-                admission=admit_verified_exit(db,node_id)
-                # One supervised per-NODE process, NEVER one worker per
-                # account. Force initial full validation/Sudoku bootstrap;
-                # subsequent subscription updates use delta-only families.
-                dispatched=launch_central_stage(
-                    db,node_id,initial_full=True,
-                )
-            except Exception as exc:
-                db.rollback()
-                hide_after_dispatch_failure(db,node_id)
-                _safe_install_progress(
-                    job_id,"failed",node_id=node_id,
-                    installed_protocols=installed_count,
-                    error_code="CENTRAL_BACKGROUND_DISPATCH_FAILED",
-                )
-                print("CENTRAL_NODE_ADMISSION_SAFE_STOP",{
-                    "node_id":node_id,"error_type":type(exc).__name__,
-                    "node_hidden":True,
-                },flush=True)
-                return
-            _safe_install_progress(
-                job_id,"completed",node_id=node_id,
-                installed_protocols=installed_count,
-                users_assigned=int(admission["eligible_users"]),
-            )
-            print("CENTRAL_NODE_FAST_PUBLISH_COMPLETE",{
-                "node_id":node_id,
-                "users_assigned":admission["eligible_users"],
-                "daemon_families_async":True,
-                "detached_unit":dispatched["unit"],
-                "legacy_account_queue_used":False,
-                "credential_coverage_verified":False,
-                "client_delivery_ready_items_only":True,
-            },flush=True)
-        else:
-            _safe_install_progress(
-                job_id, "completed" if ready else "failed",
-                node_id=node_id, installed_protocols=installed_count,
-                error_code=None if ready else "PROTOCOL_SETUP_INCOMPLETE",
-            )
+        dispatched = launch_hidden_node_finisher(
+            db, node_id, job_id,
+            xray_port=install_payload.xray_port,
+            publish_to_all_users=payload.publish_to_all_users,
+        )
+        print("HIDDEN_NODE_FINISHER_DISPATCHED", {
+            "node_id": node_id, "unit": dispatched["unit"],
+            "node_hidden": True,
+        }, flush=True)
+        return
     except Exception as exc:
         db.rollback()
         safe_code = safe_node_install_error_code(exc)
