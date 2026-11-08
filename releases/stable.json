@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.721",
+  "version": "1.1.0-rc.722",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-08T22:18:09Z",
+  "released_at": "2026-11-08T22:36:29Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "3da896011b8a956d823a792ddf42acd192fcc64f",
+  "source_sha": "8d855e612a5cd6287a4b6721efd2efc7ea8e20ff",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.721/twinpanel-1.1.0-rc.721-linux-x86_64.tar.gz",
-    "sha256": "f674c940e240f40faaebd50201e35b36beee6e8208ed9135a5fbdf4678f2c845",
-    "size_bytes": 29917790
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.722/twinpanel-1.1.0-rc.722-linux-x86_64.tar.gz",
+    "sha256": "d4112a979643c48db1c41a889214a99fc9b60459ea907aca9c992da76e209db7",
+    "size_bytes": 29922627
   },
   "notes": {
-    "fa": "رفع گلوگاه ثبت حجم و آنلاین پروتکل‌های مدرن: اولویت پردازش اتصال‌های واقعی و نشست‌های بسته‌شده دارای شمارنده نسبت به هزاران اکانت بدون فعالیت، محدودسازی پاکسازی آفلاین و ثبت زمان پردازش هر نود. بدون تغییر کانفیگ‌ها، اعتبارنامه‌ها، محاسبه حجم، تاریخ یا قطعی اتصال. دوره اعتبار حساب‌های انتقالی فاقد اطلاعات همچنان نیازمند تعیین مدت معتبر است.",
-    "en": "Urgent modern sing-box accounting: prioritize every authenticated live and retained closed connection ahead of dormant credential watermark maintenance, bound offline batches and report per-node sweep latency. Preserves canonical quota counter identity, billing, expiry and VPN configuration."
+    "fa": "رفع گلوگاه اصلی ثبت آنلاین و مصرف پروتکل‌های sing-box: ابتدا دریافت نشست‌های احرازشده واقعی از نود، سپس تطبیق فقط همان هویت‌ها با کانفیگ‌های معتبر و عضویت دقیق نود. حذف اسکن/رمزگشایی سراسری اعتبارنامه‌ها پیش از پردازش ترافیک، بدون تغییر فرمول مصرف، تاریخ انقضا، پروتکل‌ها یا پورت‌ها. شامل اصلاحات RC.721.",
+    "en": "Fix root cause of lagging modern sing-box accounting: fetch the authoritative node snapshot before constructing device mappings, then resolve only authenticated observed identities (plus previously open canonical sessions) against exact active saved credentials and node membership. Preserve quota charging, expiry and VPN dataplane, includes RC.721."
   }
 }
