@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.703",
+  "version": "1.1.0-rc.704",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-08T08:11:26Z",
+  "released_at": "2026-11-08T08:35:37Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "0067427e0bad362cae73546670203af9743f7910",
+  "source_sha": "b39a90da429276f5051316bf3eaf63d3fb4045bf",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.703/twinpanel-1.1.0-rc.703-linux-x86_64.tar.gz",
-    "sha256": "920f57793b6f4df562314e22f54fead538ca7a1c3ac833387ca98d78791a119b",
-    "size_bytes": 29794510
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.704/twinpanel-1.1.0-rc.704-linux-x86_64.tar.gz",
+    "sha256": "4dc5d658a8654d0fbfa1e7954abfd21e47988cc85437e7e44e21cd3a873dba06",
+    "size_bytes": 29798471
   },
   "notes": {
-    "fa": "نسخه rc.703: رفع ریشه‌ای خطای RUNTIMEERROR هنگام افزودن دوباره نود fin پس از ورود موفق SSH. در لاگ نود فنلاند دستور source کردن /etc/os-release با کد ۱ شکست خورد؛ اکنون مشخصات سیستم‌عامل بدون اجرای آن فایل، به‌صورت فقط‌خواندنی از /etc/os-release یا /usr/lib/os-release یا lsb_release خوانده می‌شود و فقط Ubuntu/Debian مجاز است. این بررسی در نصب نود خروجی، نود ایران، تست SSH، تعمیر کلاسیک، نصب AmneziaWG و ارتقای Agent یکسان است. IP نود فعال ایران/خروجی از نصب مجدد محفوظ است و نصب هم‌زمان روی یک IP مجاز نیست. پیام‌های دقیق و امن به فارسی/انگلیسی نمایش داده می‌شود و خطای خام SSH/اطلاعات حساس گزارش نمی‌شود. نصب پیش از تغییر سرویس‌ها در صورت نامعتبر بودن OS متوقف می‌شود؛ حساب‌ها، گواهی‌ها و نود مادر دست نخورده‌اند. این نسخه تغییرات rc.702 را نیز حفظ می‌کند. وضعیت اتصال واقعی سرور فنلاند نیاز به آزمون پس از نصب رسمی دارد.",
-    "en": "rc.703: Fix fresh/re-added node installs failing with opaque RUNTIMEERROR when SSH succeeds but sourcing /etc/os-release returns exit 1. Shared non-mutating Ubuntu/Debian detector reads /etc/os-release, /usr/lib/os-release, or lsb_release with fail-closed stable diagnostic codes across Exit/Iran bootstrap, SSH test, classic repair, AmneziaWG install and Agent upgrade. Block installations against an already-managed Iran/Exit IP and simultaneous duplicate host installs. Localized, sanitized errors instead of raw SSH messages. No customer credentials, server configurations, or mother-panel data modified. Preserves rc.702 improvements; real node connectivity must be independently reverified after installing."
+    "fa": "افزودن آشکارسازی بحرانی اتصال‌های ShadowTLS فاقد شناسه احراز هویت در لایه مشترک Shadowsocks و جلوگیری از معرفی آمار مصرف، آنلاین و محدودیت دستگاه ShadowTLS به‌عنوان اطلاعات دقیق کاربر تا زمان راه‌اندازی مسیر احراز هویت قابل انتساب. حفظ سرویس و کانفیگ‌های فعلی بدون بازنشانی یا تغییر گذرواژه. این نسخه رفع کامل احراز هویت در لایه داخلی نیست؛ رفع ریشه‌ای نیازمند انتقال شناسه کاربر در دیتاپلین و تست روی حساب آزمایشی است.",
+    "en": "Safety-only: flag unattributable ShadowTLS shared inner connections as critical node accounting integrity errors, fail closed per-user ShadowTLS presence/traffic capability claims, preserve other protocols, existing client configurations and VPN dataplane. This is not a ShadowTLS user-attribution dataplane fix; it requires an authenticated identity bridge and canary verification."
   }
 }
