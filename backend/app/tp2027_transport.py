@@ -133,10 +133,17 @@ def _candidate_desired_meta(
         .first()
     )
 
-    if (
-        row is None
-        or not bool(row.enabled)
-    ):
+    # Selected TP27 Fast is controller-owned. Its health metadata must
+    # remain available throughout first-cutover reconciliation even when
+    # another runtime temporarily marks the transport row disabled.
+    # This cannot claim health: the Agent still checks the real interface,
+    # systemd service and peer ping before positive acceptance.
+    selected_tp27 = (
+        transport == "tp27_fast"
+        and str(tunnel.active_transport or "").strip().lower() == "tp27_fast"
+        and bool(tunnel.is_active)
+    )
+    if (row is None or not bool(row.enabled)) and not selected_tp27:
         return None
 
     try:
