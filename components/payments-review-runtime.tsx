@@ -7,6 +7,7 @@ import {AnyRow,parityApi} from "../lib/admin-parity-api";
 import {API_BASE} from "../lib/api";
 import {getCustomerToken} from "../lib/customer-api";
 import {useI18n} from "../lib/i18n";
+import {paymentDateTehran} from "../lib/payment-date-tehran";
 
 type PaymentKind="purchase"|"wallet";
 type FilterKind="all"|PaymentKind;
@@ -32,7 +33,7 @@ const finalStatuses=new Set(["approved","auto_verified","paid","rejected","compl
 const reviewStatuses=new Set(["awaiting_review","payment_submitted","submitted","review","waiting"]);
 
 function money(value:number){return `${Number(value||0).toLocaleString("fa-IR")} تومان`;}
-function dateText(value:unknown){if(!value)return "—";const d=new Date(String(value));return Number.isNaN(d.getTime())?String(value):d.toLocaleString("fa-IR");}
+function dateText(value:unknown){return paymentDateTehran(value);}
 function n(value:unknown){const x=Number(value||0);return Number.isFinite(x)?x:0;}
 function s(value:unknown){return String(value??"").trim();}
 
