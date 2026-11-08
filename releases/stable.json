@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.688",
+  "version": "1.1.0-rc.689",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-08T03:08:50Z",
+  "released_at": "2026-11-08T03:22:39Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "344a912057a6eae39decf7bfb2c94462e88d21f1",
+  "source_sha": "b2e248b7de193ae753ebd603ec882cdbf75053e7",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.688/twinpanel-1.1.0-rc.688-linux-x86_64.tar.gz",
-    "sha256": "fdb81ce41b9269a4f4cb990ccd2a1f1a747eea869b05a11378ae7107398c87ee",
-    "size_bytes": 29670883
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.689/twinpanel-1.1.0-rc.689-linux-x86_64.tar.gz",
+    "sha256": "6a68b8ed9014f9e366aa3b83ac47cf874c5e04f50df586d6e7ee1c4ebeaca138",
+    "size_bytes": 29678903
   },
   "notes": {
-    "fa": "اصلاح قطعی رنگ سبز برچسب «متصل هستید» در قالب نهایی Connection. شمارش «تعداد متصل» فقط بر مبنای نشست‌های واقعی و تأییدشده سرویس است و عدد حدسی برای پروتکل فاقد حضور قابل‌اعتماد نمایش داده نمی‌شود؛ داده‌ها و محدودیت دستگاه تغییر نکرده‌اند.",
-    "en": "Ensure active Connected status appears bright green in final Connection theme; active count remains based on verified telemetry, without fabricating unobservable sessions. No quota or customer data modified."
+    "fa": "رفع ریشه‌ای شمارش ناقص OpenVPN در اکانت‌های دستی قدیمی که مدت اعتبار آنها صفر ذخیره شده است: فقط تله‌متری قابل‌اعتمادِ اتصال برقرارشده اجازه ثبت نشست واقعی را می‌گیرد، در حالی که پذیرش عادی اتصال همچنان اعتبار مدت را بررسی می‌کند. تست تراکنشی بدون تغییر دیتابیس: ثبت مشاهده‌شده قبول و پذیرش عادی رد شد. هیچ سقف دستگاه یا وضعیت اشتراک تغییر نمی‌کند.",
+    "en": "Fix omitted live OpenVPN session telemetry for legacy manual subscriptions with a stored zero duration; authoritative physically observed sessions may be accounted while ordinary new-session admission remains strictly validated. Verified in rollback-only DB test; no user quotas or statuses changed."
   }
 }
