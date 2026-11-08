@@ -223,7 +223,14 @@ async def _install_node_in_background(
                                installed_protocols=installed_count)
         try:
             from ..services.new_node_modern_bootstrap_v1 import bootstrap_new_exit_modern_protocols
-            modern_bootstrap = await bootstrap_new_exit_modern_protocols(db=db, node_id=node_id)
+            from ..services.hidden_exit_install_resume_v1 import _ready_count
+            modern_bootstrap = await bootstrap_new_exit_modern_protocols(
+                db=db, node_id=node_id,
+                on_group_complete=lambda _: _safe_install_progress(
+                    job_id, "installing_modern", node_id=node_id,
+                    installed_protocols=_ready_count(db,node_id),
+                ),
+            )
             modern_ok = bool(modern_bootstrap.get("ok")) and not bool(
                 modern_bootstrap.get("skipped_no_template") or
                 modern_bootstrap.get("skipped_port_conflict")
