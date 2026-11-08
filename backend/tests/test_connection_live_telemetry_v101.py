@@ -76,6 +76,22 @@ class LiveConnectionTelemetryV101(unittest.TestCase):
         self.assertIn("TWINPANEL_CISCO_COUNTRY_LIVE_STATE_V104", style)
         self.assertIn(".server-tabs button.server-tab.live-online", style)
 
+    def test_ocserv_resume_preserves_original_counter_epoch_and_presence(self):
+        code = source(SERVICES, "quota_runtime_reconcile.py")
+        self.assertIn("def _ocserv_resumable_session_key(", code)
+        self.assertIn("QuotaSession.session_key.startswith(prefix)", code)
+        self.assertIn('if str(row.status) == "active":', code)
+        self.assertIn("return f\"{prefix}{int(row.id)}\"[:160]", code)
+        self.assertIn('source_key=f"ocserv:{source_session_key}"[:220]', code)
+        self.assertIn("counter_epoch=source_session_key[:96]", code)
+        body = code.split("def _apply_observed_sessions(", 1)[1].split(
+            "def _apply_xray_stats(", 1
+        )[0]
+        self.assertLess(
+            body.index("active_keys.add(session_key)"),
+            body.index("with db.begin_nested():"),
+        )
+
     def test_javascript_syntax(self):
         node = shutil.which("node")
         if not node:
