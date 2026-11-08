@@ -386,6 +386,42 @@ def _cisco_try_lock(db, node_id: int) -> bool:
     )
 
 
+
+def _ocserv_resumable_session_key(
+    db, node_id: int, subscription_id: int, source_session_key: str,
+) -> str:
+    """Use a fresh *validated* ledger key if a live ocserv session was closed.
+
+    The ocserv ID/counters are still the same, but quota_service.open_session
+    correctly rejects reusing a closed ledger session key. A transient DB
+    lock timeout must not permanently hide an actual connected user. Keep
+    the ocserv source_key and counter_epoch unchanged so cumulative traffic
+    is neither reset nor billed twice. A resumed key must still pass every
+    ordinary open_session plan/quota/account validation.
+    """
+    root = str(source_session_key or "")[:128]
+    prefix = root + ":resume:"
+    row = (
+        db.query(QuotaSession)
+        .filter(
+            QuotaSession.node_id == int(node_id),
+            QuotaSession.subscription_id == int(subscription_id),
+            QuotaSession.protocol == "openconnect",
+            or_(
+                QuotaSession.session_key == source_session_key,
+                QuotaSession.session_key.startswith(prefix),
+            ),
+        )
+        .order_by(QuotaSession.id.desc())
+        .first()
+    )
+    if row is None:
+        return source_session_key
+    if str(row.status) == "active":
+        return str(row.session_key)
+    return f"{prefix}{int(row.id)}"[:160]
+
+
 def _touch_session(db, node_id: int, session_key: str, now: datetime) -> None:
     row = (
         db.query(QuotaSession)
@@ -422,7 +458,15 @@ def _apply_observed_sessions(db, node: Node, observed: list[dict]) -> dict:
         if device is None:
             ignored += 1
             continue
-        session_key = str(session["session_key"])
+        source_session_key = str(session["session_key"])
+        session_key = _ocserv_resumable_session_key(
+            db, node_id, int(device["subscription_id"]), source_session_key,
+        )
+        # Physical ocserv presence is still real even when usage accounting
+        # temporarily fails (e.g. another worker holds the subscription lock).
+        # Never CLOSE a genuinely observed existing session on accounting
+        # failure. Do not invent a NEW live session without validation.
+        active_keys.add(session_key)
         try:
             with db.begin_nested():
                 open_result = open_session(
@@ -456,21 +500,28 @@ def _apply_observed_sessions(db, node: Node, observed: list[dict]) -> dict:
                         device_id=int(device["device_id"]),
                         session_key=session_key,
                         protocol="openconnect",
-                        source_key=f"ocserv:{session_key}"[:220],
+                        source_key=f"ocserv:{source_session_key}"[:220],
                         counter_mode="cumulative",
-                        counter_epoch=session_key[:96],
+                        counter_epoch=source_session_key[:96],
                         source_sequence=sequence,
                         uplink_value=tx,
                         downlink_value=rx,
                         reported_at=now_aware,
                     ),
                 )
-            active_keys.add(session_key)
             if not bool(open_result.get("duplicate")):
                 opened += 1
             usage_events += 1
         except Exception as exc:
             ignored += 1
+            # The observed physical connection may already have a valid
+            # active quota row. Keep its freshness even when processing the
+            # counter delta failed; the canonical accounting remains retried.
+            try:
+                with db.begin_nested():
+                    _touch_session(db, node_id, session_key, now_naive)
+            except Exception:
+                pass
             print(
                 "OCSERV_TELEMETRY_SESSION_REJECTED",
                 {"node_id": node_id, "subscription_id": int(device["subscription_id"]),
