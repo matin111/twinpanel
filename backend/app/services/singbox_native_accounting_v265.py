@@ -883,7 +883,13 @@ def _salvage_singbox_devices(
     """
     recovered = failed = 0
     errors: list[str] = []
-    for device in devices:
+    # Retrying every user after a single bad cursor can overload production
+    # nodes with thousands of savepoints. Rotate bounded recovery windows.
+    retry_limit = 64
+    windows = max((len(devices) + retry_limit - 1) // retry_limit, 1)
+    window = int(time.time() // max(SINGBOX_ACCOUNTING_INTERVAL_SECONDS, 1)) % windows
+    candidates = devices[window * retry_limit:(window + 1) * retry_limit]
+    for device in candidates:
         try:
             with db.begin_nested():
                 apply_singbox_snapshot(
@@ -897,6 +903,7 @@ def _salvage_singbox_devices(
     return {
         "recovered_devices": recovered,
         "failed_devices": failed,
+        "deferred_devices": len(devices) - len(candidates),
         "sample_errors": errors,
     }
 
