@@ -21,6 +21,40 @@ def main() -> None:
         "socks5",
     }
     assert native.SINGBOX_ACCOUNTING_PROTOCOLS == expected
+    # Two users can share the same NAT IP; attribution MUST follow the
+    # authenticated user, not the source address. Two simultaneous TCP
+    # connections under one credential must also remain visible as two,
+    # never be mistaken for two distinct devices.
+    active_snapshot = {"rows": [
+        {"inbound": "twinpanel-anytls-in", "inbound_type": "anytls",
+         "user": "account-A", "source": "203.0.113.5:1111", "closed_at_ms": 0},
+        {"inbound": "twinpanel-anytls-in", "inbound_type": "anytls",
+         "user": "account-A", "source": "203.0.113.5:1112", "closed_at_ms": 0},
+        {"inbound": "twinpanel-anytls-in", "inbound_type": "anytls",
+         "user": "account-B", "source": "203.0.113.5:2222", "closed_at_ms": 0},
+        {"inbound": "twinpanel-anytls-in", "inbound_type": "anytls",
+         "user": "", "source": "203.0.113.5:3333", "closed_at_ms": 0},
+        {"inbound": "twinpanel-anytls-in", "inbound_type": "anytls",
+         "user": "unknown", "source": "203.0.113.5:4444", "closed_at_ms": 0},
+        {"inbound": "twinpanel-anytls-in", "inbound_type": "anytls",
+         "user": "account-A", "source": "203.0.113.5:1110", "closed_at_ms": 333},
+        {"inbound": "twinpanel-shadowtls-inner", "inbound_type": "shadowsocks",
+         "user": "", "closed_at_ms": 0},
+    ]}
+    integrity = native.singbox_identity_integrity_audit(
+        active_snapshot, "anytls", [
+            {"identity": "account-A"}, {"identity": "account-B"},
+        ],
+    )
+    assert integrity["active_connections"] == 5
+    assert integrity["attributed_connections"] == 3
+    assert integrity["distinct_online_credentials"] == 2
+    assert integrity["multi_connection_count"] == 1
+    assert integrity["missing_identity"] == 1
+    assert integrity["unknown_identity"] == 1
+    assert integrity["canonical_session_count_may_understate_connections"]
+    assert integrity["per_device_limit_verified"] is False
+
     assert "shadowtls" in native.SINGBOX_UNATTRIBUTABLE_PROTOCOLS
     active_inner = [
         {"inbound": "twinpanel-shadowtls-inner", "inbound_type": "shadowsocks", "user": "", "closed_at_ms": 0},
