@@ -28,7 +28,12 @@ assert "PROTOCOL_CATALOG" in helper
 assert '"mode": "central_catalog"' in helper
 assert "Node.id != int(target.id)" not in helper
 assert "ModernProtocolSetting" not in helper
-assert "from ..routers.modern_protocol_admin_v3 import ModernInstallV3In, ProtocolProfileIn, install" in helper
+assert "from ..routers.modern_protocol_admin_v3 import (" in helper
+assert "for group in groups:" in helper
+assert "except HTTPException as exc:" in helper
+assert "db.rollback()" in helper
+assert "CENTRAL_EXIT_MODERN_INSTALL_GROUP" in helper
+assert "occupied_ports.get(chosen_port, set()) - {key}" in helper
 assert "result = await install(node_id=int(node_id), payload=payload, db=db)" in helper
 
 # Reusable daemon installers are allowed; legacy account installation isn't.
