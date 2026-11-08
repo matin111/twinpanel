@@ -17,7 +17,7 @@ os.environ.setdefault("DATABASE_URL","sqlite+pysqlite:////tmp/ci-node-os-preflig
 os.environ.setdefault("NODE_AGENT_SHARED_SECRET","ci-os-agent-only")
 
 from app.services.node_os_preflight_v1 import (
-    _REMOTE_OS_READ_ONLY,
+    _REMOTE_OS_READ_ONLY, _REMOTE_PYTHON_OS_READ_ONLY,
     NodeOSPreflightError,
     remote_supported_os_info,
     remote_supported_os_id,
@@ -85,6 +85,63 @@ class NodeReadOnlyOSPreflightTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(NodeOSPreflightError) as ctx:
             await remote_supported_os_id(conn)
         self.assertEqual(ctx.exception.code,"NODE_OS_PREFLIGHT_COMMAND_FAILED")
+
+    async def test_python_single_line_probe_is_valid_on_linux(self):
+        import subprocess
+        proc = subprocess.run(
+            ["/bin/sh", "-c", _REMOTE_PYTHON_OS_READ_ONLY],
+            capture_output=True, text=True, timeout=8, check=False,
+        )
+        self.assertEqual(proc.returncode, 0, msg="Python OS reader failed")
+        self.assertIn("TP_OS_FILE_START", proc.stdout)
+        self.assertIn("TP_OS_FILE_END", proc.stdout)
+
+    async def test_python_reader_failure_falls_back_to_plain_cat(self):
+        conn=SimpleNamespace(run=AsyncMock(side_effect=[
+            remote_result("",1),
+            remote_result('PRETTY_NAME="Ubuntu"\nID=ubuntu\nVERSION_ID="24.04"\n'),
+        ]))
+        info=await remote_supported_os_info(conn)
+        self.assertEqual(info["id"],"ubuntu")
+        self.assertEqual(conn.run.await_count,2)
+        self.assertIn("python3 -c",conn.run.await_args_list[0].args[0])
+        self.assertEqual(conn.run.await_args_list[1].args[0],"cat /etc/os-release")
+
+    async def test_broken_python_and_etc_read_fall_back_to_usr_lib(self):
+        conn=SimpleNamespace(run=AsyncMock(side_effect=[
+            remote_result("",1),remote_result("",1),
+            remote_result('ID=debian\nVERSION_ID="12"\n'),
+        ]))
+        info=await remote_supported_os_info(conn)
+        self.assertEqual(info["id"],"debian")
+        self.assertEqual(conn.run.await_count,3)
+
+    async def test_failed_first_reader_does_not_override_unsupported_os(self):
+        conn=SimpleNamespace(run=AsyncMock(side_effect=[
+            remote_result("",1),
+            remote_result("ID=alpine\nVERSION_ID=3.21\n"),
+        ]))
+        with self.assertRaises(NodeOSPreflightError) as exc:
+            await remote_supported_os_id(conn)
+        self.assertEqual(exc.exception.code,"NODE_OS_UNSUPPORTED")
+        self.assertEqual(conn.run.await_count,2)
+
+    async def test_finnish_failure_reports_command_status_without_raw_output(self):
+        conn=SimpleNamespace(run=AsyncMock(return_value=SimpleNamespace(
+            stdout="",stderr="PRIVATE_REMOTE_CREDENTIAL_NEVER_LOG",
+            exit_status=1,
+        )))
+        with patch("builtins.print") as log:
+            with self.assertRaises(NodeOSPreflightError) as exc:
+                await remote_supported_os_id(conn)
+        self.assertEqual(exc.exception.code,"NODE_OS_PREFLIGHT_COMMAND_FAILED")
+        self.assertEqual(conn.run.await_count,4)
+        self.assertNotIn(
+            "PRIVATE_REMOTE_CREDENTIAL_NEVER_LOG",str(log.call_args_list),
+        )
+        self.assertTrue(any(
+            "python_single" in str(call) for call in log.call_args_list
+        ))
 
     async def test_remote_os_reader_never_sources_or_writes_system_files(self):
         command=_REMOTE_OS_READ_ONLY
