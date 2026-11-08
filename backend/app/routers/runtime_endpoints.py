@@ -69,6 +69,10 @@ def _normalized_protocol(value: str | None) -> str:
 
 def _subscription_live_states(db: Session) -> dict[int, dict]:
     states: dict[int, dict] = {}
+    # Use the same freshness cutoff as /v1/connect/{token}/live.
+    # An 'active' ledger entry alone is not proof of an ongoing connection:
+    # stale sessions must not keep admin accounts green forever.
+    cutoff = datetime.utcnow() - timedelta(seconds=_LIVE_ACTIVITY_SECONDS)
 
     for subscription_id, protocol, last_seen_at in (
         db.query(
@@ -80,6 +84,7 @@ def _subscription_live_states(db: Session) -> dict[int, dict]:
         .filter(
             Subscription.status == SubscriptionStatus.ACTIVE,
             QuotaSession.status == "active",
+            QuotaSession.last_seen_at >= cutoff,
         )
         .group_by(QuotaSession.subscription_id, QuotaSession.protocol)
         .all()
@@ -98,7 +103,6 @@ def _subscription_live_states(db: Session) -> dict[int, dict]:
         ):
             item["last_seen_at"] = last_seen_at
 
-    cutoff = datetime.utcnow() - timedelta(seconds=_LIVE_ACTIVITY_SECONDS)
     for subscription_id, protocol, reported_at in (
         db.query(
             QuotaUsageEvent.subscription_id,
