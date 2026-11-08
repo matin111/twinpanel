@@ -1,5 +1,15 @@
 # TwinPanel Changelog
 
+## 1.1.0-rc.681 — 2026-11-08
+
+### Fix Cisco falsely offline after a successful physical VPN session
+- Root-cause production verification: `occtl --json show users` confirmed `ali222` active on Turkey node 6, but a transient PostgreSQL subscription row lock timeout caused the fast Cisco collector to close the still-observed quota session. Subsequent polls hit `409 session_key_conflict` because the ledger correctly rejects reusing a closed session key.
+- The ocserv collector now preserves the observed active connection on transient accounting failures; it never converts a collector error into a false physical disconnect. An already closed ledger session can resume with a new validated session key derived from the old row ID without overwriting historical rows.
+- **Cumulative traffic accounting remains continuous** across that resume: original ocserv source key and counter epoch stay unchanged, preventing counter resets and duplicate charging. The existing subscription expiry, device limit, activation, quota and session validation remain in force.
+- Staged live verification: a new openconnect quota session was created for `ali222` on node 6, with a valid resumed key and updated usage events while the VPN service stayed online. Regressions now include a Cisco conflict/recovery test and 8 source/JavaScript tests.
+- Includes rc.680 independent 20-second Cisco polling, and correct green highlighting of the real Cisco country server-tab in both Light and Dark UI.
+- No changes to active VPN listeners, tunnels, user credentials, subscription durations, limits or plans.
+
 ## 1.1.0-rc.680 — 2026-11-08
 
 ### Fast Cisco / AnyConnect online status and green country indicators
