@@ -14,6 +14,7 @@ import tarfile
 import tempfile
 import time
 import urllib.request
+import urllib.error
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
@@ -542,16 +543,56 @@ def validate_artifact_metadata(artifact: dict) -> tuple[str, str, int | None]:
     return url, digest, size_value
 
 
+def _release_asset_api_url(url: str) -> str:
+    """Resolve only the manifest's official GitHub release asset via GitHub API."""
+    if not url.startswith(ALLOWED_ARTIFACT_PREFIX):
+        raise RuntimeError('RELEASE_ARTIFACT_URL_INVALID')
+    suffix = url[len(ALLOWED_ARTIFACT_PREFIX):]
+    parts = suffix.split('/')
+    if len(parts) != 2 or not re.fullmatch(r'v[0-9A-Za-z._-]+', parts[0]) or not re.fullmatch(r'[A-Za-z0-9._-]+\\.tar\\.gz', parts[1]):
+        raise RuntimeError('RELEASE_ARTIFACT_URL_INVALID')
+    tag, filename = parts
+    listing = 'https://api.github.com/repos/matin111/twinpanel/releases/tags/' + tag
+    req = urllib.request.Request(listing, headers={
+        'Accept': 'application/vnd.github+json',
+        'User-Agent': 'TwinPanel-Public-Updater/6',
+    })
+    with urllib.request.urlopen(req, timeout=20) as response:
+        metadata = json.load(response)
+    for asset in metadata.get('assets', []):
+        if (asset.get('name') == filename
+                and asset.get('browser_download_url') == url
+                and isinstance(asset.get('id'), int)):
+            return 'https://api.github.com/repos/matin111/twinpanel/releases/assets/' + str(asset['id'])
+    raise RuntimeError('RELEASE_ARTIFACT_NOT_FOUND_IN_OFFICIAL_RELEASE')
+
+
 def download_verified_artifact(
     url: str,
     expected_sha256: str,
     destination: Path,
     expected_size: int | None = None,
 ) -> int:
-    req = urllib.request.Request(url, headers={'User-Agent': 'TwinPanel-Public-Updater/6'})
+    headers = {'User-Agent': 'TwinPanel-Public-Updater/6'}
+    req = urllib.request.Request(url, headers=headers)
+    try:
+        response = urllib.request.urlopen(req, timeout=60)
+    except urllib.error.HTTPError as exc:
+        if exc.code not in (502, 503, 504):
+            raise
+        # Some providers time out on github.com/releases/download while the
+        # official api.github.com asset endpoint remains reachable.
+        print('RELEASE_ARTIFACT_DIRECT_GATEWAY_ERROR; retrying GitHub API asset', flush=True)
+        asset_url = _release_asset_api_url(url)
+        response = urllib.request.urlopen(
+            urllib.request.Request(asset_url, headers={
+                **headers, 'Accept': 'application/octet-stream',
+            }),
+            timeout=60,
+        )
     digest = hashlib.sha256()
     total = 0
-    with urllib.request.urlopen(req, timeout=60) as response, destination.open('wb') as out:
+    with response, destination.open('wb') as out:
         while True:
             chunk = response.read(2 * 1024 * 1024)
             if not chunk:
