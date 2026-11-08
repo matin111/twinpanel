@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.723",
+  "version": "1.1.0-rc.724",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-08T23:05:01Z",
+  "released_at": "2026-11-08T23:14:23Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "826baa156f48895ddfa4fc8f0c414003ba8e64e9",
+  "source_sha": "d09b74ce60234920af90a28f8eda5f7e2feb8ff6",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.723/twinpanel-1.1.0-rc.723-linux-x86_64.tar.gz",
-    "sha256": "b2e2e752f92f4f5bce6b7f8eb06d429c8767be5b40fceaf45a4663546ae33454",
-    "size_bytes": 29932370
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.724/twinpanel-1.1.0-rc.724-linux-x86_64.tar.gz",
+    "sha256": "6426ccf9ca7fd3d324bac99acb323a047db2dc5264b1389e3bcd3de98c806cf8",
+    "size_bytes": 29930918
   },
   "notes": {
-    "fa": "رفع خطای ساخت اشتراک بدون مدت زمان در مسیر ساخت سریع: برای اشتراک زمان‌دار مدت بیشتر از صفر الزامی است؛ نمایش تاریخ واقعی انقضا و تعداد روزهای باقی‌مانده در صفحه اتصال؛ نمایش صریح وضعیت نامحدود یا مدت نامشخص. هیچ تاریخ یا حجمی برای اکانت‌های موجود به‌صورت حدسی تغییر نمی‌کند.",
-    "en": "Prevent accidental no-expiry subscriptions from missing/zero duration in fast creation; show actual expiry date and remaining days, or explicit unlimited/unconfigured validity on public Connect. Existing account quotas, expiry and status unchanged."
+    "fa": "اصلاح فوری اشتراک زمان نامحدود: عدد صفرِ صریح دوباره به‌عنوان مدت نامحدود پشتیبانی می‌شود؛ تنها مدت خالی یا منفی نامعتبر است. فرم ساخت از پلن نامحدود مقدار صفر را حفظ می‌کند. نمایش تاریخ و تعداد روز باقی‌مانده نسخه قبل بدون دستکاری حساب‌های موجود باقی است.",
+    "en": "Urgent fix: restore explicitly selected zero-day unlimited-duration subscriptions in both fast creation API and unified admin form. Reject only missing/negative validity, preserve plan zero-duration. Existing account dates/usage unchanged; retain expiry/days labels from RC.723."
   }
 }
