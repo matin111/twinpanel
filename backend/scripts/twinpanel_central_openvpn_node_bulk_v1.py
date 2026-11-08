@@ -29,7 +29,8 @@ from app.models import (
 from app.protocol_identity import is_openvpn_central_pki_enabled
 from app.node_runtime_connection import connect_protocol_runtime
 from app.services.central_openvpn_node_signer_v2 import (
-    load_or_import_node_ca, issue_client_identity, verify_client_identity,
+    load_or_import_node_ca, issue_client_identity, issue_client_identities_batch,
+    verify_client_identity,
 )
 from app.services.central_family_readiness_v1 import verify_central_family_readiness
 from app.routers import account_delivery as ad
@@ -159,9 +160,37 @@ async def run(node_id, limit, apply):
             finally:
                 conn.close()
                 await conn.wait_closed()
+        # One signing batch like the node-wide file syncs: identify missing
+        # node-local certificates before touching any customer row. Existing
+        # identities remain byte-for-byte intact and are never reissued.
+        identities={}
+        newly_issued=set()
+        if not central_pki:
+            missing_identity_ids=[]
+            for sub,cred,items in pending:
+                stored=saved_node_identity(
+                    db,cred,node_id,local_ca["cert"],
+                )
+                if stored is None:
+                    missing_identity_ids.append(int(sub.id))
+                else:
+                    identities[int(sub.id)]=stored
+            generated=issue_client_identities_batch(
+                local_ca["cert"],local_ca["private"],
+                missing_identity_ids,node_id,
+            )
+            identities.update(generated)
+            newly_issued=set(generated)
+            print("CENTRAL_OPENVPN_IDENTITY_BATCH",json.dumps({
+                "node_id":node_id,
+                "created":len(generated),
+                "reused":len(identities)-len(generated),
+                "remote_ssh_per_account":False,
+                "daemon_restarts":0,
+            }),flush=True)
         writes=0
-        # CA is imported once. Client RSA keys are issued on the controller,
-        # never on the Exit. Existing credentials on other nodes are intact.
+        # Only the controller signs; there is NO per-user node SSH, EasyRSA,
+        # user daemon restart, or change of the OpenVPN authentication format.
         for sub,cred,items in pending:
             db.refresh(sub)
             now=datetime.utcnow()
@@ -178,16 +207,14 @@ async def run(node_id, limit, apply):
             if central_pki:
                 item=await ad._openvpn(db,node,sub,user,central_identity_commit=False)
             else:
-                identity=saved_node_identity(db,cred,node_id,local_ca["cert"])
-                if identity is None:
-                    identity=issue_client_identity(
-                        local_ca["cert"],local_ca["private"],int(sub.id),node_id)
-                    verify_client_identity(identity,local_ca["cert"],int(sub.id),node_id)
-                    # Store only this Exit's new identity separately.
-                    # Never rewrite the imported/opaque historical secret.
+                identity=identities[int(sub.id)]
+                if int(sub.id) in newly_issued:
+                    verify_client_identity(
+                        identity,local_ca["cert"],int(sub.id),node_id,
+                    )
+                    # Store only a fresh node-local identity. Imported and
+                    # existing users/certificates on other Exits are untouched.
                     store_node_identity(db,"openvpn",int(sub.id),node_id,identity)
-                    # Preserve existing username of imported subscriptions.
-                    # Client certificate CN is carried in the .ovpn item.
                 item=build_node_local_client_item(db,node,sub,user,identity)
             items.append(item)
             cred.config_text_encrypted=ad._enc(items)
