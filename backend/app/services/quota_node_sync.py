@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
@@ -210,6 +211,8 @@ def _legacy_subscription_node_ids(db: Session, subscription_id: int) -> set[int]
 
 def build_node_devices(
     db: Session, node_id: int, *, source_protocols: set[str] | None = None,
+    observed_subscription_ids: set[int] | None = None,
+    observed_usernames: set[str] | None = None,
 ):
     """Build canonical runtime identities for one node.
 
@@ -228,6 +231,20 @@ def build_node_devices(
         if not allowed:
             return []
         query = query.filter(ProtocolCredential.protocol.in_(allowed))
+    if observed_subscription_ids is not None or observed_usernames is not None:
+        # An authenticated node snapshot is a candidate filter, NOT
+        # authorization. The stored active credential, its real per-node
+        # delivery membership and quota device are still verified below.
+        selected_ids = {int(value) for value in (observed_subscription_ids or set()) if int(value) > 0}
+        selected_names = {str(value).strip() for value in (observed_usernames or set()) if str(value).strip()}
+        if not selected_ids and not selected_names:
+            return []
+        conditions = []
+        if selected_ids:
+            conditions.append(ProtocolCredential.subscription_id.in_(selected_ids))
+        if selected_names:
+            conditions.append(ProtocolCredential.username.in_(selected_names))
+        query = query.filter(or_(*conditions))
     credentials = query.order_by(
         ProtocolCredential.subscription_id.asc(), ProtocolCredential.id.asc()
     ).all()
