@@ -386,21 +386,31 @@ async def install_node_background_v1(
     if host_key in _NODE_INSTALL_HOSTS_PENDING:
         raise HTTPException(status_code=409, detail="NODE_HOST_INSTALL_ALREADY_RUNNING")
 
+    # The previous asyncio.create_task() was a child of the Uvicorn API.
+    # Updating TwinPanel stopped Uvicorn and killed node #21 mid-install,
+    # leaving its persisted job "running" forever. The installer must run
+    # in an independently supervised OS process, not an API event loop.
     from ..services.node_install_progress_v1 import create_install_progress
+    from ..services.durable_node_install_launcher_v1 import (
+        launch_initial, NodeInstallDispatchError,
+    )
     job_id = create_install_progress(db, payload.name, payload.node_type == NodeType.EXIT)
     _NODE_INSTALL_PENDING.add(name_key)
     _NODE_INSTALL_HOSTS_PENDING.add(host_key)
     try:
-        task = asyncio.create_task(_install_node_in_background(
-            payload, dict(request.scope), job_id,
-        ), name=f"node-install:{payload.name}")
+        # Only a 0600 /run tmpfs file contains the initial SSH password.
+        # The supervised worker unlinks it before making an SSH connection.
+        origin = request.url.scheme + "://" + request.url.netloc
+        launch_initial(job_id, payload.model_dump(mode="json"), origin)
+    except NodeInstallDispatchError as exc:
+        _safe_install_progress(job_id, "failed", error_code=str(exc))
+        raise HTTPException(status_code=503, detail=str(exc)) from None
     except Exception:
+        _safe_install_progress(job_id, "failed", error_code="NODE_INSTALL_DISPATCH_FAILED")
+        raise HTTPException(status_code=503, detail="NODE_INSTALL_DISPATCH_FAILED") from None
+    finally:
         _NODE_INSTALL_PENDING.discard(name_key)
         _NODE_INSTALL_HOSTS_PENDING.discard(host_key)
-        _safe_install_progress(job_id, "failed", error_code="TASK_CREATE_FAILED")
-        raise
-    _NODE_INSTALL_TASKS.add(task)
-    task.add_done_callback(_NODE_INSTALL_TASKS.discard)
 
     return {
         "ok": True,
