@@ -67,7 +67,7 @@ def adapter_command(family: RuntimeFamily, node_id: int, limit: int,
 
 async def reconcile_runtime_families(
     node_id: int, limit: int, backend: Path,
-    *, families=FAMILIES, timeout_seconds=1200, max_concurrent_families=1,
+    *, families=FAMILIES, timeout_seconds=1200, max_concurrent_families=None,
 ):
     """One remote protocol-wide operation per daemon family; nothing per user.
 
@@ -80,12 +80,16 @@ async def reconcile_runtime_families(
     if (len(families) != len(set(families))
             or any(family not in FAMILIES for family in families)):
         raise RuntimeError("CENTRAL_RUNTIME_UNKNOWN_DELTA_FAMILY")
-    if node_id <= 0 or limit <= 0 or max_concurrent_families < 1:
+    if max_concurrent_families is None:
+        # Eylan-like node-wide snapshots should not wait behind unrelated
+        # service families when the controller has adequate CPU headroom.
+        # Bound to TWO disjoint families (never per subscriber) and keep
+        # small controllers serial. Sudoku remains isolated at the end.
+        max_concurrent_families=2 if (os.cpu_count() or 1)>=8 else 1
+    if (node_id <= 0 or limit <= 0 or max_concurrent_families < 1
+            or max_concurrent_families > 3):
         raise ValueError("CENTRAL_RUNTIME_INVALID_TARGET")
-    # One daemon family at a time avoids CPU/SSH/DB thrashing on small
-    # controllers. Each family still applies all users in ONE bulk operation;
-    # this is strictly NOT a per-subscriber worker or queue.
-    throttle = asyncio.Semaphore(max_concurrent_families)
+    throttle=asyncio.Semaphore(max_concurrent_families)
     async def run_family(family):
         command=adapter_command(family,node_id,limit,backend)
         async with throttle:
