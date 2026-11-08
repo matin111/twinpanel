@@ -15,6 +15,19 @@ html body.tp80-connection .traffic .stats:has(>.stat[data-tp80-quota-merged="1"]
 html body.tp80-connection .traffic .stats>.stat[data-tp80-quota-merged="1"]{display:none!important}
 html body.tp80-connection .traffic .stats>.stat[data-tp80-quota-merged="1"]:nth-child(n+4){display:none!important}
 html body.tp80-connection .traffic .stats>.stat strong[dir="ltr"]{white-space:nowrap!important}
+/* Keep the Persian quota caption centered directly beneath its LTR numeric value. */
+html body.tp80-connection .traffic .stats>.stat:nth-child(3){
+ align-items:center!important;text-align:center!important;
+}
+html body.tp80-connection .traffic .stats>.stat:nth-child(3)>small,
+html body.tp80-connection .traffic .stats>.stat:nth-child(3)>strong{
+ display:block!important;width:100%!important;max-width:100%!important;
+ margin-inline:0!important;padding-inline:0!important;text-align:center!important;
+ align-self:center!important;
+}
+html body.tp80-connection .traffic .stats>.stat:nth-child(3)>small{direction:rtl!important;unicode-bidi:plaintext!important}
+html body.tp80-connection .traffic .stats>.stat:nth-child(3)>strong{direction:ltr!important;unicode-bidi:isolate!important}
+
 @media(max-width:720px){
  html body.tp80-connection .traffic .stats:has(>.stat[data-tp80-quota-merged="1"]){grid-template-columns:repeat(2,minmax(0,1fr))!important}
  html body.tp80-connection .traffic .stats:has(>.stat[data-tp80-quota-merged="1"])>.stat{grid-column:auto!important}
