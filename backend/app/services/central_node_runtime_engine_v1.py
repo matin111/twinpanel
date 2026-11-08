@@ -96,16 +96,37 @@ async def reconcile_runtime_families(
             proc=await asyncio.create_subprocess_exec(
                 *command,cwd=str(backend),
                 env={**os.environ,"PYTHONPATH":str(backend)},
-                stdout=asyncio.subprocess.DEVNULL,
+                stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.DEVNULL,
             )
+            started=asyncio.get_running_loop().time()
             try:
-                code=await asyncio.wait_for(proc.wait(),timeout_seconds)
+                # Consume output concurrently, avoiding child pipe deadlocks.
+                # Never print raw output, which may contain config secrets.
+                out,_=await asyncio.wait_for(proc.communicate(),timeout_seconds)
+                code=proc.returncode
             except (asyncio.TimeoutError,asyncio.CancelledError):
                 proc.terminate()
                 try:await asyncio.wait_for(proc.wait(),10)
                 except asyncio.TimeoutError:proc.kill();await proc.wait()
                 raise
+            import json
+            markers=[]
+            for line in out[-65536:].decode("utf-8",errors="replace").splitlines():
+                if any(line.startswith(tag) for tag in (
+                    "CENTRAL_WIREGUARD_SAFE_STOP", "SUDOKU_SHARED_SAFE_STOP",
+                )):
+                    # Only consume a bounded, strictly allowlisted diagnostic.
+                    import re
+                    hit=re.search(r"['\\\"]reason['\\\"]\\s*:\\s*['\\\"]([A-Z0-9_]{5,90})",line)
+                    if hit:markers.append(hit.group(1))
+                    else:markers.append("SAFE_STOP_UNCLASSIFIED")
+            print("CENTRAL_FAMILY_RESULT",json.dumps({
+                "node_id":node_id,"family":family.name,
+                "exit_code":int(code),
+                "elapsed_seconds":round(asyncio.get_running_loop().time()-started,2),
+                "error_codes":markers[-2:],
+            }),flush=True)
             return family.name,int(code)
     # Sudoku's live whitelist update/verification is a single shared
     # service-wide restart. Other adapters can saturate the controller's
