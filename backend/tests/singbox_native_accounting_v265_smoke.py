@@ -17,11 +17,22 @@ def main() -> None:
         "tuic",
         "anytls",
         "naive",
-        "shadowtls",
         "snell",
         "socks5",
     }
     assert native.SINGBOX_ACCOUNTING_PROTOCOLS == expected
+    assert "shadowtls" in native.SINGBOX_UNATTRIBUTABLE_PROTOCOLS
+    active_inner = [
+        {"inbound": "twinpanel-shadowtls-inner", "inbound_type": "shadowsocks", "user": "", "closed_at_ms": 0},
+        {"inbound": "twinpanel-shadowtls-inner", "inbound_type": "shadowsocks", "user": "", "closed_at_ms": 0},
+        {"inbound": "twinpanel-shadowtls-inner", "inbound_type": "shadowsocks", "user": "", "closed_at_ms": 10},
+        {"inbound": "twinpanel-anytls-in", "inbound_type": "anytls", "user": "known", "closed_at_ms": 0},
+    ]
+    audit = native.shadowtls_attribution_diagnostic({"rows": active_inner})
+    assert audit["active_inner_connections"] == 2
+    assert audit["unattributable_connections"] == 2
+    assert audit["device_limit_verifiable"] is False
+
     assert native.SINGBOX_API_LISTEN == "127.0.0.1"
     assert native.SINGBOX_API_PORT == 19092
     assert native.SINGBOX_CLOSED_RETENTION_LIMIT == 1000
@@ -116,6 +127,9 @@ def main() -> None:
             capability = canonical.capability_payload()[protocol]
             assert capability["presence"] is True
             assert capability["traffic"] is True
+        shadow_capability = canonical.capability_payload()["shadowtls"]
+        assert shadow_capability == {"presence": False, "traffic": False}
+
     finally:
         canonical.PRESENCE_ACCOUNTING_PROTOCOLS = old_presence
         canonical.TRAFFIC_ACCOUNTING_PROTOCOLS = old_traffic
