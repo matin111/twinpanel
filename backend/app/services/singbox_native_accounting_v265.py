@@ -873,6 +873,34 @@ def _devices_by_protocol(db, node_id: int) -> dict[str, list[dict[str, Any]]]:
     return grouped
 
 
+def _salvage_singbox_devices(
+    db, *, node: Node, protocol: str, devices: list[dict[str, Any]], snapshot: dict[str, Any],
+) -> dict[str, Any]:
+    """After a failed protocol batch, account for unaffected users only.
+
+    Healthy batches do not pay per-device savepoint overhead. A corrupt
+    identity/cursor cannot suppress the entire protocol/node's presence.
+    """
+    recovered = failed = 0
+    errors: list[str] = []
+    for device in devices:
+        try:
+            with db.begin_nested():
+                apply_singbox_snapshot(
+                    db, node=node, protocol=protocol, devices=[device], snapshot=snapshot,
+                )
+            recovered += 1
+        except Exception as exc:
+            failed += 1
+            if len(errors) < 3:
+                errors.append(f"{type(exc).__name__}:{str(exc)[:120]}")
+    return {
+        "recovered_devices": recovered,
+        "failed_devices": failed,
+        "sample_errors": errors,
+    }
+
+
 async def reconcile_singbox_quota_once() -> dict[str, Any]:
     db = SessionLocal()
     results: list[dict[str, Any]] = []
@@ -940,7 +968,13 @@ async def reconcile_singbox_quota_once() -> dict[str, Any]:
                         })
                     except HTTPException as exc:
                         db.rollback()
+                        recovery = _salvage_singbox_devices(
+                            db, node=node, protocol=protocol,
+                            devices=grouped[protocol], snapshot=snapshot,
+                        )
+                        db.commit()
                         results.append({
+                            **recovery,
                             "ok": False,
                             "collector": f"singbox-{protocol}",
                             "node_id": int(node.id),
@@ -948,7 +982,13 @@ async def reconcile_singbox_quota_once() -> dict[str, Any]:
                         })
                     except Exception as exc:
                         db.rollback()
+                        recovery = _salvage_singbox_devices(
+                            db, node=node, protocol=protocol,
+                            devices=grouped[protocol], snapshot=snapshot,
+                        )
+                        db.commit()
                         results.append({
+                            **recovery,
                             "ok": False,
                             "collector": f"singbox-{protocol}",
                             "node_id": int(node.id),
