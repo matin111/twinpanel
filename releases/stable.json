@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.701",
+  "version": "1.1.0-rc.702",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-08T07:42:51Z",
+  "released_at": "2026-11-08T07:46:52Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "9dc139f3f0c1d7b2f9094e00f93cb17b1f6d5226",
+  "source_sha": "35beefb98050498d4f85d2ebd95cdba15d38f39d",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.701/twinpanel-1.1.0-rc.701-linux-x86_64.tar.gz",
-    "sha256": "57db32d4cb0ac0585063ec5a860a40dbcc3fb78b4512f2645bfc0e558ff9315e",
-    "size_bytes": 29777781
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.702/twinpanel-1.1.0-rc.702-linux-x86_64.tar.gz",
+    "sha256": "96a7bdc2ffb6614a3b7e532d61eff6e930c077c32e0dbc4756fa24da2b971b13",
+    "size_bytes": 29779133
   },
   "notes": {
-    "fa": "نسخه rc.701: جلوگیری از خطای واردکردن فایل OpenVPN در موبایل (option_error: remote option not specified). بررسی ۴۰۹۹ کانفیگ ذخیره‌شده در نمونه ۵۰۰ اکانت فعال بدون نقص remote بود؛ اما دو نود آلمان فایل‌های هم‌نام تحویل می‌دادند. نام فایل تکراری اکنون با شناسه نود یکتا می‌شود (Germany-n7 و Germany-n13)؛ دانلود مستقیم، ارسال فایل به اپلیکیشن، دانلود ZIP و مسیر قدیمی قبل از تحویل، وجود و صحت دستور remote و پروتکل OpenVPN را تأیید می‌کنند. هیچ گواهی، کلید، UUID، سرویس یا کانفیگ ذخیره‌شده کاربر تغییر نمی‌کند. اصلاحات امن Xray نسخه rc.700 نیز حفظ شده است. فایل‌های قدیمی که قبلاً روی گوشی ذخیره شده‌اند باید پس از آپدیت دوباره دانلود شوند؛ برای تأیید علت همان فایل خراب، بررسی فایل دریافت‌شده از دستگاه لازم است.",
-    "en": "rc.701: Prevent malformed OpenVPN Connect imports (missing remote). Read-only production sample: 4,099 saved profiles across 500 active credential records had valid remote directives; duplicate Germany profiles shared an ambiguous filename. Deduplicate same-country attachment filenames by node ID, validate client/proto/remote across native HTTP downloads, legacy downloads, bulk ZIP and browser-native file sharing; fail closed instead of emitting broken .ovpn. No changes to client certificates, private keys, existing server listeners or stored account configs. Includes all rc.700 Xray fixes."
+    "fa": "اصلاح ریشه‌ای ثبت آنلاین پروتکل‌های مدرن از جمله AnyTLS برای اشتراک‌های فعال قدیمی که مدت اعتبار ثبت‌شده ندارند: نشست فقط در صورت مشاهده مستقیم توسط API معتبر نود ثبت می‌شود. خطای subscription_activation_duration_missing دیگر نباید ثبت همه کاربران نود را متوقف کند. محدودیت دستگاه، حجم و وضعیت اشتراک رعایت می‌شوند؛ پذیرش اتصال جدید بدون مدت همچنان اعتبارسنجی مستقل دارد. بدون تغییر کانفیگ VPN یا اطلاعات اشتراک.",
+    "en": "Correct authoritative AnyTLS/sing-box modern live presence for active legacy subscriptions lacking stored duration. Trusted node-observed sessions use observed_telemetry=True; strict ordinary admission, device, traffic and subscription enforcement unchanged. Do not modify VPN credentials or node configuration."
   }
 }
