@@ -2645,11 +2645,13 @@ async def install_node(
         subscription_sync = {
             "ok": True, "skipped": True, "reason": "not_run",
         }
-        if payload.defer_subscription_sync or node.node_type == NodeType.EXIT:
-            # No Exit installation path may enter the legacy per-user
-            # provisioning function, even if a caller forgot to set
-            # defer_subscription_sync. The central daemon-level engine
-            # owns registration after health validation.
+        if node.node_type == NodeType.IRAN:
+            # Iran is ingress/tunnel infrastructure only. Never attach
+            # subscriptions, generate customer VPN credentials, or enqueue
+            # per-account provisioning when registering this relay.
+            subscription_sync["reason"] = "iran_tunnel_only"
+        elif payload.defer_subscription_sync or node.node_type == NodeType.EXIT:
+            # Exit credentials belong to the central runtime after verification.
             subscription_sync["reason"] = "deferred_to_central_runtime"
         else:
             try:
