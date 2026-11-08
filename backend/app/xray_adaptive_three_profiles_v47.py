@@ -6,6 +6,8 @@ import shlex
 from typing import Any
 from urllib.parse import parse_qs, quote, urlencode, urlsplit
 
+from sqlalchemy import text
+
 from . import (
     tunnel_service_connections_admin_runtime,
     xray_customer_profile_policy_v30 as policy_v30,
@@ -57,6 +59,29 @@ def _effective_domain(node: Node | None) -> str:
     # Only explicit xray_domain enables WS/TCP TLS profiles. New Exits without
     # one must use the existing XHTTP/TCP REALITY path instead.
     return str(getattr(node, "xray_domain", None) or "").strip().lower()
+
+
+def _effective_domain_from_db(db, node: Node | None) -> str:
+    """Read the dedicated Xray TLS domain from the canonical DB column.
+
+    Some deployed Node ORM models do not map nodes.xray_domain even though
+    the migration has already added it. Without this check, the route builder
+    blindly added domainless REALITY routes to TLS Exits. This is metadata
+    only; never infer TLS from shared public_domain or untrusted customer URI.
+    """
+    known=_effective_domain(node)
+    if known or node is None:
+        return known
+    try:
+        value=db.execute(
+            text("SELECT xray_domain FROM nodes WHERE id = :node_id"),
+            {"node_id":int(node.id)},
+        ).scalar()
+    except Exception:
+        # Do not block existing legacy/self-hosted installations without the
+        # optional column. Live Xray authority remains the delivery gate.
+        return ""
+    return str(value).strip().lower() if isinstance(value,str) else ""
 
 
 def _tcp_reality_target_port(base_port: int) -> int:
@@ -421,7 +446,7 @@ def _service_routes_v47(
 
     routes = list(_original_service_routes(db, exit_node, exit_tunnel_ip))
 
-    if _effective_domain(exit_node):
+    if _effective_domain_from_db(db,exit_node):
         return routes
 
     cfg = (
