@@ -17,6 +17,8 @@ import json
 import os
 import re
 import sys
+import time
+import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
@@ -57,11 +59,25 @@ def request(url, accept="application/vnd.github+json"):
     )
 
 
+def open_official(req,timeout):
+    for attempt in range(4):
+        try:
+            return urllib.request.urlopen(req,timeout=timeout)
+        except (urllib.error.URLError,TimeoutError) as exc:
+            if isinstance(exc,urllib.error.HTTPError) and exc.code not in (
+                429,500,502,503,504,
+            ):
+                raise SystemExit("GITHUB_ASSET_REQUEST_REJECTED") from exc
+            if attempt == 3:
+                raise SystemExit("GITHUB_ASSET_NETWORK_UNAVAILABLE") from exc
+            time.sleep(2**attempt)
+
+
 metadata_url = (
     "https://api.github.com/repos/"
     + owner + "/" + repo + "/releases/tags/" + tag
 )
-with urllib.request.urlopen(request(metadata_url),timeout=28) as response:
+with open_official(request(metadata_url),timeout=28) as response:
     metadata = json.load(response)
 assets = [
     item for item in metadata.get("assets",[]) if isinstance(item,dict)
@@ -88,7 +104,7 @@ partial = target.with_name(target.name + ".verified.partial")
 size = 0
 sha = hashlib.sha256()
 try:
-    with urllib.request.urlopen(
+    with open_official(
         request(url, "application/octet-stream"), timeout=45,
     ) as response, partial.open("wb") as handle:
         os.chmod(partial,0o600)
