@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.678",
+  "version": "1.1.0-rc.679",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-07T23:41:13Z",
+  "released_at": "2026-11-08T01:24:47Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "1c6906624c774b1b423665d723773b551b307896",
+  "source_sha": "687befe42a2424e5cfbb7b7efb1abca74a02b21f",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.678/twinpanel-1.1.0-rc.678-linux-x86_64.tar.gz",
-    "sha256": "7e7d1261d81f9fcb3134f53598b45f0efdbeca1c89f330b8cea2ebb780313ebf",
-    "size_bytes": 29629121
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.679/twinpanel-1.1.0-rc.679-linux-x86_64.tar.gz",
+    "sha256": "155436875b3b371eb7c4d0a5cbc2a0186e2bf1a5b5ced6caaf9a4b4c77bb658e",
+    "size_bytes": 29633605
   },
   "notes": {
-    "fa": "نسخه rc.678: اصلاح کامل مسیر افزودن نود Exit به Bootstrap مستقل مدیریت مرکزی. حذف فراخوانی نصب‌کننده قدیمی برای نود Exit جدید و عدم کپی پورت، رمز یا تنظیمات پروتکل از نودهای قدیمی. نصب مستقل پروتکل‌های مدرن از کاتالوگ رسمی با تنظیمات پیشنهادی، آماده‌سازی WireGuard برای ساخت دسته‌ای کاربران با محدوده 10.96/21 و NAT بدون ری‌استارت اینترفیس فعال، و نگه‌داشتن نود مخفی تا تکمیل تأیید واقعی و ساخت مرکزی. نصب نود ایران از مسیر پیشین باقی می‌ماند و اطلاعات اشتراک‌های موجود تغییر نمی‌کنند.",
-    "en": "rc.678: Route brand-new Exit add-server requests through dedicated central-first daemon bootstrap instead of legacy install_node. Install modern protocol listeners from catalog-recommended presets without cloning settings or secrets from other Exits. Safely prepare fresh empty WireGuard interfaces for central 10.96/21 peer pool with persistent NAT and no interface restart. Retain hidden-node publication gate, central bulk account ownership, existing Iran relay pathway and existing customer subscription records."
+    "fa": "نسخه rc.679: افزایش سرعت ثبت دسته‌ای اکانت‌های OpenVPN در مدیریت مرکزی. تولید موازی کلیدهای RSA-2048 و امضای گواهی‌ها برای اشتراک‌هایی که هنوز روی نود تازه هویت ندارند، با همان CA معتبر خود سرور؛ بدون تغییر کلیدها، کانفیگ‌ها، رمز، حجم و تاریخ انقضای اشتراک‌های قدیمی. اعتبارسنجی CA فقط یک بار برای کل دسته انجام می‌شود، ساخت بدون SSH به‌ازای هر کاربر و بدون ری‌استارت مکرر است. خانواده‌های مستقل پروتکل روی کنترلر دارای حداقل ۸ هسته با حداکثر دو مسیر هم‌زمان اجرا می‌شوند؛ Sudoku همچنان جداگانه اجرا می‌شود و کنترلرهای کوچک سری باقی می‌مانند. تا پوشش کانفیگ و سلامت نود جدید تأیید نشود نود مخفی می‌ماند.",
+    "en": "rc.679 accelerates central first-time OpenVPN Exit bulk provisioning by parallel RSA-2048 client leaf identity generation against the existing trusted node CA, validating the CA once. Existing per-node client identities are preserved byte-for-byte. No per-user SSH, EasyRSA or daemon restarts, no changes to legacy user credentials, quotas or expiry. Independent protocol snapshot families run with at most two concurrent lanes on controllers with >=8 logical CPUs, remaining serial on smaller controllers, with Sudoku isolated. Hidden-node coverage and live health gates remain unchanged."
   }
 }
