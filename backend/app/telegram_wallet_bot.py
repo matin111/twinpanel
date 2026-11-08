@@ -363,14 +363,35 @@ def create_wallet_router(request_fn, session_fn):
             await message.answer("❌ حجم رسید نباید بیشتر از ۱۲ مگابایت باشد.")
             return
 
+        import asyncio
+        import logging
+        logger = logging.getLogger("twinpanel.wallet.receipt")
+        raw = b""
+        for attempt in range(3):
+            try:
+                content = BytesIO()
+                await message.bot.download(item, destination=content, timeout=35)
+                raw = content.getvalue()
+                if raw:
+                    break
+                raise ValueError("empty_telegram_download")
+            except Exception as exc:
+                # Do not print the Telegram file_id, path, receipt or identity.
+                logger.warning(
+                    "WALLET_RECEIPT_DOWNLOAD_RETRY attempt=%d type=%s",
+                    attempt + 1, type(exc).__name__,
+                )
+                if attempt == 2:
+                    await message.answer(
+                        "❌ دریافت تصویر از تلگرام ناموفق بود. "
+                        "لطفاً عکس را یک‌بار دیگر ارسال کنید."
+                    )
+                    return
+                await asyncio.sleep(1 + attempt)
+        if len(raw) > limit:
+            await message.answer("❌ حجم رسید نباید بیشتر از ۱۲ مگابایت باشد.")
+            return
         try:
-            content = BytesIO()
-            await message.bot.download(item, destination=content)
-            raw = content.getvalue()
-            if not raw or len(raw) > limit:
-                await message.answer("❌ فایل رسید خالی یا بزرگ‌تر از ۱۲ مگابایت است.")
-                return
-            import asyncio
             from .services.telegram_wallet_receipt_store_v1 import store_telegram_wallet_receipt
             result = await asyncio.to_thread(
                 store_telegram_wallet_receipt,
@@ -379,9 +400,15 @@ def create_wallet_router(request_fn, session_fn):
                 content=raw,
                 content_type=content_type,
             )
-        except Exception:
+        except Exception as exc:
+            # Structured failure category, no PII or receipt content.
+            logger.error("WALLET_RECEIPT_STORE_FAILED type=%s reason=%s",
+                type(exc).__name__,
+                str(exc) if type(exc).__name__ == "ReceiptStoreError" else "UNCLASSIFIED",
+            )
             await message.answer(
-                "❌ دریافت یا ثبت عکس رسید ناموفق بود؛ لطفاً دوباره همین عکس را ارسال کنید."
+                "❌ ثبت رسید انجام نشد؛ عکس را مجدد ارسال کنید. "
+                "هیچ پرداختی از این مسیر تأیید یا شارژ نشده است."
             )
             return
 
