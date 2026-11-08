@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.678",
-  "source_sha": "1c6906624c774b1b423665d723773b551b307896",
+  "version": "1.1.0-rc.679",
+  "source_sha": "687befe42a2424e5cfbb7b7efb1abca74a02b21f",
   "notes": {
-    "fa": "نسخه rc.678: اصلاح کامل مسیر افزودن نود Exit به Bootstrap مستقل مدیریت مرکزی. حذف فراخوانی نصب‌کننده قدیمی برای نود Exit جدید و عدم کپی پورت، رمز یا تنظیمات پروتکل از نودهای قدیمی. نصب مستقل پروتکل‌های مدرن از کاتالوگ رسمی با تنظیمات پیشنهادی، آماده‌سازی WireGuard برای ساخت دسته‌ای کاربران با محدوده 10.96/21 و NAT بدون ری‌استارت اینترفیس فعال، و نگه‌داشتن نود مخفی تا تکمیل تأیید واقعی و ساخت مرکزی. نصب نود ایران از مسیر پیشین باقی می‌ماند و اطلاعات اشتراک‌های موجود تغییر نمی‌کنند.",
-    "en": "rc.678: Route brand-new Exit add-server requests through dedicated central-first daemon bootstrap instead of legacy install_node. Install modern protocol listeners from catalog-recommended presets without cloning settings or secrets from other Exits. Safely prepare fresh empty WireGuard interfaces for central 10.96/21 peer pool with persistent NAT and no interface restart. Retain hidden-node publication gate, central bulk account ownership, existing Iran relay pathway and existing customer subscription records."
+    "fa": "نسخه rc.679: افزایش سرعت ثبت دسته‌ای اکانت‌های OpenVPN در مدیریت مرکزی. تولید موازی کلیدهای RSA-2048 و امضای گواهی‌ها برای اشتراک‌هایی که هنوز روی نود تازه هویت ندارند، با همان CA معتبر خود سرور؛ بدون تغییر کلیدها، کانفیگ‌ها، رمز، حجم و تاریخ انقضای اشتراک‌های قدیمی. اعتبارسنجی CA فقط یک بار برای کل دسته انجام می‌شود، ساخت بدون SSH به‌ازای هر کاربر و بدون ری‌استارت مکرر است. خانواده‌های مستقل پروتکل روی کنترلر دارای حداقل ۸ هسته با حداکثر دو مسیر هم‌زمان اجرا می‌شوند؛ Sudoku همچنان جداگانه اجرا می‌شود و کنترلرهای کوچک سری باقی می‌مانند. تا پوشش کانفیگ و سلامت نود جدید تأیید نشود نود مخفی می‌ماند.",
+    "en": "rc.679 accelerates central first-time OpenVPN Exit bulk provisioning by parallel RSA-2048 client leaf identity generation against the existing trusted node CA, validating the CA once. Existing per-node client identities are preserved byte-for-byte. No per-user SSH, EasyRSA or daemon restarts, no changes to legacy user credentials, quotas or expiry. Independent protocol snapshot families run with at most two concurrent lanes on controllers with >=8 logical CPUs, remaining serial on smaller controllers, with Sudoku isolated. Hidden-node coverage and live health gates remain unchanged."
   }
 }
