@@ -121,7 +121,7 @@ class RealWorkerLivenessTests(unittest.TestCase):
     def test_code_does_not_use_api_owned_create_task_for_install(self):
         route=Path(router.__file__).read_text(encoding="utf-8")
         begin=route.index("async def install_node_background_v1(")
-        body=route[begin:route.find("\n@router.",begin)+1 or None]
+        body=route[begin:]
         self.assertIn("launch_initial(job_id",body)
         self.assertNotIn("asyncio.create_task(_install_node_in_background(",body)
 
