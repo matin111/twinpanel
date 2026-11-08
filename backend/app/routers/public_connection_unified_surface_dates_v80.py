@@ -1531,6 +1531,20 @@ html[data-theme] body.tp80-connection.ref67 .protocol-panel .tp92-v2-country-bar
  border-color:#10b981!important;
  box-shadow:0 0 0 1px color-mix(in srgb,#10b981 25%,transparent)!important;
 }
+/* TWINPANEL_CISCO_COUNTRY_LIVE_STATE_V104
+   Original Cisco / OpenConnect UI uses .server-tabs[data-country-code]
+   rather than the newer country filter controls. Both must reflect the same
+   actual per-node Cisco presence reported by /live. */
+html[data-theme] body.tp80-connection.ref67 .protocol-panel .server-tabs button.server-tab.live-online{
+ background:linear-gradient(120deg,#047857,#10b981)!important;
+ color:#fff!important;
+ border-color:#10b981!important;
+ box-shadow:0 0 0 2px color-mix(in srgb,#10b981 22%,transparent)!important;
+}
+html[data-theme] body.tp80-connection.ref67 .protocol-choice.live-online{
+ background:color-mix(in srgb,#10b981 8%,var(--surface,#fff))!important;
+ border-color:#10b981!important;
+}
 /* TWINPANEL_CONNECTION_ENGLISH_UI_DIGITS_V101 */
 html body.tp80-connection .traffic,
 html body.tp80-connection .protocol-panel,
