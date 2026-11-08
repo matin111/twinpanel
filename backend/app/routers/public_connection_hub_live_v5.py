@@ -165,9 +165,9 @@ _LIVE_SCRIPT = r"""
       if(panel){
         panel.classList.toggle('live-online',online);
         panel.querySelectorAll(
-          '.tp80-country-bar button,.tp92-v2-country-bar button,.tp93-country-bar button'
+          '.tp80-country-bar button,.tp92-v2-country-bar button,.tp93-country-bar button,.server-tabs button[data-country-code]'
         ).forEach(chip=>{
-          const country=String(chip.dataset.tp80Country||chip.dataset.country||'').toUpperCase();
+          const country=String(chip.dataset.tp80Country||chip.dataset.country||chip.dataset.countryCode||'').toUpperCase();
           chip.classList.toggle('live-online',online&&country!=='ALL'&&countries.has(country));
         });
       }
