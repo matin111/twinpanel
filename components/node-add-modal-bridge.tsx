@@ -197,7 +197,11 @@ export function NodeAddModalBridge(){
     if(busy)return;
     setBusy("test");setError("");setOk("");
     try{await parityApi.provisionTest({host:draft.host.trim(),port:draft.port,username:draft.username.trim()||"root",password:draft.password});setOk(pick("اتصال SSH و سیستم‌عامل سرور تایید شد.","SSH connection and server OS verified."));}
-    catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
+    catch(reason){
+      const detail=reason instanceof Error?reason.message:String(reason);
+      const guidance=NODE_INSTALL_FAILURE_GUIDANCE[detail];
+      setError(guidance?pick(...guidance):detail);
+    }
     finally{setBusy("");}
   };
 
