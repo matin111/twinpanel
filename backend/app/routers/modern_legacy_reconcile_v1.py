@@ -17,8 +17,15 @@ from ..models import (
     Subscription,
     SubscriptionProtocol,
     SubscriptionStatus,
+    User,
 )
-from ..protocol_account_registry import MODERN_PROTOCOL_KEYS
+from ..protocol_account_registry import MODERN_PROTOCOL_KEYS as REGISTRY_MODERN_PROTOCOL_KEYS
+
+# Reconcile is a delivery-repair inventory, not the plan-family registry:
+# V2Ray is classic for plan/UI purposes, but missing VLESS credentials need
+# the same durable retry worker as recently purchased Modern protocols.
+# Do NOT globally reclassify V2Ray or change entitlements.
+MODERN_PROTOCOL_KEYS = ("v2ray", *REGISTRY_MODERN_PROTOCOL_KEYS)
 
 
 logger = logging.getLogger(__name__)
@@ -49,6 +56,17 @@ def credential_state(credential: ProtocolCredential | None) -> str:
 
     has_secret = bool(str(credential.secret_encrypted or "").strip())
     has_config = bool(str(credential.config_text_encrypted or "").strip())
+
+    # VLESS credentials intentionally do not store a password/secret: the
+    # identity is in their encrypted URI/profile payload. The generic
+    # 'secret and config' check incorrectly classified all valid V2Ray
+    # accounts as partial, so retry workers could never converge them.
+    if str(credential.protocol or "").strip().lower() == "v2ray":
+        if has_config and bool(credential.is_active):
+            return "complete"
+        if has_config or has_secret:
+            return "partial"
+        return "legacy_empty"
 
     if has_secret and has_config:
         return "complete"
@@ -106,6 +124,35 @@ def _reconcile_credential_state(credential: ProtocolCredential | None) -> str:
             return "legacy_amneziawg_egress"
 
     return state
+
+
+async def _provision_missing_v2ray(
+    ad: Any, db: Session, sub: Subscription, nodes: list[Any],
+) -> tuple[list[dict[str, Any]], list[dict[str, str]]]:
+    """Retry only VLESS, reusing existing identity and never other protocols.
+
+    No account creation, quota reset, PKI rotation, Xray global restart, or
+    node bootstrap here. The normal idempotent account driver uses the same
+    HandlerService per-user hot-sync contract as a new purchase.
+    """
+    from .modern_account_delivery_v1 import _provision_classic_protocol
+    from ..v2ray_provision_idempotency_v1 import (
+        _deterministic_v2ray_uuid, _existing_v2ray_uuid,
+    )
+
+    user = db.get(User, int(sub.user_id))
+    if user is None:
+        return [], [{"protocol": "v2ray", "error": "account_owner_missing"}]
+    ident = (
+        _existing_v2ray_uuid(ad, db, sub)
+        or _deterministic_v2ray_uuid(sub.id)
+    )
+    return await _provision_classic_protocol(
+        ad, db, sub, user, "v2ray", nodes,
+        str(sub.account_username or ad._safe_username(sub, user)),
+        "",  # VLESS has no account password; never rotate Cisco/L2TP.
+        ident,
+    )
 
 
 def _selected_modern_protocols(db: Session, subscription_id: int) -> list[str]:
@@ -305,13 +352,14 @@ async def _reconcile_subscription_modern_accounts(
                 )
                 continue
 
-            items, protocol_errors = await _provision_modern_protocol(
-                ad,
-                db,
-                sub,
-                protocol,
-                nodes,
-            )
+            if protocol == "v2ray":
+                items, protocol_errors = await _provision_missing_v2ray(
+                    ad, db, sub, nodes,
+                )
+            else:
+                items, protocol_errors = await _provision_modern_protocol(
+                    ad, db, sub, protocol, nodes,
+                )
 
             if protocol_errors:
                 result["ok"] = False
