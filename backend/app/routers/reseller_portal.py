@@ -2111,7 +2111,16 @@ async def reseller_edit_subscription(
     if payload.node_ids is not None:
         if not payload.node_ids:
             raise HTTPException(status_code=422, detail="حداقل یک سرور خروجی انتخاب کنید")
-        target_node_ids = allowed_nodes(db, reseller, payload.node_ids)
+        existing_node_ids = {int(n[0]) for n in db.query(SubscriptionNode.node_id).filter(
+            SubscriptionNode.subscription_id == sub.id
+        ).all()}
+        requested = list(dict.fromkeys(int(node_id) for node_id in payload.node_ids))
+        newly_added = [node_id for node_id in requested if node_id not in existing_node_ids]
+        if newly_added:
+            allowed_nodes(db, reseller, newly_added)
+        # Keep grandfathered assignments if the reseller tier was narrowed;
+        # newly requested destinations must always satisfy current entitlements.
+        target_node_ids = requested
 
     # Reseller changes may only use protocols authorized by their own tier.
     selected_protocols = None
