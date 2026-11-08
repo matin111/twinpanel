@@ -277,6 +277,37 @@ async def _issue_certificate(
             },
         )
 
+    # ACME is contacted by the remote node, not by the control plane.
+    # Fail before package installation/firewall changes when egress is blocked;
+    # otherwise a 600-second SSH command causes Cloudflare 524 and holds DB
+    # sessions for the entire request. IPv4 avoids broken IPv6 default routes.
+    acme_reachable = await provision.cmd(
+        conn,
+        (
+            "curl -4 -fsS -o /dev/null "
+            "--connect-timeout 5 --max-time 9 "
+            "https://acme-v02.api.letsencrypt.org/directory "
+            "&& echo ACME_REACHABLE"
+        ),
+        check=False,
+        timeout=14,
+    )
+    if "ACME_REACHABLE" not in str(acme_reachable):
+        raise HTTPException(
+            status_code=424,
+            detail={
+                "code": "xray_tls_acme_unreachable",
+                "message": (
+                    "صدور SSL ممکن نیست: ارتباط خروجی HTTPS نود با "
+                    "Let's Encrypt برقرار نیست. DNS-01 یا دسترسی ACME "
+                    "را تنظیم کنید؛ دامنه و سرویس‌های موجود تغییر نکردند."
+                ),
+                "domain": domain,
+                "node_id": int(node.id),
+                "retryable": True,
+            },
+        )
+
     await provision.cmd(
         conn,
         (
@@ -284,12 +315,12 @@ async def _issue_certificate(
             "|| ! command -v openssl >/dev/null 2>&1 "
             "|| ! command -v socat >/dev/null 2>&1; then "
             "export DEBIAN_FRONTEND=noninteractive; "
-            "apt-get -o DPkg::Lock::Timeout=300 update -y >/dev/null 2>&1; "
-            "apt-get -o DPkg::Lock::Timeout=300 install -y "
+            "apt-get -o DPkg::Lock::Timeout=30 update -y >/dev/null 2>&1; "
+            "apt-get -o DPkg::Lock::Timeout=30 install -y "
             "curl openssl socat >/dev/null; "
             "fi"
         ),
-        timeout=600,
+        timeout=55,
     )
 
     if not await _certificate_available(
@@ -309,13 +340,13 @@ async def _issue_certificate(
                 "curl -fsSL https://get.acme.sh "
                 "| sh >/dev/null; "
                 "fi; "
-                "/root/.acme.sh/acme.sh "
+                "timeout 65s /root/.acme.sh/acme.sh "
                 "--issue --standalone "
                 f"-d {shlex.quote(domain)} "
                 "--keylength ec-256 "
                 "--server letsencrypt"
             ),
-            timeout=600,
+            timeout=75,
         )
 
     if not await _certificate_available(
