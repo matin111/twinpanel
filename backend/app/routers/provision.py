@@ -2500,6 +2500,49 @@ async def install_node(
             await remote_supported_os_id(conn)
         except NodeOSPreflightError as exc:
             raise HTTPException(status_code=422, detail=exc.code) from None
+        # Iran relays are SSH-only registrations. Never run apt, agent,
+        # VPN daemon, fabric bootstrap, or subscription provisioning here.
+        # Tunnel services are installed only when an admin creates a tunnel.
+        if payload.node_type == NodeType.IRAN:
+            existing_ip = db.query(Node).filter(
+                Node.retired_at.is_(None),
+                Node.public_ip == payload.host,
+            ).first()
+            if existing_ip:
+                raise HTTPException(status_code=409, detail="NODE_HOST_ALREADY_REGISTERED")
+            node = Node(
+                name=payload.name, node_type=NodeType.IRAN,
+                country_code="IR", public_ip=payload.host,
+                agent_url=f"https://{payload.host}:9443",
+                status=NodeStatus.OFFLINE, show_to_users=True,
+                capacity_users=payload.capacity_users,
+                enable_cisco=False, enable_openvpn=False,
+                enable_wireguard=False, enable_l2tp=False,
+                enable_v2ray=False,
+            )
+            db.add(node)
+            db.flush()
+            # This persists only a management SSH key; no remote packages.
+            await _ensure_node_key_on_remote(
+                conn, db, node, payload.port, payload.username,
+            )
+            node.status = NodeStatus.ONLINE
+            db.commit()
+            return {
+                "ok": True, "node_id": node.id,
+                "node_name": node.name, "status": "registered",
+                "protocols": {}, "failed_protocols": [],
+                "one_time_secrets": {},
+                "agent": {"ok": True, "skipped": True, "reason": "iran_ssh_only"},
+                "quota": {"ok": True, "skipped": True, "reason": "iran_tunnel_only"},
+                "subscription_sync": {
+                    "ok": True, "skipped": True, "reason": "iran_tunnel_only",
+                },
+                "fabric": {"ok": True, "skipped": True, "reason": "tunnel_on_demand"},
+                "access_saved": True,
+                "message": "نود ایران بدون نصب سرویس، فقط برای مدیریت تانل ثبت شد",
+            }
+
         await ensure_base(conn)
         node=Node(name=payload.name,node_type=payload.node_type,country_code="IR" if payload.node_type==NodeType.IRAN else payload.country_code.upper(),public_ip=payload.host,agent_url=f"https://{payload.host}:9443",status=NodeStatus.OFFLINE,show_to_users=(payload.node_type != NodeType.EXIT or not payload.defer_subscription_sync),capacity_users=payload.capacity_users,enable_cisco=False,enable_openvpn=False,enable_wireguard=False,enable_l2tp=False,enable_v2ray=False)
         db.add(node); db.commit(); db.refresh(node)
