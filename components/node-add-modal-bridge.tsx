@@ -223,7 +223,7 @@ export function NodeAddModalBridge(){
       {ok?<div className="runtime-success">{ok}</div>:null}
       {jobId?<div>
         <NodeInstallProgress job={job} error={jobError}/>
-        {job?.state==="failed"&&job.error_code==="PROTOCOL_SETUP_INCOMPLETE"&&job.node_id?
+        {job?.state==="failed"&&["PROTOCOL_SETUP_INCOMPLETE","CISCO_REPAIR_FAILED"].includes(job.error_code||"")&&job.node_id?
           <div className="runtime-choice-section">
             <div className="runtime-warning">{pick("نصب یک پروتکل ناقص مانده است. فقط Cisco را ترمیم کن؛ ۱۵ پروتکل سالم دوباره نصب نمی‌شوند.","One protocol is incomplete. Repair only Cisco; do not reinstall the 15 healthy protocols.")}</div>
             <label className="toggle module-toggle"><span>{pick("بعد از تأیید همه ۱۶ پروتکل، نود برای کاربران مجاز نمایش داده شود","Publish to eligible users after all 16 services pass health checks")}</span><input type="checkbox" checked={publishAfterRepair} onChange={e=>setPublishAfterRepair(e.target.checked)}/><i/></label>
