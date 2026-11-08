@@ -113,7 +113,7 @@ _LIVE_SCRIPT = r"""
   const gib=1024*1024*1024,mib=1024*1024,kib=1024;
   const byId=id=>document.getElementById(id);
   const used=byId('liveUsed'),remaining=byId('liveRemaining'),total=byId('liveTotal');
-  const start=byId('liveStart'),expire=byId('liveExpire'),percent=byId('livePercent');
+  const start=byId('liveStart'),expire=byId('liveExpire'),expiryDays=byId('liveExpiryDays'),percent=byId('livePercent');
   const donut=byId('trafficDonut'),status=byId('liveStatus'),traffic=byId('trafficCard'),deviceLimit=byId('liveDeviceLimit'),deviceActive=byId('liveActiveSessions');
   let previous='';
 
@@ -131,6 +131,22 @@ _LIVE_SCRIPT = r"""
     if(Number.isNaN(d.getTime()))return '—';
     const p=v=>String(v).padStart(2,'0');
     return d.getUTCFullYear()+'/'+p(d.getUTCMonth()+1)+'/'+p(d.getUTCDate());
+  }
+  function validityLabel(payload){
+    const configured=Math.max(0,Math.trunc(Number(payload.activation_duration_days||0)));
+    const unlimited=payload.duration_unlimited===true;
+    const expiry=payload.expires_at?new Date(payload.expires_at):null;
+    const validExpiry=expiry&&!Number.isNaN(expiry.getTime());
+    if(validExpiry){
+      const remaining=Math.max(0,Math.ceil((expiry.getTime()-Date.now())/86400000));
+      return configured>0
+        ?nf.format(configured)+' روزه · '+nf.format(remaining)+' روز باقی‌مانده'
+        :nf.format(remaining)+' روز باقی‌مانده';
+    }
+    if(unlimited)return 'مدت نامحدود';
+    if(configured>0&&!payload.starts_at)return nf.format(configured)+' روز · شروع با اولین اتصال';
+    if(configured>0)return nf.format(configured)+' روز · تاریخ انقضا نامشخص';
+    return 'مدت تعیین نشده';
   }
   function flash(el){
     if(!el)return;
@@ -191,7 +207,8 @@ _LIVE_SCRIPT = r"""
     write(remaining,quota(payload.remaining_bytes,payload.unlimited));
     write(total,quota(payload.total_bytes,payload.unlimited));
     write(start,date(payload.starts_at));
-    write(expire,date(payload.expires_at));
+    write(expire,payload.duration_unlimited===true&&!payload.expires_at?'نامحدود':date(payload.expires_at));
+    write(expiryDays,validityLabel(payload));
     write(percent,payload.unlimited?'∞':nf.format(pct)+'%');
     const cap=Number(payload.device_limit||0),activeSessions=Math.max(0,Number(payload.active_sessions||0));
     write(deviceLimit,cap===0?'نامحدود':nf.format(cap)+' دستگاه');
@@ -221,6 +238,8 @@ _LIVE_SCRIPT = r"""
       payload.remaining_bytes,
       payload.starts_at,
       payload.expires_at,
+      payload.activation_duration_days,
+      payload.duration_unlimited,
       payload.active_sessions,
       payload.device_limit,
       payload.connection_online,
@@ -349,7 +368,7 @@ def public_connection_hub_live_v5(
         '<div class="stat"><small>تعداد متصل</small><strong id="liveActiveSessions">—</strong></div>'
         '<div class="stat"><small>مصرف‌شده</small><strong id="liveUsed">—</strong></div>'
         '<div class="stat"><small>باقی‌مانده</small><strong id="liveRemaining">—</strong></div>'
-        '<div class="stat"><small>تاریخ انقضا</small><strong id="liveExpire">—</strong></div>'
+        '<div class="stat"><small>تاریخ انقضا</small><strong id="liveExpire">—</strong><span id="liveExpiryDays" class="tp-expiry-days" style="display:block;margin-top:5px;font-size:11px;line-height:1.6;color:#b5c7e5;white-space:normal">—</span></div>'
         '</div>'
         # Preserve invisible legacy bindings that the live-refresh JS expects.
         '<span id="liveTotal" hidden></span><span id="liveStart" hidden></span>'
