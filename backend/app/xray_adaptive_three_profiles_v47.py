@@ -54,11 +54,31 @@ _original_admin_status_remote = None
 def _effective_domain(node: Node | None) -> str:
     if node is None:
         return ""
-    # The node's public_domain can be an Iran-tunnel host shared with other
-    # Exits. It is not proof of a dedicated TLS Xray endpoint/certificate.
-    # Only explicit xray_domain enables WS/TCP TLS profiles. New Exits without
-    # one must use the existing XHTTP/TCP REALITY path instead.
-    return str(getattr(node, "xray_domain", None) or "").strip().lower()
+    # public_domain is often a shared Iran-tunnel host and is NOT proof of
+    # node-owned TLS. Legacy Node SQLAlchemy models omit xray_domain even
+    # though the real PostgreSQL nodes table has it. Read that column only
+    # for real ORM Nodes, once per Session instance, with a safe JSONB
+    # projection (the column may not exist on very old installations).
+    direct=str(getattr(node,"xray_domain",None) or "").strip().lower()
+    if direct or not isinstance(node,Node):
+        return direct
+    marker="_tp_xray_domain_for_profile_policy_v50"
+    cached=getattr(node,marker,None)
+    if isinstance(cached,str):
+        return cached
+    try:
+        from .database import SessionLocal
+        with SessionLocal() as db:
+            result=db.execute(
+                text("SELECT to_jsonb(n)->>'xray_domain' FROM nodes n "
+                     "WHERE n.id = :node_id"),
+                {"node_id":int(node.id)},
+            ).scalar()
+        domain=str(result or "").strip().lower() if isinstance(result,(str,type(None))) else ""
+    except Exception:
+        domain=""
+    setattr(node,marker,domain)
+    return domain
 
 
 def _effective_domain_from_db(db, node: Node | None) -> str:
@@ -499,10 +519,22 @@ def _required_profiles_v47(node: Node) -> set[str]:
             xray_modern_runtime.PROFILE_XHTTP,
             PROFILE_TCP_TLS,
         }
-    return {
+    required={
         xray_modern_runtime.PROFILE_XHTTP,
         PROFILE_TCP_REALITY,
     }
+    # A mother/core is diagnostics-only during rollout. Never require a
+    # third inbound there (which would trigger unexpected maintenance).
+    if not (
+        bool(getattr(node,"is_mother",False))
+        or bool(getattr(node,"is_local_core",False))
+        or getattr(node,"agent_url",None)=="local://core"
+    ):
+        # All customer-facing non-TLS Exits require an actually verified
+        # third secure profile. Existing two-profile items are incomplete
+        # and must be reconciled, never mislabeled "fully ready".
+        required.add("tcp_reality_vision")
+    return required
 
 
 def _customer_order_for_item(item: dict[str, Any]) -> tuple[str, ...]:
