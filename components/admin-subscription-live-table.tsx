@@ -5,7 +5,7 @@ import {API_BASE} from "../lib/api";
 import {getCustomerToken} from "../lib/customer-api";
 
 type LiveItem={subscription_id:number;online:boolean;protocols?:string[];last_seen_at?:string|null};
-type LivePayload={items?:LiveItem[]};
+type LivePayload={items?:LiveItem[];generated_at?:string};
 type BulkOperation="add_traffic"|"subtract_traffic"|"add_days"|"subtract_days";
 type BulkResult={ok?:boolean;operation?:BulkOperation;amount?:number;total?:number;updated?:number;skipped?:number;clamped?:number};
 
@@ -326,6 +326,10 @@ export function AdminSubscriptionLiveTable(){
         if(disposed)return;
         // Do not accept malformed/partial results as an all-offline snapshot.
         if(!Array.isArray(payload.items))return;
+        // An empty/truncated response is not evidence that every subscriber disconnected.
+        if(loaded&&states.size>0&&payload.items.length===0)return;
+        const generatedMs=payload.generated_at?Date.parse(payload.generated_at):NaN;
+        if(!Number.isFinite(generatedMs)||Math.abs(Date.now()-generatedMs)>STALE_AFTER_MS)return;
         states.clear();
         for(const item of payload.items){
           if(item&&Number.isFinite(Number(item.subscription_id)))states.set(Number(item.subscription_id),item);
