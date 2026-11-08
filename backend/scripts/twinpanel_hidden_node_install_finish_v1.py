@@ -195,16 +195,18 @@ async def finish(node_id: int, job_id: str, *, xray_port: int,
                 # on subscriptions. Retry only PostgreSQL lock timeouts, never
                 # bypass the all-16 listener gate or publish incomplete nodes.
                 from sqlalchemy.exc import OperationalError
-                for admission_attempt in range(8):
+                for admission_attempt in range(20):
                     try:
                         admission=admit_verified_exit(db,node_id)
                         break
-                    except OperationalError as lock_exc:
+                    except (OperationalError, RuntimeError) as lock_exc:
                         db.rollback()
-                        code=getattr(lock_exc.orig, "pgcode", None)
-                        if code != "55P03" or admission_attempt == 7:
+                        code=getattr(lock_exc.orig, "pgcode", None) if isinstance(lock_exc, OperationalError) else None
+                        pending=(isinstance(lock_exc, RuntimeError) and
+                                 str(lock_exc)=="CENTRAL_ADMISSION_MEMBERSHIP_COVERAGE_PENDING")
+                        if (code != "55P03" and not pending) or admission_attempt == 19:
                             raise
-                        await asyncio.sleep(min(5 + 5 * admission_attempt, 25))
+                        await asyncio.sleep(6)
                 scheduled=launch(db,node_id,initial_full=True)
             except Exception:
                 db.rollback()
