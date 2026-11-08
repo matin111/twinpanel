@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.691",
+  "version": "1.1.0-rc.692",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-08T03:38:11Z",
+  "released_at": "2026-11-08T03:55:08Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "13d6fdfc14be7887eb9ce6b9752e095ce6cf9b21",
+  "source_sha": "f840516167775298974f86cf1c9beaf1c85b8831",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.691/twinpanel-1.1.0-rc.691-linux-x86_64.tar.gz",
-    "sha256": "f53f758ea651c25dbde4c6044e05e3cd7eac7cf78b0305c54506d8b2ac4aa875",
-    "size_bytes": 29688909
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.692/twinpanel-1.1.0-rc.692-linux-x86_64.tar.gz",
+    "sha256": "6d6c67fba5d7ab7092429c4144d29d3c6b849e2ae75044d9565ef77623908840",
+    "size_bytes": 29692076
   },
   "notes": {
-    "fa": "نسخه RC.691: افزایش پایداری پایش واقعی WireGuard، AmneziaWG، TrustTunnel، Mieru، Sudoku و هفت پروتکل sing-box با ایزوله‌سازی خطاهای دیتابیس هر پروتکل/کاربر، حفظ آمار کاربران سالم در صورت خطای شناسه آماری یک کاربر، و بازیابی مرحله‌ای محدود برای جلوگیری از فشار بیش از حد. هیچ مقدار سهمیه، تاریخ، اشتراک یا اتصال کاربر عمداً تغییر داده نمی‌شود. شمارش چند اتصال تحت یک شناسه در تمام پروتکل‌ها و اجرای محدودیت دستگاه در نقطه احراز هویت هنوز نیازمند توسعه و تست مستقل است. شامل تغییرات RC.690.",
-    "en": "RC.691: fault-isolated, bounded recovery of authentic presence/traffic telemetry for WireGuard, AmneziaWG, TrustTunnel, Mieru, Sudoku and seven sing-box protocols; preserve healthy users when a cursor/account fails and avoid retry storms. No account, plan, quotas or VPN dataplane modifications. Multi-connection counting under one identity and admission-time cross-protocol device caps remain separate unverified work. Includes rc.690."
+    "fa": "رفع تأخیر شمارنده آنلاین OpenVPN: جمع‌آوری نشست واقعی OpenVPN هر حدود ۳۰ ثانیه به‌صورت مستقل از چرخه سنگین Cisco/Xray/L2TP؛ جلوگیری از اجرای هم‌زمان دو نویسنده OpenVPN؛ بدون تغییر اطلاعات اکانت، محدودیت دستگاه و تنظیمات سرویس VPN. خطای آمار یک یا دو دقیقه‌ای قبلی پس از اجرای چرخه سنگین برطرف می‌شود؛ صحت کامل پس از نصب و پایش واقعی بررسی شود.",
+    "en": "Independent authoritative OpenVPN management-socket telemetry every ~30 seconds rather than after the 120-second-plus heavy reconciliation. Single-writer ownership removes duplicate heavy OpenVPN sweeps; no customer data, quota, node configuration or VPN connection changes. Requires post-install live validation."
   }
 }
