@@ -1314,6 +1314,15 @@ html[data-theme] body.tp80-connection.ref67 .ref67-user strong,
 html[data-theme] body.tp80-connection.ref67 .protocol-choice .protocol-text b{
  color:var(--text)!important;
 }
+/* Connected/valid account label takes precedence over neutral theme text. */
+html[data-theme] body.tp80-connection.ref67 .traffic .ref67-user small.tp78-active-account,
+html[data-theme="light"] body.tp80-connection.ref67 .traffic .ref67-user small.tp78-active-account{
+ color:#32f5a2!important;font-weight:900!important;
+ text-shadow:0 0 10px rgba(50,245,162,.14)!important;
+}
+html[data-theme] body.tp80-connection.ref67 .traffic .ref67-user:has(.tp78-active-account){
+ border-color:#1f9f68!important;box-shadow:0 0 0 1px rgba(50,245,162,.2)!important;
+}
 html[data-theme] body.tp80-connection.ref67 .traffic .stat small,
 html[data-theme] body.tp80-connection.ref67 .protocol-choice .protocol-text small,
 html[data-theme] body.tp80-connection.ref67 .ref67-user .service,
