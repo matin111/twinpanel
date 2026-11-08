@@ -8,15 +8,20 @@ import time
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import or_
+from sqlalchemy import or_, text
 
 from ..database import SessionLocal
-from ..models import Node, Subscription
+from ..models import Node, ProtocolCredential, Subscription
 from ..quota_models import QuotaSession
 from ..quota_schemas import SessionCloseIn, SessionOpenIn, UsageEventIn
 from ..quota_service import close_session
 from ..routers.provision import ssh_connect_saved
-from .quota_node_sync import build_node_devices
+from .quota_node_sync import (
+    _credential_node_ids,
+    _legacy_subscription_node_ids,
+    _quota_device_for_credential,
+    build_node_devices,
+)
 from .reseller_traffic_pool import apply_usage_event, open_session
 
 
@@ -309,6 +314,78 @@ def _device_map(db, node_id: int, protocol: str) -> dict[str, dict]:
     }
 
 
+# TWINPANEL_CISCO_FAST_PRESENCE_V104
+# A separate low-overhead Cisco poller refreshes genuine ocserv sessions between
+# expensive full Xray/OpenVPN accounting cycles. A transaction advisory lock
+# serializes Cisco accounting per node across the two processes.
+_CISCO_LOCK_NAMESPACE = 0x4349534300000000
+
+
+def _observed_cisco_device_map(
+    db, node_id: int, observed: list[dict],
+) -> dict[str, dict]:
+    names = {
+        str(row.get("username") or "").strip()
+        for row in observed if str(row.get("username") or "").strip()
+    }
+    if not names:
+        return {}
+
+    credentials = (
+        db.query(ProtocolCredential)
+        .filter(
+            ProtocolCredential.protocol == "cisco",
+            ProtocolCredential.is_active.is_(True),
+            ProtocolCredential.username.in_(names),
+        )
+        .order_by(ProtocolCredential.subscription_id, ProtocolCredential.id)
+        .all()
+    )
+    devices: dict[str, dict] = {}
+    for credential in credentials:
+        identity = str(credential.username or "").strip()
+        if identity in devices:
+            continue
+        sub_id = int(credential.subscription_id)
+        node_ids = _credential_node_ids(credential)
+        if node_ids:
+            if int(node_id) not in node_ids:
+                continue
+        elif int(node_id) not in _legacy_subscription_node_ids(db, sub_id):
+            continue
+        device = _quota_device_for_credential(db, credential)
+        if device is None:
+            continue
+        devices[identity] = {
+            "identity": identity,
+            "protocol": "openconnect",
+            "subscription_id": sub_id,
+            "device_id": int(device.id),
+            "credential_id": int(credential.id),
+        }
+
+    # Compatibility fallback for credentials with a runtime alias different
+    # from ProtocolCredential.username, exactly as the old full-node mapper.
+    if len(devices) < len(names):
+        legacy = _device_map(db, int(node_id), "openconnect")
+        for name in names - set(devices):
+            if name in legacy:
+                devices[name] = legacy[name]
+    return devices
+
+
+def _cisco_try_lock(db, node_id: int) -> bool:
+    if db.get_bind().dialect.name != "postgresql":
+        return True
+    # Advisory transaction locks are released automatically on commit/rollback.
+    return bool(
+        db.execute(
+            text("SELECT pg_try_advisory_xact_lock(:lock_key)"),
+            {"lock_key": int(_CISCO_LOCK_NAMESPACE + int(node_id))},
+        ).scalar()
+    )
+
+
 def _touch_session(db, node_id: int, session_key: str, now: datetime) -> None:
     row = (
         db.query(QuotaSession)
@@ -325,7 +402,13 @@ def _touch_session(db, node_id: int, session_key: str, now: datetime) -> None:
 
 def _apply_observed_sessions(db, node: Node, observed: list[dict]) -> dict:
     node_id = int(node.id)
-    devices = _device_map(db, node_id, "openconnect")
+    if not _cisco_try_lock(db, node_id):
+        return {
+            "collector": "ocserv", "node_id": node_id, "skipped_locked": True,
+            "observed": len(observed), "matched": 0,
+            "opened": 0, "closed": 0, "usage_events": 0, "ignored": 0,
+        }
+    devices = _observed_cisco_device_map(db, node_id, observed)
     now_aware = datetime.now(timezone.utc)
     now_naive = now_aware.replace(tzinfo=None)
     sequence_base = int(time.time_ns() // 1_000_000)
@@ -539,6 +622,50 @@ def _apply_xray_stats(db, node: Node, epoch: str, observed: list[dict]) -> dict:
         "usage_events": usage_events,
         "ignored": ignored,
     }
+
+
+async def reconcile_cisco_quota_runtime_once() -> dict:
+    """Lightweight fast poll for real ocserv sessions (no Xray scan).
+
+    Uses exactly the same canonical session and usage ledger as the normal
+    quota worker. Never reports a connection from an installed config alone.
+    A collector failure does not close previously observed sessions.
+    """
+    db = SessionLocal()
+    results: list[dict] = []
+    try:
+        nodes = (
+            db.query(Node)
+            .filter(Node.retired_at.is_(None), Node.enable_cisco.is_(True))
+            .order_by(Node.id.asc())
+            .all()
+        )
+        for node in nodes:
+            node_id = int(node.id)
+            ok, observed, error = await _collect_node_users(node, db)
+            if not ok:
+                results.append({
+                    "ok": False, "collector": "ocserv", "node_id": node_id,
+                    "error": str(error or "occtl_unavailable")[:300],
+                })
+                db.rollback()
+                continue
+            try:
+                result = _apply_observed_sessions(db, node, observed)
+                db.commit()
+                results.append({"ok": True, **result})
+            except Exception as exc:
+                db.rollback()
+                results.append({
+                    "ok": False, "collector": "ocserv", "node_id": node_id,
+                    "error": f"{type(exc).__name__}:{str(exc)[:300]}",
+                })
+        return {
+            "ok": all(item.get("ok") for item in results),
+            "nodes": results,
+        }
+    finally:
+        db.close()
 
 
 async def reconcile_quota_runtime_once() -> dict:
