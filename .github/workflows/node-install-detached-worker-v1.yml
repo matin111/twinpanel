@@ -1,0 +1,60 @@
+name: Durable Node Install and Hidden Exit Resume V1
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/services/durable_node_install_launcher_v1.py"
+      - "backend/app/services/hidden_exit_install_resume_v1.py"
+      - "backend/app/services/node_install_progress_v1.py"
+      - "backend/app/services/new_node_modern_bootstrap_v1.py"
+      - "backend/scripts/twinpanel_node_install_worker_v1.py"
+      - "backend/app/routers/publish_node_all_users_v1.py"
+      - "components/node-add-modal-bridge.tsx"
+      - "backend/tests/test_durable_node_installer_and_resume_v1.py"
+      - ".github/workflows/node-install-detached-worker-v1.yml"
+  workflow_dispatch:
+
+jobs:
+  verify-node-installer-survives-api-restart:
+    runs-on: ubuntu-24.04
+    env:
+      PYTHONPATH: backend
+      APP_SECRET_KEY: ci-durable-node-only
+      DATABASE_URL: sqlite:///./ci-durable-node.sqlite3
+      NODE_AGENT_SHARED_SECRET: ci-durable-node-agent
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install Python dependencies
+        run: python -m pip install -r backend/requirements.txt
+      - name: Compile production sources
+        run: |
+          python -m py_compile \
+            backend/app/services/durable_node_install_launcher_v1.py \
+            backend/app/services/hidden_exit_install_resume_v1.py \
+            backend/app/services/node_install_progress_v1.py \
+            backend/app/services/new_node_modern_bootstrap_v1.py \
+            backend/scripts/twinpanel_node_install_worker_v1.py \
+            backend/app/routers/publish_node_all_users_v1.py \
+            backend/tests/test_durable_node_installer_and_resume_v1.py
+      - name: Supervised worker, secret privacy and same-node resume tests
+        run: python -m unittest discover -s backend/tests -p 'test_durable_node_installer_and_resume_v1.py' -v
+      - name: Existing central-first Exit installer regressions
+        run: |
+          python -m pip install pytest
+          python -m pytest -q \
+            backend/tests/test_central_first_exit_bootstrap_v1.py \
+            backend/tests/test_central_first_modern_bootstrap_v1.py \
+            backend/tests/test_central_first_modern_isolation_v1.py \
+            backend/tests/test_central_node_installer_cutover_v1.py
+      - name: Never resurrect API-owned install coroutine
+        run: |
+          ! grep -q 'asyncio.create_task(_install_node_in_background(' backend/app/routers/publish_node_all_users_v1.py
+          grep -q 'launch_initial(job_id' backend/app/routers/publish_node_all_users_v1.py
+          grep -q 'resume-install-v1' backend/app/routers/publish_node_all_users_v1.py
+          grep -q 'NODE_INSTALL_WORKER_INTERRUPTED' backend/app/services/node_install_progress_v1.py
+          grep -q 'NODE_INSTALL_HOST_CLAIM_FAILED' backend/app/services/durable_node_install_launcher_v1.py
