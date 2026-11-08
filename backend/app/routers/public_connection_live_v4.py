@@ -10,8 +10,9 @@ from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..models import Node, SubscriptionProtocol
+from ..models import Node, Plan, SubscriptionProtocol
 from ..quota_models import QuotaCursor, QuotaSession, QuotaUsageEvent
+from ..subscription_override_models import effective_device_limit
 from ..services.modern_quota_runtime_v257 import capability_payload
 from .account_delivery import _subscription_from_share_token, _usage_payload
 from .public_connection_v3 import public_connection_page_v3
@@ -336,12 +337,17 @@ def public_connection_live(token: str, db: Session = Depends(get_db)):
     )
 
     status = str(getattr(sub.status, "value", sub.status)).lower()
+    plan = db.get(Plan, sub.plan_id) if sub.plan_id else None
+    max_connections = effective_device_limit(db, sub, plan)
     return {
         **usage,
         "subscription_status": status,
         "starts_at": _iso_utc(getattr(sub, "starts_at", None)),
         "expires_at": _iso_utc(getattr(sub, "expires_at", None)),
         "active_sessions": active_sessions,
+        "device_limit": max_connections,
+        "device_limit_unlimited": max_connections == 0,
+        "available_connection_slots": max(max_connections - active_sessions, 0) if max_connections > 0 else None,
         "connection_online": connection_online,
         "online_protocols": sorted(online_protocols),
         "last_session_seen_at": _iso_utc(last_connection_seen),
@@ -354,10 +360,10 @@ _LIVE_CSS = r"""
 .page{width:min(1120px,92vw);padding:18px 0 42px}
 .traffic{grid-template-columns:178px 1fr;gap:16px;min-height:124px;padding:14px 18px;border-radius:16px;transition:border-color .2s,box-shadow .2s}
 .traffic[data-connection="online"]{border-color:color-mix(in srgb,var(--ok) 48%,#252c45);box-shadow:0 0 0 1px color-mix(in srgb,var(--ok) 12%,transparent),0 14px 42px rgba(0,0,0,.18)}
-.visual{gap:12px}.donut{width:88px;height:88px;flex-basis:88px}.donut:before{inset:10px}.donut b{font-size:18px}.visual h2{font-size:15px}.stats{grid-template-columns:repeat(5,1fr)}.stat{padding:0 12px}.stat strong{font-size:13px;margin-top:5px}
+.visual{gap:12px}.donut{width:88px;height:88px;flex-basis:88px}.donut:before{inset:10px}.donut b{font-size:18px}.visual h2{font-size:15px}.stats{grid-template-columns:repeat(6,minmax(0,1fr))}.stat{padding:0 10px}.stat strong{font-size:13px;margin-top:5px}
 .section-head{margin:18px 0 9px}.section-head h2{font-size:17px}.protocols{gap:9px}.protocol-choice{min-height:96px;border-radius:13px;gap:5px;transition:border-color .2s,box-shadow .2s,background .2s}.protocol-icon{width:38px;height:38px}.protocol-panel{margin-top:9px}.panel-head{min-height:58px;padding:11px 13px}.server-views{padding:12px}.fact{min-height:82px;padding:12px}.apps{margin-top:15px}.apps-head{padding:12px 14px}.platforms{padding:11px}.app-card{min-height:62px;padding:8px}
 .section-head small,.protocol-choice small,.panel-head small,.apps-head small,.platform-title small,.app-card small,.profile-copy small{display:none!important}
-.status.connected{color:#7af0b5;background:#0a3322;border:1px solid #1b8053;box-shadow:0 0 0 3px rgba(41,211,125,.08)}
+.status.connected{font-size:11px;font-weight:900;color:#7af0b5;background:#0a3322;border:1px solid #1b8053;box-shadow:0 0 0 3px rgba(41,211,125,.08)}
 .status.connected i{box-shadow:0 0 0 4px rgba(41,211,125,.12)}
 .protocol-choice.live-online,.protocol-choice.live-online.active{border-color:#29d37d!important;box-shadow:0 0 0 1px rgba(41,211,125,.38),0 0 24px rgba(41,211,125,.14)!important;background:linear-gradient(180deg,rgba(41,211,125,.07),rgba(41,211,125,.02))!important}
 .protocol-choice.live-online em{color:#7af0b5!important;background:#0a3322!important;border-color:#1b8053!important}
@@ -376,7 +382,7 @@ _LIVE_SCRIPT = r"""
   const byId=(id)=>document.getElementById(id);
   const used=byId('liveUsed'),remaining=byId('liveRemaining'),total=byId('liveTotal');
   const start=byId('liveStart'),expire=byId('liveExpire'),percent=byId('livePercent');
-  const donut=byId('trafficDonut'),status=byId('liveStatus'),traffic=byId('trafficCard');
+  const donut=byId('trafficDonut'),status=byId('liveStatus'),traffic=byId('trafficCard'),deviceLimit=byId('liveDeviceLimit');
   let previous='';
 
   function bytes(value){
@@ -428,6 +434,12 @@ _LIVE_SCRIPT = r"""
     write(start,date(u.starts_at));
     write(expire,date(u.expires_at));
     write(percent,u.unlimited?'∞':nf.format(pct)+'%');
+    if(deviceLimit){
+      const cap=Number(u.device_limit||0);
+      const count=Math.max(0,Number(u.active_sessions||0));
+      write(deviceLimit,cap===0?'نامحدود':nf.format(cap)+' دستگاه');
+      deviceLimit.title='نشست‌های فعال مشاهده‌شده: '+nf.format(count);
+    }
     if(donut)donut.style.setProperty('--pct',String(pct));
 
     const connected=(u.connection_online===true)||Number(u.active_sessions||0)>0;
@@ -435,11 +447,11 @@ _LIVE_SCRIPT = r"""
     if(status){
       const active=String(u.subscription_status||'')==='active';
       status.className='status '+(connected?'connected':active?'on':'off');
-      status.innerHTML='<i></i>'+(connected?'متصل':active?'اشتراک فعال':'غیرفعال');
+      status.innerHTML='<i></i>'+(connected?'متصل هستید':active?'اشتراک فعال':'غیرفعال');
     }
     paintProtocols(u.online_protocols);
 
-    const signature=[u.used_bytes,u.remaining_bytes,u.starts_at,u.expires_at,u.active_sessions,u.connection_online,(u.online_protocols||[]).join(','),u.subscription_status].join('|');
+    const signature=[u.used_bytes,u.remaining_bytes,u.starts_at,u.expires_at,u.active_sessions,u.device_limit,u.connection_online,(u.online_protocols||[]).join(','),u.subscription_status].join('|');
     if(previous&&signature!==previous&&traffic)flash(traffic);
     previous=signature;
   }
@@ -517,6 +529,11 @@ def public_connection_page_live_v4(token: str, db: Session = Depends(get_db)):
             count=1,
         )
 
+    source = source.replace(
+        '<div class="stats">',
+        '<div class="stats"><div class="stat"><small>اتصال هم‌زمان مجاز</small><strong id="liveDeviceLimit">—</strong></div>',
+        1,
+    )
     source = source.replace("</style>", _LIVE_CSS + "\n</style>", 1)
     script = _LIVE_SCRIPT.replace("__TOKEN__", json.dumps(str(token), ensure_ascii=True))
     source = source.replace("</body>", script + "\n</body>", 1)
