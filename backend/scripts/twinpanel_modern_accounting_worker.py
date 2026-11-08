@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import signal
 import sys
 from pathlib import Path
@@ -18,6 +19,11 @@ if str(BACKEND_ROOT) not in sys.path:
 # Keep the legacy import visible for rollback/source validation, but production
 # execution uses the deadlock-safe V314 orchestration. V314 reuses the proven
 # V257 protocol collectors while separating async network I/O from DB writes.
+# The independent subprocess takes exclusive responsibility for Mieru
+# presence. This flag also disables Mieru in heavy V314 sweeps. Setting it
+# explicitly to 0 is a safe rollback to the original V314 behavior.
+os.environ.setdefault("TP_MIERU_INDEPENDENT_WORKER", "1")
+
 from app.services.modern_quota_runtime_v257 import modern_quota_runtime_loop as legacy_modern_quota_runtime_loop
 from app.services.modern_quota_runtime_v314 import modern_quota_runtime_loop
 from app.services.singbox_native_accounting_v265 import singbox_native_accounting_loop
@@ -50,6 +56,23 @@ singbox_native_accounting_v265_module.SINGBOX_ACCOUNTING_INTERVAL_SECONDS = (
 install_accounting_device_batch_cache()
 
 
+async def _mieru_fast_subprocess() -> None:
+    """Supervise Mieru in its own interpreter, isolated from V314 CPU stalls."""
+    worker = BACKEND_ROOT / "scripts/twinpanel_mieru_fast_presence_worker.py"
+    proc = await asyncio.create_subprocess_exec(sys.executable, str(worker))
+    try:
+        status = await proc.wait()
+        raise RuntimeError(f"mieru_fast_presence_worker_exited:{status}")
+    finally:
+        if proc.returncode is None:
+            proc.terminate()
+            try:
+                await asyncio.wait_for(proc.wait(), timeout=7)
+            except asyncio.TimeoutError:
+                proc.kill()
+                await proc.wait()
+
+
 async def _serve() -> None:
     stop = asyncio.Event()
     loop = asyncio.get_running_loop()
@@ -68,6 +91,16 @@ async def _serve() -> None:
         asyncio.create_task(
             singbox_native_accounting_loop(),
             name="twinpanel-singbox-native-accounting-v265",
+        ),
+        *(
+            (
+                asyncio.create_task(
+                    _mieru_fast_subprocess(),
+                    name="twinpanel-mieru-fast-presence",
+                ),
+            )
+            if os.environ.get("TP_MIERU_INDEPENDENT_WORKER") == "1"
+            else ()
         ),
     )
     stopper = asyncio.create_task(stop.wait(), name="twinpanel-accounting-stop")
