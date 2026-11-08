@@ -10,9 +10,11 @@ reusing the initial password, reinstalling the base or touching other nodes.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
+import time
 import shutil
 import stat
 import subprocess
@@ -142,14 +144,73 @@ def _dispatch(job_id: str, args: list[str], *, resume: bool) -> str:
     return _unit(job_id, resume=resume)
 
 
+def _host_claim_path(host: str) -> Path:
+    value=str(host or "").strip().lower()
+    if not value or len(value)>255:
+        raise NodeInstallDispatchError("NODE_INSTALL_HOST_INVALID")
+    digest=hashlib.sha256(value.encode("utf-8")).hexdigest()
+    return _HOST_CLAIMS/(digest+".lock")
+
+
+def _claim_host(job_id: str, host: str) -> Path:
+    """Fail closed if two different names try to install the same IP.
+
+    /run lock is a short-lived marker; no host or password is written to it.
+    It survives Uvicorn restarts, but not a VPS reboot. A genuinely orphaned
+    marker can be reclaimed only after a grace window and stopped unit check.
+    """
+    _secure_dir(_HOST_CLAIMS)
+    path=_host_claim_path(host)
+    if path.exists():
+        try:
+            previous=path.read_text().strip()
+            age=max(0,time.time()-path.stat().st_mtime)
+        except OSError:
+            raise NodeInstallDispatchError("NODE_HOST_INSTALL_ALREADY_RUNNING")
+        if age<120 or (previous and worker_alive(previous)):
+            raise NodeInstallDispatchError("NODE_HOST_INSTALL_ALREADY_RUNNING")
+        # Reclaim only a dead worker's aged marker, never running jobs.
+        path.unlink(missing_ok=True)
+    try:
+        fd=os.open(
+            path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|getattr(os,"O_NOFOLLOW",0),
+            0o600,
+        )
+    except FileExistsError as exc:
+        raise NodeInstallDispatchError("NODE_HOST_INSTALL_ALREADY_RUNNING") from exc
+    except OSError as exc:
+        raise NodeInstallDispatchError("NODE_INSTALL_HOST_CLAIM_FAILED") from exc
+    try:
+        os.write(fd,job_id.encode("ascii"))
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+    return path
+
+
+def release_job_claim(job_id: str) -> None:
+    """Remove only this job's nonsecret host marker after the worker exits."""
+    job_id=_job_id(job_id)
+    if not _HOST_CLAIMS.is_dir():
+        return
+    for path in _HOST_CLAIMS.glob("*.lock"):
+        try:
+            if path.read_text().strip()==job_id:
+                path.unlink(missing_ok=True)
+        except OSError:
+            continue
+
+
 def launch_initial(job_id: str, payload: dict, origin: str = "") -> str:
     job_id = _job_id(job_id)
-    # No credentials in unit command, journal, pid argv or status response.
-    _write_secret_job(job_id, {"payload": payload, "origin": str(origin or "")})
+    _claim_host(job_id, str(payload.get("host") or ""))
     try:
+        # No credentials in unit command, journal, pid argv or status response.
+        _write_secret_job(job_id, {"payload": payload, "origin": str(origin or "")})
         return _dispatch(job_id, [], resume=False)
     except Exception:
         (_SECRET_DIR / (job_id + ".json")).unlink(missing_ok=True)
+        release_job_claim(job_id)
         raise
 
 
