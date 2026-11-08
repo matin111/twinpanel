@@ -224,6 +224,18 @@ export function TunnelProtocolRuntimeV307(){
     throw new Error("TUNNEL_JOB_STILL_RUNNING_CHECK_STATUS");
   };
 
+  useEffect(()=>{
+    const jobId=typeof window!=="undefined"?sessionStorage.getItem("tp-selected-tunnel-job"):null;
+    if(!jobId||!/^[0-9a-f]{32}$/.test(jobId))return;
+    setBusy("create");
+    setNotice(pick("بازیابی وضعیت ساخت Tunnel...","Recovering tunnel creation status..."));
+    void pollTunnelCreation(jobId)
+      .catch(reason=>setError(reason instanceof Error?reason.message:String(reason)))
+      .finally(()=>setBusy(""));
+    // The backend job persists even when this page unmounts.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[]);
+
   const createTunnel=async(event:FormEvent)=>{
     event.preventDefault();if(busy||!draft.iran_node_id||!draft.exit_node_id)return;
     if(!readyIranNodes.some(node=>node.id===draft.iran_node_id)||!readyExitNodes.some(node=>node.id===draft.exit_node_id)){
