@@ -142,6 +142,7 @@ async def request(
     token=None,
     bot_auth=False,
     payload=None,
+    files=None,
 ):
     headers = {}
 
@@ -162,7 +163,8 @@ async def request(
             method,
             API_BASE + path,
             headers=headers,
-            json=payload,
+            json=payload if files is None else None,
+            files=files,
         )
 
     try:
