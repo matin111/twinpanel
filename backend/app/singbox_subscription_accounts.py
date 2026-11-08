@@ -550,13 +550,22 @@ async def remove_account(
     conn,
     protocol: str,
     subscription_id: int,
+    *,
+    node_username: str | None = None,
 ) -> None:
+    """Revoke the actual node-local identity, including central aliases.
+
+    The historical tp-sub-N fallback is for old credentials without a
+    node-local stored username. Never use a global mother login to revoke
+    another subscription's record on a new Exit.
+    """
     protocol = str(protocol or "").strip().lower()
     if protocol not in SINGBOX_PROTOCOLS:
         raise SingBoxAccountError(f"unsupported sing-box account protocol: {protocol}")
+    username = str(node_username or "").strip() or account_username(subscription_id)
     await _commit_account_config(
         conn,
-        _mutation_script(protocol, account_username(subscription_id), None),
+        _mutation_script(protocol, username, None),
     )
 
 
