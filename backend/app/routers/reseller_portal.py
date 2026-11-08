@@ -4,7 +4,9 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..reseller_tier_policy import reseller_tier, check_package_tier, tier_entitlements, allowed_nodes, allowed_protocols
 from ..deps import require_reseller
-from ..models import Plan, Subscription, User
+from ..models import Plan, Subscription, User, SubscriptionProtocol
+from ..subscription_override_models import SubscriptionRuntimeOverride, effective_device_limit
+from ..protocol_account_registry import normalize_protocols
 from ..services.subscription_factory import create_subscription_core
 from ..models_reseller import (
     Reseller,
@@ -330,6 +332,9 @@ def reseller_subscriptions(
                 ),
 
                 "plan_id": sub.plan_id,
+                "device_limit": effective_device_limit(db, sub, plan),
+                "activation_duration_days": int(sub.activation_duration_days or 0),
+                "protocols": [p[0] for p in db.query(SubscriptionProtocol.protocol).filter(SubscriptionProtocol.subscription_id == sub.id).all()],
                 "plan_name": (
                     plan.name
                     if plan
@@ -1452,6 +1457,8 @@ class ResellerExtendIn(BaseModel):
 
 # TWINPANEL_RESELLER_SUBSCRIPTION_EDIT_MODEL_V1
 class ResellerSubscriptionEditIn(BaseModel):
+    device_limit: int | None = Field(default=None, ge=0, le=1000)
+    protocols: list[str] | None = None
     traffic_gb: float = Field(
         gt=0,
         le=100000,
@@ -2098,6 +2105,17 @@ async def reseller_edit_subscription(
             detail="اشتراک حذف شده قابل ویرایش نیست",
         )
 
+    # Reseller changes may only use protocols authorized by their own tier.
+    selected_protocols = None
+    if payload.protocols is not None:
+        try:
+            selected_protocols = normalize_protocols(payload.protocols)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        entitled = set(allowed_protocols(db, reseller_tier(reseller)))
+        if not selected_protocols or not set(selected_protocols).issubset(entitled):
+            raise HTTPException(status_code=403, detail="پروتکل خارج از دسترسی نمایندگی مجاز نیست")
+
     # --------------------------------------------------------
     # Traffic
     # --------------------------------------------------------
@@ -2351,6 +2369,29 @@ async def reseller_edit_subscription(
         sub.traffic_limit_bytes = (
             new_limit
         )
+        if payload.device_limit is not None:
+            override = db.get(SubscriptionRuntimeOverride, int(sub.id))
+            if override is None:
+                override = SubscriptionRuntimeOverride(subscription_id=int(sub.id))
+                db.add(override)
+            override.device_limit = int(payload.device_limit)
+        if selected_protocols is not None:
+            old_protocols = {p[0] for p in db.query(SubscriptionProtocol.protocol).filter(
+                SubscriptionProtocol.subscription_id == sub.id
+            ).all()}
+            removed = old_protocols - set(selected_protocols)
+            db.query(SubscriptionProtocol).filter(
+                SubscriptionProtocol.subscription_id == sub.id
+            ).delete(synchronize_session=False)
+            for protocol in selected_protocols:
+                db.add(SubscriptionProtocol(subscription_id=int(sub.id), protocol=protocol))
+            if removed:
+                from ..subscription_enforcement import queue_subscription_enforcement
+                queue_subscription_enforcement(
+                    db, sub, command_type="revoke_subscription",
+                    reason="reseller_protocol_removed",
+                    protocols=sorted(removed),
+                )
 
         # TWINPANEL_FIRST_USE_RESELLER_EDIT_EXPIRY_V3
         if (
