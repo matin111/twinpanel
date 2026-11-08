@@ -1,0 +1,50 @@
+name: Xray Live Helper and New-Account Recovery
+
+on:
+  pull_request:
+    paths:
+      - 'backend/app/xray_hot_client_sync_v1.py'
+      - 'backend/app/routers/modern_legacy_reconcile_v1.py'
+      - 'backend/app/routers/modern_legacy_reconcile_lockfix_v2.py'
+      - 'backend/tests/test_xray_generated_helper_and_recent_recovery_v1.py'
+      - 'tests/test_xray_hot_client_sync_v1.py'
+      - '.github/workflows/publish-prebuilt-release.yml'
+      - '.github/workflows/xray-live-helper-recovery-v1.yml'
+  workflow_dispatch:
+
+jobs:
+  validate-generated-python-and-retry:
+    runs-on: ubuntu-24.04
+    env:
+      PYTHONPATH: backend
+      APP_SECRET_KEY: ci-xray-helper-only
+      DATABASE_URL: sqlite:///./ci-xray-helper-recovery.sqlite3
+      NODE_AGENT_SHARED_SECRET: ci-xray-helper-agent
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Compile backend Python files
+        run: |
+          python -m py_compile \
+            backend/app/xray_hot_client_sync_v1.py \
+            backend/app/routers/modern_legacy_reconcile_v1.py \
+            backend/app/routers/modern_legacy_reconcile_lockfix_v2.py \
+            backend/tests/test_xray_generated_helper_and_recent_recovery_v1.py
+      - name: Real standalone hot-client script simulation
+        run: python tests/test_xray_hot_client_sync_v1.py
+      - name: Install backend test dependencies
+        run: python -m pip install -r backend/requirements.txt
+      - name: Generated code syntax and VLESS-only durable repair
+        run: |
+          python -m unittest discover -s backend/tests \
+            -p 'test_xray_generated_helper_and_recent_recovery_v1.py' -v
+      - name: Existing VLESS provisioning identity contract
+        run: |
+          python -m pip install pytest
+          python -m pytest -q \
+            backend/tests/test_v2ray_provision_idempotency_v1.py \
+            backend/tests/test_xray_provision_script_fix_v1.py
