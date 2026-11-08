@@ -205,7 +205,7 @@ export function LegacySubscriptionsRuntimePage(){
 
   const openEdit=(item:RuntimeRow)=>{
     setSelected(item);setConnection(null);const limit=n(item.traffic_limit_gb)||(n(item.traffic_limit_bytes)/GB);
-    setDraft({user_id:n(item.user_id),plan_id:n(item.plan_id),traffic_gb:limit>0?String(limit):"",duration_days:n(item.activation_duration_days)>0?String(n(item.activation_duration_days)):"",device_limit:String(Math.max(1,n(item.device_limit)||n(planMap.get(n(item.plan_id))?.device_limit)||1)),username:s(item.account_username),password:"",protocols:strings(item.protocols)});
+    setDraft({user_id:n(item.user_id),plan_id:n(item.plan_id),traffic_gb:limit>0?String(limit):"",duration_days:n(item.activation_duration_days)>0?String(n(item.activation_duration_days)):"",device_limit:String(item.device_limit!==undefined&&item.device_limit!==null?n(item.device_limit):n(planMap.get(n(item.plan_id))?.device_limit)||1),username:s(item.account_username),password:"",protocols:strings(item.protocols)});
     setEditExpiry(item.expires_at?String(item.expires_at).slice(0,10):"");
     setModal("edit");
   };
