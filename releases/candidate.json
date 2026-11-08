@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.722",
-  "source_sha": "8d855e612a5cd6287a4b6721efd2efc7ea8e20ff",
+  "version": "1.1.0-rc.723",
+  "source_sha": "826baa156f48895ddfa4fc8f0c414003ba8e64e9",
   "notes": {
-    "fa": "رفع گلوگاه اصلی ثبت آنلاین و مصرف پروتکل‌های sing-box: ابتدا دریافت نشست‌های احرازشده واقعی از نود، سپس تطبیق فقط همان هویت‌ها با کانفیگ‌های معتبر و عضویت دقیق نود. حذف اسکن/رمزگشایی سراسری اعتبارنامه‌ها پیش از پردازش ترافیک، بدون تغییر فرمول مصرف، تاریخ انقضا، پروتکل‌ها یا پورت‌ها. شامل اصلاحات RC.721.",
-    "en": "Fix root cause of lagging modern sing-box accounting: fetch the authoritative node snapshot before constructing device mappings, then resolve only authenticated observed identities (plus previously open canonical sessions) against exact active saved credentials and node membership. Preserve quota charging, expiry and VPN dataplane, includes RC.721."
+    "fa": "رفع خطای ساخت اشتراک بدون مدت زمان در مسیر ساخت سریع: برای اشتراک زمان‌دار مدت بیشتر از صفر الزامی است؛ نمایش تاریخ واقعی انقضا و تعداد روزهای باقی‌مانده در صفحه اتصال؛ نمایش صریح وضعیت نامحدود یا مدت نامشخص. هیچ تاریخ یا حجمی برای اکانت‌های موجود به‌صورت حدسی تغییر نمی‌کند.",
+    "en": "Prevent accidental no-expiry subscriptions from missing/zero duration in fast creation; show actual expiry date and remaining days, or explicit unlimited/unconfigured validity on public Connect. Existing account quotas, expiry and status unchanged."
   }
 }
