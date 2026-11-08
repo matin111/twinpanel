@@ -158,13 +158,21 @@ jobs:
           set -Eeuo pipefail
           VERSION='v3.1.0-beta.0'
           EXPECTED='4ba5597568607e864fb6d5ba4f13bac91a50456da5696d99463d6375ce2a3697'
-          URL="https://github.com/ParsaKSH/spoof-tunnel/releases/download/${VERSION}/spoof-linux-amd64"
+          # The browser download endpoint intermittently returns HTTP 504.
+          # Fetch the SAME pinned GitHub Release asset using the official
+          # GitHub Assets API, which redirects to the verified asset CDN.
+          # Preserve the original SHA-256 pin, executable checks and release
+          # verification; never accept a different asset or checksum.
+          ASSET_API='https://api.github.com/repos/ParsaKSH/spoof-tunnel/releases/assets/426650450'
           TMP="$(mktemp)"
           trap 'rm -f "$TMP"' EXIT
 
           curl --fail --location --silent --show-error \
-            --retry 3 --retry-delay 2 \
-            "$URL" -o "$TMP"
+            --retry 4 --retry-delay 3 --retry-all-errors \
+            -H 'Accept: application/octet-stream' \
+            -H 'X-GitHub-Api-Version: 2022-11-28' \
+            -H 'User-Agent: TwinPanel-Verified-Release-Builder' \
+            "$ASSET_API" -o "$TMP"
           ACTUAL="$(sha256sum "$TMP" | awk '{print $1}')"
           test "$ACTUAL" = "$EXPECTED"
           test -s "$TMP"
