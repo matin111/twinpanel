@@ -1702,14 +1702,44 @@ async def provision_protocols(conn, p: ProtocolSettings, db: Session, node: Node
             )[:900]
 
     if p.install_wireguard:
-        try: await run_one("wireguard",p.wireguard_port,"udp","wg-quick@wg-access0",lambda:install_wireguard(
-                conn,
-                p.wireguard_port,
-                db,
-                node,
-                repair,
-            ))
-        except Exception as e: results["wireguard"]={"ok":False,"port":p.wireguard_port,"port_text":str(p.wireguard_port),"transport":"udp","error":str(e)}; save_config(db,node.id,"wireguard",port=p.wireguard_port,transport="udp",service="wg-quick@wg-access0",ok=False,error=str(e))
+        try:
+            # An already configured TwinPanel interface is authoritative.
+            # Re-running a giant installer command can fail with E2BIG and
+            # overwrite a healthy 51820 listener with a stale requested port.
+            # Check ownership + live UDP before any reinstall or status write.
+            live_port_raw=(await cmd(
+                conn,"wg show wg-access0 listen-port",check=False)).strip()
+            managed=(await cmd(
+                conn,"grep -Fq '10.96.0.1/21' /etc/wireguard/wg-access0.conf && echo yes",
+                check=False)).strip()=="yes"
+            live_port=int(live_port_raw) if live_port_raw.isdecimal() else 0
+            reusable=(
+                managed and 1<=live_port<=65535
+                and (await cmd(conn,"systemctl is-active wg-quick@wg-access0",
+                               check=False)).strip()=="active"
+                and await listener(conn,live_port,"udp")
+            )
+            if reusable:
+                results["wireguard"]={
+                    "ok":True,"port":live_port,"port_text":str(live_port),
+                    "transport":"udp","error":None,"reused_verified_live":True,
+                }
+                save_config(db,node.id,"wireguard",port=live_port,
+                            transport="udp",service="wg-quick@wg-access0",
+                            ok=True,error=None)
+            else:
+                await run_one(
+                    "wireguard",p.wireguard_port,"udp","wg-quick@wg-access0",
+                    lambda:install_wireguard(
+                        conn,p.wireguard_port,db,node,repair,
+                    ),
+                )
+        except Exception as e:
+            results["wireguard"]={"ok":False,"port":p.wireguard_port,
+                "port_text":str(p.wireguard_port),"transport":"udp","error":str(e)}
+            save_config(db,node.id,"wireguard",port=p.wireguard_port,
+                        transport="udp",service="wg-quick@wg-access0",
+                        ok=False,error=str(e))
     if p.install_l2tp:
         try:
             psk=get_or_create_l2tp_psk(db)
