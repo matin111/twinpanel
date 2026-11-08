@@ -977,12 +977,34 @@ def _salvage_singbox_devices(
     """
     recovered = failed = 0
     errors: list[str] = []
-    # Retrying every user after a single bad cursor can overload production
-    # nodes with thousands of savepoints. Rotate bounded recovery windows.
+    # Always recover EVERY currently authenticated live user first. Earlier
+    # salvage randomly selected 64 of ~800 credentials; a bad migrated user's
+    # duration/cursor prevented healthy live users from appearing online for
+    # multiple sweeps. Only offline historical cleanup remains windowed.
+    # No IP heuristics, no altered quotas, no synthetic presence.
+    expected_tag = str(TAGS.get(protocol) or "")
+    expected_type = "socks" if protocol == "socks5" else protocol
+    live_ids = {
+        str(row.get("user") or "").strip()
+        for row in snapshot.get("rows", [])
+        if isinstance(row, dict)
+        and str(row.get("inbound") or "").strip() == expected_tag
+        and str(row.get("inbound_type") or "").strip().lower() == expected_type
+        and not _safe_int(row.get("closed_at_ms"))
+        and str(row.get("user") or "").strip()
+    }
+    active_devices = [
+        device for device in devices
+        if str(device.get("telemetry_identity") or device.get("identity") or "").strip()
+        in live_ids
+    ]
+    offline_devices = [device for device in devices if device not in active_devices]
     retry_limit = 64
-    windows = max((len(devices) + retry_limit - 1) // retry_limit, 1)
+    windows = max((len(offline_devices) + retry_limit - 1) // retry_limit, 1)
     window = int(time.time() // max(SINGBOX_ACCOUNTING_INTERVAL_SECONDS, 1)) % windows
-    candidates = devices[window * retry_limit:(window + 1) * retry_limit]
+    candidates = active_devices + offline_devices[
+        window * retry_limit:(window + 1) * retry_limit
+    ]
     for device in candidates:
         try:
             with db.begin_nested():
@@ -995,6 +1017,7 @@ def _salvage_singbox_devices(
             if len(errors) < 3:
                 errors.append(f"{type(exc).__name__}:{str(exc)[:120]}")
     return {
+        "prioritized_active_devices": len(active_devices),
         "recovered_devices": recovered,
         "failed_devices": failed,
         "deferred_devices": len(devices) - len(candidates),
