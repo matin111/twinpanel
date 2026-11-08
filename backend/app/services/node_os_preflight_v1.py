@@ -109,7 +109,14 @@ def safe_node_install_error_code(exc: BaseException) -> str:
             return "NODE_SSH_OR_OS_REJECTED"
         return "NODE_INSTALL_API_REJECTED"
     message = str(exc or "").strip()
+    # A random uppercase SSH response can itself be a credential. Preserve
+    # only known internal namespaces, not arbitrary all-caps remote output.
+    trusted_prefixes = (
+        "NODE_", "CENTRAL_RUNTIME_", "CENTRAL_NODE_", "XRAY_",
+        "OPENVPN_", "CISCO_", "L2TP_", "TUNNEL_", "PROTOCOL_",
+    )
     if (isinstance(exc, RuntimeError)
+            and message.startswith(trusted_prefixes)
             and re.fullmatch(r"[A-Z][A-Z0-9_]{5,79}", message)):
         return message
     if isinstance(exc, RuntimeError):
