@@ -44,7 +44,7 @@ jobs:
             -p 'test_xray_generated_helper_and_recent_recovery_v1.py' -v
       - name: Existing VLESS provisioning identity contract
         run: |
-          python -m unittest discover -s backend/tests \
-            -p 'test_v2ray_provision_idempotency_v1.py' -v
-          python -m unittest discover -s backend/tests \
-            -p 'test_xray_provision_script_fix_v1.py' -v
+          python -m pip install pytest
+          python -m pytest -q \
+            backend/tests/test_v2ray_provision_idempotency_v1.py \
+            backend/tests/test_xray_provision_script_fix_v1.py
