@@ -25,7 +25,6 @@ from app.models import Node, NodeType
 from app.node_runtime_connection import connect_protocol_runtime
 from app.services.accounting_device_map_batch_v1 import install_accounting_device_batch_cache
 from app.services import modern_quota_runtime_v257 as canonical
-from app.services.quota_node_sync import build_node_devices
 
 INTERVAL_SECONDS = 20.0
 LOCK_FILE = Path("/run/twinpanel-mieru-fast-presence-v1.lock")
@@ -48,7 +47,7 @@ async def reconcile_once() -> dict:
                 # Build canonical device/identity mapping; never derive identity
                 # from source IP or use the amount of traffic as presence.
                 devices = [
-                    item for item in build_node_devices(db, node_id)
+                    item for item in canonical.build_node_devices(db, node_id)
                     if str(item.get("protocol") or "").lower() == "mieru"
                 ]
                 db.commit()
