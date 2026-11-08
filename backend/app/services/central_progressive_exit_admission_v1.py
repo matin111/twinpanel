@@ -61,19 +61,27 @@ def admit_verified_exit(db, node_id: int) -> dict:
     # The active/volume/expiry filters match the central desired projection.
     now=datetime.utcnow()
     inserted=db.execute(text("""
+        WITH unlocked_eligible AS (
+            SELECT s.id FROM subscriptions s
+            WHERE s.status='ACTIVE'
+              AND (s.expires_at IS NULL OR s.expires_at>:now)
+              AND (s.traffic_limit_bytes<=0
+                   OR s.traffic_used_bytes<s.traffic_limit_bytes)
+            FOR KEY SHARE OF s SKIP LOCKED
+        )
         INSERT INTO subscription_nodes (subscription_id,node_id,created_at)
-        SELECT s.id,:node_id,:now FROM subscriptions s
-        WHERE s.status='ACTIVE'
-          AND (s.expires_at IS NULL OR s.expires_at>:now)
-          AND (s.traffic_limit_bytes<=0
-               OR s.traffic_used_bytes<s.traffic_limit_bytes)
+        SELECT s.id,:node_id,:now FROM unlocked_eligible s
         ON CONFLICT (subscription_id,node_id) DO NOTHING
     """),{"node_id":node_id,"now":now})
     expected=set(desired.subscription_ids)
     attached={int(row[0]) for row in db.query(SubscriptionNode.subscription_id)
               .filter(SubscriptionNode.node_id==node_id).all()}
     if not expected.issubset(attached):
-        raise RuntimeError("CENTRAL_ADMISSION_MEMBERSHIP_COVERAGE_INCOMPLETE")
+        # Keep the new Exit hidden; persist only the unlocked memberships so
+        # retries converge without waiting on active quota/account writers.
+        # No customer credentials are created and no subscriptions are edited.
+        db.commit()
+        raise RuntimeError("CENTRAL_ADMISSION_MEMBERSHIP_COVERAGE_PENDING")
 
     # Preserve explicit user routing policies. DO NOT alter plan_nodes or
     # override existing account/representative node restrictions.
