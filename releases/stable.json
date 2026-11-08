@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.715",
+  "version": "1.1.0-rc.716",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-08T19:39:45Z",
+  "released_at": "2026-11-08T19:53:26Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "aecaa9c29410acbe61954d4b8efcd581aebf7730",
+  "source_sha": "8787999883772f94de46ee0a9c729464df3c383f",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.715/twinpanel-1.1.0-rc.715-linux-x86_64.tar.gz",
-    "sha256": "55d4f629e1f621a2663b8a3bc77a157aed1dc1ea61ad0eb55da86bba6bb06019",
-    "size_bytes": 29860733
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.716/twinpanel-1.1.0-rc.716-linux-x86_64.tar.gz",
+    "sha256": "ddc67b3f1df784f0ae20bc40660138c1d593fb125c62b682b82f4f8f03b567f0",
+    "size_bytes": 29869382
   },
   "notes": {
-    "fa": "رفع ریشه‌ای تداخل شناسه شمارنده Naive و پروتکل‌های sing-box: حفظ رکوردهای قدیمی متعلق به همان کاربر، و تخصیص کلید پایدار و جداگانه مبتنی بر هش هویت احراز‌شده برای اتصال جدید یا شناسه تکراری؛ جلوگیری از انتقال یا حذف شمارنده سایر کاربران. اصلاح نمایش قابلیت پایش آنلاین و حجم در API برای Naive، Hysteria2، AnyTLS، TUIC، Snell و SOCKS5 پس از جداسازی فرایند پردازشگر. بدون تغییر کانفیگ، رمز، پورت یا سرویس VPN روی نودها. ShadowTLS همچنان نیازمند انتساب هویت مستقل است.",
-    "en": "Fix Naive/sing-box reused connection-ID identity conflicts by retaining same-user legacy cursors and using deterministic authenticated-user-scoped connection keys for new or conflicting IDs. Never reassign or delete historical users' counters; preserve billing snapshots and quotas. Declare native per-user presence and traffic capabilities in the API process independently of isolated sing-box worker. Tests for Naive, native collector and active-first recovery pass. No changes to VPN nodes, ports, client credentials or configs; ShadowTLS remains unattributable."
+    "fa": "رفع تأخیر آنلاین Naive با فرایند مستقل و محدود به پایش نشست‌های واقعی احراز هویت‌شده هر ~۲۰ ثانیه، جدا از حسابداری سنگین همه پروتکل‌های sing-box. فرایند جدید فقط نشست‌های واقعی Naive را از API داخلی نود خوانده و وضعیت فعال مدیریت مرکزی را ثبت می‌کند؛ شمارنده حجم، رمز، کانفیگ و سرویس VPN نود را تغییر نمی‌دهد. فرایند اصلی همچنان مالک ثبت حجم است. تنظیم TP_NAIVE_FAST_PRESENCE_WORKER=0 برای بازگشت ایمن وجود دارد. همراه اصلاح کلیدهای هویت‌محور و قابلیت‌های API در RC.715. تست‌ها موفق بودند.",
+    "en": "Add independent, supervised, authenticated Naive live-presence-only worker to avoid false offline status when multi-protocol sing-box accounting is CPU- or cursor-bound. Polls exact node Naive identities, updates only canonical online sessions via existing quota checks, never changes VPN nodes or per-user traffic/counter records. Original sing-box worker remains responsible for byte accounting. Rollback switch TP_NAIVE_FAST_PRESENCE_WORKER=0. Includes verified RC.715 identity-scoped connection cursor and API capability fixes."
   }
 }
