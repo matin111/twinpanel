@@ -22,6 +22,8 @@ def node(hidden: bool = True):
     return SimpleNamespace(
         id=20,node_type=NodeType.EXIT,show_to_users=not hidden,
         enable_cisco=False,
+        enable_openvpn=False,enable_wireguard=False,
+        enable_l2tp=False,enable_v2ray=False,
     )
 
 
