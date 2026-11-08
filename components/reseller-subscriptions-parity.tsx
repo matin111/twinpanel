@@ -163,20 +163,24 @@ export function ResellerSubscriptionsParityRuntime(){
     if(!editRow)return;
     const id=Number(editRow.id||editRow.subscription_id||0);
     if(!id||edit.expiry_value<1||edit.device_limit<0||edit.device_limit>1000)return;
-    if(!edit.protocols.length||edit.protocols.some(p=>!tierProtocols.includes(p))){setError(pick("حداقل یک پروتکل مجاز انتخاب کنید.","Select at least one authorized protocol."));return;}
+    const oldProtocols=Array.isArray(editRow.protocols)?editRow.protocols.map(String):[];
+    const oldNodes=Array.isArray(editRow.node_ids)?editRow.node_ids.map(Number):[];
+    const protocolsChanged=[...oldProtocols].sort().join(",")!==[...edit.protocols].sort().join(",");
+    const nodesChanged=[...oldNodes].sort((a,b)=>a-b).join(",")!==[...edit.node_ids].sort((a,b)=>a-b).join(",");
+    if(protocolsChanged&&(!edit.protocols.length||edit.protocols.some(p=>!tierProtocols.includes(p)))){setError(pick("حداقل یک پروتکل مجاز انتخاب کنید.","Select at least one authorized protocol."));return;}
+    if(nodesChanged&&!edit.node_ids.length){setError(pick("حداقل یک سرور خروجی انتخاب کنید.","Select at least one exit server."));return;}
     void act(pick("اشتراک ویرایش شد","Subscription updated"),async()=>{
-      const oldProtocols=Array.isArray(editRow.protocols)?editRow.protocols.map(String):[];
       await resellerApi.editSubscription(id,{
         traffic_gb:edit.traffic_gb,
         expires_at:edit.expires_at?new Date(edit.expires_at+"T23:59:59").toISOString():expiryIso(edit.expiry_value,edit.expiry_unit),
         device_limit:edit.device_limit,
-        protocols:edit.protocols,
-        ...(edit.node_ids.length>0?{node_ids:edit.node_ids}:{}),
+        ...(protocolsChanged?{protocols:edit.protocols}:{}),
+        ...(nodesChanged?{node_ids:edit.node_ids}:{}),
         sell_price_toman:edit.sell_price_toman,
         account_username:edit.account_username.trim()||null,
         account_password:edit.account_password.trim()||null
       });
-      if([...oldProtocols].sort().join(",")!==[...edit.protocols].sort().join(",")){
+      if(protocolsChanged||nodesChanged){
         await resellerApi.provisionSubscription(id);
       }
       setEditRow(null);
