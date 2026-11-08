@@ -118,7 +118,13 @@ async def bootstrap_new_exit_modern_protocols(db: Session, node_id: int) -> dict
         )
         try:
             result = await install(node_id=int(node_id), payload=payload, db=db)
+            reported = result.get("protocols") or {}
             group_failed = set(result.get("failed_protocols") or [])
+            group_failed.update(
+                key for key in group
+                if not isinstance(reported.get(key),dict)
+                or reported[key].get("ok") is not True
+            )
             for key in group:
                 if key in group_failed:
                     failed.append(key)
