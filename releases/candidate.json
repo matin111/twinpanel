@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.725",
-  "source_sha": "b18fce81d21c1d494cd0d2b76aafac4f4a9cdce4",
+  "version": "1.1.0-rc.726",
+  "source_sha": "5af6e32603d3d968e1c1ca638189a521586c6a71",
   "notes": {
-    "fa": "ادغام تعداد دستگاه متصل و دستگاه مجاز در یک کادر (متصل / مجاز) دقیقاً مثل نمایش مصرف حجم، استفاده از کادر آزاد برای نمایش تعداد روز اشتراک، حفظ تاریخ انقضا و روزهای باقی‌مانده زیر آن. سازگار با دسکتاپ و موبایل، بدون تغییر اطلاعات مصرف، مدت یا محدودیت واقعی دستگاه.",
-    "en": "Combine connected/allowed devices into a single metric (active / limit), reclaim the extra metric for configured subscription duration, keep live expiry and days remaining on public Connect, preserving legacy UI bindings and current quota/expiry enforcement."
+    "fa": "ادغام تعداد متصل و تعداد مجاز در یک کادر و نمایش مدت اشتراک در کادر آزاد. اصلاح اولویت تاریخ انقضای واقعی نسبت به پرچم نامحدود قدیمی و نمایش اولیه روزهای باقی‌مانده حتی قبل از لود جاوااسکریپت. بدون تغییر حجم یا اعتبار حساب‌ها.",
+    "en": "Combine connected and allowed devices in one metric, show configured days in freed cell, prioritize a real finite expiry over a stale unlimited override and prerender remaining days server-side before live polling. Preserves quotas and expiry values."
   }
 }
