@@ -68,6 +68,22 @@ const NODE_INSTALL_FAILURE_GUIDANCE:Record<string,[string,string]>={
     "فرمان نصب روی سرور ناموفق بود. سرویس‌های فعلی را حذف نکنید؛ لاگ نصب نود باید بررسی شود.",
     "A remote installation command failed. Keep existing services intact and inspect the node installation log.",
   ],
+  NODE_INSTALL_WORKER_INTERRUPTED:[
+    "فرایند نصب هنگام آپدیت یا توقف بک‌اند قطع شده است. نود را حذف نکنید؛ از «ادامه نصب همین نود» استفاده کنید.",
+    "The installer stopped during a backend update. Do not delete this node; use Resume this node.",
+  ],
+  NODE_RESUME_REQUIRES_HIDDEN_EXIT:[
+    "ادامه نصب فقط برای نود خروجی مخفی و سالم از نظر هویت مجاز است.",
+    "Resume is allowed only for a hidden, non-retired Exit node.",
+  ],
+  NODE_INSTALL_ALREADY_RUNNING:[
+    "پردازش مستقل نصب هنوز فعال است؛ هم‌زمان نصب دوم شروع نمی‌شود.",
+    "A supervised install is still active. A concurrent resume is blocked.",
+  ],
+  NODE_INSTALL_RECENTLY_RUNNING:[
+    "پردازش نصب اخیراً فعال بوده است؛ وضعیت را تازه‌سازی کنید و از اجرای موازی خودداری کنید.",
+    "Installation was recently active. Refresh the job before retrying.",
+  ],
 };
 
 function NodeInstallProgress({job,error}:{job:NodeInstallJob|null;error:string}){
@@ -248,23 +264,28 @@ export function NodeAddModalBridge(){
     }
   };
 
-  const repairFailedCisco=async()=>{
+  const resumeHiddenNode=async()=>{
     if(busy||!job?.node_id||!jobId)return;
     const token=getCustomerToken();
     if(!token){setError("AUTH_REQUIRED");return;}
-    setBusy("repair");setError("");setOk("");setJobError("");
+    setBusy("resume");setError("");setOk("");setJobError("");
     try{
-      const response=await fetch(API_BASE+"/v1/nodes/"+job.node_id+"/central-stage/repair-cisco",{
+      const response=await fetch(API_BASE+"/v1/nodes/"+job.node_id+"/resume-install-v1",{
         method:"POST",cache:"no-store",
         headers:{Authorization:"Bearer "+token,"Content-Type":"application/json"},
         body:JSON.stringify({publish_to_all_users:publishAfterRepair}),
       });
       const raw=await response.text();
-      if(!response.ok)throw new Error(raw||"Cisco repair HTTP "+response.status);
+      if(!response.ok){
+        let detail="";
+        try{detail=String((JSON.parse(raw) as {detail?:string}).detail||"");}catch{}
+        const guidance=NODE_INSTALL_FAILURE_GUIDANCE[detail];
+        throw new Error(guidance?pick(...guidance):(detail||raw||"Resume HTTP "+response.status));
+      }
       const result=JSON.parse(raw) as {job_id?:string;queued?:boolean};
-      if(!result.queued||result.job_id!==jobId)throw new Error("CISCO_REPAIR_JOB_MISMATCH");
-      setJob(current=>current?{...current,state:"running",stage:"installing_base",error_code:null}:current);
-      setOk(pick("ترمیم Cisco در بک‌اند شروع شد؛ ۱۵ پروتکل سالم تغییر نمی‌کنند.","Cisco-only background repair started; the other 15 services remain unchanged."));
+      if(!result.queued||result.job_id!==jobId)throw new Error("NODE_RESUME_JOB_MISMATCH");
+      setJob(current=>current?{...current,state:"queued",stage:"queued",error_code:null}:current);
+      setOk(pick("ادامه نصب مستقل این نود شروع شد؛ فقط پروتکل‌های ناقص بررسی می‌شوند و نود تا تأیید ۱۶ سرویس مخفی می‌ماند.","This node's supervised resume has started. Only missing protocols are repaired; the node remains hidden until all 16 services pass."));
     }catch(reason){
       setError(reason instanceof Error?reason.message:String(reason));
     }finally{setBusy("");}
@@ -336,11 +357,11 @@ export function NodeAddModalBridge(){
       {ok?<div className="runtime-success">{ok}</div>:null}
       {jobId?<div>
         <NodeInstallProgress job={job} error={jobError}/>
-        {job?.state==="failed"&&["PROTOCOL_SETUP_INCOMPLETE","CISCO_REPAIR_FAILED"].includes(job.error_code||"")&&job.node_id?
+        {(job?.state==="failed"||job?.state==="interrupted")&&job.node_id?
           <div className="runtime-choice-section">
-            <div className="runtime-warning">{pick("نصب یک پروتکل ناقص مانده است. فقط Cisco را ترمیم کن؛ ۱۵ پروتکل سالم دوباره نصب نمی‌شوند.","One protocol is incomplete. Repair only Cisco; do not reinstall the 15 healthy protocols.")}</div>
-            <label className="toggle module-toggle"><span>{pick("بعد از تأیید همه ۱۶ پروتکل، نود برای کاربران مجاز نمایش داده شود","Publish to eligible users after all 16 services pass health checks")}</span><input type="checkbox" checked={publishAfterRepair} onChange={e=>setPublishAfterRepair(e.target.checked)}/><i/></label>
-            <button className="primary-soft" type="button" disabled={Boolean(busy)} onClick={()=>void repairFailedCisco()}>{busy==="repair"?pick("در حال شروع ترمیم...","Starting repair..."):pick("ترمیم Cisco و ادامه نصب همین نود","Repair Cisco and resume this node")}</button>
+            <div className="runtime-warning">{pick("برای نود ثبت‌شده از اول نصب نکن. ادامه نصب با SSH ذخیره‌شده انجام می‌شود؛ پروتکل‌های سالم و کاربران قبلی حفظ می‌شوند.","Do not delete and reinstall this node. Resume with saved SSH; healthy services and existing users remain unchanged.")}</div>
+            <label className="toggle module-toggle"><span>{pick("پس از تأیید واقعی هر ۱۶ پروتکل، نود برای کاربران مجاز منتشر شود","After all 16 LIVE services pass checks, publish to eligible users")}</span><input type="checkbox" checked={publishAfterRepair} onChange={e=>setPublishAfterRepair(e.target.checked)}/><i/></label>
+            <button className="primary-soft" type="button" disabled={Boolean(busy)} onClick={()=>void resumeHiddenNode()}>{busy==="resume"?pick("در حال شروع ادامه نصب...","Starting resume..."):pick("ادامه نصب همین نود، بدون حذف یا ساخت مجدد","Resume this node without deleting or reinstalling")}</button>
           </div>:null}
         <div className="action-row" style={{marginTop:16}}>
           <button className="primary-soft" type="button" onClick={()=>setOpen(false)}>{pick("بستن و ادامه در پس‌زمینه","Close; keep processing")}</button>
