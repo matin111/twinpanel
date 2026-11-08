@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.718",
-  "source_sha": "8670f9b9c87139ca078b8c3fab8dc51a4903fbb0",
+  "version": "1.1.0-rc.719",
+  "source_sha": "c20e994e23941210d2cdc057e3a38755447c44c9",
   "notes": {
-    "fa": "اصلاح مسیر آماده‌سازی SSL اختصاصی Xray: بررسی اتصال نود به Let's Encrypt پیش از هرگونه نصب بسته یا تغییر فایروال، بازگشت سریع خطای مشخص هنگام مسدود بودن ACME، محدودسازی زمان اجرای عملیات طولانی و نمایش دقیق خطای صدور در پنل. بدون تغییر خودکار دامنه‌ها، گواهی‌های سالم، پورت Cisco و تنظیمات VPN. همراه اصلاحات RC.717.",
-    "en": "Fast-fail Xray TLS ACME outbound connectivity preflight before node mutation; bounded certificate issuance and package install timeouts; actionable admin diagnostics on blocked Let's Encrypt. Preserves existing domains, healthy certificates and VPN services. Includes rc.717."
+    "fa": "اصلاح فعال‌سازی مدت اشتراک از اولین مصرف واقعی تأییدشده، حتی در صورت تأخیر ثبت نشست؛ جلوگیری از تغییر مجدد تاریخ در رویداد تکراری؛ نمایش هشدار مدت تعیین‌نشده برای اشتراک‌های انتقالی فاقد قرارداد معتبر. شمارنده مصرف و تاریخ ثبت‌شده کاربران بدون بازنویسی باقی می‌مانند. اصلاحات نسخه RC.718 حفظ شده‌اند.",
+    "en": "Activate configured first-use validity from the first accepted authenticated usage when session telemetry is delayed; preserve replay idempotency, existing expiry, and legacy records with missing duration. Highlight missing-duration imports in admin UI; includes RC.718."
   }
 }
