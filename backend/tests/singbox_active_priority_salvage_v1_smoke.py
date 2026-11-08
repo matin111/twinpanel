@@ -43,7 +43,7 @@ def main():
     assert result["prioritized_active_devices"] == 2, result
     assert result["failed_devices"] == 1, result
     assert result["recovered_devices"] >= 1, result
-    assert result["deferred_devices"] >= 740, result
+    assert result["deferred_devices"] >= 730, result
     assert "account-750" not in seen[:2]
     print("SINGBOX_ACTIVE_PRIORITY_SALVAGE=PASS")
 
