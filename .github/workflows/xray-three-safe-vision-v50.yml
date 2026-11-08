@@ -10,6 +10,8 @@ on:
       - "backend/app/xray_bulk_hot_sync_pilot_v1.py"
       - "backend/scripts/twinpanel_central_xray_node_bulk_v1.py"
       - "backend/app/self_hosted_runtime.py"
+      - "backend/scripts/twinpanel_hidden_node_install_finish_v1.py"
+      - "backend/tests/test_hidden_node_xray_runtime_composition_v1.py"
       - "backend/tests/test_xray_three_safe_vision_v50.py"
       - ".github/workflows/xray-three-safe-vision-v50.yml"
   workflow_dispatch:
@@ -48,6 +50,11 @@ jobs:
         run: |
           python -m unittest discover -s backend/tests -p "test_central_xray_node_authority_v1.py" -v
           python -m unittest discover -s backend/tests -p "test_central_xray_node_bulk_v1.py" -v
+      - name: Detached node installer must compose all three Xray profiles
+        run: |
+          python -m py_compile backend/scripts/twinpanel_hidden_node_install_finish_v1.py
+          python -m unittest discover -s backend/tests -p "test_hidden_node_xray_runtime_composition_v1.py" -v
+
       - name: Confirm no restart in hot-add installer
         run: |
           ! grep -n 'systemctl restart xray' backend/app/xray_domainless_vision_v50.py
