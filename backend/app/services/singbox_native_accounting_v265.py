@@ -967,6 +967,73 @@ def _devices_by_protocol(db, node_id: int) -> dict[str, list[dict[str, Any]]]:
     return grouped
 
 
+def _refresh_authenticated_live_presence(
+    db: Session,
+    *,
+    node: Node,
+    grouped: dict[str, list[dict[str, Any]]],
+    snapshot: dict[str, Any],
+) -> dict[str, int]:
+    """Commit read-only-node-observed presence before expensive byte reconciliation.
+
+    A broken historical quota cursor must never erase authentic live status
+    for an unrelated subscriber. Only an exact sing-box authenticated user
+    name bound to the canonical subscription device can open/refresh presence.
+    Neither IP nor aggregate connection count identifies a subscriber.
+    Existing quota and device-limit checks remain in canonical._mark_presence.
+    """
+    active_by_protocol: dict[str, dict[str, dict[str, Any]]] = {}
+    for row in snapshot.get("rows", []):
+        if not isinstance(row, dict) or _safe_int(row.get("closed_at_ms")):
+            continue
+        inbound = str(row.get("inbound") or "")
+        inbound_type = str(row.get("inbound_type") or "").lower()
+        identity = str(row.get("user") or "").strip()
+        if not identity:
+            continue
+        for protocol in grouped:
+            if protocol not in SINGBOX_ACCOUNTING_PROTOCOLS:
+                continue
+            if inbound != TAGS.get(protocol):
+                continue
+            if inbound_type != ("socks" if protocol == "socks5" else protocol):
+                continue
+            active_by_protocol.setdefault(protocol, {}).setdefault(identity, row)
+            break
+
+    observed_at = _utcnow()
+    refreshed = failed = 0
+    for protocol, devices in grouped.items():
+        active = active_by_protocol.get(protocol, {})
+        if not active:
+            continue
+        for device in devices:
+            identity = str(device.get("telemetry_identity") or device.get("identity") or "").strip()
+            observed = active.get(identity)
+            if observed is None:
+                continue
+            try:
+                with db.begin_nested():
+                    canonical._mark_presence(
+                        db,
+                        node_id=int(node.id),
+                        device=device,
+                        protocol=protocol,
+                        online=True,
+                        observed_at=observed_at,
+                        client_ip=_source_ip(observed.get("source")),
+                        evidence=f"singbox:{identity}:live_snapshot",
+                    )
+                refreshed += 1
+            except Exception:
+                failed += 1
+                # Individual old subscriptions can have broken plan metadata.
+                # A failed savepoint must not suppress healthy users' presence.
+                continue
+    db.commit()
+    return {"refreshed": refreshed, "failed": failed}
+
+
 def _salvage_singbox_devices(
     db, *, node: Node, protocol: str, devices: list[dict[str, Any]], snapshot: dict[str, Any],
 ) -> dict[str, Any]:
@@ -1081,6 +1148,19 @@ async def reconcile_singbox_quota_once() -> dict[str, Any]:
                         ),
                         **audit,
                     })
+
+                # Presence must not wait for per-device cursor scans and
+                # account-wide counter reconciliation. Store only real
+                # authenticated sessions from this exact node snapshot.
+                live_presence = _refresh_authenticated_live_presence(
+                    db, node=node, grouped=grouped, snapshot=snapshot,
+                )
+                results.append({
+                    "ok": live_presence["failed"] == 0,
+                    "collector": "singbox-live-presence-fast-path",
+                    "node_id": int(node.id),
+                    **live_presence,
+                })
 
                 for protocol in sorted(grouped):
                     if protocol in SINGBOX_ACCOUNTING_PROTOCOLS:
