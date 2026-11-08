@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import asyncio
 import json
+from collections.abc import Callable
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -75,7 +77,12 @@ def build_modern_bootstrap_plan(db: Session, node_id: int) -> dict[str, Any]:
     return {"node_id": int(target.id), "protocols": protocols, "ports": ports, "profiles": profiles, "sources": sources, "already_online": sorted(already_online), "skipped_no_template": skipped_no_template, "skipped_port_conflict": skipped_port_conflict}
 
 
-async def bootstrap_new_exit_modern_protocols(db: Session, node_id: int) -> dict[str, Any]:
+async def bootstrap_new_exit_modern_protocols(
+    db: Session,
+    node_id: int,
+    *,
+    on_progress: Callable[[list[str], list[str], list[str]], None] | None = None,
+) -> dict[str, Any]:
     """Install fresh Exit runtimes by independent daemon family.
 
     One failed standalone adapter (Sudoku, Mieru, etc.) must NEVER cause
@@ -117,7 +124,15 @@ async def bootstrap_new_exit_modern_protocols(db: Session, node_id: int) -> dict
             },
         )
         try:
-            result = await install(node_id=int(node_id), payload=payload, db=db)
+            # A standalone apt build may wait for kernel headers/repositories.
+            # Bound each family independently so a single broken adapter
+            # cannot hold a new Exit installation indefinitely.
+            deadline = (360 if "amneziawg" in group
+                        else 240 if len(group) > 1 else 210)
+            result = await asyncio.wait_for(
+                install(node_id=int(node_id), payload=payload, db=db),
+                timeout=deadline,
+            )
             reported = result.get("protocols") or {}
             group_failed = set(result.get("failed_protocols") or [])
             group_failed.update(
@@ -131,6 +146,11 @@ async def bootstrap_new_exit_modern_protocols(db: Session, node_id: int) -> dict
                     errors[key] = "listener_not_healthy"
                 else:
                     installed.append(key)
+        except asyncio.TimeoutError:
+            db.rollback()
+            failed.extend(group)
+            for key in group:
+                errors[key] = "install_timeout"
         except HTTPException as exc:
             db.rollback()
             failed.extend(group)
@@ -143,6 +163,15 @@ async def bootstrap_new_exit_modern_protocols(db: Session, node_id: int) -> dict
                 errors[key] = f"install_error_{type(exc).__name__}"
         # Only non-sensitive telemetry: names and opaque error classes;
         # never print a remote command, private key, password or config.
+        if on_progress is not None:
+            try:
+                on_progress(list(installed), list(failed), list(plan["already_online"]))
+            except Exception as exc:
+                # A failed progress write must never cancel a healthy install.
+                print("CENTRAL_EXIT_MODERN_PROGRESS_WRITE_FAILED", {
+                    "node_id": int(node_id),
+                    "error_type": type(exc).__name__,
+                }, flush=True)
         print("CENTRAL_EXIT_MODERN_INSTALL_GROUP",json.dumps({
             "node_id":int(node_id), "protocols":group,
             "installed":[key for key in group if key in installed],
