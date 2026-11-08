@@ -22,6 +22,24 @@ class ReceiptStoreError(Exception):
     pass
 
 
+def get_linked_wallet_topup(*, telegram_id: int, topup_id: int) -> dict:
+    with SessionLocal() as db:
+        link = db.get(TelegramUserLink, int(telegram_id))
+        if not link:
+            raise ReceiptStoreError("TELEGRAM_ACCOUNT_NOT_LINKED")
+        topup = (
+            db.query(CustomerWalletTopup)
+            .filter(
+                CustomerWalletTopup.id == int(topup_id),
+                CustomerWalletTopup.user_id == int(link.user_id),
+            )
+            .first()
+        )
+        if not topup:
+            raise ReceiptStoreError("TOPUP_NOT_FOUND")
+        return {"method": str(topup.method or ""), "status": str(topup.status or "")}
+
+
 def store_telegram_wallet_receipt(
     *, telegram_id: int, topup_id: int, content: bytes, content_type: str,
 ) -> dict:
