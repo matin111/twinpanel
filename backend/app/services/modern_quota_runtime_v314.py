@@ -96,117 +96,162 @@ def _apply_collected_node_runtime(
 
     results: list[dict[str, Any]] = []
 
-    if grouped.get("wireguard"):
-        ok, epoch, peers, error = collected["wireguard"]
-        results.append(
-            {
-                "ok": True,
-                **canonical._apply_wireguard_like(
-                    db,
-                    node=node,
-                    protocol="wireguard",
-                    devices=grouped["wireguard"],
-                    epoch=epoch,
-                    peers=peers,
-                    match_by_key=False,
-                ),
-            }
-            if ok
-            else {
-                "ok": False,
-                "collector": "wireguard",
-                "node_id": int(node.id),
-                "error": error or "wireguard_source_unavailable",
-            }
-        )
+    try:
+        # Isolate a single protocol's DB accounting. Failed telemetry must
+        # not roll back presence and counters of other protocols on this node.
+        with db.begin_nested():
+            if grouped.get("wireguard"):
+                ok, epoch, peers, error = collected["wireguard"]
+                results.append(
+                    {
+                        "ok": True,
+                        **canonical._apply_wireguard_like(
+                            db,
+                            node=node,
+                            protocol="wireguard",
+                            devices=grouped["wireguard"],
+                            epoch=epoch,
+                            peers=peers,
+                            match_by_key=False,
+                        ),
+                    }
+                    if ok
+                    else {
+                        "ok": False,
+                        "collector": "wireguard",
+                        "node_id": int(node.id),
+                        "error": error or "wireguard_source_unavailable",
+                    }
+                )
+    except Exception as exc:
+        results.append({
+            "ok": False, "collector": "wireguard", "node_id": int(node.id),
+            "error": f"{type(exc).__name__}:{str(exc)[:350]}",
+        })
 
-    if grouped.get("amneziawg"):
-        ok, epoch, peers, error = collected["amneziawg"]
-        results.append(
-            {
-                "ok": True,
-                **canonical._apply_wireguard_like(
-                    db,
-                    node=node,
-                    protocol="amneziawg",
-                    devices=grouped["amneziawg"],
-                    epoch=epoch,
-                    peers=peers,
-                    match_by_key=True,
-                ),
-            }
-            if ok
-            else {
-                "ok": False,
-                "collector": "amneziawg",
-                "node_id": int(node.id),
-                "error": error or "amneziawg_source_unavailable",
-            }
-        )
+    try:
+        # Isolate a single protocol's DB accounting. Failed telemetry must
+        # not roll back presence and counters of other protocols on this node.
+        with db.begin_nested():
+            if grouped.get("amneziawg"):
+                ok, epoch, peers, error = collected["amneziawg"]
+                results.append(
+                    {
+                        "ok": True,
+                        **canonical._apply_wireguard_like(
+                            db,
+                            node=node,
+                            protocol="amneziawg",
+                            devices=grouped["amneziawg"],
+                            epoch=epoch,
+                            peers=peers,
+                            match_by_key=True,
+                        ),
+                    }
+                    if ok
+                    else {
+                        "ok": False,
+                        "collector": "amneziawg",
+                        "node_id": int(node.id),
+                        "error": error or "amneziawg_source_unavailable",
+                    }
+                )
+    except Exception as exc:
+        results.append({
+            "ok": False, "collector": "amneziawg", "node_id": int(node.id),
+            "error": f"{type(exc).__name__}:{str(exc)[:350]}",
+        })
 
-    if grouped.get("trusttunnel"):
-        ok, epoch, rows, error = collected["trusttunnel"]
-        results.append(
-            {
-                "ok": True,
-                **canonical._apply_trusttunnel(
-                    db,
-                    node=node,
-                    devices=grouped["trusttunnel"],
-                    epoch=epoch,
-                    rows=rows,
-                ),
-            }
-            if ok
-            else {
-                "ok": False,
-                "collector": "trusttunnel",
-                "node_id": int(node.id),
-                "error": error or "trusttunnel_source_unavailable",
-            }
-        )
+    try:
+        # Isolate a single protocol's DB accounting. Failed telemetry must
+        # not roll back presence and counters of other protocols on this node.
+        with db.begin_nested():
+            if grouped.get("trusttunnel"):
+                ok, epoch, rows, error = collected["trusttunnel"]
+                results.append(
+                    {
+                        "ok": True,
+                        **canonical._apply_trusttunnel(
+                            db,
+                            node=node,
+                            devices=grouped["trusttunnel"],
+                            epoch=epoch,
+                            rows=rows,
+                        ),
+                    }
+                    if ok
+                    else {
+                        "ok": False,
+                        "collector": "trusttunnel",
+                        "node_id": int(node.id),
+                        "error": error or "trusttunnel_source_unavailable",
+                    }
+                )
+    except Exception as exc:
+        results.append({
+            "ok": False, "collector": "trusttunnel", "node_id": int(node.id),
+            "error": f"{type(exc).__name__}:{str(exc)[:350]}",
+        })
 
-    if grouped.get("mieru"):
-        ok, rows, error = collected["mieru"]
-        results.append(
-            {
-                "ok": True,
-                **canonical._apply_mieru_presence(
-                    db,
-                    node=node,
-                    devices=grouped["mieru"],
-                    rows=rows,
-                ),
-            }
-            if ok
-            else {
-                "ok": False,
-                "collector": "mieru",
-                "node_id": int(node.id),
-                "error": error or "mieru_source_unavailable",
-            }
-        )
+    try:
+        # Isolate a single protocol's DB accounting. Failed telemetry must
+        # not roll back presence and counters of other protocols on this node.
+        with db.begin_nested():
+            if grouped.get("mieru"):
+                ok, rows, error = collected["mieru"]
+                results.append(
+                    {
+                        "ok": True,
+                        **canonical._apply_mieru_presence(
+                            db,
+                            node=node,
+                            devices=grouped["mieru"],
+                            rows=rows,
+                        ),
+                    }
+                    if ok
+                    else {
+                        "ok": False,
+                        "collector": "mieru",
+                        "node_id": int(node.id),
+                        "error": error or "mieru_source_unavailable",
+                    }
+                )
+    except Exception as exc:
+        results.append({
+            "ok": False, "collector": "mieru", "node_id": int(node.id),
+            "error": f"{type(exc).__name__}:{str(exc)[:350]}",
+        })
 
-    if grouped.get("sudoku"):
-        ok, ports, error = collected["sudoku"]
-        results.append(
-            {
-                "ok": True,
-                **canonical._apply_sudoku_presence(
-                    db,
-                    node=node,
-                    devices=grouped["sudoku"],
-                    established_ports=ports,
-                ),
-            }
-            if ok
-            else {
-                "ok": False,
-                "collector": "sudoku",
-                "node_id": int(node.id),
-                "error": error or "sudoku_source_unavailable",
-            }
-        )
+    try:
+        # Isolate a single protocol's DB accounting. Failed telemetry must
+        # not roll back presence and counters of other protocols on this node.
+        with db.begin_nested():
+            if grouped.get("sudoku"):
+                ok, ports, error = collected["sudoku"]
+                results.append(
+                    {
+                        "ok": True,
+                        **canonical._apply_sudoku_presence(
+                            db,
+                            node=node,
+                            devices=grouped["sudoku"],
+                            established_ports=ports,
+                        ),
+                    }
+                    if ok
+                    else {
+                        "ok": False,
+                        "collector": "sudoku",
+                        "node_id": int(node.id),
+                        "error": error or "sudoku_source_unavailable",
+                    }
+                )
+    except Exception as exc:
+        results.append({
+            "ok": False, "collector": "sudoku", "node_id": int(node.id),
+            "error": f"{type(exc).__name__}:{str(exc)[:350]}",
+        })
 
     return results
 
