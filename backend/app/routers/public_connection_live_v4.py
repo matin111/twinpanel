@@ -24,6 +24,8 @@ router = APIRouter(prefix="/v1/connect", tags=["public-connection-live-v4"])
 # Collector sweeps take 15-90s across remote nodes; 30s caused false
 # offline results between valid positive-traffic observations.
 _LIVE_ACTIVITY_SECONDS = 180
+# Additive UI uncertainty hint only. Actual quota and expiry remain canonical.
+_LIVE_UNCERTAIN_SECONDS = 900
 # Xray StatsService reports cumulative per-user counters on the slower quota
 # sweep, not session-open events. 180s falsely marks activity offline between
 # the roughly five-minute samplings. This means RECENT TRAFFIC, not live socket.
@@ -325,7 +327,28 @@ def public_connection_live(token: str, db: Session = Depends(get_db)):
             online_protocols.add(protocol)
         last_counter_activity = _latest(last_counter_activity, reported_at)
 
+    # A collector that misses a sweep must not be mistaken for a confirmed
+    # socket close. Keep this separate from confirmed online sessions and
+    # enforce neither quota nor connection slots from uncertain presence.
+    uncertain_cutoff = datetime.utcnow() - timedelta(seconds=_LIVE_UNCERTAIN_SECONDS)
+    stale_session_rows = (
+        db.query(QuotaSession.protocol)
+        .filter(
+            QuotaSession.subscription_id == sub.id,
+            QuotaSession.status == "active",
+            QuotaSession.last_seen_at < activity_cutoff,
+            QuotaSession.last_seen_at >= uncertain_cutoff,
+        )
+        .distinct()
+        .all()
+    )
+    uncertain_protocols = {
+        _normalized_protocol(row[0])
+        for row in stale_session_rows
+        if _normalized_protocol(row[0]) not in online_protocols
+    }
     connection_online = bool(online_protocols)
+    presence_state = "online" if connection_online else ("unknown" if uncertain_protocols else "offline")
     last_connection_seen = _latest(last_session_seen, last_counter_activity)
 
     protocol_stats = _protocol_stats(
@@ -349,6 +372,8 @@ def public_connection_live(token: str, db: Session = Depends(get_db)):
         "device_limit_unlimited": max_connections == 0,
         "available_connection_slots": max(max_connections - active_sessions, 0) if max_connections > 0 else None,
         "connection_online": connection_online,
+        "presence_state": presence_state,
+        "uncertain_protocols": sorted(uncertain_protocols),
         "online_protocols": sorted(online_protocols),
         "last_session_seen_at": _iso_utc(last_connection_seen),
         "protocol_stats": protocol_stats,
@@ -443,15 +468,16 @@ _LIVE_SCRIPT = r"""
     if(donut)donut.style.setProperty('--pct',String(pct));
 
     const connected=(u.connection_online===true)||Number(u.active_sessions||0)>0;
-    if(traffic)traffic.dataset.connection=connected?'online':'idle';
+    const uncertain=!connected&&u.presence_state==='unknown';
+    if(traffic)traffic.dataset.connection=connected?'online':uncertain?'unknown':'idle';
     if(status){
       const active=String(u.subscription_status||'')==='active';
-      status.className='status '+(connected?'connected':active?'on':'off');
-      status.innerHTML='<i></i>'+(connected?'متصل هستید':active?'اشتراک فعال':'غیرفعال');
+      status.className='status '+(connected?'connected':uncertain?'on':active?'on':'off');
+      status.innerHTML='<i></i>'+(connected?'متصل هستید':uncertain?'وضعیت اتصال نامشخص':active?'اشتراک فعال':'غیرفعال');
     }
     paintProtocols(u.online_protocols);
 
-    const signature=[u.used_bytes,u.remaining_bytes,u.starts_at,u.expires_at,u.active_sessions,u.device_limit,u.connection_online,(u.online_protocols||[]).join(','),u.subscription_status].join('|');
+    const signature=[u.used_bytes,u.remaining_bytes,u.starts_at,u.expires_at,u.active_sessions,u.device_limit,u.connection_online,u.presence_state,(u.online_protocols||[]).join(','),u.subscription_status].join('|');
     if(previous&&signature!==previous&&traffic)flash(traffic);
     previous=signature;
   }
