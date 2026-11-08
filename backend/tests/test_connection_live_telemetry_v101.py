@@ -56,6 +56,26 @@ class LiveConnectionTelemetryV101(unittest.TestCase):
         l2tp = source(SERVICES, "l2tp_quota_runtime_v113.py")
         self.assertIn("source_protocols={'l2tp'}", l2tp)
 
+    def test_cisco_fast_presence_does_not_wait_for_xray_quota_sweep(self):
+        cisco = source(SERVICES, "quota_runtime_reconcile.py")
+        runtime = source(ROOT, "quota_process_isolation_v1.py")
+        self.assertIn("TWINPANEL_CISCO_FAST_PRESENCE_V104", cisco)
+        self.assertIn("async def reconcile_cisco_quota_runtime_once()", cisco)
+        self.assertIn("pg_try_advisory_xact_lock", cisco)
+        self.assertIn("ProtocolCredential.username.in_(names)", cisco)
+        self.assertIn("reconcile_cisco_quota_runtime_once", runtime)
+        self.assertIn('name="cisco-fast-presence"', runtime)
+        self.assertIn("20.0 - elapsed", runtime)
+
+    def test_cisco_country_tab_and_card_use_actual_live_country(self):
+        hub = source(ROUTERS, "public_connection_hub_live_v5.py")
+        style = source(ROUTERS, "public_connection_unified_surface_dates_v80.py")
+        self.assertIn(".server-tabs button[data-country-code]", hub)
+        self.assertIn("chip.dataset.countryCode", hub)
+        self.assertIn("countries.has(country)", hub)
+        self.assertIn("TWINPANEL_CISCO_COUNTRY_LIVE_STATE_V104", style)
+        self.assertIn(".server-tabs button.server-tab.live-online", style)
+
     def test_javascript_syntax(self):
         node = shutil.which("node")
         if not node:
