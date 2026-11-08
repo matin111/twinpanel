@@ -4,6 +4,8 @@ from pathlib import Path
 
 ROOT=Path(__file__).resolve().parents[2]
 worker=(ROOT/'backend/app/routers/publish_node_all_users_v1.py').read_text()
+finisher=(ROOT/'backend/scripts/twinpanel_hidden_node_install_finish_v1.py').read_text()
+supervisor=(ROOT/'backend/app/services/hidden_node_install_supervisor_v1.py').read_text()
 helper=(ROOT/'backend/app/services/new_node_modern_bootstrap_v1.py').read_text()
 central=(ROOT/'backend/app/services/central_first_exit_bootstrap_v1.py').read_text()
 pool=(ROOT/'backend/app/services/central_new_exit_wireguard_pool_v1.py').read_text()
@@ -14,13 +16,18 @@ registry=(ROOT/'backend/app/protocol_account_registry.py').read_text()
 assert "await bootstrap_hidden_central_exit(install_payload, request, db)" in worker
 assert "if install_payload.node_type == NodeType.EXIT" in worker
 assert "else await install_node(install_payload, request, db)" in worker
-assert "admit_verified_exit(db,node_id)" in worker
-assert "launch_central_stage(" in worker
-assert "initial_full=True" in worker
-assert "hide_after_dispatch_failure(db,node_id)" in worker
-assert worker.index("bootstrap_hidden_central_exit(install_payload") < worker.index(
-    "admission=admit_verified_exit(db,node_id)") < worker.index(
-    "dispatched=launch_central_stage(")
+# Long-running post-bootstrap installs must use a detached systemd unit,
+# not an API in-process task which the GitHub updater will kill.
+assert "launch_hidden_node_finisher(" in worker
+assert "bootstrap_new_exit_modern_protocols(" in finisher
+assert "admit_verified_exit(db,node_id)" in finisher
+assert "launch(db,node_id,initial_full=True)" in finisher
+assert "hide_after_dispatch_failure(db,node_id)" in finisher
+assert finisher.index("bootstrap_new_exit_modern_protocols(") < finisher.index(
+    "admission=admit_verified_exit(db,node_id)") < finisher.index(
+    "scheduled=launch(db,node_id,initial_full=True)")
+assert 'EnvironmentFile=/etc/twinpanel/backend.env' in supervisor
+assert 'job.stage not in {"installing_xray", "installing_modern"}' in supervisor
 assert "central_stage.run" not in worker
 assert "stage_rc = await asyncio.to_thread(" not in worker
 assert "enqueue_node_backfill(" not in worker
@@ -38,7 +45,9 @@ assert "except HTTPException as exc:" in helper
 assert "db.rollback()" in helper
 assert "CENTRAL_EXIT_MODERN_INSTALL_GROUP" in helper
 assert "occupied_ports.get(chosen_port, set()) - {key}" in helper
-assert "result = await install(node_id=int(node_id), payload=payload, db=db)" in helper
+assert "result = await asyncio.wait_for(" in helper
+assert "install(node_id=int(node_id), payload=payload, db=db)" in helper
+assert 'errors[key] = "install_timeout"' in helper
 
 # Reusable daemon installers are allowed; legacy account installation isn't.
 assert "await prov.provision_protocols(" in central
