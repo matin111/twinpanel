@@ -30,7 +30,10 @@ class CentralOpenVPNTests(unittest.TestCase):
         source=inspect.getsource(bulk.run)
         self.assertNotIn("easyrsa build-client-full",source)
         self.assertIn("load_or_import_node_ca",source)
-        self.assertIn("issue_client_identity",source)
+        self.assertIn("issue_client_identities_batch",source)
+        self.assertIn("CENTRAL_OPENVPN_IDENTITY_BATCH",source)
+        self.assertIn("saved_node_identity(",source)
+        self.assertNotIn("issue_client_identity(",source)
         self.assertIn("central_identity_commit=False",source)
 
 
