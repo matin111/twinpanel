@@ -340,6 +340,29 @@ def render_apps(uploaded: dict[str, list[dict]]) -> str:
 
 
 @router.get("/{token}", response_class=HTMLResponse)
+def _expiry_with_days(db: Session, sub, now: datetime | None = None) -> tuple[str, str]:
+    """Show authoritative expiry + remaining days, never synthesize an expiry."""
+    from ..subscription_override_models import duration_is_unlimited
+
+    now = now or datetime.utcnow()
+    expires = getattr(sub, "expires_at", None)
+    if expires is not None:
+        remaining = max(0, (expires - now).total_seconds())
+        days = int(remaining // 86400)
+        if remaining > 0 and remaining % 86400:
+            days += 1
+        return expires.strftime("%Y/%m/%d"), f"{days} روز باقی‌مانده"
+
+    if duration_is_unlimited(db, sub):
+        return "نامحدود", "مدت اشتراک نامحدود"
+
+    duration = int(getattr(sub, "activation_duration_days", None) or 0)
+    if duration > 0 and getattr(sub, "starts_at", None) is None:
+        return "پس از اولین اتصال", f"{duration} روز اعتبار"
+
+    return "تعیین نشده", "مدت اعتبار ثبت نشده"
+
+
 def public_connection_hub_v5(token: str, db: Session = Depends(get_db)):
     sub = _subscription_from_share_token(token, db)
     status = str(getattr(sub.status, "value", sub.status)).lower()
@@ -378,7 +401,7 @@ def public_connection_hub_v5(token: str, db: Session = Depends(get_db)):
     starts = getattr(sub, "starts_at", None)
     expires = getattr(sub, "expires_at", None)
     start_label = starts.strftime("%Y/%m/%d") if starts else "—"
-    expire_label = expires.strftime("%Y/%m/%d") if expires else "—"
+    expire_label, remaining_days_label = _expiry_with_days(db, sub)
 
     safe_payload = payload if status == "active" else {**payload, "credentials": [], "account": {}}
     smart_html = render_smart_connect(safe_payload, username if status == "active" else "", password if status == "active" else "", node_names)
@@ -397,7 +420,7 @@ def public_connection_hub_v5(token: str, db: Session = Depends(get_db)):
 </style></head><body>
 <header class="top"><div class="topin"><div class="brand"><button id="themeToggle" class="theme" type="button" aria-label="تغییر حالت">☾</button><span class="mark">__MARK__</span><b>__BRAND__</b></div><div class="profile"><span class="avatar">__AVATAR__</span><div class="profile-copy"><strong>__CUSTOMER__</strong><small>حساب کاربری</small></div><span class="service">__SERVICE__</span>__STATUS__</div></div></header>
 <main class="page">
-<section class="traffic"><div class="visual"><div class="donut" style="--pct:__PERCENT__"><div><b>__PERCENT_LABEL__%</b><small>مصرف شده</small></div></div><div><h2>وضعیت اشتراک</h2><em>LIVE</em></div></div><div class="stats"><div class="stat"><small>مصرف‌شده</small><strong>__USED__</strong></div><div class="stat"><small>باقی‌مانده</small><strong>__REMAIN__</strong></div><div class="stat"><small>حجم کل</small><strong>__TOTAL__</strong></div><div class="stat"><small>تاریخ اولین اتصال</small><strong>__START__</strong></div><div class="stat"><small>تاریخ انقضا</small><strong>__EXPIRE__</strong></div></div></section>
+<section class="traffic"><div class="visual"><div class="donut" style="--pct:__PERCENT__"><div><b>__PERCENT_LABEL__%</b><small>مصرف شده</small></div></div><div><h2>وضعیت اشتراک</h2><em>LIVE</em></div></div><div class="stats"><div class="stat"><small>مصرف‌شده</small><strong>__USED__</strong></div><div class="stat"><small>باقی‌مانده</small><strong>__REMAIN__</strong></div><div class="stat"><small>حجم کل</small><strong>__TOTAL__</strong></div><div class="stat"><small>تاریخ اولین اتصال</small><strong>__START__</strong></div><div class="stat"><small>تاریخ انقضا</small><strong>__EXPIRE__</strong><span class="tp-expiry-days" style="display:block;margin-top:4px;font-size:11px;color:#aebfda">__DAYS_REMAINING__</span></div></div></section>
 <div class="section-head"><div><small>SMART CONNECT</small><h2>اتصال هوشمند</h2></div><p>سریع‌ترین مسیر برای شروع اتصال، بدون درگیرشدن با جزئیات فنی.</p></div>
 __SMART__
 <div class="section-head"><div><small>QUICK CONNECT</small><h2>اتصال سریع</h2></div><p>پروتکل دلخواه را انتخاب کنید؛ فقط گزینه‌های واقعی و آماده نمایش داده می‌شوند.</p></div>
@@ -489,7 +512,7 @@ const names={windows:'Windows',macos:'macOS',android:'Android',ios:'iPhone / iPa
         "__BRAND__": h(brand_name), "__MARK__": h(brand_mark), "__PRIMARY__": primary, "__SECONDARY__": secondary,
         "__SERVICE__": h(service), "__AVATAR__": h(avatar), "__CUSTOMER__": h(customer), "__STATUS__": status_html,
         "__PERCENT__": f"{percent:.1f}", "__PERCENT_LABEL__": f"{percent:.0f}", "__USED__": h(used_label), "__REMAIN__": h(remaining_label),
-        "__TOTAL__": h(total_label), "__START__": h(start_label), "__EXPIRE__": h(expire_label), "__SMART__": smart_html,
+        "__TOTAL__": h(total_label), "__START__": h(start_label), "__EXPIRE__": h(expire_label), "__DAYS_REMAINING__": h(remaining_days_label), "__SMART__": smart_html,
         "__PCARDS__": protocol_cards, "__PPANELS__": protocol_panels, "__TOKEN__": h(token), "__SHARE__": h(share_url),
         "__SHARE_COPY__": _copy(share_url, "کپی لینک"), "__ACCOUNT_FACTS__": account_facts, "__APPS__": apps_html,
     }
