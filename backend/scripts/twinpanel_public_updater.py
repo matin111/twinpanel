@@ -549,7 +549,7 @@ def _release_asset_api_url(url: str) -> str:
         raise RuntimeError('RELEASE_ARTIFACT_URL_INVALID')
     suffix = url[len(ALLOWED_ARTIFACT_PREFIX):]
     parts = suffix.split('/')
-    if len(parts) != 2 or not re.fullmatch(r'v[0-9A-Za-z._-]+', parts[0]) or not re.fullmatch(r'[A-Za-z0-9._-]+\\.tar\\.gz', parts[1]):
+    if len(parts) != 2 or not re.fullmatch(r'v[0-9A-Za-z._-]+', parts[0]) or not re.fullmatch(r'[A-Za-z0-9._-]+\.tar\.gz', parts[1]):
         raise RuntimeError('RELEASE_ARTIFACT_URL_INVALID')
     tag, filename = parts
     listing = 'https://api.github.com/repos/matin111/twinpanel/releases/tags/' + tag
