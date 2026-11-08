@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -8,6 +9,7 @@ from sqlalchemy.orm import Session
 from ..database import SessionLocal, get_db
 from ..deps import require_admin
 from ..models import Node, NodeType, Plan, ProtocolCredential, Subscription, SubscriptionNode, SubscriptionProtocol, User
+from ..subscription_override_models import SubscriptionRuntimeOverride
 from ..plan_template_selection import plan_template_node_ids
 from ..protocol_account_registry import ALL_PROTOCOL_KEYS, normalize_protocols, plan_protocols
 from ..subscription_enforcement import queue_subscription_enforcement
@@ -186,6 +188,36 @@ async def admin_edit_subscription_fast_v1(
     if valid_count != len(set(desired_node_ids)):
         raise HTTPException(status_code=422, detail="یک یا چند سرور خروجی معتبر نیست")
 
+    # Optional per-account limits are never inferred for older API clients.
+    new_device_limit = None
+    if "device_limit" in payload:
+        try:
+            new_device_limit = int(payload["device_limit"])
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=422, detail="تعداد اتصال هم‌زمان نامعتبر است")
+        if not 0 <= new_device_limit <= 1000:
+            raise HTTPException(status_code=422, detail="تعداد دستگاه باید بین ۰ و ۱۰۰۰ باشد")
+
+    new_duration_days = None
+    if "duration_days" in payload:
+        try:
+            new_duration_days = int(payload["duration_days"])
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=422, detail="مدت اشتراک نامعتبر است")
+        if not 0 <= new_duration_days <= 3650:
+            raise HTTPException(status_code=422, detail="مدت اشتراک باید بین ۰ و ۳۶۵۰ روز باشد")
+
+    expiry_sent = "expires_at" in payload
+    new_expires_at = None
+    if expiry_sent and payload["expires_at"] not in (None, ""):
+        try:
+            parsed = datetime.fromisoformat(str(payload["expires_at"]).replace("Z", "+00:00"))
+            new_expires_at = parsed.astimezone(timezone.utc).replace(tzinfo=None) if parsed.tzinfo else parsed
+        except (ValueError, TypeError, OverflowError):
+            raise HTTPException(status_code=422, detail="تاریخ انقضا نامعتبر است")
+        if new_expires_at <= datetime.utcnow():
+            raise HTTPException(status_code=422, detail="تاریخ انقضا باید در آینده باشد")
+
     requested_username = str(payload.get("account_username") or "").strip()
     username_changed = bool(requested_username and requested_username != str(sub.account_username or ""))
     password_changed = bool(str(payload.get("account_password") or "").strip())
@@ -193,6 +225,23 @@ async def admin_edit_subscription_fast_v1(
     normalized_payload = dict(payload)
     normalized_payload["node_ids"] = list(desired_node_ids)
     normalized_payload["protocols"] = list(protocols)
+
+    def persist_account_limits():
+        if new_device_limit is not None:
+            override = db.get(SubscriptionRuntimeOverride, int(sub.id))
+            if override is None:
+                override = SubscriptionRuntimeOverride(subscription_id=int(sub.id))
+                db.add(override)
+            override.device_limit = new_device_limit
+        if new_duration_days is not None:
+            sub.activation_duration_days = new_duration_days
+            if sub.starts_at is not None and not expiry_sent and new_duration_days:
+                sub.expires_at = sub.starts_at + timedelta(days=new_duration_days)
+        if expiry_sent:
+            sub.expires_at = new_expires_at
+            if new_expires_at and sub.starts_at is None:
+                sub.activation_duration_days = max(1, (new_expires_at - datetime.utcnow()).days + 1)
+
 
     # Credential rotations need the historical shared-login synchronization.
     # They still run after the HTTP response so the UI never waits on SSH.
@@ -202,6 +251,8 @@ async def admin_edit_subscription_fast_v1(
             detail="برای تغییر نام کاربری یا رمز اشتراک دستی، ابتدا یک پلن انتخاب کنید",
         )
     if username_changed or password_changed:
+        persist_account_limits()
+        db.commit()
         background_tasks.add_task(
             _legacy_edit_background,
             int(subscription_id),
@@ -231,6 +282,7 @@ async def admin_edit_subscription_fast_v1(
 
     try:
         sub.plan_id = int(plan.id) if plan else None
+        persist_account_limits()
         sub.traffic_limit_bytes = _resolve_traffic_limit_bytes(sub, payload)
         sub.iran_node_id = None
         sub.exit_node_id = int(desired_node_ids[0])
