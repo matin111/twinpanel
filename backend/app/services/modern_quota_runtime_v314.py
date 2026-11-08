@@ -124,9 +124,13 @@ def _apply_collected_node_runtime(
                     }
                 )
     except Exception as exc:
+        recovery = _retry_failed_protocol_per_device(
+            db, node=node, protocol="wireguard", grouped=grouped, collected=collected,
+        )
         results.append({
             "ok": False, "collector": "wireguard", "node_id": int(node.id),
             "error": f"{type(exc).__name__}:{str(exc)[:350]}",
+            **recovery,
         })
 
     try:
@@ -157,9 +161,13 @@ def _apply_collected_node_runtime(
                     }
                 )
     except Exception as exc:
+        recovery = _retry_failed_protocol_per_device(
+            db, node=node, protocol="amneziawg", grouped=grouped, collected=collected,
+        )
         results.append({
             "ok": False, "collector": "amneziawg", "node_id": int(node.id),
             "error": f"{type(exc).__name__}:{str(exc)[:350]}",
+            **recovery,
         })
 
     try:
@@ -188,9 +196,13 @@ def _apply_collected_node_runtime(
                     }
                 )
     except Exception as exc:
+        recovery = _retry_failed_protocol_per_device(
+            db, node=node, protocol="trusttunnel", grouped=grouped, collected=collected,
+        )
         results.append({
             "ok": False, "collector": "trusttunnel", "node_id": int(node.id),
             "error": f"{type(exc).__name__}:{str(exc)[:350]}",
+            **recovery,
         })
 
     try:
@@ -218,9 +230,13 @@ def _apply_collected_node_runtime(
                     }
                 )
     except Exception as exc:
+        recovery = _retry_failed_protocol_per_device(
+            db, node=node, protocol="mieru", grouped=grouped, collected=collected,
+        )
         results.append({
             "ok": False, "collector": "mieru", "node_id": int(node.id),
             "error": f"{type(exc).__name__}:{str(exc)[:350]}",
+            **recovery,
         })
 
     try:
@@ -248,12 +264,76 @@ def _apply_collected_node_runtime(
                     }
                 )
     except Exception as exc:
+        recovery = _retry_failed_protocol_per_device(
+            db, node=node, protocol="sudoku", grouped=grouped, collected=collected,
+        )
         results.append({
             "ok": False, "collector": "sudoku", "node_id": int(node.id),
             "error": f"{type(exc).__name__}:{str(exc)[:350]}",
+            **recovery,
         })
 
     return results
+
+
+def _retry_failed_protocol_per_device(
+    db,
+    *,
+    node: Node,
+    protocol: str,
+    grouped: dict[str, list[dict[str, Any]]],
+    collected: dict[str, tuple[Any, ...]],
+) -> dict[str, Any]:
+    """Salvage healthy users after a node/protocol batch failed.
+
+    The main batch has already rolled back to its savepoint. Retrying only
+    after that error avoids thousands of savepoints during healthy sweeps.
+    Never fabricate a connected session when telemetry is unavailable.
+    """
+    devices = grouped.get(protocol) or []
+    reading = collected.get(protocol)
+    if not reading or reading[0] is not True:
+        return {"recovered_devices": 0, "failed_devices": len(devices)}
+    recovered = 0
+    failed = 0
+    errors: list[str] = []
+    for device in devices:
+        try:
+            with db.begin_nested():
+                if protocol in {"wireguard", "amneziawg"}:
+                    _, epoch, peers, _ = reading
+                    canonical._apply_wireguard_like(
+                        db, node=node, protocol=protocol, devices=[device],
+                        epoch=epoch, peers=peers,
+                        match_by_key=protocol == "amneziawg",
+                    )
+                elif protocol == "trusttunnel":
+                    _, epoch, rows, _ = reading
+                    canonical._apply_trusttunnel(
+                        db, node=node, devices=[device], epoch=epoch, rows=rows,
+                    )
+                elif protocol == "mieru":
+                    _, rows, _ = reading
+                    canonical._apply_mieru_presence(
+                        db, node=node, devices=[device], rows=rows,
+                    )
+                elif protocol == "sudoku":
+                    _, ports, _ = reading
+                    canonical._apply_sudoku_presence(
+                        db, node=node, devices=[device], established_ports=ports,
+                    )
+                else:
+                    raise RuntimeError("unsupported_protocol_salvage")
+            recovered += 1
+        except Exception as exc:
+            failed += 1
+            if len(errors) < 3:
+                errors.append(f"{type(exc).__name__}:{str(exc)[:120]}")
+    return {
+        "recovered_devices": recovered,
+        "failed_devices": failed,
+        "sample_errors": errors,
+    }
 
 
 async def _reconcile_node(db, node: Node) -> list[dict[str, Any]]:
