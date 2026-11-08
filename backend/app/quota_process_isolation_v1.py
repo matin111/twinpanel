@@ -95,10 +95,55 @@ def install() -> None:
 
     from .services import customer_maintenance as runtime
 
+    async def _fast_cisco_presence_worker() -> None:
+        # TWINPANEL_CISCO_FAST_PRESENCE_V104
+        # ocserv is authoritative for active Cisco/AnyConnect clients.
+        # Run independently of the full OpenVPN/Xray/L2TP quota sweep, whose
+        # CPU-heavy provisioning work can delay status by several minutes.
+        from .services.quota_runtime_reconcile import (
+            reconcile_cisco_quota_runtime_once,
+        )
+
+        while True:
+            started = asyncio.get_running_loop().time()
+            try:
+                result = await asyncio.wait_for(
+                    reconcile_cisco_quota_runtime_once(), timeout=50.0,
+                )
+                failed = [
+                    (item.get("node_id"), str(item.get("error") or "")[:160])
+                    for item in (result.get("nodes") or [])
+                    if not item.get("ok")
+                ]
+                if failed:
+                    print("CISCO_FAST_PRESENCE_ERRORS", failed, flush=True)
+                refreshed = [
+                    item
+                    for item in (result.get("nodes") or [])
+                    if item.get("opened") or item.get("closed")
+                ]
+                if refreshed:
+                    print("CISCO_FAST_PRESENCE_CHANGES", refreshed, flush=True)
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                print(
+                    "CISCO_FAST_PRESENCE_ERROR",
+                    f"{type(exc).__name__}:{str(exc)[:300]}",
+                    flush=True,
+                )
+            elapsed = asyncio.get_running_loop().time() - started
+            await asyncio.sleep(max(3.0, 20.0 - elapsed))
+
     async def _process_isolated_quota_runtime_worker() -> None:
         if os.environ.get("TWINPANEL_EXTERNAL_HEAVY_RECONCILE") == "1":
             await asyncio.Event().wait()
             return
+        # This runs in the existing external heavy-reconcile service, not
+        # inside API workers. One fast observer serves all user pages.
+        asyncio.create_task(
+            _fast_cisco_presence_worker(), name="cisco-fast-presence",
+        )
         while True:
             cycle_failed = False
             try:
