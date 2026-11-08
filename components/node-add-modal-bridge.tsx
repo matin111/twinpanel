@@ -93,7 +93,7 @@ function NodeInstallProgress({job,error}:{job:NodeInstallJob|null;error:string})
 
   const phases:[string,string,string][]=[
     ["queued","درخواست ثبت شد","Request accepted"],
-    ["installing_base",job?.expected_protocols?"نصب زیرساخت پایه و سرویس‌ها":"آماده‌سازی ابزارهای شبکه و عامل تانل",job?.expected_protocols?"Installing core services":"Preparing tunnel network tools and agent"],
+    ["installing_base",job?.expected_protocols?"نصب زیرساخت پایه و سرویس‌ها":"بررسی SSH و ثبت نود ایران",job?.expected_protocols?"Installing core services":"Checking SSH and registering Iran relay"],
     ...(job?.expected_protocols?[
       ["installing_xray","آماده‌سازی Xray","Preparing Xray"],
       ["installing_modern","نصب پروتکل‌های مدرن","Installing modern protocols"],
