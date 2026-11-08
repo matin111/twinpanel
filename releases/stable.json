@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.710",
+  "version": "1.1.0-rc.711",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-08T10:56:58Z",
+  "released_at": "2026-11-08T17:57:20Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "9a732d34bd1157c082e9ebc2a227f2383a156164",
+  "source_sha": "4149b80ae4a8ca1644d94e62fb7eb3e604eaf2e6",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.710/twinpanel-1.1.0-rc.710-linux-x86_64.tar.gz",
-    "sha256": "bd3a4f635245bf91cb3e496e5eb8fc69c37e287c2b30a3b94647b20d298b07a7",
-    "size_bytes": 29840341
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.711/twinpanel-1.1.0-rc.711-linux-x86_64.tar.gz",
+    "sha256": "b3db85cb9342148dd2f92588eb67c954954777d8a4845b50d81d03464de083dd",
+    "size_bytes": 29843777
   },
   "notes": {
-    "fa": "نسخه rc.710: رفع ریشه‌ای قطع ساخت V2Ray اکانت‌های جدید (رفع خطای SyntaxError در اسکریپت Xray، تست کامپایل اسکریپت تولیدی، بازیابی خودکار کانفیگ‌های ناقص فقط برای V2Ray با UUID ثابت و بدون ری‌استارت سراسری). رفع گیر نصب نودهای جدید مانند fin: استفاده از فایل رسمی Xray و سه پروتکل Mieru/TrustTunnel/Sudoku از GitHub Assets API با تأیید SHA256 و retry محدود برای 503/504، ادامه نصب پروتکل‌ها در worker مستقل systemd به جای task درون API، بازیابی نصب نود مخفی نیمه‌کاره پس از آپدیت/ری‌استارت، زمان‌بندی مستقل پروتکل‌های مدرن، بررسی زنده ۱۶ سرویس و وجود سه اینباند واقعی Xray پیش از نمایش به کاربران و مرحله مدیریت مرکزی. حفظ تغییرات rc.709؛ همه تست‌های PR2461 و PR2462 موفق شدند. آپدیت سرور مادر انجام نشده؛ نصب موفق نود فنلاند و اتصال واقعی کاربران پس از نصب نسخه جدید نیاز به بررسی جداگانه دارد.",
-    "en": "rc.710: Fix broken generated Xray/VLESS hot-client Python helper (SyntaxError missing bracket), precompile node-side source, and auto-repair only missing V2Ray credentials for newly active subscriptions using stable original UUIDs without restarting Xray or touching other protocols. Fix stuck hidden Finland Exit install by verified official GitHub Releases API assets (Xray, Mieru, TrustTunnel, Sudoku) with SHA256 validation and bounded transient 503/504 retries. Long Xray/Modern installer runs in a supervised per-node systemd worker surviving API restarts, with recovery of stale hidden installation jobs, independent bounded protocol families, real 16-service and three actual Xray inbound readiness checks before any customer enrollment. Preserves rc.709; PR2461 and PR2462 CI pass. No mother-host deployment performed; actual Finland installation and client-network connectivity remain unverified until official updater activation and live validation."
+    "fa": "رفع ناقص بودن آنلاین پروتکل‌های مدرن: وقتی یک حساب قدیمی باعث خطای اعتبار یا تداخل شمارنده sing-box شود، ابتدا همه کاربران دارای اتصال واقعی و هویت احرازشده در همان نود/پروتکل با savepoint مستقل پردازش می‌شوند؛ سهمیه و شمارنده هیچ حساب دیگری تغییر غیرمعتبر نمی‌کند و پاک‌سازی کاربران آفلاین همچنان محدود باقی می‌ماند. این تغییر برای AnyTLS/Hysteria2/TUIC/Naive/Snell/Socks5 بوده و اتصال VPN، پورت‌ها یا کانفیگ‌های کاربران را تغییر نمی‌دهد. ShadowTLS هنوز شناسه لایه داخلی ندارد و رفع کامل آن جداست.",
+    "en": "Fix modern-protocol online starvation on sing-box protocol batch errors: recovery first processes every authenticated live identity, even among >800 legacy accounts; only offline cleanup uses bounded rotating windows. Per-device savepoints isolate bad legacy subscription duration and cursor identity conflicts; preserve exact per-subscriber traffic/quota behavior, no VPN node, port or credential changes. ShadowTLS shared-inner identity remains unsupported."
   }
 }
