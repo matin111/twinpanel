@@ -2112,7 +2112,7 @@ async def reseller_edit_subscription(
             selected_protocols = normalize_protocols(payload.protocols)
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
-        entitled = set(allowed_protocols(db, reseller_tier(reseller)))
+        entitled = set(allowed_protocols(db, reseller, None))
         if not selected_protocols or not set(selected_protocols).issubset(entitled):
             raise HTTPException(status_code=403, detail="پروتکل خارج از دسترسی نمایندگی مجاز نیست")
 
