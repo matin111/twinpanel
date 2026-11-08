@@ -100,10 +100,15 @@ def sync():
             if current is not None:
                 if current.get("id") != client_id:
                     raise RuntimeError("UUID rotation forbidden")
+                if (tag == "vless-tcp-reality-vision"
+                        and current.get("flow") != "xtls-rprx-vision"):
+                    raise RuntimeError("XRAY_VISION_EXISTING_FLOW_MISMATCH")
                 continue
             if client_id in by_uuid:
                 raise RuntimeError("duplicate UUID across emails")
             client = {"id": client_id, "email": email, "level": 0}
+            if tag == "vless-tcp-reality-vision":
+                client["flow"] = "xtls-rprx-vision"
             users.append(client)
             additions.append(client)
         if additions:
