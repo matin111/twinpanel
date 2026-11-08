@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session
 
 from ..config import settings
 from ..services.node_os_preflight_v1 import (
+    NodeOSPreflightError,
     remote_supported_os_info,
     remote_supported_os_id,
 )
@@ -264,7 +265,10 @@ async def test_connection(payload: TestIn):
     conn = await ssh_connect(payload)
     try:
         # Exactly the same fail-closed OS preflight as the real installer.
-        os_info = await remote_supported_os_info(conn)
+        try:
+            os_info = await remote_supported_os_info(conn)
+        except NodeOSPreflightError as exc:
+            raise HTTPException(status_code=422, detail=exc.code) from None
         return {
             "ok": True,
             "hostname": await cmd(conn, "hostname"),
@@ -1559,7 +1563,10 @@ async def upgrade_agent(
     conn = await ssh_connect_saved(node, db)
     try:
         # Do not source potentially damaged/absent os-release.
-        await remote_supported_os_id(conn)
+        try:
+            await remote_supported_os_id(conn)
+        except NodeOSPreflightError as exc:
+            raise HTTPException(status_code=422, detail=exc.code) from None
         hostname = await cmd(conn, "hostname", check=False)
         result = await _install_or_upgrade_agent(
             conn,
@@ -2483,7 +2490,10 @@ async def install_node(
         # Fail before writing a node record or installing ANY service.
         # A retired Exit can be re-added even when /etc/os-release moved;
         # /usr/lib/os-release and lsb_release are read-only fallbacks.
-        await remote_supported_os_id(conn)
+        try:
+            await remote_supported_os_id(conn)
+        except NodeOSPreflightError as exc:
+            raise HTTPException(status_code=422, detail=exc.code) from None
         await ensure_base(conn)
         node=Node(name=payload.name,node_type=payload.node_type,country_code="IR" if payload.node_type==NodeType.IRAN else payload.country_code.upper(),public_ip=payload.host,agent_url=f"https://{payload.host}:9443",status=NodeStatus.OFFLINE,show_to_users=(payload.node_type != NodeType.EXIT or not payload.defer_subscription_sync),capacity_users=payload.capacity_users,enable_cisco=False,enable_openvpn=False,enable_wireguard=False,enable_l2tp=False,enable_v2ray=False)
         db.add(node); db.commit(); db.refresh(node)
