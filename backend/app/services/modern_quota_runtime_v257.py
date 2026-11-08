@@ -856,6 +856,8 @@ def _apply_mieru_presence(
         ).strip()
         row = by_user.get(username)
         if row is None:
+            if int(device["device_id"]) not in previously_active_devices:
+                continue
             presence = _mark_presence(
                 db,
                 node_id=int(node.id),
