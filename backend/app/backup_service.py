@@ -1317,57 +1317,126 @@ def verify_telegram_chat(
 
 
 
+# Keep each Telegram document well below the 50 MB Bot API upload limit.
+# The backup is encrypted BEFORE partitioning; no plaintext is transmitted.
+TELEGRAM_BACKUP_PART_BYTES = 40 * 1024 * 1024
+
+
 def send_backup_to_telegram(
     backup_path: Path,
     chat_id: str,
 ) -> dict[str, Any]:
+    import math
+    import tempfile
 
     token = load_bot_token()
+    meta = _read_meta(backup_path)
+    file_size = backup_path.stat().st_size
+    parts = max(1, math.ceil(file_size / TELEGRAM_BACKUP_PART_BYTES))
+    # Do not silently resume delivery to a different chat.
+    already_sent = meta.get("telegram_parts_sent") or []
+    if meta.get("telegram_delivery_chat") != str(chat_id):
+        already_sent = []
+    if not isinstance(already_sent, list):
+        already_sent = []
+    already_sent = [
+        int(i) for i in already_sent
+        if isinstance(i, int) and 1 <= i <= parts
+    ]
+    completed = set(already_sent)
+    meta["telegram_delivery_chat"] = str(chat_id)
+    meta["telegram_parts_total"] = parts
+    meta["telegram_parts_sent"] = sorted(completed)
+    meta["telegram_sent"] = False
+    _write_meta(backup_path, meta)
 
-    meta = _read_meta(
-        backup_path
+    caption_header = (
+        "TwinPanel encrypted backup\\n"
+        f"Type: {meta.get('kind', 'backup')}\\n"
+        f"Created: {meta.get('created_at','')}\\n"
     )
-
-    caption = (
-        "TwinPanel Backup\n"
-        f"نوع: {meta.get('kind','backup')}\n"
-        f"زمان: {meta.get('created_at','')}\n"
-        "فایل رمزگذاری‌شده است."
-    )
-
-    with backup_path.open(
-        "rb"
-    ) as handle:
-
-        payload = _telegram_api_call(
-            token,
-            "sendDocument",
-            data={
-                "chat_id":
-                    str(chat_id),
-                "caption":
-                    caption,
-            },
-            files={
-                "document": (
-                    backup_path.name,
-                    handle,
-                    "application/octet-stream",
+    with backup_path.open("rb") as source:
+        for idx in range(1, parts + 1):
+            if idx in completed:
+                continue
+            # One part at a time, bounded memory and disk use; no large
+            # in-memory read and no retained duplicate backup files.
+            source.seek((idx - 1) * TELEGRAM_BACKUP_PART_BYTES)
+            with tempfile.SpooledTemporaryFile(max_size=8 * 1024 * 1024) as spool:
+                remaining = min(
+                    TELEGRAM_BACKUP_PART_BYTES,
+                    file_size - ((idx - 1) * TELEGRAM_BACKUP_PART_BYTES),
                 )
+                while remaining:
+                    chunk = source.read(min(1024 * 1024, remaining))
+                    if not chunk:
+                        raise RuntimeError("BACKUP_SOURCE_TRUNCATED")
+                    spool.write(chunk)
+                    remaining -= len(chunk)
+                spool.seek(0)
+                filename = (
+                    backup_path.name if parts == 1 else
+                    f"{backup_path.name}.part{idx:03d}of{parts:03d}"
+                )
+                try:
+                    _telegram_api_call(
+                        token, "sendDocument",
+                        data={
+                            "chat_id": str(chat_id),
+                            "caption": (
+                                caption_header
+                                + f"Part {idx}/{parts}. Reassemble in numeric order."
+                            ),
+                        },
+                        files={
+                            "document": (
+                                filename, spool, "application/octet-stream",
+                            ),
+                        },
+                        timeout=240.0,
+                    )
+                except Exception as exc:
+                    meta["telegram_error"] = str(exc)[:500]
+                    meta["telegram_parts_sent"] = sorted(completed)
+                    _write_meta(backup_path, meta)
+                    raise
+            completed.add(idx)
+            meta["telegram_parts_sent"] = sorted(completed)
+            meta["telegram_error"] = None
+            _write_meta(backup_path, meta)
+
+    # A checksum sent separately allows verification after joining parts.
+    # The key is never sent to Telegram.
+    try:
+        _telegram_api_call(
+            token, "sendMessage",
+            data={
+                "chat_id": str(chat_id),
+                "text": (
+                    f"TwinPanel backup delivery complete: {backup_path.name}\\n"
+                    f"Parts: {parts} (join in ascending order).\\n"
+                    f"SHA256: {meta.get('sha256','')}\\n"
+                    "After joining, verify SHA256 before restoring. "
+                    "Keep the recovery key separately."
+                ),
             },
-            timeout=180.0,
+            timeout=30.0,
         )
+    except Exception as exc:
+        meta["telegram_error"] = str(exc)[:500]
+        _write_meta(backup_path, meta)
+        raise
 
-    result = (
-        payload.get("result")
-        or {}
-    )
-
+    meta["telegram_sent"] = True
+    meta["telegram_sent_at"] = _iso_now()
+    meta["telegram_error"] = None
+    _write_meta(backup_path, meta)
     return {
         "ok": True,
         "chat_id": str(chat_id),
-        "message_id":
-            result.get("message_id"),
+        "parts": parts,
+        "parts_sent": len(completed),
+        "sha256": meta.get("sha256"),
     }
 
 
@@ -2070,7 +2139,30 @@ def run_auto_backup_if_due() -> dict[
     if state.get(
         "last_auto_key"
     ) == key:
-
+        # The backup may have been created successfully while Telegram
+        # rejected an oversized attachment. Retry delivery of that same
+        # encrypted archive, never create another backup or duplicate parts.
+        if settings.get("send_telegram"):
+            filename = str(state.get("last_auto_filename") or "")
+            chat_id = str(settings.get("telegram_chat_id") or "").strip()
+            if filename and chat_id:
+                try:
+                    path = get_backup_path(filename)
+                    meta = _read_meta(path)
+                    if not meta.get("telegram_sent"):
+                        try:
+                            result = send_backup_to_telegram(path, chat_id)
+                            return {"ok": True, "ran": False,
+                                    "reason": "telegram_delivery_recovered",
+                                    "telegram": result}
+                        except Exception as exc:
+                            return {"ok": False, "ran": False,
+                                    "reason": "telegram_delivery_retry_pending",
+                                    "error": str(exc)[:240]}
+                except Exception as exc:
+                    return {"ok": False, "ran": False,
+                            "reason": "telegram_delivery_backup_missing",
+                            "error": type(exc).__name__}
         return {
             "ok": True,
             "ran": False,
