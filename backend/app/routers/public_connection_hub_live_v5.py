@@ -214,7 +214,7 @@ _LIVE_SCRIPT = r"""
     write(deviceLimit,cap===0?'نامحدود':nf.format(cap)+' دستگاه');
     write(deviceActive,nf.format(activeSessions));
     write(deviceCombined,nf.format(activeSessions)+' / '+(cap===0?'∞':nf.format(cap)));
-    write(durationMetric,payload.duration_unlimited===true?'نامحدود':Math.max(0,Math.trunc(Number(payload.activation_duration_days||0)))>0?nf.format(Math.trunc(Number(payload.activation_duration_days)))+' روز':'تعیین نشده');
+    write(durationMetric,payload.expires_at&&Number(payload.activation_duration_days||0)>0?nf.format(Math.trunc(Number(payload.activation_duration_days)))+' روز':payload.duration_unlimited===true&&!payload.expires_at?'نامحدود':Number(payload.activation_duration_days||0)>0?nf.format(Math.trunc(Number(payload.activation_duration_days)))+' روز':'تعیین نشده');
     if(donut)donut.style.setProperty('--pct',String(pct));
 
     const connected=payload.connection_online===true||Number(payload.active_sessions||0)>0;
@@ -402,8 +402,16 @@ def public_connection_hub_live_v5(
             1,
         )
         valid_days = max(int(live.get("activation_duration_days") or 0), 0)
-        duration_label = 'نامحدود' if live.get("duration_unlimited") is True else (
-            str(valid_days) + ' روز' if valid_days else 'تعیین نشده'
+        # An actual expiry timestamp takes precedence over a stale legacy
+        # unlimited override. Never label a finite account as unlimited.
+        duration_label = (
+            str(valid_days) + ' روز'
+            if valid_days and live.get("expires_at")
+            else 'نامحدود'
+            if live.get("duration_unlimited") is True and not live.get("expires_at")
+            else str(valid_days) + ' روز'
+            if valid_days
+            else 'تعیین نشده'
         )
         source = source.replace(
             '<strong id="liveDurationMetric">—</strong>',
