@@ -347,6 +347,10 @@ async def _account_modern_v50(db,node,sub,user,client_id:str, *,
 def _routes_v50(db,exit_node,exit_tunnel_ip:str)->list[dict]:
     assert _original_routes is not None
     routes=list(_original_routes(db,exit_node,exit_tunnel_ip))
+    if (bool(getattr(exit_node,"is_mother",False))
+            or bool(getattr(exit_node,"is_local_core",False))
+            or getattr(exit_node,"agent_url",None)=="local://core"):
+        return routes
     if v47._effective_domain_from_db(db,exit_node):
         return routes
     cfg=db.query(NodeProtocolConfig).filter(
