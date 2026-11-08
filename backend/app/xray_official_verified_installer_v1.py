@@ -20,6 +20,8 @@ import platform
 import re
 import subprocess
 import tempfile
+import time
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -44,11 +46,24 @@ def download(url, *, accept=None, max_size=MAX_ZIP_SIZE):
     if accept:
         headers["Accept"] = accept
     req = urllib.request.Request(url, headers=headers)
-    with urllib.request.urlopen(req, timeout=35) as response:
-        data = response.read(max_size + 1)
-        if len(data) > max_size:
-            raise RuntimeError("XRAY_OFFICIAL_DOWNLOAD_TOO_LARGE")
-        return data
+    # Some Exit egress networks intermittently return 503/504 even on the
+    # official GitHub API. Retry only transport errors with bounded backoff;
+    # never bypass the published SHA256 check or use an untrusted mirror.
+    for attempt in range(4):
+        try:
+            with urllib.request.urlopen(req, timeout=35) as response:
+                data = response.read(max_size + 1)
+                if len(data) > max_size:
+                    raise RuntimeError("XRAY_OFFICIAL_DOWNLOAD_TOO_LARGE")
+                return data
+        except (urllib.error.URLError, TimeoutError) as exc:
+            if isinstance(exc, urllib.error.HTTPError) and exc.code not in (
+                429, 500, 502, 503, 504,
+            ):
+                raise RuntimeError("XRAY_OFFICIAL_REQUEST_REJECTED") from exc
+            if attempt == 3:
+                raise RuntimeError("XRAY_OFFICIAL_NETWORK_UNAVAILABLE") from exc
+            time.sleep(2 ** attempt)
 
 
 def main():
