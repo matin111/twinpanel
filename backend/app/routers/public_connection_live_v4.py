@@ -362,11 +362,15 @@ def public_connection_live(token: str, db: Session = Depends(get_db)):
     status = str(getattr(sub.status, "value", sub.status)).lower()
     plan = db.get(Plan, sub.plan_id) if sub.plan_id else None
     max_connections = effective_device_limit(db, sub, plan)
+    from ..subscription_override_models import duration_is_unlimited
+    duration_days = int(getattr(sub, "activation_duration_days", None) or (getattr(plan, "duration_days", 0) if plan else 0) or 0)
     return {
         **usage,
         "subscription_status": status,
         "starts_at": _iso_utc(getattr(sub, "starts_at", None)),
         "expires_at": _iso_utc(getattr(sub, "expires_at", None)),
+        "activation_duration_days": duration_days,
+        "duration_unlimited": bool(duration_is_unlimited(db, sub)),
         "active_sessions": active_sessions,
         "device_limit": max_connections,
         "device_limit_unlimited": max_connections == 0,
