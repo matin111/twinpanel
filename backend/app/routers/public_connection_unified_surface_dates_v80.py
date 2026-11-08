@@ -10,6 +10,17 @@ _MARKER = "TWINPANEL_CONNECTION_UNIFIED_SURFACE_DATES_V80"
 _CSS = r"""
 /* TWINPANEL_CONNECTION_UNIFIED_SURFACE_DATES_V80 */
 html body.tp80-connection .traffic .stats{display:grid!important;grid-template-columns:repeat(5,minmax(0,1fr))!important;align-items:stretch!important;min-width:0}
+/* Four meaningful stats: devices, connections, used / total quota, expiry. */
+html body.tp80-connection .traffic .stats:has(>.stat[data-tp80-quota-merged="1"]){grid-template-columns:repeat(4,minmax(0,1fr))!important}
+html body.tp80-connection .traffic .stats>.stat[data-tp80-quota-merged="1"]{display:none!important}
+html body.tp80-connection .traffic .stats>.stat[data-tp80-quota-merged="1"]:nth-child(n+4){display:none!important}
+html body.tp80-connection .traffic .stats>.stat strong[dir="ltr"]{white-space:nowrap!important}
+@media(max-width:720px){
+ html body.tp80-connection .traffic .stats:has(>.stat[data-tp80-quota-merged="1"]){grid-template-columns:repeat(2,minmax(0,1fr))!important}
+ html body.tp80-connection .traffic .stats:has(>.stat[data-tp80-quota-merged="1"])>.stat{grid-column:auto!important}
+ html body.tp80-connection .traffic .stats>.stat[data-tp80-quota-merged="1"]{display:none!important}
+}
+
 html body.tp80-connection .traffic .stat,
 html body.tp80-connection .traffic .stat:nth-child(n+4){display:flex!important;flex-direction:column-reverse!important;justify-content:center!important;align-items:center!important;gap:7px!important;min-width:0!important;visibility:visible!important;opacity:1!important}
 html body.tp80-connection .traffic .stat small{font-size:11px!important;line-height:1.4!important;color:#bcc9e3!important;white-space:normal!important;text-align:center!important}
@@ -1606,8 +1617,21 @@ _SCRIPT = r"""
  if(!/^\/v1\/connect\/[^/]+\/?$/.test(location.pathname))return;
  document.body.classList.add('tp80-connection');
  const statItems=document.querySelectorAll('.traffic .stats > .stat');
- // starts_at is the actual first-use subscription clock, if it has started.
- if(statItems[3]){const label=statItems[3].querySelector('small');if(label)label.textContent='تاریخ اولین اتصال'}
+ // The fourth visible stat is the total quota, not a first-connection date.
+ // Keep the live quota numbers supplied by the server; combine used / total.
+ if(statItems[2]&&statItems[3]){
+   const used=statItems[2].querySelector('strong');
+   const total=statItems[3].querySelector('strong');
+   const label=statItems[2].querySelector('small');
+   if(used&&total){
+     const usedText=used.textContent.trim().replace(/\\s*GB\\s*/gi,'');
+     const totalText=total.textContent.trim().replace(/\\s*GB\\s*/gi,'');
+     used.textContent=usedText+' / '+totalText+' GB';
+     used.setAttribute('dir','ltr');
+     if(label)label.textContent='حجم مصرفی / کل';
+     statItems[3].setAttribute('data-tp80-quota-merged','1');
+   }
+ }
  if(statItems[4]){const label=statItems[4].querySelector('small');if(label)label.textContent='تاریخ انقضا'}
  const panels=()=>[...document.querySelectorAll('.protocol-panel')];
  // Many legacy mobile scripts change the selected card asynchronously. One
