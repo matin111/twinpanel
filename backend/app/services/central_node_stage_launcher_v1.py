@@ -50,7 +50,7 @@ def ensure_launchable(db, node_id: int) -> None:
         raise CentralStageLaunchError("CENTRAL_STAGE_INSTALL_NOT_VERIFIED")
 
 
-def launch(db, node_id: int) -> dict:
+def launch(db, node_id: int, *, initial_full: bool = False) -> dict:
     """Run an idempotent detached unit, fail closed if systemd is unavailable."""
     node_id = int(node_id)
     if node_id <= 0:
@@ -63,7 +63,8 @@ def launch(db, node_id: int) -> dict:
     # Only already-registered visible Exits use the first-pass delta path.
     # Initial hidden Exit installation still runs full listener and runtime
     # bootstrap validation before any publication.
-    delta_only = bool(db.get(Node,node_id).show_to_users
+    delta_only = bool(not initial_full
+                      and db.get(Node,node_id).show_to_users
                       and is_central_node(db,node_id))
     command = [
         systemd, "--system", "--no-block", "--collect",

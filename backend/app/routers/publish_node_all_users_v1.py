@@ -277,58 +277,57 @@ async def _install_node_in_background(
         _safe_install_progress(job_id, "verified_ready", node_id=node_id,
                                installed_protocols=installed_count)
         if payload.publish_to_all_users:
+            # Critical path: assign ACTIVE users and publish the node quickly.
+            # Do not run 10 daemon families / 17k credential combinations
+            # inside the Add Server job. The central backend owns this work.
+            from ..models import NodeStatus
+            from ..services.central_progressive_exit_admission_v1 import (
+                admit_verified_exit, hide_after_dispatch_failure,
+            )
+            from ..services.central_node_stage_launcher_v1 import (
+                launch as launch_central_stage,
+            )
+            node = db.get(Node, node_id)
+            if node and node.status != NodeStatus.MAINTENANCE:
+                node.status = NodeStatus.ONLINE
+            db.commit()
             _safe_install_progress(job_id, "enrolling_users", node_id=node_id,
                                    installed_protocols=installed_count)
             try:
-                from ..models import NodeStatus
-                from scripts import twinpanel_central_node_stage_v1 as central_stage
-                # Installation writes are durable before another DB session
-                # opens. The central worker performs its own health check.
-                node = db.get(Node, node_id)
-                if node and node.status != NodeStatus.MAINTENANCE:
-                    node.status = NodeStatus.ONLINE
-                db.commit()
-                stage_rc = await asyncio.to_thread(
-                    central_stage.run, node_id, central_stage.MAX_USERS, True,
+                admission=admit_verified_exit(db,node_id)
+                # One supervised per-NODE process, NEVER one worker per
+                # account. Force initial full validation/Sudoku bootstrap;
+                # subsequent subscription updates use delta-only families.
+                dispatched=launch_central_stage(
+                    db,node_id,initial_full=True,
                 )
-                if stage_rc != 0:
-                    raise RuntimeError("CENTRAL_RUNTIME_COVERAGE_INCOMPLETE")
-                db.expire_all()
-                # At this point the node-wide adapter engine has applied the
-                # subscribed protocol credentials and audited actual node items.
-                # This publish guard rejects stale/revoked snapshots, and does
-                # NOT re-enter the legacy account-by-account backfill queue.
-                publish_result = await publish_node_to_all_users(
-                    node_id=node_id, db=db,
-                )
-                if not publish_result.get("ok"):
-                    raise RuntimeError("CENTRAL_NODE_PUBLICATION_REJECTED")
-                assigned = int(db.query(func.count(SubscriptionNode.subscription_id)).filter(
-                    SubscriptionNode.node_id == node_id,
-                ).scalar() or 0)
-                _safe_install_progress(
-                    job_id, "completed", node_id=node_id,
-                    installed_protocols=installed_count,
-                    users_assigned=assigned,
-                )
-                print("CENTRAL_NODE_ADD_COMPLETE", {
-                    "node_id": node_id,
-                    "users_assigned": assigned,
-                    "credential_coverage_verified": True,
-                    "legacy_account_queue_used": False,
-                }, flush=True)
             except Exception as exc:
                 db.rollback()
+                hide_after_dispatch_failure(db,node_id)
                 _safe_install_progress(
-                    job_id, "failed", node_id=node_id,
+                    job_id,"failed",node_id=node_id,
                     installed_protocols=installed_count,
-                    error_code="CENTRAL_RUNTIME_COVERAGE_INCOMPLETE",
+                    error_code="CENTRAL_BACKGROUND_DISPATCH_FAILED",
                 )
-                print("CENTRAL_NODE_ADD_SAFE_STOP", {
-                    "node_id": node_id,
-                    "error_type": type(exc).__name__,
-                    "node_hidden_until_recovery": True,
-                }, flush=True)
+                print("CENTRAL_NODE_ADMISSION_SAFE_STOP",{
+                    "node_id":node_id,"error_type":type(exc).__name__,
+                    "node_hidden":True,
+                },flush=True)
+                return
+            _safe_install_progress(
+                job_id,"completed",node_id=node_id,
+                installed_protocols=installed_count,
+                users_assigned=int(admission["eligible_users"]),
+            )
+            print("CENTRAL_NODE_FAST_PUBLISH_COMPLETE",{
+                "node_id":node_id,
+                "users_assigned":admission["eligible_users"],
+                "daemon_families_async":True,
+                "detached_unit":dispatched["unit"],
+                "legacy_account_queue_used":False,
+                "credential_coverage_verified":False,
+                "client_delivery_ready_items_only":True,
+            },flush=True)
         else:
             _safe_install_progress(
                 job_id, "completed" if ready else "failed",
