@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from html import escape
+from io import BytesIO
 
 from aiogram import F, Router
 
@@ -23,6 +24,7 @@ class WalletTopupState(StatesGroup):
     card_last4 = State()
     transfer_date = State()
     transfer_time = State()
+    receipt_photo = State()
     txid = State()
 
 
@@ -84,9 +86,10 @@ def methods_keyboard(methods):
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
-def submit_keyboard(topup_id):
+def submit_keyboard(topup_id, method):
+    label = "📷 ارسال عکس رسید پرداخت" if method == "card_to_card" else "✅ ثبت TXID پرداخت"
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="✅ ثبت اطلاعات پرداخت", callback_data=f"wallet:submit:{topup_id}")],
+        [InlineKeyboardButton(text=label, callback_data=f"wallet:submit:{topup_id}")],
         [InlineKeyboardButton(text="💰 کیف پول", callback_data="wallet:refresh")],
     ])
 
@@ -291,22 +294,110 @@ def create_wallet_router(request_fn, session_fn):
                 "پس از ثبت TXID، شبکه خودکار بررسی و کیف پول خودکار شارژ می‌شود."
             )
 
-        await callback.message.edit_text(text, reply_markup=submit_keyboard(int(result["id"])))
+        await callback.message.edit_text(text, reply_markup=submit_keyboard(int(result["id"]), method))
 
     @router.callback_query(F.data.startswith("wallet:submit:"))
     async def wallet_submit_start(callback: CallbackQuery, state: FSMContext):
         topup_id = int(callback.data.split(":")[2])
-        data = await state.get_data()
-        method = str(data.get("payment_method") or "")
-        await state.update_data(topup_id=topup_id)
+        # Resolve the method against this user's actual topup: the inline
+        # button must keep working after a bot restart or expired FSM state.
+        try:
+            token = await _token(session_fn, callback.from_user.id)
+            rows = await request_fn("GET", "/v1/wallet/topups/me", token=token)
+            matched = next(
+                (row for row in rows if int(row.get("id") or 0) == topup_id),
+                None,
+            ) if isinstance(rows, list) else None
+            if not matched:
+                await callback.answer("درخواست شارژ پیدا نشد", show_alert=True)
+                return
+            if matched.get("status") == "approved":
+                await callback.answer("این شارژ قبلاً تأیید شده است.", show_alert=True)
+                return
+            method = str(matched.get("method") or "").strip().lower()
+        except Exception:
+            await callback.answer("دریافت اطلاعات شارژ ناموفق بود", show_alert=True)
+            return
+        await state.update_data(topup_id=topup_id, payment_method=method)
         await callback.answer()
         if method == "card_to_card":
-            await state.set_state(WalletTopupState.tracking_code)
-            await callback.message.answer("🧾 کد پیگیری کارت‌به‌کارت را ارسال کنید.")
+            await state.set_state(WalletTopupState.receipt_photo)
+            await callback.message.answer(
+                "📷 عکس رسید کارت‌به‌کارت را همین‌جا ارسال کنید.\n"
+                "می‌توانید تصویر JPG یا PNG و یا فایل PDF بفرستید.\n"
+                "حداکثر حجم: ۱۲ مگابایت. مبلغ دقیق باید مطابق پیام پرداخت باشد."
+            )
         else:
             await state.set_state(WalletTopupState.txid)
             asset = str(data.get("crypto_asset") or "ارز دیجیتال")
             await callback.message.answer(f"🔗 TXID تراکنش {escape(asset)} را ارسال کنید.")
+
+    @router.message(WalletTopupState.receipt_photo, F.photo | F.document)
+    async def wallet_receipt_upload(message: Message, state: FSMContext):
+        data = await state.get_data()
+        topup_id = int(data.get("topup_id") or 0)
+        if topup_id <= 0 or str(data.get("payment_method") or "") != "card_to_card":
+            await state.clear()
+            await message.answer("❌ درخواست شارژ معتبر نیست؛ از کیف پول دوباره شروع کنید.")
+            return
+
+        document = message.document
+        photo = message.photo[-1] if message.photo else None
+        if document:
+            content_type = str(document.mime_type or "").lower()
+            allowed = {"image/jpeg", "image/png", "image/webp", "image/gif", "application/pdf"}
+            if content_type not in allowed:
+                await message.answer("❌ فقط عکس رسید یا فایل PDF قابل قبول است.")
+                return
+            item = document
+            filename = str(document.file_name or "receipt.pdf")[:120]
+        elif photo:
+            content_type = "image/jpeg"
+            item = photo
+            filename = "telegram-receipt.jpg"
+        else:
+            await message.answer("📷 لطفاً عکس رسید را ارسال کنید.")
+            return
+
+        limit = 12 * 1024 * 1024
+        if item.file_size and int(item.file_size) > limit:
+            await message.answer("❌ حجم رسید نباید بیشتر از ۱۲ مگابایت باشد.")
+            return
+
+        try:
+            content = BytesIO()
+            await message.bot.download(item, destination=content)
+            raw = content.getvalue()
+            if not raw or len(raw) > limit:
+                await message.answer("❌ فایل رسید خالی یا بزرگ‌تر از ۱۲ مگابایت است.")
+                return
+            token = await _token(session_fn, message.from_user.id)
+            result = await request_fn(
+                "POST", f"/v1/wallet/topups/{topup_id}/receipt-upload",
+                token=token,
+                files={"receipt": (filename, raw, content_type)},
+            )
+        except Exception:
+            await message.answer(
+                "❌ دریافت یا ثبت عکس رسید ناموفق بود؛ لطفاً دوباره همین عکس را ارسال کنید."
+            )
+            return
+
+        if not result.get("receipt_uploaded"):
+            await message.answer("❌ عکس رسید ثبت نشد؛ دوباره ارسال کنید.")
+            return
+        await state.clear()
+        await message.answer(
+            "✅ <b>رسید پرداخت دریافت و ثبت شد.</b>\n\n"
+            f"🧾 شماره درخواست: <b>#{topup_id}</b>\n"
+            "⏳ وضعیت: در انتظار بررسی پرداخت.\n"
+            "موجودی فقط بعد از تطبیق و تأیید واقعی پرداخت شارژ می‌شود.",
+            reply_markup=wallet_keyboard(),
+        )
+
+    @router.message(WalletTopupState.receipt_photo)
+    async def wallet_receipt_expected(message: Message):
+        await message.answer("📷 لطفاً تصویر رسید یا فایل PDF را همین‌جا ارسال کنید.")
 
     @router.message(WalletTopupState.tracking_code)
     async def wallet_tracking(message: Message, state: FSMContext):
