@@ -47,7 +47,7 @@ export function AdminSubscriptionCreateUnified(){
     const plan=rows.find(item=>num(item.id)===id);
     if(!plan){setTraffic("");setDuration("");setDeviceLimit("1");return;}
     setTraffic(num(plan.traffic_gb)>0?String(num(plan.traffic_gb)):"");
-    setDuration(num(plan.duration_days)>0?String(Math.trunc(num(plan.duration_days))):"");
+    setDuration(plan.duration_days!==null&&plan.duration_days!==undefined?String(Math.max(0,Math.trunc(num(plan.duration_days)))):"");
     setDeviceLimit(String(Math.max(1,Math.trunc(num(plan.device_limit)||1))));
   };
 
@@ -87,10 +87,10 @@ export function AdminSubscriptionCreateUnified(){
 
   const submitNow=async()=>{
     if(busy||loading)return;
-    const trafficValue=traffic.trim()===""?0:clean(traffic),durationValue=duration.trim()===""?0:clean(duration),deviceValue=clean(deviceLimit);
+    const trafficValue=traffic.trim()===""?0:clean(traffic),durationValue=duration.trim()===""?null:clean(duration),deviceValue=clean(deviceLimit);
     if(!userId){setError(pick("کاربر را انتخاب کنید","Select a user"));return;}
     if(trafficValue===null||trafficValue<0){setError(pick("حجم معتبر نیست","Invalid traffic"));return;}
-    if(durationValue===null||durationValue<=0||!Number.isInteger(durationValue)){setError(pick("مدت معتبر نیست","Invalid duration"));return;}
+    if(durationValue===null||durationValue<0||!Number.isInteger(durationValue)){setError(pick("مدت معتبر نیست","Invalid duration"));return;}
     if(deviceValue===null||deviceValue<1||!Number.isInteger(deviceValue)){setError(pick("اتصال همزمان معتبر نیست","Invalid device limit"));return;}
     if(!protocols.length){setError(pick("حداقل یک پروتکل انتخاب کنید","Select at least one protocol"));return;}
     if(!nodeIds.length){setError(pick("حداقل یک سرور انتخاب کنید","Select at least one server"));return;}
