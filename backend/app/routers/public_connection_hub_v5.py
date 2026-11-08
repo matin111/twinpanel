@@ -339,7 +339,6 @@ def render_apps(uploaded: dict[str, list[dict]]) -> str:
     return "".join(groups)
 
 
-@router.get("/{token}", response_class=HTMLResponse)
 def _expiry_with_days(db: Session, sub, now: datetime | None = None) -> tuple[str, str]:
     """Show authoritative expiry + remaining days, never synthesize an expiry."""
     from ..subscription_override_models import duration_is_unlimited
@@ -363,6 +362,7 @@ def _expiry_with_days(db: Session, sub, now: datetime | None = None) -> tuple[st
     return "تعیین نشده", "مدت اعتبار ثبت نشده"
 
 
+@router.get("/{token}", response_class=HTMLResponse)
 def public_connection_hub_v5(token: str, db: Session = Depends(get_db)):
     sub = _subscription_from_share_token(token, db)
     status = str(getattr(sub.status, "value", sub.status)).lower()
