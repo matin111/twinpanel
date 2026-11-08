@@ -398,9 +398,14 @@ async def install(
         warning_map: dict[str, list[str]] = {}
         for key in protocols:
             health = result["protocols"][key]
-            _save_status(db, node, key, health)
-            preset, effective, warnings, port = resolved_by_key[key]
-            _save_setting(db, node.id, key, preset, effective, port)
+            preset, effective, warnings, requested_port = resolved_by_key[key]
+            # The dispatcher may resolve a real socket collision and
+            # remap a port. Save the ACTUAL verified listener, not the
+            # original request, so central credential delivery uses the
+            # same port that the daemon really bound.
+            actual_port = int(health.get("port") or requested_port)
+            _save_status(db, node, key, {**health, "port":actual_port})
+            _save_setting(db, node.id, key, preset, effective, actual_port)
             warning_map[key] = warnings
             if not health.get("ok"):
                 failed.append(key)

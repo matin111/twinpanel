@@ -204,6 +204,17 @@ mita version 2>&1 | head -n1
 
 async def _apply_mieru(conn, node: Node, port: int, settings: dict[str, Any]) -> dict[str, Any]:
     core = await _install_mieru_binary(conn)
+    # A fresh .deb installation may leave mita.service disabled/inactive
+    # (reproduced on hidden UK Exit #18). Both mita replace config and
+    # mita start require the daemon to be active. The daemon starts IDLE
+    # before any client configuration is applied. No existing user profile
+    # is touched and we NEVER restart a healthy daemon at this point.
+    await cmd(
+        conn,
+        "systemctl enable --now mita.service >/dev/null && "
+        "systemctl is-active --quiet mita.service",
+        timeout=60,
+    )
     secret = await _ensure_bootstrap_secret(conn, "mieru")
     config_path = f"{BASE_DIR}/mieru/server.json"
     config = {
@@ -224,9 +235,15 @@ async def _apply_mieru(conn, node: Node, port: int, settings: dict[str, Any]) ->
         f"install -d -m 700 {shlex.quote(BASE_DIR + '/mieru')}; "
         f"mita describe config > {shlex.quote(rollback)} 2>/dev/null || true; "
         "mita stop >/dev/null 2>&1 || true; "
-        f"if ! mita replace config {shlex.quote(config_path)} >/dev/null 2>&1 || ! mita start >/dev/null 2>&1; then "
+        f"if ! mita replace config {shlex.quote(config_path)} >/dev/null 2>&1; then "
+        "  echo MIERU_CONFIG_REPLACE_FAILED >&2; "
         f"  if [ -s {shlex.quote(rollback)} ]; then mita replace config {shlex.quote(rollback)} >/dev/null 2>&1 || true; mita start >/dev/null 2>&1 || true; fi; "
         "  exit 72; "
+        "fi; "
+        "if ! mita start >/dev/null 2>&1; then "
+        "  echo MIERU_SERVICE_START_FAILED >&2; "
+        f"  if [ -s {shlex.quote(rollback)} ]; then mita replace config {shlex.quote(rollback)} >/dev/null 2>&1 || true; mita start >/dev/null 2>&1 || true; fi; "
+        "  exit 73; "
         "fi",
         timeout=120,
     )
