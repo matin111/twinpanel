@@ -2225,8 +2225,15 @@ def run_auto_backup_if_due() -> dict[
             chat_id = str(settings.get("telegram_chat_id") or "").strip()
             if filename and chat_id:
                 try:
-                    path = get_backup_path(filename)
-                    meta = _read_meta(path)
+                    safe=Path(filename).name
+                    if safe!=filename or not safe.endswith(".tpbak"):
+                        raise ValueError("INVALID_BACKUP_FILENAME")
+                    path=BACKUP_ROOT/safe
+                    meta=_read_meta(path)
+                    if meta.get("telegram_sent"):
+                        return {"ok":True,"ran":False,"reason":"already_delivered"}
+                    if not path.is_file():
+                        raise FileNotFoundError(filename)
                     if not meta.get("telegram_sent"):
                         try:
                             result = send_backup_to_telegram(path, chat_id)
