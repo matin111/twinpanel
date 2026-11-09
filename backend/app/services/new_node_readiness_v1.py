@@ -91,6 +91,58 @@ async def verify_new_exit_readiness(
                             or profiles != expected
                         ):
                             failed.append(key)
+                        else:
+                            from .. import xray_modern_runtime as xr
+                            from ..xray_tcp_tls_v39 import _tcp_tls_target_port
+                            from ..routers import provision
+
+                            base_port = int(row.port or 8443)
+                            expected_ports = {
+                                "websocket_tls": xr._target_port(
+                                    base_port, "websocket_tls",
+                                ),
+                                "xhttp_reality": xr._target_port(
+                                    base_port, "xhttp_reality",
+                                ),
+                                "tcp_tls": _tcp_tls_target_port(base_port),
+                            }
+                            # The live Xray API must report *each* intended
+                            # inbound, not just its persisted config file.
+                            raw = await asyncio.wait_for(
+                                provision.cmd(
+                                    conn,
+                                    "/usr/local/bin/xray api lsi "
+                                    "--server=127.0.0.1:10085 "
+                                    "-isOnlyTags=true -timeout=5",
+                                    check=False,
+                                ),
+                                timeout=12,
+                            )
+                            import json
+                            live_tags = {
+                                item.get("tag")
+                                for item in json.loads(str(raw)).get(
+                                    "inbounds", []
+                                )
+                                if isinstance(item, dict)
+                            }
+                            expected_tags = {
+                                "vless-ws-tls",
+                                "vless-xhttp-reality",
+                                "vless-tcp-tls",
+                            }
+                            if not expected_tags.issubset(live_tags):
+                                failed.append(key)
+                            else:
+                                for port in expected_ports.values():
+                                    if not await asyncio.wait_for(
+                                        provision.listener(
+                                            conn, port, "tcp",
+                                        ),
+                                        timeout=10,
+                                    ):
+                                        failed.append(key)
+                                        break
                     elif len(profiles) != 3:
                         failed.append(key)
             except Exception:
