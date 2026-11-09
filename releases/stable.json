@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.730",
+  "version": "1.1.0-rc.731",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-09T01:06:48Z",
+  "released_at": "2026-11-09T01:26:42Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "b2ab24d6da6605c36fc380deffb2744b734ee184",
+  "source_sha": "83dd79ec76d7604b9edb68ed13c120490d2c6036",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.730/twinpanel-1.1.0-rc.730-linux-x86_64.tar.gz",
-    "sha256": "b60d5ce8cbf65ce0918fe69112bfef751245c83a9ed292de89a1617d4b59732a",
-    "size_bytes": 29985106
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.731/twinpanel-1.1.0-rc.731-linux-x86_64.tar.gz",
+    "sha256": "c2991f7bb43025ce5e1729363a566b5af6a56154b3d3a3f0c513e1af91700eb5",
+    "size_bytes": 30005465
   },
   "notes": {
-    "fa": "رفع قطع ثبت مصرف ساکس۵ پس از تغییر هویت اتصال: تطبیق شناسه داخلی احرازشده sing-box با اعتبارنامه فعال همان اشتراک در همان نود؛ ثبت مصرف به مسیر مرکزی بدون تغییر نام کاربری، رمز، کانفیگ، تاریخ و محدودیت حجم. اصلاح فقط برای SOCKS5 و با تست رگرسیون.",
-    "en": "Fix SOCKS5 central accounting stalling when sing-box authenticates runtime identity tp-sub-N while saved customer username differs. Safely bind exact observed authenticated internal identity to verified active credential on the same node/subscription. No credential, VPN dataplane, billing formula, expiry or quota changes. Regression tests passed."
+    "fa": "اصلاح دائمی ساخت سه Inbound موردنیاز Xray روی نودهای جدید: WebSocket TLS، XHTTP Reality و TCP TLS. دریافت دامنه اختصاصی Xray هنگام افزودن نود، بررسی صدور SSL پیش از نصب، ساخت ایمن Inbound WebSocket TLS گمشده از API زنده Xray بدون ری‌استارت و بدون تغییر UUID کاربران، تأیید دقیق سه پروفایل و پورت‌های واقعی پیش از نمایش نود به کاربران. نود فاقد گواهی معتبر مخفی می‌ماند و خطای مشخص دریافت می‌کند. عملکرد نودها و پروتکل‌های سالم تغییر نمی‌کند.",
+    "en": "Permanently require exactly WebSocket TLS, XHTTP Reality and TCP TLS on newly staged Exits. Collect and persist a dedicated Xray hostname on node creation, verify ACME certificate before provisioning, hot-add a missing WebSocket TLS listener through live Xray API without restarting or rotating users, and fail closed on mismatched live profiles, ports or TLS identity before publication. Existing nodes/protocols remain unaffected."
   }
 }
