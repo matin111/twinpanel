@@ -223,7 +223,7 @@ class NodeActiveHostGuardTests(unittest.IsolatedAsyncioTestCase):
         payload=BackgroundNodeInstallIn(
             host="193.39.9.222", port=22, username="root",
             password="ci-not-a-real-credential", name="Fin", node_type=NodeType.EXIT,
-            country_code="FI",
+            country_code="FI", xray_domain="xray-ci.example.com",
         )
         with self.assertRaises(HTTPException) as ctx:
             await install_node_background_v1(payload,request,db)
@@ -239,7 +239,7 @@ class NodeActiveHostGuardTests(unittest.IsolatedAsyncioTestCase):
         payload=BackgroundNodeInstallIn(
             host="65.109.210.100",port=22,username="root",
             password="ci-not-real",name="Fin-Two",node_type=NodeType.EXIT,
-            country_code="FI",
+            country_code="FI", xray_domain="xray-ci.example.com",
         )
         node_route._NODE_INSTALL_HOSTS_PENDING.add(payload.host)
         try:
@@ -260,7 +260,7 @@ class NodeActiveHostGuardTests(unittest.IsolatedAsyncioTestCase):
         payload=BackgroundNodeInstallIn(
             host="65.109.210.100",port=22,username="root",
             password="ci-not-a-real-credential",name="FIN",node_type=NodeType.EXIT,
-            country_code="FI",
+            country_code="FI", xray_domain="xray-ci.example.com",
         )
         with self.assertRaises(HTTPException) as ctx:
             await install_node_background_v1(payload,request,db)
