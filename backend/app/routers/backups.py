@@ -18,7 +18,6 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from ..backup_service import (
-    BACKUP_KEY,
     BACKUP_TABLES,
     EXCLUDED_RUNTIME_TABLES,
     create_backup,
@@ -28,7 +27,6 @@ from ..backup_service import (
     inspect_backup,
     list_backups,
     load_settings,
-    recovery_key_fingerprint,
     restore_backup,
     save_settings,
     send_backup_to_telegram,
@@ -134,8 +132,6 @@ def backup_home():
             load_settings(),
         "telegram_bot":
             backup_telegram_bot_status(),
-        "key_fingerprint":
-            recovery_key_fingerprint(),
         "included_tables":
             BACKUP_TABLES,
         "excluded_runtime_tables":
@@ -344,30 +340,6 @@ def backup_test_telegram():
             status_code=502,
             detail=str(exc),
         ) from exc
-
-
-@router.get("/recovery-key")
-def download_recovery_key():
-
-    if not BACKUP_KEY.is_file():
-        raise HTTPException(
-            status_code=404,
-            detail=(
-                "Recovery key "
-                "not found"
-            ),
-        )
-
-    return FileResponse(
-        path=str(BACKUP_KEY),
-        media_type=(
-            "application/octet-stream"
-        ),
-        filename=(
-            "twinpanel-backup-"
-            "recovery.key"
-        ),
-    )
 
 
 @router.post("/upload")
