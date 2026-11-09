@@ -25,11 +25,9 @@ class MembershipDB:
 
 def test_central_acks_only_verified_current_whitelist():
     db = MembershipDB()
-    desired = SimpleNamespace(fingerprint="a" * 64)
     with patch.object(subject,"is_central_node",return_value=True), \
-         patch.object(subject,"load_desired_state",return_value=desired), \
-         patch.object(subject,"require_valid_desired_state",side_effect=lambda x,max_users:x), \
-         patch.object(subject,"last_applied",return_value="a" * 64):
+         patch.object(subject,"desired_sudoku_fingerprint",return_value="a" * 64), \
+         patch.object(subject,"last_sudoku_applied",return_value="a" * 64):
         assert subject.central_sudoku_enforcement_result(
             db,exit_node(19),74,"revoke_subscription"
         ) == "controller_central_sudoku_whitelist_converged"
@@ -41,12 +39,10 @@ def test_central_acks_only_verified_current_whitelist():
 def test_incomplete_central_does_not_ack_and_schedules_stage():
     from app.services import central_node_stage_launcher_v1 as launcher
     db = MembershipDB()
-    desired = SimpleNamespace(fingerprint="a" * 64)
     launched=[]
     with patch.object(subject,"is_central_node",return_value=True), \
-         patch.object(subject,"load_desired_state",return_value=desired), \
-         patch.object(subject,"require_valid_desired_state",side_effect=lambda x,max_users:x), \
-         patch.object(subject,"last_applied",return_value="b" * 64), \
+         patch.object(subject,"desired_sudoku_fingerprint",return_value="a" * 64), \
+         patch.object(subject,"last_sudoku_applied",return_value="b" * 64), \
          patch.object(launcher,"launch",side_effect=lambda db,n:launched.append(n)):
         try:
             subject.central_sudoku_enforcement_result(
@@ -61,11 +57,9 @@ def test_incomplete_central_does_not_ack_and_schedules_stage():
 
 def test_currently_running_stage_keeps_command_pending():
     from app.services import central_node_stage_launcher_v1 as launcher
-    desired = SimpleNamespace(fingerprint="a" * 64)
     with patch.object(subject,"is_central_node",return_value=True), \
-         patch.object(subject,"load_desired_state",return_value=desired), \
-         patch.object(subject,"require_valid_desired_state",side_effect=lambda x,max_users:x), \
-         patch.object(subject,"last_applied",return_value="b" * 64), \
+         patch.object(subject,"desired_sudoku_fingerprint",return_value="a" * 64), \
+         patch.object(subject,"last_sudoku_applied",return_value="b" * 64), \
          patch.object(launcher,"launch",side_effect=launcher.CentralStageLaunchError("ALREADY_RUNNING")):
         try:
             subject.central_sudoku_enforcement_result(
