@@ -117,7 +117,34 @@ jobs:
         env:
           NEXT_TELEMETRY_DISABLED: "1"
           NEXT_PUBLIC_API_BASE: ""
+          # Pin the public client build version to the same immutable candidate
+          # used by /health. Do not inherit a stale runner env/version.
+          NEXT_PUBLIC_TWINPANEL_VERSION: ${{ steps.candidate.outputs.version }}
         run: npm run build
+
+      - name: Verify compiled web version matches candidate
+        working-directory: source
+        env:
+          RELEASE_VERSION: ${{ steps.candidate.outputs.version }}
+        run: |
+          set -Eeuo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          version = os.environ["RELEASE_VERSION"]
+          source_version = Path("VERSION").read_text().strip()
+          standalone = Path(".next/standalone/server.js")
+          if source_version != version:
+              raise SystemExit(f"Source version mismatch: {source_version!r} != {version!r}")
+          if not standalone.is_file():
+              raise SystemExit("Standalone Next.js server missing")
+          actual = standalone.read_text(errors="replace")
+          marker = json.dumps("NEXT_PUBLIC_TWINPANEL_VERSION") + ":" + json.dumps(version)
+          if marker not in actual:
+              raise SystemExit("Built Next.js frontend version differs from candidate; refusing to publish")
+          print("Verified compiled Next.js release version", version)
+          PY
 
       - name: Setup Go for TP27 carriers
         uses: actions/setup-go@v5
