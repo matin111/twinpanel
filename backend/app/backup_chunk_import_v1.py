@@ -66,7 +66,7 @@ def _load(ident:str) -> dict:
 @router.post("/upload-session",status_code=201)
 def create_upload_session(payload:InitUpload):
     safe=Path(payload.filename).name
-    if safe!=payload.filename or not safe.endswith(".tpbak"):
+    if safe!=payload.filename or not safe.lower().endswith((".tpbak", ".zip")):
         raise HTTPException(status_code=422,detail="INVALID_BACKUP_FILENAME")
     if payload.sha256 and not SHA.fullmatch(payload.sha256.lower()):
         raise HTTPException(status_code=422,detail="INVALID_SHA256")
