@@ -12,6 +12,7 @@ import json
 import logging
 import sys
 from collections import Counter
+from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
 
@@ -35,6 +36,9 @@ from app.routers.modern_account_delivery_v1 import (
 from app.central_singbox_bulk_runtime_v1 import apply_bulk
 from app.central_singbox_collision_policy_v1 import (
     BOUND, resolve_node_login_collisions,
+)
+from app.services.central_singbox_idempotent_v1 import (
+    resolve_remote_identity_collisions,
 )
 from app.services.central_family_readiness_v1 import verify_central_family_readiness
 from app.singbox_subscription_accounts import (
@@ -158,8 +162,63 @@ async def run(node_id:int,limit:int,apply:bool):
         )
         if not verified.get("ok"):
             raise RuntimeError("STAGED_16_PROTOCOL_READINESS_FAILED")
+
+        # Persist random, canonical non-bound secrets BEFORE the SSH apply.
+        # A successful remote restart followed by a DB failure must not
+        # generate a different password/UUID on retry and collide with the
+        # already-installed identity. Do not activate an unprovisioned cred.
+        nonbound=[(sid,protocol,secret) for sid,protocol,secret in work
+                  if protocol not in BOUND]
+        if nonbound:
+            pairs={(sid,protocol) for sid,protocol,_ in nonbound}
+            ids={sid for sid,_,_ in nonbound}
+            rows=db.query(ProtocolCredential).filter(
+                ProtocolCredential.subscription_id.in_(ids),
+                ProtocolCredential.protocol.in_({p for _,p,_ in nonbound}),
+            ).with_for_update().all()
+            existing_map={(int(row.subscription_id),str(row.protocol)):row
+                          for row in rows}
+            new_canonicals=0
+            for sid,protocol,secret in nonbound:
+                row=existing_map.get((sid,protocol))
+                if row is None:
+                    row=ProtocolCredential(subscription_id=sid,protocol=protocol)
+                    db.add(row)
+                    existing_map[(sid,protocol)]=row
+                if not row.secret_encrypted:
+                    if row.config_text_encrypted:
+                        raise RuntimeError("CENTRAL_SINGBOX_EXISTING_IDENTITY_WITHOUT_SECRET")
+                    row.secret_encrypted=ad._enc(secret_to_dict(secret))
+                    if not row.username:
+                        row.username=secret.username
+                    new_canonicals+=1
+            if new_canonicals:
+                db.commit()
+            else:
+                db.rollback()
+            # No network or customer daemon was altered in this transaction.
+
         conn=await asyncio.wait_for(connect_protocol_runtime(node,db),timeout=25)
         try:
+            # A remote account may exist with this username from an earlier
+            # partially committed staging attempt. Inspect exactly the managed
+            # inbounds (in-memory only). Never replace its existing secret.
+            inbound_before={}
+            for protocol in sorted(counts):
+                inbound_before[protocol]=await read_inbound(conn,protocol)
+            work,identity_stats=resolve_remote_identity_collisions(
+                work,
+                {protocol:(inbound_before[protocol].get("users") or [])
+                 for protocol in sorted(counts)},
+                node_id,
+            )
+            print("CENTRAL_SINGBOX_IDENTITY_PLAN",json.dumps({
+                "node_id":node_id,
+                "alias_count":identity_stats.get("alias_on_conflict",0),
+                "new_identities":identity_stats.get("new_identity",0),
+                "identical_identities":identity_stats.get("reused_identical",0),
+                "existing_node_records_preserved":True,
+            }),flush=True)
             confirmed=await apply_bulk(conn,[secret for _,_,secret in work])
             inbounds={}
             cert=None
