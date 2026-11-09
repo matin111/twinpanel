@@ -54,7 +54,10 @@ def _save_job(job_id: str, **changes) -> dict:
 
 def enqueue_manual_telegram_backup() -> dict:
     settings = load_settings()
-    if not settings.get("telegram_chat_id") or not settings.get("send_telegram"):
+    # Manual delivery is independent of the automatic backup schedule.
+    # A configured Telegram destination is mandatory, but turning automatic
+    # delivery off must never disable an administrator's manual operation.
+    if not settings.get("telegram_chat_id"):
         raise ValueError("BACKUP_TELEGRAM_DESTINATION_NOT_CONFIGURED")
     if not load_bot_token():
         raise ValueError("BACKUP_TELEGRAM_BOT_NOT_CONFIGURED")
