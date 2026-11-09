@@ -80,6 +80,31 @@ class SocketUnitContract(unittest.TestCase):
             self.assertIn(("disable", "--now", "twinpanel-api.socket"), executed)
             self.assertEqual(executed[-1], ("start", "twinpanel-api.service"))
 
+    def test_failed_disable_restores_socket_listener(self) -> None:
+        with tempfile.TemporaryDirectory() as work:
+            root = Path(work)
+            socket_unit = root / "twinpanel-api.socket"
+            override = root / "twinpanel-api.service.d" / "90-socket-handoff.conf"
+            override.parent.mkdir(parents=True)
+            socket_unit.write_text(module.socket_unit(8095), encoding="utf-8")
+            override.write_text(module.service_override(), encoding="utf-8")
+            executed = []
+            def command(*args: str, check: bool = True):
+                executed.append(args)
+                return subprocess.CompletedProcess(args, 0, "", "")
+            with mock.patch.object(module, "SOCKET_UNIT", socket_unit), \
+                 mock.patch.object(module, "OVERRIDE", override), \
+                 mock.patch.object(module, "is_active", return_value=True), \
+                 mock.patch.object(module, "check_health", side_effect=(True, False)), \
+                 mock.patch.object(module, "run", side_effect=command):
+                with self.assertRaisesRegex(RuntimeError, "API_SOCKET_DISABLE_HEALTH_GATE_FAILED"):
+                    module.disable(8095, "1.1.0-rc.737")
+            self.assertEqual(socket_unit.read_text(encoding="utf-8"), module.socket_unit(8095))
+            self.assertEqual(override.read_text(encoding="utf-8"), module.service_override())
+            self.assertIn(("enable", "--now", "twinpanel-api.socket"), executed)
+            self.assertEqual(executed[-1], ("start", "twinpanel-api.service"))
+
+
 
 class InheritedUvicornListener(unittest.TestCase):
     """An isolated loopback ephemeral socket; never touches systemd or TwinPanel."""
