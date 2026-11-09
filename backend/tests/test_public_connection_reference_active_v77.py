@@ -66,7 +66,7 @@ def test_final_refiner_invoked_last_and_idempotent():
     assert "source = refine_public_connection_reference_active_v77(source)" in c
     assert "source = refine_public_connection_live_reference_v78(source)" in c
     assert "source = refine_public_connection_unified_surface_dates_v80(source)" in c
-    assert "return refine_public_connection_v2ray_single_surface_v105(source)" in c
+    assert "return refine_public_connection_unified_surface_dates_v80(source)" in c
     ns = {}
     exec(compile(read("public_connection_reference_active_v77.py"), "v77", "exec"), ns)
     source = "<html><style></style><body><section class='protocol-panel'></section></body></html>"
