@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.734",
-  "source_sha": "c348e2f055461b328f50855975afe9694699c585",
+  "version": "1.1.0-rc.735",
+  "source_sha": "25d78c643b726230037be416322e4bc24715a3c8",
   "notes": {
-    "fa": "افزودن بازیابی بکاپ چندقسمتی تلگرام: آپلود مستقل هر فایل partNNNofNNN، نمایش شماره‌های دریافت‌شده، ترکیب و تأیید SHA256 و کلید رمزگذاری پیش از ورود به فهرست بکاپ، حذف امن آپلود ناقص، بدون Restore خودکار یا تغییر داده‌های کاربران. کاهش مصرف RAM هنگام وارد کردن فایل بکاپ با انتقال جریانی.",
-    "en": "Add authenticated independent Telegram backup-part uploads, complete-set gating, SHA256 and encrypted archive validation, safe cancellation and streamed archive import to reduce memory. No automatic restore or user data mutation."
+    "fa": "اصلاح فوری محاسبه SHA256 هنگام ساخت بکاپ و تست بازگشتی ایجاد/ورود بکاپ. امکان آپلود تک‌تک قسمت‌های بکاپ تلگرام، ترکیب و تطبیق SHA256، پاک‌سازی آپلود ناقص و ورود جریانی آرشیو نیز در بسته موجود است.",
+    "en": "Hotfix backup creation SHA256 after streamed import refactor; add regression tests for backup creation and import, and retain individually uploaded Telegram backup parts, verified reassembly, and safe cancellation."
   }
 }
