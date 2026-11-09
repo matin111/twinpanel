@@ -78,12 +78,12 @@ print(json.dumps(found,separators=(",",":")))
 """
 
 
-def node_or_stop(db, node_id: int):
+def node_or_stop(db, node_id: int, *, central_only: bool = False):
     node = db.get(Node, node_id)
     if (node is None or node.retired_at is not None
         or node.node_type != NodeType.EXIT or node.status != NodeStatus.ONLINE
         or not node.show_to_users or not node.enable_v2ray
-        or is_central_node(db, node_id)):
+        or bool(is_central_node(db, node_id)) != bool(central_only)):
         raise RuntimeError("REQUIRES_PUBLISHED_LEGACY_XRAY_EXIT")
     cfg=db.query(NodeProtocolConfig).filter_by(
         node_id=node_id, protocol="v2ray").one_or_none()
@@ -163,14 +163,26 @@ def entitlement_ok(db, sid: int, node_id: int) -> bool:
 
 
 async def run(args):
+    # Detached metadata repair must use the API's public-port allocation.
+    # Without this, domains are correct but Xray WS/XHTTP end up on wrong
+    # 233xx/231xx ports instead of Iran ingress 260xx/240xx.
+    from app import xray_modern_runtime as xr
+    from scripts.twinpanel_hidden_node_install_finish_v1 import (
+        _activate_xray_install_runtime,
+    )
+    xr.PROFILE_META[xr.PROFILE_XHTTP]["public_base"] = 24000
+    xr.PROFILE_META[xr.PROFILE_WS]["public_base"] = 26000
+    _activate_xray_install_runtime()
+    assert xr._public_port(args.node_id,xr.PROFILE_XHTTP) == 24000 + args.node_id
+    assert xr._public_port(args.node_id,xr.PROFILE_WS) == 26000 + args.node_id
     with SessionLocal() as db:
-        node=node_or_stop(db,args.node_id)
+        node=node_or_stop(db,args.node_id,central_only=args.central_only)
         conn=await asyncio.wait_for(ad.ssh_connect_saved(node,db),timeout=20)
     try:
         authority=await read_node_public_authority(conn)
         required=validate_public_authority(authority)
         with SessionLocal() as db:
-            node=node_or_stop(db,args.node_id)
+            node=node_or_stop(db,args.node_id,central_only=args.central_only)
             total,selected=candidates(db,args.node_id,required,
                                       args.limit,args.subscription_id)
         inventory=await node_inventory(conn,selected) if selected else {}
@@ -202,7 +214,7 @@ async def run(args):
     for off in range(0,len(safe),args.commit_batch):
         chunk=safe[off:off+args.commit_batch]
         with SessionLocal() as db:
-            node=node_or_stop(db,args.node_id)
+            node=node_or_stop(db,args.node_id,central_only=args.central_only)
             prepared=[]
             for sid,label,ident in chunk:
                 if not entitlement_ok(db,sid,args.node_id):
@@ -257,6 +269,7 @@ if __name__=="__main__":
     p.add_argument("--limit",type=int,default=1500)
     p.add_argument("--commit-batch",type=int,default=30)
     p.add_argument("--apply",action="store_true")
+    p.add_argument("--central-only",action="store_true",help="Published central Exit metadata-only repair")
     p.add_argument("--confirm-node-id",type=int)
     args=p.parse_args()
     if not 1<=args.limit<=2000 or not 1<=args.commit_batch<=50:
