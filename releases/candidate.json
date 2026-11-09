@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.726",
-  "source_sha": "5af6e32603d3d968e1c1ca638189a521586c6a71",
+  "version": "1.1.0-rc.727",
+  "source_sha": "b8e65ea7dc389622912ae6b4f84f9207cc0c6032",
   "notes": {
-    "fa": "ادغام تعداد متصل و تعداد مجاز در یک کادر و نمایش مدت اشتراک در کادر آزاد. اصلاح اولویت تاریخ انقضای واقعی نسبت به پرچم نامحدود قدیمی و نمایش اولیه روزهای باقی‌مانده حتی قبل از لود جاوااسکریپت. بدون تغییر حجم یا اعتبار حساب‌ها.",
-    "en": "Combine connected and allowed devices in one metric, show configured days in freed cell, prioritize a real finite expiry over a stale unlimited override and prerender remaining days server-side before live polling. Preserves quotas and expiry values."
+    "fa": "اصلاح مدیریت حجم مرکزی Mieru با شمارنده تجمعی اختصاصی هر کاربر در خروجی واقعی mita get metrics: ثبت مبنای اولیه بدون کسر حجم قدیمی، ثبت اختلاف واقعی شمارنده در دفعات بعد و جلوگیری از دوباره‌شماری در ری‌استارت. کاهش تراکنش‌های طولانی دیتابیس قبل از پایش شبکه و حفظ تاریخ، محدودیت حجم و کانفیگ‌ها. سایر پروتکل‌های فاقد منبع معتبر همچنان بدون کسر تخمینی.",
+    "en": "Connect Mieru authenticated per-user persisted cumulative counters to canonical central quota ledger; zero-charge first baseline, real incremental accounting, fail-closed counter reset/identity conflicts. Release DB read transactions before node network probes. No changes to existing plans, dates, traffic deductions, credentials or nodes. Protocols without authoritative per-user counters remain unsupported rather than billed by estimate."
   }
 }
