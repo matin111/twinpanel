@@ -140,10 +140,6 @@ export async function downloadBackupFile(filename:string){
   return downloadAuthenticated(`/v1/admin/backups/${encodeURIComponent(filename)}/download`,filename);
 }
 
-export async function downloadRecoveryKey(){
-  return downloadAuthenticated("/v1/admin/backups/recovery-key","twinpanel-backup-recovery.key");
-}
-
 async function downloadAuthenticated(path:string,fallbackName:string){
   const response=await fetch(`${API_BASE}${path}`,{headers:{Authorization:`Bearer ${auth()}`},cache:"no-store"});
   if(!response.ok)throw new Error(await errorText(response));
