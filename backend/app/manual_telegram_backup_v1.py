@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from .backup_service import BACKUP_ROOT, create_backup, load_settings
-from .backup_telegram_credentials import load_bot_token
+from .backup_service import load_bot_token
 
 JOBS = BACKUP_ROOT / "manual-telegram-jobs"
 JOB_PATTERN = re.compile(r"[0-9a-f]{32}\Z")
