@@ -12,7 +12,12 @@ class Query:
     def filter(self, *args):
         return self
     def all(self):
-        return self.sessions
+        # Mimic the SQL status and recent-last-seen predicate on a test fake.
+        return [
+            item for item in self.sessions
+            if item.status == "active"
+            and item.last_seen_at >= datetime.utcnow()-timedelta(seconds=120)
+        ]
 
 
 class DB:
