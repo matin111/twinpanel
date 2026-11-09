@@ -1814,13 +1814,8 @@ def restore_backup(
         backup_path
     )
 
-    # همیشه قبل از Restore
-    # یک Safety Backup مستقل.
-    safety = create_backup(
-        kind="pre-restore",
-        send_telegram=False,
-    )
-
+    # Validate backup compatibility and affected dependent tables BEFORE
+    # creating a large temporary safety archive or changing any live rows.
     current = set(
         _current_tables()
     )
@@ -1880,6 +1875,20 @@ def restore_backup(
                 "RESTORE_WOULD_ERASE_EXCLUDED_TABLES: " +
                 ",".join(sorted(nonempty))
             )
+
+    # Safety backup is mandatory but Telegram-only. A failed or partial
+    # delivery must prevent destructive restore. The local encrypted archive
+    # is removed after verified delivery; the key is kept separately.
+    destination = load_settings()
+    if not destination.get("telegram_chat_id"):
+        raise RuntimeError("RESTORE_REQUIRES_TELEGRAM_SAFETY_DESTINATION")
+    safety = create_backup(
+        kind="pre-restore",
+        send_telegram=True,
+        telegram_chat_id=str(destination["telegram_chat_id"]),
+    )
+    if not safety.get("telegram_sent") or not safety.get("telegram_only"):
+        raise RuntimeError("RESTORE_SAFETY_DELIVERY_INCOMPLETE")
 
     # TWINPANEL_RESTORE_ISOLATED_DB_V1
     # Restore must never consume or block the
