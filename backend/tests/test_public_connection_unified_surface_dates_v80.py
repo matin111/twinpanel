@@ -182,7 +182,8 @@ def test_exactly_one_real_device_aware_app_action_with_sudoku_fallback():
 def test_refiner_last_idempotent_and_js_valid():
     chain=code("public_connection_canonical_mobile_v26.py")
     assert "source = refine_public_connection_live_reference_v78(source)" in chain
-    assert "return refine_public_connection_unified_surface_dates_v80(source)" in chain
+    assert "source = refine_public_connection_unified_surface_dates_v80(source)" in chain
+    assert "return refine_public_connection_v2ray_single_surface_v105(source)" in chain
     module={}
     source=code("public_connection_unified_surface_dates_v80.py")
     exec(compile(source,"public_connection_unified_surface_dates_v80.py","exec"),module)
