@@ -211,7 +211,10 @@ print(json.dumps({"ok":True,"applied":len(incoming),
 
 
 async def apply_bulk(conn: Any, accounts: list[dict]) -> dict:
-    verify_accounts(accounts)
+    # Decommissioned: this V1 adapter creates ONE systemd unit per client.
+    # The V2 shared node daemon must be the only live Sudoku installer.
+    # Fail before opening an SSH process, touching account state or sending keys.
+    raise RuntimeError("SUDOKU_LEGACY_BULK_DISABLED_USE_SHARED_V2")
     encoded=base64.b64encode(remote_source().encode()).decode("ascii")
     process=await asyncio.wait_for(
         conn.create_process("python3 -c \"$(printf '%s' '"+encoded+"' | base64 -d)\""),

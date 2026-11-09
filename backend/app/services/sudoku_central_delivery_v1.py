@@ -39,15 +39,16 @@ def _is_active_central_shared_item(db: Any, item: dict[str, Any]) -> bool:
 def prefer_central_sudoku_items(db: Any, items: list[Any]) -> list[Any]:
     """Return central shared items only when at least one is eligible.
 
-    Do not make a valid legacy feed empty while no central shared item has
-    been provisioned. Feed's existing protocol/runtime guards run afterwards.
+    The old per-subscriber daemons have been retired across all active
+    nodes. An incomplete central identity must fail closed instead of
+    advertising a dead or insecure 3xxxx/4xxxx legacy endpoint.
     This helper is deliberately called ONLY for Sudoku in _stored_info.
     """
     shared = [
         item for item in items
         if _is_active_central_shared_item(db, item)
     ]
-    return shared if shared else items
+    return shared
 
 
 def has_published_central_sudoku_owner(db: Any, nodes: list[Any]) -> bool:

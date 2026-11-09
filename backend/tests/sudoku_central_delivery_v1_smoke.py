@@ -1,4 +1,4 @@
-"""Sudoku central-delivery preference and unchanged legacy fallback."""
+"""Sudoku central-only customer delivery after retiring all per-user units."""
 from __future__ import annotations
 
 from types import SimpleNamespace
@@ -42,11 +42,11 @@ def test_central_preference_keeps_two_shared_nodes_only():
     assert selected[1] is shared_b
 
 
-def test_missing_central_items_preserves_legacy():
+def test_missing_central_items_fail_closed():
     legacy = {"node_id": 6, "port": 30000, "uri": "old"}
     db = FakeDB({6: node()})
     with patch.object(delivery, "is_central_node", return_value=False):
-        assert delivery.prefer_central_sudoku_items(db, [legacy]) == [legacy]
+        assert delivery.prefer_central_sudoku_items(db, [legacy]) == []
 
 
 def test_unregistered_or_offline_node_is_not_preferred():
@@ -55,14 +55,14 @@ def test_unregistered_or_offline_node_is_not_preferred():
     retired = {"node_id": 22, "port": 18553}
     db = FakeDB({6: node(), 19: node(online=False), 22: node(retired=True)})
     with patch.object(delivery, "is_central_node", return_value=True):
-        assert delivery.prefer_central_sudoku_items(db, [old, offline, retired]) == [old, offline, retired]
+        assert delivery.prefer_central_sudoku_items(db, [old, offline, retired]) == []
 
 
 def test_malformed_items_never_trigger_network_or_crypto_mutation():
     data = [None, [], {"node_id": "bad", "port": 18553}, {"node_id": 19, "port": 0}]
     db = FakeDB({19: node()})
     with patch.object(delivery, "is_central_node", return_value=True):
-        assert delivery.prefer_central_sudoku_items(db, data) is data
+        assert delivery.prefer_central_sudoku_items(db, data) == []
     assert db.seen == []
 
 
@@ -70,7 +70,7 @@ def test_unpublished_central_node_not_preferred():
     db = FakeDB({19: node(visible=False)})
     with patch.object(delivery, "is_central_node", return_value=True):
         items = [{"node_id": 19, "port": 18553}]
-        assert delivery.prefer_central_sudoku_items(db, items) is items
+        assert delivery.prefer_central_sudoku_items(db, items) == []
 
 
 def test_account_creation_fences_legacy_when_shared_node_exists():
