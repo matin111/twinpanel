@@ -97,6 +97,13 @@ jobs:
       # static BadVPN build is owned by the dedicated NetMod workflow and by the
       # release publisher so unrelated backend PRs do not depend on a live clone
       # of an external repository.
+      - name: Enforce shared-only Sudoku source contract
+        working-directory: backend
+        run: |
+          PYTHONPATH=. python tests/test_central_sudoku_bulk_v1.py -v
+          PYTHONPATH=. python tests/test_central_sudoku_node_bulk_v1.py -v
+          PYTHONPATH=. python tests/sudoku_legacy_retired_v1_smoke.py
+
       - name: Run NetMod UDPGW V231 regression
         working-directory: backend
         run: PYTHONPATH=. python tests/test_netmod_udpgw_v231.py
