@@ -2,12 +2,20 @@ from __future__ import annotations
 
 import base64
 import json
+import os
 import secrets
 import shlex
 import uuid
 from dataclasses import asdict, dataclass
 from typing import Any
 
+from .shadowtls_identity_v2 import (
+    NODE_HELPER_SCRIPT,
+    IDENTIFIED_INBOUND_TAG,
+    IDENTIFIED_INNER_TAG,
+    IDENTIFIED_METHOD,
+    identified_user_key,
+)
 from .models import Node
 from .modern_protocol_runtime import CERT_PATH, CONFIG_PATH, SERVICE_NAME, STATE_PATH
 from .modern_protocol_runtime_v2 import (
@@ -30,6 +38,9 @@ class SingBoxAccountError(RuntimeError):
 
 
 REVOCATION_SENTINEL = "__twinpanel_revoked__"
+# Non-destructive migration feature gate. Never cut over production links
+# without verifying node reachability and exact username telemetry first.
+SHADOWTLS_IDENTIFIED_ENABLED = os.environ.get("TWINPANEL_SHADOWTLS_IDENTIFIED_V2", "0") == "1"
 
 
 @dataclass(frozen=True)
@@ -131,6 +142,8 @@ RECORD = json.loads({record_json!r})
 SENTINEL = {REVOCATION_SENTINEL!r}
 SHADOWTLS_INNER_TAG = {SHADOWTLS_INNER_TAG!r}
 SHADOWTLS_INNER_METHOD = {SHADOWTLS_INNER_METHOD!r}
+IDENTIFIED_ENABLED = {SHADOWTLS_IDENTIFIED_ENABLED!r}
+{NODE_HELPER_SCRIPT}
 
 
 def load_json(path, default):
@@ -256,6 +269,9 @@ if PROTOCOL == "shadowtls":
         inner.update(fresh_inner)
     else:
         inbounds.append(fresh_inner)
+
+    if IDENTIFIED_ENABLED and RECORD is not None:
+        ensure_identified_shadowtls(inbounds, state, TAG, SHADOWTLS_INNER_TAG)
 
     os.makedirs(os.path.dirname(STATE), exist_ok=True)
     with open(STATE + ".account-new", "w", encoding="utf-8") as handle:
@@ -428,6 +444,8 @@ UPDATES = json.loads({payload!r})
 SENTINEL = {REVOCATION_SENTINEL!r}
 SHADOWTLS_INNER_TAG = {SHADOWTLS_INNER_TAG!r}
 SHADOWTLS_INNER_METHOD = {SHADOWTLS_INNER_METHOD!r}
+IDENTIFIED_ENABLED = {SHADOWTLS_IDENTIFIED_ENABLED!r}
+{NODE_HELPER_SCRIPT}
 
 with open(CONFIG, "r", encoding="utf-8") as handle:
     doc = json.load(handle)
@@ -475,6 +493,9 @@ for operation in UPDATES:
             previous.clear()
             previous.update(inner)
         state["shadowtls"] = shadow
+
+if IDENTIFIED_ENABLED and inner_secret is not None:
+    ensure_identified_shadowtls(inbounds, state, "twinpanel-shadowtls-in", SHADOWTLS_INNER_TAG)
 
 # No-op: do not touch the node config or service; the SSH shell checks
 # this marker under the per-node flock before skipping a restart.
