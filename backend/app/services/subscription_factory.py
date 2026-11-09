@@ -24,6 +24,7 @@ from ..plan_template_selection import (
 from ..protocol_account_registry import CLASSIC_PROTOCOL_KEYS, normalize_protocols
 from ..quota_models import QuotaDevice
 from ..routers.general_settings import build_subscription_username
+from ..central_app_identity import central_app_entitled, prefix_account_name
 
 
 # Legacy compatibility map used by older store/reseller call sites. It is no
@@ -77,6 +78,7 @@ def create_subscription_core(
     protocols: list[str],
     username: str | None = None,
     password: str | None = None,
+    reseller_id: int | None = None,
 ):
     user = db.get(User, user_id)
 
@@ -222,6 +224,30 @@ def create_subscription_core(
             sub.id,
             user_id,
         )
+        sub.account_username = username
+
+    # Additive: reseller-owned subscriptions receive a tenant-scoped username
+    # only when the license explicitly includes the shared client. Legacy
+    # subscriptions and all other creation paths keep their existing identity.
+    if reseller_id is not None and central_app_entitled():
+        from ..system_release import ensure_installation_id
+
+        try:
+            username = prefix_account_name(
+                ensure_installation_id(), int(reseller_id), str(username)
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        duplicate_name = (
+            db.query(Subscription.id)
+            .filter(
+                Subscription.account_username == username,
+                Subscription.id != sub.id,
+            )
+            .first()
+        )
+        if duplicate_name:
+            raise HTTPException(status_code=409, detail="username_already_exists")
         sub.account_username = username
 
     for node in nodes:
