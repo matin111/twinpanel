@@ -210,7 +210,14 @@ def _endpoint(db,node,profile):
         target=vision_target_port(base_port)
     else:
         raise RuntimeError("XRAY_NODE_PROFILE_UNSUPPORTED")
-    return host,(public if int(legacy_port)==23000+int(node.id) else target)
+    # TCP REALITY and Vision use the same verified Iran ingress rule as
+    # XHTTP/WS. The dedicated domain may replace an IP only when its DNS
+    # resolves to the chosen Iran tunnel ingress. Never rewrite direct Exits,
+    # SNI or ports; a mismatched DNS remains on the previous working host.
+    if int(legacy_port)==23000+int(node.id):
+        from .xray_node_domain_runtime import _verified_tunnel_xray_domain
+        return _verified_tunnel_xray_domain(node,host),public
+    return host,target
 
 
 def build_item_from_node_authority(db,node,*,client_uuid:str,
