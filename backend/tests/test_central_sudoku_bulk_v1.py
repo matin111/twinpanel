@@ -12,17 +12,21 @@ class SudokuCentralBulkTests(unittest.TestCase):
         return {"subscription_id":sid, "port":sudoku_port(sid),
                 "master_public":"a"*64}
 
-    def test_remote_code_compiles_and_waves_are_bounded(self):
-        source=remote_source()
-        compile(source,"<sudoku-bulk-remote>","exec")
-        self.assertIn('["systemctl","start","--no-block",*units]',source)
-        self.assertIn('["systemctl","enable",*units]',source)
-        self.assertIn('["systemctl","list-units","--type=service"',source)
-        self.assertNotIn("systemctl\",\"is-active",source)
-        self.assertIn("SUDOKU_TARGET_MEMORY_ADMISSION_FAILED",source)
-        self.assertIn("SUDOKU_TARGET_SERVICE_CAPACITY_EXCEEDED",source)
-        self.assertIn('["systemctl","daemon-reload"]',source)
-        self.assertIn('["systemctl","stop",*units]',source)
+    def test_obsolete_remote_installer_fails_closed(self):
+        # The old per-user systemd writer must not be embedded in source.
+        with self.assertRaisesRegex(RuntimeError, "SUDOKU_LEGACY_BULK_DISABLED"):
+            remote_source()
+        with self.assertRaisesRegex(RuntimeError, "SUDOKU_LEGACY_BULK_DISABLED"):
+            remote_source(base="/tmp/test", unit_dir="/tmp/units")
+
+    def test_retired_module_has_no_installer_commands(self):
+        from pathlib import Path
+        import app.central_sudoku_bulk_runtime_v1 as legacy
+        source = Path(legacy.__file__).read_text(encoding="utf-8")
+        self.assertNotIn("systemctl", source)
+        self.assertNotIn("create_process(", source)
+        self.assertNotIn("unit.write_text(", source)
+        self.assertNotIn("BASE.mkdir(", source)
 
     def test_capacity_limit_and_collision(self):
         verify_accounts([self.row(1),self.row(2)])
