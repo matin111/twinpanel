@@ -2,12 +2,18 @@
 from __future__ import annotations
 
 import sys
+import types
 from pathlib import Path
 from unittest.mock import patch
 
 from cryptography.fernet import Fernet
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+# Import only the modules under test, not app.__init__ which starts DB checks.
+root = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(root))
+app_package = types.ModuleType("app")
+app_package.__path__ = [str(root / "app")]
+sys.modules["app"] = app_package
 from app import backup_service as backup
 from app import mother_access
 
