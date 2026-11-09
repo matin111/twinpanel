@@ -430,80 +430,16 @@ os.chmod(config+".new",0o600); os.replace(config+".new",config)
 
 
 async def _apply_sudoku(conn, node: Node, secret: StandaloneAccountSecret, _base_port: int) -> dict[str, Any]:
-    if not secret.sudoku_master_public_key or not secret.sudoku_client_key or not secret.sudoku_port:
-        raise StandaloneAccountError("Sudoku per-user secret is incomplete")
-    port = int(secret.sudoku_port)
-    directory = f"{BASE_DIR}/sudoku/subscriptions/{int(secret.subscription_id)}"
-    config = f"{directory}/server.config.json"
-    service = f"twinpanel-sudoku-sub-{int(secret.subscription_id)}"
-    marker = f"{directory}/subscription-id"
-    await cmd(
-        conn,
-        "set -eu; "
-        f"if ss -H -lnt | awk '$4 ~ /:{port}$/ {{found=1}} END {{exit found?0:1}}'; then "
-        f"  test -f {shlex.quote(marker)} && test \"$(cat {shlex.quote(marker)})\" = {shlex.quote(str(secret.subscription_id))}; "
-        "fi",
-        timeout=30,
+    """Disabled legacy per-user Sudoku listener.
+
+    Central, node-wide Sudoku is the only supported provisioning path. This
+    compatibility symbol fails *before* SSH, file writes or systemd calls so
+    old queue workers, delayed retries and manual invocations cannot recreate
+    hundreds of per-subscription systemd services after migration.
+    """
+    raise StandaloneAccountError(
+        "SUDOKU_PER_USER_SERVICE_RETIRED_USE_SHARED_CENTRAL_NODE"
     )
-    doc = {
-        "mode": "server", "transport": "tcp", "local_port": port,
-        "fallback_address": "127.0.0.1:80", "key": secret.sudoku_master_public_key,
-        "aead": "chacha20-poly1305", "suspicious_action": "fallback",
-        "padding_min": 5, "padding_max": 15, "custom_table": "", "custom_tables": [],
-        "ascii": "prefer_entropy", "enable_pure_downlink": True, "multiplex": "off",
-        "httpmask": {"disable": False, "mode": "auto", "tls": False, "host": "", "path_root": ""},
-        "reverse": {"listen": ""},
-    }
-    encoded = base64.b64encode((json.dumps(doc, ensure_ascii=False, indent=2) + "\n").encode()).decode()
-    unit = f'''[Unit]\nDescription=TwinPanel Sudoku subscription {secret.subscription_id}\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nType=simple\nUser=root\nExecStart=/usr/local/bin/twinpanel-sudoku -c {config}\nRestart=on-failure\nRestartSec=3\nLimitNOFILE=1048576\n\n[Install]\nWantedBy=multi-user.target\n'''
-    unit64 = base64.b64encode(unit.encode()).decode()
-    await cmd(
-        conn,
-        "set -eu; "
-        f"install -d -m 700 {shlex.quote(directory)}; "
-        f"printf '%s' {shlex.quote(encoded)} | base64 -d > {shlex.quote(config)}; chmod 600 {shlex.quote(config)}; "
-        f"printf '%s\\n' {shlex.quote(str(secret.subscription_id))} > {shlex.quote(marker)}; chmod 600 {shlex.quote(marker)}; "
-        f"printf '%s' {shlex.quote(unit64)} | base64 -d > /etc/systemd/system/{service}.service; "
-        "systemctl daemon-reload; "
-        f"systemctl enable {service}.service >/dev/null; systemctl restart {service}.service; "
-        f"systemctl is-active --quiet {service}.service; "
-        "ready=0; "
-        "for i in $(seq 1 100); do "
-        f"  if ss -H -lnt | awk '$4 ~ /:{port}$/ {{found=1}} END {{exit found?0:1}}'; then ready=1; break; fi; "
-        f"  if ! systemctl is-active --quiet {service}.service; then "
-        f"    systemctl status {service}.service --no-pager >&2 || true; "
-        f"    journalctl -u {service}.service -n 30 --no-pager >&2 || true; "
-        "    exit 1; "
-        "  fi; "
-        "  sleep 0.2; "
-        "done; "
-        "if [ ${ready:-0} -ne 1 ]; then "
-        f"  echo 'Sudoku listener readiness timeout on :{port}' >&2; "
-        f"  systemctl status {service}.service --no-pager >&2 || true; "
-        f"  journalctl -u {service}.service -n 30 --no-pager >&2 || true; "
-        "  exit 1; "
-        "fi",
-        timeout=120,
-    )
-    await ufw_allow(conn, port, "tcp")
-    host = _node_host(node)
-    endpoint = _sudoku_endpoint(host, port)
-    profile_name = f"{secret.username}-{str(node.name).strip() or f'node-{int(node.id)}'}-sudoku-{int(node.id)}"
-    client = {
-        "mode": "client", "transport": "tcp", "server_address": endpoint,
-        "local_address": "127.0.0.1", "local_port": 1080,
-        "key": secret.sudoku_client_key, "aead": "chacha20-poly1305",
-        "padding_min": 5, "padding_max": 15, "ascii": "prefer_entropy",
-        "enable_pure_downlink": True, "multiplex": "off",
-    }
-    sudoku_uri = _sudoku_share_uri(host, port, secret.sudoku_client_key, profile_name)
-    return {
-        "node_id": int(node.id), "node": str(node.name), "server": host,
-        "server_ip": host, "port": port, "username": secret.username,
-        "telemetry_identity": f"sudoku-sub-{int(secret.subscription_id)}:{port}",
-        "config_format": "sudoku-json", "config": json.dumps(client, ensure_ascii=False, indent=2),
-        "uri": sudoku_uri,
-    }
 
 
 async def _remove_sudoku(conn, secret: StandaloneAccountSecret) -> None:
@@ -531,6 +467,7 @@ async def apply_account(
     if secret.protocol == "amneziawg":
         return await _apply_amneziawg(conn, node, secret, port)
     if secret.protocol == "sudoku":
+        # Never create a per-subscription daemon; the shared family owns it.
         return await _apply_sudoku(conn, node, secret, port)
     raise StandaloneAccountError(f"unsupported standalone account protocol: {secret.protocol}")
 
