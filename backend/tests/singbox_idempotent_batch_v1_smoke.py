@@ -41,6 +41,7 @@ tags = {p: "twinpanel-" + p + "-in" for p in protocols}
 
 def generate(path: Path, state: Path):
     ns = {
+        "parallel_user_sync_script": __import__("app.services.shadowtls_2022_identity_v1",fromlist=["parallel_user_sync_script"]).parallel_user_sync_script,
         "json": json, "CONFIG_PATH": str(path), "STATE_PATH": str(state),
         "SINGBOX_PROTOCOLS": set(protocols), "TAGS": tags,
         "REVOCATION_SENTINEL": "__twinpanel_revoked__",
