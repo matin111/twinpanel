@@ -2028,11 +2028,11 @@ _SCRIPT = r"""
      if(label&&value)fields[label]=value;
    });
    const address=String(fields['server & port']||'').trim();
-   const match=address.match(/^(.+):(\\d{1,5})$/);
+   const match=address.match(/^(.+):(\d{1,5})$/);
    const user=String(fields['username']||'');
    const password=String(fields['password']||'');
    if(!match||!user||!password)return null;
-   const server=match[1].replace(/^\\[|\\]$/g,'');
+   const server=match[1].replace(/^\[|\]$/g,'');
    const port=Number(match[2]);
    if(!server||!Number.isInteger(port)||port<1||port>65535)return null;
    const params=new URLSearchParams({server,port:String(port),user,pass:password});
