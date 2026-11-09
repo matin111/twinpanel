@@ -24,9 +24,15 @@ class CentralFirstExitBootstrapTests(unittest.IsolatedAsyncioTestCase):
     async def test_new_exit_bootstraps_daemons_only_without_legacy_installer(self):
         db=MagicMock()
         db.query.return_value.filter.return_value.first.return_value=None
-        def refresh(node):
-            node.id=15
-        db.refresh.side_effect=refresh
+        def allocate_node_id():
+            db.add.call_args.args[0].id=15
+        db.flush.side_effect=allocate_node_id
+
+        async def check_read_transaction_closed(conn):
+            # The read-only duplicate lookup must not hold a connection
+            # while apt, Xray and other remote installs are awaited.
+            db.rollback.assert_called_once()
+            return "ubuntu"
         conn=MagicMock()
         conn.wait_closed=AsyncMock()
         with (
@@ -36,7 +42,7 @@ class CentralFirstExitBootstrapTests(unittest.IsolatedAsyncioTestCase):
                          return_value="ubuntu"),
             patch.object(prov,"remote_supported_os_id",
                          new_callable=AsyncMock,
-                         return_value="ubuntu") as remote_os,
+                         side_effect=check_read_transaction_closed) as remote_os,
             patch.object(prov,"ensure_base",new_callable=AsyncMock),
             patch.object(prov,"provision_protocols",new_callable=AsyncMock,
                          return_value=({"openvpn":{"ok":True}},[],{})) as daemons,
@@ -61,6 +67,9 @@ class CentralFirstExitBootstrapTests(unittest.IsolatedAsyncioTestCase):
                              "central_runtime_owns_all_subscriptions")
             self.assertFalse(db.add.call_args.args[0].show_to_users)
             remote_os.assert_awaited_once_with(conn)
+            db.flush.assert_called()
+            db.refresh.assert_not_called()
+            db.rollback.assert_called_once()
             daemons.assert_awaited_once()
             self.assertIs(daemons.await_args.args[4],False)
             quota.assert_called_once_with(db,15)
