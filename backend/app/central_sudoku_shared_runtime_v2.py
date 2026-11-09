@@ -237,7 +237,22 @@ else:
                 )
                 with urllib.request.urlopen(request,timeout=1.0) as response:
                     snapshot=json.load(response)
-                verified=snapshot.get("count")==len(clean)
+                live_users=snapshot.get("users") if isinstance(snapshot,dict) else None
+                live_names={
+                    row.get("name") for row in live_users
+                    if isinstance(row,dict) and isinstance(row.get("name"),str)
+                } if isinstance(live_users,list) else set()
+                desired_names={row["alias"] for row in clean}
+                # Count equality is NOT an identity ACK: two different user
+                # lists may have the same length. Only the exact live runtime
+                # whitelist proves that expired keys were actually removed.
+                verified=(
+                    type(snapshot.get("count")) is int
+                    and snapshot["count"]==len(clean)
+                    and isinstance(live_users,list)
+                    and len(live_users)==len(desired_names)
+                    and live_names==desired_names
+                )
                 if verified:break
             except Exception:pass
             time.sleep(0.2)
