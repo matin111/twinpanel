@@ -7,8 +7,8 @@ import {parityApi,type ProvisionInstallPayload} from "../lib/admin-parity-api";
 import {useI18n} from "../lib/i18n";
 import {NodeCountryPicker,isSupportedNodeCountry,normalizeNodeCountry} from "./node-country-picker";
 
-type NodeDraft={host:string;port:number;username:string;password:string;name:string;node_type:"iran"|"exit";country_code:string;capacity_users:number;};
-const defaultDraft:NodeDraft={host:"",port:22,username:"root",password:"",name:"",node_type:"exit",country_code:"DE",capacity_users:1000};
+type NodeDraft={host:string;port:number;username:string;password:string;name:string;node_type:"iran"|"exit";country_code:string;capacity_users:number;xray_domain:string;};
+const defaultDraft:NodeDraft={host:"",port:22,username:"root",password:"",name:"",node_type:"exit",country_code:"DE",capacity_users:1000,xray_domain:""};
 const NO_PROTOCOLS={install_cisco:false,cisco_port:443,install_openvpn:false,openvpn_port:1194,openvpn_transport:"udp" as const,install_wireguard:false,wireguard_port:51820,install_l2tp:false,install_v2ray:false,xray_port:8443};
 const EXIT_BASE_PROTOCOLS={...NO_PROTOCOLS,install_cisco:true,install_openvpn:true,install_wireguard:true,install_l2tp:true};
 function payloadOf(draft:NodeDraft):ProvisionInstallPayload{return {...draft,country_code:draft.node_type==="iran"?"IR":normalizeNodeCountry(draft.country_code),...(draft.node_type==="exit"?EXIT_BASE_PROTOCOLS:NO_PROTOCOLS)};}
@@ -39,6 +39,14 @@ const NODE_INSTALL_FAILURE_GUIDANCE:Record<string,[string,string]>={
   NODE_OS_PREFLIGHT_TIMEOUT:[
     "سرور هنگام بررسی سیستم‌عامل پاسخ نداد؛ وضعیت SSH و بار سرور را بررسی کنید.",
     "Node OS preflight timed out. Inspect SSH responsiveness and server load.",
+  ],
+  XRAY_NEW_EXIT_DEDICATED_TLS_DOMAIN_REQUIRED:[
+    "برای نصب نود خروجی، دامنه اختصاصی Xray را قبل از نصب وارد کنید؛ ساخت سه Inbound TLS بدون گواهی معتبر مجاز نیست.",
+    "Set a dedicated Xray hostname before installing an Exit. The three required TLS profiles need a valid certificate.",
+  ],
+  XRAY_NEW_EXIT_TLS_CERTIFICATE_NOT_READY:[
+    "صدور SSL نود ناموفق بود. ابتدا رکورد DNS را برای صدور گواهی به IP خروجی اشاره دهید و دسترسی به Let's Encrypt را بررسی کنید. تا تأیید SSL، نود منتشر نمی‌شود.",
+    "The Exit certificate is not ready. Point DNS to the Exit for issuance and verify Let's Encrypt access. The node remains unpublished.",
   ],
   NODE_HOST_ALREADY_REGISTERED:[
     "این IP قبلاً به نود فعالی در پنل اختصاص یافته است. برای جلوگیری از آسیب به نود ایران یا سایر کاربران، نصب تکراری مسدود شد.",
@@ -218,9 +226,12 @@ export function NodeAddModalBridge(){
     if(!isSupportedNodeCountry(draft.node_type==="iran"?"IR":draft.country_code)){
       setError(pick("لطفاً کشور معتبر را از فهرست انتخاب کنید.","Please select a valid country from the list."));return;
     }
+    if(draft.node_type==="exit"&&!/^(?=.{4,253}$)[a-z0-9](?:[a-z0-9.-]*[a-z0-9])\.[a-z]{2,63}$/i.test(draft.xray_domain.trim())){
+      setError(pick("برای نود خروجی، دامنه اختصاصی معتبر Xray را وارد کنید؛ بدون آن سه Inbound TLS ساخته نمی‌شوند.","Enter a valid dedicated Xray hostname for this Exit; all three TLS inbounds require it."));return;
+    }
     const token=getCustomerToken();
     if(!token){setError("AUTH_REQUIRED");return;}
-    const payload={...payloadOf({...draft,host:draft.host.trim(),username:draft.username.trim()||"root",name:draft.name.trim()}),publish_to_all_users:draft.node_type==="exit"?publishToAll:false};
+    const payload={...payloadOf({...draft,host:draft.host.trim(),xray_domain:draft.node_type==="exit"?draft.xray_domain.trim().toLowerCase():"",username:draft.username.trim()||"root",name:draft.name.trim()}),publish_to_all_users:draft.node_type==="exit"?publishToAll:false};
     setBusy("register");setError("");setOk("");
     try{
       const response=await fetch(`${API_BASE}/v1/nodes/install-background-v1`,{
@@ -354,6 +365,12 @@ export function NodeAddModalBridge(){
           <label className="field"><span>{pick("نوع نود","Node type")}</span><select value={draft.node_type} onChange={e=>setDraft(v=>{const node_type=e.target.value as "iran"|"exit";return {...v,node_type,country_code:node_type==="iran"?"IR":v.country_code==="IR"?"DE":v.country_code};})}><option value="iran">Iran</option><option value="exit">Exit</option></select></label>
           <div className="field"><NodeCountryPicker label={pick("کشور و پرچم سرور","Server country & flag")} value={draft.node_type==="iran"?"IR":draft.country_code} disabled={draft.node_type==="iran"} onChange={country_code=>setDraft(v=>({...v,country_code}))} language={pick("fa","en") as "fa"|"en"}/></div>
         </div>
+        {draft.node_type==="exit"?<div className="runtime-choice-section">
+          <label className="field"><span>{pick("دامنه اختصاصی Xray / V2Ray (الزامی)","Dedicated Xray domain (required)")}</span>
+            <input dir="ltr" required type="text" autoComplete="off" placeholder="v2de.example.com" value={draft.xray_domain} onChange={e=>setDraft(v=>({...v,xray_domain:e.target.value}))} />
+          </label>
+          <small>{pick("پیش از نصب، برای صدور SSL رکورد A این دامنه را به IP خروجی همین سرور بدهید. بعد از صدور گواهی و فعال‌شدن تانل می‌توانید آن را به IP ایران تغییر دهید. نود بدون WebSocket TLS، XHTTP Reality و TCP TLS منتشر نمی‌شود.","Before setup, point the A record to this Exit to issue SSL. After certification and tunnel setup you may switch it to the Iran ingress. The Exit is not published without WebSocket TLS, XHTTP Reality and TCP TLS.")}</small>
+        </div>:null}
         <hr className="tp-node-separator"/>
         <div className="tp-node-section-title"><span className="tp-node-section-number">02</span>{pick("دسترسی و ظرفیت","Access & capacity")}<small className="tp-node-section-note">{pick("اطلاعات SSH سرور","SSH credentials")}</small></div>
         <div className="setting-grid tp-node-form-grid">

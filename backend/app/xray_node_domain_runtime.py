@@ -276,12 +276,36 @@ async def _ensure_modern_xray_with_dedicated_domain(
                 domain,
             )
 
-    return await _original_ensure_modern_xray(
+    state = await _original_ensure_modern_xray(
         conn,
         base_port,
         target,
         bootstrap_done=bootstrap_done,
     )
+    # The base installer returns early for an existing XHTTP listener. A node
+    # whose TLS certificate was issued later can therefore have TCP TLS yet
+    # still lack WebSocket TLS. Repair just that missing inbound through the
+    # live Xray API, preserving all existing users and other service ports.
+    if bool(state.get("tls_enabled")):
+        current = list(state.get("available_profiles") or [])
+        if xray_modern_runtime.PROFILE_WS not in current:
+            from .xray_tls_ws_hotadd_v1 import ensure_websocket_tls
+            from .xray_customer_profile_policy_v30 import TLS_TARGET_OFFSETS_V261
+
+            ws_port = xray_modern_runtime._target_port(
+                int(base_port), xray_modern_runtime.PROFILE_WS
+            )
+            expected_port = int(base_port) + int(
+                TLS_TARGET_OFFSETS_V261[xray_modern_runtime.PROFILE_WS]
+            )
+            if ws_port != expected_port:
+                # A detached worker with incomplete runtime composition must
+                # not create a listener on a reserved sing-box/other VPN port.
+                raise RuntimeError("XRAY_WS_TLS_TARGET_POLICY_NOT_COMPOSED")
+            await ensure_websocket_tls(conn, ws_port)
+            current.append(xray_modern_runtime.PROFILE_WS)
+            state["available_profiles"] = current
+    return state
 
 
 def _node_payload_with_xray_domain(
@@ -480,6 +504,33 @@ async def prepare_dedicated_xray_domain(
         await conn.wait_closed()
 
     tls_enabled = bool(runtime.get("tls_enabled"))
+    # A saved hostname or a single live Xray listener is not a completed
+    # three-profile TLS installation. Never claim success or reconcile user
+    # delivery until all three *real* listener ports are verified.
+    required_tls = ("websocket_tls", "xhttp_reality", "tcp_tls")
+    live_profiles = runtime.get("profiles") or {}
+    missing_tls = [
+        profile for profile in required_tls
+        if not isinstance(live_profiles, dict)
+        or not bool(live_profiles.get(profile))
+    ]
+    if not tls_enabled or missing_tls:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "XRAY_TLS_THREE_PROFILES_NOT_READY",
+                "message": (
+                    "سه پروفایل موردنیاز Xray هنوز آماده نیستند؛ "
+                    "WebSocket TLS، XHTTP Reality و TCP TLS باید روی "
+                    "نود واقعاً فعال باشند. گواهی SSL و وضعیت پورت‌های "
+                    "گمشده را بررسی کنید."
+                ),
+                "node_id": int(node.id),
+                "tls_certificate_ready": tls_enabled,
+                "required_profiles": list(required_tls),
+                "missing_profiles": missing_tls,
+            },
+        )
     reconcile_job: dict[str, Any] | None = None
     reconcile_error: str | None = None
 

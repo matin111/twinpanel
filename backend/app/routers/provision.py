@@ -94,6 +94,7 @@ class InstallIn(SSHBase, ProtocolSettings):
     node_type: NodeType
     country_code: str = "IR"
     capacity_users: int = Field(default=1000, gt=0)
+    xray_domain: str | None = None
     # Staged Exit install: keep node unpublished and defer all legacy per-user SSH sync.
     defer_subscription_sync: bool = False
 

@@ -15,15 +15,16 @@ from scripts import twinpanel_hidden_node_install_finish_v1 as finisher
 
 
 class InstallCentralPipelineTests(unittest.IsolatedAsyncioTestCase):
-    async def execute(self, *, live_ok=True, launch_error=None, auto_publish=True):
+    async def execute(self, *, live_ok=True, launch_error=None, auto_publish=True, tls_ready=True):
         db=MagicMock()
         node=SimpleNamespace(
             id=14,status=NodeStatus.OFFLINE,show_to_users=False,
             enable_v2ray=True,retired_at=None,node_type=NodeType.EXIT,
+            xray_domain="v2-new-exit.example.com",
         )
         db.get.return_value=node
         db.query.return_value.filter.return_value.first.return_value=SimpleNamespace(
-            protocol="v2ray",status="online",
+            protocol="v2ray",status="online",port=8443,
         )
         db.query.return_value.filter.return_value.all.return_value=[
             SimpleNamespace(status="online") for _ in range(4)
@@ -79,6 +80,16 @@ class InstallCentralPipelineTests(unittest.IsolatedAsyncioTestCase):
                   side_effect=launch_finish) as supervisor,
             patch.object(finisher,"SessionLocal",return_value=db),
             patch.object(finisher,"require_hidden_job",return_value=(node,job)),
+            patch.object(finisher,"_prepare_new_exit_tls_certificate",
+                         new_callable=AsyncMock,
+                         side_effect=None if tls_ready else RuntimeError(
+                             "XRAY_NEW_EXIT_TLS_CERTIFICATE_NOT_READY")),
+            patch("app.central_xray_node_authority_v1.read_node_public_authority",
+                  new_callable=AsyncMock,return_value={
+                      "tls_enabled":True,
+                      "tls_domain":"v2-new-exit.example.com",
+                      "profiles":["websocket_tls","xhttp_reality","tcp_tls"],
+                  }),
             patch.object(finisher,"_status",side_effect=record_finish),
             patch.object(finisher,"bootstrap_new_exit_modern_protocols",
                   new_callable=AsyncMock,return_value=modern),
@@ -86,8 +97,9 @@ class InstallCentralPipelineTests(unittest.IsolatedAsyncioTestCase):
                   new_callable=AsyncMock,return_value=fake_remote),
             patch("app.xray_modern_runtime._ensure_modern_xray",
                   new_callable=AsyncMock,return_value={
+                      "tls_enabled":True,
                       "available_profiles":[
-                          "xhttp_reality","tcp_reality","tcp_reality_vision"
+                          "websocket_tls","xhttp_reality","tcp_tls"
                       ],
                   }),
             patch.object(finisher,"verify_new_exit_readiness",
@@ -143,6 +155,16 @@ class InstallCentralPipelineTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(stages[-1][0],"failed")
         self.assertEqual(stages[-1][1]["error_code"],
                          "CENTRAL_BACKGROUND_DISPATCH_FAILED")
+
+    async def test_missing_ssl_never_publishes_even_if_health_is_mocked_ok(self):
+        seq,stages,_,admit=await self.execute(tls_ready=False)
+        self.assertEqual(seq,["durable-finish-dispatched"])
+        admit.assert_not_called()
+        self.assertEqual(stages[-1][0],"failed")
+        self.assertEqual(
+            stages[-1][1]["error_code"],
+            "XRAY_NEW_EXIT_TLS_CERTIFICATE_NOT_READY",
+        )
 
     async def test_unhealthy_listener_rejects_before_publication(self):
         seq,stages,_,admit=await self.execute(live_ok=False)

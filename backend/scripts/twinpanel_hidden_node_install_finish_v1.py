@@ -36,6 +36,41 @@ def _status(job_id: str, stage: str, node_id: int, **kwargs) -> None:
     set_install_progress(job_id, stage, node_id=node_id, **kwargs)
 
 
+# New Exits are not allowed to fall back to three all-REALITY profiles
+# and then be advertised as TLS-ready. An explicit dedicated Xray domain
+# must have a valid certificate before protocol provisioning even begins.
+# Existing installed Exits are never targeted by this hidden-node worker.
+TLS_CUSTOMER_PROFILES = frozenset(("websocket_tls", "xhttp_reality", "tcp_tls"))
+
+
+async def _prepare_new_exit_tls_certificate(db: Session, node: Node) -> None:
+    from app import xray_modern_admin
+    from app.routers import account_delivery as ad
+
+    domain = xray_modern_admin._clean_domain(
+        getattr(node, "xray_domain", None)
+    )
+    if not domain:
+        raise RuntimeError("XRAY_NEW_EXIT_DEDICATED_TLS_DOMAIN_REQUIRED")
+    conn = await asyncio.wait_for(ad.ssh_connect_saved(node, db), timeout=20)
+    try:
+        ready = await asyncio.wait_for(
+            xray_modern_admin._certificate_available(conn, domain), timeout=22,
+        )
+        if not ready:
+            await asyncio.wait_for(
+                xray_modern_admin._issue_certificate(conn, node, domain),
+                timeout=165,
+            )
+        if not await asyncio.wait_for(
+            xray_modern_admin._certificate_available(conn, domain), timeout=22,
+        ):
+            raise RuntimeError("XRAY_NEW_EXIT_TLS_CERTIFICATE_NOT_READY")
+    finally:
+        conn.close()
+        await conn.wait_closed()
+
+
 def _count_staged(db: Session, node_id: int) -> int:
     rows = db.query(NodeProtocolConfig).filter(
         NodeProtocolConfig.node_id == node_id,
@@ -55,11 +90,31 @@ async def finish(node_id: int, job_id: str, *, xray_port: int,
         node, job = require_hidden_job(db, node_id, job_id)
         if node.show_to_users:
             raise RuntimeError("NODE_FINISH_VISIBLE_NODE_REFUSED")
+        # Prepare the real certificate before the classic Xray installer.
+        # Installing a domainless Xray first creates an incompatible three-
+        # REALITY policy that remains cached for later subscriber delivery.
+        tls_certificate_ready = False
+        tls_error_code = "XRAY_NEW_EXIT_TLS_CERTIFICATE_NOT_READY"
+        try:
+            await _prepare_new_exit_tls_certificate(db, node)
+            tls_certificate_ready = True
+        except Exception as exc:
+            tls_error_code = (
+                "XRAY_NEW_EXIT_DEDICATED_TLS_DOMAIN_REQUIRED"
+                if str(exc) == "XRAY_NEW_EXIT_DEDICATED_TLS_DOMAIN_REQUIRED"
+                else "XRAY_NEW_EXIT_TLS_CERTIFICATE_NOT_READY"
+            )
+            print("HIDDEN_NODE_TLS_PRECHECK_NOT_READY", {
+                "node_id": node_id,
+                "code": tls_error_code,
+                "error_type": type(exc).__name__,
+            }, flush=True)
+
         xray_row = db.query(NodeProtocolConfig).filter(
             NodeProtocolConfig.node_id == node_id,
             NodeProtocolConfig.protocol == "v2ray",
         ).first()
-        if (
+        if tls_certificate_ready and (
             xray_row is None
             or str(getattr(xray_row.status, "value", xray_row.status)).lower() != "online"
             or not node.enable_v2ray
@@ -95,7 +150,8 @@ async def finish(node_id: int, job_id: str, *, xray_port: int,
             NodeProtocolConfig.protocol == "v2ray",
         ).first()
         if (
-            xray_row is not None and node.enable_v2ray
+            tls_certificate_ready
+            and xray_row is not None and node.enable_v2ray
             and str(getattr(xray_row.status, "value", xray_row.status)).lower()
             == "online"
         ):
@@ -110,9 +166,20 @@ async def finish(node_id: int, job_id: str, *, xray_port: int,
                         conn,base_port,node,
                     ),timeout=300,
                 )
-                profiles = list(state.get("available_profiles") or [])
-                if len(set(profiles)) < 3:
-                    raise RuntimeError("XRAY_THREE_CUSTOMER_PROFILES_NOT_READY")
+                # The runtime state can describe pending profiles; verify
+                # the real three active Xray inbounds before proceeding.
+                from app.central_xray_node_authority_v1 import (
+                    read_node_public_authority,
+                )
+                authority = await asyncio.wait_for(
+                    read_node_public_authority(conn), timeout=65,
+                )
+                profiles = set(authority.get("profiles") or [])
+                if (
+                    not authority.get("tls_enabled")
+                    or profiles != TLS_CUSTOMER_PROFILES
+                ):
+                    raise RuntimeError("XRAY_THREE_TLS_CUSTOMER_PROFILES_NOT_READY")
                 print("HIDDEN_NODE_XRAY_THREE_INBOUNDS_VERIFIED", {
                     "node_id":node_id,"count":len(set(profiles)),
                 },flush=True)
@@ -152,12 +219,20 @@ async def finish(node_id: int, job_id: str, *, xray_port: int,
 
         # The final gate is based on 16 actual listener health probes,
         # never DB online flags or a fabricated 100% progress bar.
-        readiness = await verify_new_exit_readiness(db, node_id)
+        readiness = await verify_new_exit_readiness(
+            db, node_id, require_tls_profiles=True,
+        )
         ready_count = int(readiness.get("ready_count") or 0)
-        if not readiness.get("ok"):
+        # Defense in depth: even if future readiness code regresses or is
+        # mocked, do not admit a freshly installed Exit without its dedicated
+        # valid TLS certificate. This guard never applies to existing Exits.
+        if not tls_certificate_ready or not readiness.get("ok"):
             _status(job_id, "failed", node_id,
                     installed_protocols=ready_count,
-                    error_code="PROTOCOL_SETUP_INCOMPLETE")
+                    error_code=(
+                        tls_error_code if not tls_certificate_ready
+                        else "PROTOCOL_SETUP_INCOMPLETE"
+                    ))
             print("HIDDEN_NODE_READINESS_NOT_VERIFIED", {
                 "node_id": node_id,
                 "missing": readiness.get("missing",[]),

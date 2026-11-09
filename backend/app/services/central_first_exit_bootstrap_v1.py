@@ -40,6 +40,14 @@ async def bootstrap_hidden_central_exit(payload, request, db) -> dict:
             enable_cisco=False, enable_openvpn=False,
             enable_wireguard=False, enable_l2tp=False, enable_v2ray=False,
         )
+        # Persist the dedicated hostname *before* the detached Xray installer
+        # reads this newly created Exit. Never confuse the shared Iran/public
+        # tunnel hostname with a verified node-owned TLS identity.
+        domain = str(getattr(payload, "xray_domain", None) or "").strip().lower()
+        if domain:
+            if "xray_domain" not in Node.__table__.c:
+                raise RuntimeError("XRAY_NEW_EXIT_DOMAIN_SCHEMA_NOT_READY")
+            node.xray_domain = domain
         db.add(node)
         db.commit()
         db.refresh(node)
