@@ -1,4 +1,4 @@
-"""Authenticated, chunked import of large encrypted TwinPanel backups.
+"""Authenticated, chunked import of large portable TwinPanel data backups.
 
 Max one upload chunk per HTTP request (8 MiB) to stay below proxy limits.
 Archive verification and decryption are performed by a standalone systemd job.
