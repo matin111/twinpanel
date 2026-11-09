@@ -53,7 +53,61 @@ export function BackupsFullRuntimePage(){
     finally{setBusy("");}
   };
 
-  const create=()=>void run("create",pick("بکاپ جدید ساخته شد","Backup created"),()=>parityApi.backupCreate(Boolean(settings.send_telegram&&settings.telegram_chat_id.trim())));
+  const pollManualTelegramJob=async(id:string)=>{
+    for(let attempt=0;attempt<840;attempt+=1){
+      const result=await parityApi.backupManualJob(id);
+      const job=result.job;
+      if(job.state==="succeeded"){
+        sessionStorage.removeItem("tp-manual-backup-job");
+        setOk(pick(
+          `بکاپ دستی با موفقیت به تلگرام ارسال شد (${job.parts||"?"} قسمت). فایل رمزگذاری‌شده از سرور حذف شد.`,
+          `Manual backup delivered to Telegram (${job.parts||"?"} parts); server archive removed.`
+        ));
+        await load();
+        return;
+      }
+      if(job.state==="failed"){
+        sessionStorage.removeItem("tp-manual-backup-job");
+        throw new Error(pick(
+          "ارسال بکاپ کامل نشد. فایل رمزگذاری‌شده برای ارسال مجدد محفوظ مانده است. کد: ",
+          "Backup delivery failed; encrypted archive retained for retry. Code: "
+        )+String(job.error_code||"UNKNOWN"));
+      }
+      setOk(pick(
+        "بکاپ دستی در حال آماده‌سازی یا ارسال به تلگرام است. بدون بستن عملیات روی سرور ادامه پیدا می‌کند.",
+        "Manual backup is being prepared or uploaded to Telegram in the background."
+      ));
+      await new Promise<void>(resolve=>setTimeout(resolve,5000));
+    }
+    throw new Error(pick("عملیات هنوز در حال اجراست؛ از همین صفحه دوباره وضعیت را بررسی کنید.","Backup still running; revisit this page for status."));
+  };
+  const create=async()=>{
+    if(busy)return;
+    if(!settings.telegram_chat_id.trim() || !settings.send_telegram){
+      setError(pick("ابتدا ارسال به تلگرام و Chat ID را در تنظیمات فعال و ذخیره کنید.","Enable and save Telegram delivery and Chat ID first."));
+      return;
+    }
+    setBusy("create");setError("");setOk("");
+    try{
+      const result=await parityApi.backupCreate(true);
+      const job=(result.job||{}) as Record<string,unknown>;
+      const id=String(job.id||"");
+      if(!/^[0-9a-f]{32}$/.test(id))throw new Error("BACKUP_JOB_ID_MISSING");
+      sessionStorage.setItem("tp-manual-backup-job",id);
+      await pollManualTelegramJob(id);
+    }catch(e){setError(e instanceof Error?e.message:String(e));}
+    finally{setBusy("");}
+  };
+  useEffect(()=>{
+    const id=typeof window!=="undefined"?sessionStorage.getItem("tp-manual-backup-job"):null;
+    if(!id||!/^[0-9a-f]{32}$/.test(id))return;
+    setBusy("create");
+    void pollManualTelegramJob(id)
+      .catch(e=>setError(e instanceof Error?e.message:String(e)))
+      .finally(()=>setBusy(""));
+    // The background job survives navigation.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[]);
   const saveSettings=()=>{const normalized=normalizeSettings(settings);setSettings(normalized);void run("settings",pick("تنظیمات بکاپ ذخیره شد","Backup settings saved"),()=>parityApi.backupSettings(normalized));};
   const saveBackupBot=()=>{const token=backupBotToken.trim();if(token.length<20){setError(pick("توکن ربات بکاپ را کامل وارد کنید.","Enter the complete backup bot token."));return;}void run("backup-bot-save",pick("ربات اختصاصی بکاپ ذخیره شد","Dedicated backup bot saved"),async()=>{const result=await parityApi.backupTelegramSaveToken(token);setBackupBotToken("");return result;});};
   const deleteBackupBot=()=>{if(!window.confirm(pick("توکن ربات اختصاصی بکاپ حذف شود؟","Remove the dedicated backup bot token?")))return;void run("backup-bot-delete",pick("توکن ربات بکاپ حذف شد","Backup bot token removed"),()=>parityApi.backupTelegramDeleteToken());};
@@ -63,7 +117,7 @@ export function BackupsFullRuntimePage(){
   const recovery=async()=>{if(busy)return;setBusy("recovery");setError("");setOk("");try{await downloadRecoveryKey();setOk(pick("کلید بازیابی دانلود شد؛ آن را خارج از سرور نگه دارید.","Recovery key downloaded; store it off-server."));}catch(e){setError(e instanceof Error?e.message:String(e));}finally{setBusy("");}};
 
   return <Shell active="/admin/backups"><div className="page">
-    <div className="page-head"><div><h1>{pick("بکاپ و بازیابی","Backup & Restore")}</h1><small>{pick("بکاپ رمزگذاری‌شده، زمان‌بندی، Telegram، آپلود، دانلود و Restore","Encrypted backups, scheduling, Telegram, upload, download and restore")}</small></div><div className="action-row"><button className="ghost" disabled={Boolean(busy)} onClick={()=>inputRef.current?.click()}>{busy==="upload"?"…":pick("آپلود .tpbak","Upload .tpbak")}</button><input ref={inputRef} type="file" accept=".tpbak" hidden onChange={upload}/><button className="primary" disabled={Boolean(busy)} onClick={create}>{busy==="create"?"…":pick("ساخت بکاپ","Create backup")}</button></div></div>
+    <div className="page-head"><div><h1>{pick("بکاپ و بازیابی","Backup & Restore")}</h1><small>{pick("بکاپ رمزگذاری‌شده، زمان‌بندی، Telegram، آپلود، دانلود و Restore","Encrypted backups, scheduling, Telegram, upload, download and restore")}</small></div><div className="action-row"><button className="ghost" disabled={Boolean(busy)} onClick={()=>inputRef.current?.click()}>{busy==="upload"?"…":pick("آپلود .tpbak","Upload .tpbak")}</button><input ref={inputRef} type="file" accept=".tpbak" hidden onChange={upload}/><button className="primary" disabled={Boolean(busy)} onClick={create}>{busy==="create"?"…":pick("بکاپ دستی و ارسال به تلگرام","Manual backup to Telegram")}</button></div></div>
     {error&&<div className="runtime-error">{error}</div>}{ok&&<div className="runtime-success">{ok}</div>}
 
     <div className="stats dashboard-stats"><Stat label={pick("تعداد بکاپ","Backups")} value={String(backups.length)} icon="⟲"/><Stat label={pick("حجم کل","Total size")} value={totalBytes?sizeText({size_bytes:totalBytes}):"—"} icon="▤"/><Stat label={pick("ارسال Telegram","Telegram copies")} value={String(telegramCount)} icon="✈"/><Stat label={pick("Retention","Retention")} value={`${settings.retention} ${pick("نسخه","copies")}`} icon="⌛"/></div>
@@ -76,7 +130,7 @@ export function BackupsFullRuntimePage(){
 
     <Card className="runtime-editor"><div className="card-head"><div><b>{pick("بکاپ خودکار","Automatic Backup")}</b><small>{pick("تنظیمات مستقیم در Backend ذخیره می‌شود","Saved directly in the backend")}</small></div><label className="toggle module-toggle"><span>{settings.enabled?pick("فعال","Enabled"):pick("غیرفعال","Disabled")}</span><input type="checkbox" checked={settings.enabled} onChange={e=>setSettings(v=>({...v,enabled:e.target.checked}))}/><i/></label></div><div className="setting-grid"><label className="field"><span>{pick("تکرار","Frequency")}</span><select value={settings.frequency} onChange={e=>setSettings(v=>({...v,frequency:e.target.value as BackupSettings["frequency"]}))}><option value="hourly">Hourly</option><option value="daily">Daily</option><option value="weekly">Weekly</option></select></label><label className="field"><span>{pick("ساعت","Hour")}</span><input type="number" min={0} max={23} value={settings.hour} onChange={e=>setSettings(v=>({...v,hour:Number(e.target.value)}))}/></label><label className="field"><span>{pick("دقیقه","Minute")}</span><input type="number" min={0} max={59} value={settings.minute} onChange={e=>setSettings(v=>({...v,minute:Number(e.target.value)}))}/></label><label className="field"><span>{pick("روز هفته ۰ تا ۶","Weekday 0-6")}</span><input type="number" min={0} max={6} value={settings.weekday} onChange={e=>setSettings(v=>({...v,weekday:Number(e.target.value)}))}/></label><label className="field"><span>{pick("Timezone","Timezone")}</span><input dir="ltr" value={settings.timezone} onChange={e=>setSettings(v=>({...v,timezone:e.target.value}))}/></label><label className="field"><span>{pick("تعداد نگهداری","Retention")}</span><input type="number" min={1} max={100} value={settings.retention} onChange={e=>setSettings(v=>({...v,retention:Number(e.target.value)}))}/></label></div><button className="primary" disabled={Boolean(busy)} onClick={saveSettings}>{busy==="settings"?"…":pick("ذخیره زمان‌بندی","Save schedule")}</button></Card>
 
-    <Card><div className="card-head"><div><b>{pick("فهرست بکاپ‌ها","Backup files")}</b><small>{pick("Restore فقط با تأیید صریح اجرا می‌شود.","Restore runs only after explicit confirmation.")}</small></div><button className="ghost" disabled={loading} onClick={()=>void load()}>{pick("بروزرسانی","Refresh")}</button></div>{loading?<div className="runtime-loading">{pick("در حال دریافت بکاپ‌ها...","Loading backups...")}</div>:<div className="table"><table><thead><tr><th>{pick("فایل","File")}</th><th>{pick("نوع","Kind")}</th><th>{pick("حجم","Size")}</th><th>{pick("تاریخ","Created")}</th><th>Telegram</th><th>{pick("عملیات","Actions")}</th></tr></thead><tbody>{backups.map((raw,index)=>{const row=raw as Record<string,unknown>,name=fileName(row);return <tr key={name||index}><td dir="ltr">{name}</td><td>{str(row,"kind","type")||"—"}</td><td>{sizeText(row)}</td><td>{dateText(row.created_at||row.timestamp)}</td><td><Badge tone={row.telegram_error?"bad":telegramOk(row)?"ok":"warn"}>{row.telegram_error?pick("خطا","Error"):telegramOk(row)?pick("ارسال شده","Sent"):pick("ارسال نشده","Not sent")}</Badge></td><td><div className="row-actions"><button className="mini-btn" disabled={Boolean(busy)} onClick={()=>void run(`info:${name}`,pick("اطلاعات بکاپ دریافت شد","Backup info loaded"),()=>parityApi.backupInfo(name),false)}>{pick("Info","Info")}</button><button className="mini-btn" disabled={Boolean(busy)} onClick={()=>void download(name)}>{pick("دانلود","Download")}</button><button className="mini-btn" disabled={Boolean(busy)} onClick={()=>void run(`tg:${name}`,pick("بکاپ به Telegram ارسال شد","Backup sent to Telegram"),()=>parityApi.backupTelegram(name))}>{pick("Telegram","Telegram")}</button><button className="mini-btn danger" disabled={Boolean(busy)} onClick={()=>{const confirmText=window.prompt(pick("برای Restore عبارت RESTORE را وارد کنید","Type RESTORE to continue"),"");if(confirmText==="RESTORE")void run(`restore:${name}`,pick("Restore انجام شد","Restore completed"),()=>parityApi.backupRestore(name));}}>{pick("Restore","Restore")}</button><button className="mini-btn danger" disabled={Boolean(busy)} onClick={()=>{if(window.confirm(pick("این فایل بکاپ حذف شود؟","Delete this backup file?")))void run(`delete:${name}`,pick("بکاپ حذف شد","Backup deleted"),()=>parityApi.backupDelete(name));}}>{pick("حذف","Delete")}</button></div></td></tr>})}</tbody></table></div>}{!loading&&!backups.length&&<div className="runtime-empty">{pick("بکاپی وجود ندارد.","No backups exist.")}</div>}</Card>
+    <Card><div className="card-head"><div><b>{pick("فهرست بکاپ‌ها","Backup files")}</b><small>{pick("Restore فقط با تأیید صریح اجرا می‌شود.","Restore runs only after explicit confirmation.")}</small></div><button className="ghost" disabled={loading} onClick={()=>void load()}>{pick("بروزرسانی","Refresh")}</button></div>{loading?<div className="runtime-loading">{pick("در حال دریافت بکاپ‌ها...","Loading backups...")}</div>:<div className="table"><table><thead><tr><th>{pick("فایل","File")}</th><th>{pick("نوع","Kind")}</th><th>{pick("حجم","Size")}</th><th>{pick("تاریخ","Created")}</th><th>Telegram</th><th>{pick("عملیات","Actions")}</th></tr></thead><tbody>{backups.map((raw,index)=>{const row=raw as Record<string,unknown>,name=fileName(row);return <tr key={name||index}><td dir="ltr">{name}</td><td>{str(row,"kind","type")||"—"}</td><td>{sizeText(row)}</td><td>{dateText(row.created_at||row.timestamp)}</td><td><Badge tone={row.telegram_error?"bad":telegramOk(row)?"ok":"warn"}>{row.telegram_error?pick("خطا","Error"):row.telegram_only?pick("فقط تلگرام","Telegram only"):telegramOk(row)?pick("ارسال شده","Sent"):pick("ارسال نشده","Not sent")}</Badge></td><td><div className="row-actions"><button className="mini-btn" disabled={Boolean(busy)} onClick={()=>void run(`info:${name}`,pick("اطلاعات بکاپ دریافت شد","Backup info loaded"),()=>parityApi.backupInfo(name),false)}>{pick("Info","Info")}</button><button className="mini-btn" disabled={Boolean(busy)||row.archive_on_server===false} onClick={()=>void download(name)}>{pick("دانلود","Download")}</button><button className="mini-btn" disabled={Boolean(busy)} onClick={()=>void run(`tg:${name}`,pick("بکاپ به Telegram ارسال شد","Backup sent to Telegram"),()=>parityApi.backupTelegram(name))}>{pick("Telegram","Telegram")}</button><button className="mini-btn danger" disabled={Boolean(busy)||row.archive_on_server===false} onClick={()=>{const confirmText=window.prompt(pick("برای Restore عبارت RESTORE را وارد کنید","Type RESTORE to continue"),"");if(confirmText==="RESTORE")void run(`restore:${name}`,pick("Restore انجام شد","Restore completed"),()=>parityApi.backupRestore(name));}}>{pick("Restore","Restore")}</button><button className="mini-btn danger" disabled={Boolean(busy)} onClick={()=>{if(window.confirm(pick("این فایل بکاپ حذف شود؟","Delete this backup file?")))void run(`delete:${name}`,pick("بکاپ حذف شد","Backup deleted"),()=>parityApi.backupDelete(name));}}>{pick("حذف","Delete")}</button></div></td></tr>})}</tbody></table></div>}{!loading&&!backups.length&&<div className="runtime-empty">{pick("بکاپی وجود ندارد.","No backups exist.")}</div>}</Card>
 
     {info&&<Card><div className="card-head"><b>{pick("جزئیات بکاپ","Backup details")}</b><button className="mini-btn" onClick={()=>setInfo(null)}>×</button></div><pre className="runtime-log" dir="ltr">{JSON.stringify(info,null,2)}</pre></Card>}
   </div></Shell>;
