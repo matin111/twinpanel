@@ -47,6 +47,9 @@ def test_real_profiles_node_names_and_per_server_copy_are_preserved():
     assert "card.dataset.countryCode=String(server?.country_code||'').toUpperCase()" in v54
     assert "card.dataset.nodeId=String(server?.node_id??'')" in v54
     assert "card.dataset.nodeName" in ui
+    hub = source("public_connection_hub_v5.py")
+    assert "data-node-name=" in hub
+    assert 'name:String(tab?.dataset.nodeName||id).trim()' in ui
     assert "card.dataset.tp78Uri" not in ui  # profile URI, never a card-level fake
     assert "p.dataset.tp78Uri" in ui
     assert "unique(uris).join('\\n')" in ui
