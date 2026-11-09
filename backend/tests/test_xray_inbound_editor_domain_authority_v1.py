@@ -179,7 +179,7 @@ class XrayDomainWriteIsolationTests(TestCase):
             root / "components/node-xray-domain-runtime-v33.tsx"
         ).read_text()
         self.assertIn("setDraft(value.defaults)", protocol)
-        self.assertIn("value.draft?.inbounds", protocol)
+        self.assertIn("state.draft.inbounds", protocol)
         self.assertIn("draft_domain_conflict", protocol)
         self.assertIn("setInboundDraft(state.defaults)", advanced)
         self.assertNotIn("setInboundDraft(state.draft||state.defaults)", advanced)
