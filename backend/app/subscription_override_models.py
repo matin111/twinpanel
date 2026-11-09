@@ -55,6 +55,35 @@ def effective_device_limit(db, subscription, plan=None) -> int:
     return 1
 
 
-def duration_is_unlimited(db, subscription) -> bool:
+def duration_days(subscription, plan=None) -> int:
+    """The saved account duration wins over the original plan template."""
+    stored = int(getattr(subscription, "activation_duration_days", 0) or 0)
+    if stored > 0:
+        return stored
+    return max(0, int(getattr(plan, "duration_days", 0) or 0))
+
+
+def unlimited_without_expiry(subscription, plan=None, override=None) -> bool:
+    """An explicit expiry always wins, even over a stale unlimited flag."""
+    if getattr(subscription, "expires_at", None) is not None:
+        return False
+    if override is not None and override.duration_unlimited:
+        return True
+    return duration_days(subscription, plan) <= 0
+
+
+def duration_is_unlimited(db, subscription, plan=None) -> bool:
+    if getattr(subscription, "expires_at", None) is not None:
+        return False
     override = get_subscription_override(db, subscription.id)
-    return bool(override and override.duration_unlimited)
+    if override is not None and override.duration_unlimited:
+        return True
+    if int(getattr(subscription, "activation_duration_days", 0) or 0) > 0:
+        return False
+    if plan is None and getattr(subscription, "plan_id", None) is not None:
+        # A genuine plan duration is finite, even when a legacy row lacks
+        # its per-subscription duration snapshot.
+        from .models import Plan
+        plan = db.get(Plan, subscription.plan_id)
+    return unlimited_without_expiry(subscription, plan, override)
+
