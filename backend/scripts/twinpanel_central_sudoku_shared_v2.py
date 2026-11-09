@@ -35,11 +35,7 @@ from app.node_runtime_connection import connect_protocol_runtime
 from app.routers import account_delivery as ad
 from app.standalone_subscription_accounts import _node_host,_sudoku_endpoint,_sudoku_share_uri
 from app.services.central_family_readiness_v1 import verify_central_family_readiness
-from app.services.central_sudoku_fingerprint_v1 import (
-    desired_fingerprint as current_sudoku_fingerprint,
-    fingerprint_for_ids as sudoku_fingerprint_for_ids,
-    mark_applied as mark_sudoku_applied,
-)
+from app.services.central_sudoku_fingerprint_v1 import mark_applied as mark_sudoku_applied
 
 logging.getLogger("asyncssh").setLevel(logging.CRITICAL)
 
@@ -144,7 +140,9 @@ async def stage(node_id,limit,write):
             db.expire_all()
             if eligible(db,node_id):
                 raise RuntimeError("SUDOKU_SHARED_ENTITLEMENTS_CHANGED_AFTER_DISABLE")
-            mark_sudoku_applied(db, node_id, sudoku_fingerprint_for_ids(node_id, ()))
+            # Only an acknowledged stop may establish the zero-user family
+            # fingerprint. Do not mark other runtime families as applied.
+            mark_sudoku_applied(db, node_id, ())
             db.commit()
             print("SUDOKU_SHARED_DISABLED_EMPTY_WHITELIST",json.dumps({
                 "node_id":node_id,"users":0,
@@ -269,11 +267,10 @@ async def stage(node_id,limit,write):
                 cred.config_text_encrypted=ad._enc(next_items)
                 cred.is_active=True
                 changed+=1
-        # ACK only the exact live whitelist projection. Another daemon
-        # family can fail without erasing this verified Sudoku result.
-        if current_sudoku_fingerprint(db,node_id) != sudoku_fingerprint_for_ids(node_id,ids):
-            raise RuntimeError("SUDOKU_SHARED_ENTITLEMENTS_CHANGED_BEFORE_ACK")
-        mark_sudoku_applied(db,node_id,sudoku_fingerprint_for_ids(node_id,ids))
+        # After live daemon count ACK and successful customer item commit,
+        # persist this family's own exact entitlement fingerprint. A failed
+        # Sing-box family must not delay the confirmed Sudoku ACK.
+        mark_sudoku_applied(db, node_id, ids)
         db.commit()
         print("SUDOKU_SHARED_COMPLETE",json.dumps({
             "node_id":node_id,"users":len(ids),
