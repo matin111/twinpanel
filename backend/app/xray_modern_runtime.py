@@ -473,7 +473,9 @@ if domain:
             capture_output=True,
             check=False,
         )
-        if valid.returncode == 0 and host.returncode == 0:
+        if (valid.returncode == 0 and host.returncode == 0
+                and f"Hostname {{domain}} does match certificate" in host.stdout
+                and "does NOT match" not in host.stdout):
             # Ensure the selected private key actually belongs to the
             # certificate. A stale domain/key pair must never be published.
             cert_public = subprocess.run(
