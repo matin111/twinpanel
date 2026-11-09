@@ -216,6 +216,9 @@ _SCRIPT = r"""
     // response. Do not change profile URIs, generated configs or network state.
     card.dataset.countryCode=String(server?.country_code||'').toUpperCase();
     card.dataset.nodeId=String(server?.node_id??'');
+    // Snapshot the actual /sub/meta name before later legacy identity overlays
+    // rewrite the visible card title to a numeric node ID.
+    card.dataset.nodeName=serverLabel(server,index);
     const head=el('div','v54-v2ray-server-head');
     head.setAttribute('role','button');head.setAttribute('tabindex','0');head.setAttribute('aria-expanded','false');
     head.append(el('span','',serverLabel(server,index)),el('span','', String(profiles.length)+' اتصال'));
