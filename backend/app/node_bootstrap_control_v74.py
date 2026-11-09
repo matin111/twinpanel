@@ -49,7 +49,28 @@ _RUNTIME_APPLIED = False
 _DIRECT_TIMEOUT_SECONDS = 12
 
 
-async def _direct_saved_connect(node: Node, db: Session):
+class _WorkerReadTransactionBoundaryError(RuntimeError):
+    """Prevent background polling from accidentally committing pending writes."""
+
+
+def _close_clean_worker_read_transaction(db: Session) -> None:
+    # Only presence workers opt in. In particular, never commit a live
+    # API/provisioning transaction that could contain quota or account writes.
+    if db.new or db.dirty or db.deleted:
+        raise _WorkerReadTransactionBoundaryError("SSH_READ_TXN_HAS_PENDING_WRITES")
+    try:
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        raise _WorkerReadTransactionBoundaryError(
+            "SSH_READ_TXN_CLOSE_FAILED"
+        ) from exc
+
+
+
+async def _direct_saved_connect(
+    node: Node, db: Session, *, close_read_transaction_before_ssh: bool = False,
+):
     """Open exactly one direct saved SSH connection, with no relay candidates."""
 
     access = v63._access(db, int(node.id))
@@ -69,12 +90,21 @@ async def _direct_saved_connect(node: Node, db: Session):
             detail="کلید دسترسی این سرور پیدا نشد. دسترسی را دوباره ثبت کنید.",
         )
 
+    # Snapshot ORM values before ending the SELECT transaction; SessionLocal
+    # does not expire fields on commit. No protocol or auth values are altered.
+    host = str(node.public_ip)
+    port = int(access.ssh_port or 22)
+    username = str(access.ssh_username or "root")
+    private_key = str(key_path)
+    if close_read_transaction_before_ssh:
+        _close_clean_worker_read_transaction(db)
+
     try:
         return await asyncssh.connect(
-            str(node.public_ip),
-            port=int(access.ssh_port or 22),
-            username=str(access.ssh_username or "root"),
-            client_keys=[str(key_path)],
+            host,
+            port=port,
+            username=username,
+            client_keys=[private_key],
             known_hosts=None,
             connect_timeout=_DIRECT_TIMEOUT_SECONDS,
             login_timeout=_DIRECT_TIMEOUT_SECONDS,
@@ -88,9 +118,17 @@ async def _direct_saved_connect(node: Node, db: Session):
         ) from exc
 
 
-async def _open_iran_management_direct(iran: Node, db: Session):
+async def _open_iran_management_direct(
+    iran: Node, db: Session, *, close_read_transaction_before_ssh: bool = False,
+):
     try:
+        if close_read_transaction_before_ssh:
+            return await _direct_saved_connect(
+                iran, db, close_read_transaction_before_ssh=True,
+            )
         return await _direct_saved_connect(iran, db)
+    except _WorkerReadTransactionBoundaryError:
+        raise
     except asyncio.CancelledError:
         raise
     except BaseException as exc:
@@ -106,8 +144,15 @@ async def _saved_exit_via_iran_native_v74(
     node_key: Path,
     iran: Node,
     db: Session,
+    *,
+    close_read_transaction_before_ssh: bool = False,
 ):
-    iran_conn = await _open_iran_management_direct(iran, db)
+    if close_read_transaction_before_ssh:
+        iran_conn = await _open_iran_management_direct(
+            iran, db, close_read_transaction_before_ssh=True,
+        )
+    else:
+        iran_conn = await _open_iran_management_direct(iran, db)
 
     try:
         try:
@@ -136,16 +181,28 @@ async def _saved_exit_via_iran_native_v74(
         raise
 
 
-async def ssh_connect_saved_v74(node: Node, db: Session):
+async def ssh_connect_saved_v74(
+    node: Node, db: Session, *, close_read_transaction_before_ssh: bool = False,
+):
+    if close_read_transaction_before_ssh and (db.new or db.dirty or db.deleted):
+        raise _WorkerReadTransactionBoundaryError("SSH_READ_TXN_HAS_PENDING_WRITES")
     # Iran and any future non-Exit management remain direct-only.
     if node.node_type != NodeType.EXIT:
+        if close_read_transaction_before_ssh:
+            return await _direct_saved_connect(
+                node, db, close_read_transaction_before_ssh=True,
+            )
         return await _direct_saved_connect(node, db)
 
     direct_error = "not_attempted"
 
     try:
+        if close_read_transaction_before_ssh:
+            return await _direct_saved_connect(
+                node, db, close_read_transaction_before_ssh=True,
+            )
         return await _direct_saved_connect(node, db)
-    except asyncio.CancelledError:
+    except (asyncio.CancelledError, _WorkerReadTransactionBoundaryError):
         raise
     except BaseException as exc:
         direct_error = v72._safe_error(exc)
@@ -181,14 +238,15 @@ async def ssh_connect_saved_v74(node: Node, db: Session):
         )
 
     try:
+        if close_read_transaction_before_ssh:
+            return await _saved_exit_via_iran_native_v74(
+                node, node_access, node_key, iran, db,
+                close_read_transaction_before_ssh=True,
+            )
         return await _saved_exit_via_iran_native_v74(
-            node,
-            node_access,
-            node_key,
-            iran,
-            db,
+            node, node_access, node_key, iran, db,
         )
-    except asyncio.CancelledError:
+    except (asyncio.CancelledError, _WorkerReadTransactionBoundaryError):
         raise
     except BaseException as exc:
         fallback_error = v72._safe_error(exc)
