@@ -186,8 +186,10 @@ def main() -> None:
             capability = canonical.capability_payload()[protocol]
             assert capability["presence"] is True
             assert capability["traffic"] is True
+        # Capability applies only to the authenticated identified-inner tag.
+        # Shared legacy inner flows stay anonymous and are never billed.
         shadow_capability = canonical.capability_payload()["shadowtls"]
-        assert shadow_capability == {"presence": False, "traffic": False}
+        assert shadow_capability == {"presence": True, "traffic": True}
 
     finally:
         canonical.PRESENCE_ACCOUNTING_PROTOCOLS = old_presence
