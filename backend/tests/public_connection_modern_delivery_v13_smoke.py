@@ -10,11 +10,13 @@ v13_path = ROUTERS / "public_connection_modern_delivery_v13.py"
 live_path = ROUTERS / "public_connection_hub_live_v5.py"
 standalone_path = ROOT / "backend" / "app" / "standalone_subscription_accounts.py"
 singbox_path = ROOT / "backend" / "app" / "singbox_subscription_accounts.py"
+shared_path = ROOT / "backend" / "scripts" / "twinpanel_central_sudoku_shared_v2.py"
 
 v13 = v13_path.read_text(encoding="utf-8")
 live = live_path.read_text(encoding="utf-8")
 standalone = standalone_path.read_text(encoding="utf-8")
 singbox = singbox_path.read_text(encoding="utf-8")
+shared = shared_path.read_text(encoding="utf-8")
 
 compile(v13, str(v13_path), "exec")
 compile(live, str(live_path), "exec")
@@ -119,23 +121,16 @@ assert '"config_format": "trusttunnel-deeplink"' in standalone
 assert '"uri": deeplink' in standalone
 assert 'def _sudoku_endpoint(host: str, port: int) -> str:' in standalone
 assert 'def _sudoku_share_uri(host: str, port: int, key: str, name: str) -> str:' in standalone
-assert '"server_address": endpoint' in standalone
+# Per-subscriber Sudoku services were permanently retired. The single
+# shared Exit family now constructs public JSON/share URI and verifies all
+# loaded clients, while the old standalone installer must fail closed.
+assert '"server_address": endpoint' in shared
+assert '"config_format":"sudoku-json"' in shared
+assert '"uri":uri' in shared
+assert "SUDOKU_PER_USER_SERVICE_RETIRED_USE_SHARED_CENTRAL_NODE" in standalone
+assert "SUDOKU_SHARED_NODE_ACK_COUNT_MISMATCH" in shared
+assert "SUDOKU_SHARED_COMPLETE" in shared
 assert '"server_port": port' not in standalone
-assert '"config_format": "sudoku-json"' in standalone
-assert '"uri": sudoku_uri' in standalone
-# Sudoku provisioning is not ready merely because systemd reports the
-# process active. The account driver must wait for the per-user TCP
-# listener to bind, otherwise an immediate client can race startup.
-for marker in (
-    'ready=0; ',
-    'for i in $(seq 1 100); do ',
-    'ss -H -lnt',
-    'sleep 0.2; ',
-    'if [ ${ready:-0} -ne 1 ]; then ',
-    "Sudoku listener readiness timeout on :{port}",
-    'journalctl -u {service}.service -n 30 --no-pager',
-):
-    assert marker in standalone, marker
 assert '"config_format": "amneziawg"' in standalone
 assert '"config_format": "mieru-json"' in standalone
 assert '"config_format": "sing-box"' in singbox
