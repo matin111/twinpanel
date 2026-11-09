@@ -4,6 +4,9 @@ on:
   pull_request:
     paths:
       - backend/app/services/sudoku_central_enforcement_v1.py
+      - backend/app/services/central_sudoku_fingerprint_v1.py
+      - backend/scripts/twinpanel_central_sudoku_shared_v2.py
+      - backend/tests/central_sudoku_fingerprint_v1_smoke.py
       - backend/app/services/account_enforcement_v2.py
       - backend/tests/sudoku_central_enforcement_v1_smoke.py
       - .github/workflows/sudoku-central-enforcement-v1-smoke.yml
@@ -46,5 +49,6 @@ jobs:
           DATABASE_URL: postgresql+psycopg2://test:test@127.0.0.1:5432/test
           NODE_AGENT_SHARED_SECRET: ci-node-agent-secret-ci-node-agent-secret
         run: |
-          python -m py_compile app/services/account_enforcement_v2.py app/services/sudoku_central_enforcement_v1.py
+          python -m py_compile app/services/account_enforcement_v2.py app/services/sudoku_central_enforcement_v1.py app/services/central_sudoku_fingerprint_v1.py scripts/twinpanel_central_sudoku_shared_v2.py
+          python tests/central_sudoku_fingerprint_v1_smoke.py
           python tests/sudoku_central_enforcement_v1_smoke.py
