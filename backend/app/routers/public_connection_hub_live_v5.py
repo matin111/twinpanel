@@ -409,10 +409,12 @@ def public_connection_hub_live_v5(
         # unlimited override. Never label a finite account as unlimited.
         duration_label = (
             str(valid_days) + ' روز'
-            if valid_days
-            else 'نامحدود'
-            if not live.get("expires_at")
+            if live.get("expires_at") and valid_days
             else 'تا انقضا'
+            if live.get("expires_at")
+            else 'نامحدود'
+            if live.get("duration_unlimited") is True or valid_days <= 0
+            else str(valid_days) + ' روز'
         )
         source = source.replace(
             '<strong id="liveDurationMetric">—</strong>',
