@@ -5636,12 +5636,33 @@ def set_manual_limits(
 def extend_subscription_v17(subscription_id:int,payload:dict=Body(...),db:Session=Depends(get_db)):
     sub=db.get(Subscription,subscription_id)
     if not sub: raise HTTPException(status_code=404,detail="اشتراک پیدا نشد")
-    add_traffic_gb=float(payload.get("add_traffic_gb",0) or 0)
-    add_days=int(payload.get("add_days",0) or 0)
-    if add_traffic_gb<=0 and add_days<=0: raise HTTPException(status_code=422,detail="مقداری برای افزایش وارد نشده")
+    from ..services.subscription_cycle_reset_v1 import reset_subscription_period_usage
+
+    try:
+        add_traffic_gb=float(payload.get("add_traffic_gb",0) or 0)
+        add_days=int(payload.get("add_days",0) or 0)
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=422,detail="حجم یا مدت تمدید نامعتبر است")
+    reset_usage=payload.get("reset_usage") is True
+    reset_date=payload.get("reset_date") is True
+    if add_traffic_gb<0 or add_days<0:
+        raise HTTPException(status_code=422,detail="مقدار تمدید نمی‌تواند منفی باشد")
+    if not (add_traffic_gb>0 or add_days>0 or reset_usage):
+        raise HTTPException(status_code=422,detail="مقداری برای افزایش یا ریست وارد نشده")
+    if reset_date and add_days<=0:
+        raise HTTPException(status_code=422,detail="برای ریست تاریخ، مدت دوره جدید را به روز وارد کنید")
+    if reset_usage:
+        reset_subscription_period_usage(db,sub,origin="admin_renew")
     if add_traffic_gb>0:
         sub.traffic_limit_bytes=int(sub.traffic_limit_bytes or 0)+int(add_traffic_gb*1024**3)
-    if add_days>0:
+    if reset_date:
+        # A new term starts NOW, not at the previous expiry and not at
+        # the original activation date. Volume reset remains independent.
+        now=datetime.utcnow()
+        sub.starts_at=now
+        sub.expires_at=now+timedelta(days=add_days)
+        sub.activation_duration_days=add_days
+    elif add_days>0:
         # TWINPANEL_FIRST_USE_EXTEND_V1
         if (
             sub.starts_at is None
@@ -5695,7 +5716,7 @@ def extend_subscription_v17(subscription_id:int,payload:dict=Body(...),db:Sessio
                 + timedelta(days=add_days)
             )
     db.commit();db.refresh(sub)
-    return {"ok":True,"traffic_limit_bytes":int(sub.traffic_limit_bytes or 0),"traffic_used_bytes":int(sub.traffic_used_bytes or 0),"expires_at":sub.expires_at.isoformat() if sub.expires_at else None}
+    return {"ok":True,"traffic_limit_bytes":int(sub.traffic_limit_bytes or 0),"traffic_used_bytes":int(sub.traffic_used_bytes or 0),"expires_at":sub.expires_at.isoformat() if sub.expires_at else None,"reset_usage":reset_usage,"reset_date":reset_date}
 
 @router.patch("/{subscription_id}/admin-edit")
 async def admin_edit_subscription_v18(
