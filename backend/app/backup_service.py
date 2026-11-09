@@ -817,7 +817,7 @@ def create_backup(
             None,
         "key_fingerprint":
             recovery_key_fingerprint(),
-        "sha256": copied_sha256,
+        "sha256": hashlib.sha256(encrypted).hexdigest(),
     }
 
     _write_meta(
@@ -1212,10 +1212,7 @@ def import_backup_file(
             None,
         "key_fingerprint":
             recovery_key_fingerprint(),
-        "sha256":
-            hashlib.sha256(
-                target.read_bytes()
-            ).hexdigest(),
+        "sha256": copied_sha256,
     }
 
     _write_meta(
