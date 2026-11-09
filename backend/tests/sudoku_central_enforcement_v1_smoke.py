@@ -26,6 +26,7 @@ class MembershipDB:
 def test_central_acks_only_verified_current_whitelist():
     db = MembershipDB()
     with patch.object(subject,"is_central_node",return_value=True), \
+         patch.object(subject,"sudoku_entitled_ids",side_effect=[[],[74]]), \
          patch.object(subject,"desired_sudoku_fingerprint",return_value="a" * 64), \
          patch.object(subject,"last_sudoku_applied",return_value="a" * 64):
         assert subject.central_sudoku_enforcement_result(
@@ -41,6 +42,7 @@ def test_incomplete_central_does_not_ack_and_schedules_stage():
     db = MembershipDB()
     launched=[]
     with patch.object(subject,"is_central_node",return_value=True), \
+         patch.object(subject,"sudoku_entitled_ids",return_value=[]), \
          patch.object(subject,"desired_sudoku_fingerprint",return_value="a" * 64), \
          patch.object(subject,"last_sudoku_applied",return_value="b" * 64), \
          patch.object(launcher,"launch",side_effect=lambda db,n:launched.append(n)):
@@ -58,6 +60,7 @@ def test_incomplete_central_does_not_ack_and_schedules_stage():
 def test_currently_running_stage_keeps_command_pending():
     from app.services import central_node_stage_launcher_v1 as launcher
     with patch.object(subject,"is_central_node",return_value=True), \
+         patch.object(subject,"sudoku_entitled_ids",return_value=[74]), \
          patch.object(subject,"desired_sudoku_fingerprint",return_value="a" * 64), \
          patch.object(subject,"last_sudoku_applied",return_value="b" * 64), \
          patch.object(launcher,"launch",side_effect=launcher.CentralStageLaunchError("ALREADY_RUNNING")):
@@ -69,6 +72,27 @@ def test_currently_running_stage_keeps_command_pending():
             pass
         else:
             raise AssertionError("concurrent pending stage was acknowledged")
+
+
+def test_mismatched_revoke_or_restore_cannot_be_falsely_acknowledged():
+    with patch.object(subject,"is_central_node",return_value=True), \
+         patch.object(subject,"sudoku_entitled_ids",return_value=[74]):
+        try:
+            subject.central_sudoku_enforcement_result(
+                MembershipDB(),exit_node(19),74,"revoke_subscription")
+        except RuntimeError as exc:
+            assert str(exc)=="SUDOKU_CENTRAL_REVOKE_STILL_ENTITLED"
+        else:
+            raise AssertionError("still-entitled account was revoked")
+    with patch.object(subject,"is_central_node",return_value=True), \
+         patch.object(subject,"sudoku_entitled_ids",return_value=[]):
+        try:
+            subject.central_sudoku_enforcement_result(
+                MembershipDB(),exit_node(19),74,"restore_subscription")
+        except RuntimeError as exc:
+            assert str(exc)=="SUDOKU_CENTRAL_RESTORE_NOT_ENTITLED"
+        else:
+            raise AssertionError("not-entitled account was restored")
 
 
 def test_legacy_revoke_still_removes_old_access():
