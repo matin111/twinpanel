@@ -856,9 +856,8 @@ def create_backup(
                 meta,
             )
 
-    # Keep encrypted bytes only until Telegram verifies every part AND
-    # the final checksum message. Failed or incomplete transfers are retained
-    # for a safe retry; the recovery key is never uploaded.
+    # Keep the archive until Telegram verifies every part and final checksum.
+    # Failed or incomplete transfers remain available for a retry.
     if send_telegram and meta.get("telegram_sent"):
         _remove_uploaded_archive(target)
         meta = _read_meta(target)
@@ -1395,7 +1394,7 @@ def verify_telegram_chat(
 
 
 # Keep each Telegram document well below the 50 MB Bot API upload limit.
-# The backup is encrypted BEFORE partitioning; no plaintext is transmitted.
+# Keyless v3 archives contain sensitive data; restrict Telegram destination.
 TELEGRAM_BACKUP_PART_BYTES = 40 * 1024 * 1024
 
 
@@ -1503,7 +1502,7 @@ def send_backup_to_telegram(
             _write_meta(backup_path, meta)
 
     # A checksum sent separately allows verification after joining parts.
-    # The key is never sent to Telegram.
+    # Send checksum for portable archive integrity verification.
     try:
         _telegram_api_call(
             token, "sendMessage",
@@ -1514,7 +1513,7 @@ def send_backup_to_telegram(
                     f"Parts: {parts} (join in ascending order).\\n"
                     f"SHA256: {meta.get('sha256','')}\\n"
                     "After joining, verify SHA256 before restoring. "
-                    "Keep the recovery key separately."
+                    "Store this sensitive archive in a private location."
                 ),
             },
             timeout=30.0,
@@ -1893,9 +1892,7 @@ def restore_backup(
                 ",".join(sorted(nonempty))
             )
 
-    # Safety backup is mandatory but Telegram-only. A failed or partial
-    # delivery must prevent destructive restore. The local backup archive
-    # is removed after verified delivery; the key is kept separately.
+    # Safety backup is mandatory. Failed delivery prevents destructive restore.
     destination = load_settings()
     if not destination.get("telegram_chat_id"):
         raise RuntimeError("RESTORE_REQUIRES_TELEGRAM_SAFETY_DESTINATION")
