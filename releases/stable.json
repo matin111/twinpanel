@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.733",
+  "version": "1.1.0-rc.734",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-09T02:36:17Z",
+  "released_at": "2026-11-09T03:22:36Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "b3d3a154f62eb885053ebc4759f70a718d9e7262",
+  "source_sha": "c348e2f055461b328f50855975afe9694699c585",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.733/twinpanel-1.1.0-rc.733-linux-x86_64.tar.gz",
-    "sha256": "197834a601f83531fca688e526abd3b33118cbbf64ffe845a54bcba030d6514a",
-    "size_bytes": 30030082
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.734/twinpanel-1.1.0-rc.734-linux-x86_64.tar.gz",
+    "sha256": "00aefc88eec9277ddbbd9cbad2bee163e1928006e6014aaea2ad24d4769d2bb5",
+    "size_bytes": 30048177
   },
   "notes": {
-    "fa": "اعمال محدودیت نشست مشترک بین پروتکل‌ها روی اتصال واقعی sing-box؛ در اشتراک تک‌اتصالی، اگر پروتکل دیگری یک نشست تأییدشده فعال دارد، اتصال جدید غیرمجاز بعد از تطبیق دوباره هویت در API نود به‌صورت انتخابی قطع می‌شود. بدون ری‌استارت نود، قطع جمعی، تغییر رمز، کانفیگ، تاریخ یا حجم. محافظت در برابر نشست‌های قدیمی، نامحدودها و اتصال‌های فاقد هویت معتبر.",
-    "en": "Enforce canonical cross-protocol concurrent-session limits on the sing-box dataplane with authenticated selective per-connection CloseConnection RPC, fresh node snapshot and quota revalidation, no broad restarts, bulk disconnects, credentials, expiry or quota changes. Does not claim physical-device fingerprinting or handshake-time enforcement for protocols outside sing-box."
+    "fa": "افزودن بازیابی بکاپ چندقسمتی تلگرام: آپلود مستقل هر فایل partNNNofNNN، نمایش شماره‌های دریافت‌شده، ترکیب و تأیید SHA256 و کلید رمزگذاری پیش از ورود به فهرست بکاپ، حذف امن آپلود ناقص، بدون Restore خودکار یا تغییر داده‌های کاربران. کاهش مصرف RAM هنگام وارد کردن فایل بکاپ با انتقال جریانی.",
+    "en": "Add authenticated independent Telegram backup-part uploads, complete-set gating, SHA256 and encrypted archive validation, safe cancellation and streamed archive import to reduce memory. No automatic restore or user data mutation."
   }
 }
