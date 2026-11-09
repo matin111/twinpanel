@@ -724,7 +724,7 @@ def create_backup(
 
     payload = {
         "format": BACKUP_FORMAT,
-        "version": 2,
+        "version": 3,
         "scope": "persistent-panel-data",
         "credential_encoding": "account_credential_rewrap_v2",
         "created_at": _iso_now(),
