@@ -75,7 +75,7 @@ def test_public_shared_endpoint_matches_its_tunnel_route():
         binding._sudoku_shared_exit = shared
 
 
-def test_legacy_exit_retains_existing_public_and_target_ports():
+def test_retired_legacy_exit_generates_no_sudoku_routes():
     node = SimpleNamespace(id=6, node_type=binding.NodeType.EXIT,
                            public_ip="192.0.2.6", public_domain=None,
                            retired_at=None, show_to_users=True)
@@ -88,12 +88,14 @@ def test_legacy_exit_retains_existing_public_and_target_ports():
             "sudoku": SimpleNamespace(status="online")
         }
         binding._sudoku_shared_exit = lambda db, n: False
-        binding._sudoku_desired_subscription_ids = lambda db: [1, 2]
-        binding._sudoku_public_port_map = lambda db: {(6, 1): 41001, (6, 2): 41002}
+        binding._sudoku_desired_subscription_ids = lambda db: (_ for _ in ()).throw(
+            AssertionError("legacy subscriptions must not be enumerated")
+        )
+        binding._sudoku_public_port_map = lambda db: (_ for _ in ()).throw(
+            AssertionError("retired NAT ports must never be calculated")
+        )
         routes = binding._modern_routes_for_exit(None, node, "10.253.0.6")
-        assert len(routes) == 2
-        assert [r["public_port"] for r in routes] == [41001, 41002]
-        assert [r["target_port"] for r in routes] == [30000, 30001]
+        assert routes == []
     finally:
         binding._configured_modern_protocols = cfg
         binding._sudoku_shared_exit = shared
@@ -140,7 +142,7 @@ def main():
     for check in (
         test_central_shared_exit_has_one_route_for_all_users,
         test_public_shared_endpoint_matches_its_tunnel_route,
-        test_legacy_exit_retains_existing_public_and_target_ports,
+        test_retired_legacy_exit_generates_no_sudoku_routes,
         test_shared_rewrite_preserves_private_key,
         test_public_port_reservation_never_overlaps_legacy_pools,
     ):
