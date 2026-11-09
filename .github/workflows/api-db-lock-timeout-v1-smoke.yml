@@ -35,7 +35,10 @@ jobs:
           assert 'postgresql://' in source
           assert 'postgresql+psycopg2://' in source
           assert 'else {}' in source
-          assert 'connect_args=_DATABASE_CONNECT_ARGS' in source
+          assert 'connect_args=_WORKER_CONNECT_ARGS' in source
+          assert 'connect_args=_REQUEST_CONNECT_ARGS' in source
+          assert '**_DATABASE_CONNECT_ARGS' in source
+          assert 'application_name' in source
           print('PostgreSQL-scoped API DB lock timeout contract OK')
           PY
 
