@@ -15,7 +15,7 @@ from scripts import twinpanel_hidden_node_install_finish_v1 as finisher
 
 
 class InstallCentralPipelineTests(unittest.IsolatedAsyncioTestCase):
-    async def execute(self, *, live_ok=True, launch_error=None, auto_publish=True):
+    async def execute(self, *, live_ok=True, launch_error=None, auto_publish=True, tls_ready=True):
         db=MagicMock()
         node=SimpleNamespace(
             id=14,status=NodeStatus.OFFLINE,show_to_users=False,
@@ -81,7 +81,9 @@ class InstallCentralPipelineTests(unittest.IsolatedAsyncioTestCase):
             patch.object(finisher,"SessionLocal",return_value=db),
             patch.object(finisher,"require_hidden_job",return_value=(node,job)),
             patch.object(finisher,"_prepare_new_exit_tls_certificate",
-                         new_callable=AsyncMock),
+                         new_callable=AsyncMock,
+                         side_effect=None if tls_ready else RuntimeError(
+                             "XRAY_NEW_EXIT_TLS_CERTIFICATE_NOT_READY")),
             patch("app.central_xray_node_authority_v1.read_node_public_authority",
                   new_callable=AsyncMock,return_value={
                       "tls_enabled":True,
@@ -153,6 +155,16 @@ class InstallCentralPipelineTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(stages[-1][0],"failed")
         self.assertEqual(stages[-1][1]["error_code"],
                          "CENTRAL_BACKGROUND_DISPATCH_FAILED")
+
+    async def test_missing_ssl_never_publishes_even_if_health_is_mocked_ok(self):
+        seq,stages,_,admit=await self.execute(tls_ready=False)
+        self.assertEqual(seq,["durable-finish-dispatched"])
+        admit.assert_not_called()
+        self.assertEqual(stages[-1][0],"failed")
+        self.assertEqual(
+            stages[-1][1]["error_code"],
+            "XRAY_NEW_EXIT_TLS_CERTIFICATE_NOT_READY",
+        )
 
     async def test_unhealthy_listener_rejects_before_publication(self):
         seq,stages,_,admit=await self.execute(live_ok=False)
