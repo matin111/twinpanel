@@ -433,16 +433,18 @@ async def _fulfill_paid_order(order_id: int, db: Session) -> dict:
         # centrally owned Sudoku identities and would misclassify a paid order
         # as failed (or recreate obsolete per-user listener paths).
         central_sudoku_order = False
-        if "sudoku" in _requested_order_protocols(order):
-            from .account_delivery import _nodes
-            from ..services.sudoku_central_delivery_v1 import (
-                has_published_central_sudoku_owner,
+        # A store plan can inherit Sudoku even when the order's explicit
+        # requested_protocols is empty. Inspect the actual entitled
+        # SubscriptionProtocol rows, not only the form snapshot.
+        from .account_delivery import _nodes, _protocols
+        from ..services.sudoku_central_delivery_v1 import (
+            has_published_central_sudoku_owner,
+        )
+        target_sub = db.get(Subscription, int(order.subscription_id))
+        if target_sub is not None and "sudoku" in _protocols(db, target_sub):
+            central_sudoku_order = has_published_central_sudoku_owner(
+                db, _nodes(db, target_sub),
             )
-            target_sub = db.get(Subscription, int(order.subscription_id))
-            if target_sub is not None:
-                central_sudoku_order = has_published_central_sudoku_owner(
-                    db, _nodes(db, target_sub),
-                )
         if (fast_provision_commerce_enabled() and new_purchase_subscription
                 or central_sudoku_order):
             from .modern_account_delivery_v1 import provision_new_account_fast_v1
