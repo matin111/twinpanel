@@ -35,8 +35,9 @@ def test_delta_scheduler_is_isolated_from_global_runtime_failures():
     from pathlib import Path
     path=Path(__file__).resolve().parents[1]/"scripts/twinpanel_central_node_stage_v1.py"
     source=path.read_text(encoding="utf-8")
-    assert "last_sudoku_applied(db,node_id)" in source
-    assert "desired_sudoku_fingerprint(db,node_id)" in source
+    import re
+    assert re.search(r"last_sudoku_applied\(\s*db\s*,\s*node_id\s*\)", source)
+    assert re.search(r"desired_sudoku_fingerprint\(\s*db\s*,\s*node_id\s*\)", source)
     assert 'if sudoku not in selected:' in source
 
 
