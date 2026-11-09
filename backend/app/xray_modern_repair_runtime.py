@@ -54,6 +54,16 @@ async def _reconcile_existing_legacy_xray(
     if node.node_type != NodeType.EXIT:
         return False
 
+    # TWINPANEL_DEDICATED_XRAY_INSTALL_SINGLE_WRITER_V1
+    # The preflight reconciler was designed before dedicated Xray TLS and
+    # invokes a legacy/partial modern builder ahead of the actual installer.
+    # On a dedicated-domain Exit that path may rebuild base + XHTTP and
+    # accidentally drop TLS/WS/TCP. The canonical provision_protocols path
+    # now owns the strict three-live-inbound check and node-aware repair.
+    # Never write config.json or restart Xray in this earlier preflight.
+    if str(getattr(node, "xray_domain", None) or "").strip():
+        return False
+
     if await provision.existing_ok(
         conn,
         "v2ray",
