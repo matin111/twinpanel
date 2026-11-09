@@ -1,6 +1,8 @@
 from html import escape
 
 from aiogram import F
+
+from .telegram_navigation_v1 import show_navigation_page
 from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
@@ -404,7 +406,7 @@ def install_account_link_feature(
         await callback.answer()
 
         if callback.message is not None:
-            await callback.message.edit_text(
+            await show_navigation_page(callback.message, 
                 main_runtime._dashboard_text(data),
                 reply_markup=main_runtime._dashboard_keyboard(data),
             )
@@ -431,7 +433,7 @@ def install_account_link_feature(
         await callback.answer()
 
         if callback.message is not None:
-            await callback.message.edit_text(
+            await show_navigation_page(callback.message, 
                 "<b>👤 حساب من</b>\n\n"
                 f"نام: {escape(str(user.get('full_name') or '-'))}\n"
                 f"ایمیل: {escape(str(user.get('email') or '-'))}",
@@ -449,7 +451,7 @@ def install_account_link_feature(
 
         if callback.message is not None:
             brand_name = escape(await _brand_name(request_fn))
-            await callback.message.edit_text(
+            await show_navigation_page(callback.message, 
                 f"ایمیل حساب {brand_name} را وارد کنید.",
                 reply_markup=_home_keyboard(),
             )
@@ -463,7 +465,8 @@ def install_account_link_feature(
         await callback.answer()
 
         if callback.message is not None:
-            await callback.message.edit_text(
+            # ReplyKeyboardMarkup cannot be used with editMessageText.
+            await callback.message.answer(
                 "عملیات لغو شد.",
                 reply_markup=main_runtime.main_keyboard(),
             )
@@ -489,7 +492,7 @@ def install_account_link_feature(
         await callback.answer()
 
         if callback.message is not None:
-            await callback.message.edit_text(
+            await show_navigation_page(callback.message, 
                 "🔗 <b>دریافت لینک اکانت</b>\n\n"
                 "نام کاربری VPN اکانت خود را وارد کنید.",
                 reply_markup=_cancel_keyboard(),
