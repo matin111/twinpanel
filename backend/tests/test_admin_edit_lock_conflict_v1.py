@@ -57,6 +57,17 @@ class AdminEditLockHandlingTests(unittest.TestCase):
         session.commit.assert_called_once()
         session.rollback.assert_not_called()
 
+    def test_dml_lock_timeouts_are_also_handled_by_route(self):
+        from pathlib import Path
+        route = (Path(__file__).resolve().parents[1] /
+                 "app/routers/subscription_admin_edit_fast_v1.py").read_text(
+                     encoding="utf-8")
+        # A DML delete/update can fail before the explicit commit. Preserve
+        # the outer transaction-level classifier and rollback.
+        self.assertIn("except OperationalError as exc:\n        # DML may hit lock_timeout", route)
+        self.assertIn("_is_retryable_lock_timeout(exc)", route)
+        self.assertIn('"Retry-After": "2"', route)
+
     def test_no_orig_database_error_not_misclassified(self):
         exc = OperationalError("UPDATE", {}, RuntimeError("network unavailable"))
         self.assertFalse(_is_retryable_lock_timeout(exc))
