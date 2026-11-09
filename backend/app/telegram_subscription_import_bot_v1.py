@@ -91,7 +91,7 @@ def install(router, request_fn):
             return
         await callback.answer("اکانت از فهرست تلگرام حذف شد.")
         if callback.message:
-            await callback.message.edit_text(
+            await show_navigation_page(callback.message, 
                 "✅ اکانت از فهرست شما حذف شد.\n"
                 "اشتراک اصلی و کانفیگ‌های آن تغییری نکرده‌اند.",
                 reply_markup=_navigation(),
