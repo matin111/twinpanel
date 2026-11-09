@@ -34,6 +34,10 @@ class CentralXrayTests(unittest.TestCase):
         db.get.return_value=node
         with (patch.object(mod,"SessionLocal") as session,
               patch.object(mod,"allow_central_node",return_value=True),
+              # This unit test covers central readiness dispatch, NOT the
+              # PostgreSQL-only ORM mapper installer. Its real integration
+              # path is tested separately against PostgreSQL.
+              patch("scripts.twinpanel_hidden_node_install_finish_v1._activate_xray_install_runtime"),
               patch.object(mod,"verify_new_exit_readiness",
                            new_callable=AsyncMock) as health,
               patch.object(mod,"run_one",new_callable=AsyncMock,
@@ -50,6 +54,10 @@ class CentralXrayTests(unittest.TestCase):
         db.get.return_value=node
         with (patch.object(mod,"SessionLocal") as session,
               patch.object(mod,"allow_central_node",return_value=True),
+              # This unit test covers central readiness dispatch, NOT the
+              # PostgreSQL-only ORM mapper installer. Its real integration
+              # path is tested separately against PostgreSQL.
+              patch("scripts.twinpanel_hidden_node_install_finish_v1._activate_xray_install_runtime"),
               patch.object(mod,"verify_new_exit_readiness",
                            new_callable=AsyncMock,return_value={"ok":False}) as health,
               patch.object(mod,"run_one",new_callable=AsyncMock) as run_one):
