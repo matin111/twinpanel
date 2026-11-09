@@ -3,7 +3,7 @@
 import {ChangeEvent,useEffect,useMemo,useRef,useState} from "react";
 import {Badge,Card,Shell,Stat} from "./ui";
 import {BackupHome,BackupSettings,parityApi} from "../lib/admin-parity-api";
-import {downloadBackupFile,downloadRecoveryKey,uploadBackup} from "../lib/backup-runtime-api";
+import {downloadBackupFile,downloadRecoveryKey,uploadBackup,initTelegramParts,uploadTelegramPart,getTelegramPartsStatus,finishTelegramParts,TelegramPartsSession} from "../lib/backup-runtime-api";
 import {useI18n} from "../lib/i18n";
 
 const defaults:BackupSettings={enabled:false,frequency:"daily",hour:3,minute:0,weekday:0,timezone:"Asia/Tehran",send_telegram:false,telegram_chat_id:"",retention:14};
@@ -17,6 +17,9 @@ const telegramOk=(row:Record<string,unknown>)=>Boolean(row.telegram_file_id||row
 export function BackupsFullRuntimePage(){
   const {pick}=useI18n();
   const inputRef=useRef<HTMLInputElement>(null);
+  const telegramPartRef=useRef<HTMLInputElement>(null);
+  const [telegramParts,setTelegramParts]=useState<TelegramPartsSession|null>(null);
+  const [telegramPartsSha,setTelegramPartsSha]=useState("");
   const [home,setHome]=useState<BackupHome>({ok:true,backups:[],settings:defaults});
   const [settings,setSettings]=useState<BackupSettings>(defaults);
   const [backupBotToken,setBackupBotToken]=useState("");
@@ -113,12 +116,110 @@ export function BackupsFullRuntimePage(){
   const deleteBackupBot=()=>{if(!window.confirm(pick("توکن ربات اختصاصی بکاپ حذف شود؟","Remove the dedicated backup bot token?")))return;void run("backup-bot-delete",pick("توکن ربات بکاپ حذف شد","Backup bot token removed"),()=>parityApi.backupTelegramDeleteToken());};
   const verifyTelegram=()=>{const chatId=settings.telegram_chat_id.trim();if(!chatId){setError(pick("ابتدا Telegram Chat ID را وارد کنید.","Enter the Telegram Chat ID first."));return;}void run("verify-telegram",pick("اتصال ربات بکاپ و Chat ID تأیید شد","Backup bot and Chat ID verified"),()=>parityApi.backupVerifyTelegram(chatId),false);};
   const upload=async(event:ChangeEvent<HTMLInputElement>)=>{const file=event.target.files?.[0];event.target.value="";if(!file)return;if(!file.name.toLowerCase().endsWith(".tpbak")){setError(pick("فقط فایل .tpbak قابل آپلود است.","Only .tpbak files are accepted."));return;}await run("upload",pick("فایل بکاپ وارد شد","Backup file imported"),()=>uploadBackup(file,(percent)=>setOk(pick(`آپلود و بررسی بکاپ: ${percent}٪`,`Uploading and verifying backup: ${percent}%`))));};
+  const uploadTelegramPiece=async(event:ChangeEvent<HTMLInputElement>)=>{
+    const file=event.target.files?.[0];event.target.value="";
+    if(!file||busy)return;
+    setBusy("telegram-piece");setError("");setOk("");
+    try{
+      let session=telegramParts;
+      if(!session){
+        session=await initTelegramParts(file,telegramPartsSha);
+        sessionStorage.setItem("tp-telegram-parts-session",session.id);
+        setTelegramParts(session);
+      }
+      const updated=await uploadTelegramPart(session.id,file);
+      setTelegramParts(updated);
+      setOk(pick(
+        `قسمت دریافت شد: ${updated.received_count} از ${updated.total_parts}. می‌توانید قسمت بعدی را جداگانه انتخاب کنید.`,
+        `Part uploaded: ${updated.received_count} of ${updated.total_parts}. Select the next part separately.`
+      ));
+    }catch(e){setError(e instanceof Error?e.message:String(e))}
+    finally{setBusy("")}
+  };
+  const finishTelegramSet=async()=>{
+    const current=telegramParts;
+    if(!current||busy)return;
+    if(current.received_count!==current.total_parts){
+      setError(pick("ابتدا تمام قسمت‌های بکاپ را آپلود کنید.","Upload every part before combining."));
+      return;
+    }
+    setBusy("telegram-join");setError("");setOk("");
+    try{
+      let state=await finishTelegramParts(current.id);
+      setTelegramParts(state);
+      for(let i=0;i<600&&state.state==="verifying";i++){
+        await new Promise<void>(resolve=>setTimeout(resolve,4000));
+        state=await getTelegramPartsStatus(current.id);
+        setTelegramParts(state);
+      }
+      if(state.state==="failed")throw new Error(state.error_code||"BACKUP_JOIN_FAILED");
+      if(state.state==="imported"){
+        setOk(pick(
+          "تمام قسمت‌ها ترکیب و صحت بکاپ تأیید شد. فایل در فهرست بکاپ‌ها آماده Restore است.",
+          "All parts combined and verified; the backup is now listed for manual restore."
+        ));
+        sessionStorage.removeItem("tp-telegram-parts-session");
+        await load();
+      }else{
+        setOk(pick("بررسی فایل همچنان ادامه دارد؛ دوباره وضعیت را بررسی کنید.","Verification is still running; check the status again."));
+      }
+    }catch(e){setError(e instanceof Error?e.message:String(e))}
+    finally{setBusy("")}
+  };
+  const resetTelegramSet=()=>{
+    if(busy)return;
+    sessionStorage.removeItem("tp-telegram-parts-session");
+    setTelegramParts(null);setTelegramPartsSha("");
+    setError("");setOk("");
+  };
+  useEffect(()=>{
+    const id=typeof window==="undefined"?null:sessionStorage.getItem("tp-telegram-parts-session");
+    if(!id)return;
+    void getTelegramPartsStatus(id).then(setTelegramParts).catch(()=>{
+      sessionStorage.removeItem("tp-telegram-parts-session");
+    });
+  },[]);
   const download=async(filename:string)=>{if(busy)return;setBusy(`download:${filename}`);setError("");setOk("");try{await downloadBackupFile(filename);setOk(pick("دانلود بکاپ شروع شد","Backup download started"));}catch(e){setError(e instanceof Error?e.message:String(e));}finally{setBusy("");}};
   const recovery=async()=>{if(busy)return;setBusy("recovery");setError("");setOk("");try{await downloadRecoveryKey();setOk(pick("کلید بازیابی دانلود شد؛ آن را خارج از سرور نگه دارید.","Recovery key downloaded; store it off-server."));}catch(e){setError(e instanceof Error?e.message:String(e));}finally{setBusy("");}};
 
   return <Shell active="/admin/backups"><div className="page">
     <div className="page-head"><div><h1>{pick("بکاپ و بازیابی","Backup & Restore")}</h1><small>{pick("بکاپ رمزگذاری‌شده، زمان‌بندی، Telegram، آپلود، دانلود و Restore","Encrypted backups, scheduling, Telegram, upload, download and restore")}</small></div><div className="action-row"><button className="ghost" disabled={Boolean(busy)} onClick={()=>inputRef.current?.click()}>{busy==="upload"?"…":pick("آپلود .tpbak","Upload .tpbak")}</button><input ref={inputRef} type="file" accept=".tpbak" hidden onChange={upload}/><button className="primary" disabled={Boolean(busy)} onClick={create}>{busy==="create"?"…":pick("بکاپ دستی و ارسال به تلگرام","Manual backup to Telegram")}</button></div></div>
     {error&&<div className="runtime-error">{error}</div>}{ok&&<div className="runtime-success">{ok}</div>}
+
+    <Card className="runtime-editor">
+      <div className="card-head"><div>
+        <b>{pick("بازیابی بکاپ چندقسمتی تلگرام","Import multi-part Telegram backup")}</b>
+        <small>{pick("هر فایل part001of017 و بعدی را جداگانه بارگذاری کنید. پس از دریافت تمام قسمت‌ها، بکاپ بررسی و آماده Restore می‌شود.","Upload each partNNNofNNN file separately. When all parts arrive, the backup is checked and becomes available for manual Restore.")}</small>
+      </div><Badge tone={telegramParts?.state==="imported"?"ok":telegramParts?.state==="failed"?"bad":"warn"}>
+        {telegramParts?telegramParts.state==="imported"?pick("آماده بازیابی","Ready for restore"):telegramParts.state==="verifying"?pick("در حال بررسی","Verifying"):telegramParts.state==="failed"?pick("خطا","Failed"):pick("در حال دریافت","Uploading"):pick("شروع جدید","New import")}
+      </Badge></div>
+      {!telegramParts&&<label className="field">
+        <span>{pick("SHA256 بکاپ کامل (اختیاری، از پیام تلگرام)","Full backup SHA256 (optional, from Telegram receipt)")}</span>
+        <input dir="ltr" value={telegramPartsSha} onChange={e=>setTelegramPartsSha(e.target.value)} placeholder="64-character SHA256" maxLength={64} disabled={Boolean(busy)}/>
+      </label>}
+      {telegramParts&&<div className="runtime-info-list">
+        <div><span>{pick("نام بکاپ","Backup file")}</span><b dir="ltr">{telegramParts.filename}</b></div>
+        <div><span>{pick("قسمت‌های دریافت‌شده","Parts received")}</span><b dir="ltr">{telegramParts.received_count} / {telegramParts.total_parts}</b></div>
+        <div><span>{pick("شماره قسمت‌ها","Received part numbers")}</span><b dir="ltr">{telegramParts.received_parts.join(", ")||"—"}</b></div>
+        {telegramParts.imported_filename&&<div><span>{pick("فایل بازیابی","Imported file")}</span><b dir="ltr">{telegramParts.imported_filename}</b></div>}
+      </div>}
+      <div className="action-row">
+        <button className="primary" disabled={Boolean(busy)||Boolean(telegramParts&&telegramParts.state!=="uploading")} onClick={()=>telegramPartRef.current?.click()}>
+          {busy==="telegram-piece"?"…":pick("آپلود یک قسمت بکاپ","Upload one backup part")}
+        </button>
+        <input ref={telegramPartRef} type="file" hidden onChange={uploadTelegramPiece}/>
+        <button className="ghost" disabled={Boolean(busy)||!telegramParts||telegramParts.state!=="uploading"||telegramParts.received_count!==telegramParts.total_parts} onClick={()=>void finishTelegramSet()}>
+          {busy==="telegram-join"?"…":pick("ترکیب و بررسی همه قسمت‌ها","Combine and verify all parts")}
+        </button>
+        <button className="ghost" disabled={Boolean(busy)} onClick={resetTelegramSet}>
+          {pick("شروع مجموعه دیگر","Start another set")}
+        </button>
+        {telegramParts&&<button className="ghost" disabled={Boolean(busy)} onClick={()=>void getTelegramPartsStatus(telegramParts.id).then(setTelegramParts).catch(e=>setError(String(e)))}>
+          {pick("بررسی وضعیت","Check status")}
+        </button>}
+      </div>
+      <small>{pick("Restore خودکار اجرا نمی‌شود. کلید بازیابی باید با کلید فایل مطابقت داشته باشد.","Restore is never automatic. The recovery key must match the encrypted archive.")}</small>
+    </Card>
 
     <div className="stats dashboard-stats"><Stat label={pick("تعداد بکاپ","Backups")} value={String(backups.length)} icon="⟲"/><Stat label={pick("حجم کل","Total size")} value={totalBytes?sizeText({size_bytes:totalBytes}):"—"} icon="▤"/><Stat label={pick("ارسال Telegram","Telegram copies")} value={String(telegramCount)} icon="✈"/><Stat label={pick("Retention","Retention")} value={`${settings.retention} ${pick("نسخه","copies")}`} icon="⌛"/></div>
 
