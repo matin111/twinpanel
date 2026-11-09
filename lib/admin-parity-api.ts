@@ -121,6 +121,7 @@ export const parityApi={
 
   backups:()=>request<BackupHome>("/v1/admin/backups"),
   backupCreate:(sendTelegram:boolean)=>request<AnyRow>("/v1/admin/backups/create",{method:"POST",body:JSON.stringify({send_telegram:sendTelegram})}),
+  backupManualJob:(jobId:string)=>request<{ok:boolean;job:{id:string;state:string;stage:string;error_code?:string;filename?:string;parts?:number;tables?:number;rows?:number}}>('/v1/admin/backups/manual-jobs/'+encodeURIComponent(jobId)),
   backupSettings:(settings:BackupSettings)=>request<AnyRow>("/v1/admin/backups/settings",{method:"PUT",body:JSON.stringify(settings)}),
   backupTelegramSaveToken:(token:string)=>request<BackupTelegramBotStatus>("/v1/admin/backups/telegram-bot",{method:"PUT",body:JSON.stringify({token})}),
   backupTelegramDeleteToken:()=>request<BackupTelegramBotStatus>("/v1/admin/backups/telegram-bot",{method:"DELETE"}),
