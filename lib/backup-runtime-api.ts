@@ -121,6 +121,13 @@ export async function uploadTelegramPart(id:string,file:File):Promise<TelegramPa
   if(!response.ok)throw new Error(await errorText(response));
   return (await response.json() as {session:TelegramPartsSession}).session;
 }
+export async function discardTelegramParts(id:string):Promise<void>{
+  if(!/^[0-9a-f]{32}$/.test(id))throw new Error("BACKUP_PART_SESSION_ID_INVALID");
+  const response=await fetch(`${partsPrefix}/${id}`,{
+    method:"DELETE",headers:{Authorization:`Bearer ${auth()}`},cache:"no-store",
+  });
+  if(!response.ok)throw new Error(await errorText(response));
+}
 export async function finishTelegramParts(id:string):Promise<TelegramPartsSession>{
   const response=await fetch(`${partsPrefix}/${id}/finish`,{
     method:"POST",headers:{Authorization:`Bearer ${auth()}`},cache:"no-store",
