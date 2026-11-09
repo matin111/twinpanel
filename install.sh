@@ -159,6 +159,15 @@ if ! command -v git >/dev/null 2>&1; then
   apt-get install -y git ca-certificates
 fi
 
+# A newly installed panel must be able to restore compressed backups from
+# another server, even when the original server is no longer available.
+if ! command -v zstd >/dev/null 2>&1; then
+  say "Installing Zstandard for portable backup recovery"
+  export DEBIAN_FRONTEND=noninteractive
+  apt-get update -y
+  apt-get install -y zstd
+fi
+
 say "$PRODUCT public installer"
 echo "فارسی: نصب مستقیم TwinPanel از Release عمومی رسمی"
 echo "English: direct TwinPanel installation from the official public release"
