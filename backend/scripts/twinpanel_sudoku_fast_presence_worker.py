@@ -58,6 +58,10 @@ async def reconcile_once() -> dict:
                 # every account. No per-user presence may be inferred from it.
                 central_shared = is_central_node(db, node_id)
                 node = db.get(Node, node_id)
+                # This is a read-only lookup. Release the PostgreSQL
+                # transaction BEFORE awaiting SSH (up to 12 seconds).
+                # SessionLocal(expire_on_commit=False) keeps node fields.
+                db.commit()
                 conn = await asyncio.wait_for(
                     connect_protocol_runtime(node, db), timeout=12,
                 )

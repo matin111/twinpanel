@@ -71,6 +71,9 @@ async def reconcile_once() -> dict:
                 continue
             conn = None
             try:
+                # Previous per-node session/identity lookups may open a
+                # read transaction. Never hold it across slow SSH.
+                db.commit()
                 conn = await asyncio.wait_for(connect_protocol_runtime(node, db), timeout=12)
                 db.commit()
                 ok, snapshot, error = await asyncio.wait_for(

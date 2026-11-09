@@ -57,6 +57,9 @@ async def reconcile_once() -> dict:
                 if not devices:
                     continue
                 node = db.get(Node, node_id)
+                # Node/identity reads must not leave an open transaction
+                # over SSH and two 12-second authenticated probes.
+                db.commit()
                 conn = await asyncio.wait_for(
                     connect_protocol_runtime(node, db), timeout=12.0
                 )
