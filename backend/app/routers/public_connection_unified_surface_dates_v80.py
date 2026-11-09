@@ -2459,6 +2459,14 @@ _SCRIPT = r"""
      if(other!==footer){[...other.children].forEach(node=>footer.append(node));other.remove()}
    });
    const key=keyForPanel(panel);
+   if(key==='socks5'){
+     // SOCKS5 is a host/port/user/password proxy, not a Karing multi-config.
+     // Keep the server rows and their per-server "نمایش اطلاعات" controls.
+     // Remove this protocol's misleading universal action footer entirely.
+     footer.remove();
+     panel.querySelectorAll(':scope > .v51-multi-card,:scope > .v52-multi-card').forEach(card=>card.remove());
+     return;
+   }
    const fileProtocol=['openvpn','wireguard','amneziawg'].includes(key);
    const classify=node=>{
      const declared=String(node.dataset.kind||'').toLowerCase();
@@ -2549,6 +2557,12 @@ _SCRIPT = r"""
  function reconcileClientDownload(panel){
    const key=keyForPanel(panel);
    const noApp=/^l2tp(?:[\\/_-]?ipsec)?$/.test(key);
+   if(key==='socks5'){
+     // Do not resurrect any of the three unrelated SOCKS5 footer buttons
+     // when reconciling modal content or a different device platform.
+     panel.querySelectorAll(':scope > .tp78-action-footer,:scope > .v51-multi-card,:scope > .v52-multi-card').forEach(node=>node.remove());
+     return;
+   }
    let footer=panel.querySelector(':scope > .tp78-action-footer');
    if(!footer){
      footer=el('nav','tp78-action-footer');
