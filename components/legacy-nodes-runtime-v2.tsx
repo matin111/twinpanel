@@ -2,7 +2,8 @@
 
 import {useEffect,useMemo,useState} from "react";
 
-import {Badge,Card,Shell,Stat} from "./ui";
+import {Badge,Card,Shell} from "./ui";
+import {matchesNodeListFilter,nodeListRole,NodeListFilter} from "../lib/node-list-filters";
 import {adminApi,type AdminNode,type RuntimeRow,type XrayDomainState} from "../lib/admin-api";
 import {legacyAdminApi} from "../lib/legacy-admin-api";
 import {useI18n} from "../lib/i18n";
@@ -61,7 +62,7 @@ export function LegacyNodesRuntimePage(){
   const [overviewAvailable,setOverviewAvailable]=useState(false);
   const [domains,setDomains]=useState<RuntimeRow[]>([]);
   const [selectedId,setSelectedId]=useState(0);
-  const [filter,setFilter]=useState<"all"|"iran"|"exit">("all");
+  const [filter,setFilter]=useState<NodeListFilter>("all");
   const [query,setQuery]=useState("");
   const [loading,setLoading]=useState(true);
   const [busy,setBusy]=useState("");
@@ -180,19 +181,41 @@ export function LegacyNodesRuntimePage(){
   const effectiveXrayDomain=s(xrayDomainMeta?.effective_xray_domain);
   const displayedXrayDomain=storedXrayDomain||effectiveXrayDomain;
 
+  // The table and KPI counters must use the same live status source.
+  const statusOf=(node:ExtendedNode)=>s(
+    overviewAvailable&&overview[node.id]?.status
+      ?overview[node.id].status
+      :node.status
+  );
   const filtered=useMemo(()=>{
     const q=query.trim().toLowerCase();
     return nodes.filter(node=>{
-      const role=roleOf(node);
-      if(filter!=="all"&&role!==filter)return false;
+      if(!matchesNodeListFilter(node,filter,statusOf(node)))return false;
       if(!q)return true;
-      return `${node.id} ${node.name} ${node.public_ip||""} ${node.country_code||""} ${role}`.toLowerCase().includes(q);
+      const domain=domains.find(row=>n(row.id||row.node_id)===node.id);
+      return [
+        node.id,node.name,node.public_ip,node.country_code,nodeListRole(node),
+        statusOf(node),node.public_domain,domain?.public_domain,domain?.domain,
+      ].some(value=>s(value).toLowerCase().includes(q));
     });
-  },[nodes,filter,query]);
+  },[nodes,overview,overviewAvailable,domains,filter,query]);
 
-  const onlineCount=nodes.filter(node=>s(node.status).toLowerCase()==="online").length;
-  const iranCount=nodes.filter(node=>roleOf(node)==="iran").length;
-  const exitCount=nodes.filter(node=>roleOf(node)==="exit").length;
+  const onlineCount=nodes.filter(node=>matchesNodeListFilter(node,"online",statusOf(node))).length;
+  const iranCount=nodes.filter(node=>matchesNodeListFilter(node,"iran",statusOf(node))).length;
+  const exitCount=nodes.filter(node=>matchesNodeListFilter(node,"exit",statusOf(node))).length;
+  const selectFilter=(next:NodeListFilter)=>{
+    setFilter(next);
+    setQuery(""); // Never hide the counted nodes behind a previous search.
+  };
+  const filterLabels:Record<NodeListFilter,string>={
+    all:pick("کل نودها","All nodes"),
+    online:pick("آنلاین","Online"),
+    iran:pick("ایران","Iran"),
+    exit:pick("خارج","Exit"),
+    offline:pick("آفلاین","Offline"),
+    maintenance:pick("نگهداری","Maintenance"),
+    mother:pick("مادر","Mother"),
+  };
 
   useEffect(()=>{
     if(!selected){
@@ -379,26 +402,42 @@ export function LegacyNodesRuntimePage(){
       {warning&&modal===null?<div className="runtime-warning">{warning}</div>:null}
       {success&&modal===null?<div className="runtime-success">{success}</div>:null}
 
-      <div className="stats dashboard-stats">
-        <Stat label={pick("کل نودها","Total nodes")} value={nodes.length.toLocaleString("fa-IR")} icon="◉"/>
-        <Stat label={pick("آنلاین","Online")} value={onlineCount.toLocaleString("fa-IR")} icon="✓"/>
-        <Stat label={pick("ایران","Iran")} value={iranCount.toLocaleString("fa-IR")} icon="IR"/>
-        <Stat label={pick("خارج","Exit")} value={exitCount.toLocaleString("fa-IR")} icon="↗"/>
+      <div className="stats dashboard-stats node-list-quick-filters" role="group" aria-label={pick("فیلتر سریع نودها","Quick node filters")}>
+        {([
+          {id:"all",label:pick("کل نودها","Total nodes"),value:nodes.length,icon:"◉"},
+          {id:"online",label:pick("آنلاین","Online"),value:onlineCount,icon:"✓"},
+          {id:"iran",label:pick("ایران","Iran"),value:iranCount,icon:"IR"},
+          {id:"exit",label:pick("خارج","Exit"),value:exitCount,icon:"↗"},
+        ] as const).map(item=>
+          <button type="button" key={item.id}
+            className={`card stat node-list-filter-card${filter===item.id?" active":""}`}
+            aria-pressed={filter===item.id}
+            aria-label={`${item.label}: ${item.value}`}
+            onClick={()=>selectFilter(item.id)}>
+            <span className="stat-icon" aria-hidden="true">{item.icon}</span>
+            <span className="node-list-stat-text"><small>{item.label}</small><b>{item.value.toLocaleString("fa-IR")}</b></span>
+          </button>
+        )}
       </div>
 
       <Card>
         <div className="runtime-toolbar">
-          <label>⌕ <input value={query} onChange={event=>setQuery(event.target.value)} placeholder={pick("نام، IP یا شناسه...","Name, IP or ID...")}/></label>
-          <select value={filter} onChange={event=>setFilter(event.target.value as "all"|"iran"|"exit")}>
+          <label>⌕ <input value={query} onChange={event=>setQuery(event.target.value)} placeholder={pick("نام، IP، شناسه یا دامنه...","Name, IP, ID or domain...")}/></label>
+          <select aria-label={pick("فیلتر نودها","Node filter")} value={filter} onChange={event=>selectFilter(event.target.value as NodeListFilter)}>
             <option value="all">{pick("همه","All")}</option>
+            <option value="online">{pick("آنلاین","Online")}</option>
+            <option value="offline">{pick("آفلاین","Offline")}</option>
+            <option value="maintenance">{pick("نگهداری","Maintenance")}</option>
             <option value="iran">{pick("ایران","Iran")}</option>
             <option value="exit">{pick("خارج","Exit")}</option>
+            <option value="mother">{pick("مادر","Mother")}</option>
           </select>
+          <span className="node-list-filter-summary" aria-live="polite">{filterLabels[filter]} · {filtered.length.toLocaleString("fa-IR")}</span>
         </div>
         <div className="table"><table><thead><tr><th>{pick("نود","Node")}</th><th>{pick("نوع","Type")}</th><th>IP</th><th>{pick("وضعیت","Status")}</th><th>{pick("کل کاربران","Total users")}</th><th>{pick("مصرف ثبت‌شده","Recorded usage")}</th><th>{pick("پورت‌های تنظیم‌شده","Configured ports")}</th><th>{pick("عملیات","Actions")}</th></tr></thead>
           <tbody>{filtered.map(node=>{
             const stats=overviewAvailable?overview[node.id]:undefined;
-            const currentStatus=stats?.status||node.status;
+            const currentStatus=statusOf(node);
             return <tr key={node.id} className={node.id===selectedId&&modal!==null?"is-selected":""}>
               <td><b>{node.name}</b></td>
               <td>{roleOf(node)}</td>
@@ -411,6 +450,9 @@ export function LegacyNodesRuntimePage(){
             </tr>;
           })}</tbody>
         </table></div>
+        {filtered.length===0?<div className="runtime-empty" role="status">
+          {pick("نودی مطابق این فیلتر پیدا نشد.","No nodes match the selected filter.")}
+        </div>:null}
       </Card>
 
       {modal==="manage"&&selected?<Modal title={selected.name} sub={selected.public_ip||"—"} className="manage-card node-manage-modal-card" onClose={()=>setModal(null)}>
