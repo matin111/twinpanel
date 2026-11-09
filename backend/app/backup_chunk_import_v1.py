@@ -34,7 +34,7 @@ SHA=re.compile(r"[0-9a-f]{64}\Z")
 class InitUpload(BaseModel):
     filename: str=Field(min_length=6,max_length=180)
     size_bytes: int=Field(ge=1,le=MAX_BYTES)
-    sha256: str=Field(min_length=64,max_length=64)
+    sha256: str=Field(default="",max_length=64)
 
 
 def _files(ident: str) -> tuple[Path,Path,Path]:
@@ -68,7 +68,7 @@ def create_upload_session(payload:InitUpload):
     safe=Path(payload.filename).name
     if safe!=payload.filename or not safe.endswith(".tpbak"):
         raise HTTPException(status_code=422,detail="INVALID_BACKUP_FILENAME")
-    if not SHA.fullmatch(payload.sha256.lower()):
+    if payload.sha256 and not SHA.fullmatch(payload.sha256.lower()):
         raise HTTPException(status_code=422,detail="INVALID_SHA256")
     STAGING.mkdir(mode=0o700,parents=True,exist_ok=True)
     os.chmod(STAGING,0o700)
@@ -170,8 +170,9 @@ def run_import_job(ident:str) -> None:
     try:
         with path.open("rb") as inp:
             digest=hashlib.file_digest(inp,"sha256").hexdigest()
-        if digest!=row["sha256"]:
+        if row.get("sha256") and digest!=row["sha256"]:
             raise ValueError("BACKUP_SHA256_MISMATCH")
+        row["verified_sha256"]=digest
         # This checks Fernet authentication and the expected backup format;
         # importing to backup storage does not alter the live database.
         result=import_backup_file(path,row["filename"])
