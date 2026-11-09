@@ -20,7 +20,9 @@ def main() -> None:
         "snell",
         "socks5",
     }
-    assert native.SINGBOX_ACCOUNTING_PROTOCOLS == expected
+    # The new ShadowTLS collector is strictly bound to the separate
+    # authenticated SS2022 inner, not the legacy shared one.
+    assert native.SINGBOX_ACCOUNTING_PROTOCOLS == expected | {"shadowtls"}
     # Regression: indexed session lookup must retain the exact connection
     # ordering/counters and not conflate two identities behind one NAT.
     source = (ROOT / "app" / "services" / "singbox_native_accounting_v265.py").read_text(
