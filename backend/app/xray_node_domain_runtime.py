@@ -276,12 +276,30 @@ async def _ensure_modern_xray_with_dedicated_domain(
                 domain,
             )
 
-    return await _original_ensure_modern_xray(
+    state = await _original_ensure_modern_xray(
         conn,
         base_port,
         target,
         bootstrap_done=bootstrap_done,
     )
+    # The base installer returns early for an existing XHTTP listener. A node
+    # whose TLS certificate was issued later can therefore have TCP TLS yet
+    # still lack WebSocket TLS. Repair just that missing inbound through the
+    # live Xray API, preserving all existing users and other service ports.
+    if bool(state.get("tls_enabled")):
+        current = list(state.get("available_profiles") or [])
+        if xray_modern_runtime.PROFILE_WS not in current:
+            from .xray_tls_ws_hotadd_v1 import ensure_websocket_tls
+
+            await ensure_websocket_tls(
+                conn,
+                xray_modern_runtime._target_port(
+                    int(base_port), xray_modern_runtime.PROFILE_WS
+                ),
+            )
+            current.append(xray_modern_runtime.PROFILE_WS)
+            state["available_profiles"] = current
+    return state
 
 
 def _node_payload_with_xray_domain(
