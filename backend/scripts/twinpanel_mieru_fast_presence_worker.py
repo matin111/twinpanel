@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Independent Mieru presence-only accounting on authoritative node telemetry.
+"""Independent Mieru presence and per-user traffic accounting on native node telemetry.
 
 This subprocess isolates short Mieru probes from slow WireGuard/Sudoku sweeps.
-It does not modify Mieru node services, credentials, ports, byte counters,
+It does not modify Mieru node services, credentials, ports, source byte counters,
 or other protocols. The canonical _mark_presence handles admission and close.
 """
 from __future__ import annotations
@@ -25,6 +25,7 @@ from app.models import Node, NodeType
 from app.node_runtime_connection import connect_protocol_runtime
 from app.services.accounting_device_map_batch_v1 import install_accounting_device_batch_cache
 from app.services import modern_quota_runtime_v257 as canonical
+from app.services.quota_node_sync import build_node_devices as build_mieru_node_devices
 
 INTERVAL_SECONDS = 20.0
 LOCK_FILE = Path("/run/twinpanel-mieru-fast-presence-v1.lock")
@@ -46,10 +47,12 @@ async def reconcile_once() -> dict:
             try:
                 # Build canonical device/identity mapping; never derive identity
                 # from source IP or use the amount of traffic as presence.
-                devices = [
-                    item for item in canonical.build_node_devices(db, node_id)
-                    if str(item.get("protocol") or "").lower() == "mieru"
-                ]
+                # Do NOT invoke the worker-global cached all-protocol map:
+                # it decrypts ~20k credentials while Mieru needs only its
+                # own per-node identities. Exact canonical membership remains.
+                devices = build_mieru_node_devices(
+                    db, node_id, source_protocols={"mieru"},
+                )
                 db.commit()
                 if not devices:
                     continue
@@ -61,6 +64,14 @@ async def reconcile_once() -> dict:
                 ok, rows, error = await asyncio.wait_for(
                     canonical._collect_mieru(conn), timeout=12.0
                 )
+                # The authoritative per-user persisted Mieru byte counters
+                # live in this worker. V314 deliberately skips Mieru when
+                # TP_MIERU_INDEPENDENT_WORKER=1, so collecting only presence
+                # here silently disables central traffic billing.
+                metrics_ok, metrics, metrics_error = await asyncio.wait_for(
+                    canonical._collect_mieru_cumulative_metrics(conn),
+                    timeout=12.0,
+                )
                 # Ensure SSH connections are released BEFORE DB mutation.
                 conn.close()
                 try:
@@ -69,21 +80,38 @@ async def reconcile_once() -> dict:
                     pass
                 conn = None
                 db.commit()
-                if not ok:
-                    output.append({"node_id": node_id, "ok": False,
-                                   "error": str(error or "mieru_probe_failed")[:160]})
-                    continue
-                result = canonical._apply_mieru_presence(
-                    db, node=node, devices=devices, rows=rows,
-                )
-                db.commit()
+                presence = {}
+                if ok:
+                    presence = canonical._apply_mieru_presence(
+                        db, node=node, devices=devices, rows=rows,
+                    )
+                    db.commit()
+                # The billing ledger has its own transaction. A failed
+                # online probe cannot suppress valid authenticated byte
+                # counters; a failed byte probe never invents consumption.
+                usage = {}
+                if metrics_ok:
+                    usage = canonical._apply_mieru_cumulative_metrics(
+                        db, node=node, devices=devices, metrics=metrics,
+                    )
+                    db.commit()
                 output.append({
                     "node_id": node_id,
-                    "ok": True,
-                    "matched": result.get("matched"),
-                    "online": result.get("online"),
-                    "opened": result.get("opened"),
-                    "closed": result.get("closed"),
+                    "ok": bool(ok and metrics_ok),
+                    "presence_ok": bool(ok),
+                    "usage_ok": bool(metrics_ok),
+                    "error": str(
+                        error if not ok else metrics_error if not metrics_ok else ""
+                    )[:140] or None,
+                    "matched": presence.get("matched"),
+                    "online": presence.get("online"),
+                    "opened": presence.get("opened"),
+                    "closed": presence.get("closed"),
+                    "usage_matched": usage.get("matched", 0),
+                    "baselined": usage.get("baselined", 0),
+                    "usage_events": usage.get("usage_events", 0),
+                    "accepted_bytes": usage.get("accepted_bytes", 0),
+                    "rejected_counters": usage.get("rejected_counters", 0),
                 })
             except asyncio.CancelledError:
                 db.rollback()
