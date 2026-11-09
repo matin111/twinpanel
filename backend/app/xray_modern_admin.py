@@ -760,9 +760,12 @@ async def get_xray_inbound_editor(node_id: int, db: Session = Depends(get_db)):
     tcp_applied = applied_profiles.get("tcp_tls") or {}
     ws_applied = applied_profiles.get("ws_tls") or {}
     xhttp_applied = applied_profiles.get("xhttp_reality") or {}
+    from .xray_node_domain_runtime import _xray_tunnel_dns_diagnostic
+    dns_delivery = _xray_tunnel_dns_diagnostic(db, node)
     return {
         "node_id": int(node.id),
         "configured_xray_domain": default_domain,
+        "dns_delivery": dns_delivery,
         "active_tls_domain": live_tls_domain or None,
         "tls_domain_mismatch": bool(
             live_tls_domain and default_domain
