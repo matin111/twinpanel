@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.731",
-  "source_sha": "83dd79ec76d7604b9edb68ed13c120490d2c6036",
+  "version": "1.1.0-rc.732",
+  "source_sha": "6db5325832dd98c861f8ef8e61bf5dcf2dca15d6",
   "notes": {
-    "fa": "اصلاح دائمی ساخت سه Inbound موردنیاز Xray روی نودهای جدید: WebSocket TLS، XHTTP Reality و TCP TLS. دریافت دامنه اختصاصی Xray هنگام افزودن نود، بررسی صدور SSL پیش از نصب، ساخت ایمن Inbound WebSocket TLS گمشده از API زنده Xray بدون ری‌استارت و بدون تغییر UUID کاربران، تأیید دقیق سه پروفایل و پورت‌های واقعی پیش از نمایش نود به کاربران. نود فاقد گواهی معتبر مخفی می‌ماند و خطای مشخص دریافت می‌کند. عملکرد نودها و پروتکل‌های سالم تغییر نمی‌کند.",
-    "en": "Permanently require exactly WebSocket TLS, XHTTP Reality and TCP TLS on newly staged Exits. Collect and persist a dedicated Xray hostname on node creation, verify ACME certificate before provisioning, hot-add a missing WebSocket TLS listener through live Xray API without restarting or rotating users, and fail closed on mismatched live profiles, ports or TLS identity before publication. Existing nodes/protocols remain unaffected."
+    "fa": "حذف سه دکمه نامربوط پایین پنجره SOCKS5: دانلود Karing، کپی همه کانفیگ‌ها و کپی لینک مولتی‌لینک. فهرست سرورها، فیلتر کشور و دکمه نمایش اطلاعات بدون تغییر می‌مانند. این اصلاح فقط ظاهر SOCKS5 را تغییر می‌دهد و روی سایر پروتکل‌ها یا حجم و تاریخ اثری ندارد.",
+    "en": "Remove non-applicable Karing download, copy-all configs, and multi-link footer controls exclusively from the SOCKS5 connection modal. Preserve individual server details, country filters, all other protocols, accounting and expiry."
   }
 }
