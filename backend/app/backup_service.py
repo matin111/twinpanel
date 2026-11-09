@@ -818,8 +818,8 @@ def create_backup(
         "key_fingerprint":
             recovery_key_fingerprint(),
         "sha256":
-            hashlib.sha256(
-                target.read_bytes()
+            hashlib.file_digest(
+                target.open("rb"), "sha256"
             ).hexdigest(),
     }
 
@@ -1162,14 +1162,30 @@ def import_backup_file(
             )
         )
 
-    target.write_bytes(
-        source.read_bytes()
-    )
-
-    os.chmod(
-        target,
-        0o600,
-    )
+    # Avoid reading a 600MB+ encrypted archive into RAM a second time
+    # during import. The earlier inspect_backup() already authenticates it.
+    # Stream to a private, fsynced temporary file and rename atomically.
+    import shutil
+    import tempfile
+    with tempfile.NamedTemporaryFile(
+        mode="wb", prefix=".tpbak-import-",
+        suffix=".tmp", dir=BACKUP_ROOT, delete=False,
+    ) as out:
+        staged = Path(out.name)
+        os.chmod(staged, 0o600)
+        try:
+            with source.open("rb") as incoming:
+                shutil.copyfileobj(incoming, out, length=1024 * 1024)
+            out.flush()
+            os.fsync(out.fileno())
+        except BaseException:
+            staged.unlink(missing_ok=True)
+            raise
+    try:
+        staged.replace(target)
+    except BaseException:
+        staged.unlink(missing_ok=True)
+        raise
 
     meta = {
         "filename":
