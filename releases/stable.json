@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.731",
+  "version": "1.1.0-rc.732",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-09T01:26:42Z",
+  "released_at": "2026-11-09T01:46:20Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "83dd79ec76d7604b9edb68ed13c120490d2c6036",
+  "source_sha": "6db5325832dd98c861f8ef8e61bf5dcf2dca15d6",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.731/twinpanel-1.1.0-rc.731-linux-x86_64.tar.gz",
-    "sha256": "c2991f7bb43025ce5e1729363a566b5af6a56154b3d3a3f0c513e1af91700eb5",
-    "size_bytes": 30005465
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.732/twinpanel-1.1.0-rc.732-linux-x86_64.tar.gz",
+    "sha256": "4a0d375e8e0931b09dfc0c9443a25022f27ce9f43d752f55731495e8b45b024d",
+    "size_bytes": 30016947
   },
   "notes": {
-    "fa": "اصلاح دائمی ساخت سه Inbound موردنیاز Xray روی نودهای جدید: WebSocket TLS، XHTTP Reality و TCP TLS. دریافت دامنه اختصاصی Xray هنگام افزودن نود، بررسی صدور SSL پیش از نصب، ساخت ایمن Inbound WebSocket TLS گمشده از API زنده Xray بدون ری‌استارت و بدون تغییر UUID کاربران، تأیید دقیق سه پروفایل و پورت‌های واقعی پیش از نمایش نود به کاربران. نود فاقد گواهی معتبر مخفی می‌ماند و خطای مشخص دریافت می‌کند. عملکرد نودها و پروتکل‌های سالم تغییر نمی‌کند.",
-    "en": "Permanently require exactly WebSocket TLS, XHTTP Reality and TCP TLS on newly staged Exits. Collect and persist a dedicated Xray hostname on node creation, verify ACME certificate before provisioning, hot-add a missing WebSocket TLS listener through live Xray API without restarting or rotating users, and fail closed on mismatched live profiles, ports or TLS identity before publication. Existing nodes/protocols remain unaffected."
+    "fa": "حذف سه دکمه نامربوط پایین پنجره SOCKS5: دانلود Karing، کپی همه کانفیگ‌ها و کپی لینک مولتی‌لینک. فهرست سرورها، فیلتر کشور و دکمه نمایش اطلاعات بدون تغییر می‌مانند. این اصلاح فقط ظاهر SOCKS5 را تغییر می‌دهد و روی سایر پروتکل‌ها یا حجم و تاریخ اثری ندارد.",
+    "en": "Remove non-applicable Karing download, copy-all configs, and multi-link footer controls exclusively from the SOCKS5 connection modal. Preserve individual server details, country filters, all other protocols, accounting and expiry."
   }
 }
