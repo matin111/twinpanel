@@ -875,7 +875,7 @@ def _apply_mieru_cumulative_metrics(
     counters fail closed until a verified reset epoch is supplied.
     """
     now = _utcnow()
-    matched = baselined = usage_events = accepted_bytes = 0
+    matched = baselined = usage_events = accepted_bytes = rejected_counters = 0
     for device in devices:
         username = str(
             device.get("telemetry_identity") or device.get("identity") or ""
@@ -890,19 +890,30 @@ def _apply_mieru_cumulative_metrics(
             device_id=int(device["device_id"]),
             protocol="mieru",
         )
-        usage = _baseline_or_apply_cumulative(
-            db,
-            node_id=int(node.id),
-            device=device,
-            protocol="mieru",
-            source_key=f"mieru:user:{username}"[:220],
-            counter_epoch="mieru-persisted-metrics-v1",
-            uplink=counters[0],
-            downlink=counters[1],
-            session_key=(active[0].session_key if active else None),
-            client_ip=None,
-            reported_at=now,
-        )
+        try:
+            usage = _baseline_or_apply_cumulative(
+                db,
+                node_id=int(node.id),
+                device=device,
+                protocol="mieru",
+                source_key=f"mieru:user:{username}"[:220],
+                counter_epoch="mieru-persisted-metrics-v1",
+                uplink=counters[0],
+                downlink=counters[1],
+                session_key=(active[0].session_key if active else None),
+                client_ip=None,
+                reported_at=now,
+            )
+        except RuntimeError as exc:
+            # A metrics reset or reused username must never make us charge
+            # historical traffic again, nor starve every other Mieru user.
+            if str(exc) not in (
+                "counter_decreased_without_authoritative_new_epoch",
+                "runtime_counter_source_identity_conflict",
+            ):
+                raise
+            rejected_counters += 1
+            continue
         baselined += int(bool(usage["baselined"]))
         usage_events += int(bool(usage["event"]))
         accepted_bytes += int(usage["accepted_bytes"])
@@ -914,6 +925,7 @@ def _apply_mieru_cumulative_metrics(
         "usage_events": usage_events,
         "accepted_bytes": accepted_bytes,
         "usage_supported": True,
+        "rejected_counters": rejected_counters,
     }
 
 
