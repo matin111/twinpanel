@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.759",
+  "version": "1.1.0-rc.760",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-09T22:39:15Z",
+  "released_at": "2026-11-09T22:42:44Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "f3f75f82521862abd9c0f1faee9465630249cc69",
+  "source_sha": "031a7dca7b37b357294dc70311da9cfabd4b986d",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.759/twinpanel-1.1.0-rc.759-linux-x86_64.tar.gz",
-    "sha256": "f1a4e697322cdd332c10981be6688036ba990e3a6e54f567c7dc203ea8297d4d",
-    "size_bytes": 30212463
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.760/twinpanel-1.1.0-rc.760-linux-x86_64.tar.gz",
+    "sha256": "13f4278201c862abdf7cfe598493f7e774329cde1644e4fd28109576375974da",
+    "size_bytes": 30213997
   },
   "notes": {
-    "fa": "اصلاح سراسری بازماندن تراکنش PostgreSQL هنگام نصب نود تازه: آزادسازی تراکنش خواندنی پیش از SSH و apt و جلوگیری از refresh غیرضروری بعد از ثبت نود. تفکیک اتصال‌های HTTP و Worker در PostgreSQL برای شناسایی دقیق علت قفل‌ها و اضافه‌شدن گزارش فقط‌خواندنی و بدون اطلاعات محرمانه. حفظ ساخت مرکزی نودها، سه Inbound ویتوری، اکانت‌ها، ریست حجم/تاریخ، ربات‌ها، پرداخت‌ها و بکاپ. علت تمام قفل‌های Worker هنوز نیازمند تشخیص با داده‌های نسخه جدید است.",
-    "en": "Prevent long read-only PostgreSQL transactions from spanning SSH/apt during central new Exit bootstrap; use flush/commit for new Node ID without reopening a read transaction. Attribute HTTP versus worker PostgreSQL connections and add a read-only, redacted lock/blocker audit. Preserve central provisioning, three-profile Xray gates, billing, quota/date reset, bot and backup behavior. Additional worker lock root causes need post-release evidence."
+    "fa": "بکاپ تلگرام با یک فایل ZIP قابل بازیابی: فرمت اصلی بکاپ بدون تغییر داخل ZIP بسته‌بندی می‌شود، فایل‌های زیر سقف ۵۰ مگابایتی API تلگرام یکجا ارسال می‌شوند، حجم و SHA256 فایل ZIP و بکاپ داخلی کنترل می‌شوند و اگر تنها پیام تأیید ناموفق بود آپلود تکرار نمی‌شود. پشتیبانی API محلی نیز ZIP می‌فرستد. برای فایل‌های بزرگ‌تر از سقف تلگرام مسیر امن چندقسمتی حفظ شده است؛ نصب و مدیریت پروتکل‌ها دست‌نخورده است.",
+    "en": "Send portable backups to Telegram as one directly restorable ZIP when below the 50 MB cloud API limit; validate returned document size, provide ZIP and inner archive SHA256 checksums, resume receipt without reuploading, support local Telegram Bot API with ZIP too. Larger backups retain multipart fallback; original archive and runtime/protocol settings remain unchanged."
   }
 }
