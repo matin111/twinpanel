@@ -25,6 +25,7 @@ def canary():
     secret_a = secrets.token_urlsafe(32)
     secret_b = secrets.token_urlsafe(32)
     key = base64.b64encode(secrets.token_bytes(16)).decode("ascii")
+    private_seed = base64.b64encode(secrets.token_bytes(32)).decode("ascii")
     legacy = {
         "log": {"level": "info"},
         "inbounds": [
@@ -45,23 +46,23 @@ def canary():
         "outbounds": [{"type": "direct", "tag": "direct"}],
     }
     original = copy.deepcopy(legacy)
-    modern = stage_parallel_identity_inbounds(legacy, listen_port=30448, server_key=key)
+    modern = stage_parallel_identity_inbounds(legacy, listen_port=30448, server_key=key, derivation_secret=private_seed)
     assert legacy == original
     assert modern["inbounds"][:2] == original["inbounds"]
     modern_inner = next(x for x in modern["inbounds"] if x["tag"] == NEW_INNER_TAG)
     assert modern_inner["method"] == INNER_METHOD
     assert [x["name"] for x in modern_inner["users"]] == ["tp-sub-17", "tp-sub-18"]
     assert modern_inner["users"][0]["password"] != modern_inner["users"][1]["password"]
-    assert modern_inner["users"][0]["password"] == user_inner_key("tp-sub-17", secret_a)
-    for kwargs in ({"listen_port":18448,"server_key":key},
-                   {"listen_port":30448,"server_key":"invalid"}):
+    assert modern_inner["users"][0]["password"] == user_inner_key("tp-sub-17", secret_a, private_seed)
+    for kwargs in ({"listen_port":18448,"server_key":key,"derivation_secret":private_seed},
+                   {"listen_port":30448,"server_key":"invalid","derivation_secret":private_seed}):
         try:
             stage_parallel_identity_inbounds(legacy, **kwargs)
             raise AssertionError("unsafe stage was accepted")
         except ValueError:
             pass
     try:
-        stage_parallel_identity_inbounds(modern, listen_port=30448, server_key=key)
+        stage_parallel_identity_inbounds(modern, listen_port=30448, server_key=key, derivation_secret=private_seed)
         raise AssertionError("duplicate modern inbound accepted")
     except ValueError:
         pass
@@ -83,10 +84,10 @@ def canary():
                 "tls":{"enabled":True,"server_name":"www.microsoft.com"},
             }
             outs = identity_client_outbounds(
-                transport, username=username, outer_password=password,
+                transport, username=username, user_key=user_inner_key(username,password,private_seed),
                 listen_port=30448,server_key=key,
             )
-            assert outs[0]["password"] == key+":"+user_inner_key(username,password)
+            assert outs[0]["password"] == key+":"+user_inner_key(username,password,private_seed)
             clients.append({
                 "log":{"level":"warn"},
                 "inbounds":[{"type":"socks","tag":"local","listen":"127.0.0.1","listen_port":port}],
