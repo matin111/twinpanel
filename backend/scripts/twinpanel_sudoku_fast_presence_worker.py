@@ -24,6 +24,10 @@ from app.models import Node, NodeType
 from app.node_runtime_connection import connect_protocol_runtime
 from app.services import modern_quota_runtime_v257 as canonical
 from app.services.accounting_device_map_batch_v1 import install_accounting_device_batch_cache
+from app.services.central_runtime_ownership_v1 import is_central_node
+from app.services.sudoku_shared_native_presence_v1 import (
+    collect_shared_native_users, apply_shared_native_presence,
+)
 
 LOCK_FILE = Path("/run/twinpanel-sudoku-fast-presence-v1.lock")
 INTERVAL_SECONDS = 20.0
@@ -50,14 +54,22 @@ async def reconcile_once() -> dict:
                 db.commit()
                 if not devices:
                     continue
+                # Registered published central Exits have ONE shared port for
+                # every account. No per-user presence may be inferred from it.
+                central_shared = is_central_node(db, node_id)
                 node = db.get(Node, node_id)
                 conn = await asyncio.wait_for(
                     connect_protocol_runtime(node, db), timeout=12,
                 )
                 db.commit()
-                ok, ports, error = await asyncio.wait_for(
-                    canonical._collect_established_tcp_ports(conn), timeout=10,
-                )
+                if central_shared:
+                    ok, native, error = await asyncio.wait_for(
+                        collect_shared_native_users(conn), timeout=14,
+                    )
+                else:
+                    ok, ports, error = await asyncio.wait_for(
+                        canonical._collect_established_tcp_ports(conn), timeout=10,
+                    )
                 conn.close()
                 try:
                     await asyncio.wait_for(conn.wait_closed(), timeout=3)
@@ -69,11 +81,17 @@ async def reconcile_once() -> dict:
                     results.append({"node_id": node_id, "ok": False,
                                     "error": str(error or "sudoku_probe_failed")[:160]})
                     continue
-                # Reuse canonical per-port identity and session admission rules.
-                # No IP-based subscription inference or guessed traffic bytes.
-                stats = canonical._apply_sudoku_presence(
-                    db, node=node, devices=devices, established_ports=ports,
-                )
+                # The native controller is the ONLY per-user source for
+                # centrally owned Sudoku. Legacy Exits retain their old
+                # dedicated-port checks until their verified retirement.
+                if central_shared:
+                    stats = apply_shared_native_presence(
+                        db, node=node, devices=devices, snapshot=native,
+                    )
+                else:
+                    stats = canonical._apply_sudoku_presence(
+                        db, node=node, devices=devices, established_ports=ports,
+                    )
                 db.commit()
                 results.append({"node_id": node_id, "ok": True,
                                 "online": stats["online"],
