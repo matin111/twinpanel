@@ -5664,6 +5664,7 @@ def extend_subscription_v17(subscription_id:int,payload:dict=Body(...),db:Sessio
         sub.traffic_limit_bytes=int(sub.traffic_limit_bytes or 0)+int(add_traffic_gb*1024**3)
     if add_days > 0:
         from ..subscription_override_models import SubscriptionRuntimeOverride
+        from ..models import Plan
         from ..services.subscription_validity_v1 import add_validity_days
         override = db.get(SubscriptionRuntimeOverride, int(sub.id))
         plan = db.get(Plan, sub.plan_id) if sub.plan_id else None
