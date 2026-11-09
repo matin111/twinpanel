@@ -84,10 +84,15 @@ def load_backup_telegram_bot_token() -> str:
 
 
 def _get_me(token: str) -> dict:
+    # When backup bot operates on a local Bot API server, its cloud session
+    # has been logged out and getMe must use the local endpoint too.
+    from .backup_telegram_single_file_v1 import local_api_url
+    base = local_api_url() or "https://api.telegram.org"
     try:
         response = httpx.get(
-            f"https://api.telegram.org/bot{token}/getMe",
+            f"{base}/bot{token}/getMe",
             timeout=httpx.Timeout(10.0, connect=4.0),
+            trust_env=base.startswith("https://"),
         )
     except httpx.RequestError as exc:
         raise RuntimeError("ارتباط با Telegram برای بررسی ربات بکاپ برقرار نشد") from exc
