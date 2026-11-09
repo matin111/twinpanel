@@ -13,7 +13,7 @@ from ..subscription_override_models import SubscriptionRuntimeOverride
 from ..plan_template_selection import plan_template_node_ids
 from ..protocol_account_registry import ALL_PROTOCOL_KEYS, normalize_protocols, plan_protocols
 from ..subscription_enforcement import queue_subscription_enforcement
-from ..services.subscription_cycle_reset_v1 import reset_subscription_period_usage
+from ..services.subscription_cycle_reset_v1 import reset_subscription_period_usage, restore_after_period_change
 from .subscription_protocol_lifecycle_v2 import _resolve_traffic_limit_bytes
 from .subscription_protocol_lifecycle_v3 import (
     _current_exit_node_ids,
@@ -228,6 +228,10 @@ async def admin_edit_subscription_fast_v1(
     normalized_payload["protocols"] = list(protocols)
 
     reset_usage = payload.get("reset_usage") is True
+    was_exhausted = bool(
+        int(sub.traffic_limit_bytes or 0) > 0
+        and int(sub.traffic_used_bytes or 0) >= int(sub.traffic_limit_bytes or 0)
+    )
 
     def persist_account_limits():
         if reset_usage:
@@ -259,6 +263,8 @@ async def admin_edit_subscription_fast_v1(
         )
     if username_changed or password_changed:
         persist_account_limits()
+        if reset_usage:
+            restore_after_period_change(db, sub, was_exhausted=was_exhausted)
         db.commit()
         background_tasks.add_task(
             _legacy_edit_background,
@@ -291,6 +297,8 @@ async def admin_edit_subscription_fast_v1(
         sub.plan_id = int(plan.id) if plan else None
         persist_account_limits()
         sub.traffic_limit_bytes = _resolve_traffic_limit_bytes(sub, payload)
+        if reset_usage:
+            restore_after_period_change(db, sub, was_exhausted=was_exhausted)
         sub.iran_node_id = None
         sub.exit_node_id = int(desired_node_ids[0])
 
