@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from math import ceil
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -10,7 +11,7 @@ from ..models import (
     SubscriptionProtocol, SubscriptionStatus, ProtocolCredential, User,
 )
 from ..schemas import MySubscriptionOut, SubscriptionCreate, SubscriptionOut
-from ..subscription_override_models import effective_device_limit
+from ..subscription_override_models import effective_device_limit, duration_is_unlimited
 
 from ..services.subscription_factory import create_subscription_core
 
@@ -205,7 +206,7 @@ def my_subscriptions(user: User = Depends(get_current_user), db: Session = Depen
         if sub.expires_at:
             days_remaining = max(
                 0,
-                (sub.expires_at - now).days,
+                ceil((sub.expires_at - now).total_seconds() / 86400),
             )
         elif sub.starts_at is None:
             days_remaining = max(
@@ -258,6 +259,7 @@ def my_subscriptions(user: User = Depends(get_current_user), db: Session = Depen
             traffic_limit_gb=round(limit_gb, 2), traffic_used_gb=round(used_gb, 2),
             traffic_remaining_gb=round(remaining_gb, 2), days_remaining=days_remaining,
             device_limit=effective_device_limit(db, sub, plan),
+            duration_unlimited=duration_is_unlimited(db, sub, plan),
         ))
     return result
 
