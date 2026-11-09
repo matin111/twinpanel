@@ -134,7 +134,7 @@ _LIVE_SCRIPT = r"""
   }
   function validityLabel(payload){
     const configured=Math.max(0,Math.trunc(Number(payload.activation_duration_days||0)));
-    const unlimited=payload.duration_unlimited===true;
+    const unlimited=payload.duration_unlimited===true||(!payload.expires_at&&configured<=0);
     const expiry=payload.expires_at?new Date(payload.expires_at):null;
     const validExpiry=expiry&&!Number.isNaN(expiry.getTime());
     if(validExpiry){
@@ -146,7 +146,7 @@ _LIVE_SCRIPT = r"""
     if(unlimited)return 'مدت نامحدود';
     if(configured>0&&!payload.starts_at)return nf.format(configured)+' روز · شروع با اولین اتصال';
     if(configured>0)return nf.format(configured)+' روز · تاریخ انقضا نامشخص';
-    return 'مدت تعیین نشده';
+    return 'مدت نامحدود';
   }
   function flash(el){
     if(!el)return;
@@ -207,14 +207,17 @@ _LIVE_SCRIPT = r"""
     write(remaining,quota(payload.remaining_bytes,payload.unlimited));
     write(total,quota(payload.total_bytes,payload.unlimited));
     write(start,date(payload.starts_at));
-    write(expire,payload.duration_unlimited===true&&!payload.expires_at?'نامحدود':date(payload.expires_at));
+    write(expire,payload.expires_at?date(payload.expires_at):(payload.duration_unlimited===true||Number(payload.activation_duration_days||0)<=0?'نامحدود':'پس از اولین اتصال'));
     write(expiryDays,validityLabel(payload));
     write(percent,payload.unlimited?'∞':nf.format(pct)+'%');
     const cap=Number(payload.device_limit||0),activeSessions=Math.max(0,Number(payload.active_sessions||0));
     write(deviceLimit,cap===0?'نامحدود':nf.format(cap)+' دستگاه');
     write(deviceActive,nf.format(activeSessions));
     write(deviceCombined,nf.format(activeSessions)+' / '+(cap===0?'∞':nf.format(cap)));
-    write(durationMetric,payload.expires_at&&Number(payload.activation_duration_days||0)>0?nf.format(Math.trunc(Number(payload.activation_duration_days)))+' روز':payload.duration_unlimited===true&&!payload.expires_at?'نامحدود':Number(payload.activation_duration_days||0)>0?nf.format(Math.trunc(Number(payload.activation_duration_days)))+' روز':'تعیین نشده');
+    const configuredDays=Math.max(0,Math.trunc(Number(payload.activation_duration_days||0)));
+    const expiryTime=payload.expires_at?new Date(payload.expires_at).getTime():NaN;
+    const remainingDays=Number.isFinite(expiryTime)?Math.max(0,Math.ceil((expiryTime-Date.now())/86400000)):0;
+    write(durationMetric,Number.isFinite(expiryTime)?nf.format(configuredDays||remainingDays)+' روز':(payload.duration_unlimited===true||configuredDays<=0?'نامحدود':nf.format(configuredDays)+' روز'));
     if(donut)donut.style.setProperty('--pct',String(pct));
 
     const connected=payload.connection_online===true||Number(payload.active_sessions||0)>0;
@@ -406,12 +409,12 @@ def public_connection_hub_live_v5(
         # unlimited override. Never label a finite account as unlimited.
         duration_label = (
             str(valid_days) + ' روز'
-            if valid_days and live.get("expires_at")
+            if live.get("expires_at") and valid_days
+            else 'تا انقضا'
+            if live.get("expires_at")
             else 'نامحدود'
-            if live.get("duration_unlimited") is True and not live.get("expires_at")
+            if live.get("duration_unlimited") is True or valid_days <= 0
             else str(valid_days) + ' روز'
-            if valid_days
-            else 'تعیین نشده'
         )
         source = source.replace(
             '<strong id="liveDurationMetric">—</strong>',
@@ -431,12 +434,12 @@ def public_connection_hub_live_v5(
                 (expiry_dt - datetime.now(timezone.utc)).total_seconds() / 86400
             ))
             remaining_label = str(left) + " روز باقی‌مانده"
-        elif live.get("duration_unlimited") is True:
+        elif live.get("duration_unlimited") is True or valid_days <= 0:
             remaining_label = "مدت نامحدود"
-        elif valid_days and not live.get("starts_at"):
+        elif not live.get("starts_at"):
             remaining_label = str(valid_days) + " روز · شروع با اولین اتصال"
         else:
-            remaining_label = "مدت تعیین نشده"
+            remaining_label = str(valid_days) + " روز اعتبار"
         source = re.sub(
             r'(<span id="liveExpiryDays"[^>]*>)[^<]*(</span>)',
             lambda match: match.group(1) + remaining_label + match.group(2),

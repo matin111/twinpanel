@@ -108,8 +108,8 @@ function CustomerDashboardInner(){
 
           <div className="customer-dash-v27-metrics">
             <div><small>{pick("حجم باقی‌مانده","Remaining traffic")}</small><b>{active.traffic_remaining_gb.toLocaleString("fa-IR")} GB</b></div>
-            <div><small>{pick("روز باقی‌مانده","Days remaining")}</small><b>{active.days_remaining.toLocaleString("fa-IR")}</b></div>
-            <div><small>{pick("تاریخ انقضا","Expiry date")}</small><b>{dateText(active.expires_at)}</b></div>
+            <div><small>{pick("روز باقی‌مانده","Days remaining")}</small><b>{active.duration_unlimited===true||(!active.expires_at&&Number(active.activation_duration_days||0)<=0)?pick("نامحدود","Unlimited"):active.days_remaining.toLocaleString("fa-IR")}</b></div>
+            <div><small>{pick("تاریخ انقضا","Expiry date")}</small><b>{active.expires_at?dateText(active.expires_at):active.duration_unlimited===true||Number(active.activation_duration_days||0)<=0?pick("نامحدود","Unlimited"):pick("پس از اولین اتصال","After first connection")}</b></div>
             <div><small>{pick("تعداد دستگاه","Device limit")}</small><b>{active.device_limit.toLocaleString("fa-IR")}</b></div>
           </div>
 

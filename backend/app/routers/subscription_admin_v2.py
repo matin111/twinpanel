@@ -28,6 +28,7 @@ from ..subscription_override_models import (
     SubscriptionRuntimeOverride,
     effective_device_limit,
     get_subscription_override,
+    unlimited_without_expiry,
 )
 from ..subscription_plan_schema import ensure_subscription_plan_schema
 from .account_delivery import public_router as account_delivery_public_router, _share_url
@@ -94,9 +95,7 @@ def _enriched_payload(db: Session, sub: Subscription) -> dict:
                 or 0
             ),
             "traffic_unlimited": int(sub.traffic_limit_bytes or 0) <= 0,
-            "duration_unlimited": bool(
-                override and override.duration_unlimited
-            ),
+            "duration_unlimited": unlimited_without_expiry(sub, plan, override),
             "device_limit": effective_device_limit(db, sub, plan),
             "device_limit_source": (
                 "subscription"
@@ -253,7 +252,7 @@ def _enriched_payload_from_context(sub: Subscription, context: dict) -> dict:
                 or 0
             ),
             "traffic_unlimited": int(sub.traffic_limit_bytes or 0) <= 0,
-            "duration_unlimited": bool(override and override.duration_unlimited),
+            "duration_unlimited": unlimited_without_expiry(sub, plan, override),
             "device_limit": device_limit,
             "device_limit_source": (
                 "subscription"
@@ -533,16 +532,6 @@ async def admin_create_v2(
         else 1
     )
 
-    if duration_days <= 0:
-        raise HTTPException(
-            status_code=422,
-            detail=(
-                "مدت اشتراک دستی باید بیشتر از صفر باشد"
-                if manual
-                else "مدت پلن یا اشتراک باید بیشتر از صفر باشد"
-            ),
-        )
-
     sub = create_subscription_core(
         db=db,
         user_id=payload.user_id,
@@ -561,7 +550,7 @@ async def admin_create_v2(
         SubscriptionRuntimeOverride(
             subscription_id=sub.id,
             device_limit=max(0, device_limit),
-            duration_unlimited=False,
+            duration_unlimited=(duration_days == 0),
         )
     )
     db.flush()

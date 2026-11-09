@@ -275,14 +275,39 @@ async def admin_edit_subscription_fast_v1(
                 override = SubscriptionRuntimeOverride(subscription_id=int(sub.id))
                 db.add(override)
             override.device_limit = new_device_limit
-        if new_duration_days is not None:
-            sub.activation_duration_days = new_duration_days
-            if sub.starts_at is not None and not expiry_sent and new_duration_days:
-                sub.expires_at = sub.starts_at + timedelta(days=new_duration_days)
-        if expiry_sent:
-            sub.expires_at = new_expires_at
-            if new_expires_at and sub.starts_at is None:
-                sub.activation_duration_days = max(1, (new_expires_at - datetime.utcnow()).days + 1)
+        if new_duration_days is not None or expiry_sent:
+            override = db.get(SubscriptionRuntimeOverride, int(sub.id))
+            if override is None:
+                override = SubscriptionRuntimeOverride(subscription_id=int(sub.id))
+                db.add(override)
+            if new_duration_days is not None:
+                if new_duration_days == 0 and not (expiry_sent and new_expires_at):
+                    # Zero or a cleared duration means unlimited: no expiry.
+                    sub.activation_duration_days = 0
+                    sub.expires_at = None
+                    override.duration_unlimited = True
+                elif new_duration_days > 0:
+                    from ..subscription_override_models import unlimited_without_expiry
+                    was_indefinite = unlimited_without_expiry(sub, plan, override)
+                    if was_indefinite and not expiry_sent:
+                        now = datetime.utcnow()
+                        sub.starts_at = now
+                        sub.expires_at = now + timedelta(days=new_duration_days)
+                    elif sub.starts_at is not None and not expiry_sent:
+                        sub.expires_at = sub.starts_at + timedelta(days=new_duration_days)
+                    sub.activation_duration_days = new_duration_days
+                    override.duration_unlimited = False
+            if expiry_sent:
+                sub.expires_at = new_expires_at
+                if new_expires_at is not None:
+                    override.duration_unlimited = False
+                    if sub.starts_at is None:
+                        sub.activation_duration_days = max(1, (new_expires_at - datetime.utcnow()).days + 1)
+                elif new_duration_days is None or new_duration_days == 0:
+                    # Clearing a date without assigning a finite term
+                    # explicitly switches this account to unlimited.
+                    sub.activation_duration_days = 0
+                    override.duration_unlimited = True
 
 
     # Credential rotations need the historical shared-login synchronization.
@@ -294,7 +319,7 @@ async def admin_edit_subscription_fast_v1(
         )
     if username_changed or password_changed:
         persist_account_limits()
-        if reset_usage:
+        if reset_usage or new_duration_days is not None or expiry_sent:
             restore_after_period_change(db, sub, was_exhausted=was_exhausted)
         _commit_admin_edit(db)
         background_tasks.add_task(
@@ -328,7 +353,7 @@ async def admin_edit_subscription_fast_v1(
         sub.plan_id = int(plan.id) if plan else None
         persist_account_limits()
         sub.traffic_limit_bytes = _resolve_traffic_limit_bytes(sub, payload)
-        if reset_usage:
+        if reset_usage or new_duration_days is not None or expiry_sent:
             restore_after_period_change(db, sub, was_exhausted=was_exhausted)
         sub.iran_node_id = None
         sub.exit_node_id = int(desired_node_ids[0])

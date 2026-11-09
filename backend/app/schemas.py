@@ -237,6 +237,7 @@ class MySubscriptionOut(SubscriptionOut):
     traffic_used_gb: float = 0
     traffic_remaining_gb: float = 0
     days_remaining: int = 0
+    duration_unlimited: bool = False
     device_limit: int = 0
 
     # TWINPANEL_MY_SUB_FIRST_USE_UI_V1

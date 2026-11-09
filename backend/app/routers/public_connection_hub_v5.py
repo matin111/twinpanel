@@ -365,7 +365,12 @@ def _expiry_with_days(db: Session, sub, now: datetime | None = None) -> tuple[st
     if duration > 0 and getattr(sub, "starts_at", None) is None:
         return "پس از اولین اتصال", f"{duration} روز اعتبار"
 
-    return "تعیین نشده", "مدت اعتبار ثبت نشده"
+    # A positive term without an expiry is waiting for the first accepted
+    # connection, or is a legacy account whose start timestamp is incomplete.
+    # Neither case should be mislabeled as "undefined".
+    if duration > 0:
+        return "پس از اولین اتصال", f"{duration} روز اعتبار"
+    return "نامحدود", "مدت اشتراک نامحدود"
 
 
 @router.get("/{token}", response_class=HTMLResponse)
