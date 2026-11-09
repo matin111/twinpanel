@@ -34,7 +34,7 @@ def install(router, request_fn):
         await state.set_state(ImportLinkState.link)
         await callback.answer()
         if callback.message:
-            await callback.message.edit_text(
+            await show_navigation_page(callback.message,
                 "➕ <b>افزودن اکانت</b>\n\n"
                 "ساب‌لینک اصلی اکانت خود را ارسال کنید.\n"
                 "فقط لینک HTTPS همین پنل پذیرفته می‌شود.\n\n"
