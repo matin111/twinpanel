@@ -532,16 +532,6 @@ async def admin_create_v2(
         else 1
     )
 
-    if duration_days <= 0:
-        raise HTTPException(
-            status_code=422,
-            detail=(
-                "مدت اشتراک دستی باید بیشتر از صفر باشد"
-                if manual
-                else "مدت پلن یا اشتراک باید بیشتر از صفر باشد"
-            ),
-        )
-
     sub = create_subscription_core(
         db=db,
         user_id=payload.user_id,
@@ -560,7 +550,7 @@ async def admin_create_v2(
         SubscriptionRuntimeOverride(
             subscription_id=sub.id,
             device_limit=max(0, device_limit),
-            duration_unlimited=False,
+            duration_unlimited=(duration_days == 0),
         )
     )
     db.flush()
