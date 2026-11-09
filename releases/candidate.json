@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.733",
-  "source_sha": "b3d3a154f62eb885053ebc4759f70a718d9e7262",
+  "version": "1.1.0-rc.734",
+  "source_sha": "c348e2f055461b328f50855975afe9694699c585",
   "notes": {
-    "fa": "اعمال محدودیت نشست مشترک بین پروتکل‌ها روی اتصال واقعی sing-box؛ در اشتراک تک‌اتصالی، اگر پروتکل دیگری یک نشست تأییدشده فعال دارد، اتصال جدید غیرمجاز بعد از تطبیق دوباره هویت در API نود به‌صورت انتخابی قطع می‌شود. بدون ری‌استارت نود، قطع جمعی، تغییر رمز، کانفیگ، تاریخ یا حجم. محافظت در برابر نشست‌های قدیمی، نامحدودها و اتصال‌های فاقد هویت معتبر.",
-    "en": "Enforce canonical cross-protocol concurrent-session limits on the sing-box dataplane with authenticated selective per-connection CloseConnection RPC, fresh node snapshot and quota revalidation, no broad restarts, bulk disconnects, credentials, expiry or quota changes. Does not claim physical-device fingerprinting or handshake-time enforcement for protocols outside sing-box."
+    "fa": "افزودن بازیابی بکاپ چندقسمتی تلگرام: آپلود مستقل هر فایل partNNNofNNN، نمایش شماره‌های دریافت‌شده، ترکیب و تأیید SHA256 و کلید رمزگذاری پیش از ورود به فهرست بکاپ، حذف امن آپلود ناقص، بدون Restore خودکار یا تغییر داده‌های کاربران. کاهش مصرف RAM هنگام وارد کردن فایل بکاپ با انتقال جریانی.",
+    "en": "Add authenticated independent Telegram backup-part uploads, complete-set gating, SHA256 and encrypted archive validation, safe cancellation and streamed archive import to reduce memory. No automatic restore or user data mutation."
   }
 }
