@@ -29,6 +29,7 @@ jobs:
       - name: Run shared-v2 and legacy-v251 tunnel regression
         working-directory: backend
         env:
+          PYTHONPATH: .
           APP_NAME: TwinPanel-CI
           APP_ENV: test
           APP_SECRET_KEY: ci-only-secret-key-ci-only-secret-key-ci-only-secret-key
