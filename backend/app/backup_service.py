@@ -111,6 +111,29 @@ BACKUP_TABLES = [
     # Support content editable by admin
     "support_tickets",
     "support_messages",
+
+    # Persistent extensions required for a full migration / restore.
+    "dns_emergency_iran_settings",
+    "dns_emergency_settings",
+    "download_assets",
+    "main_trial_settings",
+    "masterdnsvpn_settings",
+    "migration_import_records",
+    "modern_protocol_settings",
+    "plan_category_assignments",
+    "plan_nodes",
+    "plan_protocols",
+    "plan_trial_settings",
+    "reseller_bot_plans",
+    "reseller_pool_suspensions",
+    "reseller_trial_settings",
+    "storefront_settings",
+    "subscription_delivery_policy_state",
+    "subscription_node_delivery_modes",
+    "subscription_runtime_overrides",
+    "telegram_imported_accounts",
+    "tunnel_transports",
+    "vpnshop_runtime_settings",
 ]
 
 
@@ -126,6 +149,19 @@ EXCLUDED_RUNTIME_TABLES = [
     "reseller_notifications",
     "reseller_expiry_telegram_deliveries",
     "payment_sms_reader_pair_codes",
+    # Disposable runtime queues / audit / telemetry and dedupe claims.
+    "cleanup_jobs",
+    "fast_provision_jobs_v1",
+    "main_trial_claims",
+    "node_backfill_jobs_v1",
+    "node_install_progress_v1",
+    "node_protocol_applied_endpoints_v1",
+    "node_telemetry",
+    "quota_audit_logs",
+    "reseller_trial_claims",
+    "subscription_expiry_notification_claims",
+    "trial_claims",
+    "twinpanel_selected_tunnel_jobs_v1",
 ]
 
 
@@ -830,7 +866,28 @@ def create_backup(
                 meta,
             )
 
+    # Keep encrypted bytes only until Telegram verifies every part AND
+    # the final checksum message. Failed or incomplete transfers are retained
+    # for a safe retry; the recovery key is never uploaded.
+    if send_telegram and meta.get("telegram_sent"):
+        _remove_uploaded_archive(target)
+        meta = _read_meta(target)
+
     return meta
+
+
+def _remove_uploaded_archive(path: Path) -> bool:
+    meta = _read_meta(path)
+    if not meta.get("telegram_sent") or not meta.get("telegram_parts_total"):
+        return False
+    expected = set(range(1, int(meta["telegram_parts_total"]) + 1))
+    if not expected.issubset(set(meta.get("telegram_parts_sent") or [])):
+        return False
+    path.unlink(missing_ok=True)
+    meta["archive_on_server"] = False
+    meta["telegram_only"] = True
+    _write_meta(path, meta)
+    return True
 
 
 def list_backups() -> list[
@@ -840,6 +897,24 @@ def list_backups() -> list[
     ensure_backup_environment()
 
     result = []
+
+    # Show successful Telegram-only backups even after encrypted local
+    # archives are removed. Metadata contains no private backup content.
+    archived_names: set[str] = set()
+    for meta_file in BACKUP_ROOT.glob("*.tpbak.meta.json"):
+        try:
+            meta = json.loads(meta_file.read_text())
+            name = str(meta.get("filename") or "")
+            if not name.endswith(".tpbak"):
+                continue
+            local = BACKUP_ROOT / name
+            if not local.is_file() and meta.get("telegram_sent"):
+                meta["archive_on_server"] = False
+                meta["telegram_only"] = True
+                result.append(meta)
+                archived_names.add(name)
+        except Exception:
+            continue
 
     for path in sorted(
         BACKUP_ROOT.glob(
@@ -870,6 +945,7 @@ def list_backups() -> list[
                     False,
             }
 
+        meta["archive_on_server"] = True
         result.append(
             meta
         )
@@ -1761,6 +1837,16 @@ def restore_backup(
             "داخل بکاپ وجود ندارد"
         )
 
+    # Fail closed BEFORE any TRUNCATE. Older incomplete archives must not
+    # erase persistent tables introduced by a newer panel release.
+    required = set(_current_tables())
+    missing = required - set(payload["tables"])
+    if missing:
+        raise RuntimeError(
+            "BACKUP_INCOMPLETE_FOR_CURRENT_SCHEMA: " +
+            ",".join(sorted(missing))
+        )
+
     # TWINPANEL_RESTORE_ISOLATED_DB_V1
     # Restore must never consume or block the
     # normal API QueuePool.
@@ -2152,6 +2238,7 @@ def run_auto_backup_if_due() -> dict[
                     if not meta.get("telegram_sent"):
                         try:
                             result = send_backup_to_telegram(path, chat_id)
+                            _remove_uploaded_archive(path)
                             return {"ok": True, "ran": False,
                                     "reason": "telegram_delivery_recovered",
                                     "telegram": result}
