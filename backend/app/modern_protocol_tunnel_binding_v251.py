@@ -19,6 +19,7 @@ from .models import (
 from .protocol_catalog import PROTOCOL_CATALOG
 from .routers import account_delivery, tunnels
 from .standalone_subscription_accounts import _sudoku_port
+from .services.central_runtime_ownership_v1 import is_central_node
 
 
 # TWINPANEL_MODERN_PROTOCOL_TUNNEL_BINDING_V251
@@ -35,12 +36,11 @@ from .standalone_subscription_accounts import _sudoku_port
 #   modern fixed ports   : 28000..38999 (30000 block intentionally unused)
 #   Sudoku dynamic ports : 40000..49999
 #
-# Sudoku is different: each subscription owns a distinct listener on the Exit,
-# so it cannot share one fixed target port. A deterministic collision-resolving
-# allocator maps the currently desired (Exit, Subscription) pairs into the
-# reserved Iran public-port pool. No credential secret is required to build the
-# route because the Exit listener port is already deterministic from the
-# subscription id.
+# Legacy Sudoku still uses individual per-subscription listeners and hashed
+# public tunnel ports. Centrally owned Exits use ONE authenticated shared
+# listener on port 18553 with one stable public tunnel port per Exit. Never
+# rewrite a shared client key to a legacy per-user target: that produces
+# unusable configs and thousands of unnecessary ingress rules.
 
 FIXED_PUBLIC_PORT_BASE: dict[str, int] = {
     "hysteria2": 28000,
@@ -76,6 +76,8 @@ SINGBOX_TUNNEL_PROTOCOLS = frozenset({
 
 SUDOKU_PUBLIC_PORT_START = 40000
 SUDOKU_PUBLIC_PORT_END = 49999
+SUDOKU_SHARED_TARGET_PORT = 18553
+SUDOKU_SHARED_PUBLIC_BASE = 50000  # 50001..50999, below separate 52000+ tunnel pools
 
 _RUNTIME_APPLIED = False
 _ORIGINAL_SERVICE_ROUTES_FOR_EXIT = None
@@ -136,6 +138,29 @@ def _configured_modern_protocols(db, node_id: int) -> dict[str, NodeProtocolConf
         for row in rows
         if str(row.protocol or "").strip().lower() in MODERN_TUNNEL_PROTOCOLS
     }
+
+
+def _sudoku_shared_exit(db, exit_node: Node) -> bool:
+    """Only a published centrally admitted Exit may use shared routing.
+
+    Central ownership is registered after the strict live listener/whitelist
+    stage succeeds. Old imported or partially migrated nodes keep their
+    original per-user routes until explicitly cut over.
+    """
+    return bool(
+        exit_node is not None
+        and exit_node.node_type == NodeType.EXIT
+        and getattr(exit_node, "retired_at", None) is None
+        and getattr(exit_node, "show_to_users", False)
+        and is_central_node(db, int(exit_node.id))
+    )
+
+
+def _shared_sudoku_public_port(exit_node_id: int) -> int:
+    node_id = int(exit_node_id)
+    if not 1 <= node_id <= 999:
+        raise RuntimeError("SUDOKU_SHARED_EXIT_ID_OUT_OF_RANGE")
+    return SUDOKU_SHARED_PUBLIC_BASE + node_id
 
 
 def _sudoku_desired_subscription_ids(db) -> list[int]:
@@ -270,22 +295,39 @@ def _modern_routes_for_exit(db, exit_node: Node, exit_tunnel_ip: str) -> list[di
         })
 
     if "sudoku" in configs:
-        # Compute deterministic port map once per route build, not per user.
-        sudoku_ports = _sudoku_public_port_map(db)
-        for subscription_id in _sudoku_desired_subscription_ids(db):
-            output.append({
-                "protocol": "sudoku",
-                "profile": f"subscription-{subscription_id}",
-                "subscription_id": int(subscription_id),
-                "exit_node_id": int(exit_node.id),
-                "public_port": sudoku_ports[
-                    (int(exit_node.id), int(subscription_id))
-                ],
-                "target_ip": str(exit_tunnel_ip),
-                "target_port": int(_sudoku_port(int(subscription_id))),
-                "transport": "tcp",
-                "client_subnet": None,
-            })
+        if _sudoku_shared_exit(db, exit_node):
+            # The modern server enforces per-user keys on its own whitelist.
+            # A SINGLE Iran->Exit route reaches all entitled identities;
+            # no per-user ports or NAT churn should be generated here.
+            if _enum_value(configs["sudoku"].status) == "online":
+                output.append({
+                    "protocol": "sudoku",
+                    "profile": "shared",
+                    "exit_node_id": int(exit_node.id),
+                    "public_port": _shared_sudoku_public_port(int(exit_node.id)),
+                    "target_ip": str(exit_tunnel_ip),
+                    "target_port": SUDOKU_SHARED_TARGET_PORT,
+                    "transport": "tcp",
+                    "client_subnet": None,
+                })
+        else:
+            # Legacy Exit during staged migration: preserve original mappings
+            # and existing customer links until an explicit verified cutover.
+            sudoku_ports = _sudoku_public_port_map(db)
+            for subscription_id in _sudoku_desired_subscription_ids(db):
+                output.append({
+                    "protocol": "sudoku",
+                    "profile": f"subscription-{subscription_id}",
+                    "subscription_id": int(subscription_id),
+                    "exit_node_id": int(exit_node.id),
+                    "public_port": sudoku_ports[
+                        (int(exit_node.id), int(subscription_id))
+                    ],
+                    "target_ip": str(exit_tunnel_ip),
+                    "target_port": int(_sudoku_port(int(subscription_id))),
+                    "transport": "tcp",
+                    "client_subnet": None,
+                })
 
     return output
 
@@ -370,11 +412,13 @@ def _modern_tunnel_endpoint(
         raise RuntimeError(f"invalid delivery hostname for Exit {exit_node.id}")
 
     if protocol == "sudoku":
-        port = _sudoku_public_port(
-            db,
-            int(exit_node.id),
-            int(subscription_id),
-        )
+        if _sudoku_shared_exit(db, exit_node):
+            config = _configured_modern_protocols(db, int(exit_node.id)).get("sudoku")
+            if config is None or _enum_value(config.status) != "online":
+                return None
+            port = _shared_sudoku_public_port(int(exit_node.id))
+        else:
+            port = _sudoku_public_port(db, int(exit_node.id), int(subscription_id))
     else:
         port = _fixed_public_port(int(exit_node.id), protocol)
 
@@ -634,6 +678,11 @@ def _live_client_item_v251(db, sub: Subscription, protocol: str, item: dict[str,
     node = db.get(Node, node_id)
     if node is None or node.node_type != NodeType.EXIT:
         return result
+    if protocol == "sudoku" and _sudoku_shared_exit(db, node):
+        # Do not point a legacy, per-user key at the shared listener; that
+        # whitelist accepts only the centrally persisted client identity.
+        if int(result.get("port") or 0) != SUDOKU_SHARED_TARGET_PORT:
+            return result
 
     try:
         endpoint = _modern_tunnel_endpoint(
