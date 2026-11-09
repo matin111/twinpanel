@@ -24,6 +24,7 @@ from ..quota_models import QuotaCursor, QuotaSession
 from ..subscription_override_models import effective_device_limit
 from . import modern_quota_runtime_v257 as canonical
 from .quota_node_sync import build_node_devices
+from .shadowtls_2022_identity_v1 import NEW_INNER_TAG as SHADOWTLS_IDENTITY_INNER_TAG
 
 
 # ShadowTLS v3 is authenticated at the outer inbound, but its detour goes
@@ -33,7 +34,7 @@ from .quota_node_sync import build_node_devices
 # Reenable only after a real identity-preserving, end-to-end tested collector.
 SINGBOX_UNATTRIBUTABLE_PROTOCOLS = frozenset({"shadowtls"})
 SINGBOX_ACCOUNTING_PROTOCOLS = frozenset(
-    {"hysteria2", "tuic", "anytls", "naive", "snell", "socks5"}
+    {"hysteria2", "tuic", "anytls", "naive", "snell", "socks5", "shadowtls"}
 )
 SHADOWTLS_INNER_TAG = "twinpanel-shadowtls-inner"
 SINGBOX_ACCOUNTING_INTERVAL_SECONDS = 5.0
@@ -48,10 +49,10 @@ def activate_singbox_capabilities() -> None:
     """Advertise only capabilities backed by this native collector."""
 
     canonical.PRESENCE_ACCOUNTING_PROTOCOLS = frozenset(
-        set(canonical.PRESENCE_ACCOUNTING_PROTOCOLS) | set(SINGBOX_ACCOUNTING_PROTOCOLS)
+        set(canonical.PRESENCE_ACCOUNTING_PROTOCOLS) | (set(SINGBOX_ACCOUNTING_PROTOCOLS) - {"shadowtls"})
     )
     canonical.TRAFFIC_ACCOUNTING_PROTOCOLS = frozenset(
-        set(canonical.TRAFFIC_ACCOUNTING_PROTOCOLS) | set(SINGBOX_ACCOUNTING_PROTOCOLS)
+        set(canonical.TRAFFIC_ACCOUNTING_PROTOCOLS) | (set(SINGBOX_ACCOUNTING_PROTOCOLS) - {"shadowtls"})
     )
 
 
@@ -79,6 +80,17 @@ def shadowtls_attribution_diagnostic(snapshot: dict[str, Any]) -> dict[str, Any]
     }
 
 
+def _metered_inbound(protocol: str) -> tuple[str, str]:
+    """Only the SS2022 multiuser inner has attributable ShadowTLS bytes.
+
+    The original shared AES-GCM inner continues to work, but its blank
+    usernames must NEVER count as an account's online session or usage.
+    """
+    if protocol == "shadowtls":
+        return SHADOWTLS_IDENTITY_INNER_TAG, "shadowsocks"
+    return str(TAGS.get(protocol) or ""), ("socks" if protocol == "socks5" else protocol)
+
+
 def singbox_identity_integrity_audit(
     snapshot: dict[str, Any],
     protocol: str,
@@ -100,8 +112,7 @@ def singbox_identity_integrity_audit(
         for d in devices
     }
     known.discard("")
-    expected_tag = str(TAGS.get(protocol) or "")
-    expected_type = "socks" if protocol == "socks5" else protocol
+    expected_tag, expected_type = _metered_inbound(protocol)
     active = [
         row for row in rows
         if isinstance(row, dict)
@@ -801,7 +812,7 @@ def apply_singbox_snapshot(
         raise RuntimeError("singbox_snapshot_contract_invalid")
 
     observed_at = _utcnow()
-    expected_tag = str(TAGS.get(protocol) or "").strip()
+    expected_tag, expected_type = _metered_inbound(protocol)
     if not expected_tag:
         raise RuntimeError("singbox_protocol_tag_missing")
 
@@ -809,7 +820,7 @@ def apply_singbox_snapshot(
         row for row in rows
         if isinstance(row, dict)
         and str(row.get("inbound") or "").strip() == expected_tag
-        and str(row.get("inbound_type") or "").strip().lower() == ("socks" if protocol == "socks5" else protocol)
+        and str(row.get("inbound_type") or "").strip().lower() == expected_type
         and str(row.get("user") or "").strip()
     ]
     # Index authenticated connections once per snapshot instead of scanning
@@ -1026,12 +1037,15 @@ def _observed_devices_by_protocol(
         if not isinstance(row, dict):
             continue
         identity = str(row.get("user") or "").strip()
-        protocol = str(row.get("inbound_type") or "").lower()
-        if protocol == "socks":
-            protocol = "socks5"
+        inbound = str(row.get("inbound") or "")
+        source_type = str(row.get("inbound_type") or "").lower()
+        if inbound == SHADOWTLS_IDENTITY_INNER_TAG and source_type == "shadowsocks":
+            protocol = "shadowtls"
+        else:
+            protocol = "socks5" if source_type == "socks" else source_type
         if protocol not in SINGBOX_ACCOUNTING_PROTOCOLS:
             continue
-        if str(row.get("inbound") or "") != str(TAGS.get(protocol) or ""):
+        if (inbound, source_type) != _metered_inbound(protocol):
             continue
         if not identity:
             continue
@@ -1113,9 +1127,7 @@ def _refresh_authenticated_live_presence(
         for protocol in grouped:
             if protocol not in SINGBOX_ACCOUNTING_PROTOCOLS:
                 continue
-            if inbound != TAGS.get(protocol):
-                continue
-            if inbound_type != ("socks" if protocol == "socks5" else protocol):
+            if (inbound, inbound_type) != _metered_inbound(protocol):
                 continue
             active_by_protocol.setdefault(protocol, {}).setdefault(identity, row)
             break
@@ -1168,8 +1180,7 @@ def _salvage_singbox_devices(
     # duration/cursor prevented healthy live users from appearing online for
     # multiple sweeps. Only offline historical cleanup remains windowed.
     # No IP heuristics, no altered quotas, no synthetic presence.
-    expected_tag = str(TAGS.get(protocol) or "")
-    expected_type = "socks" if protocol == "socks5" else protocol
+    expected_tag, expected_type = _metered_inbound(protocol)
     live_ids = {
         str(row.get("user") or "").strip()
         for row in snapshot.get("rows", [])
@@ -1230,8 +1241,7 @@ def _priority_snapshot_devices(
     maintenance of truly offline, never-observed credentials is windowed.
     Preserve original input order within each priority group.
     """
-    expected_tag = str(TAGS.get(protocol) or "")
-    expected_type = "socks" if protocol == "socks5" else protocol
+    expected_tag, expected_type = _metered_inbound(protocol)
     seen = {
         str(row.get("user") or "").strip()
         for row in snapshot.get("rows", [])
@@ -1299,7 +1309,8 @@ def _overlimit_singbox_connections(
         for device in devices:
             identity = str(device.get("telemetry_identity") or device.get("identity") or "").strip()
             if identity:
-                key = (str(TAGS.get(protocol) or ""), "socks" if protocol == "socks5" else protocol, identity)
+                metered_tag, metered_type = _metered_inbound(protocol)
+                key = (metered_tag, metered_type, identity)
                 expected.setdefault(key, []).append(device)
 
     candidates: list[dict[str, Any]] = []
@@ -1538,10 +1549,10 @@ async def reconcile_singbox_quota_once() -> dict[str, Any]:
                                 "node_id": int(node.id),
                                 **integrity,
                             })
-                    # ShadowTLS identity is lost in the shared inner detour;
-                    # do not synthesize or charge per-user sessions from it.
-                    if protocol in SINGBOX_UNATTRIBUTABLE_PROTOCOLS:
-                        continue
+                    # Legacy ShadowTLS is never in this authenticated group.
+                    # Only the separate SS2022 multi-user inner has user IDs.
+                    # Preserve all historic legacy (blank-user) traffic outside
+                    # this collector, with no synthetic accounting.
                     try:
                         prioritized_devices = _priority_snapshot_devices(
                             db,

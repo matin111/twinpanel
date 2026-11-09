@@ -95,6 +95,7 @@ with tempfile.TemporaryDirectory(prefix="twinpanel-shadowtls-v234-") as temp_dir
     assert runtime_state["shadowtls"]["inner_password"] == inner["password"]
 
     account_ns: dict[str, Any] = {
+        "parallel_user_sync_script": __import__("app.services.shadowtls_2022_identity_v1",fromlist=["parallel_user_sync_script"]).parallel_user_sync_script,
         "json": json,
         "Any": Any,
         "Node": object,
@@ -107,6 +108,13 @@ with tempfile.TemporaryDirectory(prefix="twinpanel-shadowtls-v234-") as temp_dir
         "TAGS": {"shadowtls": "twinpanel-shadowtls-in"},
         "SHADOWTLS_INNER_TAG": "twinpanel-shadowtls-inner",
         "SHADOWTLS_INNER_METHOD": "aes-256-gcm",
+        "SHADOWTLS_IDENTITY_INNER_TAG": "twinpanel-shadowtls-identity-inner",
+        "SHADOWTLS_IDENTITY_OUTER_TAG": "twinpanel-shadowtls-identity-in",
+        "SHADOWTLS_IDENTITY_METHOD": "2022-blake3-aes-128-gcm",
+        "identity_client_outbounds": __import__(
+            "app.services.shadowtls_2022_identity_v1",
+            fromlist=["identity_client_outbounds"],
+        ).identity_client_outbounds,
     }
     exec_functions(
         account_tree,
