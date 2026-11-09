@@ -102,7 +102,43 @@ class SocketUnitContract(unittest.TestCase):
             self.assertEqual(socket_unit.read_text(encoding="utf-8"), module.socket_unit(8095))
             self.assertEqual(override.read_text(encoding="utf-8"), module.service_override())
             self.assertIn(("enable", "--now", "twinpanel-api.socket"), executed)
-            self.assertEqual(executed[-1], ("start", "twinpanel-api.service"))
+            self.assertEqual(executed[-2], ("start", "twinpanel-api.service"))
+            self.assertEqual(executed[-1], ("start", "twinpanel-reseller-bots.service"))
+
+    def test_successful_socket_cutover_restores_only_previously_active_reseller(self):
+        with tempfile.TemporaryDirectory() as work:
+            root = Path(work)
+            socket_unit = root / "api.socket"
+            override = root / "api.service.d" / "90-socket-handoff.conf"
+            executed = []
+            def command(*args: str, check: bool = True):
+                executed.append(args)
+                return subprocess.CompletedProcess(args, 0, "", "")
+            active = {"twinpanel-api.service", "twinpanel-reseller-bots.service"}
+            with mock.patch.object(module, "SOCKET_UNIT", socket_unit), \
+                 mock.patch.object(module, "OVERRIDE", override), \
+                 mock.patch.object(module, "is_active", side_effect=lambda name: name in active), \
+                 mock.patch.object(module, "check_health", return_value=True), \
+                 mock.patch.object(module, "run", side_effect=command):
+                module.enable(8095, "1.1.0-rc.754")
+            self.assertIn(("stop", "twinpanel-api.service"), executed)
+            self.assertIn(("start", "twinpanel-api.service"), executed)
+            self.assertIn(("start", "twinpanel-reseller-bots.service"), executed)
+
+    def test_cutover_does_not_start_intentionally_inactive_reseller(self):
+        with tempfile.TemporaryDirectory() as work:
+            root = Path(work)
+            executed = []
+            def command(*args: str, check: bool = True):
+                executed.append(args)
+                return subprocess.CompletedProcess(args, 0, "", "")
+            with mock.patch.object(module, "SOCKET_UNIT", root / "api.socket"), \
+                 mock.patch.object(module, "OVERRIDE", root / "api.d" / "90-socket-handoff.conf"), \
+                 mock.patch.object(module, "is_active", side_effect=lambda name: name == "twinpanel-api.service"), \
+                 mock.patch.object(module, "check_health", return_value=True), \
+                 mock.patch.object(module, "run", side_effect=command):
+                module.enable(8095, "1.1.0-rc.754")
+            self.assertNotIn(("start", "twinpanel-reseller-bots.service"), executed)
 
 
 
