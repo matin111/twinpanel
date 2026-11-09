@@ -652,15 +652,11 @@ def install(router, request_fn):
                 await callback.message.answer("❌ دریافت اطلاعات اکانت انجام نشد: " + escape(str(exc)[:150]))
             return
         if callback.message:
-            try:
-                await callback.message.edit_text(
-                    _details_text(info), reply_markup=_management_keyboard(sub_id, info),
-                )
-            except Exception as exc:
-                # Telegram returns "message is not modified" when counters
-                # did not change. Refresh should not be reported as a failure.
-                if "message is not modified" not in str(exc).lower():
-                    raise
+            # Shared helper handles photo captions and unchanged text safely.
+            await show_navigation_page(
+                callback.message, _details_text(info),
+                reply_markup=_management_keyboard(sub_id, info),
+            )
 
     @router.callback_query(F.data.startswith("subimp:"))
     async def import_detail(callback: CallbackQuery):
