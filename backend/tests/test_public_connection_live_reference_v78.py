@@ -22,7 +22,7 @@ def test_reference_injection_and_mobile_cards_and_real_actions():
     ui = source("public_connection_live_reference_v78.py")
     assert "source = refine_public_connection_live_reference_v78(source)" in canonical
     assert "source = refine_public_connection_unified_surface_dates_v80(source)" in canonical
-    assert "return refine_public_connection_v2ray_single_surface_v105(source)" in canonical
+    assert "return refine_public_connection_unified_surface_dates_v80(source)" in canonical
     assert "grid-template-columns:repeat(4,minmax(0,1fr))!important" in ui
     assert "body.tp78-ui .protocol-choice .protocol-text{order:1!important" in ui
     assert 'body.tp78-ui .protocol-choice .protocol-icon{order:0!important' in ui
