@@ -290,13 +290,19 @@ async def _ensure_modern_xray_with_dedicated_domain(
         current = list(state.get("available_profiles") or [])
         if xray_modern_runtime.PROFILE_WS not in current:
             from .xray_tls_ws_hotadd_v1 import ensure_websocket_tls
+            from .xray_customer_profile_policy_v30 import TLS_TARGET_OFFSETS_V261
 
-            await ensure_websocket_tls(
-                conn,
-                xray_modern_runtime._target_port(
-                    int(base_port), xray_modern_runtime.PROFILE_WS
-                ),
+            ws_port = xray_modern_runtime._target_port(
+                int(base_port), xray_modern_runtime.PROFILE_WS
             )
+            expected_port = int(base_port) + int(
+                TLS_TARGET_OFFSETS_V261[xray_modern_runtime.PROFILE_WS]
+            )
+            if ws_port != expected_port:
+                # A detached worker with incomplete runtime composition must
+                # not create a listener on a reserved sing-box/other VPN port.
+                raise RuntimeError("XRAY_WS_TLS_TARGET_POLICY_NOT_COMPOSED")
+            await ensure_websocket_tls(conn, ws_port)
             current.append(xray_modern_runtime.PROFILE_WS)
             state["available_profiles"] = current
     return state
