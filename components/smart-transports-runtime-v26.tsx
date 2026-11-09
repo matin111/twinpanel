@@ -84,9 +84,9 @@ const RETIRED_UNUSED_CARRIERS=new Set(["tp6_fast","kernel_ipip"]);
 const visibleTransport=(transport:unknown,status:unknown)=>{
   const name=normalized(transport);
   if(RETIRED_UNUSED_CARRIERS.has(name))return false;
-  // VXLAN has real working instances on other tunnels; keep them visible.
-  // Only hide an uninstalled empty placeholder on the selected tunnel.
-  return name!=="kernel_vxlan"||normalized(status)!=="not_installed";
+  // VXLAN is proven on other tunnels, so keep its install/test card
+  // visible on EVERY tunnel, including where it is not yet installed.
+  return true;
 };
 
 export function SmartTransportsRuntimeV26(){
