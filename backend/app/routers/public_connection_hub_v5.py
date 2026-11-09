@@ -289,6 +289,12 @@ def render_protocols(
                 node_id = 0
             # Identity data only. No cached RTT or fake reachability on user pages.
             identity_attr = f' data-node-id="{node_id}" data-country-code="{h(item.get("country_code") or "")}"' if node_id > 0 else ""
+            if protocol == "v2ray" and node_id > 0:
+                # Stable fallback identity when async /sub/meta is delayed.
+                # Same genuine Node.name used by V54; never a generated index.
+                saved_name = str(node_names.get(node_id) or "").strip()
+                if saved_name:
+                    identity_attr += f' data-node-name="{h(saved_name)}"'
             server_tabs.append(
                 f'<button class="server-tab{server_active}" type="button" data-server="{h(server_id)}"{identity_attr}><i></i><span>{h(name)}</span></button>'
             )
