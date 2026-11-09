@@ -33,11 +33,12 @@ class RuntimeReconciliationTests(unittest.IsolatedAsyncioTestCase):
         active=0
         peak=0
         class Process:
-            async def wait(self):
+            returncode = 0
+            async def communicate(self):
                 nonlocal active
                 await asyncio.sleep(0.02)
                 active-=1
-                return 0
+                return b"", b""
         async def spawn(*cmd,**kwargs):
             nonlocal active,peak
             started.append(cmd)
@@ -63,11 +64,12 @@ class RuntimeReconciliationTests(unittest.IsolatedAsyncioTestCase):
         peak=0
         spawned=[]
         class Process:
-            async def wait(self):
+            returncode = 0
+            async def communicate(self):
                 nonlocal active
                 await asyncio.sleep(0.025)
                 active-=1
-                return 0
+                return b"", b""
         async def spawn(*command,**kwargs):
             nonlocal active,peak
             active+=1
@@ -90,8 +92,9 @@ class RuntimeReconciliationTests(unittest.IsolatedAsyncioTestCase):
     async def test_delta_runs_only_selected_wireguard_family(self):
         calls = []
         class Process:
-            async def wait(self):
-                return 0
+            returncode = 0
+            async def communicate(self):
+                return b"", b""
         async def spawn(*cmd, **kwargs):
             calls.append(cmd)
             return Process()
@@ -120,8 +123,8 @@ class RuntimeReconciliationTests(unittest.IsolatedAsyncioTestCase):
     async def test_shared_sudoku_gets_one_isolated_retry_after_nonzero(self):
         calls=[]
         class Process:
-            def __init__(self,code):self.code=code
-            async def wait(self):return self.code
+            def __init__(self,code):self.returncode=code
+            async def communicate(self):return b"", b""
         async def spawn(*cmd,**kw):
             name=str(cmd[1])
             calls.append(name)
@@ -139,8 +142,8 @@ class RuntimeReconciliationTests(unittest.IsolatedAsyncioTestCase):
     async def test_shared_sudoku_second_failure_blocks_publication(self):
         calls=[]
         class Process:
-            def __init__(self,code):self.code=code
-            async def wait(self):return self.code
+            def __init__(self,code):self.returncode=code
+            async def communicate(self):return b"", b""
         async def spawn(*cmd,**kw):
             name=str(cmd[1])
             calls.append(name)
@@ -154,8 +157,8 @@ class RuntimeReconciliationTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_single_family_failure_makes_whole_node_unpublishable(self):
         class Process:
-            def __init__(self,index):self.index=index
-            async def wait(self):return 2 if self.index==3 else 0
+            def __init__(self,index):self.returncode=2 if index==3 else 0
+            async def communicate(self):return b"", b""
         index=0
         async def spawn(*cmd,**kw):
             nonlocal index
