@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import tempfile
+import zipfile
+import os
 from pathlib import Path
 from typing import Literal
 
@@ -13,6 +15,7 @@ from fastapi import (
     File,
     HTTPException,
     UploadFile,
+    BackgroundTasks,
 )
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
@@ -285,14 +288,9 @@ def backup_verify_telegram(
 # not leave encrypted archives on the server after successful delivery.
 @router.post("/create",status_code=202)
 def manual_backup(payload: BackupCreateIn):
-    if not payload.send_telegram:
-        raise HTTPException(
-            status_code=422,
-            detail="MANUAL_BACKUP_REQUIRES_TELEGRAM_DELIVERY",
-        )
     from ..manual_telegram_backup_v1 import enqueue_manual_telegram_backup
     try:
-        return {"ok": True, "job": enqueue_manual_telegram_backup()}
+        return {"ok": True, "job": enqueue_manual_telegram_backup(send_telegram=payload.send_telegram)}
     except ValueError as exc:
         raise HTTPException(status_code=422,detail=str(exc)) from exc
     except Exception as exc:
@@ -349,16 +347,14 @@ async def upload_backup(
 
     original = Path(
         file.filename
-        or "backup.tpbak"
+        or "backup.zip"
     ).name
 
-    if not original.endswith(
-        ".tpbak"
-    ):
+    if not original.lower().endswith((".zip", ".tpbak")):
         raise HTTPException(
             status_code=400,
             detail=(
-                "فقط فایل .tpbak "
+                "فقط فایل ZIP یا .tpbak "
                 "مجاز است"
             ),
         )
@@ -445,6 +441,7 @@ def backup_info(
 @router.get("/{filename}/download")
 def download_backup(
     filename: str,
+    background_tasks: BackgroundTasks,
 ):
 
     try:
@@ -466,12 +463,26 @@ def download_backup(
             detail=str(exc),
         ) from exc
 
+    # The internal .tpbak is already gzip compressed.
+    # Wrap it in one standard ZIP without redundant compression.
+    with tempfile.NamedTemporaryFile(
+        suffix=".zip", prefix="tp-download-",
+        dir=path.parent, delete=False,
+    ) as handle:
+        zipped = Path(handle.name)
+    os.chmod(zipped, 0o600)
+    try:
+        with zipfile.ZipFile(zipped, "w", allowZip64=True) as archive:
+            archive.write(path, arcname=path.name, compress_type=zipfile.ZIP_STORED)
+    except BaseException:
+        zipped.unlink(missing_ok=True)
+        raise
+    background_tasks.add_task(zipped.unlink, missing_ok=True)
     return FileResponse(
-        path=str(path),
-        media_type=(
-            "application/octet-stream"
-        ),
-        filename=path.name,
+        path=str(zipped),
+        media_type="application/zip",
+        filename=path.name.removesuffix(".tpbak") + ".zip",
+        background=background_tasks,
     )
 
 
