@@ -186,4 +186,9 @@ async def connect_protocol_runtime(
     # and the protocol routers import this connection selector.
     from .routers.provision import ssh_connect_saved
 
-    return await ssh_connect_saved(node, db, close_read_transaction_before_ssh=close_read_transaction_before_ssh)
+    if close_read_transaction_before_ssh:
+        return await ssh_connect_saved(
+            node, db, close_read_transaction_before_ssh=True,
+        )
+    # Preserve legacy callers' exact behavior and call signature.
+    return await ssh_connect_saved(node, db)
