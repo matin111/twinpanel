@@ -489,18 +489,43 @@ async def publish_node_to_all_users_route_v2(
 def read_node_backfill_status_v1(node_id: int, db: Session = Depends(get_db)) -> dict[str, Any]:
     """Admin-only status: never exposes credentials or SSH secrets."""
     try:
-        return job_status(db, node_id)
+        result = job_status(db, node_id)
     except ValueError:
         raise HTTPException(status_code=404, detail="سرور پیدا نشد")
+    from ..services.central_runtime_ownership_v1 import is_central_node
+    result["central_runtime"] = bool(is_central_node(db, int(node_id)))
+    # Legacy queue counts cannot describe a central node's daemon-level work.
+    # The UI treats these as separate runtime families, not an empty queue.
+    return result
 
 
 @router.post("/{node_id}/backfill-retry")
 def retry_node_backfill_v1(node_id: int, db: Session = Depends(get_db)) -> dict[str, Any]:
-    """Explicit admin action for an already published Exit, no manual SQL."""
+    """Admin retry routes centrally owned Exits to their actual daemon worker.
+
+    Legacy per-subscriber backfill must never run for centrally owned Exits.
+    Backward compatibility matters: older browsers still call backfill-retry.
+    """
+    from ..services.central_runtime_ownership_v1 import is_central_node
+    if is_central_node(db, int(node_id)):
+        from ..services.central_node_stage_launcher_v1 import (
+            launch, CentralStageLaunchError,
+        )
+        try:
+            started = launch(db, int(node_id))
+        except CentralStageLaunchError as exc:
+            db.rollback()
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        result = job_status(db, node_id)
+        result["central_runtime"] = True
+        result["central_stage"] = started
+        return result
     try:
         enqueue_node_backfill(db, node_id, retry_complete=True)
         db.commit()
-        return job_status(db, node_id)
+        result = job_status(db, node_id)
+        result["central_runtime"] = False
+        return result
     except ValueError as exc:
         db.rollback()
         raise HTTPException(status_code=409, detail=str(exc))
