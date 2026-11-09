@@ -323,22 +323,29 @@ def existing_units() -> list[str]:
 
 
 def restart_services() -> None:
+    """Dispatch one restart transaction; fail the release if systemd rejects it.
+
+    This checks only the synchronous dispatch result, not eventual service
+    readiness. The existing strict API/Web health+version gates remain in
+    charge of readiness and rollback. No extra restart is introduced.
+    """
     subprocess.run(
         ['systemctl', 'daemon-reload'],
-        check=False,
+        check=True,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
         timeout=15,
     )
     units = existing_units()
-    if units:
-        subprocess.run(
-            ['systemctl', '--no-block', 'restart', *units],
-            check=False,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            timeout=15,
-        )
+    if not {'twinpanel-api.service', 'twinpanel-web.service'}.issubset(units):
+        raise RuntimeError('UPDATER_REQUIRED_SERVICE_UNIT_MISSING')
+    subprocess.run(
+        ['systemctl', '--no-block', 'restart', *units],
+        check=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        timeout=15,
+    )
 
 
 def install_node_auto_backfill_timer(release: Path) -> None:
