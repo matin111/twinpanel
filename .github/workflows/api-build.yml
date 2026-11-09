@@ -7,6 +7,7 @@ on:
   pull_request:
     paths:
       - "backend/**"
+      - "VERSION"
       - "app/**"
       - "components/**"
       - "lib/**"
@@ -115,6 +116,10 @@ jobs:
         run: |
           PYTHONPATH=. python tests/test_telegram_link_photo_navigation_v1.py -v
           PYTHONPATH=. python tests/test_telegram_navigation_fast_ack_v1.py
+
+      - name: Protect subscription usage and date reset semantics
+        working-directory: backend
+        run: PYTHONPATH=. python tests/subscription_admin_cycle_reset_smoke.py
 
       - name: Run NetMod UDPGW V231 regression
         working-directory: backend
