@@ -322,6 +322,19 @@ if state_path.exists():
     except Exception as exc:
         raise RuntimeError("invalid Xray modern state: " + repr(exc))
 
+# Even if an outdated caller drops the Node argument, never silently reset
+# an existing TLS Exit to REALITY. The previous guard only detected TLS when
+# 'domain' was non-empty, which was precisely the broken reinstall case.
+if not domain and (
+    state.get("tls_enabled")
+    or state.get("managed_cert")
+    or state.get("tls_domain")
+    or state.get("tls_sni_ws")
+    or state.get("tls_sni_tcp")
+    or Path("/usr/local/etc/xray/twinpanel-tls/fullchain.pem").is_file()
+):
+    raise RuntimeError("XRAY_DEDICATED_TLS_NODE_CONTEXT_REQUIRED")
+
 # The node's verified runtime values are authoritative. Reconciliation must
 # never reset an admin-applied REALITY target/SNI to global process defaults.
 reality_target = str(state.get("reality_target") or default_reality_target)
@@ -1092,22 +1105,139 @@ async def _ensure_modern_xray(
     return state
 
 
-async def _install_xray_modern(conn, port: int):
+async def _three_tls_inbounds_live(
+    conn, base_port: int, node: Node | None,
+) -> bool:
+    """Read-only strict installed health: file, Xray API and real listeners.
+
+    The prior generic readiness check trusted base + XHTTP only; its result
+    caused Repair to skip missing WS/TCP TLS and claim successful installation.
+    Never call an installer as part of this probe.
+    """
+    from .routers import provision
+    from .central_xray_node_authority_v1 import read_node_public_authority
+
+    dedicated = _clean_domain(
+        getattr(node, "xray_domain", None) if node is not None else ""
+    )
+    if not dedicated:
+        return False
+    try:
+        authority = await read_node_public_authority(conn)
+        if (
+            authority.get("tls_enabled") is not True
+            or str(authority.get("tls_domain") or "").lower() != dedicated
+            or set(authority.get("profiles") or ()) != {
+                "websocket_tls", "xhttp_reality", "tcp_tls",
+            }
+        ):
+            return False
+        if not await provision.active(conn, "xray"):
+            return False
+
+        live_text = await provision.cmd(
+            conn,
+            "/usr/local/bin/xray api lsi "
+            "--server=127.0.0.1:10085 -isOnlyTags=true -timeout=5",
+            check=False,
+        )
+        live_tags = {
+            str(entry.get("tag") or "")
+            for entry in json.loads(str(live_text).strip()).get("inbounds", [])
+            if isinstance(entry, dict)
+        }
+        required_tags = {
+            "vless-ws-tls", "vless-xhttp-reality", "vless-tcp-tls",
+        }
+        if not required_tags.issubset(live_tags):
+            return False
+
+        for profile in ("websocket_tls", "xhttp_reality", "tcp_tls"):
+            if not await provision.listener(
+                conn, _target_port(int(base_port), profile), "tcp",
+            ):
+                return False
+        return True
+    except Exception:
+        return False
+
+
+async def _install_xray_modern(conn, port: int, node: Node | None = None):
+    """Install or repair Xray with the selected node's TLS authority.
+
+    Never run the destructive legacy bootstrap against an existing config.
+    That bootstrap used to overwrite all three TLS inbounds, after which the
+    node-less modern wrapper rebuilt domainless REALITY and Vision profiles.
+    """
+    from .routers import provision
+
     original = _originals.get("install_xray")
     if original is None:
         return False, "legacy Xray installer unavailable"
 
-    ok, error = await original(conn, int(port))
-    if not ok:
-        return ok, error
+    port = int(port)
+    dedicated = _clean_domain(
+        getattr(node, "xray_domain", None) if node is not None else ""
+    )
+    existing = (
+        await provision.cmd(
+            conn,
+            "if [ -s /usr/local/etc/xray/config.json ]; "
+            "then echo present; else echo absent; fi",
+            check=False,
+        )
+    ).strip() == "present"
+
+    if existing and node is None:
+        # Every existing installation requires a node ID/domain. Fail before
+        # executing any state generator or replacing any config or clients.
+        return False, "XRAY_REPAIR_NODE_CONTEXT_REQUIRED"
+
+    if dedicated:
+        from . import xray_modern_admin
+        try:
+            certificate_ready = await xray_modern_admin._certificate_available(
+                conn, dedicated,
+            )
+        except Exception:
+            certificate_ready = False
+        if not certificate_ready:
+            return False, "XRAY_DEDICATED_TLS_CERTIFICATE_NOT_READY"
+
+    if existing and await _three_tls_inbounds_live(conn, port, node):
+        # Strict live check; healthy nodes are left bit-for-bit untouched.
+        return True, None
+
+    if existing:
+        # We can repair an existing Xray config only when the binary remains.
+        # Its bootstrapper must NEVER replace a real customer config.
+        binary_ready = (
+            await provision.cmd(
+                conn,
+                "test -x /usr/local/bin/xray && echo ready || echo missing",
+                check=False,
+            )
+        ).strip() == "ready"
+        if not binary_ready:
+            return False, "XRAY_EXISTING_CONFIG_REQUIRES_SAFE_BINARY_RECOVERY"
+    else:
+        if await provision.active(conn, "xray"):
+            return False, "XRAY_RUNNING_WITHOUT_MANAGED_CONFIG_STOP"
+        # Fresh, never-configured node only: legacy bootstrap installs the
+        # verified Xray binary and basic service; modern provisioning below
+        # then receives the actual Node and dedicated hostname.
+        ok, error = await original(conn, port)
+        if not ok:
+            return ok, error
 
     try:
         await _ensure_modern_xray(
-            conn,
-            int(port),
-            None,
-            bootstrap_done=True,
+            conn, port, node, bootstrap_done=True,
         )
+        if dedicated and not await _three_tls_inbounds_live(
+            conn, port, node,
+        ):
+            return False, "XRAY_TLS_THREE_INBOUNDS_NOT_VERIFIED"
         return True, None
     except Exception as exc:
         return False, str(exc)[:1800]
