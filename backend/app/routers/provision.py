@@ -1814,11 +1814,16 @@ async def provision_protocols(conn, p: ProtocolSettings, db: Session, node: Node
                     "transport": "tcp", "error": err,
                     "three_inbound_verified": bool(ok),
                 }
-                save_config(
-                    db, node.id, "v2ray", port=p.xray_port,
-                    transport="tcp", service="xray",
-                    ok=bool(ok), error=err,
-                )
+                if ok:
+                    save_config(
+                        db, node.id, "v2ray", port=p.xray_port,
+                        transport="tcp", service="xray",
+                        ok=True, error=None,
+                    )
+                # An unsuccessful Repair must not revoke the already-enabled
+                # protocol or overwrite its previous healthy DB config.
+                # Customers may still have working existing inbounds while
+                # the missing TLS profile is being investigated.
             else:
                 await run_one(
                     "v2ray", p.xray_port, "tcp", "xray",
@@ -1830,17 +1835,27 @@ async def provision_protocols(conn, p: ProtocolSettings, db: Session, node: Node
                 "port_text": str(p.xray_port),
                 "transport": "tcp", "error": str(e),
             }
-            save_config(
-                db, node.id, "v2ray", port=p.xray_port,
-                transport="tcp", service="xray",
-                ok=False, error=str(e),
-            )
+            if not (
+                repair and node.node_type == NodeType.EXIT
+                and getattr(node, "xray_domain", None)
+            ):
+                save_config(
+                    db, node.id, "v2ray", port=p.xray_port,
+                    transport="tcp", service="xray",
+                    ok=False, error=str(e),
+                )
 
     node.enable_cisco=bool(results.get("cisco",{}).get("ok")) if p.install_cisco else node.enable_cisco
     node.enable_openvpn=bool(results.get("openvpn",{}).get("ok")) if p.install_openvpn else node.enable_openvpn
     node.enable_wireguard=bool(results.get("wireguard",{}).get("ok")) if p.install_wireguard else node.enable_wireguard
     node.enable_l2tp=bool(results.get("l2tp",{}).get("ok")) if p.install_l2tp else node.enable_l2tp
-    node.enable_v2ray=bool(results.get("v2ray",{}).get("ok")) if p.install_v2ray else node.enable_v2ray
+    if p.install_v2ray:
+        if bool(results.get("v2ray", {}).get("ok")):
+            node.enable_v2ray = True
+        elif not repair:
+            # Fresh install failure: protocol was never made available.
+            node.enable_v2ray = False
+        # Failed Repair never disables an already-published Xray service.
     db.commit()
     selected={"cisco":p.install_cisco,"openvpn":p.install_openvpn,"wireguard":p.install_wireguard,"l2tp":p.install_l2tp,"v2ray":p.install_v2ray}
     failed=[k for k,v in selected.items() if v and not results.get(k,{}).get("ok")]
