@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.754",
+  "version": "1.1.0-rc.755",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-09T21:24:57Z",
+  "released_at": "2026-11-09T21:31:54Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "10dce42f28bcd42cdb222e3ce477ba6ff36e8c76",
+  "source_sha": "cda4a613e0d9faa8fe9932f24ea3aa3254d7b529",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.754/twinpanel-1.1.0-rc.754-linux-x86_64.tar.gz",
-    "sha256": "dfb65768dbe18668c0503a5acee31ddae87fdbf51f3a4dd36105131d61c7ed30",
-    "size_bytes": 30181485
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.755/twinpanel-1.1.0-rc.755-linux-x86_64.tar.gz",
+    "sha256": "576f54557f0b98bfe572b45d3321217470cffc61c8dd52090efcd1baa7a3dae4",
+    "size_bytes": 30185814
   },
   "notes": {
-    "fa": "رفع کامل برگشت تنظیمات V2Ray/Xray به Reality پس از نصب یا Repair از داخل پنل مادر. مسیر قدیمی Pre-Repair برای نودهای دارای دامنه اختصاصی حذف شد؛ نصب مجدد از مسیر واحد Node-aware استفاده می‌کند و سه Inbound واقعی WebSocket TLS، XHTTP Reality و TCP TLS را بررسی می‌کند. نصب‌کننده قدیمی حق بازنویسی کانفیگ موجود ندارد. اضافه‌کردن TCP TLS با API و بدون ری‌استارت کلی Xray انجام می‌شود؛ UUID، دامنه و گواهی و وضعیت قبلی پروتکل در Repair ناموفق حفظ می‌شوند. اصلاح شامل همه نودهای جدید TLSدار است، نه فقط فنلاند. سایر پروتکل‌ها بدون تغییر.",
-    "en": "Complete central-panel Xray install/Repair fix for dedicated TLS Exit nodes, including Finland and future nodes. Remove the older pre-repair partial builder from dedicated-domain flow. Single node-aware installer verifies all three live WS TLS/XHTTP Reality/TCP TLS inbounds, never runs legacy bootstrap over existing Xray config, hot-adds TCP TLS through Xray API without restarting Xray, and preserves UUIDs, TLS certificates and enabled protocol state on failed Repair. Existing domainless nodes/other protocols unchanged. 56 main regression tests plus 27 focused follow-up tests passed."
+    "fa": "بهینه‌سازی بکاپ بدون حذف داده یا هویت اتصال: بازپیچی رمزگذاری هویت‌های OpenVPN/WireGuard و L2TP روی پنل مقصد، فشرده‌سازی Zstandard سطح ۱۰، پشتیبانی از فایل‌های GZIP قبلی و ZIP تک‌فایلی، جلوگیری از بازکردن آرشیوهای بیش‌ازحد بزرگ، نصب zstd در نصب خام. نمونه واقعی ۶۶.۹۶ به ۳۵.۵۴ مگابایت کاهش یافت. فایل بکاپ بدون رمزگذاری و شامل داده‌های محرمانه است؛ خصوصی نگهداری شود.",
+    "en": "Lossless portable backups: rewrap OpenVPN/WireGuard identities and L2TP secrets on the destination, zstd level 10, legacy gzip and one-file ZIP support, bounded decompression, clean-installer zstd setup. Real sample 66.96 MB to 35.54 MB. Archive is unencrypted and contains sensitive secrets."
   }
 }
