@@ -10,9 +10,10 @@ from __future__ import annotations
 from typing import Any
 
 from ..models import Node, NodeType, SubscriptionNode
-from .central_runtime_ownership_v1 import is_central_node, last_applied
-from .central_node_desired_state_v1 import (
-    load_desired_state, require_valid_desired_state,
+from .central_runtime_ownership_v1 import is_central_node
+from .central_sudoku_fingerprint_v1 import (
+    desired_fingerprint as desired_sudoku_fingerprint,
+    last_applied as last_sudoku_applied,
 )
 
 
@@ -37,10 +38,11 @@ def central_sudoku_enforcement_result(
     node_id = int(node.id)
 
     if is_central_node(db, node_id):
-        state = require_valid_desired_state(
-            load_desired_state(db, node_id), max_users=3000,
-        )
-        if last_applied(db, node_id) == state.fingerprint:
+        # A failing Sing-box, Xray or other runtime family must never
+        # block the acknowledgement of a separately verified Sudoku hash
+        # whitelist. The Sudoku stage persists this marker only AFTER its
+        # own live-daemon apply/zero-user disable was confirmed.
+        if last_sudoku_applied(db, node_id) == desired_sudoku_fingerprint(db, node_id):
             return "controller_central_sudoku_whitelist_converged"
 
         from .central_node_stage_launcher_v1 import (
