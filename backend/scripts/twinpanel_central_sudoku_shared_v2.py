@@ -23,7 +23,7 @@ ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
 
 from app.central_sudoku_shared_runtime_v2 import (
-    SHARED_PORT, prepare, apply, users_manifest,
+    SHARED_PORT, prepare, apply, deactivate, users_manifest,
 )
 from app.services.central_runtime_ownership_v1 import allow_central_node
 from app.database import SessionLocal
@@ -120,7 +120,28 @@ async def stage(node_id,limit,write):
         if len(ids)>limit:
             raise RuntimeError("SUDOKU_SHARED_DESIRED_USERS_OVER_OPERATION_LIMIT")
         if not ids:
-            print("SUDOKU_SHARED_NO_SUBSCRIBERS",json.dumps({"node_id":node_id}))
+            print("SUDOKU_SHARED_NO_SUBSCRIBERS",json.dumps({
+                "node_id": node_id, "apply": bool(write),
+            }), flush=True)
+            if not write:
+                return 0
+            # Do NOT leave a previously entitled client on a live whitelist
+            # when zero active subscriptions remain. A blank whitelist is
+            # prohibited by the daemon; stop only this owned shared service.
+            conn = await asyncio.wait_for(connect_protocol_runtime(node,db),timeout=25)
+            try:
+                ack = await deactivate(conn)
+            finally:
+                conn.close()
+                await conn.wait_closed()
+            if not ack.get("deactivated"):
+                raise RuntimeError("SUDOKU_SHARED_EMPTY_DISABLE_NOT_ACKNOWLEDGED")
+            db.expire_all()
+            if eligible(db,node_id):
+                raise RuntimeError("SUDOKU_SHARED_ENTITLEMENTS_CHANGED_AFTER_DISABLE")
+            print("SUDOKU_SHARED_DISABLED_EMPTY_WHITELIST",json.dumps({
+                "node_id":node_id,"users":0,
+            }),flush=True)
             return 0
         rows=(db.query(ProtocolCredential)
               .filter(ProtocolCredential.protocol=="sudoku",
@@ -147,7 +168,14 @@ async def stage(node_id,limit,write):
         if not write:return 0
         readiness=await verify_central_family_readiness(db, node_id, {"sudoku"})
         if not readiness.get("ok"):
-            raise RuntimeError("SUDOKU_SHARED_LISTENERS_NOT_READY")
+            # A published Exit with zero subscribers intentionally stops its
+            # shared daemon; the next positive entitlement must be able to
+            # start it. The final apply checks both listener and LIVE users.
+            if not (
+                readiness.get("reason")=="live_health_failed"
+                and readiness.get("missing")==["sudoku"]
+            ):
+                raise RuntimeError("SUDOKU_SHARED_LISTENERS_NOT_READY")
         # New Exit and recovered nodes must share the SAME pinned binary.
         # Verify/install once at node level, never per subscriber; skip
         # automatically when the verified artifact is already present.
