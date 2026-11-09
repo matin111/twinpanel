@@ -29,6 +29,7 @@ protocols = (
 tags = {protocol: f"tp-{protocol}" for protocol in protocols}
 
 namespace = {
+    "parallel_user_sync_script": __import__("app.services.shadowtls_2022_identity_v1",fromlist=["parallel_user_sync_script"]).parallel_user_sync_script,
     "json": json,
     "TAGS": tags,
     "CONFIG_PATH": "",
