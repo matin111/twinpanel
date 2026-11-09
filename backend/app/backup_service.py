@@ -950,7 +950,11 @@ def list_backups() -> list[
             meta
         )
 
-    return result
+    return sorted(
+        result,
+        key=lambda item: str(item.get("created_at") or ""),
+        reverse=True,
+    )
 
 
 def get_backup_path(
@@ -983,23 +987,17 @@ def get_backup_path(
     return path
 
 
-def delete_backup(
-    filename: str,
-) -> None:
-
-    path = get_backup_path(
-        filename
-    )
-
-    path.unlink(
-        missing_ok=True
-    )
-
-    _meta_path(
-        path
-    ).unlink(
-        missing_ok=True
-    )
+def delete_backup(filename: str) -> None:
+    safe=Path(filename).name
+    if safe!=filename or not safe.endswith(".tpbak"):
+        raise ValueError("Invalid backup filename")
+    path=BACKUP_ROOT/safe
+    meta=_meta_path(path)
+    # For Telegram-only files this deletes the local audit record only.
+    if not path.exists() and not meta.exists():
+        raise FileNotFoundError(safe)
+    path.unlink(missing_ok=True)
+    meta.unlink(missing_ok=True)
 
 
 def _decode_backup(
@@ -2018,18 +2016,12 @@ def cleanup_retention(
         reverse=True,
     )
 
-    for path in items[
-        keep:
-    ]:
-        path.unlink(
-            missing_ok=True
-        )
-
-        _meta_path(
-            path
-        ).unlink(
-            missing_ok=True
-        )
+    for path in items[keep:]:
+        # Never prune the only available copy following an upload failure.
+        # Backup retention must not destroy unconfirmed encrypted archives.
+        if not _read_meta(path).get("telegram_sent"):
+            continue
+        _remove_uploaded_archive(path)
 
 
 def _load_state() -> dict[str, Any]:
