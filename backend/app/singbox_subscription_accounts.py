@@ -23,7 +23,13 @@ from .naive_tls_lifecycle_v224 import (
     ensure_managed_naive_tls,
 )
 from .routers.provision import cmd
-from .services.shadowtls_2022_identity_v1 import parallel_user_sync_script
+from .services.shadowtls_2022_identity_v1 import (
+    INNER_METHOD as SHADOWTLS_IDENTITY_METHOD,
+    NEW_INNER_TAG as SHADOWTLS_IDENTITY_INNER_TAG,
+    NEW_OUTER_TAG as SHADOWTLS_IDENTITY_OUTER_TAG,
+    identity_client_outbounds,
+    parallel_user_sync_script,
+)
 
 
 class SingBoxAccountError(RuntimeError):
@@ -288,6 +294,10 @@ p={CONFIG_PATH!r}
 tag={tag!r}
 protocol={protocol!r}
 inner_tag={SHADOWTLS_INNER_TAG!r}
+identity_tag={SHADOWTLS_IDENTITY_INNER_TAG!r}
+identity_outer_tag={SHADOWTLS_IDENTITY_OUTER_TAG!r}
+identity_method={SHADOWTLS_IDENTITY_METHOD!r}
+state_path={STATE_PATH!r}
 with open(p, "r", encoding="utf-8") as h:
     d=json.load(h)
 row=next((x for x in d.get("inbounds",[]) if isinstance(x,dict) and x.get("tag")==tag),None)
@@ -299,6 +309,31 @@ if protocol == "shadowtls":
         raise SystemExit("managed ShadowTLS inner inbound not found")
     row=dict(row)
     row["_twinpanel_shadowtls_inner"]={{"method":inner["method"],"password":inner["password"]}}
+    # A separately provisioned, tested and routed listener is required.
+    # Never switch clients merely because an unverified new inbound exists.
+    try:
+        state=json.load(open(state_path,encoding="utf-8"))
+    except (OSError,ValueError):
+        state={{}}
+    selection=state.get("shadowtls_identity2022") if isinstance(state,dict) else None
+    if isinstance(selection,dict) and selection.get("delivery_enabled") is True:
+        modern_inner=next((x for x in d.get("inbounds",[]) if isinstance(x,dict) and
+            x.get("tag")==identity_tag and x.get("type")=="shadowsocks"),None)
+        modern_outer=next((x for x in d.get("inbounds",[]) if isinstance(x,dict) and
+            x.get("tag")==identity_outer_tag and x.get("type")=="shadowtls"),None)
+        if not (isinstance(modern_inner,dict) and isinstance(modern_outer,dict)
+                and modern_inner.get("method")==identity_method
+                and modern_outer.get("detour")==identity_tag):
+            raise SystemExit("shadowtls_identity_delivery_enabled_but_not_installed")
+        new_port=selection.get("advertised_port")
+        if not isinstance(new_port,int) or not 1024<=new_port<=65535:
+            raise SystemExit("shadowtls_identity_advertised_port_invalid")
+        row["_twinpanel_shadowtls_identity_inner"]={{
+            "method":modern_inner["method"],
+            "password":modern_inner["password"],
+            "port":new_port,
+            "enabled":True,
+        }}
 print(json.dumps(row,separators=(",",":")))
 '''
 
@@ -806,6 +841,27 @@ def client_item(
         # Preserve the public protocol metadata as ShadowTLS. Consumers that
         # import raw sing-box JSON receive the complete two-stage chain.
         outbound = transport
+
+        identity = inbound.get("_twinpanel_shadowtls_identity_inner")
+        if isinstance(identity, dict) and identity.get("enabled") is True:
+            # Only an operator-confirmed, separately routable listener may
+            # replace delivery to new/fetched profiles. Existing legacy files
+            # remain valid on the unmodified old port.
+            method = str(identity.get("method") or "")
+            server_key = str(identity.get("password") or "")
+            modern_port = identity.get("port")
+            if method != SHADOWTLS_IDENTITY_METHOD or not isinstance(modern_port, int):
+                raise SingBoxAccountError("unverified ShadowTLS identity listener")
+            config_outbounds = identity_client_outbounds(
+                outbound,
+                username=secret.username,
+                outer_password=secret.password,
+                listen_port=modern_port,
+                server_key=server_key,
+            )
+            route_final = config_outbounds[0]["tag"]
+            outbound = config_outbounds[1]
+            endpoint_port = modern_port
 
     config = {
         "log": {"level": "warn"},
