@@ -108,6 +108,29 @@ def test_account_provisioning_guards_before_legacy_driver():
     assert 'if not results and not pending_protocols:' in code
 
 
+def test_pending_sudoku_never_triggers_paid_subscription_suspension():
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[1] / "app"
+    worker = (root / "services/fast_provision_worker_v1.py").read_text(encoding="utf-8")
+    create = (root / "routers/subscription_create_fast_v1.py").read_text(encoding="utf-8")
+    store = (root / "routers/store.py").read_text(encoding="utf-8")
+    modern = (root / "routers/modern_account_delivery_v1.py").read_text(encoding="utf-8")
+    assert '"sudoku" in (result.get("pending_protocols") or ())' in worker
+    assert 'return "retry", "central_sudoku_reconciliation_pending"' in worker
+    assert worker.index('return "retry", "central_sudoku_reconciliation_pending"') < worker.index(
+        'if reason == "provisioning_conflict"'
+    )
+    assert 'if "sudoku" in (provisioning.get("pending_protocols") or ()):' in create
+    assert create.index('TWINPANEL_SUDOKU_CENTRAL_CONVERGENCE_PENDING') < create.index(
+        'if _should_suspend_after_background_provisioning('
+    )
+    assert 'if "sudoku" in (provision_result.get("pending_protocols") or ()):' in store
+    assert store.index('central_reconciliation_pending": True') < store.index(
+        'if not _delivery_ready_for_order('
+    )
+    assert '"central_reconciliation_pending": bool(pending_protocols)' in modern
+
+
 if __name__ == "__main__":
     for name, value in sorted(globals().items()):
         if name.startswith("test_") and callable(value):
