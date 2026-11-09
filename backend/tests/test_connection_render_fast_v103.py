@@ -32,11 +32,12 @@ class ConnectionFastRender(unittest.TestCase):
     def test_node_readiness_cache_is_opt_in_not_global(self):
         a = get("routers/account_delivery.py")
         m = get("mother_subscription_delivery_policy_v108.py")
-        self.assertIn('cache = db.info.get("_tp_public_connection_cfg_cache_v102")', a)
-        self.assertIn('db.info.get("_tp_public_connection_cfg_prefetched_v103")', a)
+        self.assertIn('cache = info.get("_tp_public_connection_cfg_cache_v102")', a)
+        self.assertIn('info = getattr(db, "info", {})', a)
+        self.assertIn('info.get("_tp_public_connection_cfg_prefetched_v103")', a)
         self.assertIn('db.info.get("_tp_public_connection_cfg_prefetched_v103")', m)
         self.assertIn('def _modern_direct_item_is_usable_uncached(', m)
-        self.assertIn('db.info.get("_tp_public_connection_item_cache_v102")', m)
+        self.assertIn('getattr(db, "info", {}).get("_tp_public_connection_item_cache_v102")', m)
         self.assertIn("return _modern_direct_item_is_usable_uncached(db, protocol, item)", m)
 
     def test_qr_png_remains_scannable_and_keeps_original_data(self):
