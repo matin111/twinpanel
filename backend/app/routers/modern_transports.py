@@ -43,6 +43,12 @@ router = APIRouter(
 )
 
 
+# Retired after live production audit: neither carrier was installed or
+# referenced by any active/preferred tunnel. Preserve lower-level compatibility
+# modules for old data, but do not offer new installations.
+RETIRED_UNUSED_CANDIDATES = frozenset({"tp6_fast", "kernel_ipip"})
+
+
 _PROFILE = {
     "tp27_fast": {
         "iran_profile": "tp27-auto-gre",
@@ -564,6 +570,7 @@ def transport_catalog():
                 "auto_managed": True,
             }
             for spec in catalog()
+            if str(spec["transport"]) not in RETIRED_UNUSED_CANDIDATES
         ],
     }
 
@@ -590,6 +597,8 @@ def list_modern_transports(
     output = []
     for spec in catalog():
         name = str(spec["transport"])
+        if name in RETIRED_UNUSED_CANDIDATES:
+            continue
         row = rows.get(name)
         output.append(
             {
@@ -982,6 +991,11 @@ async def install_modern_transport(
     db: Session = Depends(get_db),
 ):
     name = str(transport or "").strip().lower()
+    if name in RETIRED_UNUSED_CANDIDATES:
+        raise HTTPException(
+            status_code=409,
+            detail="Unused transport retired: no installed or active production instances",
+        )
     if name not in ACTIVE_SPECS:
         raise HTTPException(status_code=404, detail="Unknown or retired modern transport")
 
