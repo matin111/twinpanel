@@ -1563,6 +1563,17 @@ def send_backup_to_telegram(
     if result is not None:
         return result
 
+    # The cloud Bot API accepts a single ZIP document while it is under
+    # 50 MB. Keep the original .tpbak on disk; ZIP is only the transport.
+    # Larger archives retain the existing resumable parts fallback.
+    from .backup_telegram_zip_delivery_v1 import send_cloud_zip_backup
+    zip_result = send_cloud_zip_backup(
+        backup_path, chat_id, token=token, meta=meta,
+        write_meta=_write_meta, telegram_api_call=_telegram_api_call,
+    )
+    if zip_result is not None:
+        return zip_result
+
     file_size = backup_path.stat().st_size
     parts = max(1, math.ceil(file_size / TELEGRAM_BACKUP_PART_BYTES))
     # Do not silently resume delivery to a different chat.
