@@ -13,6 +13,7 @@ from ..models import Node, NodeType, SubscriptionNode
 from .central_runtime_ownership_v1 import is_central_node
 from .central_sudoku_fingerprint_v1 import (
     desired_fingerprint as desired_sudoku_fingerprint,
+    entitled_ids as sudoku_entitled_ids,
     last_applied as last_sudoku_applied,
 )
 
@@ -38,6 +39,14 @@ def central_sudoku_enforcement_result(
     node_id = int(node.id)
 
     if is_central_node(db, node_id):
+        # Never acknowledge a command that contradicts the canonical
+        # subscription status/expiry/quota/membership. Fingerprint parity
+        # alone does not prove a particular command's intended result.
+        entitlement_present = int(subscription_id) in set(sudoku_entitled_ids(db, node_id))
+        if command_type == "revoke_subscription" and entitlement_present:
+            raise RuntimeError("SUDOKU_CENTRAL_REVOKE_STILL_ENTITLED")
+        if command_type == "restore_subscription" and not entitlement_present:
+            raise RuntimeError("SUDOKU_CENTRAL_RESTORE_NOT_ENTITLED")
         # A failing Sing-box, Xray or other runtime family must never
         # block the acknowledgement of a separately verified Sudoku hash
         # whitelist. The Sudoku stage persists this marker only AFTER its
