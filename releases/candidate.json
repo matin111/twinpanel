@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.742",
-  "source_sha": "e23f46f388affd6d22f91849bb3db017db3ff6bf",
+  "version": "1.1.0-rc.743",
+  "source_sha": "75673101eb1e0f1153539df039af890773c39091",
   "notes": {
-    "fa": "جلوگیری از رفرش پشت‌سرهم پنل پس از آپدیت: اصلاح کنترل اختلاف نسخه فرانت‌اند و سرور، محدودکردن بازخوانی خودکار به یک‌بار برای هر نسخه و توقف انتشار بسته در صورت اختلاف نسخه فایل اجرایی وب.",
-    "en": "Fix panel reload loop after update: restrict client version convergence to one reload per build/target pair; pin and verify compiled Next.js version matches the immutable release candidate before publishing."
+    "fa": "حذف عبارت فنی SMS Reader از پیام‌های شارژ کیف پول کارت‌به‌کارت در ربات اصلی و نسخه دوم؛ حفظ دستور پرداخت دقیق، دکمه ارسال رسید و عملکرد تأیید خودکار بدون تغییر.",
+    "en": "Remove internal SMS Reader references from Telegram customer wallet card-to-card payment copy, retaining exact amount instructions, receipt buttons and existing automatic payment functionality."
   }
 }
