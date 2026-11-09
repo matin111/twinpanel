@@ -129,6 +129,11 @@ def test_pending_sudoku_never_triggers_paid_subscription_suspension():
         'if not _delivery_ready_for_order('
     )
     assert '"central_reconciliation_pending": bool(pending_protocols)' in modern
+    assert 'central_sudoku_order = has_published_central_sudoku_owner(' in store
+    assert 'or central_sudoku_order):' in store
+    assert store.index('central_sudoku_order = has_published_central_sudoku_owner(') < store.index(
+        'provision_result = await provision_account(int(order.subscription_id), db)'
+    )
 
 
 if __name__ == "__main__":
