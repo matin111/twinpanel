@@ -223,7 +223,10 @@ async def finish(node_id: int, job_id: str, *, xray_port: int,
             db, node_id, require_tls_profiles=True,
         )
         ready_count = int(readiness.get("ready_count") or 0)
-        if not readiness.get("ok"):
+        # Defense in depth: even if future readiness code regresses or is
+        # mocked, do not admit a freshly installed Exit without its dedicated
+        # valid TLS certificate. This guard never applies to existing Exits.
+        if not tls_certificate_ready or not readiness.get("ok"):
             _status(job_id, "failed", node_id,
                     installed_protocols=ready_count,
                     error_code=(
