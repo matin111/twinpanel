@@ -223,68 +223,18 @@ async def _ensure_modern_xray_v39(
         state["available_profiles"] = available
         return state
 
-    domain = str(state.get("tls_sni_tcp") or state.get("tls_domain") or _effective_domain(node)).strip().lower()
-    cert = str(state.get("managed_cert") or "").strip()
-    key = str(state.get("managed_key") or "").strip()
     target_port = _tcp_tls_target_port(int(base_port))
+    # TWINPANEL_XRAY_TCP_TLS_HOT_ADD_V1
+    # Every already-running Xray node must keep its existing clients
+    # connected when a missing third TLS inbound is added. The legacy v39
+    # implementation wrote config.json and restarted the entire service.
+    # The dedicated hot-add helper atomically persists the new inbound only
+    # after verifying the live HandlerService tag and TCP listener.
+    from .xray_tls_tcp_hotadd_v1 import ensure_tcp_tls
 
-    occupied = (
-        await provision.cmd(
-            conn,
-            (
-                "ss -H -lntp 2>/dev/null "
-                f"| awk '$4 ~ /:{target_port}$/ {{print}}' | head -1"
-            ),
-            check=False,
-        )
-    ).strip()
-    if occupied and "xray" not in occupied.lower():
-        raise RuntimeError(
-            f"TCP TLS port collision port={target_port} listener={occupied[:300]}"
-        )
-
-    script = _tcp_tls_config_script(
-        port=target_port,
-        domain=domain,
-        cert=cert,
-        key=key,
-    )
-    payload = base64.b64encode(script.encode()).decode()
-    raw = await provision.cmd(
-        conn,
-        f"printf '%s' {shlex.quote(payload)} | base64 -d | python3",
-    )
-
-    try:
-        result = json.loads(raw.strip().splitlines()[-1])
-    except Exception as exc:
-        raise RuntimeError("cannot parse TCP TLS config result: " + repr(exc)) from exc
-
-    if bool(result.get("changed")):
-        backup = str(result.get("backup") or "").strip()
-        await provision.cmd(conn, "systemctl restart xray")
-
-        service_ok = await provision.active(conn, "xray")
-        listener_ok = await provision.listener(conn, target_port, "tcp")
-
-        if not (service_ok and listener_ok):
-            if backup:
-                await provision.cmd(
-                    conn,
-                    (
-                        f"if [ -f {shlex.quote(backup)} ]; then "
-                        f"cp -a {shlex.quote(backup)} /usr/local/etc/xray/config.json; "
-                        "systemctl restart xray; fi"
-                    ),
-                    check=False,
-                )
-            raise RuntimeError(
-                "TCP TLS listener verification failed; previous Xray config restored"
-            )
-    elif not await provision.listener(conn, target_port, "tcp"):
-        raise RuntimeError("TCP TLS config exists but listener is not active")
-
-    await provision.ufw_allow(conn, target_port, "tcp")
+    verified = await ensure_tcp_tls(conn, target_port)
+    if verified.get("ready") is not True:
+        raise RuntimeError("XRAY_TCP_TLS_HOT_ADD_NOT_VERIFIED")
 
     if PROFILE_TCP_TLS not in available:
         available.append(PROFILE_TCP_TLS)
