@@ -657,7 +657,6 @@ def _sale_impl(
                 or None
             ),
             password=(
-            reseller_id=int(reseller.id),
                 str(
                     getattr(
                         payload,
@@ -668,6 +667,7 @@ def _sale_impl(
                 ).strip()
                 or None
             ),
+            reseller_id=int(reseller.id),
         )
 
         db.flush()
