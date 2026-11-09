@@ -24,13 +24,14 @@ def run():
              patch.object(backup,"ensure_backup_environment",return_value=None),\
              patch.object(backup,"_export_database",return_value=({"users":[]},{"users":0},[])),\
              patch.object(backup,"_collect_admin_files",return_value={}),\
-             patch.object(backup,"_write_meta",side_effect=meta_write),\
-             patch.object(backup,"recovery_key_fingerprint",return_value="example"):
+             patch.object(backup,"_write_meta",side_effect=meta_write):
             created=backup.create_backup(kind="unit-test",send_telegram=False)
             path=base/created["filename"]
             with path.open("rb") as stream:
                 digest=hashlib.file_digest(stream,"sha256").hexdigest()
             assert created["sha256"]==digest
+            assert path.read_bytes().startswith(b"\\x1f\\x8b")
+            assert backup.inspect_backup(path)["format"]==backup.BACKUP_FORMAT
             print("BACKUP_CREATED_ARCHIVE_SHA256_PASS")
             with patch.object(backup,"inspect_backup",return_value={
                 "created_at":"2026-11-09","tables":1,"rows":0,"row_counts":{"users":0}
