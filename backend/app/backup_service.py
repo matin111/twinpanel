@@ -405,6 +405,16 @@ def _unpack(value: Any) -> Any:
         "__tp_type__"
     )
 
+    if type_name == "runtime_setting_fernet_rewrap_v1":
+        # Re-encrypt the same identity/PSK with the destination panel secret.
+        # The portable backup holds the plaintext in the already sensitive
+        # gzip archive, just as it does for account credential rewrapping.
+        from .mother_access import encrypt_setting_value
+        payload = _unpack(value["payload"])
+        if not isinstance(payload, str) or not payload:
+            raise ValueError("BACKUP_RUNTIME_IDENTITY_PAYLOAD_INVALID")
+        return encrypt_setting_value(payload)
+
     if type_name == "account_credential_rewrap_v2":
         # Encrypted credential fields are compressed as their original JSON
         # while inside the OUTER backup. On restore, encrypt again
@@ -534,6 +544,40 @@ def _collect_admin_files(
     return result
 
 
+# These are persistent, per-subscription identities, NOT installed protocol
+# programs or generated runtime files. Preserve them without storing their
+# incompressible source-server Fernet ciphertext in portable backups.
+_RUNTIME_REWRAP_PREFIXES = (
+    "vpn.central.identity.openvpn.subscription.",
+    "vpn.central.identity.wireguard.subscription.",
+)
+_RUNTIME_REWRAP_EXACT = frozenset({"vpn.l2tp_psk_encrypted"})
+
+
+def _rewrap_runtime_setting_row(row: dict[str, Any]) -> dict[str, Any]:
+    key = row.get("setting_key")
+    ciphertext = row.get("setting_value")
+    if not isinstance(key, str) or not (
+        key.startswith(_RUNTIME_REWRAP_PREFIXES)
+        or key in _RUNTIME_REWRAP_EXACT
+    ):
+        return row
+    if not isinstance(ciphertext, str) or not ciphertext:
+        # Empty entries are not rotated; original values remain untouched.
+        return row
+    from .mother_access import decrypt_setting_value
+    plaintext = decrypt_setting_value(ciphertext)
+    if not plaintext:
+        # An undecryptable identity must not be silently omitted or copied
+        # to a newly installed panel where it would remain unreadable.
+        raise ValueError("BACKUP_RUNTIME_IDENTITY_CANNOT_DECRYPT")
+    row["setting_value"] = {
+        "__tp_type__": "runtime_setting_fernet_rewrap_v1",
+        "payload": plaintext,
+    }
+    return row
+
+
 def _current_tables() -> list[str]:
 
     existing = set(
@@ -608,6 +652,9 @@ def _export_database() -> tuple[
                         node_key_paths.add(
                             str(key_path)
                         )
+
+                if name == "vpnshop_runtime_settings":
+                    plain = _rewrap_runtime_setting_row(plain)
 
                 if name == "protocol_credentials":
                     # The source rows contain per-user Fernet ciphertext.
@@ -730,6 +777,7 @@ def create_backup(
         "version": 3,
         "scope": "persistent-panel-data",
         "credential_encoding": "account_credential_rewrap_v2",
+        "runtime_setting_encoding": "runtime_setting_fernet_rewrap_v1",
         "created_at": _iso_now(),
         "kind": kind,
         "tables": tables,
