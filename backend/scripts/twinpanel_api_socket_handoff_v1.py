@@ -181,23 +181,56 @@ def enable(port: int, version: str) -> None:
         raise
 
 
+def disable(port: int, version: str) -> None:
+    """Controlled operator rollback from socket mode to the original API bind."""
+    if not (SOCKET_UNIT.is_file() and OVERRIDE.is_file()
+            and is_active(SOCKET_NAME) and is_active(API_UNIT)
+            and check_health(port, version, seconds=3)):
+        raise RuntimeError("API_SOCKET_DISABLE_PREFLIGHT_FAILED")
+    try:
+        run("stop", API_UNIT)
+        run("disable", "--now", SOCKET_NAME)
+        OVERRIDE.unlink()
+        SOCKET_UNIT.unlink()
+        run("daemon-reload")
+        run("start", API_UNIT)
+        if not check_health(port, version):
+            raise RuntimeError("API_SOCKET_DISABLE_HEALTH_GATE_FAILED")
+        print("API_SOCKET_DISABLED_NORMAL_BIND_HEALTHY version=" + version)
+    except BaseException:
+        # Failed removal must restore the known-good socket configuration.
+        run("stop", API_UNIT, check=False)
+        atomic_write(SOCKET_UNIT, socket_unit(port))
+        atomic_write(OVERRIDE, service_override())
+        run("daemon-reload", check=False)
+        run("enable", "--now", SOCKET_NAME, check=False)
+        run("start", API_UNIT, check=False)
+        raise
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--apply", action="store_true",
-                        help="Opt in to a controlled API restart (not automatic)")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--apply", action="store_true",
+                      help="Opt in to a controlled first-time cutover")
+    mode.add_argument("--disable", action="store_true",
+                      help="Roll back an active socket listener to the original bind mode")
     parser.add_argument("--confirm-brief-cutover", action="store_true",
-                        help="Required acknowledgement of initial cutover downtime")
+                        help="Required acknowledgement of API maintenance cutover")
     args = parser.parse_args(argv)
     port, version = ensure_safe_state()
-    if not args.apply:
+    if not (args.apply or args.disable):
         print(json.dumps({"mode": "read_only", "api_port": port,
                           "version": version, "socket_exists": SOCKET_UNIT.exists(),
                           "override_exists": OVERRIDE.exists(),
                           "updater_active": False}, sort_keys=True))
         return 0
     if not args.confirm_brief_cutover:
-        parser.error("--apply requires --confirm-brief-cutover")
-    enable(port, version)
+        parser.error("--apply or --disable requires --confirm-brief-cutover")
+    if args.disable:
+        disable(port, version)
+    else:
+        enable(port, version)
     return 0
 
 
