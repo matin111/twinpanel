@@ -159,3 +159,82 @@ def identity_client_outbounds(
         "udp_over_tcp": {"enabled": True, "version": 2},
     }
     return [proxy, transport]
+
+
+def parallel_user_sync_script() -> str:
+    """Python fragment embedded in each existing node account mutation.
+
+    Safe no-op until the parallel listener has been deliberately installed.
+    When it exists, update/revoke matching users on *both* the outer and
+    authenticated inner in one atomic sing-box config rewrite.
+    """
+    return '''
+# Optional ShadowTLS 2022 synchronization; legacy-only nodes are untouched.
+import base64 as _st_base64
+import hashlib as _st_hashlib
+import hmac as _st_hmac
+_st_outer = next((x for x in inbounds if isinstance(x,dict) and
+    x.get("tag")=="twinpanel-shadowtls-identity-in"),None)
+_st_inner = next((x for x in inbounds if isinstance(x,dict) and
+    x.get("tag")=="twinpanel-shadowtls-identity-inner"),None)
+if _st_outer is not None or _st_inner is not None:
+    if not (isinstance(_st_outer,dict) and isinstance(_st_inner,dict)
+            and _st_outer.get("type")=="shadowtls"
+            and _st_inner.get("type")=="shadowsocks"
+            and _st_inner.get("method")=="2022-blake3-aes-128-gcm"):
+        raise SystemExit("shadowtls_identity_parallel_incomplete")
+    _st_key = _st_inner.get("password")
+    try:
+        if len(_st_base64.b64decode(_st_key,validate=True))!=16:
+            raise ValueError("key length")
+    except Exception:
+        raise SystemExit("shadowtls_identity_server_key_invalid")
+    _st_legacy = next((x for x in inbounds if isinstance(x,dict) and
+        x.get("tag")=="twinpanel-shadowtls-in" and
+        x.get("type")=="shadowtls"),None)
+    if not isinstance(_st_legacy,dict):
+        raise SystemExit("shadowtls_identity_legacy_outer_missing")
+    _st_synced_users=[]
+    _st_inner_users=[]
+    _st_seen=set()
+    for _st_row in _st_legacy.get("users") or []:
+        if not isinstance(_st_row,dict):
+            continue
+        _st_username=str(_st_row.get("name") or "")
+        _st_password=str(_st_row.get("password") or "")
+        if not _st_username.startswith("tp-sub-"):
+            continue
+        if not _st_username[7:].isdigit() or int(_st_username[7:])<=0:
+            raise SystemExit("shadowtls_identity_username_invalid")
+        if _st_username in _st_seen or len(_st_password)<16:
+            raise SystemExit("shadowtls_identity_duplicate_or_invalid")
+        _st_seen.add(_st_username)
+        _st_synced_users.append(dict(_st_row))
+        _st_inner_users.append(dict(
+            name=_st_username,
+            password=_st_base64.b64encode(_st_hmac.new(
+                _st_password.encode("utf-8"),
+                b"twinpanel:shadowtls:identity-inner:2022:v1:"+
+                    _st_username.encode("utf-8"),
+                _st_hashlib.sha256,
+            ).digest()[:16]).decode("ascii"),
+        ))
+    if not _st_inner_users:
+        # A random, undisclosed sentinel avoids leaving the parallel
+        # server in single-user/unauthenticated fallback after last revoke.
+        _st_inner_users=[dict(
+            name="twinpanel-identity-disabled",
+            password=_st_base64.b64encode(_st_hmac.new(
+                _st_key.encode("utf-8"),b"twinpanel-disabled-inner",
+                _st_hashlib.sha256,
+            ).digest()[:16]).decode("ascii"),
+        )]
+    _st_outer["users"] = _st_synced_users or [
+        dict(name="twinpanel-identity-disabled",
+             password=_st_base64.b64encode(_st_hmac.new(
+                 _st_key.encode("utf-8"),b"twinpanel-disabled-outer",
+                 _st_hashlib.sha256,
+             ).digest()[:16]).decode("ascii"))
+    ]
+    _st_inner["users"] = _st_inner_users
+'''
