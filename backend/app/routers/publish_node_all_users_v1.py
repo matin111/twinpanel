@@ -287,7 +287,7 @@ async def install_node_background_v1(
     # domainless Xray profiles. Require the dedicated hostname up front.
     # Iran relay nodes do not run customer VPN/Xray and are exempt.
     if payload.node_type == NodeType.EXIT:
-        from .xray_modern_admin import _clean_domain
+        from ..xray_modern_admin import _clean_domain
         domain = _clean_domain(payload.xray_domain)
         if not domain or not "." in domain:
             raise HTTPException(
