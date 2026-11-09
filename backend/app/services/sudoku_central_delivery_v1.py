@@ -48,3 +48,33 @@ def prefer_central_sudoku_items(db: Any, items: list[Any]) -> list[Any]:
         if _is_active_central_shared_item(db, item)
     ]
     return shared if shared else items
+
+
+def has_published_central_sudoku_owner(db: Any, nodes: list[Any]) -> bool:
+    """Account creation must not install per-user Sudoku on legacy exits
+    when a centrally registered, published service family already owns it.
+
+    The existing visible convergence worker then adds each new subscriber to
+    its shared whitelist; never SSH or start a service in the HTTP request.
+    """
+    for node in nodes:
+        node_id = int(getattr(node, "id", 0) or 0)
+        if (
+            node_id > 0
+            and getattr(node, "retired_at", None) is None
+            and bool(getattr(node, "show_to_users", False))
+            and getattr(node, "node_type", None) == NodeType.EXIT
+            and str(getattr(getattr(node, "status", None), "value",
+                            getattr(node, "status", None))).strip().lower() == "online"
+            and is_central_node(db, node_id)
+        ):
+            return True
+    return False
+
+
+def ready_central_sudoku_items(db: Any, items: list[Any]) -> list[dict[str, Any]]:
+    """Strict central identity subset for the account-creation response."""
+    return [
+        item for item in items
+        if _is_active_central_shared_item(db, item)
+    ]
