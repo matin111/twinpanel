@@ -192,21 +192,19 @@ def extend_subscription_usage_only(
     if payload.reset_usage:
         sub.traffic_limit_bytes = add_bytes
         sub.traffic_used_bytes = 0
-        if sub.starts_at is None and sub.expires_at is None:
-            sub.activation_duration_days = add_days
-        else:
-            sub.starts_at = now
-            sub.expires_at = now + timedelta(days=add_days)
-            sub.activation_duration_days = add_days
-    else:
-        if add_bytes > 0:
-            sub.traffic_limit_bytes = old_limit + add_bytes
-        if add_days > 0:
-            if sub.starts_at is None and sub.expires_at is None:
-                sub.activation_duration_days = int(sub.activation_duration_days or 0) + add_days
-            else:
-                base = sub.expires_at if sub.expires_at and sub.expires_at > now else now
-                sub.expires_at = base + timedelta(days=add_days)
+    elif add_bytes > 0:
+        sub.traffic_limit_bytes = old_limit + add_bytes
+    if add_days > 0:
+        from ..models import Plan
+        from ..subscription_override_models import SubscriptionRuntimeOverride
+        from ..services.subscription_validity_v1 import add_validity_days
+        override = db.get(SubscriptionRuntimeOverride, int(sub.id))
+        plan = db.get(Plan, sub.plan_id) if sub.plan_id is not None else None
+        add_validity_days(
+            sub, add_days, now, override=override,
+            plan_days=int(plan.duration_days or 0) if plan else 0,
+            reset_date=bool(payload.reset_usage),
+        )
 
     expiry_ok = not sub.expires_at or sub.expires_at > now
     limit = int(sub.traffic_limit_bytes or 0)
