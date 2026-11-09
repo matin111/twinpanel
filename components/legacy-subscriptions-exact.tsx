@@ -202,7 +202,7 @@ export function LegacySubscriptionsRuntimePage(){
     if(!draft.user_id||!draft.plan_id){setError(pick("کاربر و پلن را انتخاب کنید","Select user and plan"));return;}
     const traffic=optionalPositive(draft.traffic_gb);const duration=optionalPositive(draft.duration_days);const device=Math.max(1,Math.trunc(optionalPositive(draft.device_limit)||1));
     void act("create",pick("اشتراک ساخته و اکانت صادر شد","Subscription created and account provisioned"),async()=>{
-      await adminApi.createSubscriptionV2({user_id:draft.user_id,plan_id:draft.plan_id,node_ids:[],protocols:draft.protocols,...(traffic!==undefined?{traffic_gb:traffic}:{}),...(duration!==undefined?{duration_days:Math.trunc(duration)}:{}),device_limit:device,...(draft.username.trim()?{username:draft.username.trim()}:{}),...(draft.password.trim()?{password:draft.password.trim()}:{})});
+      await adminApi.createSubscriptionV2({user_id:draft.user_id,plan_id:draft.plan_id,node_ids:[],protocols:draft.protocols,...(traffic!==undefined?{traffic_gb:traffic}:{}),duration_days:Math.trunc(duration??0),device_limit:device,...(draft.username.trim()?{username:draft.username.trim()}:{}),...(draft.password.trim()?{password:draft.password.trim()}:{})});
     },true);
   };
 
@@ -218,12 +218,14 @@ export function LegacySubscriptionsRuntimePage(){
     event.preventDefault();if(!selected)return;
     if(editResetUsage&&!window.confirm(pick("مصرف ثبت‌شده اشتراک صفر شود؟ سوابق حسابداری برای جلوگیری از ثبت دوباره مصرف حفظ می‌شوند.","Reset this subscription's billed usage to zero? Historical accounting remains for replay protection.")))return;
     const traffic=optionalPositive(draft.traffic_gb);
+    const originalDays=n(selected.activation_duration_days)>0?String(Math.trunc(n(selected.activation_duration_days))):"";
+    const durationChanged=draft.duration_days.trim()!==originalDays;
     void act("edit",pick("تنظیمات ذخیره شد؛ همگام‌سازی کانفیگ‌ها در صف است","Settings saved; config sync queued"),()=>adminApi.editSubscription(n(selected.id),{
       plan_id:draft.plan_id||null,
       traffic_gb:traffic??0,
       reset_usage:editResetUsage,
       device_limit:Math.max(0,Math.min(1000,Math.trunc(Number(draft.device_limit)||0))),
-      duration_days:Math.max(0,Math.min(3650,Math.trunc(Number(draft.duration_days)||0))),
+      ...(durationChanged?{duration_days:Math.max(0,Math.min(3650,Math.trunc(Number(draft.duration_days)||0)))}:{}),
       ...(editExpiry&&editExpiry!==String(selected.expires_at||"").slice(0,10)?{expires_at:new Date(editExpiry+"T23:59:59").toISOString()}:{}),
       node_ids:[],
       protocols:draft.protocols,
@@ -376,7 +378,16 @@ export function LegacySubscriptionsRuntimePage(){
   const selectedItems=selectedCredential?list(selectedCredential.items):[];
 
   const trafficCell=(item:RuntimeRow)=>{const limit=n(item.traffic_limit_bytes);const used=n(item.traffic_used_bytes);if(limit<=0)return <div className="user-cell"><b dir="ltr">{formatBytes(used)} / {pick("نامحدود","Unlimited")}</b><small>∞</small></div>;const percent=Math.min(100,Math.round(used/limit*100));return <div className="user-cell"><b dir="ltr">{formatBytes(used)} / {formatBytes(limit)}</b><small>{percent.toLocaleString("fa-IR")}٪</small></div>;};
-  const expiryCell=(item:RuntimeRow)=>{if(item.duration_unlimited===true)return pick("نامحدود","Unlimited");if(item.expires_at)return formatDate(item.expires_at);const days=n(item.activation_duration_days)||n(planMap.get(n(item.plan_id))?.duration_days);if(days>0)return pick(`${days.toLocaleString("fa-IR")} روز از اولین اتصال`,`${days} days from first connection`);if(s(item.status).toLowerCase()==="active")return <span title={pick("این اشتراک مدت معتبر ندارد. از ویرایش اشتراک، مدت اعتبار را تنظیم کنید؛ تاریخ انقضا خودکار حدس زده نمی‌شود.","No valid duration. Set validity in Edit subscription; expiry is never guessed.")} style={{color:"var(--warning, #d5a538)",fontWeight:700}}>{pick("⚠ مدت تعیین نشده","⚠ Duration missing")}</span>;return "—";};
+  const expiryCell=(item:RuntimeRow)=>{
+    if(item.expires_at){
+      const expires=new Date(String(item.expires_at));
+      const remaining=Number.isFinite(expires.getTime())?Math.max(0,Math.ceil((expires.getTime()-Date.now())/86400000)):null;
+      return <div className="user-cell"><b>{formatDate(item.expires_at)}</b>{remaining!==null&&<small>{remaining>0?pick(`${remaining.toLocaleString("fa-IR")} روز باقی‌مانده`,`${remaining} days remaining`):pick("منقضی شده","Expired")}</small>}</div>;
+    }
+    const days=n(item.activation_duration_days)||n(planMap.get(n(item.plan_id))?.duration_days);
+    if(item.duration_unlimited===true||days<=0)return pick("نامحدود","Unlimited");
+    return <div className="user-cell"><b>{pick(`${days.toLocaleString("fa-IR")} روز`,`${days} days`)}</b><small>{pick("از اولین اتصال","From first connection")}</small></div>;
+  };
 
   return <Shell active="/admin/subscriptions"><div className="page legacy-subscriptions-page">
     <div className="page-head"><div><h1>{pick("اشتراک‌ها","Subscriptions")}</h1><small>{pick("مدیریت اشتراک، تمدید، وضعیت و سابلینک","Subscriptions, renewals, status and public links")}</small></div><button className="primary" onClick={openCreate}>＋ {pick("اشتراک جدید","New subscription")}</button></div>
