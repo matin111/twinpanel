@@ -285,30 +285,33 @@ def backup_verify_telegram(
         ) from exc
 
 
-# TWINPANEL_MANUAL_BACKUP_CREATE_ROUTE_V146
-@router.post("/create")
-def manual_backup(
-    payload: BackupCreateIn,
-):
-
-    try:
-        result = create_backup(
-            kind="manual",
-            send_telegram=(
-                payload.send_telegram
-            ),
-        )
-
-    except Exception as exc:
+# Manual backups must not run for minutes in an HTTP request and may
+# not leave encrypted archives on the server after successful delivery.
+@router.post("/create",status_code=202)
+def manual_backup(payload: BackupCreateIn):
+    if not payload.send_telegram:
         raise HTTPException(
-            status_code=500,
-            detail=str(exc),
-        ) from exc
+            status_code=422,
+            detail="MANUAL_BACKUP_REQUIRES_TELEGRAM_DELIVERY",
+        )
+    from ..manual_telegram_backup_v1 import enqueue_manual_telegram_backup
+    try:
+        return {"ok": True, "job": enqueue_manual_telegram_backup()}
+    except ValueError as exc:
+        raise HTTPException(status_code=422,detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=503,detail="BACKUP_JOB_DISPATCH_FAILED") from exc
 
-    return {
-        "ok": True,
-        "backup": result,
-    }
+
+@router.get("/manual-jobs/{job_id}")
+def manual_backup_job_status(job_id: str):
+    from ..manual_telegram_backup_v1 import read_job
+    try:
+        return {"ok": True, "job": read_job(job_id)}
+    except (OSError,ValueError,json.JSONDecodeError) as exc:
+        raise HTTPException(
+            status_code=404,detail="BACKUP_JOB_NOT_FOUND"
+        ) from exc
 
 
 @router.post("/test-telegram")
