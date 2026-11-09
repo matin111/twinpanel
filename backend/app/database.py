@@ -14,6 +14,22 @@ _DATABASE_CONNECT_ARGS = (
     else {}
 )
 
+# Connection labels make real PostgreSQL blockers attributable to either
+# web requests or background jobs without exposing customer information.
+# Only use libpq's application_name for PostgreSQL; SQLite tests are unchanged.
+_IS_POSTGRESQL = settings.database_url.startswith(
+    ("postgresql://", "postgresql+psycopg2://")
+)
+_WORKER_CONNECT_ARGS = (
+    {**_DATABASE_CONNECT_ARGS, "application_name": "twinpanel-worker"}
+    if _IS_POSTGRESQL else _DATABASE_CONNECT_ARGS
+)
+_REQUEST_CONNECT_ARGS = (
+    {**_DATABASE_CONNECT_ARGS, "application_name": "twinpanel-http"}
+    if _IS_POSTGRESQL else _DATABASE_CONNECT_ARGS
+)
+
+
 engine = create_engine(
     settings.database_url,
 
@@ -28,7 +44,7 @@ engine = create_engine(
 
     # Bound PostgreSQL lock waits so a contended synchronous SQL statement
     # cannot freeze the single Uvicorn event-loop worker indefinitely.
-    connect_args=_DATABASE_CONNECT_ARGS,
+    connect_args=_WORKER_CONNECT_ARGS,
     future=True,
 )
 
@@ -56,7 +72,7 @@ if settings.database_url.startswith(("postgresql://", "postgresql+psycopg2://"))
         pool_timeout=10,
         pool_recycle=1800,
         pool_use_lifo=True,
-        connect_args=_DATABASE_CONNECT_ARGS,
+        connect_args=_REQUEST_CONNECT_ARGS,
         future=True,
     )
 else:
