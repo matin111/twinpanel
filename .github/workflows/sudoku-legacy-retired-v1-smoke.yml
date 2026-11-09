@@ -1,0 +1,59 @@
+name: Sudoku Legacy Retirement V1 Smoke
+
+on:
+  pull_request:
+    paths:
+      - backend/app/standalone_subscription_accounts.py
+      - backend/app/central_sudoku_bulk_runtime_v1.py
+      - backend/scripts/twinpanel_central_sudoku_node_bulk_v1.py
+      - backend/app/services/sudoku_central_delivery_v1.py
+      - backend/app/modern_protocol_tunnel_binding_v251.py
+      - backend/tests/sudoku_central_delivery_v1_smoke.py
+      - backend/tests/sudoku_shared_tunnel_v2_smoke.py
+      - backend/tests/sudoku_legacy_retired_v1_smoke.py
+      - .github/workflows/sudoku-legacy-retired-v1-smoke.yml
+  workflow_dispatch:
+
+jobs:
+  no-per-user-respawn:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 14
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U test -d test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install backend
+        run: pip install -r backend/requirements.txt
+      - name: Compile edited modules
+        run: |
+          python -m py_compile backend/app/standalone_subscription_accounts.py backend/app/central_sudoku_bulk_runtime_v1.py backend/scripts/twinpanel_central_sudoku_node_bulk_v1.py backend/app/services/sudoku_central_delivery_v1.py backend/app/modern_protocol_tunnel_binding_v251.py
+      - name: Test retired path fail-closed and live central-only routing
+        working-directory: backend
+        env:
+          PYTHONPATH: .
+          APP_NAME: TwinPanel-CI
+          APP_ENV: test
+          APP_SECRET_KEY: ci-only-secret-key-ci-only-secret-key-ci-only-secret-key
+          DATABASE_URL: postgresql+psycopg2://test:test@127.0.0.1:5432/test
+          NODE_AGENT_SHARED_SECRET: ci-node-agent-secret-ci-node-agent-secret
+        run: |
+          python tests/sudoku_legacy_retired_v1_smoke.py
+          python tests/sudoku_central_delivery_v1_smoke.py
+          python tests/sudoku_shared_tunnel_v2_smoke.py
