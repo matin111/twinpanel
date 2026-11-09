@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.747",
-  "source_sha": "90f4577d0454c019f4f182917515485c78917d3c",
+  "version": "1.1.0-rc.748",
+  "source_sha": "9fb87b1ecdb17fe545732fa37ce316383d6ba4db",
   "notes": {
-    "fa": "اصلاح ریشه‌ای نمایش دامنه‌های مستقل V2Ray/Xray در مدیریت پروتکل‌ها: اطلاعات هر نود از دامنه اختصاصی همان نود و وضعیت واقعی Xray خوانده می‌شود؛ پیش‌نویس قدیمی نود دیگر به‌صورت خودکار نمایش داده نمی‌شود. دامنه SSL فعال جدا از دامنه ثبت‌شده نمایش داده می‌شود تا آمریکا با TLS قدیمی اشتباهاً آماده اعلام نشود. ذخیره دامنه Xray دیگر دامنه عمومی نود و سایر پروتکل‌ها را تغییر نمی‌دهد. اعتبارسنجی دامنه گواهی SSL نیز دقیق و مستقل شد.",
-    "en": "Fix per-node Xray inbound editor authority. Prefer each node's dedicated Xray domain and actually running TLS state over old unapplied drafts; flag mismatched USA/UK draft and active TLS hostname separately. Prevent dedicated Xray domain edits from overwriting the general node public domain. Harden OpenSSL hostname verification and the retained REALITY alias postcondition. Preserve VPN services and UUIDs."
+    "fa": "تکمیل اصلاح دائمی مدیریت دامنه Xray: حتی نصب‌کننده اصلی و Workerهای مستقل هنگام Repair اول دامنه اختصاصی ثبت‌شده هر نود را می‌خوانند و دیگر آن را با دامنه عمومی نود جایگزین نمی‌کنند؛ مشکل برگشت دامنه آمریکا یا فنلاند با تعمیر پروتکل برطرف می‌شود. اصلاحات نمایش ویرایشگر آمریکا/فنلاند و اعتبارسنجی SSL از rc.747 نیز حفظ شده‌اند. بدون تغییر سایر پروتکل‌ها.",
+    "en": "Enforce node.xray_domain precedence in the core Xray provisioner even when optional runtime wrappers are bypassed. Prevent USA/Finland dedicated TLS domains from reverting to shared public_domain during Repair/reconcile. Includes rc.747 editor, SSL hostname and stale-draft fixes; legacy Xray domains retain fallback behavior."
   }
 }
