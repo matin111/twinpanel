@@ -21,7 +21,11 @@ from sqlalchemy import text
 BACKEND = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND))
 
-from app.services.central_runtime_ownership_v1 import allow_central_node, is_central_node, mark_central_node, mark_central_applied
+from app.services.central_runtime_ownership_v1 import allow_central_node, is_central_node, mark_central_node, mark_central_applied, last_applied
+from app.services.central_sudoku_fingerprint_v1 import (
+    desired_fingerprint as desired_sudoku_fingerprint,
+    last_applied as last_sudoku_applied,
+)
 from app.database import SessionLocal
 from app.models import Node, NodeStatus, NodeType
 from app.services.new_node_readiness_v1 import verify_new_exit_readiness
@@ -79,12 +83,10 @@ def missing_runtime_families(node_id, limit):
         node = db.get(Node, node_id)
         if not allow_central_node(db, node):
             raise RuntimeError("CENTRAL_DELTA_NODE_NOT_OWNED")
-        require_valid_desired_state(
+        desired = require_valid_desired_state(
             load_desired_state(db, node_id), max_users=limit,
         )
         audit = verify_coverage(db, node_id)
-        if audit["ok"]:
-            return ()
         missing = {name for name, count in audit["missing_by_protocol"].items()
                    if int(count) > 0}
         selected = tuple(f for f in FAMILIES if f.protocols & missing)
@@ -93,8 +95,25 @@ def missing_runtime_families(node_id, limit):
                 or audit["subscriptions_without_entitlements"]
                 or audit["unknown_protocols"]):
             raise RuntimeError("CENTRAL_DELTA_AUDIT_NOT_RECONCILABLE")
-        # Only membership drift can be repaired by the next bounded
-        # _run_locked membership INSERT, without restarting any daemon.
+
+        # Missing-only credential coverage is NOT enough for revocable
+        # shared Sudoku. On expiry, quota exhaustion or plan change a stale
+        # client hash can remain in the LIVE daemon although every remaining
+        # entitled account has a credential item. Reconcile the complete
+        # whitelist whenever the node's desired entitlement fingerprint
+        # changes. The shared daemon itself checks for an unchanged config
+        # before restarting, so unrelated protocol changes stay idempotent.
+        if (last_sudoku_applied(db,node_id) !=
+                desired_sudoku_fingerprint(db,node_id)):
+            sudoku = next(f for f in FAMILIES if f.name == "sudoku")
+            if sudoku not in selected:
+                selected = (*selected, sudoku)
+
+        if audit["ok"] and not selected:
+            return ()
+        # Membership drift alone is repaired by the following bounded
+        # _run_locked membership INSERT. Never mark a changed fingerprint
+        # applied before Sudoku's live whitelist has been reconciled.
         if not selected and not audit["missing_node_memberships"]:
             raise RuntimeError("CENTRAL_DELTA_AUDIT_NOT_RECONCILABLE")
         return selected
