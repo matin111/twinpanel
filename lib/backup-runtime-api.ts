@@ -74,6 +74,61 @@ export async function uploadBackup(file:File,onProgress?:(percent:number)=>void)
   throw new Error("BACKUP_IMPORT_STILL_PROCESSING");
 }
 
+export type TelegramPartsSession={
+  id:string;filename:string;total_parts:number;received_parts:number[];
+  received_count:number;state:string;size_bytes:number;
+  imported_filename?:string;error_code?:string;
+};
+
+const partsPrefix=`${API_BASE}/v1/admin/backups/telegram-parts`;
+function telegramPartName(name:string){
+  const match=name.match(/^([a-zA-Z0-9][a-zA-Z0-9._-]{0,163}\\.tpbak)\\.part(\\d{3})of(\\d{3})$/);
+  if(!match)throw new Error("BACKUP_PART_FILENAME_INVALID");
+  const number=Number(match[2]),total=Number(match[3]);
+  if(number<1||total>75||number>total)throw new Error("BACKUP_PART_NUMBER_INVALID");
+  return {filename:match[1],number,total};
+}
+export async function initTelegramParts(file:File,sha256=""):Promise<TelegramPartsSession>{
+  telegramPartName(file.name);
+  const response=await fetch(partsPrefix,{
+    method:"POST",headers:{Authorization:`Bearer ${auth()}`,"Content-Type":"application/json"},
+    body:JSON.stringify({part_filename:file.name,sha256:sha256.trim()}),
+    cache:"no-store",
+  });
+  if(!response.ok)throw new Error(await errorText(response));
+  return (await response.json() as {session:TelegramPartsSession}).session;
+}
+export async function getTelegramPartsStatus(id:string):Promise<TelegramPartsSession>{
+  if(!/^[0-9a-f]{32}$/.test(id))throw new Error("BACKUP_PART_SESSION_ID_INVALID");
+  const response=await fetch(`${partsPrefix}/${id}`,{
+    headers:{Authorization:`Bearer ${auth()}`},cache:"no-store",
+  });
+  if(!response.ok)throw new Error(await errorText(response));
+  return (await response.json() as {session:TelegramPartsSession}).session;
+}
+export async function uploadTelegramPart(id:string,file:File):Promise<TelegramPartsSession>{
+  const info=telegramPartName(file.name);
+  const current=await getTelegramPartsStatus(id);
+  if(current.filename!==info.filename||current.total_parts!==info.total){
+    throw new Error("BACKUP_PART_SET_MISMATCH");
+  }
+  if(file.size<=0||file.size>40*1024*1024)throw new Error("BACKUP_PART_TOO_LARGE");
+  const form=new FormData();
+  form.append("file",file,file.name);
+  const response=await fetch(`${partsPrefix}/${id}/part`,{
+    method:"POST",headers:{Authorization:`Bearer ${auth()}`},body:form,cache:"no-store",
+  });
+  if(!response.ok)throw new Error(await errorText(response));
+  return (await response.json() as {session:TelegramPartsSession}).session;
+}
+export async function finishTelegramParts(id:string):Promise<TelegramPartsSession>{
+  const response=await fetch(`${partsPrefix}/${id}/finish`,{
+    method:"POST",headers:{Authorization:`Bearer ${auth()}`},cache:"no-store",
+  });
+  if(!response.ok)throw new Error(await errorText(response));
+  return (await response.json() as {session:TelegramPartsSession}).session;
+}
+
 export async function downloadBackupFile(filename:string){
   return downloadAuthenticated(`/v1/admin/backups/${encodeURIComponent(filename)}/download`,filename);
 }
