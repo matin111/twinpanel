@@ -1065,8 +1065,23 @@ def _observed_devices_by_protocol(
     grouped: dict[str, list[dict[str, Any]]] = {}
     for device in candidates:
         protocol = str(device.get("protocol") or "").strip().lower()
-        if protocol in SINGBOX_ACCOUNTING_PROTOCOLS:
-            grouped.setdefault(protocol, []).append(dict(device))
+        if protocol not in SINGBOX_ACCOUNTING_PROTOCOLS:
+            continue
+        entry = dict(device)
+        if protocol == "socks5":
+            # Older SOCKS5 credentials advertise the customer's login, but
+            # sing-box actually authenticates them as tp-sub-N. Only accept
+            # that alternate identity when it is *observed* on this inbound
+            # and the canonical active credential was already verified to
+            # belong to this exact node and subscription. Never infer it
+            # from an IP or unverified client-supplied username.
+            internal = f"tp-sub-{int(device['subscription_id'])}"
+            current = str(
+                entry.get("telemetry_identity") or entry.get("identity") or ""
+            ).strip()
+            if internal in observed_names and current not in observed_names:
+                entry["telemetry_identity"] = internal
+        grouped.setdefault(protocol, []).append(entry)
     return grouped
 
 
