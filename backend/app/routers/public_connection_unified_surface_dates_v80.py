@@ -158,6 +158,24 @@ html body.tp80-connection .tp80-socks5-detail .fact{
  text-align:center!important;word-break:break-word!important;padding:11px!important;
 }
 html body.tp80-connection .tp80-socks5-detail .fact strong{overflow-wrap:anywhere!important}
+html body.tp80-connection .tp80-socks5-detail .tp-socks-telegram-actions{
+  display:flex!important;gap:8px!important;flex-wrap:wrap!important;margin:12px 0 3px!important;
+  direction:rtl!important;
+}
+html body.tp80-connection .tp80-socks5-detail .tp-socks-telegram-actions a,
+html body.tp80-connection .tp80-socks5-detail .tp-socks-telegram-actions button{
+  border:1px solid #53648c!important;border-radius:10px!important;
+  background:#293f69!important;color:#fff!important;cursor:pointer!important;
+  padding:11px 14px!important;min-height:41px!important;font:inherit!important;
+  font-size:12px!important;font-weight:800!important;text-decoration:none!important;
+  display:inline-flex!important;align-items:center!important;justify-content:center!important;
+}
+html body.tp80-connection .tp80-socks5-detail .tp-socks-telegram-actions .tp-socks-telegram-open{
+  background:#1686bb!important;border-color:#1686bb!important;
+}
+html body.tp80-connection .tp80-socks5-detail>.ref67-row-actions{
+  display:flex!important;justify-content:flex-start!important;margin-top:8px!important;
+}
 @media(max-width:720px){
  html body.tp80-connection .tp80-socks5-detail .facts{grid-template-columns:1fr!important}
 }
@@ -2000,6 +2018,61 @@ _SCRIPT = r"""
      }
    }
  }
+ function tpSocksTelegramActions(facts){
+   // Read only the original server-local credentials; never the global
+   // subscription fields or another country's active tab.
+   const fields={};
+   facts.querySelectorAll(':scope > .fact').forEach(fact=>{
+     const label=String(fact.querySelector('small')?.textContent||'').trim().toLowerCase();
+     const value=String(fact.querySelector('strong')?.textContent||'').trim();
+     if(label&&value)fields[label]=value;
+   });
+   const address=String(fields['server & port']||'').trim();
+   const match=address.match(/^(.+):(\\d{1,5})$/);
+   const user=String(fields['username']||'');
+   const password=String(fields['password']||'');
+   if(!match||!user||!password)return null;
+   const server=match[1].replace(/^\\[|\\]$/g,'');
+   const port=Number(match[2]);
+   if(!server||!Number.isInteger(port)||port<1||port>65535)return null;
+   const params=new URLSearchParams({server,port:String(port),user,pass:password});
+   const direct='https://t.me/socks?'+params.toString();
+   const shared='https://t.me/share/url?'+new URLSearchParams({
+     url:direct,text:'اتصال SOCKS5 تلگرام (اطلاعات خصوصی اشتراک)'
+   }).toString();
+   const actions=el('div','tp-socks-telegram-actions');
+   // Telegram displays a confirmation prompt before enabling a SOCKS5 proxy.
+   const connect=el('a','tp-socks-telegram-open','اتصال مستقیم به تلگرام');
+   connect.href=direct;connect.target='_blank';connect.rel='noopener noreferrer';
+   const share=el('a','','ارسال لینک به تلگرام');
+   share.href=shared;share.target='_blank';share.rel='noopener noreferrer';
+   share.title='این لینک شامل نام کاربری و رمز است؛ فقط در گفت‌وگوی خصوصی ارسال کنید';
+   const copy=el('button','','کپی لینک تلگرام');
+   copy.type='button';
+   copy.addEventListener('click',async()=>{
+     let ok=false;
+     try{
+       if(navigator.clipboard&&window.isSecureContext){
+         await navigator.clipboard.writeText(direct);ok=true;
+       }
+     }catch(_e){}
+     if(!ok){
+       const area=document.createElement('textarea');
+       area.value=direct;area.style.position='fixed';area.style.left='-9999px';
+       document.body.append(area);area.select();
+       try{ok=document.execCommand('copy')}catch(_e){}
+       area.remove();
+     }
+     const toast=document.getElementById('toast');
+     if(toast){
+       toast.textContent=ok?'لینک تلگرام کپی شد':'کپی انجام نشد';
+       toast.classList.add('show');
+       setTimeout(()=>toast.classList.remove('show'),1700);
+     }
+   });
+   actions.append(connect,share,copy);
+   return actions;
+ }
  function normalizeModern(panel){
    if(panel.dataset.tp80ModernReady==='1'||panel.dataset.v54V2ray==='1')return;
    if(panel.classList.contains('tp80-native')||panel.dataset.ref67NativeProtocol)return;
@@ -2007,10 +2080,14 @@ _SCRIPT = r"""
    const tabs=[...panel.querySelectorAll('.server-tab[data-server]')];
    const rows=[...list?.querySelectorAll(':scope > .ref67-row')||[]];
    if(!list||!tabs.length||!rows.length)return;
+   const socks=keyForPanel(panel)==='socks5';
    const sections=[];
    rows.forEach((row,index)=>{
      const actions=row.querySelector('.ref67-row-actions');
-     if(actions&&actions.querySelector('a[href],button'))return;
+     // Other protocols preserve their original working import/copy buttons.
+     // SOCKS5 needs a consistent "view details" button for EVERY Exit even
+     // when V67 inserted a copy button for only some countries.
+     if(!socks&&actions&&actions.querySelector('a[href],button'))return;
      const tab=tabs[index];
      const view=tab?panel.querySelector('.server-view[id="'+tab.dataset.server+'"]'):null;
      if(!view||!view.textContent.trim())return;
@@ -2018,23 +2095,23 @@ _SCRIPT = r"""
      toggle.type='button';
      const holder=el('section','tp80-modern-detail');
      holder.hidden=true;
-     // SOCKS5 often carries both a human-readable raw credential block and
-     // canonical .facts. Keep the actual copyable facts, not two copies of
-     // the same secrets or a large raw text canvas.
-     const socks=keyForPanel(panel)==='socks5';
      const realFacts=socks?view.querySelector('.facts'):null;
      if(realFacts){
        holder.classList.add('tp80-socks5-detail');
        view.hidden=true;
-       // Some V67/V69 rules forcibly display .server-view with !important;
-       // an inline important override keeps the redundant raw SOCKS dump out.
        view.style.setProperty('display','none','important');
        view.setAttribute('aria-hidden','true');
        holder.append(view,realFacts);
+       const telegram=tpSocksTelegramActions(realFacts);
+       if(telegram)holder.append(telegram);
+       // Move existing live copy handlers into the matching details section,
+       // not beneath another country. Do not clone/rebind them.
+       if(actions)holder.append(actions);
        toggle.textContent='نمایش اطلاعات';
      }else{
-       // Reuse the ORIGINAL details/buttons. A clone would lose their handlers.
        holder.append(view);
+       if(socks&&actions)holder.append(actions);
+       if(socks)toggle.textContent='نمایش اطلاعات';
      }
      row.insertAdjacentElement('afterend',holder);
      row.append(toggle);
@@ -2051,7 +2128,10 @@ _SCRIPT = r"""
    });
    if(sections.length){
      panel.querySelector('.ref67-tabs')?.addEventListener('click',()=>{
-       sections.forEach(section=>{section.holder.hidden=true;section.toggle.textContent='نمایش کانفیگ'});
+       sections.forEach(section=>{
+         section.holder.hidden=true;
+         section.toggle.textContent=section.holder.classList.contains('tp80-socks5-detail')?'نمایش اطلاعات':'نمایش کانفیگ';
+       });
      });
    }
    panel.dataset.tp80ModernReady='1';
