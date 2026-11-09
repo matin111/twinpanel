@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.750",
+  "version": "1.1.0-rc.751",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-09T20:30:06Z",
+  "released_at": "2026-11-09T20:41:22Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "427e279fd0a79ff297c4066fd62a323765fe62c0",
+  "source_sha": "9287094ffb6ac126520a20bb86212c74d169e4f0",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.750/twinpanel-1.1.0-rc.750-linux-x86_64.tar.gz",
-    "sha256": "fabc3733fe315203678933e764a155246f2cc6cd8f43c89db172890bdbe76e12",
-    "size_bytes": 30143772
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.751/twinpanel-1.1.0-rc.751-linux-x86_64.tar.gz",
+    "sha256": "a13c3ca87ac983cf0999d6d9e7ce0ffa4aa4dca5c36dab3109df730ef5b96093",
+    "size_bytes": 30147636
   },
   "notes": {
-    "fa": "افزودن ریست مستقل مصرف ترافیک در ویرایش اشتراک و ریست ترافیک و تاریخ در تمدید اشتراک؛ حفظ سوابق حسابداری و مبنای شمارنده‌های پروتکل‌ها؛ شروع اعتبار جدید از لحظه تمدید فقط با انتخاب ریست تاریخ؛ حفاظت از تعلیق دستی و بازفعال‌سازی اشتراک معلق صرفاً در صورت اتمام حجم قبلی.",
-    "en": "Admin subscription edit supports an optional independent usage-balance reset; renew supports independent usage and new-term date reset from now. Preserves cumulative node cursor checkpoints and historical quota audit data, locks subscription against concurrent usage writes, and selectively restores quota-exhausted users while preserving manual suspension."
+    "fa": "رفع خطای منوهای تلگرام هنگام استفاده از پیام عکس و QR؛ دریافت لینک اکانت، افزودن ساب‌لینک، بروزرسانی، تمدید و بازگشت به مدیریت اکانت با نمایش ایمن پیام. تشخیص قطعی خطای ارسال فرمان ری‌استارت آپدیتر به systemd و جلوگیری از ادامه بی‌صدای استقرار ناموفق. حفظ قابلیت ریست مستقل حجم و تاریخ و تست‌های محافظتی نسخه قبلی. این نسخه به‌تنهایی مشکل فاصله قطعی API در ری‌استارت یا قفل هم‌زمان دیتابیس را برطرف نمی‌کند.",
+    "en": "Fix Telegram QR/photo callback navigation for account link lookup, imported subscription management, renewal and refresh without invalid editMessageText calls. Fail closed on updater systemd restart dispatch errors; preserve independent traffic/date reset and its regression gate. This release does not yet solve the API listener downtime gap during restarts or admin-edit database lock contention."
   }
 }
