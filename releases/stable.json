@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.755",
+  "version": "1.1.0-rc.756",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-09T21:31:54Z",
+  "released_at": "2026-11-09T21:58:08Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "cda4a613e0d9faa8fe9932f24ea3aa3254d7b529",
+  "source_sha": "e9eacfd9ac3d0bff1207b8e0eedf22e78f247000",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.755/twinpanel-1.1.0-rc.755-linux-x86_64.tar.gz",
-    "sha256": "576f54557f0b98bfe572b45d3321217470cffc61c8dd52090efcd1baa7a3dae4",
-    "size_bytes": 30185814
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.756/twinpanel-1.1.0-rc.756-linux-x86_64.tar.gz",
+    "sha256": "bcd921c139f85ade39b778563e444eae895bc0b6e780cbb208af8bae5044e3e1",
+    "size_bytes": 30186962
   },
   "notes": {
-    "fa": "بهینه‌سازی بکاپ بدون حذف داده یا هویت اتصال: بازپیچی رمزگذاری هویت‌های OpenVPN/WireGuard و L2TP روی پنل مقصد، فشرده‌سازی Zstandard سطح ۱۰، پشتیبانی از فایل‌های GZIP قبلی و ZIP تک‌فایلی، جلوگیری از بازکردن آرشیوهای بیش‌ازحد بزرگ، نصب zstd در نصب خام. نمونه واقعی ۶۶.۹۶ به ۳۵.۵۴ مگابایت کاهش یافت. فایل بکاپ بدون رمزگذاری و شامل داده‌های محرمانه است؛ خصوصی نگهداری شود.",
-    "en": "Lossless portable backups: rewrap OpenVPN/WireGuard identities and L2TP secrets on the destination, zstd level 10, legacy gzip and one-file ZIP support, bounded decompression, clean-installer zstd setup. Real sample 66.96 MB to 35.54 MB. Archive is unencrypted and contains sensitive secrets."
+    "fa": "رفع مشکل توقف ربات‌های نمایندگی هنگام فعال‌سازی یا بازگشت از Socket Activation در پنل مادر: سرویس‌های وابسته‌ای که پیش از تغییر روشن بودند، پس از سلامت API خودکار بازیابی می‌شوند؛ سرویس‌های عمداً غیرفعال روشن نمی‌شوند. حفظ اصلاحات قبلی API، 502، مدیریت خطای قفل دیتابیس، ربات، ویتوری، بکاپ و ریست حجم/تاریخ. این نسخه تضمین حذف همه قفل‌های PostgreSQL یا خطاهای درخواست‌های در حال اجرا را نمی‌دهد.",
+    "en": "Restore previously active reseller bot supervisors following controlled API socket activation or disable/rollback, leaving intentionally inactive services off. Preserves prior API listener, DB conflict safety, Telegram, Xray, backups and quota/date reset fixes. Underlying PostgreSQL lock-holder and in-flight request interruptions remain separate issues."
   }
 }
