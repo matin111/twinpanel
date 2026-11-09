@@ -239,7 +239,7 @@ _SCRIPT = r"""
      if(!actualCopy) return;
      output.push({
        key:'legacy:'+id+':'+index,code:validCode(code)?code:'',id,
-       name:id,uris:[],originalCopy:actualCopy,
+       name:String(tab?.dataset.nodeName||id).trim(),uris:[],originalCopy:actualCopy,
      });
    });
    return output;
