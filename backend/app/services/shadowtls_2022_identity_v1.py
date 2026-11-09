@@ -32,7 +32,7 @@ def _validate_key(value: str) -> str:
         raise ValueError("shadowtls_2022_key_invalid")
     try:
         raw = base64.b64decode(value, validate=True)
-    except (ValueError, Exception) as exc:
+    except Exception as exc:
         raise ValueError("shadowtls_2022_key_invalid") from exc
     if len(raw) != 16:
         raise ValueError("shadowtls_2022_key_length_invalid")
@@ -89,7 +89,10 @@ def stage_parallel_identity_inbounds(
             continue
         if existing.get("tag") in (NEW_OUTER_TAG, NEW_INNER_TAG):
             raise ValueError("shadowtls_2022_parallel_tag_already_exists")
-        if existing.get("listen_port") == listen_port and existing.get("listen") not in ("127.0.0.1", "::1"):
+        # Same port on any address family is unsafe for additive rollout.
+        # Refuse even loopback duplicates; node provisioning must reserve a
+        # genuinely separate port and verify all tunnel listeners as well.
+        if existing.get("listen_port") == listen_port:
             raise ValueError("shadowtls_2022_port_conflict")
     real_users = []
     seen = set()
