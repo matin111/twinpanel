@@ -86,8 +86,14 @@ async def verify_new_exit_readiness(
                         expected = frozenset((
                             "websocket_tls", "xhttp_reality", "tcp_tls",
                         ))
+                        expected_domain = str(
+                            getattr(node, "xray_domain", None) or ""
+                        ).strip().lower()
                         if (
-                            not authority.get("tls_enabled")
+                            not expected_domain
+                            or not authority.get("tls_enabled")
+                            or str(authority.get("tls_domain") or "").strip().lower()
+                            != expected_domain
                             or profiles != expected
                         ):
                             failed.append(key)
