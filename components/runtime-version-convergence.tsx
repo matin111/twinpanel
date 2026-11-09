@@ -7,6 +7,7 @@ const POLL_MS=15_000;
 const CONFIRM_MS=1_200;
 const REQUEST_TIMEOUT_MS=4_000;
 const CACHE_BUSTER="__tpv";
+const CONVERGENCE_GUARD_KEY="twinpanel:last-convergence-attempt-v1";
 
 function sleep(ms:number){
   return new Promise<void>(resolve=>window.setTimeout(resolve,ms));
@@ -65,6 +66,17 @@ export function RuntimeVersionConvergence(){
       if(!confirmed||confirmed!==serverVersion||confirmed===BUILD_VERSION)return false;
 
       const url=new URL(window.location.href);
+      // The URL marker is carried across the hard reload. If the release
+      // still serves an outdated browser bundle, repeating the same replace
+      // every 15s would trap customers in an endless refresh loop.
+      if(url.searchParams.get(CACHE_BUSTER)===confirmed)return false;
+      const attempt=BUILD_VERSION+"->"+confirmed;
+      try{
+        if(window.sessionStorage.getItem(CONVERGENCE_GUARD_KEY)===attempt)return false;
+        window.sessionStorage.setItem(CONVERGENCE_GUARD_KEY,attempt);
+      }catch{
+        // Restricted storage must not disable the URL-based loop guard.
+      }
       url.searchParams.set(CACHE_BUSTER,confirmed);
       window.location.replace(url.toString());
       return true;
