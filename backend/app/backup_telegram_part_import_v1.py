@@ -112,6 +112,26 @@ def show_session(ident:str):
     return {"ok":True,"session":status(load(ident))}
 
 
+@router.delete("/telegram-parts/{ident}")
+def cancel_session(ident:str):
+    folder,meta,lock=paths(ident)
+    if not folder.is_dir():
+        raise HTTPException(status_code=404,detail="BACKUP_PART_SESSION_UNKNOWN")
+    with lock.open("a+") as mutex:
+        fcntl.flock(mutex,fcntl.LOCK_EX)
+        state=load(ident)
+        if state["state"]=="verifying":
+            raise HTTPException(status_code=409,detail="BACKUP_PART_JOIN_IN_PROGRESS")
+        # Only temporary chunks and bookkeeping are deleted here.
+        # Never remove the verified imported backup file from BACKUP_ROOT.
+        for part in folder.iterdir():
+            if part.is_file() and part.name!="state.lock":
+                part.unlink(missing_ok=True)
+    lock.unlink(missing_ok=True)
+    folder.rmdir()
+    return {"ok":True,"deleted":True}
+
+
 @router.post("/telegram-parts/{ident}/part")
 async def upload_part(ident:str,file:UploadFile=File(...)):
     folder,meta,lock=paths(ident)
