@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.753",
-  "source_sha": "0a451ca85de36087139a7be1d93316ac03345173",
+  "version": "1.1.0-rc.754",
+  "source_sha": "10dce42f28bcd42cdb222e3ce477ba6ff36e8c76",
   "notes": {
-    "fa": "اصلاح دائمی نصب و Repair پروتکل V2Ray/Xray فنلاند و نودهای جدید: ارسال هویت و دامنه اختصاصی نود به نصب‌کننده؛ جلوگیری از بازنویسی کانفیگ کاربران توسط نصب‌کننده قدیمی؛ ممنوعیت افت خودکار TLS به سه REALITY؛ صحت‌سنجی سه Inbound واقعی با API و پورت‌های فعال؛ نصب WebSocket/TCP TLS از طریق API بدون ری‌استارت کل Xray؛ حفظ UUID و وضعیت قبلی کاربران حتی هنگام خطای Repair. سایر پروتکل‌ها و کشورها دست‌نخورده‌اند.",
-    "en": "Stop destructive Xray reinstalls and Finland TLS reverting to three REALITY inbounds. Pass the real node/domain into fresh install and Repair, retain existing active Xray config and UUIDs, fail closed if dedicated TLS identity is missing, verify all three real TLS/XHTTP inbounds through live HandlerService and TCP listeners, hot-add missing TCP TLS without service restart, and preserve prior published protocol state on failed repairs. 56 targeted regression tests passed."
+    "fa": "رفع کامل برگشت تنظیمات V2Ray/Xray به Reality پس از نصب یا Repair از داخل پنل مادر. مسیر قدیمی Pre-Repair برای نودهای دارای دامنه اختصاصی حذف شد؛ نصب مجدد از مسیر واحد Node-aware استفاده می‌کند و سه Inbound واقعی WebSocket TLS، XHTTP Reality و TCP TLS را بررسی می‌کند. نصب‌کننده قدیمی حق بازنویسی کانفیگ موجود ندارد. اضافه‌کردن TCP TLS با API و بدون ری‌استارت کلی Xray انجام می‌شود؛ UUID، دامنه و گواهی و وضعیت قبلی پروتکل در Repair ناموفق حفظ می‌شوند. اصلاح شامل همه نودهای جدید TLSدار است، نه فقط فنلاند. سایر پروتکل‌ها بدون تغییر.",
+    "en": "Complete central-panel Xray install/Repair fix for dedicated TLS Exit nodes, including Finland and future nodes. Remove the older pre-repair partial builder from dedicated-domain flow. Single node-aware installer verifies all three live WS TLS/XHTTP Reality/TCP TLS inbounds, never runs legacy bootstrap over existing Xray config, hot-adds TCP TLS through Xray API without restarting Xray, and preserves UUIDs, TLS certificates and enabled protocol state on failed Repair. Existing domainless nodes/other protocols unchanged. 56 main regression tests plus 27 focused follow-up tests passed."
   }
 }
