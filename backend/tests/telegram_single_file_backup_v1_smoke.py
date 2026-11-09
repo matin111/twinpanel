@@ -1,6 +1,8 @@
 """Offline test: local Telegram Bot API receives one full backup document."""
 from __future__ import annotations
 import json
+import io
+import zipfile
 import sys
 import tempfile
 from pathlib import Path
@@ -31,10 +33,14 @@ def main():
             if method=="sendDocument":
                 assert "document" in files
                 filename,handle,mimetype=files["document"]
-                assert filename==backup.name
-                assert handle.read()==backup.read_bytes()
+                assert filename=="test-backup.zip"
+                assert mimetype=="application/zip"
+                content=handle.read()
+                with zipfile.ZipFile(io.BytesIO(content)) as archive:
+                    assert archive.namelist()==[backup.name]
+                    assert archive.read(backup.name)==backup.read_bytes()
                 return {"ok":True,"result":{"message_id":11,
-                    "document":{"file_size":backup.stat().st_size}}}
+                    "document":{"file_size":len(content)}}}
             if method=="sendMessage":
                 assert "SHA256" in data["text"]
                 return {"ok":True,"result":{"message_id":12}}
@@ -45,7 +51,7 @@ def main():
             first=single.send_single_backup(
                 backup,"9876",token="fake-token",meta=meta,write_meta=save
             )
-            assert first["parts"]==1 and first["delivery_mode"]=="single"
+            assert first["parts"]==1 and first["delivery_mode"]=="single_zip"
             assert meta["telegram_sent"] is True
             assert recorded[-1]["telegram_parts_sent"]==[1]
             second=single.send_single_backup(
