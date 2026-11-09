@@ -3,7 +3,11 @@
 Does not require live credentials or network access.
 """
 import json
+import sys
+from pathlib import Path
 from types import SimpleNamespace
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.routers.modern_account_delivery_v1 import _singbox_secret
 from app.singbox_subscription_accounts import SingBoxAccountSecret,client_item
