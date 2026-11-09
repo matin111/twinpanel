@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.756",
-  "source_sha": "e9eacfd9ac3d0bff1207b8e0eedf22e78f247000",
+  "version": "1.1.0-rc.757",
+  "source_sha": "2a43bf905cf0b3f7bc114668346c53beb9618a13",
   "notes": {
-    "fa": "رفع مشکل توقف ربات‌های نمایندگی هنگام فعال‌سازی یا بازگشت از Socket Activation در پنل مادر: سرویس‌های وابسته‌ای که پیش از تغییر روشن بودند، پس از سلامت API خودکار بازیابی می‌شوند؛ سرویس‌های عمداً غیرفعال روشن نمی‌شوند. حفظ اصلاحات قبلی API، 502، مدیریت خطای قفل دیتابیس، ربات، ویتوری، بکاپ و ریست حجم/تاریخ. این نسخه تضمین حذف همه قفل‌های PostgreSQL یا خطاهای درخواست‌های در حال اجرا را نمی‌دهد.",
-    "en": "Restore previously active reseller bot supervisors following controlled API socket activation or disable/rollback, leaving intentionally inactive services off. Preserves prior API listener, DB conflict safety, Telegram, Xray, backups and quota/date reset fixes. Underlying PostgreSQL lock-holder and in-flight request interruptions remain separate issues."
+    "fa": "اصلاح ریشه‌ای نمایش دامنه اختصاصی V2Ray/Xray هنگام تونل ایران: راهنمای اشتباه پنل که DNS را به IP خروجی هدایت می‌کرد حذف و اصلاح شد. در مدیریت دامنه و ویرایش سه Inbound، DNS واقعی، IP صحیح ورودی تونل ایران و علت جایگزینی IP به‌جای دامنه نمایش داده می‌شود. آمریکا و آلمان دوم DNS اشتباه دارند؛ آلمان اول، انگلیس و فنلاند از نظر DNS صحیح‌اند. با اصلاح رکوردهای DNS، ساب‌لینک به طور خودکار دامنه را ترجیح می‌دهد؛ بدون تغییر UUID، پورت، سرویس Xray، دیگر پروتکل‌ها یا گواهی‌ها. اصلاح DNS خارجی توسط این آپدیت انجام نمی‌شود.",
+    "en": "Fix Xray domain-to-Iran-ingress guidance and expose read-only mismatch diagnostics in node/domain and three-inbound editor UIs. Verified USA and Germany Exit hostnames currently point at Exit IPs instead of the active Iran tunnel ingress, which explains safe fallback to IP. Present actual resolved DNS and exact required A record. Other Germany, UK and Finland DNS routes match. No external DNS, UUIDs, ports, certificates, VPN services or other nodes are changed by this release."
   }
 }
