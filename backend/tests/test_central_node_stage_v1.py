@@ -308,6 +308,10 @@ class CentralNodeStageTests(unittest.TestCase):
                  "subscriptions_without_entitlements": 0,
                  "unknown_protocols": []}
         with (patch.object(stage, "SessionLocal") as session,
+              # A stable, previously acknowledged Sudoku-only whitelist
+              # must not be re-staged for unrelated protocol/membership drift.
+              patch.object(stage, "desired_sudoku_fingerprint", return_value="d"*64),
+              patch.object(stage, "last_sudoku_applied", return_value="d"*64),
               patch.object(stage, "load_desired_state",
                            return_value=desired_state(3)),
               patch.object(stage, "verify_coverage", return_value=audit)):
@@ -330,6 +334,10 @@ class CentralNodeStageTests(unittest.TestCase):
                  "subscriptions_without_entitlements": 0,
                  "unknown_protocols": []}
         with (patch.object(stage, "SessionLocal") as session,
+              # A stable, previously acknowledged Sudoku-only whitelist
+              # must not be re-staged for unrelated protocol/membership drift.
+              patch.object(stage, "desired_sudoku_fingerprint", return_value="d"*64),
+              patch.object(stage, "last_sudoku_applied", return_value="d"*64),
               patch.object(stage, "load_desired_state",
                            return_value=desired_state(3)),
               patch.object(stage, "verify_coverage", return_value=audit)):
