@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.758",
-  "source_sha": "d4b7009cf30b257d00cd3f3387b2f08d0932ddc4",
+  "version": "1.1.0-rc.759",
+  "source_sha": "f3f75f82521862abd9c0f1faee9465630249cc69",
   "notes": {
-    "fa": "اصلاح نمایش مدت اعتبار اشتراک‌ها: بدون مدت/انقضا = نامحدود؛ تمدید با روز، تاریخ انقضا و روز باقی‌مانده ایجاد می‌کند؛ نمایش همسان در مدیریت، سابلینک و پنل مشتری؛ رفع باگ «مدت تعیین نشده» و بازگردانی اعتبار پس از تمدید مجاز؛ حفظ قانون شروع دوره‌های از قبل تعیین‌شده با اولین اتصال. بدون حذف یا تغییر گروهی اطلاعات کاربران.",
-    "en": "Fix unlimited duration presentation and dated renewals: accounts without term or expiry are unlimited; adding days starts a finite term when previously unlimited; show expiry plus remaining days in admin, connection hub and customer portal; preserve first-use activation for preconfigured waiting accounts; repair stale unlimited flags and restore eligible expired accounts."
+    "fa": "اصلاح سراسری بازماندن تراکنش PostgreSQL هنگام نصب نود تازه: آزادسازی تراکنش خواندنی پیش از SSH و apt و جلوگیری از refresh غیرضروری بعد از ثبت نود. تفکیک اتصال‌های HTTP و Worker در PostgreSQL برای شناسایی دقیق علت قفل‌ها و اضافه‌شدن گزارش فقط‌خواندنی و بدون اطلاعات محرمانه. حفظ ساخت مرکزی نودها، سه Inbound ویتوری، اکانت‌ها، ریست حجم/تاریخ، ربات‌ها، پرداخت‌ها و بکاپ. علت تمام قفل‌های Worker هنوز نیازمند تشخیص با داده‌های نسخه جدید است.",
+    "en": "Prevent long read-only PostgreSQL transactions from spanning SSH/apt during central new Exit bootstrap; use flush/commit for new Node ID without reopening a read transaction. Attribute HTTP versus worker PostgreSQL connections and add a read-only, redacted lock/blocker audit. Preserve central provisioning, three-profile Xray gates, billing, quota/date reset, bot and backup behavior. Additional worker lock root causes need post-release evidence."
   }
 }
