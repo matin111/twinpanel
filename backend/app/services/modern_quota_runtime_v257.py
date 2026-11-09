@@ -34,7 +34,7 @@ MODERN_ACCOUNTING_LOCK = Path("/run/twinpanel-modern-quota.lock")
 # traffic-accounting-ready until TwinPanel has a verified cumulative per-user
 # source. Presence-only protocols never fabricate byte counters.
 TRAFFIC_ACCOUNTING_PROTOCOLS = frozenset(
-    {"wireguard", "amneziawg", "trusttunnel"}
+    {"wireguard", "amneziawg", "trusttunnel", "mieru"}
 )
 PRESENCE_ACCOUNTING_PROTOCOLS = frozenset(
     {"wireguard", "amneziawg", "trusttunnel", "mieru", "sudoku"}
@@ -819,6 +819,104 @@ async def _collect_mieru(
         return False, [], f"mieru_parse_failed:{exc}"
 
 
+def _parse_mieru_cumulative_metrics(raw: str) -> dict[str, tuple[int, int]]:
+    """Read *lifetime persisted* per-user counters, not rolling 1/7/30-day usage.
+
+    Mieru server exports user > {username} > DownloadBytes / UploadBytes.
+    Per-user group names must match authenticated canonical credentials.
+    Missing or malformed counters fail closed; never estimate usage from
+    sliding-window CLI statistics or the global traffic group.
+    """
+    data = json.loads(raw)
+    if not isinstance(data, dict) or not isinstance(data.get("users"), dict):
+        raise ValueError("mieru_per_user_metric_groups_unavailable")
+    result: dict[str, tuple[int, int]] = {}
+    for username, counters in data["users"].items():
+        if not isinstance(username, str) or not username.strip():
+            continue
+        if not isinstance(counters, dict):
+            raise ValueError("mieru_user_counters_invalid")
+        upload = counters.get("UploadBytes")
+        download = counters.get("DownloadBytes")
+        if (
+            type(upload) is not int or type(download) is not int
+            or upload < 0 or download < 0
+        ):
+            raise ValueError("mieru_user_counters_invalid")
+        result[username] = (upload, download)
+    return result
+
+
+async def _collect_mieru_cumulative_metrics(
+    conn,
+) -> tuple[bool, dict[str, tuple[int, int]], str | None]:
+    ok, output = await _run_node_command(conn, "mita get metrics", timeout=8)
+    if not ok:
+        return False, {}, output[-500:] or "mieru_user_metrics_unavailable"
+    try:
+        return True, _parse_mieru_cumulative_metrics(output), None
+    except Exception as exc:
+        return False, {}, f"mieru_user_metrics_invalid:{type(exc).__name__}"
+
+
+def _apply_mieru_cumulative_metrics(
+    db,
+    *,
+    node: Node,
+    devices: list[dict[str, Any]],
+    metrics: dict[str, tuple[int, int]],
+) -> dict[str, Any]:
+    """Feed authoritative per-user lifetime values to the canonical quota ledger.
+
+    The first snapshot is a zero-charge baseline; subsequent increments
+    are replay-safe. Mieru persists its metrics across service restarts.
+    A stable counter epoch therefore avoids treating preserved totals as
+    new usage after a restart. If metrics are reset manually, decreasing
+    counters fail closed until a verified reset epoch is supplied.
+    """
+    now = _utcnow()
+    matched = baselined = usage_events = accepted_bytes = 0
+    for device in devices:
+        username = str(
+            device.get("telemetry_identity") or device.get("identity") or ""
+        ).strip()
+        counters = metrics.get(username)
+        if counters is None:
+            continue
+        matched += 1
+        active = _active_sessions(
+            db,
+            node_id=int(node.id),
+            device_id=int(device["device_id"]),
+            protocol="mieru",
+        )
+        usage = _baseline_or_apply_cumulative(
+            db,
+            node_id=int(node.id),
+            device=device,
+            protocol="mieru",
+            source_key=f"mieru:user:{username}"[:220],
+            counter_epoch="mieru-persisted-metrics-v1",
+            uplink=counters[0],
+            downlink=counters[1],
+            session_key=(active[0].session_key if active else None),
+            client_ip=None,
+            reported_at=now,
+        )
+        baselined += int(bool(usage["baselined"]))
+        usage_events += int(bool(usage["event"]))
+        accepted_bytes += int(usage["accepted_bytes"])
+    return {
+        "collector": "mieru-native-cumulative",
+        "node_id": int(node.id),
+        "matched": matched,
+        "baselined": baselined,
+        "usage_events": usage_events,
+        "accepted_bytes": accepted_bytes,
+        "usage_supported": True,
+    }
+
+
 def _apply_mieru_presence(
     db,
     *,
@@ -1079,21 +1177,22 @@ async def _reconcile_node(db, node: Node) -> list[dict[str, Any]]:
         if grouped.get("mieru"):
             ok, rows, error = await _collect_mieru(conn)
             results.append(
-                {
-                    "ok": True,
-                    **_apply_mieru_presence(
-                        db,
-                        node=node,
-                        devices=grouped["mieru"],
-                        rows=rows,
-                    ),
-                }
-                if ok
-                else {
-                    "ok": False,
-                    "collector": "mieru",
+                {"ok": True, **_apply_mieru_presence(
+                    db, node=node, devices=grouped["mieru"], rows=rows,
+                )} if ok else {
+                    "ok": False, "collector": "mieru-presence",
                     "node_id": int(node.id),
-                    "error": error or "mieru_source_unavailable",
+                    "error": error or "mieru_presence_unavailable",
+                }
+            )
+            metrics_ok, metrics, metrics_error = await _collect_mieru_cumulative_metrics(conn)
+            results.append(
+                {"ok": True, **_apply_mieru_cumulative_metrics(
+                    db, node=node, devices=grouped["mieru"], metrics=metrics,
+                )} if metrics_ok else {
+                    "ok": False, "collector": "mieru-native-cumulative",
+                    "node_id": int(node.id),
+                    "error": metrics_error or "mieru_user_metrics_unavailable",
                 }
             )
 
