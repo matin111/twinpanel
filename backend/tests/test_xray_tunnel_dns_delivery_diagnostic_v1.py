@@ -23,6 +23,8 @@ class TunnelDnsDeliveryTests(TestCase):
                          return_value=(host, port)),
             patch.object(runtime, "_resolved_host_ips",
                          side_effect=fake_dns),
+            patch.object(runtime.xray_modern_runtime, "_public_port",
+                         return_value=24000 + node.id),
         ):
             return runtime._xray_tunnel_dns_diagnostic(MagicMock(),node)
 
