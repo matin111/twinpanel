@@ -124,7 +124,7 @@ assert 'def _sudoku_share_uri(host: str, port: int, key: str, name: str) -> str:
 # Per-subscriber Sudoku services were permanently retired. The single
 # shared Exit family now constructs public JSON/share URI and verifies all
 # loaded clients, while the old standalone installer must fail closed.
-assert '"server_address": endpoint' in shared
+assert '"server_address":_sudoku_endpoint(host,SHARED_PORT)' in shared
 assert '"config_format":"sudoku-json"' in shared
 assert '"uri":uri' in shared
 assert "SUDOKU_PER_USER_SERVICE_RETIRED_USE_SHARED_CENTRAL_NODE" in standalone
