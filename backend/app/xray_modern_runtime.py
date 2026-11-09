@@ -1092,22 +1092,97 @@ async def _ensure_modern_xray(
     return state
 
 
-async def _install_xray_modern(conn, port: int):
+async def _install_xray_modern(conn, port: int, node: Node | None = None):
+    """Install or repair Xray with the selected node's TLS authority.
+
+    Never run the destructive legacy bootstrap against an existing config.
+    That bootstrap used to overwrite all three TLS inbounds, after which the
+    node-less modern wrapper rebuilt domainless REALITY and Vision profiles.
+    """
+    from .routers import provision
+
     original = _originals.get("install_xray")
     if original is None:
         return False, "legacy Xray installer unavailable"
 
-    ok, error = await original(conn, int(port))
-    if not ok:
-        return ok, error
+    port = int(port)
+    dedicated = _clean_domain(
+        getattr(node, "xray_domain", None) if node is not None else ""
+    )
+    existing = (
+        await provision.cmd(
+            conn,
+            "if [ -s /usr/local/etc/xray/config.json ]; "
+            "then echo present; else echo absent; fi",
+            check=False,
+        )
+    ).strip() == "present"
+
+    if existing and node is None:
+        # Every existing installation requires a node ID/domain. Fail before
+        # executing any state generator or replacing any config or clients.
+        return False, "XRAY_REPAIR_NODE_CONTEXT_REQUIRED"
+
+    if dedicated:
+        from . import xray_modern_admin
+        try:
+            certificate_ready = await xray_modern_admin._certificate_available(
+                conn, dedicated,
+            )
+        except Exception:
+            certificate_ready = False
+        if not certificate_ready:
+            return False, "XRAY_DEDICATED_TLS_CERTIFICATE_NOT_READY"
+
+    from .central_xray_node_authority_v1 import read_node_public_authority
+
+    async def verified() -> bool:
+        if node is None or not dedicated:
+            return False
+        try:
+            authority = await read_node_public_authority(conn)
+        except Exception:
+            return False
+        return bool(
+            authority.get("tls_enabled") is True
+            and str(authority.get("tls_domain") or "").lower() == dedicated
+            and set(authority.get("profiles") or ()) == {
+                "websocket_tls", "xhttp_reality", "tcp_tls",
+            }
+        )
+
+    if existing and await verified():
+        # Strict live check; healthy nodes are left bit-for-bit untouched.
+        return True, None
+
+    if existing:
+        # We can repair an existing Xray config only when the binary remains.
+        # Its bootstrapper must NEVER replace a real customer config.
+        binary_ready = (
+            await provision.cmd(
+                conn,
+                "test -x /usr/local/bin/xray && echo ready || echo missing",
+                check=False,
+            )
+        ).strip() == "ready"
+        if not binary_ready:
+            return False, "XRAY_EXISTING_CONFIG_REQUIRES_SAFE_BINARY_RECOVERY"
+    else:
+        if await provision.active(conn, "xray"):
+            return False, "XRAY_RUNNING_WITHOUT_MANAGED_CONFIG_STOP"
+        # Fresh, never-configured node only: legacy bootstrap installs the
+        # verified Xray binary and basic service; modern provisioning below
+        # then receives the actual Node and dedicated hostname.
+        ok, error = await original(conn, port)
+        if not ok:
+            return ok, error
 
     try:
         await _ensure_modern_xray(
-            conn,
-            int(port),
-            None,
-            bootstrap_done=True,
+            conn, port, node, bootstrap_done=True,
         )
+        if dedicated and not await verified():
+            return False, "XRAY_TLS_THREE_INBOUNDS_NOT_VERIFIED"
         return True, None
     except Exception as exc:
         return False, str(exc)[:1800]
