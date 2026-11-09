@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.762",
+  "version": "1.1.0-rc.763",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-09T23:14:04Z",
+  "released_at": "2026-11-09T23:57:45Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "dde468fa9e1ab8db0fa7ca0e7fe609046c1e1884",
+  "source_sha": "963bee0c9273213356b067228e0a7f5008420bf2",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.762/twinpanel-1.1.0-rc.762-linux-x86_64.tar.gz",
-    "sha256": "91e56e43737994e466b541dbf7c1e7e161e85de664bda3ac94f244a1e8634072",
-    "size_bytes": 30222884
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.763/twinpanel-1.1.0-rc.763-linux-x86_64.tar.gz",
+    "sha256": "6df41d11e2b3de89cf0555144f2de411baa259077586f0a9849b4fac31f4beaa",
+    "size_bytes": 30242749
   },
   "notes": {
-    "fa": "اصلاح ریشه‌ای بخشی از تراکنش‌های طولانی Workerهای آنلاین Sudoku، Naive و Mieru: بستن تراکنش‌های صرفاً خواندنی PostgreSQL پیش از انتظار SSH و دریافت وضعیت سرور. بدون تغییر در شمارش مصرف حجم، محدودیت دستگاه، اطلاعات اکانت، UUID، ساخت نود، کانفیگ پروتکل‌ها، ربات‌ها، کیف پول و تنظیمات. خطای مقطعی 502 مربوط به ری‌استارت وب روی پورت 3000 همچنان جداگانه در حال بررسی است.",
-    "en": "Release read-only PostgreSQL transactions before slow SSH presence probes in shared Sudoku, Naive and Mieru workers. Preserve quota counters, authenticated session identity, device limit rules, all protocol and node configs, credentials, reseller bots, payments, backups, and rc.761 receipt filtering. Independent frontend port 3000 502 restart gap remains open (#2570)."
+    "fa": "اصلاح فیلتر صفحه نودها: کارت‌های کل نودها، آنلاین، ایران و خارج قابل کلیک شدند و دقیقاً همان نودهای شمارش‌شده را نشان می‌دهند. فیلتر کشویی آنلاین، آفلاین، نگهداری و نود مادر اضافه شد. جستجو اکنون نام، شناسه، IP و دامنه نود را پشتیبانی می‌کند. وضعیت آنلاین در شمارنده و جدول از منبع یکسان خوانده می‌شود. فیلتر فعال، تعداد نتایج و حالت نتیجه خالی نمایش داده می‌شوند. هیچ تغییری در پروتکل‌ها، کاربران، نودها، تونل‌ها یا ذخیره اطلاعات ایجاد نمی‌شود.",
+    "en": "Enable clickable KPI filters for all/online/Iran/Exit nodes on the active admin nodes page, add Offline/Maintenance/Mother dropdown filters, search by name/IP/ID/domain, and keep KPI counts consistent with the same live overview status shown in the table. Selected filter/count and empty state included. UI and read-only filtering only; no node, protocol, tunnel, user or payment mutations. 5 Python regression tests, 8 dynamic filter checks, full TypeScript compile passed."
   }
 }
