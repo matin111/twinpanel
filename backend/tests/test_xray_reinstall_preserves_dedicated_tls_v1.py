@@ -24,6 +24,8 @@ def node(nid=22, domain="v2fin.in88.sbs"):
         id=nid, node_type=NodeType.EXIT,
         xray_domain=domain, public_domain="fin.in88.sbs",
         enable_v2ray=True,
+        enable_cisco=False, enable_openvpn=False,
+        enable_wireguard=False, enable_l2tp=False,
     )
 
 
@@ -40,15 +42,14 @@ class InstallerRetainsNodeContext(unittest.IsolatedAsyncioTestCase):
         cn=object()
         target=node()
         old=AsyncMock(return_value=(True,None))
-        probe=AsyncMock(return_value=authority())
+        probe=AsyncMock(return_value=True)
         with (
             patch.dict(xr._originals,{"install_xray":old}),
             patch.object(provision,"cmd",new=AsyncMock(return_value="present")),
             patch.object(xr, "_ensure_modern_xray",new=AsyncMock()) as ensure,
             patch("app.xray_modern_admin._certificate_available",
                   new=AsyncMock(return_value=True)),
-            patch("app.central_xray_node_authority_v1.read_node_public_authority",
-                  new=probe),
+            patch.object(xr, "_three_tls_inbounds_live", new=probe),
         ):
             ok,error=await xr._install_xray_modern(cn,8443,target)
         self.assertTrue(ok,error)
@@ -61,9 +62,7 @@ class InstallerRetainsNodeContext(unittest.IsolatedAsyncioTestCase):
         cn=object()
         target=node()
         original=AsyncMock(return_value=(True,None))
-        probes=AsyncMock(side_effect=[
-            RuntimeError("XRAY_WS_NOT_READY"),authority(),
-        ])
+        probes=AsyncMock(side_effect=[False,True])
         checks=AsyncMock(side_effect=["present","ready"])
         installed=AsyncMock(return_value={"tls_enabled":True})
         with (
@@ -72,8 +71,7 @@ class InstallerRetainsNodeContext(unittest.IsolatedAsyncioTestCase):
             patch.object(xr,"_ensure_modern_xray",new=installed),
             patch("app.xray_modern_admin._certificate_available",
                   new=AsyncMock(return_value=True)),
-            patch("app.central_xray_node_authority_v1.read_node_public_authority",
-                  new=probes),
+            patch.object(xr,"_three_tls_inbounds_live",new=probes),
         ):
             ok,error=await xr._install_xray_modern(cn,8443,target)
         self.assertTrue(ok,error)
@@ -122,8 +120,8 @@ class InstallerRetainsNodeContext(unittest.IsolatedAsyncioTestCase):
             patch.object(xr,"_ensure_modern_xray",new=AsyncMock()) as ensure,
             patch("app.xray_modern_admin._certificate_available",
                   new=AsyncMock(return_value=True)),
-            patch("app.central_xray_node_authority_v1.read_node_public_authority",
-                  new=AsyncMock(return_value=authority())),
+            patch.object(xr,"_three_tls_inbounds_live",
+                         new=AsyncMock(return_value=True)),
         ):
             ok,error=await xr._install_xray_modern(cn,8443,target)
         self.assertTrue(ok,error)
@@ -148,8 +146,8 @@ class ProtocolPanelNodeAwareRepair(unittest.IsolatedAsyncioTestCase):
         with (
             patch.object(provision,"install_xray",new=original),
             patch.object(provision,"save_config",new=MagicMock()) as save,
-            patch("app.central_xray_node_authority_v1.read_node_public_authority",
-                  new=AsyncMock(return_value=authority())),
+            patch.object(xr,"_three_tls_inbounds_live",
+                         new=AsyncMock(return_value=True)),
         ):
             results,failed,_=await provision.provision_protocols(
                 object(),self.settings(),db,target,repair=True,
@@ -166,8 +164,8 @@ class ProtocolPanelNodeAwareRepair(unittest.IsolatedAsyncioTestCase):
         with (
             patch.object(provision,"install_xray",new=original),
             patch.object(provision,"save_config",new=MagicMock()),
-            patch("app.central_xray_node_authority_v1.read_node_public_authority",
-                  new=AsyncMock(side_effect=RuntimeError("TLS_INCOMPLETE"))),
+            patch.object(xr,"_three_tls_inbounds_live",
+                         new=AsyncMock(return_value=False)),
         ):
             results,failed,_=await provision.provision_protocols(
                 object(),self.settings(),db,target,repair=True,
@@ -209,6 +207,52 @@ class ProtocolPanelNodeAwareRepair(unittest.IsolatedAsyncioTestCase):
         original.assert_awaited_once_with(
             unittest.mock.ANY,8443,target,
         )
+
+
+class StrictThreeInboundHealth(unittest.IsolatedAsyncioTestCase):
+    async def test_xray_api_tags_and_live_listener_ports_required(self):
+        cn=object()
+        target=node()
+        tags=json.dumps({"inbounds":[
+            {"tag":"vless-ws-tls"},
+            {"tag":"vless-xhttp-reality"},
+            {"tag":"vless-tcp-tls"},
+        ]})
+        with (
+            patch("app.central_xray_node_authority_v1.read_node_public_authority",
+                  new=AsyncMock(return_value=authority())),
+            patch.object(provision,"active",new=AsyncMock(return_value=True)),
+            patch.object(provision,"cmd",new=AsyncMock(return_value=tags)),
+            patch.object(provision,"listener",
+                         new=AsyncMock(return_value=True)) as listener,
+            patch.object(xr,"_target_port",
+                         side_effect=lambda port,profile: port + {
+                             "websocket_tls":1,
+                             "xhttp_reality":4,
+                             "tcp_tls":3,
+                         }[profile]),
+        ):
+            ready=await xr._three_tls_inbounds_live(cn,8443,target)
+        self.assertTrue(ready)
+        self.assertEqual(listener.await_count,3)
+
+    async def test_missing_ws_api_tag_is_not_a_healthy_install(self):
+        cn=object()
+        tags=json.dumps({"inbounds":[
+            {"tag":"vless-xhttp-reality"},
+            {"tag":"vless-tcp-tls"},
+        ]})
+        with (
+            patch("app.central_xray_node_authority_v1.read_node_public_authority",
+                  new=AsyncMock(return_value=authority())),
+            patch.object(provision,"active",new=AsyncMock(return_value=True)),
+            patch.object(provision,"cmd",new=AsyncMock(return_value=tags)),
+            patch.object(provision,"listener",
+                         new=AsyncMock(return_value=True)) as listener,
+        ):
+            ready=await xr._three_tls_inbounds_live(cn,8443,node())
+        self.assertFalse(ready)
+        listener.assert_not_awaited()
 
 
 class GeneratedStateFailClosed(unittest.TestCase):
