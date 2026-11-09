@@ -103,7 +103,20 @@ def bulk_adjust_subscriptions(
             updated += 1
             continue
 
-        if _is_duration_unlimited(override):
+        if operation == "add_days":
+            from ..models import Plan
+            from ..services.subscription_validity_v1 import add_validity_days
+            plan = db.get(Plan, sub.plan_id) if sub.plan_id is not None else None
+            add_validity_days(
+                sub, days, now, override=override,
+                plan_days=int(plan.duration_days or 0) if plan else 0,
+            )
+            updated += 1
+            continue
+
+        # Subtracting days cannot turn an unlimited subscription into finite.
+        from ..subscription_override_models import duration_is_unlimited
+        if duration_is_unlimited(db, sub):
             skipped += 1
             continue
 
@@ -114,16 +127,11 @@ def bulk_adjust_subscriptions(
             if current_days <= 0:
                 skipped += 1
                 continue
-
-            if operation == "add_days":
-                sub.activation_duration_days = current_days + days
-            else:
-                raw_days = current_days - days
-                next_days = max(1, raw_days)
-                if next_days > raw_days:
-                    clamped += 1
-                sub.activation_duration_days = next_days
-
+            raw_days = current_days - days
+            next_days = max(1, raw_days)
+            if next_days > raw_days:
+                clamped += 1
+            sub.activation_duration_days = next_days
             updated += 1
             continue
 
