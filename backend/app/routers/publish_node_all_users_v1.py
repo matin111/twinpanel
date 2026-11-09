@@ -177,6 +177,8 @@ class BackgroundNodeInstallIn(BaseModel):
     install_l2tp: bool = True
     install_v2ray: bool = False
     xray_port: int = Field(default=8443, ge=1, le=65535)
+    # Dedicated hostname needed for the three required TLS customer profiles.
+    xray_domain: str | None = None
     publish_to_all_users: bool = False
 
 
@@ -281,6 +283,18 @@ async def install_node_background_v1(
     request: Request,
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
+    # Do not create an Exit only to fail its hidden worker later with
+    # domainless Xray profiles. Require the dedicated hostname up front.
+    # Iran relay nodes do not run customer VPN/Xray and are exempt.
+    if payload.node_type == NodeType.EXIT:
+        from .xray_modern_admin import _clean_domain
+        domain = _clean_domain(payload.xray_domain)
+        if not domain or not "." in domain:
+            raise HTTPException(
+                status_code=422,
+                detail="XRAY_NEW_EXIT_DEDICATED_TLS_DOMAIN_REQUIRED",
+            )
+        payload.xray_domain = domain
     name_key = payload.name.strip().casefold()
     # Reject a duplicate active name (case/whitespace insensitive).
     # Reusing a retired name is explicitly allowed.
