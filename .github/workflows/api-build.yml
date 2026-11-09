@@ -121,6 +121,10 @@ jobs:
         working-directory: backend
         run: PYTHONPATH=. python tests/subscription_admin_cycle_reset_smoke.py
 
+      - name: Prevent stale release manifest hiding new updates
+        working-directory: backend
+        run: PYTHONPATH=. python tests/test_release_manifest_freshness_v1.py -v
+
       - name: Run NetMod UDPGW V231 regression
         working-directory: backend
         run: PYTHONPATH=. python tests/test_netmod_udpgw_v231.py
