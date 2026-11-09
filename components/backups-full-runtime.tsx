@@ -3,7 +3,7 @@
 import {ChangeEvent,useEffect,useMemo,useRef,useState} from "react";
 import {Badge,Card,Shell,Stat} from "./ui";
 import {BackupHome,BackupSettings,parityApi} from "../lib/admin-parity-api";
-import {downloadBackupFile,downloadRecoveryKey,uploadBackup,initTelegramParts,uploadTelegramPart,getTelegramPartsStatus,finishTelegramParts,discardTelegramParts,TelegramPartsSession} from "../lib/backup-runtime-api";
+import {downloadBackupFile,uploadBackup,initTelegramParts,uploadTelegramPart,getTelegramPartsStatus,finishTelegramParts,discardTelegramParts,TelegramPartsSession} from "../lib/backup-runtime-api";
 import {useI18n} from "../lib/i18n";
 
 const defaults:BackupSettings={enabled:false,frequency:"daily",hour:3,minute:0,weekday:0,timezone:"Asia/Tehran",send_telegram:false,telegram_chat_id:"",retention:14};
@@ -63,7 +63,7 @@ export function BackupsFullRuntimePage(){
       if(job.state==="succeeded"){
         sessionStorage.removeItem("tp-manual-backup-job");
         setOk(pick(
-          `بکاپ دستی با موفقیت به تلگرام ارسال شد (${job.parts||"?"} قسمت). فایل رمزگذاری‌شده از سرور حذف شد.`,
+          `بکاپ دستی با موفقیت به تلگرام ارسال شد (${job.parts||"?"} قسمت). فایل بکاپ از سرور حذف شد.`,
           `Manual backup delivered to Telegram (${job.parts||"?"} parts); server archive removed.`
         ));
         await load();
@@ -72,8 +72,8 @@ export function BackupsFullRuntimePage(){
       if(job.state==="failed"){
         sessionStorage.removeItem("tp-manual-backup-job");
         throw new Error(pick(
-          "ارسال بکاپ کامل نشد. فایل رمزگذاری‌شده برای ارسال مجدد محفوظ مانده است. کد: ",
-          "Backup delivery failed; encrypted archive retained for retry. Code: "
+          "ارسال بکاپ کامل نشد. فایل بکاپ برای ارسال مجدد محفوظ مانده است. کد: ",
+          "Backup delivery failed; backup archive retained for retry. Code: "
         )+String(job.error_code||"UNKNOWN"));
       }
       setOk(pick(
@@ -184,10 +184,10 @@ export function BackupsFullRuntimePage(){
     });
   },[]);
   const download=async(filename:string)=>{if(busy)return;setBusy(`download:${filename}`);setError("");setOk("");try{await downloadBackupFile(filename);setOk(pick("دانلود بکاپ شروع شد","Backup download started"));}catch(e){setError(e instanceof Error?e.message:String(e));}finally{setBusy("");}};
-  const recovery=async()=>{if(busy)return;setBusy("recovery");setError("");setOk("");try{await downloadRecoveryKey();setOk(pick("کلید بازیابی دانلود شد؛ آن را خارج از سرور نگه دارید.","Recovery key downloaded; store it off-server."));}catch(e){setError(e instanceof Error?e.message:String(e));}finally{setBusy("");}};
+
 
   return <Shell active="/admin/backups"><div className="page">
-    <div className="page-head"><div><h1>{pick("بکاپ و بازیابی","Backup & Restore")}</h1><small>{pick("بکاپ رمزگذاری‌شده، زمان‌بندی، Telegram، آپلود، دانلود و Restore","Encrypted backups, scheduling, Telegram, upload, download and restore")}</small></div><div className="action-row"><button className="ghost" disabled={Boolean(busy)} onClick={()=>inputRef.current?.click()}>{busy==="upload"?"…":pick("آپلود .tpbak","Upload .tpbak")}</button><input ref={inputRef} type="file" accept=".tpbak" hidden onChange={upload}/><button className="primary" disabled={Boolean(busy)} onClick={create}>{busy==="create"?"…":pick("بکاپ دستی و ارسال به تلگرام","Manual backup to Telegram")}</button></div></div>
+    <div className="page-head"><div><h1>{pick("بکاپ و بازیابی","Backup & Restore")}</h1><small>{pick("بکاپ قابل انتقال، زمان‌بندی، Telegram، آپلود، دانلود و Restore","Portable backups, scheduling, Telegram, upload, download and restore")}</small></div><div className="action-row"><button className="ghost" disabled={Boolean(busy)} onClick={()=>inputRef.current?.click()}>{busy==="upload"?"…":pick("آپلود .tpbak","Upload .tpbak")}</button><input ref={inputRef} type="file" accept=".tpbak" hidden onChange={upload}/><button className="primary" disabled={Boolean(busy)} onClick={create}>{busy==="create"?"…":pick("بکاپ دستی و ارسال به تلگرام","Manual backup to Telegram")}</button></div></div>
     {error&&<div className="runtime-error">{error}</div>}{ok&&<div className="runtime-success">{ok}</div>}
 
     <Card className="runtime-editor">
@@ -222,14 +222,12 @@ export function BackupsFullRuntimePage(){
           {pick("بررسی وضعیت","Check status")}
         </button>}
       </div>
-      <small>{pick("Restore خودکار اجرا نمی‌شود. کلید بازیابی باید با کلید فایل مطابقت داشته باشد.","Restore is never automatic. The recovery key must match the encrypted archive.")}</small>
+      <small>{pick("بازیابی فقط با تأیید مدیر انجام می‌شود و نیازی به کلید ندارد.","Restore requires admin confirmation; no recovery key is needed.")}</small>
     </Card>
 
     <div className="stats dashboard-stats"><Stat label={pick("تعداد بکاپ","Backups")} value={String(backups.length)} icon="⟲"/><Stat label={pick("حجم کل","Total size")} value={totalBytes?sizeText({size_bytes:totalBytes}):"—"} icon="▤"/><Stat label={pick("ارسال Telegram","Telegram copies")} value={String(telegramCount)} icon="✈"/><Stat label={pick("Retention","Retention")} value={`${settings.retention} ${pick("نسخه","copies")}`} icon="⌛"/></div>
 
     <div className="module-grid two">
-      <Card><div className="card-head"><div><b>{pick("کلید بازیابی","Recovery Key")}</b><small>{pick("بدون این کلید، بکاپ رمزگذاری‌شده روی سرور دیگر قابل Restore نیست.","Encrypted backups cannot be restored on another server without this key.")}</small></div><Badge tone="violet">{home.key_fingerprint?pick("فعال","Ready"):pick("نامشخص","Unknown")}</Badge></div><div className="runtime-info-list"><div><span>{pick("Fingerprint","Fingerprint")}</span><b dir="ltr">{home.key_fingerprint||"—"}</b></div><div><span>{pick("جداول داخل بکاپ","Included tables")}</span><b>{home.included_tables?.length??0}</b></div><div><span>{pick("جداول Runtime حذف‌شده","Excluded runtime tables")}</span><b>{home.excluded_runtime_tables?.length??0}</b></div></div><button className="ghost full" disabled={Boolean(busy)} onClick={()=>void recovery()}>{busy==="recovery"?"…":pick("دانلود کلید بازیابی","Download recovery key")}</button></Card>
-
       <Card><div className="card-head"><div><b>{pick("ربات اختصاصی بکاپ","Dedicated Backup Bot")}</b><small>{pick("این ربات فقط برای ارسال بکاپ است و هیچ وابستگی به ربات فروش ندارد.","This bot is used only for backup delivery and has no dependency on the sales bot.")}</small></div><Badge tone={telegramConfigured?"ok":"warn"}>{telegramConfigured?(telegramUsername?`@${telegramUsername}`:pick("تنظیم شده","Configured")):pick("تنظیم نشده","Not configured")}</Badge></div><label className="field"><span>{pick("توکن ربات بکاپ","Backup bot token")}</span><input type="password" dir="ltr" autoComplete="off" placeholder={telegramConfigured?pick("برای تعویض، توکن جدید را وارد کنید","Enter a new token to replace it"):"123456:AA..."} value={backupBotToken} onChange={e=>setBackupBotToken(e.target.value)}/></label><label className="field"><span>Telegram Chat ID</span><input dir="ltr" value={settings.telegram_chat_id} onChange={e=>setSettings(v=>({...v,telegram_chat_id:e.target.value}))}/></label><label className="toggle module-toggle"><span>{pick("ارسال بکاپ‌های جدید به Telegram","Send new backups to Telegram")}</span><input type="checkbox" checked={settings.send_telegram} onChange={e=>setSettings(v=>({...v,send_telegram:e.target.checked}))}/><i/></label><div className="action-row"><button className="primary" disabled={Boolean(busy)||backupBotToken.trim().length<20} onClick={saveBackupBot}>{busy==="backup-bot-save"?"…":pick("ذخیره ربات بکاپ","Save backup bot")}</button>{telegramConfigured&&<button className="ghost danger" disabled={Boolean(busy)} onClick={deleteBackupBot}>{busy==="backup-bot-delete"?"…":pick("حذف توکن","Remove token")}</button>}<button className="ghost" disabled={Boolean(busy)||!telegramConfigured} onClick={verifyTelegram}>{busy==="verify-telegram"?"…":pick("تأیید و تست Chat ID","Verify & test Chat ID")}</button><button className="primary" disabled={Boolean(busy)} onClick={saveSettings}>{busy==="settings"?"…":pick("ذخیره تنظیمات","Save settings")}</button></div></Card>
     </div>
 

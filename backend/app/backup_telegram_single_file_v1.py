@@ -1,4 +1,4 @@
-"""Single-document encrypted backup delivery via Telegram's local Bot API.
+"""Single-document portable backup delivery via Telegram's local Bot API.
 
 Telegram's cloud Bot API limits sendDocument uploads to 50MB. This module is
 enabled ONLY after the dedicated local Bot API server is configured and healthy.
@@ -95,10 +95,10 @@ def send_single_backup(backup_path: Path, chat_id: str, *,
         write_meta(backup_path, meta)
 
         caption = (
-            "TwinPanel encrypted backup (one complete file)\\n"
+            "TwinPanel portable data backup (one complete file)\\n"
             f"Type: {meta.get('kind', 'backup')}\\n"
             f"Created: {meta.get('created_at', '')}\\n"
-            "Keep the recovery key separately."
+            "Contains sensitive credentials; keep private."
         )
         with backup_path.open("rb") as source:
             result = _call(
@@ -129,7 +129,7 @@ def send_single_backup(backup_path: Path, chat_id: str, *,
             "text": (
                 f"TwinPanel single-file backup complete: {backup_path.name}\\n"
                 f"SHA256: {meta.get('sha256', '')}\\n"
-                "Verify SHA256 and use the separately stored recovery key."
+                "Verify SHA256 and restrict file access."
             ),
         },
         timeout=35.0,
