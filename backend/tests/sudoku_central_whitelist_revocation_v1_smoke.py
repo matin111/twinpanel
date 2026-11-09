@@ -72,7 +72,10 @@ def test_empty_staging_stops_only_owned_shared_service():
     src=remote_source()
     assert 'if action=="deactivate":' in src
     assert "SUDOKU_SHARED_UNIT_OWNERSHIP_CONFLICT" in src
-    assert '["systemctl","stop",SERVICE]' in src
+    assert '["systemctl","disable","--now",SERVICE]' in src
+    assert '["systemctl","is-enabled","--quiet",SERVICE]' in src
+    # A stale live whitelist must not reappear from systemd on reboot.
+    assert '["systemctl","stop",SERVICE]' not in src
     assert '"users":0,"port":PORT,"deactivated":True' in src
     assert "systemctl stop twinpanel-api" not in src
     assert "twinpanel-sudoku-sub-" not in src
