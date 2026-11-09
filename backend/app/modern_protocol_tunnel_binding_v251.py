@@ -310,24 +310,9 @@ def _modern_routes_for_exit(db, exit_node: Node, exit_tunnel_ip: str) -> list[di
                     "transport": "tcp",
                     "client_subnet": None,
                 })
-        else:
-            # Legacy Exit during staged migration: preserve original mappings
-            # and existing customer links until an explicit verified cutover.
-            sudoku_ports = _sudoku_public_port_map(db)
-            for subscription_id in _sudoku_desired_subscription_ids(db):
-                output.append({
-                    "protocol": "sudoku",
-                    "profile": f"subscription-{subscription_id}",
-                    "subscription_id": int(subscription_id),
-                    "exit_node_id": int(exit_node.id),
-                    "public_port": sudoku_ports[
-                        (int(exit_node.id), int(subscription_id))
-                    ],
-                    "target_ip": str(exit_tunnel_ip),
-                    "target_port": int(_sudoku_port(int(subscription_id))),
-                    "transport": "tcp",
-                    "client_subnet": None,
-                })
+        # Noncentral Exits have no Sudoku service after the verified
+        # 2026-11-09 retirement. No per-subscriber 3xxxx listeners or 4xxxx
+        # NAT entries may be (re)created during tunnel reconciliation.
 
     return output
 
@@ -418,7 +403,9 @@ def _modern_tunnel_endpoint(
                 return None
             port = _shared_sudoku_public_port(int(exit_node.id))
         else:
-            port = _sudoku_public_port(db, int(exit_node.id), int(subscription_id))
+            # The old Sudoku per-user units and routes have been removed.
+            # Never advertise a dead legacy tunnel endpoint.
+            return None
     else:
         port = _fixed_public_port(int(exit_node.id), protocol)
 
