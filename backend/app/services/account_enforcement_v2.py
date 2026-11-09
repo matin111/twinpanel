@@ -599,82 +599,95 @@ async def _execute_command(command: dict[str, Any]) -> None:
         if node is None or getattr(node, "retired_at", None) is not None:
             raise RuntimeError("exit node is unavailable")
 
-        source_protocol = CLASSIC_SOURCE_PROTOCOL.get(protocol, protocol)
-        credential = (
-            db.query(ProtocolCredential)
-            .filter(
-                ProtocolCredential.subscription_id == subscription_id,
-                ProtocolCredential.protocol == source_protocol,
+        handled_by_central_sudoku = False
+        if protocol == "sudoku":
+            from .sudoku_central_enforcement_v1 import (
+                central_sudoku_enforcement_result,
             )
-            .first()
-        )
-        if credential is None:
-            raise RuntimeError("protocol credential is unavailable")
+            special = central_sudoku_enforcement_result(
+                db, node, subscription_id, command_type,
+            )
+            if special is not None:
+                result_code = special
+                handled_by_central_sudoku = True
 
-        from ..routers.provision import ssh_connect_saved
-
-        conn = await ssh_connect_saved(node, db)
-
-        if protocol in CONTROLLER_MODERN_PROTOCOLS:
-            if not credential.secret_encrypted:
-                raise RuntimeError("protocol credential is unavailable")
-            secret = _decode_modern_secret(protocol, credential)
-
-            if protocol in SINGBOX_MODERN_PROTOCOLS:
-                from ..singbox_subscription_accounts import apply_account, remove_account
-                # Revoke/restore must use the SAME node-local login that the
-                # bulk adapter installed, never derive tp-sub-N blindly.
-                actual_secret = _singbox_node_secret(
-                    credential,protocol,node_id,secret,
+        if not handled_by_central_sudoku:
+            source_protocol = CLASSIC_SOURCE_PROTOCOL.get(protocol, protocol)
+            credential = (
+                db.query(ProtocolCredential)
+                .filter(
+                    ProtocolCredential.subscription_id == subscription_id,
+                    ProtocolCredential.protocol == source_protocol,
                 )
-
-                if command_type == "revoke_subscription":
-                    await remove_account(
-                        conn, protocol, subscription_id,
-                        node_username=actual_secret.username,
-                    )
-                    result_code = "controller_modern_revoked"
-                elif command_type == "restore_subscription":
-                    if not bool(credential.is_active):
-                        raise RuntimeError("active protocol credential is unavailable")
-                    await apply_account(conn, node, actual_secret)
-                    result_code = "controller_modern_restored"
-                else:
-                    raise RuntimeError(f"unsupported command type: {command_type}")
-            else:
-                from ..standalone_subscription_accounts import apply_account, remove_account
-
-                if command_type == "revoke_subscription":
-                    await remove_account(conn, secret)
-                    result_code = "controller_standalone_revoked"
-                elif command_type == "restore_subscription":
-                    if not bool(credential.is_active):
-                        raise RuntimeError("active protocol credential is unavailable")
-                    cfg = (
-                        db.query(NodeProtocolConfig)
-                        .filter(
-                            NodeProtocolConfig.node_id == node_id,
-                            NodeProtocolConfig.protocol == protocol,
-                            NodeProtocolConfig.status == "online",
-                        )
-                        .first()
-                    )
-                    if cfg is None or not cfg.port:
-                        raise RuntimeError("standalone runtime config is unavailable")
-                    await apply_account(conn, node, secret, int(cfg.port))
-                    result_code = "controller_standalone_restored"
-                else:
-                    raise RuntimeError(f"unsupported command type: {command_type}")
-        else:
-            result_code = await _execute_classic_command(
-                db=db,
-                conn=conn,
-                credential=credential,
-                protocol=protocol,
-                subscription_id=subscription_id,
-                node_id=node_id,
-                command_type=command_type,
+                .first()
             )
+            if credential is None:
+                raise RuntimeError("protocol credential is unavailable")
+
+            from ..routers.provision import ssh_connect_saved
+
+            conn = await ssh_connect_saved(node, db)
+
+            if protocol in CONTROLLER_MODERN_PROTOCOLS:
+                if not credential.secret_encrypted:
+                    raise RuntimeError("protocol credential is unavailable")
+                secret = _decode_modern_secret(protocol, credential)
+
+                if protocol in SINGBOX_MODERN_PROTOCOLS:
+                    from ..singbox_subscription_accounts import apply_account, remove_account
+                    # Revoke/restore must use the SAME node-local login that the
+                    # bulk adapter installed, never derive tp-sub-N blindly.
+                    actual_secret = _singbox_node_secret(
+                        credential,protocol,node_id,secret,
+                    )
+
+                    if command_type == "revoke_subscription":
+                        await remove_account(
+                            conn, protocol, subscription_id,
+                            node_username=actual_secret.username,
+                        )
+                        result_code = "controller_modern_revoked"
+                    elif command_type == "restore_subscription":
+                        if not bool(credential.is_active):
+                            raise RuntimeError("active protocol credential is unavailable")
+                        await apply_account(conn, node, actual_secret)
+                        result_code = "controller_modern_restored"
+                    else:
+                        raise RuntimeError(f"unsupported command type: {command_type}")
+                else:
+                    from ..standalone_subscription_accounts import apply_account, remove_account
+
+                    if command_type == "revoke_subscription":
+                        await remove_account(conn, secret)
+                        result_code = "controller_standalone_revoked"
+                    elif command_type == "restore_subscription":
+                        if not bool(credential.is_active):
+                            raise RuntimeError("active protocol credential is unavailable")
+                        cfg = (
+                            db.query(NodeProtocolConfig)
+                            .filter(
+                                NodeProtocolConfig.node_id == node_id,
+                                NodeProtocolConfig.protocol == protocol,
+                                NodeProtocolConfig.status == "online",
+                            )
+                            .first()
+                        )
+                        if cfg is None or not cfg.port:
+                            raise RuntimeError("standalone runtime config is unavailable")
+                        await apply_account(conn, node, secret, int(cfg.port))
+                        result_code = "controller_standalone_restored"
+                    else:
+                        raise RuntimeError(f"unsupported command type: {command_type}")
+            else:
+                result_code = await _execute_classic_command(
+                    db=db,
+                    conn=conn,
+                    credential=credential,
+                    protocol=protocol,
+                    subscription_id=subscription_id,
+                    node_id=node_id,
+                    command_type=command_type,
+                )
 
     except Exception as exc:
         error = exc
@@ -706,6 +719,22 @@ async def _execute_command(command: dict[str, Any]) -> None:
             row.result_message = None
             row.acknowledged_at = now
         else:
+            from .sudoku_central_enforcement_v1 import (
+                CentralSudokuReconciliationPending,
+            )
+            if isinstance(error, CentralSudokuReconciliationPending) and row.expires_at > now:
+                # A shared family takes longer than one quota-worker cycle.
+                # Keep the command unacknowledged and recheck after the
+                # normal 90-second stale-processing lease, not every 0.5s.
+                # Waiting for an external node-wide ACK is not a failed
+                # per-user SSH attempt, so do not consume the attempt budget.
+                row.status = "controller_processing"
+                row.attempt_count = max(0, int(row.attempt_count or 0) - 1)
+                row.last_delivered_at = now
+                row.result_code = "controller_central_sudoku_awaiting_ack"
+                row.result_message = "CENTRAL_SUDOKU_WHITELIST_AWAITING_ACK"
+                status_db.commit()
+                return
             message = f"{type(error).__name__}:{str(error)[:700]}"
             if int(row.attempt_count or 0) >= _MAX_ATTEMPTS or row.expires_at <= now:
                 row.status = "failed"
