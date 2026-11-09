@@ -44,7 +44,10 @@ jobs:
           assert 'telegram_bot?:BackupTelegramBotStatus' in api
 
           assert 'ربات اختصاصی بکاپ' in ui
-          assert 'هیچ وابستگی به ربات فروش ندارد' in ui
+          # The backups UI was simplified in rc.745: decorative copy was
+          # removed, but the dedicated backup-bot API and encrypted token
+          # storage remain the security contract.
+          assert 'parityApi.backupTelegramSaveToken(token)' in ui
           assert 'backupTelegramSaveToken' in ui
           assert 'backupTelegramDeleteToken' in ui
           assert 'backupVerifyTelegram(chatId)' in ui
