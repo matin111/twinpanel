@@ -1137,8 +1137,8 @@ def import_backup_file(
             )
         )
 
-    # Avoid reading a 600MB+ backup archive into RAM a second time
-    # during import. The earlier inspect_backup() already authenticates it.
+    # Avoid reading a large backup into RAM a second time during import.
+    # inspect_backup() has already validated the portable archive format.
     # Stream to a private, fsynced temporary file and rename atomically.
     import shutil
     import tempfile
@@ -1892,17 +1892,11 @@ def restore_backup(
                 ",".join(sorted(nonempty))
             )
 
-    # Safety backup is mandatory. Failed delivery prevents destructive restore.
-    destination = load_settings()
-    if not destination.get("telegram_chat_id"):
-        raise RuntimeError("RESTORE_REQUIRES_TELEGRAM_SAFETY_DESTINATION")
-    safety = create_backup(
-        kind="pre-restore",
-        send_telegram=True,
-        telegram_chat_id=str(destination["telegram_chat_id"]),
-    )
-    if not safety.get("telegram_sent") or not safety.get("telegram_only"):
-        raise RuntimeError("RESTORE_SAFETY_DELIVERY_INCOMPLETE")
+    # A private local safety copy is mandatory before any destructive restore.
+    # A new installation must be restorable without configuring Telegram.
+    safety = create_backup(kind="pre-restore", send_telegram=False)
+    if not (BACKUP_ROOT / safety["filename"]).is_file():
+        raise RuntimeError("RESTORE_SAFETY_ARCHIVE_MISSING")
 
     # TWINPANEL_RESTORE_ISOLATED_DB_V1
     # Restore must never consume or block the
