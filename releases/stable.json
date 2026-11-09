@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.749",
+  "version": "1.1.0-rc.750",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-09T20:26:41Z",
+  "released_at": "2026-11-09T20:30:06Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "5154fb6fdf35799b4fda417c3ce1bd654da6ab23",
+  "source_sha": "427e279fd0a79ff297c4066fd62a323765fe62c0",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.749/twinpanel-1.1.0-rc.749-linux-x86_64.tar.gz",
-    "sha256": "397c10214db41046f93143c04960377ad3e47fe70eaf733dd02aa4ae8a57ebfe",
-    "size_bytes": 30141229
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.750/twinpanel-1.1.0-rc.750-linux-x86_64.tar.gz",
+    "sha256": "fabc3733fe315203678933e764a155246f2cc6cd8f43c89db172890bdbe76e12",
+    "size_bytes": 30143772
   },
   "notes": {
-    "fa": "رفع ریشه‌ای شناسایی SNI قدیمی در ترمیم Credentialهای V2Ray/Xray آمریکا. حتی کانفیگ‌های دارای پورت صحیح، اگر SNI قدیمی داشته باشند با تطبیق UUID و هویت واقعی نود اصلاح می‌شوند؛ UUID و سرویس‌های VPN تغییر نمی‌کنند. اشتراک‌های واجد شرایط آمریکا از نظر پورت‌های 24011/26011/28011 و SNI اختصاصی v2usa.in88.sbs ترمیم شده‌اند. برای نمایش دامنه به‌جای IP، رکورد DNS v2usa.in88.sbs باید جداگانه به IP ورودی ایران 94.183.231.158 تغییر کند؛ انتشار این نسخه DNS را تغییر نمی‌دهد.",
-    "en": "Fix metadata-only Xray credential reconciliation to detect stale TLS SNI even when public ports are correct. Verified USA node 11 canary (3/3 real client HTTP 200) and reconciled 1,219 subscriber credentials with unchanged UUIDs and zero Xray restarts; final audit 1,238/1,239 eligible correct. To display v2usa.in88.sbs instead of Iran ingress IP, its DNS A record must be changed externally from Exit 64.49.12.196 to Iran ingress 94.183.231.158; release does not modify DNS."
+    "fa": "افزودن ریست مستقل مصرف ترافیک در ویرایش اشتراک و ریست ترافیک و تاریخ در تمدید اشتراک؛ حفظ سوابق حسابداری و مبنای شمارنده‌های پروتکل‌ها؛ شروع اعتبار جدید از لحظه تمدید فقط با انتخاب ریست تاریخ؛ حفاظت از تعلیق دستی و بازفعال‌سازی اشتراک معلق صرفاً در صورت اتمام حجم قبلی.",
+    "en": "Admin subscription edit supports an optional independent usage-balance reset; renew supports independent usage and new-term date reset from now. Preserves cumulative node cursor checkpoints and historical quota audit data, locks subscription against concurrent usage writes, and selectively restores quota-exhausted users while preserving manual suspension."
   }
 }
