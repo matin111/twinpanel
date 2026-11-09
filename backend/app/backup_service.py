@@ -1270,15 +1270,20 @@ def _telegram_api_call(
     timeout: float = 30.0,
 ) -> dict[str, Any]:
 
+    # After the dedicated backup bot has been migrated off the cloud API,
+    # every interaction with that bot (probe, receipt, completion message)
+    # must use the same local Bot API server. Never accidentally send it back
+    # to the logged-out Telegram cloud Bot API.
+    from .backup_telegram_single_file_v1 import local_api_url
+    backup_api = local_api_url()
+    base_url = backup_api or "https://api.telegram.org"
     try:
         response = httpx.post(
-            (
-                "https://api.telegram.org/"
-                f"bot{token}/{method}"
-            ),
+            f"{base_url}/bot{token}/{method}",
             data=data or {},
             files=files,
             timeout=timeout,
+            trust_env=not bool(backup_api),
         )
 
     except httpx.RequestError as exc:
