@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.751",
-  "source_sha": "9287094ffb6ac126520a20bb86212c74d169e4f0",
+  "version": "1.1.0-rc.752",
+  "source_sha": "533cbcb0c1598b817e3e53e2c10c1123c71009cf",
   "notes": {
-    "fa": "رفع خطای منوهای تلگرام هنگام استفاده از پیام عکس و QR؛ دریافت لینک اکانت، افزودن ساب‌لینک، بروزرسانی، تمدید و بازگشت به مدیریت اکانت با نمایش ایمن پیام. تشخیص قطعی خطای ارسال فرمان ری‌استارت آپدیتر به systemd و جلوگیری از ادامه بی‌صدای استقرار ناموفق. حفظ قابلیت ریست مستقل حجم و تاریخ و تست‌های محافظتی نسخه قبلی. این نسخه به‌تنهایی مشکل فاصله قطعی API در ری‌استارت یا قفل هم‌زمان دیتابیس را برطرف نمی‌کند.",
-    "en": "Fix Telegram QR/photo callback navigation for account link lookup, imported subscription management, renewal and refresh without invalid editMessageText calls. Fail closed on updater systemd restart dispatch errors; preserve independent traffic/date reset and its regression gate. This release does not yet solve the API listener downtime gap during restarts or admin-edit database lock contention."
+    "fa": "بکاپ یک‌فایلی ZIP: دانلود خودکار ZIP بعد از بکاپ دستی بدون الزام تنظیم ربات تلگرام؛ آپلود ZIP با انتقال قطعه‌ای خودکار در پس‌زمینه و پیشنهاد بازیابی با تأیید مدیر؛ حذف مراحل دستی ترکیب بکاپ چندقسمتی از صفحه. فرمت داخلی قدیمی حفظ شده تا اطلاعات بکاپ پاک نشود.",
+    "en": "Single-file ZIP download for manual backups without Telegram prerequisite; one ZIP upload via resumable internal transfer and explicit restore confirmation; remove manual multipart assembly UI. Preserve existing internal backup format and data."
   }
 }
