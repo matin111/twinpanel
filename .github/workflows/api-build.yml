@@ -101,6 +101,7 @@ jobs:
         working-directory: backend
         run: |
           PYTHONPATH=. python tests/test_central_sudoku_bulk_v1.py -v
+          PYTHONPATH=. python tests/test_central_sudoku_node_bulk_v1.py -v
           PYTHONPATH=. python tests/sudoku_legacy_retired_v1_smoke.py
 
       - name: Run NetMod UDPGW V231 regression
