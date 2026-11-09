@@ -99,7 +99,7 @@ jobs:
       # of an external repository.
       - name: Verify read-only Sudoku legacy audit
         working-directory: backend
-        run: PYTHONPATH=. python -m unittest tests.test_audit_sudoku_legacy_units -v
+        run: PYTHONPATH=. python tests/test_audit_sudoku_legacy_units.py -v
 
       - name: Run NetMod UDPGW V231 regression
         working-directory: backend
