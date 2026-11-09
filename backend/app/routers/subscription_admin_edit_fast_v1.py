@@ -371,6 +371,16 @@ async def admin_edit_subscription_fast_v1(
             ).update({ProtocolCredential.is_active: False}, synchronize_session=False)
 
         _commit_admin_edit(db)
+    except OperationalError as exc:
+        # DML may hit lock_timeout during delete/update before commit.
+        db.rollback()
+        if _is_retryable_lock_timeout(exc):
+            raise HTTPException(
+                status_code=503,
+                detail="ثبت تغییرات به‌دلیل هم‌زمانی عملیات انجام نشد؛ دوباره تلاش کنید",
+                headers={"Retry-After": "2"},
+            ) from exc
+        raise
     except Exception:
         db.rollback()
         raise
