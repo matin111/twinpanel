@@ -80,6 +80,14 @@ const duration=(value:unknown)=>{
   return `${Math.round(n)}s`;
 };
 const asObject=(value:unknown):Record<string,unknown>=>value&&typeof value==="object"&&!Array.isArray(value)?value as Record<string,unknown>:{};
+const RETIRED_UNUSED_CARRIERS=new Set(["tp6_fast","kernel_ipip"]);
+const visibleTransport=(transport:string,status:unknown)=>{
+  const name=normalized(transport);
+  if(RETIRED_UNUSED_CARRIERS.has(name))return false;
+  // VXLAN has real working instances on other tunnels; keep them visible.
+  // Only hide an uninstalled empty placeholder on the selected tunnel.
+  return name!=="kernel_vxlan"||normalized(status)!=="not_installed";
+};
 
 export function SmartTransportsRuntimeV26(){
   const {pick}=useI18n();
@@ -148,8 +156,8 @@ export function SmartTransportsRuntimeV26(){
     return()=>window.clearInterval(timer);
   },[selected]);
 
-  const candidates=useMemo(()=>Array.isArray(smart?.transports)?smart!.transports:[],[smart]);
-  const allRows=useMemo(()=>Array.isArray(allState?.transports)?allState!.transports as TunnelTransportRow[]:[],[allState]);
+  const candidates=useMemo(()=>Array.isArray(smart?.transports)?smart!.transports.filter(row=>visibleTransport(row.transport,row.status)):[],[smart]);
+  const allRows=useMemo(()=>Array.isArray(allState?.transports)?(allState!.transports as TunnelTransportRow[]).filter(row=>visibleTransport(row.transport,row.status)):[],[allState]);
   const candidateNames=useMemo(()=>new Set(candidates.map(row=>String(row.transport))),[candidates]);
   const visibleAllRows=useMemo(()=>allRows.filter(row=>candidateNames.has(String(row.transport))||(row.enabled!==false&&normalized(row.status)!=="not_installed")),[allRows,candidateNames]);
   const selectedTunnel=tunnels.find(row=>row.id===selected);
