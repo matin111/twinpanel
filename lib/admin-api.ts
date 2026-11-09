@@ -10,12 +10,13 @@ export type AdminNode={id:number;name:string;node_type?:string;country_code?:str
 export type AdminTunnel={id:number;iran_node_id:number;exit_node_id:number;transport?:string;active_transport?:string|null;preferred_transport?:string|null;mode?:string|null;status?:string;latency_ms?:number|null;priority?:number;is_active?:boolean};
 export type RuntimeRow=Record<string,unknown>;
 export type PaymentReviewSummary={needs_review:number;purchase_review:number;receipt_review:number;wallet_review:number;generated_at?:string};
-export type XrayDomainState={ok?:boolean;node_id?:number;xray_domain?:string|null;effective_xray_domain?:string|null;legacy_public_domain_fallback?:boolean;public_domain?:string|null;tls_enabled?:boolean;available_profiles?:string[];message?:string};
+export type XrayDnsDelivery={status:"not_configured"|"unavailable"|"direct"|"matched"|"unresolved"|"mismatch";domain?:string|null;mode?:string|null;ingress_host?:string|null;required_ingress_ips?:string[];observed_domain_ips?:string[];suggested_a_record?:string|null;client_address?:string|null};
+export type XrayDomainState={ok?:boolean;node_id?:number;xray_domain?:string|null;effective_xray_domain?:string|null;legacy_public_domain_fallback?:boolean;public_domain?:string|null;tls_enabled?:boolean;available_profiles?:string[];message?:string;dns_delivery?:XrayDnsDelivery};
 
 export type XrayInboundProfile={connection_domain:string;server_name:string;path:string;target:string;transport:string;security:string};
 export type XrayInboundKey="tcp_tls"|"ws_tls"|"xhttp_reality";
 export type XrayInboundDraft={connection_domain:string;tls_server_name:string;reality_server_name:string;reality_target:string;transport:string;security:string;inbounds?:Record<XrayInboundKey,XrayInboundProfile>};
-export type XrayInboundEditorState={node_id:number;defaults:XrayInboundDraft;draft:XrayInboundDraft|null;applied:Partial<XrayInboundDraft>;transports:string[];securities:string[];requires_apply:boolean;message?:string;configured_xray_domain?:string;active_tls_domain?:string|null;tls_domain_mismatch?:boolean;draft_domain_conflict?:boolean;runtime_detected?:boolean};
+export type XrayInboundEditorState={node_id:number;defaults:XrayInboundDraft;draft:XrayInboundDraft|null;applied:Partial<XrayInboundDraft>;transports:string[];securities:string[];requires_apply:boolean;message?:string;configured_xray_domain?:string;active_tls_domain?:string|null;tls_domain_mismatch?:boolean;draft_domain_conflict?:boolean;runtime_detected?:boolean;dns_delivery?:XrayDnsDelivery};
 
 const READ_CACHE_TTL_MS=4000;
 const readCache=new Map<string,{expires:number;promise:Promise<unknown>}>();

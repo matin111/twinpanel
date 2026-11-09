@@ -114,6 +114,15 @@ export function XrayInboundEditorInProtocol({nodeId}:{nodeId:number}){
       <span>{pick("دامنه اختصاصی ثبت‌شده برای همین نود","Dedicated domain saved for this node")}</span>
       <strong dir="ltr">{state.configured_xray_domain||"—"}</strong>
     </div>:null}
+    {state?.dns_delivery?.status==="mismatch"?<div className={styles.warningBox}>
+      {pick(
+        "دامنه اختصاصی ثبت است اما DNS آن به ورودی تونل ایران اشاره نمی‌کند. به همین دلیل در لینک V2Ray، IP ایران نشان داده می‌شود. اصلاح رکورد A لازم است؛ تنظیمات TLS را برای رفع این اختلاف تغییر ندهید.",
+        "The dedicated hostname is saved, but its DNS differs from the Iran tunnel ingress. V2Ray correctly falls back to the ingress IP. Fix the DNS A record rather than changing TLS."
+      )}
+      <div dir="ltr">DNS: {(state.dns_delivery.observed_domain_ips||[]).join(", ")||"—"}</div>
+      <div dir="ltr">Iran ingress: {(state.dns_delivery.required_ingress_ips||[]).join(", ")||"—"}</div>
+      {state.dns_delivery.suggested_a_record?<div dir="ltr">{state.dns_delivery.domain} A → {state.dns_delivery.suggested_a_record}</div>:null}
+    </div>:null}
     {state?.tls_domain_mismatch?<div className={styles.warningBox}>
       {pick(
         "دامنه SSL فعال با دامنه اختصاصی این نود متفاوت است؛ تا زمان نصب گواهی درست، تغییر ظاهری فرم به معنی فعال‌شدن SSL جدید نیست.",

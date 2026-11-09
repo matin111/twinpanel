@@ -127,6 +127,20 @@ export function NodeXrayDomainRuntimeV33(){
         </div>
       </div>
 
+      {meta?.dns_delivery?.status==="mismatch"?<div className="runtime-error">
+        {pick(
+          "دامنه پاک نشده است؛ رکورد DNS با ورودی تونل ایران تطابق ندارد، بنابراین ساب‌لینک برای حفظ اتصال IP ورودی را نشان می‌دهد. رکورد A همین دامنه را اصلاح کنید.",
+          "The Xray domain is saved, but DNS points away from the Iran tunnel ingress. Subscription links safely show the ingress IP until this domain's A record is corrected."
+        )}{" "}
+        <b dir="ltr">{meta.dns_delivery.domain||"—"}</b>
+        <div dir="ltr">DNS: {(meta.dns_delivery.observed_domain_ips||[]).join(", ")||"—"}</div>
+        <div dir="ltr">Required ingress: {(meta.dns_delivery.required_ingress_ips||[]).join(", ")||"—"}</div>
+        {meta.dns_delivery.suggested_a_record?<div dir="ltr">A → {meta.dns_delivery.suggested_a_record} (DNS only)</div>:null}
+      </div>:null}
+      {meta?.dns_delivery?.status==="unresolved"?<div className="runtime-error">
+        {pick("بررسی DNS یا ورودی تونل هنوز ممکن نیست؛ تا تأیید DNS، لینک کاربران با IP ورودی امن باقی می‌ماند.",
+        "DNS/ingress cannot currently be verified; links safely retain the ingress IP until resolution succeeds.")}
+      </div>:null}
       {error?<div className="runtime-error">{error}</div>:null}
       {ok?<div className="runtime-success">{ok}</div>:null}
       {loading?<div className="runtime-loading">{pick("در حال دریافت نودهای Xray...","Loading Xray nodes...")}</div>:null}
@@ -141,7 +155,7 @@ export function NodeXrayDomainRuntimeV33(){
         <label className="field span-two">
           <span>{pick("دامنه V2Ray / Xray","V2Ray / Xray domain")}</span>
           <input dir="ltr" value={domain} onChange={event=>setDomain(event.target.value)} placeholder="xray.example.com"/>
-          <small>{pick("DNS باید به IP همین نود خروجی اشاره کند. ذخیره این مقدار دامنه عمومی نود را تغییر نمی‌دهد.","DNS must point to this Exit node IP. Saving this value does not change the Node public domain.")}</small>
+          <small>{pick("اگر اتصال از تونل ایران است، رکورد DNS باید به IP ورودی ایرانِ همان تونل اشاره کند، نه IP نود خروجی. در اتصال مستقیم، IP خروجی درست است.","For an Iran tunnel, DNS must point to the selected Iran ingress, NOT the Exit IP. Direct connections use the Exit IP.")}</small>
         </label>
       </div>:null}
 

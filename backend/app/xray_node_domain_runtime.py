@@ -166,6 +166,76 @@ def _verified_tunnel_xray_domain(node: Node, tunnel_host: str) -> str:
     return str(tunnel_host)
 
 
+
+def _xray_tunnel_dns_diagnostic(db: Session, node: Node) -> dict[str, Any]:
+    """Explain why a configured Xray domain is replaced by the Iran ingress IP.
+
+    The subscription resolver deliberately fails closed when the node's
+    dedicated hostname points at the Exit IP rather than the Iran tunnel
+    ingress. The same read-only resolver is the source of truth here; do not
+    infer an ingress from the Exit public IP or change customer link routing.
+    """
+    dedicated = _stored_xray_domain(node)
+    result: dict[str, Any] = {
+        "status": "not_configured" if not dedicated else "unavailable",
+        "domain": dedicated or None,
+        "ingress_host": None,
+        "required_ingress_ips": [],
+        "observed_domain_ips": [],
+        "suggested_a_record": None,
+        "client_address": None,
+        "mode": None,
+    }
+    if not dedicated or _original_profile_endpoint is None:
+        return result
+    try:
+        ingress_host, ingress_port = _original_profile_endpoint(
+            db, node, xray_modern_runtime.PROFILE_XHTTP,
+        )
+        expected_public_port = xray_modern_runtime._public_port(
+            int(node.id), xray_modern_runtime.PROFILE_XHTTP,
+        )
+        ingress_host = str(ingress_host or "").strip().lower()
+        if not ingress_host:
+            return result
+        result["ingress_host"] = ingress_host
+
+        if int(ingress_port) != int(expected_public_port):
+            result.update({
+                "status": "direct", "mode": "direct",
+                "client_address": dedicated,
+            })
+            return result
+
+        result["mode"] = "tunnel"
+        bucket = int(time.monotonic() // 300)
+        ingress_ips = _resolved_host_ips(ingress_host, bucket)
+        dedicated_ips = _resolved_host_ips(dedicated, bucket)
+        result["required_ingress_ips"] = sorted(ingress_ips)
+        result["observed_domain_ips"] = sorted(dedicated_ips)
+        ingress_v4 = [
+            ip for ip in ingress_ips
+            if ipaddress.ip_address(ip).version == 4
+        ]
+        if len(ingress_ips) == 1 and len(ingress_v4) == 1:
+            result["suggested_a_record"] = ingress_v4[0]
+
+        match = bool(
+            ingress_ips and dedicated_ips
+            and dedicated_ips.issubset(ingress_ips)
+        )
+        result["client_address"] = dedicated if match else ingress_host
+        result["status"] = (
+            "matched" if match
+            else "unresolved" if not ingress_ips or not dedicated_ips
+            else "mismatch"
+        )
+    except Exception:
+        # The diagnostic must NEVER block domain management or cause a 500.
+        result["status"] = "unavailable"
+    return result
+
+
 def _profile_endpoint_with_dedicated_domain(
     db: Session,
     node: Node,
@@ -392,6 +462,7 @@ def get_xray_domain(
             not stored
             and effective
         ),
+        "dns_delivery": _xray_tunnel_dns_diagnostic(db, node),
     }
 
 
@@ -426,6 +497,7 @@ def save_dedicated_xray_domain(
             str(getattr(node, "public_domain", None) or "").strip()
             or None
         ),
+        "dns_delivery": _xray_tunnel_dns_diagnostic(db, node),
     }
 
 
