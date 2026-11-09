@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.739",
+  "version": "1.1.0-rc.740",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-09T04:31:23Z",
+  "released_at": "2026-11-09T04:54:38Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "6ba526dacad5ffd729547889bc4fdc81bcd8abdf",
+  "source_sha": "7aed7d27a02a493664a65d3aff295dd12d4ae889",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.739/twinpanel-1.1.0-rc.739-linux-x86_64.tar.gz",
-    "sha256": "e264a352fed3da23bfe057cadbb2546801943709b61f8ae003ee6f627ffb006c",
-    "size_bytes": 30077372
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.740/twinpanel-1.1.0-rc.740-linux-x86_64.tar.gz",
+    "sha256": "d3e20675e70a2706381f21dd0d44db3a0f8c85c32f48f3ea1ed138e5dc35c173",
+    "size_bytes": 30077591
   },
   "notes": {
-    "fa": "حذف مسیرهای بلااستفاده TP6 Fast و Kernel IPIP از فهرست تانل و جلوگیری از نصب مجدد آن‌ها؛ پنهان‌سازی کارت خالی Kernel VXLAN فقط در تانل‌هایی که نصب نشده است. حفظ کامل Kernel VXLAN فعال روی تانل‌های ۳۰ و ۳۲؛ تست واقعی دوطرفه با ۰٪ افت و بدون تغییر تونل‌ها و IPها.",
-    "en": "Retire unused TP6 Fast and kernel IPIP from the tunnel transport catalog and installation; hide only uninstalled VXLAN placeholders. Preserve functioning installed kernel VXLAN standby on tunnels 30 and 32; no active transport or node dataplane changes."
+    "fa": "اصلاح نمایش Kernel VXLAN برای تمام تانل‌ها، حتی تانل‌هایی که هنوز VXLAN روی آن‌ها نصب نشده است. دکمه نصب و تست در دسترس می‌ماند؛ VXLANهای نصب‌شده و فعال بدون تغییر حفظ می‌شوند.",
+    "en": "Restore Kernel VXLAN install/test card for every tunnel, including those with no VXLAN installed yet. Preserve already working VXLAN and active production routes."
   }
 }
