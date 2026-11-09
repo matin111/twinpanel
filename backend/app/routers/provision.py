@@ -1114,7 +1114,7 @@ connect-delay 5000
     return ok, None if ok else "strongSwan/xl2tpd یا پورت‌های L2TP/IPsec آماده نیست", psk
 
 
-async def install_xray(conn, port: int):
+async def install_xray(conn, port: int, node=None):
     # github.com/XTLS/.../raw and GitHub's release UI return HTTP 504 on
     # some new Exits even though api.github.com and raw.githubusercontent.com
     # are reachable. Fetch the SHA256-verified official release via GitHub's
@@ -1777,8 +1777,76 @@ async def provision_protocols(conn, p: ProtocolSettings, db: Session, node: Node
             if psk: secrets_out["l2tp_psk"]=psk
         except Exception as e: results["l2tp"]={"ok":False,"port":None,"port_text":"500/4500/1701","transport":"udp","error":str(e)}; save_config(db,node.id,"l2tp",port_text="500/4500/1701",transport="udp",service="strongswan-starter + xl2tpd",ok=False,error=str(e))
     if p.install_v2ray:
-        try: await run_one("v2ray",p.xray_port,"tcp","xray",lambda:install_xray(conn,p.xray_port))
-        except Exception as e: results["v2ray"]={"ok":False,"port":p.xray_port,"port_text":str(p.xray_port),"transport":"tcp","error":str(e)}; save_config(db,node.id,"v2ray",port=p.xray_port,transport="tcp",service="xray",ok=False,error=str(e))
+        try:
+            # TWINPANEL_XRAY_NODE_AWARE_THREE_INBOUND_REPAIR_V1
+            # On a dedicated-domain Exit the installed base + XHTTP
+            # listeners are not sufficient. The old generic repair skipped
+            # missing TLS inbounds, then sometimes called the legacy Xray
+            # installer without a Node and rebuilt three Reality profiles.
+            dedicated_domain = str(
+                getattr(node, "xray_domain", None) or ""
+            ).strip().lower()
+            dedicated_exit = bool(
+                repair and node.node_type == NodeType.EXIT
+                and dedicated_domain
+            )
+            if dedicated_exit:
+                from ..central_xray_node_authority_v1 import (
+                    read_node_public_authority,
+                )
+
+                healthy_three = False
+                try:
+                    authority = await read_node_public_authority(conn)
+                    healthy_three = (
+                        authority.get("tls_enabled") is True
+                        and str(authority.get("tls_domain") or "").lower()
+                            == dedicated_domain
+                        and set(authority.get("profiles") or ()) == {
+                            "websocket_tls", "xhttp_reality", "tcp_tls",
+                        }
+                    )
+                except Exception:
+                    # Read-only health is not proof of readiness; the
+                    # node-aware installer must repair or fail closed.
+                    healthy_three = False
+
+                if healthy_three:
+                    ok, err = True, None
+                else:
+                    # Do NOT preflight the existing Xray-owned base port.
+                    # The node-aware modern installer checks ownership and
+                    # preserves its clients/config instead of reinstalling.
+                    ok, err = await install_xray(
+                        conn, p.xray_port, node,
+                    )
+                results["v2ray"] = {
+                    "ok": bool(ok), "port": p.xray_port,
+                    "port_text": str(p.xray_port),
+                    "transport": "tcp", "error": err,
+                    "three_inbound_verified": bool(ok),
+                }
+                save_config(
+                    db, node.id, "v2ray", port=p.xray_port,
+                    transport="tcp", service="xray",
+                    ok=bool(ok), error=err,
+                )
+            else:
+                await run_one(
+                    "v2ray", p.xray_port, "tcp", "xray",
+                    lambda: install_xray(conn, p.xray_port, node),
+                )
+        except Exception as e:
+            results["v2ray"] = {
+                "ok": False, "port": p.xray_port,
+                "port_text": str(p.xray_port),
+                "transport": "tcp", "error": str(e),
+            }
+            save_config(
+                db, node.id, "v2ray", port=p.xray_port,
+                transport="tcp", service="xray",
+                ok=False, error=str(e),
+            )
 
     node.enable_cisco=bool(results.get("cisco",{}).get("ok")) if p.install_cisco else node.enable_cisco
     node.enable_openvpn=bool(results.get("openvpn",{}).get("ok")) if p.install_openvpn else node.enable_openvpn
