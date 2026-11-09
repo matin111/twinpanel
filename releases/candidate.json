@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.752",
-  "source_sha": "533cbcb0c1598b817e3e53e2c10c1123c71009cf",
+  "version": "1.1.0-rc.753",
+  "source_sha": "0a451ca85de36087139a7be1d93316ac03345173",
   "notes": {
-    "fa": "بکاپ یک‌فایلی ZIP: دانلود خودکار ZIP بعد از بکاپ دستی بدون الزام تنظیم ربات تلگرام؛ آپلود ZIP با انتقال قطعه‌ای خودکار در پس‌زمینه و پیشنهاد بازیابی با تأیید مدیر؛ حذف مراحل دستی ترکیب بکاپ چندقسمتی از صفحه. فرمت داخلی قدیمی حفظ شده تا اطلاعات بکاپ پاک نشود.",
-    "en": "Single-file ZIP download for manual backups without Telegram prerequisite; one ZIP upload via resumable internal transfer and explicit restore confirmation; remove manual multipart assembly UI. Preserve existing internal backup format and data."
+    "fa": "اصلاح دائمی نصب و Repair پروتکل V2Ray/Xray فنلاند و نودهای جدید: ارسال هویت و دامنه اختصاصی نود به نصب‌کننده؛ جلوگیری از بازنویسی کانفیگ کاربران توسط نصب‌کننده قدیمی؛ ممنوعیت افت خودکار TLS به سه REALITY؛ صحت‌سنجی سه Inbound واقعی با API و پورت‌های فعال؛ نصب WebSocket/TCP TLS از طریق API بدون ری‌استارت کل Xray؛ حفظ UUID و وضعیت قبلی کاربران حتی هنگام خطای Repair. سایر پروتکل‌ها و کشورها دست‌نخورده‌اند.",
+    "en": "Stop destructive Xray reinstalls and Finland TLS reverting to three REALITY inbounds. Pass the real node/domain into fresh install and Repair, retain existing active Xray config and UUIDs, fail closed if dedicated TLS identity is missing, verify all three real TLS/XHTTP inbounds through live HandlerService and TCP listeners, hot-add missing TCP TLS without service restart, and preserve prior published protocol state on failed repairs. 56 targeted regression tests passed."
   }
 }
