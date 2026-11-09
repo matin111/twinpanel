@@ -24,6 +24,22 @@ SOCKET_UNIT = Path("/etc/systemd/system/twinpanel-api.socket")
 OVERRIDE = Path("/etc/systemd/system/twinpanel-api.service.d/90-socket-handoff.conf")
 API_UNIT = "twinpanel-api.service"
 SOCKET_NAME = "twinpanel-api.socket"
+# Reseller supervisor has Requires=twinpanel-api.service, so systemd stops it
+# whenever the API is stopped for the initial opt-in or explicit rollback.
+# Only restore a dependent that was running BEFORE the controlled cutover.
+API_DEPENDENT_UNITS = ("twinpanel-reseller-bots.service",)
+
+
+def _active_api_dependents() -> tuple[str, ...]:
+    return tuple(unit for unit in API_DEPENDENT_UNITS if is_active(unit))
+
+
+def _restore_api_dependents(units: tuple[str, ...]) -> None:
+    for unit in units:
+        run("start", unit)
+        if not is_active(unit):
+            raise RuntimeError("API_SOCKET_DEPENDENT_START_FAILED:" + unit)
+
 
 
 def api_port(env_path: Path = ENV_FILE) -> int:
@@ -151,6 +167,7 @@ def enable(port: int, version: str) -> None:
         return
 
     was_running = is_active(API_UNIT)
+    dependents = _active_api_dependents()
     if not was_running or not check_health(port, version, seconds=3):
         raise RuntimeError("API_SOCKET_PRECHANGE_HEALTH_FAILED")
 
@@ -167,6 +184,7 @@ def enable(port: int, version: str) -> None:
         run("start", API_UNIT)
         if not check_health(port, version):
             raise RuntimeError("API_SOCKET_HEALTH_GATE_FAILED")
+        _restore_api_dependents(dependents)
         print("API_SOCKET_ENABLED_HEALTHY version=" + version)
     except BaseException:
         # Fail back to the unchanged normal bind-mode API, never touch DB/VPN.
@@ -178,6 +196,8 @@ def enable(port: int, version: str) -> None:
         run("daemon-reload", check=False)
         if was_running:
             run("start", API_UNIT, check=False)
+            for unit in dependents:
+                run("start", unit, check=False)
         raise
 
 
@@ -187,6 +207,7 @@ def disable(port: int, version: str) -> None:
             and is_active(SOCKET_NAME) and is_active(API_UNIT)
             and check_health(port, version, seconds=3)):
         raise RuntimeError("API_SOCKET_DISABLE_PREFLIGHT_FAILED")
+    dependents = _active_api_dependents()
     try:
         run("stop", API_UNIT)
         run("disable", "--now", SOCKET_NAME)
@@ -196,6 +217,7 @@ def disable(port: int, version: str) -> None:
         run("start", API_UNIT)
         if not check_health(port, version):
             raise RuntimeError("API_SOCKET_DISABLE_HEALTH_GATE_FAILED")
+        _restore_api_dependents(dependents)
         print("API_SOCKET_DISABLED_NORMAL_BIND_HEALTHY version=" + version)
     except BaseException:
         # Failed removal must restore the known-good socket configuration.
@@ -205,6 +227,8 @@ def disable(port: int, version: str) -> None:
         run("daemon-reload", check=False)
         run("enable", "--now", SOCKET_NAME, check=False)
         run("start", API_UNIT, check=False)
+        for unit in dependents:
+            run("start", unit, check=False)
         raise
 
 
