@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.741",
+  "version": "1.1.0-rc.742",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-09T05:46:49Z",
+  "released_at": "2026-11-09T05:53:27Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "b94a98c30c923a3ad78439149270937911d84f40",
+  "source_sha": "e23f46f388affd6d22f91849bb3db017db3ff6bf",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.741/twinpanel-1.1.0-rc.741-linux-x86_64.tar.gz",
-    "sha256": "1cf4dfe83e9b21b9d65bb9f4b5a791e4286fe7bf2fe23011e2bdffa80cf225f1",
-    "size_bytes": 30087769
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.742/twinpanel-1.1.0-rc.742-linux-x86_64.tar.gz",
+    "sha256": "67f90fd5cae0294433db5ebf1c592298a94c4a5dfd5f47d67ac11bbee721c026",
+    "size_bytes": 30089193
   },
   "notes": {
-    "fa": "بازطراحی بکاپ به داده‌های پنل و تنظیمات ضروری؛ حذف هزاران فایل تولیدی و نسخه‌های موقت sing-box از آرشیو؛ فشرده‌سازی محتوای اعتبارنامه‌های اختصاصی کاربران در لایه بکاپ رمزگذاری‌شده و رمزگذاری مجدد هنگام بازیابی روی پنل مقصد؛ سازگار با بکاپ‌های قدیمی. تست واقعی کاهش حجم از حدود ۶۴۸ مگابایت به ۸۸٫۱۱ مگابایت با حفظ ۶۲ جدول و بیش از ۹۰ هزار رکورد. بکاپ آزمایشی پس از تأیید حذف شد.",
-    "en": "Compact data-only encrypted backups: exclude thousands of generated runtime and sing-box snapshots; compress credential data inside the outer encrypted archive and re-encrypt on restore with the destination key. Backward compatible. Verified real 88.11MB archive (down from ~648MB), retaining 62 tables and >90k rows; test file removed."
+    "fa": "جلوگیری از رفرش پشت‌سرهم پنل پس از آپدیت: اصلاح کنترل اختلاف نسخه فرانت‌اند و سرور، محدودکردن بازخوانی خودکار به یک‌بار برای هر نسخه و توقف انتشار بسته در صورت اختلاف نسخه فایل اجرایی وب.",
+    "en": "Fix panel reload loop after update: restrict client version convergence to one reload per build/target pair; pin and verify compiled Next.js version matches the immutable release candidate before publishing."
   }
 }
