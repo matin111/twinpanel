@@ -83,6 +83,14 @@ def test_live_ack_is_written_only_after_native_confirmation():
     )
 
 
+def test_live_daemon_ack_requires_exact_identity_set_not_only_count():
+    src=remote_source()
+    assert 'live_names==desired_names' in src
+    assert 'len(live_users)==len(desired_names)' in src
+    assert 'snapshot["count"]==len(clean)' in src
+    assert 'verified=snapshot.get("count")==len(clean)' not in src
+
+
 def test_empty_users_never_create_unrestricted_listener():
     try:
         users_manifest([])
