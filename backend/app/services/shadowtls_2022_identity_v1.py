@@ -39,22 +39,29 @@ def _validate_key(value: str) -> str:
     return value
 
 
-def user_inner_key(username: str, outer_password: str) -> str:
-    """Derive 16-byte SS2022 user key from the existing *private* credential.
+def user_inner_key(username: str, outer_password: str, derivation_secret: str) -> str:
+    """Strong 16-byte SS2022 user key, even for migrated short outer passwords.
 
-    This function cannot be used to identify a customer without the original
-    authenticated ShadowTLS secret. No IP address, shared inner password,
-    plan metadata or other customer's key may be used as an identity.
+    A private 32-byte node-specific seed (never included in client profiles)
+    keys HMAC. The user's historical ShadowTLS password and exact name are
+    inputs, but knowing a short outer password and the shared SS2022 server
+    key is insufficient to derive another user's inner credential.
     """
-    if not isinstance(username, str) or not username.startswith("tp-sub-"):
-        raise ValueError("shadowtls_2022_canonical_username_required")
-    if not username[7:].isdigit() or int(username[7:]) <= 0:
-        raise ValueError("shadowtls_2022_canonical_username_required")
-    if not isinstance(outer_password, str) or len(outer_password) < 16:
+    if not isinstance(username, str) or not username.strip() or username != username.strip():
+        raise ValueError("shadowtls_2022_username_invalid")
+    if len(username.encode("utf-8")) > 160 or username.startswith(("twinpanel-bootstrap", "__twinpanel_revoked__")):
+        raise ValueError("shadowtls_2022_username_invalid")
+    if not isinstance(outer_password, str) or not outer_password:
         raise ValueError("shadowtls_2022_outer_secret_invalid")
+    try:
+        seed = base64.b64decode(derivation_secret, validate=True)
+    except Exception as exc:
+        raise ValueError("shadowtls_2022_derivation_secret_invalid") from exc
+    if len(seed) < 32:
+        raise ValueError("shadowtls_2022_derivation_secret_invalid")
     derived = hmac.new(
-        outer_password.encode("utf-8"),
-        _DOMAIN + username.encode("utf-8"),
+        seed,
+        _DOMAIN + username.encode("utf-8") + b"\0" + outer_password.encode("utf-8"),
         hashlib.sha256,
     ).digest()[:16]
     return base64.b64encode(derived).decode("ascii")
@@ -65,6 +72,7 @@ def stage_parallel_identity_inbounds(
     *,
     listen_port: int,
     server_key: str,
+    derivation_secret: str,
 ) -> dict[str, Any]:
     """Build an additive (non-installed) modern ShadowTLS protocol snapshot.
 
@@ -73,6 +81,8 @@ def stage_parallel_identity_inbounds(
     users, silently overwrite another inbound, or auto-publish a new port.
     """
     _validate_key(server_key)
+    # Validate the private seed before constructing or publishing any user key.
+    user_inner_key("migration-preflight", "check", derivation_secret)
     if not isinstance(listen_port, int) or not 1024 <= listen_port <= 65535:
         raise ValueError("shadowtls_2022_port_invalid")
     staged = copy.deepcopy(config)
@@ -101,14 +111,16 @@ def stage_parallel_identity_inbounds(
             continue
         username = str(entry.get("name") or "")
         password = str(entry.get("password") or "")
-        if not username.startswith("tp-sub-"):
+        if username.startswith(("twinpanel-bootstrap", "__twinpanel_revoked__")):
             continue  # bootstrap/revocation sentinels are never routable
+        if not username or not password:
+            raise ValueError("shadowtls_2022_legacy_identity_invalid")
         if username in seen:
             raise ValueError("shadowtls_2022_duplicate_user")
         seen.add(username)
         real_users.append({
             "name": username,
-            "password": user_inner_key(username, password),
+            "password": user_inner_key(username, password, derivation_secret),
         })
     if not real_users:
         raise ValueError("shadowtls_2022_no_verified_users")
@@ -132,7 +144,7 @@ def identity_client_outbounds(
     legacy_transport: dict[str, Any],
     *,
     username: str,
-    outer_password: str,
+    user_key: str,
     listen_port: int,
     server_key: str,
 ) -> list[dict[str, Any]]:
@@ -142,7 +154,9 @@ def identity_client_outbounds(
     is configured, and a real end-to-end client handshake has succeeded.
     """
     _validate_key(server_key)
-    user_key = user_inner_key(username, outer_password)
+    _validate_key(user_key)
+    if not isinstance(username, str) or not username.strip():
+        raise ValueError("shadowtls_2022_username_invalid")
     if not 1024 <= listen_port <= 65535:
         raise ValueError("shadowtls_2022_port_invalid")
     if legacy_transport.get("type") != "shadowtls":
@@ -184,6 +198,15 @@ if _st_outer is not None or _st_inner is not None:
             and _st_inner.get("method")=="2022-blake3-aes-128-gcm"):
         raise SystemExit("shadowtls_identity_parallel_incomplete")
     _st_key = _st_inner.get("password")
+    _st_state_path = STATE
+    _st_state = json.load(open(_st_state_path,encoding="utf-8"))
+    _st_opts = _st_state.get("shadowtls_identity2022") if isinstance(_st_state,dict) else None
+    _st_secret = (_st_opts or {}).get("derivation_secret")
+    try:
+        if len(_st_base64.b64decode(_st_secret,validate=True))<32:
+            raise ValueError("private seed length")
+    except Exception:
+        raise SystemExit("shadowtls_identity_derivation_secret_invalid")
     try:
         if len(_st_base64.b64decode(_st_key,validate=True))!=16:
             raise ValueError("key length")
@@ -202,20 +225,18 @@ if _st_outer is not None or _st_inner is not None:
             continue
         _st_username=str(_st_row.get("name") or "")
         _st_password=str(_st_row.get("password") or "")
-        if not _st_username.startswith("tp-sub-"):
+        if _st_username.startswith(("twinpanel-bootstrap","__twinpanel_revoked__")):
             continue
-        if not _st_username[7:].isdigit() or int(_st_username[7:])<=0:
-            raise SystemExit("shadowtls_identity_username_invalid")
-        if _st_username in _st_seen or len(_st_password)<16:
+        if _st_username in _st_seen or not _st_username or not _st_password:
             raise SystemExit("shadowtls_identity_duplicate_or_invalid")
         _st_seen.add(_st_username)
         _st_synced_users.append(dict(_st_row))
         _st_inner_users.append(dict(
             name=_st_username,
             password=_st_base64.b64encode(_st_hmac.new(
-                _st_password.encode("utf-8"),
+                _st_base64.b64decode(_st_secret,validate=True),
                 b"twinpanel:shadowtls:identity-inner:2022:v1:"+
-                    _st_username.encode("utf-8"),
+                    _st_username.encode("utf-8")+b"\\x00"+_st_password.encode("utf-8"),
                 _st_hashlib.sha256,
             ).digest()[:16]).decode("ascii"),
         ))
