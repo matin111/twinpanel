@@ -2044,33 +2044,7 @@ _SCRIPT = r"""
    // Telegram displays a confirmation prompt before enabling a SOCKS5 proxy.
    const connect=el('a','tp-socks-telegram-open','اتصال مستقیم به تلگرام');
    connect.href=direct;connect.target='_blank';connect.rel='noopener noreferrer';
-   const share=el('a','','ارسال لینک به تلگرام');
-   share.href=shared;share.target='_blank';share.rel='noopener noreferrer';
-   share.title='این لینک شامل نام کاربری و رمز است؛ فقط در گفت‌وگوی خصوصی ارسال کنید';
-   const copy=el('button','','کپی لینک تلگرام');
-   copy.type='button';
-   copy.addEventListener('click',async()=>{
-     let ok=false;
-     try{
-       if(navigator.clipboard&&window.isSecureContext){
-         await navigator.clipboard.writeText(direct);ok=true;
-       }
-     }catch(_e){}
-     if(!ok){
-       const area=document.createElement('textarea');
-       area.value=direct;area.style.position='fixed';area.style.left='-9999px';
-       document.body.append(area);area.select();
-       try{ok=document.execCommand('copy')}catch(_e){}
-       area.remove();
-     }
-     const toast=document.getElementById('toast');
-     if(toast){
-       toast.textContent=ok?'لینک تلگرام کپی شد':'کپی انجام نشد';
-       toast.classList.add('show');
-       setTimeout(()=>toast.classList.remove('show'),1700);
-     }
-   });
-   actions.append(connect,share,copy);
+   actions.append(connect);
    return actions;
  }
  function normalizeModern(panel){
@@ -2106,11 +2080,13 @@ _SCRIPT = r"""
        if(telegram)holder.append(telegram);
        // Move existing live copy handlers into the matching details section,
        // not beneath another country. Do not clone/rebind them.
-       if(actions)holder.append(actions);
+       // SOCKS5 per-server legacy row action is a redundant standalone copy.
+       // Preserve the existing per-field copy controls inside realFacts.
+       if(actions)actions.remove();
        toggle.textContent='نمایش اطلاعات';
      }else{
        holder.append(view);
-       if(socks&&actions)holder.append(actions);
+       if(socks&&actions)actions.remove();
        if(socks)toggle.textContent='نمایش اطلاعات';
      }
      row.insertAdjacentElement('afterend',holder);
