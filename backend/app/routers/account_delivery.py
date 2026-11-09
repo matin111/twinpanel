@@ -5662,66 +5662,17 @@ def extend_subscription_v17(subscription_id:int,payload:dict=Body(...),db:Sessio
         reset_subscription_period_usage(db,sub,origin="admin_renew")
     if add_traffic_gb>0:
         sub.traffic_limit_bytes=int(sub.traffic_limit_bytes or 0)+int(add_traffic_gb*1024**3)
-    if reset_date:
-        # A new term starts NOW, not at the previous expiry and not at
-        # the original activation date. Volume reset remains independent.
-        now=datetime.utcnow()
-        sub.starts_at=now
-        sub.expires_at=now+timedelta(days=add_days)
-        sub.activation_duration_days=add_days
-    elif add_days>0:
-        # TWINPANEL_FIRST_USE_EXTEND_V1
-        if (
-            sub.starts_at is None
-            and sub.expires_at is None
-        ):
-            current_days = int(
-                sub.activation_duration_days
-                or 0
-            )
-
-            if current_days <= 0:
-                from ..models import Plan as _FirstUsePlan
-
-                _plan = db.get(
-                    _FirstUsePlan,
-                    sub.plan_id,
-                )
-
-                current_days = int(
-                    _plan.duration_days
-                    if _plan
-                    else 0
-                )
-
-            if current_days <= 0:
-                raise HTTPException(
-                    status_code=409,
-                    detail=(
-                        "مدت اشتراک برای فعال‌سازی "
-                        "اولیه مشخص نیست"
-                    ),
-                )
-
-            sub.activation_duration_days = (
-                current_days
-                + add_days
-            )
-
-        else:
-            now=datetime.utcnow()
-            base=(
-                sub.expires_at
-                if (
-                    sub.expires_at
-                    and sub.expires_at>now
-                )
-                else now
-            )
-            sub.expires_at=(
-                base
-                + timedelta(days=add_days)
-            )
+    if add_days > 0:
+        from ..subscription_override_models import SubscriptionRuntimeOverride
+        from ..services.subscription_validity_v1 import add_validity_days
+        override = db.get(SubscriptionRuntimeOverride, int(sub.id))
+        plan = db.get(Plan, sub.plan_id) if sub.plan_id else None
+        add_validity_days(
+            sub, add_days, datetime.utcnow(),
+            override=override,
+            plan_days=int(plan.duration_days or 0) if plan else 0,
+            reset_date=reset_date,
+        )
     if reset_usage or reset_date:
         restore_after_period_change(db,sub,was_exhausted=was_exhausted)
     db.commit();db.refresh(sub)
