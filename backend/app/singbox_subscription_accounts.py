@@ -142,8 +142,8 @@ RECORD = json.loads({record_json!r})
 SENTINEL = {REVOCATION_SENTINEL!r}
 SHADOWTLS_INNER_TAG = {SHADOWTLS_INNER_TAG!r}
 SHADOWTLS_INNER_METHOD = {SHADOWTLS_INNER_METHOD!r}
-IDENTIFIED_ENABLED = {SHADOWTLS_IDENTIFIED_ENABLED!r}
-{NODE_HELPER_SCRIPT}
+IDENTIFIED_ENABLED = {globals().get("SHADOWTLS_IDENTIFIED_ENABLED", False)!r}
+{globals().get("NODE_HELPER_SCRIPT", "")}
 
 
 def load_json(path, default):
@@ -453,8 +453,8 @@ UPDATES = json.loads({payload!r})
 SENTINEL = {REVOCATION_SENTINEL!r}
 SHADOWTLS_INNER_TAG = {SHADOWTLS_INNER_TAG!r}
 SHADOWTLS_INNER_METHOD = {SHADOWTLS_INNER_METHOD!r}
-IDENTIFIED_ENABLED = {SHADOWTLS_IDENTIFIED_ENABLED!r}
-{NODE_HELPER_SCRIPT}
+IDENTIFIED_ENABLED = {globals().get("SHADOWTLS_IDENTIFIED_ENABLED", False)!r}
+{globals().get("NODE_HELPER_SCRIPT", "")}
 
 with open(CONFIG, "r", encoding="utf-8") as handle:
     doc = json.load(handle)
@@ -815,7 +815,7 @@ def client_item(
         transport["tag"] = "twinpanel-shadowtls-transport"
         identified = inbound.get("_twinpanel_shadowtls_identified")
         if (
-            SHADOWTLS_IDENTIFIED_ENABLED
+            globals().get("SHADOWTLS_IDENTIFIED_ENABLED", False)
             and isinstance(identified, dict)
             and secret.username in (identified.get("users") or [])
             and str(identified.get("method") or "") == IDENTIFIED_METHOD
