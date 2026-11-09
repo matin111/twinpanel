@@ -5,6 +5,9 @@ from __future__ import annotations
 import base64
 import enum
 import gzip
+import zipfile
+import tempfile
+import shutil
 import hashlib
 import json
 import os
@@ -1104,6 +1107,46 @@ def import_backup_file(
 
     ensure_backup_environment()
 
+    # One uploaded ZIP contains exactly one existing portable .tpbak.
+    # Do not extract arbitrary archive paths or unbounded ZIP entries.
+    if original_name.lower().endswith(".zip"):
+        try:
+            with zipfile.ZipFile(source, "r") as archive:
+                files = [item for item in archive.infolist() if not item.is_dir()]
+                if (len(files) != 1
+                    or files[0].filename != Path(files[0].filename).name
+                    or not files[0].filename.endswith(".tpbak")
+                    or files[0].file_size > 1024 * 1024 * 1024):
+                    raise ValueError("ZIP_MUST_CONTAIN_ONE_TPBAK")
+                with tempfile.NamedTemporaryFile(
+                    mode="wb", suffix=".tpbak", prefix=".zip-import-",
+                    dir=BACKUP_ROOT, delete=False,
+                ) as output:
+                    staged = Path(output.name)
+                    os.chmod(staged, 0o600)
+                    try:
+                        with archive.open(files[0]) as incoming:
+                            total = 0
+                            while True:
+                                chunk = incoming.read(1024 * 1024)
+                                if not chunk:
+                                    break
+                                total += len(chunk)
+                                if total > 1024 * 1024 * 1024:
+                                    raise ValueError("ZIP_MEMBER_TOO_LARGE")
+                                output.write(chunk)
+                        output.flush()
+                        os.fsync(output.fileno())
+                    except BaseException:
+                        staged.unlink(missing_ok=True)
+                        raise
+                try:
+                    return import_backup_file(staged, files[0].filename)
+                finally:
+                    staged.unlink(missing_ok=True)
+        except (zipfile.BadZipFile, zipfile.LargeZipFile) as exc:
+            raise ValueError("BACKUP_ZIP_INVALID") from exc
+
     info = inspect_backup(
         source
     )
@@ -1141,7 +1184,6 @@ def import_backup_file(
     # inspect_backup() has already validated the portable archive format.
     # Stream to a private, fsynced temporary file and rename atomically.
     import shutil
-    import tempfile
     with tempfile.NamedTemporaryFile(
         mode="wb", prefix=".tpbak-import-",
         suffix=".tmp", dir=BACKUP_ROOT, delete=False,

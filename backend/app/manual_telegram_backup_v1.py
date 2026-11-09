@@ -52,14 +52,14 @@ def _save_job(job_id: str, **changes) -> dict:
     return state
 
 
-def enqueue_manual_telegram_backup() -> dict:
+def enqueue_manual_telegram_backup(send_telegram: bool = True) -> dict:
     settings = load_settings()
     # Manual delivery is independent of the automatic backup schedule.
     # A configured Telegram destination is mandatory, but turning automatic
     # delivery off must never disable an administrator's manual operation.
-    if not settings.get("telegram_chat_id"):
+    if send_telegram and not settings.get("telegram_chat_id"):
         raise ValueError("BACKUP_TELEGRAM_DESTINATION_NOT_CONFIGURED")
-    if not load_bot_token():
+    if send_telegram and not load_bot_token():
         raise ValueError("BACKUP_TELEGRAM_BOT_NOT_CONFIGURED")
 
     JOBS.mkdir(mode=0o700,parents=True,exist_ok=True)
@@ -73,7 +73,7 @@ def enqueue_manual_telegram_backup() -> dict:
             except Exception:
                 continue
         jid=uuid.uuid4().hex
-        _save_job(jid,state="queued",stage="queued")
+        _save_job(jid,state="queued",stage="queued",send_telegram=send_telegram)
         cmd=[
             "/usr/bin/systemd-run", "--quiet", "--collect",
             "--unit=twinpanel-manual-backup-"+jid,
@@ -100,15 +100,17 @@ def enqueue_manual_telegram_backup() -> dict:
 def run_manual_job(job_id: str) -> None:
     if not JOB_PATTERN.fullmatch(job_id):
         raise ValueError("INVALID_BACKUP_JOB_ID")
-    _save_job(job_id,state="running",stage="building_encrypted_archive")
+    job = read_job(job_id)
+    send_telegram = bool(job.get("send_telegram", True))
+    _save_job(job_id,state="running",stage="building_archive")
     try:
-        result=create_backup(kind="manual",send_telegram=True)
-        if not result.get("telegram_sent") or not result.get("telegram_only"):
+        result=create_backup(kind="manual",send_telegram=send_telegram)
+        if send_telegram and (not result.get("telegram_sent") or not result.get("telegram_only")):
             _save_job(job_id,state="failed",stage="delivery_failed",
                       filename=result.get("filename"),
                       error_code="BACKUP_TELEGRAM_DELIVERY_INCOMPLETE")
             raise RuntimeError("BACKUP_TELEGRAM_DELIVERY_INCOMPLETE")
-        _save_job(job_id,state="succeeded",stage="telegram_delivered",
+        _save_job(job_id,state="succeeded",stage="telegram_delivered" if send_telegram else "ready_for_download",
                   filename=result["filename"],
                   parts=result.get("telegram_parts_total"),
                   tables=result.get("tables"),rows=result.get("rows"),

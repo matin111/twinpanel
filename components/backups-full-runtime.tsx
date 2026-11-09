@@ -62,37 +62,27 @@ export function BackupsFullRuntimePage(){
       const job=result.job;
       if(job.state==="succeeded"){
         sessionStorage.removeItem("tp-manual-backup-job");
-        setOk(pick(
-          `بکاپ دستی با موفقیت به تلگرام ارسال شد (${job.parts||"?"} قسمت). فایل بکاپ از سرور حذف شد.`,
-          `Manual backup delivered to Telegram (${job.parts||"?"} parts); server archive removed.`
-        ));
+        const filename=String(job.filename||"");
+        if(!filename.endsWith(".tpbak"))throw new Error("BACKUP_FILENAME_MISSING");
         await load();
+        await downloadBackupFile(filename);
+        setOk(pick("فایل ZIP بکاپ آماده و دانلود شد.","Backup ZIP created and downloaded."));
         return;
       }
       if(job.state==="failed"){
         sessionStorage.removeItem("tp-manual-backup-job");
-        throw new Error(pick(
-          "ارسال بکاپ کامل نشد. فایل بکاپ برای ارسال مجدد محفوظ مانده است. کد: ",
-          "Backup delivery failed; backup archive retained for retry. Code: "
-        )+String(job.error_code||"UNKNOWN"));
+        throw new Error(String(job.error_code||"BACKUP_CREATE_FAILED"));
       }
-      setOk(pick(
-        "بکاپ دستی در حال آماده‌سازی یا ارسال به تلگرام است. بدون بستن عملیات روی سرور ادامه پیدا می‌کند.",
-        "Manual backup is being prepared or uploaded to Telegram in the background."
-      ));
+      setOk(pick("در حال ساخت بکاپ…","Creating backup…"));
       await new Promise<void>(resolve=>setTimeout(resolve,5000));
     }
-    throw new Error(pick("عملیات هنوز در حال اجراست؛ از همین صفحه دوباره وضعیت را بررسی کنید.","Backup still running; revisit this page for status."));
+    throw new Error("BACKUP_JOB_STILL_PROCESSING");
   };
   const create=async()=>{
     if(busy)return;
-    if(!settings.telegram_chat_id.trim()){
-      setError(pick("برای بکاپ دستی، Chat ID تلگرام را تنظیم و ذخیره کنید.","Configure and save a Telegram Chat ID for on-demand backups."));
-      return;
-    }
     setBusy("create");setError("");setOk("");
     try{
-      const result=await parityApi.backupCreate(true);
+      const result=await parityApi.backupCreate(false);
       const job=(result.job||{}) as Record<string,unknown>;
       const id=String(job.id||"");
       if(!/^[0-9a-f]{32}$/.test(id))throw new Error("BACKUP_JOB_ID_MISSING");
@@ -115,7 +105,28 @@ export function BackupsFullRuntimePage(){
   const saveBackupBot=()=>{const token=backupBotToken.trim();if(token.length<20){setError(pick("توکن ربات بکاپ را کامل وارد کنید.","Enter the complete backup bot token."));return;}void run("backup-bot-save",pick("ربات اختصاصی بکاپ ذخیره شد","Dedicated backup bot saved"),async()=>{const result=await parityApi.backupTelegramSaveToken(token);setBackupBotToken("");return result;});};
   const deleteBackupBot=()=>{if(!window.confirm(pick("توکن ربات اختصاصی بکاپ حذف شود؟","Remove the dedicated backup bot token?")))return;void run("backup-bot-delete",pick("توکن ربات بکاپ حذف شد","Backup bot token removed"),()=>parityApi.backupTelegramDeleteToken());};
   const verifyTelegram=()=>{const chatId=settings.telegram_chat_id.trim();if(!chatId){setError(pick("ابتدا Telegram Chat ID را وارد کنید.","Enter the Telegram Chat ID first."));return;}void run("verify-telegram",pick("اتصال ربات بکاپ و Chat ID تأیید شد","Backup bot and Chat ID verified"),()=>parityApi.backupVerifyTelegram(chatId),false);};
-  const upload=async(event:ChangeEvent<HTMLInputElement>)=>{const file=event.target.files?.[0];event.target.value="";if(!file)return;if(!file.name.toLowerCase().endsWith(".tpbak")){setError(pick("فقط فایل .tpbak قابل آپلود است.","Only .tpbak files are accepted."));return;}await run("upload",pick("فایل بکاپ وارد شد","Backup file imported"),()=>uploadBackup(file,(percent)=>setOk(pick(`آپلود و بررسی بکاپ: ${percent}٪`,`Uploading and verifying backup: ${percent}%`))));};
+  const upload=async(event:ChangeEvent<HTMLInputElement>)=>{
+    const file=event.target.files?.[0];event.target.value="";
+    if(!file)return;
+    if(!/\.(zip|tpbak)$/i.test(file.name)){
+      setError(pick("فقط فایل ZIP بکاپ قابل آپلود است.","Select a backup ZIP file."));return;
+    }
+    if(busy)return;
+    setBusy("upload");setError("");setOk("");
+    try{
+      const result=await uploadBackup(file,(percent)=>setOk(pick(`در حال آپلود: ${percent}٪`,`Uploading: ${percent}%`)));
+      const filename=String(result.filename||"");
+      await load();
+      if(filename&&window.confirm(pick("بکاپ آپلود شد. اطلاعات پنل فعلی با اطلاعات این بکاپ جایگزین شود؟","Backup uploaded. Replace this panel's current data with this backup?"))){
+        await parityApi.backupRestore(filename);
+        await load();
+        setOk(pick("بازیابی بکاپ انجام شد.","Backup restored."));
+      }else{
+        setOk(pick("بکاپ آپلود شد و برای بازیابی آماده است.","Backup uploaded and ready to restore."));
+      }
+    }catch(e){setError(e instanceof Error?e.message:String(e));}
+    finally{setBusy("");}
+  };
   const uploadTelegramPiece=async(event:ChangeEvent<HTMLInputElement>)=>{
     const file=event.target.files?.[0];event.target.value="";
     if(!file||busy)return;
@@ -187,41 +198,8 @@ export function BackupsFullRuntimePage(){
 
 
   return <Shell active="/admin/backups"><div className="page">
-    <div className="page-head"><div><h1>{pick("بکاپ و بازیابی","Backup & Restore")}</h1></div><div className="action-row"><button className="ghost" disabled={Boolean(busy)} onClick={()=>inputRef.current?.click()}>{busy==="upload"?"…":pick("آپلود .tpbak","Upload .tpbak")}</button><input ref={inputRef} type="file" accept=".tpbak" hidden onChange={upload}/><button className="primary" disabled={Boolean(busy)} onClick={create}>{busy==="create"?"…":pick("بکاپ دستی","Create backup")}</button></div></div>
+    <div className="page-head"><div><h1>{pick("بکاپ و بازیابی","Backup & Restore")}</h1></div><div className="action-row"><button className="ghost" disabled={Boolean(busy)} onClick={()=>inputRef.current?.click()}>{busy==="upload"?"…":pick("آپلود و بازیابی ZIP","Upload and restore ZIP")}</button><input ref={inputRef} type="file" accept=".zip,.tpbak" hidden onChange={upload}/><button className="primary" disabled={Boolean(busy)} onClick={create}>{busy==="create"?"…":pick("دانلود بکاپ ZIP","Download backup ZIP")}</button></div></div>
     {error&&<div className="runtime-error">{error}</div>}{ok&&<div className="runtime-success">{ok}</div>}
-
-    <Card className="runtime-editor">
-      <div className="card-head"><div>
-        <b>{pick("بازیابی بکاپ چندقسمتی تلگرام","Import multi-part Telegram backup")}</b>
-      </div><Badge tone={telegramParts?.state==="imported"?"ok":telegramParts?.state==="failed"?"bad":"warn"}>
-        {telegramParts?telegramParts.state==="imported"?pick("آماده بازیابی","Ready for restore"):telegramParts.state==="verifying"?pick("در حال بررسی","Verifying"):telegramParts.state==="failed"?pick("خطا","Failed"):pick("در حال دریافت","Uploading"):pick("شروع جدید","New import")}
-      </Badge></div>
-      {!telegramParts&&<label className="field">
-        <span>{pick("SHA256 بکاپ کامل (اختیاری، از پیام تلگرام)","Full backup SHA256 (optional, from Telegram receipt)")}</span>
-        <input dir="ltr" value={telegramPartsSha} onChange={e=>setTelegramPartsSha(e.target.value)} placeholder="64-character SHA256" maxLength={64} disabled={Boolean(busy)}/>
-      </label>}
-      {telegramParts&&<div className="runtime-info-list">
-        <div><span>{pick("نام بکاپ","Backup file")}</span><b dir="ltr">{telegramParts.filename}</b></div>
-        <div><span>{pick("قسمت‌های دریافت‌شده","Parts received")}</span><b dir="ltr">{telegramParts.received_count} / {telegramParts.total_parts}</b></div>
-        <div><span>{pick("شماره قسمت‌ها","Received part numbers")}</span><b dir="ltr">{telegramParts.received_parts.join(", ")||"—"}</b></div>
-        {telegramParts.imported_filename&&<div><span>{pick("فایل بازیابی","Imported file")}</span><b dir="ltr">{telegramParts.imported_filename}</b></div>}
-      </div>}
-      <div className="action-row">
-        <button className="primary" disabled={Boolean(busy)||Boolean(telegramParts&&telegramParts.state!=="uploading")} onClick={()=>telegramPartRef.current?.click()}>
-          {busy==="telegram-piece"?"…":pick("آپلود یک قسمت بکاپ","Upload one backup part")}
-        </button>
-        <input ref={telegramPartRef} type="file" hidden onChange={uploadTelegramPiece}/>
-        <button className="ghost" disabled={Boolean(busy)||!telegramParts||telegramParts.state!=="uploading"||telegramParts.received_count!==telegramParts.total_parts} onClick={()=>void finishTelegramSet()}>
-          {busy==="telegram-join"?"…":pick("ترکیب و بررسی همه قسمت‌ها","Combine and verify all parts")}
-        </button>
-        <button className="ghost" disabled={Boolean(busy)} onClick={()=>void resetTelegramSet()}>
-          {pick("شروع مجموعه دیگر","Start another set")}
-        </button>
-        {telegramParts&&<button className="ghost" disabled={Boolean(busy)} onClick={()=>void getTelegramPartsStatus(telegramParts.id).then(setTelegramParts).catch(e=>setError(String(e)))}>
-          {pick("بررسی وضعیت","Check status")}
-        </button>}
-      </div>
-    </Card>
 
     <div className="stats dashboard-stats"><Stat label={pick("تعداد بکاپ","Backups")} value={String(backups.length)} icon="⟲"/><Stat label={pick("حجم کل","Total size")} value={totalBytes?sizeText({size_bytes:totalBytes}):"—"} icon="▤"/><Stat label={pick("ارسال Telegram","Telegram copies")} value={String(telegramCount)} icon="✈"/><Stat label={pick("Retention","Retention")} value={`${settings.retention} ${pick("نسخه","copies")}`} icon="⌛"/></div>
 
