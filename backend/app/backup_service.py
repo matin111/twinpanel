@@ -505,61 +505,57 @@ def _file_entry(
         return None
 
 
+# Only irreplaceable, administrator-created settings and cryptographic
+# identities are archived. Never recursively archive /etc/twinpanel:
+# it contains thousands of generated sing-box snapshots and runtime files.
+# Runtime configuration and node software must be recreated by the installer
+# and the centralized provisioning controller.
+PERSISTENT_CONFIG_FILES = frozenset({
+    "/etc/twinpanel-telegram-api.env",
+    "/etc/twinpanel/backup-telegram-bot.json",
+    "/etc/twinpanel/backup-telegram-token.enc",
+    "/etc/twinpanel/backup-telegram.key",
+    "/etc/twinpanel/masterdnsvpn/encrypt_key.txt",
+    "/etc/twinpanel/masterdnsvpn/server_config.toml",
+    "/etc/twinpanel/controller-ip/ca.crt",
+    "/etc/twinpanel/controller-ip/ca.key",
+    "/etc/twinpanel/sing-box/managed-ca.crt",
+    "/etc/twinpanel/sing-box/managed-ca.key",
+    "/etc/twinpanel/sing-box/server.crt",
+    "/etc/twinpanel/sing-box/server.key",
+    "/etc/twinpanel/standalone/amneziawg/private.key",
+})
+
+
 def _collect_admin_files(
     node_key_paths: set[str],
 ) -> dict[str, Any]:
+    # Credential and CA material that cannot safely be reconstructed for
+    # already-enrolled nodes are exceptions to the data-only backup policy.
+    # The panel encryption key itself is ALWAYS kept separately.
+    allowed = set(PERSISTENT_CONFIG_FILES)
+    for raw in node_key_paths:
+        if not raw:
+            continue
+        path = Path(raw)
+        if (
+            not path.is_absolute()
+            or ".." in path.parts
+            or path == BACKUP_KEY
+        ):
+            continue
+        # Only the explicit SSH key files referenced by node_access;
+        # never back up whole home directories or runtime trees.
+        allowed.add(str(path))
 
     result: dict[str, Any] = {}
-
-    candidates: set[str] = set()
-
-    # Telegram Bot token/config
-    candidates.add(
-        "/etc/twinpanel-telegram-api.env"
-    )
-
-    # Admin-managed configuration
-    # stored below /etc/twinpanel.
-    etc_root = Path(
-        "/etc/twinpanel"
-    )
-
-    if etc_root.exists():
-        for path in etc_root.rglob("*"):
-            if not path.is_file():
-                continue
-
-            if path == BACKUP_KEY:
-                continue
-
-            # frontend runtime address is
-            # deployment config, not panel data.
-            if path.name == "frontend.env":
-                continue
-
-            candidates.add(
-                str(path)
-            )
-
-    # SSH private-key files referenced
-    # by node_access are essential for
-    # restoring server access.
-    candidates.update(
-        path
-        for path in node_key_paths
-        if path
-    )
-
-    for raw in sorted(candidates):
-        path = Path(raw)
-
-        entry = _file_entry(
-            path
-        )
-
+    for name in sorted(allowed):
+        path = Path(name)
+        if path == BACKUP_KEY:
+            continue
+        entry = _file_entry(path)
         if entry is not None:
             result[str(path)] = entry
-
     return result
 
 
