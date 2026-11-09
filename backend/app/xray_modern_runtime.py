@@ -448,6 +448,14 @@ if domain:
             f"/root/.acme.sh/{{domain}}/fullchain.cer",
             f"/root/.acme.sh/{{domain}}/{{domain}}.key",
         ),
+        # The panel's safe ACME relay may install the validated certificate
+        # directly into Xray's managed TLS directory. Older reconciliation
+        # ignored it, reset tls_enabled=False and rebuilt three REALITY
+        # inbounds despite the certificate being valid and still on disk.
+        (
+            "/usr/local/etc/xray/twinpanel-tls/fullchain.pem",
+            "/usr/local/etc/xray/twinpanel-tls/privkey.pem",
+        ),
     ]
 
     for cert, key in candidates:
@@ -465,10 +473,34 @@ if domain:
             capture_output=True,
             check=False,
         )
-        if valid.returncode == 0 and host.returncode == 0:
+        if (valid.returncode == 0 and host.returncode == 0
+                and f"Hostname {{domain}} does match certificate" in host.stdout
+                and "does NOT match" not in host.stdout):
+            # Ensure the selected private key actually belongs to the
+            # certificate. A stale domain/key pair must never be published.
+            cert_public = subprocess.run(
+                ["openssl", "x509", "-in", cert, "-pubkey", "-noout"],
+                text=True, capture_output=True, check=False,
+            )
+            key_public = subprocess.run(
+                ["openssl", "pkey", "-in", key, "-pubout"],
+                text=True, capture_output=True, check=False,
+            )
+            if (cert_public.returncode or key_public.returncode
+                    or cert_public.stdout != key_public.stdout):
+                continue
             source_cert = cert
             source_key = key
             break
+
+# Never downgrade a previously configured dedicated TLS Exit to Reality
+# because ACME is temporarily unreachable or a certificate is missing.
+# Fail *before* rewriting state or service configuration. Initial Exits
+# without previous state are handled by their separate TLS preflight.
+if domain and not source_cert and (
+    state.get("tls_enabled") or state.get("managed_cert")
+):
+    raise RuntimeError("XRAY_DEDICATED_TLS_CERTIFICATE_MISSING_STOP")
 
 if source_cert and source_key:
     user_result = subprocess.run(
@@ -484,8 +516,10 @@ if source_cert and source_key:
     managed_cert = str(target_dir / "fullchain.pem")
     managed_key = str(target_dir / "privkey.pem")
 
-    shutil.copyfile(source_cert, managed_cert)
-    shutil.copyfile(source_key, managed_key)
+    if os.path.realpath(source_cert) != os.path.realpath(managed_cert):
+        shutil.copyfile(source_cert, managed_cert)
+    if os.path.realpath(source_key) != os.path.realpath(managed_key):
+        shutil.copyfile(source_key, managed_key)
     os.chmod(managed_cert, 0o644)
     os.chmod(managed_key, 0o600)
 
