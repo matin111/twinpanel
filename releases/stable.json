@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.744",
+  "version": "1.1.0-rc.745",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-09T06:46:07Z",
+  "released_at": "2026-11-09T07:02:40Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "2b23d5627dd4bc6f505c97aa89468dab4c6cb78f",
+  "source_sha": "f5830f5dbf1f19fd5035c7e0a54ea5473d1c6ee5",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.744/twinpanel-1.1.0-rc.744-linux-x86_64.tar.gz",
-    "sha256": "0208b91bf5fd8d1523d2b9fd8abc0bb760812a7b12e025297f91a4f3a3860bc8",
-    "size_bytes": 30121695
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.745/twinpanel-1.1.0-rc.745-linux-x86_64.tar.gz",
+    "sha256": "2b92e51478aa757bed98b2e839f6aefb489fd492f37d5dcecc205aadbb067abf",
+    "size_bytes": 30125591
   },
   "notes": {
-    "fa": "بکاپ قابل‌انتقال داده‌های TwinPanel بدون کلید بازیابی با فرمت جدید v3. حفظ داده‌های پایدار کاربران، نمایندگان، کیف پول‌ها، اشتراک‌ها و تنظیمات ضروری؛ حذف وابستگی بازیابی به تنظیمات تلگرام؛ نسخه ایمنی محلی قبل از Restore؛ حذف مسیر دانلود کلید و پشتیبانی از فایل‌های بکاپ قدیمی. توجه: فایل بکاپ جدید حاوی داده‌های حساس است و باید خصوصی نگهداری شود.",
-    "en": "Portable keyless TwinPanel data-only backup format v3, retaining persistent users, resellers, subscriptions, wallets and essential settings; no Telegram prerequisite for restore; pre-restore local safety copy; legacy encrypted archives unsupported. Warning: backups contain sensitive credentials and must be kept private."
+    "fa": "اصلاح صفحه بکاپ و بازیابی: کارت ربات بکاپ و زمان‌بندی در یک ردیف کنار هم، حذف توضیحات تکراری و بهبود تراکم و نظم نمایش؛ بدون تغییر عملکرد بکاپ و ربات.",
+    "en": "Backup page layout: side-by-side bot and schedule cards on desktop, remove redundant copy, preserve backup and bot controls."
   }
 }
