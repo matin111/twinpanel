@@ -6,6 +6,9 @@ No database writes, subscriptions, node counters or external services are used.
 from datetime import datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
+
+from app.models import SubscriptionStatus
 
 from fastapi import HTTPException
 
@@ -14,11 +17,28 @@ from app.services.subscription_cycle_reset_v1 import reset_subscription_period_u
 from app.quota_models import QuotaAuditLog
 
 
+class Query:
+    def __init__(self, db):
+        self.db = db
+
+    def filter(self, *args):
+        return self
+
+    def with_for_update(self):
+        return self
+
+    def first(self):
+        return self.db.sub
+
+
 class DB:
     def __init__(self, subscription):
         self.sub = subscription
         self.events = []
         self.commits = 0
+
+    def query(self, model):
+        return Query(self)
 
     def get(self, model, ident):
         return self.sub if int(ident) == self.sub.id else None
@@ -40,6 +60,7 @@ def check():
         starts_at=datetime.utcnow() - timedelta(days=15),
         expires_at=datetime.utcnow() + timedelta(days=15),
         activation_duration_days=30, plan_id=None,
+        status=SubscriptionStatus.ACTIVE,
     )
     db = DB(sub)
     first_expiry = sub.expires_at
@@ -83,6 +104,24 @@ def check():
     assert old == 123456 and other.traffic_used_bytes == 0
     assert db2.events[0].action == "subscription_usage_period_reset"
     assert db2.events[0].details["origin"] == "admin_edit"
+
+    # Prior quota exhaustion may be restored; unrelated manual suspension
+    # must never be silently lifted.
+    from app.services import subscription_cycle_reset_v1 as service
+    sub.status = SubscriptionStatus.SUSPENDED
+    sub.traffic_limit_bytes = 1024
+    sub.traffic_used_bytes = 1024
+    sub.expires_at = datetime.utcnow() + timedelta(days=2)
+    with patch.object(service, "queue_subscription_enforcement") as restored:
+        extend_subscription_v17(9333, {"reset_usage": True}, db)
+        assert sub.status == SubscriptionStatus.ACTIVE
+        restored.assert_called_once()
+        assert restored.call_args.kwargs["command_type"] == "restore_subscription"
+        sub.status = SubscriptionStatus.SUSPENDED
+        sub.traffic_used_bytes = 1
+        extend_subscription_v17(9333, {"reset_usage": True}, db)
+        assert sub.status == SubscriptionStatus.SUSPENDED
+        assert restored.call_count == 1
 
     root=Path(__file__).resolve().parents[1]
     fast=(root/"app/routers/subscription_admin_edit_fast_v1.py").read_text()
