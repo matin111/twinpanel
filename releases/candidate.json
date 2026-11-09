@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.753",
-  "source_sha": "0a451ca85de36087139a7be1d93316ac03345173",
+  "version": "1.1.0-rc.754",
+  "source_sha": "e889e571b19295f874b0c19633bf1f1c0f7de8b9",
   "notes": {
-    "fa": "اصلاح دائمی نصب و Repair پروتکل V2Ray/Xray فنلاند و نودهای جدید: ارسال هویت و دامنه اختصاصی نود به نصب‌کننده؛ جلوگیری از بازنویسی کانفیگ کاربران توسط نصب‌کننده قدیمی؛ ممنوعیت افت خودکار TLS به سه REALITY؛ صحت‌سنجی سه Inbound واقعی با API و پورت‌های فعال؛ نصب WebSocket/TCP TLS از طریق API بدون ری‌استارت کل Xray؛ حفظ UUID و وضعیت قبلی کاربران حتی هنگام خطای Repair. سایر پروتکل‌ها و کشورها دست‌نخورده‌اند.",
-    "en": "Stop destructive Xray reinstalls and Finland TLS reverting to three REALITY inbounds. Pass the real node/domain into fresh install and Repair, retain existing active Xray config and UUIDs, fail closed if dedicated TLS identity is missing, verify all three real TLS/XHTTP inbounds through live HandlerService and TCP listeners, hot-add missing TCP TLS without service restart, and preserve prior published protocol state on failed repairs. 56 targeted regression tests passed."
+    "fa": "رفع پاسخ خطای نامشخص 500 هنگام قفل شدن تراکنش ویرایش اشتراک: بازگشت ایمن تراکنش و اعلام 503 با امکان تلاش دوباره، بدون اجرای تکراری تغییرات. افزودن ابزار اختیاری و قابل‌بازگشت Socket Activation برای کاهش 502 هنگام ری‌استارت API؛ این ابزار به‌صورت خودکار روی سرور فعال نمی‌شود. حفظ اصلاحات قبلی ربات، ویتوری، بکاپ، ریست حجم و تاریخ، و آپدیتر. علت اصلی طولانی‌ماندن بعضی تراکنش‌ها و قطعی درخواست‌های در حال اجرا همچنان نیازمند بررسی است.",
+    "en": "Safely roll back PostgreSQL lock conflicts in admin subscription edits and return a retryable 503 without replaying mutation/queue writes. Include an opt-in, reversible API systemd socket-handoff utility with isolated regression tests to reduce connection refused 502s on future restarts; it remains disabled until controlled cutover. Preserve prior Telegram, Xray, backup, quota/date-reset, and updater fixes. Underlying long DB transactions and in-flight API requests remain separate concerns."
   }
 }
