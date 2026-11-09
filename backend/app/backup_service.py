@@ -438,6 +438,14 @@ def _unpack(value: Any) -> Any:
         "__tp_type__"
     )
 
+    if type_name == "account_credential_rewrap_v2":
+        # Encrypted credential fields are compressed as their original JSON
+        # while inside the OUTER encrypted backup. On restore, encrypt again
+        # using the destination panel's APP_SECRET_KEY, so migration does not
+        # require copying the old deployment .env or database credentials.
+        from .routers import account_delivery as account_crypto
+        return account_crypto._enc(_unpack(value["payload"]))
+
     if type_name == "bytes":
         return base64.b64decode(
             value["value"]
@@ -634,6 +642,27 @@ def _export_database() -> tuple[
                             str(key_path)
                         )
 
+                if name == "protocol_credentials":
+                    # The source rows contain per-user Fernet ciphertext.
+                    # Ciphertext is deliberately incompressible; rewrap only
+                    # the JSON that we can authenticate and decrypt locally.
+                    # Do not persist plaintext separately; the entire gzip
+                    # payload is encrypted before it touches the disk.
+                    from .routers import account_delivery as account_crypto
+                    for field in ("secret_encrypted", "config_text_encrypted"):
+                        ciphertext = plain.get(field)
+                        if not isinstance(ciphertext, str) or not ciphertext:
+                            continue
+                        decoded = account_crypto._dec(ciphertext)
+                        if decoded is None:
+                            # Preserve unreadable/legacy values byte-for-byte.
+                            # Never silently erase a credential.
+                            continue
+                        plain[field] = {
+                            "__tp_type__": "account_credential_rewrap_v2",
+                            "payload": decoded,
+                        }
+
                 plain_rows.append(
                     _pack(plain)
                 )
@@ -731,7 +760,9 @@ def create_backup(
 
     payload = {
         "format": BACKUP_FORMAT,
-        "version": 1,
+        "version": 2,
+        "scope": "persistent-panel-data",
+        "credential_encoding": "account_credential_rewrap_v2",
         "created_at": _iso_now(),
         "kind": kind,
         "tables": tables,
