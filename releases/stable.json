@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.751",
+  "version": "1.1.0-rc.752",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-09T20:41:22Z",
+  "released_at": "2026-11-09T20:44:00Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "9287094ffb6ac126520a20bb86212c74d169e4f0",
+  "source_sha": "533cbcb0c1598b817e3e53e2c10c1123c71009cf",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.751/twinpanel-1.1.0-rc.751-linux-x86_64.tar.gz",
-    "sha256": "a13c3ca87ac983cf0999d6d9e7ce0ffa4aa4dca5c36dab3109df730ef5b96093",
-    "size_bytes": 30147636
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.752/twinpanel-1.1.0-rc.752-linux-x86_64.tar.gz",
+    "sha256": "36debf195397ca41ead60730bc555ae28dd43bc523576a6e8a6cfaf8940eb5c8",
+    "size_bytes": 30143867
   },
   "notes": {
-    "fa": "رفع خطای منوهای تلگرام هنگام استفاده از پیام عکس و QR؛ دریافت لینک اکانت، افزودن ساب‌لینک، بروزرسانی، تمدید و بازگشت به مدیریت اکانت با نمایش ایمن پیام. تشخیص قطعی خطای ارسال فرمان ری‌استارت آپدیتر به systemd و جلوگیری از ادامه بی‌صدای استقرار ناموفق. حفظ قابلیت ریست مستقل حجم و تاریخ و تست‌های محافظتی نسخه قبلی. این نسخه به‌تنهایی مشکل فاصله قطعی API در ری‌استارت یا قفل هم‌زمان دیتابیس را برطرف نمی‌کند.",
-    "en": "Fix Telegram QR/photo callback navigation for account link lookup, imported subscription management, renewal and refresh without invalid editMessageText calls. Fail closed on updater systemd restart dispatch errors; preserve independent traffic/date reset and its regression gate. This release does not yet solve the API listener downtime gap during restarts or admin-edit database lock contention."
+    "fa": "بکاپ یک‌فایلی ZIP: دانلود خودکار ZIP بعد از بکاپ دستی بدون الزام تنظیم ربات تلگرام؛ آپلود ZIP با انتقال قطعه‌ای خودکار در پس‌زمینه و پیشنهاد بازیابی با تأیید مدیر؛ حذف مراحل دستی ترکیب بکاپ چندقسمتی از صفحه. فرمت داخلی قدیمی حفظ شده تا اطلاعات بکاپ پاک نشود.",
+    "en": "Single-file ZIP download for manual backups without Telegram prerequisite; one ZIP upload via resumable internal transfer and explicit restore confirmation; remove manual multipart assembly UI. Preserve existing internal backup format and data."
   }
 }
