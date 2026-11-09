@@ -45,6 +45,11 @@ def desired_subscription_ids(db, node_id: int) -> tuple[int, ...]:
     return tuple(sorted({int(row[0]) for row in rows}))
 
 
+def entitled_ids(db, node_id: int) -> tuple[int, ...]:
+    """Canonical entitlement membership used by the enforcement guard."""
+    return desired_subscription_ids(db, node_id)
+
+
 def fingerprint_for_ids(node_id: int, ids) -> str:
     canonical = tuple(sorted({int(item) for item in ids}))
     if any(item <= 0 for item in canonical):
