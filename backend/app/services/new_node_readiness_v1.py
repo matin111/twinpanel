@@ -22,7 +22,12 @@ def _online(value: Any) -> bool:
     return str(getattr(value, "value", value) or "").lower() == "online"
 
 
-async def verify_new_exit_readiness(db: Session, node_id: int) -> dict[str, Any]:
+async def verify_new_exit_readiness(
+    db: Session,
+    node_id: int,
+    *,
+    require_tls_profiles: bool = False,
+) -> dict[str, Any]:
     node = db.get(Node, int(node_id))
     if node is None or node.retired_at is not None or node.node_type != NodeType.EXIT:
         return {"ok": False, "reason": "invalid_exit", "missing": list(ALL_PROTOCOL_KEYS)}
@@ -73,7 +78,20 @@ async def verify_new_exit_readiness(db: Session, node_id: int) -> dict[str, Any]
                     authority = await asyncio.wait_for(
                         read_node_public_authority(conn), timeout=65,
                     )
-                    if len(set(authority.get("profiles") or [])) != 3:
+                    profiles = frozenset(authority.get("profiles") or [])
+                    if require_tls_profiles:
+                        # Only the brand-new hidden Exit installer enables
+                        # this stricter policy. Do not break older working
+                        # domainless nodes or their existing VPN users.
+                        expected = frozenset((
+                            "websocket_tls", "xhttp_reality", "tcp_tls",
+                        ))
+                        if (
+                            not authority.get("tls_enabled")
+                            or profiles != expected
+                        ):
+                            failed.append(key)
+                    elif len(profiles) != 3:
                         failed.append(key)
             except Exception:
                 # This is a read-only guard. Do not log sensitive command output.
