@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.737",
-  "source_sha": "802d92871fb99822c3c9c055cf62941a729166cb",
+  "version": "1.1.0-rc.738",
+  "source_sha": "25bc0a6f999aa15ec3f8ea80e09b9d115abe1ba7",
   "notes": {
-    "fa": "افزودن زیرساخت مهاجرت ایمن ShadowTLS به لایه داخلی Shadowsocks 2022 چندکاربره با حفظ هویت اختصاصی مشتری، اتصال حسابداری مرکزی فقط به نشست و ترافیک دارای شناسه معتبر، پشتیبانی از نام‌های کاربری انتقالی و رمزهای کوتاه با کلید خصوصی نود، و همگام‌سازی ساخت و حذف اکانت. این قابلیت پیش‌فرض غیرفعال است و ورودی قدیمی، پورت، رمز و کانفیگ مشتریان تا انجام مهاجرت کنترل‌شده تغییر نمی‌کند.",
-    "en": "Default-off additive ShadowTLS v3/SS2022 identity-preserving migration primitives: private-seeded per-user 128-bit inner keys, legacy username compatibility, account add/revoke sync, explicit per-node modern delivery opt-in, canonical authenticated-only accounting and selective session limit. No automatic legacy port change, node restart, key rotation or historical charge; public/tunnel port routing and controlled live rollout still required."
+    "fa": "حذف کامل لیست تکراری پایینی V2Ray/Xray و فیلتر کشور تکراری در صفحه اتصال. فقط لیست اصلی بالایی با پرچم، نام کشور و دکمه کپی کانفیگ هر سرور باقی می‌ماند. هیچ تغییری در لینک‌ها، UUID، پروتکل‌های دیگر یا سرویس‌های VPN ایجاد نشده است.",
+    "en": "Remove the duplicate lower V2Ray/Xray server list and repeated country filter. Retain only the previously approved top list with actual node names, flags and per-server copy actions. No VPN, connection links, credentials or other protocol changes."
   }
 }
