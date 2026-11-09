@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.732",
-  "source_sha": "6db5325832dd98c861f8ef8e61bf5dcf2dca15d6",
+  "version": "1.1.0-rc.733",
+  "source_sha": "b3d3a154f62eb885053ebc4759f70a718d9e7262",
   "notes": {
-    "fa": "حذف سه دکمه نامربوط پایین پنجره SOCKS5: دانلود Karing، کپی همه کانفیگ‌ها و کپی لینک مولتی‌لینک. فهرست سرورها، فیلتر کشور و دکمه نمایش اطلاعات بدون تغییر می‌مانند. این اصلاح فقط ظاهر SOCKS5 را تغییر می‌دهد و روی سایر پروتکل‌ها یا حجم و تاریخ اثری ندارد.",
-    "en": "Remove non-applicable Karing download, copy-all configs, and multi-link footer controls exclusively from the SOCKS5 connection modal. Preserve individual server details, country filters, all other protocols, accounting and expiry."
+    "fa": "اعمال محدودیت نشست مشترک بین پروتکل‌ها روی اتصال واقعی sing-box؛ در اشتراک تک‌اتصالی، اگر پروتکل دیگری یک نشست تأییدشده فعال دارد، اتصال جدید غیرمجاز بعد از تطبیق دوباره هویت در API نود به‌صورت انتخابی قطع می‌شود. بدون ری‌استارت نود، قطع جمعی، تغییر رمز، کانفیگ، تاریخ یا حجم. محافظت در برابر نشست‌های قدیمی، نامحدودها و اتصال‌های فاقد هویت معتبر.",
+    "en": "Enforce canonical cross-protocol concurrent-session limits on the sing-box dataplane with authenticated selective per-connection CloseConnection RPC, fresh node snapshot and quota revalidation, no broad restarts, bulk disconnects, credentials, expiry or quota changes. Does not claim physical-device fingerprinting or handshake-time enforcement for protocols outside sing-box."
   }
 }
