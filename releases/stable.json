@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.729",
+  "version": "1.1.0-rc.730",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-09T00:43:12Z",
+  "released_at": "2026-11-09T01:06:48Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "6ca655fa8747371fd5aa7d3d7e960d3c0ac8cb27",
+  "source_sha": "b2ab24d6da6605c36fc380deffb2744b734ee184",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.729/twinpanel-1.1.0-rc.729-linux-x86_64.tar.gz",
-    "sha256": "ee6701903ec27bf640b636f84ee530e5d4b2f6f8f3a7c61ac20a4fa697eab0a2",
-    "size_bytes": 29970655
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.730/twinpanel-1.1.0-rc.730-linux-x86_64.tar.gz",
+    "sha256": "b60d5ce8cbf65ce0918fe69112bfef751245c83a9ed292de89a1617d4b59732a",
+    "size_bytes": 29985106
   },
   "notes": {
-    "fa": "اصلاح عدم خواندن دامنه اختصاصی Xray توسط Worker مستقل مدیریت مرکزی و استفاده از دامنه فقط در صورت تطابق DNS آن با IP ورودی تانل ایران برای XHTTP، TCP Reality و Vision. مسیر مستقیم، پورت‌ها و تنظیمات سایر نودها بدون تغییر می‌مانند. برای اتصال نودهای دارای خطای Route، صحت DNS و فوروارد پورت‌ها جداگانه لازم است.",
-    "en": "Activate dedicated Xray-domain mapper in detached central workers. Safely prefer DNS-verified Iran ingress hostnames for Reality and Vision as well as XHTTP; preserve direct fallback, existing ports, users and all other services. DNS and ingress route readiness remain separate prerequisites."
+    "fa": "رفع قطع ثبت مصرف ساکس۵ پس از تغییر هویت اتصال: تطبیق شناسه داخلی احرازشده sing-box با اعتبارنامه فعال همان اشتراک در همان نود؛ ثبت مصرف به مسیر مرکزی بدون تغییر نام کاربری، رمز، کانفیگ، تاریخ و محدودیت حجم. اصلاح فقط برای SOCKS5 و با تست رگرسیون.",
+    "en": "Fix SOCKS5 central accounting stalling when sing-box authenticates runtime identity tp-sub-N while saved customer username differs. Safely bind exact observed authenticated internal identity to verified active credential on the same node/subscription. No credential, VPN dataplane, billing formula, expiry or quota changes. Regression tests passed."
   }
 }
