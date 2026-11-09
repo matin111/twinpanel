@@ -61,7 +61,7 @@ async def verify(presence_ok, metrics_ok):
     with (
         patch.object(worker, "SessionLocal", return_value=db),
         patch.object(worker, "connect_protocol_runtime", connect),
-        patch.object(worker.canonical, "build_node_devices", return_value=[
+        patch.object(worker, "build_mieru_node_devices", return_value=[
             {"protocol": "mieru", "device_id": 1}
         ]),
         patch.object(worker.canonical, "_collect_mieru", presence),
