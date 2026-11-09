@@ -139,6 +139,25 @@ def _singbox_secret(
 ):
     from ..singbox_subscription_accounts import SingBoxAccountSecret, new_account_secret
 
+    if protocol == "socks5":
+        # Preserve live legacy credentials until an explicit, verified
+        # migration. Never silently break already-issued proxy profiles.
+        stored = _stored_singbox_secret(ad, cred, protocol)
+        if stored is not None:
+            return stored
+        # New SOCKS5 credentials use the same account-level login as
+        # Cisco/L2TP; the eight-digit password is generated centrally,
+        # not independently on each Exit.
+        username = str(sub.account_username or "").strip()
+        password = str(sub.account_password_encrypted or "")
+        if not username or not password:
+            raise RuntimeError("SOCKS5_SUBSCRIPTION_ACCOUNT_CREDENTIALS_MISSING")
+        return SingBoxAccountSecret(
+            protocol=protocol,
+            username=username,
+            password=password,
+        )
+
     if protocol in SUBSCRIPTION_BOUND_SINGBOX_PROTOCOLS:
         username = str(sub.account_username or "").strip()
         password = str(sub.account_password_encrypted or "")
