@@ -277,6 +277,13 @@ async def run_one(db,node_id:int,limit:int,apply:bool)->int:
 
 
 async def run(node_id:int,limit:int,apply:bool,all_batches:bool):
+    # Detached central workers do not import app.main. Without this runtime
+    # activation Node.xray_domain is absent from the ORM mapper and the
+    # customer delivery authority silently falls back to the Exit IP.
+    # Apply the same dedicated-domain mapper + endpoint policy as the API
+    # before opening any subscription or Node session.
+    from app.xray_node_domain_runtime import apply_xray_node_domain_runtime
+    apply_xray_node_domain_runtime()
     with SessionLocal() as db:
         if apply:
             node=db.get(Node,node_id)
