@@ -189,19 +189,16 @@ DOMAIN={quoted}
 for CERT in \
   /etc/letsencrypt/live/$DOMAIN/fullchain.pem \
   /root/.acme.sh/${{DOMAIN}}_ecc/fullchain.cer \
-  /root/.acme.sh/$DOMAIN/fullchain.cer
+  /root/.acme.sh/$DOMAIN/fullchain.cer \
+  /usr/local/etc/xray/twinpanel-tls/fullchain.pem
 do
   [ -s \"$CERT\" ] || continue
-
-  if openssl x509 \
-      -checkend 86400 \
-      -noout \
-      -in \"$CERT\" >/dev/null 2>&1 \
-    && openssl x509 \
-      -checkhost \"$DOMAIN\" \
-      -noout \
-      -in \"$CERT\" >/dev/null 2>&1
-  then
+  CHECK=$(openssl x509 -checkhost \"$DOMAIN\" -noout -in \"$CERT\" 2>/dev/null) || continue
+  case \"$CHECK\" in
+    \"Hostname $DOMAIN does match certificate\") ;;
+    *) continue ;;
+  esac
+  if openssl x509 -checkend 86400 -noout -in \"$CERT\" >/dev/null 2>&1; then
     echo READY
     break
   fi
@@ -940,7 +937,11 @@ for tag, server_name, state_key in (
         ["openssl", "x509", "-noout", "-checkhost", server_name, "-in", certificate],
         capture_output=True, timeout=10,
     )
-    if result.returncode:
+    if (
+        result.returncode
+        or ("Hostname " + server_name + " does match certificate")
+        not in result.stdout.decode("utf-8", "replace")
+    ):
         raise RuntimeError("TLS certificate does not cover SNI " + server_name)
     tls_settings["serverName"] = server_name
     state[state_key] = server_name
@@ -993,7 +994,7 @@ try:
         raise RuntimeError("Xray did not become active")
     new_config = json.loads(config_path.read_text())
     assert all(
-        x["streamSettings"]["realitySettings"]["serverNames"] == [name]
+        x["streamSettings"]["realitySettings"]["serverNames"] == [name, *aliases]
         for x in new_config["inbounds"] if x.get("tag") in
         ("vless-xhttp-reality",)
     )
