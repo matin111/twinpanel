@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.742",
+  "version": "1.1.0-rc.743",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-09T05:53:27Z",
+  "released_at": "2026-11-09T06:39:21Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "e23f46f388affd6d22f91849bb3db017db3ff6bf",
+  "source_sha": "75673101eb1e0f1153539df039af890773c39091",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.742/twinpanel-1.1.0-rc.742-linux-x86_64.tar.gz",
-    "sha256": "67f90fd5cae0294433db5ebf1c592298a94c4a5dfd5f47d67ac11bbee721c026",
-    "size_bytes": 30089193
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.743/twinpanel-1.1.0-rc.743-linux-x86_64.tar.gz",
+    "sha256": "a90d035c1078a2d9a28b9148ea6ea6da01157956f28823f0b1b381b34e6b1847",
+    "size_bytes": 30115519
   },
   "notes": {
-    "fa": "جلوگیری از رفرش پشت‌سرهم پنل پس از آپدیت: اصلاح کنترل اختلاف نسخه فرانت‌اند و سرور، محدودکردن بازخوانی خودکار به یک‌بار برای هر نسخه و توقف انتشار بسته در صورت اختلاف نسخه فایل اجرایی وب.",
-    "en": "Fix panel reload loop after update: restrict client version convergence to one reload per build/target pair; pin and verify compiled Next.js version matches the immutable release candidate before publishing."
+    "fa": "حذف عبارت فنی SMS Reader از پیام‌های شارژ کیف پول کارت‌به‌کارت در ربات اصلی و نسخه دوم؛ حفظ دستور پرداخت دقیق، دکمه ارسال رسید و عملکرد تأیید خودکار بدون تغییر.",
+    "en": "Remove internal SMS Reader references from Telegram customer wallet card-to-card payment copy, retaining exact amount instructions, receipt buttons and existing automatic payment functionality."
   }
 }
