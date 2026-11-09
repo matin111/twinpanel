@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.752",
+  "version": "1.1.0-rc.753",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-09T20:44:00Z",
+  "released_at": "2026-11-09T21:11:39Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "533cbcb0c1598b817e3e53e2c10c1123c71009cf",
+  "source_sha": "0a451ca85de36087139a7be1d93316ac03345173",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.752/twinpanel-1.1.0-rc.752-linux-x86_64.tar.gz",
-    "sha256": "36debf195397ca41ead60730bc555ae28dd43bc523576a6e8a6cfaf8940eb5c8",
-    "size_bytes": 30143867
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.753/twinpanel-1.1.0-rc.753-linux-x86_64.tar.gz",
+    "sha256": "14284ef1053a948a3bc4ffa98bf5c28744b529a172ca3db11e77bac66830dd66",
+    "size_bytes": 30165006
   },
   "notes": {
-    "fa": "بکاپ یک‌فایلی ZIP: دانلود خودکار ZIP بعد از بکاپ دستی بدون الزام تنظیم ربات تلگرام؛ آپلود ZIP با انتقال قطعه‌ای خودکار در پس‌زمینه و پیشنهاد بازیابی با تأیید مدیر؛ حذف مراحل دستی ترکیب بکاپ چندقسمتی از صفحه. فرمت داخلی قدیمی حفظ شده تا اطلاعات بکاپ پاک نشود.",
-    "en": "Single-file ZIP download for manual backups without Telegram prerequisite; one ZIP upload via resumable internal transfer and explicit restore confirmation; remove manual multipart assembly UI. Preserve existing internal backup format and data."
+    "fa": "اصلاح دائمی نصب و Repair پروتکل V2Ray/Xray فنلاند و نودهای جدید: ارسال هویت و دامنه اختصاصی نود به نصب‌کننده؛ جلوگیری از بازنویسی کانفیگ کاربران توسط نصب‌کننده قدیمی؛ ممنوعیت افت خودکار TLS به سه REALITY؛ صحت‌سنجی سه Inbound واقعی با API و پورت‌های فعال؛ نصب WebSocket/TCP TLS از طریق API بدون ری‌استارت کل Xray؛ حفظ UUID و وضعیت قبلی کاربران حتی هنگام خطای Repair. سایر پروتکل‌ها و کشورها دست‌نخورده‌اند.",
+    "en": "Stop destructive Xray reinstalls and Finland TLS reverting to three REALITY inbounds. Pass the real node/domain into fresh install and Repair, retain existing active Xray config and UUIDs, fail closed if dedicated TLS identity is missing, verify all three real TLS/XHTTP inbounds through live HandlerService and TCP listeners, hot-add missing TCP TLS without service restart, and preserve prior published protocol state on failed repairs. 56 targeted regression tests passed."
   }
 }
