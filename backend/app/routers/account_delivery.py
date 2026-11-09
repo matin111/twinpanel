@@ -5636,7 +5636,10 @@ def set_manual_limits(
 def extend_subscription_v17(subscription_id:int,payload:dict=Body(...),db:Session=Depends(get_db)):
     sub=db.get(Subscription,subscription_id)
     if not sub: raise HTTPException(status_code=404,detail="اشتراک پیدا نشد")
-    from ..services.subscription_cycle_reset_v1 import reset_subscription_period_usage
+    from ..services.subscription_cycle_reset_v1 import (
+        reset_subscription_period_usage,
+        restore_after_period_change,
+    )
 
     try:
         add_traffic_gb=float(payload.get("add_traffic_gb",0) or 0)
@@ -5651,6 +5654,10 @@ def extend_subscription_v17(subscription_id:int,payload:dict=Body(...),db:Sessio
         raise HTTPException(status_code=422,detail="مقداری برای افزایش یا ریست وارد نشده")
     if reset_date and add_days<=0:
         raise HTTPException(status_code=422,detail="برای ریست تاریخ، مدت دوره جدید را به روز وارد کنید")
+    was_exhausted=bool(
+        int(sub.traffic_limit_bytes or 0)>0
+        and int(sub.traffic_used_bytes or 0)>=int(sub.traffic_limit_bytes or 0)
+    )
     if reset_usage:
         reset_subscription_period_usage(db,sub,origin="admin_renew")
     if add_traffic_gb>0:
@@ -5715,6 +5722,8 @@ def extend_subscription_v17(subscription_id:int,payload:dict=Body(...),db:Sessio
                 base
                 + timedelta(days=add_days)
             )
+    if reset_usage or reset_date:
+        restore_after_period_change(db,sub,was_exhausted=was_exhausted)
     db.commit();db.refresh(sub)
     return {"ok":True,"traffic_limit_bytes":int(sub.traffic_limit_bytes or 0),"traffic_used_bytes":int(sub.traffic_used_bytes or 0),"expires_at":sub.expires_at.isoformat() if sub.expires_at else None,"reset_usage":reset_usage,"reset_date":reset_date}
 
