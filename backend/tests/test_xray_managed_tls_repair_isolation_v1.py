@@ -20,7 +20,7 @@ class RetainedManagedCertificateTests(unittest.TestCase):
         root=Path(root)
         state=root/"twinpanel-modern-state.json"
         certdir=root/"twinpanel-tls"
-        source=_state_generator_script(domain or self.DOMAIN)
+        source=_state_generator_script(self.DOMAIN if domain is None else domain)
         source=source.replace(
             "/usr/local/etc/xray/twinpanel-modern-state.json", str(state)
         ).replace(
