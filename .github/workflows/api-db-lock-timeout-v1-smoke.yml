@@ -35,7 +35,10 @@ jobs:
           assert 'postgresql://' in source
           assert 'postgresql+psycopg2://' in source
           assert 'else {}' in source
-          assert 'connect_args=_DATABASE_CONNECT_ARGS' in source
+          assert 'connect_args=_WORKER_CONNECT_ARGS' in source
+          assert 'connect_args=_REQUEST_CONNECT_ARGS' in source
+          assert '**_DATABASE_CONNECT_ARGS' in source
+          assert 'application_name' in source
           print('PostgreSQL-scoped API DB lock timeout contract OK')
           PY
 
@@ -49,6 +52,12 @@ jobs:
           NODE_AGENT_SHARED_SECRET: db-lock-ci-node-secret-db-lock-ci-node-secret
         run: |
           PYTHONPATH=backend python3 - <<'PY'
+          # Import the lightweight DB module without executing the full
+          # app package bootstrap in this narrow SQLite compatibility check.
+          import sys, types
+          package = types.ModuleType('app')
+          package.__path__ = ['backend/app']
+          sys.modules['app'] = package
           from app.database import engine
           assert engine.dialect.name == 'sqlite'
           with engine.connect() as conn:
