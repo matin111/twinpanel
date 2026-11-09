@@ -1,7 +1,8 @@
 "use client";
 
 import {useEffect,useMemo,useState} from "react";
-import {Badge,Card,Shell,Stat} from "./ui";
+import {Badge,Card,Shell} from "./ui";
+import {matchesPaymentReviewFilter,needsPaymentReview,PaymentReviewFilter} from "../lib/payment-review-filters";
 import {adminApi,AdminUser,RuntimeRow} from "../lib/admin-api";
 import {AnyRow,parityApi} from "../lib/admin-parity-api";
 import {API_BASE} from "../lib/api";
@@ -10,7 +11,6 @@ import {useI18n} from "../lib/i18n";
 import {paymentDateTehran} from "../lib/payment-date-tehran";
 
 type PaymentKind="purchase"|"wallet";
-type FilterKind="all"|PaymentKind;
 
 type ReviewRow={
   key:string;
@@ -78,7 +78,7 @@ export function PaymentsReviewRuntime(){
   const [purchases,setPurchases]=useState<RuntimeRow[]>([]);
   const [wallets,setWallets]=useState<AnyRow[]>([]);
   const [users,setUsers]=useState<AdminUser[]>([]);
-  const [filter,setFilter]=useState<FilterKind>("all");
+  const [filter,setFilter]=useState<PaymentReviewFilter>("all");
   const [query,setQuery]=useState("");
   const [busyKey,setBusyKey]=useState("");
   const [error,setError]=useState("");
@@ -126,11 +126,10 @@ export function PaymentsReviewRuntime(){
       const method=s(row.method);
       const status=s(row.status);
       const trackingCode=s(row.tracking_code);
-      // Older wallet-list responses do not expose receipt_uploaded. A submitted
-      // card-to-card top-up with a tracking code is reviewable only after the
-      // customer flow has collected the payment proof, so keep that as a
-      // compatibility fallback until every installed backend returns the flag.
-      const hasReceipt=Boolean(row.receipt_uploaded)||(method==="card_to_card"&&Boolean(trackingCode)&&reviewStatuses.has(status.toLowerCase()));
+      // The backend returns receipt_uploaded explicitly. A tracking code is
+      // NOT an uploaded image; never advertise a missing attachment as a
+      // viewable receipt or inflate the "New receipts" count.
+      const hasReceipt=Boolean(row.receipt_uploaded);
       return {
         key:`wallet:${n(row.id)}`,
         kind:"wallet" as const,
@@ -157,15 +156,32 @@ export function PaymentsReviewRuntime(){
 
   const userMap=useMemo(()=>new Map(users.map(user=>[user.id,user])),[users]);
 
-  const pendingRows=rows.filter(row=>!finalStatuses.has(row.status.toLowerCase())&&(reviewStatuses.has(row.status.toLowerCase())||row.hasReceipt));
-  const receiptRows=rows.filter(row=>row.hasReceipt&&!finalStatuses.has(row.status.toLowerCase()));
-  const walletPending=rows.filter(row=>row.kind==="wallet"&&reviewStatuses.has(row.status.toLowerCase()));
-  const purchasePending=rows.filter(row=>row.kind==="purchase"&&!finalStatuses.has(row.status.toLowerCase())&&(reviewStatuses.has(row.status.toLowerCase())||row.hasReceipt));
+  // The KPI counters and their click filters share the same predicate:
+  // clicking a card must reveal exactly the payment rows counted by it.
+  const pendingRows=rows.filter(row=>matchesPaymentReviewFilter(row,"needs_review"));
+  const receiptRows=rows.filter(row=>matchesPaymentReviewFilter(row,"new_receipts"));
+  const walletPending=rows.filter(row=>matchesPaymentReviewFilter(row,"wallet_review"));
+  const purchasePending=rows.filter(row=>matchesPaymentReviewFilter(row,"purchase_review"));
+
+  const selectFilter=(next:PaymentReviewFilter)=>{
+    setFilter(next);
+    setQuery(""); // Old search terms must not hide rows counted in the card.
+  };
+
+  const selectedFilterLabel:Record<PaymentReviewFilter,string>={
+    all:pick("همه پرداخت‌ها","All payments"),
+    purchase:pick("همه خریدهای اشتراک","All subscription purchases"),
+    wallet:pick("همه شارژهای کیف پول","All wallet top-ups"),
+    needs_review:pick("نیاز به بررسی","Needs review"),
+    new_receipts:pick("رسید تصویری جدید","New receipts"),
+    purchase_review:pick("خرید اشتراک نیازمند بررسی","Subscription purchases to review"),
+    wallet_review:pick("شارژ کیف پول نیازمند بررسی","Wallet top-ups to review"),
+  };
 
   const filtered=useMemo(()=>{
     const q=query.trim().toLowerCase();
     return rows.filter(row=>{
-      if(filter!=="all"&&row.kind!==filter)return false;
+      if(!matchesPaymentReviewFilter(row,filter))return false;
       if(!q)return true;
       const user=userMap.get(row.userId);
       return [row.id,row.userId,row.amount,row.method,row.status,row.txid,row.trackingCode,row.orderId,user?.email,user?.full_name,row.sourceLabel]
@@ -287,22 +303,36 @@ export function PaymentsReviewRuntime(){
     {error&&<div className="runtime-error">{error}</div>}
     {ok&&<div className="runtime-success">{ok}</div>}
 
-    <div className="stats dashboard-stats">
-      <Stat label={pick("نیاز به بررسی","Needs review")} value={String(pendingRows.length)} icon="◫"/>
-      <Stat label={pick("رسید تصویری جدید","New receipts")} value={String(receiptRows.length)} icon="▧"/>
-      <Stat label={pick("خرید اشتراک","Subscription purchases")} value={String(purchasePending.length)} icon="◇"/>
-      <Stat label={pick("شارژ کیف پول","Wallet top-ups")} value={String(walletPending.length)} icon="◉"/>
+    <div className="stats dashboard-stats payment-review-quick-filters" role="group" aria-label={pick("فیلتر سریع رسید و پرداخت‌ها","Quick receipt and payment filters")}>
+      {([
+        {id:"needs_review",label:pick("نیاز به بررسی","Needs review"),value:pendingRows.length,icon:"◫"},
+        {id:"new_receipts",label:pick("رسید تصویری جدید","New receipts"),value:receiptRows.length,icon:"▧"},
+        {id:"purchase_review",label:pick("خرید اشتراک","Subscription purchases"),value:purchasePending.length,icon:"◇"},
+        {id:"wallet_review",label:pick("شارژ کیف پول","Wallet top-ups"),value:walletPending.length,icon:"◉"},
+      ] as const).map(item=>
+        <button
+          key={item.id} type="button"
+          className={`card stat payment-review-filter-card${filter===item.id?" active":""}`}
+          aria-pressed={filter===item.id}
+          aria-label={`${item.label}: ${item.value} · ${pick("نمایش رسیدهای این دسته","Show payments in this category")}`}
+          onClick={()=>selectFilter(item.id)}
+        >
+          <span className="stat-icon" aria-hidden="true">{item.icon}</span>
+          <span className="payment-review-stat-text"><small>{item.label}</small><b>{item.value.toLocaleString("fa-IR")}</b></span>
+        </button>
+      )}
     </div>
 
     <Card>
       <div className="runtime-toolbar" style={{gap:10,flexWrap:"wrap"}}>
         <div className="action-row">
-          <button className={filter==="all"?"primary":"ghost"} onClick={()=>setFilter("all")}>{pick("همه","All")}</button>
-          <button className={filter==="purchase"?"primary":"ghost"} onClick={()=>setFilter("purchase")}>{pick("خرید اشتراک","Purchases")}</button>
-          <button className={filter==="wallet"?"primary":"ghost"} onClick={()=>setFilter("wallet")}>{pick("شارژ کیف پول","Wallet")}</button>
+          <button type="button" className={filter==="all"?"primary":"ghost"} onClick={()=>selectFilter("all")}>{pick("همه","All")}</button>
+          <button type="button" className={filter==="purchase"?"primary":"ghost"} onClick={()=>selectFilter("purchase")}>{pick("خرید اشتراک","Purchases")}</button>
+          <button type="button" className={filter==="wallet"?"primary":"ghost"} onClick={()=>selectFilter("wallet")}>{pick("شارژ کیف پول","Wallet")}</button>
+          <button type="button" className={filter==="new_receipts"?"primary":"ghost"} onClick={()=>selectFilter("new_receipts")}>{pick("رسیدهای جدید","New receipts")}</button>
         </div>
         <label>⌕ <input value={query} onChange={e=>setQuery(e.target.value)} placeholder={pick("جستجو در پرداخت‌ها...","Search payments...")}/></label>
-        <span>{filtered.length.toLocaleString("fa-IR")}</span>
+        <span className="payment-review-active-filter" aria-live="polite">{selectedFilterLabel[filter]} · {filtered.length.toLocaleString("fa-IR")}</span>
       </div>
 
       <div className="table"><table>
@@ -320,16 +350,16 @@ export function PaymentsReviewRuntime(){
         <tbody>{filtered.map(row=>{
           const status=row.status.toLowerCase();
           const user=userMap.get(row.userId);
-          const reviewable=!finalStatuses.has(status)&&(reviewStatuses.has(status)||row.hasReceipt);
+          const reviewable=needsPaymentReview(row);
           const proofCode=row.txid?`TXID: ${row.txid}`:row.trackingCode?`${pick("کد رهگیری","Tracking code")}: ${row.trackingCode}`:"";
           return <tr key={row.key}>
             <td><Badge tone={row.kind==="purchase"?"violet":"warn"}>{row.sourceLabel}</Badge></td>
-            <td>#{row.id}{row.orderId?<small style={{display:"block"}}>Order #{row.orderId}</small>:null}</td>
+            <td>{row.hasReceipt?<button type="button" className="payment-review-receipt-link" onClick={()=>void openReceipt(row)} aria-label={pick(`مشاهده رسید شماره ${row.id}`,`Open receipt #${row.id}`)}>#{row.id}</button>:<>#{row.id}</>}{row.orderId?<small style={{display:"block"}}>Order #{row.orderId}</small>:null}</td>
             <td><b>{userName(user,row.userId)}</b><small style={{display:"block"}}>{user?.email||`User #${row.userId}`}</small></td>
             <td>{money(row.amount)}</td>
             <td>{methodLabel(row.method)}</td>
             <td><div style={{display:"grid",gap:6,maxWidth:320}}>
-              {row.hasReceipt&&<Badge tone="violet">✓ {pick("رسید ارسال شده","Receipt received")}</Badge>}
+              {row.hasReceipt&&<button type="button" className="payment-review-receipt-link" onClick={()=>void openReceipt(row)}>{pick("✓ مشاهده رسید تصویری","✓ View receipt image")}</button>}
               {proofCode?<span dir="ltr" style={{display:"block",wordBreak:"break-all",fontSize:11}}>{proofCode}</span>:!row.hasReceipt?<span>{pick("ارسال نشده","Not submitted")}</span>:null}
             </div></td>
             <td><Badge tone={statusTone(status)}>{statusLabel(status,pick)}</Badge></td>
@@ -342,6 +372,9 @@ export function PaymentsReviewRuntime(){
           </tr>;
         })}</tbody>
       </table></div>
+      {filtered.length===0&&<div className="runtime-empty" role="status">
+        {pick("پرداخت یا رسیدی برای این فیلتر پیدا نشد.","No payments or receipts match this filter.")}
+      </div>}
     </Card>
   </div></Shell>;
 }
