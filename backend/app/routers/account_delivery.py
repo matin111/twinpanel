@@ -1954,6 +1954,17 @@ def _stored_info(
             else [payload]
         )
 
+        # Once a central Sudoku identity is persisted on a published Exit,
+        # stop exposing stale per-user 3xxxx listeners and their 4xxxx tunnel
+        # endpoints. Keep their encrypted records untouched for rollback.
+        # Other protocols and users without a ready central identity retain
+        # the historical delivery path.
+        if protocol_key == "sudoku":
+            from ..services.sudoku_central_delivery_v1 import (
+                prefer_central_sudoku_items,
+            )
+            source_items = prefer_central_sudoku_items(db, source_items)
+
         filtered_items = []
 
         for item in source_items:
