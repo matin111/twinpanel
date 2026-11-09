@@ -331,6 +331,7 @@ if protocol == "shadowtls":
         row["_twinpanel_shadowtls_identity_inner"]={{
             "method":modern_inner["method"],
             "password":modern_inner["password"],
+            "users":modern_inner.get("users",[]),
             "port":new_port,
             "enabled":True,
         }}
@@ -852,10 +853,17 @@ def client_item(
             modern_port = identity.get("port")
             if method != SHADOWTLS_IDENTITY_METHOD or not isinstance(modern_port, int):
                 raise SingBoxAccountError("unverified ShadowTLS identity listener")
+            key_matches = [
+                row for row in identity.get("users") or []
+                if isinstance(row, dict)
+                and str(row.get("name") or "") == secret.username
+            ]
+            if len(key_matches) != 1:
+                raise SingBoxAccountError("ShadowTLS identity user not staged")
             config_outbounds = identity_client_outbounds(
                 outbound,
                 username=secret.username,
-                outer_password=secret.password,
+                user_key=str(key_matches[0].get("password") or ""),
                 listen_port=modern_port,
                 server_key=server_key,
             )
