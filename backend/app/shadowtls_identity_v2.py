@@ -27,7 +27,7 @@ def identified_user_key(server_key: str, username: str, shadowtls_password: str)
     raw = base64.b64decode(server_key, validate=True)
     if len(raw) != 16 or not username or not shadowtls_password:
         raise ValueError("invalid_shadowtls_identified_key_material")
-    data = username.encode("utf-8") + b"\\x00" + shadowtls_password.encode("utf-8")
+    data = username.encode("utf-8") + bytes([0]) + shadowtls_password.encode("utf-8")
     return base64.b64encode(hmac.new(raw, data, hashlib.sha256).digest()[:16]).decode("ascii")
 
 
