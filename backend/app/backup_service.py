@@ -12,6 +12,7 @@ import hashlib
 import json
 import os
 import stat
+import subprocess
 from datetime import date, datetime, time, timezone
 from decimal import Decimal
 from pathlib import Path
@@ -29,6 +30,8 @@ from .database import engine
 
 
 BACKUP_FORMAT = "twinpanel-portable-data-v3"
+BACKUP_ZSTD_MAGIC = bytes.fromhex("28b52ffd")
+MAX_DECOMPRESSED_BYTES = 1024 * 1024 * 1024
 
 BACKUP_ROOT = Path(
     "/var/lib/twinpanel-backups"
@@ -405,6 +408,16 @@ def _unpack(value: Any) -> Any:
         "__tp_type__"
     )
 
+    if type_name == "runtime_setting_fernet_rewrap_v1":
+        # Re-encrypt the same identity/PSK with the destination panel secret.
+        # The portable backup holds the plaintext in the already sensitive
+        # gzip archive, just as it does for account credential rewrapping.
+        from .mother_access import encrypt_setting_value
+        payload = _unpack(value["payload"])
+        if not isinstance(payload, str) or not payload:
+            raise ValueError("BACKUP_RUNTIME_IDENTITY_PAYLOAD_INVALID")
+        return encrypt_setting_value(payload)
+
     if type_name == "account_credential_rewrap_v2":
         # Encrypted credential fields are compressed as their original JSON
         # while inside the OUTER backup. On restore, encrypt again
@@ -534,6 +547,40 @@ def _collect_admin_files(
     return result
 
 
+# These are persistent, per-subscription identities, NOT installed protocol
+# programs or generated runtime files. Preserve them without storing their
+# incompressible source-server Fernet ciphertext in portable backups.
+_RUNTIME_REWRAP_PREFIXES = (
+    "vpn.central.identity.openvpn.subscription.",
+    "vpn.central.identity.wireguard.subscription.",
+)
+_RUNTIME_REWRAP_EXACT = frozenset({"vpn.l2tp_psk_encrypted"})
+
+
+def _rewrap_runtime_setting_row(row: dict[str, Any]) -> dict[str, Any]:
+    key = row.get("setting_key")
+    ciphertext = row.get("setting_value")
+    if not isinstance(key, str) or not (
+        key.startswith(_RUNTIME_REWRAP_PREFIXES)
+        or key in _RUNTIME_REWRAP_EXACT
+    ):
+        return row
+    if not isinstance(ciphertext, str) or not ciphertext:
+        # Empty entries are not rotated; original values remain untouched.
+        return row
+    from .mother_access import decrypt_setting_value
+    plaintext = decrypt_setting_value(ciphertext)
+    if not plaintext:
+        # An undecryptable identity must not be silently omitted or copied
+        # to a newly installed panel where it would remain unreadable.
+        raise ValueError("BACKUP_RUNTIME_IDENTITY_CANNOT_DECRYPT")
+    row["setting_value"] = {
+        "__tp_type__": "runtime_setting_fernet_rewrap_v1",
+        "payload": plaintext,
+    }
+    return row
+
+
 def _current_tables() -> list[str]:
 
     existing = set(
@@ -608,6 +655,9 @@ def _export_database() -> tuple[
                         node_key_paths.add(
                             str(key_path)
                         )
+
+                if name == "vpnshop_runtime_settings":
+                    plain = _rewrap_runtime_setting_row(plain)
 
                 if name == "protocol_credentials":
                     # The source rows contain per-user Fernet ciphertext.
@@ -713,6 +763,55 @@ def _read_meta(
     return {}
 
 
+def _compress_backup_bytes(raw: bytes) -> tuple[bytes, str]:
+    """Use Zstandard when available, keeping a GZIP-only host functional."""
+    import shutil
+    zstd = shutil.which("zstd")
+    if zstd:
+        result = subprocess.run(
+            [zstd, "-q", "-10", "--stdout"],
+            input=raw, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            timeout=300, check=True,
+        )
+        if not result.stdout.startswith(BACKUP_ZSTD_MAGIC):
+            raise RuntimeError("BACKUP_ZSTD_FRAME_INVALID")
+        return result.stdout, "zstd-10"
+    return gzip.compress(raw, compresslevel=9), "gzip-9"
+
+
+def _read_zstd_backup(path: Path) -> bytes:
+    """Decompress with a hard output limit before JSON parsing."""
+    import shutil
+    zstd = shutil.which("zstd")
+    if not zstd:
+        raise ValueError("BACKUP_REQUIRES_ZSTD_PACKAGE")
+    process = subprocess.Popen(
+        [zstd, "-q", "-d", "--stdout", str(path)],
+        stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+    )
+    chunks: list[bytes] = []
+    total = 0
+    try:
+        assert process.stdout is not None
+        while True:
+            block = process.stdout.read(1024 * 1024)
+            if not block:
+                break
+            total += len(block)
+            if total > MAX_DECOMPRESSED_BYTES:
+                raise ValueError("BACKUP_DECOMPRESSED_SIZE_EXCEEDED")
+            chunks.append(block)
+        if process.wait(timeout=300) != 0:
+            raise ValueError("BACKUP_ZSTD_DECOMPRESSION_FAILED")
+        return b"".join(chunks)
+    finally:
+        if process.poll() is None:
+            process.kill()
+            process.wait(timeout=10)
+        if process.stdout is not None:
+            process.stdout.close()
+
+
 def create_backup(
     kind: str = "manual",
     send_telegram: bool = False,
@@ -730,6 +829,7 @@ def create_backup(
         "version": 3,
         "scope": "persistent-panel-data",
         "credential_encoding": "account_credential_rewrap_v2",
+        "runtime_setting_encoding": "runtime_setting_fernet_rewrap_v1",
         "created_at": _iso_now(),
         "kind": kind,
         "tables": tables,
@@ -744,14 +844,10 @@ def create_backup(
         separators=(",", ":"),
     ).encode("utf-8")
 
-    compressed = gzip.compress(
-        encoded,
-        compresslevel=9,
-    )
-
-    # Portable, keyless gzip archive. The file contains sensitive secrets:
-    # restrict access and transfer only over protected channels.
-    archive_bytes = compressed
+    # Always preserve the full payload. This does not drop identities,
+    # subscriptions, node keys, wallet balances or payment history.
+    # Keyless ZIP downloads still contain highly sensitive credentials.
+    archive_bytes, compression = _compress_backup_bytes(encoded)
 
     stamp = _now_utc().strftime(
         "%Y%m%d-%H%M%S"
@@ -808,6 +904,7 @@ def create_backup(
         "telegram_error":
             None,
         "sha256": hashlib.sha256(archive_bytes).hexdigest(),
+        "compression": compression,
     }
 
     _write_meta(
@@ -996,26 +1093,23 @@ def _decode_backup(
     path: Path,
 ) -> dict[str, Any]:
 
-    # The v3 archive is a portable gzip stream; legacy backup archives
-    # are deliberately unsupported by the new restore flow.
-    compressed = path.read_bytes()
-    if not compressed.startswith(b"\x1f\x8b"):
+    # Accept existing keyless v3 GZIP archives as well as new Zstandard.
+    # Both contain exactly the same logical schema and validation checks.
+    with path.open("rb") as stream:
+        magic = stream.read(4)
+    if magic.startswith(b"\x1f\x8b"):
+        try:
+            raw = gzip.decompress(path.read_bytes())
+        except Exception as exc:
+            raise ValueError("BACKUP_GZIP_INVALID") from exc
+    elif magic == BACKUP_ZSTD_MAGIC:
+        raw = _read_zstd_backup(path)
+    else:
         raise ValueError("UNSUPPORTED_BACKUP_FORMAT_V3_ONLY")
-
     try:
-        raw = gzip.decompress(
-            compressed
-        )
-
-        payload = json.loads(
-            raw.decode("utf-8")
-        )
-
-    except Exception as exc:
-        raise ValueError(
-            "ساختار فایل بکاپ "
-            "معتبر نیست"
-        ) from exc
+        payload = json.loads(raw.decode("utf-8"))
+    except (UnicodeError, ValueError) as exc:
+        raise ValueError("BACKUP_JSON_INVALID") from exc
 
     if (
         not isinstance(
