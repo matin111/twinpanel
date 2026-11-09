@@ -30,7 +30,7 @@ def run():
             with path.open("rb") as stream:
                 digest=hashlib.file_digest(stream,"sha256").hexdigest()
             assert created["sha256"]==digest
-            assert path.read_bytes().startswith(bytes([0x1f, 0x8b]))
+            assert path.read_bytes()[:4] == backup.BACKUP_ZSTD_MAGIC or path.read_bytes()[:2] == bytes([0x1f, 0x8b])
             assert backup.inspect_backup(path)["format"]==backup.BACKUP_FORMAT
             print("BACKUP_CREATED_ARCHIVE_SHA256_PASS")
             with patch.object(backup,"inspect_backup",return_value={
