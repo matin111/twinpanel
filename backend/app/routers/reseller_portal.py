@@ -1862,62 +1862,21 @@ def reseller_extend_subscription(
             # deltas to this zero baseline.
             sub.traffic_used_bytes = 0
 
-            # A new period starts now.
-            # TWINPANEL_FIRST_USE_RESELLER_RENEW_V3
-            if (
-                sub.starts_at is None
-                and sub.expires_at is None
-            ):
-                sub.activation_duration_days = max(
-                    1,
-                    int(add_days),
-                )
-            else:
-                # TWINPANEL_RESELLER_RENEW_DATE_FIX_V4
-                sub.expires_at = (
-                    now
-                    + timedelta(
-                        days=add_days
-                    )
-                )
-
         else:
-
             if period_bytes > 0:
-                sub.traffic_limit_bytes = (
-                    old_limit
-                    + period_bytes
-                )
+                sub.traffic_limit_bytes = old_limit + period_bytes
 
-            if add_days > 0:
-                base = (
-                    sub.expires_at
-                    if (
-                        sub.expires_at
-                        and sub.expires_at > now
-                    )
-                    else now
-                )
-
-                if (
-                    sub.starts_at is None
-                    and sub.expires_at is None
-                ):
-                    _waiting_days = int(
-                        sub.activation_duration_days
-                        or 0
-                    )
-                    sub.activation_duration_days = (
-                        _waiting_days
-                        + int(add_days)
-                    )
-                else:
-                    sub.expires_at = (
-                        base
-                        + timedelta(
-                            days=add_days
-                        )
-                    )
+        if add_days > 0:
+            from ..models import Plan
+            from ..subscription_override_models import SubscriptionRuntimeOverride
+            from ..services.subscription_validity_v1 import add_validity_days
+            override = db.get(SubscriptionRuntimeOverride, int(sub.id))
+            plan = db.get(Plan, sub.plan_id) if sub.plan_id is not None else None
+            add_validity_days(
+                sub, add_days, now, override=override,
+                plan_days=int(plan.duration_days or 0) if plan else 0,
+                reset_date=bool(reset_usage),
+            )
 
         reseller.traffic_balance_bytes = (
             new_balance
