@@ -92,6 +92,41 @@ def node_or_stop(db, node_id: int, *, central_only: bool = False):
     return node
 
 
+TLS_INGRESS_PORTS = {
+    "websocket_tls": 26000,
+    "xhttp_reality": 24000,
+    "tcp_tls": 28000,
+}
+
+
+def item_has_complete_profiles(item: dict | None, required: frozenset[str],
+                               node_id: int) -> bool:
+    """Do not mistake three stale-but-present TLS URLs for completed delivery.
+
+    Keep legacy/domainless completion semantics unchanged. Only the three
+    dedicated TLS profiles use stable TP27 ingress ports.
+    """
+    from urllib.parse import urlsplit
+
+    profiles={
+        str(p.get("id") or "").strip().lower():str(p.get("uri") or "")
+        for p in ((item or {}).get("profiles") or [])
+        if isinstance(p,dict) and p.get("uri")
+    }
+    if not required.issubset(profiles):
+        return False
+    if required!=frozenset(TLS_INGRESS_PORTS):
+        return True
+    try:
+        return all(
+            urlsplit(profiles[key]).port
+            == TLS_INGRESS_PORTS[key]+int(node_id)
+            for key in required
+        )
+    except (ValueError,TypeError):
+        return False
+
+
 def candidates(db, node_id: int, required: frozenset[str],
                limit: int, subscription_id: int | None):
     members, creds = eligible(db, node_id)
@@ -106,10 +141,7 @@ def candidates(db, node_id: int, required: frozenset[str],
         own=[x for x in items if ad._autosync_item_node_id(x)==node_id]
         if len(own)>1:continue
         current=own[0] if own else None
-        existing={str(p.get("id") or "").strip().lower()
-                  for p in (current or {}).get("profiles",[])
-                  if isinstance(p,dict) and p.get("uri")}
-        if required.issubset(existing):continue
+        if item_has_complete_profiles(current,required,node_id):continue
         label=str(sub.account_username or f"user{sub.id}")[:100]
         selected.append((int(sub.id),label,uuid_from_item(current)
                          if current else None))
@@ -240,10 +272,9 @@ async def run(args):
                      if ad._autosync_item_node_id(v)==args.node_id]
                 if len(own)>1 or (own and uuid_from_item(own[0])!=ident):
                     skipped+=1;continue
-                old_profiles={str(p.get("id") or "").lower()
-                              for p in (own[0].get("profiles") if own else []) or []
-                              if isinstance(p,dict) and p.get("uri")}
-                if required.issubset(old_profiles):
+                if item_has_complete_profiles(
+                    own[0] if own else None,required,args.node_id
+                ):
                     skipped+=1;continue
                 rest=[v for v in old
                       if ad._autosync_item_node_id(v)!=args.node_id]
