@@ -35,7 +35,7 @@ class ConnectionFastRender(unittest.TestCase):
         self.assertIn('cache = info.get("_tp_public_connection_cfg_cache_v102")', a)
         self.assertIn('info = getattr(db, "info", {})', a)
         self.assertIn('info.get("_tp_public_connection_cfg_prefetched_v103")', a)
-        self.assertIn('db.info.get("_tp_public_connection_cfg_prefetched_v103")', m)
+        self.assertIn('getattr(db, "info", {}).get("_tp_public_connection_cfg_prefetched_v103")', m)
         self.assertIn('def _modern_direct_item_is_usable_uncached(', m)
         self.assertIn('getattr(db, "info", {}).get("_tp_public_connection_item_cache_v102")', m)
         self.assertIn("return _modern_direct_item_is_usable_uncached(db, protocol, item)", m)
