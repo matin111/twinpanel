@@ -23,7 +23,7 @@ def test_public_connection_still_keeps_top_list_and_other_protocols():
     page="<html><head><style>body{margin:0}</style></head><body><main>OpenVPN WireGuard Cisco V2Ray</main></body></html>"
     out=refine_public_connection_reference_layout_v38(page)
     assert "OpenVPN WireGuard Cisco V2Ray" in out
-    assert "TWINPANEL_PUBLIC_CONNECT_UNIFIED_SURFACE_DATES_V80" in out
+    assert "TWINPANEL_CONNECTION_UNIFIED_SURFACE_DATES_V80" in out
     assert "TWINPANEL_PUBLIC_V2RAY_SINGLE_SURFACE_V105" not in out
     assert 'id="twinpanelPublicV2raySingleSurfaceV105"' not in out
     assert refine_public_connection_reference_layout_v38(out)==out
