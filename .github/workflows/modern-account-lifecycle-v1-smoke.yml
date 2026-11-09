@@ -27,11 +27,20 @@ jobs:
   contract:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      PYTHONPATH: backend
+      APP_NAME: TwinPanel-CI
+      APP_ENV: test
+      APP_SECRET_KEY: ci-modern-lifecycle-only-nonproduction-secret
+      DATABASE_URL: sqlite:///./modern-lifecycle-ci.sqlite3
+      NODE_AGENT_SHARED_SECRET: ci-lifecycle-node-agent-only
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Install backend test dependencies
+        run: python -m pip install -r backend/requirements.txt
       - name: Compile lifecycle modules
         run: |
           python -m py_compile \
