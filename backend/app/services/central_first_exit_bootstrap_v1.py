@@ -22,6 +22,11 @@ async def bootstrap_hidden_central_exit(payload, request, db) -> dict:
             Node.retired_at.is_(None), Node.name == payload.name
             ).first() is not None):
         raise HTTPException(status_code=409,detail="نام سرور قبلاً ثبت شده است")
+    # This was only a duplicate-name SELECT on a brand-new, private
+    # background SessionLocal with no staged writes. Release its read
+    # transaction BEFORE SSH, apt and remote protocol installation; otherwise
+    # PostgreSQL holds an idle-in-transaction connection for minutes.
+    db.rollback()
 
     conn = await prov.ssh_connect(payload)
     try:
@@ -49,8 +54,11 @@ async def bootstrap_hidden_central_exit(payload, request, db) -> dict:
                 raise RuntimeError("XRAY_NEW_EXIT_DOMAIN_SCHEMA_NOT_READY")
             node.xray_domain = domain
         db.add(node)
+        # Flush allocates Node.id while the first write transaction is open.
+        # SessionLocal uses expire_on_commit=False, so refresh() would only
+        # start an unnecessary SELECT transaction before slow SSH installs.
+        db.flush()
         db.commit()
-        db.refresh(node)
 
         # The existing low-level installers are reusable. The LEGACY
         # install_node orchestrator, automatic repair loop and all legacy
