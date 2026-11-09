@@ -89,6 +89,12 @@ async def _provision_claim(job: ClaimedProvisionJob) -> tuple[str, str | None]:
         missing = _missing_provisioned_protocols(
             db, job.subscription_id, list(job.requested_protocols),
         )
+        if result and "sudoku" in (result.get("pending_protocols") or ()):
+            # A central Sudoku identity is produced by the existing node-wide
+            # daemon convergence loop, not by per-user SSH. Never suspend or
+            # revoke a paid subscription just because this async first-pass
+            # is waiting for the next central desired-state scan.
+            return "retry", "central_sudoku_reconciliation_pending"
         quota_ok = bool(((result or {}).get("quota") or {}).get("ok", False))
         has_usable = len(missing) < len(job.requested_protocols)
         complete = (
