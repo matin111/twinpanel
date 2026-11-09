@@ -176,6 +176,44 @@ class ProtocolPanelNodeAwareRepair(unittest.IsolatedAsyncioTestCase):
             unittest.mock.ANY,8443,target,
         )
 
+    async def test_failed_dedicated_repair_keeps_enabled_and_db_record(self):
+        target=node()
+        original=AsyncMock(return_value=(
+            False,"XRAY_DEDICATED_TLS_CERTIFICATE_NOT_READY",
+        ))
+        saved=MagicMock()
+        with (
+            patch.object(provision,"install_xray",new=original),
+            patch.object(provision,"save_config",new=saved),
+            patch.object(xr,"_three_tls_inbounds_live",
+                         new=AsyncMock(return_value=False)),
+        ):
+            result,failed,_=await provision.provision_protocols(
+                object(),self.settings(),MagicMock(),target,repair=True,
+            )
+        self.assertEqual(failed,["v2ray"])
+        self.assertFalse(result["v2ray"]["ok"])
+        self.assertTrue(target.enable_v2ray)
+        saved.assert_not_called()
+        original.assert_awaited_once()
+
+    async def test_failed_fresh_xray_install_remains_disabled(self):
+        target=node()
+        original=AsyncMock(return_value=(
+            False,"XRAY_NEW_EXIT_TLS_CERTIFICATE_NOT_READY",
+        ))
+        with (
+            patch.object(provision,"install_xray",new=original),
+            patch.object(provision,"preflight",new=AsyncMock()),
+            patch.object(provision,"save_config",new=MagicMock()) as saved,
+        ):
+            result,failed,_=await provision.provision_protocols(
+                object(),self.settings(),MagicMock(),target,repair=False,
+            )
+        self.assertEqual(failed,["v2ray"])
+        self.assertFalse(target.enable_v2ray)
+        saved.assert_called_once()
+
     async def test_legacy_domainless_repair_preserves_existing_policy(self):
         target=node(domain="")
         original=AsyncMock(return_value=(True,None))
