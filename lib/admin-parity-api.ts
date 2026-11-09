@@ -100,6 +100,7 @@ export type ProvisionInstallPayload=ProvisionProtocolSettings&{
   node_type:"iran"|"exit";
   country_code:string;
   capacity_users:number;
+  xray_domain?:string;
 };
 
 export type MotherAccessSettings={
