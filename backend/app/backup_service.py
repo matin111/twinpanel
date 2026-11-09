@@ -1411,6 +1411,26 @@ def send_backup_to_telegram(
 
     token = load_bot_token()
     meta = _read_meta(backup_path)
+    # When a local Telegram Bot API server is explicitly configured, send
+    # the complete encrypted archive as ONE document (up to 2GB).
+    # Leave cloud-API multipart as the non-destructive fallback for existing
+    # installations which cannot send files larger than 50MB.
+    from .backup_telegram_single_file_v1 import send_single_backup
+    try:
+        result = send_single_backup(
+            backup_path, chat_id, token=token, meta=meta,
+            write_meta=_write_meta,
+        )
+    except Exception as exc:
+        meta["telegram_error"] = (
+            str(exc)[:250] if str(exc).startswith("BACKUP_")
+            else "BACKUP_SINGLE_FILE_DELIVERY_FAILED"
+        )
+        _write_meta(backup_path, meta)
+        raise
+    if result is not None:
+        return result
+
     file_size = backup_path.stat().st_size
     parts = max(1, math.ceil(file_size / TELEGRAM_BACKUP_PART_BYTES))
     # Do not silently resume delivery to a different chat.
