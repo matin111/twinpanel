@@ -15,8 +15,11 @@ class CentralXrayDedicatedDomainTests(TestCase):
     def test_detached_worker_maps_domain_before_loading_node(self):
         source=SCRIPT.read_text(encoding="utf-8")
         run=source.split("async def run(",1)[1].split("if __name__",1)[0]
-        self.assertIn("apply_xray_node_domain_runtime()",run)
-        self.assertLess(run.index("apply_xray_node_domain_runtime()"),
+        # Source port bases must match the self-hosted API and TP27 ingress.
+        self.assertIn('xr.PROFILE_META[xr.PROFILE_XHTTP]["public_base"] = 24000',run)
+        self.assertIn('xr.PROFILE_META[xr.PROFILE_WS]["public_base"] = 26000',run)
+        self.assertIn("_activate_xray_install_runtime()",run)
+        self.assertLess(run.index("_activate_xray_install_runtime()"),
                         run.index("with SessionLocal() as db:"))
 
     def test_tcp_reality_uses_verified_domain_only_for_tunnel(self):
