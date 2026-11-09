@@ -504,6 +504,33 @@ async def prepare_dedicated_xray_domain(
         await conn.wait_closed()
 
     tls_enabled = bool(runtime.get("tls_enabled"))
+    # A saved hostname or a single live Xray listener is not a completed
+    # three-profile TLS installation. Never claim success or reconcile user
+    # delivery until all three *real* listener ports are verified.
+    required_tls = ("websocket_tls", "xhttp_reality", "tcp_tls")
+    live_profiles = runtime.get("profiles") or {}
+    missing_tls = [
+        profile for profile in required_tls
+        if not isinstance(live_profiles, dict)
+        or not bool(live_profiles.get(profile))
+    ]
+    if not tls_enabled or missing_tls:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "XRAY_TLS_THREE_PROFILES_NOT_READY",
+                "message": (
+                    "سه پروفایل موردنیاز Xray هنوز آماده نیستند؛ "
+                    "WebSocket TLS، XHTTP Reality و TCP TLS باید روی "
+                    "نود واقعاً فعال باشند. گواهی SSL و وضعیت پورت‌های "
+                    "گمشده را بررسی کنید."
+                ),
+                "node_id": int(node.id),
+                "tls_certificate_ready": tls_enabled,
+                "required_profiles": list(required_tls),
+                "missing_profiles": missing_tls,
+            },
+        )
     reconcile_job: dict[str, Any] | None = None
     reconcile_error: str | None = None
 
