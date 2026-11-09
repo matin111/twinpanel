@@ -515,7 +515,7 @@ export function LegacySubscriptionsRuntimePage(){
       {transferResellerId&&!transferLoading&&!transferCustomers.length?<p className="runtime-error">{pick("کاربری پیدا نشد؛ نام، ایمیل، موبایل یا شناسه کاربر موجود را جستجو کنید.","No active customer found for this reseller. Create a customer first.")}</p>:null}</>}
       <div className="modalActions"><button className="ghost" disabled={!!busy} onClick={()=>setTransferOpen(false)}>{pick("انصراف","Cancel")}</button><button className="primary" disabled={!!busy||transferLoading||(transferMode==="user"?!transferUserId:!transferResellerId||!transferCustomerId)} onClick={submitTransfer}>{busy==="transfer"?pick("در حال انتقال…","Transferring…"):pick("تأیید انتقال","Confirm transfer")}</button></div>
     </Modal>}
-    {modal==="extend"&&selected&&<Modal title={pick("تمدید اشتراک","Renew subscription")} sub={`MV-${n(selected.id)} · ${expiryCell(selected)}`} onClose={()=>!busy&&setModal(null)}>
+    {modal==="extend"&&selected&&<Modal title={pick("تمدید اشتراک","Renew subscription")} sub={`MV-${n(selected.id)} · ${selected.expires_at?formatDate(selected.expires_at):selected.duration_unlimited===true||n(selected.activation_duration_days)<=0?pick("نامحدود","Unlimited"):pick("از اولین اتصال","From first connection")}`} onClose={()=>!busy&&setModal(null)}>
       <Notice error={error} ok={ok}/>
       <div className="setting-grid">
         <label className="field"><span>{pick("روز اضافه / مدت دوره جدید","Add days / new period days")}</span><input type="number" min={0} value={extendDays} onChange={event=>setExtendDays(Math.max(0,Number(event.target.value)||0))}/></label>
