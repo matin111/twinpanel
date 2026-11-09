@@ -133,6 +133,10 @@ jobs:
         working-directory: backend
         run: PYTHONPATH=. python tests/test_admin_edit_lock_conflict_v1.py -v
 
+      - name: Check PostgreSQL source attribution and read-only lock audit
+        working-directory: backend
+        run: PYTHONPATH=. python tests/test_db_pool_attribution_lock_audit_v1.py -v
+
       - name: Run NetMod UDPGW V231 regression
         working-directory: backend
         run: PYTHONPATH=. python tests/test_netmod_udpgw_v231.py
