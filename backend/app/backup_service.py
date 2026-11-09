@@ -2181,6 +2181,84 @@ def _due_key(
     )
 
 
+# Drain older updater snapshots gradually, only after the updater is done.
+# Never delete a backup that has not been fully delivered and checksum-verified.
+def _forward_one_retained_archive(settings: dict[str, Any]) -> dict[str, Any] | None:
+    if not settings.get("send_telegram"):
+        return None
+    chat_id = str(settings.get("telegram_chat_id") or "").strip()
+    if not chat_id:
+        return None
+    import subprocess
+    if subprocess.run(
+        ["/usr/bin/systemctl","is-active","--quiet","twinpanel-updater.service"],
+        stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,check=False,
+        timeout=5,
+    ).returncode == 0:
+        return {"ok":True,"ran":False,"reason":"updater_in_progress"}
+
+    from datetime import timedelta
+    progress_file = BACKUP_ROOT/"pending-telegram-delivery-state.json"
+    try:
+        state = json.loads(progress_file.read_text())
+    except Exception:
+        state = {}
+    now = _now_utc()
+    try:
+        previous = datetime.fromisoformat(str(state.get("last_attempt") or ""))
+        if now - previous < timedelta(minutes=25):
+            return None
+    except (ValueError,TypeError):
+        pass
+
+    files = sorted(
+        BACKUP_ROOT.glob("*.tpbak"),
+        key=lambda f: f.stat().st_mtime,
+        reverse=True,
+    )
+    for path in files:
+        meta = _read_meta(path)
+        if meta.get("telegram_sent"):
+            _remove_uploaded_archive(path)
+            continue
+        if not meta or meta.get("kind") not in {
+            "pre_update","pre-restore","auto","manual",
+        }:
+            continue
+        # Limit to one archive per timer tick, with a durable throttle.
+        progress_file.write_text(json.dumps({
+            "last_attempt":now.isoformat(),"filename":path.name,
+        }))
+        os.chmod(progress_file,0o600)
+        try:
+            if (
+                meta.get("size_bytes") != path.stat().st_size
+                or not meta.get("sha256")
+            ):
+                raise ValueError("BACKUP_SIZE_OR_HASH_METADATA_MISSING")
+            with path.open("rb") as handle:
+                checksum = hashlib.file_digest(handle, "sha256").hexdigest()
+            if checksum != meta["sha256"]:
+                raise ValueError("BACKUP_HASH_MISMATCH")
+            send_backup_to_telegram(path,chat_id)
+            if not _remove_uploaded_archive(path):
+                raise RuntimeError("BACKUP_DELIVERY_UNCONFIRMED")
+            return {"ok":True,"ran":False,"reason":"older_backup_delivered",
+                    "filename":path.name}
+        except Exception as exc:
+            meta = _read_meta(path)
+            meta["telegram_error"] = (
+                str(exc)[:180] if isinstance(exc, ValueError)
+                else type(exc).__name__
+            )
+            _write_meta(path,meta)
+            return {"ok":False,"ran":False,
+                    "reason":"older_backup_delivery_retry_pending",
+                    "filename":path.name,
+                    "error_code":type(exc).__name__}
+    return None
+
+
 def run_auto_backup_if_due() -> dict[
     str,
     Any,
@@ -2206,10 +2284,8 @@ def run_auto_backup_if_due() -> dict[
     )
 
     if key is None:
-        return {
-            "ok": True,
-            "ran": False,
-            "reason": "not_due",
+        return _forward_one_retained_archive(settings) or {
+            "ok": True, "ran": False, "reason": "not_due",
         }
 
     state = _load_state()
@@ -2231,7 +2307,9 @@ def run_auto_backup_if_due() -> dict[
                     path=BACKUP_ROOT/safe
                     meta=_read_meta(path)
                     if meta.get("telegram_sent"):
-                        return {"ok":True,"ran":False,"reason":"already_delivered"}
+                        return _forward_one_retained_archive(settings) or {
+                            "ok":True,"ran":False,"reason":"already_delivered"
+                        }
                     if not path.is_file():
                         raise FileNotFoundError(filename)
                     if not meta.get("telegram_sent"):
@@ -2249,11 +2327,10 @@ def run_auto_backup_if_due() -> dict[
                     return {"ok": False, "ran": False,
                             "reason": "telegram_delivery_backup_missing",
                             "error": type(exc).__name__}
-        return {
+        return _forward_one_retained_archive(settings) or {
             "ok": True,
             "ran": False,
-            "reason":
-                "already_done",
+            "reason": "already_done",
         }
 
     result = create_backup(
