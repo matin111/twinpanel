@@ -83,8 +83,8 @@ export function BackupsFullRuntimePage(){
   };
   const create=async()=>{
     if(busy)return;
-    if(!settings.telegram_chat_id.trim() || !settings.send_telegram){
-      setError(pick("ابتدا ارسال به تلگرام و Chat ID را در تنظیمات فعال و ذخیره کنید.","Enable and save Telegram delivery and Chat ID first."));
+    if(!settings.telegram_chat_id.trim()){
+      setError(pick("برای بکاپ دستی، Chat ID تلگرام را تنظیم و ذخیره کنید.","Configure and save a Telegram Chat ID for on-demand backups."));
       return;
     }
     setBusy("create");setError("");setOk("");
