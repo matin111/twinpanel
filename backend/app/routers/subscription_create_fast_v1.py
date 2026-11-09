@@ -217,6 +217,16 @@ async def _provision_subscription_background(
             subscription_id,
             requested_protocols,
         )
+        if "sudoku" in (provisioning.get("pending_protocols") or ()):
+            # One central daemon reconciles the subscriber asynchronously.
+            # This is not a failed subscription and must not trigger the
+            # automatic suspension/revocation postcondition.
+            print(
+                "TWINPANEL_SUDOKU_CENTRAL_CONVERGENCE_PENDING",
+                {"subscription_id": subscription_id},
+                flush=True,
+            )
+            return
         provision_errors = list(provisioning.get("errors") or [])
         quota_ok = bool((provisioning.get("quota") or {}).get("ok", True))
         provisioning_ok = bool(provisioning.get("ok", False))

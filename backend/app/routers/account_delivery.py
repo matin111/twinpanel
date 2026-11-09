@@ -504,10 +504,11 @@ def _cfg(db: Session, node_id: int, protocol: str) -> NodeProtocolConfig | None:
     # The public Connection page builds multiple presentation stages from one
     # read-only snapshot. Cache only within its SQLAlchemy Session (never
     # globally); admin, provisioning and other mutable paths stay uncached.
-    cache = db.info.get("_tp_public_connection_cfg_cache_v102")
+    info = getattr(db, "info", {})
+    cache = info.get("_tp_public_connection_cfg_cache_v102")
     key = (int(node_id), str(protocol or "").strip().lower())
     if isinstance(cache, dict) and (
-        key in cache or db.info.get("_tp_public_connection_cfg_prefetched_v103")
+        key in cache or info.get("_tp_public_connection_cfg_prefetched_v103")
     ):
         return cache.get(key)
     result = (
@@ -1953,6 +1954,17 @@ def _stored_info(
             )
             else [payload]
         )
+
+        # Once a central Sudoku identity is persisted on a published Exit,
+        # stop exposing stale per-user 3xxxx listeners and their 4xxxx tunnel
+        # endpoints. Keep their encrypted records untouched for rollback.
+        # Other protocols and users without a ready central identity retain
+        # the historical delivery path.
+        if protocol_key == "sudoku":
+            from ..services.sudoku_central_delivery_v1 import (
+                prefer_central_sudoku_items,
+            )
+            source_items = prefer_central_sudoku_items(db, source_items)
 
         filtered_items = []
 

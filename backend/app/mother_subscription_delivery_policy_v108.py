@@ -90,10 +90,10 @@ def _modern_direct_item_is_usable_uncached(
     if account_delivery._delivery_active_tunnels(db, node):
         return False
 
-    config_cache = db.info.get("_tp_public_connection_cfg_cache_v102")
+    config_cache = getattr(db, "info", {}).get("_tp_public_connection_cfg_cache_v102")
     if (
         isinstance(config_cache, dict)
-        and db.info.get("_tp_public_connection_cfg_prefetched_v103")
+        and getattr(db, "info", {}).get("_tp_public_connection_cfg_prefetched_v103")
     ):
         cfg = config_cache.get((node_id, key))
     else:
@@ -121,7 +121,7 @@ def _modern_direct_item_is_usable(
     SQLAlchemy Session is created for each HTTP request; all admin/mutation
     flows bypass this cache and still check live state.
     """
-    cache = db.info.get("_tp_public_connection_item_cache_v102")
+    cache = getattr(db, "info", {}).get("_tp_public_connection_item_cache_v102")
     if not isinstance(cache, dict) or not isinstance(item, dict):
         return _modern_direct_item_is_usable_uncached(db, protocol, item)
     try:

@@ -427,7 +427,26 @@ async def _fulfill_paid_order(order_id: int, db: Session) -> dict:
                 "recovered_existing_delivery": True,
             }
 
-        if fast_provision_commerce_enabled() and new_purchase_subscription:
+        # A paid order can be revisited by the durable recovery loop after
+        # its first central Sudoku staging pass. Do not fall back to the old
+        # classic-only account driver on the second attempt: it cannot issue
+        # centrally owned Sudoku identities and would misclassify a paid order
+        # as failed (or recreate obsolete per-user listener paths).
+        central_sudoku_order = False
+        # A store plan can inherit Sudoku even when the order's explicit
+        # requested_protocols is empty. Inspect the actual entitled
+        # SubscriptionProtocol rows, not only the form snapshot.
+        from .account_delivery import _nodes, _protocols
+        from ..services.sudoku_central_delivery_v1 import (
+            has_published_central_sudoku_owner,
+        )
+        target_sub = db.get(Subscription, int(order.subscription_id))
+        if target_sub is not None and "sudoku" in _protocols(db, target_sub):
+            central_sudoku_order = has_published_central_sudoku_owner(
+                db, _nodes(db, target_sub),
+            )
+        if (fast_provision_commerce_enabled() and new_purchase_subscription
+                or central_sudoku_order):
             from .modern_account_delivery_v1 import provision_new_account_fast_v1
             provision_result = await provision_new_account_fast_v1(
                 int(order.subscription_id), db,
@@ -436,6 +455,17 @@ async def _fulfill_paid_order(order_id: int, db: Session) -> dict:
             provision_result = await provision_account(int(order.subscription_id), db)
         if not isinstance(provision_result, dict):
             raise RuntimeError("invalid account provisioning response")
+
+        if "sudoku" in (provision_result.get("pending_protocols") or ()):
+            # Payment is already verified; the existing order recovery loop
+            # can finalize after the central daemon's next whitelist stage.
+            # Do not falsely mark it fulfilled or provision_failed, and do
+            # not trigger the obsolete per-user Sudoku service creation.
+            return {
+                **_order_out(db.get(StoreOrder, order_id)),
+                "delivery_ready": False,
+                "central_reconciliation_pending": True,
+            }
 
         errors = (
             provision_result.get("errors")
