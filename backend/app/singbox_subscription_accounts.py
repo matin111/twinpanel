@@ -23,6 +23,7 @@ from .naive_tls_lifecycle_v224 import (
     ensure_managed_naive_tls,
 )
 from .routers.provision import cmd
+from .services.shadowtls_2022_identity_v1 import parallel_user_sync_script
 
 
 class SingBoxAccountError(RuntimeError):
@@ -264,6 +265,10 @@ if PROTOCOL == "shadowtls":
     os.replace(STATE + ".account-new", STATE)
     os.chmod(STATE, 0o600)
 
+# Existing users migrate only after a separate identity listener is staged.
+if PROTOCOL == "shadowtls":
+    exec({parallel_user_sync_script()!r})
+
 if doc == original_doc:
     print("account_unchanged=1")
     raise SystemExit(0)
@@ -475,6 +480,11 @@ for operation in UPDATES:
             previous.clear()
             previous.update(inner)
         state["shadowtls"] = shadow
+
+# Mirror ShadowTLS users into a separately staged, authenticated 2022 inner.
+# Existing legacy-only nodes remain byte-for-byte unchanged.
+if any(item.get("protocol") == "shadowtls" for item in UPDATES):
+    exec({parallel_user_sync_script()!r})
 
 # No-op: do not touch the node config or service; the SSH shell checks
 # this marker under the per-node flock before skipping a restart.
