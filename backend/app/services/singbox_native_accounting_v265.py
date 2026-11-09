@@ -8,7 +8,7 @@ import json
 import re
 import shlex
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -16,11 +16,12 @@ from fastapi import HTTPException
 from sqlalchemy import or_
 
 from ..database import SessionLocal
-from ..models import Node, NodeType
+from ..models import Node, NodeType, Plan, Subscription
 from ..modern_protocol_runtime import CONFIG_PATH, SERVICE_NAME, STATE_PATH
 from ..modern_protocol_runtime_v2 import TAGS
 from ..node_runtime_connection import connect_protocol_runtime
 from ..quota_models import QuotaCursor, QuotaSession
+from ..subscription_override_models import effective_device_limit
 from . import modern_quota_runtime_v257 as canonical
 from .quota_node_sync import build_node_devices
 
@@ -1272,6 +1273,174 @@ def _priority_snapshot_devices(
     return priority
 
 
+def _overlimit_singbox_connections(
+    db,
+    *,
+    node_id: int,
+    grouped: dict[str, list[dict[str, Any]]],
+    snapshot: dict[str, Any],
+    now: datetime | None = None,
+) -> list[dict[str, Any]]:
+    """Select only physically observed, authenticated, unadmitted connections.
+
+    Canonical QuotaSession is one slot per admitted protocol/node. An already
+    occupied subscription limit must also be enforced on the actual sing-box
+    dataplane; otherwise a second protocol continues forwarding although the
+    ledger rejects its session. Never infer user identity from IP or terminate
+    all connections globally. Do not treat N TCP flows of one admitted sing-box
+    protocol as N devices.
+    """
+    when = now or datetime.utcnow()
+    fresh_since = when - timedelta(seconds=120)
+    expected: dict[tuple[str, str, str], list[dict[str, Any]]] = {}
+    for protocol, devices in grouped.items():
+        if protocol not in SINGBOX_ACCOUNTING_PROTOCOLS:
+            continue
+        for device in devices:
+            identity = str(device.get("telemetry_identity") or device.get("identity") or "").strip()
+            if identity:
+                key = (str(TAGS.get(protocol) or ""), "socks" if protocol == "socks5" else protocol, identity)
+                expected.setdefault(key, []).append(device)
+
+    candidates: list[dict[str, Any]] = []
+    decision_cache: dict[tuple[int, int, str], bool] = {}
+    for row in snapshot.get("rows") or []:
+        if not isinstance(row, dict) or _safe_int(row.get("closed_at_ms")):
+            continue
+        identity = str(row.get("user") or "").strip()
+        connection_id = str(row.get("id") or "").strip()
+        inbound = str(row.get("inbound") or "").strip()
+        kind = str(row.get("inbound_type") or "").strip().lower()
+        created = _safe_int(row.get("created_at_ms"))
+        if not identity or not connection_id or not (0 < created <= _safe_int(snapshot.get("snapshot_ms")) + 5000):
+            continue
+        matches = expected.get((inbound, kind, identity), [])
+        if len(matches) != 1:
+            continue  # ambiguous credential -> never disconnect
+        device = matches[0]
+        protocol = str(device["protocol"])
+        subscription_id = int(device["subscription_id"])
+        device_id = int(device["device_id"])
+        key = (subscription_id, device_id, protocol)
+        if key not in decision_cache:
+            subscription = db.get(Subscription, subscription_id)
+            if subscription is None:
+                decision_cache[key] = False
+                continue
+            plan = db.get(Plan, subscription.plan_id) if subscription.plan_id else None
+            limit = effective_device_limit(db, subscription, plan)
+            if limit <= 0:
+                decision_cache[key] = False
+                continue
+            admitted = (
+                db.query(QuotaSession)
+                .filter(
+                    QuotaSession.subscription_id == subscription_id,
+                    QuotaSession.status == "active",
+                    QuotaSession.last_seen_at >= fresh_since,
+                )
+                .all()
+            )
+            if any(
+                int(x.node_id) == int(node_id)
+                and int(x.device_id) == device_id
+                and str(x.protocol) == protocol
+                for x in admitted
+            ):
+                decision_cache[key] = False
+                continue
+            # Fail closed on telemetry uncertainty: only disconnect a
+            # second *observed* protocol when fresh admitted slots exist.
+            decision_cache[key] = len(admitted) >= limit
+        if not decision_cache[key]:
+            continue
+        candidates.append({
+            "id": connection_id,
+            "user": identity,
+            "inbound": inbound,
+            "inbound_type": kind,
+            "created_at_ms": created,
+        })
+        if len(candidates) >= 32:
+            break
+    return candidates
+
+
+def _selective_close_script(connection_ids: list[str]) -> str:
+    """Node-local authenticated gRPC-Web CloseConnection, never CloseAll."""
+    ids_json = json.dumps(connection_ids, separators=(",", ":"))
+    return f'''from __future__ import annotations
+import http.client, json, struct
+STATE={STATE_PATH!r}
+HOST={SINGBOX_API_LISTEN!r}
+PORT={SINGBOX_API_PORT!r}
+IDS=json.loads({ids_json!r})
+with open(STATE, "r", encoding="utf-8") as handle:
+    state=json.load(handle)
+secret=str(state["accounting_api"]["secret"])
+if not secret:
+    raise SystemExit("accounting_api_secret_unavailable")
+closed=0
+for conn_id in IDS:
+    if not isinstance(conn_id,str) or not (1 <= len(conn_id.encode("utf-8")) <= 128):
+        raise SystemExit("invalid_connection_id")
+    encoded=conn_id.encode("utf-8")
+    # CloseConnectionRequest: string id = 1, length-delimited wire field.
+    size=len(encoded)
+    varint=bytearray()
+    while size >= 128:
+        varint.append((size & 127) | 128)
+        size >>= 7
+    varint.append(size)
+    message=b"\\x0a"+bytes(varint)+encoded
+    body=b"\\x00"+struct.pack(">I", len(message))+message
+    c=http.client.HTTPConnection(HOST,PORT,timeout=4)
+    try:
+        c.request("POST","/daemon.StartedService/CloseConnection",body=body,headers={{
+            "Content-Type":"application/grpc-web+proto",
+            "Accept":"application/grpc-web+proto",
+            "X-Grpc-Web":"1",
+            "TE":"trailers",
+            "Authorization":"Bearer "+secret,
+        }})
+        response=c.getresponse()
+        payload=response.read(4096)
+        grpc_status=str(response.getheader("grpc-status") or "")
+        if not grpc_status and b"grpc-status: 0" in payload.lower():
+            grpc_status="0"
+        if response.status == 200 and grpc_status == "0":
+            closed+=1
+        else:
+            raise RuntimeError("selective_close_not_confirmed_http_"+str(response.status))
+    finally:
+        c.close()
+print(json.dumps({{"closed":closed,"requested":len(IDS)}}))
+'''
+
+
+async def _selective_close_singbox_connections(conn, connection_ids: list[str]) -> dict[str, Any]:
+    if not connection_ids:
+        return {"ok": True, "closed": 0}
+    if len(connection_ids) > 32 or len(set(connection_ids)) != len(connection_ids):
+        return {"ok": False, "closed": 0, "error": "unsafe_connection_selection"}
+    encoded = base64.b64encode(_selective_close_script(connection_ids).encode("utf-8")).decode("ascii")
+    ok, output = await _run_node_command(
+        conn,
+        f"printf '%s' {shlex.quote(encoded)} | base64 -d | python3",
+        timeout=22,
+    )
+    if not ok:
+        return {"ok": False, "closed": 0, "error": "selective_close_rpc_failed"}
+    try:
+        result = json.loads(output)
+        count = int(result["closed"])
+        if count != len(connection_ids):
+            return {"ok": False, "closed": count, "error": "selective_close_partial"}
+        return {"ok": True, "closed": count}
+    except Exception:
+        return {"ok": False, "closed": 0, "error": "selective_close_invalid_response"}
+
+
 async def reconcile_singbox_quota_once() -> dict[str, Any]:
     db = SessionLocal()
     results: list[dict[str, Any]] = []
@@ -1427,6 +1596,45 @@ async def reconcile_singbox_quota_once() -> dict[str, Any]:
                             "collector": f"singbox-{protocol}",
                             "node_id": int(node.id),
                             "error": f"{type(exc).__name__}:{str(exc)[:500]}",
+                        })
+                # Physical enforcement after quota/traffic reconciliation:
+                # re-read live node identities and DB admission immediately
+                # before any targeted connection close. Never restart sing-box,
+                # revoke a whole account, or terminate an admitted protocol.
+                initial = _overlimit_singbox_connections(
+                    db, node_id=int(node.id), grouped=grouped, snapshot=snapshot,
+                )
+                db.commit()
+                if initial:
+                    fresh_ok, fresh_snapshot, _fresh_error = await collect_singbox_snapshot(conn)
+                    if fresh_ok and fresh_snapshot and fresh_snapshot.get("epoch") == snapshot.get("epoch"):
+                        db.rollback()  # discard stale read transaction
+                        verified = _overlimit_singbox_connections(
+                            db, node_id=int(node.id), grouped=grouped,
+                            snapshot=fresh_snapshot,
+                        )
+                        approved = {
+                            (str(x["id"]),str(x["user"]),str(x["inbound"]),int(x["created_at_ms"]))
+                            for x in initial
+                        }
+                        targets = [
+                            x["id"] for x in verified
+                            if (str(x["id"]),str(x["user"]),str(x["inbound"]),int(x["created_at_ms"])) in approved
+                        ][:32]
+                        db.commit()
+                        if targets:
+                            closed = await _selective_close_singbox_connections(conn, targets)
+                            results.append({
+                                "collector": "singbox-selective-session-limit",
+                                "node_id": int(node.id),
+                                **closed,
+                                "target_count": len(targets),
+                            })
+                    else:
+                        results.append({
+                            "collector": "singbox-selective-session-limit",
+                            "node_id": int(node.id), "ok": False,
+                            "error": "fresh_authoritative_snapshot_unavailable",
                         })
             except HTTPException as exc:
                 db.rollback()
