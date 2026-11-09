@@ -73,6 +73,41 @@ def test_unpublished_central_node_not_preferred():
         assert delivery.prefer_central_sudoku_items(db, items) is items
 
 
+def test_account_creation_fences_legacy_when_shared_node_exists():
+    old = node()
+    old.id = 6
+    shared = node()
+    shared.id = 19
+    db = FakeDB({6: old, 19: shared})
+    with patch.object(delivery, "is_central_node", side_effect=lambda db, nid: nid == 19):
+        assert delivery.has_published_central_sudoku_owner(db, [old, shared])
+        assert not delivery.has_published_central_sudoku_owner(db, [old])
+        assert delivery.ready_central_sudoku_items(db, [
+            {"node_id": 6, "port": 30001},
+            {"node_id": 19, "port": 18553},
+        ]) == [{"node_id": 19, "port": 18553}]
+
+
+def test_unpublished_central_owner_cannot_fence_account_creation():
+    shared = node(visible=False)
+    shared.id = 19
+    db = FakeDB({19: shared})
+    with patch.object(delivery, "is_central_node", return_value=True):
+        assert not delivery.has_published_central_sudoku_owner(db, [shared])
+
+
+def test_account_provisioning_guards_before_legacy_driver():
+    from pathlib import Path
+    path = Path(__file__).resolve().parents[1] / "app/routers/modern_account_delivery_v1.py"
+    code = path.read_text(encoding="utf-8")
+    assert 'if protocol == "sudoku" and central_sudoku_owner:' in code
+    assert code.index('if protocol == "sudoku" and central_sudoku_owner:') < code.index(
+        'items, protocol_errors = await _provision_modern_protocol('
+    )
+    assert '"pending_protocols": pending_protocols' in code
+    assert 'if not results and not pending_protocols:' in code
+
+
 if __name__ == "__main__":
     for name, value in sorted(globals().items()):
         if name.startswith("test_") and callable(value):
