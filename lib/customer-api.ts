@@ -38,6 +38,7 @@ export type MySubscription={
   protocols:string[];
   plan_name:string|null;
   days_remaining:number;
+  duration_unlimited?:boolean;
   device_limit:number;
   activation_duration_days?:number;
 };
