@@ -21,7 +21,11 @@ from sqlalchemy import text
 BACKEND = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND))
 
-from app.services.central_runtime_ownership_v1 import allow_central_node, is_central_node, mark_central_node, mark_central_applied, last_applied
+from app.services.central_runtime_ownership_v1 import allow_central_node, is_central_node, mark_central_node, mark_central_applied
+from app.services.central_sudoku_fingerprint_v1 import (
+    desired_fingerprint as desired_sudoku_fingerprint,
+    last_applied as last_sudoku_applied,
+)
 from app.database import SessionLocal
 from app.models import Node, NodeStatus, NodeType
 from app.services.new_node_readiness_v1 import verify_new_exit_readiness
@@ -92,14 +96,11 @@ def missing_runtime_families(node_id, limit):
                 or audit["unknown_protocols"]):
             raise RuntimeError("CENTRAL_DELTA_AUDIT_NOT_RECONCILABLE")
 
-        # Missing-only credential coverage is NOT enough for revocable
-        # shared Sudoku. On expiry, quota exhaustion or plan change a stale
-        # client hash can remain in the LIVE daemon although every remaining
-        # entitled account has a credential item. Reconcile the complete
-        # whitelist whenever the node's desired entitlement fingerprint
-        # changes. The shared daemon itself checks for an unchanged config
-        # before restarting, so unrelated protocol changes stay idempotent.
-        if last_applied(db, node_id) != desired.fingerprint:
+        # Track only Sudoku entitlement changes, independent from the
+        # 16-family global fingerprint. A failing Sing-box family must not
+        # block an independently verified Sudoku revoke/restore ACK or
+        # trigger redundant shared-daemon restages.
+        if last_sudoku_applied(db, node_id) != desired_sudoku_fingerprint(db, node_id):
             sudoku = next(f for f in FAMILIES if f.name == "sudoku")
             if sudoku not in selected:
                 selected = (*selected, sudoku)
