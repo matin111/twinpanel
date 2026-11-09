@@ -282,8 +282,18 @@ async def run(node_id:int,limit:int,apply:bool,all_batches:bool):
     # customer delivery authority silently falls back to the Exit IP.
     # Apply the same dedicated-domain mapper + endpoint policy as the API
     # before opening any subscription or Node session.
-    from app.xray_node_domain_runtime import apply_xray_node_domain_runtime
-    apply_xray_node_domain_runtime()
+    # Match the exact source of public port authority used by app.self_hosted_runtime.
+    # Applying only the domain mapper produced 231xx/233xx ports instead of the
+    # real Iran ingress 240xx/260xx ports in detached central workers.
+    from app import xray_modern_runtime as xr
+    from scripts.twinpanel_hidden_node_install_finish_v1 import (
+        _activate_xray_install_runtime,
+    )
+    xr.PROFILE_META[xr.PROFILE_XHTTP]["public_base"] = 24000
+    xr.PROFILE_META[xr.PROFILE_WS]["public_base"] = 26000
+    _activate_xray_install_runtime()
+    assert xr._public_port(node_id, xr.PROFILE_XHTTP) == 24000 + node_id
+    assert xr._public_port(node_id, xr.PROFILE_WS) == 26000 + node_id
     with SessionLocal() as db:
         if apply:
             node=db.get(Node,node_id)
