@@ -21,8 +21,22 @@ jobs:
     env:
       PYTHONPATH: backend
       APP_SECRET_KEY: ci-central-bulk-only
-      DATABASE_URL: sqlite:///./central-bulk-test.sqlite3
+      DATABASE_URL: postgresql+psycopg2://test:test@127.0.0.1:5432/test
       NODE_AGENT_SHARED_SECRET: ci-central-agent-only
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U test -d test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
