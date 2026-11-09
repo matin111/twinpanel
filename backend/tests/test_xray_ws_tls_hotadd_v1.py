@@ -21,7 +21,6 @@ class TestSafeHotaddSource(unittest.TestCase):
         source=MODULE.read_text(encoding="utf-8")
         self.assertIn('"network":"ws"',_REMOTE)
         self.assertIn('"security":"tls"',_REMOTE)
-        self.assertIn('["XRAY","api"',source) if False else None
         self.assertIn('"api","adi"',_REMOTE)
         self.assertIn('"api","rmi"',_REMOTE)
         self.assertIn('XRAY_WS_CONFIG_PORT_COLLISION',_REMOTE)
@@ -49,7 +48,9 @@ class TestWebsocketTLSRuntime(unittest.IsolatedAsyncioTestCase):
         node=SimpleNamespace(xray_domain="v2uk.in88.sbs",public_domain="uk.in88.sbs")
         async def original(*args,**kwargs):
             return {"tls_enabled":True,"available_profiles":["xhttp_reality"]}
-        with patch.object(domain,"_original_ensure_modern_xray",original), patch(
+        with patch.object(domain,"_original_ensure_modern_xray",original), patch.object(
+            domain.xray_modern_runtime,"_target_port",return_value=9444,
+        ), patch(
             "app.xray_tls_ws_hotadd_v1.ensure_websocket_tls",
             new_callable=AsyncMock,return_value={"ready":True},
         ) as repair:
