@@ -1,38 +1,57 @@
-"""Per-node Sudoku whitelist fingerprint; independent of other protocol families.
+"""Per-Exit Sudoku whitelist fingerprint independent of unrelated protocol families.
 
-The global last_applied marker cannot be used to acknowledge Sudoku changes:
-a completely unrelated Sing-box or Xray delta may fail after Sudoku itself has
-safely reconciled. The Sudoku stage writes its own marker only after the live
-shared daemon acknowledged the exact desired whitelist (or safe zero-user stop).
+Only an acknowledged, post-apply Sudoku daemon state can write this marker.
+The parent 16-protocol stage keeps its own global fingerprint unchanged and
+must never claim other protocol families succeeded because Sudoku did.
 """
 from __future__ import annotations
 
 import hashlib
 import json
 from datetime import datetime
+from typing import Iterable
 
 from sqlalchemy import or_
 
-from ..models import Subscription, SubscriptionNode, SubscriptionProtocol, SubscriptionStatus
+from ..models import (
+    Subscription, SubscriptionNode, SubscriptionProtocol, SubscriptionStatus,
+)
 from ..mother_access import get_value, set_value
 
 
-def _node_id(node_id: int) -> int:
-    number = int(node_id)
-    if number <= 0:
-        raise ValueError("SUDOKU_FINGERPRINT_INVALID_NODE")
-    return number
+def sudoku_applied_key(node_id: int) -> str:
+    nid = int(node_id)
+    if nid <= 0:
+        raise ValueError("SUDOKU_INVALID_NODE_ID")
+    return f"vpn.central_runtime.exit.{nid}.sudoku_whitelist_applied_v1"
 
 
-def desired_subscription_ids(db, node_id: int) -> tuple[int, ...]:
-    """Use exactly the central Sudoku staging entitlement predicates."""
-    now = datetime.utcnow()
+def fingerprint(node_id: int, ids: Iterable[int]) -> str:
+    nid = int(node_id)
+    if nid <= 0:
+        raise ValueError("SUDOKU_INVALID_NODE_ID")
+    unique = sorted({int(sid) for sid in ids})
+    if any(sid <= 0 for sid in unique) or len(unique) > 3000:
+        raise ValueError("SUDOKU_INVALID_ENTITLEMENT_SET")
+    return hashlib.sha256(
+        json.dumps(
+            {"version": 1, "node": nid, "protocol": "sudoku", "ids": unique},
+            separators=(",", ":"), sort_keys=True,
+        ).encode("ascii")
+    ).hexdigest()
+
+
+def entitled_ids(db, node_id: int, *, as_of: datetime | None = None) -> list[int]:
+    nid = int(node_id)
+    if nid <= 0:
+        raise ValueError("SUDOKU_INVALID_NODE_ID")
+    now = as_of or datetime.utcnow()
     rows = (
         db.query(Subscription.id)
         .join(SubscriptionNode, SubscriptionNode.subscription_id == Subscription.id)
         .join(SubscriptionProtocol, SubscriptionProtocol.subscription_id == Subscription.id)
         .filter(
-            SubscriptionNode.node_id == _node_id(node_id),
+            SubscriptionNode.node_id == nid,
             SubscriptionProtocol.protocol == "sudoku",
             Subscription.status == SubscriptionStatus.ACTIVE,
             or_(Subscription.expires_at.is_(None), Subscription.expires_at > now),
@@ -42,40 +61,18 @@ def desired_subscription_ids(db, node_id: int) -> tuple[int, ...]:
         .distinct()
         .all()
     )
-    return tuple(sorted({int(row[0]) for row in rows}))
-
-
-def entitled_ids(db, node_id: int) -> tuple[int, ...]:
-    """Canonical entitlement membership used by the enforcement guard."""
-    return desired_subscription_ids(db, node_id)
-
-
-def fingerprint_for_ids(node_id: int, ids) -> str:
-    canonical = tuple(sorted({int(item) for item in ids}))
-    if any(item <= 0 for item in canonical):
-        raise ValueError("SUDOKU_FINGERPRINT_INVALID_SUBSCRIPTION")
-    return hashlib.sha256(
-        json.dumps(
-            {"family": "sudoku-shared-v1", "node_id": _node_id(node_id),
-             "entitled_subscription_ids": canonical},
-            separators=(",", ":"), sort_keys=True,
-        ).encode("ascii")
-    ).hexdigest()
+    return sorted({int(row[0]) for row in rows})
 
 
 def desired_fingerprint(db, node_id: int) -> str:
-    return fingerprint_for_ids(node_id, desired_subscription_ids(db, node_id))
-
-
-def marker_key(node_id: int) -> str:
-    return f"vpn.central_runtime.exit.{_node_id(node_id)}.sudoku.last_applied"
+    return fingerprint(node_id, entitled_ids(db, node_id))
 
 
 def last_applied(db, node_id: int) -> str:
-    return get_value(db, marker_key(node_id), "")
+    return get_value(db, sudoku_applied_key(node_id), "")
 
 
-def mark_applied(db, node_id: int, fingerprint: str) -> None:
-    if len(fingerprint) != 64 or any(ch not in "0123456789abcdef" for ch in fingerprint):
-        raise ValueError("SUDOKU_FINGERPRINT_INVALID_MARKER")
-    set_value(db, marker_key(node_id), fingerprint)
+def mark_applied(db, node_id: int, ids: Iterable[int]) -> str:
+    digest = fingerprint(node_id, ids)
+    set_value(db, sudoku_applied_key(node_id), digest)
+    return digest
