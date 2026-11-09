@@ -319,7 +319,7 @@ async def admin_edit_subscription_fast_v1(
         )
     if username_changed or password_changed:
         persist_account_limits()
-        if reset_usage:
+        if reset_usage or new_duration_days is not None or expiry_sent:
             restore_after_period_change(db, sub, was_exhausted=was_exhausted)
         _commit_admin_edit(db)
         background_tasks.add_task(
@@ -353,7 +353,7 @@ async def admin_edit_subscription_fast_v1(
         sub.plan_id = int(plan.id) if plan else None
         persist_account_limits()
         sub.traffic_limit_bytes = _resolve_traffic_limit_bytes(sub, payload)
-        if reset_usage:
+        if reset_usage or new_duration_days is not None or expiry_sent:
             restore_after_period_change(db, sub, was_exhausted=was_exhausted)
         sub.iran_node_id = None
         sub.exit_node_id = int(desired_node_ids[0])
