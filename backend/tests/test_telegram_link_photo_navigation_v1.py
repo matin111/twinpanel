@@ -51,6 +51,20 @@ class TelegramLinkPhotoNavigationTests(unittest.TestCase):
         self.assertIn("main_runtime.main_keyboard()", body)
         self.assertNotIn("callback.message.edit_text(", body)
 
+    def test_all_imported_account_callbacks_use_media_safe_navigation(self):
+        import_src = (ROOT / "backend/app/telegram_subscription_import_bot_v1.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertNotIn("callback.message.edit_text(", import_src)
+        for name in (
+            "import_remove", "_show_renewal_step", "_show_imported_renewal",
+            "import_renewal_order", "import_request_prompt",
+            "import_request_confirm", "import_refresh", "import_detail",
+        ):
+            with self.subTest(name=name):
+                body = handler("backend/app/telegram_subscription_import_bot_v1.py", name)
+                self.assertNotIn("callback.message.edit_text(", body)
+
     def test_existing_navigation_utility_handles_photo(self):
         src = (ROOT / "backend/app/telegram_navigation_v1.py").read_text()
         self.assertIn('getattr(message, "photo", None)', src)
