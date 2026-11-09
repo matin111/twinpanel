@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.729",
-  "source_sha": "6ca655fa8747371fd5aa7d3d7e960d3c0ac8cb27",
+  "version": "1.1.0-rc.730",
+  "source_sha": "b2ab24d6da6605c36fc380deffb2744b734ee184",
   "notes": {
-    "fa": "اصلاح عدم خواندن دامنه اختصاصی Xray توسط Worker مستقل مدیریت مرکزی و استفاده از دامنه فقط در صورت تطابق DNS آن با IP ورودی تانل ایران برای XHTTP، TCP Reality و Vision. مسیر مستقیم، پورت‌ها و تنظیمات سایر نودها بدون تغییر می‌مانند. برای اتصال نودهای دارای خطای Route، صحت DNS و فوروارد پورت‌ها جداگانه لازم است.",
-    "en": "Activate dedicated Xray-domain mapper in detached central workers. Safely prefer DNS-verified Iran ingress hostnames for Reality and Vision as well as XHTTP; preserve direct fallback, existing ports, users and all other services. DNS and ingress route readiness remain separate prerequisites."
+    "fa": "رفع قطع ثبت مصرف ساکس۵ پس از تغییر هویت اتصال: تطبیق شناسه داخلی احرازشده sing-box با اعتبارنامه فعال همان اشتراک در همان نود؛ ثبت مصرف به مسیر مرکزی بدون تغییر نام کاربری، رمز، کانفیگ، تاریخ و محدودیت حجم. اصلاح فقط برای SOCKS5 و با تست رگرسیون.",
+    "en": "Fix SOCKS5 central accounting stalling when sing-box authenticates runtime identity tp-sub-N while saved customer username differs. Safely bind exact observed authenticated internal identity to verified active credential on the same node/subscription. No credential, VPN dataplane, billing formula, expiry or quota changes. Regression tests passed."
   }
 }
