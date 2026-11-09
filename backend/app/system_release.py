@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import hashlib
 import json
 import os
@@ -493,11 +494,66 @@ def activate_license(license_key: str) -> dict[str, Any]:
     return _state_from_vendor(payload)
 
 
+# Keep the legacy source supported, but do not allow CDN-stale raw manifests
+# to hide newer verified releases published in the canonical TwinPanel repo.
+OFFICIAL_RAW_MANIFEST = (
+    "https://raw.githubusercontent.com/matin111/twinpanel/main/releases/stable.json"
+)
+OFFICIAL_GITHUB_MANIFEST_API = (
+    "https://api.github.com/repos/matin111/twinpanel/contents/releases/stable.json?ref=main"
+)
+_PUBLIC_API_CACHE: dict[str, Any] | None = None
+_PUBLIC_API_CACHE_UNTIL = 0.0
+_PUBLIC_API_FAILURE_UNTIL = 0.0
+
+
+def _fresh_public_github_manifest() -> dict[str, Any] | None:
+    """Rate-limited, read-only fallback; never accept unpublished releases."""
+    global _PUBLIC_API_CACHE, _PUBLIC_API_CACHE_UNTIL, _PUBLIC_API_FAILURE_UNTIL
+    now = time.monotonic()
+    if _PUBLIC_API_CACHE is not None and now < _PUBLIC_API_CACHE_UNTIL:
+        return dict(_PUBLIC_API_CACHE)
+    if now < _PUBLIC_API_FAILURE_UNTIL:
+        return None
+    try:
+        response = httpx.get(
+            OFFICIAL_GITHUB_MANIFEST_API,
+            timeout=httpx.Timeout(8.0, connect=5.0),
+            follow_redirects=True,
+            headers={"Accept": "application/vnd.github+json"},
+        )
+        response.raise_for_status()
+        envelope = response.json()
+        if (not isinstance(envelope, dict)
+                or envelope.get("path") != "releases/stable.json"
+                or envelope.get("encoding") != "base64"):
+            raise ValueError("RELEASE_GITHUB_CONTENTS_INVALID")
+        content = str(envelope.get("content") or "").replace("\n", "")
+        if len(content) > 180000:
+            raise ValueError("RELEASE_GITHUB_CONTENTS_TOO_LARGE")
+        decoded = base64.b64decode(content, validate=True)
+        if len(decoded) > 131072:
+            raise ValueError("RELEASE_GITHUB_MANIFEST_TOO_LARGE")
+        value = json.loads(decoded.decode("utf-8"))
+        if (not isinstance(value, dict) or value.get("published") is not True
+                or value.get("installable") is not True
+                or not str(value.get("version") or "").strip()):
+            raise ValueError("RELEASE_GITHUB_MANIFEST_UNPUBLISHED")
+    except (Exception):
+        _PUBLIC_API_FAILURE_UNTIL = now + 30.0
+        return None
+    _PUBLIC_API_CACHE = dict(value)
+    _PUBLIC_API_CACHE_UNTIL = now + 60.0
+    _PUBLIC_API_FAILURE_UNTIL = 0.0
+    return dict(value)
+
+
 def release_manifest() -> dict[str, Any]:
     url = str(
         os.getenv("TWINPANEL_RELEASE_MANIFEST_URL", DEFAULT_MANIFEST_URL)
     ).strip() or DEFAULT_MANIFEST_URL
-
+    primary: dict[str, Any] | None = None
+    error = "RELEASE_MANIFEST_UNREACHABLE"
     try:
         response = httpx.get(
             url,
@@ -508,13 +564,28 @@ def release_manifest() -> dict[str, Any]:
         value = response.json()
         if not isinstance(value, dict):
             raise RuntimeError("INVALID_RELEASE_MANIFEST")
-        return value
+        primary = value
     except Exception as exc:
-        return {
-            "channel": os.getenv("TWINPANEL_RELEASE_CHANNEL", DEFAULT_RELEASE_CHANNEL),
-            "version": current_version(),
-            "error": type(exc).__name__,
-        }
+        error = type(exc).__name__
+
+    # Only the first-party raw feeds can be overridden by their verified
+    # GitHub Contents API counterpart. Respect customer/vendor custom URLs.
+    if url in (DEFAULT_MANIFEST_URL, OFFICIAL_RAW_MANIFEST):
+        fresh = _fresh_public_github_manifest()
+        if fresh is not None and (
+            primary is None or is_newer_version(
+                str(fresh.get("version") or ""),
+                str(primary.get("version") or ""),
+            )
+        ):
+            return fresh
+    if primary is not None:
+        return primary
+    return {
+        "channel": os.getenv("TWINPANEL_RELEASE_CHANNEL", DEFAULT_RELEASE_CHANNEL),
+        "version": current_version(),
+        "error": error,
+    }
 
 
 def load_update_state() -> dict[str, Any]:
