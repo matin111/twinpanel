@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.745",
+  "version": "1.1.0-rc.746",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-09T07:02:40Z",
+  "released_at": "2026-11-09T07:49:18Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "f5830f5dbf1f19fd5035c7e0a54ea5473d1c6ee5",
+  "source_sha": "3d03161e0e34456ce73eac857aa27cfb6a0a89d2",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.745/twinpanel-1.1.0-rc.745-linux-x86_64.tar.gz",
-    "sha256": "2b92e51478aa757bed98b2e839f6aefb489fd492f37d5dcecc205aadbb067abf",
-    "size_bytes": 30125591
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.746/twinpanel-1.1.0-rc.746-linux-x86_64.tar.gz",
+    "sha256": "385060032a8253c090029617fa365b5fb91a82d203f666995aee76b6ca6e4b1c",
+    "size_bytes": 30125702
   },
   "notes": {
-    "fa": "اصلاح صفحه بکاپ و بازیابی: کارت ربات بکاپ و زمان‌بندی در یک ردیف کنار هم، حذف توضیحات تکراری و بهبود تراکم و نظم نمایش؛ بدون تغییر عملکرد بکاپ و ربات.",
-    "en": "Backup page layout: side-by-side bot and schedule cards on desktop, remove redundant copy, preserve backup and bot controls."
+    "fa": "حذف سرویس‌ها و فایل‌های اختصاصی قدیمی Sudoku و جلوگیری از ساخت مجدد آن‌ها؛ اتصال Sudoku فقط از طریق مدیریت مرکزی و سرویس مشترک نودها انجام می‌شود. اطلاعات اشتراک‌ها، کلیدها و سایر پروتکل‌ها بدون تغییر می‌مانند.",
+    "en": "Retire legacy per-subscriber Sudoku services and ingress routes. Central shared per-node Sudoku remains the only provisioner; preserve subscription data, credentials and all other protocols."
   }
 }
