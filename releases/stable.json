@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.726",
+  "version": "1.1.0-rc.727",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-08T23:41:04Z",
+  "released_at": "2026-11-09T00:08:53Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "5af6e32603d3d968e1c1ca638189a521586c6a71",
+  "source_sha": "44f76e122b39ec58938585ff0b2791c090e0f6eb",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.726/twinpanel-1.1.0-rc.726-linux-x86_64.tar.gz",
-    "sha256": "b2183f6043a31743146824708b107a7ed7e36627d4ba686c4fd5ed6c2dde85b9",
-    "size_bytes": 29932433
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.727/twinpanel-1.1.0-rc.727-linux-x86_64.tar.gz",
+    "sha256": "385c803ac5d63a4aef9b8988d95c9378f8aa7862b66db760bcf23a66e2f84a5e",
+    "size_bytes": 29945606
   },
   "notes": {
-    "fa": "ادغام تعداد متصل و تعداد مجاز در یک کادر و نمایش مدت اشتراک در کادر آزاد. اصلاح اولویت تاریخ انقضای واقعی نسبت به پرچم نامحدود قدیمی و نمایش اولیه روزهای باقی‌مانده حتی قبل از لود جاوااسکریپت. بدون تغییر حجم یا اعتبار حساب‌ها.",
-    "en": "Combine connected and allowed devices in one metric, show configured days in freed cell, prioritize a real finite expiry over a stale unlimited override and prerender remaining days server-side before live polling. Preserves quotas and expiry values."
+    "fa": "اصلاح مدیریت حجم مرکزی Mieru با شمارنده تجمعی اختصاصی هر کاربر در خروجی واقعی mita get metrics: ثبت مبنای اولیه بدون کسر حجم قدیمی، ثبت اختلاف واقعی شمارنده در دفعات بعد و جلوگیری از دوباره‌شماری در ری‌استارت. کاهش تراکنش‌های طولانی دیتابیس قبل از پایش شبکه و حفظ تاریخ، محدودیت حجم و کانفیگ‌ها. سایر پروتکل‌های فاقد منبع معتبر همچنان بدون کسر تخمینی.",
+    "en": "Connect Mieru authenticated per-user persisted cumulative counters to canonical central quota ledger; zero-charge first baseline, real incremental accounting, fail-closed counter reset/identity conflicts. Release DB read transactions before node network probes. No changes to existing plans, dates, traffic deductions, credentials or nodes. Protocols without authoritative per-user counters remain unsupported rather than billed by estimate."
   }
 }
