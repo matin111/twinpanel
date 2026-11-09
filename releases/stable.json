@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.757",
+  "version": "1.1.0-rc.758",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-09T22:03:28Z",
+  "released_at": "2026-11-09T22:20:20Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "2a43bf905cf0b3f7bc114668346c53beb9618a13",
+  "source_sha": "d4b7009cf30b257d00cd3f3387b2f08d0932ddc4",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.757/twinpanel-1.1.0-rc.757-linux-x86_64.tar.gz",
-    "sha256": "7f58514ea06bb802b651adcc54390d788b48a59622ebcb31b663b060701c031b",
-    "size_bytes": 30200213
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.758/twinpanel-1.1.0-rc.758-linux-x86_64.tar.gz",
+    "sha256": "bc8b513224dd5d41961e0a818435139089bb0247236827f057e3c68cc1d30f6d",
+    "size_bytes": 30204924
   },
   "notes": {
-    "fa": "اصلاح ریشه‌ای نمایش دامنه اختصاصی V2Ray/Xray هنگام تونل ایران: راهنمای اشتباه پنل که DNS را به IP خروجی هدایت می‌کرد حذف و اصلاح شد. در مدیریت دامنه و ویرایش سه Inbound، DNS واقعی، IP صحیح ورودی تونل ایران و علت جایگزینی IP به‌جای دامنه نمایش داده می‌شود. آمریکا و آلمان دوم DNS اشتباه دارند؛ آلمان اول، انگلیس و فنلاند از نظر DNS صحیح‌اند. با اصلاح رکوردهای DNS، ساب‌لینک به طور خودکار دامنه را ترجیح می‌دهد؛ بدون تغییر UUID، پورت، سرویس Xray، دیگر پروتکل‌ها یا گواهی‌ها. اصلاح DNS خارجی توسط این آپدیت انجام نمی‌شود.",
-    "en": "Fix Xray domain-to-Iran-ingress guidance and expose read-only mismatch diagnostics in node/domain and three-inbound editor UIs. Verified USA and Germany Exit hostnames currently point at Exit IPs instead of the active Iran tunnel ingress, which explains safe fallback to IP. Present actual resolved DNS and exact required A record. Other Germany, UK and Finland DNS routes match. No external DNS, UUIDs, ports, certificates, VPN services or other nodes are changed by this release."
+    "fa": "اصلاح نمایش مدت اعتبار اشتراک‌ها: بدون مدت/انقضا = نامحدود؛ تمدید با روز، تاریخ انقضا و روز باقی‌مانده ایجاد می‌کند؛ نمایش همسان در مدیریت، سابلینک و پنل مشتری؛ رفع باگ «مدت تعیین نشده» و بازگردانی اعتبار پس از تمدید مجاز؛ حفظ قانون شروع دوره‌های از قبل تعیین‌شده با اولین اتصال. بدون حذف یا تغییر گروهی اطلاعات کاربران.",
+    "en": "Fix unlimited duration presentation and dated renewals: accounts without term or expiry are unlimited; adding days starts a finite term when previously unlimited; show expiry plus remaining days in admin, connection hub and customer portal; preserve first-use activation for preconfigured waiting accounts; repair stale unlimited flags and restore eligible expired accounts."
   }
 }
