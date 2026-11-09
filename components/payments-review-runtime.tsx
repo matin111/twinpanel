@@ -2,7 +2,7 @@
 
 import {useEffect,useMemo,useState} from "react";
 import {Badge,Card,Shell} from "./ui";
-import {isNewPaymentReceipt,matchesPaymentReviewFilter,needsPaymentReview,PaymentReviewFilter} from "../lib/payment-review-filters";
+import {matchesPaymentReviewFilter,needsPaymentReview,PaymentReviewFilter} from "../lib/payment-review-filters";
 import {adminApi,AdminUser,RuntimeRow} from "../lib/admin-api";
 import {AnyRow,parityApi} from "../lib/admin-parity-api";
 import {API_BASE} from "../lib/api";
