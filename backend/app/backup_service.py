@@ -597,6 +597,12 @@ def _export_database() -> tuple[
     node_key_paths: set[str] = set()
 
     with engine.connect() as conn:
+        # Every table must reflect the same committed database snapshot.
+        # Without this, a busy panel may export subscriptions and wallets
+        # from different moments even though each individual SELECT succeeds.
+        conn.execute(text(
+            "SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY"
+        ))
 
         metadata = MetaData()
 
@@ -1844,6 +1850,36 @@ def restore_backup(
             "BACKUP_INCOMPLETE_FOR_CURRENT_SCHEMA: " +
             ",".join(sorted(missing))
         )
+    # CASCADE also clears tables not explicitly named in TRUNCATE.
+    # Reject restoring into an occupied instance when any dependent table
+    # outside the archive contains rows. Restoration must be rehearsed
+    # on an isolated DB, not used as a live destructive merge.
+    with engine.connect() as preflight:
+        affected = preflight.execute(text("""
+            SELECT DISTINCT child.relname
+            FROM pg_constraint fk
+            JOIN pg_class child ON child.oid=fk.conrelid
+            JOIN pg_class parent ON parent.oid=fk.confrelid
+            JOIN pg_namespace ns ON ns.oid=child.relnamespace
+            WHERE fk.contype='f' AND ns.nspname='public'
+              AND parent.relname = ANY(:parents)
+              AND child.relname <> ALL(:included)
+        """), {
+            "parents": restore_names,
+            "included": restore_names,
+        }).scalars().all()
+        nonempty=[]
+        for name in affected:
+            quoted_name = '"' + name.replace('"','""') + '"'
+            if preflight.execute(
+                text("SELECT EXISTS(SELECT 1 FROM "+quoted_name+" LIMIT 1)")
+            ).scalar():
+                nonempty.append(name)
+        if nonempty:
+            raise RuntimeError(
+                "RESTORE_WOULD_ERASE_EXCLUDED_TABLES: " +
+                ",".join(sorted(nonempty))
+            )
 
     # TWINPANEL_RESTORE_ISOLATED_DB_V1
     # Restore must never consume or block the
