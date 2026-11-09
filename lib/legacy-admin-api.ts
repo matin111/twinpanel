@@ -72,7 +72,7 @@ export type ClassicProtocolInventoryResponse={
 export const legacyAdminApi={
   usersPage:(params:{limit:number;offset:number;q:string;status:"all"|"active"|"inactive"|"subscribed"})=>request<UsersPageResponse>(`/v1/admin/users-page?limit=${encodeURIComponent(String(params.limit))}&offset=${encodeURIComponent(String(params.offset))}&q=${encodeURIComponent(params.q)}&status=${encodeURIComponent(params.status)}`),
   subscriptionsByUser:(userId:number)=>request<RuntimeRow[]>(`/v1/subscriptions/by-user/${userId}`),
-  extendSubscription:(id:number,payload:{add_traffic_gb?:number;add_days?:number})=>request<RuntimeRow>(`/v1/subscriptions/${id}/extend`,{method:"PATCH",body:JSON.stringify(payload)}),
+  extendSubscription:(id:number,payload:{add_traffic_gb?:number;add_days?:number;reset_usage?:boolean;reset_date?:boolean})=>request<RuntimeRow>(`/v1/subscriptions/${id}/extend`,{method:"PATCH",body:JSON.stringify(payload)}),
   nodeAccess:(id:number)=>request<RuntimeRow>(`/v1/provision/node-access/${id}`),
   saveNodeAccess:(payload:{node_id:number;host:string;port:number;username:string;password:string})=>request<RuntimeRow>("/v1/provision/save-node-access",{method:"POST",body:JSON.stringify(payload)}),
   classicProtocols:()=>request<ClassicProtocolInventoryResponse>("/v1/provision/classic-protocols"),

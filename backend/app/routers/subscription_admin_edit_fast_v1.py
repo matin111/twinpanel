@@ -13,6 +13,7 @@ from ..subscription_override_models import SubscriptionRuntimeOverride
 from ..plan_template_selection import plan_template_node_ids
 from ..protocol_account_registry import ALL_PROTOCOL_KEYS, normalize_protocols, plan_protocols
 from ..subscription_enforcement import queue_subscription_enforcement
+from ..services.subscription_cycle_reset_v1 import reset_subscription_period_usage
 from .subscription_protocol_lifecycle_v2 import _resolve_traffic_limit_bytes
 from .subscription_protocol_lifecycle_v3 import (
     _current_exit_node_ids,
@@ -226,7 +227,13 @@ async def admin_edit_subscription_fast_v1(
     normalized_payload["node_ids"] = list(desired_node_ids)
     normalized_payload["protocols"] = list(protocols)
 
+    reset_usage = payload.get("reset_usage") is True
+
     def persist_account_limits():
+        if reset_usage:
+            # Same transaction as the edit. Do not delete cumulative
+            # cursor baselines or historical accounting events.
+            reset_subscription_period_usage(db, sub, origin="admin_edit")
         if new_device_limit is not None:
             override = db.get(SubscriptionRuntimeOverride, int(sub.id))
             if override is None:
