@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.743",
-  "source_sha": "75673101eb1e0f1153539df039af890773c39091",
+  "version": "1.1.0-rc.744",
+  "source_sha": "2b23d5627dd4bc6f505c97aa89468dab4c6cb78f",
   "notes": {
-    "fa": "حذف عبارت فنی SMS Reader از پیام‌های شارژ کیف پول کارت‌به‌کارت در ربات اصلی و نسخه دوم؛ حفظ دستور پرداخت دقیق، دکمه ارسال رسید و عملکرد تأیید خودکار بدون تغییر.",
-    "en": "Remove internal SMS Reader references from Telegram customer wallet card-to-card payment copy, retaining exact amount instructions, receipt buttons and existing automatic payment functionality."
+    "fa": "بکاپ قابل‌انتقال داده‌های TwinPanel بدون کلید بازیابی با فرمت جدید v3. حفظ داده‌های پایدار کاربران، نمایندگان، کیف پول‌ها، اشتراک‌ها و تنظیمات ضروری؛ حذف وابستگی بازیابی به تنظیمات تلگرام؛ نسخه ایمنی محلی قبل از Restore؛ حذف مسیر دانلود کلید و پشتیبانی از فایل‌های بکاپ قدیمی. توجه: فایل بکاپ جدید حاوی داده‌های حساس است و باید خصوصی نگهداری شود.",
+    "en": "Portable keyless TwinPanel data-only backup format v3, retaining persistent users, resellers, subscriptions, wallets and essential settings; no Telegram prerequisite for restore; pre-restore local safety copy; legacy encrypted archives unsupported. Warning: backups contain sensitive credentials and must be kept private."
   }
 }
