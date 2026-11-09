@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import OperationalError
 
 from ..database import SessionLocal, get_db
 from ..deps import require_admin
@@ -23,6 +24,36 @@ from .subscription_protocol_lifecycle_v3 import (
 
 
 router = APIRouter(dependencies=[Depends(require_admin)])
+
+def _is_retryable_lock_timeout(exc: BaseException) -> bool:
+    """Only known PostgreSQL lock conflicts may be surfaced as retryable.
+
+    A timeout aborts the transaction. Never retry the same ORM session or
+    replay queue writes; the caller can explicitly re-submit the entire edit.
+    """
+    original = getattr(exc, "orig", None)
+    code = str(
+        getattr(original, "pgcode", None)
+        or getattr(original, "sqlstate", None)
+        or ""
+    )
+    return code in {"55P03", "40P01"}
+
+
+def _commit_admin_edit(db: Session) -> None:
+    """Commit once; rollback before returning an actionable transient error."""
+    try:
+        db.commit()
+    except OperationalError as exc:
+        db.rollback()
+        if _is_retryable_lock_timeout(exc):
+            raise HTTPException(
+                status_code=503,
+                detail="ثبت تغییرات به‌دلیل هم‌زمانی عملیات انجام نشد؛ دوباره تلاش کنید",
+                headers={"Retry-After": "2"},
+            ) from exc
+        raise
+
 
 
 async def _reconcile_snapshot_background(subscription_id: int) -> None:
@@ -265,7 +296,7 @@ async def admin_edit_subscription_fast_v1(
         persist_account_limits()
         if reset_usage:
             restore_after_period_change(db, sub, was_exhausted=was_exhausted)
-        db.commit()
+        _commit_admin_edit(db)
         background_tasks.add_task(
             _legacy_edit_background,
             int(subscription_id),
@@ -339,7 +370,7 @@ async def admin_edit_subscription_fast_v1(
                 ProtocolCredential.protocol.in_(removed_protocols),
             ).update({ProtocolCredential.is_active: False}, synchronize_session=False)
 
-        db.commit()
+        _commit_admin_edit(db)
     except Exception:
         db.rollback()
         raise
