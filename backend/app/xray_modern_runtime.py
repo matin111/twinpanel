@@ -734,6 +734,21 @@ if changed:
 print(json.dumps({{"changed": changed, "updated_inbounds": found}}, separators=(",", ":")))
 '''
 
+def _preferred_node_xray_domain(node: Node | None) -> str:
+    """Prefer explicit Xray TLS identity even in unwrapped repair workers.
+
+    The standalone installer originally read only node.public_domain. That
+    silently replaced valid dedicated v2usa/v2fin certificates with the
+    shared general node hostname when a worker bypassed the runtime proxy.
+    """
+    if node is None:
+        return ""
+    return _clean_domain(
+        getattr(node, "xray_domain", None)
+        or getattr(node, "public_domain", None)
+    )
+
+
 async def _ensure_modern_xray(
     conn,
     base_port: int,
@@ -768,11 +783,10 @@ async def _ensure_modern_xray(
             if not ok:
                 raise RuntimeError(error or "legacy Xray bootstrap failed")
 
-    domain = (
-        _clean_domain(getattr(node, "public_domain", None))
-        if node is not None
-        else ""
-    )
+    # Core fail-safe: do not depend on optional monkeypatch ordering.
+    # A dedicated certificate must be preferred by *every* installer,
+    # including detached workers that call this base function directly.
+    domain = _preferred_node_xray_domain(node)
 
     state_script = _state_generator_script(domain)
     state_b64 = base64.b64encode(state_script.encode()).decode()
