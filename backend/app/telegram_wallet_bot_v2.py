@@ -172,7 +172,7 @@ def create_wallet_router(request_fn, session_fn):
                 "شماره کارت:\n"
                 f"<code>{escape(str(payment.get('card_number') or '-'))}</code>\n"
                 f"به نام: <b>{escape(str(payment.get('card_holder') or '-'))}</b>\n\n"
-                "⚠️ مبلغ را دقیقاً مطابق عدد بالا پرداخت کنید تا SMS Reader آن را خودکار تأیید کند."
+                "⚠️ مبلغ را دقیقاً مطابق عدد بالا پرداخت کنید."
             )
         else:
             asset = _asset(result, payment, method)
@@ -271,7 +271,7 @@ def create_wallet_router(request_fn, session_fn):
         await message.answer(
             "✅ <b>اطلاعات شارژ ثبت شد</b>\n\n"
             f"💰 مبلغ کیف پول: <b>{money(result.get('amount_toman'))} تومان</b>\n"
-            + ("✅ موجودی شارژ شد." if status == "approved" else "🤖 SMS Reader پرداخت را خودکار بررسی می‌کند."),
+            + ("✅ موجودی شارژ شد." if status == "approved" else "⏳ پرداخت در حال بررسی است."),
             reply_markup=wallet_keyboard(),
         )
 
