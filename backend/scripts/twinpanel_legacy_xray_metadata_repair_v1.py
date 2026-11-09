@@ -100,13 +100,13 @@ TLS_INGRESS_PORTS = {
 
 
 def item_has_complete_profiles(item: dict | None, required: frozenset[str],
-                               node_id: int) -> bool:
+                               node_id: int, tls_sni: str = "") -> bool:
     """Do not mistake three stale-but-present TLS URLs for completed delivery.
 
     Keep legacy/domainless completion semantics unchanged. Only the three
     dedicated TLS profiles use stable TP27 ingress ports.
     """
-    from urllib.parse import urlsplit
+    from urllib.parse import urlsplit, parse_qs
 
     profiles={
         str(p.get("id") or "").strip().lower():str(p.get("uri") or "")
@@ -118,17 +118,28 @@ def item_has_complete_profiles(item: dict | None, required: frozenset[str],
     if required!=frozenset(TLS_INGRESS_PORTS):
         return True
     try:
-        return all(
+        if not all(
             urlsplit(profiles[key]).port
             == TLS_INGRESS_PORTS[key]+int(node_id)
             for key in required
-        )
+        ):
+            return False
+        if tls_sni:
+            expected = str(tls_sni).strip().lower()
+            # A port-correct profile with a previous node's SNI is just as
+            # broken as a port-stale profile. Verify actual TLS identities.
+            for key in ("websocket_tls", "tcp_tls"):
+                query = parse_qs(urlsplit(profiles[key]).query)
+                if [value.lower() for value in query.get("sni", [])] != [expected]:
+                    return False
+        return True
     except (ValueError,TypeError):
         return False
 
 
 def candidates(db, node_id: int, required: frozenset[str],
-               limit: int, subscription_id: int | None):
+               limit: int, subscription_id: int | None,
+               tls_sni: str = ""):
     members, creds = eligible(db, node_id)
     selected=[]
     for sub in members:
@@ -141,7 +152,7 @@ def candidates(db, node_id: int, required: frozenset[str],
         own=[x for x in items if ad._autosync_item_node_id(x)==node_id]
         if len(own)>1:continue
         current=own[0] if own else None
-        if item_has_complete_profiles(current,required,node_id):continue
+        if item_has_complete_profiles(current,required,node_id,tls_sni):continue
         label=str(sub.account_username or f"user{sub.id}")[:100]
         selected.append((int(sub.id),label,uuid_from_item(current)
                          if current else None))
@@ -213,10 +224,14 @@ async def run(args):
     try:
         authority=await read_node_public_authority(conn)
         required=validate_public_authority(authority)
+        expected_tls_sni = str(
+            authority.get("tls_domain") or ""
+        ).strip().lower() if required == frozenset(TLS_INGRESS_PORTS) else ""
         with SessionLocal() as db:
             node=node_or_stop(db,args.node_id,central_only=args.central_only)
             total,selected=candidates(db,args.node_id,required,
-                                      args.limit,args.subscription_id)
+                                      args.limit,args.subscription_id,
+                                      expected_tls_sni)
         inventory=await node_inventory(conn,selected) if selected else {}
     finally:
         conn.close()
@@ -273,7 +288,8 @@ async def run(args):
                 if len(own)>1 or (own and uuid_from_item(own[0])!=ident):
                     skipped+=1;continue
                 if item_has_complete_profiles(
-                    own[0] if own else None,required,args.node_id
+                    own[0] if own else None,required,args.node_id,
+                    expected_tls_sni,
                 ):
                     skipped+=1;continue
                 rest=[v for v in old
