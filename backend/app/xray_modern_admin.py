@@ -167,6 +167,10 @@ def _node_payload(
             str(getattr(node, "public_domain", None) or "").strip()
             or None
         ),
+        "xray_domain": (
+            str(getattr(node, "xray_domain", None) or "").strip()
+            or None
+        ),
         "enabled": bool(getattr(node, "enable_v2ray", False)),
         "status": _enum_value(getattr(cfg, "status", None)) if cfg else "missing",
         "base_port": base_port,
@@ -451,10 +455,11 @@ def save_xray_domain(
         payload.domain
     )
 
-    node.public_domain = (
-        domain
-        or None
-    )
+    # V2Ray's identity must never overwrite the Node public domain:
+    # other protocols and the Iran tunnel may still depend on that hostname.
+    if "xray_domain" not in Node.__table__.c:
+        raise HTTPException(status_code=409, detail="XRAY_DOMAIN_SCHEMA_NOT_READY")
+    node.xray_domain = domain or None
 
     db.commit()
     db.refresh(node)
@@ -530,11 +535,16 @@ async def prepare_xray_node(
     domain = _clean_domain(
         payload.domain
         if payload.domain is not None
-        else getattr(node, "public_domain", None)
+        else (
+            getattr(node, "xray_domain", None)
+            or getattr(node, "public_domain", None)
+        )
     )
 
     if payload.domain is not None:
-        node.public_domain = domain or None
+        if "xray_domain" not in Node.__table__.c:
+            raise HTTPException(status_code=409, detail="XRAY_DOMAIN_SCHEMA_NOT_READY")
+        node.xray_domain = domain or None
         db.commit()
         db.refresh(node)
 
@@ -677,6 +687,27 @@ def _validated_editor_settings(payload: InboundEditorDraft) -> dict[str, str]:
     }
 
 
+def _inbound_draft_uses_other_node_domain(
+    draft: dict[str, Any] | None,
+    dedicated_domain: str,
+) -> bool:
+    """Detect drafts copied from another Exit without deleting user edits.
+
+    A draft is an un-applied proposal, not the actual Xray configuration.
+    Only explicitly chosen drafts can override the node's live defaults.
+    """
+    if not isinstance(draft, dict) or not dedicated_domain:
+        return False
+    candidates = [draft.get("connection_domain")]
+    for profile in (draft.get("inbounds") or {}).values():
+        if isinstance(profile, dict):
+            candidates.append(profile.get("connection_domain"))
+    return any(
+        str(value or "").strip().lower() not in ("", dedicated_domain)
+        for value in candidates
+    )
+
+
 @router.get("/nodes/{node_id}/inbound-editor")
 async def get_xray_inbound_editor(node_id: int, db: Session = Depends(get_db)):
     node = _node_or_404(db, node_id)
@@ -712,7 +743,20 @@ async def get_xray_inbound_editor(node_id: int, db: Session = Depends(get_db)):
         if conn is not None:
             conn.close()
             await conn.wait_closed()
-    default_domain = str(getattr(node, "xray_domain", None) or getattr(node, "public_domain", None) or "")
+    # The configured domain belongs to *this node*; it is never obtained
+    # from a previous draft or a different country's public hostname.
+    default_domain = str(
+        getattr(node, "xray_domain", None)
+        or getattr(node, "public_domain", None)
+        or ""
+    ).strip().lower()
+    live_tls_domain = str(runtime_state.get("tls_domain") or "").strip().lower()
+    saved_draft = values.get("draft")
+    if not isinstance(saved_draft, dict):
+        saved_draft = None
+    draft_domain_conflict = _inbound_draft_uses_other_node_domain(
+        saved_draft, default_domain,
+    )
     applied_profiles = values.get("inbound_applied") or {}
     if not isinstance(applied_profiles, dict):
         applied_profiles = {}
@@ -721,6 +765,13 @@ async def get_xray_inbound_editor(node_id: int, db: Session = Depends(get_db)):
     xhttp_applied = applied_profiles.get("xhttp_reality") or {}
     return {
         "node_id": int(node.id),
+        "configured_xray_domain": default_domain,
+        "active_tls_domain": live_tls_domain or None,
+        "tls_domain_mismatch": bool(
+            live_tls_domain and default_domain
+            and live_tls_domain != default_domain
+        ),
+        "draft_domain_conflict": draft_domain_conflict,
         "defaults": {
             "connection_domain": default_domain,
             "tls_server_name": str(runtime_state.get("tls_domain") or default_domain),
@@ -747,7 +798,7 @@ async def get_xray_inbound_editor(node_id: int, db: Session = Depends(get_db)):
                 },
             },
         },
-        "draft": values.get("draft") if isinstance(values.get("draft"), dict) else None,
+        "draft": saved_draft,
         "applied": {
             key: values[key] for key in ("reality_server_name", "tls_server_name")
             if isinstance(values.get(key), str)
