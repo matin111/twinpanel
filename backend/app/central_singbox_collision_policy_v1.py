@@ -1,6 +1,6 @@
 """Deterministic new-Exit aliases for duplicate subscription-bound logins.
 
-A duplicate Naive/ShadowTLS username must never abort the 7-protocol sing-box
+A duplicate Naive/ShadowTLS/SOCKS5 username must never abort the 7-protocol sing-box
 bulk apply or overwrite another customer's live auth record. Existing mother
 credentials and saved items on other nodes are never edited. Only the new
 node's protocol-specific client record is assigned a stable alias.
@@ -12,7 +12,7 @@ from dataclasses import replace
 from hashlib import sha256
 from typing import Iterable
 
-BOUND = frozenset({"naive", "shadowtls"})
+BOUND = frozenset({"naive", "shadowtls", "socks5"})
 
 
 def resolve_node_login_collisions(
