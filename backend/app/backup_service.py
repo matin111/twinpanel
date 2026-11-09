@@ -1184,7 +1184,6 @@ def import_backup_file(
     # inspect_backup() has already validated the portable archive format.
     # Stream to a private, fsynced temporary file and rename atomically.
     import shutil
-    import tempfile
     with tempfile.NamedTemporaryFile(
         mode="wb", prefix=".tpbak-import-",
         suffix=".tmp", dir=BACKUP_ROOT, delete=False,
