@@ -1105,6 +1105,63 @@ async def _ensure_modern_xray(
     return state
 
 
+async def _three_tls_inbounds_live(
+    conn, base_port: int, node: Node | None,
+) -> bool:
+    """Read-only strict installed health: file, Xray API and real listeners.
+
+    The prior generic readiness check trusted base + XHTTP only; its result
+    caused Repair to skip missing WS/TCP TLS and claim successful installation.
+    Never call an installer as part of this probe.
+    """
+    from .routers import provision
+    from .central_xray_node_authority_v1 import read_node_public_authority
+
+    dedicated = _clean_domain(
+        getattr(node, "xray_domain", None) if node is not None else ""
+    )
+    if not dedicated:
+        return False
+    try:
+        authority = await read_node_public_authority(conn)
+        if (
+            authority.get("tls_enabled") is not True
+            or str(authority.get("tls_domain") or "").lower() != dedicated
+            or set(authority.get("profiles") or ()) != {
+                "websocket_tls", "xhttp_reality", "tcp_tls",
+            }
+        ):
+            return False
+        if not await provision.active(conn, "xray"):
+            return False
+
+        live_text = await provision.cmd(
+            conn,
+            "/usr/local/bin/xray api lsi "
+            "--server=127.0.0.1:10085 -isOnlyTags=true -timeout=5",
+            check=False,
+        )
+        live_tags = {
+            str(entry.get("tag") or "")
+            for entry in json.loads(str(live_text).strip()).get("inbounds", [])
+            if isinstance(entry, dict)
+        }
+        required_tags = {
+            "vless-ws-tls", "vless-xhttp-reality", "vless-tcp-tls",
+        }
+        if not required_tags.issubset(live_tags):
+            return False
+
+        for profile in ("websocket_tls", "xhttp_reality", "tcp_tls"):
+            if not await provision.listener(
+                conn, _target_port(int(base_port), profile), "tcp",
+            ):
+                return False
+        return True
+    except Exception:
+        return False
+
+
 async def _install_xray_modern(conn, port: int, node: Node | None = None):
     """Install or repair Xray with the selected node's TLS authority.
 
@@ -1147,24 +1204,7 @@ async def _install_xray_modern(conn, port: int, node: Node | None = None):
         if not certificate_ready:
             return False, "XRAY_DEDICATED_TLS_CERTIFICATE_NOT_READY"
 
-    from .central_xray_node_authority_v1 import read_node_public_authority
-
-    async def verified() -> bool:
-        if node is None or not dedicated:
-            return False
-        try:
-            authority = await read_node_public_authority(conn)
-        except Exception:
-            return False
-        return bool(
-            authority.get("tls_enabled") is True
-            and str(authority.get("tls_domain") or "").lower() == dedicated
-            and set(authority.get("profiles") or ()) == {
-                "websocket_tls", "xhttp_reality", "tcp_tls",
-            }
-        )
-
-    if existing and await verified():
+    if existing and await _three_tls_inbounds_live(conn, port, node):
         # Strict live check; healthy nodes are left bit-for-bit untouched.
         return True, None
 
@@ -1194,7 +1234,9 @@ async def _install_xray_modern(conn, port: int, node: Node | None = None):
         await _ensure_modern_xray(
             conn, port, node, bootstrap_done=True,
         )
-        if dedicated and not await verified():
+        if dedicated and not await _three_tls_inbounds_live(
+            conn, port, node,
+        ):
             return False, "XRAY_TLS_THREE_INBOUNDS_NOT_VERIFIED"
         return True, None
     except Exception as exc:
