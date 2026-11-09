@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.740",
-  "source_sha": "7aed7d27a02a493664a65d3aff295dd12d4ae889",
+  "version": "1.1.0-rc.741",
+  "source_sha": "b94a98c30c923a3ad78439149270937911d84f40",
   "notes": {
-    "fa": "اصلاح نمایش Kernel VXLAN برای تمام تانل‌ها، حتی تانل‌هایی که هنوز VXLAN روی آن‌ها نصب نشده است. دکمه نصب و تست در دسترس می‌ماند؛ VXLANهای نصب‌شده و فعال بدون تغییر حفظ می‌شوند.",
-    "en": "Restore Kernel VXLAN install/test card for every tunnel, including those with no VXLAN installed yet. Preserve already working VXLAN and active production routes."
+    "fa": "بازطراحی بکاپ به داده‌های پنل و تنظیمات ضروری؛ حذف هزاران فایل تولیدی و نسخه‌های موقت sing-box از آرشیو؛ فشرده‌سازی محتوای اعتبارنامه‌های اختصاصی کاربران در لایه بکاپ رمزگذاری‌شده و رمزگذاری مجدد هنگام بازیابی روی پنل مقصد؛ سازگار با بکاپ‌های قدیمی. تست واقعی کاهش حجم از حدود ۶۴۸ مگابایت به ۸۸٫۱۱ مگابایت با حفظ ۶۲ جدول و بیش از ۹۰ هزار رکورد. بکاپ آزمایشی پس از تأیید حذف شد.",
+    "en": "Compact data-only encrypted backups: exclude thousands of generated runtime and sing-box snapshots; compress credential data inside the outer encrypted archive and re-encrypt on restore with the destination key. Backward compatible. Verified real 88.11MB archive (down from ~648MB), retaining 62 tables and >90k rows; test file removed."
   }
 }
