@@ -81,7 +81,7 @@ const duration=(value:unknown)=>{
 };
 const asObject=(value:unknown):Record<string,unknown>=>value&&typeof value==="object"&&!Array.isArray(value)?value as Record<string,unknown>:{};
 const RETIRED_UNUSED_CARRIERS=new Set(["tp6_fast","kernel_ipip"]);
-const visibleTransport=(transport:string,status:unknown)=>{
+const visibleTransport=(transport:unknown,status:unknown)=>{
   const name=normalized(transport);
   if(RETIRED_UNUSED_CARRIERS.has(name))return false;
   // VXLAN has real working instances on other tunnels; keep them visible.
