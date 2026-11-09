@@ -33,7 +33,7 @@ const bytes=(value:number|undefined):string=>{
   while(n>=1024&&unit<units.length-1){n/=1024;unit++;}
   return new Intl.NumberFormat("fa-IR",{maximumFractionDigits:unit?1:0}).format(n)+" "+units[unit];
 };
-type NodeBackfillStatus={node_id:number;published:boolean;queued:boolean;completed_pairs:number;families:Array<{protocol:string;state:string;completed_pairs:number;last_batch:number;attempts:number;error_code:string|null}>};
+type NodeBackfillStatus={node_id:number;published:boolean;queued:boolean;central_runtime?:boolean;completed_pairs:number;families:Array<{protocol:string;state:string;completed_pairs:number;last_batch:number;attempts:number;error_code:string|null}>};
 
 function roleOf(node:ExtendedNode):NodeRole{
   if(node.is_mother||node.node_type==="mother"||node.node_type==="core")return "mother";
@@ -108,12 +108,13 @@ export function LegacyNodesRuntimePage(){
     if(publish&&!window.confirm(pick("این نود به اشتراک‌های فعال قبلی اضافه و ساخت کانفیگ‌ها صف می‌شود. ادامه می‌دهید؟","Publish this node to eligible existing accounts and queue credential creation?")))return;
     setBackfillBusy(true);setBackfillError("");
     try{
-      const url=`${API_BASE}/v1/nodes/${selectedId}/${publish?"publish-all-users":"backfill-retry"}`;
+      const action=publish?"publish-all-users":backfill?.central_runtime?"central-stage":"backfill-retry";
+      const url=`${API_BASE}/v1/nodes/${selectedId}/${action}`;
       const response=await fetch(url,{method:"POST",cache:"no-store",headers:{Authorization:`Bearer ${token}`}});
       if(!response.ok)throw new Error(await response.text());
       const status=await fetch(`${API_BASE}/v1/nodes/${selectedId}/backfill-status`,{cache:"no-store",headers:{Authorization:`Bearer ${token}`}});
       if(status.ok)setBackfill(await status.json() as NodeBackfillStatus);
-      setSuccess(pick("ساخت کانفیگ در صف پایدار ثبت شد و به‌صورت خودکار ادامه می‌یابد.","Credential generation queued durably and will continue automatically."));
+      setSuccess(backfill?.central_runtime?pick("همگام‌سازی مدیریت مرکزی برای این نود درخواست شد.","Central runtime reconciliation requested for this Exit."):pick("ساخت کانفیگ در صف پایدار ثبت شد و به‌صورت خودکار ادامه می‌یابد.","Credential generation queued durably and will continue automatically."));
     }catch(error){setBackfillError(error instanceof Error?error.message:String(error));}
     finally{setBackfillBusy(false);}
   };
@@ -432,14 +433,14 @@ export function LegacyNodesRuntimePage(){
           <div><span>{pick("پروتکل‌های Online","Online protocols")}</span><b>{overviewAvailable&&overview[selected.id]?overview[selected.id].protocols_online.toLocaleString("fa-IR"):"—"}</b></div>
         </div>
         {selectedRole==="exit"?<div className="runtime-choice-section" style={{marginBottom:12}}>
-          <div className="card-head"><b>{pick("ساخت خودکار کانفیگ کاربران قبلی","Automatic existing-account provisioning")}</b><Badge tone={backfill?.families.some(row=>row.state==="failed")?"bad":backfill?.queued?"warn":"ok"}>{backfill?.queued?pick("در حال پردازش","Processing"):backfill?.families.length?pick("آماده","Ready"):pick("هنوز شروع نشده","Not queued")}</Badge></div>
-          <small>{pick("این عملیات در Worker مستقل و دسته‌های محدود اجرا می‌شود. ساخت اکانت جدید و پنل مسدود نمی‌شوند. V2Ray / REALITY تغییر نمی‌کند.","A separate bounded worker handles existing accounts. New-account creation and the panel remain responsive. V2Ray / REALITY are unchanged.")}</small>
+          <div className="card-head"><b>{pick("ساخت خودکار کانفیگ کاربران قبلی","Automatic existing-account provisioning")}</b><Badge tone={backfill?.families.some(row=>row.state==="failed")?"bad":backfill?.queued?"warn":"ok"}>{backfill?.central_runtime?pick("مدیریت مرکزی","Central runtime"):backfill?.queued?pick("در حال پردازش","Processing"):backfill?.families.length?pick("آماده","Ready"):pick("هنوز شروع نشده","Not queued")}</Badge></div>
+          <small>{backfill?.central_runtime?pick("این نود با مدیریت مرکزی کار می‌کند؛ همگام‌سازی از سرویس‌های مرکزی انجام می‌شود، نه صف قدیمی ساخت اکانت.","This Exit uses centralized daemon-level reconciliation, not the legacy subscriber queue."):pick("این عملیات در Worker مستقل و دسته‌های محدود اجرا می‌شود. ساخت اکانت جدید و پنل مسدود نمی‌شوند. V2Ray / REALITY تغییر نمی‌کند.","A separate bounded worker handles existing accounts. New-account creation and the panel remain responsive. V2Ray / REALITY are unchanged.")}</small>
           <div className="runtime-info-list" style={{marginTop:10}}>
-            <div><span>{pick("جفت کانفیگ ثبت‌شده","Credential pairs recorded")}</span><b>{(backfill?.completed_pairs??0).toLocaleString("fa-IR")}</b></div>
+            {!backfill?.central_runtime?<div><span>{pick("جفت کانفیگ ثبت‌شده","Credential pairs recorded")}</span><b>{(backfill?.completed_pairs??0).toLocaleString("fa-IR")}</b></div>:null}
             {backfill?.families.map(row=><div key={row.protocol}><span dir="ltr">{row.protocol}</span><b>{row.state} · {row.completed_pairs.toLocaleString("fa-IR")}{row.error_code?` · ${row.error_code}`:""}</b></div>)}
           </div>
           {backfillError?<div className="runtime-error">{backfillError}</div>:null}
-          <button type="button" className="primary-soft" disabled={backfillBusy} onClick={()=>void queueNodeBackfill()}>{backfillBusy?"…":backfill?.published===false?pick("انتشار نود و شروع ساخت خودکار","Publish and start automatic provisioning"):pick("شروع / تلاش مجدد ساخت کانفیگ","Start / retry credential generation")}</button>
+          <button type="button" className="primary-soft" disabled={backfillBusy} onClick={()=>void queueNodeBackfill()}>{backfillBusy?"…":backfill?.published===false?pick("انتشار نود و شروع ساخت خودکار","Publish and start automatic provisioning"):backfill?.central_runtime?pick("شروع همگام‌سازی مرکزی","Start central reconciliation"):pick("شروع / تلاش مجدد ساخت کانفیگ","Start / retry credential generation")}</button>
         </div>:null}
         <div className="runtime-warning">
           {pick("Health، Repair، Port و تنظیمات حرفه‌ای پروتکل‌ها از مرکز «پروتکل‌ها» مدیریت می‌شود. هویت دامنه Xray / V2Ray متعلق به خود Exit Server است و از همین بخش مدیریت می‌شود.","Protocol health, repair, ports and advanced settings remain in Protocols. Xray / V2Ray domain identity belongs to the Exit server and is managed here.")}
