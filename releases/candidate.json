@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.744",
-  "source_sha": "2b23d5627dd4bc6f505c97aa89468dab4c6cb78f",
+  "version": "1.1.0-rc.745",
+  "source_sha": "f5830f5dbf1f19fd5035c7e0a54ea5473d1c6ee5",
   "notes": {
-    "fa": "بکاپ قابل‌انتقال داده‌های TwinPanel بدون کلید بازیابی با فرمت جدید v3. حفظ داده‌های پایدار کاربران، نمایندگان، کیف پول‌ها، اشتراک‌ها و تنظیمات ضروری؛ حذف وابستگی بازیابی به تنظیمات تلگرام؛ نسخه ایمنی محلی قبل از Restore؛ حذف مسیر دانلود کلید و پشتیبانی از فایل‌های بکاپ قدیمی. توجه: فایل بکاپ جدید حاوی داده‌های حساس است و باید خصوصی نگهداری شود.",
-    "en": "Portable keyless TwinPanel data-only backup format v3, retaining persistent users, resellers, subscriptions, wallets and essential settings; no Telegram prerequisite for restore; pre-restore local safety copy; legacy encrypted archives unsupported. Warning: backups contain sensitive credentials and must be kept private."
+    "fa": "اصلاح صفحه بکاپ و بازیابی: کارت ربات بکاپ و زمان‌بندی در یک ردیف کنار هم، حذف توضیحات تکراری و بهبود تراکم و نظم نمایش؛ بدون تغییر عملکرد بکاپ و ربات.",
+    "en": "Backup page layout: side-by-side bot and schedule cards on desktop, remove redundant copy, preserve backup and bot controls."
   }
 }
