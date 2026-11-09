@@ -437,6 +437,17 @@ async def _fulfill_paid_order(order_id: int, db: Session) -> dict:
         if not isinstance(provision_result, dict):
             raise RuntimeError("invalid account provisioning response")
 
+        if "sudoku" in (provision_result.get("pending_protocols") or ()):
+            # Payment is already verified; the existing order recovery loop
+            # can finalize after the central daemon's next whitelist stage.
+            # Do not falsely mark it fulfilled or provision_failed, and do
+            # not trigger the obsolete per-user Sudoku service creation.
+            return {
+                **_order_out(db.get(StoreOrder, order_id)),
+                "delivery_ready": False,
+                "central_reconciliation_pending": True,
+            }
+
         errors = (
             provision_result.get("errors")
             or provision_result.get("provision_errors")
