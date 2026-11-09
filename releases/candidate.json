@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.741",
-  "source_sha": "b94a98c30c923a3ad78439149270937911d84f40",
+  "version": "1.1.0-rc.742",
+  "source_sha": "e23f46f388affd6d22f91849bb3db017db3ff6bf",
   "notes": {
-    "fa": "بازطراحی بکاپ به داده‌های پنل و تنظیمات ضروری؛ حذف هزاران فایل تولیدی و نسخه‌های موقت sing-box از آرشیو؛ فشرده‌سازی محتوای اعتبارنامه‌های اختصاصی کاربران در لایه بکاپ رمزگذاری‌شده و رمزگذاری مجدد هنگام بازیابی روی پنل مقصد؛ سازگار با بکاپ‌های قدیمی. تست واقعی کاهش حجم از حدود ۶۴۸ مگابایت به ۸۸٫۱۱ مگابایت با حفظ ۶۲ جدول و بیش از ۹۰ هزار رکورد. بکاپ آزمایشی پس از تأیید حذف شد.",
-    "en": "Compact data-only encrypted backups: exclude thousands of generated runtime and sing-box snapshots; compress credential data inside the outer encrypted archive and re-encrypt on restore with the destination key. Backward compatible. Verified real 88.11MB archive (down from ~648MB), retaining 62 tables and >90k rows; test file removed."
+    "fa": "جلوگیری از رفرش پشت‌سرهم پنل پس از آپدیت: اصلاح کنترل اختلاف نسخه فرانت‌اند و سرور، محدودکردن بازخوانی خودکار به یک‌بار برای هر نسخه و توقف انتشار بسته در صورت اختلاف نسخه فایل اجرایی وب.",
+    "en": "Fix panel reload loop after update: restrict client version convergence to one reload per build/target pair; pin and verify compiled Next.js version matches the immutable release candidate before publishing."
   }
 }
