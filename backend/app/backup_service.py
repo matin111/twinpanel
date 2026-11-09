@@ -817,10 +817,7 @@ def create_backup(
             None,
         "key_fingerprint":
             recovery_key_fingerprint(),
-        "sha256":
-            hashlib.file_digest(
-                target.open("rb"), "sha256"
-            ).hexdigest(),
+        "sha256": copied_sha256,
     }
 
     _write_meta(
@@ -1186,6 +1183,11 @@ def import_backup_file(
     except BaseException:
         staged.unlink(missing_ok=True)
         raise
+
+    with target.open("rb") as checksum_source:
+        copied_sha256 = hashlib.file_digest(
+            checksum_source, "sha256"
+        ).hexdigest()
 
     meta = {
         "filename":
