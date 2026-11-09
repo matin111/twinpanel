@@ -2309,10 +2309,23 @@ def run_auto_backup_if_due() -> dict[
     if not settings.get(
         "enabled"
     ):
-        return {
+        # Disabling the schedule must not leave already-created updater
+        # safety archives permanently on disk. Drain those gradually.
+        return _forward_one_retained_archive(settings) or {
             "ok": True,
             "ran": False,
             "reason": "disabled",
+        }
+
+    if not settings.get("send_telegram") or not str(
+        settings.get("telegram_chat_id") or ""
+    ).strip():
+        # Telegram-only backup policy: never create a new unattended
+        # archive that would be left permanently on the server.
+        return {
+            "ok": False,
+            "ran": False,
+            "reason": "telegram_destination_required",
         }
 
     key = _due_key(
