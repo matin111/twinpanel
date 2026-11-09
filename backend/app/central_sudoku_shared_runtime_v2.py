@@ -79,7 +79,10 @@ if action=="deactivate":
         existing=UNIT.read_text()
         if str(BINARY) not in existing or str(CONF) not in existing:
             raise RuntimeError("SUDOKU_SHARED_UNIT_OWNERSHIP_CONFLICT")
-        stopped=subprocess.run(["systemctl","stop",SERVICE],
+        # A plain stop is not durable: systemd would restart the stale
+        # nonempty whitelist after a node reboot. Disable the owned unit as
+        # well. A future positive-identity apply always enables it again.
+        stopped=subprocess.run(["systemctl","disable","--now",SERVICE],
                                check=False,timeout=35,
                                stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
         if stopped.returncode:
@@ -87,7 +90,10 @@ if action=="deactivate":
         active=subprocess.run(["systemctl","is-active","--quiet",SERVICE],
                               check=False,timeout=10,
                               stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
-        if active.returncode==0:
+        enabled=subprocess.run(["systemctl","is-enabled","--quiet",SERVICE],
+                               check=False,timeout=10,
+                               stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+        if active.returncode==0 or enabled.returncode==0:
             raise RuntimeError("SUDOKU_SHARED_DEACTIVATE_NOT_CONFIRMED")
     print(json.dumps({"ok":True,"changed":bool(UNIT.exists()),
                       "users":0,"port":PORT,"deactivated":True}))
