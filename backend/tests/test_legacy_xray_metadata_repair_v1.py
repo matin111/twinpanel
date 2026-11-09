@@ -44,6 +44,35 @@ class LegacyXrayMetadataRepairTests(unittest.TestCase):
         self.assertLess(src.index('_activate_xray_install_runtime()'),
                         src.index('with SessionLocal() as db:'))
 
+    def test_stale_legacy_tls_public_ports_are_not_considered_complete(self):
+        from scripts.twinpanel_legacy_xray_metadata_repair_v1 import (
+            item_has_complete_profiles,
+        )
+        required=frozenset(("websocket_tls","xhttp_reality","tcp_tls"))
+        def sample(ws, xhttp, tcp):
+            return {"profiles":[
+                {"id":"websocket_tls","uri":f"vless://UUID@v2fin.in88.sbs:{ws}?security=tls"},
+                {"id":"xhttp_reality","uri":f"vless://UUID@v2fin.in88.sbs:{xhttp}?security=reality"},
+                {"id":"tcp_tls","uri":f"vless://UUID@v2fin.in88.sbs:{tcp}?security=tls"},
+            ]}
+        self.assertTrue(item_has_complete_profiles(sample(26022,24022,28022),required,22))
+        self.assertFalse(item_has_complete_profiles(sample(23322,23122,28022),required,22))
+        self.assertFalse(item_has_complete_profiles(sample(26022,23122,28022),required,22))
+        self.assertFalse(item_has_complete_profiles(sample(26022,24022,28019),required,22))
+        self.assertFalse(item_has_complete_profiles(None,required,22))
+
+    def test_domainless_legacy_completion_policy_is_preserved(self):
+        from scripts.twinpanel_legacy_xray_metadata_repair_v1 import (
+            item_has_complete_profiles,
+        )
+        item={"profiles":[
+            {"id":"xhttp_reality","uri":"vless://UUID@host:23122?security=reality"},
+            {"id":"tcp_reality","uri":"vless://UUID@host:38022?security=reality"},
+            {"id":"tcp_reality_vision","uri":"vless://UUID@host:39022?security=reality"},
+        ]}
+        required=frozenset(("xhttp_reality","tcp_reality","tcp_reality_vision"))
+        self.assertTrue(item_has_complete_profiles(item,required,22))
+
     def test_apply_is_opt_in_and_confirmed(self):
         src=SOURCE.read_text(encoding="utf-8")
         self.assertIn('if not args.apply:',src)
