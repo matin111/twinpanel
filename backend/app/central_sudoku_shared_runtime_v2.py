@@ -63,12 +63,35 @@ MASTER=BASE/"master.json"
 CONTROLLER="127.0.0.1:19095"
 req=json.load(sys.stdin)
 action=req.get("action")
-if action not in ("prepare","apply","probe"):
+if action not in ("prepare","apply","probe","deactivate"):
     raise RuntimeError("SUDOKU_SHARED_ACTION_NOT_ALLOWED")
 if not BINARY.is_file() or BINARY.is_symlink():
     raise RuntimeError("SUDOKU_SHARED_BINARY_NOT_INSTALLED")
 if BASE.is_symlink() or MASTER.is_symlink() or CONF.is_symlink() or UNIT.is_symlink():
     raise RuntimeError("SUDOKU_SHARED_UNSAFE_PATH")
+
+# A zero-entitlement whitelist must never run as a blank/unrestricted
+# Sudoku server. Stop only the owned shared daemon and retain encrypted
+# identities/config for a future reactivation or rollback. No legacy units,
+# data or other protocol services are modified here.
+if action=="deactivate":
+    if UNIT.exists():
+        existing=UNIT.read_text()
+        if str(BINARY) not in existing or str(CONF) not in existing:
+            raise RuntimeError("SUDOKU_SHARED_UNIT_OWNERSHIP_CONFLICT")
+        stopped=subprocess.run(["systemctl","stop",SERVICE],
+                               check=False,timeout=35,
+                               stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+        if stopped.returncode:
+            raise RuntimeError("SUDOKU_SHARED_DEACTIVATE_FAILED")
+        active=subprocess.run(["systemctl","is-active","--quiet",SERVICE],
+                              check=False,timeout=10,
+                              stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+        if active.returncode==0:
+            raise RuntimeError("SUDOKU_SHARED_DEACTIVATE_NOT_CONFIRMED")
+    print(json.dumps({"ok":True,"changed":bool(UNIT.exists()),
+                      "users":0,"port":PORT,"deactivated":True}))
+    raise SystemExit(0)
 
 def read_master():
     if not MASTER.is_file():raise RuntimeError("SUDOKU_SHARED_MASTER_NOT_INITIALIZED")
@@ -270,4 +293,15 @@ async def apply(conn: Any, accounts: list[dict]) -> dict:
     result=await _remote(conn,{"action":"apply","users":manifest},timeout=160)
     if result.get("users")!=len(manifest) or result.get("port")!=SHARED_PORT:
         raise RuntimeError("SUDOKU_SHARED_APPLY_MISMATCH")
+    return result
+
+
+async def deactivate(conn: Any) -> dict:
+    """Stop the *owned* shared daemon if no subscribers remain.
+
+    A subsequent normal apply can reactivate the existing unit atomically.
+    """
+    result = await _remote(conn, {"action": "deactivate"})
+    if not result.get("deactivated") or result.get("users") != 0:
+        raise RuntimeError("SUDOKU_SHARED_DEACTIVATE_ACK_INVALID")
     return result
