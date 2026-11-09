@@ -495,7 +495,9 @@ if domain:
 # because ACME is temporarily unreachable or a certificate is missing.
 # Fail *before* rewriting state or service configuration. Initial Exits
 # without previous state are handled by their separate TLS preflight.
-if domain and not source_cert and state_path.exists():
+if domain and not source_cert and (
+    state.get("tls_enabled") or state.get("managed_cert")
+):
     raise RuntimeError("XRAY_DEDICATED_TLS_CERTIFICATE_MISSING_STOP")
 
 if source_cert and source_key:
