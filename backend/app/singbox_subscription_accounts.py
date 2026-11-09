@@ -310,6 +310,15 @@ if protocol == "shadowtls":
         raise SystemExit("managed ShadowTLS inner inbound not found")
     row=dict(row)
     row["_twinpanel_shadowtls_inner"]={{"method":inner["method"],"password":inner["password"]}}
+    identified=next((x for x in d.get("inbounds",[]) if isinstance(x,dict) and x.get("tag")=="twinpanel-shadowtls-identified-in" and x.get("type")=="shadowtls"),None)
+    identified_inner=next((x for x in d.get("inbounds",[]) if isinstance(x,dict) and x.get("tag")=="twinpanel-shadowtls-identified-inner" and x.get("type")=="shadowsocks"),None)
+    if identified and identified_inner and identified_inner.get("method")=="2022-blake3-aes-128-gcm" and identified_inner.get("password"):
+        row["_twinpanel_shadowtls_identified"]={{
+            "port":identified.get("listen_port"),
+            "method":identified_inner["method"],
+            "server_key":identified_inner["password"],
+            "users":[u.get("name") for u in (identified_inner.get("users") or []) if isinstance(u,dict) and u.get("name")],
+        }}
 print(json.dumps(row,separators=(",",":")))
 '''
 
@@ -804,6 +813,23 @@ def client_item(
 
         transport = dict(outbound)
         transport["tag"] = "twinpanel-shadowtls-transport"
+        identified = inbound.get("_twinpanel_shadowtls_identified")
+        if (
+            SHADOWTLS_IDENTIFIED_ENABLED
+            and isinstance(identified, dict)
+            and secret.username in (identified.get("users") or [])
+            and str(identified.get("method") or "") == IDENTIFIED_METHOD
+        ):
+            identified_port = int(identified.get("port") or 0)
+            if not 1 <= identified_port <= 65535:
+                raise SingBoxAccountError("identified ShadowTLS server port invalid")
+            server_key = str(identified.get("server_key") or "")
+            method = IDENTIFIED_METHOD
+            password = server_key + ":" + identified_user_key(
+                server_key, secret.username, secret.password,
+            )
+            transport["server_port"] = identified_port
+            endpoint_port = identified_port
         proxy = {
             "type": "shadowsocks",
             "tag": "twinpanel-shadowtls",
