@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.748",
+  "version": "1.1.0-rc.749",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-09T19:15:10Z",
+  "released_at": "2026-11-09T20:26:41Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "9fb87b1ecdb17fe545732fa37ce316383d6ba4db",
+  "source_sha": "5154fb6fdf35799b4fda417c3ce1bd654da6ab23",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.748/twinpanel-1.1.0-rc.748-linux-x86_64.tar.gz",
-    "sha256": "6530ac8855667f977eb53191e9924d064173a368878b795ed251af42c6df039a",
-    "size_bytes": 30140883
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.749/twinpanel-1.1.0-rc.749-linux-x86_64.tar.gz",
+    "sha256": "397c10214db41046f93143c04960377ad3e47fe70eaf733dd02aa4ae8a57ebfe",
+    "size_bytes": 30141229
   },
   "notes": {
-    "fa": "تکمیل اصلاح دائمی مدیریت دامنه Xray: حتی نصب‌کننده اصلی و Workerهای مستقل هنگام Repair اول دامنه اختصاصی ثبت‌شده هر نود را می‌خوانند و دیگر آن را با دامنه عمومی نود جایگزین نمی‌کنند؛ مشکل برگشت دامنه آمریکا یا فنلاند با تعمیر پروتکل برطرف می‌شود. اصلاحات نمایش ویرایشگر آمریکا/فنلاند و اعتبارسنجی SSL از rc.747 نیز حفظ شده‌اند. بدون تغییر سایر پروتکل‌ها.",
-    "en": "Enforce node.xray_domain precedence in the core Xray provisioner even when optional runtime wrappers are bypassed. Prevent USA/Finland dedicated TLS domains from reverting to shared public_domain during Repair/reconcile. Includes rc.747 editor, SSL hostname and stale-draft fixes; legacy Xray domains retain fallback behavior."
+    "fa": "رفع ریشه‌ای شناسایی SNI قدیمی در ترمیم Credentialهای V2Ray/Xray آمریکا. حتی کانفیگ‌های دارای پورت صحیح، اگر SNI قدیمی داشته باشند با تطبیق UUID و هویت واقعی نود اصلاح می‌شوند؛ UUID و سرویس‌های VPN تغییر نمی‌کنند. اشتراک‌های واجد شرایط آمریکا از نظر پورت‌های 24011/26011/28011 و SNI اختصاصی v2usa.in88.sbs ترمیم شده‌اند. برای نمایش دامنه به‌جای IP، رکورد DNS v2usa.in88.sbs باید جداگانه به IP ورودی ایران 94.183.231.158 تغییر کند؛ انتشار این نسخه DNS را تغییر نمی‌دهد.",
+    "en": "Fix metadata-only Xray credential reconciliation to detect stale TLS SNI even when public ports are correct. Verified USA node 11 canary (3/3 real client HTTP 200) and reconciled 1,219 subscriber credentials with unchanged UUIDs and zero Xray restarts; final audit 1,238/1,239 eligible correct. To display v2usa.in88.sbs instead of Iran ingress IP, its DNS A record must be changed externally from Exit 64.49.12.196 to Iran ingress 94.183.231.158; release does not modify DNS."
   }
 }
