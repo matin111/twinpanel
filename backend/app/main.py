@@ -448,3 +448,5 @@ from .routers.backups import router as backups_router
 from .backup_chunk_import_v1 import router as backup_chunk_import_v1_router
 app.include_router(backups_router)
 app.include_router(backup_chunk_import_v1_router)
+from .backup_telegram_part_import_v1 import router as backup_telegram_part_import_v1_router
+app.include_router(backup_telegram_part_import_v1_router)
