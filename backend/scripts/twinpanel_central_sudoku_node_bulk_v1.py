@@ -102,6 +102,10 @@ def client_item(node, secret):
 
 
 async def stage(node_id: int, limit: int, apply: bool):
+    if apply:
+        # Retired staging route: prohibit pre-network secret generation and
+        # persistence for the old per-user systemd installer.
+        raise RuntimeError("SUDOKU_LEGACY_STAGE_RETIRED_USE_SHARED_V2")
     with SessionLocal() as db:
         node, cfg = check_node(db, node_id)
         subs = eligible(db, node_id)
