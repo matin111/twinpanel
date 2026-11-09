@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.738",
+  "version": "1.1.0-rc.739",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-09T04:03:45Z",
+  "released_at": "2026-11-09T04:31:23Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "25bc0a6f999aa15ec3f8ea80e09b9d115abe1ba7",
+  "source_sha": "6ba526dacad5ffd729547889bc4fdc81bcd8abdf",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.738/twinpanel-1.1.0-rc.738-linux-x86_64.tar.gz",
-    "sha256": "875a04db99747bfd09e6af7b9bdd3316fe69869d68d1372b6ce40b0daf85e643",
-    "size_bytes": 30077319
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.739/twinpanel-1.1.0-rc.739-linux-x86_64.tar.gz",
+    "sha256": "e264a352fed3da23bfe057cadbb2546801943709b61f8ae003ee6f627ffb006c",
+    "size_bytes": 30077372
   },
   "notes": {
-    "fa": "حذف کامل لیست تکراری پایینی V2Ray/Xray و فیلتر کشور تکراری در صفحه اتصال. فقط لیست اصلی بالایی با پرچم، نام کشور و دکمه کپی کانفیگ هر سرور باقی می‌ماند. هیچ تغییری در لینک‌ها، UUID، پروتکل‌های دیگر یا سرویس‌های VPN ایجاد نشده است.",
-    "en": "Remove the duplicate lower V2Ray/Xray server list and repeated country filter. Retain only the previously approved top list with actual node names, flags and per-server copy actions. No VPN, connection links, credentials or other protocol changes."
+    "fa": "حذف مسیرهای بلااستفاده TP6 Fast و Kernel IPIP از فهرست تانل و جلوگیری از نصب مجدد آن‌ها؛ پنهان‌سازی کارت خالی Kernel VXLAN فقط در تانل‌هایی که نصب نشده است. حفظ کامل Kernel VXLAN فعال روی تانل‌های ۳۰ و ۳۲؛ تست واقعی دوطرفه با ۰٪ افت و بدون تغییر تونل‌ها و IPها.",
+    "en": "Retire unused TP6 Fast and kernel IPIP from the tunnel transport catalog and installation; hide only uninstalled VXLAN placeholders. Preserve functioning installed kernel VXLAN standby on tunnels 30 and 32; no active transport or node dataplane changes."
   }
 }
