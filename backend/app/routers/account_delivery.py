@@ -5674,7 +5674,9 @@ def extend_subscription_v17(subscription_id:int,payload:dict=Body(...),db:Sessio
             plan_days=int(plan.duration_days or 0) if plan else 0,
             reset_date=reset_date,
         )
-    if reset_usage or reset_date:
+    if reset_usage or reset_date or add_days > 0:
+        # Renewed accounts may have been EXPIRED; restore only if the
+        # new expiry and current quota actually permit access.
         restore_after_period_change(db,sub,was_exhausted=was_exhausted)
     db.commit();db.refresh(sub)
     return {"ok":True,"traffic_limit_bytes":int(sub.traffic_limit_bytes or 0),"traffic_used_bytes":int(sub.traffic_used_bytes or 0),"expires_at":sub.expires_at.isoformat() if sub.expires_at else None,"reset_usage":reset_usage,"reset_date":reset_date}
