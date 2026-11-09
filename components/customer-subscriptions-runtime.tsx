@@ -113,7 +113,7 @@ function Body(){
         <div className="card-head"><div><small>#{row.id}</small><h3>{row.plan_name||`Plan #${row.plan_id}`}</h3></div><Badge tone={tone(row.status)}>{statusFa(row.status)}</Badge></div>
 
         <div className="customerSubStats">
-          <span><small>{pick("روز باقی‌مانده","Days left")}</small><b>{row.days_remaining.toLocaleString("fa-IR")}</b></span>
+          <span><small>{pick("روز باقی‌مانده","Days left")}</small><b>{row.duration_unlimited===true||(!row.expires_at&&Number(row.activation_duration_days||0)<=0)?pick("نامحدود","Unlimited"):row.days_remaining.toLocaleString("fa-IR")}</b>{row.expires_at&&<small>{new Date(row.expires_at).toLocaleDateString("fa-IR",{year:"numeric",month:"short",day:"numeric"})}</small>}</span>
           <span><small>{pick("اتصال هم‌زمان مجاز","Allowed simultaneous devices")}</small><b>{row.device_limit===0?pick("نامحدود","Unlimited"):row.device_limit.toLocaleString("fa-IR")}</b></span>
           <span><small>{pick("حجم باقی‌مانده","Traffic left")}</small><b>{row.traffic_remaining_gb.toLocaleString("fa-IR")} GB</b></span>
         </div>
