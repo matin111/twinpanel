@@ -19,6 +19,7 @@ def main() -> None:
         "naive",
         "snell",
         "socks5",
+        "shadowtls",
     }
     assert native.SINGBOX_ACCOUNTING_PROTOCOLS == expected
     # Regression: indexed session lookup must retain the exact connection
@@ -75,7 +76,11 @@ def main() -> None:
     assert integrity["canonical_session_count_may_understate_connections"]
     assert integrity["per_device_limit_verified"] is False
 
-    assert "shadowtls" in native.SINGBOX_UNATTRIBUTABLE_PROTOCOLS
+    # The legacy shared AEAD inner remains unattributable. Only the distinct
+    # identified Shadowsocks 2022 inbound is eligible for quota accounting.
+    assert native._accounting_inbound_tag("shadowtls") == "twinpanel-shadowtls-identified-inner"
+    assert native._accounting_inbound_type("shadowtls") == "shadowsocks"
+    assert native.shadowtls_attribution_diagnostic({"rows": []})["per_subscriber_traffic_supported"] is False
     active_inner = [
         {"inbound": "twinpanel-shadowtls-inner", "inbound_type": "shadowsocks", "user": "", "closed_at_ms": 0},
         {"inbound": "twinpanel-shadowtls-inner", "inbound_type": "shadowsocks", "user": "", "closed_at_ms": 0},
