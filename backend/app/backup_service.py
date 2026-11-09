@@ -17,7 +17,6 @@ from uuid import UUID
 from zoneinfo import ZoneInfo
 
 import httpx
-from cryptography.fernet import Fernet, InvalidToken
 from sqlalchemy import MetaData, Table, create_engine, inspect, select, text
 from sqlalchemy.pool import NullPool
 
@@ -26,7 +25,7 @@ from .config import settings
 from .database import engine
 
 
-BACKUP_FORMAT = "twinpanel-selective-backup-v1"
+BACKUP_FORMAT = "twinpanel-portable-data-v3"
 
 BACKUP_ROOT = Path(
     "/var/lib/twinpanel-backups"
@@ -199,21 +198,6 @@ def ensure_backup_environment() -> None:
         0o700,
     )
 
-    BACKUP_KEY.parent.mkdir(
-        parents=True,
-        exist_ok=True,
-    )
-
-    if not BACKUP_KEY.exists():
-        BACKUP_KEY.write_bytes(
-            Fernet.generate_key()
-        )
-
-    os.chmod(
-        BACKUP_KEY,
-        0o600,
-    )
-
     if not SETTINGS_FILE.exists():
         tmp = SETTINGS_FILE.with_suffix(
             ".json.tmp"
@@ -236,26 +220,6 @@ def ensure_backup_environment() -> None:
         tmp.replace(
             SETTINGS_FILE
         )
-
-
-def _fernet() -> Fernet:
-    ensure_backup_environment()
-
-    return Fernet(
-        BACKUP_KEY
-        .read_bytes()
-        .strip()
-    )
-
-
-def recovery_key_fingerprint() -> str:
-    ensure_backup_environment()
-
-    return hashlib.sha256(
-        BACKUP_KEY
-        .read_bytes()
-        .strip()
-    ).hexdigest()[:16]
 
 
 def load_settings() -> dict[str, Any]:
@@ -440,7 +404,7 @@ def _unpack(value: Any) -> Any:
 
     if type_name == "account_credential_rewrap_v2":
         # Encrypted credential fields are compressed as their original JSON
-        # while inside the OUTER encrypted backup. On restore, encrypt again
+        # while inside the OUTER backup. On restore, encrypt again
         # using the destination panel's APP_SECRET_KEY, so migration does not
         # require copying the old deployment .env or database credentials.
         from .routers import account_delivery as account_crypto
@@ -540,7 +504,7 @@ def _collect_admin_files(
 ) -> dict[str, Any]:
     # Credential and CA material that cannot safely be reconstructed for
     # already-enrolled nodes are exceptions to the data-only backup policy.
-    # The panel encryption key itself is ALWAYS kept separately.
+    # A legacy backup key is excluded from the portable data archive.
     allowed = set(PERSISTENT_CONFIG_FILES)
     for raw in node_key_paths:
         if not raw:
@@ -646,8 +610,8 @@ def _export_database() -> tuple[
                     # The source rows contain per-user Fernet ciphertext.
                     # Ciphertext is deliberately incompressible; rewrap only
                     # the JSON that we can authenticate and decrypt locally.
-                    # Do not persist plaintext separately; the entire gzip
-                    # payload is encrypted before it touches the disk.
+                    # WARNING: portable v3 backups include these sensitive
+                    # credentials; limit access to the resulting archive.
                     from .routers import account_delivery as account_crypto
                     for field in ("secret_encrypted", "config_text_encrypted"):
                         ciphertext = plain.get(field)
@@ -782,11 +746,9 @@ def create_backup(
         compresslevel=9,
     )
 
-    encrypted = (
-        _fernet().encrypt(
-            compressed
-        )
-    )
+    # Portable, keyless gzip archive. The file contains sensitive secrets:
+    # restrict access and transfer only over protected channels.
+    archive_bytes = compressed
 
     stamp = _now_utc().strftime(
         "%Y%m%d-%H%M%S"
@@ -813,7 +775,7 @@ def create_backup(
     )
 
     tmp.write_bytes(
-        encrypted
+        archive_bytes
     )
 
     os.chmod(
@@ -842,9 +804,7 @@ def create_backup(
             False,
         "telegram_error":
             None,
-        "key_fingerprint":
-            recovery_key_fingerprint(),
-        "sha256": hashlib.sha256(encrypted).hexdigest(),
+        "sha256": hashlib.sha256(archive_bytes).hexdigest(),
     }
 
     _write_meta(
@@ -1034,19 +994,11 @@ def _decode_backup(
     path: Path,
 ) -> dict[str, Any]:
 
-    try:
-        compressed = (
-            _fernet().decrypt(
-                path.read_bytes()
-            )
-        )
-
-    except InvalidToken as exc:
-        raise ValueError(
-            "کلید این بکاپ با "
-            "کلید بازیابی سرور "
-            "مطابقت ندارد"
-        ) from exc
+    # The v3 archive is a portable gzip stream; legacy backup archives
+    # are deliberately unsupported by the new restore flow.
+    compressed = path.read_bytes()
+    if not compressed.startswith(b"\x1f\x8b"):
+        raise ValueError("UNSUPPORTED_BACKUP_FORMAT_V3_ONLY")
 
     try:
         raw = gzip.decompress(
@@ -1186,7 +1138,7 @@ def import_backup_file(
             )
         )
 
-    # Avoid reading a 600MB+ encrypted archive into RAM a second time
+    # Avoid reading a 600MB+ backup archive into RAM a second time
     # during import. The earlier inspect_backup() already authenticates it.
     # Stream to a private, fsynced temporary file and rename atomically.
     import shutil
@@ -1237,8 +1189,6 @@ def import_backup_file(
             False,
         "telegram_error":
             None,
-        "key_fingerprint":
-            recovery_key_fingerprint(),
         "sha256": copied_sha256,
     }
 
@@ -1459,7 +1409,7 @@ def send_backup_to_telegram(
     token = load_bot_token()
     meta = _read_meta(backup_path)
     # When a local Telegram Bot API server is explicitly configured, send
-    # the complete encrypted archive as ONE document (up to 2GB).
+    # the complete backup archive as ONE document (up to 2GB).
     # Leave cloud-API multipart as the non-destructive fallback for existing
     # installations which cannot send files larger than 50MB.
     from .backup_telegram_single_file_v1 import send_single_backup
@@ -1498,7 +1448,7 @@ def send_backup_to_telegram(
     _write_meta(backup_path, meta)
 
     caption_header = (
-        "TwinPanel encrypted backup\\n"
+        "TwinPanel backup\\n"
         f"Type: {meta.get('kind', 'backup')}\\n"
         f"Created: {meta.get('created_at','')}\\n"
     )
@@ -1944,7 +1894,7 @@ def restore_backup(
             )
 
     # Safety backup is mandatory but Telegram-only. A failed or partial
-    # delivery must prevent destructive restore. The local encrypted archive
+    # delivery must prevent destructive restore. The local backup archive
     # is removed after verified delivery; the key is kept separately.
     destination = load_settings()
     if not destination.get("telegram_chat_id"):
@@ -2130,7 +2080,7 @@ def cleanup_retention(
 
     for path in items[keep:]:
         # Never prune the only available copy following an upload failure.
-        # Backup retention must not destroy unconfirmed encrypted archives.
+        # Backup retention must not destroy unconfirmed backup archives.
         if not _read_meta(path).get("telegram_sent"):
             continue
         _remove_uploaded_archive(path)
@@ -2420,7 +2370,7 @@ def run_auto_backup_if_due() -> dict[
     ) == key:
         # The backup may have been created successfully while Telegram
         # rejected an oversized attachment. Retry delivery of that same
-        # encrypted archive, never create another backup or duplicate parts.
+        # backup archive, never create another backup or duplicate parts.
         if settings.get("send_telegram"):
             filename = str(state.get("last_auto_filename") or "")
             chat_id = str(settings.get("telegram_chat_id") or "").strip()
