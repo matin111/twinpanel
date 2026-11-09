@@ -1791,25 +1791,13 @@ async def provision_protocols(conn, p: ProtocolSettings, db: Session, node: Node
                 and dedicated_domain
             )
             if dedicated_exit:
-                from ..central_xray_node_authority_v1 import (
-                    read_node_public_authority,
-                )
+                from ..xray_modern_runtime import _three_tls_inbounds_live
 
-                healthy_three = False
-                try:
-                    authority = await read_node_public_authority(conn)
-                    healthy_three = (
-                        authority.get("tls_enabled") is True
-                        and str(authority.get("tls_domain") or "").lower()
-                            == dedicated_domain
-                        and set(authority.get("profiles") or ()) == {
-                            "websocket_tls", "xhttp_reality", "tcp_tls",
-                        }
-                    )
-                except Exception:
-                    # Read-only health is not proof of readiness; the
-                    # node-aware installer must repair or fail closed.
-                    healthy_three = False
+                # A valid file alone is not proof of readiness. Check the
+                # actual Xray API tags and all three live listener ports.
+                healthy_three = await _three_tls_inbounds_live(
+                    conn, p.xray_port, node,
+                )
 
                 if healthy_three:
                     ok, err = True, None
