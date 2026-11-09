@@ -34,7 +34,8 @@ with tempfile.TemporaryDirectory() as directory:
         {"type": p, "tag": "tp-" + p, "users": [
             {"username" if p == "naive" else "name": "old-live-user", "password": "keep"}
         ]} for p in protocols]}), encoding="utf-8")
-    values = {"json": json, "CONFIG_PATH": str(config), "STATE_PATH": str(state),
+    values = {"parallel_user_sync_script": __import__("app.services.shadowtls_2022_identity_v1",fromlist=["parallel_user_sync_script"]).parallel_user_sync_script,
+              "json": json, "CONFIG_PATH": str(config), "STATE_PATH": str(state),
               "SINGBOX_PROTOCOLS": set(protocols),
               "TAGS": {p: "tp-"+p for p in protocols},
               "REVOCATION_SENTINEL": "__twinpanel_revoked__",
