@@ -442,7 +442,7 @@ def install(router, request_fn):
                 await callback.message.answer("❌ " + escape(str(exc)[:180]))
             return
         if callback.message:
-            await callback.message.edit_text(
+            await show_navigation_page(callback.message, 
                 "✅ <b>سفارش تمدید همان اکانت ساخته شد</b>\n\n"
                 f"شماره سفارش: <b>#{int(order['id'])}</b>\n"
                 f"مبلغ: <b>{int(order.get('amount_toman') or 0):,} تومان</b>\n\n"
@@ -570,7 +570,7 @@ def install(router, request_fn):
         await callback.answer()
         title = "تمدید" if kind == "renew" else "تغییر رمز"
         if callback.message:
-            await callback.message.edit_text(
+            await show_navigation_page(callback.message, 
                 f"📝 <b>درخواست {title} اکانت</b>\n\n"
                 "نام کاربری: <code>" +
                 escape(str(info.get("account_username") or "-")) + "</code>\n\n"
@@ -627,7 +627,7 @@ def install(router, request_fn):
             return
         await callback.answer("درخواست ثبت شد.")
         if callback.message:
-            await callback.message.edit_text(
+            await show_navigation_page(callback.message, 
                 f"✅ <b>درخواست {title} ثبت شد</b>\n\n"
                 f"شماره درخواست: <b>#{ticket.get('id', '-')}</b>\n"
                 "پشتیبانی پس از بررسی مالکیت پاسخ می‌دهد.",
