@@ -31,6 +31,15 @@ def test_independent_marker_isolation():
         assert fp.marker_key(19)=="vpn.central_runtime.exit.19.sudoku.last_applied"
 
 
+def test_delta_scheduler_is_isolated_from_global_runtime_failures():
+    from pathlib import Path
+    path=Path(__file__).resolve().parents[1]/"scripts/twinpanel_central_node_stage_v1.py"
+    source=path.read_text(encoding="utf-8")
+    assert "last_sudoku_applied(db,node_id)" in source
+    assert "desired_sudoku_fingerprint(db,node_id)" in source
+    assert 'if sudoku not in selected:' in source
+
+
 def test_apply_marker_occurs_only_after_verified_sudoku_runtime():
     from pathlib import Path
     source=(Path(__file__).resolve().parents[1]/"scripts/twinpanel_central_sudoku_shared_v2.py").read_text()
