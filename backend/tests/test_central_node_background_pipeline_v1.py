@@ -24,7 +24,7 @@ class InstallCentralPipelineTests(unittest.IsolatedAsyncioTestCase):
         )
         db.get.return_value=node
         db.query.return_value.filter.return_value.first.return_value=SimpleNamespace(
-            protocol="v2ray",status="online",
+            protocol="v2ray",status="online",port=8443,
         )
         db.query.return_value.filter.return_value.all.return_value=[
             SimpleNamespace(status="online") for _ in range(4)
