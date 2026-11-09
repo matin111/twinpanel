@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.728",
+  "version": "1.1.0-rc.729",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-09T00:21:26Z",
+  "released_at": "2026-11-09T00:43:12Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "51bd065a8c2ef26d80316af05db6f6b74faaa851",
+  "source_sha": "6ca655fa8747371fd5aa7d3d7e960d3c0ac8cb27",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.728/twinpanel-1.1.0-rc.728-linux-x86_64.tar.gz",
-    "sha256": "9db7fd863cd28389b326d3dccb5d8ba9e9a9f210fffb50ee27ef450ec5285e31",
-    "size_bytes": 29956738
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.729/twinpanel-1.1.0-rc.729-linux-x86_64.tar.gz",
+    "sha256": "ee6701903ec27bf640b636f84ee530e5d4b2f6f8f3a7c61ac20a4fa697eab0a2",
+    "size_bytes": 29970655
   },
   "notes": {
-    "fa": "اصلاح نهایی مسیر اجرایی Mieru: خواندن شمارنده تجمعی معتبر هر کاربر در خود پردازشگر مستقل فعال، ثبت حجم در دفتر مرکزی با تراکنش جدا از آنلاین، اولین نمونه بدون کسر سابقه، محافظت در برابر تکرار و ریست شمارنده، و بهینه‌سازی بارگذاری اعتبارنامه‌های Mieru به‌جای ۲۰هزار اعتبارنامه همه پروتکل‌ها. بدون تغییر کانفیگ، محدودیت، تاریخ یا اتصال کاربران.",
-    "en": "Wire native persistent Mieru per-user lifetime counters into the actual running independent Mieru worker; independent canonical quota commit separate from presence; fail-closed reset, initial zero-charge baseline, and dedicated Mieru-only credential lookup. No changes to VPN services, quotas, expiry or customer configs."
+    "fa": "اصلاح عدم خواندن دامنه اختصاصی Xray توسط Worker مستقل مدیریت مرکزی و استفاده از دامنه فقط در صورت تطابق DNS آن با IP ورودی تانل ایران برای XHTTP، TCP Reality و Vision. مسیر مستقیم، پورت‌ها و تنظیمات سایر نودها بدون تغییر می‌مانند. برای اتصال نودهای دارای خطای Route، صحت DNS و فوروارد پورت‌ها جداگانه لازم است.",
+    "en": "Activate dedicated Xray-domain mapper in detached central workers. Safely prefer DNS-verified Iran ingress hostnames for Reality and Vision as well as XHTTP; preserve direct fallback, existing ports, users and all other services. DNS and ingress route readiness remain separate prerequisites."
   }
 }
