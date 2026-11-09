@@ -104,6 +104,12 @@ jobs:
           PYTHONPATH=. python tests/test_central_sudoku_node_bulk_v1.py -v
           PYTHONPATH=. python tests/sudoku_legacy_retired_v1_smoke.py
 
+      - name: Verify Telegram account link and QR photo navigation
+        working-directory: backend
+        run: |
+          PYTHONPATH=. python tests/test_telegram_link_photo_navigation_v1.py -v
+          PYTHONPATH=. python tests/test_telegram_navigation_fast_ack_v1.py
+
       - name: Run NetMod UDPGW V231 regression
         working-directory: backend
         run: PYTHONPATH=. python tests/test_netmod_udpgw_v231.py

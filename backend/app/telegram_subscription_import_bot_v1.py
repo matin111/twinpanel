@@ -34,7 +34,7 @@ def install(router, request_fn):
         await state.set_state(ImportLinkState.link)
         await callback.answer()
         if callback.message:
-            await callback.message.edit_text(
+            await show_navigation_page(callback.message,
                 "➕ <b>افزودن اکانت</b>\n\n"
                 "ساب‌لینک اصلی اکانت خود را ارسال کنید.\n"
                 "فقط لینک HTTPS همین پنل پذیرفته می‌شود.\n\n"
@@ -91,7 +91,7 @@ def install(router, request_fn):
             return
         await callback.answer("اکانت از فهرست تلگرام حذف شد.")
         if callback.message:
-            await callback.message.edit_text(
+            await show_navigation_page(callback.message, 
                 "✅ اکانت از فهرست شما حذف شد.\n"
                 "اشتراک اصلی و کانفیگ‌های آن تغییری نکرده‌اند.",
                 reply_markup=_navigation(),
@@ -302,7 +302,7 @@ def install(router, request_fn):
                     else:
                         raise ValueError("مرحله انتخاب پلن معتبر نیست")
             rows.append([InlineKeyboardButton(text="⬅️ بازگشت", callback_data=back)])
-            await callback.message.edit_text(
+            await show_navigation_page(callback.message, 
                 title, reply_markup=InlineKeyboardMarkup(inline_keyboard=rows),
             )
         except Exception as exc:
@@ -329,7 +329,7 @@ def install(router, request_fn):
                 await callback.message.answer("❌ " + escape(str(exc)[:160]))
             return
         if callback.message:
-            await callback.message.edit_text(
+            await show_navigation_page(callback.message, 
                 "♻️ <b>تمدید همین اکانت</b>\n\n"
                 "👤 نام کاربری: <code>" + escape(str(info.get("account_username") or "-")) + "</code>\n"
                 "📋 پلن: <b>" + escape(str(plan.get("name") or "-")) + "</b>\n"
@@ -442,7 +442,7 @@ def install(router, request_fn):
                 await callback.message.answer("❌ " + escape(str(exc)[:180]))
             return
         if callback.message:
-            await callback.message.edit_text(
+            await show_navigation_page(callback.message, 
                 "✅ <b>سفارش تمدید همان اکانت ساخته شد</b>\n\n"
                 f"شماره سفارش: <b>#{int(order['id'])}</b>\n"
                 f"مبلغ: <b>{int(order.get('amount_toman') or 0):,} تومان</b>\n\n"
@@ -570,7 +570,7 @@ def install(router, request_fn):
         await callback.answer()
         title = "تمدید" if kind == "renew" else "تغییر رمز"
         if callback.message:
-            await callback.message.edit_text(
+            await show_navigation_page(callback.message, 
                 f"📝 <b>درخواست {title} اکانت</b>\n\n"
                 "نام کاربری: <code>" +
                 escape(str(info.get("account_username") or "-")) + "</code>\n\n"
@@ -627,7 +627,7 @@ def install(router, request_fn):
             return
         await callback.answer("درخواست ثبت شد.")
         if callback.message:
-            await callback.message.edit_text(
+            await show_navigation_page(callback.message, 
                 f"✅ <b>درخواست {title} ثبت شد</b>\n\n"
                 f"شماره درخواست: <b>#{ticket.get('id', '-')}</b>\n"
                 "پشتیبانی پس از بررسی مالکیت پاسخ می‌دهد.",
@@ -652,15 +652,11 @@ def install(router, request_fn):
                 await callback.message.answer("❌ دریافت اطلاعات اکانت انجام نشد: " + escape(str(exc)[:150]))
             return
         if callback.message:
-            try:
-                await callback.message.edit_text(
-                    _details_text(info), reply_markup=_management_keyboard(sub_id, info),
-                )
-            except Exception as exc:
-                # Telegram returns "message is not modified" when counters
-                # did not change. Refresh should not be reported as a failure.
-                if "message is not modified" not in str(exc).lower():
-                    raise
+            # Shared helper handles photo captions and unchanged text safely.
+            await show_navigation_page(
+                callback.message, _details_text(info),
+                reply_markup=_management_keyboard(sub_id, info),
+            )
 
     @router.callback_query(F.data.startswith("subimp:"))
     async def import_detail(callback: CallbackQuery):
