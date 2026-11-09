@@ -302,7 +302,7 @@ def install(router, request_fn):
                     else:
                         raise ValueError("مرحله انتخاب پلن معتبر نیست")
             rows.append([InlineKeyboardButton(text="⬅️ بازگشت", callback_data=back)])
-            await callback.message.edit_text(
+            await show_navigation_page(callback.message, 
                 title, reply_markup=InlineKeyboardMarkup(inline_keyboard=rows),
             )
         except Exception as exc:
@@ -329,7 +329,7 @@ def install(router, request_fn):
                 await callback.message.answer("❌ " + escape(str(exc)[:160]))
             return
         if callback.message:
-            await callback.message.edit_text(
+            await show_navigation_page(callback.message, 
                 "♻️ <b>تمدید همین اکانت</b>\n\n"
                 "👤 نام کاربری: <code>" + escape(str(info.get("account_username") or "-")) + "</code>\n"
                 "📋 پلن: <b>" + escape(str(plan.get("name") or "-")) + "</b>\n"
