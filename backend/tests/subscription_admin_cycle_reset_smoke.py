@@ -60,6 +60,9 @@ def check():
         starts_at=datetime.utcnow() - timedelta(days=15),
         expires_at=datetime.utcnow() + timedelta(days=15),
         activation_duration_days=30, plan_id=None,
+        # The mock Query.first returns this object even for an override
+        # lookup; model the override attribute to exercise the real renewal.
+        duration_unlimited=False,
         status=SubscriptionStatus.ACTIVE,
     )
     db = DB(sub)
