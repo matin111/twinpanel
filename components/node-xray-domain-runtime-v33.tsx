@@ -67,7 +67,9 @@ export function NodeXrayDomainRuntimeV33(){
     adminApi.xrayInboundEditor(selectedId).then(state=>{
       if(cancelled)return;
       setInbound(state);
-      setInboundDraft(state.draft||state.defaults);
+      // Live defaults are authoritative. Saved drafts are never the
+      // installed configuration and may belong to another node.
+      setInboundDraft(state.defaults);
     }).catch(reason=>{
       if(!cancelled)setError(reason instanceof Error?reason.message:String(reason));
     });
@@ -80,7 +82,7 @@ export function NodeXrayDomainRuntimeV33(){
     try{
       await adminApi.saveXrayInboundDraft(selectedId,inboundDraft);
       const current=await adminApi.xrayInboundEditor(selectedId);
-      setInbound(current);setInboundDraft(current.draft||current.defaults);
+      setInbound(current);setInboundDraft(current.defaults);
       setOk(pick("پیش‌نویس تنظیمات ذخیره شد. برای اعمال روی سرور هنوز انتشار امن لازم است.","Inbound draft saved. Safe server apply is still required."));
     }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
     finally{setInboundBusy(false);}
@@ -161,6 +163,22 @@ export function NodeXrayDomainRuntimeV33(){
         </div>
         <Badge tone="warn">{pick("پیش‌نویس، اعمال‌نشده","Draft / not applied")}</Badge>
       </div>
+      <div className="runtime-info-list">
+        <div><span>{pick("دامنه اختصاصی نود","Configured dedicated domain")}</span><b dir="ltr">{inbound?.configured_xray_domain||"—"}</b></div>
+        <div><span>{pick("TLS فعال سرور","Active TLS domain")}</span><b dir="ltr">{inbound?.active_tls_domain||"—"}</b></div>
+      </div>
+      {inbound?.tls_domain_mismatch?<div className="runtime-error">
+        {pick("دامنه SSL فعال با دامنه اختصاصی نود یکی نیست. ابتدا گواهی مناسب نصب و اعمال شود؛ ذخیره پیش‌نویس اتصال را تغییر نمی‌دهد.","The active TLS domain differs from this node's dedicated domain. A matching certificate must be installed and applied before using that identity.")}
+      </div>:null}
+      {inbound?.draft_domain_conflict?<div className="runtime-error">
+        {pick("پیش‌نویس ذخیره‌شده متعلق به دامنه نود دیگری است؛ از روی تنظیمات واقعی این نود بارگذاری شد.","The old draft referenced another node, so current node settings are displayed instead.")}
+      </div>:null}
+      {inbound?.draft&&!inbound.draft_domain_conflict?<div className="action-row">
+        <button type="button" className="ghost" disabled={inboundBusy||Boolean(busy)}
+          onClick={()=>setInboundDraft(inbound.draft||inbound.defaults)}>
+          {pick("بارگذاری پیش‌نویس قبلی (اعمال‌نشده)","Load previous unapplied draft")}
+        </button>
+      </div>:null}
       <div className="setting-grid">
         {([
           ["connection_domain",pick("دامنه اتصال","Connection domain"),"v2ray.example.com"],
