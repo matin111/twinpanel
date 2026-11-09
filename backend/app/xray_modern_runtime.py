@@ -322,6 +322,19 @@ if state_path.exists():
     except Exception as exc:
         raise RuntimeError("invalid Xray modern state: " + repr(exc))
 
+# Even if an outdated caller drops the Node argument, never silently reset
+# an existing TLS Exit to REALITY. The previous guard only detected TLS when
+# 'domain' was non-empty, which was precisely the broken reinstall case.
+if not domain and (
+    state.get("tls_enabled")
+    or state.get("managed_cert")
+    or state.get("tls_domain")
+    or state.get("tls_sni_ws")
+    or state.get("tls_sni_tcp")
+    or Path("/usr/local/etc/xray/twinpanel-tls/fullchain.pem").is_file()
+):
+    raise RuntimeError("XRAY_DEDICATED_TLS_NODE_CONTEXT_REQUIRED")
+
 # The node's verified runtime values are authoritative. Reconciliation must
 # never reset an admin-applied REALITY target/SNI to global process defaults.
 reality_target = str(state.get("reality_target") or default_reality_target)
