@@ -28,6 +28,7 @@ from ..subscription_override_models import (
     SubscriptionRuntimeOverride,
     effective_device_limit,
     get_subscription_override,
+    unlimited_without_expiry,
 )
 from ..subscription_plan_schema import ensure_subscription_plan_schema
 from .account_delivery import public_router as account_delivery_public_router, _share_url
@@ -94,9 +95,7 @@ def _enriched_payload(db: Session, sub: Subscription) -> dict:
                 or 0
             ),
             "traffic_unlimited": int(sub.traffic_limit_bytes or 0) <= 0,
-            "duration_unlimited": bool(
-                override and override.duration_unlimited
-            ),
+            "duration_unlimited": unlimited_without_expiry(sub, plan, override),
             "device_limit": effective_device_limit(db, sub, plan),
             "device_limit_source": (
                 "subscription"
@@ -253,7 +252,7 @@ def _enriched_payload_from_context(sub: Subscription, context: dict) -> dict:
                 or 0
             ),
             "traffic_unlimited": int(sub.traffic_limit_bytes or 0) <= 0,
-            "duration_unlimited": bool(override and override.duration_unlimited),
+            "duration_unlimited": unlimited_without_expiry(sub, plan, override),
             "device_limit": device_limit,
             "device_limit_source": (
                 "subscription"
