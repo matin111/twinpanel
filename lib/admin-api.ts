@@ -15,7 +15,7 @@ export type XrayDomainState={ok?:boolean;node_id?:number;xray_domain?:string|nul
 export type XrayInboundProfile={connection_domain:string;server_name:string;path:string;target:string;transport:string;security:string};
 export type XrayInboundKey="tcp_tls"|"ws_tls"|"xhttp_reality";
 export type XrayInboundDraft={connection_domain:string;tls_server_name:string;reality_server_name:string;reality_target:string;transport:string;security:string;inbounds?:Record<XrayInboundKey,XrayInboundProfile>};
-export type XrayInboundEditorState={node_id:number;defaults:XrayInboundDraft;draft:XrayInboundDraft|null;applied:Partial<XrayInboundDraft>;transports:string[];securities:string[];requires_apply:boolean;message?:string};
+export type XrayInboundEditorState={node_id:number;defaults:XrayInboundDraft;draft:XrayInboundDraft|null;applied:Partial<XrayInboundDraft>;transports:string[];securities:string[];requires_apply:boolean;message?:string;configured_xray_domain?:string;active_tls_domain?:string|null;tls_domain_mismatch?:boolean;draft_domain_conflict?:boolean;runtime_detected?:boolean};
 
 const READ_CACHE_TTL_MS=4000;
 const readCache=new Map<string,{expires:number;promise:Promise<unknown>}>();

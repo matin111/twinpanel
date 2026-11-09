@@ -29,16 +29,29 @@ export function XrayInboundEditorInProtocol({nodeId}:{nodeId:number}){
     adminApi.xrayInboundEditor(nodeId).then(value=>{
       if(!active)return;
       setState(value);
-      setDraft({
-        ...value.defaults,...(value.draft||{}),
-        inbounds:{
-          ...value.defaults.inbounds,
-          ...(value.draft?.inbounds||{}),
-        } as Record<XrayInboundKey,XrayInboundProfile>,
-      });
+      // GET must display what this node is actually running, not an old
+      // un-applied draft (USA had a copied UK hostname). Loading drafts is
+      // an explicit action, and never crosses a dedicated-domain boundary.
+      setDraft(value.defaults);
     }).catch(reason=>{if(active)setError(reason instanceof Error?reason.message:String(reason));});
     return()=>{active=false;};
   },[nodeId]);
+
+  const loadSavedDraft=()=>{
+    if(!state?.draft||state.draft_domain_conflict)return;
+    setDraft({
+      ...state.defaults,
+      ...state.draft,
+      inbounds:{
+        ...state.defaults.inbounds,
+        ...(state.draft.inbounds||{}),
+      } as Record<XrayInboundKey,XrayInboundProfile>,
+    });
+    setNotice(pick(
+      "پیش‌نویس اعمال‌نشده بارگذاری شد؛ این مقادیر تنظیمات فعلی سرور نیستند.",
+      "Saved unapplied draft loaded; it does not represent current server settings.",
+    ));
+  };
 
   const profile=draft?.inbounds?.[selected];
   const edit=(key:keyof XrayInboundProfile,value:string)=>{
@@ -73,6 +86,7 @@ export function XrayInboundEditorInProtocol({nodeId}:{nodeId:number}){
       const result=await adminApi.applyXrayInboundDraft(nodeId);
       const updated=await adminApi.xrayInboundEditor(nodeId);
       setState(updated);
+      setDraft(updated.defaults);
       setNotice(pick(
         "تنظیمات پشتیبانی‌شده هر سه Inbound اعمال و اعتبارسنجی شدند. تغییرات با دریافت مجدد ساب‌لینک نمایش داده می‌شوند.",
         "Supported settings for all three inbounds were applied and validated. The next subscription refresh reflects the change."
@@ -96,6 +110,29 @@ export function XrayInboundEditorInProtocol({nodeId}:{nodeId:number}){
     </div></div>
     {error?<div className={styles.errorBox}>{error}</div>:null}
     {notice?<div className={styles.successBox}>{notice}</div>:null}
+    {state?<div className={styles.readonlyRow}>
+      <span>{pick("دامنه اختصاصی ثبت‌شده برای همین نود","Dedicated domain saved for this node")}</span>
+      <strong dir="ltr">{state.configured_xray_domain||"—"}</strong>
+    </div>:null}
+    {state?.tls_domain_mismatch?<div className={styles.warningBox}>
+      {pick(
+        "دامنه SSL فعال با دامنه اختصاصی این نود متفاوت است؛ تا زمان نصب گواهی درست، تغییر ظاهری فرم به معنی فعال‌شدن SSL جدید نیست.",
+        "Live TLS certificate domain differs from this node's configured domain; editing these fields does not activate a new SSL identity.",
+      )} {" "}
+      <b dir="ltr">{state.active_tls_domain||"—"}</b>
+    </div>:null}
+    {state?.draft_domain_conflict?<div className={styles.warningBox}>
+      {pick(
+        "پیش‌نویس قدیمی دامنه نود دیگری را داشت و به‌صورت خودکار بارگذاری نشد. اطلاعات فعلی از خود نود خوانده شده‌اند.",
+        "A previous draft used another node's hostname and was not loaded. Current values are read from this node.",
+      )}
+    </div>:null}
+    {state?.draft&&!state.draft_domain_conflict?<div className={styles.actionRow}>
+      <button type="button" className={styles.secondaryButton} disabled={Boolean(busy)}
+        onClick={loadSavedDraft}>
+        {pick("بارگذاری پیش‌نویس ذخیره‌شده","Load saved draft")}
+      </button>
+    </div>:null}
     {!draft||!profile?<div className={styles.readonlyRow}><span>{pick("در حال خواندن تنظیمات...","Loading inbounds...")}</span></div>:<>
       <div className={styles.presetGrid}>
         {INBOUNDS.map(item=><button key={item.key} type="button"
