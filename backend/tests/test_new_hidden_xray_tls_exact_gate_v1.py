@@ -34,6 +34,38 @@ class NewExitTLSGateSourceTests(TestCase):
         self.assertIn("require_tls_profiles: bool = False",source)
 
 
+class NewExitDomainRegistrationTests(IsolatedAsyncioTestCase):
+    async def test_exit_without_tls_hostname_rejected_before_ssh(self):
+        from fastapi import HTTPException
+        from app.routers import publish_node_all_users_v1 as publisher
+        from app.routers.publish_node_all_users_v1 import BackgroundNodeInstallIn
+        payload=BackgroundNodeInstallIn(
+            host="203.0.113.99",port=22,username="root",password="mock",
+            name="Future node",node_type=NodeType.EXIT,country_code="DE",
+        )
+        with self.assertRaises(HTTPException) as error:
+            await publisher.install_node_background_v1(
+                payload,MagicMock(),MagicMock(),
+            )
+        self.assertEqual(error.exception.status_code,422)
+        self.assertEqual(
+            error.exception.detail,
+            "XRAY_NEW_EXIT_DEDICATED_TLS_DOMAIN_REQUIRED",
+        )
+
+    def test_hostname_flows_through_bootstrap_and_node_form(self):
+        root=Path(__file__).resolve().parents[2]
+        bootstrap=(root/"backend/app/services/central_first_exit_bootstrap_v1.py").read_text()
+        self.assertIn('node.xray_domain = domain',bootstrap)
+        self.assertIn('XRAY_NEW_EXIT_DOMAIN_SCHEMA_NOT_READY',bootstrap)
+        from app.routers.provision import InstallIn
+        self.assertIn("xray_domain",InstallIn.model_fields)
+        form=(root/"components/node-add-modal-bridge.tsx").read_text()
+        self.assertIn('draft.xray_domain',form)
+        self.assertIn('xray_domain:',form)
+        self.assertIn('WebSocket TLS، XHTTP Reality و TCP TLS',form)
+
+
 class NewExitTLSGateRuntimeTests(IsolatedAsyncioTestCase):
     async def _check(self, authority, *, domain="v2future.example.com",
                      tags=None, listeners=True, require_tls=True):
