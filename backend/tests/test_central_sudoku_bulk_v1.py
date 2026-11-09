@@ -28,6 +28,17 @@ class SudokuCentralBulkTests(unittest.TestCase):
         self.assertNotIn("unit.write_text(", source)
         self.assertNotIn("BASE.mkdir(", source)
 
+    def test_bulk_apply_fails_before_using_connection(self):
+        import asyncio
+        from app.central_sudoku_bulk_runtime_v1 import apply_bulk
+
+        class FailIfTouched:
+            def __getattr__(self, name):
+                raise AssertionError(f"unexpected legacy connection access: {name}")
+
+        with self.assertRaisesRegex(RuntimeError, "SUDOKU_LEGACY_BULK_DISABLED"):
+            asyncio.run(apply_bulk(FailIfTouched(), [self.row(1)]))
+
     def test_capacity_limit_and_collision(self):
         verify_accounts([self.row(1),self.row(2)])
         verify_accounts([self.row(x) for x in range(1,1901)])
