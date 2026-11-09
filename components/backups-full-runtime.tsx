@@ -3,7 +3,7 @@
 import {ChangeEvent,useEffect,useMemo,useRef,useState} from "react";
 import {Badge,Card,Shell,Stat} from "./ui";
 import {BackupHome,BackupSettings,parityApi} from "../lib/admin-parity-api";
-import {downloadBackupFile,downloadRecoveryKey,uploadBackup,initTelegramParts,uploadTelegramPart,getTelegramPartsStatus,finishTelegramParts,TelegramPartsSession} from "../lib/backup-runtime-api";
+import {downloadBackupFile,downloadRecoveryKey,uploadBackup,initTelegramParts,uploadTelegramPart,getTelegramPartsStatus,finishTelegramParts,discardTelegramParts,TelegramPartsSession} from "../lib/backup-runtime-api";
 import {useI18n} from "../lib/i18n";
 
 const defaults:BackupSettings={enabled:false,frequency:"daily",hour:3,minute:0,weekday:0,timezone:"Asia/Tehran",send_telegram:false,telegram_chat_id:"",retention:14};
@@ -166,11 +166,15 @@ export function BackupsFullRuntimePage(){
     }catch(e){setError(e instanceof Error?e.message:String(e))}
     finally{setBusy("")}
   };
-  const resetTelegramSet=()=>{
+  const resetTelegramSet=async()=>{
     if(busy)return;
-    sessionStorage.removeItem("tp-telegram-parts-session");
-    setTelegramParts(null);setTelegramPartsSha("");
-    setError("");setOk("");
+    setBusy("telegram-discard");setError("");
+    try{
+      if(telegramParts)await discardTelegramParts(telegramParts.id);
+      sessionStorage.removeItem("tp-telegram-parts-session");
+      setTelegramParts(null);setTelegramPartsSha("");setOk("");
+    }catch(e){setError(e instanceof Error?e.message:String(e))}
+    finally{setBusy("")}
   };
   useEffect(()=>{
     const id=typeof window==="undefined"?null:sessionStorage.getItem("tp-telegram-parts-session");
@@ -211,7 +215,7 @@ export function BackupsFullRuntimePage(){
         <button className="ghost" disabled={Boolean(busy)||!telegramParts||telegramParts.state!=="uploading"||telegramParts.received_count!==telegramParts.total_parts} onClick={()=>void finishTelegramSet()}>
           {busy==="telegram-join"?"…":pick("ترکیب و بررسی همه قسمت‌ها","Combine and verify all parts")}
         </button>
-        <button className="ghost" disabled={Boolean(busy)} onClick={resetTelegramSet}>
+        <button className="ghost" disabled={Boolean(busy)} onClick={()=>void resetTelegramSet()}>
           {pick("شروع مجموعه دیگر","Start another set")}
         </button>
         {telegramParts&&<button className="ghost" disabled={Boolean(busy)} onClick={()=>void getTelegramPartsStatus(telegramParts.id).then(setTelegramParts).catch(e=>setError(String(e)))}>
