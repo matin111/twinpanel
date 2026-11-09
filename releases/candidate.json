@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.760",
-  "source_sha": "031a7dca7b37b357294dc70311da9cfabd4b986d",
+  "version": "1.1.0-rc.761",
+  "source_sha": "07bb15c27394be14c93a1cad1d6dd50d3faf90ab",
   "notes": {
-    "fa": "بکاپ تلگرام با یک فایل ZIP قابل بازیابی: فرمت اصلی بکاپ بدون تغییر داخل ZIP بسته‌بندی می‌شود، فایل‌های زیر سقف ۵۰ مگابایتی API تلگرام یکجا ارسال می‌شوند، حجم و SHA256 فایل ZIP و بکاپ داخلی کنترل می‌شوند و اگر تنها پیام تأیید ناموفق بود آپلود تکرار نمی‌شود. پشتیبانی API محلی نیز ZIP می‌فرستد. برای فایل‌های بزرگ‌تر از سقف تلگرام مسیر امن چندقسمتی حفظ شده است؛ نصب و مدیریت پروتکل‌ها دست‌نخورده است.",
-    "en": "Send portable backups to Telegram as one directly restorable ZIP when below the 50 MB cloud API limit; validate returned document size, provide ZIP and inner archive SHA256 checksums, resume receipt without reuploading, support local Telegram Bot API with ZIP too. Larger backups retain multipart fallback; original archive and runtime/protocol settings remain unchanged."
+    "fa": "فعال‌سازی کامل فیلتر رسیدها در صفحه پرداخت‌های مدیریت: کارت‌های نیاز به بررسی، رسید تصویری جدید، خرید اشتراک و شارژ کیف پول قابل کلیک شده‌اند و دقیقاً همان رسیدها و پرداخت‌های شمارش‌شده را فیلتر می‌کنند. کلیک روی شماره یا برچسب رسید، تصویر/PDF همان پرداخت را با احراز هویت ادمین باز می‌کند. فیلترهای همه/خرید/کیف پول و جستجو حفظ شده‌اند و وضعیت انتخابی مشخص است. برای شارژ کیف پول فقط فایل واقعاً آپلودشده «رسید تصویری» محسوب می‌شود نه صرف کد رهگیری. تأیید و رد پرداخت، کیف پول، قیمت‌ها و ربات‌ها بدون تغییر.",
+    "en": "Enable click-to-filter receipt and payment review KPI cards in admin payments (Needs Review, New Receipts, Subscription Purchases, Wallet Top-Ups). Each filter shows exactly its counted rows, with accessible selected state and direct receipt viewing from ID/badge/action via the existing authenticated endpoints. Fix false positive wallet image receipts inferred from tracking code alone. Preserve all payment approval/rejection, wallet and pricing logic. Full TypeScript compile and regression tests passed."
   }
 }
