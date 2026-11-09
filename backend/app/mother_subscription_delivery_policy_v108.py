@@ -90,10 +90,10 @@ def _modern_direct_item_is_usable_uncached(
     if account_delivery._delivery_active_tunnels(db, node):
         return False
 
-    config_cache = db.info.get("_tp_public_connection_cfg_cache_v102")
+    config_cache = getattr(db, "info", {}).get("_tp_public_connection_cfg_cache_v102")
     if (
         isinstance(config_cache, dict)
-        and db.info.get("_tp_public_connection_cfg_prefetched_v103")
+        and getattr(db, "info", {}).get("_tp_public_connection_cfg_prefetched_v103")
     ):
         cfg = config_cache.get((node_id, key))
     else:
