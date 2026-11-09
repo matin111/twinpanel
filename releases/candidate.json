@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.735",
-  "source_sha": "25d78c643b726230037be416322e4bc24715a3c8",
+  "version": "1.1.0-rc.736",
+  "source_sha": "fce3fb1ff150a3b2a8a25b2c7f67feed220e6685",
   "notes": {
-    "fa": "اصلاح فوری محاسبه SHA256 هنگام ساخت بکاپ و تست بازگشتی ایجاد/ورود بکاپ. امکان آپلود تک‌تک قسمت‌های بکاپ تلگرام، ترکیب و تطبیق SHA256، پاک‌سازی آپلود ناقص و ورود جریانی آرشیو نیز در بسته موجود است.",
-    "en": "Hotfix backup creation SHA256 after streamed import refactor; add regression tests for backup creation and import, and retain individually uploaded Telegram backup parts, verified reassembly, and safe cancellation."
+    "fa": "نمایش V2Ray/Xray در صفحه اتصال عمومی یکدست شد: فقط مدل سوم مورد تأیید، پرچم و نام واقعی نود در سمت راست و تنها دکمه کپی کانفیگ‌های همان نود در سمت چپ؛ حذف دو نمای قدیمی و دکمه افزودن از ردیف‌ها، فیلتر پایدار کشورها و نمایش دو نود آلمان. منبع داده و URIهای واقعی دست‌نخورده باقی می‌مانند؛ نمایش جایگزین در تأخیر دریافت اطلاعات نیز همان ظاهر را حفظ می‌کند. بدون تغییر سایر پروتکل‌ها.",
+    "en": "Unify public V2Ray/Xray Connection to one approved compact row style: actual node name and flag right, only real per-node copy button left; suppress both legacy visual modes and row Add controls, stable country filters including two Germany nodes. Preserve authoritative URI payloads, existing copy actions, other protocol panels and VPN services; consistent fallback while /sub/meta is loading."
   }
 }
