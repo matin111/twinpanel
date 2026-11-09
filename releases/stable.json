@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.743",
+  "version": "1.1.0-rc.744",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-09T06:39:21Z",
+  "released_at": "2026-11-09T06:46:07Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "75673101eb1e0f1153539df039af890773c39091",
+  "source_sha": "2b23d5627dd4bc6f505c97aa89468dab4c6cb78f",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.743/twinpanel-1.1.0-rc.743-linux-x86_64.tar.gz",
-    "sha256": "a90d035c1078a2d9a28b9148ea6ea6da01157956f28823f0b1b381b34e6b1847",
-    "size_bytes": 30115519
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.744/twinpanel-1.1.0-rc.744-linux-x86_64.tar.gz",
+    "sha256": "0208b91bf5fd8d1523d2b9fd8abc0bb760812a7b12e025297f91a4f3a3860bc8",
+    "size_bytes": 30121695
   },
   "notes": {
-    "fa": "حذف عبارت فنی SMS Reader از پیام‌های شارژ کیف پول کارت‌به‌کارت در ربات اصلی و نسخه دوم؛ حفظ دستور پرداخت دقیق، دکمه ارسال رسید و عملکرد تأیید خودکار بدون تغییر.",
-    "en": "Remove internal SMS Reader references from Telegram customer wallet card-to-card payment copy, retaining exact amount instructions, receipt buttons and existing automatic payment functionality."
+    "fa": "بکاپ قابل‌انتقال داده‌های TwinPanel بدون کلید بازیابی با فرمت جدید v3. حفظ داده‌های پایدار کاربران، نمایندگان، کیف پول‌ها، اشتراک‌ها و تنظیمات ضروری؛ حذف وابستگی بازیابی به تنظیمات تلگرام؛ نسخه ایمنی محلی قبل از Restore؛ حذف مسیر دانلود کلید و پشتیبانی از فایل‌های بکاپ قدیمی. توجه: فایل بکاپ جدید حاوی داده‌های حساس است و باید خصوصی نگهداری شود.",
+    "en": "Portable keyless TwinPanel data-only backup format v3, retaining persistent users, resellers, subscriptions, wallets and essential settings; no Telegram prerequisite for restore; pre-restore local safety copy; legacy encrypted archives unsupported. Warning: backups contain sensitive credentials and must be kept private."
   }
 }
