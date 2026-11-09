@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.736",
+  "version": "1.1.0-rc.737",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-09T03:34:52Z",
+  "released_at": "2026-11-09T03:55:54Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "fce3fb1ff150a3b2a8a25b2c7f67feed220e6685",
+  "source_sha": "802d92871fb99822c3c9c055cf62941a729166cb",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.736/twinpanel-1.1.0-rc.736-linux-x86_64.tar.gz",
-    "sha256": "e9a38ebb28de2624988b64d1e9dcfda879b2fb7dd03192fd6d274469013219d2",
-    "size_bytes": 30066035
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.737/twinpanel-1.1.0-rc.737-linux-x86_64.tar.gz",
+    "sha256": "a34bebc45c3373c93aa9b5257670557222a02116ae872c0464f8d906b7597d28",
+    "size_bytes": 30087037
   },
   "notes": {
-    "fa": "نمایش V2Ray/Xray در صفحه اتصال عمومی یکدست شد: فقط مدل سوم مورد تأیید، پرچم و نام واقعی نود در سمت راست و تنها دکمه کپی کانفیگ‌های همان نود در سمت چپ؛ حذف دو نمای قدیمی و دکمه افزودن از ردیف‌ها، فیلتر پایدار کشورها و نمایش دو نود آلمان. منبع داده و URIهای واقعی دست‌نخورده باقی می‌مانند؛ نمایش جایگزین در تأخیر دریافت اطلاعات نیز همان ظاهر را حفظ می‌کند. بدون تغییر سایر پروتکل‌ها.",
-    "en": "Unify public V2Ray/Xray Connection to one approved compact row style: actual node name and flag right, only real per-node copy button left; suppress both legacy visual modes and row Add controls, stable country filters including two Germany nodes. Preserve authoritative URI payloads, existing copy actions, other protocol panels and VPN services; consistent fallback while /sub/meta is loading."
+    "fa": "افزودن زیرساخت مهاجرت ایمن ShadowTLS به لایه داخلی Shadowsocks 2022 چندکاربره با حفظ هویت اختصاصی مشتری، اتصال حسابداری مرکزی فقط به نشست و ترافیک دارای شناسه معتبر، پشتیبانی از نام‌های کاربری انتقالی و رمزهای کوتاه با کلید خصوصی نود، و همگام‌سازی ساخت و حذف اکانت. این قابلیت پیش‌فرض غیرفعال است و ورودی قدیمی، پورت، رمز و کانفیگ مشتریان تا انجام مهاجرت کنترل‌شده تغییر نمی‌کند.",
+    "en": "Default-off additive ShadowTLS v3/SS2022 identity-preserving migration primitives: private-seeded per-user 128-bit inner keys, legacy username compatibility, account add/revoke sync, explicit per-node modern delivery opt-in, canonical authenticated-only accounting and selective session limit. No automatic legacy port change, node restart, key rotation or historical charge; public/tunnel port routing and controlled live rollout still required."
   }
 }
