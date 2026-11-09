@@ -27,7 +27,8 @@ def missing(*, current: str, applied: str, audit: dict):
          patch.object(stage,"load_desired_state",return_value=state), \
          patch.object(stage,"require_valid_desired_state",side_effect=lambda x,max_users:x), \
          patch.object(stage,"verify_coverage",return_value=audit), \
-         patch.object(stage,"last_applied",return_value=applied):
+         patch.object(stage,"desired_sudoku_fingerprint",return_value=current), \
+         patch.object(stage,"last_sudoku_applied",return_value=applied):
         return stage.missing_runtime_families(19,3000)
 
 
@@ -57,6 +58,29 @@ def test_failed_singbox_and_new_revocation_both_get_family_reconcile():
     audit["missing_by_protocol"]={"naive":3}
     selected=missing(current="a"*64,applied="b"*64,audit=audit)
     assert [family.name for family in selected]==["singbox","sudoku"]
+
+
+def test_non_sudoku_global_fingerprint_changes_do_not_reapply_sudoku():
+    # A failing Sing-box adapter cannot force redundant Sudoku restarts:
+    # only the fully acknowledged Sudoku family fingerprint matters.
+    assert missing(current="a"*64,applied="a"*64,audit=okay_audit())==()
+
+
+def test_live_ack_is_written_only_after_native_confirmation():
+    from pathlib import Path
+    text=(Path(__file__).resolve().parents[1]/
+          "scripts/twinpanel_central_sudoku_shared_v2.py").read_text()
+    assert "mark_sudoku_applied(db, node_id, ids)" in text
+    assert text.index("if ack[\"users\"]!=len(ids):") < text.index(
+        "mark_sudoku_applied(db, node_id, ids)"
+    )
+    assert text.index("db.commit()\n        print(\"SUDOKU_SHARED_COMPLETE\"") > text.index(
+        "mark_sudoku_applied(db, node_id, ids)"
+    )
+    assert "mark_sudoku_applied(db, node_id, ())" in text
+    assert text.index('if not ack.get("deactivated"):') < text.index(
+        "mark_sudoku_applied(db, node_id, ())"
+    )
 
 
 def test_empty_users_never_create_unrestricted_listener():
