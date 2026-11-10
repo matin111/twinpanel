@@ -55,7 +55,7 @@ def test_staged_node_cannot_be_manually_published_before_readiness(stage):
 
 @pytest.mark.parametrize("stage", ["verified_ready", "users_queued", "completed"])
 def test_staged_node_allows_publish_after_health_validation(stage):
-    require_staged_node_publish_ready(_Db(job=SimpleNamespace(stage=stage)), 14)
+    require_staged_node_publish_ready(_Db(job=SimpleNamespace(stage=stage, installed_protocols=16)), 14)
 
 
 def test_existing_nonstaged_node_retains_legacy_manual_control():
