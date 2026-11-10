@@ -98,7 +98,151 @@ Uri _parseSecureOrigin(String value) {
   final host = uri.host.toLowerCase();
   // Do not accept localhost, private literals, or single-label hosts.
   if (host == 'localhost' || host.endsWith('.localhost') ||
-      host.endsWith('.local') || !host.contains('.')) {
+      host.endsWith('.local') || host.endsWith('.internal') ||
+      host.endsWith('.invalid') || host.endsWith('.test') ||
+      host.endsWith('.example') || !host.contains('.') ||
+      RegExp(r'^[0-9.]+  return Uri(scheme: 'https', host: host);
+}
+
+class BrandPreview {
+  const BrandPreview({
+    required this.namespace,
+    required this.brandName,
+    required this.ownerType,
+    required this.accountStatus,
+    required this.appUsernamePrefix,
+    this.telegramUrl,
+    this.renewalUrl,
+    this.websiteUrl,
+    this.phone,
+    this.supportText,
+    this.logoUrl,
+    this.primaryColor = '#7C3AED',
+    this.secondaryColor = '#4F46E5',
+  });
+
+  final String namespace;
+  final String brandName;
+  final String ownerType;
+  final String accountStatus;
+  final String appUsernamePrefix;
+  final String? telegramUrl;
+  final String? renewalUrl;
+  final String? websiteUrl;
+  final String? phone;
+  final String? supportText;
+  final String? logoUrl;
+  final String primaryColor;
+  final String secondaryColor;
+
+  factory BrandPreview.fromJson(Map<String, dynamic> json) {
+    String field(String key, [String fallback = '']) {
+      final value = json[key];
+      return value is String && value.trim().isNotEmpty
+          ? value.trim()
+          : fallback;
+    }
+
+    String? optional(String key) {
+      final value = field(key);
+      return value.isEmpty ? null : value;
+    }
+
+    String color(String key, String fallback) {
+      final value = field(key);
+      return RegExp(r'^#[A-Fa-f0-9]{6}$').hasMatch(value) ? value : fallback;
+    }
+
+    return BrandPreview(
+      namespace: field('namespace'),
+      brandName: field('brand_name', 'TwinPanel'),
+      ownerType: field('owner_type'),
+      accountStatus: field('account_status', 'unknown'),
+      appUsernamePrefix: field('app_username_prefix'),
+      telegramUrl: optional('telegram_url'),
+      renewalUrl: optional('renewal_url'),
+      websiteUrl: optional('website_url'),
+      phone: optional('support_phone'),
+      supportText: optional('support_text'),
+      logoUrl: optional('logo_url'),
+      primaryColor: color('primary_color', '#7C3AED'),
+      secondaryColor: color('secondary_color', '#4F46E5'),
+    );
+  }
+}
+).hasMatch(host) || host.contains(':') ||
+      !RegExp(r'^[a-z0-9.-]+  return Uri(scheme: 'https', host: host);
+}
+
+class BrandPreview {
+  const BrandPreview({
+    required this.namespace,
+    required this.brandName,
+    required this.ownerType,
+    required this.accountStatus,
+    required this.appUsernamePrefix,
+    this.telegramUrl,
+    this.renewalUrl,
+    this.websiteUrl,
+    this.phone,
+    this.supportText,
+    this.logoUrl,
+    this.primaryColor = '#7C3AED',
+    this.secondaryColor = '#4F46E5',
+  });
+
+  final String namespace;
+  final String brandName;
+  final String ownerType;
+  final String accountStatus;
+  final String appUsernamePrefix;
+  final String? telegramUrl;
+  final String? renewalUrl;
+  final String? websiteUrl;
+  final String? phone;
+  final String? supportText;
+  final String? logoUrl;
+  final String primaryColor;
+  final String secondaryColor;
+
+  factory BrandPreview.fromJson(Map<String, dynamic> json) {
+    String field(String key, [String fallback = '']) {
+      final value = json[key];
+      return value is String && value.trim().isNotEmpty
+          ? value.trim()
+          : fallback;
+    }
+
+    String? optional(String key) {
+      final value = field(key);
+      return value.isEmpty ? null : value;
+    }
+
+    String color(String key, String fallback) {
+      final value = field(key);
+      return RegExp(r'^#[A-Fa-f0-9]{6}$').hasMatch(value) ? value : fallback;
+    }
+
+    return BrandPreview(
+      namespace: field('namespace'),
+      brandName: field('brand_name', 'TwinPanel'),
+      ownerType: field('owner_type'),
+      accountStatus: field('account_status', 'unknown'),
+      appUsernamePrefix: field('app_username_prefix'),
+      telegramUrl: optional('telegram_url'),
+      renewalUrl: optional('renewal_url'),
+      websiteUrl: optional('website_url'),
+      phone: optional('support_phone'),
+      supportText: optional('support_text'),
+      logoUrl: optional('logo_url'),
+      primaryColor: color('primary_color', '#7C3AED'),
+      secondaryColor: color('secondary_color', '#4F46E5'),
+    );
+  }
+}
+).hasMatch(host) ||
+      host.contains('..') || host.startsWith('-') ||
+      host.endsWith('-') || host.startsWith('.') || host.endsWith('.')) {
     throw const FormatException('آدرس پنل عمومی نیست.');
   }
   return Uri(scheme: 'https', host: host);
