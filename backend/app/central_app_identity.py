@@ -35,12 +35,15 @@ def prefix_account_name(installation_id: str, reseller_id: int, name: str) -> st
     prefix = reseller_prefix(installation_id, reseller_id)
     name = str(name or "").strip()
     if name.startswith(prefix):
-        return name
-    if not name or _OTHER_ALIAS_RE.match(name):
-        raise ValueError("username_prefix_conflict")
-    if any(ch.isspace() for ch in name) or not re.fullmatch(r"[A-Za-z0-9_.-]+", name):
+        local_name = name[len(prefix):]
+        result = name
+    else:
+        if not name or _OTHER_ALIAS_RE.match(name):
+            raise ValueError("username_prefix_conflict")
+        local_name = name
+        result = prefix + name
+    if not local_name or any(ch.isspace() for ch in local_name) or not re.fullmatch(r"[A-Za-z0-9_.-]+", local_name):
         raise ValueError("username_invalid_for_vpn")
-    result = prefix + name
     # Keep protocol usernames within a conservative, portable bound.
     if len(result) > 64:
         raise ValueError("username_too_long_for_vpn")
