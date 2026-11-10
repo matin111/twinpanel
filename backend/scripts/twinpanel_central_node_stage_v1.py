@@ -55,7 +55,7 @@ def eligible_count(db):
 
 
 def establish_hidden_memberships(db, node_id, *, eligible_ids=None):
-    """One INSERT for migrated and native subscriptions; do not alter plan rights."""
+    """One set-based INSERT; never attach users with no usable node protocol."""
     if eligible_ids is not None and not eligible_ids:
         return 0
     ids_clause = "AND s.id = ANY(:eligible_ids)" if eligible_ids is not None else ""
@@ -63,11 +63,15 @@ def establish_hidden_memberships(db, node_id, *, eligible_ids=None):
         INSERT INTO subscription_nodes (subscription_id, node_id, created_at)
         SELECT s.id, :node_id, :now FROM subscriptions s
         WHERE s.status='ACTIVE'
+          {ids_clause}
           AND (s.expires_at IS NULL OR s.expires_at > :now)
-          AND (s.traffic_limit_bytes <= 0 OR s.traffic_used_bytes < s.traffic_limit_bytes)
+          AND (s.traffic_limit_bytes <= 0
+               OR s.traffic_used_bytes < s.traffic_limit_bytes)
         ON CONFLICT (subscription_id,node_id) DO NOTHING
-    """), {"node_id": node_id, "now": datetime.utcnow()})
+    """), {"node_id": node_id, "now": datetime.utcnow(),
+           **({"eligible_ids":list(eligible_ids)} if eligible_ids is not None else {})})
     return max(0, int(result.rowcount or 0))
+
 
 
 def adapter_command(name, node_id, limit, apply):
