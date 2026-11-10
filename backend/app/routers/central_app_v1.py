@@ -442,35 +442,48 @@ def subscription_protocol_profiles(
     if not protocol or protocol not in _selected_client_protocols(db, sub.id):
         raise HTTPException(status_code=404, detail="PROTOCOL_NOT_SELECTED")
 
-    info = getattr(db, "info", None)
-    if isinstance(info, dict):
-        info["_tp_public_feed_only_protocol"] = protocol
-    try:
-        # Existing delivery owns live endpoint, SNI, credential and node
-        # projection. NEVER generate altered synthetic server credentials here.
-        projected = _stored_info(db, sub)
-    finally:
+    if protocol == "v2ray":
+        # V2Ray may contain three distinct customer-safe inbounds per node.
+        # Reuse the same public projection as the canonical Xray feed so that
+        # TCP/WS/XHTTP profiles, Reality SNI, and availability stay consistent.
+        from .public_connection_multilink_v7 import (
+            _subscription_and_payload, _v2ray_items,
+        )
+        _verified, projected = _subscription_and_payload(
+            payload.share_token, db
+        )
+        profile_items = [
+            dict(item) for item in _v2ray_items(projected)
+        ]
+    else:
+        info = getattr(db, "info", None)
         if isinstance(info, dict):
-            info.pop("_tp_public_feed_only_protocol", None)
-    credentials = [
-        entry for entry in projected.get("credentials", [])
-        if normalize_protocol(entry.get("protocol")) == protocol
-    ]
-    if not credentials:
-        raise HTTPException(status_code=404, detail="PROFILES_NOT_READY")
-    profile_items: list[dict] = []
-    for credential in credentials:
-        items = credential.get("items") or []
-        if isinstance(items, dict):
-            items = [items]
-        if not isinstance(items, list):
-            continue
-        for item in items:
-            if isinstance(item, dict):
-                # Preserve nested Xray inbounds and sing-box ShadowTLS chains.
-                profile_items.append(dict(item))
-                if len(profile_items) > 200:
-                    raise HTTPException(status_code=413, detail="TOO_MANY_PROFILES")
+            info["_tp_public_feed_only_protocol"] = protocol
+        try:
+            # Existing delivery owns live endpoint, credential and node
+            # projection. Never synthesize server or cryptographic details.
+            projected = _stored_info(db, sub)
+        finally:
+            if isinstance(info, dict):
+                info.pop("_tp_public_feed_only_protocol", None)
+        credentials = [
+            entry for entry in projected.get("credentials", [])
+            if normalize_protocol(entry.get("protocol")) == protocol
+        ]
+        profile_items = []
+        for credential in credentials:
+            items = credential.get("items") or []
+            if isinstance(items, dict):
+                items = [items]
+            if not isinstance(items, list):
+                continue
+            for item in items:
+                if isinstance(item, dict):
+                    # Preserve compound ShadowTLS detours and other native
+                    # formats without converting to a lossy URI.
+                    profile_items.append(dict(item))
+    if len(profile_items) > 200:
+        raise HTTPException(status_code=413, detail="TOO_MANY_PROFILES")
     if not profile_items:
         raise HTTPException(status_code=404, detail="PROFILES_NOT_READY")
 
