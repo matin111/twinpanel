@@ -646,19 +646,34 @@ class _TwinConnectDevAppState extends State<TwinConnectDevApp> {
     );
 
     Widget settingLine(IconData icon, String title,
-        {bool disabled = true, VoidCallback? onTap}) => Material(
-      color: Colors.transparent,
-      child: ListTile(
-      leading: Icon(icon, color: purple, size: 21),
-      title: txt(title, bold: true),
-      subtitle: disabled
-          ? txt(tr('در این نسخه غیرفعال', 'Unavailable in preview'),
-              color: sub, size: 10)
-          : null,
-      trailing: disabled
-          ? const Switch(value: false, onChanged: null)
-          : Icon(Icons.chevron_right_rounded, color: sub),
-      onTap: onTap,
+        {bool disabled = true, VoidCallback? onTap}) => Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: glassCard(
+        radius: 17,
+        padding: const EdgeInsets.symmetric(vertical: 3),
+        child: Material(
+          color: Colors.transparent,
+          child: ListTile(
+            leading: Container(
+              width: 37,
+              height: 37,
+              decoration: BoxDecoration(
+                color: purple.withValues(alpha: _dark ? .17 : .10),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: purple, size: 20),
+            ),
+            title: txt(title, bold: true),
+            subtitle: disabled
+                ? txt(tr('در این نسخه غیرفعال', 'Unavailable in preview'),
+                    color: sub, size: 10)
+                : null,
+            trailing: disabled
+                ? const Switch(value: false, onChanged: null)
+                : Icon(Icons.chevron_right_rounded, color: sub),
+            onTap: onTap,
+          ),
+        ),
       ),
     );
 
@@ -668,23 +683,56 @@ class _TwinConnectDevAppState extends State<TwinConnectDevApp> {
         heading(tr('تنظیمات', 'Settings')),
         const SizedBox(height: 15),
         glassCard(
-          padding: const EdgeInsets.all(12),
-          radius: 25,
-          child: Column(children: [
-            settingLine(Icons.shield_outlined, 'Kill Switch'),
-            settingLine(Icons.dns_outlined, tr('حفاظت DNS', 'DNS protection')),
-            settingLine(Icons.security_outlined,
-                tr('حفاظت IPv6', 'IPv6 protection')),
-            settingLine(Icons.auto_awesome_rounded,
-                tr('اتصال خودکار', 'Auto-connect')),
-            const Divider(),
-            settingLine(Icons.language_rounded, tr('زبان', 'Language'),
-                disabled: false,
-                onTap: () => setState(() => _persian = !_persian)),
-            settingLine(Icons.palette_outlined, tr('ظاهر', 'Appearance'),
-                disabled: false,
-                onTap: () => setState(() => _dark = !_dark)),
+          key: const Key('devSettingsGlassHeader'),
+          radius: 22,
+          padding: const EdgeInsets.symmetric(horizontal: 19, vertical: 19),
+          child: Row(children: [
+            Container(
+              height: 48, width: 48,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                color: purple.withValues(alpha: .17),
+              ),
+              child: const Icon(Icons.tune_rounded, color: purple, size: 24),
+            ),
+            const SizedBox(width: 13),
+            Expanded(child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                txt(tr('تنظیمات اتصال', 'Connection preferences'),
+                    size: 16, bold: true),
+                const SizedBox(height: 5),
+                txt(tr('تنظیمات سیستم پس از نصب موتور فعال می‌شوند',
+                       'System options unlock after engine installation'),
+                    size: 11, color: sub),
+              ],
+            )),
           ]),
+        ),
+        const SizedBox(height: 17),
+        settingLine(Icons.shield_outlined, 'Kill Switch'),
+        settingLine(Icons.dns_outlined, tr('حفاظت DNS', 'DNS protection')),
+        settingLine(Icons.security_outlined,
+            tr('حفاظت IPv6', 'IPv6 protection')),
+        settingLine(Icons.auto_awesome_rounded,
+            tr('اتصال خودکار', 'Auto-connect')),
+        const SizedBox(height: 9),
+        glassCard(
+          key: const Key('devSettingsAppearanceCard'),
+          radius: 20,
+          padding: const EdgeInsets.fromLTRB(15, 12, 15, 12),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              txt(tr('شخصی‌سازی', 'Personalization'), size: 15, bold: true),
+              const SizedBox(height: 10),
+              settingLine(Icons.language_rounded, tr('زبان', 'Language'),
+                  disabled: false,
+                  onTap: () => setState(() => _persian = !_persian)),
+              settingLine(Icons.palette_outlined, tr('ظاهر', 'Appearance'),
+                  disabled: false,
+                  onTap: () => setState(() => _dark = !_dark)),
+            ],
+          ),
         ),
       ],
     );
