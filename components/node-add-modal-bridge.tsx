@@ -378,10 +378,14 @@ export function NodeAddModalBridge(){
       {ok?<div className="runtime-success">{ok}</div>:null}
       {jobId?<div>
         <NodeInstallProgress job={job} error={jobError}/>
-        {job?.state==="failed"&&job.node_id&&[
-          "XRAY_NEW_EXIT_TLS_CERTIFICATE_NOT_READY","PROTOCOL_SETUP_INCOMPLETE",
-          "NODE_NO_VERIFIED_PROTOCOLS",
-        ].includes(job.error_code||"")?<div className="runtime-choice-section">
+        {job?.node_id&&(
+          (job.state==="failed"&&[
+            "XRAY_NEW_EXIT_TLS_CERTIFICATE_NOT_READY","PROTOCOL_SETUP_INCOMPLETE",
+          ].includes(job.error_code||""))
+          ||(job.state==="completed"&&job.users_assigned===null
+             &&job.expected_protocols!==null
+             &&(job.installed_protocols??0)<job.expected_protocols)
+        )?<div className="runtime-choice-section">
           <div className="runtime-warning">{pick("نصب همه پروتکل‌ها ضروری نیست. قبل از انتشار، سلامت پروتکل‌های موجود دوباره بررسی می‌شود.","Not all protocols are required. Installed listeners are reverified before admission.")}</div>
           <button className="primary-soft" type="button" disabled={Boolean(busy)} onClick={()=>void publishHealthy()}>{busy==="publish-healthy"?"…":pick("فعال‌سازی نود با پروتکل‌های سالم","Activate node with healthy protocols")}</button>
         </div>:null}
