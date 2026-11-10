@@ -1048,7 +1048,7 @@ async def _ensure_modern_xray(
         f"config.json.bak-modern-{stamp}"
     )
 
-    await provision.cmd(
+    restart_output = await provision.cmd(
         conn,
         (
             "if [ -f /usr/local/etc/xray/config.json ]; "
@@ -1058,12 +1058,13 @@ async def _ensure_modern_xray(
             "/usr/local/etc/xray/config.json; "
             f"rm -f {shlex.quote(temp_path)}; "
             "systemctl enable xray >/dev/null; "
-            "systemctl restart xray"
+            "systemctl restart xray >/dev/null 2>&1 "
+            "|| echo XRAY_RESTART_FAILED"
         ),
-        # A failed restart must still enter the service/listener diagnostic
-        # and safe rollback path below instead of raising prematurely.
+        # Preserve evidence even when systemctl returns a nonzero exit code.
         check=False,
     )
+    restart_ok = "XRAY_RESTART_FAILED" not in str(restart_output)
 
     await asyncio.sleep(1)
 
@@ -1074,7 +1075,7 @@ async def _ensure_modern_xray(
         if not await provision.listener(conn, candidate, "tcp"):
             missing_listeners.append(candidate)
 
-    if not (service_ok and not missing_listeners):
+    if not (restart_ok and service_ok and not missing_listeners):
         # Capture the reason BEFORE restoring the previous configuration.
         # Only inspect systemd metadata and the listener table: journal excerpts
         # can contain customer identifiers or credentials and are intentionally
@@ -1140,7 +1141,7 @@ async def _ensure_modern_xray(
             rollback_result = "failed"
         raise RuntimeError(
             "XRAY_MODERN_START_VERIFICATION_FAILED "
-            f"service_active={service_ok} "
+            f"restart_ok={restart_ok} service_active={service_ok} "
             f"missing_tcp_ports={','.join(map(str, missing_listeners)) or 'none'} "
             f"systemd={diagnostics} reason={failure_reason} "
             f"rollback={rollback_result}"
