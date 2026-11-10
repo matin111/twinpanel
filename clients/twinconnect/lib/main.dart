@@ -1,0 +1,455 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import 'app_strings.dart';
+import 'tenant_api.dart';
+import 'tenant_models.dart';
+
+void main() => runApp(const TwinConnectApp());
+
+enum AppLanguage { automatic, persian, english }
+
+class TwinConnectApp extends StatefulWidget {
+  const TwinConnectApp({super.key});
+
+  @override
+  State<TwinConnectApp> createState() => _TwinConnectAppState();
+}
+
+class _TwinConnectAppState extends State<TwinConnectApp> {
+  static const _languageKey = 'twinconnect_ui_language_v1';
+  AppLanguage _language = AppLanguage.automatic;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLanguage();
+  }
+
+  Future<void> _loadLanguage() async {
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      final saved = preferences.getString(_languageKey);
+      if (!mounted) return;
+      setState(() {
+        _language = switch (saved) {
+          'fa' => AppLanguage.persian,
+          'en' => AppLanguage.english,
+          _ => AppLanguage.automatic,
+        };
+      });
+    } catch (_) {
+      // A preference failure must not stop the app; device locale is the default.
+    }
+  }
+
+  Future<void> _changeLanguage(AppLanguage choice) async {
+    setState(() => _language = choice);
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      final code = switch (choice) {
+        AppLanguage.automatic => 'system',
+        AppLanguage.persian => 'fa',
+        AppLanguage.english => 'en',
+      };
+      await preferences.setString(_languageKey, code);
+    } catch (_) {
+      // The requested language still applies to this running session.
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final Locale? selectedLocale = switch (_language) {
+      AppLanguage.automatic => null,
+      AppLanguage.persian => const Locale('fa'),
+      AppLanguage.english => const Locale('en'),
+    };
+
+    return MaterialApp(
+      title: 'TwinConnect',
+      debugShowCheckedModeBanner: false,
+      locale: selectedLocale,
+      supportedLocales: const [Locale('en'), Locale('fa')],
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      theme: ThemeData(
+        useMaterial3: true,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF7358DF),
+        ),
+      ),
+      darkTheme: ThemeData(
+        useMaterial3: true,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF7358DF),
+          brightness: Brightness.dark,
+        ),
+      ),
+      themeMode: ThemeMode.system,
+      home: TwinConnectHome(
+        language: _language,
+        onLanguageChanged: _changeLanguage,
+      ),
+    );
+  }
+}
+
+class TwinConnectHome extends StatefulWidget {
+  const TwinConnectHome({
+    required this.language,
+    required this.onLanguageChanged,
+    super.key,
+  });
+
+  final AppLanguage language;
+  final ValueChanged<AppLanguage> onLanguageChanged;
+
+  @override
+  State<TwinConnectHome> createState() => _TwinConnectHomeState();
+}
+
+class _TwinConnectHomeState extends State<TwinConnectHome> {
+  final _formKey = GlobalKey<FormState>();
+  final _username = TextEditingController();
+  final _subscription = TextEditingController();
+  final _tenantCode = TextEditingController();
+
+  bool _loading = false;
+  String? _errorCode;
+  BrandPreview? _brand;
+
+  @override
+  void dispose() {
+    _username.dispose();
+    _subscription.dispose();
+    _tenantCode.dispose();
+    super.dispose();
+  }
+
+  Future<void> _identify() async {
+    if (!_formKey.currentState!.validate() || _loading) return;
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _loading = true;
+      _errorCode = null;
+      _brand = null;
+    });
+
+    try {
+      final username = _username.text.trim();
+      final namespace = TenantIdentity.parseNamespace(
+        username,
+        _tenantCode.text,
+      );
+      final token = SubscriptionInput.tokenFromInput(_subscription.text);
+      final api = TenantApi.fromBuildConfig();
+      final panel = await api.resolve(namespace);
+      final brand = await api.loadBrand(
+        panel: panel,
+        username: username,
+        shareToken: token,
+      );
+      if (!mounted) return;
+      setState(() => _brand = brand);
+    } on FormatException catch (error) {
+      if (mounted) setState(() => _errorCode = error.message);
+    } on TenantApiException catch (error) {
+      if (mounted) setState(() => _errorCode = error.message);
+    } catch (_) {
+      if (mounted) setState(() => _errorCode = 'UNKNOWN_ERROR');
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = AppStrings.of(context);
+    final brand = _brand;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(strings.appTitle),
+        actions: [
+          Tooltip(
+            message: strings.engineNotReady,
+            child: const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 8),
+              child: Icon(Icons.shield_outlined),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsetsDirectional.only(end: 12),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<AppLanguage>(
+                key: const Key('languagePicker'),
+                value: widget.language,
+                onChanged: (value) {
+                  if (value != null) widget.onLanguageChanged(value);
+                },
+                items: [
+                  DropdownMenuItem(
+                    value: AppLanguage.automatic,
+                    child: Text(strings.systemLanguage),
+                  ),
+                  DropdownMenuItem(
+                    value: AppLanguage.persian,
+                    child: Text(strings.persianLanguage),
+                  ),
+                  DropdownMenuItem(
+                    value: AppLanguage.english,
+                    child: Text(strings.englishLanguage),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 740),
+            child: ListView(
+              padding: const EdgeInsets.all(18),
+              children: [
+                const SizedBox(height: 14),
+                const Icon(Icons.shield_moon_outlined, size: 60),
+                const SizedBox(height: 12),
+                Text(
+                  strings.appHeadline,
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.headlineSmall,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  strings.appIntroduction,
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+                const SizedBox(height: 22),
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(18),
+                    child: Form(
+                      key: _formKey,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Text(
+                            strings.identifyAccount,
+                            style: Theme.of(context).textTheme.titleLarge,
+                          ),
+                          const SizedBox(height: 18),
+                          TextFormField(
+                            key: const Key('accountUsername'),
+                            controller: _username,
+                            textDirection: TextDirection.ltr,
+                            decoration: InputDecoration(
+                              labelText: strings.accountUsername,
+                              hintText: strings.accountUsernameHint,
+                              border: const OutlineInputBorder(),
+                            ),
+                            validator: (text) =>
+                                (text == null || text.trim().isEmpty)
+                                    ? strings.usernameRequired
+                                    : null,
+                          ),
+                          const SizedBox(height: 13),
+                          TextFormField(
+                            key: const Key('subscriptionLink'),
+                            controller: _subscription,
+                            textDirection: TextDirection.ltr,
+                            decoration: InputDecoration(
+                              labelText: strings.subscription,
+                              hintText: strings.subscriptionHint,
+                              border: const OutlineInputBorder(),
+                            ),
+                            validator: (text) =>
+                                (text == null || text.trim().isEmpty)
+                                    ? strings.subscriptionRequired
+                                    : null,
+                          ),
+                          const SizedBox(height: 13),
+                          TextFormField(
+                            key: const Key('tenantCode'),
+                            controller: _tenantCode,
+                            textDirection: TextDirection.ltr,
+                            decoration: InputDecoration(
+                              labelText: strings.tenantCode,
+                              hintText: strings.tenantCodeHint,
+                              border: const OutlineInputBorder(),
+                            ),
+                          ),
+                          const SizedBox(height: 18),
+                          FilledButton.icon(
+                            key: const Key('identifyButton'),
+                            onPressed: _loading ? null : _identify,
+                            icon: _loading
+                                ? const SizedBox.square(
+                                    dimension: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Icon(Icons.verified_user_outlined),
+                            label: Text(strings.identifyButton),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                if (_errorCode != null) ...[
+                  const SizedBox(height: 12),
+                  SelectableText(
+                    strings.error(_errorCode!),
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                  ),
+                ],
+                if (brand != null) ...[
+                  const SizedBox(height: 20),
+                  BrandDetails(brand: brand),
+                ],
+                const SizedBox(height: 20),
+                Text(
+                  strings.developmentNotice,
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class BrandDetails extends StatelessWidget {
+  const BrandDetails({required this.brand, super.key});
+
+  final BrandPreview brand;
+
+  Color get _brandColor => Color(
+        int.parse('FF${brand.primaryColor.substring(1)}', radix: 16),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = AppStrings.of(context);
+    final status = switch (brand.accountStatus) {
+      'expired' => strings.statusExpired,
+      'active' => strings.statusActive,
+      _ => strings.statusOther(brand.accountStatus),
+    };
+
+    return Theme(
+      data: Theme.of(context).copyWith(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: _brandColor,
+          brightness: Theme.of(context).brightness,
+        ),
+      ),
+      child: Card(
+        key: const Key('brandCard'),
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  CircleAvatar(
+                    radius: 26,
+                    backgroundColor: _brandColor,
+                    child: const Icon(Icons.shield, color: Colors.white),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      brand.brandName,
+                      style: Theme.of(context).textTheme.headlineSmall,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(status),
+              const Divider(height: 30),
+              _CopyValue(label: strings.supportTelegram, value: brand.telegramUrl),
+              _CopyValue(label: strings.renewalLink, value: brand.renewalUrl),
+              _CopyValue(label: strings.supportPhone, value: brand.phone),
+              _CopyValue(label: strings.website, value: brand.websiteUrl),
+              if (brand.supportText != null) ...[
+                const SizedBox(height: 8),
+                Text(brand.supportText!),
+              ],
+              const SizedBox(height: 16),
+              FilledButton.icon(
+                onPressed: null,
+                icon: const Icon(Icons.power_settings_new),
+                label: Text(strings.connectionDisabled),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CopyValue extends StatelessWidget {
+  const _CopyValue({required this.label, required this.value});
+
+  final String label;
+  final String? value;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = value;
+    if (text == null || text.isEmpty) return const SizedBox.shrink();
+    final strings = AppStrings.of(context);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 125,
+            child: Text(
+              label,
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          ),
+          Expanded(
+            child: SelectableText(
+              text,
+              textDirection: TextDirection.ltr,
+            ),
+          ),
+          IconButton(
+            tooltip: strings.copyTooltip(label),
+            onPressed: () async {
+              await Clipboard.setData(ClipboardData(text: text));
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(strings.copied(label))),
+                );
+              }
+            },
+            icon: const Icon(Icons.copy_outlined),
+          ),
+        ],
+      ),
+    );
+  }
+}

@@ -1,0 +1,112 @@
+name: TwinConnect Flutter Foundation
+
+on:
+  pull_request:
+    paths:
+      - "clients/twinconnect/**"
+      - ".github/workflows/twinconnect-flutter.yml"
+      - "backend/app/routers/central_app_v1.py"
+  workflow_dispatch:
+    inputs:
+      build_four_platforms:
+        description: "Build unsigned Android, Windows, iOS, and macOS previews"
+        type: boolean
+        default: false
+      directory_url:
+        description: "Public HTTPS TwinPanel vendor directory base URL"
+        type: string
+        required: false
+
+jobs:
+  analyze-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: clients/twinconnect
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Generate native project scaffolds
+        run: flutter create --platforms=android,ios,macos,windows --org com.twinpanel --project-name twinconnect .
+      - name: Resolve packages
+        run: flutter pub get
+      - name: Analyze Dart
+        run: flutter analyze
+      - name: Unit and widget tests
+        run: flutter test --reporter expanded
+
+  unsigned-platform-previews:
+    if: github.event_name == 'workflow_dispatch' && inputs.build_four_platforms
+    needs: analyze-test
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: android
+            runner: ubuntu-latest
+          - platform: windows
+            runner: windows-latest
+          - platform: ios
+            runner: macos-latest
+          - platform: macos
+            runner: macos-latest
+    runs-on: ${{ matrix.runner }}
+    defaults:
+      run:
+        working-directory: clients/twinconnect
+    env:
+      TWINCONNECT_DIRECTORY_URL: ${{ inputs.directory_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Generate native project files
+        run: flutter create --platforms=android,ios,macos,windows --org com.twinpanel --project-name twinconnect .
+      - name: Build Android (unsigned preview)
+        if: matrix.platform == 'android'
+        run: flutter build apk --release --dart-define=TWINCONNECT_DIRECTORY_URL=$TWINCONNECT_DIRECTORY_URL
+      - name: Build Windows
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: flutter build windows --release "--dart-define=TWINCONNECT_DIRECTORY_URL=$env:TWINCONNECT_DIRECTORY_URL"
+      - name: Build iOS app without signing
+        if: matrix.platform == 'ios'
+        run: flutter build ios --release --no-codesign "--dart-define=TWINCONNECT_DIRECTORY_URL=$TWINCONNECT_DIRECTORY_URL"
+      - name: Build macOS app
+        if: matrix.platform == 'macos'
+        run: flutter build macos --release "--dart-define=TWINCONNECT_DIRECTORY_URL=$TWINCONNECT_DIRECTORY_URL"
+      - name: Upload Android artifact
+        uses: actions/upload-artifact@v4
+        if: matrix.platform == 'android'
+        with:
+          name: twinconnect-android-preview
+          path: clients/twinconnect/build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        if: matrix.platform == 'windows'
+        with:
+          name: twinconnect-windows-preview
+          path: clients/twinconnect/build/windows/x64/runner/Release/**
+          if-no-files-found: error
+      - name: Upload iOS .app artifact (not IPA)
+        uses: actions/upload-artifact@v4
+        if: matrix.platform == 'ios'
+        with:
+          name: twinconnect-ios-unsigned-app
+          path: clients/twinconnect/build/ios/iphoneos/Runner.app/**
+          if-no-files-found: error
+      - name: Upload macOS app artifact
+        uses: actions/upload-artifact@v4
+        if: matrix.platform == 'macos'
+        with:
+          name: twinconnect-macos-preview
+          path: clients/twinconnect/build/macos/Build/Products/Release/*.app/**
+          if-no-files-found: error
