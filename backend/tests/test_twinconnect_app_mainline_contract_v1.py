@@ -72,7 +72,7 @@ class TwinConnectMainlineContract(unittest.TestCase):
         self.assertIn("getAppAccess(owner,subscriptionId,reset)", delivery)
         self.assertIn("registerAppDirectory(origin.trim())", delivery)
         self.assertIn("/v1/central-app/admin/register", api)
-        self.assertIn("'/v1/app/register'", DIRECTORY.replace('"', "'")) if False else None
+        self.assertIn('@router.post("/admin/register")', DIRECTORY.read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":
