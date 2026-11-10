@@ -176,7 +176,7 @@ export function LegacySubscriptionsRuntimePage(){
 
   const act=async(key:string,label:string,fn:()=>Promise<unknown>,close=false)=>{
     if(busy)return;setBusy(key);setError("");setOk("");
-    try{await fn();setOk(label);await load(true);if(close)setModal(null);}catch(reason){setError(reason instanceof Error?reason.message:String(reason));}finally{setBusy("");}
+    try{await fn();setOk(label);if(close&&key==="edit"){setModal(null);void load(true);}else{await load(true);if(close)setModal(null);}}catch(reason){setError(reason instanceof Error?reason.message:String(reason));}finally{setBusy("");}
   };
 
   const planDraft=(plan:RuntimeRow|undefined)=>({
