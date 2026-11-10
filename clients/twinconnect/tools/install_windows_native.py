@@ -122,7 +122,8 @@ def install() -> None:
             result->Error("WINDOWS_ADMIN_REQUIRED");
             return;
           }
-          if (!twinconnect_wireguard::ValidConfig(*raw)) {
+          if (!twinconnect_wireguard::ValidConfig(
+                  twinconnect_wireguard::ProtectedFullTunnelConfig(*raw))) {
             result->Error("WIREGUARD_CONFIG_UNSAFE");
             return;
           }
