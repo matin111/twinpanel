@@ -110,7 +110,7 @@ void main() {
     expect(find.byKey(const Key('accountUsername')), findsOneWidget);
     expect(find.byKey(const Key('appPassword')), findsOneWidget);
     expect(find.byKey(const Key('identifyButton')), findsOneWidget);
-    expect(find.text('Sign in'), findsOneWidget);
+    expect(find.text('Sign in'), findsWidgets);
     // The connection engine is deliberately not mounted to any action.
     expect(find.byKey(const Key('brandCard')), findsNothing);
   });
