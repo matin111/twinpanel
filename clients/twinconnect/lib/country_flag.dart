@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 /// Vector flags rendered by Flutter itself. Windows does not consistently
@@ -107,8 +109,8 @@ class _FlagPainter extends CustomPainter {
         for (int i = 0; i < 5; i++) {
           final angle = i * 6.283185307179586 / 5 - 1.5707963267948966;
           // Small stars remain visible even at compact list sizes.
-          final x = size.width * (.38 + .09 * _cos(angle));
-          final y = size.height * (.25 + .16 * _sin(angle));
+          final x = size.width * (.38 + .09 * math.cos(angle));
+          final y = size.height * (.25 + .16 * math.sin(angle));
           canvas.drawCircle(Offset(x, y), size.width * .014, star);
         }
       default:
@@ -133,16 +135,6 @@ class _FlagPainter extends CustomPainter {
       ..color = Colors.white.withValues(alpha: .27)
       ..style = PaintingStyle.stroke
       ..strokeWidth = .75);
-  }
-
-  // Small polynomial approximations are not needed; dart:math trig suffices.
-  static double _cos(double value) => _trig(value, true);
-  static double _sin(double value) => _trig(value, false);
-  static double _trig(double value, bool cosine) {
-    final x = cosine ? value + 1.5707963267948966 : value;
-    final z = x % 6.283185307179586;
-    final t = z > 3.141592653589793 ? z - 6.283185307179586 : z;
-    return t * (1 - t * t / 6 * (1 - t * t / 20 * (1 - t * t / 42)));
   }
 
   @override
