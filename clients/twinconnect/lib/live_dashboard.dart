@@ -52,7 +52,7 @@ class _DemoServer {
 }
 
 class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
-  bool _persian = true;
+  bool _persian = false;
   bool _dark = true;
   String _page = 'home';
   String _filter = 'all';
@@ -286,7 +286,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
         child: Container(
-      key: const Key('devConnectionStatus'),
+      key: const Key('liveConnectionStatus'),
       padding: const EdgeInsets.fromLTRB(18, 18, 18, 15),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(29),
@@ -315,7 +315,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           duration: const Duration(milliseconds: 240),
           child: KeyedSubtree(
             key: const ValueKey('dev-disconnected'),
-            child: smallPill(tr('آفلاین', 'Offline'), icon: Icons.circle),
+            child: smallPill(tr('وضعیت نامشخص', 'Status unknown'), icon: Icons.circle),
           ),
         ),
         const SizedBox(height: 13),
@@ -581,7 +581,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           Row(children: [
             Expanded(child: txt(tr('وضعیت شبکه', 'Network status'),
               size: 17, bold: true)),
-            smallPill(tr('بدون اتصال', 'Disconnected')),
+            smallPill(tr('بررسی در کنترل اتصال', 'Check VPN controls')),
           ]),
           const SizedBox(height: 16),
           Row(children: [
@@ -608,7 +608,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
             child: Row(children: [
               if (selectedServer != null) CountryFlag(selectedServer!.flag, width: 30),
               const SizedBox(width: 9),
-              Expanded(child: txt(demoServers[_selected].country, bold: true)),
+              Expanded(child: txt(selectedServer?.country ?? '—', bold: true)),
               txt(tr('از پنل', 'Panel'), color: sub, size: 10),
             ]),
           ),
