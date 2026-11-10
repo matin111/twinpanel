@@ -1090,6 +1090,36 @@ async def _ensure_modern_xray(
             ).strip().replace("\n", "; ")[:350]
         except Exception:
             pass
+        # Reduce recent Xray journal entries to fixed error categories on the
+        # node itself. Never return raw logs or attacker-controlled log text.
+        failure_reason = "UNKNOWN"
+        try:
+            reason_script = (
+                "python3 - <<'PYXRAYREASON'\n"
+                "import subprocess\n"
+                "p=subprocess.run(['journalctl','-u','xray.service',"
+                "'--since','-90 seconds','--no-pager','-n','80',"
+                "'--output=cat'],capture_output=True,text=True,timeout=8)\n"
+                "s=p.stdout.lower()\n"
+                "checks=[('ADDRESS_IN_USE',('address already in use','bind: address already in use')),"
+                "('CERTIFICATE_ERROR',('failed to load certificate','certificate verify failed','no such file or directory: certificate')),"
+                "('PERMISSION_DENIED',('permission denied','operation not permitted')),"
+                "('INVALID_CONFIG',('failed to load config','failed to parse','invalid configuration')),"
+                "('START_LIMIT',('start request repeated too quickly',))]\n"
+                "print(next((name for name,words in checks "
+                "if any(word in s for word in words)),'UNKNOWN'))\n"
+                "PYXRAYREASON"
+            )
+            candidate_reason = str(
+                await provision.cmd(conn, reason_script, check=False, timeout=12)
+            ).strip().splitlines()[-1]
+            if candidate_reason in {
+                "ADDRESS_IN_USE", "CERTIFICATE_ERROR", "PERMISSION_DENIED",
+                "INVALID_CONFIG", "START_LIMIT", "UNKNOWN",
+            }:
+                failure_reason = candidate_reason
+        except Exception:
+            pass
         rollback_result = "not_attempted"
         try:
             await provision.cmd(
@@ -1109,7 +1139,7 @@ async def _ensure_modern_xray(
             "XRAY_MODERN_START_VERIFICATION_FAILED "
             f"service_active={service_ok} "
             f"missing_tcp_ports={','.join(map(str, missing_listeners)) or 'none'} "
-            f"systemd={diagnostics} "
+            f"systemd={diagnostics} reason={failure_reason} "
             f"rollback={rollback_result}"
         )
 
