@@ -17,6 +17,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('devConnectionStatus')), findsOneWidget);
+    expect(find.byKey(const Key('devConnectionStats')), findsOneWidget);
+    expect(find.text('— ms'), findsWidgets);
+    expect(find.text('— B/s'), findsNWidgets(2));
     expect(find.byKey(const Key('devSampleNotice')), findsOneWidget);
     for (final page in ['home', 'locations', 'settings', 'account']) {
       expect(find.byKey(Key('devNav_$page')), findsOneWidget);
@@ -46,9 +49,9 @@ void main() {
     await tester.pumpAndSettle();
     await openLocations(tester);
     expect(VpnProtocols.all.length, 16);
-    final list = tester.widget<ListView>(
-      find.byKey(const Key('devProtocolFilters')));
-    expect(list.scrollDirection, Axis.horizontal);
+    expect(find.byKey(const Key('devProtocolFilters')), findsOneWidget);
+    expect(find.byType(ChoiceChip), findsNWidgets(17));
+    expect(find.byKey(const Key('devFilter_sudoku')), findsOneWidget);
     await tester.tap(find.byKey(const Key('devFilter_wireguard')));
     await tester.pumpAndSettle();
     expect(find.textContaining('Netherlands'), findsOneWidget);
