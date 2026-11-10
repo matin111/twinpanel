@@ -15,6 +15,7 @@
 #include <windows.h>
 #include <wincrypt.h>
 #include <sddl.h>
+#include <shlobj.h>
 #include <winsvc.h>
 #include <flutter/encodable_value.h>
 #include <algorithm>
@@ -28,6 +29,8 @@
 
 #pragma comment(lib, "Crypt32.lib")
 #pragma comment(lib, "Advapi32.lib")
+#pragma comment(lib, "Shell32.lib")
+#pragma comment(lib, "Ole32.lib")
 
 namespace twinconnect_wireguard {
 
@@ -46,13 +49,12 @@ inline bool IsAdmin() {
   return ok && elevation.TokenIsElevated != 0;
 }
 
-inline std::wstring GetEnv(const wchar_t* name) {
-  DWORD count = GetEnvironmentVariableW(name, nullptr, 0);
-  if (count < 2 || count > 32768) return L"";
-  std::wstring value(count, L'\0');
-  const DWORD got = GetEnvironmentVariableW(name, value.data(), count);
-  if (got == 0 || got >= count) return L"";
-  value.resize(got);
+inline std::wstring TrustedFolder(REFKNOWNFOLDERID folder) {
+  PWSTR path = nullptr;
+  const HRESULT result = SHGetKnownFolderPath(folder, 0, nullptr, &path);
+  if (FAILED(result) || !path) return L"";
+  const std::wstring value(path);
+  CoTaskMemFree(path);
   return value;
 }
 
@@ -63,7 +65,7 @@ inline bool IsFile(const std::wstring& path) {
 }
 
 inline std::wstring WireGuardExe() {
-  const auto files = GetEnv(L"ProgramFiles");
+  const auto files = TrustedFolder(FOLDERID_ProgramFiles);
   if (files.empty()) return L"";
   const auto path = files + L"\\WireGuard\\wireguard.exe";
   return IsFile(path) ? path : L"";
@@ -97,7 +99,7 @@ inline bool ServiceExists() {
 // Read only handshake and transfer statistics from the locally installed
 // signed WireGuard tools. Never invoke a shell or request private-key output.
 inline bool WgQuery(const wchar_t* fixedArgs, std::string* output) {
-  const auto programFiles = GetEnv(L"ProgramFiles");
+  const auto programFiles = TrustedFolder(FOLDERID_ProgramFiles);
   if (programFiles.empty()) return false;
   const auto exe = programFiles + L"\\WireGuard\\wg.exe";
   if (!IsFile(exe)) return false;
@@ -182,7 +184,7 @@ inline void TransferTotals(int64_t* received, int64_t* sent) {
 }
 
 inline std::wstring PrivateFolder() {
-  const auto root = GetEnv(L"ProgramData");
+  const auto root = TrustedFolder(FOLDERID_ProgramData);
   return root.empty() ? L"" : root + L"\\TwinConnect";
 }
 
