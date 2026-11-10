@@ -211,9 +211,9 @@ class _TwinConnectDevAppState extends State<TwinConnectDevApp> {
         sideNav('settings', Icons.tune_rounded, tr('تنظیمات', 'Settings')),
         sideNav('account', Icons.person_outline_rounded, tr('حساب', 'Account')),
         const Spacer(),
-        if (wide) Container(
+        if (wide) glassCard(
           padding: const EdgeInsets.all(12),
-          decoration: tile(),
+          radius: 18,
           child: Column(children: [
             txt(tr('حساب آزمایشی', 'Demo account'), bold: true, size: 11),
             const SizedBox(height: 3),
@@ -658,9 +658,9 @@ class _TwinConnectDevAppState extends State<TwinConnectDevApp> {
       children: [
         heading(tr('تنظیمات', 'Settings')),
         const SizedBox(height: 15),
-        Container(
+        glassCard(
           padding: const EdgeInsets.all(12),
-          decoration: tile(radius: 25),
+          radius: 25,
           child: Column(children: [
             settingLine(Icons.shield_outlined, 'Kill Switch'),
             settingLine(Icons.dns_outlined, tr('حفاظت DNS', 'DNS protection')),
@@ -685,16 +685,22 @@ class _TwinConnectDevAppState extends State<TwinConnectDevApp> {
       children: [
         heading(tr('حساب', 'Account')),
         const SizedBox(height: 16),
-        Container(
-          padding: const EdgeInsets.all(25),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(26),
-            gradient: LinearGradient(colors: _dark
-                ? [const Color(0xFF3B275E), const Color(0xFF252746)]
-                : [const Color(0xFFEDE1FF), const Color(0xFFFDFBFF)]),
-            border: Border.all(color: purple.withValues(alpha: 0.45)),
-          ),
-          child: Row(children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(26),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+            child: Container(
+              padding: const EdgeInsets.all(25),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(26),
+                gradient: LinearGradient(colors: _dark
+                    ? [const Color(0xFF3B275E).withValues(alpha: 0.75),
+                       const Color(0xFF252746).withValues(alpha: 0.70)]
+                    : [const Color(0xFFEDE1FF).withValues(alpha: 0.80),
+                       Colors.white.withValues(alpha: 0.74)]),
+                border: Border.all(color: purple.withValues(alpha: 0.45)),
+              ),
+              child: Row(children: [
             Container(
               width: 76, height: 76,
               decoration: BoxDecoration(
@@ -714,6 +720,8 @@ class _TwinConnectDevAppState extends State<TwinConnectDevApp> {
               ],
             )),
           ]),
+            ),
+          ),
         ),
         const SizedBox(height: 17),
         Row(children: [
@@ -722,9 +730,9 @@ class _TwinConnectDevAppState extends State<TwinConnectDevApp> {
             (Icons.data_usage_rounded, tr('ترافیک', 'Traffic')),
             (Icons.event_outlined, tr('انقضا', 'Expiry')),
           ]) ...[
-            Expanded(child: Container(
+            Expanded(child: glassCard(
               padding: const EdgeInsets.symmetric(vertical: 18),
-              decoration: tile(),
+              radius: 18,
               child: Column(children: [
                 Icon(entry.$1, color: purple),
                 const SizedBox(height: 8),
