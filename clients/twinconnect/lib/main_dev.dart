@@ -129,7 +129,7 @@ class _TwinConnectDevAppState extends State<TwinConnectDevApp> {
         color: _page == page ? purple.withValues(alpha: 0.19)
             : Colors.transparent,
         child: InkWell(
-          key: Key('devNav_' + page),
+          key: Key('devNav_$page'),
           borderRadius: BorderRadius.circular(13),
           onTap: () => setState(() => _page = page),
           child: Padding(
@@ -294,8 +294,7 @@ class _TwinConnectDevAppState extends State<TwinConnectDevApp> {
             Expanded(child: Column(children: [
               txt(tr('مکان', 'Location'), size: 10, color: sub),
               const SizedBox(height: 4),
-              txt(demoServers[_selected].flag + ' ' +
-                  demoServers[_selected].country, size: 11, bold: true),
+              txt('${demoServers[_selected].flag} ${demoServers[_selected].country}', size: 11, bold: true),
             ])),
             Expanded(child: Column(children: [
               txt(tr('آی‌پی', 'IP'), size: 10, color: sub),
@@ -326,7 +325,7 @@ class _TwinConnectDevAppState extends State<TwinConnectDevApp> {
     Widget serverRow(int index) {
       final server = demoServers[index];
       return Container(
-        key: Key('devServer_' + index.toString()),
+        key: Key('devServer_$index'),
         margin: const EdgeInsets.only(bottom: 9),
         decoration: tile(selected: _selected == index, radius: 16),
         child: InkWell(
@@ -349,8 +348,7 @@ class _TwinConnectDevAppState extends State<TwinConnectDevApp> {
               Expanded(child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  txt(server.flag + '  ' + server.country +
-                      ' · ' + server.city, bold: true),
+                  txt('${server.flag}  ${server.country} · ${server.city}', bold: true),
                   const SizedBox(height: 3),
                   txt(tr('نمونه آزمایشی', 'Sample server'), size: 10, color: sub),
                 ],
@@ -377,7 +375,7 @@ class _TwinConnectDevAppState extends State<TwinConnectDevApp> {
             Padding(
               padding: const EdgeInsetsDirectional.only(end: 7),
               child: ChoiceChip(
-                key: Key('devFilter_' + entry.$1),
+                key: Key('devFilter_${entry.$1}'),
                 label: txt(entry.$2, size: 11,
                   color: _filter == entry.$1 ? Colors.white : ink),
                 selected: _filter == entry.$1,
@@ -401,7 +399,7 @@ class _TwinConnectDevAppState extends State<TwinConnectDevApp> {
         for (int i = 0; i < demoServers.length; i++)
           if ((_filter == 'all' ||
                   demoServers[i].protocols.contains(_filter)) &&
-              (demoServers[i].country + ' ' + demoServers[i].city)
+              '${demoServers[i].country} ${demoServers[i].city}'
                 .toLowerCase().contains(_search.toLowerCase()))
             i,
       ];
@@ -477,7 +475,9 @@ class _TwinConnectDevAppState extends State<TwinConnectDevApp> {
     );
 
     Widget settingLine(IconData icon, String title,
-        {bool disabled = true, VoidCallback? onTap}) => ListTile(
+        {bool disabled = true, VoidCallback? onTap}) => Material(
+      color: Colors.transparent,
+      child: ListTile(
       leading: Icon(icon, color: purple, size: 21),
       title: txt(title, bold: true),
       subtitle: disabled
@@ -488,6 +488,7 @@ class _TwinConnectDevAppState extends State<TwinConnectDevApp> {
           ? const Switch(value: false, onChanged: null)
           : Icon(Icons.chevron_right_rounded, color: sub),
       onTap: onTap,
+      ),
     );
 
     Widget settings() => Column(
