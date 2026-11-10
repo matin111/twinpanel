@@ -145,6 +145,10 @@ jobs:
         working-directory: backend
         run: PYTHONPATH=. python tests/test_fast_presence_read_txn_before_ssh_v1.py -v
 
+      - name: Ensure modern accounting never waits on SSH with staged quota writes
+        working-directory: backend
+        run: PYTHONPATH=. python tests/test_modern_accounting_collect_first_v1.py -v
+
       - name: Run NetMod UDPGW V231 regression
         working-directory: backend
         run: PYTHONPATH=. python tests/test_netmod_udpgw_v231.py
