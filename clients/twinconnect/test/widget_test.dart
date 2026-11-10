@@ -16,7 +16,7 @@ void main() {
     const en = AppStrings(Locale('en'));
 
     expect(fa.identifyAccount, 'شناسایی حساب');
-    expect(en.identifyAccount, 'Identify your account');
+    expect(en.appLoginTitle, 'Sign in');
     expect(fa.statusExpired, 'اشتراک منقضی');
     expect(en.statusExpired, 'Expired subscription');
     expect(fa.error('TENANT_MISMATCH'), contains('شناسه'));
@@ -44,7 +44,7 @@ void main() {
     await tester.tap(find.text('English').last);
     await tester.pumpAndSettle();
 
-    expect(find.text('Identify your account'), findsOneWidget);
+    expect(find.text('Sign in'), findsOneWidget);
     expect(
       Directionality.of(tester.element(find.byKey(const Key('accountUsername')))),
       TextDirection.ltr,
@@ -56,7 +56,7 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pumpWidget(const TwinConnectApp());
     await tester.pumpAndSettle();
-    expect(find.text('Identify your account'), findsOneWidget);
+    expect(find.text('Sign in'), findsOneWidget);
   });
 
   testWidgets('Persian selection is saved from English UI', (tester) async {
@@ -65,7 +65,7 @@ void main() {
     });
     await tester.pumpWidget(const TwinConnectApp());
     await tester.pumpAndSettle();
-    expect(find.text('Identify your account'), findsOneWidget);
+    expect(find.text('Sign in'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('languagePicker')));
     await tester.pumpAndSettle();
