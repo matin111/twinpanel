@@ -4,9 +4,11 @@ Status: backend/frontend implementation in an unmerged branch. Do not deploy unt
 
 For every **app-entitled** subscription created via the central subscription factory, the panel issues a *separate* app username and random 160-bit app password. The VPN username, VPN password, protocol credentials, server IP/port/SNI and original subscription share URL remain unchanged.
 
-App usernames use a unique panel namespace and owner prefix:
-- Owner: `TP<16HEX>_A_APP<16HEX>`
-- Reseller: `TP<16HEX>_R<RESID>_APP<16HEX>`
+App usernames use a panel alias allocated by the existing vendor license directory. The vendor starts with six hexadecimal digits and lengthens the alias on collisions:
+- Owner: `TP<6-16HEX>_A_APP<16HEX>`
+- Reseller: `TP<6-16HEX>_R<RESID>_APP<16HEX>`
+
+The short alias is saved locally only after successful, administrator-authorized vendor registration. Before registration the existing full namespace remains the fallback. Previously issued 16-digit namespace accounts keep working unchanged. **VPN usernames and reseller VPN prefixes never change.**
 
 No account or app credentials are created when a license does not include the app. Existing subscriptions can be issued app credentials lazily, by authenticated admin/reseller delivery or a verified owner's Telegram delivery route, without changing VPN credentials. Issuance is idempotent; **only the explicit reset action changes the app password**.
 
@@ -38,7 +40,7 @@ The Flutter login now contains only username, password and a short single-line g
 
 ## Rollout
 
-1. Merge/ship vendor panel directory/entitlement dependencies and previous API/theme PRs in dependency order.
+1. Merge/ship vendor license plan PR #6 and directory PR #7 first. Registration returns both the immutable full namespace and the centrally unique short alias. Deploy the panel and client only after both are ready.
 2. Validate additive `subscription_app_credentials` schema creation (no existing subscription columns rewritten).
 3. Validate owner/reseller bot delivery, stable links, password reset, and login from Windows test app on a **non-production** licensed panel.
 4. Add and verify transport-level protections/rate limiting and monitoring before broad public release.
