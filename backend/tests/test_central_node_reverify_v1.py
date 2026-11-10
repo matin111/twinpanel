@@ -49,7 +49,7 @@ class ExistingExitRecoveryTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(job.state,"completed")
         self.assertEqual(job.installed_protocols,16)
         self.assertEqual(job.users_assigned,1215)
-        probe.assert_awaited_once_with(db,19)
+        probe.assert_awaited_once_with(db,19,require_tls_profiles=True,allow_partial=True)
         enrolled.assert_called_once_with(db,19)
         started.assert_called_once_with(db,19,initial_full=False)
 
