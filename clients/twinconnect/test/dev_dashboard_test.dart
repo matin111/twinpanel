@@ -17,7 +17,7 @@ void main() {
     final connect = tester.widget<FilledButton>(
         find.byKey(const Key('devConnectButton')));
     expect(connect.onPressed, isNull);
-    expect(find.byKey(const Key('devProtocol_openvpn')), findsOneWidget);
+    expect(find.byKey(const Key('devFilter_openvpn')), findsOneWidget);
     expect(find.byKey(const Key('devRefreshServers')), findsOneWidget);
     await tester.ensureVisible(find.byKey(const Key('devRefreshServers')));
     await tester.pumpAndSettle();
@@ -34,8 +34,8 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('devFilter_wireguard')));
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('devProtocol_wireguard')), findsOneWidget);
-    expect(find.byKey(const Key('devProtocol_openvpn')), findsNothing);
+    expect(find.textContaining('Netherlands'), findsOneWidget);
+    expect(find.textContaining('Germany'), findsNothing);
     final connect = tester.widget<FilledButton>(
         find.byKey(const Key('devConnectButton')));
     expect(connect.onPressed, isNull);
