@@ -429,6 +429,87 @@ export function LegacySubscriptionsRuntimePage(){
     <Card>
       <div className="runtime-toolbar"><label>⌕ <input value={query} onChange={event=>{setQuery(event.target.value);setPage(0);}} placeholder={pick("نام، ایمیل، نام کاربری یا کد اشتراک…","Name, email, username or subscription code…")}/></label><select value={status} onChange={event=>{setStatus(event.target.value as typeof status);setPage(0);}}><option value="all">{pick("همه","All")}</option><option value="active">{pick("فعال","Active")}</option><option value="expired">{pick("منقضی","Expired")}</option><option value="suspended">{pick("معلق","Suspended")}</option><option value="online">{pick("آنلاین‌ها","Online now")}</option><option value="pending">{pick("در انتظار","Pending")}</option></select><select aria-label={pick("فیلتر نماینده","Filter by reseller")} value={resellerFilterId} onChange={event=>{setResellerFilterId(Number(event.target.value));setPage(0);}}><option value={0}>{pick("همه نمایندگی‌ها","All resellers")}</option><option value={-1}>{pick("بدون نماینده","No reseller")}</option>{transferResellers.map(reseller=><option key={n(reseller.id)} value={n(reseller.id)}>{s(reseller.name)||s(reseller.brand_name)||`#${reseller.id}`}</option>)}</select><button className="ghost" disabled={loading} onClick={()=>void load()}>{loading?"…":pick("بروزرسانی","Refresh")}</button></div>
       {loading&&rows.length===0?<div className="runtime-loading">…</div>:<div className="table"><table><thead><tr><th>{pick("کاربر","User")}</th><th>{pick("نماینده","Reseller")}</th><th>{pick("پلن","Plan")}</th><th>{pick("نام کاربری","Username")}</th><th>{pick("ترافیک","Traffic")}</th><th>{pick("ساخت","Created")}</th><th>{pick("انقضا","Expires")}</th><th>{pick("وضعیت","Status")}</th><th>{pick("عملیات","Actions")}</th></tr></thead><tbody>{filtered.map(item=>{const user=userMap.get(n(item.user_id));const plan=planMap.get(n(item.plan_id));return <tr key={n(item.id)}><td><div className="user-cell"><b>{user?.full_name||s(item.customer_name)||`#${item.user_id}`}</b><small dir="ltr">{user?.email||s(item.customer_email)||"—"}</small></div></td><td><div className="user-cell"><b>{s(item.reseller_name)||pick("مستقیم","Direct")}</b>{n(item.reseller_id)>0&&<small dir="ltr">#{n(item.reseller_id)}</small>}</div></td><td><div className="user-cell"><b>{s(item.plan_name)||s(plan?.name)||`#${item.plan_id}`}</b><small dir="ltr">MV-{n(item.id)}</small></div></td><td><div className="secret-row"><b dir="ltr">{s(item.account_username)||"—"}</b>{s(item.account_username)&&<button className="mini-btn" onClick={()=>copy(s(item.account_username))}>{pick("کپی","Copy")}</button>}</div></td><td>{trafficCell(item)}</td><td>{formatDate(item.created_at)}</td><td>{expiryCell(item)}</td><td><Badge tone={tone(item.status)}>{statusLabel(item.status)}</Badge></td><td><div className="row-actions"><button className="danger" disabled={!!busy} onClick={()=>void remove(item)}>{pick("حذف","Delete")}</button><button disabled={!!busy} onClick={()=>void toggleStatus(item)}>{s(item.status).toLowerCase()==="active"?pick("تعلیق","Suspend"):pick("فعال‌سازی","Activate")}</button><button onClick={()=>openEdit(item)}>{pick("ویرایش","Edit")}</button><button onClick={()=>openExtend(item)}>{pick("تمدید","Renew")}</button><button className="ghost" disabled={!!busy} onClick={()=>void openTransfer(item)}>{pick("انتقال اکانت","Transfer account")}</button><button className="primary-soft" onMouseEnter={()=>prefetchSubscriptionLink(item)} onFocus={()=>prefetchSubscriptionLink(item)} onClick={()=>void openSubscriptionLink(item)}>{pick("سابلینک","Sub-link")}</button><button className="ghost" type="button" data-testid="admin-app-delivery-action" onClick={()=>setAppDeliverySubscriptionId(n(item.id)||null)}>{pick("ورود اپ","App Delivery")}</button></div></td></tr>;})}</tbody></table>{filtered.length===0&&<div className="runtime-empty">{pick("اشتراکی پیدا نشد","No subscriptions found")}</div>}</div>}
+
+      <div className="mobile-subscription-cards" aria-label={pick("فهرست اشتراک‌ها","Subscriptions list")}>
+        {filtered.map(item=>{
+          const user=userMap.get(n(item.user_id));
+          const plan=planMap.get(n(item.plan_id));
+          return <article className="mobile-subscription-card" key={n(item.id)}>
+            <div className="mobile-subscription-card-head">
+              <div className="mobile-subscription-user">
+                <span className="mobile-subscription-avatar" aria-hidden="true">◉</span>
+                <div className="mobile-subscription-identities">
+                  <b dir="auto">{s(item.account_username)||user?.full_name||s(item.customer_name)||`#${item.user_id}`}</b>
+                  <small>{user?.full_name||s(item.customer_name)||pick("کاربر","Customer")}</small>
+                </div>
+              </div>
+              <Badge tone={tone(item.status)}>{statusLabel(item.status)}</Badge>
+            </div>
+            <div className="mobile-subscription-meta">
+              <span className="mobile-subscription-plan">{s(item.plan_name)||s(plan?.name)||pick("پلن دستی","Manual plan")}</span>
+              <span dir="ltr">MV-{n(item.id)}</span>
+              <span>{s(item.reseller_name)||pick("کاربر مستقیم","Direct customer")}</span>
+              <span dir="auto" className="mobile-subscription-contact">{user?.email||s(item.customer_email)||"—"}</span>
+            </div>
+            <div className="mobile-subscription-usage">
+              <div><small>{pick("حجم","Traffic")}</small>{trafficCell(item)}</div>
+              <div><small>{pick("انقضا","Expiry")}</small>{expiryCell(item)}</div>
+            </div>
+            <div className="mobile-subscription-actions">
+              <button type="button" className="mobile-action mobile-action-renew" disabled={!!busy} onClick={()=>openExtend(item)}>▣ {pick("تمدید","Renew")}</button>
+              <button type="button" className="mobile-action" disabled={!!busy} onClick={()=>openEdit(item)}>✎ {pick("ویرایش","Edit")}</button>
+              <button type="button" className="mobile-action" disabled={!!busy} onClick={()=>{openEdit(item);setEditResetUsage(true);}}>↻ {pick("ریست","Reset")}</button>
+              <button type="button" className="mobile-action mobile-action-connect" onMouseEnter={()=>prefetchSubscriptionLink(item)} onFocus={()=>prefetchSubscriptionLink(item)} onClick={()=>void openSubscriptionLink(item)}>↗ {pick("اتصال","Connect")}</button>
+            </div>
+            <details className="mobile-subscription-more">
+              <summary>{pick("عملیات بیشتر","More actions")} <span aria-hidden="true">⋯</span></summary>
+              <div className="mobile-subscription-more-actions">
+                <button type="button" disabled={!!busy} onClick={()=>void toggleStatus(item)}>{s(item.status).toLowerCase()==="active"?pick("تعلیق","Suspend"):pick("فعال‌سازی","Activate")}</button>
+                <button type="button" disabled={!!busy} onClick={()=>void openTransfer(item)}>{pick("انتقال اکانت","Transfer account")}</button>
+                <button type="button" onClick={()=>setAppDeliverySubscriptionId(n(item.id)||null)}>{pick("ورود اپ","App Delivery")}</button>
+                <button type="button" className="danger" disabled={!!busy} onClick={()=>void remove(item)}>{pick("حذف","Delete")}</button>
+              </div>
+            </details>
+          </article>;
+        })}
+        {!loading&&filtered.length===0&&<div className="runtime-empty">{pick("اشتراکی پیدا نشد","No subscriptions found")}</div>}
+      </div>
+      <style>{`
+        .legacy-subscriptions-page .mobile-subscription-cards{display:none}
+        @media(max-width:760px){
+          .legacy-subscriptions-page .runtime-toolbar+.table{display:none}
+          .legacy-subscriptions-page .mobile-subscription-cards{display:grid;gap:13px;margin-top:15px;direction:rtl}
+          .legacy-subscriptions-page .mobile-subscription-card{min-width:0;overflow:hidden;padding:15px;border:1px solid rgba(119,118,240,.48);border-radius:19px;background:linear-gradient(145deg,rgba(52,44,106,.34),rgba(12,23,44,.96) 58%,rgba(11,21,40,.98));box-shadow:inset 0 1px rgba(255,255,255,.075),0 8px 23px rgba(0,0,0,.14)}
+          .legacy-subscriptions-page .mobile-subscription-card-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+          .legacy-subscriptions-page .mobile-subscription-user{display:flex;align-items:center;min-width:0;gap:10px}
+          .legacy-subscriptions-page .mobile-subscription-avatar{display:grid;place-items:center;flex:none;width:39px;height:39px;border:1px solid rgba(151,114,255,.65);border-radius:50%;color:#e9d5ff;background:linear-gradient(135deg,#6430b8,#263d91)}
+          .legacy-subscriptions-page .mobile-subscription-identities{min-width:0;display:flex;flex-direction:column;gap:3px}
+          .legacy-subscriptions-page .mobile-subscription-identities b{font-size:15px;max-width:100%;overflow-wrap:anywhere}
+          .legacy-subscriptions-page .mobile-subscription-identities small{color:#aebbd5;font-size:11px;overflow-wrap:anywhere}
+          .legacy-subscriptions-page .mobile-subscription-meta{display:flex;gap:8px 12px;flex-wrap:wrap;align-items:center;margin:12px 0;font-size:12px;color:#b8c7e5}
+          .legacy-subscriptions-page .mobile-subscription-meta>span{overflow-wrap:anywhere}
+          .legacy-subscriptions-page .mobile-subscription-plan{border:1px solid rgba(45,145,255,.54);border-radius:999px;background:rgba(8,83,182,.44);color:#d2e9ff;padding:4px 10px;font-weight:700}
+          .legacy-subscriptions-page .mobile-subscription-contact{max-width:100%}
+          .legacy-subscriptions-page .mobile-subscription-usage{display:grid;grid-template-columns:1fr 1fr;gap:8px;border-top:1px solid rgba(148,163,184,.14);padding-top:10px;margin-bottom:13px}
+          .legacy-subscriptions-page .mobile-subscription-usage>div{min-width:0;overflow-wrap:anywhere}
+          .legacy-subscriptions-page .mobile-subscription-usage>div>small{display:block;color:#93a6c8;margin-bottom:3px}
+          .legacy-subscriptions-page .mobile-subscription-usage .user-cell b{font-size:12px}
+          .legacy-subscriptions-page .mobile-subscription-actions{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+          .legacy-subscriptions-page .mobile-action{display:flex;align-items:center;justify-content:center;gap:4px;min-width:0;min-height:43px;padding:8px 3px;color:#f8faff;font-size:12px;font-weight:700;border:1px solid rgba(121,145,192,.46);border-radius:12px;background:linear-gradient(180deg,#25334e,#141e34);cursor:pointer;white-space:nowrap}
+          .legacy-subscriptions-page .mobile-action-renew{background:linear-gradient(125deg,#137ee9,#1351b7);border-color:#309cfb}
+          .legacy-subscriptions-page .mobile-action-connect{background:linear-gradient(125deg,#7226ad,#4934aa);border-color:#a05aff}
+          .legacy-subscriptions-page .mobile-action:disabled{opacity:.5;cursor:not-allowed}
+          .legacy-subscriptions-page .mobile-subscription-more{margin-top:11px;border-top:1px solid rgba(148,163,184,.16);padding-top:8px}
+          .legacy-subscriptions-page .mobile-subscription-more summary{cursor:pointer;font-size:12px;color:#b8c9f1;list-style:none;display:flex;justify-content:space-between;align-items:center}
+          .legacy-subscriptions-page .mobile-subscription-more summary::-webkit-details-marker{display:none}
+          .legacy-subscriptions-page .mobile-subscription-more-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:10px}
+          .legacy-subscriptions-page .mobile-subscription-more-actions button{min-height:42px;border-radius:10px}
+          .legacy-subscriptions-page .mobile-subscription-more-actions .danger{color:#fecaca}
+        }
+        @media(max-width:355px){
+          .legacy-subscriptions-page .mobile-subscription-actions{grid-template-columns:repeat(2,minmax(0,1fr))}
+        }
+      `}</style>
     </Card>
     <div className="runtime-toolbar" style={{justifyContent:"space-between",marginTop:12}}>
       <span>{matchedTotal.toLocaleString("fa-IR")} {pick("نتیجه","results")} · {pick("صفحه","Page")} {(page+1).toLocaleString("fa-IR")} / {pageCount.toLocaleString("fa-IR")}</span>
