@@ -32,6 +32,8 @@ jobs:
           cache: true
       - name: Generate native project scaffolds
         run: flutter create --platforms=android,ios,macos,windows --org com.twinpanel --project-name twinconnect .
+      - name: Install reviewed Android WireGuard source
+        run: python tools/install_android_native.py
       - name: Resolve packages
         run: flutter pub get
       - name: Analyze Dart
@@ -69,6 +71,9 @@ jobs:
           cache: true
       - name: Generate native project files
         run: flutter create --platforms=android,ios,macos,windows --org com.twinpanel --project-name twinconnect .
+      - name: Install Android native WireGuard
+        if: matrix.platform == 'android'
+        run: python tools/install_android_native.py
       - name: Build Android (unsigned preview)
         if: matrix.platform == 'android'
         run: flutter build apk --release --dart-define=TWINCONNECT_DIRECTORY_URL=$TWINCONNECT_DIRECTORY_URL
