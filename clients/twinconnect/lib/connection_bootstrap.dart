@@ -64,19 +64,29 @@ class ConnectionBootstrap {
       panel: panel, sessionToken: sessionToken,
       protocol: definition, native: nativeProtocols);
 
-    // Reject stale/misrouted bundles that don't contain the selected node.
-    final hasNode = profiles.items.any((item) {
+    if (profiles.namespace != panel.namespace ||
+        profiles.protocol.code != definition.code) {
+      throw const ConnectionBootstrapException('PROFILE_SCOPE_MISMATCH');
+    }
+
+    // Never pass the complete subscription profile bundle to a native
+    // adapter that is connecting to only one selected node.
+    final nodeItems = profiles.items.where((item) {
       final id = item['node_id'];
-      return id is int && id.toString() == serverId ||
-          id is String && id == serverId;
-    });
-    if (!hasNode) {
+      return (id is int && id.toString() == serverId) ||
+          (id is String && id == serverId);
+    }).toList(growable: false);
+    if (nodeItems.isEmpty) {
       throw const ConnectionBootstrapException('SERVER_PROFILE_MISSING');
     }
     return ConnectionCandidate(
       server: selected.single,
       protocol: definition,
-      profiles: profiles,
+      profiles: ClientProtocolProfiles(
+        namespace: profiles.namespace,
+        protocol: definition,
+        items: List.unmodifiable(nodeItems),
+      ),
     );
   }
 }
