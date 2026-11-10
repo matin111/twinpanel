@@ -35,12 +35,16 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
   bool get _identified =>
       widget.tenant.trim().isNotEmpty && widget.account.trim().isNotEmpty;
 
-  bool get _perAppDraftSupported {
-    final platform = _capabilities.platform;
-    return platform == VpnPlatform.android ||
-        platform == VpnPlatform.windows ||
-        _capabilities.managedDevice;
-  }
+  bool get _perAppDraftSupported =>
+      _includeAppsReady || _excludeAppsReady;
+
+  // A platform name does not prove a working per-app routing engine.
+  // Windows/Android options stay disabled until OS-native rules are verified.
+  bool get _includeAppsReady =>
+      _capabilities.engineReady && _capabilities.includeApps;
+
+  bool get _excludeAppsReady =>
+      _capabilities.engineReady && _capabilities.excludeApps;
 
   @override
   void initState() {
@@ -70,7 +74,12 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
   void _update(VpnPolicy next) => setState(() => _policy = next);
 
   void _addApp() {
-    if (!_perAppDraftSupported) return;
+    if ((_policy.routingMode == VpnRoutingMode.onlySelectedApps &&
+            !_includeAppsReady) ||
+        (_policy.routingMode == VpnRoutingMode.excludeSelectedApps &&
+            !_excludeAppsReady)) {
+      return;
+    }
     final identifier = _appId.text.trim();
     if (identifier.isEmpty) return;
     if (!_policy.appIds.contains(identifier)) {
@@ -179,12 +188,12 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
                           _choice(
                             VpnRoutingMode.onlySelectedApps,
                             s.vpnOnlyApps,
-                            enabled: _perAppDraftSupported,
+                            enabled: _includeAppsReady,
                           ),
                           _choice(
                             VpnRoutingMode.excludeSelectedApps,
                             s.vpnExceptApps,
-                            enabled: _perAppDraftSupported,
+                            enabled: _excludeAppsReady,
                           ),
                         ],
                       ),
