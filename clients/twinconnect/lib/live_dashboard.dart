@@ -141,21 +141,91 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
 
   Future<void> _selectServerAndConnect(int index) async {
     final nodes = widget.servers?.servers;
-    if (nodes == null || index < 0 || index >= nodes.length) return;
-    if (_vpnBusy) return;
-    if (_vpnUp || _vpnCleanup) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(
-        tr('برای تغییر سرور ابتدا اتصال فعلی را قطع کنید.',
-           'Disconnect the current tunnel before switching servers.'))));
+    if (nodes == null || index < 0 || index >= nodes.length ||
+        _vpnBusy || !Platform.isWindows) return;
+
+    final targetId = nodes[index].id;
+    if (_vpnUp && _activeNodeId == targetId) {
+      setState(() { _selected = index; _page = 'home'; });
       return;
     }
-    setState(() {
-      _selected = index;
-      _autoFastest = false;
-      _filter = 'wireguard';
-      _page = 'home';
-    });
-    await _toggleVpn();
+    if (_vpnUnmanaged) {
+      setState(() => _vpnError = 'UNMANAGED_WIREGUARD_SERVICE');
+      return;
+    }
+    if (!_vpnReady || !_wireGuardAllowed) {
+      setState(() => _vpnError = !_wireGuardAllowed
+          ? 'WIREGUARD_NOT_ALLOWED'
+          : 'WIREGUARD_NOT_INSTALLED_OR_ADMIN_REQUIRED');
+      return;
+    }
+
+    // Validate the target and obtain only its authorized profile BEFORE
+    // removing the working tunnel. A failed preflight keeps it running.
+    setState(() { _vpnBusy = true; _vpnError = null; });
+    try {
+      final policy = await _vpnPolicy.load(
+          widget.panel.namespace, widget.username);
+      final capabilities = await NativeVpnBridge.probe();
+      final native = await NativeVpnBridge.protocolReadiness();
+      final candidate = await ConnectionBootstrap(
+          api: TenantApi.fromBuildConfig()).prepare(
+        panel: widget.panel,
+        sessionToken: widget.sessionToken,
+        serverId: targetId,
+        protocolCode: 'wireguard',
+        policy: policy,
+        capabilities: capabilities,
+        nativeProtocols: native,
+      );
+      final node = WindowsWireGuardController.configForSingleNode(
+          candidate.profiles, targetId);
+      if (!mounted) return;
+
+      if (_vpnUp || _vpnCleanup) {
+        await _vpn.stop();
+        if (!mounted) return;
+        // Never start a second tunnel until the native bridge confirms down.
+        final stopped = await _vpn.status();
+        if (stopped['state'] != 'down') {
+          throw const FormatException('PREVIOUS_TUNNEL_NOT_STOPPED');
+        }
+        setState(() {
+          _vpnUp = false;
+          _vpnVerified = false;
+          _vpnCleanup = false;
+          _vpnRx = 0;
+          _vpnTx = 0;
+          _activeNodeId = null;
+          _resetNetworkStats();
+        });
+      }
+      final started = await _vpn.start(
+        node: node,
+        policy: policy,
+        capabilities: capabilities,
+        nativeProtocols: native,
+      );
+      if (!mounted) return;
+      setState(() {
+        _selected = index;
+        _filter = 'wireguard';
+        _autoFastest = false;
+        _page = 'home';
+        _vpnUp = started['state'] == 'interface_up' ||
+            started['state'] == 'peer_verified';
+        _vpnVerified = started['state'] == 'peer_verified' &&
+            started['peerHandshakeVerified'] == true;
+        _vpnRx = started['rxBytes'] is int ? started['rxBytes'] as int : 0;
+        _vpnTx = started['txBytes'] is int ? started['txBytes'] as int : 0;
+        _activeNodeId = targetId;
+      });
+      if (_vpnUp) _startNetworkStats();
+    } catch (error) {
+      if (mounted) setState(() => _vpnError = _errorText(error));
+    } finally {
+      if (mounted) setState(() => _vpnBusy = false);
+    }
   }
 
   @override
