@@ -2217,8 +2217,18 @@ async def _telegram_notification_worker(bot):
                     .delivered_at
                     .is_(None)
                 )
+                # Fair durable outbox: prioritize never-attempted events
+                # (especially newly fulfilled purchases), then retry older
+                # failures. Ordering only by ID permanently starved every
+                # new purchase when 20 ancient blocked/unlinked recipients
+                # occupied the fixed-size poll window.
+                #
+                # This uses the existing attempts column and commits; no
+                # schema migration, re-created subscription or forced resend
+                # of already delivered notifications is involved.
                 .order_by(
-                    TelegramNotification.id.asc()
+                    TelegramNotification.attempts.asc(),
+                    TelegramNotification.id.asc(),
                 )
                 .limit(20)
                 .all()

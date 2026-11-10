@@ -1,0 +1,24 @@
+name: Telegram Purchase Delivery Fairness Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'backend/app/telegram_runtime_bot.py'
+      - 'backend/tests/test_telegram_notification_outbox_fairness_v1.py'
+      - '.github/workflows/telegram-purchase-delivery-fairness.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'backend/app/telegram_runtime_bot.py'
+      - 'backend/tests/test_telegram_notification_outbox_fairness_v1.py'
+
+jobs:
+  prevent-outbox-starvation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check SQL ordering and purchase delivery deduplication invariants
+        run: python backend/tests/test_telegram_notification_outbox_fairness_v1.py -v
