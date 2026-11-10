@@ -12,6 +12,7 @@ import 'tenant_api.dart';
 import 'tenant_models.dart';
 import 'vpn_policy_store.dart';
 import 'windows_wireguard.dart';
+import 'interactive_glass_card.dart';
 
 /// Actual Windows WireGuard system-tunnel controls, distinct from the offline
 /// Dev dashboard. Requires the official WireGuard installation, Administrator
@@ -170,11 +171,12 @@ class _WindowsConnectionCardState extends State<WindowsConnectionCard> {
     final validSelection = available.any((server) => server.id == _selectedId)
         ? _selectedId : null;
 
-    return Card(
+    return TwinConnectGlassCard(
       key: const Key('windowsConnectionCard'),
-      child: Padding(
-        padding: const EdgeInsets.all(17),
-        child: Column(
+      dark: Theme.of(context).brightness == Brightness.dark,
+      radius: 22,
+      padding: const EdgeInsets.all(17),
+      child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(s.pick('اتصال WireGuard ویندوز', 'Windows WireGuard'),
@@ -271,7 +273,6 @@ class _WindowsConnectionCardState extends State<WindowsConnectionCard> {
               ),
             ],
           ],
-        ),
       ),
     );
   }
