@@ -1060,6 +1060,9 @@ async def _ensure_modern_xray(
             "systemctl enable xray >/dev/null; "
             "systemctl restart xray"
         ),
+        # A failed restart must still enter the service/listener diagnostic
+        # and safe rollback path below instead of raising prematurely.
+        check=False,
     )
 
     await asyncio.sleep(1)
