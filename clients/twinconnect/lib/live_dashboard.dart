@@ -370,7 +370,31 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         if (_vpnUp) _startNetworkStats();
       }
     } catch (error) {
-      if (mounted) setState(() => _vpnError = _errorText(error));
+      if (mounted) {
+        setState(() => _vpnError = _errorText(error));
+        // A helper may time out after Windows has already removed the tunnel.
+        // Reconcile with the actual service; never infer failure = connected.
+        try {
+          final actual = await _vpn.status().timeout(
+            const Duration(seconds: 8));
+          if (mounted) {
+            final stillUp = actual['state'] == 'interface_up' ||
+                actual['state'] == 'peer_verified';
+            setState(() {
+              _vpnUp = stillUp;
+              _vpnVerified = actual['state'] == 'peer_verified' &&
+                  actual['peerHandshakeVerified'] == true;
+              _vpnCleanup = actual['state'] == 'needs_cleanup';
+              if (!stillUp) {
+                _activeNodeId = null;
+                _resetNetworkStats();
+              }
+            });
+          }
+        } catch (_) {
+          // Keep the last proven state if Windows cannot be queried.
+        }
+      }
     } finally {
       if (mounted) setState(() => _vpnBusy = false);
     }
