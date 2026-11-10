@@ -75,6 +75,7 @@ class SeparateAppCredentialContract(unittest.TestCase):
             '@router.get("/session/brand")', 1)[0]
         self.assertIn("authenticate_app(db, payload.username, payload.password)", login)
         self.assertIn('"session_token": token', login)
+        self.assertIn('"namespace": subscription_app_namespace(db, sub)', login)
         self.assertIn('"brand": brand', login)
         self.assertNotIn('"app_password"', login)
         self.assertNotIn('"subscription_link"', login)
