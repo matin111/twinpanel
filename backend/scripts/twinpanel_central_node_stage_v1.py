@@ -29,6 +29,7 @@ from app.services.central_sudoku_fingerprint_v1 import (
 from app.database import SessionLocal
 from app.models import Node, NodeStatus, NodeType
 from app.services.new_node_readiness_v1 import verify_new_exit_readiness
+from app.services.central_partial_protocol_scope_v1 import node_supported_protocols
 from app.protocol_account_registry import ALL_PROTOCOL_KEYS
 from app.singbox_subscription_accounts import SINGBOX_PROTOCOLS
 from app.services.central_sudoku_shared_bootstrap_v2 import ensure_shared_binary
@@ -100,7 +101,8 @@ def missing_runtime_families(node_id, limit):
         # 16-family global fingerprint. A failing Sing-box family must not
         # block an independently verified Sudoku revoke/restore ACK or
         # trigger redundant shared-daemon restages.
-        if last_sudoku_applied(db, node_id) != desired_sudoku_fingerprint(db, node_id):
+        if ("sudoku" in node_supported_protocols(db, node_id)
+                and last_sudoku_applied(db, node_id) != desired_sudoku_fingerprint(db, node_id)):
             sudoku = next(f for f in FAMILIES if f.name == "sudoku")
             if sudoku not in selected:
                 selected = (*selected, sudoku)
@@ -216,13 +218,19 @@ def _run_locked(node_id, limit, apply, *, families=None, delta_only=False):
             if not bool(node.show_to_users) or not is_central_node(db, node_id):
                 raise RuntimeError("CENTRAL_DELTA_REQUIRES_REGISTERED_VISIBLE_EXIT")
         else:
-            # First hidden-node install must prove all listeners are healthy.
-            readiness = asyncio.run(verify_new_exit_readiness(db, node_id))
-            if not readiness.get("ok"):
+            # Verify each offered listener, not an arbitrary 16/16 quota.
+            # Never stage a daemon family whose protocol isn't live-ready.
+            ready_scope = node_supported_protocols(db, node_id)
+            readiness = asyncio.run(verify_new_exit_readiness(
+                db, node_id, require_tls_profiles=True, allow_partial=True,
+            ))
+            if (not readiness.get("ok") or
+                    set(readiness.get("ready_protocols") or ()) != set(ready_scope)):
                 raise RuntimeError("CENTRAL_NODE_STAGE_PROTOCOLS_NOT_READY")
-            shared = asyncio.run(ensure_shared_binary(node, db))
-            print("CENTRAL_SUDOKU_SHARED_RUNTIME_READY",
-                  json.dumps({"node_id":node_id,**shared}),flush=True)
+            if "sudoku" in ready_scope:
+                shared = asyncio.run(ensure_shared_binary(node, db))
+                print("CENTRAL_SUDOKU_SHARED_RUNTIME_READY",
+                      json.dumps({"node_id":node_id,**shared}),flush=True)
         # Re-read after the potentially slow listener audit and serialize only
         # the short membership transaction, never the network health checks.
         db.expire_all()
@@ -245,7 +253,9 @@ def _run_locked(node_id, limit, apply, *, families=None, delta_only=False):
         if latest.fingerprint != desired.fingerprint:
             raise RuntimeError("CENTRAL_NODE_DESIRED_STATE_CHANGED_BEFORE_APPLY")
     if families is None:
-        families = FAMILIES
+        with SessionLocal() as scope_db:
+            supported = node_supported_protocols(scope_db, node_id)
+        families = tuple(f for f in FAMILIES if f.protocols & supported)
     if families:
         result = asyncio.run(reconcile_runtime_families(
             node_id, limit, BACKEND, families=families,
@@ -318,10 +328,14 @@ def _run_locked(node_id, limit, apply, *, families=None, delta_only=False):
                 "failed","verified_ready","users_queued","enrolling_users"}:
             progress.stage="completed"
             progress.state="completed"
-            progress.installed_protocols=len(ALL_PROTOCOL_KEYS)
+            supported = node_supported_protocols(db, node_id)
+            progress.installed_protocols=len(supported)
             progress.expected_protocols=len(ALL_PROTOCOL_KEYS)
             progress.users_assigned=desired.count
-            progress.error_code=None
+            progress.error_code=(
+                "PARTIAL_PROTOCOLS_PENDING"
+                if len(supported) < len(ALL_PROTOCOL_KEYS) else None
+            )
         db.commit()
     print("CENTRAL_RUNTIME_OWNERSHIP_REGISTERED",json.dumps({
         "node_id":node_id,"engine":"central","published":bool(node.show_to_users),
