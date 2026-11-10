@@ -139,6 +139,7 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
       const NativeProtocolReadiness(supportedCodes: {});
   bool _protocolCatalogUnavailable = false;
   bool _offlineDemo = false;
+  int _lookupSerial = 0;
 
   @override
   void dispose() {
@@ -150,6 +151,7 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
 
   Future<void> _identify() async {
     if (!_formKey.currentState!.validate() || _loading) return;
+    final serial = ++_lookupSerial;
     FocusScope.of(context).unfocus();
     setState(() {
       _loading = true;
@@ -178,7 +180,7 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
         username: username,
         shareToken: token,
       );
-      if (!mounted) return;
+      if (!mounted || serial != _lookupSerial) return;
       setState(() {
         _brand = brand;
         _confirmedPanel = panel;
@@ -194,29 +196,30 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
           shareToken: token,
         );
         final native = await NativeVpnBridge.protocolReadiness();
-        if (mounted) {
+        if (mounted && serial == _lookupSerial) {
           setState(() {
             _catalog = catalog;
             _nativeProtocols = native;
           });
         }
       } catch (_) {
-        if (mounted) {
+        if (mounted && serial == _lookupSerial) {
           setState(() => _protocolCatalogUnavailable = true);
         }
       }
     } on FormatException catch (error) {
-      if (mounted) setState(() => _errorCode = error.message);
+      if (mounted && serial == _lookupSerial) setState(() => _errorCode = error.message);
     } on TenantApiException catch (error) {
-      if (mounted) setState(() => _errorCode = error.message);
+      if (mounted && serial == _lookupSerial) setState(() => _errorCode = error.message);
     } catch (_) {
-      if (mounted) setState(() => _errorCode = 'UNKNOWN_ERROR');
+      if (mounted && serial == _lookupSerial) setState(() => _errorCode = 'UNKNOWN_ERROR');
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted && serial == _lookupSerial) setState(() => _loading = false);
     }
   }
 
   void _showOfflineDemo() {
+    ++_lookupSerial; // Do not allow a late network response to replace demo state.
     FocusScope.of(context).unfocus();
     setState(() {
       _offlineDemo = true;
