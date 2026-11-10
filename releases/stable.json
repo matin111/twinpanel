@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.776",
+  "version": "1.1.0-rc.777",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-10T11:46:50Z",
+  "released_at": "2026-11-10T18:51:33Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "03a6ac321f45af2a5eff7defb3dfe8a9ea948ab6",
+  "source_sha": "5be3411902f95d1345e251b97822afa7555ab919",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.776/twinpanel-1.1.0-rc.776-linux-x86_64.tar.gz",
-    "sha256": "ca38b8ef01787971ac7103d2a815e03639365ab434e2539ef17104e1c1650ca2",
-    "size_bytes": 30401665
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.777/twinpanel-1.1.0-rc.777-linux-x86_64.tar.gz",
+    "sha256": "affad5d201aad37e7d3dcd0df479859bcfca53b634410e67d47e4ca2b4e93dd6",
+    "size_bytes": 30422124
   },
   "notes": {
-    "fa": "افزودن ورود مستقل اپ TwinConnect برای هر اشتراک: دریافت و تغییر رمز مخصوص اپ در مدیریت اشتراک‌های ادمین و نماینده، ثبت امن آدرس پنل در سرور لایسنس و API ورود، بدون تغییر کانفیگ‌ها، رمزهای VPN، حجم، موجودی کیف پول یا ساختار نودها.",
-    "en": "TwinConnect independent per-subscription app sign-in: App Delivery and app-password reset for admins/resellers, licensed panel directory registration and session API. No changes to VPN credentials, configs, traffic, wallets or node provisioning."
+    "fa": "بهبود نمایش موبایل مدیریت اشتراک‌ها با کارت‌های خوانا، نمایش واضح عملیات تمدید، ویرایش، ریست مصرف و اتصال و حفظ سایر عملیات در منوی بیشتر. جدول دسکتاپ و اطلاعات کاربران بدون تغییر.",
+    "en": "Responsive mobile subscription management cards, visible Renew/Edit/Reset/Connection actions and More disclosure. Preserve desktop table, subscription data and backend behavior."
   }
 }
