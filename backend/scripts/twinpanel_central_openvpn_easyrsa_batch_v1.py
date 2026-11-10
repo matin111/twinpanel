@@ -256,9 +256,9 @@ async def run(opts):
             if node is None or node.show_to_users:
                 raise RuntimeError("NODE_MUST_REMAIN_HIDDEN")
             health=await asyncio.wait_for(
-                verify_new_exit_readiness(db,opts.node_id),timeout=510,
+                verify_new_exit_readiness(db,opts.node_id, allow_partial=True),timeout=510,
             )
-            if not health.get("ok"):
+            if not health.get("ok") or "openvpn" not in health.get("ready_protocols", ()):
                 raise RuntimeError("STAGED_PROTOCOL_READINESS_FAILED")
         total=0
         for _ in range(25 if opts.all and opts.apply else 1):
