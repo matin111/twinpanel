@@ -263,7 +263,7 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
                         key: const Key('vpnKillSwitch'),
                         title: Text(s.vpnKillSwitch),
                         subtitle: Text(s.vpnKillSwitchSubtitle),
-                        value: _policy.killSwitchRequested,
+                        value: _capabilities.engineReady && _capabilities.killSwitchEnforced && _policy.killSwitchRequested,
                         onChanged: _capabilities.engineReady &&
                                 _capabilities.killSwitchEnforced
                             ? (value) => _update(
@@ -275,7 +275,7 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
                         key: const Key('vpnDnsGuard'),
                         title: Text(s.vpnDnsProtected),
                         subtitle: Text(s.vpnDnsHint),
-                        value: _policy.dnsMode == VpnDnsMode.protected,
+                        value: _capabilities.engineReady && _capabilities.dnsGuard && _policy.dnsMode == VpnDnsMode.protected,
                         onChanged: _capabilities.engineReady && _capabilities.dnsGuard
                             ? (value) => _update(_policy.copyWith(
                                 dnsMode: value ? VpnDnsMode.protected : VpnDnsMode.system))
@@ -285,7 +285,7 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
                         key: const Key('vpnIpv6Guard'),
                         title: Text(s.vpnIpv6Protected),
                         subtitle: Text(s.vpnIpv6Hint),
-                        value: _policy.ipv6Mode == VpnIpv6Mode.tunnelOrBlock,
+                        value: _capabilities.engineReady && _capabilities.ipv6Guard && _policy.ipv6Mode == VpnIpv6Mode.tunnelOrBlock,
                         onChanged: _capabilities.engineReady && _capabilities.ipv6Guard
                             ? (value) => _update(_policy.copyWith(
                                 ipv6Mode: value ? VpnIpv6Mode.tunnelOrBlock : VpnIpv6Mode.unprotected))
@@ -295,7 +295,7 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
                         key: const Key('vpnLanAccess'),
                         title: Text(s.vpnAllowLan),
                         subtitle: Text(s.vpnAllowLanHint),
-                        value: _policy.allowLan,
+                        value: _capabilities.engineReady && _capabilities.localNetworkBypass && _policy.allowLan,
                         onChanged: _capabilities.engineReady && _capabilities.localNetworkBypass
                             ? (value) => _update(_policy.copyWith(allowLan: value))
                             : null,
@@ -304,7 +304,7 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
                       SwitchListTile.adaptive(
                         key: const Key('vpnAutoReconnect'),
                         title: Text(s.vpnAutoReconnect),
-                        value: _policy.autoReconnect,
+                        value: _capabilities.engineReady && _capabilities.autoReconnect && _policy.autoReconnect,
                         onChanged: _capabilities.engineReady && _capabilities.autoReconnect
                             ? (value) => _update(_policy.copyWith(autoReconnect: value))
                             : null,
@@ -312,7 +312,7 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
                       SwitchListTile.adaptive(
                         key: const Key('vpnAutoConnect'),
                         title: Text(s.vpnAutoConnect),
-                        value: _policy.autoConnect,
+                        value: _capabilities.engineReady && _capabilities.autoConnect && _policy.autoConnect,
                         onChanged: _capabilities.engineReady && _capabilities.autoConnect
                             ? (value) => _update(_policy.copyWith(autoConnect: value))
                             : null,
@@ -320,7 +320,7 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
                       SwitchListTile.adaptive(
                         key: const Key('vpnAutoSelect'),
                         title: Text(s.vpnAutoSelectServer),
-                        value: _policy.autoSelectServer,
+                        value: false,
                         onChanged: null, // No verified native auto-selection engine.
                       ),
 
