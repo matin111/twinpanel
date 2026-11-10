@@ -1001,7 +1001,7 @@ def main() -> int:
                 atomic_switch(previous)
                 restart_services(include_web=False)
             subprocess.run(
-                ['systemctl', 'stop', f'twinpanel-web-slot@{bg_ports[1]}.service'],
+                ['systemctl', 'disable', '--now', f'twinpanel-web-slot@{bg_ports[1]}.service'],
                 check=False, timeout=25,
             )
         raise
