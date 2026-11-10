@@ -1,3 +1,5 @@
+import 'dart:ui' show ImageFilter;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
@@ -102,18 +104,47 @@ class _TwinConnectDevAppState extends State<TwinConnectDevApp> {
 
     BoxDecoration tile({bool selected = false, double radius = 17}) =>
         BoxDecoration(
-          color: selected ? purple.withValues(alpha: _dark ? 0.16 : 0.09) : panel,
+          color: selected
+              ? purple.withValues(alpha: _dark ? 0.17 : 0.10)
+              : (_dark ? const Color(0xFF344360) : const Color(0xFFFDFDFF))
+                  .withValues(alpha: _dark ? 0.55 : 0.76),
           borderRadius: BorderRadius.circular(radius),
-          border: Border.all(color: selected ? purple : line),
+          border: Border.all(
+            color: selected
+                ? purple.withValues(alpha: 0.80)
+                : (_dark ? Colors.white : const Color(0xFF6971AC))
+                    .withValues(alpha: _dark ? 0.20 : 0.19),
+          ),
           boxShadow: [
             BoxShadow(
-              color: (selected ? purple : Colors.black).withValues(
-                alpha: selected ? 0.13 : 0.025),
-              blurRadius: selected ? 24 : 13,
-              offset: const Offset(0, 5),
+              color: (selected ? purple : Colors.black)
+                  .withValues(alpha: selected ? 0.14 : 0.08),
+              blurRadius: selected ? 26 : 20,
+              offset: const Offset(0, 10),
             ),
           ],
         );
+
+    // Reusable frosted-glass surface for cards in both light and dark themes.
+    // The blur samples only the background behind each translucent surface.
+    Widget glassCard({
+      required Widget child,
+      double radius = 20,
+      bool selected = false,
+      EdgeInsetsGeometry padding = EdgeInsets.zero,
+      Key? key,
+    }) => ClipRRect(
+      key: key,
+      borderRadius: BorderRadius.circular(radius),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+        child: Container(
+          padding: padding,
+          decoration: tile(selected: selected, radius: radius),
+          child: child,
+        ),
+      ),
+    );
 
     void notification() => ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(tr(
