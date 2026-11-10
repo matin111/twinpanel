@@ -272,7 +272,11 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
         elevation: 0,
         scrolledUnderElevation: 0,
         titleSpacing: 24,
-        title: Row(
+        // Before authentication, never display the app brand, reseller
+        // brand, panel brand or a customer-identifying title.
+        title: brand == null
+            ? const SizedBox.shrink()
+            : Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
