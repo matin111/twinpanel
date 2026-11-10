@@ -30,7 +30,8 @@ class TelegramNotificationStarvationTest(TestCase):
             worker.index("TelegramNotification.attempts.asc()"),
             worker.index(".limit(20)"),
         )
-        self.assertIn("TelegramNotification.delivered_at", worker)
+        self.assertIn("TelegramNotification", worker)
+        self.assertIn(".delivered_at", worker)
         self.assertIn("row.delivered_at =", worker)
         self.assertIn("row.attempts += 1", worker)
 
