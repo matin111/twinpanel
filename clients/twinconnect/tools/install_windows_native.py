@@ -87,6 +87,37 @@ def install() -> None:
             result->Error("INVALID_PROTOCOL");
             return;
           }
+          const auto policyIt =
+              args->find(flutter::EncodableValue("policy"));
+          const auto* policy = policyIt == args->end()
+              ? nullptr
+              : std::get_if<flutter::EncodableMap>(&policyIt->second);
+          if (!policy) {
+            result->Error("INVALID_POLICY");
+            return;
+          }
+          const auto policyString = [&](const char* key) -> std::string {
+            const auto it = policy->find(flutter::EncodableValue(key));
+            if (it == policy->end()) return "";
+            const auto* value = std::get_if<std::string>(&it->second);
+            return value ? *value : "";
+          };
+          const auto policyFalse = [&](const char* key) -> bool {
+            const auto it = policy->find(flutter::EncodableValue(key));
+            if (it == policy->end()) return false;
+            const auto* value = std::get_if<bool>(&it->second);
+            return value != nullptr && !*value;
+          };
+          if (policyString("routingMode") != "fullTunnel" ||
+              policyString("dnsMode") != "protected" ||
+              policyString("ipv6Mode") != "tunnelOrBlock" ||
+              !policyFalse("killSwitchRequested") ||
+              !policyFalse("allowLan") ||
+              !policyFalse("autoReconnect") ||
+              !policyFalse("autoConnect")) {
+            result->Error("UNSUPPORTED_VPN_POLICY");
+            return;
+          }
           if (!twinconnect_wireguard::IsAdmin()) {
             result->Error("WINDOWS_ADMIN_REQUIRED");
             return;
