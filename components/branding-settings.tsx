@@ -158,6 +158,8 @@ export function BrandingSettingsPage(){
           <div className="brandPresetRow"><span>{pick("پالت‌های سریع","Quick palettes")}</span><div>{COLOR_PRESETS.map(([primary,secondary])=><button type="button" key={`${primary}-${secondary}`} title={`${primary} · ${secondary}`} style={{background:`linear-gradient(135deg,${primary},${secondary})`}} onClick={()=>setDraft(current=>({...current,accent:primary,secondaryColor:secondary}))}/>)}</div></div>
         </Card>
 
+        <CentralAppAppearanceStudio role="admin"/>
+
         <Card className="brandingOwnershipCard">
           <div className="card-head"><div><b>{pick("تنظیمات مربوط به فروشگاه","Storefront-owned settings")}</b><small>{pick("برای جلوگیری از دو منبع تنظیمات، متن‌ها، فوتر، شبکه‌های اجتماعی و SEO فقط از بخش تنظیمات فروشگاه مدیریت می‌شوند.","To avoid duplicate sources of truth, copy, footer, social links and SEO are managed only in Store Settings.")}</small></div></div>
           <div className="brandingOwnershipTags"><span>{pick("محتوا","Content")}</span><span>{pick("فوتر","Footer")}</span><span>{pick("شبکه‌های اجتماعی","Social links")}</span><span>SEO</span></div>
