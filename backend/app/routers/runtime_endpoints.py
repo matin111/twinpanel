@@ -1,4 +1,6 @@
 from datetime import datetime, timedelta
+import threading
+import time
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 from pydantic import BaseModel, Field
@@ -47,6 +49,17 @@ _LIVE_ACTIVITY_SECONDS = 180
 # This is a UI hint only: billing, admission, and expiration are unchanged.
 _LIVE_UNCERTAIN_SECONDS = 900
 
+# Cache only derived, read-only online snapshots. Every subscriptions page and
+# live-status poll used to perform the same three aggregate database queries.
+# Five seconds is far below the 180s authenticated freshness window and the
+# browser's 15s refresh interval. A lock coalesces simultaneous requests.
+# Never cache a database session, mutate a quota, or use the cached state
+# for accounting / device admission.
+_LIVE_SNAPSHOT_TTL_SECONDS = 5.0
+_live_snapshot_lock = threading.Lock()
+_live_snapshot_cached_at = 0.0
+_live_snapshot_cache: dict[int, dict] | None = None
+
 
 def _active_api_domain(db: Session) -> Domain | None:
     return (
@@ -70,7 +83,7 @@ def _normalized_protocol(value: str | None) -> str:
     return protocol
 
 
-def _subscription_live_states(db: Session) -> dict[int, dict]:
+def _subscription_live_states_uncached(db: Session) -> dict[int, dict]:
     states: dict[int, dict] = {}
     # Use the same freshness cutoff as /v1/connect/{token}/live.
     # An 'active' ledger entry alone is not proof of an ongoing connection:
@@ -169,6 +182,30 @@ def _subscription_live_states(db: Session) -> dict[int, dict]:
                 item["last_seen_at"] = seen_at
 
     return states
+
+
+def _subscription_live_states(db: Session) -> dict[int, dict]:
+    """Short-lived, immutable-by-convention snapshot shared across admin polls.
+
+    The caller never mutates these derived entries; all authenticated presence
+    changes still come exclusively from the canonical quota ledger. On any
+    database error leave the previous timestamp untouched so the next request
+    can retry rather than treating an error as everyone being offline.
+    """
+    global _live_snapshot_cache, _live_snapshot_cached_at
+    now = time.monotonic()
+    if (_live_snapshot_cache is not None
+            and now - _live_snapshot_cached_at < _LIVE_SNAPSHOT_TTL_SECONDS):
+        return _live_snapshot_cache
+    with _live_snapshot_lock:
+        now = time.monotonic()
+        if (_live_snapshot_cache is not None
+                and now - _live_snapshot_cached_at < _LIVE_SNAPSHOT_TTL_SECONDS):
+            return _live_snapshot_cache
+        fresh = _subscription_live_states_uncached(db)
+        _live_snapshot_cache = fresh
+        _live_snapshot_cached_at = time.monotonic()
+        return fresh
 
 
 def _online_subscription_ids(db: Session) -> set[int]:
