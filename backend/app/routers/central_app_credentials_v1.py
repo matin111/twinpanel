@@ -16,8 +16,8 @@ from ..central_app_credentials import (
 )
 from ..central_app_identity import central_app_entitled, installation_namespace
 from ..database import get_db
-from ..deps import require_admin, require_reseller
-from ..models import Subscription
+from ..deps import get_current_user, require_admin, require_reseller
+from ..models import Subscription, User
 from ..models_reseller import Reseller, ResellerSubscription
 from ..system_release import ensure_installation_id
 from .account_delivery import _share_token, _share_url
@@ -164,6 +164,20 @@ def admin_app_reset(
     subscription_id: int, _=Depends(require_admin), db: Session = Depends(get_db),
 ):
     return _deliver(db, _owner_delivery(db, subscription_id, None), reset=True)
+
+
+@router.post("/customer/subscriptions/{subscription_id}/app-delivery")
+def customer_app_delivery(
+    subscription_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    # Only the authenticated subscription owner may retrieve their app login.
+    # Do NOT authorize using a share URL or a bare subscription ID.
+    sub = db.get(Subscription, int(subscription_id))
+    if sub is None or int(sub.user_id) != int(user.id):
+        raise HTTPException(status_code=404, detail="SUBSCRIPTION_NOT_FOUND")
+    return _deliver(db, sub, reset=False)
 
 
 @router.post("/reseller/subscriptions/{subscription_id}/app-delivery")
