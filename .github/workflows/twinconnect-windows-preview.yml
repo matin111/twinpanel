@@ -20,7 +20,10 @@ jobs:
       run:
         working-directory: clients/twinconnect
     env:
-      TWINCONNECT_DIRECTORY_URL: ${{ vars.TWINCONNECT_DIRECTORY_URL }}
+      # Temporary, TLS-verified directory for Windows developer preview only.
+      # A dedicated owned HTTPS domain must replace this before production.
+      # Using a repository variable takes precedence without modifying code.
+      TWINCONNECT_DIRECTORY_URL: ${{ vars.TWINCONNECT_DIRECTORY_URL || 'https://167-104-219-168.sslip.io' }}
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
@@ -37,6 +40,22 @@ jobs:
         run: |
           flutter analyze
           flutter test --reporter expanded
+      - name: Verify HTTPS directory is configured and reachable
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $origin = [uri]$env:TWINCONNECT_DIRECTORY_URL
+          if ($origin.Scheme -ne "https" -or !$origin.Host -or $origin.UserInfo -or
+              $origin.Query -or $origin.Fragment -or $origin.AbsolutePath -ne "/") {
+            throw "TWINCONNECT_DIRECTORY_URL must be a clean HTTPS origin"
+          }
+          $probe = "$($origin.AbsoluteUri.TrimEnd('/'))/v1/app/resolve/TP934FE9"
+          $result = Invoke-RestMethod -Uri $probe -Method Get -TimeoutSec 15
+          if ($result.namespace -ne "TP934FE9" -or
+              $result.api_origin -ne "https://panel.matindnspro.sbs") {
+            throw "Tenant directory contract invalid or panel registration missing"
+          }
+          Write-Host "Verified HTTPS directory and registered panel namespace"
       - name: Build Windows x64 standalone directory
         shell: pwsh
         run: flutter build windows --release "--dart-define=TWINCONNECT_DIRECTORY_URL=$env:TWINCONNECT_DIRECTORY_URL"
@@ -78,6 +97,10 @@ jobs:
             does not modify server endpoints, keys or panel records.
           - The native adapter writes a DPAPI-encrypted file with restrictive
             admin/SYSTEM ACLs; no plain private-key config is saved to disk.
+          - The directory URL is built in for this development preview.
+          - Until the project gets an owned HTTPS vendor domain, the
+            test directory uses the sslip.io dynamic DNS service.
+            Do not use it as a permanent customer deployment address.
           - The Dev Dashboard artifact remains entirely offline.
           - Do not deploy these experimental binaries to customers yet.
           '@ | Set-Content -Path (Join-Path $release "README-TEST.txt") -Encoding UTF8
