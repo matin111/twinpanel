@@ -340,7 +340,7 @@ class BrandDetails extends StatelessWidget {
   final BrandPreview brand;
 
   Color get _brandColor => Color(
-        int.parse('FF' + brand.primaryColor.substring(1), radix: 16),
+        int.parse('FF${brand.primaryColor.substring(1)}', radix: 16),
       );
 
   @override
