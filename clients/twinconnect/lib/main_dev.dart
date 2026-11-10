@@ -5,9 +5,7 @@ import 'brand_theme.dart';
 import 'vpn_settings.dart';
 import 'windows_preview_fixture.dart';
 
-/// Local UI-only development entrypoint. Not included in production main.dart.
-/// No license, session, share token, VPN configuration or private endpoint is
-/// fabricated. This screen cannot connect to a VPN.
+/// Isolated offline UI build; it cannot authenticate or start VPN connections.
 void main() => runApp(const TwinConnectDevApp());
 
 class TwinConnectDevApp extends StatefulWidget {
@@ -22,16 +20,19 @@ class _TwinConnectDevAppState extends State<TwinConnectDevApp> {
   bool _dark = true;
   String _search = '';
   String _section = 'all';
+  String _page = 'home';
+
+  String t(String fa, String en) => _persian ? fa : en;
 
   @override
   Widget build(BuildContext context) {
     final brand = WindowsPreviewFixture.brand();
-    final protocols = WindowsPreviewFixture.protocolCatalog().entries.where(
-      (item) => (_section == 'all' || item.protocol.engine.name == _section) &&
-          item.protocol.name.toLowerCase().contains(_search.toLowerCase()),
-    ).toList();
-    String label(String fa, String en) => _persian ? fa : en;
     final accent = BrandTheme.parse(brand.primaryColor, '#7358DF');
+    final entries = WindowsPreviewFixture.protocolCatalog().entries;
+    final filtered = entries.where((item) =>
+      (_section == 'all' || item.protocol.engine.name == _section) &&
+      item.protocol.name.toLowerCase().contains(_search.toLowerCase())
+    ).toList();
 
     return MaterialApp(
       title: 'TwinConnect Dev',
@@ -47,12 +48,17 @@ class _TwinConnectDevAppState extends State<TwinConnectDevApp> {
       darkTheme: BrandTheme.make(brand, Brightness.dark),
       themeMode: _dark ? ThemeMode.dark : ThemeMode.light,
       home: Builder(builder: (context) {
-        final isWide = MediaQuery.sizeOf(context).width >= 800;
-        final isDark = Theme.of(context).brightness == Brightness.dark;
-        final surface = Theme.of(context).colorScheme.surface;
-        final textColor = Theme.of(context).colorScheme.onSurface;
+        final theme = Theme.of(context);
+        final dark = theme.brightness == Brightness.dark;
+        final foreground = theme.colorScheme.onSurface;
+        final muted = foreground.withValues(alpha: 0.56);
+        final surface = theme.colorScheme.surface;
+        final wide = MediaQuery.sizeOf(context).width >= 920;
+        final medium = MediaQuery.sizeOf(context).width >= 650;
+        final navBg = dark ? const Color(0xFF101629) : const Color(0xFFF4F5FB);
+        final border = foreground.withValues(alpha: 0.08);
         final options = <String, String>{
-          'all': label('همه', 'All'),
+          'all': t('همه', 'All'),
           'openvpn': 'OpenVPN',
           'wireguard': 'WireGuard',
           'openconnect': 'Cisco',
@@ -60,213 +66,386 @@ class _TwinConnectDevAppState extends State<TwinConnectDevApp> {
           'singbox': 'Sing-box',
         };
 
-        Widget statusPanel() => Container(
+        Widget tab(String code, IconData icon, String title) => Material(
+          color: _page == code ? accent.withValues(alpha: 0.16) : Colors.transparent,
+          borderRadius: BorderRadius.circular(15),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(15),
+            onTap: () {
+              if (code == 'settings') {
+                Navigator.of(context).push(MaterialPageRoute(
+                  builder: (_) => VpnSettingsScreen(
+                    tenant: '', account: '', brand: brand,
+                  ),
+                ));
+              } else {
+                setState(() => _page = code);
+              }
+            },
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 14),
+              child: Row(children: [
+                Icon(icon, color: _page == code ? accent : muted, size: 22),
+                if (wide) ...[
+                  const SizedBox(width: 13),
+                  Expanded(child: Text(title, style: TextStyle(
+                    fontWeight: _page == code ? FontWeight.w700 : FontWeight.w500,
+                    color: _page == code ? foreground : muted,
+                  ))),
+                ],
+              ]),
+            ),
+          ),
+        );
+
+        Widget hero() => Container(
           key: const Key('devConnectionStatus'),
+          constraints: const BoxConstraints(minHeight: 308),
+          padding: const EdgeInsets.all(28),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(30),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: dark
+                  ? [const Color(0xFF30235B), const Color(0xFF1C2648), const Color(0xFF17283B)]
+                  : [const Color(0xFFEEE7FF), const Color(0xFFE1EEFF), const Color(0xFFF3F5FF)],
+            ),
+            border: Border.all(color: accent.withValues(alpha: 0.28)),
+            boxShadow: [BoxShadow(
+              color: accent.withValues(alpha: dark ? 0.13 : 0.09),
+              blurRadius: 45, offset: const Offset(0, 18),
+            )],
+          ),
+          child: Column(
+            children: [
+              Row(children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                  decoration: BoxDecoration(
+                    color: foreground.withValues(alpha: 0.07),
+                    borderRadius: BorderRadius.circular(40),
+                  ),
+                  child: Row(mainAxisSize: MainAxisSize.min, children: [
+                    const Icon(Icons.circle, size: 8, color: Color(0xFFFFB464)),
+                    const SizedBox(width: 8),
+                    Text(t('آفلاین', 'Offline'), style: const TextStyle(fontSize: 12)),
+                  ]),
+                ),
+                const Spacer(),
+                const Icon(Icons.more_horiz_rounded),
+              ]),
+              const SizedBox(height: 21),
+              Container(
+                width: 104, height: 104,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: accent.withValues(alpha: 0.25), width: 2),
+                  boxShadow: [BoxShadow(color: accent.withValues(alpha: 0.21),
+                    blurRadius: 36, spreadRadius: 3)],
+                  gradient: LinearGradient(colors: [
+                    accent.withValues(alpha: 0.26),
+                    accent.withValues(alpha: 0.08),
+                  ]),
+                ),
+                child: Icon(Icons.power_settings_new_rounded, size: 49, color: accent),
+              ),
+              const SizedBox(height: 20),
+              Text(t('متصل نیست', 'Not connected'),
+                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 27)),
+              const SizedBox(height: 5),
+              Text(t('موتور ویندوز آماده نیست', 'Windows engine unavailable'),
+                style: TextStyle(color: muted, fontSize: 12)),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: 230, height: 47,
+                child: FilledButton.icon(
+                  key: const Key('devConnectButton'),
+                  onPressed: null,
+                  icon: const Icon(Icons.power_settings_new_rounded, size: 19),
+                  label: Text(t('اتصال', 'Connect')),
+                  style: FilledButton.styleFrom(
+                    disabledBackgroundColor: accent.withValues(alpha: 0.35),
+                    disabledForegroundColor: foreground.withValues(alpha: 0.70),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+
+        Widget summaryCard(IconData icon, String title, String value) => Expanded(
+          child: Container(
+            padding: const EdgeInsets.all(15),
+            decoration: BoxDecoration(
+              color: surface, borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: border),
+            ),
+            child: Row(children: [
+              Container(
+                width: 38, height: 38,
+                decoration: BoxDecoration(
+                  color: accent.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12)),
+                child: Icon(icon, color: accent, size: 19)),
+              const SizedBox(width: 11),
+              Expanded(child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, maxLines: 1, overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 11, color: muted)),
+                  const SizedBox(height: 3),
+                  Text(value, maxLines: 1, overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+                ],
+              )),
+            ]),
+          ),
+        );
+
+        Widget protocols() => Container(
           padding: const EdgeInsets.all(22),
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                Color.lerp(surface, accent, isDark ? 0.19 : 0.07)!,
-                surface,
-              ],
-            ),
-            borderRadius: BorderRadius.circular(26),
-            border: Border.all(color: accent.withValues(alpha: 0.28)),
+            color: surface, borderRadius: BorderRadius.circular(25),
+            border: Border.all(color: border),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(13),
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: accent.withValues(alpha: 0.14),
-                    ),
-                    child: Icon(Icons.power_settings_new_rounded,
-                        size: 32, color: accent),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(label('متصل نیست', 'Disconnected'),
-                          style: const TextStyle(
-                              fontSize: 23, fontWeight: FontWeight.w800)),
-                      const SizedBox(height: 3),
-                      Text(label('موتور VPN ویندوز آماده نیست',
-                              'Windows VPN engine unavailable'),
-                          style: TextStyle(color: textColor.withValues(alpha: 0.65))),
-                    ],
-                  )),
-                ],
-              ),
-              const SizedBox(height: 20),
-              FilledButton.icon(
-                key: const Key('devConnectButton'),
-                onPressed: null,
-                icon: const Icon(Icons.power_settings_new),
-                label: Text(label('اتصال', 'Connect')),
-              ),
-            ],
-          ),
-        );
-
-        Widget protocolList() => Container(
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: surface,
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: textColor.withValues(alpha: 0.09)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
               Row(children: [
-                Expanded(child: Text(label('پروتکل‌ها', 'Protocols'),
-                    style: const TextStyle(
-                      fontSize: 19, fontWeight: FontWeight.w700,
-                    ))),
-                Text('${protocols.length} / 16',
-                    style: TextStyle(color: textColor.withValues(alpha: 0.62))),
+                Expanded(child: Text(t('پروتکل‌ها', 'Protocols'),
+                    style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800))),
+                Text('${filtered.length} / 16', style: TextStyle(color: muted)),
               ]),
-              const SizedBox(height: 14),
-              TextField(
+              const SizedBox(height: 17),
+              SizedBox(height: 48, child: TextField(
                 key: const Key('devProtocolSearch'),
-                onChanged: (value) => setState(() => _search = value),
+                onChanged: (v) => setState(() => _search = v),
                 decoration: InputDecoration(
-                  hintText: label('جستجوی پروتکل', 'Search protocols'),
-                  prefixIcon: const Icon(Icons.search_rounded),
+                  hintText: t('جستجو', 'Search'),
+                  prefixIcon: const Icon(Icons.search_rounded, size: 20),
                   filled: true,
+                  fillColor: foreground.withValues(alpha: 0.035),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 10),
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(15),
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide(color: border),
                   ),
                 ),
-              ),
-              const SizedBox(height: 12),
+              )),
+              const SizedBox(height: 14),
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: Row(children: [
-                  for (final option in options.entries) ...[
+                  for (final entry in options.entries) ...[
                     ChoiceChip(
-                      key: Key('devFilter_${option.key}'),
-                      label: Text(option.value),
-                      selected: _section == option.key,
-                      onSelected: (_) => setState(() => _section = option.key),
+                      key: Key('devFilter_${entry.key}'),
+                      label: Text(entry.value),
+                      selected: _section == entry.key,
+                      onSelected: (_) => setState(() => _section = entry.key),
+                      showCheckmark: false,
+                      side: BorderSide(color: _section == entry.key
+                          ? accent.withValues(alpha: 0.4) : border),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 7),
                   ],
                 ]),
               ),
               const SizedBox(height: 10),
-              for (final item in protocols)
-                ListTile(
-                  key: Key('devProtocol_${item.protocol.code}'),
-                  contentPadding: EdgeInsets.zero,
-                  leading: Container(
-                    height: 38,
-                    width: 38,
+              for (final p in filtered)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Container(
+                    key: Key('devProtocol_${p.protocol.code}'),
+                    padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 13),
                     decoration: BoxDecoration(
-                      color: accent.withValues(alpha: 0.10),
-                      borderRadius: BorderRadius.circular(12),
+                      color: foreground.withValues(alpha: 0.035),
+                      borderRadius: BorderRadius.circular(15),
+                      border: Border.all(color: border),
                     ),
-                    child: Icon(Icons.hub_outlined, size: 19, color: accent),
+                    child: Row(children: [
+                      Container(
+                        width: 40, height: 40,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(13),
+                          color: accent.withValues(alpha: 0.13),
+                        ),
+                        child: Icon(Icons.hub_rounded, color: accent, size: 20),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(p.protocol.name, style: const TextStyle(
+                            fontSize: 14, fontWeight: FontWeight.w650)),
+                          const SizedBox(height: 3),
+                          Text(t('موتور آماده نیست', 'Engine unavailable'),
+                            style: TextStyle(color: muted, fontSize: 11)),
+                        ],
+                      )),
+                      Icon(Icons.lock_outline_rounded, size: 17, color: muted),
+                    ]),
                   ),
-                  title: Text(item.protocol.name),
-                  subtitle: Text(label('موتور آماده نیست', 'Engine unavailable'),
-                      style: TextStyle(color: textColor.withValues(alpha: 0.58))),
-                  trailing: const Icon(Icons.lock_outline_rounded, size: 18),
                 ),
             ],
           ),
         );
 
-        return Scaffold(
-          appBar: AppBar(
-            title: Row(mainAxisSize: MainAxisSize.min, children: [
-              Icon(Icons.bolt_rounded, color: accent),
-              const SizedBox(width: 8),
-              const Text('TwinConnect',
-                  style: TextStyle(fontWeight: FontWeight.w800)),
+        Widget dashboard() => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(children: [
+              Expanded(child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(t('اتصال سریع', 'Quick connect'),
+                    style: const TextStyle(fontSize: 27, fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 5),
+                  Text(t('پیش‌نمایش رابط کاربری', 'Interface preview'),
+                    key: const Key('devSampleNotice'),
+                    style: TextStyle(color: muted, fontSize: 12)),
+                ],
+              )),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+                decoration: BoxDecoration(
+                  color: accent.withValues(alpha: 0.11),
+                  borderRadius: BorderRadius.circular(20)),
+                child: Text('DEV', style: TextStyle(
+                  color: accent, fontSize: 11, fontWeight: FontWeight.w800)),
+              ),
             ]),
-            actions: [
-              IconButton(
-                key: const Key('devThemeToggle'),
-                tooltip: label('تغییر ظاهر', 'Toggle theme'),
-                onPressed: () => setState(() => _dark = !_dark),
-                icon: Icon(_dark ? Icons.light_mode_outlined
-                    : Icons.dark_mode_outlined),
-              ),
-              TextButton(
-                key: const Key('devLanguageToggle'),
-                onPressed: () => setState(() => _persian = !_persian),
-                child: Text(_persian ? 'EN' : 'فا'),
-              ),
-              IconButton(
-                key: const Key('devSettingsButton'),
-                tooltip: label('تنظیمات', 'Settings'),
-                onPressed: () => Navigator.of(context).push(MaterialPageRoute(
-                  builder: (_) => VpnSettingsScreen(
-                    tenant: '', account: '', brand: brand,
+            const SizedBox(height: 23),
+            if (medium)
+              Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Expanded(flex: 5, child: hero()),
+                const SizedBox(width: 17),
+                Expanded(flex: 4, child: Column(children: [
+                  Row(children: [
+                    summaryCard(Icons.language_rounded,
+                      t('کشورها', 'Countries'), '—'),
+                    const SizedBox(width: 10),
+                    summaryCard(Icons.dns_rounded,
+                      t('سرورها', 'Servers'), '—'),
+                  ]),
+                  const SizedBox(height: 13),
+                  Container(
+                    height: 205,
+                    padding: const EdgeInsets.all(22),
+                    decoration: BoxDecoration(
+                      color: surface, borderRadius: BorderRadius.circular(22),
+                      border: Border.all(color: border),
+                    ),
+                    child: Center(child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.public_off_outlined, size: 34, color: muted),
+                        const SizedBox(height: 11),
+                        Text(t('سرور واقعی دریافت نشده', 'No live servers'),
+                          style: const TextStyle(fontWeight: FontWeight.w700)),
+                        const SizedBox(height: 5),
+                        Text(t('بعد از اتصال حساب نمایش داده می‌شود',
+                               'Available after account sign-in'),
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: muted, fontSize: 11)),
+                      ],
+                    )),
                   ),
-                )),
-                icon: const Icon(Icons.tune_rounded),
-              ),
-              const SizedBox(width: 12),
+                ])),
+              ])
+            else ...[
+              hero(),
+              const SizedBox(height: 15),
+              Row(children: [
+                summaryCard(Icons.language_rounded, t('کشورها', 'Countries'), '—'),
+                const SizedBox(width: 10),
+                summaryCard(Icons.dns_rounded, t('سرورها', 'Servers'), '—'),
+              ]),
             ],
-          ),
-          body: BrandBackground(
-            brand: brand,
-            child: SafeArea(
-              child: ListView(
-                padding: const EdgeInsets.all(22),
+            const SizedBox(height: 23),
+            protocols(),
+          ],
+        );
+
+        return Scaffold(
+          body: Row(children: [
+            Container(
+              width: wide ? 214 : 70,
+              decoration: BoxDecoration(
+                color: navBg, border: Border(right: BorderSide(color: border)),
+              ),
+              child: SafeArea(child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 20),
+                child: Column(children: [
+                  Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                    Container(
+                      width: 38, height: 38,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(colors: [
+                          accent, theme.colorScheme.secondary,
+                        ]),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(Icons.bolt_rounded,
+                        color: Colors.white, size: 25),
+                    ),
+                    if (wide) ...[
+                      const SizedBox(width: 9),
+                      const Expanded(child: Text('TwinConnect',
+                        style: TextStyle(fontWeight: FontWeight.w800,
+                          fontSize: 17))),
+                    ],
+                  ]),
+                  const SizedBox(height: 39),
+                  tab('home', Icons.grid_view_rounded, t('خانه', 'Home')),
+                  const SizedBox(height: 8),
+                  tab('protocols', Icons.hub_outlined, t('پروتکل‌ها', 'Protocols')),
+                  const SizedBox(height: 8),
+                  tab('settings', Icons.tune_rounded, t('تنظیمات', 'Settings')),
+                  const Spacer(),
+                  IconButton(
+                    key: const Key('devThemeToggle'),
+                    tooltip: t('تغییر ظاهر', 'Theme'),
+                    onPressed: () => setState(() => _dark = !_dark),
+                    icon: Icon(_dark ? Icons.light_mode_outlined
+                        : Icons.dark_mode_outlined),
+                  ),
+                  TextButton(
+                    key: const Key('devLanguageToggle'),
+                    onPressed: () => setState(() => _persian = !_persian),
+                    child: Text(_persian ? 'EN' : 'فا'),
+                  ),
+                  IconButton(
+                    key: const Key('devSettingsButton'),
+                    tooltip: t('تنظیمات', 'Settings'),
+                    onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+                      builder: (_) => VpnSettingsScreen(
+                        tenant: '', account: '', brand: brand),
+                    )),
+                    icon: const Icon(Icons.settings_outlined),
+                  ),
+                ]),
+              )),
+            ),
+            Expanded(child: BrandBackground(
+              brand: brand,
+              child: SafeArea(child: ListView(
+                padding: EdgeInsets.symmetric(
+                  horizontal: wide ? 32 : 18, vertical: 27),
                 children: [
                   Center(child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 1120),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Text(label('داشبورد', 'Dashboard'),
-                            style: const TextStyle(
-                              fontSize: 27, fontWeight: FontWeight.w800,
-                            )),
-                        const SizedBox(height: 8),
-                        Text(label('نمایش آزمایشی · بدون اطلاعات واقعی',
-                                'UI preview · Sample data only'),
-                            key: const Key('devSampleNotice'),
-                            style: TextStyle(
-                              color: textColor.withValues(alpha: 0.60),
-                            )),
-                        const SizedBox(height: 22),
-                        if (isWide)
-                          Row(crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Expanded(flex: 4, child: statusPanel()),
-                              const SizedBox(width: 18),
-                              Expanded(flex: 5, child: protocolList()),
-                            ],
-                          )
-                        else ...[
-                          statusPanel(),
-                          const SizedBox(height: 18),
-                          protocolList(),
-                        ],
-                        const SizedBox(height: 16),
-                        Text(label(
-                          'اتصال واقعی پس از اتصال موتور بومی و احراز هویت اشتراک فعال می‌شود.',
-                          'Real connections require the native engine and an authorized subscription.',
-                        ), style: TextStyle(
-                          fontSize: 12,
-                          color: textColor.withValues(alpha: 0.55),
-                        )),
-                      ],
-                    ),
+                    constraints: const BoxConstraints(maxWidth: 1200),
+                    child: _page == 'protocols'
+                        ? protocols()
+                        : dashboard(),
                   )),
                 ],
-              ),
-            ),
-          ),
+              )),
+            )),
+          ]),
         );
       }),
     );
