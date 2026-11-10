@@ -89,6 +89,118 @@ async def _collect_node_runtime(
                 pass
 
 
+# Avoid a single PostgreSQL write transaction spanning thousands of live
+# devices. Each batch is committed before the next batch begins. Idempotent
+# per-device quota cursors and canonical session keys remain unchanged.
+ACCOUNTING_APPLY_BATCH_SIZE = 64
+
+
+def _apply_collected_node_runtime_batched(
+    db,
+    *,
+    node: Node,
+    grouped: dict[str, list[dict[str, Any]]],
+    collected: dict[str, tuple[Any, ...]],
+) -> list[dict[str, Any]]:
+    """Commit bounded, independently recoverable accounting batches.
+
+    A partial failure preserves successful batches; the failed batch is rolled
+    back to its savepoint and is retried using the existing per-device salvage.
+    This function is synchronous: no network await occurs after any DB write.
+    """
+    node_id = int(node.id)
+    outcomes: list[dict[str, Any]] = []
+
+    for protocol in ("wireguard", "amneziawg", "trusttunnel", "mieru", "sudoku"):
+        devices = grouped.get(protocol) or []
+        if not devices:
+            continue
+        if protocol == "mieru" and MIERU_INDEPENDENT_WORKER:
+            continue
+        if protocol == "sudoku" and SUDOKU_INDEPENDENT_WORKER:
+            continue
+
+        reading = collected.get(protocol)
+        if not reading or reading[0] is not True:
+            outcomes.append({
+                "ok": False,
+                "collector": protocol,
+                "node_id": node_id,
+                "error": ((reading[-1] if reading else None) or f"{protocol}_source_unavailable"),
+            })
+            continue
+
+        summary: dict[str, Any] = {
+            "ok": True, "collector": protocol, "node_id": node_id,
+        }
+        failures: list[str] = []
+        recovered = failed = 0
+
+        for offset in range(0, len(devices), ACCOUNTING_APPLY_BATCH_SIZE):
+            subset = devices[offset:offset + ACCOUNTING_APPLY_BATCH_SIZE]
+            try:
+                with db.begin_nested():
+                    if protocol in ("wireguard", "amneziawg"):
+                        _, epoch, peers, _ = reading
+                        result = canonical._apply_wireguard_like(
+                            db, node=node, protocol=protocol, devices=subset,
+                            epoch=epoch, peers=peers,
+                            match_by_key=protocol == "amneziawg",
+                        )
+                    elif protocol == "trusttunnel":
+                        _, epoch, rows, _ = reading
+                        result = canonical._apply_trusttunnel(
+                            db, node=node, devices=subset, epoch=epoch, rows=rows,
+                        )
+                    elif protocol == "mieru":
+                        _, rows, _ = reading
+                        result = canonical._apply_mieru_presence(
+                            db, node=node, devices=subset, rows=rows,
+                        )
+                    else:
+                        _, ports, _ = reading
+                        result = canonical._apply_sudoku_presence(
+                            db, node=node, devices=subset, established_ports=ports,
+                        )
+                # Release row locks and the PostgreSQL transaction after
+                # at most one bounded device batch; no await crosses a write.
+                db.commit()
+                for key, value in result.items():
+                    if key not in ("collector", "node_id") and type(value) is int:
+                        summary[key] = int(summary.get(key, 0)) + value
+                    elif key not in ("collector", "node_id"):
+                        summary[key] = value
+            except Exception as exc:
+                # begin_nested has already rolled this batch back. Reuse the
+                # existing bounded per-device salvage for healthy identities.
+                try:
+                    salvage = _retry_failed_protocol_per_device(
+                        db, node=node, protocol=protocol,
+                        grouped={protocol: subset}, collected={protocol: reading},
+                    )
+                    recovered += int(salvage.get("recovered_devices") or 0)
+                    failed += int(salvage.get("failed_devices") or 0)
+                    db.commit()
+                except Exception as salvage_exc:
+                    db.rollback()
+                    failed += len(subset)
+                    failures.append(f"salvage:{type(salvage_exc).__name__}")
+                failures.append(f"{type(exc).__name__}:{str(exc)[:160]}")
+
+        if failures:
+            summary.update({
+                "ok": False,
+                "error": "batch_apply_failed",
+                "failed_batches": len(failures),
+                "recovered_devices": recovered,
+                "failed_devices": failed,
+                "sample_errors": failures[:3],
+            })
+        outcomes.append(summary)
+
+    return outcomes
+
+
 def _apply_collected_node_runtime(
     db,
     *,
@@ -101,6 +213,15 @@ def _apply_collected_node_runtime(
     node = db.get(Node, int(node_id))
     if node is None:
         raise RuntimeError(f"modern_accounting_node_missing:{int(node_id)}")
+
+    # Use bounded transactions only for large accounting sweeps; the small
+    # canonical path remains byte-for-byte unchanged for existing deployments.
+    if any(len(grouped.get(p) or ()) > ACCOUNTING_APPLY_BATCH_SIZE for p in (
+        "wireguard", "amneziawg", "trusttunnel", "mieru", "sudoku",
+    )):
+        return _apply_collected_node_runtime_batched(
+            db, node=node, grouped=grouped, collected=collected,
+        )
 
     results: list[dict[str, Any]] = []
 
@@ -381,6 +502,9 @@ async def _reconcile_node(db, node: Node) -> list[dict[str, Any]]:
 
 async def reconcile_modern_quota_once() -> dict[str, Any]:
     db = SessionLocal()
+    # The fresh dedicated worker session has no pending billing writes before
+    # its first credential/device-map cache build.
+    db.info["twinpanel_v314_clean_lookup_session"] = True
     results: list[dict[str, Any]] = []
     try:
         node_ids = [
