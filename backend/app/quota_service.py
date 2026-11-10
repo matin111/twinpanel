@@ -49,10 +49,26 @@ def _activate_from_accepted_traffic(db: Session, subscription: Subscription, *, 
     Incomplete legacy imports with no duration are intentionally NOT assigned
     an invented expiry.
     """
-    if int(accepted) <= 0 or subscription.starts_at is not None or subscription.expires_at is not None:
+    if int(accepted) <= 0 or subscription.expires_at is not None:
         return False
 
-    from .subscription_override_models import duration_is_unlimited
+    from .subscription_override_models import (
+        duration_days,
+        duration_is_unlimited,
+        effective_expiry_at,
+    )
+
+    if subscription.starts_at is not None:
+        # Reconcile a started finite account that has no stored expiry, but
+        # NEVER reset the first-use clock or convert an unlimited subscription.
+        expiry = effective_expiry_at(db, subscription)
+        if expiry is None:
+            return False
+        plan = db.get(Plan, subscription.plan_id) if subscription.plan_id is not None else None
+        subscription.activation_duration_days = duration_days(subscription, plan)
+        subscription.expires_at = expiry
+        return True
+
     if duration_is_unlimited(db, subscription):
         subscription.starts_at = now
         return True
