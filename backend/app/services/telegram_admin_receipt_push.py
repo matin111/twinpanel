@@ -148,7 +148,7 @@ async def _deliver(client: httpx.AsyncClient, token: str, chat_id: int,
     )
     keyboard = {"inline_keyboard": [
         [
-            {"text": "✅ تأیید رسید", "callback_data": f"adm:ask:approve:{kind}:{item_id}"},
+            {"text": "✅ تأیید رسید", "callback_data": f"adm:do:approve:{kind}:{item_id}"},
             {"text": "❌ رد رسید", "callback_data": f"adm:ask:reject:{kind}:{item_id}"},
         ],
         [{"text": "🔎 بررسی وضعیت", "callback_data": f"adm:r:{kind}:{item_id}"}],
