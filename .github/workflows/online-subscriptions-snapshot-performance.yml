@@ -1,0 +1,22 @@
+name: Online Subscriptions Snapshot Performance
+on:
+  pull_request:
+    paths:
+      - 'backend/app/routers/runtime_endpoints.py'
+      - 'backend/tests/test_online_subscriptions_snapshot_cache_v1.py'
+      - '.github/workflows/online-subscriptions-snapshot-performance.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'backend/app/routers/runtime_endpoints.py'
+      - 'backend/tests/test_online_subscriptions_snapshot_cache_v1.py'
+jobs:
+  performance-safety:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify cached live presence does not change canonical accounting
+        run: python backend/tests/test_online_subscriptions_snapshot_cache_v1.py -v
