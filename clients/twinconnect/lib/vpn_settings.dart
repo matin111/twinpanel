@@ -38,9 +38,6 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
   bool get _identified =>
       widget.tenant.trim().isNotEmpty && widget.account.trim().isNotEmpty;
 
-  bool get _perAppDraftSupported =>
-      _includeAppsReady || _excludeAppsReady;
-
   // A platform name does not prove a working per-app routing engine.
   // Windows/Android options stay disabled until OS-native rules are verified.
   bool get _includeAppsReady =>
