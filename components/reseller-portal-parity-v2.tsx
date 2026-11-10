@@ -152,6 +152,7 @@ export function ResellerSettingsParityV2(){
         {str(me,"code")&&<span className="reseller-settings-code" dir="ltr">{str(me,"code")}</span>}
       </div>
       <Notice error={error} ok={ok}/>
+      <CentralAppAppearanceStudio role="reseller"/>
       <div className="reseller-settings-columns">
         <Card className="reseller-settings-card">
           <div className="card-head"><div><b>{pick("اطلاعات نمایندگی","Reseller profile")}</b><small>{pick("مشخصات و راه‌های ارتباطی نمایندگی","Identity and contact information")}</small></div></div>
