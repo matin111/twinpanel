@@ -4,6 +4,7 @@ import 'dart:io';
 import 'tenant_models.dart';
 import 'protocols.dart';
 import 'server_inventory.dart';
+import 'plan_classification.dart';
 
 /// A fail-closed directory client. The vendor sees ONLY a tenant namespace.
 /// Username and bearer share token go directly to the licensed installation.
@@ -75,6 +76,22 @@ class TenantApi {
       throw const FormatException('NAMESPACE_MISMATCH');
     }
     return catalog;
+  }
+
+  /// Exact type / user-count group configured on the subscription's panel.
+  Future<AppPlanClassification> loadSessionPlan({
+    required PanelDirectoryEntry panel,
+    required String sessionToken,
+  }) async {
+    final data = await _requestJson(
+      panel.apiOrigin.resolve('/v1/central-app/session/plan'),
+      bearerToken: sessionToken,
+    );
+    final plan = AppPlanClassification.fromJson(data);
+    if (plan.namespace != panel.namespace) {
+      throw const FormatException('NAMESPACE_MISMATCH');
+    }
+    return plan;
   }
 
   /// Fetch fresh nodes from the owning panel using the existing app session.
