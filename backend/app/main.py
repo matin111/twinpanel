@@ -433,6 +433,10 @@ from .routers.reseller_bot_orders_volume_v2 import (
 from .routers.reseller_bot_orders_owned_v3 import (
     router as reseller_bot_orders_owned_v3_router,
 )
+# Install the aiogram Telegram delivery replacement once for every order flow.
+# Both legacy and owned-plan approval paths call legacy._send_order_delivery_to_telegram.
+from .routers import reseller_bot_delivery_runtime_v2  # noqa: F401
+
 from .routers.reseller_bot_wallet_topups import (
     router as reseller_bot_wallet_topups_router,
 )
