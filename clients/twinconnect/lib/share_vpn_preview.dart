@@ -54,12 +54,17 @@ class _ShareVpnPreviewState extends State<ShareVpnPreview> {
         key: const Key('devShareVpnGuide'),
         title: Text(tr('راهنمای اشتراک‌گذاری VPN', 'Share VPN guide')),
         content: Text(tr(
-          'ابتدا اتصال واقعی VPN و سپس اشتراک‌گذاری شبکه در ویندوز باید '
-          'توسط موتور بومی تأیید شوند. تا آن زمان هیچ دستگاهی به VPN '
-          'اشتراکی متصل نمی‌شود و گزینه روشن‌کردن غیرفعال می‌ماند.',
-          'A verified native VPN tunnel and Windows network-sharing adapter '
-          'are both required. Sharing remains disabled until those capabilities '
-          'are installed and verified.',
+          'این پیام خطای اتصال VPN نیست. اشتراک‌گذاری اینترنت از طریق '
+          'هات‌اسپات ویندوز با عبور دادن ترافیک دستگاه‌های دیگر از تونل VPN '
+          'متفاوت است. این نسخه هنوز مسیریابی، NAT و انتخاب آداپتور خروجی VPN '
+          'را پیاده‌سازی و آزمایش نکرده است. از بخش «بازکردن تنظیمات» می‌توانید '
+          'هات‌اسپات ویندوز را بررسی کنید؛ روشن شدن هات‌اسپات به تنهایی '
+          'به معنای اشتراک VPN نیست.',
+          'This is not a VPN connection error. Windows Mobile hotspot alone '
+          'does not route other devices through the VPN tunnel. This build '
+          'does not yet implement and verify VPN adapter selection, NAT and '
+          'sharing routing. Use Open settings to inspect Windows hotspot, '
+          'but an enabled hotspot is not proof of VPN sharing.',
         )),
         actions: [
           TextButton(
@@ -106,10 +111,21 @@ class _ShareVpnPreviewState extends State<ShareVpnPreview> {
                   style: TextStyle(color: color, fontSize: 18,
                       fontWeight: FontWeight.bold),
                 )),
-                const Switch(
-                  key: Key('devShareVpnSwitch'),
-                  value: false,
-                  onChanged: null,
+                Tooltip(
+                  message: tr('موتور اشتراک‌گذاری VPN نصب و تأیید نشده است.',
+                    'The native VPN sharing engine is not implemented or verified.'),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 11, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFB86B).withValues(alpha: .12),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(tr('غیرفعال', 'Unavailable'),
+                      style: const TextStyle(
+                        color: Color(0xFFFFB86B),
+                        fontSize: 11, fontWeight: FontWeight.w700)),
+                  ),
                 ),
               ]),
               const SizedBox(height: 15),
