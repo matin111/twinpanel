@@ -1,5 +1,7 @@
 """Regression: app-only identities must never alter VPN credentials or links."""
 import ast
+import asyncio
+from html import escape
 import re
 import secrets
 import unittest
@@ -128,6 +130,42 @@ class SeparateAppCredentialContract(unittest.TestCase):
         self.assertIn("if app_credentials:", qr)
         self.assertIn('f"<code>{escape(value)}</code>', qr)
         self.assertIn("escape(str(app_credentials.get(\"app_password\")", qr)
+
+    def test_qr_message_keeps_link_and_app_password_separate_and_escaped(self):
+        # Run the actual async caption builder with a fake Telegram transport;
+        # no customer credential is sent over the network during this test.
+        source = QR.read_text(encoding="utf-8")
+        tree = ast.parse(source)
+        target = next(node for node in tree.body
+                      if isinstance(node, ast.AsyncFunctionDef)
+                      and node.name == "send_subscription_link_and_qr")
+        scope = {"subscription_qr_photo": lambda url: "mock-qr", "escape": escape}
+        exec(compile(ast.Module(body=[target], type_ignores=[]),
+                     str(QR), "exec"), scope)
+
+        class FakeMessage:
+            def __init__(self):
+                self.output = None
+
+            async def answer_photo(self, **kwargs):
+                self.output = kwargs
+                return kwargs
+
+        msg = FakeMessage()
+        value = "https://panel.example.org/v1/connect/random-token"
+        result = asyncio.run(scope["send_subscription_link_and_qr"](
+            msg, value, username="VPN_A", app_credentials={
+                "app_username": "APP_<USER>",
+                "app_password": "P&<SECRET>",
+            },
+        ))
+        caption = result["caption"]
+        self.assertEqual(result["photo"], "mock-qr")
+        self.assertIn(f"<code>{value}</code>", caption)
+        self.assertIn("APP_&lt;USER&gt;", caption)
+        self.assertIn("P&amp;&lt;SECRET&gt;", caption)
+        self.assertIn("رمز اپ:", caption)
+        self.assertLessEqual(len(caption), 1024)
 
     def test_client_only_has_username_and_app_password_fields(self):
         flutter = FLUTTER.read_text()
