@@ -7,6 +7,7 @@ import 'protocols.dart';
 import 'country_flag.dart';
 import 'ambient_background.dart';
 import 'interactive_glass_card.dart';
+import 'share_vpn_preview.dart';
 
 /// Visual-only desktop preview. No real VPN session, ping or account is created.
 void main() => runApp(const TwinConnectDevApp());
@@ -729,7 +730,13 @@ class _TwinConnectDevAppState extends State<TwinConnectDevApp> {
             tr('حفاظت IPv6', 'IPv6 protection')),
         settingLine(Icons.auto_awesome_rounded,
             tr('اتصال خودکار', 'Auto-connect')),
-        const SizedBox(height: 9),
+        const SizedBox(height: 16),
+        ShareVpnPreview(
+          key: const Key('devShareVpnSection'),
+          dark: _dark,
+          persian: _persian,
+        ),
+        const SizedBox(height: 16),
         glassCard(
           key: const Key('devSettingsAppearanceCard'),
           radius: 20,
