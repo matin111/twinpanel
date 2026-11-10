@@ -17,8 +17,9 @@ from ..central_app_credentials import (
 from ..central_app_identity import central_app_entitled, installation_namespace, subscription_app_namespace
 from ..database import get_db
 from ..deps import get_current_user, require_admin, require_reseller
-from ..models import Subscription, User, Node, SubscriptionNode, NodeStatus
+from ..models import Subscription, User, Node, SubscriptionNode, NodeStatus, Plan
 from ..models_reseller import Reseller, ResellerSubscription
+from ..plan_category_models import PlanCategoryAssignment
 from ..system_release import ensure_installation_id
 from .account_delivery import _share_token, _share_url
 from .central_app_v1 import (
@@ -133,6 +134,35 @@ def session_protocols(
     )
     response.headers.update(_PRIVATE_HEADERS)
     return response
+
+
+@router.get("/session/plan")
+def session_plan(
+    sub: Subscription = Depends(_session_subscription),
+    db: Session = Depends(get_db),
+):
+    """Read the panel's two existing plan classifications, not plan-name guesses.
+
+    First dimension is subscription_type (e.g. V2Ray / Premium); second
+    dimension is category (the admin-configured user-count group).
+    device_limit is a separate numeric entitlement, not a category ID.
+    """
+    plan = db.get(Plan, int(sub.plan_id))
+    if plan is None:
+        raise HTTPException(status_code=404, detail="PLAN_NOT_FOUND")
+    grouping = db.query(PlanCategoryAssignment).filter(
+        PlanCategoryAssignment.plan_id == int(plan.id)
+    ).first()
+    return JSONResponse({
+        "schema": 1,
+        "namespace": subscription_app_namespace(db, sub),
+        "plan_id": int(plan.id),
+        "subscription_type": str(grouping.subscription_type or "اشتراک عمومی")
+            if grouping else "اشتراک عمومی",
+        "user_count_category": str(grouping.category or "سایر پلن‌ها")
+            if grouping else "سایر پلن‌ها",
+        "device_limit": int(plan.device_limit if plan.device_limit is not None else 1),
+    }, headers=_PRIVATE_HEADERS)
 
 
 @router.get("/session/servers")
