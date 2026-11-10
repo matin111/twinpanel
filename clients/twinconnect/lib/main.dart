@@ -226,11 +226,22 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
       _serverRefreshError = null;
     });
     try {
-      final inventory = await TenantApi.fromBuildConfig().refreshSessionServers(
+      final api = TenantApi.fromBuildConfig();
+      // Server refresh is also a plan/protocol entitlement refresh.
+      // Publish both together so removed permissions never remain in the UI
+      // alongside newly fetched servers.
+      final catalog = await api.loadSessionProtocolCatalog(
+        panel: panel, sessionToken: session,
+      );
+      final inventory = await api.refreshSessionServers(
         panel: panel, sessionToken: session,
       );
       if (!mounted || serial != _lookupSerial) return;
-      setState(() => _servers = inventory);
+      setState(() {
+        _catalog = catalog;
+        _servers = inventory;
+        _protocolCatalogUnavailable = false;
+      });
     } catch (_) {
       if (!mounted || serial != _lookupSerial) return;
       setState(() => _serverRefreshError = 'SERVER_REFRESH_FAILED');
