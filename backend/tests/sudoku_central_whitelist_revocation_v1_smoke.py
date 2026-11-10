@@ -28,7 +28,8 @@ def missing(*, current: str, applied: str, audit: dict):
          patch.object(stage,"require_valid_desired_state",side_effect=lambda x,max_users:x), \
          patch.object(stage,"verify_coverage",return_value=audit), \
          patch.object(stage,"desired_sudoku_fingerprint",return_value=current), \
-         patch.object(stage,"last_sudoku_applied",return_value=applied):
+         patch.object(stage,"last_sudoku_applied",return_value=applied), \
+         patch.object(stage,"node_supported_protocols",return_value=frozenset({"sudoku","naive"})):
         return stage.missing_runtime_families(19,3000)
 
 
