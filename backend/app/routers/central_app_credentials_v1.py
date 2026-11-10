@@ -147,21 +147,26 @@ def session_plan(
     dimension is category (the admin-configured user-count group).
     device_limit is a separate numeric entitlement, not a category ID.
     """
-    plan = db.get(Plan, int(sub.plan_id))
-    if plan is None:
-        raise HTTPException(status_code=404, detail="PLAN_NOT_FOUND")
-    grouping = db.query(PlanCategoryAssignment).filter(
-        PlanCategoryAssignment.plan_id == int(plan.id)
-    ).first()
+    # Legacy and migrated subscriptions may not have an assigned plan.
+    # The app can still authenticate and obtain its authorized nodes; only
+    # plan classification is unknown. A zero ID signals "unassigned" rather
+    # than inventing a Plan or rewriting the existing subscription.
+    plan_id = getattr(sub, "plan_id", None)
+    plan = db.get(Plan, int(plan_id)) if plan_id is not None else None
+    grouping = (
+        db.query(PlanCategoryAssignment).filter(
+            PlanCategoryAssignment.plan_id == int(plan.id)
+        ).first() if plan is not None else None
+    )
     return JSONResponse({
         "schema": 1,
         "namespace": subscription_app_namespace(db, sub),
-        "plan_id": int(plan.id),
+        "plan_id": int(plan.id) if plan else 0,
         "subscription_type": str(grouping.subscription_type or "اشتراک عمومی")
             if grouping else "اشتراک عمومی",
         "user_count_category": str(grouping.category or "سایر پلن‌ها")
             if grouping else "سایر پلن‌ها",
-        "device_limit": int(plan.device_limit if plan.device_limit is not None else 1),
+        "device_limit": int(plan.device_limit) if plan and plan.device_limit is not None else 0,
     }, headers=_PRIVATE_HEADERS)
 
 

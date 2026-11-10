@@ -78,9 +78,16 @@ def _plan_type_code(db: Session, sub: Subscription) -> int:
     The second category (user count) is deliberately NOT another account
     namespace and does not enter this code. Existing logins are never renamed.
     """
-    group = db.query(PlanCategoryAssignment).filter(
-        PlanCategoryAssignment.plan_id == int(sub.plan_id)
-    ).first()
+    # Historical/imported subscriptions may have no plan_id at all. Treat
+    # these as the stable generic subscription type, without creating a Plan
+    # or rewriting the subscription's original VPN/account fields.
+    plan_id = getattr(sub, "plan_id", None)
+    group = (
+        db.query(PlanCategoryAssignment).filter(
+            PlanCategoryAssignment.plan_id == int(plan_id)
+        ).first()
+        if plan_id is not None else None
+    )
     type_name = str(group.subscription_type or "اشتراک عمومی").strip() if group else "اشتراک عمومی"
     existing = db.query(AppPlanTypeCode).filter(
         AppPlanTypeCode.type_name == type_name
