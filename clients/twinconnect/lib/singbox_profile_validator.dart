@@ -1,6 +1,5 @@
 import 'dart:convert';
 
-import 'protocols.dart';
 
 /// The sing-box family uses one engine process. Profiles may be native
 /// outbound JSON or a full native config; opaque links are deliberately not
