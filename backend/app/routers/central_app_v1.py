@@ -20,6 +20,8 @@ from sqlalchemy.orm import Session
 from ..branding_models import BrandingSettings
 from ..central_app_identity import (
     central_app_entitled, installation_namespace, reseller_prefix,
+    app_directory_namespace, app_reseller_prefix, save_app_directory_alias,
+    subscription_app_namespace, subscription_app_prefix,
 )
 from ..central_app_models import CentralAppContact
 from ..central_app_appearance import resolve_appearance
@@ -116,7 +118,7 @@ def admin_client_info(
     db: Session = Depends(get_db),
     _=Depends(require_admin),
 ):
-    namespace = installation_namespace(ensure_installation_id())
+    namespace = app_directory_namespace(ensure_installation_id())
     return {
         "namespace": namespace,
         "app_enabled": central_app_entitled(),
@@ -153,8 +155,14 @@ def register_with_vendor(
         raise HTTPException(status_code=503, detail="VENDOR_UNREACHABLE") from exc
     if result.get("namespace") != installation_namespace(installation_id):
         raise HTTPException(status_code=502, detail="VENDOR_NAMESPACE_MISMATCH")
+    alias = result.get("short_namespace") or result["namespace"]
+    try:
+        saved = save_app_directory_alias(installation_id, alias)
+    except (ValueError, OSError) as exc:
+        raise HTTPException(status_code=502, detail="VENDOR_ALIAS_INVALID_OR_UNWRITABLE") from exc
     return {
         "ok": True, "namespace": result["namespace"],
+        "short_namespace": saved,
         "api_origin": result.get("api_origin"),
     }
 
@@ -187,7 +195,7 @@ def admin_reseller_app_profile(
         raise HTTPException(status_code=404, detail="RESELLER_NOT_FOUND")
     return {
         **_contact_out(_contact(db, reseller.id)),
-        "app_username_prefix": reseller_prefix(
+        "app_username_prefix": app_reseller_prefix(
             ensure_installation_id(), int(reseller.id)
         ),
         "brand_name": reseller.brand_name or reseller.name,
@@ -214,7 +222,7 @@ def reseller_app_profile(
 ):
     return {
         **_contact_out(_contact(db, reseller.id)),
-        "app_username_prefix": reseller_prefix(
+        "app_username_prefix": app_reseller_prefix(
             ensure_installation_id(), int(reseller.id)
         ),
         "brand_name": reseller.brand_name or reseller.name,
@@ -229,7 +237,7 @@ def update_reseller_app_profile(
 ):
     return {
         **_save_contact(db, int(reseller.id), payload),
-        "app_username_prefix": reseller_prefix(
+        "app_username_prefix": app_reseller_prefix(
             ensure_installation_id(), int(reseller.id)
         ),
     }
@@ -271,7 +279,7 @@ def subscription_app_brand(
     info = _contact_out(contact)
     if reseller:
         return {
-            "namespace": installation_namespace(ensure_installation_id()),
+            "namespace": subscription_app_namespace(db, sub),
             "owner_type": "reseller",
             "brand_name": reseller.brand_name or reseller.name,
             "logo_url": info["logo_url"],
@@ -283,14 +291,12 @@ def subscription_app_brand(
             "support_phone": info["support_phone"] or reseller.phone,
             "support_text": reseller.support_text,
             "website_url": info["website_url"],
-            "app_username_prefix": reseller_prefix(
-                ensure_installation_id(), int(reseller.id)
-            ),
+            "app_username_prefix": subscription_app_prefix(db, sub, int(reseller.id)),
         }
 
     branding = db.query(BrandingSettings).first()
     return {
-        "namespace": installation_namespace(ensure_installation_id()),
+        "namespace": subscription_app_namespace(db, sub),
         "owner_type": "admin",
         "brand_name": getattr(branding, "brand_name", None) or "TwinPanel",
         "logo_url": info["logo_url"] or getattr(branding, "logo_url", None),
@@ -302,7 +308,7 @@ def subscription_app_brand(
         "support_phone": info["support_phone"],
         "support_text": None,
         "website_url": info["website_url"],
-        "app_username_prefix": installation_namespace(ensure_installation_id()) + "_A_",
+        "app_username_prefix": subscription_app_prefix(db, sub, 0),
     }
 
 @router.post("/public/brand-preview")
