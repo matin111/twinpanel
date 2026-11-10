@@ -165,6 +165,32 @@ def session_plan(
     }, headers=_PRIVATE_HEADERS)
 
 
+@router.get("/session/account")
+def session_account(
+    sub: Subscription = Depends(_session_subscription),
+    db: Session = Depends(get_db),
+):
+    """Authenticated subscription-only account snapshot without credentials.
+
+    Zero traffic limit means unlimited. A missing expiry with a configured
+    activation duration represents a first-use period not yet started.
+    """
+    limit = max(0, int(sub.traffic_limit_bytes or 0))
+    used = max(0, int(sub.traffic_used_bytes or 0))
+    expiry = sub.expires_at
+    duration = sub.activation_duration_days
+    return JSONResponse({
+        "schema": 1,
+        "namespace": subscription_app_namespace(db, sub),
+        "subscription_id": str(sub.id),
+        "traffic_limit_bytes": limit,
+        "traffic_used_bytes": used,
+        "expires_at": expiry.isoformat() + "Z" if expiry else None,
+        "activation_duration_days": int(duration) if duration is not None else None,
+        "status": sub.status.value if hasattr(sub.status, "value") else str(sub.status),
+    }, headers=_PRIVATE_HEADERS)
+
+
 @router.get("/session/servers")
 def session_servers(
     sub: Subscription = Depends(_session_subscription),
