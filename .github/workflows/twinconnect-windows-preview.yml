@@ -8,6 +8,7 @@ on:
   push:
     branches:
       - feat/twinconnect-windows-preview-v1
+      - integration/twinconnect-windows-app-20261110
     paths:
       - "clients/twinconnect/**"
       - ".github/workflows/twinconnect-windows-preview.yml"
