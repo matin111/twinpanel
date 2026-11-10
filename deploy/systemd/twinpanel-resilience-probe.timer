@@ -1,0 +1,13 @@
+[Unit]
+Description=Periodic TwinPanel controller resilience probe
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=1min
+RandomizedDelaySec=10s
+AccuracySec=10s
+Persistent=true
+Unit=twinpanel-resilience-probe.service
+
+[Install]
+WantedBy=timers.target
