@@ -181,6 +181,29 @@ class SeparateAppCredentialContract(unittest.TestCase):
         self.assertIn("رمز اپ:", caption)
         self.assertLessEqual(len(caption), 1024)
 
+    def test_admin_app_delivery_is_reachable_from_subscription_table_and_link_modal(self):
+        # The legacy admin subscription page is the currently used entry point.
+        # Link/QR must carry the explicit app owner and subscription id so
+        # the already-implemented app delivery UI is visible and actionable.
+        legacy = (ROOT / "components/legacy-subscriptions-exact.tsx").read_text(
+            encoding="utf-8"
+        )
+        modal = (ROOT / "components/subscription-link-delivery-modal.tsx").read_text(
+            encoding="utf-8"
+        )
+        card = (ROOT / "components/app-credential-delivery-card.tsx").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn('data-testid="admin-app-delivery-action"', legacy)
+        self.assertIn('pick("ورود اپ","App Delivery")', legacy)
+        self.assertIn('appOwner="admin"', legacy)
+        self.assertIn("subscriptionId={linkModalId??undefined}", legacy)
+        self.assertIn("<AppCredentialDeliveryCard", modal)
+        self.assertIn("owner={appOwner} subscriptionId={subscriptionId}", modal)
+        self.assertIn('getAppAccess(owner,subscriptionId,reset)', card)
+        self.assertIn('pick("دریافت اطلاعات اپ","Show app credentials")', card)
+        self.assertIn('pick("تغییر رمز اپ","Reset app password")', card)
+
     def test_client_only_has_username_and_app_password_fields(self):
         flutter = FLUTTER.read_text()
         client = CLIENT.read_text()
