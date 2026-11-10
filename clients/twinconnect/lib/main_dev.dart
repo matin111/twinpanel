@@ -44,8 +44,22 @@ class _TwinConnectDevAppState extends State<TwinConnectDevApp> {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      theme: BrandTheme.make(brand, Brightness.light),
-      darkTheme: BrandTheme.make(brand, Brightness.dark),
+      theme: ThemeData(
+        useMaterial3: true,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: accent, brightness: Brightness.light,
+          surface: Colors.white,
+        ),
+        scaffoldBackgroundColor: const Color(0xFFF4F3FC),
+      ),
+      darkTheme: ThemeData(
+        useMaterial3: true,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: accent, brightness: Brightness.dark,
+          surface: const Color(0xFF1A2540),
+        ),
+        scaffoldBackgroundColor: const Color(0xFF101629),
+      ),
       themeMode: _dark ? ThemeMode.dark : ThemeMode.light,
       home: Builder(builder: (context) {
         final theme = Theme.of(context);
@@ -56,7 +70,7 @@ class _TwinConnectDevAppState extends State<TwinConnectDevApp> {
         final wide = MediaQuery.sizeOf(context).width >= 920;
         final medium = MediaQuery.sizeOf(context).width >= 650;
         final navBg = dark ? const Color(0xFF101629) : const Color(0xFFF4F5FB);
-        final border = foreground.withValues(alpha: 0.08);
+        final border = foreground.withValues(alpha: dark ? 0.12 : 0.13);
         final options = <String, String>{
           'all': t('همه', 'All'),
           'openvpn': 'OpenVPN',
@@ -459,8 +473,18 @@ class _TwinConnectDevAppState extends State<TwinConnectDevApp> {
                 ]),
               )),
             ),
-            Expanded(child: BrandBackground(
-              brand: brand,
+            Expanded(child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: dark
+                      ? [const Color(0xFF101629), const Color(0xFF171A38),
+                         const Color(0xFF121A2D)]
+                      : [const Color(0xFFF9F8FF), const Color(0xFFF0F2FC),
+                         const Color(0xFFFFFFFF)],
+                ),
+              ),
               child: SafeArea(child: ListView(
                 padding: EdgeInsets.symmetric(
                   horizontal: wide ? 32 : 18, vertical: 27),
