@@ -15,6 +15,7 @@ import 'android_connection_card.dart';
 import 'vpn_settings.dart';
 import 'vpn_strings.dart';
 import 'server_inventory.dart';
+import 'country_flag.dart';
 
 void main() => runApp(const TwinConnectApp());
 
@@ -597,6 +598,7 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
                     for (final server in _servers!.servers)
                       ListTile(
                         key: Key('assignedServer_${server.id}'),
+                        leading: CountryFlag(server.countryCode, width: 31),
                         title: Text(server.name),
                         subtitle: Text(server.countryCode),
                         trailing: Text(server.nodeOnline
