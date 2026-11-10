@@ -22,6 +22,7 @@ from ..central_app_identity import (
     central_app_entitled, installation_namespace, reseller_prefix,
 )
 from ..central_app_models import CentralAppContact
+from ..central_app_appearance import resolve_appearance
 from ..database import get_db
 from ..deps import require_admin, require_reseller
 from ..models_reseller import Reseller, ResellerSubscription
@@ -276,6 +277,7 @@ def subscription_app_brand(
             "logo_url": info["logo_url"],
             "primary_color": info["primary_color"] or "#7C3AED",
             "secondary_color": info["secondary_color"] or "#4F46E5",
+            **resolve_appearance(db, reseller.id),
             "telegram_url": info["telegram_url"],
             "renewal_url": info["renewal_url"],
             "support_phone": info["support_phone"] or reseller.phone,
@@ -294,6 +296,7 @@ def subscription_app_brand(
         "logo_url": info["logo_url"] or getattr(branding, "logo_url", None),
         "primary_color": info["primary_color"] or getattr(branding, "primary_color", None) or "#7C3AED",
         "secondary_color": info["secondary_color"] or getattr(branding, "secondary_color", None) or "#4F46E5",
+        **resolve_appearance(db, 0),
         "telegram_url": info["telegram_url"] or getattr(branding, "telegram_url", None),
         "renewal_url": info["renewal_url"],
         "support_phone": info["support_phone"],
