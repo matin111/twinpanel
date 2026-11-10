@@ -1,0 +1,22 @@
+name: Sudoku Shared UFW Listener Reachability
+on:
+  pull_request:
+    paths:
+      - 'backend/app/central_sudoku_shared_runtime_v2.py'
+      - 'backend/tests/test_sudoku_shared_firewall_v1.py'
+      - '.github/workflows/sudoku-shared-ufw-reachability.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'backend/app/central_sudoku_shared_runtime_v2.py'
+      - 'backend/tests/test_sudoku_shared_firewall_v1.py'
+jobs:
+  safety:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify shared Sudoku firewall rule only and both apply paths
+        run: python backend/tests/test_sudoku_shared_firewall_v1.py -v
