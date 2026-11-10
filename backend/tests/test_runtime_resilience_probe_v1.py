@@ -41,7 +41,7 @@ class RuntimeResilienceProbe(unittest.TestCase):
                 if args[0] == "nginx":
                     return 0, ""
                 if args[0] == "runuser":
-                    return 0, "0|0" if "postgres" in args else "0"
+                    return 0, "0|0" if args[args.index("-d") + 1] == "postgres" else "0"
                 raise AssertionError(args)
             with mock.patch.object(probe, "CURRENT", current), \
                  mock.patch.object(probe, "SLOT_STATE", state), \
@@ -66,7 +66,7 @@ class RuntimeResilienceProbe(unittest.TestCase):
                         return 3, "inactive"
                     return 0, "active"
                 if args[0] == "runuser":
-                    return 0, "0|0" if "postgres" in args else "0"
+                    return 0, "0|0" if args[args.index("-d") + 1] == "postgres" else "0"
                 return 0, ""
             with mock.patch.object(probe, "CURRENT", current), \
                  mock.patch.object(probe, "SLOT_STATE", state), \
@@ -88,7 +88,7 @@ class RuntimeResilienceProbe(unittest.TestCase):
             }))
             def fake_run(*args, **kwargs):
                 if args[0] == "runuser":
-                    return 0, "2|90" if "postgres" in args else "0"
+                    return 0, "2|90" if args[args.index("-d") + 1] == "postgres" else "0"
                 return 0, "active"
             with mock.patch.object(probe, "CURRENT", current), \
                  mock.patch.object(probe, "SLOT_STATE", state), \
@@ -110,7 +110,7 @@ class RuntimeResilienceProbe(unittest.TestCase):
             }))
             def fake_run(*args, **kwargs):
                 if args[0] == "runuser":
-                    return (0, "0|0") if "postgres" in args else (0, "2")
+                    return (0, "0|0") if args[args.index("-d") + 1] == "postgres" else (0, "2")
                 return 0, "active"
             with mock.patch.object(probe, "CURRENT", current), \
                  mock.patch.object(probe, "SLOT_STATE", state), \
