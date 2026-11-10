@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 
 import 'app_strings.dart';
-import 'protocol_strings.dart';
 import 'protocols.dart';
 
-/// Read-only status from the owning panel. Never represents a VPN connection.
+/// App protocol picker driven by the subscription snapshot from TwinPanel.
+/// Unselected protocols stay absent, while engines still require native proof.
 class ProtocolCatalogCard extends StatelessWidget {
   const ProtocolCatalogCard({
     required this.catalog,
@@ -17,7 +17,8 @@ class ProtocolCatalogCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final s = AppStrings.of(context);
+    final strings = AppStrings.of(context);
+    final allowed = catalog.entries.where((entry) => entry.selected).toList();
     return Card(
       key: const Key('protocolCatalogCard'),
       child: Padding(
@@ -25,53 +26,45 @@ class ProtocolCatalogCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(
-              s.protocolListTitle,
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: 8),
-            Text(s.protocolListSubtitle),
+            Text(strings.protocolListTitle,
+                style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 12),
-            for (final entry in catalog.entries)
-              _ProtocolItem(entry: entry, native: native),
-            const SizedBox(height: 10),
-            Text(
-              s.protocolPrivacy,
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
+            if (allowed.isEmpty)
+              Text(strings.protocolNotSelected)
+            else
+              SizedBox(
+                height: 44,
+                child: ListView(
+                  key: const Key('allowedProtocolFilters'),
+                  scrollDirection: Axis.horizontal,
+                  children: [
+                    for (final entry in allowed)
+                      Padding(
+                        padding: const EdgeInsetsDirectional.only(end: 8),
+                        child: Tooltip(
+                          message: !entry.configRecordPresent
+                              ? strings.protocolNotConfigured
+                              : !native.supports(entry.protocol.code)
+                                  ? strings.protocolEnginePending
+                                  : strings.protocolEngineReady,
+                          child: Chip(
+                            key: Key('protocol_${entry.protocol.code}'),
+                            label: Text(entry.protocol.name),
+                            avatar: Icon(
+                              entry.configRecordPresent
+                                  ? Icons.hub_outlined
+                                  : Icons.lock_outline_rounded,
+                              size: 16,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
           ],
         ),
       ),
-    );
-  }
-}
-
-class _ProtocolItem extends StatelessWidget {
-  const _ProtocolItem({required this.entry, required this.native});
-
-  final PanelProtocolStatus entry;
-  final NativeProtocolReadiness native;
-
-  @override
-  Widget build(BuildContext context) {
-    final s = AppStrings.of(context);
-    final status = !entry.selected
-        ? s.protocolNotSelected
-        : !entry.configRecordPresent
-            ? s.protocolNotConfigured
-            : !native.supports(entry.protocol.code)
-                ? s.protocolEnginePending
-                : s.protocolEngineReady;
-    return ListTile(
-      key: Key('protocol_${entry.protocol.code}'),
-      contentPadding: EdgeInsets.zero,
-      leading: Icon(
-        entry.selected ? Icons.tune : Icons.remove_circle_outline,
-        size: 20,
-      ),
-      title: Text(entry.protocol.name),
-      subtitle: Text(status),
-      trailing: const Icon(Icons.lock_outline, size: 17),
     );
   }
 }
