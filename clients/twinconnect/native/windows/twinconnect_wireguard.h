@@ -96,6 +96,23 @@ inline bool ServiceExists() {
   return found;
 }
 
+// The official installtunnelservice creates an automatically-starting
+// service. The app's autoConnect policy is false: do not surprise users by
+// reconnecting automatically on the next Windows boot.
+inline bool DisableTunnelAutostart() {
+  SC_HANDLE scm = OpenSCManagerW(nullptr, nullptr, SC_MANAGER_CONNECT);
+  if (!scm) return false;
+  SC_HANDLE svc = OpenServiceW(scm, kServiceName, SERVICE_CHANGE_CONFIG);
+  if (!svc) { CloseServiceHandle(scm); return false; }
+  const bool ok = ChangeServiceConfigW(
+      svc, SERVICE_NO_CHANGE, SERVICE_DEMAND_START,
+      SERVICE_NO_CHANGE, nullptr, nullptr, nullptr,
+      nullptr, nullptr, nullptr, nullptr) != FALSE;
+  CloseServiceHandle(svc);
+  CloseServiceHandle(scm);
+  return ok;
+}
+
 // Read only handshake and transfer statistics from the locally installed
 // signed WireGuard tools. Never invoke a shell or request private-key output.
 inline bool WgQuery(const wchar_t* fixedArgs, std::string* output) {
@@ -466,6 +483,12 @@ inline bool Start(const std::string& config) {
   if (!InvokeOfficialWireGuard(L"/installtunnelservice", EncryptedPath())) {
     // If an install timed out but actually started, do not delete the
     // configuration that the running service still needs.
+    if (!ServiceExists()) DeleteFileW(EncryptedPath().c_str());
+    return false;
+  }
+  if (!DisableTunnelAutostart()) {
+    // Respect the user's requested no-auto-connect policy and roll back.
+    InvokeOfficialWireGuard(L"/uninstalltunnelservice", kTunnelName);
     if (!ServiceExists()) DeleteFileW(EncryptedPath().c_str());
     return false;
   }
