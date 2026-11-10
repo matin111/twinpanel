@@ -375,7 +375,7 @@ async def classic_port_check(
         socket_type = parts[0].lower()
         if not socket_type.startswith(transport):
             continue
-        local = parts[4]
+        local = parts[3]
         match = re.search(r":([0-9]+)$", local)
         if match and int(match.group(1)) in ports:
             # Keep this response free of PIDs, command lines and identities.
