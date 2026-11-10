@@ -15,8 +15,10 @@ from cryptography.fernet import Fernet
 from fastapi import HTTPException
 from jose import JWTError, jwt
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 
-from .central_app_credential_models import SubscriptionAppCredential
+from .central_app_credential_models import SubscriptionAppCredential, AppPlanTypeCode
+from .plan_category_models import PlanCategoryAssignment
 from .central_app_identity import (
     central_app_entitled, installation_namespace, app_directory_namespace,
     app_reseller_prefix,
@@ -70,12 +72,41 @@ def _active_subscription(db: Session, sub_id: int) -> Subscription:
     return sub
 
 
-def _username(reseller_id: int) -> str:
+def _plan_type_code(db: Session, sub: Subscription) -> int:
+    """Allocate one stable numeric code per first-level subscription type.
+
+    The second category (user count) is deliberately NOT another account
+    namespace and does not enter this code. Existing logins are never renamed.
+    """
+    group = db.query(PlanCategoryAssignment).filter(
+        PlanCategoryAssignment.plan_id == int(sub.plan_id)
+    ).first()
+    type_name = str(group.subscription_type or "اشتراک عمومی").strip() if group else "اشتراک عمومی"
+    existing = db.query(AppPlanTypeCode).filter(
+        AppPlanTypeCode.type_name == type_name
+    ).first()
+    if existing is not None:
+        return int(existing.id)
+    try:
+        with db.begin_nested():
+            new_code = AppPlanTypeCode(type_name=type_name)
+            db.add(new_code)
+            db.flush()
+            value = int(new_code.id)
+        return value
+    except IntegrityError:
+        existing = db.query(AppPlanTypeCode).filter(
+            AppPlanTypeCode.type_name == type_name
+        ).one()
+        return int(existing.id)
+
+
+def _username(reseller_id: int, type_code: int) -> str:
     installation = ensure_installation_id()
     prefix = (app_reseller_prefix(installation, reseller_id)
               if reseller_id > 0
               else app_directory_namespace(installation) + "_A_")
-    return prefix + "APP" + secrets.token_hex(8).upper()
+    return prefix + f"C{int(type_code)}_APP" + secrets.token_hex(8).upper()
 
 
 def _password() -> str:
@@ -103,7 +134,7 @@ def get_or_issue_app_credentials(
         if int(row.reseller_id) != owner:
             raise HTTPException(status_code=409, detail="APP_OWNER_MISMATCH")
         return row
-    username = _username(owner)
+    username = _username(owner, _plan_type_code(db, sub))
     password = _password()
     row = SubscriptionAppCredential(
         subscription_id=int(sub.id),
