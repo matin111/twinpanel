@@ -6,6 +6,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'protocols.dart';
 import 'country_flag.dart';
 import 'ambient_background.dart';
+import 'interactive_glass_card.dart';
 
 /// Visual-only desktop preview. No real VPN session, ping or account is created.
 void main() => runApp(const TwinConnectDevApp());
@@ -135,17 +136,13 @@ class _TwinConnectDevAppState extends State<TwinConnectDevApp> {
       bool selected = false,
       EdgeInsetsGeometry padding = EdgeInsets.zero,
       Key? key,
-    }) => ClipRRect(
+    }) => TwinConnectGlassCard(
       key: key,
-      borderRadius: BorderRadius.circular(radius),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
-        child: Container(
-          padding: padding,
-          decoration: tile(selected: selected, radius: radius),
-          child: child,
-        ),
-      ),
+      dark: _dark,
+      selected: selected,
+      radius: radius,
+      padding: padding,
+      child: child,
     );
 
     void notification() => ScaffoldMessenger.of(context).showSnackBar(
