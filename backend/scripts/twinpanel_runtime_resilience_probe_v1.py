@@ -113,6 +113,35 @@ def report() -> dict:
         errors.append("postgres_txn_audit_unavailable")
     if stale:
         errors.append("idle_postgres_transactions_over_60s")
+
+    # Alert on purchase notifications that can be sent but are not moving.
+    # Exclude unlinked/blocked Telegram recipients: those cannot be delivered
+    # until the recipient connects/unblocks the bot, not a controller outage.
+    delivery_sql = (
+        "SELECT count(*) FROM telegram_notifications t "
+        "WHERE t.kind='payment_approved' AND t.delivered_at IS NULL "
+        "AND t.created_at < now() - interval '5 minutes' "
+        "AND ((t.attempts = 0) "
+        "OR (t.attempts >= 8 AND t.last_error IS NOT NULL "
+        "AND t.last_error <> 'telegram link not found' "
+        "AND t.last_error NOT ILIKE '%blocked by the user%') "
+        "OR (t.last_error = 'telegram link not found' "
+        "AND EXISTS (SELECT 1 FROM telegram_user_links l WHERE l.user_id=t.user_id)))"
+    )
+    delivery_code, delivery_value = run(
+        "runuser", "-u", "postgres", "--", "psql", "-X", "-A", "-t",
+        "-d", "twinpanel", "-c", delivery_sql, timeout=8,
+    )
+    pending_paid_attention = 0
+    if delivery_code == 0:
+        try:
+            pending_paid_attention = int(delivery_value)
+            if pending_paid_attention:
+                errors.append("actionable_paid_telegram_deliveries_stalled")
+        except ValueError:
+            errors.append("telegram_paid_outbox_audit_parse_error")
+    else:
+        errors.append("telegram_paid_outbox_audit_unavailable")
     return {
         "event": "twinpanel_resilience_probe_v1",
         "healthy": not errors,
@@ -121,6 +150,7 @@ def report() -> dict:
         "service_status": services,
         "stale_db_transactions": stale,
         "oldest_stale_seconds": max_age,
+        "actionable_paid_delivery_pending": pending_paid_attention,
         "errors": errors,
     }
 
