@@ -35,10 +35,7 @@ class SingBoxWindowsConfig {
           'dns_mode': 'hijack',
         },
       ],
-      'outbounds': [
-        serverOutbound,
-        {'type': 'block', 'tag': 'block'},
-      ],
+      'outbounds': [serverOutbound],
       'route': {
         'auto_detect_interface': true,
         'final': 'proxy',
