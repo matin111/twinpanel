@@ -23,7 +23,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('devRefreshServers')));
     await tester.pump();
-    expect(find.text('برای دریافت سرورها، ورود به پنل لازم است'), findsOneWidget);
+    expect(find.text('برای دریافت سرورها وارد حساب شوید'), findsOneWidget);
   });
 
   testWidgets('dev dashboard supports filters without fake connections',
