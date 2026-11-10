@@ -7,6 +7,7 @@ from app.models import NodeType
 from app.protocol_account_registry import ALL_PROTOCOL_KEYS
 from app.services.central_partial_protocol_scope_v1 import node_supported_protocols
 from app.services.new_node_readiness_v1 import verify_new_exit_readiness
+from app.services.central_node_desired_state_v1 import load_desired_state
 
 
 class PartialNodeScopeTests(unittest.TestCase):
@@ -29,6 +30,27 @@ class PartialNodeScopeTests(unittest.TestCase):
         )
         with self.assertRaisesRegex(RuntimeError, "NOT_VERIFIED"):
             node_supported_protocols(db, 27)
+
+
+class PartialNodeEntitlementTests(unittest.TestCase):
+    def test_only_users_with_supported_protocols_are_attached(self):
+        db = MagicMock()
+        users = MagicMock()
+        users.filter.return_value.all.return_value = [(1,), (2,), (3,)]
+        entitled = MagicMock()
+        entitled.filter.return_value.all.return_value = [
+            (1, "openvpn"), (2, "v2ray"), (3, "wireguard"),
+            (3, "v2ray"),
+        ]
+        db.query.side_effect = [users, entitled]
+        with patch(
+            "app.services.central_partial_protocol_scope_v1.node_supported_protocols",
+            return_value=frozenset({"openvpn", "wireguard"}),
+        ):
+            state = load_desired_state(db, 27)
+        self.assertEqual(state.subscription_ids, (1, 3))
+        self.assertEqual(state.entitled_pairs, ((1, "openvpn"), (3, "wireguard")))
+        self.assertNotIn(2, state.subscription_ids)
 
 
 class LivePartialReadinessTests(unittest.IsolatedAsyncioTestCase):
