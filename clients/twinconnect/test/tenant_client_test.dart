@@ -127,7 +127,9 @@ void main() {
     SharedPreferences.setMockInitialValues({'twinconnect_ui_language_v1': 'en'});
     await tester.pumpWidget(const TwinConnectApp());
     await tester.pumpAndSettle();
-    expect(find.text('TwinConnect'), findsOneWidget);
+    // Login remains neutral until the account is authenticated.
+    expect(find.text('TwinConnect'), findsNothing);
+    expect(find.text('Matin Vpn'), findsNothing);
     expect(find.byKey(const Key('accountUsername')), findsOneWidget);
     expect(find.byKey(const Key('appPassword')), findsOneWidget);
     expect(find.byKey(const Key('identifyButton')), findsOneWidget);
