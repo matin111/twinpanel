@@ -276,7 +276,11 @@ inline bool InvokeOfficialWireGuard(const wchar_t* command,
   if (!CreateProcessW(exe.c_str(), args.data(), nullptr, nullptr, FALSE,
                       CREATE_NO_WINDOW, nullptr, nullptr, &startup, &process))
     return false;
-  const DWORD wait = WaitForSingleObject(process.hProcess, 30000);
+  // The Flutter Windows method handler runs on the platform UI thread.
+  // Bound this external helper wait so a stuck WireGuard CLI cannot freeze
+  // the desktop for thirty seconds. Never kill a possibly active service:
+  // callers verify Windows service state before reporting disconnection.
+  const DWORD wait = WaitForSingleObject(process.hProcess, 6000);
   DWORD exit_code = 1;
   if (wait == WAIT_OBJECT_0)
     GetExitCodeProcess(process.hProcess, &exit_code);
