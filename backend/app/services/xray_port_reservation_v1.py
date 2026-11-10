@@ -154,6 +154,18 @@ async def select_install_xray_base_port(conn, node: Any, requested_port: int) ->
         except (ValueError, IndexError, TypeError, AttributeError) as exc:
             raise RuntimeError("XRAY_ACTIVE_CONFIG_AUDIT_FAILED") from exc
         if installed_base == requested:
+            if (
+                not bool(getattr(node, "enable_v2ray", False))
+                and (
+                    not report.get("safe")
+                    or int(report.get("clients", -1)) != 0
+                    or str(report.get("tls_domain") or "").lower()
+                        != str(getattr(node, "xray_domain", "") or "").lower()
+                )
+            ):
+                raise RuntimeError(
+                    "XRAY_EXISTING_ACTIVE_CUSTOMER_DATA_OR_IDENTITY_STOP"
+                )
             return requested
         if (
             requested != _DEFAULT_XRAY_BASE
