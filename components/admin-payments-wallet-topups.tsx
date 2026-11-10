@@ -97,14 +97,14 @@ export function AdminPaymentsWalletTopups(){
     setHost(target);
   },[]);
 
-  const load=useCallback(async()=>{
-    setLoading(true);setError("");
+  const load=useCallback(async(silent=false)=>{
+    if(!silent){setLoading(true);setError("");}
     try{
       const result=await request<WalletTopup[]>("/v1/admin/wallet/topups");
       const clean=Array.isArray(result)?result.filter(row=>!isResellerBotTopup(row)):[];
       setRows(clean);
-    }catch(e){setError(e instanceof Error?e.message:String(e));}
-    finally{setLoading(false);}
+    }catch(e){if(!silent)setError(e instanceof Error?e.message:String(e));}
+    finally{if(!silent)setLoading(false);}
   },[]);
 
   useEffect(()=>{
@@ -122,7 +122,12 @@ export function AdminPaymentsWalletTopups(){
   const run=async(message:string,fn:()=>Promise<unknown>)=>{
     if(busy)return;
     setBusy(true);setError("");setOk("");
-    try{await fn();setOk(message);await load();}
+    try{
+      await fn();
+      setOk(message);
+      // Never hold the approval button until another list request completes.
+      void load(true);
+    }
     catch(e){setError(e instanceof Error?e.message:String(e));}
     finally{setBusy(false);}
   };
@@ -153,7 +158,10 @@ export function AdminPaymentsWalletTopups(){
 
   const approve=(row:WalletTopup)=>void run(
     pick("شارژ کیف پول تأیید شد و موجودی افزایش یافت.","Wallet top-up approved and credited."),
-    ()=>request(`/v1/admin/wallet/topups/${row.id}/approve`,{method:"POST"})
+    async()=>{
+      await request(`/v1/admin/wallet/topups/${row.id}/approve`,{method:"POST"});
+      setRows(current=>current.map(item=>item.id===row.id?{...item,status:"approved"}:item));
+    }
   );
 
   const reject=(event:FormEvent)=>{
@@ -167,6 +175,7 @@ export function AdminPaymentsWalletTopups(){
           method:"POST",
           body:JSON.stringify({reason:reason.trim()||"رد توسط مدیر"})
         });
+        setRows(current=>current.map(item=>item.id===row.id?{...item,status:"rejected"}:item));
         setRejecting(null);setReason("");
       }
     );
