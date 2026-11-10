@@ -159,8 +159,31 @@ def install() -> None:
     if not manifest.is_file():
         raise RuntimeError("Missing Windows executable manifest")
     xml = manifest.read_text(encoding="utf-8-sig")
-    if 'level="asInvoker"' in xml:
-        xml = xml.replace('level="asInvoker"', 'level="requireAdministrator"')
+    # Flutter's stock Windows manifest normally has no UAC declaration.
+    # Inject it once, or safely update an existing level.
+    import re
+    if re.search(r"<requestedExecutionLevel\\b", xml):
+        xml, count = re.subn(
+            r'(<requestedExecutionLevel\\b[^>]*\\blevel\\s*=\\s*["\\\'])[^"\\\']+(["\\\'])',
+            r'\\g<1>requireAdministrator\\g<2>',
+            xml,
+            count=1,
+        )
+        if count != 1:
+            raise RuntimeError("Existing UAC level could not be updated")
+    else:
+        trust_info = (
+            '  <trustInfo xmlns="urn:schemas-microsoft-com:asm.v2">\\n'
+            '    <security>\\n'
+            '      <requestedPrivileges xmlns="urn:schemas-microsoft-com:asm.v3">\\n'
+            '        <requestedExecutionLevel level="requireAdministrator" uiAccess="false" />\\n'
+            '      </requestedPrivileges>\\n'
+            '    </security>\\n'
+            '  </trustInfo>\\n'
+        )
+        if xml.count("</assembly>") != 1:
+            raise RuntimeError("Unexpected Windows application manifest")
+        xml = xml.replace("</assembly>", trust_info + "</assembly>", 1)
     if 'level="requireAdministrator"' not in xml:
         raise RuntimeError("Windows manifest elevation contract missing")
     manifest.write_text(xml, encoding="utf-8")
