@@ -359,11 +359,15 @@ class _TwinConnectDevAppState extends State<TwinConnectDevApp> {
 
     Widget serverRow(int index) {
       final server = demoServers[index];
-      return Container(
-        key: Key('devServer_$index'),
-        margin: const EdgeInsets.only(bottom: 9),
-        decoration: tile(selected: _selected == index, radius: 16),
-        child: InkWell(
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 9),
+        child: glassCard(
+          key: Key('devServer_$index'),
+          selected: _selected == index,
+          radius: 16,
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
           onTap: () => setState(() => _selected = index),
           borderRadius: BorderRadius.circular(16),
           child: Padding(
@@ -392,6 +396,9 @@ class _TwinConnectDevAppState extends State<TwinConnectDevApp> {
               const SizedBox(width: 8),
               Icon(Icons.lock_outline, size: 17, color: sub),
             ]),
+          ),
+        ),
+            ),
           ),
         ),
       );
