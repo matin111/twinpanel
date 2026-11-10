@@ -90,6 +90,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   String? _activeNodeId;
 
   final Map<String, int?> _nodePings = {};
+  final Map<String, String> _nodePingErrors = {};
   final Set<String> _pingingNodes = {};
   bool _pingAllBusy = false;
   int? _latencyFor(AppServer node) => _nodePings.containsKey(node.id)
@@ -102,34 +103,56 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     final node = nodes[index];
     if (_pingingNodes.contains(node.id)) return;
     if (node.probeIp == null) {
-      setState(() => _nodePings[node.id] = null);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(tr('پنل هنوز آدرس عمومی پینگ این سرور را ارسال نکرده است.',
-            'The panel has not provided a public probe address for this server.')),
-      ));
+      if (mounted) setState(() {
+        _nodePings[node.id] = null;
+        _nodePingErrors[node.id] = 'NO_PROBE_ADDRESS';
+      });
       return;
     }
     setState(() => _pingingNodes.add(node.id));
     int? latency;
+    String? error;
     try {
+      final clock = Stopwatch()..start();
       final windowsRoot = Platform.environment['SystemRoot'];
-      if (windowsRoot == null || windowsRoot.isEmpty) return;
+      if (windowsRoot == null || windowsRoot.isEmpty) {
+        error = 'PING_PROGRAM_UNAVAILABLE';
+        return;
+      }
       final pingExe = '$windowsRoot\\System32\\PING.EXE';
       final result = await Process.run(pingExe,
         ['-n', '1', '-w', '1500', node.probeIp!],
         runInShell: false).timeout(const Duration(seconds: 4));
+      clock.stop();
       if (result.exitCode == 0) {
         final output = result.stdout.toString();
+        // Prefer the ICMP reply's RTT when Windows emits an English
+        // field; localized Windows installations may omit "time=".
         final match = RegExp(r'time\s*[=<]\s*(\d+)\s*ms',
           caseSensitive: false).firstMatch(output);
-        if (match != null) latency = int.tryParse(match.group(1)!);
-        if (latency == null && output.toLowerCase().contains('time<1ms')) latency = 1;
+        latency = match == null ? null : int.tryParse(match.group(1)!);
+        if (latency == null && RegExp(r'time\s*<\s*1\s*ms',
+          caseSensitive: false).hasMatch(output)) latency = 1;
+        // A successful single-reply ping is measured by elapsed time
+        // when localized output cannot be parsed. This includes process
+        // startup overhead and is explicitly marked approximate.
+        if (latency == null) {
+          latency = clock.elapsedMilliseconds.clamp(1, 60000);
+          error = 'APPROXIMATE_RTT';
+        }
+      } else {
+        error = 'ICMP_TIMEOUT_OR_BLOCKED';
       }
     } catch (_) {
-      // ICMP blocked is not the same as a failed VPN tunnel.
+      error = 'PING_FAILED';
     } finally {
       if (mounted) setState(() {
         _nodePings[node.id] = latency;
+        if (error == null) {
+          _nodePingErrors.remove(node.id);
+        } else {
+          _nodePingErrors[node.id] = error;
+        }
         _pingingNodes.remove(node.id);
       });
     }
@@ -335,6 +358,25 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   void initState() {
     super.initState();
     _refreshVpnStatus();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && (widget.servers?.servers.isNotEmpty ?? false)) {
+        _probeAllNodes();
+      }
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant TwinConnectLiveDashboard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.servers != widget.servers) {
+      final ids = widget.servers?.servers.map((node) => node.id).toSet()
+          ?? <String>{};
+      _nodePings.removeWhere((id, value) => !ids.contains(id));
+      _nodePingErrors.removeWhere((id, value) => !ids.contains(id));
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _probeAllNodes();
+      });
+    }
   }
 
   Future<void> _refreshVpnStatus() async {
@@ -960,10 +1002,32 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                   txt(server.city, size: 10, color: sub),
                 ],
               )),
-              Text(_pingingNodes.contains(widget.servers!.servers[index].id) ? '…' :
-                  _latencyFor(widget.servers!.servers[index]) == null ? '— ms' :
-                  '${_latencyFor(widget.servers!.servers[index])} ms',
-                  style: TextStyle(fontSize: 11, color: sub)),
+              Tooltip(
+                message: switch (_nodePingErrors[widget.servers!.servers[index].id]) {
+                  'NO_PROBE_ADDRESS' => tr('پنل آدرس عمومی این سرور را ارائه نکرده است.',
+                    'No public ping address was supplied for this server.'),
+                  'ICMP_TIMEOUT_OR_BLOCKED' => tr('پینگ پاسخ نداد؛ ممکن است ICMP مسدود باشد.',
+                    'No ping reply; ICMP may be blocked.'),
+                  'PING_PROGRAM_UNAVAILABLE' => tr('دستور Ping ویندوز در دسترس نیست.',
+                    'Windows Ping executable is unavailable.'),
+                  'PING_FAILED' => tr('تست پینگ ناموفق بود.',
+                    'Ping test failed.'),
+                  'APPROXIMATE_RTT' => tr('زمان تقریبی شامل سربار اجرای Ping',
+                    'Approximate timing including ping startup overhead'),
+                  _ => tr('پینگ سرور', 'Server ping'),
+                },
+                child: Text(
+                  _pingingNodes.contains(widget.servers!.servers[index].id)
+                    ? '…'
+                    : _latencyFor(widget.servers!.servers[index]) == null
+                      ? (_nodePingErrors[widget.servers!.servers[index].id]
+                          == 'NO_PROBE_ADDRESS' ? tr('بدون آدرس', 'No IP')
+                          : '— ms')
+                      : '${_nodePingErrors[widget.servers!.servers[index].id]
+                          == 'APPROXIMATE_RTT' ? '≈' : ''}${_latencyFor(widget.servers!.servers[index])} ms',
+                  style: TextStyle(fontSize: 11, color: sub),
+                ),
+              ),
               IconButton(
                 key: Key('probeNode_${widget.servers!.servers[index].id}'),
                 tooltip: tr('تست پینگ', 'Ping server'),
@@ -1053,7 +1117,10 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
             IconButton(
               key: const Key('devRefreshServers'),
               tooltip: tr('به‌روزرسانی', 'Refresh'),
-              onPressed: widget.onRefresh,
+              onPressed: () {
+                widget.onRefresh();
+                _probeAllNodes();
+              },
               icon: const Icon(Icons.refresh_rounded),
             ),
           ]),
