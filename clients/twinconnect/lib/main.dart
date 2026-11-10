@@ -20,6 +20,8 @@ import 'country_flag.dart';
 import 'ambient_background.dart';
 import 'interactive_glass_card.dart';
 import 'live_dashboard.dart';
+import 'app_session_store.dart';
+import 'plan_classification.dart';
 
 void main() => runApp(const TwinConnectApp());
 
@@ -125,6 +127,9 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
   final _formKey = GlobalKey<FormState>();
   final _username = TextEditingController();
   final _password = TextEditingController();
+  final AppSessionStore _sessionStore = const AppSessionStore();
+  AppPlanClassification? _plan;
+  bool _restoringSession = true;
 
   int _dashboardTab = 0;
   bool _loading = false;
@@ -141,6 +146,71 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
       const NativeProtocolReadiness(supportedCodes: {});
   bool _protocolCatalogUnavailable = false;
   int _lookupSerial = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _restoreSession();
+  }
+
+  Future<void> _restoreSession() async {
+    final serial = _lookupSerial;
+    try {
+      final remembered = await _sessionStore.lastUsername();
+      if (!mounted || serial != _lookupSerial) return;
+      if (remembered != null) _username.text = remembered;
+      final saved = await _sessionStore.read();
+      if (saved == null) return;
+      final api = TenantApi.fromBuildConfig();
+      final namespace = TenantIdentity.parseNamespace(saved.username, '');
+      if (namespace != saved.brand.namespace) return;
+      final panel = await api.resolve(namespace);
+      // OS storage does not make a session valid: always revalidate
+      // with the owning panel before restoring an authenticated screen.
+      final catalog = await api.loadSessionProtocolCatalog(
+        panel: panel, sessionToken: saved.sessionToken,
+      );
+      final native = await NativeVpnBridge.protocolReadiness();
+      if (!mounted || serial != _lookupSerial) return;
+      setState(() {
+        _brand = saved.brand;
+        widget.onBrandChanged(saved.brand);
+        _confirmedPanel = panel;
+        _confirmedUsername = saved.username;
+        _confirmedSessionToken = saved.sessionToken;
+        _catalog = catalog;
+        _nativeProtocols = native;
+      });
+      _refreshServers();
+      _loadAccountPlan(panel, saved.sessionToken, serial);
+    } on TenantApiException catch (error) {
+      if (error.message == 'APP_LOGIN_INVALID' ||
+          error.message == 'APP_NOT_AUTHORIZED') {
+        try { await _sessionStore.clearSession(); } catch (_) {}
+      }
+    } catch (_) {
+      // An offline panel keeps the remembered username, not access.
+    } finally {
+      if (mounted && serial == _lookupSerial) {
+        setState(() => _restoringSession = false);
+      }
+    }
+  }
+
+  Future<void> _loadAccountPlan(
+    PanelDirectoryEntry panel, String session, int serial,
+  ) async {
+    try {
+      final plan = await TenantApi.fromBuildConfig().loadSessionPlan(
+        panel: panel, sessionToken: session,
+      );
+      if (mounted && serial == _lookupSerial) {
+        setState(() => _plan = plan);
+      }
+    } catch (_) {
+      // Missing plan metadata is not a reason to sign out.
+    }
+  }
 
   @override
   void dispose() {
@@ -163,6 +233,7 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
       _confirmedSessionToken = null;
       _catalog = null;
       _servers = null;
+      _plan = null;
       _refreshingServers = false;
       _serverRefreshError = null;
       _protocolCatalogUnavailable = false;
@@ -189,6 +260,12 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
         _confirmedUsername = username;
         _confirmedSessionToken = loggedIn.sessionToken;
       });
+      // Persist only in OS secure storage; invalid sessions must reauthenticate.
+      try {
+        await _sessionStore.save(username: username,
+          sessionToken: loggedIn.sessionToken, brand: brand);
+      } catch (_) {}
+      _loadAccountPlan(panel, loggedIn.sessionToken, serial);
       // Refresh server inventory after authenticated login; failures are isolated.
       _refreshServers();
       // Subscription metadata is not secret and is fetched independently of
@@ -600,8 +677,11 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
         catalog: _catalog,
         servers: _servers,
         native: _nativeProtocols,
+        plan: _plan,
+        accountStatus: _brand?.accountStatus ?? 'unknown',
         onRefresh: _refreshServers,
         onLogout: () {
+          _sessionStore.clearSession();
           ++_lookupSerial;
           setState(() {
             _brand = null;
@@ -610,6 +690,7 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
             _confirmedSessionToken = null;
             _catalog = null;
             _servers = null;
+            _plan = null;
             _dashboardTab = 0;
             _errorCode = null;
             widget.onBrandChanged(null);
@@ -622,6 +703,9 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
     final dark = Theme.of(context).brightness == Brightness.dark;
     final foreground = Theme.of(context).colorScheme.onSurface;
 
+    if (_restoringSession) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
@@ -661,20 +745,6 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
           ],
         ),
         actions: [
-          IconButton(
-            key: const Key('vpnSettingsButton'),
-            tooltip: strings.vpnSettingsTitle,
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => VpnSettingsScreen(
-                  brand: brand,
-                  tenant: brand?.namespace ?? '',
-                  account: brand == null ? '' : _username.text.trim(),
-                ),
-              ),
-            ),
-            icon: const Icon(Icons.tune_rounded),
-          ),
           Padding(
             padding: const EdgeInsetsDirectional.only(start: 5, end: 18),
             child: DropdownButtonHideUnderline(
