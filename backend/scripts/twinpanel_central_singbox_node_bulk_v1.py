@@ -41,6 +41,7 @@ from app.services.central_singbox_idempotent_v1 import (
     resolve_remote_identity_collisions,
 )
 from app.services.central_family_readiness_v1 import verify_central_family_readiness
+from app.services.central_partial_protocol_scope_v1 import node_supported_protocols
 from app.singbox_subscription_accounts import (
     SINGBOX_PROTOCOLS, _naive_tls_trust_material, client_item, read_inbound,
     secret_to_dict,
@@ -64,7 +65,7 @@ def parse_args(argv=None):
     return args
 
 
-def select_work(db,node_id:int,limit:int):
+def select_work(db,node_id:int,limit:int,*,supported=None):
     """One central snapshot with explicit membership, entitlement, expiry/quota."""
     now=datetime.utcnow()
     subs=(db.query(Subscription)
@@ -79,11 +80,12 @@ def select_work(db,node_id:int,limit:int):
     if not subs:
         return []
     ids=[int(sub.id) for sub in subs]
+    supported = set(SINGBOX_PROTOCOLS if supported is None else supported)
     entitled={(int(sid),str(p)) for sid,p in db.query(
         SubscriptionProtocol.subscription_id,SubscriptionProtocol.protocol
     ).filter(
         SubscriptionProtocol.subscription_id.in_(ids),
-        SubscriptionProtocol.protocol.in_(list(SINGBOX_PROTOCOLS)),
+        SubscriptionProtocol.protocol.in_(sorted(supported)),
     ).all()}
     stored={(int(c.subscription_id),str(c.protocol)):c for c in db.query(
         ProtocolCredential
@@ -93,7 +95,7 @@ def select_work(db,node_id:int,limit:int):
     ).all()}
     work=[]
     for sub in subs:
-        for protocol in sorted(SINGBOX_PROTOCOLS):
+        for protocol in sorted(supported):
             if (int(sub.id),protocol) not in entitled:
                 continue
             existing=stored.get((int(sub.id),protocol))
@@ -146,9 +148,10 @@ async def run(node_id:int,limit:int,apply:bool):
             NodeProtocolConfig.protocol.in_(list(SINGBOX_PROTOCOLS)),
             NodeProtocolConfig.status=="online",
         ).all()}
-        if ready!=set(SINGBOX_PROTOCOLS):
+        supported=set(SINGBOX_PROTOCOLS).intersection(node_supported_protocols(db,node_id))
+        if not supported or not supported.issubset(ready):
             raise RuntimeError("STAGED_SINGBOX_PROTOCOL_NOT_READY")
-        work=select_work(db,node_id,limit)
+        work=select_work(db,node_id,limit,supported=supported)
         counts=Counter(p for _,p,_ in work)
         print("CENTRAL_SINGBOX_PLAN",json.dumps({
             "node_id":node_id,"subscriptions_limit":limit,
@@ -158,7 +161,7 @@ async def run(node_id:int,limit:int,apply:bool):
         if not apply or not work:
             return
         verified=await asyncio.wait_for(
-            verify_central_family_readiness(db, node_id, SINGBOX_PROTOCOLS),timeout=510,
+            verify_central_family_readiness(db, node_id, supported),timeout=510,
         )
         if not verified.get("ok"):
             raise RuntimeError("STAGED_16_PROTOCOL_READINESS_FAILED")
