@@ -212,9 +212,45 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
     final strings = AppStrings.of(context);
     final brand = _brand;
 
+    final accent = Theme.of(context).colorScheme.primary;
+    final surface = Theme.of(context).colorScheme.surface;
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final foreground = Theme.of(context).colorScheme.onSurface;
+
     return Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
-        title: Text(strings.appTitle),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        titleSpacing: 24,
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              height: 35,
+              width: 35,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [accent, Theme.of(context).colorScheme.secondary],
+                ),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.bolt_rounded, color: Colors.white, size: 23),
+            ),
+            const SizedBox(width: 10),
+            Text(
+              strings.appTitle,
+              style: const TextStyle(
+                fontWeight: FontWeight.w800,
+                fontSize: 19,
+                letterSpacing: -0.5,
+              ),
+            ),
+          ],
+        ),
         actions: [
           IconButton(
             key: const Key('vpnSettingsButton'),
@@ -228,21 +264,15 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
                 ),
               ),
             ),
-            icon: const Icon(Icons.tune_outlined),
-          ),
-          Tooltip(
-            message: strings.engineNotReady,
-            child: const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 8),
-              child: Icon(Icons.shield_outlined),
-            ),
+            icon: const Icon(Icons.tune_rounded),
           ),
           Padding(
-            padding: const EdgeInsetsDirectional.only(end: 12),
+            padding: const EdgeInsetsDirectional.only(start: 5, end: 18),
             child: DropdownButtonHideUnderline(
               child: DropdownButton<AppLanguage>(
                 key: const Key('languagePicker'),
                 value: widget.language,
+                icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 19),
                 onChanged: (value) {
                   if (value != null) widget.onLanguageChanged(value);
                 },
@@ -267,120 +297,264 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
       ),
       body: BrandBackground(
         brand: brand,
-        child: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 740),
-            child: ListView(
-              padding: const EdgeInsets.all(18),
-              children: [
-                const SizedBox(height: 35),
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(18),
-                    child: Form(
-                      key: _formKey,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Text(
-                            strings.appLoginTitle,
-                            style: Theme.of(context).textTheme.titleLarge,
-                          ),
-                          const SizedBox(height: 8),
-                          Text(strings.appLoginGuide),
-                          const SizedBox(height: 18),
-                          TextFormField(
-                            key: const Key('accountUsername'),
-                            controller: _username,
-                            textDirection: TextDirection.ltr,
-                            decoration: InputDecoration(
-                              labelText: strings.appUsername,
-                              border: const OutlineInputBorder(),
-                            ),
-                            validator: (text) =>
-                                (text == null || text.trim().isEmpty)
-                                    ? strings.usernameRequired
-                                    : null,
-                          ),
-                          const SizedBox(height: 13),
-                          TextFormField(
-                            key: const Key('appPassword'),
-                            controller: _password,
-                            obscureText: true,
-                            textDirection: TextDirection.ltr,
-                            decoration: InputDecoration(
-                              labelText: strings.appPassword,
-                              border: const OutlineInputBorder(),
-                            ),
-                            validator: (text) =>
-                                (text == null || text.isEmpty)
-                                    ? strings.appPasswordRequired
-                                    : null,
-                            onFieldSubmitted: (_) => _identify(),
-                          ),
-                          const SizedBox(height: 18),
-                          FilledButton.icon(
-                            key: const Key('identifyButton'),
-                            onPressed: _loading ? null : _identify,
-                            icon: _loading
-                                ? const SizedBox.square(
-                                    dimension: 18,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                : const Icon(Icons.verified_user_outlined),
-                            label: Text(strings.appLoginButton),
-                          ),
-                        ],
-                      ),
+        child: Stack(
+          children: [
+            Positioned(
+              right: -140,
+              top: -160,
+              child: IgnorePointer(
+                child: Container(
+                  width: 560,
+                  height: 560,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      colors: [
+                        accent.withValues(alpha: dark ? 0.25 : 0.12),
+                        accent.withValues(alpha: 0),
+                      ],
                     ),
                   ),
                 ),
-                if (_errorCode != null) ...[
-                  const SizedBox(height: 12),
-                  SelectableText(
-                    strings.error(_errorCode!),
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.error,
+              ),
+            ),
+            Positioned(
+              left: -160,
+              bottom: -250,
+              child: IgnorePointer(
+                child: Container(
+                  width: 550,
+                  height: 550,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      colors: [
+                        Theme.of(context).colorScheme.secondary.withValues(
+                          alpha: dark ? 0.17 : 0.10,
+                        ),
+                        Colors.transparent,
+                      ],
                     ),
                   ),
-                ],
-                if (brand != null) ...[
-                  const SizedBox(height: 20),
-                  BrandDetails(brand: brand),
-                  if (_protocolCatalogUnavailable) ...[
-                    const SizedBox(height: 16),
-                    Text(strings.protocolCatalogUnavailable),
-                  ],
-                  if (_catalog != null) ...[
-                    const SizedBox(height: 20),
-                    ProtocolCatalogCard(
-                      catalog: _catalog!,
-                      native: _nativeProtocols,
-                    ),
-                    if (_confirmedPanel != null &&
-                        _confirmedUsername != null &&
-                        _confirmedSessionToken != null) ...[
-                      const SizedBox(height: 12),
-                      AndroidConnectionCard(
-                        key: ValueKey(_confirmedUsername),
-                        panel: _confirmedPanel!,
-                        username: _confirmedUsername!,
-                        sessionToken: _confirmedSessionToken!,
-                        catalog: _catalog!,
-                        native: _nativeProtocols,
-                      ),
-                    ],
-                  ],
-                ],
-              ],
+                ),
+              ),
             ),
-          ),
+            SafeArea(
+              child: LayoutBuilder(
+                builder: (context, constraints) => Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 520),
+                    child: ListView(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 20,
+                      ),
+                      shrinkWrap: brand == null,
+                      children: [
+                        SizedBox(
+                          height: brand == null
+                              ? (constraints.maxHeight > 640 ? 38 : 8)
+                              : 8,
+                        ),
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Color.lerp(
+                              surface, accent, dark ? 0.045 : 0.025,
+                            ),
+                            borderRadius: BorderRadius.circular(28),
+                            border: Border.all(
+                              color: accent.withValues(alpha: dark ? 0.28 : 0.15),
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(
+                                  alpha: dark ? 0.30 : 0.08,
+                                ),
+                                blurRadius: 45,
+                                offset: const Offset(0, 22),
+                              ),
+                            ],
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 30,
+                            vertical: 30,
+                          ),
+                          child: Form(
+                            key: _formKey,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Align(
+                                  alignment: AlignmentDirectional.centerStart,
+                                  child: Container(
+                                    height: 48,
+                                    width: 48,
+                                    decoration: BoxDecoration(
+                                      color: accent.withValues(alpha: 0.13),
+                                      border: Border.all(
+                                        color: accent.withValues(alpha: 0.25),
+                                      ),
+                                      borderRadius: BorderRadius.circular(17),
+                                    ),
+                                    child: Icon(
+                                      Icons.shield_moon_outlined,
+                                      color: accent,
+                                      size: 25,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 18),
+                                Text(
+                                  strings.appLoginTitle,
+                                  style: TextStyle(
+                                    color: foreground,
+                                    fontSize: 26,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: -0.6,
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  strings.appLoginGuide,
+                                  style: TextStyle(
+                                    color: foreground.withValues(alpha: 0.65),
+                                    fontSize: 13,
+                                  ),
+                                ),
+                                const SizedBox(height: 25),
+                                TextFormField(
+                                  key: const Key('accountUsername'),
+                                  controller: _username,
+                                  textDirection: TextDirection.ltr,
+                                  autocorrect: false,
+                                  decoration: InputDecoration(
+                                    labelText: strings.appUsername,
+                                    prefixIcon: const Icon(Icons.person_outline_rounded),
+                                    filled: true,
+                                    fillColor: foreground.withValues(alpha: 0.035),
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 16, vertical: 18,
+                                    ),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(15),
+                                    ),
+                                  ),
+                                  validator: (text) =>
+                                      (text == null || text.trim().isEmpty)
+                                          ? strings.usernameRequired
+                                          : null,
+                                ),
+                                const SizedBox(height: 15),
+                                TextFormField(
+                                  key: const Key('appPassword'),
+                                  controller: _password,
+                                  obscureText: true,
+                                  textDirection: TextDirection.ltr,
+                                  decoration: InputDecoration(
+                                    labelText: strings.appPassword,
+                                    prefixIcon: const Icon(Icons.lock_outline_rounded),
+                                    filled: true,
+                                    fillColor: foreground.withValues(alpha: 0.035),
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 16, vertical: 18,
+                                    ),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(15),
+                                    ),
+                                  ),
+                                  validator: (text) =>
+                                      (text == null || text.isEmpty)
+                                          ? strings.appPasswordRequired
+                                          : null,
+                                  onFieldSubmitted: (_) => _identify(),
+                                ),
+                                const SizedBox(height: 22),
+                                SizedBox(
+                                  height: 52,
+                                  child: FilledButton(
+                                    key: const Key('identifyButton'),
+                                    style: FilledButton.styleFrom(
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(15),
+                                      ),
+                                      elevation: 0,
+                                    ),
+                                    onPressed: _loading ? null : _identify,
+                                    child: _loading
+                                        ? const SizedBox.square(
+                                            dimension: 20,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              color: Colors.white,
+                                            ),
+                                          )
+                                        : Row(
+                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            children: [
+                                              Text(
+                                                strings.appLoginButton,
+                                                style: const TextStyle(
+                                                  fontSize: 15,
+                                                  fontWeight: FontWeight.w700,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 10),
+                                              const Icon(Icons.arrow_forward_rounded,
+                                                  size: 19),
+                                            ],
+                                          ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        if (_errorCode != null) ...[
+                          const SizedBox(height: 12),
+                          SelectableText(
+                            strings.error(_errorCode!),
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.error,
+                            ),
+                          ),
+                        ],
+                        if (brand != null) ...[
+                          const SizedBox(height: 20),
+                          BrandDetails(brand: brand),
+                          if (_protocolCatalogUnavailable) ...[
+                            const SizedBox(height: 16),
+                            Text(strings.protocolCatalogUnavailable),
+                          ],
+                          if (_catalog != null) ...[
+                            const SizedBox(height: 20),
+                            ProtocolCatalogCard(
+                              catalog: _catalog!,
+                              native: _nativeProtocols,
+                            ),
+                            if (_confirmedPanel != null &&
+                                _confirmedUsername != null &&
+                                _confirmedSessionToken != null) ...[
+                              const SizedBox(height: 12),
+                              AndroidConnectionCard(
+                                key: ValueKey(_confirmedUsername),
+                                panel: _confirmedPanel!,
+                                username: _confirmedUsername!,
+                                sessionToken: _confirmedSessionToken!,
+                                catalog: _catalog!,
+                                native: _nativeProtocols,
+                              ),
+                            ],
+                          ],
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
-      ),
       ),
     );
   }
