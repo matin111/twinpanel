@@ -1,4 +1,5 @@
-/// Read-only classification from the exact plan linked to an app subscription.
+/// Read-only classification from the app subscription's panel.
+/// Legacy subscriptions can be unassigned (planId = 0).
 /// Type and user-count group are independent admin-managed panel dimensions.
 class AppPlanClassification {
   const AppPlanClassification({
@@ -10,7 +11,10 @@ class AppPlanClassification {
   });
 
   final String namespace;
+  /// 0 means historical subscription without a plan; not a real plan id.
   final int planId;
+  bool get hasAssignedPlan => planId > 0;
+
   final String subscriptionType;
   final String userCountCategory;
   final int deviceLimit;
@@ -24,7 +28,7 @@ class AppPlanClassification {
     if (json['schema'] != 1 ||
         namespace is! String ||
         !RegExp(r'^TP[A-Fa-f0-9]{6,16}$').hasMatch(namespace) ||
-        planId is! int || planId <= 0 ||
+        planId is! int || planId < 0 ||
         type is! String || type.trim().isEmpty || type.length > 120 ||
         group is! String || group.trim().isEmpty || group.length > 120 ||
         limit is! int || limit < 0) {
