@@ -89,7 +89,7 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
 
   Future<void> _save() async {
     if (_saving || !_identified) return;
-    final problems = _policy.draftProblems(_capabilities.platform);
+    final problems = _policy.draftProblems(_capabilities.platform, managedDevice: _capabilities.managedDevice);
     if (problems.isNotEmpty) return;
 
     setState(() => _saving = true);
@@ -133,7 +133,7 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final s = AppStrings.of(context);
-    final issues = _policy.draftProblems(_capabilities.platform);
+    final issues = _policy.draftProblems(_capabilities.platform, managedDevice: _capabilities.managedDevice);
     final selectedMode = _policy.routingMode != VpnRoutingMode.fullTunnel;
     final platformName = switch (_capabilities.platform) {
       VpnPlatform.android => s.vpnPlatformAndroid,
