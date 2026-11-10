@@ -64,7 +64,7 @@ class CentralXrayTests(unittest.TestCase):
             session.return_value.__enter__.return_value=db
             import asyncio
             with self.assertRaisesRegex(RuntimeError,
-                                        "16_PROTOCOL_READINESS_NOT_VERIFIED"):
+                                        "XRAY_LISTENER_NOT_VERIFIED"):
                 asyncio.run(mod.run(14,100,True,True))
             health.assert_awaited_once()
             run_one.assert_not_awaited()

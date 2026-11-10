@@ -55,7 +55,15 @@ def test_staged_node_cannot_be_manually_published_before_readiness(stage):
 
 @pytest.mark.parametrize("stage", ["verified_ready", "users_queued", "completed"])
 def test_staged_node_allows_publish_after_health_validation(stage):
-    require_staged_node_publish_ready(_Db(job=SimpleNamespace(stage=stage)), 14)
+    require_staged_node_publish_ready(_Db(job=SimpleNamespace(stage=stage, installed_protocols=16)), 14)
+
+
+def test_partial_exit_rejects_unsafe_legacy_bulk_publish():
+    db = _Db(job=SimpleNamespace(stage="completed", installed_protocols=15))
+    with pytest.raises(HTTPException) as err:
+        require_staged_node_publish_ready(db, 27)
+    assert err.value.status_code == 409
+    assert err.value.detail == "PARTIAL_NODE_REQUIRES_CENTRAL_ADMISSION"
 
 
 def test_existing_nonstaged_node_retains_legacy_manual_control():

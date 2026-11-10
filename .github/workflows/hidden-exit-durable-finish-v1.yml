@@ -10,6 +10,9 @@ on:
       - 'backend/app/services/new_node_modern_bootstrap_v1.py'
       - 'backend/app/services/hidden_node_install_supervisor_v1.py'
       - 'backend/scripts/twinpanel_hidden_node_install_finish_v1.py'
+      - 'backend/app/services/central_partial_protocol_scope_v1.py'
+      - 'backend/app/services/new_node_readiness_v1.py'
+      - 'backend/tests/test_partial_node_admission_v1.py'
       - 'backend/app/routers/publish_node_all_users_v1.py'
       - 'backend/tests/test_hidden_node_install_official_xray_v1.py'
       - '.github/workflows/hidden-exit-durable-finish-v1.yml'
@@ -45,6 +48,8 @@ jobs:
             backend/app/routers/publish_node_all_users_v1.py
       - name: Validate official Xray asset and node-finish safety
         run: python -m unittest discover -s backend/tests -p 'test_hidden_node_install_official_xray_v1.py' -v
+      - name: Verify partial Exit protocol and entitlement isolation
+        run: python -m unittest discover -s backend/tests -p 'test_partial_node_admission_v1.py' -v
       - name: Check existing node-readiness regressions
         run: |
           python -m unittest discover -s backend/tests -p 'test_central_first_exit_bootstrap_v1.py' -v

@@ -72,6 +72,14 @@ const NODE_INSTALL_FAILURE_GUIDANCE:Record<string,[string,string]>={
     "سرور در بررسی اولیه مجاز به نصب جدید نبود؛ سرویس‌های موجود نباید بازنویسی شوند.",
     "Remote safety preflight rejected the install to protect existing services.",
   ],
+  PARTIAL_PROTOCOLS_PENDING:[
+    "نود با پروتکل‌های سالم فعال شده است. پروتکل‌های نصب‌نشده بعداً به‌صورت جداگانه قابل تعمیرند.",
+    "The node is active with its verified healthy protocols. Missing protocols can be repaired separately.",
+  ],
+  NODE_NO_VERIFIED_PROTOCOLS:[
+    "هیچ پروتکل سالمی روی نود تأیید نشد؛ انتشار آن برای کاربران متوقف شده است.",
+    "No healthy protocol was verified; node publication is blocked.",
+  ],
   NODE_INSTALL_REMOTE_COMMAND_FAILED:[
     "فرمان نصب روی سرور ناموفق بود. سرویس‌های فعلی را حذف نکنید؛ لاگ نصب نود باید بررسی شود.",
     "A remote installation command failed. Keep existing services intact and inspect the node installation log.",
@@ -111,6 +119,8 @@ function NodeInstallProgress({job,error}:{job:NodeInstallJob|null;error:string})
   ];
   const index=phases.findIndex(([key])=>key===job?.stage);
   const finished=job?.state==="completed";
+  const partial=Boolean(finished&&job?.expected_protocols&&
+    (job.installed_protocols??0)<job.expected_protocols);
   const failed=job?.state==="failed"||job?.state==="interrupted";
   const waiting=job?.state==="waiting_backfill";
   const pending=job?.state==="queued"||job?.state==="running"||!job;
@@ -119,7 +129,7 @@ function NodeInstallProgress({job,error}:{job:NodeInstallJob|null;error:string})
       <div className={"node-install-orb "+(failed?"is-failed":finished?"is-done":"is-working")} aria-hidden="true">◉</div>
       <div>
         <b>{job?.node_name||pick("آماده‌سازی سرور","Preparing server")}</b>
-        <small>{failed?pick("نصب کامل تأیید نشده است","Installation is not confirmed"):waiting?pick("کاربران به نود منتسب شده‌اند؛ اعمال کانفیگ‌ها هنوز در صف مرکزی است","Accounts are assigned; configuration application is still queued centrally"):finished?pick("نصب به پایان رسید؛ وضعیت نمایش نود و کانفیگ‌های آماده را بررسی کنید","Installation is complete; check node publication and ready configurations"):pick("وضعیت مراحل مستقیماً از سرور خوانده می‌شود","Stages are read directly from the server")}</small>
+        <small>{failed?pick("نصب کامل تأیید نشده است","Installation is not confirmed"):waiting?pick("کاربران به نود منتسب شده‌اند؛ اعمال کانفیگ‌ها هنوز در صف مرکزی است","Accounts are assigned; configuration application is still queued centrally"):partial?pick("نود با پروتکل‌های سالم فعال شده؛ پروتکل ناموفق جداگانه قابل تعمیر است","Node admitted with healthy protocols; missing ones can be repaired independently"):finished?pick("نصب به پایان رسید؛ وضعیت نمایش نود و کانفیگ‌های آماده را بررسی کنید","Installation is complete; check node publication and ready configurations"):pick("وضعیت مراحل مستقیماً از سرور خوانده می‌شود","Stages are read directly from the server")}</small>
       </div>
     </div>
     <div className={"node-install-running-line "+(pending?"is-active":"")} aria-hidden="true"><span/></div>
@@ -259,6 +269,27 @@ export function NodeAddModalBridge(){
     }
   };
 
+  const publishHealthy=async()=>{
+    if(busy||!job?.node_id||!jobId)return;
+    const token=getCustomerToken();
+    if(!token){setError("AUTH_REQUIRED");return;}
+    setBusy("publish-healthy");setError("");setOk("");setJobError("");
+    try{
+      const response=await fetch(API_BASE+"/v1/nodes/"+job.node_id+"/central-stage/reverify",{
+        method:"POST",cache:"no-store",headers:{Authorization:"Bearer "+token},
+      });
+      const raw=await response.text();
+      if(!response.ok)throw new Error(raw||"Health verification HTTP "+response.status);
+      const result=JSON.parse(raw) as {live_protocols?:number;users_assigned?:number};
+      setOk(pick(`نود با ${result.live_protocols??"—"} پروتکل سالم به حساب‌های مجاز افزوده شد.`,`Node admitted with ${result.live_protocols??"—"} healthy protocols.`));
+      setJob(current=>current?{...current,state:"completed",stage:"completed",
+        installed_protocols:result.live_protocols??current.installed_protocols,
+        users_assigned:result.users_assigned??current.users_assigned,
+        error_code:"PARTIAL_PROTOCOLS_PENDING"}:current);
+    }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
+    finally{setBusy("");}
+  };
+
   const repairFailedCisco=async()=>{
     if(busy||!job?.node_id||!jobId)return;
     const token=getCustomerToken();
@@ -347,6 +378,17 @@ export function NodeAddModalBridge(){
       {ok?<div className="runtime-success">{ok}</div>:null}
       {jobId?<div>
         <NodeInstallProgress job={job} error={jobError}/>
+        {job?.node_id&&(
+          (job.state==="failed"&&[
+            "XRAY_NEW_EXIT_TLS_CERTIFICATE_NOT_READY","PROTOCOL_SETUP_INCOMPLETE",
+          ].includes(job.error_code||""))
+          ||(job.state==="completed"&&job.users_assigned===null
+             &&job.expected_protocols!==null
+             &&(job.installed_protocols??0)<job.expected_protocols)
+        )?<div className="runtime-choice-section">
+          <div className="runtime-warning">{pick("نصب همه پروتکل‌ها ضروری نیست. قبل از انتشار، سلامت پروتکل‌های موجود دوباره بررسی می‌شود.","Not all protocols are required. Installed listeners are reverified before admission.")}</div>
+          <button className="primary-soft" type="button" disabled={Boolean(busy)} onClick={()=>void publishHealthy()}>{busy==="publish-healthy"?"…":pick("فعال‌سازی نود با پروتکل‌های سالم","Activate node with healthy protocols")}</button>
+        </div>:null}
         {job?.state==="failed"&&["PROTOCOL_SETUP_INCOMPLETE","CISCO_REPAIR_FAILED"].includes(job.error_code||"")&&job.node_id?
           <div className="runtime-choice-section">
             <div className="runtime-warning">{pick("نصب یک پروتکل ناقص مانده است. فقط Cisco را ترمیم کن؛ ۱۵ پروتکل سالم دوباره نصب نمی‌شوند.","One protocol is incomplete. Repair only Cisco; do not reinstall the 15 healthy protocols.")}</div>

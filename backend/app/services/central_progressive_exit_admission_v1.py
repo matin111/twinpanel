@@ -21,6 +21,7 @@ from ..node_install_progress_models_v1 import NodeInstallProgressV1
 from .central_node_desired_state_v1 import (
     load_desired_state, require_valid_desired_state,
 )
+from .central_partial_protocol_scope_v1 import node_supported_protocols
 from .central_runtime_ownership_v1 import mark_central_node, central_key
 from ..mother_access import set_value
 
@@ -52,8 +53,11 @@ def admit_verified_exit(db, node_id: int) -> dict:
          .order_by(NodeInstallProgressV1.created_at.desc())
          .populate_existing().first())
     if (job is None or job.stage not in {"verified_ready","enrolling_users"}
-            or int(job.installed_protocols or 0)!=16):
+            or not 1 <= int(job.installed_protocols or 0) <= 16):
         raise RuntimeError("CENTRAL_ADMISSION_LISTENERS_NOT_VERIFIED")
+    available=node_supported_protocols(db,node_id)
+    if len(available) != int(job.installed_protocols or 0):
+        raise RuntimeError("CENTRAL_ADMISSION_PARTIAL_SCOPE_MISMATCH")
 
     desired=require_valid_desired_state(
         load_desired_state(db,node_id),max_users=MAX_USERS,
@@ -65,6 +69,7 @@ def admit_verified_exit(db, node_id: int) -> dict:
         WITH unlocked_eligible AS (
             SELECT s.id FROM subscriptions s
             WHERE s.status='ACTIVE'
+              AND s.id = ANY(:eligible_ids)
               AND (s.expires_at IS NULL OR s.expires_at>:now)
               AND (s.traffic_limit_bytes<=0
                    OR s.traffic_used_bytes<s.traffic_limit_bytes)
@@ -73,7 +78,8 @@ def admit_verified_exit(db, node_id: int) -> dict:
         INSERT INTO subscription_nodes (subscription_id,node_id,created_at)
         SELECT s.id,:node_id,:now FROM unlocked_eligible s
         ON CONFLICT (subscription_id,node_id) DO NOTHING
-    """),{"node_id":node_id,"now":now})
+    """),{"node_id":node_id,"now":now,
+           "eligible_ids":list(desired.subscription_ids)})
     expected=set(desired.subscription_ids)
     attached={int(row[0]) for row in db.query(SubscriptionNode.subscription_id)
               .filter(SubscriptionNode.node_id==node_id).all()}

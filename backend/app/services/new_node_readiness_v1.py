@@ -27,6 +27,7 @@ async def verify_new_exit_readiness(
     node_id: int,
     *,
     require_tls_profiles: bool = False,
+    allow_partial: bool = False,
 ) -> dict[str, Any]:
     node = db.get(Node, int(node_id))
     if node is None or node.retired_at is not None or node.node_type != NodeType.EXIT:
@@ -43,7 +44,7 @@ async def verify_new_exit_readiness(
         key for key in ALL_PROTOCOL_KEYS
         if key not in rows or not _online(rows[key].status)
     ]
-    if missing:
+    if missing and not allow_partial:
         return {
             "ok": False, "reason": "protocol_not_installed",
             "ready_count": len(ALL_PROTOCOL_KEYS) - len(missing),
@@ -51,10 +52,12 @@ async def verify_new_exit_readiness(
         }
 
     conn = None
-    failed: list[str] = []
+    failed: list[str] = list(missing) if allow_partial else []
     try:
         conn = await asyncio.wait_for(connect_protocol_runtime(node, db), timeout=20)
         for key in ALL_PROTOCOL_KEYS:
+            if key in missing:
+                continue
             row = rows[key]
             try:
                 if key in CLASSIC_PROTOCOL_KEYS:
@@ -165,10 +168,15 @@ async def verify_new_exit_readiness(
             conn.close()
             await conn.wait_closed()
 
+    ready = [key for key in ALL_PROTOCOL_KEYS if key not in failed]
     return {
-        "ok": not failed,
-        "reason": "ready" if not failed else "live_health_failed",
-        "ready_count": len(ALL_PROTOCOL_KEYS) - len(failed),
+        "ok": bool(ready) if allow_partial else not failed,
+        "reason": (
+            "partial_ready" if allow_partial and failed and ready
+            else "ready" if not failed else "live_health_failed"
+        ),
+        "ready_count": len(ready),
         "required_count": len(ALL_PROTOCOL_KEYS),
-        "missing": failed,
+        "ready_protocols": ready,
+        "missing": sorted(set(failed)),
     }

@@ -1,8 +1,8 @@
 """Deny manual publication of a staged Exit before its verified install phase.
 
 Legacy nodes with no staged-install job keep their existing manual publish
-workflow. The detached installer sets verified_ready only AFTER 16 live
-protocol checks succeed; failures do not expose new nodes to customers.
+workflow. The detached installer marks a staged Exit ready only after at least
+one live protocol is verified; no failed listener is delivered to customers.
 """
 from __future__ import annotations
 
@@ -35,5 +35,15 @@ def require_staged_node_publish_ready(db: Session, node_id: int) -> None:
     if job.stage not in {"verified_ready", "completed", "users_queued"}:
         raise HTTPException(
             status_code=409,
-            detail="نصب این نود هنوز با سلامت ۱۶ پروتکل تأیید نشده؛ انتشار برای کاربران مسدود است",
+            detail="هیچ مجموعه سالمی از پروتکل‌های این نود برای انتشار تأیید نشده است",
         )
+    if not 1 <= int(job.installed_protocols or 0) <= 16:
+        raise HTTPException(status_code=409, detail="NODE_NO_VERIFIED_PROTOCOLS")
+    if int(job.installed_protocols or 0) < 16:
+        # Legacy manual publish attaches every explicit subscriber and cannot
+        # filter missing protocol entitlements. Partial nodes MUST use the
+        # scoped central admission transaction instead.
+        raise HTTPException(
+            status_code=409, detail="PARTIAL_NODE_REQUIRES_CENTRAL_ADMISSION",
+        )
+

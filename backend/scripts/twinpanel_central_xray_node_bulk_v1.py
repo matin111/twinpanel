@@ -304,10 +304,10 @@ async def run(node_id:int,limit:int,apply:bool,all_batches:bool):
             # certified, and Xray's own adapter checks its live service.
             if not node.show_to_users:
                 readiness=await asyncio.wait_for(
-                    verify_new_exit_readiness(db,node_id),timeout=510,
+                    verify_new_exit_readiness(db,node_id, require_tls_profiles=True, allow_partial=True),timeout=510,
                 )
-                if not readiness.get("ok"):
-                    raise RuntimeError("16_PROTOCOL_READINESS_NOT_VERIFIED")
+                if not readiness.get("ok") or "v2ray" not in readiness.get("ready_protocols", ()):
+                    raise RuntimeError("XRAY_LISTENER_NOT_VERIFIED")
         total=0
         for cycle in range(MAX_CYCLES if all_batches and apply else 1):
             saved=await run_one(db,node_id,limit,apply)

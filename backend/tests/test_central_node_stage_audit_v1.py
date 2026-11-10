@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 
 from app.central_node_stage_audit_v1 import verify_coverage
 from app.models import NodeType,NodeStatus
+from app.protocol_account_registry import ALL_PROTOCOL_SET
 
 
 def fake_db(active, attached, requested, credentials):
@@ -23,6 +24,14 @@ def fake_db(active, attached, requested, credentials):
 
 
 class StageCoverageAuditTests(unittest.TestCase):
+    def setUp(self):
+        # These legacy-node tests use a four-query fake DB. The new
+        # staged-partial protocol projection is tested separately.
+        mocked=patch("app.central_node_stage_audit_v1.node_supported_protocols",
+                     return_value=ALL_PROTOCOL_SET)
+        mocked.start()
+        self.addCleanup(mocked.stop)
+
     def test_complete_actual_node_item(self):
         cred=SimpleNamespace(subscription_id=1,protocol="openvpn",is_active=True)
         db=fake_db([(1,)],[(1,)],[(1,"openvpn")],[cred])

@@ -10,12 +10,21 @@ from app.models import NodeStatus, NodeType
 def desired_state(count):
     return SimpleNamespace(
         count=count, pair_count=count, fingerprint="0"*64,
+        subscription_ids=tuple(range(1,count+1)),
         entitled_pairs=((1,"sudoku"),) if count else (),
         invalid_protocols=(), without_entitlements=(),
     )
 
 
 class CentralNodeStageTests(unittest.TestCase):
+    def setUp(self):
+        # Existing full-node contract mocks have no staged progress table.
+        # Partial-only scope and fail-closed behavior have dedicated tests.
+        scoped=patch.object(stage, "node_supported_protocols",
+                            return_value=frozenset(stage.ALL_PROTOCOL_KEYS))
+        scoped.start()
+        self.addCleanup(scoped.stop)
+
     def test_bulk_adapters_include_xray_and_no_individual_worker(self):
         self.assertEqual(len(stage.ADAPTERS), 10)
         self.assertFalse(any("backfill" in name for name in stage.ADAPTERS))
@@ -104,7 +113,7 @@ class CentralNodeStageTests(unittest.TestCase):
         db.get.return_value = fake
         with (patch.object(stage, "SessionLocal") as session,
               patch.object(stage, "load_desired_state", return_value=desired_state(3)),
-              patch.object(stage, "verify_new_exit_readiness", new_callable=AsyncMock, return_value={"ok": True}),
+              patch.object(stage, "verify_new_exit_readiness", new_callable=AsyncMock, return_value={"ok": True, "ready_protocols": list(stage.ALL_PROTOCOL_KEYS)}),
               patch.object(stage, "establish_hidden_memberships", return_value=3),
               patch.object(stage, "verify_coverage", return_value={"ok": True}),
               patch.object(stage, "ensure_shared_binary", new_callable=AsyncMock,
@@ -131,7 +140,7 @@ class CentralNodeStageTests(unittest.TestCase):
               patch.object(stage,"allow_central_node",return_value=True),
               patch.object(stage,"load_desired_state",return_value=desired_state(3)),
               patch.object(stage,"verify_new_exit_readiness",
-                           new_callable=AsyncMock,return_value={"ok":True}),
+                           new_callable=AsyncMock,return_value={"ok": True, "ready_protocols": list(stage.ALL_PROTOCOL_KEYS)}),
               patch.object(stage,"ensure_shared_binary",
                            new_callable=AsyncMock,return_value={"ok":True}),
               patch.object(stage,"establish_hidden_memberships",return_value=0),
@@ -160,7 +169,7 @@ class CentralNodeStageTests(unittest.TestCase):
         with (patch.object(stage,"SessionLocal") as session,
               patch.object(stage,"load_desired_state",return_value=desired_state(1206)),
               patch.object(stage,"verify_new_exit_readiness",new_callable=AsyncMock,
-                           return_value={"ok":True}),
+                           return_value={"ok":True,"ready_protocols":list(stage.ALL_PROTOCOL_KEYS)}),
               patch.object(stage,"ensure_shared_binary",new_callable=AsyncMock,
                            side_effect=RuntimeError("SUDOKU_SHARED_TARGET_BINARY_UNRECOGNIZED")),
               patch.object(stage,"establish_hidden_memberships") as insert,
@@ -182,7 +191,7 @@ class CentralNodeStageTests(unittest.TestCase):
         db = MagicMock()
         db.get.return_value = fake
         calls_during_health = []
-        async def health(session, node_id):
+        async def health(session, node_id, **kwargs):
             calls_during_health.extend(session.get.call_args_list)
             return {"ok": False}
         with (patch.object(stage, "SessionLocal") as session,
@@ -247,7 +256,7 @@ class CentralNodeStageTests(unittest.TestCase):
               patch.object(stage, "load_desired_state",
                            side_effect=[before, before, after]),
               patch.object(stage, "verify_new_exit_readiness", new_callable=AsyncMock,
-                           return_value={"ok": True}),
+                           return_value={"ok":True,"ready_protocols":list(stage.ALL_PROTOCOL_KEYS)}),
               patch.object(stage, "ensure_shared_binary", new_callable=AsyncMock,
                            return_value={"ok": True}),
               patch.object(stage, "establish_hidden_memberships", return_value=4),
@@ -278,7 +287,7 @@ class CentralNodeStageTests(unittest.TestCase):
               patch.object(stage, "load_desired_state",
                            side_effect=[before, before, after]),
               patch.object(stage, "verify_new_exit_readiness", new_callable=AsyncMock,
-                           return_value={"ok": True}),
+                           return_value={"ok":True,"ready_protocols":list(stage.ALL_PROTOCOL_KEYS)}),
               patch.object(stage, "ensure_shared_binary", new_callable=AsyncMock,
                            return_value={"ok": True}),
               patch.object(stage, "establish_hidden_memberships", return_value=4),

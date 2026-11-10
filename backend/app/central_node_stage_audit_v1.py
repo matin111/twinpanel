@@ -16,6 +16,7 @@ from .models import (
     SubscriptionProtocol, SubscriptionStatus,
 )
 from .protocol_account_registry import ALL_PROTOCOL_SET
+from .services.central_partial_protocol_scope_v1 import node_supported_protocols
 from .services.central_runtime_ownership_v1 import allow_central_node
 from .routers import account_delivery as ad
 
@@ -25,6 +26,7 @@ def verify_coverage(db, node_id: int, *, max_pairs: int = 50000) -> dict:
     if not allow_central_node(db,node):
         raise RuntimeError("CENTRAL_AUDIT_REQUIRES_HIDDEN_NODE")
     now = datetime.utcnow()
+    supported = node_supported_protocols(db, node_id)
     active = db.query(Subscription.id).filter(
         Subscription.status == SubscriptionStatus.ACTIVE,
         or_(Subscription.expires_at.is_(None), Subscription.expires_at > now),
@@ -32,6 +34,18 @@ def verify_coverage(db, node_id: int, *, max_pairs: int = 50000) -> dict:
             Subscription.traffic_used_bytes < Subscription.traffic_limit_bytes),
     ).all()
     eligible = {int(row[0]) for row in active}
+    if supported != ALL_PROTOCOL_SET and eligible:
+        # A user entitled exclusively to a missing listener must never
+        # receive a phantom node membership or incomplete credential.
+        eligible = {
+            int(sid) for sid, protocol in db.query(
+                SubscriptionProtocol.subscription_id,
+                SubscriptionProtocol.protocol,
+            ).filter(
+                SubscriptionProtocol.subscription_id.in_(eligible),
+                SubscriptionProtocol.protocol.in_(list(supported)),
+            ).all()
+        }
     attached = {
         int(row[0]) for row in db.query(SubscriptionNode.subscription_id)
         .filter(SubscriptionNode.node_id == int(node_id)).all()
@@ -44,6 +58,7 @@ def verify_coverage(db, node_id: int, *, max_pairs: int = 50000) -> dict:
         (int(subscription_id), str(protocol).strip().lower())
         for subscription_id, protocol in requested
         if int(subscription_id) in eligible
+        and (supported == ALL_PROTOCOL_SET or str(protocol).strip().lower() in supported)
     }
     unknown = {protocol for _, protocol in expected
                if protocol not in ALL_PROTOCOL_SET}
