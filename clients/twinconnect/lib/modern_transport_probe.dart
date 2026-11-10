@@ -48,6 +48,9 @@ class ModernTransportProbe {
     final port = reservation.port;
     await reservation.close();
     final config = proxyConfig(protocol: protocol, profile: profile, port: port);
+    if (!await WindowsSingBoxPreflight.checkInMemory(config)) {
+      throw const FormatException('SINGBOX_PROXY_CONFIG_REJECTED');
+    }
     final executable = WindowsSingBoxPreflight.enginePath(
       Platform.resolvedExecutable);
     Process? engine;
@@ -67,20 +70,20 @@ class ModernTransportProbe {
         ..findProxy = (uri) => 'PROXY 127.0.0.1:$port';
       final clock = Stopwatch()..start();
       Object? lastError;
-      for (var attempt = 0; attempt < 8; attempt++) {
+      for (var attempt = 0; attempt < 3; attempt++) {
         await Future<void>.delayed(const Duration(milliseconds: 500));
         try {
           final request = await client.getUrl(
             Uri.https('api.ipify.org', '/', {'format': 'json'}),
-          ).timeout(const Duration(seconds: 4));
+          ).timeout(const Duration(seconds: 3));
           request.followRedirects = false;
           final response = await request.close()
-              .timeout(const Duration(seconds: 8));
+              .timeout(const Duration(seconds: 5));
           if (response.statusCode != HttpStatus.ok) {
             throw const FormatException('PROXY_HTTP_RESPONSE_INVALID');
           }
           final body = await utf8.decoder.bind(response)
-              .join().timeout(const Duration(seconds: 8));
+              .join().timeout(const Duration(seconds: 5));
           if (body.length > 512) {
             throw const FormatException('PROXY_RESPONSE_TOO_LARGE');
           }
