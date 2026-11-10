@@ -1628,29 +1628,12 @@ async def subscription_connection(
             await callback.message.answer("❌ دریافت لینک اتصال ناموفق بود: " + escape(str(exc)[:150]))
         return
 
-    # This is the authenticated user's own subscription, already checked by
-    # customer/connection-info. Fetch app-only credentials through the equally
-    # owner-scoped endpoint; missing app entitlement must not hide a valid link.
-    app_credentials = None
-    try:
-        app_credentials = await request(
-            "POST",
-            f"/v1/central-app/customer/subscriptions/{sub_id}/app-delivery",
-            token=token,
-        )
-    except Exception:
-        logging.getLogger(__name__).warning(
-            "app credentials unavailable in main bot connection flow, subscription=%s",
-            sub_id,
-        )
-
     from .telegram_subscription_qr_v1 import send_subscription_link_and_qr
 
     await send_subscription_link_and_qr(
         callback.message,
         link,
         username=str(info.get("account_username") or f"#{sub_id}"),
-        app_credentials=app_credentials,
     )
 
 
