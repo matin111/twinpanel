@@ -24,7 +24,7 @@ class TenantApi {
 
   Future<PanelDirectoryEntry> resolve(String namespace) async {
     final url = vendorOrigin.resolve(
-      '/v1/app/resolve/\${Uri.encodeComponent(namespace)}',
+      '/v1/app/resolve/${Uri.encodeComponent(namespace)}',
     );
     final map = await _requestJson(url);
     final entry = PanelDirectoryEntry.fromJson(map);
@@ -93,7 +93,7 @@ class TenantApi {
           );
         }
         throw TenantApiException(
-          'درخواست به سرور ناموفق بود (کد \${response.statusCode}).',
+          'درخواست به سرور ناموفق بود (کد ${response.statusCode}).',
         );
       }
       final bytes = <int>[];
