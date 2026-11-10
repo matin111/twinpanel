@@ -30,6 +30,7 @@ from pathlib import Path
 MAIN_PORT = 3000
 STANDBY_PORT = 33001
 STANDBY_UNIT = "twinpanel-web-bluegreen-standby-v1.service"
+STANDBY_UNIT_FILE = Path("/etc/systemd/system") / STANDBY_UNIT
 ROOT = Path("/etc/nginx")
 STATE = Path("/var/lib/twinpanel-license/web-bluegreen-v1-state.json")
 BACKUP_ROOT = Path("/var/lib/twinpanel-license/web-bluegreen-v1")
@@ -163,6 +164,38 @@ def _validate_release(release: Path, version: str) -> Path:
     return work
 
 
+def _standby_unit_text(work: Path) -> str:
+    """A pinned persistent standby survives a reboot during an interrupted update."""
+    return (
+        "[Unit]\n"
+        "Description=TwinPanel pinned Next.js bluegreen update standby\n"
+        "After=network-online.target\n"
+        "Wants=network-online.target\n"
+        "[Service]\n"
+        "Type=simple\n"
+        "User=www-data\n"
+        "Group=www-data\n"
+        f"WorkingDirectory={work}\n"
+        "Environment=NODE_ENV=production\n"
+        "EnvironmentFile=/etc/twinpanel/frontend.env\n"
+        "NoNewPrivileges=yes\n"
+        "ProtectSystem=full\n"
+        "ProtectHome=yes\n"
+        f"ExecStart=/usr/bin/env HOSTNAME=127.0.0.1 PORT={STANDBY_PORT} "
+        f"NODE_ENV=production /usr/bin/node {work / 'server.js'}\n"
+        "Restart=on-failure\n"
+        "RestartSec=3\n"
+        "[Install]\n"
+        "WantedBy=multi-user.target\n"
+    )
+
+
+def _remove_standby_unit() -> None:
+    _run("systemctl", "disable", "--now", STANDBY_UNIT)
+    STANDBY_UNIT_FILE.unlink(missing_ok=True)
+    _run("systemctl", "daemon-reload")
+
+
 def stage(release: Path, version: str) -> dict:
     _require_root()
     if STATE.exists() or BACKUP_ROOT.exists():
@@ -172,29 +205,30 @@ def stage(release: Path, version: str) -> dict:
     before = plan()
     working = _validate_release(release, version)
     # Staging must never change the already active frontend on 3000.
-    if subprocess.run(
+    if STANDBY_UNIT_FILE.exists() or subprocess.run(
         ["systemctl", "is-active", "--quiet", STANDBY_UNIT],
         check=False, stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL, timeout=5
     ).returncode == 0:
-        raise RuntimeError("WEB_BLUEGREEN_STANDBY_SERVICE_ALREADY_ACTIVE")
+        raise RuntimeError("WEB_BLUEGREEN_STANDBY_SERVICE_ALREADY_EXISTS")
     if not _http_health(MAIN_PORT, (CURRENT / "VERSION").read_text().strip(),
                         seconds=3):
         raise RuntimeError("WEB_BLUEGREEN_PRIMARY_UNHEALTHY")
-    _run(
-        "systemd-run", "--quiet", "--collect",
-        "--unit=" + STANDBY_UNIT.removesuffix(".service"),
-        "--property=User=www-data", "--property=Group=www-data",
-        "--property=WorkingDirectory=" + str(working),
-        "--property=EnvironmentFile=/etc/twinpanel/frontend.env",
-        "--property=NoNewPrivileges=yes", "--property=ProtectSystem=full",
-        "/usr/bin/env", "HOSTNAME=127.0.0.1",
-        "PORT=" + str(STANDBY_PORT), "NODE_ENV=production",
-        "/usr/bin/node", str(working / "server.js"),
-    )
-    if not _http_health(STANDBY_PORT, version):
-        _run("systemctl", "stop", STANDBY_UNIT)
-        raise RuntimeError("WEB_BLUEGREEN_STANDBY_HEALTH_FAILED")
+    # Keep the standby up after a host reboot until a verified primary can
+    # take traffic back. Transient systemd-run units are not crash-safe here.
+    STANDBY_UNIT_FILE.write_text(_standby_unit_text(working), encoding="utf-8")
+    os.chmod(STANDBY_UNIT_FILE, 0o644)
+    try:
+        _run("systemctl", "daemon-reload")
+        _run("systemctl", "enable", "--now", STANDBY_UNIT)
+        if not _http_health(STANDBY_PORT, version):
+            raise RuntimeError("WEB_BLUEGREEN_STANDBY_HEALTH_FAILED")
+    except Exception:
+        try:
+            _remove_standby_unit()
+        except Exception:
+            pass
+        raise
     try:
         BACKUP_ROOT.mkdir(parents=True, exist_ok=False)
         os.chmod(BACKUP_ROOT, 0o700)
@@ -217,7 +251,7 @@ def stage(release: Path, version: str) -> dict:
     except Exception:
         # A disk/permission/state failure must not strand a Next process
         # or mutate a Nginx config. Never delete an older handoff state.
-        _run("systemctl", "stop", STANDBY_UNIT)
+        _remove_standby_unit()
         if not STATE.exists() and BACKUP_ROOT.is_dir():
             shutil.rmtree(BACKUP_ROOT)
         raise
@@ -288,7 +322,7 @@ def restore(version: str) -> dict:
     # A crash may occur between Nginx reload and the phase state write.
     # Always restore upstreams, even if state still says "staged".
     _switch_files(state, to_standby=False)
-    _run("systemctl", "stop", STANDBY_UNIT)
+    _remove_standby_unit()
     shutil.rmtree(BACKUP_ROOT)
     STATE.unlink(missing_ok=True)
     return {"restored": True, "version": version}
