@@ -71,6 +71,7 @@ class WebSlots(unittest.TestCase):
     def test_web_unit_has_no_global_prestart_side_effects(self):
         self.assertNotIn("ExecStartPre", web.UNIT)
         self.assertIn('TP_WEB_RELEASE', web.UNIT)
+        self.assertIn("SuccessExitStatus=143", web.UNIT)
         self.assertNotIn("/opt/twinpanel/current/.next", web.UNIT)
 
     def test_reboot_persistence_and_safe_retire(self):
