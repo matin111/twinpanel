@@ -1065,27 +1065,52 @@ async def _ensure_modern_xray(
     await asyncio.sleep(1)
 
     service_ok = await provision.active(conn, "xray")
-    listeners_ok = True
+    missing_listeners = []
 
     for candidate in candidate_ports:
         if not await provision.listener(conn, candidate, "tcp"):
-            listeners_ok = False
-            break
+            missing_listeners.append(candidate)
 
-    if not (service_ok and listeners_ok):
-        await provision.cmd(
-            conn,
-            (
-                f"if [ -f {shlex.quote(backup_path)} ]; "
-                f"then cp -a {shlex.quote(backup_path)} "
-                "/usr/local/etc/xray/config.json; "
-                "systemctl restart xray; fi"
-            ),
-            check=False,
-        )
+    if not (service_ok and not missing_listeners):
+        # Capture the reason BEFORE restoring the previous configuration.
+        # Only inspect systemd metadata and the listener table: journal excerpts
+        # can contain customer identifiers or credentials and are intentionally
+        # not exposed in API errors.
+        diagnostics = "unavailable"
+        try:
+            diagnostics = (
+                await provision.cmd(
+                    conn,
+                    "systemctl show xray.service "
+                    "-p ActiveState -p SubState -p Result "
+                    "-p ExecMainStatus -p NRestarts --no-pager",
+                    check=False,
+                    timeout=12,
+                )
+            ).strip().replace("\\n", "; ")[:350]
+        except Exception:
+            pass
+        rollback_result = "not_attempted"
+        try:
+            await provision.cmd(
+                conn,
+                (
+                    f"if [ -f {shlex.quote(backup_path)} ]; "
+                    f"then cp -a {shlex.quote(backup_path)} "
+                    "/usr/local/etc/xray/config.json; "
+                    "systemctl restart xray; "
+                    "else exit 44; fi"
+                ),
+            )
+            rollback_result = "restored"
+        except Exception:
+            rollback_result = "failed"
         raise RuntimeError(
-            "modern Xray restart/listener verification failed; "
-            "previous config restored"
+            "XRAY_MODERN_START_VERIFICATION_FAILED "
+            f"service_active={service_ok} "
+            f"missing_tcp_ports={','.join(map(str, missing_listeners)) or 'none'} "
+            f"systemd={diagnostics} "
+            f"rollback={rollback_result}"
         )
 
     for candidate in candidate_ports:
