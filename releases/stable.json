@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.773",
+  "version": "1.1.0-rc.774",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-10T07:06:39Z",
+  "released_at": "2026-11-10T09:23:10Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "83962f160fe55621771c85694e08bebb2b7ffcd6",
+  "source_sha": "438afb0369b212c890c31595a6fde7fc0a462d52",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.773/twinpanel-1.1.0-rc.773-linux-x86_64.tar.gz",
-    "sha256": "61ffbfec2c6b79ccd467f12ad7da4f62184ec3bb5c73728c8ef5cb89140e789b",
-    "size_bytes": 30331099
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.774/twinpanel-1.1.0-rc.774-linux-x86_64.tar.gz",
+    "sha256": "d7d6575b0782f094d6d994fd212322bdcba4c8652b738a6e621ba180b2681dbb",
+    "size_bytes": 30332436
   },
   "notes": {
-    "fa": "تأیید تک‌مرحله‌ای رسید در ربات مدیریت: با همان اولین کلیک روی تأیید رسید، عملیات مالی توسط API اصلی اجرا می‌شود و دکمه تأیید مجدد نمایش داده نمی‌شود. دکمه بررسی وضعیت، وضعیت همان تصویر/پیام رسید را به‌روز می‌کند و هیچ رسید جدیدی نمی‌سازد. وضعیت کیف پول پس از بررسی نیز روی شناسه اصلی قابل مشاهده است. اطلاعات کاربران، اشتراک‌ها، کیف پول‌ها، نودها و امکانات نسخه 772 بدون تغییر باقی می‌ماند.",
-    "en": "Telegram admin receipts: direct first-tap approval without extra confirmation, check status updates existing original message/photo rather than posting new receipt, keep completed wallet receipt read-only status. Canonical payment and wallet approval unchanged; preserve rc.772."
+    "fa": "بهینه‌سازی بخش آنلاین‌ها و اشتراک‌ها: نتایج تاییدشده وضعیت آنلاین برای ۵ ثانیه بین درخواست‌های همزمان بازاستفاده می‌شوند تا بار تکراری روی دیتابیس و API کاهش یابد. مدت تشخیص آنلاین، تعداد دستگاه، سهمیه ترافیک، پروتکل‌ها، نودها و تنظیمات اتصال تغییر نمی‌کنند. اختلال متناوب CDN آروان موضوع جداگانه است.",
+    "en": "Online and subscriptions performance: coalesce repeated authenticated presence DB scans in an in-process read-only 5-second snapshot. Preserve real online status, uncertainty, device limits, quota accounting, protocols and nodes. Arvan CDN connectivity issue is independent."
   }
 }
