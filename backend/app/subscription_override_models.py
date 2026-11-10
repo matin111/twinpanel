@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Integer
 from sqlalchemy.orm import Mapped, mapped_column
@@ -87,3 +87,29 @@ def duration_is_unlimited(db, subscription, plan=None) -> bool:
         plan = db.get(Plan, subscription.plan_id)
     return unlimited_without_expiry(subscription, plan, override)
 
+
+
+def effective_expiry_at(db, subscription, plan=None) -> datetime | None:
+    """Return the expiry of an already-started finite account without mutation.
+
+    The stored expiry is authoritative. A finite plan with a recorded start
+    date but a missing expiry has a recoverable end date; missing start dates
+    must NOT be treated as first-use activation. Explicit unlimited overrides
+    must never acquire a synthetic expiry.
+    """
+    stored = getattr(subscription, "expires_at", None)
+    if stored is not None:
+        return stored
+
+    started = getattr(subscription, "starts_at", None)
+    if started is None or duration_is_unlimited(db, subscription, plan):
+        return None
+
+    if plan is None and getattr(subscription, "plan_id", None) is not None:
+        from .models import Plan
+        plan = db.get(Plan, int(subscription.plan_id))
+
+    days = duration_days(subscription, plan)
+    if days <= 0:
+        return None
+    return started + timedelta(days=days)
