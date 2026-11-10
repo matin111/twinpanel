@@ -75,7 +75,7 @@ def app_reseller_prefix(installation_id: str, reseller_id: int) -> str:
 
 def app_namespace_from_username(username: str, installation_id: str) -> str:
     value = str(username or "").strip().upper()
-    match = re.match(r"^(TP(?:[A-F0-9]{6}|[A-F0-9]{8}|[A-F0-9]{10}|[A-F0-9]{12}|[A-F0-9]{14}|[A-F0-9]{16}))_(?:A|R[0-9A-F]+)_APP[0-9A-F]{16}$", value)
+    match = re.match(r"^(TP(?:[A-F0-9]{6}|[A-F0-9]{8}|[A-F0-9]{10}|[A-F0-9]{12}|[A-F0-9]{14}|[A-F0-9]{16}))_(?:A|R[0-9A-F]+)_(?:C[0-9]+_)?APP[0-9A-F]{16}$", value)
     full = installation_namespace(installation_id)
     if match and full.startswith(match.group(1)):
         return match.group(1)
