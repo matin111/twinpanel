@@ -18,13 +18,16 @@ for required in (
     'if not receipt:', '_reserve(db, kind, item_id, chat_id)',
     'await _deliver(', 'base + "sendPhoto"', 'base + method',
     '"✅ تأیید رسید"', '"❌ رد رسید"',
-    'adm:ask:approve:{kind}:{item_id}', 'adm:ask:reject:{kind}:{item_id}',
+    'adm:do:approve:{kind}:{item_id}', 'adm:ask:reject:{kind}:{item_id}',
 ):
     assert required in source, required
 assert 'push_manual_receipts_once()' in loop
 assert 'last_manual_receipt_push' in loop
 assert 'F.data.startswith("adm:ask:")' in bot
 assert 'F.data.startswith("adm:do:")' in bot
+assert 'async def receipt_detail(' in bot
+assert 'callback.message.edit_caption(' in bot
+assert 'callback.message.edit_text(' in bot
 assert 'if not _manual_purchase(row):' in api
 assert '_admin(db, payload.telegram_id)' in api
 print("DIRECT_ADMIN_MANUAL_RECEIPT_BUTTONS=PASS")
