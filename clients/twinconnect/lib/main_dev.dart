@@ -280,7 +280,7 @@ class _TwinConnectDevAppState extends State<TwinConnectDevApp> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(p.protocol.name, style: const TextStyle(
-                            fontSize: 14, fontWeight: FontWeight.w650)),
+                            fontSize: 14, fontWeight: FontWeight.w600)),
                           const SizedBox(height: 3),
                           Text(t('موتور آماده نیست', 'Engine unavailable'),
                             style: TextStyle(color: muted, fontSize: 11)),
