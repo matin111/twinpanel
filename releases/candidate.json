@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.770",
-  "source_sha": "1a2d1d411fbcabe7995cbb9bc2c81dbb7a8e2e8b",
+  "version": "1.1.0-rc.771",
+  "source_sha": "2cf4aeeffede25f1af0e534df3c7253098abf524",
   "notes": {
-    "fa": "رفع دائمی ازدحام صف تحویل اکانت در ربات: پیام‌های بدون اتصال تلگرام و کاربران مسدودکننده در قرنطینه باقی می‌مانند، از تکرار بی‌پایان جلوگیری می‌شود و با اتصال حساب یا تعامل دوباره کاربر، سفارش پرداخت‌شده به‌صورت ایمن دوباره قابل تحویل خواهد بود. اولویت سفارش‌های جدید، جلوگیری از ارسال مجدد اعلان‌های تحویل‌شده و پایش پرداخت‌های معطل فعال است. تغییرات قبلی پروتکل‌ها، پورت‌ها، کیف پول و اشتراک‌ها محفوظ‌اند.",
-    "en": "Harden Telegram paid subscription delivery: quarantine unreachable/unlinked recipients rather than retrying indefinitely, revive undelivered paid orders on Telegram account linking and authenticated bot return, preserve priority for new purchases and delivered-at/event-key deduplication, and alert on actionable stalled delivery. Includes prior rc.769 protocol port conflict warning features and preserves accounts, wallets, quotas and node settings."
+    "fa": "افزودن نود با پروتکل‌های سالم حتی هنگام شکست یک یا چند پروتکل، بدون نیاز به سلامت اجباری ۱۶/۱۶؛ ثبت اکانت و ساخت کانفیگ فقط برای پروتکل‌های تأییدشده و مجاز، نمایش وضعیت نصب ناقص، بازیابی نودهای ناقص با کنترل سلامت زنده. حفظ تمام اصلاحات rc.770 و عدم تغییر اطلاعات اشتراک و کلیدها.",
+    "en": "Admit newly installed Exits with their individually live-verified supported protocol subset, without requiring all 16. Entitlement-scoped central membership and credential staging, explicit partial status and guarded recovery of failed hidden nodes; preserve all rc.770 fixes and customer identities."
   }
 }
