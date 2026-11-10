@@ -6,6 +6,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'app_strings.dart';
 import 'tenant_api.dart';
 import 'tenant_models.dart';
+import 'vpn_settings.dart';
+import 'vpn_strings.dart';
 
 void main() => runApp(const TwinConnectApp());
 
@@ -177,6 +179,19 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
       appBar: AppBar(
         title: Text(strings.appTitle),
         actions: [
+          IconButton(
+            key: const Key('vpnSettingsButton'),
+            tooltip: strings.vpnSettingsTitle,
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => VpnSettingsScreen(
+                  tenant: brand?.namespace ?? '',
+                  account: brand == null ? '' : _username.text.trim(),
+                ),
+              ),
+            ),
+            icon: const Icon(Icons.tune_outlined),
+          ),
           Tooltip(
             message: strings.engineNotReady,
             child: const Padding(
