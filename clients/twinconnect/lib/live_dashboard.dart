@@ -1141,7 +1141,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           child: Material(
             color: Colors.transparent,
             child: InkWell(
-          onTap: _vpnBusy ? null : () => _selectServerAndConnect(index),
+          onTap: () => _selectServerAndConnect(index),
           borderRadius: BorderRadius.circular(16),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
