@@ -5,10 +5,13 @@ no supported protocols until independently verified tunnel engines are added.
 This patch is idempotent and fails when the Flutter template has changed.
 """
 from pathlib import Path
+import shutil
 
 ROOT = Path(__file__).resolve().parents[1]
 HEADER = ROOT / "windows" / "runner" / "flutter_window.h"
 SOURCE = ROOT / "windows" / "runner" / "flutter_window.cpp"
+NATIVE = ROOT / "native" / "windows" / "twinconnect_wireguard.h"
+INSTALLED = ROOT / "windows" / "runner" / "twinconnect_wireguard.h"
 
 HEADER_MARKER = "  std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> vpn_channel_;"
 CPP_MARKER = "  // TwinConnect: fail-closed Windows native capability handshake."
@@ -21,8 +24,10 @@ def insert_once(text: str, anchor: str, replacement: str) -> str:
 
 
 def install() -> None:
-    if not HEADER.is_file() or not SOURCE.is_file():
+    if not HEADER.is_file() or not SOURCE.is_file() or not NATIVE.is_file():
         raise RuntimeError("Generate the Windows Flutter runner before installing native bridge.")
+
+    shutil.copyfile(NATIVE, INSTALLED)
 
     header = HEADER.read_text(encoding="utf-8-sig")
     cpp = SOURCE.read_text(encoding="utf-8-sig")
@@ -45,7 +50,8 @@ def install() -> None:
         cpp = insert_once(
             cpp, '#include "flutter_window.h"',
             '#include "flutter_window.h"\n'
-            '#include <flutter/standard_method_codec.h>',
+            '#include <flutter/standard_method_codec.h>\n'
+            '#include "twinconnect_wireguard.h"',
         )
         injection = """  // TwinConnect: fail-closed Windows native capability handshake.
   vpn_channel_ = std::make_unique<
@@ -57,24 +63,53 @@ def install() -> None:
   vpn_channel_->SetMethodCallHandler(
       [](const flutter::MethodCall<flutter::EncodableValue>& call,
          std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result) {
-        using flutter::EncodableValue;
         if (call.method_name() == "getCapabilities") {
-          flutter::EncodableMap capabilities = {
-              {EncodableValue("contractVersion"), EncodableValue(1)},
-              {EncodableValue("engineReady"), EncodableValue(false)},
-              {EncodableValue("fullTunnel"), EncodableValue(false)},
-              {EncodableValue("killSwitchEnforced"), EncodableValue(false)},
-              {EncodableValue("dnsGuard"), EncodableValue(false)},
-              {EncodableValue("ipv6Guard"), EncodableValue(false)},
-          };
-          result->Success(EncodableValue(capabilities));
+          result->Success(twinconnect_wireguard::Capabilities());
         } else if (call.method_name() == "getProtocolCapabilities") {
-          flutter::EncodableMap response = {
-              {EncodableValue("contractVersion"), EncodableValue(1)},
-              {EncodableValue("supportedProtocols"),
-               EncodableValue(flutter::EncodableList{})},
+          result->Success(twinconnect_wireguard::ProtocolCapabilities());
+        } else if (call.method_name() == "getTunnelStatus") {
+          result->Success(twinconnect_wireguard::Status());
+        } else if (call.method_name() == "startTunnel") {
+          const auto* args = std::get_if<flutter::EncodableMap>(
+              call.arguments());
+          if (!args) {
+            result->Error("INVALID_REQUEST");
+            return;
+          }
+          const auto findString = [&](const char* key) -> const std::string* {
+            const auto it = args->find(flutter::EncodableValue(key));
+            if (it == args->end()) return nullptr;
+            return std::get_if<std::string>(&it->second);
           };
-          result->Success(EncodableValue(response));
+          const auto* protocol = findString("protocol");
+          const auto* raw = findString("config");
+          if (!protocol || *protocol != "wireguard" || !raw) {
+            result->Error("INVALID_PROTOCOL");
+            return;
+          }
+          if (!twinconnect_wireguard::IsAdmin()) {
+            result->Error("WINDOWS_ADMIN_REQUIRED");
+            return;
+          }
+          if (!twinconnect_wireguard::ValidConfig(*raw)) {
+            result->Error("WIREGUARD_CONFIG_UNSAFE");
+            return;
+          }
+          if (twinconnect_wireguard::ServiceExists()) {
+            result->Error("TUNNEL_ALREADY_RUNNING");
+            return;
+          }
+          if (!twinconnect_wireguard::Start(*raw)) {
+            result->Error("WIREGUARD_START_FAILED");
+            return;
+          }
+          result->Success(twinconnect_wireguard::Status());
+        } else if (call.method_name() == "stopTunnel") {
+          if (!twinconnect_wireguard::Stop()) {
+            result->Error("WIREGUARD_STOP_FAILED");
+            return;
+          }
+          result->Success(twinconnect_wireguard::Status());
         } else {
           result->NotImplemented();
         }
