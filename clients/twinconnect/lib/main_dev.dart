@@ -481,9 +481,9 @@ class _TwinConnectDevAppState extends State<TwinConnectDevApp> {
     }
 
     Widget metric(IconData icon, String title, String value,
-        {String? detail}) => Container(
+        {String? detail}) => glassCard(
+      radius: 17,
       padding: const EdgeInsets.all(14),
-      decoration: tile(radius: 17),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -563,13 +563,22 @@ class _TwinConnectDevAppState extends State<TwinConnectDevApp> {
               connectionStats(),
             ]);
           }
-          return Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(flex: 5, child: powerCard()),
-              const SizedBox(width: 14),
-              Expanded(flex: 5, child: connectionStats()),
-            ],
+          return Directionality(
+            textDirection: TextDirection.ltr,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(flex: 5, child: Directionality(
+                  textDirection: _persian ? TextDirection.rtl : TextDirection.ltr,
+                  child: powerCard(),
+                )),
+                const SizedBox(width: 14),
+                Expanded(flex: 5, child: Directionality(
+                  textDirection: _persian ? TextDirection.rtl : TextDirection.ltr,
+                  child: connectionStats(),
+                )),
+              ],
+            ),
           );
         }),
         const SizedBox(height: 15),
