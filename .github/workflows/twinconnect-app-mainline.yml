@@ -1,0 +1,42 @@
+name: TwinConnect Mainline App Delivery Integration
+
+on:
+  pull_request:
+    paths:
+      - 'backend/app/central_app_*.py'
+      - 'backend/app/routers/central_app_*.py'
+      - 'backend/app/main.py'
+      - 'backend/tests/test_twinconnect_app_mainline_contract_v1.py'
+      - 'components/app-credential-delivery-card.tsx'
+      - 'components/legacy-subscriptions-exact.tsx'
+      - 'components/reseller-subscriptions-parity.tsx'
+      - 'components/subscription-link-delivery-modal.tsx'
+      - 'lib/central-app-credential-api.ts'
+      - '.github/workflows/twinconnect-app-mainline.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'backend/app/central_app_*.py'
+      - 'backend/app/routers/central_app_*.py'
+      - 'components/app-credential-delivery-card.tsx'
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.11', '3.12']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Verify additive app API syntax
+        run: |
+          python -m py_compile backend/app/central_app_*.py backend/app/routers/central_app_*.py backend/app/main.py
+      - name: Verify app-only auth and panel UI wiring
+        run: python -m unittest discover -s backend/tests -p test_twinconnect_app_mainline_contract_v1.py -v
