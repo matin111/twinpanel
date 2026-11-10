@@ -152,6 +152,19 @@ def install() -> None:
             "  RegisterPlugins(flutter_controller_->engine());\n\n" + injection,
         )
 
+    # Windows tunnel service creation requires elevation on every launch.
+    # Encode this in the executable manifest rather than relying on the
+    # user's shortcut or a one-time elevated setup process.
+    manifest = ROOT / "windows" / "runner" / "runner.exe.manifest"
+    if not manifest.is_file():
+        raise RuntimeError("Missing Windows executable manifest")
+    xml = manifest.read_text(encoding="utf-8-sig")
+    if 'level="asInvoker"' in xml:
+        xml = xml.replace('level="asInvoker"', 'level="requireAdministrator"')
+    if 'level="requireAdministrator"' not in xml:
+        raise RuntimeError("Windows manifest elevation contract missing")
+    manifest.write_text(xml, encoding="utf-8")
+
     HEADER.write_text(header, encoding="utf-8")
     SOURCE.write_text(cpp, encoding="utf-8")
 
