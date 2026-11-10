@@ -1,0 +1,23 @@
+name: Web BlueGreen Standby V1 Safety Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'backend/scripts/twinpanel_web_bluegreen_v1.py'
+      - 'backend/tests/test_web_bluegreen_v1.py'
+      - '.github/workflows/web-bluegreen-standby-v1-smoke.yml'
+  workflow_dispatch:
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check helper Python syntax
+        run: python -m py_compile backend/scripts/twinpanel_web_bluegreen_v1.py
+      - name: Verify Next.js staging and fail-closed Nginx route rollback
+        working-directory: backend
+        run: PYTHONPATH=. python tests/test_web_bluegreen_v1.py -v
