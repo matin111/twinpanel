@@ -28,7 +28,7 @@ class SingBoxWindowsConfig {
           'type': 'tun',
           'tag': 'twinconnect-tun',
           'interface_name': 'TwinConnectSB',
-          'address': ['172.19.0.1/30'],
+          'address': ['172.19.0.1/30', 'fdfe:dcba:9876::1/126'],
           'mtu': 1400,
           'auto_route': true,
           'strict_route': true,
