@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.768",
+  "version": "1.1.0-rc.769",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-10T02:59:42Z",
+  "released_at": "2026-11-10T03:19:33Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "49c4b3749fe42bc189c83dd9d6772032e1936128",
+  "source_sha": "e8b4e9ec28289ac4b820a5b29fbde21e29c47fad",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.768/twinpanel-1.1.0-rc.768-linux-x86_64.tar.gz",
-    "sha256": "79f0364ebbf3ef10b8a70fa3c12a4f2de97b8c5049db0328ef3f165b892582cd",
-    "size_bytes": 30305132
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.769/twinpanel-1.1.0-rc.769-linux-x86_64.tar.gz",
+    "sha256": "e2a166b6718e9e4dc2f43261c691e81565f78e8bd51fadd6061927b13abf4fd2",
+    "size_bytes": 30308453
   },
   "notes": {
-    "fa": "رفع فوری مشکل گیرکردن تحویل اکانت‌های تأییدشده به ربات تلگرام: اولویت‌بندی صف اعلان‌ها براساس تعداد تلاش، جلوگیری از مسدودشدن ارسال‌های جدید پشت گیرندگان قدیمی، حفظ جلوگیری از ارسال تکراری و تحویل QR/لینک خرید. همچنین پایش دوره‌ای سلامت وب/API/PostgreSQL، اصلاح بازیابی Web Blue/Green و افزایش هوشمند سهمیه CPU حسابداری بدون قطع سرویس. اطلاعات کاربران، خریدها، نودها و محدودیت دستگاه‌ها بدون تغییر.",
-    "en": "Restore pending Telegram purchased-account delivery with fair durable notification outbox priority (fewest attempts first); old blocked/unlinked notices cannot starve new payment-approval QR/link messages. Preserve event-key uniqueness and delivered-at deduplication, all user/account/payment data, bot handlers and existing protocols. Also includes periodic read-only Web/API/PostgreSQL resilience probe, blue-green standby cleanup and adaptive non-disruptive accounting CPU headroom."
+    "fa": "افزودن بررسی زنده تداخل پورت در مدیریت پروتکل‌ها همراه هشدار و قابلیت انتخاب دستی پورت جایگزین، بدون توقف سرویس‌های سالم. تفکیک هشدار SSL دامنه از تداخل پورت Xray. حفظ اصلاحات rc.768 ربات، سرویس‌ها و اتصال‌ها.",
+    "en": "Live listener-port collision preflight and explicit manual port choice in Protocol Command Center without displacing running services; distinguish ACME HTTP-01 certificate failures from Xray listener conflicts. Preserve rc.768 fixes."
   }
 }
