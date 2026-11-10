@@ -70,10 +70,21 @@ def report() -> dict:
         services[unit.removesuffix(".service")] = value if code == 0 else "inactive"
         if code != 0:
             errors.append("inactive_service:" + unit)
-    expected_web = "twinpanel-web.service" if port == 3000 else f"twinpanel-web-slot@{port}.service"
-    code, value = run("systemctl", "is-active", expected_web)
-    services["active_web_unit"] = value if code == 0 else "inactive"
-    if code != 0:
+    # After a successful blue/green update *both* ports can be owned by a
+    # pinned slot unit; on first migration port 3000 is still the legacy unit.
+    # Never confuse an intentionally disabled legacy Web with an outage.
+    candidate_units = [f"twinpanel-web-slot@{port}.service"]
+    if port == 3000:
+        candidate_units.append("twinpanel-web.service")
+    web_alive = False
+    for web_unit in candidate_units:
+        result, _ = run("systemctl", "is-active", web_unit)
+        if result == 0:
+            web_alive = True
+            services["active_web_unit"] = web_unit
+            break
+    if not web_alive:
+        services["active_web_unit"] = "inactive"
         errors.append("active_web_unit_inactive")
     if version and http_version(8095) != version:
         errors.append("api_version_or_health_failure")
