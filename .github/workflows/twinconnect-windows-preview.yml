@@ -63,6 +63,9 @@ jobs:
       - name: Bundle pinned and verified sing-box engine (not yet enabled)
         shell: pwsh
         run: ./tools/bundle_singbox_windows.ps1
+      - name: Verify bundled sing-box accepts synthetic Windows TUN config
+        shell: pwsh
+        run: ./tools/check_singbox_windows.ps1
       - name: Package portable ZIP and usage instructions
         shell: pwsh
         run: |
