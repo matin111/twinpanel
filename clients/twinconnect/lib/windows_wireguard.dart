@@ -82,6 +82,7 @@ class WindowsWireGuardController {
         raw['protocol'] != 'wireguard' ||
         (raw['state'] != 'interface_up' &&
          raw['state'] != 'peer_verified' &&
+         raw['state'] != 'needs_cleanup' &&
          raw['state'] != 'down') ||
         (raw['state'] == 'peer_verified'
             ? raw['peerHandshakeVerified'] != true
