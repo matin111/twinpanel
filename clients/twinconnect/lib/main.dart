@@ -190,7 +190,6 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
               child: DropdownButton<AppLanguage>(
                 key: const Key('languagePicker'),
                 value: widget.language,
-                tooltip: strings.language,
                 onChanged: (value) {
                   if (value != null) widget.onLanguageChanged(value);
                 },
