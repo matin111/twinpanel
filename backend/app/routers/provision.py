@@ -1778,6 +1778,24 @@ async def provision_protocols(conn, p: ProtocolSettings, db: Session, node: Node
         except Exception as e: results["l2tp"]={"ok":False,"port":None,"port_text":"500/4500/1701","transport":"udp","error":str(e)}; save_config(db,node.id,"l2tp",port_text="500/4500/1701",transport="udp",service="strongswan-starter + xl2tpd",ok=False,error=str(e))
     if p.install_v2ray:
         try:
+            # TWINPANEL_NEW_EXIT_XRAY_SAFE_PORT_GROUP_V1
+            # A newly added Exit can use SSH on 8443 while the Xray default
+            # is also 8443. The old installer bootstrapped a config, then
+            # repeatedly failed EADDRINUSE. Before any config mutation,
+            # select a complete free set of base + WS/XHTTP/TCP-TLS ports
+            # only when the existing Xray is inactive, has no customers,
+            # and its partial config is safe to rebase.
+            from ..services.xray_port_reservation_v1 import (
+                select_install_xray_base_port,
+            )
+
+            requested_xray_port = int(p.xray_port)
+            safe_xray_port = await select_install_xray_base_port(
+                conn, node, requested_xray_port,
+            )
+            if safe_xray_port != requested_xray_port:
+                p = p.model_copy(update={"xray_port": safe_xray_port})
+
             # TWINPANEL_XRAY_NODE_AWARE_THREE_INBOUND_REPAIR_V1
             # On a dedicated-domain Exit the installed base + XHTTP
             # listeners are not sufficient. The old generic repair skipped
@@ -1829,6 +1847,9 @@ async def provision_protocols(conn, p: ProtocolSettings, db: Session, node: Node
                     "v2ray", p.xray_port, "tcp", "xray",
                     lambda: install_xray(conn, p.xray_port, node),
                 )
+            if p.xray_port != requested_xray_port and "v2ray" in results:
+                results["v2ray"]["fallback_from_port"] = requested_xray_port
+                results["v2ray"]["selected_port"] = int(p.xray_port)
         except Exception as e:
             results["v2ray"] = {
                 "ok": False, "port": p.xray_port,
