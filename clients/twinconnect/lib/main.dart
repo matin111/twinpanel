@@ -21,6 +21,7 @@ import 'ambient_background.dart';
 import 'interactive_glass_card.dart';
 import 'live_dashboard.dart';
 import 'app_session_store.dart';
+import 'account_snapshot.dart';
 import 'plan_classification.dart';
 
 void main() => runApp(const TwinConnectApp());
@@ -129,6 +130,7 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
   final _password = TextEditingController();
   final AppSessionStore _sessionStore = const AppSessionStore();
   AppPlanClassification? _plan;
+  AppAccountSnapshot? _account;
   bool _restoringSession = true;
 
   int _dashboardTab = 0;
@@ -183,6 +185,7 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
       });
       _refreshServers();
       _loadAccountPlan(panel, saved.sessionToken, serial);
+      _loadAccountSnapshot(panel, saved.sessionToken, serial);
     } on TenantApiException catch (error) {
       if (error.message == 'APP_LOGIN_INVALID' ||
           error.message == 'APP_NOT_AUTHORIZED') {
@@ -194,6 +197,21 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
       if (mounted && serial == _lookupSerial) {
         setState(() => _restoringSession = false);
       }
+    }
+  }
+
+  Future<void> _loadAccountSnapshot(
+    PanelDirectoryEntry panel, String session, int serial,
+  ) async {
+    try {
+      final snapshot = await TenantApi.fromBuildConfig().loadSessionAccount(
+        panel: panel, sessionToken: session,
+      );
+      if (mounted && serial == _lookupSerial) {
+        setState(() => _account = snapshot);
+      }
+    } catch (_) {
+      // Unsupported or temporarily unavailable account endpoints are not fatal.
     }
   }
 
@@ -234,6 +252,7 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
       _catalog = null;
       _servers = null;
       _plan = null;
+      _account = null;
       _refreshingServers = false;
       _serverRefreshError = null;
       _protocolCatalogUnavailable = false;
@@ -266,6 +285,7 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
           sessionToken: loggedIn.sessionToken, brand: brand);
       } catch (_) {}
       _loadAccountPlan(panel, loggedIn.sessionToken, serial);
+      _loadAccountSnapshot(panel, loggedIn.sessionToken, serial);
       // Refresh server inventory after authenticated login; failures are isolated.
       _refreshServers();
       // Subscription metadata is not secret and is fetched independently of
@@ -678,6 +698,7 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
         servers: _servers,
         native: _nativeProtocols,
         plan: _plan,
+        account: _account,
         accountStatus: _brand?.accountStatus ?? 'unknown',
         onRefresh: _refreshServers,
         onLogout: () {
@@ -691,6 +712,7 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
             _catalog = null;
             _servers = null;
             _plan = null;
+            _account = null;
             _dashboardTab = 0;
             _errorCode = null;
             widget.onBrandChanged(null);
