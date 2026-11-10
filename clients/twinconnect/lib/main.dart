@@ -1,22 +1,84 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
+import 'app_strings.dart';
 import 'tenant_api.dart';
 import 'tenant_models.dart';
 
 void main() => runApp(const TwinConnectApp());
 
-class TwinConnectApp extends StatelessWidget {
+enum AppLanguage { automatic, persian, english }
+
+class TwinConnectApp extends StatefulWidget {
   const TwinConnectApp({super.key});
 
   @override
+  State<TwinConnectApp> createState() => _TwinConnectAppState();
+}
+
+class _TwinConnectAppState extends State<TwinConnectApp> {
+  static const _languageKey = 'twinconnect_ui_language_v1';
+  AppLanguage _language = AppLanguage.automatic;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLanguage();
+  }
+
+  Future<void> _loadLanguage() async {
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      final saved = preferences.getString(_languageKey);
+      if (!mounted) return;
+      setState(() {
+        _language = switch (saved) {
+          'fa' => AppLanguage.persian,
+          'en' => AppLanguage.english,
+          _ => AppLanguage.automatic,
+        };
+      });
+    } catch (_) {
+      // A preference failure must not stop the app; device locale is the default.
+    }
+  }
+
+  Future<void> _changeLanguage(AppLanguage choice) async {
+    setState(() => _language = choice);
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      final code = switch (choice) {
+        AppLanguage.automatic => 'system',
+        AppLanguage.persian => 'fa',
+        AppLanguage.english => 'en',
+      };
+      await preferences.setString(_languageKey, code);
+    } catch (_) {
+      // The requested language still applies to this running session.
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final Locale? selectedLocale = switch (_language) {
+      AppLanguage.automatic => null,
+      AppLanguage.persian => const Locale('fa'),
+      AppLanguage.english => const Locale('en'),
+    };
+
     return MaterialApp(
       title: 'TwinConnect',
       debugShowCheckedModeBanner: false,
+      locale: selectedLocale,
+      supportedLocales: const [Locale('en'), Locale('fa')],
+      localizationsDelegates: GlobalMaterialLocalizations.delegates,
       theme: ThemeData(
         useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF7358DF)),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF7358DF),
+        ),
       ),
       darkTheme: ThemeData(
         useMaterial3: true,
@@ -26,16 +88,23 @@ class TwinConnectApp extends StatelessWidget {
         ),
       ),
       themeMode: ThemeMode.system,
-      home: const Directionality(
-        textDirection: TextDirection.rtl,
-        child: TwinConnectHome(),
+      home: TwinConnectHome(
+        language: _language,
+        onLanguageChanged: _changeLanguage,
       ),
     );
   }
 }
 
 class TwinConnectHome extends StatefulWidget {
-  const TwinConnectHome({super.key});
+  const TwinConnectHome({
+    required this.language,
+    required this.onLanguageChanged,
+    super.key,
+  });
+
+  final AppLanguage language;
+  final ValueChanged<AppLanguage> onLanguageChanged;
 
   @override
   State<TwinConnectHome> createState() => _TwinConnectHomeState();
@@ -48,7 +117,7 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
   final _tenantCode = TextEditingController();
 
   bool _loading = false;
-  String? _error;
+  String? _errorCode;
   BrandPreview? _brand;
 
   @override
@@ -64,7 +133,7 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
     FocusScope.of(context).unfocus();
     setState(() {
       _loading = true;
-      _error = null;
+      _errorCode = null;
       _brand = null;
     });
 
@@ -85,13 +154,11 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
       if (!mounted) return;
       setState(() => _brand = brand);
     } on FormatException catch (error) {
-      if (mounted) setState(() => _error = error.message);
+      if (mounted) setState(() => _errorCode = error.message);
     } on TenantApiException catch (error) {
-      if (mounted) setState(() => _error = error.message);
+      if (mounted) setState(() => _errorCode = error.message);
     } catch (_) {
-      if (mounted) {
-        setState(() => _error = 'امکان دریافت اطلاعات پنل وجود ندارد.');
-      }
+      if (mounted) setState(() => _errorCode = 'UNKNOWN_ERROR');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -99,16 +166,45 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
 
   @override
   Widget build(BuildContext context) {
+    final strings = AppStrings.of(context);
     final brand = _brand;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('TwinConnect'),
-        actions: const [
+        title: Text(strings.appTitle),
+        actions: [
           Tooltip(
-            message: 'نسخه اولیه: بدون موتور اتصال VPN',
-            child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: 18),
+            message: strings.engineNotReady,
+            child: const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 8),
               child: Icon(Icons.shield_outlined),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsetsDirectional.only(end: 12),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<AppLanguage>(
+                key: const Key('languagePicker'),
+                value: widget.language,
+                tooltip: strings.language,
+                onChanged: (value) {
+                  if (value != null) widget.onLanguageChanged(value);
+                },
+                items: [
+                  DropdownMenuItem(
+                    value: AppLanguage.automatic,
+                    child: Text(strings.systemLanguage),
+                  ),
+                  DropdownMenuItem(
+                    value: AppLanguage.persian,
+                    child: Text(strings.persianLanguage),
+                  ),
+                  DropdownMenuItem(
+                    value: AppLanguage.english,
+                    child: Text(strings.englishLanguage),
+                  ),
+                ],
+              ),
             ),
           ),
         ],
@@ -124,13 +220,13 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
                 const Icon(Icons.shield_moon_outlined, size: 60),
                 const SizedBox(height: 12),
                 Text(
-                  'اپلیکیشن مرکزی چندبرندی',
+                  strings.appHeadline,
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.headlineSmall,
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'برند و اطلاعات پشتیبانی مستقیماً از پنل دارای لایسنس شما دریافت می‌شود.',
+                  strings.appIntroduction,
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
@@ -144,7 +240,7 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           Text(
-                            'شناسایی حساب',
+                            strings.identifyAccount,
                             style: Theme.of(context).textTheme.titleLarge,
                           ),
                           const SizedBox(height: 18),
@@ -152,14 +248,14 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
                             key: const Key('accountUsername'),
                             controller: _username,
                             textDirection: TextDirection.ltr,
-                            decoration: const InputDecoration(
-                              labelText: 'نام کاربری کامل',
-                              hintText: 'TP..._R..._ali',
-                              border: OutlineInputBorder(),
+                            decoration: InputDecoration(
+                              labelText: strings.accountUsername,
+                              hintText: strings.accountUsernameHint,
+                              border: const OutlineInputBorder(),
                             ),
                             validator: (text) =>
                                 (text == null || text.trim().isEmpty)
-                                    ? 'نام کاربری لازم است.'
+                                    ? strings.usernameRequired
                                     : null,
                           ),
                           const SizedBox(height: 13),
@@ -167,14 +263,14 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
                             key: const Key('subscriptionLink'),
                             controller: _subscription,
                             textDirection: TextDirection.ltr,
-                            decoration: const InputDecoration(
-                              labelText: 'لینک یا کد اشتراک',
-                              hintText: 'https://panel.example/v1/connect/...',
-                              border: OutlineInputBorder(),
+                            decoration: InputDecoration(
+                              labelText: strings.subscription,
+                              hintText: strings.subscriptionHint,
+                              border: const OutlineInputBorder(),
                             ),
                             validator: (text) =>
                                 (text == null || text.trim().isEmpty)
-                                    ? 'لینک اشتراک لازم است.'
+                                    ? strings.subscriptionRequired
                                     : null,
                           ),
                           const SizedBox(height: 13),
@@ -182,10 +278,10 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
                             key: const Key('tenantCode'),
                             controller: _tenantCode,
                             textDirection: TextDirection.ltr,
-                            decoration: const InputDecoration(
-                              labelText: 'شناسه پنل (در صورت نداشتن پیشوند)',
-                              hintText: 'TP0123456789ABCDEF',
-                              border: OutlineInputBorder(),
+                            decoration: InputDecoration(
+                              labelText: strings.tenantCode,
+                              hintText: strings.tenantCodeHint,
+                              border: const OutlineInputBorder(),
                             ),
                           ),
                           const SizedBox(height: 18),
@@ -200,19 +296,21 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
                                     ),
                                   )
                                 : const Icon(Icons.verified_user_outlined),
-                            label: const Text('دریافت اطلاعات برند'),
+                            label: Text(strings.identifyButton),
                           ),
                         ],
                       ),
                     ),
                   ),
                 ),
-                if (_error != null) ...[
+                if (_errorCode != null) ...[
                   const SizedBox(height: 12),
                   SelectableText(
-                    _error!,
+                    strings.error(_errorCode!),
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: Theme.of(context).colorScheme.error),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
                   ),
                 ],
                 if (brand != null) ...[
@@ -220,9 +318,8 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
                   BrandDetails(brand: brand),
                 ],
                 const SizedBox(height: 20),
-                const Text(
-                  'این نسخه فقط شناسایی پنل و نمایش برند را انجام می‌دهد. '
-                  'اتصال واقعی VPN پس از تکمیل موتورهای بومی فعال خواهد شد.',
+                Text(
+                  strings.developmentNotice,
                   textAlign: TextAlign.center,
                 ),
               ],
@@ -236,20 +333,22 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
 
 class BrandDetails extends StatelessWidget {
   const BrandDetails({required this.brand, super.key});
+
   final BrandPreview brand;
 
   Color get _brandColor => Color(
-    int.parse('FF' + brand.primaryColor.substring(1), radix: 16),
-  );
+        int.parse('FF' + brand.primaryColor.substring(1), radix: 16),
+      );
 
   @override
   Widget build(BuildContext context) {
-    final isExpired = brand.accountStatus == 'expired';
-    final status = isExpired
-        ? 'اشتراک منقضی'
-        : (brand.accountStatus == 'active'
-              ? 'اشتراک فعال'
-              : 'وضعیت: ' + brand.accountStatus);
+    final strings = AppStrings.of(context);
+    final status = switch (brand.accountStatus) {
+      'expired' => strings.statusExpired,
+      'active' => strings.statusActive,
+      _ => strings.statusOther(brand.accountStatus),
+    };
+
     return Theme(
       data: Theme.of(context).copyWith(
         colorScheme: ColorScheme.fromSeed(
@@ -283,19 +382,19 @@ class BrandDetails extends StatelessWidget {
               const SizedBox(height: 12),
               Text(status),
               const Divider(height: 30),
-              _CopyValue(label: 'پشتیبانی تلگرام', value: brand.telegramUrl),
-              _CopyValue(label: 'لینک تمدید', value: brand.renewalUrl),
-              _CopyValue(label: 'شماره تماس', value: brand.phone),
-              _CopyValue(label: 'وب‌سایت', value: brand.websiteUrl),
+              _CopyValue(label: strings.supportTelegram, value: brand.telegramUrl),
+              _CopyValue(label: strings.renewalLink, value: brand.renewalUrl),
+              _CopyValue(label: strings.supportPhone, value: brand.phone),
+              _CopyValue(label: strings.website, value: brand.websiteUrl),
               if (brand.supportText != null) ...[
                 const SizedBox(height: 8),
                 Text(brand.supportText!),
               ],
               const SizedBox(height: 16),
-              const FilledButton.icon(
+              FilledButton.icon(
                 onPressed: null,
-                icon: Icon(Icons.power_settings_new),
-                label: Text('اتصال VPN (در دست توسعه)'),
+                icon: const Icon(Icons.power_settings_new),
+                label: Text(strings.connectionDisabled),
               ),
             ],
           ),
@@ -307,6 +406,7 @@ class BrandDetails extends StatelessWidget {
 
 class _CopyValue extends StatelessWidget {
   const _CopyValue({required this.label, required this.value});
+
   final String label;
   final String? value;
 
@@ -314,24 +414,32 @@ class _CopyValue extends StatelessWidget {
   Widget build(BuildContext context) {
     final text = value;
     if (text == null || text.isEmpty) return const SizedBox.shrink();
+    final strings = AppStrings.of(context);
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Row(
         children: [
           SizedBox(
-            width: 115,
-            child: Text(label, style: Theme.of(context).textTheme.bodyMedium),
+            width: 125,
+            child: Text(
+              label,
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
           ),
           Expanded(
-            child: SelectableText(text, textDirection: TextDirection.ltr),
+            child: SelectableText(
+              text,
+              textDirection: TextDirection.ltr,
+            ),
           ),
           IconButton(
-            tooltip: 'کپی ' + label,
+            tooltip: strings.copyTooltip(label),
             onPressed: () async {
               await Clipboard.setData(ClipboardData(text: text));
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(label + ' کپی شد.')),
+                  SnackBar(content: Text(strings.copied(label))),
                 );
               }
             },
