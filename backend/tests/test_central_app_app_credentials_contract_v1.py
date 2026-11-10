@@ -102,7 +102,10 @@ class SeparateAppCredentialContract(unittest.TestCase):
         owned = BOT_LINK.read_text()
         self.assertIn("_owned_subscription_by_username(", owned)
         self.assertIn("linked_user(", owned)
-        self.assertIn("app_delivery_payload(db, sub)", owned)
+        self.assertIn("_share_url(db, sub)", owned)
+        self.assertIn("username = State()", owned)
+        self.assertNotIn("app_delivery_payload", owned)
+        self.assertNotIn("central_app_credentials", owned)
 
     def test_main_bot_delivery_is_authenticated_and_owner_scoped(self):
         api = ROUTES.read_text(encoding="utf-8")
@@ -122,8 +125,16 @@ class SeparateAppCredentialContract(unittest.TestCase):
         self.assertIn("app_delivery_payload(db, owned)", bot)
         self.assertIn("نام کاربری مخصوص اپ:", bot)
         self.assertIn("رمز مخصوص اپ:", bot)
-        self.assertIn("customer/subscriptions/{sub_id}/app-delivery", bot)
-        self.assertIn("app_credentials=app_credentials", bot)
+        # Retrieval of an existing link is not an app-login or app-password
+        # issuance flow. Keep app credentials in verified purchase delivery.
+        connection = bot.split('F.data.startswith("subconn:")', 1)[1].split(
+            'F.data.startswith("subrenew:")', 1
+        )[0]
+        self.assertIn('f"{sub_id}/connection-info"', connection)
+        self.assertIn("send_subscription_link_and_qr(", connection)
+        self.assertNotIn("app-delivery", connection)
+        self.assertNotIn("app_credentials=app_credentials", connection)
+        self.assertIn('app_delivery_payload(db, owned)', bot)
         self.assertIn("len(text) <= 1024", bot)
         self.assertIn("subscription_qr_photo(value)", qr)
         self.assertIn("app_credentials: dict | None = None", qr)
