@@ -257,7 +257,11 @@ class _TwinConnectDevAppState extends State<TwinConnectDevApp> {
       ]),
     );
 
-    Widget powerCard() => Container(
+    Widget powerCard() => ClipRRect(
+      borderRadius: BorderRadius.circular(28),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+        child: Container(
       key: const Key('devConnectionStatus'),
       padding: const EdgeInsets.fromLTRB(18, 18, 18, 15),
       decoration: BoxDecoration(
@@ -343,7 +347,7 @@ class _TwinConnectDevAppState extends State<TwinConnectDevApp> {
           ]),
         ),
       ]),
-    );
+    )));
 
     Widget heading(String name) => Row(children: [
       Expanded(child: txt(name, size: 24, bold: true)),
@@ -498,10 +502,10 @@ class _TwinConnectDevAppState extends State<TwinConnectDevApp> {
       ),
     );
 
-    Widget connectionStats() => Container(
+    Widget connectionStats() => glassCard(
       key: const Key('devConnectionStats'),
+      radius: 23,
       padding: const EdgeInsets.all(16),
-      decoration: tile(radius: 23),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
