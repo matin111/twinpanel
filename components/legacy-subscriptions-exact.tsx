@@ -95,6 +95,7 @@ export function LegacySubscriptionsRuntimePage(){
   const [extendDays,setExtendDays]=useState(30);
   const [extendTraffic,setExtendTraffic]=useState(10);
   const [editResetUsage,setEditResetUsage]=useState(false);
+  const [resetTarget,setResetTarget]=useState<RuntimeRow|null>(null);
   const [extendResetUsage,setExtendResetUsage]=useState(false);
   const [extendResetDate,setExtendResetDate]=useState(false);
   const [linkModalId,setLinkModalId]=useState<number|null>(null);
@@ -214,6 +215,22 @@ export function LegacySubscriptionsRuntimePage(){
     setEditExpiry(item.expires_at?String(item.expires_at).slice(0,10):"");
     setEditResetUsage(false);
     setModal("edit");
+  };
+
+  const confirmUsageReset=()=>{
+    if(!resetTarget||busy)return;
+    const subscriptionId=n(resetTarget.id);
+    if(!subscriptionId)return;
+    void act(
+      "reset-usage",
+      pick("حجم مصرفی اشتراک صفر شد؛ حجم کل و تاریخ انقضا تغییر نکردند","Subscription usage was reset; total quota and expiry were unchanged"),
+      async()=>{
+        await legacyAdminApi.extendSubscription(subscriptionId,{
+          add_traffic_gb:0,add_days:0,reset_usage:true,reset_date:false,
+        });
+        setResetTarget(null);
+      },
+    );
   };
 
   const saveEdit=(event:FormEvent)=>{
@@ -458,7 +475,7 @@ export function LegacySubscriptionsRuntimePage(){
             <div className="mobile-subscription-actions">
               <button type="button" className="mobile-action mobile-action-renew" disabled={!!busy} onClick={()=>openExtend(item)}>▣ {pick("تمدید","Renew")}</button>
               <button type="button" className="mobile-action mobile-action-edit" disabled={!!busy} onClick={()=>openEdit(item)}>✎ {pick("ویرایش","Edit")}</button>
-              <button type="button" className="mobile-action mobile-action-reset" disabled={!!busy} onClick={()=>{openEdit(item);setEditResetUsage(true);}}>↻ {pick("ریست","Reset")}</button>
+              <button type="button" className="mobile-action mobile-action-reset" disabled={!!busy} onClick={()=>{if(!busy){setError("");setOk("");setResetTarget(item);}}}>↻ {pick("ریست","Reset")}</button>
               <button type="button" className="mobile-action mobile-action-connect" onMouseEnter={()=>prefetchSubscriptionLink(item)} onFocus={()=>prefetchSubscriptionLink(item)} onClick={()=>void openSubscriptionLink(item)}>↗ {pick("اتصال","Connect")}</button>
             </div>
             <details className="mobile-subscription-more">
@@ -583,6 +600,20 @@ export function LegacySubscriptionsRuntimePage(){
         @media(max-width:700px){.subscription-page-navigation{gap:4px}.subscription-page-number{min-width:30px;height:32px;padding:0 5px}}
       `}</style>
     </div>
+
+    {resetTarget&&<Modal
+      title={pick("تأیید ریست حجم مصرفی","Confirm usage reset")}
+      sub={`MV-${n(resetTarget.id)} · ${s(resetTarget.account_username)||pick("اشتراک","Subscription")}`}
+      onClose={()=>{if(!busy)setResetTarget(null);}}
+    >
+      <p>{pick("حجم مصرفی این اشتراک صفر شود؟ حجم کل، تاریخ انقضا، رمز و کانفیگ‌ها تغییر نمی‌کنند.","Reset this subscription's used traffic to zero? Total quota, expiration, password and configurations will not change.")}</p>
+      <small className="muted">{pick("سوابق مصرف و شمارنده‌های نود برای جلوگیری از محاسبه تکراری محفوظ می‌مانند.","Historical usage and node accounting cursors are preserved.")}</small>
+      {error&&<Notice error={error} ok=""/>}
+      <div className="modalActions">
+        <button type="button" className="ghost" disabled={!!busy} onClick={()=>setResetTarget(null)}>{pick("خیر","No")}</button>
+        <button type="button" className="primary" disabled={!!busy} onClick={confirmUsageReset}>{busy==="reset-usage"?pick("در حال ریست…","Resetting…"):pick("بله، ریست کن","Yes, reset")}</button>
+      </div>
+    </Modal>}
 
     {modal==="create"&&<Modal title={pick("ساخت اشتراک","Create subscription")} onClose={()=>!busy&&setModal(null)} wide>
       <form className="subscription-create-form" onSubmit={createSubscription}>
