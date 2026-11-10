@@ -14,6 +14,15 @@ class XrayStartDiagnosticsTest(unittest.TestCase):
         self.assertLess(diagnostic, restore)
         self.assertLess(restore, failure)
 
+    def test_restart_failure_does_not_skip_diagnostics_and_rollback(self):
+        text = SOURCE.read_text(encoding="utf-8")
+        anchor = text.index('"systemctl restart xray"')
+        check = text.index("check=False,", anchor)
+        diagnostics = text.index('diagnostics = "unavailable"', check)
+        self.assertLess(anchor, check)
+        self.assertLess(check, diagnostics)
+        self.assertLess(check - anchor, 350)
+
     def test_no_credential_bearing_journal_in_error(self):
         text = SOURCE.read_text(encoding="utf-8")
         start = text.index('diagnostics = "unavailable"')
