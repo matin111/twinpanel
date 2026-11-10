@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.775",
+  "version": "1.1.0-rc.776",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-10T11:15:36Z",
+  "released_at": "2026-11-10T11:46:50Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "47d39ee4a8d1edbb9021cb2210656ad70d355016",
+  "source_sha": "03a6ac321f45af2a5eff7defb3dfe8a9ea948ab6",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.775/twinpanel-1.1.0-rc.775-linux-x86_64.tar.gz",
-    "sha256": "a679b554a20a492b7aeee3ac6d987cbd1c64aed5e25efa4bc187eeddf7850674",
-    "size_bytes": 30348807
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.776/twinpanel-1.1.0-rc.776-linux-x86_64.tar.gz",
+    "sha256": "ca38b8ef01787971ac7103d2a815e03639365ab434e2539ef17104e1c1650ca2",
+    "size_bytes": 30401665
   },
   "notes": {
-    "fa": "اصلاح سودوکو قدیمی: خواندن شمارنده واقعی IPIngressBytes هر سرویس اختصاصی از systemd بدون ری‌استارت؛ ثبت مبنای اولیه بدون شارژ و سپس دلتاهای معتبر در حسابداری مرکزی؛ جلوگیری از قطع پردازش سایر کاربران به‌خاطر اشتراک غیرفعال. تغییر نکردن کانفیگ/رمز/پورت/نود/وضعیت سهمیه. کنترلر مشترک مرکزی که فقط تعداد اتصال را گزارش می‌دهد هنوز حسابداری حجم ندارد.",
-    "en": "Sudoku legacy dedicated accounts: validate service ownership, obtain real per-unit cgroup IPIngressBytes, zero-charge first baseline, bill only authenticated subsequent counter deltas through canonical ledger without restarting units; isolate inactive subscriptions. Shared Sudoku daemon without authentic byte telemetry remains presence-only; no estimate."
+    "fa": "افزودن ورود مستقل اپ TwinConnect برای هر اشتراک: دریافت و تغییر رمز مخصوص اپ در مدیریت اشتراک‌های ادمین و نماینده، ثبت امن آدرس پنل در سرور لایسنس و API ورود، بدون تغییر کانفیگ‌ها، رمزهای VPN، حجم، موجودی کیف پول یا ساختار نودها.",
+    "en": "TwinConnect independent per-subscription app sign-in: App Delivery and app-password reset for admins/resellers, licensed panel directory registration and session API. No changes to VPN credentials, configs, traffic, wallets or node provisioning."
   }
 }
