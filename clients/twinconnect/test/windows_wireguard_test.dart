@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:twinconnect/protocols.dart';
 import 'package:twinconnect/windows_wireguard.dart';
@@ -52,8 +54,8 @@ void main() {
 
   test('native Windows service is not assumed on other operating systems',
       () async {
+    if (Platform.isWindows) return;
     final status = await const WindowsWireGuardController().status();
-    // Flutter CI Linux does not have the Windows tunnel service.
     expect(status['state'], 'unavailable');
   });
 }
