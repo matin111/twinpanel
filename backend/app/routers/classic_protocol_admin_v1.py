@@ -341,10 +341,11 @@ async def classic_port_check(
     node = _runtime_node(db, payload.node_id)
     if payload.protocol == "l2tp":
         raise HTTPException(status_code=422, detail="L2TP uses fixed ports")
-    transport = (
-        payload.transport or "udp"
-        if payload.protocol == "openvpn"
-        else "udp" if payload.protocol == "wireguard" else "tcp"
+    transports = (
+        {"tcp", "udp"} if payload.protocol == "cisco"
+        else {payload.transport or "udp"} if payload.protocol == "openvpn"
+        else {"udp"} if payload.protocol == "wireguard"
+        else {"tcp"}
     )
     try:
         ports = (
@@ -373,13 +374,13 @@ async def classic_port_check(
         if len(parts) < 5:
             continue
         socket_type = parts[0].lower()
-        if not socket_type.startswith(transport):
+        if socket_type not in transports:
             continue
         local = parts[3]
         match = re.search(r":([0-9]+)$", local)
         if match and int(match.group(1)) in ports:
             # Keep this response free of PIDs, command lines and identities.
-            conflicts.append({"port": int(match.group(1)), "transport": transport})
+            conflicts.append({"port": int(match.group(1)), "transport": socket_type})
     conflicts = sorted(
         { (item["port"], item["transport"]) for item in conflicts }
     )
