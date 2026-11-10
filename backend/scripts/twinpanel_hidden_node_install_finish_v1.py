@@ -217,22 +217,18 @@ async def finish(node_id: int, job_id: str, *, xray_port: int,
         db.expire_all()
         node, _ = require_hidden_job(db, node_id, job_id)
 
-        # The final gate is based on 16 actual listener health probes,
-        # never DB online flags or a fabricated 100% progress bar.
+        # Admit a verified subset. Missing Xray TLS does not hold healthy
+        # independent protocols hostage. A failed protocol NEVER gets a node
+        # credential, and zero verified live listeners still fails closed.
         readiness = await verify_new_exit_readiness(
-            db, node_id, require_tls_profiles=True,
+            db, node_id, require_tls_profiles=True, allow_partial=True,
         )
         ready_count = int(readiness.get("ready_count") or 0)
-        # Defense in depth: even if future readiness code regresses or is
-        # mocked, do not admit a freshly installed Exit without its dedicated
-        # valid TLS certificate. This guard never applies to existing Exits.
-        if not tls_certificate_ready or not readiness.get("ok"):
+        missing = frozenset(readiness.get("missing") or [])
+        if not readiness.get("ok") or ready_count < 1:
             _status(job_id, "failed", node_id,
                     installed_protocols=ready_count,
-                    error_code=(
-                        tls_error_code if not tls_certificate_ready
-                        else "PROTOCOL_SETUP_INCOMPLETE"
-                    ))
+                    error_code="NODE_NO_VERIFIED_PROTOCOLS")
             print("HIDDEN_NODE_READINESS_NOT_VERIFIED", {
                 "node_id": node_id,
                 "missing": readiness.get("missing",[]),
@@ -242,6 +238,25 @@ async def finish(node_id: int, job_id: str, *, xray_port: int,
             return {"ok": False, "node_id": node_id,
                     "missing": readiness.get("missing",[]),
                     "reason": readiness.get("reason")}
+
+        # Never advertise an offline / failed service based on a stale
+        # "online" database row. No remote process is stopped or restarted.
+        for row in db.query(NodeProtocolConfig).filter(
+            NodeProtocolConfig.node_id == node_id,
+            NodeProtocolConfig.protocol.in_(list(missing)),
+        ).all():
+            row.status = "offline"
+        if "v2ray" in missing:
+            node.enable_v2ray = False
+        db.commit()
+        partial = ready_count < len(ALL_PROTOCOL_KEYS)
+        if partial:
+            print("HIDDEN_NODE_PARTIAL_PROTOCOLS_VERIFIED", {
+                "node_id": node_id,
+                "ready_count": ready_count,
+                "missing": sorted(missing),
+                "xray_tls_pending": not tls_certificate_ready,
+            }, flush=True)
 
         from app.services.new_node_quota_bootstrap_v1 import (
             bootstrap_fresh_hidden_exit_quota,
@@ -253,7 +268,8 @@ async def finish(node_id: int, job_id: str, *, xray_port: int,
             return {"ok": False, "reason": "NODE_QUOTA_SETUP_FAILED"}
 
         stage = "verified_ready"
-        _status(job_id,stage,node_id,installed_protocols=ready_count)
+        _status(job_id,stage,node_id,installed_protocols=ready_count,
+                error_code="PARTIAL_PROTOCOLS_PENDING" if partial else None)
         if publish_to_all_users:
             from app.services.central_progressive_exit_admission_v1 import (
                 admit_verified_exit, hide_after_dispatch_failure,
@@ -271,7 +287,7 @@ async def finish(node_id: int, job_id: str, *, xray_port: int,
             try:
                 # Concurrent quota/account workers may temporarily hold row locks
                 # on subscriptions. Retry only PostgreSQL lock timeouts, never
-                # bypass the all-16 listener gate or publish incomplete nodes.
+                # bypass the per-protocol verified-health gate.
                 from sqlalchemy.exc import OperationalError
                 for admission_attempt in range(20):
                     try:
@@ -297,7 +313,8 @@ async def finish(node_id: int, job_id: str, *, xray_port: int,
                 return {"ok":False,"reason":"CENTRAL_BACKGROUND_DISPATCH_FAILED"}
             _status(job_id,"completed",node_id,
                     installed_protocols=ready_count,
-                    users_assigned=int(admission["eligible_users"]))
+                    users_assigned=int(admission["eligible_users"]),
+                    error_code="PARTIAL_PROTOCOLS_PENDING" if partial else None)
             print("HIDDEN_NODE_CENTRAL_PUBLISH_SUCCESS",{
                 "node_id":node_id,
                 "users_assigned":int(admission["eligible_users"]),
@@ -306,7 +323,8 @@ async def finish(node_id: int, job_id: str, *, xray_port: int,
             },flush=True)
         else:
             _status(job_id,"completed",node_id,
-                    installed_protocols=ready_count)
+                    installed_protocols=ready_count,
+                    error_code="PARTIAL_PROTOCOLS_PENDING" if partial else None)
             print("HIDDEN_NODE_VERIFIED_UNPUBLISHED",{
                 "node_id":node_id, "published":False,
             },flush=True)
