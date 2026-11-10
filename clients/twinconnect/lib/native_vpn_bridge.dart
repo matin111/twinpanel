@@ -52,7 +52,7 @@ class NativeVpnBridge {
   ) {
     final reasons = policy.connectionProblems(capabilities);
     if (reasons.isNotEmpty) {
-      throw StateError('NATIVE_VPN_POLICY_NOT_ENFORCED: ' + reasons.join(','));
+      throw StateError('NATIVE_VPN_POLICY_NOT_ENFORCED: ${reasons.join(',')}');
     }
   }
 }
