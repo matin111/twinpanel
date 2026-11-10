@@ -63,7 +63,7 @@ class _ProtocolItem extends StatelessWidget {
                 ? s.protocolEnginePending
                 : s.protocolEngineReady;
     return ListTile(
-      key: Key('protocol_' + entry.protocol.code),
+      key: Key('protocol_${entry.protocol.code}'),
       contentPadding: EdgeInsets.zero,
       leading: Icon(
         entry.selected ? Icons.tune : Icons.remove_circle_outline,
