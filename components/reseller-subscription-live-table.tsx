@@ -82,6 +82,37 @@ export function ResellerSubscriptionLiveTable(){
           host.appendChild(detail);
         }
       }
+
+      // The desktop and mobile glass cards share the same live-status feed.
+      // Keep the existing table updater for backwards compatibility.
+      for(const card of Array.from(document.querySelectorAll<HTMLElement>(
+        ".reseller-subscriptions-parity [data-reseller-subscription-id]"
+      ))){
+        const id=Number(card.dataset.resellerSubscriptionId||0);
+        if(!id)continue;
+        const host=card.querySelector<HTMLElement>("[data-reseller-live-card-state]");
+        if(!host)continue;
+        const state=states.get(id);
+        const online=Boolean(state?.online);
+        const protocols=(state?.protocols||[]).map(protocolLabel).filter(Boolean);
+        const signature=loaded?`${online?"1":"0"}:${protocols.join(",")}`:"loading";
+        if(host.dataset.liveSignature===signature)continue;
+        host.dataset.liveSignature=signature;
+        host.replaceChildren();
+        const badge=document.createElement("span");
+        badge.className=`badge ${loaded?(online?"ok":"bad"):"violet"}`;
+        badge.textContent=document.documentElement.lang==="en"
+          ?loaded?(online?"Online":"Offline"):"Checking…"
+          :loaded?(online?"آنلاین":"آفلاین"):"در حال بررسی…";
+        host.appendChild(badge);
+        if(loaded&&online&&protocols.length){
+          const details=document.createElement("small");
+          details.dir="ltr";
+          details.style.opacity=".8";
+          details.textContent=protocols.join(" · ");
+          host.appendChild(details);
+        }
+      }
     };
 
     const refresh=async()=>{
