@@ -1,6 +1,6 @@
 "use client";
 
-import {useEffect,useState} from "react";
+import {useEffect,useRef,useState} from "react";
 import {useI18n} from "../lib/i18n";
 import {getAppAccess,type AppAccessDelivery} from "../lib/central-app-credential-api";
 
@@ -13,15 +13,26 @@ export function AppCredentialDeliveryCard({
   const [data,setData]=useState<AppAccessDelivery|null>(null);
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState("");
-  useEffect(()=>{setData(null);setError("");},[subscriptionId,owner]);
+  const requestEpoch=useRef(0);
+  useEffect(()=>{
+    requestEpoch.current++;
+    setData(null);
+    setError("");
+  },[subscriptionId,owner]);
 
   const load=async(reset:boolean)=>{
     if(busy)return;
     if(reset&&!window.confirm(pick("رمز مخصوص اپ تغییر کند؟","Reset the app password?")))return;
+    const epoch=++requestEpoch.current;
     setBusy(true);setError("");setData(null);
-    try{setData(await getAppAccess(owner,subscriptionId,reset));}
-    catch(e){setError(e instanceof Error?e.message:String(e));}
-    finally{setBusy(false);}
+    try{
+      const result=await getAppAccess(owner,subscriptionId,reset);
+      if(requestEpoch.current===epoch)setData(result);
+    }catch(e){
+      if(requestEpoch.current===epoch)setError(e instanceof Error?e.message:String(e));
+    }finally{
+      if(requestEpoch.current===epoch)setBusy(false);
+    }
   };
 
   const copy=(value:string)=>navigator.clipboard.writeText(value).catch(()=>{});
