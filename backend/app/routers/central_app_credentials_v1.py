@@ -5,6 +5,8 @@ is delivered as a separate field. No app password appears in a public URL.
 """
 from __future__ import annotations
 
+import ipaddress
+
 from fastapi import APIRouter, Depends, Header, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
@@ -191,6 +193,16 @@ def session_account(
     }, headers=_PRIVATE_HEADERS)
 
 
+def _public_node_probe_ip(value: str | None) -> str | None:
+    if not value:
+        return None
+    try:
+        address = ipaddress.ip_address(str(value).strip())
+        return str(address) if address.is_global else None
+    except ValueError:
+        return None
+
+
 @router.get("/session/servers")
 def session_servers(
     sub: Subscription = Depends(_session_subscription),
@@ -222,6 +234,10 @@ def session_servers(
                 "name": node.name,
                 "country_code": node.country_code,
                 "node_online": node.status == NodeStatus.ONLINE,
+                # An address for an already authorized, assigned server:
+                # used only for client-side ICMP reachability checks.
+                # Never reveal agent_url, private hostnames or credentials.
+                "probe_ip": _public_node_probe_ip(node.public_ip),
                 "latency_ms": None,
             }
             for node in nodes
