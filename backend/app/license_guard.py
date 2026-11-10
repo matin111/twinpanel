@@ -22,6 +22,7 @@ PROTECTED_PREFIXES = (
     "/v1/domains",
     "/v1/branding",
     "/v1/settings",
+    "/v1/central-app/",  # shared-client reseller/admin profile mutations
 )
 
 # License activation, backup/export and diagnostics stay usable after expiry.
