@@ -141,8 +141,9 @@ def install_telegram_admin_ops(router, request_fn):
 
     @router.callback_query(F.data.startswith("adm:r:"))
     async def receipt_detail(callback: CallbackQuery):
-        await callback.answer()
+        # Refresh the existing receipt in place; never send a second receipt.
         if not callback.message or callback.message.chat.type != "private":
+            await callback.answer()
             return
         try:
             _, _, kind, raw_id = (callback.data or "").split(":")
@@ -152,51 +153,49 @@ def install_telegram_admin_ops(router, request_fn):
                 callback.from_user.id,
             )
         except Exception as exc:
-            await callback.message.answer("❌ " + escape(str(exc)[:170]))
+            await callback.answer("❌ " + str(exc)[:155], show_alert=True)
             return
+        status = str(data.get("status") or "-")
+        approved = (
+            status.lower() in ("fulfilled", "approved", "paid", "completed")
+        )
+        rejected = status.lower() in ("rejected", "payment_rejected", "failed")
+        title = (
+            "✅ رسید تأیید شد" if approved else
+            "❌ رسید رد شد" if rejected else
+            "🧾 رسید در انتظار بررسی"
+        )
         caption = (
-            f"🧾 <b>بررسی رسید</b>\n"
-            f"نوع: {escape(kind)} | شناسه: {item_id}\n"
-            f"کاربر: {data.get('user_id')}\n"
-            f"مبلغ: {int(data.get('amount_toman') or 0):,} تومان\n"
-            f"وضعیت: {escape(str(data.get('status') or '-'))}\n"
-            f"کد پیگیری: {escape(str(data.get('tracking_code') or '-'))}\n"
-            "قبل از تأیید، تطابق مبلغ و تراکنش را مستقل بررسی کنید."
+            f"{title}\\n"
+            f"نوع: {escape(kind)} | شناسه: {item_id}\\n"
+            f"کاربر: {data.get('user_id')}\\n"
+            f"مبلغ: {int(data.get('amount_toman') or 0):,} تومان\\n"
+            f"وضعیت: {escape(status)}\\n"
+            f"کد پیگیری: {escape(str(data.get('tracking_code') or '-'))}"
         )
         rows = []
         if data.get("can_approve") and data.get("has_receipt"):
             rows.append([
-                ("✅ بررسی و تأیید", f"adm:ask:approve:{kind}:{item_id}"),
+                ("✅ تأیید رسید", f"adm:do:approve:{kind}:{item_id}"),
                 ("❌ رد رسید", f"adm:ask:reject:{kind}:{item_id}"),
             ])
-        rows.append([("⬅️ صف رسیدها", "adm:review")])
-        markup = _buttons(*rows)
-        attachment = data.get("receipt_base64")
-        file_id = data.get("receipt_telegram_file_id")
+        # Keep status-check available only while a decision is pending.
+        if rows:
+            rows.append([("🔄 بررسی وضعیت", f"adm:r:{kind}:{item_id}")])
+        markup = _buttons(*rows) if rows else None
         try:
-            if attachment:
-                raw = base64.b64decode(attachment, validate=True)
-                ext = str(data.get("receipt_format") or "jpg").lower()
-                file = BufferedInputFile(raw, filename=f"receipt-{item_id}.{ext}")
-                if ext in ("jpg", "jpeg", "png", "webp"):
-                    await callback.message.answer_photo(file, caption=caption,
-                                                        reply_markup=markup)
-                else:
-                    await callback.message.answer_document(file, caption=caption,
-                                                           reply_markup=markup)
-            elif file_id:
-                await callback.message.answer_photo(file_id, caption=caption,
-                                                    reply_markup=markup)
+            if (callback.message.photo or callback.message.document
+                    or callback.message.video or callback.message.animation):
+                await callback.message.edit_caption(caption=caption, reply_markup=markup)
             else:
-                await callback.message.answer(
-                    caption + "\n⚠️ تصویر رسید موجود نیست.",
-                    reply_markup=markup,
-                )
-        except Exception:
-            await callback.message.answer(
-                caption + "\n⚠️ نمایش تصویر ممکن نشد؛ بدون دیدن رسید تأیید نکنید.",
-                reply_markup=_buttons([("⬅️ صف رسیدها", "adm:review")]),
-            )
+                await callback.message.edit_text(caption, reply_markup=markup)
+            await callback.answer("وضعیت همین رسید به‌روز شد")
+        except Exception as exc:
+            # Telegram may say message is not modified when status did not change.
+            if "not modified" in str(exc).lower():
+                await callback.answer("وضعیت رسید تغییری نکرده است")
+            else:
+                await callback.answer("امکان به‌روزرسانی این پیام نیست", show_alert=True)
 
     async def _finalize_receipt_message(message: Message, status_text: str):
         """Replace actionable receipt messages with a permanent status."""
@@ -225,6 +224,12 @@ def install_telegram_admin_ops(router, request_fn):
 
     @router.callback_query(F.data.startswith("adm:ask:"))
     async def sensitive_preview(callback: CallbackQuery):
+        # Honor old buttons already delivered to admins: one tap for approval.
+        pieces = (callback.data or "").split(":")
+        if len(pieces) == 5 and pieces[2] == "approve" and pieces[3] in ("purchase", "wallet"):
+            callback.data = f"adm:do:approve:{pieces[3]}:{pieces[4]}"
+            await sensitive_execute(callback)
+            return
         await callback.answer()
         if not callback.message or callback.message.chat.type != "private":
             return
@@ -286,7 +291,7 @@ def install_telegram_admin_ops(router, request_fn):
         except Exception as exc:
             # Failure is not success. Leave the confirmation available for a
             # legitimate retry, while showing the actual backend error.
-            await callback.message.answer("❌ " + escape(str(exc)[:200]))
+            await callback.answer("❌ " + str(exc)[:170], show_alert=True)
             return
 
         status = (
@@ -332,11 +337,13 @@ def install_telegram_admin_ops(router, request_fn):
                         )
                     except Exception:
                         pass
-        await callback.message.answer(
-            detail,
-            reply_markup=_buttons([("🧾 صف رسیدهای جدید", "adm:review")],
-                                  [("🏠 مدیریت", "adm:home")]),
-        )
+        # Approving/rejecting a receipt changes that original receipt itself.
+        # Do not create a second receipt or confirmation message.
+        if kind not in ("purchase", "wallet"):
+            await callback.message.answer(
+                detail,
+                reply_markup=_buttons([("🏠 مدیریت", "adm:home")]),
+            )
 
     @router.callback_query(F.data == "adm:lookup")
     async def lookup_start(callback: CallbackQuery, state: FSMContext):
