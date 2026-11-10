@@ -205,6 +205,11 @@ def install_telegram_admin_ops(router, request_fn):
         first = previous.split("\n", 1)[0]
         rest = previous.split("\n", 1)[1] if "\n" in previous else ""
         if "رسید" in first:
+            # An approved receipt must not still display the old pending state.
+            rest = "\n".join(
+                part for part in rest.split("\n")
+                if not part.strip().startswith("وضعیت:")
+            )
             content = status_text + ("\n" + rest if rest else "")
         else:
             content = status_text
@@ -227,8 +232,9 @@ def install_telegram_admin_ops(router, request_fn):
         # Honor old buttons already delivered to admins: one tap for approval.
         pieces = (callback.data or "").split(":")
         if len(pieces) == 5 and pieces[2] == "approve" and pieces[3] in ("purchase", "wallet"):
-            callback.data = f"adm:do:approve:{pieces[3]}:{pieces[4]}"
-            await sensitive_execute(callback)
+            await sensitive_execute(
+                callback, direct_data=f"adm:do:approve:{pieces[3]}:{pieces[4]}"
+            )
             return
         await callback.answer()
         if not callback.message or callback.message.chat.type != "private":
@@ -264,12 +270,12 @@ def install_telegram_admin_ops(router, request_fn):
         )
 
     @router.callback_query(F.data.startswith("adm:do:"))
-    async def sensitive_execute(callback: CallbackQuery):
+    async def sensitive_execute(callback: CallbackQuery, direct_data: str | None = None):
         await callback.answer()
         if not callback.message or callback.message.chat.type != "private":
             return
         try:
-            parts = (callback.data or "").split(":")
+            parts = (direct_data or callback.data or "").split(":")
             if len(parts) not in (5, 6):
                 raise ValueError("دکمه تأیید معتبر نیست")
             _, _, action, kind, raw_id = parts[:5]
