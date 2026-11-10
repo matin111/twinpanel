@@ -159,9 +159,9 @@ def install() -> None:
     if not runner_cmake.is_file():
         raise RuntimeError("Missing generated Windows runner CMakeLists.txt")
     cmake = runner_cmake.read_text(encoding="utf-8-sig")
-    uac_line = 'target_link_options(${BINARY_NAME} PRIVATE "/MANIFESTUAC:level=\\'requireAdministrator\\' uiAccess=\\'false\\'")'
+    uac_line = "target_link_options(${BINARY_NAME} PRIVATE \"/MANIFESTUAC:level='requireAdministrator' uiAccess='false'\")"
     if uac_line not in cmake:
-        cmake += "\\n# TwinConnect native VPN needs elevation for service management.\\n" + uac_line + "\\n"
+        cmake += "\n# TwinConnect native VPN needs elevation for service management.\n" + uac_line + "\n"
     runner_cmake.write_text(cmake, encoding="utf-8")
 
     HEADER.write_text(header, encoding="utf-8")
