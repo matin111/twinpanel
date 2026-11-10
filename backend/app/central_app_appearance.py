@@ -42,8 +42,12 @@ def _validate_background_url(value: str | None) -> str | None:
     if not value:
         return None
     url = urlsplit(value.strip())
-    if (url.scheme != "https" or not url.hostname or url.username or
-            url.password or url.query or url.fragment or url.port not in (None, 443)):
+    try:
+        invalid = (url.scheme != "https" or not url.hostname or url.username or
+                   url.password or url.query or url.fragment or url.port not in (None, 443))
+    except ValueError:
+        invalid = True
+    if invalid:
         raise HTTPException(status_code=422, detail="INVALID_BACKGROUND_IMAGE_URL")
     host = url.hostname.lower()
     if host.endswith(".") or host in ("localhost", "local") or not host.count("."):
