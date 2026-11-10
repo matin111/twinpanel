@@ -218,7 +218,7 @@ class _TwinConnectDevAppState extends State<TwinConnectDevApp> {
         );
 
         Widget protocols() => Container(
-          padding: const EdgeInsets.all(22),
+          padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
             color: surface, borderRadius: BorderRadius.circular(25),
             border: Border.all(color: border),
@@ -227,95 +227,97 @@ class _TwinConnectDevAppState extends State<TwinConnectDevApp> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Row(children: [
-                Expanded(child: Text(t('پروتکل‌ها', 'Protocols'),
-                    style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800))),
-                Tooltip(
-                  message: t('پس از ورود، تغییرات سرورها از پنل دریافت می‌شود',
-                             'Sign in to refresh servers from your panel'),
-                  child: IconButton(
-                    key: const Key('devRefreshServers'),
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                        content: Text(t('برای دریافت سرورها، ورود به پنل لازم است',
-                                        'Sign in to fetch updated servers')),
-                      ));
-                    },
-                    icon: const Icon(Icons.refresh_rounded),
-                  ),
+                Expanded(child: Text(t('مکان‌ها', 'Locations'),
+                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800))),
+                IconButton(
+                  key: const Key('devRefreshServers'),
+                  tooltip: t('به‌روزرسانی سرورها', 'Refresh servers'),
+                  icon: const Icon(Icons.refresh_rounded),
+                  onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(t('برای دریافت سرورها وارد حساب شوید',
+                      'Sign in to fetch updated servers')))),
                 ),
-                Text('${filtered.length} / 16', style: TextStyle(color: muted)),
               ]),
-              const SizedBox(height: 17),
-              SizedBox(height: 48, child: TextField(
+              const SizedBox(height: 11),
+              TextField(
                 key: const Key('devProtocolSearch'),
                 onChanged: (v) => setState(() => _search = v),
                 decoration: InputDecoration(
-                  hintText: t('جستجو', 'Search'),
-                  prefixIcon: const Icon(Icons.search_rounded, size: 20),
+                  hintText: t('جستجوی پروتکل', 'Search protocol'),
+                  prefixIcon: const Icon(Icons.search_rounded),
                   filled: true,
-                  fillColor: foreground.withValues(alpha: 0.035),
-                  contentPadding: const EdgeInsets.symmetric(vertical: 10),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: BorderSide(color: border),
-                  ),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
                 ),
-              )),
-              const SizedBox(height: 14),
+              ),
+              const SizedBox(height: 12),
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: Row(children: [
                   for (final entry in options.entries) ...[
                     ChoiceChip(
-                      key: Key('devFilter_${entry.key}'),
+                      key: Key('devFilter_\${entry.key}'),
                       label: Text(entry.value),
                       selected: _section == entry.key,
                       onSelected: (_) => setState(() => _section = entry.key),
                       showCheckmark: false,
-                      side: BorderSide(color: _section == entry.key
-                          ? accent.withValues(alpha: 0.4) : border),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12)),
                     ),
-                    const SizedBox(width: 7),
+                    const SizedBox(width: 8),
                   ],
                 ]),
               ),
-              const SizedBox(height: 10),
-              for (final p in filtered)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: Container(
-                    key: Key('devProtocol_${p.protocol.code}'),
-                    padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 13),
-                    decoration: BoxDecoration(
-                      color: foreground.withValues(alpha: 0.035),
-                      borderRadius: BorderRadius.circular(15),
-                      border: Border.all(color: border),
-                    ),
-                    child: Row(children: [
-                      Container(
-                        width: 40, height: 40,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(13),
-                          color: accent.withValues(alpha: 0.13),
-                        ),
-                        child: Icon(Icons.hub_rounded, color: accent, size: 20),
+              const SizedBox(height: 14),
+              SizedBox(height: 39, child: ListView(
+                scrollDirection: Axis.horizontal,
+                children: [
+                  for (final item in filtered)
+                    Container(
+                      key: Key('devProtocol_\${item.protocol.code}'),
+                      alignment: Alignment.center,
+                      margin: const EdgeInsetsDirectional.only(end: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: accent.withValues(alpha: 0.09),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: border),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(p.protocol.name, style: const TextStyle(
-                            fontSize: 14, fontWeight: FontWeight.w600)),
-                          const SizedBox(height: 3),
-                          Text(t('موتور آماده نیست', 'Engine unavailable'),
-                            style: TextStyle(color: muted, fontSize: 11)),
-                        ],
-                      )),
-                      Icon(Icons.lock_outline_rounded, size: 17, color: muted),
-                    ]),
+                      child: Text(item.protocol.name, style: const TextStyle(fontSize: 11)),
+                    ),
+                ],
+              )),
+              const SizedBox(height: 18),
+              for (final location in const [
+                ('🇩🇪', 'Germany · Frankfurt'),
+                ('🇳🇱', 'Netherlands · Amsterdam'),
+                ('🇬🇧', 'United Kingdom · London'),
+                ('🇺🇸', 'United States · New York'),
+                ('🇸🇬', 'Singapore'),
+              ])
+                Container(
+                  margin: const EdgeInsets.only(bottom: 9),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: foreground.withValues(alpha: 0.045),
+                    borderRadius: BorderRadius.circular(15),
+                    border: Border.all(color: border),
                   ),
+                  child: Row(children: [
+                    Text(location.$1, style: const TextStyle(fontSize: 22)),
+                    const SizedBox(width: 12),
+                    Expanded(child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(location.$2, style: const TextStyle(
+                          fontWeight: FontWeight.w700, fontSize: 13)),
+                        Text(t('نمونه نمایشی', 'Sample only'),
+                          style: TextStyle(fontSize: 10, color: muted)),
+                      ],
+                    )),
+                    Text('— ms', style: TextStyle(fontSize: 11, color: muted)),
+                    const SizedBox(width: 8),
+                    const Icon(Icons.lock_outline_rounded, size: 17),
+                  ]),
                 ),
             ],
           ),
