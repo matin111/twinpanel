@@ -347,10 +347,10 @@ def render_apps(uploaded: dict[str, list[dict]]) -> str:
 
 def _expiry_with_days(db: Session, sub, now: datetime | None = None) -> tuple[str, str]:
     """Show authoritative expiry + remaining days, never synthesize an expiry."""
-    from ..subscription_override_models import duration_is_unlimited
+    from ..subscription_override_models import duration_is_unlimited, effective_expiry_at
 
     now = now or datetime.utcnow()
-    expires = getattr(sub, "expires_at", None)
+    expires = effective_expiry_at(db, sub)
     if expires is not None:
         remaining = max(0, (expires - now).total_seconds())
         days = int(remaining // 86400)
@@ -361,15 +361,16 @@ def _expiry_with_days(db: Session, sub, now: datetime | None = None) -> tuple[st
     if duration_is_unlimited(db, sub):
         return "نامحدود", "مدت اشتراک نامحدود"
 
-    duration = int(getattr(sub, "activation_duration_days", None) or 0)
+    from ..subscription_override_models import duration_days
+    plan = db.get(Plan, sub.plan_id) if sub.plan_id else None
+    duration = duration_days(sub, plan)
     if duration > 0 and getattr(sub, "starts_at", None) is None:
         return "پس از اولین اتصال", f"{duration} روز اعتبار"
 
-    # A positive term without an expiry is waiting for the first accepted
-    # connection, or is a legacy account whose start timestamp is incomplete.
-    # Neither case should be mislabeled as "undefined".
+    # An already-started finite account must not be shown as waiting for its
+    # first connection, even if its period timestamps need investigation.
     if duration > 0:
-        return "پس از اولین اتصال", f"{duration} روز اعتبار"
+        return "در حال بررسی تاریخ انقضا", f"{duration} روز اعتبار"
     return "نامحدود", "مدت اشتراک نامحدود"
 
 
