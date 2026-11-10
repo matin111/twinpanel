@@ -16,7 +16,7 @@ class XrayStartDiagnosticsTest(unittest.TestCase):
 
     def test_restart_failure_does_not_skip_diagnostics_and_rollback(self):
         text = SOURCE.read_text(encoding="utf-8")
-        anchor = text.index('"systemctl restart xray"')
+        anchor = text.index('"systemctl restart xray >/dev/null')
         check = text.index("check=False,", anchor)
         diagnostics = text.index('diagnostics = "unavailable"', check)
         self.assertLess(anchor, check)
