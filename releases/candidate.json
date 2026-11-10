@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.779",
-  "source_sha": "af16e0d623587455c580e19c5bb2323b0f78de20",
+  "version": "1.1.0-rc.780",
+  "source_sha": "0e7a4ebe7b833e4066599359735e45404b303b6d",
   "notes": {
-    "fa": "اصلاح نمایش اشتراک‌های پنل ادمین در ویندوز و اندروید: کارت‌های یکسان به جای جدول دسکتاپ، سه یا چهار ستون در صفحه بزرگ، دو ستون تبلت و یک ستون موبایل؛ دکمه‌های ریست و ویرایش با رنگ جداگانه و عملیات بیشتر رنگی و خوانا. اطلاعات کاربران و تنظیمات پروتکل بدون تغییر.",
-    "en": "Fix admin subscription view across Windows and Android: responsive glass cards replace desktop table, visually distinct Reset and Edit, color-coded accessible overflow actions. No account, server, protocol or data mutation."
+    "fa": "دکمه ریست حجم مصرفی اشتراک در پنل ادمین بدون ورود به صفحه ویرایش: پنجره بله/خیر و اجرای مستقیم فقط پس از تأیید. حجم کل، انقضا، اطلاعات اتصال و شمارنده‌های ضدتکرار حفظ می‌شوند؛ تمام تغییرات RC779 باقی می‌مانند.",
+    "en": "Admin subscription usage reset now opens Yes/No confirmation instead of Edit, sending a usage-only, accounting-safe reset request on Yes. Quota, expiry, credentials, node counters and RC779 changes remain intact."
   }
 }
