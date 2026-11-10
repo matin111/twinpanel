@@ -19,6 +19,7 @@ import 'server_inventory.dart';
 import 'country_flag.dart';
 import 'ambient_background.dart';
 import 'interactive_glass_card.dart';
+import 'authenticated_dashboard.dart';
 
 void main() => runApp(const TwinConnectApp());
 
@@ -264,6 +265,47 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
     final accent = Theme.of(context).colorScheme.primary;
     final dark = Theme.of(context).brightness == Brightness.dark;
     final foreground = Theme.of(context).colorScheme.onSurface;
+
+    // Strictly separate sign-in and the authenticated four-page application.
+    // Never render the old BrandDetails / coming-soon screen after login.
+    if (brand != null &&
+        _confirmedPanel != null &&
+        _confirmedUsername != null &&
+        _confirmedSessionToken != null) {
+      return AuthenticatedDashboard(
+        key: const Key('authenticatedDashboard'),
+        panel: _confirmedPanel!,
+        username: _confirmedUsername!,
+        sessionToken: _confirmedSessionToken!,
+        brand: brand,
+        servers: _servers,
+        catalog: _catalog,
+        nativeProtocols: _nativeProtocols,
+        refreshServers: () { _refreshServers(); },
+        refreshingServers: _refreshingServers,
+        protocolCatalogUnavailable: _protocolCatalogUnavailable,
+        onLogout: () {
+          ++_lookupSerial;
+          _password.clear();
+          _username.clear();
+          widget.onBrandChanged(null);
+          setState(() {
+            _brand = null;
+            _confirmedPanel = null;
+            _confirmedUsername = null;
+            _confirmedSessionToken = null;
+            _catalog = null;
+            _servers = null;
+            _errorCode = null;
+            _serverRefreshError = null;
+            _protocolCatalogUnavailable = false;
+            _refreshingServers = false;
+            _nativeProtocols =
+                const NativeProtocolReadiness(supportedCodes: {});
+          });
+        },
+      );
+    }
 
     return Scaffold(
       extendBodyBehindAppBar: true,
@@ -569,79 +611,7 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
                             ),
                           ),
                         ],
-                        if (brand != null) ...[
-                          const SizedBox(height: 20),
-                          BrandDetails(brand: brand),
-                          if (_protocolCatalogUnavailable) ...[
-                            const SizedBox(height: 16),
-                            Text(strings.protocolCatalogUnavailable),
-                          ],
-                          const SizedBox(height: 12),
-                  Row(children: [
-                    Expanded(child: Text(
-                      strings.pick('سرورهای اشتراک', 'Subscription servers'),
-                      style: Theme.of(context).textTheme.titleMedium,
-                    )),
-                    IconButton(
-                      key: const Key('refreshSubscriptionServers'),
-                      tooltip: strings.pick('به‌روزرسانی سرورها', 'Refresh servers'),
-                      onPressed: _refreshingServers ? null : _refreshServers,
-                      icon: _refreshingServers
-                          ? const SizedBox.square(
-                              dimension: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                          : const Icon(Icons.refresh_rounded),
-                    ),
-                  ]),
-                  if (_serverRefreshError != null)
-                    Text(strings.pick('دریافت سرورها ناموفق بود',
-                      'Could not refresh servers')),
-                  if (_servers != null) ...[
-                    if (_servers!.servers.isEmpty)
-                      Text(strings.pick('سروری برای این اشتراک ثبت نشده',
-                        'No servers assigned to this subscription')),
-                    for (final server in _servers!.servers)
-                      ListTile(
-                        key: Key('assignedServer_${server.id}'),
-                        leading: CountryFlag(server.countryCode, width: 31),
-                        title: Text(server.name),
-                        subtitle: Text(server.countryCode),
-                        trailing: Text(server.nodeOnline
-                            ? strings.pick('نود آنلاین', 'Node online')
-                            : strings.pick('نود آفلاین', 'Node offline')),
-                      ),
-                  ],
-                  if (_catalog != null) ...[
-                            const SizedBox(height: 20),
-                            ProtocolCatalogCard(
-                              catalog: _catalog!,
-                              native: _nativeProtocols,
-                            ),
-                            if (_confirmedPanel != null &&
-                                _confirmedUsername != null &&
-                                _confirmedSessionToken != null) ...[
-                              const SizedBox(height: 12),
-                              AndroidConnectionCard(
-                                key: ValueKey(_confirmedUsername),
-                                panel: _confirmedPanel!,
-                                username: _confirmedUsername!,
-                                sessionToken: _confirmedSessionToken!,
-                                catalog: _catalog!,
-                                native: _nativeProtocols,
-                              ),
-                              if (_servers != null) ...[
-                                const SizedBox(height: 12),
-                                WindowsConnectionCard(
-                                  key: ValueKey('windows_${_confirmedUsername!}'),
-                                  panel: _confirmedPanel!,
-                                  username: _confirmedUsername!,
-                                  sessionToken: _confirmedSessionToken!,
-                                  catalog: _catalog!,
-                                  servers: _servers!,
-                                ),
-                              ],
-                            ],
-                          ],
-                        ],
+
                       ],
                     ),
                   ),
