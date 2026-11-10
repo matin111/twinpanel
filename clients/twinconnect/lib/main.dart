@@ -17,6 +17,8 @@ import 'vpn_settings.dart';
 import 'vpn_strings.dart';
 import 'server_inventory.dart';
 import 'country_flag.dart';
+import 'ambient_background.dart';
+import 'interactive_glass_card.dart';
 
 void main() => runApp(const TwinConnectApp());
 
@@ -260,7 +262,6 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
     final brand = _brand;
 
     final accent = Theme.of(context).colorScheme.primary;
-    final surface = Theme.of(context).colorScheme.surface;
     final dark = Theme.of(context).brightness == Brightness.dark;
     final foreground = Theme.of(context).colorScheme.onSurface;
 
@@ -342,8 +343,8 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
           ),
         ],
       ),
-      body: BrandBackground(
-        brand: brand,
+      body: TwinConnectAmbientBackground(
+        dark: dark,
         child: Stack(
           children: [
             Positioned(
@@ -403,30 +404,27 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
                               ? (constraints.maxHeight > 640 ? 38 : 8)
                               : 8,
                         ),
-                        Container(
-                          decoration: BoxDecoration(
-                            color: Color.lerp(
-                              surface, accent, dark ? 0.045 : 0.025,
+                        TweenAnimationBuilder<double>(
+                          key: const Key('loginEntranceAnimation'),
+                          tween: Tween(begin: 0, end: 1),
+                          duration: const Duration(milliseconds: 720),
+                          curve: Curves.easeOutCubic,
+                          builder: (context, progress, child) => Opacity(
+                            opacity: progress,
+                            child: Transform.translate(
+                              offset: Offset(0, 22 * (1 - progress)),
+                              child: child,
                             ),
-                            borderRadius: BorderRadius.circular(28),
-                            border: Border.all(
-                              color: accent.withValues(alpha: dark ? 0.28 : 0.15),
+                          ),
+                          child: TwinConnectGlassCard(
+                            key: const Key('loginGlassCard'),
+                            dark: dark,
+                            radius: 28,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 30,
+                              vertical: 30,
                             ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(
-                                  alpha: dark ? 0.30 : 0.08,
-                                ),
-                                blurRadius: 45,
-                                offset: const Offset(0, 22),
-                              ),
-                            ],
-                          ),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 30,
-                            vertical: 30,
-                          ),
-                          child: Form(
+                            child: Form(
                             key: _formKey,
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -554,6 +552,7 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
                                 ),
                               ],
                             ),
+                          ),
                           ),
                         ),
                         if (_errorCode != null) ...[
