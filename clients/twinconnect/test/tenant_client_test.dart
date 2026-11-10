@@ -108,9 +108,9 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('TwinConnect'), findsOneWidget);
     expect(find.byKey(const Key('accountUsername')), findsOneWidget);
-    expect(find.byKey(const Key('subscriptionLink')), findsOneWidget);
+    expect(find.byKey(const Key('appPassword')), findsOneWidget);
     expect(find.byKey(const Key('identifyButton')), findsOneWidget);
-    expect(find.text('One app, many brands'), findsOneWidget);
+    expect(find.text('Sign in'), findsOneWidget);
     // The connection engine is deliberately not mounted to any action.
     expect(find.byKey(const Key('brandCard')), findsNothing);
   });
