@@ -1287,18 +1287,54 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           ]),
         ),
         const SizedBox(height: 17),
-        settingLine(Icons.shield_outlined, 'Kill Switch'),
-        settingLine(Icons.dns_outlined, tr('حفاظت DNS', 'DNS protection')),
-        settingLine(Icons.security_outlined,
-            tr('حفاظت IPv6', 'IPv6 protection')),
-        settingLine(Icons.auto_awesome_rounded,
-            tr('اتصال خودکار', 'Auto-connect')),
+        settingLine(
+          Icons.shield_outlined,
+          tr('تنظیمات امنیت و VPN', 'VPN and security settings'),
+          disabled: false,
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => VpnSettingsScreen(
+                tenant: widget.panel.namespace,
+                account: widget.username,
+              ),
+            ),
+          ),
+        ),
+        settingLine(
+          Icons.refresh_rounded,
+          tr('به‌روزرسانی اطلاعات حساب و سرورها',
+             'Refresh account and servers'),
+          disabled: false,
+          onTap: () {
+            widget.onRefreshAccount();
+            widget.onRefresh();
+            _probeAllNodes();
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: Text(tr('درخواست به‌روزرسانی ارسال شد.',
+                'Refresh requested.')),
+            ));
+          },
+        ),
         const SizedBox(height: 16),
         ShareVpnPreview(
           key: const Key('devShareVpnSection'),
           dark: _dark,
           persian: _persian,
         ),
+        const SizedBox(height: 12),
+        OutlinedButton.icon(
+          key: const Key('settingsSignOut'),
+          onPressed: _vpnUp || _vpnCleanup || _vpnBusy ? null : widget.onLogout,
+          icon: const Icon(Icons.logout_rounded),
+          label: Text(tr('خروج از حساب', 'Sign out')),
+        ),
+        if (_vpnUp || _vpnCleanup || _vpnBusy)
+          Padding(
+            padding: const EdgeInsets.only(top: 7),
+            child: Text(tr('ابتدا اتصال VPN را قطع کنید.',
+                'Disconnect VPN before signing out.'),
+                style: TextStyle(color: sub, fontSize: 11)),
+          ),
         const SizedBox(height: 16),
         glassCard(
           key: const Key('devSettingsAppearanceCard'),
@@ -1379,6 +1415,20 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
             ),
           ),
         ),
+        const SizedBox(height: 12),
+        Row(children: [
+          Expanded(child: OutlinedButton.icon(
+            onPressed: widget.onRefreshAccount,
+            icon: const Icon(Icons.refresh_rounded),
+            label: Text(tr('به‌روزرسانی حساب', 'Refresh account')),
+          )),
+        ]),
+        if (widget.accountError != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text(tr('اطلاعات حجم و انقضا از پنل دریافت نشد.',
+                'Usage and expiry could not be retrieved from the panel.'),
+              style: const TextStyle(color: Colors.orangeAccent, fontSize: 12))),
         const SizedBox(height: 17),
         Row(children: [
           for (final entry in [
