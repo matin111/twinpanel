@@ -44,7 +44,7 @@ class SeparateAppCredentialContract(unittest.TestCase):
         reseller = scope["_username"](24, 2)
         self.assertRegex(owner, r"^TP[0-9A-F]{6}_A_C1_APP[0-9A-F]{16}$")
         self.assertRegex(reseller, r"^TP[0-9A-F]{6}_R18_C2_APP[0-9A-F]{16}$")
-        self.assertNotEqual(owner, scope["_username"](0))
+        self.assertNotEqual(owner, scope["_username"](0, 1))
         self.assertNotEqual(owner, reseller)
         first, second = scope["_password"](), scope["_password"]()
         self.assertNotEqual(first, second)
