@@ -166,8 +166,7 @@ class _WindowsConnectionCardState extends State<WindowsConnectionCard> {
     if (!Platform.isWindows || (!_allowed && !_up)) {
       return const SizedBox.shrink();
     }
-    final available = widget.servers.servers
-        .where((server) => server.nodeOnline).toList(growable: false);
+    final available = widget.servers.servers.toList(growable: false);
     final validSelection = available.any((server) => server.id == _selectedId)
         ? _selectedId : null;
 
@@ -227,7 +226,12 @@ class _WindowsConnectionCardState extends State<WindowsConnectionCard> {
                 ),
                 items: [
                   for (final server in available)
-                    DropdownMenuItem(value: server.id, child: Text(server.name)),
+                    DropdownMenuItem(
+                      value: server.id,
+                      child: Text(server.nodeOnline
+                          ? server.name
+                          : '${server.name} · ${s.pick('وضعیت نود نامشخص', 'status unverified')}'),
+                    ),
                 ],
                 onChanged: _busy ? null : (value) => setState(() {
                   _selectedId = value;
