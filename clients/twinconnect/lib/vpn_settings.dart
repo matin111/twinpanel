@@ -113,7 +113,7 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
     bool enabled = true,
   }) {
     return ChoiceChip(
-      key: Key('vpnMode_' + mode.name),
+      key: Key('vpnMode_${mode.name}'),
       label: Text(title),
       selected: _policy.routingMode == mode,
       onSelected: enabled
@@ -163,7 +163,7 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
                       ListTile(
                         contentPadding: EdgeInsets.zero,
                         leading: const Icon(Icons.shield_outlined),
-                        title: Text(s.vpnPlatformStatus + ' · ' + platformName),
+                        title: Text('${s.vpnPlatformStatus} · $platformName'),
                         subtitle: Text(
                           _capabilities.engineReady
                               ? s.vpnEngineAvailable
@@ -332,7 +332,7 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
                         for (final issue in issues)
                           Padding(
                             padding: const EdgeInsets.only(bottom: 6),
-                            child: Text('• ' + s.vpnProblem(issue)),
+                            child: Text('• ${s.vpnProblem(issue)}'),
                           ),
                       ],
                       if (!_identified) ...[
