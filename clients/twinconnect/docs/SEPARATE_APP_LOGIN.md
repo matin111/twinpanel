@@ -17,7 +17,7 @@ Three separate, copyable fields:
 - App password
 - Subscription link
 
-The reseller Telegram order-delivery message and account-link retrieval also include the app credentials under their own heading, separately from any VPN login. No app secret is embedded in the subscription URL or QR. The existing share URL stays stable after password resets.
+The reseller Telegram verified purchase/order-delivery message includes app credentials under its own heading, separate from the VPN login. The existing bot «دریافت لینک اکانت» / account-link lookup remains username-only and never requires or issues TwinConnect app credentials. No app secret is embedded in the subscription URL or QR. The existing share URL stays stable after password resets.
 
 ## API (owning panel, never the vendor registry)
 
