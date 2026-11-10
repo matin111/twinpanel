@@ -131,7 +131,6 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
   final AppSessionStore _sessionStore = const AppSessionStore();
   AppPlanClassification? _plan;
   AppAccountSnapshot? _account;
-  bool _restoringSession = true;
 
   int _dashboardTab = 0;
   bool _loading = false;
@@ -194,9 +193,7 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
     } catch (_) {
       // An offline panel keeps the remembered username, not access.
     } finally {
-      if (mounted && serial == _lookupSerial) {
-        setState(() => _restoringSession = false);
-      }
+      // No blocking splash: login stays responsive while secure storage is checked.
     }
   }
 
@@ -725,9 +722,6 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
     final dark = Theme.of(context).brightness == Brightness.dark;
     final foreground = Theme.of(context).colorScheme.onSurface;
 
-    if (_restoringSession) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
