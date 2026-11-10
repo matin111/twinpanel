@@ -17,6 +17,8 @@ def new_exit(enabled=False,domain="v2tr.in88.sbs"):
     return SimpleNamespace(
         id=24, node_type=NodeType.EXIT,
         xray_domain=domain, enable_v2ray=enabled,
+        enable_cisco=False, enable_openvpn=False,
+        enable_wireguard=False, enable_l2tp=False,
     )
 
 
