@@ -269,8 +269,10 @@ def receipt_detail(
         payload["can_approve"] = _manual_purchase(row)
     elif kind == "wallet":
         row = db.get(CustomerWalletTopup, item_id)
-        if not row or _is_reseller_scoped_topup(row) or not _manual_topup(row):
-            raise HTTPException(status_code=404, detail="درخواست شارژ در صف بازبینی نیست")
+        if not row or _is_reseller_scoped_topup(row):
+            raise HTTPException(status_code=404, detail="رسید کیف پول پیدا نشد")
+        # Read-only status must remain accessible after automatic/manual
+        # approval or rejection; do not create another topup or receipt.
         marker = str(row.receipt_file_marker or "").strip()
         payload = {"id": row.id, "status": row.status, "user_id": row.user_id,
                    "amount_toman": int(row.payable_amount_toman or 0),
