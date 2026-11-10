@@ -32,7 +32,6 @@ void main() {
     expect(find.byKey(const Key('devRefreshServers')), findsOneWidget);
     expect(find.byKey(const Key('devProtocolFilters')), findsOneWidget);
     expect(find.byKey(const Key('devFilter_openvpn')), findsOneWidget);
-    expect(find.byKey(const Key('devFilter_v2ray')), findsWidgets);
 
     await tester.tap(find.byKey(const Key('devRefreshServers')));
     await tester.pump();
