@@ -195,6 +195,11 @@ class SeparateAppCredentialContract(unittest.TestCase):
             encoding="utf-8"
         )
         self.assertIn('data-testid="admin-app-delivery-action"', legacy)
+        self.assertIn("onClick={()=>setAppDeliverySubscriptionId(n(item.id)||null)}", legacy)
+        self.assertIn("appDeliverySubscriptionId!==null&&<Modal", legacy)
+        self.assertIn('title={pick("ورود مخصوص اپ TwinConnect","TwinConnect App Delivery")}', legacy)
+        self.assertIn('owner="admin"', legacy)
+        self.assertIn("subscriptionId={appDeliverySubscriptionId}", legacy)
         self.assertIn('pick("ورود اپ","App Delivery")', legacy)
         self.assertIn('appOwner="admin"', legacy)
         self.assertIn("subscriptionId={linkModalId??undefined}", legacy)
