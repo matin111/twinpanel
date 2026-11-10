@@ -15,7 +15,7 @@ class VpnPolicy {
     this.dnsMode = VpnDnsMode.protected,
     this.ipv6Mode = VpnIpv6Mode.tunnelOrBlock,
     this.allowLan = false,
-    this.autoReconnect = true,
+    this.autoReconnect = false,
     this.autoConnect = false,
     this.autoSelectServer = true,
   });
