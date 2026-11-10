@@ -100,14 +100,14 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   Future<void> _probeNode(int index) async {
     final nodes = widget.servers?.servers;
     if (!Platform.isWindows || nodes == null || index < 0 ||
-        index >= nodes.length) return;
+        index >= nodes.length) { return; }
     final node = nodes[index];
-    if (_pingingNodes.contains(node.id)) return;
+    if (_pingingNodes.contains(node.id)) { return; }
     if (node.probeIp == null) {
-      if (mounted) setState(() {
+      if (mounted) { setState(() {
         _nodePings[node.id] = null;
         _nodePingErrors[node.id] = 'NO_PROBE_ADDRESS';
-      });
+      }); }
       return;
     }
     setState(() => _pingingNodes.add(node.id));
@@ -133,7 +133,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           caseSensitive: false).firstMatch(output);
         latency = match == null ? null : int.tryParse(match.group(1)!);
         if (latency == null && RegExp(r'time\s*<\s*1\s*ms',
-          caseSensitive: false).hasMatch(output)) latency = 1;
+          caseSensitive: false).hasMatch(output)) { latency = 1; }
         // A successful single-reply ping is measured by elapsed time
         // when localized output cannot be parsed. This includes process
         // startup overhead and is explicitly marked approximate.
@@ -147,7 +147,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     } catch (_) {
       error = 'PING_FAILED';
     } finally {
-      if (mounted) setState(() {
+      if (mounted) { setState(() {
         _nodePings[node.id] = latency;
         if (error == null) {
           _nodePingErrors.remove(node.id);
@@ -155,7 +155,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           _nodePingErrors[node.id] = error;
         }
         _pingingNodes.remove(node.id);
-      });
+      }); }
     }
   }
   Future<void> _probeAllNodes() async {
@@ -291,7 +291,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   Future<void> _selectServerAndConnect(int index) async {
     final nodes = widget.servers?.servers;
     if (nodes == null || index < 0 || index >= nodes.length ||
-        _vpnBusy || !Platform.isWindows) return;
+        _vpnBusy || !Platform.isWindows) { return; }
 
     final targetId = nodes[index].id;
     if (_vpnUp && _activeNodeId == targetId) {
@@ -391,7 +391,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   String? get _selectedServerId {
     final servers = widget.servers?.servers;
     if (servers == null || servers.isEmpty || _selected < 0 ||
-        _selected >= servers.length) return null;
+        _selected >= servers.length) { return null; }
     return servers[_selected].id;
   }
 
@@ -453,13 +453,13 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       if (_vpnUp && (!wasUp || _networkTimer == null)) _startNetworkStats();
       if (_vpnUp && _vpnVerified && _publicIp == null) _readNetworkStats();
     } catch (error) {
-      if (mounted) setState(() {
+      if (mounted) { setState(() {
         _vpnReady = false;
         _vpnUp = false;
         _vpnVerified = false;
         _vpnError = _errorText(error);
         _resetNetworkStats();
-      });
+      }); }
     }
   }
 
@@ -745,13 +745,6 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       radius: radius,
       padding: padding,
       child: child,
-    );
-
-    void notification() => ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(tr(
-        'برای دریافت سرورها از به‌روزرسانی استفاده کنید',
-        'Refresh to fetch updated servers',
-      ))),
     );
 
     Widget sideNav(String page, IconData icon, String title) => Padding(
