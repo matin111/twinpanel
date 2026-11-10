@@ -41,6 +41,31 @@ void main() {
     expect(find.text('برای دریافت سرورها وارد حساب شوید'), findsOneWidget);
   });
 
+  testWidgets('premium glass layout pins connection left and stats right',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(1280, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(const TwinConnectDevApp());
+    await tester.pumpAndSettle();
+
+    final connect = tester.getTopLeft(
+      find.byKey(const Key('devConnectionStatus')));
+    final network = tester.getTopLeft(
+      find.byKey(const Key('devConnectionStats')));
+    expect(connect.dx, lessThan(network.dx));
+    expect(find.byKey(const Key('devAutoSelectCard')), findsOneWidget);
+    expect(find.byKey(const Key('devLocationsCard')), findsOneWidget);
+    expect(find.byType(BackdropFilter), findsWidgets);
+
+    await tester.tap(find.byKey(const Key('devLanguageToggle')));
+    await tester.pumpAndSettle();
+    final englishConnect = tester.getTopLeft(
+      find.byKey(const Key('devConnectionStatus')));
+    final englishNetwork = tester.getTopLeft(
+      find.byKey(const Key('devConnectionStats')));
+    expect(englishConnect.dx, lessThan(englishNetwork.dx));
+  });
+
   testWidgets('all 16 canonical protocols appear in horizontal filter',
       (tester) async {
     await tester.binding.setSurfaceSize(const Size(1280, 900));
