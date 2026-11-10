@@ -362,6 +362,7 @@ def _expiry_with_days(db: Session, sub, now: datetime | None = None) -> tuple[st
         return "نامحدود", "مدت اشتراک نامحدود"
 
     from ..subscription_override_models import duration_days
+    from ..models import Plan
     plan = db.get(Plan, sub.plan_id) if sub.plan_id else None
     duration = duration_days(sub, plan)
     if duration > 0 and getattr(sub, "starts_at", None) is None:
