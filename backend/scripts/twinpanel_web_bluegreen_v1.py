@@ -20,8 +20,8 @@ SLOT_UNIT = Path("/etc/systemd/system/twinpanel-web-slot@.service")
 ENV_DIR = Path("/etc/twinpanel")
 ENABLED = Path("/etc/nginx/sites-enabled")
 ALLOWED_PORTS = (3000, 3001)
-UPSTREAM = re.compile(r"http://127\\.0\\.0\\.1:(3000|3001)(?=[/;])")
-VERSION = re.compile(r"^\\d+\\.\\d+\\.\\d+(?:-[A-Za-z0-9._-]+)?$")
+UPSTREAM = re.compile(r"http://127\.0\.0\.1:(3000|3001)(?=[/;])")
+VERSION = re.compile(r"^\d+\.\d+\.\d+(?:-[A-Za-z0-9._-]+)?$")
 UNIT = """[Unit]
 Description=TwinPanel pinned Next.js Web slot %i
 After=network-online.target
@@ -129,7 +129,7 @@ def prepare(candidate: Path, previous: Path) -> tuple[int, int]:
     if not SLOT_UNIT.exists() or SLOT_UNIT.read_text() != UNIT:
         _write_atomic(SLOT_UNIT, UNIT, 0o644)
     env_path = ENV_DIR / f"web-slot-{standby}.env"
-    _write_atomic(env_path, f"TP_WEB_RELEASE={candidate}\\nTP_WEB_PORT={standby}\\n", 0o600)
+    _write_atomic(env_path, f"TP_WEB_RELEASE={candidate}\nTP_WEB_PORT={standby}\n", 0o600)
     cmd("systemctl", "daemon-reload")
     unit = f"twinpanel-web-slot@{standby}.service"
     if subprocess.run(["systemctl", "is-active", "--quiet", unit]).returncode == 0:
@@ -190,7 +190,7 @@ def activate(previous_port: int, candidate_port: int, release: Path) -> None:
         _write_atomic(STATE, json.dumps({
             "active_port": candidate_port,
             "release": str(versioned_release(release)),
-        }) + "\\n", 0o600)
+        }) + "\n", 0o600)
     except Exception:
         _update_nginx(candidate_port, previous_port)
         raise
@@ -202,7 +202,57 @@ def revert(previous_port: int, candidate_port: int, old_release: Path) -> None:
     _write_atomic(STATE, json.dumps({
         "active_port": previous_port,
         "release": str(versioned_release(old_release)),
-    }) + "\\n", 0o600)
+    }) + "\n", 0o600)
+
+
+def readiness(port: int, version: str, release: Path) -> bool:
+    """Version comes from API health; also probe actual Next routes and a built asset."""
+    import urllib.error
+    import urllib.request
+    if port not in ALLOWED_PORTS or not VERSION.fullmatch(version):
+        return False
+    base = f"http://127.0.0.1:{port}"
+    for route, permitted in (("/health", {200}), ("/admin/nodes", {200, 301, 302, 303, 307, 308}), ("/favicon.ico", {200, 404})):
+        try:
+            with urllib.request.urlopen(
+                urllib.request.Request(base + route, headers={"User-Agent": "TwinPanel-Canary/1"}),
+                timeout=4,
+            ) as response:
+                status = response.status
+                if route == "/health":
+                    payload = json.loads(response.read(8192))
+                    if not isinstance(payload, dict) or payload.get("ok") is not True or str(payload.get("version")) != version:
+                        return False
+                if status not in permitted:
+                    return False
+        except urllib.error.HTTPError as exc:
+            if exc.code not in permitted:
+                return False
+        except Exception:
+            return False
+    static_dir = release / ".next/standalone/.next/static"
+    if not static_dir.is_dir():
+        static_dir = release / ".next/static"
+    assets = sorted(static_dir.rglob("*.js")) if static_dir.is_dir() else []
+    if not assets:
+        return False
+    rel = assets[0].relative_to(static_dir).as_posix()
+    try:
+        with urllib.request.urlopen(base + "/_next/static/" + rel, timeout=5) as response:
+            if response.status != 200 or not response.read(100):
+                return False
+    except Exception:
+        return False
+    return True
+
+
+def wait_ready(port: int, version: str, release: Path, seconds: int = 45) -> bool:
+    deadline = time.monotonic() + seconds
+    while time.monotonic() < deadline:
+        if readiness(port, version, release):
+            return True
+        time.sleep(0.5)
+    return False
 
 
 def stop_unused(old: int, delay_seconds: int = 30) -> None:
