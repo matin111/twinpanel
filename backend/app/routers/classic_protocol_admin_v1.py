@@ -373,7 +373,11 @@ async def classic_port_check(
         conn.close()
         await conn.wait_closed()
 
-    if "PORT_CHECK_UNAVAILABLE" in sockets:\n        raise HTTPException(status_code=503, detail="PORT_CHECK_UNAVAILABLE")\n\n    conflicts = []\n    for line in sockets.splitlines():
+    if "PORT_CHECK_UNAVAILABLE" in sockets:
+        raise HTTPException(status_code=503, detail="PORT_CHECK_UNAVAILABLE")
+
+    conflicts = []
+    for line in sockets.splitlines():
         parts = line.split()
         if len(parts) < 5:
             continue
