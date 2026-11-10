@@ -39,4 +39,11 @@ def require_staged_node_publish_ready(db: Session, node_id: int) -> None:
         )
     if not 1 <= int(job.installed_protocols or 0) <= 16:
         raise HTTPException(status_code=409, detail="NODE_NO_VERIFIED_PROTOCOLS")
+    if int(job.installed_protocols or 0) < 16:
+        # Legacy manual publish attaches every explicit subscriber and cannot
+        # filter missing protocol entitlements. Partial nodes MUST use the
+        # scoped central admission transaction instead.
+        raise HTTPException(
+            status_code=409, detail="PARTIAL_NODE_REQUIRES_CENTRAL_ADMISSION",
+        )
 
