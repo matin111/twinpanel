@@ -423,7 +423,7 @@ def subscription_protocol_catalog(
     return JSONResponse(
         {
             "schema": 1,
-            "namespace": installation_namespace(ensure_installation_id()),
+            "namespace": subscription_app_namespace(db, sub),
             "protocols": protocol_catalog(selected, configured),
         },
         headers={
@@ -501,7 +501,7 @@ def subscription_protocol_profiles(
 
     response = {
         "schema": 1,
-        "namespace": installation_namespace(ensure_installation_id()),
+        "namespace": subscription_app_namespace(db, sub),
         "protocol": protocol,
         "items": jsonable_encoder(profile_items),
         "native_engine_ready": False,
