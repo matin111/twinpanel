@@ -320,19 +320,41 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
 
   Future<void> _selectServerAndConnect(int index) async {
     final nodes = widget.servers?.servers;
-    if (nodes == null || index < 0 || index >= nodes.length ||
-        _vpnBusy || !Platform.isWindows) { return; }
-
-    // A protocol filter is not a WireGuard connection request. Until a
-    // verified sing-box native adapter is registered, never silently start
-    // WireGuard when a modern protocol chip is selected.
-    if (_filter != 'all' && _filter != 'wireguard') {
+    if (nodes == null || index < 0 || index >= nodes.length) {
+      if (mounted) setState(() => _vpnError = 'SERVER_NOT_AVAILABLE');
+      return;
+    }
+    if (_vpnBusy) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(tr(
-          'موتور اتصال این پروتکل هنوز آماده نیست؛ اتصال WireGuard به‌جای آن انجام نمی‌شود.',
-          'This protocol engine is not ready yet; WireGuard will not be substituted.',
-        )),
-      ));
+        content: Text(tr('در حال انجام اتصال قبلی هستیم.',
+            'Previous connection is still running.'))));
+      return;
+    }
+    // Row selection and page navigation must never be gated by engine readiness.
+    setState(() {
+      _selected = index;
+      _page = 'home';
+      _autoFastest = false;
+      _vpnError = null;
+    });
+    if (!Platform.isWindows) {
+      setState(() => _vpnError = 'WINDOWS_ENGINE_REQUIRED');
+      return;
+    }
+    if (_filter != 'all' && _filter != 'wireguard') {
+      final protocol = _filter;
+      final modern = SingBoxProfileValidator.supportsFamily(protocol);
+      final message = modern
+          ? tr('موتور $protocol هنوز تونل ویندوز را اجرا نمی‌کند؛ سرور انتخاب شد، اتصال قبلی حفظ شد.',
+              '$protocol Windows tunnel is not yet enabled. Server selected; current VPN preserved.')
+          : tr('موتور $protocol هنوز آماده نیست؛ سرور انتخاب شد، اتصال قبلی حفظ شد.',
+              '$protocol engine is not ready. Server selected; current VPN preserved.');
+      if (!mounted) return;
+      setState(() => _vpnError = modern
+          ? 'SINGBOX_NATIVE_TUN_NOT_READY'
+          : 'PROTOCOL_ENGINE_NOT_READY');
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(message)));
       return;
     }
     final targetId = nodes[index].id;
@@ -345,6 +367,9 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       return;
     }
     if (!_vpnReady || !_wireGuardAllowed) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(tr('موتور WireGuard یا دسترسی اشتراک آماده نیست.',
+            'WireGuard engine or subscription access is unavailable.'))));
       setState(() => _vpnError = !_wireGuardAllowed
           ? 'WIREGUARD_NOT_ALLOWED'
           : 'WIREGUARD_NOT_INSTALLED_OR_ADMIN_REQUIRED');
@@ -807,8 +832,9 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       padding: const EdgeInsets.only(bottom: 8),
       child: Material(
         borderRadius: BorderRadius.circular(13),
-        color: _page == page ? purple.withValues(alpha: 0.19)
-            : Colors.transparent,
+        color: _page == page ? purple.withValues(alpha: 0.21)
+            : (_dark ? Colors.white.withValues(alpha: 0.045)
+                : const Color(0xFF7662A8).withValues(alpha: 0.055)),
         child: InkWell(
           key: Key('devNav_$page'),
           borderRadius: BorderRadius.circular(13),
@@ -820,12 +846,16 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
               mainAxisAlignment: wide ? MainAxisAlignment.start
                   : MainAxisAlignment.center,
               children: [
-                Icon(icon, color: _page == page ? purple : sub, size: 21),
+                Icon(icon, color: _page == page ? purple
+                    : (_dark ? const Color(0xFFD2CCEA)
+                        : const Color(0xFF53496D)), size: 21),
                 if (wide) ...[
                   const SizedBox(width: 12),
                   Expanded(child: txt(title,
-                    color: _page == page ? ink : sub,
-                    bold: _page == page)),
+                    color: _page == page ? ink
+                        : (_dark ? const Color(0xFFE7E2F8)
+                            : const Color(0xFF42395A)),
+                    bold: true)),
                 ],
               ],
             ),
