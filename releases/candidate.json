@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.774",
-  "source_sha": "438afb0369b212c890c31595a6fde7fc0a462d52",
+  "version": "1.1.0-rc.775",
+  "source_sha": "47d39ee4a8d1edbb9021cb2210656ad70d355016",
   "notes": {
-    "fa": "بهینه‌سازی بخش آنلاین‌ها و اشتراک‌ها: نتایج تاییدشده وضعیت آنلاین برای ۵ ثانیه بین درخواست‌های همزمان بازاستفاده می‌شوند تا بار تکراری روی دیتابیس و API کاهش یابد. مدت تشخیص آنلاین، تعداد دستگاه، سهمیه ترافیک، پروتکل‌ها، نودها و تنظیمات اتصال تغییر نمی‌کنند. اختلال متناوب CDN آروان موضوع جداگانه است.",
-    "en": "Online and subscriptions performance: coalesce repeated authenticated presence DB scans in an in-process read-only 5-second snapshot. Preserve real online status, uncertainty, device limits, quota accounting, protocols and nodes. Arvan CDN connectivity issue is independent."
+    "fa": "اصلاح سودوکو قدیمی: خواندن شمارنده واقعی IPIngressBytes هر سرویس اختصاصی از systemd بدون ری‌استارت؛ ثبت مبنای اولیه بدون شارژ و سپس دلتاهای معتبر در حسابداری مرکزی؛ جلوگیری از قطع پردازش سایر کاربران به‌خاطر اشتراک غیرفعال. تغییر نکردن کانفیگ/رمز/پورت/نود/وضعیت سهمیه. کنترلر مشترک مرکزی که فقط تعداد اتصال را گزارش می‌دهد هنوز حسابداری حجم ندارد.",
+    "en": "Sudoku legacy dedicated accounts: validate service ownership, obtain real per-unit cgroup IPIngressBytes, zero-charge first baseline, bill only authenticated subsequent counter deltas through canonical ledger without restarting units; isolate inactive subscriptions. Shared Sudoku daemon without authentic byte telemetry remains presence-only; no estimate."
   }
 }
