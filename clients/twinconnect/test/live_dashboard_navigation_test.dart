@@ -27,7 +27,7 @@ void main() {
     });
 
     await tester.pumpWidget(MaterialApp(
-      home: TwinConnectLiveDashboard(
+      home: Scaffold(body: TwinConnectLiveDashboard(
         panel: PanelDirectoryEntry(
           namespace: WindowsPreviewFixture.namespace,
           apiOrigin: Uri.parse('https://panel.example.org'),
@@ -51,7 +51,7 @@ void main() {
         account: null,
         onLogout: () {},
         onRefreshAccount: () {},
-      ),
+      )),
     ));
     await tester.pump(const Duration(milliseconds: 800));
     await tester.tap(find.byKey(const Key('devNav_locations')));
@@ -69,5 +69,7 @@ void main() {
     await tester.pump();
     // Selecting a node is never a no-op, even without a Windows engine.
     expect(find.byKey(const Key('liveConnectionStatus')), findsWidgets);
+    // Allow any synthetic platform-channel readiness timeouts to settle.
+    await tester.pump(const Duration(seconds: 12));
   });
 }
