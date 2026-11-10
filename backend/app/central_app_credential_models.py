@@ -34,3 +34,16 @@ class SubscriptionAppCredential(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False,
     )
+
+
+class AppPlanTypeCode(Base):
+    """Stable per-installation numeric code for the admin's first plan category.
+
+    Every plan using the same first-level subscription_type receives one code.
+    This is only an app username routing/display hint, never access authority.
+    """
+    __tablename__ = "app_plan_type_codes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    type_name: Mapped[str] = mapped_column(String(120), unique=True, index=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
