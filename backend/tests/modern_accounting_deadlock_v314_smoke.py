@@ -89,7 +89,8 @@ def main() -> None:
     try:
         runtime.canonical._devices_by_protocol = lambda _db, _node_id: grouped
 
-        async def fake_connect(_node, _db):
+        async def fake_connect(_node, _db, *, close_read_transaction_before_ssh=False):
+            assert close_read_transaction_before_ssh is True
             events.append("connect")
             return conn
 
