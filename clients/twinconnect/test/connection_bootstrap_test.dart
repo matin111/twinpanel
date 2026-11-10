@@ -115,11 +115,11 @@ void main() {
     expect(api.profileCalls, 0);
   });
 
-  test('offline or unassigned node refuses before downloading secrets', () async {
-    final api = FakePanel()..online = false;
+  test('unassigned node refuses before downloading secrets', () async {
+    final api = FakePanel();
     await expectLater(
       ConnectionBootstrap(api: api).prepare(
-        panel: _panel, sessionToken: _session, serverId: '17',
+        panel: _panel, sessionToken: _session, serverId: '99',
         protocolCode: 'wireguard', policy: const VpnPolicy(),
         capabilities: _native, nativeProtocols: _ready,
       ),
@@ -127,6 +127,18 @@ void main() {
           .having((e) => e.code, 'code', 'SERVER_NOT_AVAILABLE')),
     );
     expect(api.profileCalls, 0);
+  });
+
+  test('offline heartbeat is advisory; exact assigned node is still eligible',
+      () async {
+    final api = FakePanel()..online = false;
+    final candidate = await ConnectionBootstrap(api: api).prepare(
+      panel: _panel, sessionToken: _session, serverId: '17',
+      protocolCode: 'wireguard', policy: const VpnPolicy(),
+      capabilities: _native, nativeProtocols: _ready,
+    );
+    expect(candidate.server.nodeOnline, isFalse);
+    expect(candidate.profiles.items, hasLength(1));
   });
 
   test('matching authorized native configuration becomes a candidate, not a connection', () async {
