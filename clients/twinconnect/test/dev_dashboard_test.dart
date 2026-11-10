@@ -19,6 +19,10 @@ void main() {
 
     expect(find.byKey(const Key('devAnimatedBackground')), findsOneWidget);
     expect(find.byKey(const Key('devPowerEntranceAnimation')), findsOneWidget);
+    expect(find.byKey(const Key('devSignalAnimation')), findsOneWidget);
+    expect(find.byKey(const Key('devSignalWave')), findsOneWidget);
+    expect(find.byKey(const Key('devConnectButton')), findsOneWidget);
+    expect(find.byType(FilledButton), findsOneWidget);
     expect(find.byType(TwinConnectGlassCard), findsWidgets);
     expect(find.byKey(const Key('devAmbientGrid')), findsOneWidget);
     expect(find.byKey(const Key('devPageTransition')), findsOneWidget);
