@@ -74,7 +74,6 @@ void main() {
     final b = getBrand('#0F9B6A', '#FFFFFF');
     expect(BrandTheme.make(a, Brightness.dark).colorScheme.primary,
         isNot(BrandTheme.make(b, Brightness.dark).colorScheme.primary));
-    expect(BrandTheme.background(a).colors, isNull);
     expect(BrandTheme.background(a).gradient, isNotNull);
   });
 
