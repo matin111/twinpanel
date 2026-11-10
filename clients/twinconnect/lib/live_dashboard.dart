@@ -500,8 +500,24 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
             size: 12, color: sub),
         if (_vpnError != null) ...[
           const SizedBox(height: 8),
-          Text(_vpnError!, style: const TextStyle(
-              color: Colors.orangeAccent, fontSize: 11)),
+          Text(
+            switch (_vpnError!) {
+              'WIREGUARD_NOT_ALLOWED' => tr(
+                'این اشتراک مجوز WireGuard ندارد.',
+                'WireGuard is not enabled for this subscription.'),
+              'WIREGUARD_NOT_INSTALLED_OR_ADMIN_REQUIRED' => tr(
+                'WireGuard رسمی را نصب کرده و برنامه را با دسترسی مدیر اجرا کنید.',
+                'Install official WireGuard and run this app as Administrator.'),
+              'SELECT_WIREGUARD_SERVER' => tr(
+                'در مکان‌ها سرور WireGuard انتخاب کنید.',
+                'Select a WireGuard server in Locations.'),
+              'UNMANAGED_WIREGUARD_SERVICE' => tr(
+                'سرویس WireGuard متعلق به برنامه نیست؛ تغییری ایجاد نشد.',
+                'WireGuard service is not managed by this app.'),
+              final code => tr('خطای اتصال: $code', 'Connection error: $code'),
+            },
+            style: const TextStyle(color: Colors.orangeAccent, fontSize: 11),
+          ),
         ],
         TextButton.icon(
           onPressed: _vpnBusy ? null : _refreshVpnStatus,
@@ -793,23 +809,6 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         }),
         const SizedBox(height: 15),
         glassCard(
-          key: const Key('devAutoSelectCard'),
-          radius: 19,
-          padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 8),
-          child: Row(children: [
-            const Icon(Icons.auto_awesome_rounded, size: 19, color: purple),
-            const SizedBox(width: 11),
-            Expanded(child: txt(tr('انتخاب خودکار بهترین سرور',
-                'Automatic best server'), size: 13, bold: true)),
-            const Switch(
-              key: Key('devAutoBestServer'),
-              value: false,
-              onChanged: null,
-            ),
-          ]),
-        ),
-        const SizedBox(height: 15),
-        glassCard(
           key: const Key('devLocationsCard'),
           radius: 23,
           padding: const EdgeInsets.fromLTRB(15, 11, 15, 10),
@@ -933,7 +932,17 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         heading(tr('حساب', 'Account')),
         const SizedBox(height: 16),
         OutlinedButton.icon(
-          onPressed: widget.onLogout,
+          onPressed: () {
+            if (_vpnUp || _vpnBusy || _vpnCleanup) {
+              ScaffoldMessenger.of(context)
+                ..hideCurrentSnackBar()
+                ..showSnackBar(SnackBar(content: Text(tr(
+                  'پیش از خروج، اتصال VPN را قطع کنید.',
+                  'Disconnect VPN before signing out.'))));
+              return;
+            }
+            widget.onLogout();
+          },
           icon: const Icon(Icons.logout),
           label: Text(tr('خروج از حساب', 'Sign out')),
         ),
