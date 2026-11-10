@@ -4,6 +4,7 @@ import 'dart:convert' show utf8;
 import 'dart:async' show Timer;
 
 import 'package:flutter/services.dart' show PlatformException;
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -357,6 +358,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   @override
   void initState() {
     super.initState();
+    _restoreAppearance();
     _refreshVpnStatus();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && (widget.servers?.servers.isNotEmpty ?? false)) {
@@ -512,6 +514,42 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
 
   bool _persian = false;
   bool _dark = true;
+  static const _languagePreference = 'twinconnect_ui_language_v1';
+  static const _appearancePreference = 'twinconnect_ui_dark_v1';
+
+  Future<void> _restoreAppearance() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final language = prefs.getString(_languagePreference);
+      final dark = prefs.getBool(_appearancePreference);
+      if (!mounted) return;
+      setState(() {
+        if (language == 'fa' || language == 'en') {
+          _persian = language == 'fa';
+        }
+        if (dark != null) _dark = dark;
+      });
+    } catch (_) {}
+  }
+
+  Future<void> _changeLanguage() async {
+    final next = !_persian;
+    setState(() => _persian = next);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_languagePreference, next ? 'fa' : 'en');
+    } catch (_) {}
+  }
+
+  Future<void> _changeAppearance() async {
+    final next = !_dark;
+    setState(() => _dark = next);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_appearancePreference, next);
+    } catch (_) {}
+  }
+
   String _page = 'home';
   String _filter = 'all';
   String _search = '';
@@ -741,11 +779,11 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           tooltip: tr('تغییر ظاهر', 'Theme'),
           icon: Icon(_dark ? Icons.light_mode_outlined
               : Icons.dark_mode_outlined, color: sub),
-          onPressed: () => setState(() => _dark = !_dark),
+          onPressed: _changeAppearance,
         ),
         TextButton(
           key: const Key('devLanguageToggle'),
-          onPressed: () => setState(() => _persian = !_persian),
+          onPressed: _changeLanguage,
           child: Text(_persian ? 'EN' : 'فا'),
         ),
         IconButton(
@@ -1467,10 +1505,10 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
               const SizedBox(height: 10),
               settingLine(Icons.language_rounded, tr('زبان', 'Language'),
                   disabled: false,
-                  onTap: () => setState(() => _persian = !_persian)),
+                  onTap: _changeLanguage),
               settingLine(Icons.palette_outlined, tr('ظاهر', 'Appearance'),
                   disabled: false,
-                  onTap: () => setState(() => _dark = !_dark)),
+                  onTap: _changeAppearance),
             ],
           ),
         ),
