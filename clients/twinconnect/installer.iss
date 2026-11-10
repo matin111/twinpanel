@@ -31,9 +31,10 @@ Name: "{autodesktop}\TwinConnect"; Filename: "{app}\{#MyAppExeName}"; Tasks: des
 [Tasks]
 Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Additional shortcuts:"
 
-[Run]
-Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -NonInteractive -ExecutionPolicy Bypass -File ""{app}\tools\install_prerequisites.ps1"""; StatusMsg: "Installing verified VPN prerequisite (WireGuard)..."; Flags: runhidden waituntilterminated
-Filename: "{app}\{#MyAppExeName}"; Description: "Launch TwinConnect"; Flags: postinstall nowait skipifsilent
+; TwinConnect requires elevation on launch for the Windows VPN service.
+; Avoid Inno Setup's postinstall process launch (CreateProcess 740).
+; The installed Start Menu/Desktop shortcuts invoke Windows UAC normally.
+; Prerequisites are installed once in ssPostInstall below.
 
 [Code]
 procedure CurStepChanged(CurStep: TSetupStep);
