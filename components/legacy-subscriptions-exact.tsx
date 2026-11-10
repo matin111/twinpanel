@@ -563,7 +563,49 @@ export function LegacySubscriptionsRuntimePage(){
 
     {modal==="edit"&&selected&&<Modal title={pick("ویرایش اشتراک","Edit subscription")} sub={`MV-${n(selected.id)}`} onClose={()=>!busy&&setModal(null)} wide>
       <Notice error={error} ok={ok}/>
-      <form onSubmit={saveEdit}><div className="setting-grid"><label className="field"><span>{pick("پلن","Plan")}</span><select value={draft.plan_id} onChange={event=>setDraft(current=>({...current,plan_id:Number(event.target.value)}))}><option value={0} disabled={n(selected.plan_id)>0}>{pick("اشتراک دستی (بدون پلن)","Manual subscription (no plan)")}</option>{plans.map(plan=><option key={n(plan.id)} value={n(plan.id)}>{s(plan.name)||`#${plan.id}`}</option>)}</select></label><label className="field"><span>{pick("حجم کل GB","Total traffic GB")}</span><input type="number" min={0} step="0.1" value={draft.traffic_gb} onChange={event=>setDraft(current=>({...current,traffic_gb:event.target.value}))} placeholder={pick("خالی = نامحدود","empty = unlimited")}/></label><label className="field"><span>{pick("اتصال هم‌زمان مجاز","Allowed concurrent devices")}</span><input type="number" min={0} max={1000} step={1} required value={draft.device_limit} onChange={event=>setDraft(current=>({...current,device_limit:event.target.value}))}/><small>{pick("۰ = نامحدود؛ عدد انتخابی به همین اشتراک اعمال می‌شود","0 = unlimited; applied to this account")}</small></label><label className="field"><span>{pick("مدت اعتبار (روز)","Validity (days)")}</span><input type="number" min={0} max={3650} step={1} value={draft.duration_days} onChange={event=>{setDraft(current=>({...current,duration_days:event.target.value}));setEditExpiry("");}}/></label><label className="field"><span>{pick("تاریخ انقضا","Expiry date")}</span><input type="date" value={editExpiry} onChange={event=>setEditExpiry(event.target.value)}/><small>{pick("اگر خالی باشد، تاریخ فعلی حفظ می‌شود","Leave blank to preserve current expiry")}</small></label><label className="field"><span>{pick("نام کاربری","Username")}</span><input dir="ltr" value={draft.username} onChange={event=>setDraft(current=>({...current,username:event.target.value}))}/></label><label className="field"><span>{pick("رمز جدید","New password")}</span><input dir="ltr" autoComplete="new-password" value={draft.password} onChange={event=>setDraft(current=>({...current,password:event.target.value}))} placeholder={pick("خالی = بدون تغییر","empty = unchanged")}/></label></div><label className="field" style={{display:"flex",alignItems:"center",gap:10,marginTop:12}}><input type="checkbox" checked={editResetUsage} onChange={event=>setEditResetUsage(event.target.checked)}/><span>{pick("ریست ترافیک مصرفی (صفر شدن مصرف دوره)","Reset used traffic (start usage at zero)")}</span></label><small className="muted">{pick("فقط مصرف این اشتراک صفر می‌شود؛ سوابق حسابداری و شمارنده‌های نود حفظ می‌شوند.","Only this subscription's used balance is reset; accounting history and node counters are preserved.")}</small><div className="manage-section-head"><div><b>{pick("پروتکل‌ها","Protocols")}</b><small>{draft.protocols.length.toLocaleString("fa-IR")} {pick("انتخاب","selected")}</small></div></div><div className="protocol-toggle-grid">{protocolKeys.map(key=>{const modern=!classicProtocolSet.has(key);const supported=modern||nodes.some(node=>node.status==="online"&&Boolean((node as unknown as RuntimeRow)[`enable_${key}`]));const checked=draft.protocols.includes(key);return <label key={key} className="toggle module-toggle compact-toggle"><span>{protocolLabels[key]}<small>{modern?pick("وضعیت Runtime هنگام ذخیره بررسی می‌شود","Runtime readiness is checked on save"):supported?pick("قابل استفاده","Available"):pick("روی سرور آنلاین فعال نیست","Not enabled on an online server")}</small></span><input type="checkbox" disabled={!supported} checked={checked} onChange={event=>setDraft(current=>({...current,protocols:event.target.checked?[...new Set([...current.protocols,key])]:current.protocols.filter(item=>item!==key)}))}/><i/></label>;})}</div><div className="modalActions"><button type="button" className="ghost" onClick={()=>setModal(null)}>{pick("انصراف","Cancel")}</button><button className="primary" disabled={busy==="edit"||(!draft.plan_id&&n(selected.plan_id)>0)||!draft.protocols.length}>{busy==="edit"?"…":pick("ذخیره تغییرات","Save changes")}</button></div></form>
+      
+      <form onSubmit={saveEdit} className="subs-edit-form">
+        <div className="subs-edit-main">
+          <div className="subs-edit-main-title">{pick("تنظیمات اصلی","Main settings")}</div>
+          <div className="subs-edit-grid">
+            <label className="field"><span>{pick("پلن","Plan")}</span><select value={draft.plan_id} onChange={event=>setDraft(current=>({...current,plan_id:Number(event.target.value)}))}><option value={0} disabled={n(selected.plan_id)>0}>{pick("اشتراک دستی (بدون پلن)","Manual subscription (no plan)")}</option>{plans.map(plan=><option key={n(plan.id)} value={n(plan.id)}>{s(plan.name)||`#${plan.id}`}</option>)}</select></label>
+            <label className="field"><span>{pick("حجم کل GB","Total traffic GB")}</span><input type="number" min={0} step="0.1" value={draft.traffic_gb} onChange={event=>setDraft(current=>({...current,traffic_gb:event.target.value}))} placeholder={pick("خالی = نامحدود","empty = unlimited")}/></label>
+            <label className="field"><span>{pick("اتصال هم‌زمان مجاز","Allowed concurrent devices")}</span><input type="number" min={0} max={1000} step={1} required value={draft.device_limit} onChange={event=>setDraft(current=>({...current,device_limit:event.target.value}))}/><small>{pick("۰ = نامحدود؛ عدد انتخابی به همین اشتراک اعمال می‌شود","0 = unlimited; applied to this account")}</small></label>
+            <label className="field"><span>{pick("مدت اعتبار (روز)","Validity (days)")}</span><input type="number" min={0} max={3650} step={1} value={draft.duration_days} onChange={event=>{setDraft(current=>({...current,duration_days:event.target.value}));setEditExpiry("");}}/></label>
+            <label className="field"><span>{pick("تاریخ انقضا","Expiry date")}</span><input type="date" value={editExpiry} onChange={event=>setEditExpiry(event.target.value)}/><small>{pick("اگر خالی باشد، تاریخ فعلی حفظ می‌شود","Leave blank to preserve current expiry")}</small></label>
+          </div>
+        </div>
+        <details className="subs-edit-section">
+          <summary>
+            <span>{pick("نام کاربری و رمز عبور","Username and password")}</span>
+            <small>{pick("فقط هنگام نیاز باز کنید","Open when needed")}</small>
+          </summary>
+          <div className="subs-edit-section-content subs-edit-credentials">
+            <label className="field"><span>{pick("نام کاربری","Username")}</span><input dir="ltr" value={draft.username} onChange={event=>setDraft(current=>({...current,username:event.target.value}))}/></label>
+            <label className="field"><span>{pick("رمز جدید","New password")}</span><input dir="ltr" autoComplete="new-password" value={draft.password} onChange={event=>setDraft(current=>({...current,password:event.target.value}))} placeholder={pick("خالی = بدون تغییر","empty = unchanged")}/></label>
+          </div>
+        </details>
+        <details className="subs-edit-section subs-edit-protocols">
+          <summary>
+            <span>{pick("پروتکل‌ها","Protocols")}</span>
+            <small>{draft.protocols.length.toLocaleString("fa-IR")} {pick("انتخاب‌شده","selected")}</small>
+          </summary>
+          <div className="subs-edit-section-content">
+            <div className="protocol-toggle-grid subs-edit-protocol-grid">{protocolKeys.map(key=>{const modern=!classicProtocolSet.has(key);const supported=modern||nodes.some(node=>node.status==="online"&&Boolean((node as unknown as RuntimeRow)[`enable_${key}`]));const checked=draft.protocols.includes(key);return <label key={key} className="toggle module-toggle compact-toggle"><span>{protocolLabels[key]}<small>{modern?pick("وضعیت Runtime هنگام ذخیره بررسی می‌شود","Runtime readiness is checked on save"):supported?pick("قابل استفاده","Available"):pick("روی سرور آنلاین فعال نیست","Not enabled on an online server")}</small></span><input type="checkbox" disabled={!supported} checked={checked} onChange={event=>setDraft(current=>({...current,protocols:event.target.checked?[...new Set([...current.protocols,key])]:current.protocols.filter(item=>item!==key)}))}/><i/></label>;})}</div>
+          </div>
+        </details>
+        <details className="subs-edit-section">
+          <summary>
+            <span>{pick("تنظیمات پیشرفته","Advanced settings")}</span>
+            <small>{editResetUsage?pick("ریست مصرف انتخاب شده","Traffic reset selected"):pick("ریست ترافیک مصرفی","Reset used traffic")}</small>
+          </summary>
+          <div className="subs-edit-section-content subs-edit-advanced">
+            <label className="field" style={{display:"flex",alignItems:"center",gap:10,marginTop:12}}><input type="checkbox" checked={editResetUsage} onChange={event=>setEditResetUsage(event.target.checked)}/><span>{pick("ریست ترافیک مصرفی (صفر شدن مصرف دوره)","Reset used traffic (start usage at zero)")}</span></label><small className="muted">{pick("فقط مصرف این اشتراک صفر می‌شود؛ سوابق حسابداری و شمارنده‌های نود حفظ می‌شوند.","Only this subscription's used balance is reset; accounting history and node counters are preserved.")}</small>
+          </div>
+        </details>
+        <div className="modalActions"><button type="button" className="ghost" onClick={()=>setModal(null)}>{pick("انصراف","Cancel")}</button><button className="primary" disabled={busy==="edit"||(!draft.plan_id&&n(selected.plan_id)>0)||!draft.protocols.length}>{busy==="edit"?pick("در حال ذخیره…","Saving…"):pick("ذخیره تغییرات","Save changes")}</button></div>
+      </form>
+
     </Modal>}
 
     {transferOpen&&selected&&<Modal title={pick("انتقال اکانت","Transfer account")} sub={`MV-${n(selected.id)} · ${s(selected.account_username)}`} onClose={()=>!busy&&setTransferOpen(false)}>
