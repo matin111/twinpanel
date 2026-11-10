@@ -69,7 +69,7 @@ class BoundedAccountingSmoke(TestCase):
                 raise RuntimeError("bad_single_device")
             return {"collector": "wireguard", "node_id": 33,
                     "targets": len(kwargs["devices"]), "accepted_bytes": len(kwargs["devices"]) * 7}
-        with mock.patch.object(runtime.canonical, "_apply_wireguard_like", side_effect=apply), \\
+        with mock.patch.object(runtime.canonical, "_apply_wireguard_like", side_effect=apply), \
              mock.patch.object(runtime, "_retry_failed_protocol_per_device", return_value={
                  "recovered_devices": 63, "failed_devices": 1,
              }) as recover:
