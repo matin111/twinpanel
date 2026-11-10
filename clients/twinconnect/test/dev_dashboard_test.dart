@@ -19,7 +19,7 @@ void main() {
     expect(find.byKey(const Key('devConnectionStatus')), findsOneWidget);
     expect(find.byKey(const Key('devSampleNotice')), findsOneWidget);
     for (final page in ['home', 'locations', 'settings', 'account']) {
-      expect(find.byKey(Key('devNav_' + page)), findsOneWidget);
+      expect(find.byKey(Key('devNav_$page')), findsOneWidget);
     }
     expect(find.byKey(const Key('accountUsername')), findsNothing);
     expect(find.byKey(const Key('appPassword')), findsNothing);
