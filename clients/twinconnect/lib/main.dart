@@ -7,15 +7,10 @@ import 'brand_theme.dart';
 import 'tenant_api.dart';
 import 'tenant_models.dart';
 import 'protocols.dart';
-import 'protocol_catalog_view.dart';
-import 'protocol_strings.dart';
 import 'native_vpn_bridge.dart';
-import 'android_connection_card.dart';
-import 'windows_connection_card.dart';
 import 'vpn_settings.dart';
 import 'vpn_strings.dart';
 import 'server_inventory.dart';
-import 'country_flag.dart';
 import 'ambient_background.dart';
 import 'interactive_glass_card.dart';
 import 'authenticated_dashboard.dart';
@@ -134,7 +129,6 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
   PanelProtocolCatalog? _catalog;
   AppServerInventory? _servers;
   bool _refreshingServers = false;
-  String? _serverRefreshError;
   NativeProtocolReadiness _nativeProtocols =
       const NativeProtocolReadiness(supportedCodes: {});
   bool _protocolCatalogUnavailable = false;
@@ -162,7 +156,6 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
       _catalog = null;
       _servers = null;
       _refreshingServers = false;
-      _serverRefreshError = null;
       _protocolCatalogUnavailable = false;
       _nativeProtocols = const NativeProtocolReadiness(supportedCodes: {});
     });
@@ -227,7 +220,6 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
     final serial = _lookupSerial;
     setState(() {
       _refreshingServers = true;
-      _serverRefreshError = null;
     });
     try {
       final api = TenantApi.fromBuildConfig();
@@ -248,7 +240,7 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
       });
     } catch (_) {
       if (!mounted || serial != _lookupSerial) return;
-      setState(() => _serverRefreshError = 'SERVER_REFRESH_FAILED');
+      setState(() => _protocolCatalogUnavailable = true);
     } finally {
       if (mounted && serial == _lookupSerial) {
         setState(() => _refreshingServers = false);
@@ -296,8 +288,7 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
             _catalog = null;
             _servers = null;
             _errorCode = null;
-            _serverRefreshError = null;
-            _protocolCatalogUnavailable = false;
+                  _protocolCatalogUnavailable = false;
             _refreshingServers = false;
             _nativeProtocols =
                 const NativeProtocolReadiness(supportedCodes: {});
