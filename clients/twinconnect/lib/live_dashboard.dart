@@ -293,6 +293,18 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     if (nodes == null || index < 0 || index >= nodes.length ||
         _vpnBusy || !Platform.isWindows) { return; }
 
+    // A protocol filter is not a WireGuard connection request. Until a
+    // verified sing-box native adapter is registered, never silently start
+    // WireGuard when a modern protocol chip is selected.
+    if (_filter != 'all' && _filter != 'wireguard') {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(tr(
+          'موتور اتصال این پروتکل هنوز آماده نیست؛ اتصال WireGuard به‌جای آن انجام نمی‌شود.',
+          'This protocol engine is not ready yet; WireGuard will not be substituted.',
+        )),
+      ));
+      return;
+    }
     final targetId = nodes[index].id;
     if (_vpnUp && _activeNodeId == targetId) {
       setState(() { _selected = index; _page = 'home'; });
