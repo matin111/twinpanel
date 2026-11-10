@@ -38,6 +38,7 @@ void main() {
     await openLocations(tester);
     expect(find.byKey(const Key('devRefreshServers')), findsOneWidget);
     expect(find.byKey(const Key('devProtocolFilters')), findsOneWidget);
+    expect(find.byKey(const Key('devLocationListingCard')), findsOneWidget);
     expect(find.byKey(const Key('devFilter_openvpn')), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('devRefreshServers')));
@@ -100,8 +101,12 @@ void main() {
     await tester.tap(find.byKey(const Key('devNav_settings')));
     await tester.pumpAndSettle();
     expect(find.text('Kill Switch'), findsOneWidget);
+    expect(find.byKey(const Key('devSettingsGlassHeader')), findsOneWidget);
+    expect(find.byKey(const Key('devSettingsAppearanceCard')), findsOneWidget);
+    expect(find.byType(BackdropFilter), findsWidgets);
     await tester.tap(find.byKey(const Key('devNav_account')));
     await tester.pumpAndSettle();
     expect(find.text('حساب آزمایشی'), findsWidgets);
+    expect(find.byType(BackdropFilter), findsWidgets);
   });
 }
