@@ -27,7 +27,7 @@ from .system_release import ensure_installation_id
 
 _APP_PURPOSE = "twinconnect-session-v1"
 _BAD_LOGIN = "APP_LOGIN_INVALID"
-_DUMMY_HASH = "$2b$12$5AF12tAWuUtXfubQibyySuy6uTrlc6ozFQ7Oz.4SiZ6nClE8h2qZ6"
+_DUMMY_HASH = hash_password("twinconnect-nonexistent-account")
 
 
 def _fernet() -> Fernet:
