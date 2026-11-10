@@ -405,8 +405,10 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
             ],
           ],
         );
+        break;
       case 1:
         page = serverInventory();
+        break;
       case 2:
         page = Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -458,6 +460,7 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
             )),
           ],
         );
+        break;
       default:
         page = Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -480,7 +483,19 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
               ],
             )),
             const SizedBox(height: 16),
-            BrandDetails(brand: brand),
+            glass(Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                header(strings.pick('پشتیبانی و تمدید', 'Support and renewal'),
+                  Icons.help_outline_rounded),
+                const SizedBox(height: 12),
+                _CopyValue(label: strings.supportTelegram, value: brand.telegramUrl),
+                _CopyValue(label: strings.renewalLink, value: brand.renewalUrl),
+                _CopyValue(label: strings.supportPhone, value: brand.phone),
+                _CopyValue(label: strings.website, value: brand.websiteUrl),
+                if (brand.supportText != null) Text(brand.supportText!),
+              ],
+            )),
             const SizedBox(height: 12),
             OutlinedButton.icon(
               onPressed: () {
@@ -502,6 +517,7 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
             ),
           ],
         );
+        break;
     }
 
     final content = ListView(
