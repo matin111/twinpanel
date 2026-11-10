@@ -35,6 +35,70 @@ class TenantApi {
     return entry;
   }
 
+  /// Dedicated app login: the vendor sees only a namespace, never a
+  /// username/password. Credentials are posted directly to the owning panel.
+  Future<AppLoginSession> login({
+    required PanelDirectoryEntry panel,
+    required String username,
+    required String password,
+  }) async {
+    final data = await _requestJson(
+      panel.apiOrigin.resolve('/v1/central-app/public/login'),
+      payload: {
+        'username': username.trim(),
+        'password': password,
+      },
+    );
+    final session = AppLoginSession.fromJson(data);
+    if (session.namespace != panel.namespace ||
+        session.brand.namespace != panel.namespace) {
+      throw const FormatException('NAMESPACE_MISMATCH');
+    }
+    if (session.brand.ownerType == 'reseller' &&
+        !username.trim().startsWith(session.brand.appUsernamePrefix)) {
+      throw const FormatException('RESELLER_PREFIX_MISMATCH');
+    }
+    return session;
+  }
+
+  Future<PanelProtocolCatalog> loadSessionProtocolCatalog({
+    required PanelDirectoryEntry panel,
+    required String sessionToken,
+  }) async {
+    final data = await _requestJson(
+      panel.apiOrigin.resolve('/v1/central-app/session/protocols'),
+      bearerToken: sessionToken,
+    );
+    final catalog = PanelProtocolCatalog.fromJson(data);
+    if (catalog.namespace != panel.namespace) {
+      throw const FormatException('NAMESPACE_MISMATCH');
+    }
+    return catalog;
+  }
+
+  Future<ClientProtocolProfiles> loadSessionNativeProfiles({
+    required PanelDirectoryEntry panel,
+    required String sessionToken,
+    required VpnProtocolDefinition protocol,
+    required NativeProtocolReadiness native,
+  }) async {
+    if (!native.supports(protocol.code)) {
+      throw const TenantApiException('ENGINE_NOT_READY');
+    }
+    final data = await _requestJson(
+      panel.apiOrigin.resolve('/v1/central-app/session/profiles'),
+      payload: {'protocol': protocol.code},
+      bearerToken: sessionToken,
+      maxBytes: 1024 * 1024,
+    );
+    final profiles = ClientProtocolProfiles.fromJson(data);
+    if (profiles.namespace != panel.namespace ||
+        profiles.protocol.code != protocol.code) {
+      throw const FormatException('PROFILE_PROTOCOL_MISMATCH');
+    }
+    return profiles;
+  }
+
   Future<BrandPreview> loadBrand({
     required PanelDirectoryEntry panel,
     required String username,
@@ -119,6 +183,7 @@ class TenantApi {
     Uri url, {
     Map<String, dynamic>? payload,
     int maxBytes = 32768,
+    String? bearerToken,
   }) async {
     if (url.scheme != 'https') {
       throw const FormatException('INSECURE_CONNECTION');
@@ -131,6 +196,10 @@ class TenantApi {
           : await client.postUrl(url).timeout(const Duration(seconds: 10));
       request.followRedirects = false;
       request.headers.set(HttpHeaders.acceptHeader, 'application/json');
+      request.headers.set(HttpHeaders.cacheControlHeader, 'no-store');
+      if (bearerToken != null) {
+        request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $bearerToken');
+      }
       if (payload != null) {
         request.headers.contentType = ContentType.json;
         request.write(jsonEncode(payload));
@@ -141,6 +210,12 @@ class TenantApi {
       if (response.statusCode != HttpStatus.ok) {
         if (response.statusCode == HttpStatus.notFound) {
           throw const TenantApiException('PANEL_NOT_FOUND');
+        }
+        if (response.statusCode == HttpStatus.unauthorized) {
+          throw const TenantApiException('APP_LOGIN_INVALID');
+        }
+        if (response.statusCode == HttpStatus.tooManyRequests) {
+          throw const TenantApiException('APP_LOGIN_LOCKED');
         }
         if (response.statusCode == HttpStatus.forbidden) {
           throw const TenantApiException(
@@ -178,4 +253,34 @@ class TenantApiException implements Exception {
   final String message;
   @override
   String toString() => message;
+}
+
+class AppLoginSession {
+  const AppLoginSession({
+    required this.namespace,
+    required this.sessionToken,
+    required this.brand,
+  });
+
+  final String namespace;
+  /// Sensitive, short-lived. Do not persist or log.
+  final String sessionToken;
+  final BrandPreview brand;
+
+  factory AppLoginSession.fromJson(Map<String, dynamic> data) {
+    final namespace = data['namespace'];
+    final token = data['session_token'];
+    final brand = data['brand'];
+    if (namespace is! String ||
+        token is! String ||
+        token.length < 40 ||
+        brand is! Map<String, dynamic>) {
+      throw const FormatException('INVALID_SERVER_RESPONSE');
+    }
+    return AppLoginSession(
+      namespace: namespace.toUpperCase(),
+      sessionToken: token,
+      brand: BrandPreview.fromJson(brand),
+    );
+  }
 }
