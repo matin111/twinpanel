@@ -301,4 +301,9 @@ def create_subscription_core(
     sub.account_password_encrypted = password
 
     db.flush()
+    # App credentials are fully separate from these VPN protocol credentials.
+    # Issue within the same creation transaction for all admin/reseller/bot
+    # callers of the central factory; app-only licenses are checked inside.
+    from ..central_app_credentials import get_or_issue_app_credentials
+    get_or_issue_app_credentials(db, sub, reseller_id=reseller_id or 0)
     return sub
