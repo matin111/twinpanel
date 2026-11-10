@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.765",
+  "version": "1.1.0-rc.766",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-10T01:00:16Z",
+  "released_at": "2026-11-10T01:21:38Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "7c01543acb2ac8a0b4544804ca8f2b5921b5de8d",
+  "source_sha": "051fdded1aacddd678719e3e0c812d36523035f8",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.765/twinpanel-1.1.0-rc.765-linux-x86_64.tar.gz",
-    "sha256": "2c0110b2f82fa4c12766ed9d353ba13a238bcb929f4feff6b08aa35c6d126de2",
-    "size_bytes": 30272317
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.766/twinpanel-1.1.0-rc.766-linux-x86_64.tar.gz",
+    "sha256": "3cd06d3b4961d6cc181d2f13be68def080c9539625aacdc1ad75769120bda7e3",
+    "size_bytes": 30274208
   },
   "notes": {
-    "fa": "رفع سراسری 502 وب هنگام آپدیت با آماده‌سازی نسخه Next.js روی پورت جایگزین و سوییچ ایمن Nginx همراه با تست سلامت، بازگشت و نگه‌داشت فایل‌های نسخه قبلی. کاهش تراکنش‌های طولانی PostgreSQL در Workerهای SSH و حسابداری مرکزی با بسته‌شدن خواندن‌های تمیز پیش از I/O و رمزگشایی، و ثبت مصرف دسته‌ای 64 دستگاه همراه با محافظت از سهمیه‌ها و بازیابی خطا. حفظ ربات‌ها، کیف‌پول، نودها، اتصال کاربران، UUID و حسابداری ترافیک.",
-    "en": "Upgrade Web via pinned blue/green Next.js slots and tested Nginx cutover with rollback and legacy static assets, preventing frontend listener gaps on subsequent releases. Bound PostgreSQL worker transactions across SSH read lookups, CPU-heavy credential mapping and 64-device accounting batches without changing canonical usage/quota functions. Preserve API/bot/node/user data, credentials, billing and device limits."
+    "fa": "تکمیل اصلاحات PostgreSQL با بستن تراکنش‌های خواندنی تمیز در Workerهای مستقل Naive و Sudoku پیش از رمزگشایی حجیم اطلاعات دستگاه‌ها، بدون Commit داده‌های ثبت‌نشده. بهبود توقف سالم نمونه قدیمی وب در آپدیتر Blue/Green. تمام امکانات rc.765 و پروتکل‌ها، اشتراک‌ها، حجم و محدودیت دستگاه‌ها حفظ شده‌اند.",
+    "en": "Close clean PostgreSQL read transactions before CPU-heavy credential mapping in independent Naive/Sudoku presence workers, without changing pending writes; treat intentional Next.js blue/green slot termination as clean. Retain all rc.765 blue/green and bounded-accounting fixes."
   }
 }
