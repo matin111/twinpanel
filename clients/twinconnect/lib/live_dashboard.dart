@@ -11,6 +11,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'protocols.dart';
 import 'server_inventory.dart';
+import 'server_latency.dart';
 import 'connection_bootstrap.dart';
 import 'tenant_api.dart';
 import 'vpn_policy_store.dart';
@@ -94,8 +95,36 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   final Map<String, String> _nodePingErrors = {};
   final Set<String> _pingingNodes = {};
   bool _pingAllBusy = false;
+  bool _statusRefreshing = false;
+  bool _nativeReadyRefreshing = false;
+  DateTime? _lastNativeReadyCheck;
   int? _latencyFor(AppServer node) => _nodePings.containsKey(node.id)
     ? _nodePings[node.id] : node.latencyMs;
+
+  int? get _connectedServerRtt {
+    if (!_vpnUp || _activeNodeId == null) return null;
+    final nodes = widget.servers?.servers;
+    if (nodes == null) return null;
+    for (final node in nodes) {
+      if (node.id == _activeNodeId) return _latencyFor(node);
+    }
+    return null;
+  }
+
+  Future<void> _refreshNativeReadiness() async {
+    if (_nativeReadyRefreshing || !Platform.isWindows) return;
+    _nativeReadyRefreshing = true;
+    try {
+      final native = await NativeVpnBridge.protocolReadiness()
+          .timeout(const Duration(seconds: 8));
+      if (mounted) setState(() => _vpnReady = native.supports('wireguard'));
+      _lastNativeReadyCheck = DateTime.now();
+    } catch (_) {
+      // Readiness failure must not erase an already verified tunnel state.
+    } finally {
+      _nativeReadyRefreshing = false;
+    }
+  }
 
   Future<void> _probeNode(int index) async {
     final nodes = widget.servers?.servers;
@@ -420,6 +449,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   void initState() {
     super.initState();
     _restoreAppearance();
+    _refreshNativeReadiness();
     _refreshVpnStatus();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && (widget.servers?.servers.isNotEmpty ?? false)) {
@@ -443,35 +473,48 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   }
 
   Future<void> _refreshVpnStatus() async {
-    if (!Platform.isWindows || _vpnBusy) return;
+    // Prevent method-channel calls from accumulating while Windows is busy.
+    if (!Platform.isWindows || !mounted || _vpnBusy || _statusRefreshing) return;
+    _statusRefreshing = true;
     final wasUp = _vpnUp;
     try {
-      final status = await _vpn.status();
-      final native = await NativeVpnBridge.protocolReadiness();
+      final status = await _vpn.status().timeout(const Duration(seconds: 8));
       if (!mounted) return;
-      setState(() {
-        _vpnUp = status['state'] == 'interface_up' ||
-            status['state'] == 'peer_verified';
-        _vpnVerified = status['state'] == 'peer_verified' &&
-            status['peerHandshakeVerified'] == true;
-        _vpnCleanup = status['state'] == 'needs_cleanup';
-        _vpnUnmanaged = status['state'] == 'unmanaged_service';
-        _vpnRx = status['rxBytes'] is int ? status['rxBytes'] as int : 0;
-        _vpnTx = status['txBytes'] is int ? status['txBytes'] as int : 0;
-        _vpnReady = native.supports('wireguard');
-        _vpnError = null;
-        if (!_vpnUp) _resetNetworkStats();
-      });
-      if (_vpnUp && (!wasUp || _networkTimer == null)) _startNetworkStats();
-      if (_vpnUp && _vpnVerified && _publicIp == null) _readNetworkStats();
-    } catch (error) {
-      if (mounted) { setState(() {
-        _vpnReady = false;
-        _vpnUp = false;
-        _vpnVerified = false;
-        _vpnError = _errorText(error);
-        _resetNetworkStats();
-      }); }
+      final nextUp = status['state'] == 'interface_up' ||
+          status['state'] == 'peer_verified';
+      final nextVerified = status['state'] == 'peer_verified' &&
+          status['peerHandshakeVerified'] == true;
+      final nextCleanup = status['state'] == 'needs_cleanup';
+      final nextUnmanaged = status['state'] == 'unmanaged_service';
+      final nextRx = status['rxBytes'] is int ? status['rxBytes'] as int : 0;
+      final nextTx = status['txBytes'] is int ? status['txBytes'] as int : 0;
+      // Avoid rebuilding the blurred dashboard when only polling unchanged data.
+      if (nextUp != _vpnUp || nextVerified != _vpnVerified ||
+          nextCleanup != _vpnCleanup || nextUnmanaged != _vpnUnmanaged ||
+          nextRx != _vpnRx || nextTx != _vpnTx) {
+        setState(() {
+          _vpnUp = nextUp;
+          _vpnVerified = nextVerified;
+          _vpnCleanup = nextCleanup;
+          _vpnUnmanaged = nextUnmanaged;
+          _vpnRx = nextRx;
+          _vpnTx = nextTx;
+          if (!nextUp) _resetNetworkStats();
+        });
+      }
+      if (nextUp && (!wasUp || _networkTimer == null)) _startNetworkStats();
+      if (nextUp && nextVerified && _publicIp == null) _readNetworkStats();
+      // Native feature probe is expensive; do not repeat it every 12 seconds.
+      if (_lastNativeReadyCheck == null ||
+          DateTime.now().difference(_lastNativeReadyCheck!) >
+              const Duration(minutes: 3)) {
+        _refreshNativeReadiness();
+      }
+    } catch (_) {
+      // A status timeout is not evidence that the tunnel disconnected.
+      // Keep the last verified state, allowing navigation to stay responsive.
+    } finally {
+      _statusRefreshing = false;
     }
   }
 
@@ -1111,13 +1154,17 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                 child: Text(
                   _pingingNodes.contains(widget.servers!.servers[index].id)
                     ? '…'
-                    : _latencyFor(widget.servers!.servers[index]) == null
-                      ? (_nodePingErrors[widget.servers!.servers[index].id]
-                          == 'NO_PROBE_ADDRESS' ? tr('بدون آدرس', 'No IP')
-                          : '— ms')
-                      : '${_nodePingErrors[widget.servers!.servers[index].id]
-                          == 'APPROXIMATE_RTT' ? '≈' : ''}${_latencyFor(widget.servers!.servers[index])} ms',
-                  style: TextStyle(fontSize: 11, color: sub),
+                    : _nodePingErrors[widget.servers!.servers[index].id]
+                        == 'NO_PROBE_ADDRESS' ? tr('بدون آدرس', 'No IP')
+                    : ServerLatency.label(
+                        _latencyFor(widget.servers!.servers[index]),
+                        approximate: _nodePingErrors[
+                          widget.servers!.servers[index].id] == 'APPROXIMATE_RTT'),
+                  style: TextStyle(
+                    fontSize: 11, fontWeight: FontWeight.w700,
+                    color: ServerLatency.color(
+                      _latencyFor(widget.servers!.servers[index])),
+                  ),
                 ),
               ),
               IconButton(
@@ -1275,10 +1322,30 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           ]),
           const SizedBox(height: 23),
           Row(children: [
-            Expanded(child: metric(Icons.speed_rounded,
-              tr('تاخیر HTTPS', 'HTTPS latency'),
-              _vpnVerified && _httpsLatencyMs != null
-                ? '$_httpsLatencyMs ms' : '— ms')),
+            Expanded(child: glassCard(
+              radius: 17,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(children: [
+                    Icon(Icons.speed_rounded, color: purple, size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(child: txt(tr('پینگ سرور', 'Server ping'),
+                        size: 11, color: sub)),
+                  ]),
+                  const SizedBox(height: 16),
+                  Text(ServerLatency.label(_connectedServerRtt),
+                    style: TextStyle(
+                      fontSize: 18, fontWeight: FontWeight.bold,
+                      color: ServerLatency.color(_connectedServerRtt))),
+                  const SizedBox(height: 5),
+                  Text(_vpnVerified && _httpsLatencyMs != null
+                    ? 'HTTPS: $_httpsLatencyMs ms'
+                    : tr('زمان پاسخ ICMP', 'ICMP round-trip time'),
+                    style: TextStyle(fontSize: 10, color: sub)),
+                ],
+              ),
+            )),
             const SizedBox(width: 10),
             Expanded(child: metric(Icons.public_rounded,
               tr('آی‌پی عمومی', 'Public IP'),
