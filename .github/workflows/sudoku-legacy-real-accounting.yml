@@ -1,0 +1,28 @@
+name: Sudoku Legacy Real Traffic Accounting
+on:
+  pull_request:
+    paths:
+      - 'backend/app/services/sudoku_legacy_systemd_accounting_v1.py'
+      - 'backend/scripts/twinpanel_sudoku_fast_presence_worker.py'
+      - 'backend/app/services/modern_quota_runtime_v257.py'
+      - 'backend/app/services/sudoku_shared_native_presence_v1.py'
+      - 'backend/tests/test_sudoku_legacy_real_accounting_v1.py'
+      - '.github/workflows/sudoku-legacy-real-accounting.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'backend/app/services/sudoku_legacy_systemd_accounting_v1.py'
+      - 'backend/scripts/twinpanel_sudoku_fast_presence_worker.py'
+      - 'backend/app/services/modern_quota_runtime_v257.py'
+      - 'backend/app/services/sudoku_shared_native_presence_v1.py'
+      - 'backend/tests/test_sudoku_legacy_real_accounting_v1.py'
+jobs:
+  sudoku-counter-safety:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify real byte counters, identity and epoch safety
+        run: python backend/tests/test_sudoku_legacy_real_accounting_v1.py -v

@@ -19,6 +19,8 @@ import re
 import shlex
 from typing import Any
 
+from fastapi import HTTPException
+
 from . import modern_quota_runtime_v257 as canonical
 
 MAX_SHARED_USERS = 3000
@@ -161,18 +163,23 @@ def apply_shared_native_presence(
         if name in known:
             matched += 1
         connected = int(by_name.get(name, 0))
-        result = canonical._mark_presence(
-            db,
-            node_id=int(node.id),
-            device=device,
-            protocol="sudoku",
-            online=connected > 0,
-            observed_at=now,
-            client_ip=None,
-            evidence=f"sudoku-native:{name}:conns={connected}",
-        )
-        opened += result["opened"]
-        closed += result["closed"]
+        try:
+            result = canonical._mark_presence(
+                db,
+                node_id=int(node.id),
+                device=device,
+                protocol="sudoku",
+                online=connected > 0,
+                observed_at=now,
+                client_ip=None,
+                evidence=f"sudoku-native:{name}:conns={connected}",
+            )
+            opened += result["opened"]
+            closed += result["closed"]
+        except HTTPException as exc:
+            if exc.status_code == 403 and str(exc.detail) == "subscription_not_active":
+                continue
+            raise
         online_count += int(connected > 0)
 
     return {

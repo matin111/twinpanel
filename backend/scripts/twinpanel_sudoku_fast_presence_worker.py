@@ -28,6 +28,9 @@ from app.services.central_runtime_ownership_v1 import is_central_node
 from app.services.sudoku_shared_native_presence_v1 import (
     collect_shared_native_users, apply_shared_native_presence,
 )
+from app.services.sudoku_legacy_systemd_accounting_v1 import (
+    collect_legacy_unit_counters, apply_legacy_unit_counters,
+)
 
 LOCK_FILE = Path("/run/twinpanel-sudoku-fast-presence-v1.lock")
 INTERVAL_SECONDS = 20.0
@@ -74,9 +77,15 @@ async def reconcile_once() -> dict:
                     ok, native, error = await asyncio.wait_for(
                         collect_shared_native_users(conn), timeout=14,
                     )
+                    usage_ok, counters, usage_error = True, {}, None
                 else:
                     ok, ports, error = await asyncio.wait_for(
                         canonical._collect_established_tcp_ports(conn), timeout=10,
+                    )
+                    # Per-user legacy units only; never inspect shared daemon
+                    # or charge based on socket counts / estimated speeds.
+                    usage_ok, counters, usage_error = await asyncio.wait_for(
+                        collect_legacy_unit_counters(conn, devices), timeout=36,
                     )
                 conn.close()
                 try:
@@ -96,15 +105,30 @@ async def reconcile_once() -> dict:
                     stats = apply_shared_native_presence(
                         db, node=node, devices=devices, snapshot=native,
                     )
+                    usage={"usage_events":0,"accepted_bytes":0,
+                           "usage_supported":False,"baselined":0}
                 else:
                     stats = canonical._apply_sudoku_presence(
                         db, node=node, devices=devices, established_ports=ports,
                     )
+                    usage = (
+                        apply_legacy_unit_counters(
+                            db, node=node, devices=devices, counters=counters,
+                        ) if usage_ok else {
+                            "usage_events":0,"accepted_bytes":0,
+                            "usage_supported":False,"baselined":0,
+                        }
+                    )
                 db.commit()
-                results.append({"node_id": node_id, "ok": True,
+                results.append({"node_id": node_id, "ok": bool(usage_ok),
                                 "online": stats["online"],
                                 "opened": stats["opened"],
-                                "closed": stats["closed"]})
+                                "closed": stats["closed"],
+                                "usage_events":usage["usage_events"],
+                                "accepted_bytes":usage["accepted_bytes"],
+                                "baselined":usage["baselined"],
+                                "usage_supported":usage["usage_supported"],
+                                **({"usage_error":usage_error} if not usage_ok else {})})
             except asyncio.CancelledError:
                 db.rollback()
                 raise

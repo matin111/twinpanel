@@ -1067,18 +1067,25 @@ def _apply_sudoku_presence(
             continue
         matched += 1
         online = established_ports.get(port, 0) > 0
-        presence = _mark_presence(
-            db,
-            node_id=int(node.id),
-            device=device,
-            protocol="sudoku",
-            online=online,
-            observed_at=now,
-            client_ip=None,
-            evidence=f"{identity}:established={established_ports.get(port, 0)}",
-        )
-        opened += presence["opened"]
-        closed += presence["closed"]
+        try:
+            presence = _mark_presence(
+                db,
+                node_id=int(node.id),
+                device=device,
+                protocol="sudoku",
+                online=online,
+                observed_at=now,
+                client_ip=None,
+                evidence=f"{identity}:established={established_ports.get(port, 0)}",
+            )
+            opened += presence["opened"]
+            closed += presence["closed"]
+        except HTTPException as exc:
+            # A stale entitlement may still have a socket. Do not let one
+            # rejected account starve every other Sudoku user's presence.
+            if exc.status_code == 403 and str(exc.detail) == "subscription_not_active":
+                continue
+            raise
         online_count += int(online)
 
     return {
