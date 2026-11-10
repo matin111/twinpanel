@@ -88,8 +88,8 @@ export function AdminWalletV2(){
   const [adjustAmount,setAdjustAmount]=useState("");
   const [note,setNote]=useState("");
 
-  const load=async()=>{
-    setLoading(true);setError("");
+  const load=async(silent=false)=>{
+    if(!silent){setLoading(true);setError("");}
     try{
       const [walletRows,topupRows]=await Promise.all([
         api<WalletRow[]>("/v1/admin/wallet/wallets"),
@@ -97,8 +97,8 @@ export function AdminWalletV2(){
       ]);
       setWallets(Array.isArray(walletRows)?walletRows:[]);
       setTopups(Array.isArray(topupRows)?topupRows:[]);
-    }catch(e){setError(e instanceof Error?e.message:String(e));}
-    finally{setLoading(false);}
+    }catch(e){if(!silent)setError(e instanceof Error?e.message:String(e));}
+    finally{if(!silent)setLoading(false);}
   };
 
   useEffect(()=>{void load();},[]);
@@ -106,14 +106,23 @@ export function AdminWalletV2(){
   const run=async(message:string,fn:()=>Promise<unknown>)=>{
     if(busy)return;
     setBusy(true);setError("");setOk("");
-    try{await fn();setOk(message);await load();}
+    try{
+      await fn();
+      setOk(message);
+      // Read-after-write is useful, but it is not part of the money mutation.
+      // Release the button after the API confirms the committed transaction.
+      void load(true);
+    }
     catch(e){setError(e instanceof Error?e.message:String(e));}
     finally{setBusy(false);}
   };
 
   const approve=(row:TopupRow)=>void run(
     pick("شارژ کیف پول تأیید شد.","Wallet top-up approved."),
-    ()=>api(`/v1/admin/wallet/topups/${row.id}/approve`,{method:"POST"}),
+    async()=>{
+      await api(`/v1/admin/wallet/topups/${row.id}/approve`,{method:"POST"});
+      setTopups(current=>current.map(item=>item.id===row.id?{...item,status:"approved"}:item));
+    },
   );
 
   const reject=(row:TopupRow)=>{
@@ -121,10 +130,13 @@ export function AdminWalletV2(){
     if(!reason)return;
     void run(
       pick("درخواست شارژ رد شد.","Top-up rejected."),
-      ()=>api(`/v1/admin/wallet/topups/${row.id}/reject`,{
-        method:"POST",
-        body:JSON.stringify({reason}),
-      }),
+      async()=>{
+        await api(`/v1/admin/wallet/topups/${row.id}/reject`,{
+          method:"POST",
+          body:JSON.stringify({reason}),
+        });
+        setTopups(current=>current.map(item=>item.id===row.id?{...item,status:"rejected"}:item));
+      },
     );
   };
 
@@ -136,10 +148,12 @@ export function AdminWalletV2(){
     void run(
       pick("موجودی کیف پول اصلاح شد و اعلان برای کاربر ثبت شد.","Wallet balance adjusted and user notified."),
       async()=>{
-        await api(`/v1/admin/wallet/wallets/${uid}/adjust`,{
+        const result=await api<{balance_toman:number}>(`/v1/admin/wallet/wallets/${uid}/adjust`,{
           method:"POST",
           body:JSON.stringify({amount_toman:amount,note:note.trim()}),
         });
+        // The returned balance is the committed amount; no second read needed.
+        setWallets(current=>current.map(item=>item.user_id===uid?{...item,balance_toman:Number(result.balance_toman||0)}:item));
         setAdjustAmount("");setNote("");
       },
     );
