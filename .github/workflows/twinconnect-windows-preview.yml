@@ -54,18 +54,30 @@ jobs:
           
           1. Extract the complete ZIP to a folder (do not run from inside ZIP).
           2. Run twinconnect.exe from that folder. Keep DLL/data files beside it.
-          3. Click "Explore Windows demo" or "مشاهده نسخه آزمایشی ویندوز".
-          4. Test Persian/English, dark/light, brand, 16 protocol statuses and routing preferences.
-          5. This is an unsigned TEST build. If Windows SmartScreen warns,
-             only run it if you trust the GitHub source and this artifact.
-          
+          3. For UI-only demo: use the Dev Dashboard artifact instead.
+          4. For experimental REAL WireGuard:
+             - Install official WireGuard for Windows from wireguard.com/install.
+             - Run THIS Portable EXE as Administrator (Windows tunnel service).
+             - Sign in with a valid TwinConnect APP username/password.
+             - The vendor directory URL and licensed panel backend must be
+               deployed and reachable over HTTPS at build time.
+             - Pick an ONLINE authorized WireGuard server and Start.
+             - Read the actual service/handshake status; never assume that
+               an interface-up state means internet connectivity.
+             - Stop the tunnel before closing the app, and check for leaks.
+          5. Only one TwinConnect WireGuard tunnel is supported per PC.
+          6. This is an unsigned TEST build. Only run builds you trust.
+
           IMPORTANT:
-          - NO Windows VPN engine is installed in this preview.
-          - WireGuard and Cisco/OpenConnect CANNOT connect from this ZIP.
-          - The offline sample is fictional; no real subscription data is used.
-          - Live account verification needs the separately deployed license
-            registry and panel backend; it is not activated here.
-          - No administrator rights or driver installation is needed.
+          - No WireGuard software or drivers are bundled with TwinConnect.
+          - Cisco/OpenConnect and the other 15 protocols have no Windows
+            tunnel adapter in this preview.
+          - WireGuard profiles are accepted only with one peer, both full-tunnel
+            /0 routes, and a configured DNS resolver.
+          - The native adapter writes a DPAPI-encrypted file with restrictive
+            admin/SYSTEM ACLs; no plain private-key config is saved to disk.
+          - The Dev Dashboard artifact remains entirely offline.
+          - Do not deploy these experimental binaries to customers yet.
           '@ | Set-Content -Path (Join-Path $release "README-TEST.txt") -Encoding UTF8
           $zip = Join-Path (Get-Location) "TwinConnect-Windows-Preview.zip"
           if (Test-Path $zip) { Remove-Item $zip -Force }
