@@ -76,7 +76,7 @@ jobs:
             backend/app/routers/public_connection_hub_live_v5.py \
             backend/scripts/twinpanel_modern_accounting_worker.py \
             backend/tests/modern_accounting_v257_smoke.py \
-            backend/tests/modern_accounting_deadlock_v314_smoke.py \\
+            backend/tests/modern_accounting_deadlock_v314_smoke.py \
             backend/tests/test_modern_accounting_bounded_transactions_v1.py
 
       - name: Run modern accounting regression smoke
