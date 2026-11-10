@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:twinconnect/live_dashboard.dart';
-import 'package:twinconnect/native_vpn_bridge.dart';
+import 'package:twinconnect/protocols.dart';
 import 'package:twinconnect/server_inventory.dart';
 import 'package:twinconnect/tenant_models.dart';
 import 'package:twinconnect/windows_preview_fixture.dart';
