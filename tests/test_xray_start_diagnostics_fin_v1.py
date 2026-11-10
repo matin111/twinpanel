@@ -21,7 +21,9 @@ class XrayStartDiagnosticsTest(unittest.TestCase):
         diagnostics = text.index('diagnostics = "unavailable"', check)
         self.assertLess(anchor, check)
         self.assertLess(check, diagnostics)
-        self.assertLess(check - anchor, 350)
+        self.assertLess(check - anchor, 500)
+        self.assertIn('restart_ok = "XRAY_RESTART_FAILED" not in str(restart_output)', text)
+        self.assertIn("if not (restart_ok and service_ok and not missing_listeners):", text)
 
     def test_no_credential_bearing_journal_in_error(self):
         text = SOURCE.read_text(encoding="utf-8")
