@@ -24,9 +24,12 @@ Requires:
 4. Your subscription must have an authorized WireGuard protocol profile and
    at least one assigned, online node. **No fixture/demo server is usable.**
 5. The selected node must supply exactly one WireGuard `config` with
-   matching `node_id`, one peer, IPv4 and IPv6 default routes
-   (`0.0.0.0/0, ::/0`), DNS, and an endpoint.
-   Profiles without this security scope are refused, not silently modified.
+   matching `node_id`, one peer, DNS, endpoint and either an IPv4 `/0`
+   default route or the panel's existing split `0.0.0.0/1, 128.0.0.0/1`
+   routes. **Only for the requested protected full-tunnel mode**, the native
+   adapter derives local `AllowedIPs = 0.0.0.0/0, ::/0` before encrypting
+   the runtime configuration. The original panel profile, keys, address and
+   endpoint are never changed. Unknown custom routes are refused.
 
 ### Test sequence
 
