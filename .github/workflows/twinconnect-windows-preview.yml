@@ -70,6 +70,33 @@ jobs:
           Compress-Archive -Path (Join-Path $release "*") -DestinationPath $zip -CompressionLevel Optimal
           if (!(Test-Path $zip)) { throw "ZIP packaging failed" }
           Write-Host ("Windows ZIP bytes: " + (Get-Item $zip).Length)
+      - name: Build isolated Windows Dev dashboard (no sign-in)
+        shell: pwsh
+        run: flutter build windows --release --target lib/main_dev.dart
+      - name: Package Windows Dev dashboard
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $release = Join-Path (Get-Location) "build/windows/x64/runner/Release"
+          if (!(Test-Path (Join-Path $release "twinconnect.exe"))) {
+            throw "Dev executable missing"
+          }
+          @'
+          TwinConnect DEV dashboard - Windows x64
+          Extract every file, then start twinconnect.exe.
+          Offline visual test: navigation, protocol filters, theme and language.
+          No account, license, VPN secrets or real connection is included.
+          This is a development-only build. Do not distribute to customers.
+          '@ | Set-Content -Path (Join-Path $release "README-DEV.txt") -Encoding UTF8
+          $zip = Join-Path (Get-Location) "TwinConnect-Windows-Dev.zip"
+          if (Test-Path $zip) { Remove-Item $zip -Force }
+          Compress-Archive -Path (Join-Path $release "*") -DestinationPath $zip -CompressionLevel Optimal
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TwinConnect-Windows-x64-Dev-Dashboard
+          path: clients/twinconnect/TwinConnect-Windows-Dev.zip
+          if-no-files-found: error
+          retention-days: 14
       - uses: actions/upload-artifact@v4
         with:
           name: TwinConnect-Windows-x64-Portable
