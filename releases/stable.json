@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.778",
+  "version": "1.1.0-rc.779",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-10T19:23:20Z",
+  "released_at": "2026-11-10T21:16:44Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "d12c77d47d2f158ad167fcb504e1cabf7d53683a",
+  "source_sha": "af16e0d623587455c580e19c5bb2323b0f78de20",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.778/twinpanel-1.1.0-rc.778-linux-x86_64.tar.gz",
-    "sha256": "b9becd374c6c523e63b025780c9a86827eca792392080a04f1b9e169924cc4a8",
-    "size_bytes": 30435167
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.779/twinpanel-1.1.0-rc.779-linux-x86_64.tar.gz",
+    "sha256": "804c589650db8a14c688b711324c4248c0055ae5d938ae361c86f7331cd529de",
+    "size_bytes": 30442255
   },
   "notes": {
-    "fa": "بازطراحی نمایش اشتراک‌های پنل نماینده و کاربر با کارت‌های شیشه‌ای خوانا، رنگ‌بندی واضح دکمه‌ها و نمایش چندستونه در دسکتاپ ویندوز و تک‌ستونه در موبایل. وضعیت آنلاین، حجم، انقضا و عملیات قبلی حفظ شدند. بدون تغییر در اطلاعات کاربران یا پروتکل‌ها.",
-    "en": "Responsive glass-style reseller and customer subscription cards on Windows desktop and mobile. Clear primary actions, live online badges, traffic and expiry, safe overflow actions. No backend or customer data changes."
+    "fa": "اصلاح نمایش اشتراک‌های پنل ادمین در ویندوز و اندروید: کارت‌های یکسان به جای جدول دسکتاپ، سه یا چهار ستون در صفحه بزرگ، دو ستون تبلت و یک ستون موبایل؛ دکمه‌های ریست و ویرایش با رنگ جداگانه و عملیات بیشتر رنگی و خوانا. اطلاعات کاربران و تنظیمات پروتکل بدون تغییر.",
+    "en": "Fix admin subscription view across Windows and Android: responsive glass cards replace desktop table, visually distinct Reset and Edit, color-coded accessible overflow actions. No account, server, protocol or data mutation."
   }
 }
