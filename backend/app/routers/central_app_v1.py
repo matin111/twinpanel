@@ -13,6 +13,7 @@ from urllib.parse import urlsplit
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -24,11 +25,12 @@ from ..central_app_models import CentralAppContact
 from ..database import get_db
 from ..deps import require_admin, require_reseller
 from ..models_reseller import Reseller, ResellerSubscription
-from ..models import Subscription
+from ..models import Subscription, SubscriptionProtocol, ProtocolCredential
 from ..system_release import (
     _vendor_post, ensure_installation_id, load_license_state,
 )
-from .account_delivery import _subscription_from_share_token
+from .account_delivery import _subscription_from_share_token, _stored_info
+from ..central_app_protocols import protocol_catalog, normalize_protocol
 
 router = APIRouter(prefix="/v1/central-app", tags=["central-app"])
 _COLOR = re.compile(r"^#[0-9A-Fa-f]{6}$")
@@ -339,3 +341,157 @@ def subscription_app_brand_preview(
         "account_status": "expired" if expired else status_value,
         "vpn_connection_available": False,  # Client engine/session flow not available yet.
     }
+
+
+class ProtocolProfilesIn(BrandPreviewIn):
+    protocol: str = Field(min_length=2, max_length=32)
+
+
+def _verified_protocol_subscription(
+    payload: BrandPreviewIn,
+    db: Session,
+) -> Subscription:
+    """Token and username must match a single *currently active* subscription."""
+    if not central_app_entitled():
+        raise HTTPException(status_code=403, detail="CENTRAL_APP_NOT_INCLUDED")
+    sub = _subscription_from_share_token(payload.share_token, db)
+    name = str(sub.account_username or "").strip()
+    if not name or not hmac.compare_digest(
+        name.encode("utf-8"), payload.account_username.strip().encode("utf-8")
+    ):
+        raise HTTPException(status_code=403, detail="ACCOUNT_TOKEN_MISMATCH")
+    status = str(getattr(sub.status, "value", sub.status) or "").strip().lower()
+    if status != "active":
+        raise HTTPException(status_code=403, detail="SUBSCRIPTION_INACTIVE")
+    if sub.expires_at and sub.expires_at <= datetime.utcnow():
+        raise HTTPException(status_code=403, detail="SUBSCRIPTION_EXPIRED")
+    link = (
+        db.query(ResellerSubscription)
+        .filter(ResellerSubscription.subscription_id == sub.id)
+        .first()
+    )
+    if link:
+        reseller = db.get(Reseller, int(link.reseller_id))
+        if reseller is None or not reseller.is_active:
+            raise HTTPException(status_code=403, detail="RESELLER_INACTIVE")
+    return sub
+
+
+def _selected_client_protocols(db: Session, subscription_id: int) -> set[str]:
+    rows = (
+        db.query(SubscriptionProtocol.protocol)
+        .filter(SubscriptionProtocol.subscription_id == subscription_id)
+        .all()
+    )
+    return {value for row in rows if (value := normalize_protocol(row[0]))}
+
+
+@router.post("/public/protocols")
+def subscription_protocol_catalog(
+    payload: BrandPreviewIn,
+    db: Session = Depends(get_db),
+):
+    """Reveal availability metadata, never credentials or subscription tokens.
+
+    'config_record_present' means stored data exists, NOT that a connection
+    works or that a specific app engine is installed.
+    """
+    sub = _verified_protocol_subscription(payload, db)
+    selected = _selected_client_protocols(db, sub.id)
+    rows = (
+        db.query(ProtocolCredential)
+        .filter(
+            ProtocolCredential.subscription_id == sub.id,
+            ProtocolCredential.is_active.is_(True),
+        )
+        .all()
+    )
+    configured = {
+        value for row in rows
+        if (value := normalize_protocol(row.protocol))
+        and bool(row.config_text_encrypted)
+    }
+    return JSONResponse(
+        {
+            "schema": 1,
+            "namespace": installation_namespace(ensure_installation_id()),
+            "protocols": protocol_catalog(selected, configured),
+        },
+        headers={
+            "Cache-Control": "no-store",
+            "Pragma": "no-cache",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+
+
+@router.post("/public/profiles")
+def subscription_protocol_profiles(
+    payload: ProtocolProfilesIn,
+    db: Session = Depends(get_db),
+):
+    """Fetch one authorized protocol's *existing* panel profiles on demand.
+
+    This is a credential-bearing endpoint: HTTPS POST, no URL tokens, no
+    caches. The vendor directory is never involved. Client code must request
+    it only when an actual native engine is ready and immediately erase the
+    profiles after delivery to the protected native process.
+    """
+    sub = _verified_protocol_subscription(payload, db)
+    protocol = normalize_protocol(payload.protocol)
+    if not protocol or protocol not in _selected_client_protocols(db, sub.id):
+        raise HTTPException(status_code=404, detail="PROTOCOL_NOT_SELECTED")
+
+    info = getattr(db, "info", None)
+    if isinstance(info, dict):
+        info["_tp_public_feed_only_protocol"] = protocol
+    try:
+        # Existing delivery owns live endpoint, SNI, credential and node
+        # projection. NEVER generate altered synthetic server credentials here.
+        projected = _stored_info(db, sub)
+    finally:
+        if isinstance(info, dict):
+            info.pop("_tp_public_feed_only_protocol", None)
+    credentials = [
+        entry for entry in projected.get("credentials", [])
+        if normalize_protocol(entry.get("protocol")) == protocol
+    ]
+    if not credentials:
+        raise HTTPException(status_code=404, detail="PROFILES_NOT_READY")
+    profile_items: list[dict] = []
+    for credential in credentials:
+        items = credential.get("items") or []
+        if isinstance(items, dict):
+            items = [items]
+        if not isinstance(items, list):
+            continue
+        for item in items:
+            if isinstance(item, dict):
+                # Preserve nested Xray inbounds and sing-box ShadowTLS chains.
+                profile_items.append(dict(item))
+                if len(profile_items) > 200:
+                    raise HTTPException(status_code=413, detail="TOO_MANY_PROFILES")
+    if not profile_items:
+        raise HTTPException(status_code=404, detail="PROFILES_NOT_READY")
+
+    import json
+    from fastapi.encoders import jsonable_encoder
+
+    response = {
+        "schema": 1,
+        "namespace": installation_namespace(ensure_installation_id()),
+        "protocol": protocol,
+        "items": jsonable_encoder(profile_items),
+        "native_engine_ready": False,
+    }
+    raw = json.dumps(response, ensure_ascii=False, separators=(",", ":"))
+    if len(raw.encode("utf-8")) > 1024 * 1024:
+        raise HTTPException(status_code=413, detail="PROFILE_RESPONSE_TOO_LARGE")
+    return JSONResponse(
+        response,
+        headers={
+            "Cache-Control": "no-store, private, max-age=0",
+            "Pragma": "no-cache",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
