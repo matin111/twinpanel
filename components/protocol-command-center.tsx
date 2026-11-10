@@ -242,6 +242,7 @@ export function ProtocolCommandCenter(){
   const [notice,setNotice]=useState("");
   const [classicRuntime,setClassicRuntime]=useState<Record<string,ClassicRuntime>>({});
   const [classicChecked,setClassicChecked]=useState<Record<string,boolean>>({});
+  const [portWarnings,setPortWarnings]=useState<Record<string,string>>({});
   const [classicDrafts,setClassicDrafts]=useState<Record<string,ClassicDraft>>({});
   const [modernEditor,setModernEditor]=useState<ModernEditor|null>(null);
   const [modernPreview,setModernPreview]=useState<ModernPreview|null>(null);
@@ -386,6 +387,19 @@ export function ProtocolCommandCenter(){
     finally{setBusy("");}
   };
 
+  const checkClassicPort=async(row:UnifiedProtocol)=>{
+    if(!selectedNode||row.kind!=="classic"||row.protocol==="l2tp"||busy)return;
+    const protocol=row.protocol as ClassicProtocolKey;
+    const key=classicKey(selectedNode.id,protocol);
+    const draft=classicDrafts[key]||{port:Number(row.classicRow?.port||CLASSIC_MAP.get(protocol)?.defaultPort||0),transport:"udp" as const};
+    setBusy(`port-check:${key}`);setError("");
+    try{
+      const result=await legacyAdminApi.classicPortCheck({node_id:selectedNode.id,protocol,port:draft.port,...(protocol==="openvpn"?{transport:draft.transport}:{})});
+      setPortWarnings(current=>({...current,[key]:result.available?pick("پورت‌های انتخاب‌شده آزاد هستند.","Selected ports are available."):pick(`تداخل پورت: ${result.conflicts.map(x=>`${x.port}/${x.transport.toUpperCase()}`).join("، ")}. پورت دیگری انتخاب کنید؛ سرویس فعلی تغییر نمی‌کند.`,`Port conflict: ${result.conflicts.map(x=>`${x.port}/${x.transport.toUpperCase()}`).join(", ")}. Choose another port; the current service stays unchanged.`)}));
+    }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
+    finally{setBusy("");}
+  };
+
   const ensureClassic=async(row:UnifiedProtocol)=>{
     if(!selectedNode?.classic||row.kind!=="classic"||!row.classicRow||busy)return;
     const protocol=row.protocol as ClassicProtocolKey;
@@ -394,6 +408,15 @@ export function ProtocolCommandCenter(){
     const draft=classicDrafts[key]||{port:Number(row.classicRow.port||def.defaultPort||0),transport:row.classicRow.transport==="tcp"?"tcp":"udp"};
     setBusy(`classic-ensure:${key}`);setError("");setNotice("");
     try{
+      if(!row.installed&&protocol!=="l2tp"){
+        const probe=await legacyAdminApi.classicPortCheck({node_id:selectedNode.id,protocol,port:draft.port,...(protocol==="openvpn"?{transport:draft.transport}:{})});
+        if(!probe.available){
+          const ports=probe.conflicts.map(item=>`${item.port}/${item.transport.toUpperCase()}`).join(", ");
+          setSelectedProtocol({kind:"classic",protocol});
+          setError(pick(`تداخل پورت ${ports}. در مدیریت پروتکل پورت آزاد انتخاب کنید؛ هیچ سرویس فعالی متوقف نمی‌شود.`,`Port conflict ${ports}. Choose a free port in protocol management; no running services will be stopped.`));
+          return;
+        }
+      }
       const result=await legacyAdminApi.ensureClassicProtocol({node_id:selectedNode.id,protocol,...(protocol==="l2tp"?{}:{port:draft.port}),...(protocol==="openvpn"?{transport:draft.transport}:{})});
       const runtimeRow=result&&typeof result.runtime==="object"&&result.runtime?result.runtime as ClassicRuntime:{};
       setClassicRuntime(current=>({...current,[key]:runtimeRow}));setClassicChecked(current=>({...current,[key]:true}));
@@ -618,6 +641,9 @@ export function ProtocolCommandCenter(){
             <section className={styles.drawerSection}>
               <div className={styles.sectionHead}><div><strong>{pick("Listener","Listener")}</strong><small>{pick("تنظیمات اصلی سرویس","Primary service settings")}</small></div></div>
               {protocol==="l2tp"?<div className={styles.readonlyRow}><span>{pick("پورت‌های ثابت","Fixed ports")}</span><b dir="ltr">500 / 4500 / 1701 UDP</b></div>:<div className={styles.formGrid}><div className={styles.field}><label>{pick("پورت Listener","Listener port")}</label><input type="number" min={1} max={65535} value={draft.port} onChange={event=>setClassicDrafts(current=>({...current,[key]:{...draft,port:Number(event.target.value)}}))}/></div>{protocol==="openvpn"?<div className={styles.field}><label>Transport</label><select value={draft.transport} onChange={event=>setClassicDrafts(current=>({...current,[key]:{...draft,transport:event.target.value as "udp"|"tcp"}}))}><option value="udp">UDP</option><option value="tcp">TCP</option></select></div>:null}</div>}
+              {protocol==="v2ray"?<div className={styles.warningBox}>{pick("تغییر پورت Xray مشکل صدور SSL را حل نمی‌کند؛ تأیید HTTP-01 به پورت عمومی 80 نیاز دارد.","Changing the Xray listener port does not fix SSL issuance; HTTP-01 requires public port 80.")}</div>:null}
+              {portWarnings[key]?<div className={styles.warningBox}>{portWarnings[key]}</div>:null}
+              {protocol!=="l2tp"?<button className={styles.secondaryButton} disabled={!!busy||!Number.isInteger(draft.port)||draft.port<1||draft.port>65535} onClick={()=>void checkClassicPort(selectedRow)}>{busy===`port-check:${key}`?"…":pick("بررسی تداخل پورت","Check port conflict")}</button>:null}
               {run?.error||selectedRow.error?<div className={styles.errorBox}>{run?.error||selectedRow.error}</div>:null}
               <div className={styles.actionRow}><button className={styles.primaryButton} disabled={!!busy} onClick={()=>void ensureClassic(selectedRow)}>{busy===`classic-ensure:${key}`?"…":selectedRow.installed?pick("اعمال / Repair","Apply / repair"):pick("نصب / فعال‌سازی","Install / enable")}</button>{selectedRow.installed?<button className={styles.secondaryButton} disabled={!!busy} onClick={()=>void classicHealth(selectedRow)}>{busy===`classic-health:${key}`?"…":"Health"}</button>:null}{selectedRow.installed&&checked&&!run?.ok?<button className={styles.secondaryButton} disabled={!!busy} onClick={()=>void restartClassic(selectedRow)}>{busy===`classic-restart:${key}`?"…":pick("ریستارت","Restart")}</button>:null}</div>
             </section>
