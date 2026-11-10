@@ -350,6 +350,28 @@ def restart_services(*, include_web: bool = True) -> None:
     )
 
 
+def converge_web_prestart_helpers_for_bluegreen(release: Path, env: dict[str, str]) -> None:
+    """Replay required global Web ExecStartPre migrations without restarting Web.
+
+    The pinned standby is deliberately side-effect-free; the legacy Web unit
+    previously owned these migrations. Run only canonical verified helpers and
+    do so while the old Web listener still serves all Nginx vhosts.
+    """
+    python = VENV if VENV.is_file() else Path(sys.executable)
+    scripts = (
+        ("twinpanel_nginx_reconcile.py", ("--reload",)),
+        ("twinpanel_updater_unit_reconcile_v69.py", ()),
+        ("twinpanel_api_update_handoff_v69.py", ()),
+        ("twinpanel_runtime_unit_reconcile.py", ("--verify",)),
+        ("twinpanel_accounting_unit_reconcile.py", ("--verify",)),
+    )
+    for script, args in scripts:
+        target = release / "backend/scripts" / script
+        if not target.is_file():
+            raise RuntimeError("WEB_BLUEGREEN_REQUIRED_PRESTART_MISSING:" + script)
+        run([str(python), str(target), *args], cwd=release / "backend", env=env, timeout=90)
+
+
 def install_node_auto_backfill_timer(release: Path) -> None:
     """Install durable worker units from the exact verified, pinned release.
 
@@ -949,6 +971,9 @@ def main() -> int:
             seconds=45,
         )
         if health_ok_all and bg is not None:
+            # Preserve all prestart migrations formerly run by the restarted
+            # production Web unit, without shutting down the old listener.
+            converge_web_prestart_helpers_for_bluegreen(final, env)
             health_ok_all = bg.wait_ready(target_web_port, version, final)
             if not health_ok_all:
                 pending = ['web_canary_routes_assets']
