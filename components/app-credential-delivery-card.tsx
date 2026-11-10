@@ -29,7 +29,14 @@ export function AppCredentialDeliveryCard({
       const result=await getAppAccess(owner,subscriptionId,reset);
       if(requestEpoch.current===epoch)setData(result);
     }catch(e){
-      if(requestEpoch.current===epoch)setError(e instanceof Error?e.message:String(e));
+      if(requestEpoch.current===epoch){
+        const reason=e instanceof Error?e.message:String(e);
+        setError(reason.includes("CENTRAL_APP_NOT_INCLUDED")
+          ? pick("اپ TwinConnect در لایسنس این پنل فعال نیست.","TwinConnect is not enabled in this panel license.")
+          : reason.includes("SUBSCRIPTION_NOT_FOUND")
+            ? pick("اشتراک در دسترس نیست یا اجازه مشاهده آن را ندارید.","Subscription not found or access denied.")
+            : reason);
+      }
     }finally{
       if(requestEpoch.current===epoch)setBusy(false);
     }
