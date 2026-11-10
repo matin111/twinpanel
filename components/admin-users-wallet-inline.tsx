@@ -160,7 +160,9 @@ export function AdminUsersWalletInline(){
       setBalances(current=>({...current,[userId]:Number(result.balance_toman||0)}));
       setOk(mode==="debit"?pick("موجودی با موفقیت کسر شد و در پنل و ربات بروزرسانی می‌شود.","Balance deducted and reflected in panel and bot."):pick("کیف پول شارژ شد؛ موجودی در پنل کاربری و ربات مشترک است.","Wallet credited; balance is shared by user panel and bot."));
       setAmount("");setNote("");
-      await loadBalances();
+      // The balance from the committed response is authoritative. A secondary
+      // list refresh must not keep the money-action button busy after success.
+      void loadBalances();
     }catch(e){setError(e instanceof Error?e.message:String(e));}
     finally{setBusy(false);}
   };
