@@ -661,7 +661,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
             Expanded(child: Column(children: [
               txt(tr('پروتکل', 'Protocol'), size: 10, color: sub),
               const SizedBox(height: 4),
-              txt(_filter == 'all'
+              txt(_vpnUp ? 'WireGuard' : _filter == 'all'
                   ? tr('خودکار', 'Auto')
                   : (VpnProtocols.byCode(_filter)?.name ?? '—'),
                   size: 11, bold: true),
@@ -690,7 +690,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           child: Material(
             color: Colors.transparent,
             child: InkWell(
-          onTap: () => setState(() => _selected = index),
+          onTap: _vpnBusy ? null : () => _selectServerAndConnect(index),
           borderRadius: BorderRadius.circular(16),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -721,7 +721,10 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
               txt(widget.servers?.servers[index].latencyMs == null
                   ? '— ms' : '${widget.servers!.servers[index].latencyMs} ms', size: 11, color: sub),
               const SizedBox(width: 8),
-              Icon(Icons.lock_outline, size: 17, color: sub),
+              Icon(_vpnUp && _activeNodeId == widget.servers?.servers[index].id
+                ? Icons.verified_rounded : Icons.chevron_right_rounded,
+                size: 19, color: _vpnUp && _activeNodeId == widget.servers?.servers[index].id
+                  ? const Color(0xFF33D6A6) : sub),
             ]),
           ),
         ),
@@ -857,10 +860,13 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           const SizedBox(height: 16),
           Row(children: [
             Expanded(child: metric(Icons.speed_rounded,
-              tr('پینگ', 'Ping'), '— ms')),
+              tr('تاخیر HTTPS', 'HTTPS latency'),
+              _vpnVerified && _httpsLatencyMs != null
+                ? '$_httpsLatencyMs ms' : '— ms')),
             const SizedBox(width: 10),
             Expanded(child: metric(Icons.public_rounded,
-              tr('آی‌پی', 'IP address'), '—')),
+              tr('آی‌پی عمومی', 'Public IP'),
+              _vpnVerified ? (_publicIp ?? '—') : '—')),
           ]),
           const SizedBox(height: 10),
           Row(children: [
@@ -919,6 +925,50 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
             ),
           );
         }),
+        const SizedBox(height: 15),
+        glassCard(
+          key: const Key('liveAutoFastestServer'),
+          radius: 19,
+          padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 10),
+          child: Row(children: [
+            const Icon(Icons.auto_awesome_rounded, size: 22, color: purple),
+            const SizedBox(width: 12),
+            Expanded(child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                txt(tr('انتخاب سریع‌ترین سرور', 'Select fastest server'),
+                    size: 13, bold: true),
+                const SizedBox(height: 4),
+                txt(_fastestKnownIndex == null
+                    ? tr('تاخیر قابل‌اندازه‌گیری موجود نیست',
+                        'No measured server latency available')
+                    : tr('بر اساس تاخیر گزارش‌شده پنل',
+                        'Based on panel-reported server latency'),
+                    size: 11, color: sub),
+              ],
+            )),
+            Switch(
+              key: const Key('autoFastestServerToggle'),
+              value: _autoFastest,
+              onChanged: _vpnBusy || _vpnUp ? null : (enabled) {
+                final best = _fastestKnownIndex;
+                if (enabled && best == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                    content: Text(tr('برای انتخاب خودکار، پینگ معتبر لازم است.',
+                        'Measured server latency is required.'))));
+                  return;
+                }
+                setState(() {
+                  _autoFastest = enabled;
+                  if (enabled) {
+                    _selected = best!;
+                    _filter = 'wireguard';
+                  }
+                });
+              },
+            ),
+          ]),
+        ),
         const SizedBox(height: 15),
         glassCard(
           key: const Key('devLocationsCard'),
