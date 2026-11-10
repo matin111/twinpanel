@@ -176,7 +176,8 @@ function CustomerPaymentsBody(){
         <div className="paymentDestination">
           <div><span>{pick("روش","Method")}</span><b>{currentMethod?.title||intent.method}</b></div>
           {intent.method==="card_to_card"?<>
-            <div><span>{pick("مبلغ دقیق","Exact amount")}</span><b>{money(intent.payable_amount_toman||intent.amount_toman||order.amount_toman)}</b></div>
+            <div><span>{pick("مبلغ دقیق","Exact amount")}</span><b>{money(intent.payable_amount_toman||intent.amount_toman||order.amount_toman)}</b><button type="button" title={pick("کپی مبلغ دقیق","Copy exact amount")} onClick={()=>void copy("card-amount",String(intent.payable_amount_toman||intent.amount_toman||order.amount_toman))}>{copied==="card-amount"?"✓":pick("کپی مبلغ","Copy amount")}</button></div>
+            <small>{pick("فقط مبلغ دقیق بالا را واریز کنید؛ مبلغ رُند خودکار تأیید نمی‌شود.","Transfer the exact amount shown; rounded transfers cannot be auto-verified.")}</small>
             <div><span>{pick("شماره کارت","Card number")}</span><b dir="ltr">{currentMethod?.card_number||"—"}</b>{currentMethod?.card_number&&<button type="button" onClick={()=>void copy("card",currentMethod.card_number!)}>{copied==="card"?"✓":"⧉"}</button>}</div>
             <div><span>{pick("به نام","Card holder")}</span><b>{currentMethod?.card_holder||"—"}</b></div>
           </>:<>
