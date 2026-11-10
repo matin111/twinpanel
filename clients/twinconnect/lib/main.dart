@@ -157,6 +157,7 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
       _confirmedSessionToken = null;
       _catalog = null;
       _servers = null;
+      _refreshingServers = false;
       _serverRefreshError = null;
       _protocolCatalogUnavailable = false;
       _nativeProtocols = const NativeProtocolReadiness(supportedCodes: {});
