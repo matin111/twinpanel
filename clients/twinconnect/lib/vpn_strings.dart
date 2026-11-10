@@ -1,24 +1,24 @@
 import 'app_strings.dart';
 
 extension VpnStrings on AppStrings {
-  String get vpnSettingsTitle => pick('تنظیمات پیشرفته VPN', 'Advanced VPN settings');
+  String get vpnSettingsTitle => pick('تنظیمات VPN', 'VPN settings');
   String get vpnPolicyOnly => pick(
-    'این نسخه فقط تنظیمات را ذخیره می‌کند. هیچ تونل یا Kill Switch فعالی ایجاد نشده است.',
-    'This preview only saves preferences. No VPN tunnel or kill switch is active.',
+    'موتور اتصال هنوز فعال نیست.',
+    'Connection engine is not active.',
   );
-  String get vpnPlatformStatus => pick('وضعیت موتور دستگاه', 'Device engine status');
+  String get vpnPlatformStatus => pick('وضعیت موتور', 'Engine status');
   String get vpnEngineUnavailable => pick(
-    'موتور VPN نصب یا تأیید نشده است؛ حفاظت غیرفعال است.',
-    'The native VPN engine is not available or verified. Protection is OFF.',
+    'نصب نیست',
+    'Not installed',
   );
   String get vpnEngineAvailable => pick(
-    'موتور شناسایی شد؛ هر قابلیت باید جداگانه تأیید شود.',
-    'Native engine detected; individual protections require verification.',
+    'آماده',
+    'Ready',
   );
   String get vpnFullTunnel => pick('تمام دستگاه', 'Entire device');
   String get vpnFullTunnelHint => pick(
-    'ترافیک دستگاه از تونل VPN عبور می‌کند.',
-    'Route device traffic through the VPN tunnel.',
+    'ترافیک دستگاه از VPN عبور می‌کند.',
+    'Route traffic through VPN.',
   );
   String get vpnOnlyApps => pick('فقط برنامه‌های انتخابی', 'Only selected apps');
   String get vpnOnlyAppsHint => pick(
@@ -32,8 +32,8 @@ extension VpnStrings on AppStrings {
   );
   String get vpnRoutingTitle => pick('مسیر عبور ترافیک', 'Traffic routing');
   String get vpnAppSelectionUnavailable => pick(
-    'انتخاب برنامه در نسخه مصرف‌کننده این سیستم‌عامل پشتیبانی نمی‌شود؛ در دستگاه‌های مدیریت‌شده ممکن است به MDM نیاز باشد.',
-    'Per-app selection is unavailable in this consumer build; managed devices may require MDM.',
+    'فعلاً پشتیبانی نمی‌شود',
+    'Not supported yet',
   );
   String get vpnAppIds => pick('برنامه‌های انتخابی', 'Selected apps');
   String get vpnAppIdLabel => pick('شناسه برنامه', 'App identifier');
@@ -45,52 +45,52 @@ extension VpnStrings on AppStrings {
   String get vpnAddApp => pick('افزودن برنامه', 'Add app');
   String get vpnRemoveApp => pick('حذف از فهرست', 'Remove from list');
   String get vpnAppPickerNote => pick(
-    'فعلاً شناسه برنامه را دستی وارد کنید. فهرست برنامه‌های نصب‌شده پس از اتصال ماژول بومی افزوده می‌شود.',
-    'Enter app identifiers manually for now. Installed-app picking needs a native module.',
+    'شناسه برنامه را وارد کنید.',
+    'Enter app identifier.',
   );
-  String get vpnSecurityTitle => pick('امنیت و جلوگیری از نشت', 'Security and leak protection');
-  String get vpnKillSwitch => pick('درخواست Kill Switch سخت‌گیرانه', 'Request strict kill switch');
+  String get vpnSecurityTitle => pick('امنیت', 'Security');
+  String get vpnKillSwitch => pick('Kill Switch', 'Kill switch');
   String get vpnKillSwitchSubtitle => pick(
-    'تا تأیید قفل شبکه توسط سیستم‌عامل، این گزینه حفاظت فعالی ایجاد نمی‌کند.',
-    'This cannot block traffic until OS-level lockdown is confirmed.',
+    'قطع اینترنت هنگام قطع VPN',
+    'Blocks internet if VPN disconnects',
   );
   String get vpnKillSwitchOff => pick(
-    'وضعیت واقعی Kill Switch: غیرفعال',
-    'Actual kill switch: NOT ACTIVE',
+    'Kill Switch: غیرفعال',
+    'Kill switch: Off',
   );
   String get vpnKillSwitchOn => pick(
-    'قفل شبکه توسط موتور بومی تأیید شده است.',
-    'Network lockdown verified by the native engine.',
+    'Kill Switch: فعال',
+    'Kill switch: On',
   );
   String get vpnDnsProtected => pick('حفاظت DNS', 'Protect DNS requests');
   String get vpnDnsHint => pick(
-    'DNS فقط داخل تونل یا مسدود؛ جلوگیری از درخواست‌های مستقیم.',
-    'DNS must travel inside the tunnel or be blocked.',
+    'جلوگیری از نشت DNS',
+    'Prevent DNS leaks',
   );
   String get vpnIpv6Protected => pick('حفاظت IPv6', 'IPv6 leak protection');
   String get vpnIpv6Hint => pick(
-    'IPv6 نیز تونل شود یا هنگام عدم پشتیبانی مسدود گردد.',
-    'Tunnel IPv6 or block it when unsupported.',
+    'جلوگیری از نشت IPv6',
+    'Prevent IPv6 leaks',
   );
   String get vpnAllowLan => pick('اجازه دسترسی به شبکه محلی', 'Allow local network access');
   String get vpnAllowLanHint => pick(
-    'برای پرینتر و دستگاه‌های محلی؛ یک استثنای شبکه محسوب می‌شود.',
-    'Allow printers and LAN devices; creates a routing exception.',
+    'دسترسی به دستگاه‌های محلی',
+    'Access local devices',
   );
   String get vpnAutomationTitle => pick('اتصال هوشمند', 'Smart connection');
   String get vpnAutoReconnect => pick('اتصال مجدد خودکار', 'Auto reconnect');
-  String get vpnAutoConnect => pick('اتصال خودکار هنگام اجرای برنامه', 'Auto connect on app start');
-  String get vpnAutoSelectServer => pick('انتخاب خودکار سرور مناسب', 'Automatically select a suitable server');
+  String get vpnAutoConnect => pick('اتصال هنگام اجرای برنامه', 'Connect on launch');
+  String get vpnAutoSelectServer => pick('انتخاب خودکار سرور', 'Auto-select server');
   String get vpnNotConfigured => pick(
-    'ابتدا حساب خود را شناسایی کنید تا تنظیمات اختصاصی آن ذخیره شود.',
-    'Identify your account before saving account-specific settings.',
+    'ابتدا وارد شوید.',
+    'Sign in first.',
   );
-  String get vpnSave => pick('ذخیره تنظیمات پیشنهادی', 'Save desired settings');
+  String get vpnSave => pick('ذخیره تنظیمات', 'Save settings');
   String get vpnSaved => pick(
-    'تنظیمات ذخیره شد؛ تا راه‌اندازی موتور بومی اجرا نمی‌شود.',
-    'Preferences saved; they will not take effect until the native engine is ready.',
+    'تنظیمات ذخیره شد',
+    'Settings saved',
   );
-  String get vpnSaveError => pick('ذخیره تنظیمات ناموفق بود.', 'Could not save preferences.');
+  String get vpnSaveError => pick('ذخیره نشد', 'Could not save');
   String get vpnPlatformAndroid => 'Android';
   String get vpnPlatformWindows => 'Windows';
   String get vpnPlatformIos => 'iOS';
