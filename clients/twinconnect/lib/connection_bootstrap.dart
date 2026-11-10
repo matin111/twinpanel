@@ -4,6 +4,7 @@ import 'tenant_api.dart';
 import 'tenant_models.dart';
 import 'vpn_policy.dart';
 import 'native_vpn_bridge.dart';
+import 'singbox_profile_validator.dart';
 
 /// A validated, subscription-scoped connection candidate. These checks do
 /// not start a VPN tunnel and must never be shown as "connected".
@@ -81,6 +82,20 @@ class ConnectionBootstrap {
     }).toList(growable: false);
     if (nodeItems.isEmpty) {
       throw const ConnectionBootstrapException('SERVER_PROFILE_MISSING');
+    }
+    if (SingBoxProfileValidator.supportsFamily(definition.code)) {
+      // Do not attempt a mixed-engine or lossy URI conversion. Once the
+      // native engine advertises readiness, profiles must be valid native
+      // sing-box outbounds before they reach it.
+      for (final item in nodeItems) {
+        try {
+          SingBoxProfileValidator.validateOutbound(
+            protocolCode: definition.code, item: item);
+        } on FormatException {
+          throw const ConnectionBootstrapException(
+              'SINGBOX_PROFILE_NOT_NATIVE_READY');
+        }
+      }
     }
     return ConnectionCandidate(
       server: selected.single,
