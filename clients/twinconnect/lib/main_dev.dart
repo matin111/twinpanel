@@ -228,7 +228,7 @@ class _TwinConnectDevAppState extends State<TwinConnectDevApp> {
 
     Widget powerCard() => Container(
       key: const Key('devConnectionStatus'),
-      padding: const EdgeInsets.fromLTRB(25, 22, 25, 19),
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 15),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(29),
         gradient: LinearGradient(
@@ -247,9 +247,9 @@ class _TwinConnectDevAppState extends State<TwinConnectDevApp> {
       ),
       child: Column(children: [
         smallPill(tr('آفلاین', 'Offline'), icon: Icons.circle),
-        const SizedBox(height: 21),
+        const SizedBox(height: 13),
         Container(
-          height: 128, width: 128,
+          height: 94, width: 94,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             border: Border.all(color: purple, width: 3),
@@ -263,16 +263,16 @@ class _TwinConnectDevAppState extends State<TwinConnectDevApp> {
             ],
           ),
           child: const Icon(Icons.power_settings_new_rounded,
-              size: 57, color: purple),
+              size: 45, color: purple),
         ),
-        const SizedBox(height: 18),
-        txt(tr('اتصال سریع', 'Quick connect'), size: 24, bold: true),
+        const SizedBox(height: 12),
+        txt(tr('اتصال سریع', 'Quick connect'), size: 20, bold: true),
         const SizedBox(height: 5),
         txt(tr('موتور اتصال آماده نیست', 'Connection engine unavailable'),
             size: 12, color: sub),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
         SizedBox(
-          width: 245, height: 46,
+          width: 215, height: 43,
           child: FilledButton.icon(
             key: const Key('devConnectButton'),
             onPressed: null,
@@ -286,7 +286,7 @@ class _TwinConnectDevAppState extends State<TwinConnectDevApp> {
             label: Text(tr('اتصال', 'Connect')),
           ),
         ),
-        const SizedBox(height: 17),
+        const SizedBox(height: 12),
         Container(
           decoration: tile(radius: 15),
           padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 12),
@@ -362,34 +362,35 @@ class _TwinConnectDevAppState extends State<TwinConnectDevApp> {
       );
     }
 
-    Widget filters() => SizedBox(
-      height: 43,
-      child: ListView(
-        key: const Key('devProtocolFilters'),
-        scrollDirection: Axis.horizontal,
+    // All 16 chips remain visible. Admin-selected protocols will replace
+    // the preview's complete catalog after an authenticated panel session.
+    Widget filters() => Container(
+      key: const Key('devProtocolFilters'),
+      width: double.infinity,
+      alignment: AlignmentDirectional.centerStart,
+      child: Wrap(
+        alignment: WrapAlignment.start,
+        runSpacing: 8,
+        spacing: 7,
         children: [
           for (final entry in <(String, String)>[
             ('all', tr('همه', 'All')),
             for (final p in VpnProtocols.all) (p.code, p.name),
-          ]) ...[
-            Padding(
-              padding: const EdgeInsetsDirectional.only(end: 7),
-              child: ChoiceChip(
-                key: Key('devFilter_${entry.$1}'),
-                label: txt(entry.$2, size: 11,
-                  color: _filter == entry.$1 ? Colors.white : ink),
-                selected: _filter == entry.$1,
-                showCheckmark: false,
-                selectedColor: _dark
-                    ? const Color(0xFF7640C9) : const Color(0xFF7844C7),
-                backgroundColor: panel,
-                side: BorderSide(color: _filter == entry.$1 ? purple : line),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
-                onSelected: (_) => setState(() => _filter = entry.$1),
-              ),
+          ])
+            ChoiceChip(
+              key: Key('devFilter_${entry.$1}'),
+              label: txt(entry.$2, size: 11,
+                color: _filter == entry.$1 ? Colors.white : ink),
+              selected: _filter == entry.$1,
+              showCheckmark: false,
+              selectedColor: _dark
+                  ? const Color(0xFF7640C9) : const Color(0xFF7844C7),
+              backgroundColor: panel,
+              side: BorderSide(color: _filter == entry.$1 ? purple : line),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12)),
+              onSelected: (_) => setState(() => _filter = entry.$1),
             ),
-          ],
         ],
       ),
     );
@@ -444,13 +445,99 @@ class _TwinConnectDevAppState extends State<TwinConnectDevApp> {
       );
     }
 
+    Widget metric(IconData icon, String title, String value,
+        {String? detail}) => Container(
+      padding: const EdgeInsets.all(14),
+      decoration: tile(radius: 17),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            Icon(icon, color: purple, size: 18),
+            const SizedBox(width: 8),
+            Expanded(child: txt(title, size: 11, color: sub)),
+          ]),
+          const SizedBox(height: 10),
+          txt(value, size: 18, bold: true),
+          if (detail != null) ...[
+            const SizedBox(height: 4),
+            txt(detail, size: 10, color: sub),
+          ],
+        ],
+      ),
+    );
+
+    Widget connectionStats() => Container(
+      key: const Key('devConnectionStats'),
+      padding: const EdgeInsets.all(16),
+      decoration: tile(radius: 23),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(children: [
+            Expanded(child: txt(tr('وضعیت شبکه', 'Network status'),
+              size: 17, bold: true)),
+            smallPill(tr('بدون اتصال', 'Disconnected')),
+          ]),
+          const SizedBox(height: 16),
+          Row(children: [
+            Expanded(child: metric(Icons.speed_rounded,
+              tr('پینگ', 'Ping'), '— ms')),
+            const SizedBox(width: 10),
+            Expanded(child: metric(Icons.public_rounded,
+              tr('آی‌پی', 'IP address'), '—')),
+          ]),
+          const SizedBox(height: 10),
+          Row(children: [
+            Expanded(child: metric(Icons.arrow_downward_rounded,
+              tr('دانلود', 'Download'), '— B/s',
+              detail: tr('مصرف: —', 'Used: —'))),
+            const SizedBox(width: 10),
+            Expanded(child: metric(Icons.arrow_upward_rounded,
+              tr('آپلود', 'Upload'), '— B/s',
+              detail: tr('مصرف: —', 'Used: —'))),
+          ]),
+          const SizedBox(height: 14),
+          Container(
+            decoration: tile(radius: 14),
+            padding: const EdgeInsets.all(12),
+            child: Row(children: [
+              const Icon(Icons.place_outlined, color: purple, size: 20),
+              const SizedBox(width: 8),
+              Expanded(child: txt(
+                '${demoServers[_selected].flag} ${demoServers[_selected].country}',
+                bold: true)),
+              txt(tr('نمونه', 'Demo'), color: sub, size: 10),
+            ]),
+          ),
+        ],
+      ),
+    );
+
     Widget home() => Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         heading(tr('اتصال سریع', 'Quick connect')),
-        const SizedBox(height: 18),
-        powerCard(),
-        const SizedBox(height: 19),
+        const SizedBox(height: 16),
+        LayoutBuilder(builder: (context, constraints) {
+          final split = constraints.maxWidth >= 740;
+          if (!split) {
+            return Column(children: [
+              powerCard(),
+              const SizedBox(height: 12),
+              connectionStats(),
+            ]);
+          }
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(flex: 5, child: powerCard()),
+              const SizedBox(width: 14),
+              Expanded(flex: 5, child: connectionStats()),
+            ],
+          );
+        }),
+        const SizedBox(height: 15),
         Row(children: [
           Expanded(child: txt(tr('انتخاب خودکار بهترین سرور',
               'Automatic best server'), color: sub, size: 12)),
@@ -460,7 +547,7 @@ class _TwinConnectDevAppState extends State<TwinConnectDevApp> {
             onChanged: null,
           ),
         ]),
-        const SizedBox(height: 12),
+        const SizedBox(height: 10),
         Row(children: [
           Expanded(child: txt(tr('مکان‌ها', 'Locations'),
             size: 18, bold: true)),
