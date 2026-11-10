@@ -14,6 +14,7 @@ import 'native_vpn_bridge.dart';
 import 'android_connection_card.dart';
 import 'vpn_settings.dart';
 import 'vpn_strings.dart';
+import 'server_inventory.dart';
 
 void main() => runApp(const TwinConnectApp());
 
@@ -127,6 +128,9 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
   String? _confirmedUsername;
   String? _confirmedSessionToken;
   PanelProtocolCatalog? _catalog;
+  AppServerInventory? _servers;
+  bool _refreshingServers = false;
+  String? _serverRefreshError;
   NativeProtocolReadiness _nativeProtocols =
       const NativeProtocolReadiness(supportedCodes: {});
   bool _protocolCatalogUnavailable = false;
@@ -152,6 +156,8 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
       _confirmedUsername = null;
       _confirmedSessionToken = null;
       _catalog = null;
+      _servers = null;
+      _serverRefreshError = null;
       _protocolCatalogUnavailable = false;
       _nativeProtocols = const NativeProtocolReadiness(supportedCodes: {});
     });
@@ -176,6 +182,8 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
         _confirmedUsername = username;
         _confirmedSessionToken = loggedIn.sessionToken;
       });
+      // Refresh server inventory after authenticated login; failures are isolated.
+      _refreshServers();
       // Subscription metadata is not secret and is fetched independently of
       // brand details. A temporary metadata error must not hide renewal links.
       try {
@@ -204,6 +212,31 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
     } finally {
       _password.clear();
       if (mounted && serial == _lookupSerial) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _refreshServers() async {
+    final panel = _confirmedPanel;
+    final session = _confirmedSessionToken;
+    if (panel == null || session == null || _refreshingServers) return;
+    final serial = _lookupSerial;
+    setState(() {
+      _refreshingServers = true;
+      _serverRefreshError = null;
+    });
+    try {
+      final inventory = await TenantApi.fromBuildConfig().refreshSessionServers(
+        panel: panel, sessionToken: session,
+      );
+      if (!mounted || serial != _lookupSerial) return;
+      setState(() => _servers = inventory);
+    } catch (_) {
+      if (!mounted || serial != _lookupSerial) return;
+      setState(() => _serverRefreshError = 'SERVER_REFRESH_FAILED');
+    } finally {
+      if (mounted && serial == _lookupSerial) {
+        setState(() => _refreshingServers = false);
+      }
     }
   }
 
@@ -526,7 +559,40 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
                             const SizedBox(height: 16),
                             Text(strings.protocolCatalogUnavailable),
                           ],
-                          if (_catalog != null) ...[
+                          const SizedBox(height: 12),
+                  Row(children: [
+                    Expanded(child: Text(
+                      strings.pick('سرورهای اشتراک', 'Subscription servers'),
+                      style: Theme.of(context).textTheme.titleMedium,
+                    )),
+                    IconButton(
+                      key: const Key('refreshSubscriptionServers'),
+                      tooltip: strings.pick('به‌روزرسانی سرورها', 'Refresh servers'),
+                      onPressed: _refreshingServers ? null : _refreshServers,
+                      icon: _refreshingServers
+                          ? const SizedBox.square(
+                              dimension: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                          : const Icon(Icons.refresh_rounded),
+                    ),
+                  ]),
+                  if (_serverRefreshError != null)
+                    Text(strings.pick('دریافت سرورها ناموفق بود',
+                      'Could not refresh servers')),
+                  if (_servers != null) ...[
+                    if (_servers!.servers.isEmpty)
+                      Text(strings.pick('سروری برای این اشتراک ثبت نشده',
+                        'No servers assigned to this subscription')),
+                    for (final server in _servers!.servers)
+                      ListTile(
+                        key: Key('assignedServer_${server.id}'),
+                        title: Text(server.name),
+                        subtitle: Text(server.countryCode),
+                        trailing: Text(server.nodeOnline
+                            ? strings.pick('نود آنلاین', 'Node online')
+                            : strings.pick('نود آفلاین', 'Node offline')),
+                      ),
+                  ],
+                  if (_catalog != null) ...[
                             const SizedBox(height: 20),
                             ProtocolCatalogCard(
                               catalog: _catalog!,
