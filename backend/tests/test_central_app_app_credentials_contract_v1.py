@@ -29,6 +29,8 @@ def _exec_selected(*names):
         "secrets": secrets,
         "installation_namespace": lambda _: "TP0123456789ABCDEF",
         "reseller_prefix": lambda _, ident: f"TP0123456789ABCDEF_R{ident:X}_",
+        "app_reseller_prefix": lambda _, ident: f"TP012345_R{ident:X}_",
+        "app_directory_namespace": lambda _: "TP012345",
         "ensure_installation_id": lambda: "local-test",
     }
     exec(compile(ast.Module(body=funcs, type_ignores=[]), str(CORE), "exec"), scope)
@@ -40,8 +42,8 @@ class SeparateAppCredentialContract(unittest.TestCase):
         scope = _exec_selected("_username", "_password")
         owner = scope["_username"](0)
         reseller = scope["_username"](24)
-        self.assertRegex(owner, r"^TP[0-9A-F]{16}_A_APP[0-9A-F]{16}$")
-        self.assertRegex(reseller, r"^TP[0-9A-F]{16}_R18_APP[0-9A-F]{16}$")
+        self.assertRegex(owner, r"^TP[0-9A-F]{6}_A_APP[0-9A-F]{16}$")
+        self.assertRegex(reseller, r"^TP[0-9A-F]{6}_R18_APP[0-9A-F]{16}$")
         self.assertNotEqual(owner, scope["_username"](0))
         self.assertNotEqual(owner, reseller)
         first, second = scope["_password"](), scope["_password"]()
