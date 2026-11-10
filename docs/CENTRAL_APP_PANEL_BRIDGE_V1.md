@@ -48,7 +48,7 @@ Public route:
 - Vendor-side registration of public panel URL requires a signed app entitlement and should gain proof of hostname ownership plus rate limits before broad rollout.
 - The client VPN engines and Flutter binaries are not in this PR.
 - Username-only sign-in needs subscription-specific authentication; prefix alone only routes traffic to the correct installation and **does not authorize anyone**.
-- The current public brand route reuses the Connection page's share-token validation, including its existing expiry rules. Expired subscriptions may require a separate limited, renewal-only brand lookup.
+- The brand route uses normal Connection link checks; for an expired persistent short link only, it falls back to a **brand/contact-only** read so customers can reach renewal. It never returns credentials or configs for an expired account.
 - Deployment requires both vendor entitlement/directory changes and this panel branch to be reviewed and tested. Never deploy only half the contract.
 - No production server update, changes to active subscriptions or new VPN installation logic is included.
 
