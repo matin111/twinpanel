@@ -1,6 +1,6 @@
 # TwinConnect — shared Flutter client (foundation)
 
-One client source for Android, Windows, iOS and macOS. All installations of TwinPanel share the **same app binaries**; the logo, brand/contact details, reseller affiliation and renewal link are retrieved from the licensed owner's panel after account verification.
+One client source for Android, Windows, iOS and macOS. The app supports **Persian (RTL) and English (LTR)**: it follows the device language by default and provides an in-app language selector (automatic, فارسی, English). The selection is stored locally using shared preferences, without storing subscription credentials. All installations of TwinPanel share the **same app binaries**; the logo, brand/contact details, reseller affiliation and renewal link are retrieved from the licensed owner's panel after account verification.
 
 **Current status: prototype/foundation. This is NOT yet a working VPN application.** The interface displays branding and contact information. The connect button is disabled until native VPN engines, secure session/bootstrap and connection lifecycle management are implemented and tested per platform.
 
@@ -60,3 +60,7 @@ Native project directories are generated during CI at this stage; before shippin
 - Automated deployment/signing pipelines once all four OS-specific implementations pass acceptance tests.
 
 The app must not bypass a panel-only license. No changes to active VPN traffic or existing customer subscriptions are required to run this prototype.
+
+## Localization quality gate
+
+`lib/app_strings.dart` contains all static Persian/English labels and error translations. Platform/framework translations use the official Flutter Material/Widgets/Cupertino delegates, with fallback to English for other device languages. `test/widget_test.dart` exercises RTL-to-LTR switching, persistence and bilingual errors; `test/tenant_client_test.dart` covers panel-brand data which must stay unmodified across language changes.
