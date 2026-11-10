@@ -73,7 +73,11 @@ class _TwinConnectAppState extends State<TwinConnectApp> {
       debugShowCheckedModeBanner: false,
       locale: selectedLocale,
       supportedLocales: const [Locale('en'), Locale('fa')],
-      localizationsDelegates: GlobalMaterialLocalizations.delegates,
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(
