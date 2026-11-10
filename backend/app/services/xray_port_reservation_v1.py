@@ -37,6 +37,7 @@ else:
         safe=True
         clients=0
         tags=[]
+        base_port=0
         allowed={
             'vless-in','api','vless-xhttp-reality','vless-ws-tls',
             'vless-tcp-tls','vless-tcp-reality','vless-tcp-reality-vision',
@@ -47,6 +48,11 @@ else:
                 continue
             tag=str(inbound.get('tag') or '')
             tags.append(tag)
+            if tag=='vless-in':
+                try:
+                    base_port=int(inbound.get('port') or 0)
+                except (ValueError,TypeError):
+                    safe=False
             if tag not in allowed:
                 safe=False
             if tag!='api' and inbound.get('protocol')!='vless':
@@ -64,7 +70,14 @@ else:
             for o in outbounds
         ):
             safe=False
-        print(json.dumps({'safe':safe,'clients':clients,
+        state_path=Path('/usr/local/etc/xray/twinpanel-modern-state.json')
+        try:
+            state=json.loads(state_path.read_text(encoding='utf-8'))
+            tls_domain=str(state.get('tls_domain') or '').strip().lower()
+        except Exception:
+            tls_domain=''
+        print(json.dumps({'safe':safe,'clients':clients,'base_port':base_port,
+                          'tls_domain':tls_domain,
                           'configured':True,'tags':tags},separators=(',',':')))
     except Exception:
         print(json.dumps({'safe':False,'clients':-1,'configured':True,
@@ -126,7 +139,40 @@ async def select_install_xray_base_port(conn, node: Any, requested_port: int) ->
     from ..routers import provision
 
     if await provision.active(conn, "xray"):
-        return requested
+        # An Exit might be deleted and re-added while its original Xray
+        # service is *still* running under the same dedicated TLS identity.
+        # Do not rewrite a healthy customer's instance with requested 8443.
+        # Adopt the existing base only when there are ZERO remote clients,
+        # all three live TLS inbounds agree with the new node domain, and
+        # the previous state/config remain fully managed by TwinPanel.
+        report_raw = await provision.cmd(
+            conn, _READ_CONFIG, check=False, timeout=15,
+        )
+        try:
+            report = json.loads(str(report_raw).strip().splitlines()[-1])
+            installed_base = int(report.get("base_port") or 0)
+        except (ValueError, IndexError, TypeError, AttributeError) as exc:
+            raise RuntimeError("XRAY_ACTIVE_CONFIG_AUDIT_FAILED") from exc
+        if installed_base == requested:
+            return requested
+        if (
+            requested != _DEFAULT_XRAY_BASE
+            or bool(getattr(node, "enable_v2ray", False))
+            or not report.get("safe")
+            or int(report.get("clients", -1)) != 0
+            or str(report.get("tls_domain") or "").lower()
+                != str(getattr(node, "xray_domain", "") or "").lower()
+            or not 1 <= installed_base <= 65535
+        ):
+            raise RuntimeError(
+                "XRAY_EXISTING_ACTIVE_DIFFERENT_BASE_OR_IDENTITY_STOP"
+            )
+        from ..xray_modern_runtime import _three_tls_inbounds_live
+
+        if not await _three_tls_inbounds_live(conn, installed_base, node):
+            raise RuntimeError("XRAY_EXISTING_ACTIVE_THREE_INBOUNDS_NOT_READY")
+        # Verified live adoption: no config, service or user-data mutations.
+        return installed_base
 
     port_report = await provision.cmd(
         conn, "ss -H -lntp 2>/dev/null || echo XRAY_SS_UNAVAILABLE",
