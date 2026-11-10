@@ -278,6 +278,56 @@ inline std::string TrimLower(const std::string& s) {
   return out;
 }
 
+// Existing TwinPanel WireGuard delivery uses two /1 IPv4 routes to
+// avoid the standard Windows WireGuard restrictive firewall. For the
+// explicitly requested protected full-tunnel policy, convert ONLY the
+// client-side AllowedIPs line to both /0 routes. The panel's stored profile,
+// private/public keys, IP address and endpoint are left unchanged. Custom
+// routes are rejected instead of silently rewritten.
+inline std::string ProtectedFullTunnelConfig(const std::string& raw) {
+  if (raw.empty() || raw.size() > 65536 ||
+      raw.find('\0') != std::string::npos) return "";
+  std::string result;
+  bool peer = false, found = false;
+  size_t pos = 0;
+  while (pos <= raw.size()) {
+    const auto end = raw.find('\n', pos);
+    const std::string line = raw.substr(pos, end == std::string::npos
+        ? std::string::npos : end - pos);
+    pos = end == std::string::npos ? raw.size() + 1 : end + 1;
+    const auto clean = TrimLower(line);
+    if (clean == "[peer]") peer = true;
+    else if (clean == "[interface]") peer = false;
+    if (peer && clean.rfind("allowedips", 0) == 0) {
+      const auto equal = clean.find('=');
+      if (equal == std::string::npos || found) return "";
+      const auto values = clean.substr(equal + 1);
+      bool full = false, firstHalf = false, secondHalf = false;
+      size_t start = 0;
+      while (start <= values.size()) {
+        const auto comma = values.find(',', start);
+        const auto token = TrimLower(values.substr(start,
+            comma == std::string::npos ? std::string::npos : comma - start));
+        if (token == "0.0.0.0/0") full = true;
+        else if (token == "0.0.0.0/1") firstHalf = true;
+        else if (token == "128.0.0.0/1") secondHalf = true;
+        else if (token == "::/0" || token == "::/1" ||
+                 token == "8000::/1") {}
+        else return "";
+        if (comma == std::string::npos) break;
+        start = comma + 1;
+      }
+      if (!full && !(firstHalf && secondHalf)) return "";
+      if (full && (firstHalf || secondHalf)) return "";
+      result += "AllowedIPs = 0.0.0.0/0, ::/0\n";
+      found = true;
+    } else {
+      result += line + "\n";
+    }
+  }
+  return found ? result : "";
+}
+
 inline bool ValidConfig(const std::string& text) {
   if (text.size() < 80 || text.size() > 65536 ||
       text.find('\0') != std::string::npos) return false;
@@ -398,14 +448,21 @@ inline flutter::EncodableValue Status() {
 }
 
 inline bool Start(const std::string& config) {
-  if (!IsAdmin() || WireGuardExe().empty() || ServiceExists() ||
-      !ValidConfig(config)) return false;
+  if (!IsAdmin() || WireGuardExe().empty() || ServiceExists()) return false;
+  std::string protectedConfig = ProtectedFullTunnelConfig(config);
+  if (!ValidConfig(protectedConfig)) {
+    if (!protectedConfig.empty())
+      SecureZeroMemory(protectedConfig.data(), protectedConfig.size());
+    return false;
+  }
   // Reclaim only this application's own orphaned encrypted configuration
   // after an interrupted prior run, never an active service's profile.
   const auto stale = EncryptedPath();
   if (!stale.empty() && IsFile(stale) && !DeleteFileW(stale.c_str()))
     return false;
-  if (!WriteEncryptedConfig(config)) return false;
+  const bool written = WriteEncryptedConfig(protectedConfig);
+  SecureZeroMemory(protectedConfig.data(), protectedConfig.size());
+  if (!written) return false;
   if (!InvokeOfficialWireGuard(L"/installtunnelservice", EncryptedPath())) {
     // If an install timed out but actually started, do not delete the
     // configuration that the running service still needs.
