@@ -7,12 +7,10 @@ import 'interactive_glass_card.dart';
 import 'protocol_catalog_view.dart';
 import 'protocols.dart';
 import 'server_inventory.dart';
-import 'tenant_api.dart';
 import 'tenant_models.dart';
 import 'windows_connection_card.dart';
 import 'android_connection_card.dart';
 import 'share_vpn_preview.dart';
-import 'native_vpn_bridge.dart';
 import 'vpn_settings.dart';
 
 /// Production-data shell matching the previously approved four-page design.
@@ -296,9 +294,11 @@ class _AuthenticatedDashboardState extends State<AuthenticatedDashboard> {
       _label(tr('اتصال سریع', 'Quick connect'), size: 23, bold: true),
       const SizedBox(height: 17),
       LayoutBuilder(builder: (context, constraints) {
-        if (constraints.maxWidth < 700) return Column(children: [
-          _quickCard(), const SizedBox(height: 13), _networkCard(),
-        ]);
+        if (constraints.maxWidth < 700) {
+          return Column(children: [
+            _quickCard(), const SizedBox(height: 13), _networkCard(),
+          ]);
+        }
         return Row(crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(child: _quickCard()),
