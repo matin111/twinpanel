@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.779",
+  "version": "1.1.0-rc.780",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-10T21:16:44Z",
+  "released_at": "2026-11-10T22:06:14Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "af16e0d623587455c580e19c5bb2323b0f78de20",
+  "source_sha": "0e7a4ebe7b833e4066599359735e45404b303b6d",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.779/twinpanel-1.1.0-rc.779-linux-x86_64.tar.gz",
-    "sha256": "804c589650db8a14c688b711324c4248c0055ae5d938ae361c86f7331cd529de",
-    "size_bytes": 30442255
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.780/twinpanel-1.1.0-rc.780-linux-x86_64.tar.gz",
+    "sha256": "af596518a4c908b46da4902d62cb1c9d378fbe8c8521b159463ff1f9c56c11f4",
+    "size_bytes": 30446342
   },
   "notes": {
-    "fa": "اصلاح نمایش اشتراک‌های پنل ادمین در ویندوز و اندروید: کارت‌های یکسان به جای جدول دسکتاپ، سه یا چهار ستون در صفحه بزرگ، دو ستون تبلت و یک ستون موبایل؛ دکمه‌های ریست و ویرایش با رنگ جداگانه و عملیات بیشتر رنگی و خوانا. اطلاعات کاربران و تنظیمات پروتکل بدون تغییر.",
-    "en": "Fix admin subscription view across Windows and Android: responsive glass cards replace desktop table, visually distinct Reset and Edit, color-coded accessible overflow actions. No account, server, protocol or data mutation."
+    "fa": "دکمه ریست حجم مصرفی اشتراک در پنل ادمین بدون ورود به صفحه ویرایش: پنجره بله/خیر و اجرای مستقیم فقط پس از تأیید. حجم کل، انقضا، اطلاعات اتصال و شمارنده‌های ضدتکرار حفظ می‌شوند؛ تمام تغییرات RC779 باقی می‌مانند.",
+    "en": "Admin subscription usage reset now opens Yes/No confirmation instead of Edit, sending a usage-only, accounting-safe reset request on Yes. Quota, expiry, credentials, node counters and RC779 changes remain intact."
   }
 }
