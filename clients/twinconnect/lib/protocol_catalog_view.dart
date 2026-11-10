@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'app_strings.dart';
+import 'protocol_strings.dart';
 import 'protocols.dart';
 
 /// App protocol picker driven by the subscription snapshot from TwinPanel.
