@@ -1,0 +1,24 @@
+name: TwinPanel Host Resilience Policy Smoke
+on:
+  pull_request:
+    paths:
+      - 'backend/scripts/twinpanel_host_resilience_policy_v1.py'
+      - 'backend/tests/test_host_resilience_policy_v1.py'
+      - '.github/workflows/host-resilience-policy-v1.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'backend/scripts/twinpanel_host_resilience_policy_v1.py'
+      - 'backend/tests/test_host_resilience_policy_v1.py'
+jobs:
+  host-resilience:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify syntax
+        run: python -m py_compile backend/scripts/twinpanel_host_resilience_policy_v1.py backend/tests/test_host_resilience_policy_v1.py
+      - name: Verify no destructive config mutations
+        run: python backend/tests/test_host_resilience_policy_v1.py -v
