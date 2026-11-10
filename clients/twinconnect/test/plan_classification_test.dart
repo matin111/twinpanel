@@ -30,6 +30,32 @@ void main() {
     expect(row.deviceLimit, 1);
   });
 
+  test('legacy unassigned plan is accepted without inventing device capacity', () {
+    final row = AppPlanClassification.fromJson({
+      'schema': 1,
+      'namespace': 'TP934FE9',
+      'plan_id': 0,
+      'subscription_type': 'اشتراک عمومی',
+      'user_count_category': 'سایر پلن‌ها',
+      'device_limit': 0,
+    });
+    expect(row.planId, 0);
+    expect(row.hasAssignedPlan, isFalse);
+    expect(row.deviceLimit, 0);
+    expect(row.userCountCategory, 'سایر پلن‌ها');
+  });
+
+  test('rejects negative plan IDs', () {
+    expect(() => AppPlanClassification.fromJson({
+      'schema': 1,
+      'namespace': 'TPABCDEF',
+      'plan_id': -2,
+      'subscription_type': 'ویژه',
+      'user_count_category': '۲ کاربره',
+      'device_limit': 2,
+    }), throwsFormatException);
+  });
+
   test('rejects malformed classifications', () {
     expect(() => AppPlanClassification.fromJson({
       'schema': 1, 'namespace': 'TPABCDEF', 'plan_id': 1,
