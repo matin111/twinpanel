@@ -1,0 +1,24 @@
+name: Telegram Outbox Quarantine And Recovery
+on:
+  pull_request:
+    paths:
+      - 'backend/app/telegram_runtime_bot.py'
+      - 'backend/app/routers/telegram_bot.py'
+      - 'backend/tests/test_telegram_outbox_quarantine_recovery_v1.py'
+      - '.github/workflows/telegram-outbox-quarantine-recovery.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'backend/app/telegram_runtime_bot.py'
+      - 'backend/app/routers/telegram_bot.py'
+      - 'backend/tests/test_telegram_outbox_quarantine_recovery_v1.py'
+jobs:
+  outbox-quarantine:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify no starvation, bounded retries and safe recovery
+        run: python backend/tests/test_telegram_outbox_quarantine_recovery_v1.py -v
