@@ -38,6 +38,9 @@ void main() {
     await tester.tap(find.byKey(const Key('windowsDemoButton')));
     await tester.pumpAndSettle();
 
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('offlineDemoBanner')), 280,
+    );
     expect(find.byKey(const Key('offlineDemoBanner')), findsOneWidget);
     expect(
       find.textContaining('Sample data only'),
