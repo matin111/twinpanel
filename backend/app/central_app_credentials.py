@@ -18,7 +18,8 @@ from sqlalchemy.orm import Session
 
 from .central_app_credential_models import SubscriptionAppCredential
 from .central_app_identity import (
-    central_app_entitled, installation_namespace, reseller_prefix,
+    central_app_entitled, installation_namespace, app_directory_namespace,
+    app_reseller_prefix,
 )
 from .config import settings
 from .models import Subscription
@@ -71,9 +72,9 @@ def _active_subscription(db: Session, sub_id: int) -> Subscription:
 
 def _username(reseller_id: int) -> str:
     installation = ensure_installation_id()
-    prefix = (reseller_prefix(installation, reseller_id)
+    prefix = (app_reseller_prefix(installation, reseller_id)
               if reseller_id > 0
-              else installation_namespace(installation) + "_A_")
+              else app_directory_namespace(installation) + "_A_")
     return prefix + "APP" + secrets.token_hex(8).upper()
 
 
