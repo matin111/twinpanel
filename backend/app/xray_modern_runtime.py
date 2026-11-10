@@ -1087,7 +1087,7 @@ async def _ensure_modern_xray(
                     check=False,
                     timeout=12,
                 )
-            ).strip().replace("\\n", "; ")[:350]
+            ).strip().replace("\n", "; ")[:350]
         except Exception:
             pass
         rollback_result = "not_attempted"
