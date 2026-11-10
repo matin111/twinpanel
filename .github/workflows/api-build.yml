@@ -149,6 +149,10 @@ jobs:
         working-directory: backend
         run: PYTHONPATH=. python tests/test_ssh_access_transaction_release_v1.py -v
 
+      - name: Verify V314 accounting SSH read transaction closes before await
+        working-directory: backend
+        run: PYTHONPATH=. python tests/test_modern_quota_ssh_txn_boundary_v1.py -v
+
       - name: Run NetMod UDPGW V231 regression
         working-directory: backend
         run: PYTHONPATH=. python tests/test_netmod_udpgw_v231.py

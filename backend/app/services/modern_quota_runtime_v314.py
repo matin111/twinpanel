@@ -47,7 +47,9 @@ async def _collect_node_runtime(
     conn = None
     collected: dict[str, tuple[Any, ...]] = {}
     try:
-        conn = await connect_protocol_runtime(node, db)
+        conn = await connect_protocol_runtime(
+            node, db, close_read_transaction_before_ssh=True,
+        )
 
         # ssh_connect_saved() reads NodeAccess through this Session. End that
         # read transaction before the slower runtime probes. From this point
