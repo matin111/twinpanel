@@ -363,13 +363,17 @@ async def classic_port_check(
 
     conn = await connect_protocol_runtime(node, db)
     try:
-        sockets = await cmd(conn, "ss -H -lntup 2>/dev/null", check=False, timeout=12)
+        sockets = await cmd(
+            conn,
+            "if command -v ss >/dev/null 2>&1; then ss -H -lntup; "
+            "else echo PORT_CHECK_UNAVAILABLE; fi",
+            check=False, timeout=12,
+        )
     finally:
         conn.close()
         await conn.wait_closed()
 
-    conflicts = []
-    for line in sockets.splitlines():
+    if "PORT_CHECK_UNAVAILABLE" in sockets:\n        raise HTTPException(status_code=503, detail="PORT_CHECK_UNAVAILABLE")\n\n    conflicts = []\n    for line in sockets.splitlines():
         parts = line.split()
         if len(parts) < 5:
             continue
