@@ -8,6 +8,7 @@ import 'country_flag.dart';
 import 'ambient_background.dart';
 import 'interactive_glass_card.dart';
 import 'share_vpn_preview.dart';
+import 'connection_signal_art.dart';
 
 /// Visual-only desktop preview. No real VPN session, ping or account is created.
 void main() => runApp(const TwinConnectDevApp());
@@ -304,22 +305,22 @@ class _TwinConnectDevAppState extends State<TwinConnectDevApp> {
             scale: value,
             child: child,
           ),
-          child: Container(
-            height: 94, width: 94,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: purple, width: 2.5),
-              gradient: RadialGradient(colors: [
-                purple.withValues(alpha: 0.42),
-                purple.withValues(alpha: 0.05),
-              ]),
-              boxShadow: [
-                BoxShadow(color: purple.withValues(alpha: 0.32),
-                  blurRadius: 43, spreadRadius: 4),
-              ],
+          child: SizedBox(
+            width: 94, height: 94,
+            child: FilledButton(
+              key: const Key('devConnectButton'),
+              onPressed: null,
+              style: FilledButton.styleFrom(
+                padding: EdgeInsets.zero,
+                shape: const CircleBorder(),
+                disabledBackgroundColor: purple.withValues(alpha: .22),
+                disabledForegroundColor: purple,
+                side: const BorderSide(color: purple, width: 2.5),
+                elevation: 0,
+              ),
+              child: const Icon(Icons.power_settings_new_rounded,
+                  size: 45, color: purple),
             ),
-            child: const Icon(Icons.power_settings_new_rounded,
-                size: 45, color: purple),
           ),
         ),
         const SizedBox(height: 12),
@@ -328,21 +329,7 @@ class _TwinConnectDevAppState extends State<TwinConnectDevApp> {
         txt(tr('موتور اتصال آماده نیست', 'Connection engine unavailable'),
             size: 12, color: sub),
         const SizedBox(height: 12),
-        SizedBox(
-          width: 215, height: 43,
-          child: FilledButton.icon(
-            key: const Key('devConnectButton'),
-            onPressed: null,
-            style: FilledButton.styleFrom(
-              disabledBackgroundColor: purple.withValues(alpha: 0.40),
-              disabledForegroundColor: ink.withValues(alpha: 0.73),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(15)),
-            ),
-            icon: const Icon(Icons.bolt_rounded),
-            label: Text(tr('اتصال', 'Connect')),
-          ),
-        ),
+        ConnectionSignalArt(dark: _dark),
         const SizedBox(height: 12),
         Container(
           decoration: tile(radius: 15),
