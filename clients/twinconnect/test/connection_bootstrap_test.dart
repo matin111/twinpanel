@@ -66,6 +66,7 @@ class FakePanel extends TenantApi {
       'protocol': protocol.code,
       'items': [
         {'node_id': profileForNode ? 17 : 22, 'config': '[Interface]'},
+        {'node_id': 23, 'config': '[Interface] other node'},
       ],
     });
   }
