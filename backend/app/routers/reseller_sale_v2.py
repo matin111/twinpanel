@@ -667,6 +667,7 @@ def _sale_impl(
                 ).strip()
                 or None
             ),
+            reseller_id=int(reseller.id),
         )
 
         db.flush()

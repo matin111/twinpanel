@@ -440,6 +440,7 @@ def create_subscription_from_owned_plan(
             protocols=protocols,
             username=(str(username).strip() if username else None),
             password=(str(password).strip() if password else None),
+            reseller_id=int(reseller.id),
         )
         db.flush()
 

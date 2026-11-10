@@ -1267,6 +1267,7 @@ def reseller_sell_subscription(
             protocols=requested_protocols,
             username=payload.username,
             password=payload.password,
+            reseller_id=int(reseller.id),
         )
 
         db.flush()

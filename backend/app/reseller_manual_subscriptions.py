@@ -128,6 +128,7 @@ def create_manual_reseller_subscription(
             protocols=normalized_protocols,
             username=(str(username).strip() if username else None),
             password=(str(password).strip() if password else None),
+            reseller_id=int(reseller.id),
         )
         db.flush()
         db.add(SubscriptionRuntimeOverride(subscription_id=int(subscription.id), device_limit=int(device_limit)))
