@@ -21,6 +21,10 @@
 #include <cctype>
 #include <string>
 #include <vector>
+#include <array>
+#include <ctime>
+#include <cstdint>
+#include <sstream>
 
 #pragma comment(lib, "Crypt32.lib")
 #pragma comment(lib, "Advapi32.lib")
@@ -88,6 +92,82 @@ inline bool ServiceExists() {
   if (svc) CloseServiceHandle(svc);
   CloseServiceHandle(scm);
   return found;
+}
+
+// Read only handshake and transfer statistics from the locally installed
+// signed WireGuard tools. Never invoke a shell or request private-key output.
+inline bool WgQuery(const wchar_t* fixedArgs, std::string* output) {
+  const auto programFiles = GetEnv(L"ProgramFiles");
+  if (programFiles.empty()) return false;
+  const auto exe = programFiles + L"\\WireGuard\\wg.exe";
+  if (!IsFile(exe)) return false;
+
+  SECURITY_ATTRIBUTES pipeAttrs = {sizeof(SECURITY_ATTRIBUTES), nullptr, TRUE};
+  HANDLE readPipe = nullptr, writePipe = nullptr;
+  if (!CreatePipe(&readPipe, &writePipe, &pipeAttrs, 0)) return false;
+  SetHandleInformation(readPipe, HANDLE_FLAG_INHERIT, 0);
+
+  std::wstring command = L"\"" + exe + L"\" show TwinConnect " + fixedArgs;
+  STARTUPINFOW startup = {};
+  startup.cb = sizeof(startup);
+  startup.dwFlags = STARTF_USESTDHANDLES;
+  startup.hStdOutput = writePipe;
+  startup.hStdError = writePipe;
+  startup.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
+  PROCESS_INFORMATION process = {};
+  const BOOL started = CreateProcessW(
+      exe.c_str(), command.data(), nullptr, nullptr, TRUE,
+      CREATE_NO_WINDOW, nullptr, nullptr, &startup, &process);
+  CloseHandle(writePipe);
+  if (!started) { CloseHandle(readPipe); return false; }
+
+  const DWORD result = WaitForSingleObject(process.hProcess, 6000);
+  DWORD code = 1;
+  if (result == WAIT_TIMEOUT) {
+    TerminateProcess(process.hProcess, 1);
+    WaitForSingleObject(process.hProcess, 3000);
+  } else if (result == WAIT_OBJECT_0) {
+    GetExitCodeProcess(process.hProcess, &code);
+  }
+  CloseHandle(process.hThread);
+  CloseHandle(process.hProcess);
+
+  std::string buffer;
+  std::array<char, 1024> chunk = {};
+  DWORD received = 0;
+  while (buffer.size() < 8192 &&
+         ReadFile(readPipe, chunk.data(), static_cast<DWORD>(chunk.size()),
+                  &received, nullptr) && received > 0)
+    buffer.append(chunk.data(), received);
+  CloseHandle(readPipe);
+  if (result != WAIT_OBJECT_0 || code != 0) return false;
+  *output = buffer;
+  return true;
+}
+
+inline int64_t LatestHandshakeEpoch() {
+  std::string out;
+  if (!WgQuery(L"latest-handshakes", &out)) return 0;
+  std::istringstream stream(out);
+  std::string publicKey;
+  int64_t timestamp = 0;
+  stream >> publicKey >> timestamp;
+  return timestamp > 0 ? timestamp : 0;
+}
+
+inline void TransferTotals(int64_t* received, int64_t* sent) {
+  *received = 0;
+  *sent = 0;
+  std::string out;
+  if (!WgQuery(L"transfer", &out)) return;
+  std::istringstream stream(out);
+  std::string publicKey;
+  int64_t rx = -1, tx = -1;
+  stream >> publicKey >> rx >> tx;
+  if (rx >= 0 && tx >= 0) {
+    *received = rx;
+    *sent = tx;
+  }
 }
 
 inline std::wstring PrivateFolder() {
@@ -243,11 +323,26 @@ inline bool ValidConfig(const std::string& text) {
 }
 
 inline flutter::EncodableValue Info(const char* state) {
+  const bool isUp = std::string(state) == "interface_up";
+  const int64_t handshake = isUp ? LatestHandshakeEpoch() : 0;
+  const int64_t now = static_cast<int64_t>(std::time(nullptr));
+  const bool verified = handshake > 0 && now >= handshake &&
+      (now - handshake) < 180;
+  int64_t rx = 0, tx = 0;
+  if (isUp) TransferTotals(&rx, &tx);
   flutter::EncodableMap map = {
       {flutter::EncodableValue("contractVersion"), flutter::EncodableValue(1)},
       {flutter::EncodableValue("protocol"), flutter::EncodableValue("wireguard")},
-      {flutter::EncodableValue("state"), flutter::EncodableValue(state)},
-      {flutter::EncodableValue("peerHandshakeVerified"), flutter::EncodableValue(false)},
+      {flutter::EncodableValue("state"),
+       flutter::EncodableValue(verified ? "peer_verified" : state)},
+      {flutter::EncodableValue("peerHandshakeVerified"),
+       flutter::EncodableValue(verified)},
+      {flutter::EncodableValue("lastHandshakeEpoch"),
+       flutter::EncodableValue(handshake)},
+      {flutter::EncodableValue("rxBytes"),
+       flutter::EncodableValue(rx)},
+      {flutter::EncodableValue("txBytes"),
+       flutter::EncodableValue(tx)},
   };
   return flutter::EncodableValue(map);
 }
