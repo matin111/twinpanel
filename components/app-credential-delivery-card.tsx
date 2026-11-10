@@ -2,7 +2,7 @@
 
 import {useEffect,useRef,useState} from "react";
 import {useI18n} from "../lib/i18n";
-import {getAppAccess,type AppAccessDelivery} from "../lib/central-app-credential-api";
+import {getAppAccess,registerAppDirectory,type AppAccessDelivery} from "../lib/central-app-credential-api";
 
 export function AppCredentialDeliveryCard({
   owner,subscriptionId
@@ -12,6 +12,8 @@ export function AppCredentialDeliveryCard({
   const {pick}=useI18n();
   const [data,setData]=useState<AppAccessDelivery|null>(null);
   const [busy,setBusy]=useState(false);
+  const [registerBusy,setRegisterBusy]=useState(false);
+  const [directoryAlias,setDirectoryAlias]=useState("");
   const [error,setError]=useState("");
   const requestEpoch=useRef(0);
   useEffect(()=>{
@@ -42,17 +44,39 @@ export function AppCredentialDeliveryCard({
     }
   };
 
+  const registerDirectory=async()=>{
+    if(busy||registerBusy||owner!=="admin")return;
+    const origin=window.prompt(
+      pick("آدرس عمومی HTTPS پنل که اپ باید به آن متصل شود:",
+           "Public HTTPS panel API origin for TwinConnect:"),
+      window.location.origin,
+    );
+    if(!origin)return;
+    setRegisterBusy(true);setError("");setDirectoryAlias("");
+    try{
+      const result=await registerAppDirectory(origin.trim());
+      setDirectoryAlias(result.short_namespace);
+    }catch(e){
+      setError(e instanceof Error?e.message:String(e));
+    }finally{setRegisterBusy(false);}
+  };
+
   const copy=(value:string)=>navigator.clipboard.writeText(value).catch(()=>{});
   return <section className="app-credential-delivery" data-testid="separate-app-login">
     <div className="card-head">
       <b>{pick("ورود مخصوص اپ","App login")}</b>
       <div className="action-row">
-        <button type="button" className="ghost" disabled={busy||subscriptionId<=0}
+        {owner==="admin"&&<button type="button" className="ghost"
+          data-testid="admin-app-directory-register"
+          disabled={busy||registerBusy}
+          onClick={()=>void registerDirectory()}>{registerBusy?"…":pick("ثبت آدرس پنل در لایسنس","Register panel for app")}</button>}
+        <button type="button" className="ghost" disabled={busy||registerBusy||subscriptionId<=0}
           onClick={()=>void load(false)}>{busy?"…":pick("دریافت اطلاعات اپ","Show app credentials")}</button>
         <button type="button" className="ghost" disabled={busy||subscriptionId<=0}
           onClick={()=>void load(true)}>{pick("تغییر رمز اپ","Reset app password")}</button>
       </div>
     </div>
+    {directoryAlias&&<p className="form-success" role="status">{pick("شناسه ثبت‌شده پنل: ","Registered app namespace: ")}<code dir="ltr">{directoryAlias}</code></p>}
     {error&&<p className="form-error" role="alert">{error}</p>}
     {data&&<div className="credential-grid">
       {[
