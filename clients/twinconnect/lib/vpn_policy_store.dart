@@ -13,9 +13,9 @@ class VpnPolicyStore {
   const VpnPolicyStore();
 
   static String storageKey(String tenant, String account) {
-    final scope = tenant.trim().toUpperCase() + ':' + account.trim();
-    final digest = sha256.convert(utf8.encode('twinconnect:policy:v1:' + scope));
-    return 'twinconnect_vpn_policy_v1_' + digest.toString();
+    final scope = '${tenant.trim().toUpperCase()}:${account.trim()}';
+    final digest = sha256.convert(utf8.encode('twinconnect:policy:v1:$scope'));
+    return 'twinconnect_vpn_policy_v1_$digest';
   }
 
   Future<VpnPolicy> load(String tenant, String account) async {
