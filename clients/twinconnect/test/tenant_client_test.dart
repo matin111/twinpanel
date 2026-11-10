@@ -107,10 +107,9 @@ void main() {
     expect(find.byKey(const Key('accountUsername')), findsOneWidget);
     expect(find.byKey(const Key('subscriptionLink')), findsOneWidget);
     expect(find.byKey(const Key('identifyButton')), findsOneWidget);
-    expect(
-      find.textContaining('اتصال واقعی VPN'),
-      findsOneWidget,
-    );
+    expect(find.text('اپلیکیشن مرکزی چندبرندی'), findsOneWidget);
+    // The connection engine is deliberately not mounted to any action.
+    expect(find.byKey(const Key('brandCard')), findsNothing);
   });
 
   testWidgets('brand preview contains only reseller contact, not configs', (tester) async {
