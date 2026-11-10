@@ -158,7 +158,10 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
       body: BrandBackground(
         brand: widget.brand,
         child: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? Center(
+              child: Text(AppStrings.of(context).pick(
+                'در حال بررسی تنظیمات', 'Checking settings')),
+            )
           : SafeArea(
               child: Center(
                 child: ConstrainedBox(
