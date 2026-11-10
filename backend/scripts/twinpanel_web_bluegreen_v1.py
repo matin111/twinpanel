@@ -34,6 +34,7 @@ ROOT = Path("/etc/nginx")
 STATE = Path("/var/lib/twinpanel-license/web-bluegreen-v1-state.json")
 BACKUP_ROOT = Path("/var/lib/twinpanel-license/web-bluegreen-v1")
 RELEASE_ROOT = Path("/opt/twinpanel/releases")
+CURRENT = Path("/opt/twinpanel/current")
 NEEDLE = "proxy_pass http://127.0.0.1:{port};"
 
 
@@ -175,7 +176,7 @@ def stage(release: Path, version: str) -> dict:
         stderr=subprocess.DEVNULL, timeout=5
     ).returncode == 0:
         raise RuntimeError("WEB_BLUEGREEN_STANDBY_SERVICE_ALREADY_ACTIVE")
-    if not _http_health(MAIN_PORT, (Path("/opt/twinpanel/current") / "VERSION").read_text().strip(),
+    if not _http_health(MAIN_PORT, (CURRENT / "VERSION").read_text().strip(),
                         seconds=3):
         raise RuntimeError("WEB_BLUEGREEN_PRIMARY_UNHEALTHY")
     _run(
@@ -192,19 +193,32 @@ def stage(release: Path, version: str) -> dict:
     if not _http_health(STANDBY_PORT, version):
         _run("systemctl", "stop", STANDBY_UNIT)
         raise RuntimeError("WEB_BLUEGREEN_STANDBY_HEALTH_FAILED")
-    BACKUP_ROOT.mkdir(parents=True, exist_ok=False)
-    os.chmod(BACKUP_ROOT, 0o700)
-    # Persist original configs with checksums so a crash can be recovered.
-    manifest: dict[str, dict] = {}
-    for index, (path, source) in enumerate(before["originals"].items()):
-        basename = f"site-{index:03}.bak"
-        backup = BACKUP_ROOT / basename
-        backup.write_bytes(source.encode("utf-8"))
-        os.chmod(backup, 0o600)
-        manifest[path] = {"backup": basename, "before": _sha(source.encode()),
-                          "staged": _sha(before["replacements"][path].encode())}
-    _save_json({"phase": "staged", "version": version, "sites": manifest,
-                "standby_port": STANDBY_PORT, "primary_port": MAIN_PORT})
+    try:
+        BACKUP_ROOT.mkdir(parents=True, exist_ok=False)
+        os.chmod(BACKUP_ROOT, 0o700)
+        # Persist original configs before any Nginx edits so the handoff is
+        # recoverable after the updater process is terminated.
+        manifest: dict[str, dict] = {}
+        for index, (path, source) in enumerate(before["originals"].items()):
+            basename = f"site-{index:03}.bak"
+            backup = BACKUP_ROOT / basename
+            backup.write_bytes(source.encode("utf-8"))
+            os.chmod(backup, 0o600)
+            manifest[path] = {
+                "backup": basename, "before": _sha(source.encode()),
+                "staged": _sha(before["replacements"][path].encode()),
+            }
+        _save_json({
+            "phase": "staged", "version": version, "sites": manifest,
+            "standby_port": STANDBY_PORT, "primary_port": MAIN_PORT,
+        })
+    except Exception:
+        # A disk/permission/state failure must not strand a Next process
+        # or mutate a Nginx config. Never delete an older handoff state.
+        _run("systemctl", "stop", STANDBY_UNIT)
+        if not STATE.exists() and BACKUP_ROOT.is_dir():
+            shutil.rmtree(BACKUP_ROOT)
+        raise
     return {"staged": True, "version": version, "sites": len(manifest),
             "routes": before["routes"]}
 
