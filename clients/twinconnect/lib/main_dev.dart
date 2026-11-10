@@ -28,12 +28,6 @@ class _TwinConnectDevAppState extends State<TwinConnectDevApp> {
   Widget build(BuildContext context) {
     final brand = WindowsPreviewFixture.brand();
     final accent = BrandTheme.parse(brand.primaryColor, '#7358DF');
-    final entries = WindowsPreviewFixture.protocolCatalog().entries;
-    final filtered = entries.where((item) =>
-      (_section == 'all' || item.protocol.engine.name == _section) &&
-      item.protocol.name.toLowerCase().contains(_search.toLowerCase())
-    ).toList();
-
     return MaterialApp(
       title: 'TwinConnect Dev',
       debugShowCheckedModeBanner: false,
@@ -249,7 +243,7 @@ class _TwinConnectDevAppState extends State<TwinConnectDevApp> {
                 key: const Key('devProtocolSearch'),
                 onChanged: (v) => setState(() => _search = v),
                 decoration: InputDecoration(
-                  hintText: t('جستجوی پروتکل', 'Search protocol'),
+                  hintText: t('جستجوی سرور', 'Search server'),
                   prefixIcon: const Icon(Icons.search_rounded),
                   filled: true,
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
@@ -276,12 +270,14 @@ class _TwinConnectDevAppState extends State<TwinConnectDevApp> {
               const SizedBox(height: 14),
               const SizedBox(height: 18),
               for (final location in const [
-                ('🇩🇪', 'Germany · Frankfurt'),
-                ('🇳🇱', 'Netherlands · Amsterdam'),
-                ('🇬🇧', 'United Kingdom · London'),
-                ('🇺🇸', 'United States · New York'),
-                ('🇸🇬', 'Singapore'),
-              ])
+                ('🇩🇪', 'Germany · Frankfurt', 'xray'),
+                ('🇳🇱', 'Netherlands · Amsterdam', 'wireguard'),
+                ('🇬🇧', 'United Kingdom · London', 'openconnect'),
+                ('🇺🇸', 'United States · New York', 'openvpn'),
+                ('🇸🇬', 'Singapore', 'singbox'),
+              ].where((location) =>
+                  (_section == 'all' || location.$3 == _section) &&
+                  location.$2.toLowerCase().contains(_search.toLowerCase())))
                 Container(
                   margin: const EdgeInsets.only(bottom: 9),
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
