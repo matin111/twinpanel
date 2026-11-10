@@ -377,13 +377,19 @@ inline flutter::EncodableValue ProtocolCapabilities() {
 }
 
 inline flutter::EncodableValue Status() {
-  return Info(ServiceRunning() ? "interface_up" : "down");
+  return Info(ServiceRunning() ? "interface_up" :
+      ServiceExists() ? "needs_cleanup" : "down");
 }
 
 inline bool Start(const std::string& config) {
   if (!IsAdmin() || WireGuardExe().empty() || ServiceExists() ||
-      !ValidConfig(config) || !WriteEncryptedConfig(config))
+      !ValidConfig(config)) return false;
+  // Reclaim only this application's own orphaned encrypted configuration
+  // after an interrupted prior run, never an active service's profile.
+  const auto stale = EncryptedPath();
+  if (!stale.empty() && IsFile(stale) && !DeleteFileW(stale.c_str()))
     return false;
+  if (!WriteEncryptedConfig(config)) return false;
   if (!InvokeOfficialWireGuard(L"/installtunnelservice", EncryptedPath())) {
     // If an install timed out but actually started, do not delete the
     // configuration that the running service still needs.
