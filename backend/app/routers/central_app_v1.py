@@ -22,6 +22,7 @@ from ..central_app_models import CentralAppContact
 from ..database import get_db
 from ..deps import require_admin, require_reseller
 from ..models_reseller import Reseller, ResellerSubscription
+from ..models import Subscription
 from ..system_release import (
     _vendor_post, ensure_installation_id, load_license_state,
 )
@@ -230,7 +231,20 @@ def subscription_app_brand(
     if not central_app_entitled():
         raise HTTPException(status_code=403, detail="CENTRAL_APP_NOT_INCLUDED")
 
-    sub = _subscription_from_share_token(token, db)
+    try:
+        sub = _subscription_from_share_token(token, db)
+    except HTTPException as exc:
+        if exc.status_code != 403:
+            raise
+        # Renewal-only brand lookup for previously issued short links. Do not
+        # deliver credentials/configs or bypass regular subscription expiry.
+        sub = (
+            db.query(Subscription)
+            .filter(Subscription.share_code == token)
+            .first()
+        )
+        if not sub:
+            raise
     link = (
         db.query(ResellerSubscription)
         .filter(ResellerSubscription.subscription_id == sub.id)
