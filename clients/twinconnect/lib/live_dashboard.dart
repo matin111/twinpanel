@@ -239,6 +239,55 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     });
   }
 
+  Future<void> _disconnectAndSignOut() async {
+    if (_vpnBusy) return;
+    if (_vpnUnmanaged) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(tr('تونل فعلی توسط TwinConnect مدیریت نمی‌شود.',
+          'The current tunnel is not managed by TwinConnect.')),
+      ));
+      return;
+    }
+    setState(() { _vpnBusy = true; _vpnError = null; });
+    try {
+      // Do not clear the stored login while a managed VPN is still active.
+      // Always read the native state, even if the UI appears disconnected.
+      var status = await _vpn.status().timeout(const Duration(seconds: 10));
+      if (status['state'] == 'unmanaged_service') {
+        throw const FormatException('UNMANAGED_WIREGUARD_SERVICE');
+      }
+      if (status['state'] != 'down') {
+        await _vpn.stop().timeout(const Duration(seconds: 20));
+        status = await _vpn.status().timeout(const Duration(seconds: 10));
+      }
+      if (status['state'] != 'down') {
+        throw const FormatException('TUNNEL_NOT_STOPPED');
+      }
+      if (!mounted) return;
+      _resetNetworkStats();
+      setState(() {
+        _vpnUp = false;
+        _vpnVerified = false;
+        _vpnCleanup = false;
+        _activeNodeId = null;
+        _vpnRx = 0;
+        _vpnTx = 0;
+      });
+      widget.onLogout();
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _vpnError = _errorText(error));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(tr(
+          'قطع امن تونل انجام نشد؛ حساب همچنان وارد است.',
+          'Could not safely disconnect; account remains signed in.',
+        )),
+      ));
+    } finally {
+      if (mounted) setState(() => _vpnBusy = false);
+    }
+  }
+
   Future<void> _selectServerAndConnect(int index) async {
     final nodes = widget.servers?.servers;
     if (nodes == null || index < 0 || index >= nodes.length ||
@@ -1483,15 +1532,15 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         const SizedBox(height: 12),
         OutlinedButton.icon(
           key: const Key('settingsSignOut'),
-          onPressed: _vpnUp || _vpnCleanup || _vpnBusy ? null : widget.onLogout,
+          onPressed: _vpnBusy ? null : _disconnectAndSignOut,
           icon: const Icon(Icons.logout_rounded),
           label: Text(tr('خروج از حساب', 'Sign out')),
         ),
         if (_vpnUp || _vpnCleanup || _vpnBusy)
           Padding(
             padding: const EdgeInsets.only(top: 7),
-            child: Text(tr('ابتدا اتصال VPN را قطع کنید.',
-                'Disconnect VPN before signing out.'),
+            child: Text(tr('خروج، ابتدا اتصال VPN را قطع می‌کند.',
+                'Signing out will disconnect the VPN first.'),
                 style: TextStyle(color: sub, fontSize: 11)),
           ),
         const SizedBox(height: 16),
@@ -1708,16 +1757,15 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           ],
           const SizedBox(height: 18),
           OutlinedButton.icon(
-            onPressed: _vpnUp || _vpnBusy || _vpnCleanup
-                ? null : widget.onLogout,
+            onPressed: _vpnBusy ? null : _disconnectAndSignOut,
             icon: const Icon(Icons.logout_rounded),
             label: Text(tr('خروج از حساب', 'Sign out')),
           ),
           if (_vpnUp || _vpnBusy || _vpnCleanup)
             Padding(
               padding: const EdgeInsets.only(top: 8),
-              child: txt(tr('برای خروج ابتدا VPN را قطع کنید.',
-                    'Disconnect VPN before signing out.'),
+              child: txt(tr('با خروج، اتصال VPN ابتدا به‌صورت امن قطع می‌شود.',
+                    'Signing out safely disconnects VPN first.'),
                   color: sub, size: 11)),
         ],
       );
