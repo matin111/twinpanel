@@ -128,9 +128,17 @@ async def select_install_xray_base_port(conn, node: Any, requested_port: int) ->
     if await provision.active(conn, "xray"):
         return requested
 
-    occupied = _parse_tcp_listeners(
-        await provision.cmd(conn, "ss -H -lntp", check=False, timeout=12)
+    port_report = await provision.cmd(
+        conn, "ss -H -lntp 2>/dev/null || echo XRAY_SS_UNAVAILABLE",
+        check=False, timeout=12,
     )
+    if "XRAY_SS_UNAVAILABLE" in str(port_report):
+        raise RuntimeError("XRAY_LISTENER_PRECHECK_UNAVAILABLE")
+    occupied = _parse_tcp_listeners(port_report)
+    # The management API port is fixed independently of the listener base.
+    # Never run a bootstrap that would steal it from another process.
+    if 10085 in occupied:
+        raise RuntimeError("XRAY_API_PORT_10085_ALREADY_IN_USE")
     wanted = _required_ports(requested)
     clashes = sorted(wanted.intersection(occupied))
     if not clashes:
@@ -147,11 +155,6 @@ async def select_install_xray_base_port(conn, node: Any, requested_port: int) ->
             "XRAY_CUSTOM_BASE_PORT_CONFLICT:"
             + ",".join(map(str, clashes))
         )
-
-    # The internal HandlerService endpoint is fixed; it cannot be relocated
-    # by choosing a different external listener group.
-    if 10085 in occupied:
-        raise RuntimeError("XRAY_API_PORT_10085_ALREADY_IN_USE")
 
     report_raw = await provision.cmd(
         conn, _READ_CONFIG, check=False, timeout=15,
