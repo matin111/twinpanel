@@ -138,7 +138,8 @@ function CustomerWalletV2Body(){
           <div className="customer-topup-summary">
             <div><small>{pick("درخواست","Request")}</small><b>#{active.id}</b></div>
             <div><small>{pick("موجودی افزوده‌شونده","Wallet credit")}</small><b>{money(active.amount_toman)}</b></div>
-            <div><small>{pick("مبلغ دقیق پرداخت","Exact payment")}</small><b>{isCrypto?`${cryptoAmount||"—"} ${asset}`:money(active.payable_amount_toman||active.amount_toman)}</b></div>
+            <div><small>{pick("مبلغ دقیق پرداخت","Exact payment")}</small><b>{isCrypto?`${cryptoAmount||"—"} ${asset}`:money(active.payable_amount_toman||active.amount_toman)}</b>{!isCrypto&&<button type="button" title={pick("کپی مبلغ دقیق","Copy exact amount")} onClick={()=>void copy("card-exact",String(active.payable_amount_toman||active.amount_toman))}>{copied==="card-exact"?"✓":pick("کپی مبلغ","Copy amount")}</button>}</div>
+            {!isCrypto&&<small>{pick("برای تأیید خودکار، مبلغ را بدون رُند کردن پرداخت کنید.","For auto-verification, do not round the payment amount.")}</small>}
             <Badge tone={tone(active.status)}>{statusFa(active.status)}</Badge>
           </div>
 
