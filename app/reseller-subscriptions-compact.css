@@ -211,3 +211,175 @@
     width:100%;
   }
 }
+
+/* Shared subscription-card design for reseller and customer portals, mobile + desktop. */
+.reseller-subscriptions-parity .reseller-sub-table{display:none}
+.reseller-subscriptions-parity .reseller-sub-card-grid,
+.customerSubscriptionsParity .customerSubGrid{
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;
+}
+.reseller-subscriptions-parity .reseller-sub-glass-card,
+.customerSubscriptionsParity .customerSubCard{
+  position:relative;min-width:0;isolation:isolate;overflow:hidden;
+  padding:19px!important;border:1px solid rgba(132,125,255,.35)!important;
+  border-radius:21px!important;
+  background:linear-gradient(145deg,rgba(46,36,95,.89) 0%,rgba(14,24,48,.96) 53%,rgba(10,20,40,.97) 100%)!important;
+  color:#f4f6ff!important;
+  box-shadow:0 16px 35px rgba(2,8,22,.18),inset 0 1px rgba(255,255,255,.08);
+  transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease;
+}
+.reseller-subscriptions-parity .reseller-sub-glass-card:before,
+.customerSubscriptionsParity .customerSubCard:before{
+  content:"";position:absolute;z-index:-1;pointer-events:none;top:-88px;inset-inline-start:-65px;
+  width:205px;height:175px;border-radius:100%;background:rgba(128,64,224,.16);filter:blur(55px)
+}
+@media(hover:hover){
+  .reseller-subscriptions-parity .reseller-sub-glass-card:hover,
+  .customerSubscriptionsParity .customerSubCard:hover{
+    transform:translateY(-3px);border-color:rgba(154,115,255,.65)!important;
+    box-shadow:0 19px 38px rgba(2,8,22,.29),inset 0 1px rgba(255,255,255,.1)
+  }
+}
+.reseller-subscriptions-parity .reseller-sub-glass-head,
+.reseller-subscriptions-parity .reseller-sub-identity{display:flex;align-items:center;gap:10px;min-width:0}
+.reseller-subscriptions-parity .reseller-sub-glass-head{justify-content:space-between}
+.reseller-subscriptions-parity .reseller-sub-identity>div{display:grid;gap:3px;min-width:0}
+.reseller-subscriptions-parity .reseller-sub-identity strong{
+  font-size:15px;overflow-wrap:anywhere;line-height:1.4
+}
+.reseller-subscriptions-parity .reseller-sub-identity small{color:#b4c5e5;font-size:11px;overflow-wrap:anywhere}
+.reseller-subscriptions-parity .reseller-sub-avatar{
+  display:grid;flex:0 0 40px;width:40px;height:40px;place-items:center;
+  border-radius:50%;background:linear-gradient(140deg,#753ce3,#233c88);border:1px solid #956af5;color:#fff;font-size:22px
+}
+.reseller-subscriptions-parity .reseller-sub-glass-metadata{
+  display:flex;align-items:center;gap:8px 12px;flex-wrap:wrap;
+  min-height:43px;margin:13px 0;color:#b9c7e7;font-size:12px
+}
+.reseller-subscriptions-parity .reseller-sub-plan,
+.customerSubscriptionsParity .customerSubCard .customer-plan-tag{
+  border:1px solid rgba(56,163,255,.54);background:rgba(17,98,201,.28);
+  color:#cce6ff;border-radius:99px;padding:5px 10px;font-weight:750
+}
+.reseller-subscriptions-parity .reseller-sub-contact{min-width:0;overflow-wrap:anywhere}
+.reseller-subscriptions-parity .reseller-sub-usage-grid{
+  display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:12px;
+  border-top:1px solid rgba(153,172,216,.19);padding-top:13px;margin-bottom:12px
+}
+.reseller-subscriptions-parity .reseller-sub-usage-grid>div{min-width:0;display:grid;align-content:start;gap:7px}
+.reseller-subscriptions-parity .reseller-sub-usage-grid small{font-size:11px;color:#9fb1d7}
+.reseller-subscriptions-parity .reseller-sub-usage-grid b{
+  font-size:12px;color:#f4f6ff;overflow-wrap:anywhere;line-height:1.5
+}
+.reseller-subscriptions-parity .reseller-sub-usage-grid .progress,
+.customerSubscriptionsParity .customerSubTraffic .progress{
+  height:7px;border-radius:99px;background:rgba(123,137,190,.23);overflow:hidden
+}
+.reseller-subscriptions-parity .reseller-sub-usage-grid .progress i,
+.customerSubscriptionsParity .customerSubTraffic .progress i{
+  display:block;height:100%;border-radius:inherit;
+  background:linear-gradient(90deg,#338dff,#9b5bff)
+}
+.reseller-subscriptions-parity .reseller-sub-live-status{min-height:22px;margin-bottom:9px}
+.reseller-subscriptions-parity .reseller-sub-quick-actions{
+  display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px
+}
+.reseller-subscriptions-parity .sub-action,
+.customerSubscriptionsParity .customerSubActions>button{
+  min-width:0;min-height:43px;padding:9px 9px;border:1px solid rgba(145,168,217,.46);
+  border-radius:12px;color:#f9fbff;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;
+  background:linear-gradient(140deg,#273858,#182440);
+  display:flex;align-items:center;justify-content:center;text-align:center;
+  transition:filter .16s ease,transform .16s ease
+}
+.reseller-subscriptions-parity .sub-action:hover:not(:disabled),
+.customerSubscriptionsParity .customerSubActions>button:hover:not(:disabled){filter:brightness(1.13)}
+.reseller-subscriptions-parity .sub-action:disabled{opacity:.5;cursor:not-allowed}
+.reseller-subscriptions-parity .sub-action-connect,
+.customerSubscriptionsParity .customerSubActions>.ghost{
+  background:linear-gradient(135deg,#7631c9,#513ab8);border-color:#ad6aff;color:#fff
+}
+.reseller-subscriptions-parity .sub-action-renew,
+.customerSubscriptionsParity .customerSubActions>.primary{
+  background:linear-gradient(135deg,#2086ed,#1555b9);border-color:#409bff;color:#fff
+}
+.reseller-subscriptions-parity .sub-action-edit{
+  background:linear-gradient(140deg,#334661,#1d2c48);border-color:#7089be
+}
+.reseller-subscriptions-parity .reseller-sub-more{margin-top:13px;border-top:1px solid rgba(153,172,216,.21);padding-top:10px}
+.reseller-subscriptions-parity .reseller-sub-more summary{
+  display:flex;justify-content:space-between;align-items:center;
+  color:#b9c8eb;font-size:12px;cursor:pointer;list-style:none
+}
+.reseller-subscriptions-parity .reseller-sub-more summary::-webkit-details-marker{display:none}
+.reseller-subscriptions-parity .reseller-sub-more-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-top:12px}
+.reseller-subscriptions-parity .sub-action-suspend{
+  background:linear-gradient(140deg,#885c20,#553416);border-color:#e3a747
+}
+.reseller-subscriptions-parity .sub-action-activate{
+  background:linear-gradient(140deg,#167458,#0b483d);border-color:#31b48b
+}
+.reseller-subscriptions-parity .sub-action-delete{
+  background:linear-gradient(140deg,#742737,#421924);border-color:#e07585;color:#ffe5e7
+}
+/* Customer subscriptions use the same visual language at every screen size. */
+.customerSubscriptionsParity .customerSubCard .card-head{align-items:center;gap:12px}
+.customerSubscriptionsParity .customerSubCard .card-head h3{font-size:17px;color:#f5f7ff}
+.customerSubscriptionsParity .customerSubCard .card-head small,
+.customerSubscriptionsParity .customerSubStats small,
+.customerSubscriptionsParity .customerSubTraffic small{color:#b5c5e5;font-size:11px}
+.customerSubscriptionsParity .customerSubStats{
+  display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px
+}
+.customerSubscriptionsParity .customerSubStats span,
+.customerSubscriptionsParity .customerSubCredentials{
+  min-width:0;border:1px solid rgba(138,150,220,.25);
+  border-radius:13px;background:rgba(18,32,60,.51);color:#f3f6ff
+}
+.customerSubscriptionsParity .customerSubStats b{font-size:15px;overflow-wrap:anywhere}
+.customerSubscriptionsParity .customerSubProtocols span{
+  color:#cbd9f5;background:rgba(30,46,79,.72);border-color:rgba(139,158,210,.27);font-size:11px
+}
+.customerSubscriptionsParity .customerSubTraffic{padding:0 2px}
+.customerSubscriptionsParity .customerSubCredentials{background:rgba(24,33,66,.64);padding:14px}
+.customerSubscriptionsParity .customerSubCredentialsHead b,
+.customerSubscriptionsParity .customerSubSecretRow code{color:#f4f6ff}
+.customerSubscriptionsParity .customerSubSecretRow>span{color:#a7badb}
+.customerSubscriptionsParity .customerSubSecretRow code,
+.customerSubscriptionsParity .customerSubSecretRow button{
+  background:rgba(13,23,45,.75);color:#eaf2ff;border-color:rgba(147,165,212,.3)
+}
+.customerSubscriptionsParity .customerSubActions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+@media(min-width:1600px){
+  .reseller-subscriptions-parity .reseller-sub-card-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+@media(max-width:900px){
+  .reseller-subscriptions-parity .reseller-sub-card-grid,.customerSubscriptionsParity .customerSubGrid{
+    grid-template-columns:1fr
+  }
+}
+@media(max-width:460px){
+  .reseller-subscriptions-parity .reseller-sub-glass-card,.customerSubscriptionsParity .customerSubCard{padding:14px!important;border-radius:18px!important}
+  .reseller-subscriptions-parity .reseller-sub-usage-grid{gap:9px}
+  .reseller-subscriptions-parity .reseller-sub-quick-actions{gap:6px}
+  .reseller-subscriptions-parity .sub-action{padding:8px 3px;font-size:11px;min-height:44px}
+  .customerSubscriptionsParity .customerSubStats{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .customerSubscriptionsParity .customerSubActions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+  .customerSubscriptionsParity .customerSubActions>button{min-height:46px}
+}
+@media(prefers-reduced-motion:reduce){
+ .reseller-subscriptions-parity .reseller-sub-glass-card,.customerSubscriptionsParity .customerSubCard{transition:none;transform:none!important}
+}
+html[data-theme="light"] .reseller-subscriptions-parity .reseller-sub-glass-card,
+html[data-theme="light"] .customerSubscriptionsParity .customerSubCard{
+  background:linear-gradient(140deg,#f2efff,#e8f1ff)!important;color:#1b2a49!important;border-color:rgba(101,85,173,.28)!important
+}
+html[data-theme="light"] .reseller-subscriptions-parity .reseller-sub-identity strong,
+html[data-theme="light"] .reseller-subscriptions-parity .reseller-sub-usage-grid b,
+html[data-theme="light"] .customerSubscriptionsParity .customerSubCard .card-head h3,
+html[data-theme="light"] .customerSubscriptionsParity .customerSubStats b{color:#162342}
+html[data-theme="light"] .reseller-subscriptions-parity .reseller-sub-identity small,
+html[data-theme="light"] .reseller-subscriptions-parity .reseller-sub-usage-grid small,
+html[data-theme="light"] .customerSubscriptionsParity .customerSubStats small{color:#4c5f83}
+html[data-theme="light"] .customerSubscriptionsParity .customerSubStats span,
+html[data-theme="light"] .customerSubscriptionsParity .customerSubCredentials{background:#fff;color:#162342}
