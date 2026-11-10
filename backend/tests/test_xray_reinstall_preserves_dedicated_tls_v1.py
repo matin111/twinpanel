@@ -132,6 +132,17 @@ class InstallerRetainsNodeContext(unittest.IsolatedAsyncioTestCase):
 
 
 class ProtocolPanelNodeAwareRepair(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self):
+        # The port allocator is separately covered in its own live-socket
+        # regression suite; preserve the previously tested 8443 behavior in
+        # the isolated node-aware repair tests.
+        selector=patch(
+            "app.services.xray_port_reservation_v1.select_install_xray_base_port",
+            new=AsyncMock(side_effect=lambda _conn,_node,port:int(port)),
+        )
+        selector.start()
+        self.addCleanup(selector.stop)
+
     def settings(self):
         return provision.ProtocolSettings(
             install_cisco=False,install_openvpn=False,
