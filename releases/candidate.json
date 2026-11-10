@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.766",
-  "source_sha": "051fdded1aacddd678719e3e0c812d36523035f8",
+  "version": "1.1.0-rc.767",
+  "source_sha": "301f87144f519ed796cb7582ce5136e0910b2108",
   "notes": {
-    "fa": "تکمیل اصلاحات PostgreSQL با بستن تراکنش‌های خواندنی تمیز در Workerهای مستقل Naive و Sudoku پیش از رمزگشایی حجیم اطلاعات دستگاه‌ها، بدون Commit داده‌های ثبت‌نشده. بهبود توقف سالم نمونه قدیمی وب در آپدیتر Blue/Green. تمام امکانات rc.765 و پروتکل‌ها، اشتراک‌ها، حجم و محدودیت دستگاه‌ها حفظ شده‌اند.",
-    "en": "Close clean PostgreSQL read transactions before CPU-heavy credential mapping in independent Naive/Sudoku presence workers, without changing pending writes; treat intentional Next.js blue/green slot termination as clean. Retain all rc.765 blue/green and bounded-accounting fixes."
+    "fa": "رفع نقص گزارش خطای راه‌اندازی Xray در نودهای موجود: ثبت وضعیت سرویس، پورت‌های غیرفعال و علت استاندارد خرابی قبل از بازیابی ایمن تنظیمات. جلوگیری از اعلام موفقیت اشتباه هنگام شکست restart. هیچ تغییری در پورت‌ها، کاربران، ۱۵ پروتکل دیگر و نصب سالم نودهای جدید اعمال نشده است.",
+    "en": "Improve Xray failed-start diagnosis for existing nodes: capture safe systemd and listener status plus normalized failure reason before restoring prior config; do not report success when restart fails. No automatic port migration, identity changes or changes to other healthy protocols."
   }
 }
