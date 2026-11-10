@@ -18,6 +18,9 @@ def _assignment(module: ast.Module, name: str):
         if isinstance(node, ast.Assign):
             if any(isinstance(t, ast.Name) and t.id == name for t in node.targets):
                 return node.value
+    for node in module.body:
+        if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name) and node.target.id == name:
+            return node.value
     raise AssertionError(f"assignment {name} missing")
 
 
