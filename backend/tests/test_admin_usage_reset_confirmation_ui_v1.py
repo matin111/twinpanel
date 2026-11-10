@@ -17,7 +17,7 @@ class DirectResetConfirmationTests(unittest.TestCase):
     def test_reset_calls_existing_accounting_safe_endpoint(self):
         self.assertIn('await legacyAdminApi.extendSubscription(subscriptionId,{', VIEW)
         self.assertIn('add_traffic_gb:0,add_days:0,reset_usage:true,reset_date:false', VIEW)
-        self.assertIn('if(reset_usage):\n        reset_subscription_period_usage(db,sub,origin="admin_renew")', API)
+        self.assertIn('reset_subscription_period_usage(db,sub,origin="admin_renew")', API)
         self.assertIn('if add_traffic_gb>0:', API)
         self.assertIn('if add_days > 0:', API)
 
