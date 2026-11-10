@@ -248,6 +248,7 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
             onPressed: () => Navigator.of(context).push(
               MaterialPageRoute<void>(
                 builder: (_) => VpnSettingsScreen(
+                  brand: brand,
                   tenant: brand?.namespace ?? '',
                   account: _offlineDemo
                       ? 'offline-demo-only'
