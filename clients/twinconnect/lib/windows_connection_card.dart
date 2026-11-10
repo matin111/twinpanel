@@ -43,6 +43,7 @@ class _WindowsConnectionCardState extends State<WindowsConnectionCard> {
   final _store = const VpnPolicyStore();
   bool _busy = false;
   bool _up = false;
+  bool _needsCleanup = false;
   bool _peerVerified = false;
   int _receivedBytes = 0;
   int _sentBytes = 0;
@@ -69,6 +70,7 @@ class _WindowsConnectionCardState extends State<WindowsConnectionCard> {
       setState(() {
         _up = status['state'] == 'interface_up' ||
             status['state'] == 'peer_verified';
+        _needsCleanup = status['state'] == 'needs_cleanup';
         _peerVerified = status['state'] == 'peer_verified' &&
             status['peerHandshakeVerified'] == true;
         _receivedBytes = status['rxBytes'] is int
@@ -123,6 +125,7 @@ class _WindowsConnectionCardState extends State<WindowsConnectionCard> {
       setState(() {
         _up = result['state'] == 'interface_up' ||
             result['state'] == 'peer_verified';
+        _needsCleanup = false;
         _peerVerified = result['peerHandshakeVerified'] == true;
         _receivedBytes = result['rxBytes'] is int ? result['rxBytes'] as int : 0;
         _sentBytes = result['txBytes'] is int ? result['txBytes'] as int : 0;
@@ -135,12 +138,13 @@ class _WindowsConnectionCardState extends State<WindowsConnectionCard> {
   }
 
   Future<void> _disconnect() async {
-    if (_busy || !_up || !Platform.isWindows) return;
+    if (_busy || (!_up && !_needsCleanup) || !Platform.isWindows) return;
     setState(() { _busy = true; _errorCode = null; });
     try {
       await _controller.stop();
       if (mounted) setState(() {
         _up = false;
+        _needsCleanup = false;
         _peerVerified = false;
         _receivedBytes = 0;
         _sentBytes = 0;
@@ -173,7 +177,11 @@ class _WindowsConnectionCardState extends State<WindowsConnectionCard> {
             Text(s.pick('اتصال WireGuard ویندوز', 'Windows WireGuard'),
                 style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 9),
-            Text(_up
+            Text(_needsCleanup
+                ? s.pick(
+                    'سرویس قبلی ناقص مانده؛ برای پاک‌سازی روی دکمه پایین بزنید.',
+                    'Previous tunnel service needs cleanup before reconnecting.')
+                : _up
                 ? (_peerVerified
                     ? s.pick('دست‌دهی WireGuard با سرور تأیید شد؛ '
                             'دسترسی اینترنت و نبود نشت هنوز آزموده نشده‌اند.',
@@ -199,7 +207,7 @@ class _WindowsConnectionCardState extends State<WindowsConnectionCard> {
               ]),
             ],
             const SizedBox(height: 10),
-            if (!_up)
+            if (!_up && !_needsCleanup)
               DropdownButtonFormField<String>(
                 key: const Key('windowsWireGuardServer'),
                 initialValue: validSelection,
@@ -220,15 +228,17 @@ class _WindowsConnectionCardState extends State<WindowsConnectionCard> {
               key: const Key('windowsWireGuardAction'),
               onPressed: _busy
                   ? null
-                  : _up
+                  : (_up || _needsCleanup)
                       ? _disconnect
                       : (_ready && _allowed && validSelection != null)
                           ? _connect : null,
-              icon: Icon(_up ? Icons.stop_circle_outlined
+              icon: Icon(_up || _needsCleanup ? Icons.stop_circle_outlined
                   : Icons.power_settings_new_rounded),
-              label: Text(_up
-                  ? s.pick('قطع رابط', 'Stop interface')
-                  : s.pick('شروع WireGuard', 'Start WireGuard')),
+              label: Text(_needsCleanup
+                  ? s.pick('پاک‌سازی سرویس', 'Clean up service')
+                  : _up
+                      ? s.pick('قطع رابط', 'Stop interface')
+                      : s.pick('شروع WireGuard', 'Start WireGuard')),
             ),
             const SizedBox(height: 5),
             OutlinedButton.icon(
