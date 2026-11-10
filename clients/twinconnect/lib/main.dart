@@ -358,6 +358,7 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
   }
 
 
+  // ignore: unused_element
   Widget _buildAuthenticatedDashboard(
     BuildContext context,
     AppStrings strings,
