@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:twinconnect/main.dart';
 import 'package:twinconnect/tenant_models.dart';
+import 'package:twinconnect/interactive_glass_card.dart';
 
 void main() {
   group('tenant routing', () {
@@ -130,6 +131,11 @@ void main() {
     expect(find.byKey(const Key('accountUsername')), findsOneWidget);
     expect(find.byKey(const Key('appPassword')), findsOneWidget);
     expect(find.byKey(const Key('identifyButton')), findsOneWidget);
+    expect(find.byKey(const Key('loginGlassCard')), findsOneWidget);
+    expect(find.byKey(const Key('loginEntranceAnimation')), findsOneWidget);
+    expect(find.byKey(const Key('devAnimatedBackground')), findsOneWidget);
+    expect(find.byType(TwinConnectGlassCard), findsOneWidget);
+    expect(find.byType(BackdropFilter), findsWidgets);
     expect(find.text('Sign in'), findsWidgets);
     // The connection engine is deliberately not mounted to any action.
     expect(find.byKey(const Key('brandCard')), findsNothing);
