@@ -178,9 +178,15 @@ jobs:
           assert "High Availability Config" in v9
           assert "v9-config-card" in v9
           assert "v9-server-row" in v9
-          assert "sendRealFile" in v9
-          assert "response.arrayBuffer()" in v9
-          assert "navigator.share" in v9
+          # V9 is source-only. Its historical Blob/share helper was replaced
+          # with a canonical server-side profile file route, while V7 owns
+          # Web Share. Require the real file URL and delegation, not dead JS.
+          assert "function fileUrl(protocol,index)" in v9
+          assert "const url=fileUrl(key,index)" in v9
+          assert "const dl=actionLink('download','دانلود فایل واقعی',url)" in v9
+          assert "shareSource?shareSource.click():copy.click()" in v9
+          assert "async function shareFile(sourceId,filename)" in mobile
+          assert "await navigator.share(payload)" in mobile
           assert "!important" not in v9
 
           # V11 owns platform/client detection. V36 owns responsive layout only.
