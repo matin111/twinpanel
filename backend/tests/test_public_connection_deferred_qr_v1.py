@@ -19,7 +19,7 @@ from app.routers.public_connection_qr_deferred_v1 import (
 
 class DeferredPublicConnectionQrTests(TestCase):
     def test_page_defers_sensitive_qr_without_changing_value(self):
-        private_config = "[Interface]\\nPrivateKey = private_test_only\\n"
+        private_config = "[Interface]\nPrivateKey = private_test_only\n"
         with defer_public_connection_qr("customer-sample"):
             url = ad._qr_data_uri(private_config)
             self.assertIn("/v1/connect/customer-sample/qr-image?v=", url)
@@ -37,7 +37,7 @@ class DeferredPublicConnectionQrTests(TestCase):
         self.assertTrue(direct.startswith("data:image/png;base64,"))
         self.assertTrue(
             base64.b64decode(direct.partition(",")[2]).startswith(
-                b"\\x89PNG\\r\\n\\x1a\\n"
+                b"\x89PNG\r\n\x1a\n"
             )
         )
 
@@ -54,7 +54,7 @@ class DeferredPublicConnectionQrTests(TestCase):
             self.assertEqual(image.status_code, 200)
             self.assertEqual(image.media_type, "image/png")
             self.assertEqual(image.headers["cache-control"], "private, no-store")
-            self.assertTrue(image.body.startswith(b"\\x89PNG\\r\\n\\x1a\\n"))
+            self.assertTrue(image.body.startswith(b"\x89PNG\r\n\x1a\n"))
 
         with patch.object(
             ad,
