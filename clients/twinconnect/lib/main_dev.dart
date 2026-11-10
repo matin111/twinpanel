@@ -23,7 +23,6 @@ class _DemoServer {
 class _TwinConnectDevAppState extends State<TwinConnectDevApp> {
   bool _persian = true;
   bool _dark = true;
-  bool _autoSelect = true;
   String _page = 'home';
   String _filter = 'all';
   String _search = '';
@@ -31,7 +30,6 @@ class _TwinConnectDevAppState extends State<TwinConnectDevApp> {
   final Set<int> _favorites = <int>{};
 
   static const purple = Color(0xFFA46AFF);
-  static const mint = Color(0xFF74D9CA);
   static const demoServers = <_DemoServer>[
     _DemoServer('🇩🇪', 'Germany', 'Frankfurt',
         ['openvpn', 'v2ray', 'hysteria2', 'shadowtls', 'sudoku']),
@@ -457,10 +455,10 @@ class _TwinConnectDevAppState extends State<TwinConnectDevApp> {
         Row(children: [
           Expanded(child: txt(tr('انتخاب خودکار بهترین سرور',
               'Automatic best server'), color: sub, size: 12)),
-          Switch(
-            key: const Key('devAutoBestServer'),
-            value: _autoSelect,
-            onChanged: (v) => setState(() => _autoSelect = v),
+          const Switch(
+            key: Key('devAutoBestServer'),
+            value: false,
+            onChanged: null,
           ),
         ]),
         const SizedBox(height: 12),
