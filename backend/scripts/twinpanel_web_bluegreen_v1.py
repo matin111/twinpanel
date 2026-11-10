@@ -135,6 +135,9 @@ def prepare(candidate: Path, previous: Path) -> tuple[int, int]:
     if subprocess.run(["systemctl", "is-active", "--quiet", unit]).returncode == 0:
         raise RuntimeError("WEB_CANDIDATE_SLOT_ALREADY_ACTIVE")
     cmd("systemctl", "start", unit)
+    # The new slot must survive a controller reboot once Nginx is switched.
+    # Both old and new are enabled until a successful drain.
+    cmd("systemctl", "enable", unit)
     return active, standby
 
 
@@ -263,6 +266,6 @@ def stop_unused(old: int, delay_seconds: int = 30) -> None:
     if old == 3000 and subprocess.run(
         ["systemctl", "is-active", "--quiet", "twinpanel-web.service"]
     ).returncode == 0:
-        cmd("systemctl", "stop", "twinpanel-web.service")
+        cmd("systemctl", "disable", "--now", "twinpanel-web.service")
     else:
-        cmd("systemctl", "stop", f"twinpanel-web-slot@{old}.service")
+        cmd("systemctl", "disable", "--now", f"twinpanel-web-slot@{old}.service")
