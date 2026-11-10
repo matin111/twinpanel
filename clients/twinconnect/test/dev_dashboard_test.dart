@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:twinconnect/main_dev.dart';
 import 'package:twinconnect/protocols.dart';
+import 'package:twinconnect/interactive_glass_card.dart';
 
 void main() {
   Future<void> openLocations(WidgetTester tester) async {
@@ -17,6 +18,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('devAnimatedBackground')), findsOneWidget);
+    expect(find.byKey(const Key('devPowerEntranceAnimation')), findsOneWidget);
+    expect(find.byType(TwinConnectGlassCard), findsWidgets);
     expect(find.byKey(const Key('devAmbientGrid')), findsOneWidget);
     expect(find.byKey(const Key('devPageTransition')), findsOneWidget);
     expect(find.byType(AnimatedSwitcher), findsWidgets);
