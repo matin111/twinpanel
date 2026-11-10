@@ -1,0 +1,26 @@
+name: Telegram Receipt One Tap In Place
+on:
+  pull_request:
+    paths:
+      - 'backend/app/telegram_admin_ops_v1.py'
+      - 'backend/app/routers/telegram_admin_ops_v1.py'
+      - 'backend/app/services/telegram_admin_receipt_push.py'
+      - 'backend/tests/test_telegram_receipt_one_tap_inplace_v1.py'
+      - '.github/workflows/telegram-receipt-one-tap-inplace.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'backend/app/telegram_admin_ops_v1.py'
+      - 'backend/app/routers/telegram_admin_ops_v1.py'
+      - 'backend/app/services/telegram_admin_receipt_push.py'
+      - 'backend/tests/test_telegram_receipt_one_tap_inplace_v1.py'
+jobs:
+  receipt-safety:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify original receipt edited, canonical payment approval and single tap
+        run: python backend/tests/test_telegram_receipt_one_tap_inplace_v1.py -v
