@@ -39,8 +39,9 @@ class OnlineSnapshotTests(unittest.TestCase):
         get=namespace["_subscription_live_states"]
         self.assertEqual(get("one"),get("two"))
         self.assertEqual(len(calls),1)
+        prior = get("two")
         namespace["_live_snapshot_cached_at"]-=6
-        self.assertNotEqual(get("new"),get("one"))
+        self.assertNotEqual(get("new"),prior)
         self.assertEqual(len(calls),2)
         namespace["_live_snapshot_cached_at"]-=6
         with self.assertRaises(RuntimeError):get("fail")
