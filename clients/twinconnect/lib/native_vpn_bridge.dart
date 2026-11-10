@@ -80,7 +80,7 @@ class NativeVpnBridge {
   ) {
     requireSafeToConnect(policy, capabilities);
     if (!capabilities.engineReady || !nativeProtocols.supports(protocol.code)) {
-      throw StateError('PROTOCOL_ENGINE_NOT_READY: ' + protocol.code);
+      throw StateError('PROTOCOL_ENGINE_NOT_READY: ${protocol.code}');
     }
   }
 
