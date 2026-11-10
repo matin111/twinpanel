@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.774",
+  "version": "1.1.0-rc.775",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-10T09:23:10Z",
+  "released_at": "2026-11-10T11:15:36Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "438afb0369b212c890c31595a6fde7fc0a462d52",
+  "source_sha": "47d39ee4a8d1edbb9021cb2210656ad70d355016",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.774/twinpanel-1.1.0-rc.774-linux-x86_64.tar.gz",
-    "sha256": "d7d6575b0782f094d6d994fd212322bdcba4c8652b738a6e621ba180b2681dbb",
-    "size_bytes": 30332436
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.775/twinpanel-1.1.0-rc.775-linux-x86_64.tar.gz",
+    "sha256": "a679b554a20a492b7aeee3ac6d987cbd1c64aed5e25efa4bc187eeddf7850674",
+    "size_bytes": 30348807
   },
   "notes": {
-    "fa": "بهینه‌سازی بخش آنلاین‌ها و اشتراک‌ها: نتایج تاییدشده وضعیت آنلاین برای ۵ ثانیه بین درخواست‌های همزمان بازاستفاده می‌شوند تا بار تکراری روی دیتابیس و API کاهش یابد. مدت تشخیص آنلاین، تعداد دستگاه، سهمیه ترافیک، پروتکل‌ها، نودها و تنظیمات اتصال تغییر نمی‌کنند. اختلال متناوب CDN آروان موضوع جداگانه است.",
-    "en": "Online and subscriptions performance: coalesce repeated authenticated presence DB scans in an in-process read-only 5-second snapshot. Preserve real online status, uncertainty, device limits, quota accounting, protocols and nodes. Arvan CDN connectivity issue is independent."
+    "fa": "اصلاح سودوکو قدیمی: خواندن شمارنده واقعی IPIngressBytes هر سرویس اختصاصی از systemd بدون ری‌استارت؛ ثبت مبنای اولیه بدون شارژ و سپس دلتاهای معتبر در حسابداری مرکزی؛ جلوگیری از قطع پردازش سایر کاربران به‌خاطر اشتراک غیرفعال. تغییر نکردن کانفیگ/رمز/پورت/نود/وضعیت سهمیه. کنترلر مشترک مرکزی که فقط تعداد اتصال را گزارش می‌دهد هنوز حسابداری حجم ندارد.",
+    "en": "Sudoku legacy dedicated accounts: validate service ownership, obtain real per-unit cgroup IPIngressBytes, zero-charge first baseline, bill only authenticated subsequent counter deltas through canonical ledger without restarting units; isolate inactive subscriptions. Shared Sudoku daemon without authentic byte telemetry remains presence-only; no estimate."
   }
 }
