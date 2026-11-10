@@ -457,17 +457,17 @@ export function LegacySubscriptionsRuntimePage(){
             </div>
             <div className="mobile-subscription-actions">
               <button type="button" className="mobile-action mobile-action-renew" disabled={!!busy} onClick={()=>openExtend(item)}>▣ {pick("تمدید","Renew")}</button>
-              <button type="button" className="mobile-action" disabled={!!busy} onClick={()=>openEdit(item)}>✎ {pick("ویرایش","Edit")}</button>
-              <button type="button" className="mobile-action" disabled={!!busy} onClick={()=>{openEdit(item);setEditResetUsage(true);}}>↻ {pick("ریست","Reset")}</button>
+              <button type="button" className="mobile-action mobile-action-edit" disabled={!!busy} onClick={()=>openEdit(item)}>✎ {pick("ویرایش","Edit")}</button>
+              <button type="button" className="mobile-action mobile-action-reset" disabled={!!busy} onClick={()=>{openEdit(item);setEditResetUsage(true);}}>↻ {pick("ریست","Reset")}</button>
               <button type="button" className="mobile-action mobile-action-connect" onMouseEnter={()=>prefetchSubscriptionLink(item)} onFocus={()=>prefetchSubscriptionLink(item)} onClick={()=>void openSubscriptionLink(item)}>↗ {pick("اتصال","Connect")}</button>
             </div>
             <details className="mobile-subscription-more">
               <summary>{pick("عملیات بیشتر","More actions")} <span aria-hidden="true">⋯</span></summary>
               <div className="mobile-subscription-more-actions">
-                <button type="button" disabled={!!busy} onClick={()=>void toggleStatus(item)}>{s(item.status).toLowerCase()==="active"?pick("تعلیق","Suspend"):pick("فعال‌سازی","Activate")}</button>
-                <button type="button" disabled={!!busy} onClick={()=>void openTransfer(item)}>{pick("انتقال اکانت","Transfer account")}</button>
-                <button type="button" onClick={()=>setAppDeliverySubscriptionId(n(item.id)||null)}>{pick("ورود اپ","App Delivery")}</button>
-                <button type="button" className="danger" disabled={!!busy} onClick={()=>void remove(item)}>{pick("حذف","Delete")}</button>
+                <button type="button" className={s(item.status).toLowerCase()==="active"?"mobile-more-suspend":"mobile-more-activate"} disabled={!!busy} onClick={()=>void toggleStatus(item)}>{s(item.status).toLowerCase()==="active"?pick("تعلیق","Suspend"):pick("فعال‌سازی","Activate")}</button>
+                <button type="button" className="mobile-more-transfer" disabled={!!busy} onClick={()=>void openTransfer(item)}>{pick("انتقال اکانت","Transfer account")}</button>
+                <button type="button" className="mobile-more-app" onClick={()=>setAppDeliverySubscriptionId(n(item.id)||null)}>{pick("ورود اپ","App Delivery")}</button>
+                <button type="button" className="danger mobile-more-delete" disabled={!!busy} onClick={()=>void remove(item)}>{pick("حذف","Delete")}</button>
               </div>
             </details>
           </article>;
@@ -475,10 +475,8 @@ export function LegacySubscriptionsRuntimePage(){
         {!loading&&filtered.length===0&&<div className="runtime-empty">{pick("اشتراکی پیدا نشد","No subscriptions found")}</div>}
       </div>
       <style>{`
-        .legacy-subscriptions-page .mobile-subscription-cards{display:none}
-        @media(max-width:760px){
-          .legacy-subscriptions-page .runtime-toolbar+.table{display:none}
-          .legacy-subscriptions-page .mobile-subscription-cards{display:grid;gap:13px;margin-top:15px;direction:rtl}
+        .legacy-subscriptions-page .runtime-toolbar+.table{display:none}
+        .legacy-subscriptions-page .mobile-subscription-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:15px;direction:rtl}
           .legacy-subscriptions-page .mobile-subscription-card{min-width:0;overflow:hidden;padding:15px;border:1px solid rgba(119,118,240,.48);border-radius:19px;background:linear-gradient(145deg,rgba(52,44,106,.34),rgba(12,23,44,.96) 58%,rgba(11,21,40,.98));box-shadow:inset 0 1px rgba(255,255,255,.075),0 8px 23px rgba(0,0,0,.14)}
           .legacy-subscriptions-page .mobile-subscription-card-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
           .legacy-subscriptions-page .mobile-subscription-user{display:flex;align-items:center;min-width:0;gap:10px}
@@ -505,7 +503,53 @@ export function LegacySubscriptionsRuntimePage(){
           .legacy-subscriptions-page .mobile-subscription-more-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:10px}
           .legacy-subscriptions-page .mobile-subscription-more-actions button{min-height:42px;border-radius:10px}
           .legacy-subscriptions-page .mobile-subscription-more-actions .danger{color:#fecaca}
-        }
+          .legacy-subscriptions-page .mobile-subscription-card{height:100%;box-sizing:border-box}
+          .legacy-subscriptions-page .mobile-subscription-usage{margin-top:auto}
+          .legacy-subscriptions-page .mobile-subscription-identities{max-width:100%}
+          .legacy-subscriptions-page .mobile-subscription-usage .user-cell b{overflow-wrap:anywhere}
+          .legacy-subscriptions-page .mobile-subscription-more-actions button{
+            cursor:pointer;border:1px solid rgba(161,178,218,.54);
+            padding:9px 7px;background:linear-gradient(145deg,#253756,#182740);
+            color:#f5f7ff;font-size:12px;font-weight:700;font-family:inherit
+          }
+          .legacy-subscriptions-page .mobile-subscription-more-actions .mobile-more-transfer{
+            background:linear-gradient(135deg,#314969,#203451);border-color:#829ed7;color:#fff
+          }
+          .legacy-subscriptions-page .mobile-subscription-more-actions .mobile-more-suspend{
+            background:linear-gradient(135deg,#79531d,#533516);border-color:#edaa4d;color:#fff
+          }
+          .legacy-subscriptions-page .mobile-subscription-more-actions .mobile-more-activate{
+            background:linear-gradient(135deg,#146c56,#0d4038);border-color:#36c99f;color:#fff
+          }
+          .legacy-subscriptions-page .mobile-subscription-more-actions .mobile-more-app{
+            background:linear-gradient(135deg,#185fbf,#1c3984);border-color:#559aff;color:#fff
+          }
+          .legacy-subscriptions-page .mobile-subscription-more-actions .mobile-more-delete{
+            background:linear-gradient(135deg,#63202f,#3e1824);border-color:#db7288;color:#ffe2e7
+          }
+          .legacy-subscriptions-page .mobile-subscription-more-actions button:disabled{opacity:.52;cursor:not-allowed}
+          .legacy-subscriptions-page .mobile-action-edit{
+            background:linear-gradient(135deg,#395173,#243652);border-color:#8aa5d9;color:#fff
+          }
+          .legacy-subscriptions-page .mobile-action-reset{
+            background:linear-gradient(135deg,#89541e,#5b3516);border-color:#f4af58;color:#fff
+          }
+          .legacy-subscriptions-page .mobile-subscription-card:focus-within{
+            border-color:rgba(171,137,255,.82);box-shadow:0 0 0 2px rgba(120,87,233,.15)
+          }
+          .legacy-subscriptions-page .mobile-subscription-more summary:focus-visible,
+          .legacy-subscriptions-page .mobile-subscription-actions button:focus-visible{
+            outline:2px solid #b2a4ff;outline-offset:2px
+          }
+          @media(min-width:1650px){
+            .legacy-subscriptions-page .mobile-subscription-cards{grid-template-columns:repeat(4,minmax(0,1fr))}
+          }
+          @media(max-width:1220px){
+            .legacy-subscriptions-page .mobile-subscription-cards{grid-template-columns:repeat(2,minmax(0,1fr))}
+          }
+          @media(max-width:760px){
+            .legacy-subscriptions-page .mobile-subscription-cards{grid-template-columns:1fr}
+          }
         @media(max-width:355px){
           .legacy-subscriptions-page .mobile-subscription-actions{grid-template-columns:repeat(2,minmax(0,1fr))}
         }
