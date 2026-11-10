@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:twinconnect/main.dart';
 import 'package:twinconnect/tenant_models.dart';
 
@@ -102,12 +103,14 @@ void main() {
   });
 
   testWidgets('screen explains that VPN engine is not yet connected', (tester) async {
+    SharedPreferences.setMockInitialValues({'twinconnect_ui_language_v1': 'en'});
     await tester.pumpWidget(const TwinConnectApp());
+    await tester.pumpAndSettle();
     expect(find.text('TwinConnect'), findsOneWidget);
     expect(find.byKey(const Key('accountUsername')), findsOneWidget);
     expect(find.byKey(const Key('subscriptionLink')), findsOneWidget);
     expect(find.byKey(const Key('identifyButton')), findsOneWidget);
-    expect(find.text('اپلیکیشن مرکزی چندبرندی'), findsOneWidget);
+    expect(find.text('One app, many brands'), findsOneWidget);
     // The connection engine is deliberately not mounted to any action.
     expect(find.byKey(const Key('brandCard')), findsNothing);
   });
@@ -133,7 +136,7 @@ void main() {
     expect(find.text('https://t.me/aria_support'), findsOneWidget);
     expect(find.text('https://renew.example.com'), findsOneWidget);
     final connect = tester.widget<FilledButton>(
-      find.widgetWithText(FilledButton, 'اتصال VPN (در دست توسعه)'),
+      find.widgetWithText(FilledButton, 'Connect VPN (coming soon)'),
     );
     expect(connect.onPressed, isNull);
   });
