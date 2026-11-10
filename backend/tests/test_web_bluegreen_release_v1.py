@@ -74,6 +74,31 @@ class WebSlots(unittest.TestCase):
         self.assertIn("SuccessExitStatus=143", web.UNIT)
         self.assertNotIn("/opt/twinpanel/current/.next", web.UNIT)
 
+    def test_partial_candidate_start_cleans_standby_without_touching_active(self):
+        with mock.patch.object(web, "old_port", return_value=3000), \
+             mock.patch.object(web, "versioned_release", side_effect=lambda p: p), \
+             mock.patch.object(web, "copy_previous_static"), \
+             mock.patch.object(web, "SLOT_UNIT", Path(self.tmp.name) / "slot.service"), \
+             mock.patch.object(web, "ENV_DIR", Path(self.tmp.name)), \
+             mock.patch.object(web.subprocess, "run", return_value=mock.Mock(returncode=1)) as runner:
+            calls = []
+            def command(*args, **kwargs):
+                calls.append(args)
+                if args[:2] == ("systemctl", "enable"):
+                    raise RuntimeError("enable_failed")
+            with mock.patch.object(web, "cmd", side_effect=command):
+                with self.assertRaisesRegex(RuntimeError, "enable_failed"):
+                    web.prepare(Path("/opt/twinpanel/releases/1.1.0-rc.768"),
+                                Path("/opt/twinpanel/releases/1.1.0-rc.767"))
+            self.assertIn(("systemctl", "start", "twinpanel-web-slot@3001.service"), calls)
+            runner.assert_any_call(
+                ["systemctl", "disable", "--now", "twinpanel-web-slot@3001.service"],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                check=False, timeout=25,
+            )
+            self.assertNotIn(("systemctl", "stop", "twinpanel-web-slot@3000.service"), calls)
+
+
     def test_reboot_persistence_and_safe_retire(self):
         source = FILE.read_text()
         self.assertIn('cmd("systemctl", "enable", unit)', source)

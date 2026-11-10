@@ -51,6 +51,32 @@ class RuntimeResilienceProbe(unittest.TestCase):
             self.assertTrue(result["healthy"], result["errors"])
             self.assertEqual(result["active_web_port"], 3001)
 
+    def test_3000_is_owned_by_pinned_slot_after_bluegreen_cutover(self):
+        with tempfile.TemporaryDirectory() as d:
+            current = Path(d) / "current"
+            current.mkdir()
+            (current / "VERSION").write_text("1.1.0-rc.767")
+            state = Path(d) / "state.json"
+            state.write_text(json.dumps({
+                "active_port": 3000, "release": str(current.resolve()),
+            }))
+            def fake_run(*args, **kwargs):
+                if args[0] == "systemctl":
+                    if args[-1] == "twinpanel-web.service":
+                        return 3, "inactive"
+                    return 0, "active"
+                if args[0] == "runuser":
+                    return 0, "0|0"
+                return 0, ""
+            with mock.patch.object(probe, "CURRENT", current), \
+                 mock.patch.object(probe, "SLOT_STATE", state), \
+                 mock.patch.object(probe, "run", side_effect=fake_run), \
+                 mock.patch.object(probe, "http_version", return_value="1.1.0-rc.767"):
+                result = probe.report()
+            self.assertTrue(result["healthy"], result["errors"])
+            self.assertEqual(result["service_status"]["active_web_unit"],
+                             "twinpanel-web-slot@3000.service")
+
     def test_stale_database_transaction_is_visible_not_mutated(self):
         with tempfile.TemporaryDirectory() as d:
             current = Path(d)/"current"

@@ -372,6 +372,19 @@ def converge_web_prestart_helpers_for_bluegreen(release: Path, env: dict[str, st
         run([str(python), str(target), *args], cwd=release / "backend", env=env, timeout=90)
 
 
+def ensure_accounting_cpu_budget(release: Path) -> None:
+    """Optional adaptive CPU allowance for the shared multi-worker cgroup.
+
+    Never restarts systemd units; respects unlimited or already-higher custom
+    budgets. No effect on customers with releases predating this helper.
+    """
+    script = release / "backend/scripts/twinpanel_accounting_cpu_budget_v1.py"
+    if not script.is_file():
+        return
+    python = VENV if VENV.is_file() else Path(sys.executable)
+    run([str(python), str(script), "--apply"], timeout=25)
+
+
 def install_resilience_probe_timer(release: Path) -> None:
     """Install read-only resilience visibility for every verified release.
 
@@ -1017,6 +1030,14 @@ def main() -> int:
         except Exception as probe_exc:
             print(
                 f"UPDATER_RESILIENCE_PROBE_INSTALL_WARNING {type(probe_exc).__name__}:{probe_exc}",
+                flush=True,
+            )
+        try:
+            ensure_accounting_cpu_budget(final)
+        except Exception as cpu_exc:
+            # A host CPU policy must not roll back a healthy Web/API release.
+            print(
+                f"UPDATER_ACCOUNTING_CPU_BUDGET_WARNING {type(cpu_exc).__name__}:{cpu_exc}",
                 flush=True,
             )
     except Exception:

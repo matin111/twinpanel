@@ -5,6 +5,8 @@ on:
       - 'backend/scripts/twinpanel_host_resilience_policy_v1.py'
       - 'backend/tests/test_host_resilience_policy_v1.py'
       - 'backend/scripts/twinpanel_runtime_resilience_probe_v1.py'
+      - 'backend/scripts/twinpanel_accounting_cpu_budget_v1.py'
+      - 'backend/tests/test_accounting_cpu_budget_v1.py'
       - 'backend/tests/test_runtime_resilience_probe_v1.py'
       - 'backend/scripts/twinpanel_public_updater.py'
       - 'deploy/systemd/twinpanel-resilience-probe.service'
@@ -24,8 +26,10 @@ jobs:
         with:
           python-version: '3.12'
       - name: Verify syntax
-        run: python -m py_compile backend/scripts/twinpanel_host_resilience_policy_v1.py backend/tests/test_host_resilience_policy_v1.py backend/scripts/twinpanel_runtime_resilience_probe_v1.py backend/tests/test_runtime_resilience_probe_v1.py backend/scripts/twinpanel_public_updater.py
+        run: python -m py_compile backend/scripts/twinpanel_host_resilience_policy_v1.py backend/tests/test_host_resilience_policy_v1.py backend/scripts/twinpanel_runtime_resilience_probe_v1.py backend/tests/test_runtime_resilience_probe_v1.py backend/scripts/twinpanel_public_updater.py backend/scripts/twinpanel_accounting_cpu_budget_v1.py backend/tests/test_accounting_cpu_budget_v1.py
       - name: Verify no destructive config mutations
         run: python backend/tests/test_host_resilience_policy_v1.py -v
       - name: Probe tests and blue-green updater contract
         run: python backend/tests/test_runtime_resilience_probe_v1.py -v
+      - name: Adaptive accounting CPU budget tests
+        run: python backend/tests/test_accounting_cpu_budget_v1.py -v
