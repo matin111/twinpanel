@@ -77,6 +77,7 @@ export const legacyAdminApi={
   saveNodeAccess:(payload:{node_id:number;host:string;port:number;username:string;password:string})=>request<RuntimeRow>("/v1/provision/save-node-access",{method:"POST",body:JSON.stringify(payload)}),
   classicProtocols:()=>request<ClassicProtocolInventoryResponse>("/v1/provision/classic-protocols"),
   protocolHealth:(nodeId:number,protocol?:ClassicProtocolKey)=>request<RuntimeRow>("/v1/provision/classic-protocol-health",{method:"POST",body:JSON.stringify({node_id:nodeId,...(protocol?{protocol}:{})})}),
+  classicPortCheck:(payload:EnsureClassicProtocolPayload)=>request<{ok:boolean;available:boolean;checked_ports:number[];conflicts:Array<{port:number;transport:string}>;note?:string|null}>("/v1/provision/classic-port-check",{method:"POST",body:JSON.stringify(payload)}),
   ensureClassicProtocol:(payload:EnsureClassicProtocolPayload)=>request<RuntimeRow>("/v1/provision/ensure-classic-protocol",{method:"POST",body:JSON.stringify(payload)}),
   restartProtocol:(nodeId:number,protocol:string)=>request<RuntimeRow>("/v1/provision/classic-restart-protocol",{method:"POST",body:JSON.stringify({node_id:nodeId,protocol})}),
   repairProtocolsSaved:(nodeId:number)=>request<RuntimeRow>("/v1/provision/repair-protocols-saved",{method:"POST",body:JSON.stringify({node_id:nodeId})}),
