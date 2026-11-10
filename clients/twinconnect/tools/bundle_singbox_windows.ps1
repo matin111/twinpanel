@@ -21,6 +21,11 @@ if ($matches.Count -ne 1) { throw 'Expected exactly one official sing-box.exe' }
 $binary = $matches[0]
 New-Item -ItemType Directory -Path $destination -Force | Out-Null
 Copy-Item -LiteralPath $binary.FullName -Destination (Join-Path $destination 'sing-box.exe') -Force
+# NaiveProxy in official Windows builds loads libcronet.dll next to sing-box.exe.
+# The release archive is already verified as a whole before extraction.
+$cronet = @(Get-ChildItem -LiteralPath $extract -Filter 'libcronet.dll' -Recurse -File)
+if ($cronet.Count -ne 1) { throw 'Required official libcronet.dll is missing' }
+Copy-Item -LiteralPath $cronet[0].FullName -Destination (Join-Path $destination 'libcronet.dll') -Force
 $versionOutput = & (Join-Path $destination 'sing-box.exe') version
 if ($LASTEXITCODE -ne 0 -or !(($versionOutput -join ' ') -match '1\.14\.4')) {
   throw 'Bundled sing-box version mismatch'
