@@ -167,7 +167,7 @@ class _WindowsConnectionCardState extends State<WindowsConnectionCard> {
             if (!_up)
               DropdownButtonFormField<String>(
                 key: const Key('windowsWireGuardServer'),
-                value: validSelection,
+                initialValue: validSelection,
                 isExpanded: true,
                 decoration: InputDecoration(
                   labelText: s.pick('سرور WireGuard', 'WireGuard server'),
