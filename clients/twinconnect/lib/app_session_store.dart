@@ -37,7 +37,7 @@ class AppSessionStore {
       final brandData = parsed['brand'];
       if (username is! String || username.isEmpty ||
           token is! String || token.length < 40 ||
-          brandData is! Map<String, dynamic>) return null;
+          brandData is! Map<String, dynamic>) { return null; }
       final brand = BrandPreview.fromJson(brandData);
       if (brand.namespace.isEmpty ||
           TenantIdentity.namespaceFromUsername(username) != brand.namespace) {
