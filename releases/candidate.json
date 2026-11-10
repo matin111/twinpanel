@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.772",
-  "source_sha": "b923113abd87101235fbcb39f9cabbe4ec26cebc",
+  "version": "1.1.0-rc.773",
+  "source_sha": "83962f160fe55621771c85694e08bebb2b7ffcd6",
   "notes": {
-    "fa": "اصلاح بازیابی نودهای ناقص با تأیید زنده پروتکل‌های سالم بدون الزام ۱۶ از ۱۶؛ حفظ پروتکل‌های ناموفق در وضعیت غیرفعال. مناسب فعال‌سازی فنلاند با ۱۵ پروتکل سالم بدون نصب مجدد؛ حفظ کلیه اصلاحات RC771 و تنظیمات کاربر.",
-    "en": "Fix live-verified recovery of partially installed Exits without requiring all 16 protocols, preserving failed listeners disabled and scoped subscription entitlements; retains RC771 and all customer identities."
+    "fa": "تأیید تک‌مرحله‌ای رسید در ربات مدیریت: با همان اولین کلیک روی تأیید رسید، عملیات مالی توسط API اصلی اجرا می‌شود و دکمه تأیید مجدد نمایش داده نمی‌شود. دکمه بررسی وضعیت، وضعیت همان تصویر/پیام رسید را به‌روز می‌کند و هیچ رسید جدیدی نمی‌سازد. وضعیت کیف پول پس از بررسی نیز روی شناسه اصلی قابل مشاهده است. اطلاعات کاربران، اشتراک‌ها، کیف پول‌ها، نودها و امکانات نسخه 772 بدون تغییر باقی می‌ماند.",
+    "en": "Telegram admin receipts: direct first-tap approval without extra confirmation, check status updates existing original message/photo rather than posting new receipt, keep completed wallet receipt read-only status. Canonical payment and wallet approval unchanged; preserve rc.772."
   }
 }
