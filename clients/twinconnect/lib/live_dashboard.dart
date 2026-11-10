@@ -1,5 +1,7 @@
 import 'dart:ui' show ImageFilter;
-import 'dart:io' show Platform;
+import 'dart:io' show Platform, HttpClient, InternetAddress;
+import 'dart:convert' show utf8;
+import 'dart:async' show Timer;
 
 import 'package:flutter/services.dart' show PlatformException;
 
@@ -66,6 +68,102 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   int _vpnRx = 0;
   int _vpnTx = 0;
   String? _vpnError;
+  String? _publicIp;
+  int? _httpsLatencyMs;
+  bool _autoFastest = false;
+  bool _networkRefreshing = false;
+  int _networkEpoch = 0;
+  Timer? _networkTimer;
+  String? _activeNodeId;
+
+  int? get _fastestKnownIndex {
+    final servers = widget.servers?.servers;
+    if (servers == null) return null;
+    int? best;
+    for (var i = 0; i < servers.length; i++) {
+      final node = servers[i];
+      if (!node.nodeOnline || node.latencyMs == null) continue;
+      if (best == null || node.latencyMs! < servers[best].latencyMs!) {
+        best = i;
+      }
+    }
+    return best;
+  }
+
+  void _resetNetworkStats() {
+    _networkEpoch++;
+    _networkTimer?.cancel();
+    _networkTimer = null;
+    _publicIp = null;
+    _httpsLatencyMs = null;
+  }
+
+  Future<void> _readNetworkStats() async {
+    if (!mounted || !_vpnVerified || _networkRefreshing) return;
+    _networkRefreshing = true;
+    final epoch = _networkEpoch;
+    final client = HttpClient()..connectionTimeout = const Duration(seconds: 5);
+    try {
+      final clock = Stopwatch()..start();
+      final request = await client.getUrl(Uri.https('api.ipify.org', '/'));
+      final response = await request.close().timeout(const Duration(seconds: 7));
+      final ip = (await utf8.decoder.bind(response).join()).trim();
+      clock.stop();
+      if (response.statusCode != 200 ||
+          ip.length > 45 || InternetAddress.tryParse(ip) == null) {
+        throw const FormatException('PUBLIC_IP_UNAVAILABLE');
+      }
+      if (!mounted || epoch != _networkEpoch || !_vpnVerified) return;
+      setState(() {
+        _publicIp = ip;
+        _httpsLatencyMs = clock.elapsedMilliseconds;
+      });
+    } catch (_) {
+      if (mounted && epoch == _networkEpoch && _vpnVerified) {
+        setState(() { _publicIp = null; _httpsLatencyMs = null; });
+      }
+    } finally {
+      client.close(force: true);
+      _networkRefreshing = false;
+    }
+  }
+
+  void _startNetworkStats() {
+    _networkTimer?.cancel();
+    if (!_vpnVerified) return;
+    _readNetworkStats();
+    _networkTimer = Timer.periodic(const Duration(seconds: 12), (_) {
+      if (!mounted) return;
+      _refreshVpnStatus();
+      _readNetworkStats();
+    });
+  }
+
+  Future<void> _selectServerAndConnect(int index) async {
+    final nodes = widget.servers?.servers;
+    if (nodes == null || index < 0 || index >= nodes.length) return;
+    if (_vpnBusy) return;
+    if (_vpnUp || _vpnCleanup) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(
+        tr('برای تغییر سرور ابتدا اتصال فعلی را قطع کنید.',
+           'Disconnect the current tunnel before switching servers.'))));
+      return;
+    }
+    setState(() {
+      _selected = index;
+      _autoFastest = false;
+      _filter = 'wireguard';
+      _page = 'home';
+    });
+    await _toggleVpn();
+  }
+
+  @override
+  void dispose() {
+    _resetNetworkStats();
+    super.dispose();
+  }
+
 
   bool get _wireGuardAllowed => widget.catalog?.entries.any((entry) =>
       entry.protocol.code == 'wireguard' && entry.selected &&
