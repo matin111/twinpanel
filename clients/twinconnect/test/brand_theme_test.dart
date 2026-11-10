@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:twinconnect/brand_theme.dart';
-import 'package:twinconnect/main.dart';
 import 'package:twinconnect/tenant_models.dart';
 import 'package:twinconnect/windows_preview_fixture.dart';
 
