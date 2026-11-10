@@ -12,6 +12,7 @@ import 'protocol_catalog_view.dart';
 import 'protocol_strings.dart';
 import 'native_vpn_bridge.dart';
 import 'android_connection_card.dart';
+import 'windows_connection_card.dart';
 import 'vpn_settings.dart';
 import 'vpn_strings.dart';
 import 'server_inventory.dart';
@@ -624,6 +625,17 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
                                 catalog: _catalog!,
                                 native: _nativeProtocols,
                               ),
+                              if (_servers != null) ...[
+                                const SizedBox(height: 12),
+                                WindowsConnectionCard(
+                                  key: ValueKey('windows_${_confirmedUsername!}'),
+                                  panel: _confirmedPanel!,
+                                  username: _confirmedUsername!,
+                                  sessionToken: _confirmedSessionToken!,
+                                  catalog: _catalog!,
+                                  servers: _servers!,
+                                ),
+                              ],
                             ],
                           ],
                         ],
