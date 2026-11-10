@@ -53,17 +53,17 @@ void main() {
         onRefreshAccount: () {},
       ),
     ));
-    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 800));
     await tester.tap(find.byKey(const Key('devNav_locations')));
-    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 800));
     expect(find.byKey(const Key('devLocationListingCard')), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('devNav_home')));
-    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 800));
     expect(find.byKey(const Key('liveConnectionStatus')), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('devNav_locations')));
-    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 800));
     await tester.ensureVisible(find.byKey(const Key('devServer_1')));
     await tester.tap(find.byKey(const Key('devServer_1')));
     await tester.pump();
