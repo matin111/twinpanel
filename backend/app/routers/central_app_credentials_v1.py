@@ -5,6 +5,8 @@ is delivered as a separate field. No app password appears in a public URL.
 """
 from __future__ import annotations
 
+import ipaddress
+
 from fastapi import APIRouter, Depends, Header, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
@@ -170,6 +172,36 @@ def session_plan(
     }, headers=_PRIVATE_HEADERS)
 
 
+@router.get("/session/account")
+def session_account(
+    sub: Subscription = Depends(_session_subscription),
+    db: Session = Depends(get_db),
+):
+    """Read-only account status, quota and expiry for this verified app session."""
+    expiry = sub.expires_at
+    duration = sub.activation_duration_days
+    return JSONResponse({
+        "schema": 1,
+        "namespace": subscription_app_namespace(db, sub),
+        "subscription_id": str(sub.id),
+        "traffic_limit_bytes": max(0, int(sub.traffic_limit_bytes or 0)),
+        "traffic_used_bytes": max(0, int(sub.traffic_used_bytes or 0)),
+        "expires_at": expiry.isoformat() + "Z" if expiry else None,
+        "activation_duration_days": int(duration) if duration is not None else None,
+        "status": sub.status.value if hasattr(sub.status, "value") else str(sub.status),
+    }, headers=_PRIVATE_HEADERS)
+
+
+def _public_node_probe_ip(value: str | None) -> str | None:
+    if not value:
+        return None
+    try:
+        address = ipaddress.ip_address(str(value).strip())
+        return str(address) if address.is_global else None
+    except ValueError:
+        return None
+
+
 @router.get("/session/servers")
 def session_servers(
     sub: Subscription = Depends(_session_subscription),
@@ -201,6 +233,7 @@ def session_servers(
                 "name": node.name,
                 "country_code": node.country_code,
                 "node_online": node.status == NodeStatus.ONLINE,
+                "probe_ip": _public_node_probe_ip(node.public_ip),
                 "latency_ms": None,
             }
             for node in nodes
