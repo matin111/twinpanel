@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'brand_theme.dart';
-import 'protocols.dart';
 import 'vpn_settings.dart';
 import 'windows_preview_fixture.dart';
 
