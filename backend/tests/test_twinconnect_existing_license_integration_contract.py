@@ -51,6 +51,27 @@ class ExistingLicenseIntegrationContract(unittest.TestCase):
         self.assertNotIn("app_delivery_payload", bot)
         self.assertNotIn("central_app_entitled", bot)
 
+    def test_reseller_identity_is_namespaced_by_panel_and_bound_to_subscription(self):
+        identity = IDENTITY.read_text(encoding="utf-8")
+        credentials = (ROOT / "backend/app/central_app_credentials.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn('return f"{installation_namespace(installation_id)}_R{ident:X}_"', identity)
+        self.assertIn("reseller_prefix(installation, reseller_id)", credentials)
+        self.assertIn("_current_reseller_id(db, sub.id)", credentials)
+        self.assertIn("APP_OWNER_MISMATCH", credentials)
+        self.assertIn("APP_OWNER_CHANGED", credentials)
+        # A reseller identifier is only meaningful inside its installation.
+        from hashlib import sha256
+        def namespace(installation):
+            return "TP" + sha256(
+                ("twinpanel:central-app:v1:" + installation).encode("utf-8")
+            ).hexdigest()[:16].upper()
+        self.assertNotEqual(namespace("panel-A") + "_R1_",
+                            namespace("panel-B") + "_R1_")
+        self.assertNotEqual(namespace("panel-A") + "_R1_",
+                            namespace("panel-A") + "_R2_")
+
     def test_app_login_remains_separate_from_bot_link_lookup(self):
         routes = APP_ROUTES.read_text(encoding="utf-8")
         self.assertIn('@router.post("/public/login")', routes)
