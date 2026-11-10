@@ -110,6 +110,26 @@ jobs:
           Compress-Archive -Path (Join-Path $release "*") -DestinationPath $zip -CompressionLevel Optimal
           if (!(Test-Path $zip)) { throw "ZIP packaging failed" }
           Write-Host ("Windows ZIP bytes: " + (Get-Item $zip).Length)
+      - name: Install Inno Setup installer compiler
+        shell: pwsh
+        run: choco install innosetup --no-progress -y
+      - name: Package TwinConnect Windows setup with automatic WireGuard prerequisite
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $compiler = "${env:ProgramFiles(x86)}\\Inno Setup 6\\ISCC.exe"
+          if (!(Test-Path $compiler)) { throw "Inno Setup 6 compiler not installed" }
+          & $compiler "installer.iss"
+          if ($LASTEXITCODE -ne 0) { throw "Installer compilation failed" }
+          if (!(Test-Path "TwinConnect-Windows-x64-Setup.exe")) {
+            throw "TwinConnect setup executable missing"
+          }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TwinConnect-Windows-x64-Setup
+          path: clients/twinconnect/TwinConnect-Windows-x64-Setup.exe
+          if-no-files-found: error
+          retention-days: 30
       - name: Build isolated Windows Dev dashboard (no sign-in)
         shell: pwsh
         run: flutter build windows --release --target lib/main_dev.dart
