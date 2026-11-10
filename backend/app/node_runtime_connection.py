@@ -161,8 +161,15 @@ def protocol_runtime_node_clause():
     )
 
 
-async def connect_protocol_runtime(node: Node, db: Any):
-    """Return a local executor for Local Core, otherwise the saved SSH path."""
+async def connect_protocol_runtime(
+    node: Node, db: Any, *, close_read_transaction_before_ssh: bool = False,
+):
+    """Return a local executor, or the saved SSH path.
+
+    The opt-in only applies to independent presence workers, whose session
+    finished all reads and has no uncommitted writes. Other API/provisioning
+    call sites retain their existing transaction behavior.
+    """
 
     if is_local_core(node):
         if os.name != "posix" or os.geteuid() != 0:
@@ -179,4 +186,9 @@ async def connect_protocol_runtime(node: Node, db: Any):
     # and the protocol routers import this connection selector.
     from .routers.provision import ssh_connect_saved
 
+    if close_read_transaction_before_ssh:
+        return await ssh_connect_saved(
+            node, db, close_read_transaction_before_ssh=True,
+        )
+    # Preserve legacy callers' exact behavior and call signature.
     return await ssh_connect_saved(node, db)

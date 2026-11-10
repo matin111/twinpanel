@@ -182,15 +182,38 @@ async def _ensure_node_key_on_remote(conn, db: Session, node: Node, ssh_port: in
     return access
 
 
-async def ssh_connect_saved(node: Node, db: Session):
+async def ssh_connect_saved(
+    node: Node,
+    db: Session,
+    *,
+    close_read_transaction_before_ssh: bool = False,
+):
     access = _get_node_access(db, node.id)
     if not access:
         raise HTTPException(status_code=409, detail="دسترسی امن این سرور ثبت نشده است. یک‌بار «ثبت دسترسی سرور» را انجام دهید.")
     key_path = Path(access.private_key_path)
     if not key_path.exists():
         raise HTTPException(status_code=409, detail="کلید دسترسی این سرور پیدا نشد. دسترسی را دوباره ثبت کنید.")
+    # Snapshot authenticated endpoint values while ORM objects are loaded.
+    # Presence workers are allowed to end their read-only transaction here.
+    # The access SELECT above otherwise reopens a PostgreSQL transaction that
+    # stays idle for the full 12-second asyncssh.connect timeout.
+    host = str(node.public_ip)
+    port = int(access.ssh_port)
+    username = str(access.ssh_username)
+    client_key = str(key_path)
+    if close_read_transaction_before_ssh:
+        # Never commit any caller's staged account, quota or provisioning
+        # writes. Raise closed instead of accidentally changing semantics.
+        if db.new or db.dirty or db.deleted:
+            raise RuntimeError("SSH_READ_TXN_HAS_PENDING_WRITES")
+        db.commit()
     try:
-        return await asyncssh.connect(node.public_ip, port=access.ssh_port, username=access.ssh_username, client_keys=[str(key_path)], known_hosts=None, connect_timeout=12, login_timeout=12)
+        return await asyncssh.connect(
+            host, port=port, username=username,
+            client_keys=[client_key], known_hosts=None,
+            connect_timeout=12, login_timeout=12,
+        )
     except Exception as exc:
         raise HTTPException(status_code=400, detail=f"اتصال ذخیره‌شده SSH ناموفق بود: {exc}")
 

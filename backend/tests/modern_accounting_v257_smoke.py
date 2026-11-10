@@ -65,12 +65,17 @@ def main() -> None:
         assert capabilities[protocol]["presence"] is True
         assert capabilities[protocol]["traffic"] is True
 
-    for protocol in ("mieru", "sudoku"):
-        assert capabilities[protocol]["presence"] is True
-        assert capabilities[protocol]["traffic"] is False
+    # Independent Mieru native accounting now persists real per-user byte
+    # counters. Sudoku remains presence-only: shared TCP is not byte telemetry.
+    assert capabilities["mieru"] == {"presence": True, "traffic": True}
+    assert capabilities["sudoku"] == {"presence": True, "traffic": False}
 
-    for protocol in ("hysteria2", "tuic", "anytls", "naive", "shadowtls", "snell"):
-        assert capabilities[protocol]["traffic"] is False
+    # A dedicated native sing-box worker supports attributable per-subscriber
+    # traffic for these protocols. ShadowTLS shared-inner remains fail-closed.
+    for protocol in ("hysteria2", "tuic", "anytls", "naive", "snell", "socks5"):
+        assert capabilities[protocol]["presence"] is True
+        assert capabilities[protocol]["traffic"] is True
+    assert capabilities["shadowtls"] == {"presence": False, "traffic": False}
 
     now = 1_800_000_000
     wg_dump = (

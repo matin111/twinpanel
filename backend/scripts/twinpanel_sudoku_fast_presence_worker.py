@@ -63,7 +63,7 @@ async def reconcile_once() -> dict:
                 # SessionLocal(expire_on_commit=False) keeps node fields.
                 db.commit()
                 conn = await asyncio.wait_for(
-                    connect_protocol_runtime(node, db), timeout=12,
+                    connect_protocol_runtime(node, db, close_read_transaction_before_ssh=True), timeout=12,
                 )
                 db.commit()
                 if central_shared:

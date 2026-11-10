@@ -61,7 +61,7 @@ async def reconcile_once() -> dict:
                 # over SSH and two 12-second authenticated probes.
                 db.commit()
                 conn = await asyncio.wait_for(
-                    connect_protocol_runtime(node, db), timeout=12.0
+                    connect_protocol_runtime(node, db, close_read_transaction_before_ssh=True), timeout=12.0
                 )
                 db.commit()
                 ok, rows, error = await asyncio.wait_for(

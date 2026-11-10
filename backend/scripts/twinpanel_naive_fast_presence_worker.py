@@ -74,7 +74,7 @@ async def reconcile_once() -> dict:
                 # Previous per-node session/identity lookups may open a
                 # read transaction. Never hold it across slow SSH.
                 db.commit()
-                conn = await asyncio.wait_for(connect_protocol_runtime(node, db), timeout=12)
+                conn = await asyncio.wait_for(connect_protocol_runtime(node, db, close_read_transaction_before_ssh=True), timeout=12)
                 db.commit()
                 ok, snapshot, error = await asyncio.wait_for(
                     native.collect_singbox_snapshot(conn), timeout=18,
