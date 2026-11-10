@@ -14,7 +14,7 @@ from ..central_app_credentials import (
     app_delivery_payload, authenticate_app, rotate_app_credentials,
     verify_app_session,
 )
-from ..central_app_identity import central_app_entitled, installation_namespace
+from ..central_app_identity import central_app_entitled, installation_namespace, subscription_app_namespace
 from ..database import get_db
 from ..deps import get_current_user, require_admin, require_reseller
 from ..models import Subscription, User
@@ -99,7 +99,7 @@ def login_app(payload: AppLoginIn, db: Session = Depends(get_db)):
     )
     return JSONResponse({
         "schema": 1,
-        "namespace": installation_namespace(ensure_installation_id()),
+        "namespace": subscription_app_namespace(db, sub),
         "session_token": token,
         "account_status": brand.get("account_status"),
         "brand": brand,
