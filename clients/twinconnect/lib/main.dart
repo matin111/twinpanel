@@ -11,6 +11,7 @@ import 'protocol_catalog_view.dart';
 import 'protocol_strings.dart';
 import 'native_vpn_bridge.dart';
 import 'android_connection_card.dart';
+import 'windows_preview_fixture.dart';
 import 'vpn_settings.dart';
 import 'vpn_strings.dart';
 
@@ -137,6 +138,7 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
   NativeProtocolReadiness _nativeProtocols =
       const NativeProtocolReadiness(supportedCodes: {});
   bool _protocolCatalogUnavailable = false;
+  bool _offlineDemo = false;
 
   @override
   void dispose() {
@@ -153,6 +155,7 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
       _loading = true;
       _errorCode = null;
       _brand = null;
+      _offlineDemo = false;
       _confirmedPanel = null;
       _confirmedUsername = null;
       _confirmedToken = null;
@@ -213,6 +216,23 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
     }
   }
 
+  void _showOfflineDemo() {
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _offlineDemo = true;
+      _errorCode = null;
+      _loading = false;
+      _confirmedPanel = null;
+      _confirmedUsername = null;
+      _confirmedToken = null;
+      _brand = WindowsPreviewFixture.brand();
+      _catalog = WindowsPreviewFixture.protocolCatalog();
+      _nativeProtocols =
+          const NativeProtocolReadiness(supportedCodes: {});
+      _protocolCatalogUnavailable = false;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final strings = AppStrings.of(context);
@@ -229,7 +249,9 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
               MaterialPageRoute<void>(
                 builder: (_) => VpnSettingsScreen(
                   tenant: brand?.namespace ?? '',
-                  account: brand == null ? '' : _username.text.trim(),
+                  account: _offlineDemo
+                      ? 'offline-demo-only'
+                      : (brand == null ? '' : _username.text.trim()),
                 ),
               ),
             ),
@@ -359,6 +381,19 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
                                 : const Icon(Icons.verified_user_outlined),
                             label: Text(strings.identifyButton),
                           ),
+                          const SizedBox(height: 12),
+                          OutlinedButton.icon(
+                            key: const Key('windowsDemoButton'),
+                            onPressed: _showOfflineDemo,
+                            icon: const Icon(Icons.desktop_windows_outlined),
+                            label: Text(strings.previewButton),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            strings.previewSubtitle,
+                            textAlign: TextAlign.center,
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
                         ],
                       ),
                     ),
@@ -376,6 +411,22 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
                 ],
                 if (brand != null) ...[
                   const SizedBox(height: 20),
+                  if (_offlineDemo) ...[
+                    Card(
+                      key: const Key('offlineDemoBanner'),
+                      child: Padding(
+                        padding: const EdgeInsets.all(14),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.info_outline),
+                            const SizedBox(width: 12),
+                            Expanded(child: Text(strings.previewBanner)),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                  ],
                   BrandDetails(brand: brand),
                   if (_protocolCatalogUnavailable) ...[
                     const SizedBox(height: 16),
@@ -403,6 +454,11 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
                   ],
                 ],
                 const SizedBox(height: 20),
+                Text(
+                  strings.windowsEnginePending,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
                 Text(
                   strings.developmentNotice,
                   textAlign: TextAlign.center,
