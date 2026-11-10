@@ -1,0 +1,13 @@
+[Unit]
+Description=TwinPanel read-only resilience probe
+After=network-online.target postgresql.service nginx.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+ExecStart=/usr/bin/python3 /opt/twinpanel/current/backend/scripts/twinpanel_runtime_resilience_probe_v1.py --strict
+TimeoutStartSec=30
+NoNewPrivileges=true
+ProtectHome=true
+PrivateTmp=true
