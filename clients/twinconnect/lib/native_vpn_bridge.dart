@@ -24,7 +24,9 @@ class NativeVpnBridge {
 
   static Future<NativeVpnCapabilities> probe() async {
     final os = platform;
-    if (os == VpnPlatform.other) {
+    if (os != VpnPlatform.android) {
+      // No native Windows/iOS/macOS engine is bundled in this preview.
+      // Never wait for a nonexistent desktop platform-channel implementation.
       return NativeVpnCapabilities.unavailable(os);
     }
     try {
@@ -47,7 +49,8 @@ class NativeVpnBridge {
 
   static Future<NativeProtocolReadiness> protocolReadiness() async {
     // Missing plugin is expected until real protocol engines are built.
-    if (platform == VpnPlatform.other) {
+    if (platform != VpnPlatform.android) {
+      // No desktop protocol adapter has been installed in this build.
       return const NativeProtocolReadiness(supportedCodes: {});
     }
     // This additional OS-level probe is mandatory: a plugin must not report
