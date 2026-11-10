@@ -33,3 +33,36 @@ export async function getAppAccess(
   }
   return await response.json() as AppAccessDelivery;
 }
+
+
+export type AppDirectoryRegistration={
+  ok:boolean;namespace:string;short_namespace:string;api_origin:string;
+};
+
+/** Only a panel administrator may register the public panel HTTPS origin.
+ * Vendor receives a signed installation entitlement and namespace only;
+ * never app usernames or passwords.
+ */
+export async function registerAppDirectory(apiOrigin:string):Promise<AppDirectoryRegistration>{
+  const origin=new URL(apiOrigin);
+  if(origin.protocol!=="https:"||origin.username||origin.password||
+     origin.search||origin.hash||origin.pathname!=="/"||
+     (origin.port&&origin.port!=="443")){
+    throw new Error("PUBLIC_HTTPS_ORIGIN_REQUIRED");
+  }
+  const token=getCustomerToken();
+  if(!token)throw new Error("Login required");
+  const response=await fetch(`${API_BASE}/v1/central-app/admin/register`,{
+    method:"POST",
+    headers:{"Authorization":`Bearer ${token}`,"Content-Type":"application/json",
+             "Cache-Control":"no-store"},
+    cache:"no-store",
+    body:JSON.stringify({api_origin:origin.origin}),
+  });
+  if(!response.ok){
+    let reason=`HTTP ${response.status}`;
+    try{const data=await response.json();reason=String(data.detail||reason);}catch{}
+    throw new Error(reason);
+  }
+  return await response.json() as AppDirectoryRegistration;
+}
