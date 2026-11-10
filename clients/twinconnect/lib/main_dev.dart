@@ -274,24 +274,6 @@ class _TwinConnectDevAppState extends State<TwinConnectDevApp> {
                 ]),
               ),
               const SizedBox(height: 14),
-              SizedBox(height: 39, child: ListView(
-                scrollDirection: Axis.horizontal,
-                children: [
-                  for (final item in filtered)
-                    Container(
-                      key: Key('devProtocol_${item.protocol.code}'),
-                      alignment: Alignment.center,
-                      margin: const EdgeInsetsDirectional.only(end: 8),
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      decoration: BoxDecoration(
-                        color: accent.withValues(alpha: 0.09),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: border),
-                      ),
-                      child: Text(item.protocol.name, style: const TextStyle(fontSize: 11)),
-                    ),
-                ],
-              )),
               const SizedBox(height: 18),
               for (final location in const [
                 ('🇩🇪', 'Germany · Frankfurt'),
