@@ -86,15 +86,7 @@ class _TwinConnectDevAppState extends State<TwinConnectDevApp> {
           child: InkWell(
             borderRadius: BorderRadius.circular(15),
             onTap: () {
-              if (code == 'settings') {
-                Navigator.of(context).push(MaterialPageRoute(
-                  builder: (_) => VpnSettingsScreen(
-                    tenant: '', account: '', brand: brand,
-                  ),
-                ));
-              } else {
-                setState(() => _page = code);
-              }
+              setState(() => _page = code);
             },
             child: Padding(
               padding: EdgeInsets.symmetric(horizontal: wide ? 15 : 8, vertical: 14),
@@ -413,6 +405,110 @@ class _TwinConnectDevAppState extends State<TwinConnectDevApp> {
           ],
         );
 
+        Widget settingsPage() => Container(
+          padding: const EdgeInsets.all(23),
+          decoration: BoxDecoration(
+            color: surface, borderRadius: BorderRadius.circular(25),
+            border: Border.all(color: border),
+          ),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            Text(t('تنظیمات', 'Settings'),
+              style: const TextStyle(fontSize: 25, fontWeight: FontWeight.w800)),
+            const SizedBox(height: 19),
+            for (final option in [
+              (Icons.shield_outlined, 'Kill Switch'),
+              (Icons.dns_outlined, t('حفاظت DNS', 'DNS protection')),
+              (Icons.security_outlined, t('حفاظت IPv6', 'IPv6 protection')),
+              (Icons.auto_awesome_rounded,
+                t('اتصال خودکار به بهترین سرور', 'Auto-connect to best server')),
+            ])
+              ListTile(
+                leading: Icon(option.$1, color: accent),
+                title: Text(option.$2),
+                subtitle: Text(t('هنوز فعال نیست', 'Not available yet'),
+                  style: TextStyle(color: muted, fontSize: 11)),
+                trailing: const Switch(value: false, onChanged: null),
+              ),
+            const Divider(height: 30),
+            ListTile(
+              leading: Icon(Icons.language_rounded, color: accent),
+              title: Text(t('زبان', 'Language')),
+              trailing: Text(_persian ? 'فارسی' : 'English'),
+              onTap: () => setState(() => _persian = !_persian),
+            ),
+            ListTile(
+              leading: Icon(Icons.palette_outlined, color: accent),
+              title: Text(t('ظاهر', 'Appearance')),
+              trailing: Text(_dark ? t('تیره', 'Dark') : t('روشن', 'Light')),
+              onTap: () => setState(() => _dark = !_dark),
+            ),
+          ]),
+        );
+
+        Widget accountPage() => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(t('حساب', 'Account'),
+              style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800)),
+            const SizedBox(height: 18),
+            Container(
+              padding: const EdgeInsets.all(25),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: accent.withValues(alpha: 0.4)),
+                gradient: LinearGradient(colors: dark
+                    ? [const Color(0xFF352450), const Color(0xFF1B2442)]
+                    : [const Color(0xFFEEE5FF), Colors.white]),
+              ),
+              child: Row(children: [
+                Container(
+                  height: 82, width: 82,
+                  decoration: BoxDecoration(
+                    color: accent.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(20)),
+                  child: Icon(Icons.workspace_premium_rounded,
+                    color: accent, size: 43),
+                ),
+                const SizedBox(width: 18),
+                Expanded(child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(t('حساب آزمایشی', 'Demo account'),
+                      style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 6),
+                    Text(t('اطلاعات واقعی دریافت نشده', 'No subscription loaded'),
+                      style: TextStyle(color: muted, fontSize: 12)),
+                  ],
+                )),
+              ]),
+            ),
+            const SizedBox(height: 19),
+            Row(children: [
+              for (final entry in [
+                (Icons.devices_outlined, t('دستگاه‌ها', 'Devices')),
+                (Icons.data_usage_rounded, t('ترافیک', 'Traffic')),
+                (Icons.event_available_outlined, t('انقضا', 'Expiry')),
+              ]) ...[
+                Expanded(child: Container(
+                  padding: const EdgeInsets.all(17),
+                  decoration: BoxDecoration(
+                    color: surface, borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: border)),
+                  child: Column(children: [
+                    Icon(entry.$1, color: accent),
+                    const SizedBox(height: 10),
+                    Text('—', style: const TextStyle(
+                      fontSize: 18, fontWeight: FontWeight.w700)),
+                    Text(entry.$2, style: TextStyle(
+                      color: muted, fontSize: 11)),
+                  ]),
+                )),
+                const SizedBox(width: 8),
+              ],
+            ]),
+          ],
+        );
+
         return Scaffold(
           body: Row(children: [
             Container(
@@ -443,11 +539,13 @@ class _TwinConnectDevAppState extends State<TwinConnectDevApp> {
                     ],
                   ]),
                   const SizedBox(height: 39),
-                  tab('home', Icons.grid_view_rounded, t('خانه', 'Home')),
+                  tab('home', Icons.bolt_rounded, t('اتصال سریع', 'Quick connect')),
                   const SizedBox(height: 8),
-                  tab('protocols', Icons.hub_outlined, t('پروتکل‌ها', 'Protocols')),
+                  tab('protocols', Icons.location_on_outlined, t('مکان‌ها', 'Locations')),
                   const SizedBox(height: 8),
                   tab('settings', Icons.tune_rounded, t('تنظیمات', 'Settings')),
+                  const SizedBox(height: 8),
+                  tab('account', Icons.person_outline_rounded, t('حساب', 'Account')),
                   const Spacer(),
                   IconButton(
                     key: const Key('devThemeToggle'),
@@ -491,9 +589,12 @@ class _TwinConnectDevAppState extends State<TwinConnectDevApp> {
                 children: [
                   Center(child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 1200),
-                    child: _page == 'protocols'
-                        ? protocols()
-                        : dashboard(),
+                    child: switch (_page) {
+                      'protocols' => protocols(),
+                      'settings' => settingsPage(),
+                      'account' => accountPage(),
+                      _ => dashboard(),
+                    },
                   )),
                 ],
               )),
