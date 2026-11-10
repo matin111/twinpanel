@@ -38,9 +38,10 @@ void main() {
   testWidgets('app password is masked', (tester) async {
     await tester.pumpWidget(const TwinConnectApp());
     await tester.pumpAndSettle();
-    final input = tester.widget<TextFormField>(
-      find.byKey(const Key('appPassword')),
+    final field = find.byKey(const Key('appPassword'));
+    final editable = tester.widget<EditableText>(
+      find.descendant(of: field, matching: find.byType(EditableText)),
     );
-    expect(input.obscureText, true);
+    expect(editable.obscureText, true);
   });
 }
