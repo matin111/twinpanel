@@ -63,8 +63,11 @@ class WindowsWireGuardController {
     });
     if (raw == null || raw['contractVersion'] != 1 ||
         raw['protocol'] != 'wireguard' ||
-        raw['state'] != 'interface_up' ||
-        raw['peerHandshakeVerified'] != false) {
+        (raw['state'] != 'interface_up' &&
+         raw['state'] != 'peer_verified') ||
+        (raw['state'] == 'peer_verified'
+            ? raw['peerHandshakeVerified'] != true
+            : raw['peerHandshakeVerified'] != false)) {
       throw const FormatException('NATIVE_TUNNEL_STATUS_INVALID');
     }
     return Map.unmodifiable(raw);
@@ -77,8 +80,12 @@ class WindowsWireGuardController {
     );
     if (raw == null || raw['contractVersion'] != 1 ||
         raw['protocol'] != 'wireguard' ||
-        (raw['state'] != 'interface_up' && raw['state'] != 'down') ||
-        raw['peerHandshakeVerified'] != false) {
+        (raw['state'] != 'interface_up' &&
+         raw['state'] != 'peer_verified' &&
+         raw['state'] != 'down') ||
+        (raw['state'] == 'peer_verified'
+            ? raw['peerHandshakeVerified'] != true
+            : raw['peerHandshakeVerified'] != false)) {
       throw const FormatException('NATIVE_TUNNEL_STATUS_INVALID');
     }
     return Map.unmodifiable(raw);
