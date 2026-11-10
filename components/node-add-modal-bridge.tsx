@@ -45,8 +45,8 @@ const NODE_INSTALL_FAILURE_GUIDANCE:Record<string,[string,string]>={
     "Set a dedicated Xray hostname before installing an Exit. The three required TLS profiles need a valid certificate.",
   ],
   XRAY_NEW_EXIT_TLS_CERTIFICATE_NOT_READY:[
-    "صدور SSL نود ناموفق بود. ابتدا رکورد DNS را برای صدور گواهی به IP خروجی اشاره دهید و دسترسی به Let's Encrypt را بررسی کنید. تا تأیید SSL، نود منتشر نمی‌شود.",
-    "The Exit certificate is not ready. Point DNS to the Exit for issuance and verify Let's Encrypt access. The node remains unpublished.",
+    "گواهی SSL ویتوری آماده نیست. DNS، دسترسی خروجی HTTPS به Let's Encrypt و پورت عمومی 80 برای تأیید HTTP-01 را بررسی کنید. تغییر پورت Xray این خطا را برطرف نمی‌کند؛ ۱۵ پروتکل دیگر دست‌نخورده می‌مانند.",
+    "The Xray TLS certificate is not ready. Check DNS, outbound HTTPS to Let's Encrypt and public TCP port 80 for HTTP-01. Changing Xray's listener port cannot fix this. Other healthy protocols remain untouched.",
   ],
   NODE_HOST_ALREADY_REGISTERED:[
     "این IP قبلاً به نود فعالی در پنل اختصاص یافته است. برای جلوگیری از آسیب به نود ایران یا سایر کاربران، نصب تکراری مسدود شد.",
@@ -336,7 +336,13 @@ export function NodeAddModalBridge(){
       }
     `}</style>
 
-    {!open&&jobId?<button className="node-install-reopen" type="button" onClick={()=>setOpen(true)}>{pick("مشاهده مراحل افزودن نود","View server installation stages")} · {job?.node_name||pick("در حال دریافت وضعیت","Loading status")}{job?.state==="running"?" ●":""}</button>:null}
+    {!open&&jobId&&(job?.state==="failed"||job?.state==="interrupted")?<div className="runtime-warning" role="alert" style={{marginBottom:12}}>
+      <strong>{pick("نصب این نود کامل نشده است","This node installation is incomplete")}</strong>
+      <p>{job?.installed_protocols??0} / {job?.expected_protocols??16} {pick("پروتکل آماده","protocols ready")}</p>
+      {job.error_code?<p>{pick(...(NODE_INSTALL_FAILURE_GUIDANCE[job.error_code]||[job.error_code,job.error_code]))}</p>:null}
+      <button type="button" className="node-install-reopen" onClick={()=>setOpen(true)}>{pick("مشاهده خطای نصب","View installation failure")}</button>
+    </div>:null}
+    {!open&&jobId&&job?.state!=="failed"&&job?.state!=="interrupted"?<button className="node-install-reopen" type="button" onClick={()=>setOpen(true)}>{pick("مشاهده مراحل افزودن نود","View server installation stages")} · {job?.node_name||pick("در حال دریافت وضعیت","Loading status")}{job?.state==="running"?" ●":""}</button>:null}
     {!open&&ok?<div className="runtime-success" style={{marginBottom:12}}>{ok}</div>:null}
     {!open&&error?<div className="runtime-error" style={{marginBottom:12}}>{error}</div>:null}
     {open?<div className="runtime-modal tp-add-node-modal" role="dialog" aria-modal="true">
