@@ -538,6 +538,8 @@ export function LegacySubscriptionsRuntimePage(){
     </Modal>}
 
     <SubscriptionLinkDeliveryModal
+      appOwner="admin"
+      subscriptionId={linkModalId??undefined}
       open={linkModalId!==null}
       link={linkModalLink}
       reference={linkModalId?`MV-${linkModalId}`:""}
