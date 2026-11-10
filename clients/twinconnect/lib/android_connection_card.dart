@@ -20,7 +20,7 @@ class AndroidConnectionCard extends StatefulWidget {
   const AndroidConnectionCard({
     required this.panel,
     required this.username,
-    required this.shareToken,
+    required this.sessionToken,
     required this.catalog,
     required this.native,
     super.key,
@@ -28,7 +28,7 @@ class AndroidConnectionCard extends StatefulWidget {
 
   final PanelDirectoryEntry panel;
   final String username;
-  final String shareToken;
+  final String sessionToken;
   final PanelProtocolCatalog catalog;
   final NativeProtocolReadiness native;
 
@@ -130,10 +130,9 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
         widget.native,
       );
       // Fetch secrets only AFTER the native engine/policy guard passes.
-      final profiles = await TenantApi.fromBuildConfig().loadNativeProfiles(
+      final profiles = await TenantApi.fromBuildConfig().loadSessionNativeProfiles(
         panel: widget.panel,
-        username: widget.username,
-        shareToken: widget.shareToken,
+        sessionToken: widget.sessionToken,
         protocol: VpnProtocols.byCode('wireguard')!,
         native: widget.native,
       );
