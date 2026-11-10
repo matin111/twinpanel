@@ -73,7 +73,7 @@
 .reseller-subscriptions-parity .sub-action,
 .customerSubscriptionsParity .customerSubActions>button{
   min-width:0;min-height:43px;padding:9px 9px;border:1px solid rgba(145,168,217,.46);
-  border-radius:12px;color:#f9fbff;font:700 12px inherit;cursor:pointer;
+  border-radius:12px;color:#f9fbff;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;
   background:linear-gradient(140deg,#273858,#182440);
   display:flex;align-items:center;justify-content:center;text-align:center;
   transition:filter .16s ease,transform .16s ease
