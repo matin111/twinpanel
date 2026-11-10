@@ -11,6 +11,7 @@ import {
   type BrandingConfig,
 } from "../lib/branding";
 import {brandingApi,type BrandingAssetKind,type BrandingRecord} from "../lib/branding-api";
+import {CentralAppAppearanceStudio} from "./central-app-appearance-studio";
 
 const COLOR_PRESETS=[
   ["#7C3AED","#4F46E5"],
