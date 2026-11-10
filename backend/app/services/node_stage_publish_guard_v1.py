@@ -32,11 +32,11 @@ def require_staged_node_publish_ready(db: Session, node_id: int) -> None:
                 detail="CENTRAL_NODE_CREDENTIAL_COVERAGE_INCOMPLETE",
             )
         return
-    if not 1 <= int(job.installed_protocols or 0) <= 16:
-        raise HTTPException(status_code=409, detail="NODE_NO_VERIFIED_PROTOCOLS")
     if job.stage not in {"verified_ready", "completed", "users_queued"}:
         raise HTTPException(
             status_code=409,
             detail="هیچ مجموعه سالمی از پروتکل‌های این نود برای انتشار تأیید نشده است",
         )
+    if not 1 <= int(job.installed_protocols or 0) <= 16:
+        raise HTTPException(status_code=409, detail="NODE_NO_VERIFIED_PROTOCOLS")
 
