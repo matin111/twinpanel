@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.763",
+  "version": "1.1.0-rc.764",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-09T23:57:45Z",
+  "released_at": "2026-11-10T00:29:38Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "963bee0c9273213356b067228e0a7f5008420bf2",
+  "source_sha": "76037ed62e5b11bbd8a08ad04cf52d9e9db16beb",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.763/twinpanel-1.1.0-rc.763-linux-x86_64.tar.gz",
-    "sha256": "6df41d11e2b3de89cf0555144f2de411baa259077586f0a9849b4fac31f4beaa",
-    "size_bytes": 30242749
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.764/twinpanel-1.1.0-rc.764-linux-x86_64.tar.gz",
+    "sha256": "47f126e3e7f9fb156ccee20103595fe9ad188a0d22f5ec485101bac4dc4a95e7",
+    "size_bytes": 30254733
   },
   "notes": {
-    "fa": "اصلاح فیلتر صفحه نودها: کارت‌های کل نودها، آنلاین، ایران و خارج قابل کلیک شدند و دقیقاً همان نودهای شمارش‌شده را نشان می‌دهند. فیلتر کشویی آنلاین، آفلاین، نگهداری و نود مادر اضافه شد. جستجو اکنون نام، شناسه، IP و دامنه نود را پشتیبانی می‌کند. وضعیت آنلاین در شمارنده و جدول از منبع یکسان خوانده می‌شود. فیلتر فعال، تعداد نتایج و حالت نتیجه خالی نمایش داده می‌شوند. هیچ تغییری در پروتکل‌ها، کاربران، نودها، تونل‌ها یا ذخیره اطلاعات ایجاد نمی‌شود.",
-    "en": "Enable clickable KPI filters for all/online/Iran/Exit nodes on the active admin nodes page, add Offline/Maintenance/Mother dropdown filters, search by name/IP/ID/domain, and keep KPI counts consistent with the same live overview status shown in the table. Selected filter/count and empty state included. UI and read-only filtering only; no node, protocol, tunnel, user or payment mutations. 5 Python regression tests, 8 dynamic filter checks, full TypeScript compile passed."
+    "fa": "رفع ریشه‌ای نصب‌نشدن V2Ray/Xray روی نودهای جدید وقتی پورت پیش‌فرض 8443 توسط SSH یا سایر سرویس‌ها اشغال است: قبل از نصب، وضعیت واقعی پورت‌ها بررسی و فقط برای Xray جدید بدون کاربر و بدون سرویس فعال، مجموعه پورت آزاد برای سه Inbound TLS انتخاب می‌شود. پورت انتخابی در دیتابیس پنل ثبت شده و در ساخت کانفیگ‌ها و Repairهای بعدی استفاده می‌شود. پورت SSH، sing-box، SSL، UUID کاربران و سایر پروتکل‌های فعال تغییر نمی‌کنند. روی نود tr1 شماره 24 با گواهی معتبر v2tr.in88.sbs، پورت 12443 و پروفایل‌های 13444/13446/13447 در تست فقط‌خواندنی آزاد تشخیص داده شدند. تست‌های رگرسیون: 49 مورد موفق.",
+    "en": "Prevent new Exit Xray install failure when sshd owns TCP 8443. Central port preflight selects a complete free Xray base+TLS listener group only for inactive, customerless dedicated TLS Exit nodes, persists the selected base for future customer delivery/Repair, and fails closed if any existing active Xray, client UUID, custom config, 10085 API or manually selected port would be affected. Validated read-only on tr1 node 24: base 12443, WS 13444, TCP TLS 13446, XHTTP 13447. Preserve SSH, sing-box, all other protocols, certificates and existing accounts. 49 tests pass."
   }
 }
