@@ -87,6 +87,17 @@ def load_desired_state(db, node_id: int, *, as_of: datetime | None = None):
         .filter(SubscriptionProtocol.subscription_id.in_(ids))
         .all() if ids else []
     )
+    # New partially verified Exits are eligible only for protocols actually
+    # installed and live-checked. Preserve full legacy projection elsewhere.
+    from .central_partial_protocol_scope_v1 import node_supported_protocols
+    scope = node_supported_protocols(db, node_id)
+    if scope != ALL_PROTOCOL_SET:
+        protocols = [
+            (sid, protocol) for sid, protocol in protocols
+            if str(protocol).strip().lower() in scope
+        ]
+        entitled_ids = {int(sid) for sid, _ in protocols}
+        ids = [sid for sid in ids if sid in entitled_ids]
     return build_desired_state(node_id, ids, protocols)
 
 
