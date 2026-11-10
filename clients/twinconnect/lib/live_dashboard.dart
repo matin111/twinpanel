@@ -13,6 +13,7 @@ import 'protocols.dart';
 import 'server_inventory.dart';
 import 'server_latency.dart';
 import 'windows_singbox_preflight.dart';
+import 'singbox_profile_validator.dart';
 import 'connection_bootstrap.dart';
 import 'tenant_api.dart';
 import 'vpn_policy_store.dart';
