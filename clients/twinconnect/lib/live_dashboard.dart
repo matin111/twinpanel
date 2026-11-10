@@ -1,10 +1,17 @@
 import 'dart:ui' show ImageFilter;
+import 'dart:io' show Platform;
+
+import 'package:flutter/services.dart' show PlatformException;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'protocols.dart';
 import 'server_inventory.dart';
+import 'connection_bootstrap.dart';
+import 'tenant_api.dart';
+import 'vpn_policy_store.dart';
+import 'windows_wireguard.dart';
 import 'tenant_models.dart';
 import 'native_vpn_bridge.dart';
 import 'country_flag.dart';
@@ -48,6 +55,137 @@ class _DemoServer {
 }
 
 class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
+  final WindowsWireGuardController _vpn = const WindowsWireGuardController();
+  final VpnPolicyStore _vpnPolicy = const VpnPolicyStore();
+  bool _vpnBusy = false;
+  bool _vpnUp = false;
+  bool _vpnVerified = false;
+  bool _vpnReady = false;
+  bool _vpnUnmanaged = false;
+  bool _vpnCleanup = false;
+  int _vpnRx = 0;
+  int _vpnTx = 0;
+  String? _vpnError;
+
+  bool get _wireGuardAllowed => widget.catalog?.entries.any((entry) =>
+      entry.protocol.code == 'wireguard' && entry.selected &&
+      entry.configRecordPresent) ?? false;
+
+  String? get _selectedServerId {
+    final servers = widget.servers?.servers;
+    if (servers == null || servers.isEmpty || _selected < 0 ||
+        _selected >= servers.length) return null;
+    return servers[_selected].id;
+  }
+
+  String _errorText(Object error) {
+    if (error is PlatformException) return error.code;
+    if (error is TenantApiException) return error.message;
+    if (error is ConnectionBootstrapException) return error.code;
+    if (error is FormatException) return error.message;
+    if (error is StateError) return 'NATIVE_ENGINE_UNAVAILABLE';
+    return 'VPN_CONNECTION_FAILED';
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _refreshVpnStatus();
+  }
+
+  Future<void> _refreshVpnStatus() async {
+    if (!Platform.isWindows || _vpnBusy) return;
+    try {
+      final status = await _vpn.status();
+      final native = await NativeVpnBridge.protocolReadiness();
+      if (!mounted) return;
+      setState(() {
+        _vpnUp = status['state'] == 'interface_up' ||
+            status['state'] == 'peer_verified';
+        _vpnVerified = status['state'] == 'peer_verified' &&
+            status['peerHandshakeVerified'] == true;
+        _vpnCleanup = status['state'] == 'needs_cleanup';
+        _vpnUnmanaged = status['state'] == 'unmanaged_service';
+        _vpnRx = status['rxBytes'] is int ? status['rxBytes'] as int : 0;
+        _vpnTx = status['txBytes'] is int ? status['txBytes'] as int : 0;
+        _vpnReady = native.supports('wireguard');
+        _vpnError = null;
+      });
+    } catch (error) {
+      if (mounted) setState(() {
+        _vpnReady = false;
+        _vpnUp = false;
+        _vpnVerified = false;
+        _vpnError = _errorText(error);
+      });
+    }
+  }
+
+  Future<void> _toggleVpn() async {
+    if (_vpnBusy || !Platform.isWindows) return;
+    if (_vpnUnmanaged) {
+      setState(() => _vpnError = 'UNMANAGED_WIREGUARD_SERVICE');
+      return;
+    }
+    if (!_vpnUp && !_vpnCleanup && (!_vpnReady || !_wireGuardAllowed ||
+        _selectedServerId == null || _filter != 'all' && _filter != 'wireguard')) {
+      setState(() => _vpnError = !_wireGuardAllowed
+          ? 'WIREGUARD_NOT_ALLOWED'
+          : !_vpnReady ? 'WIREGUARD_NOT_INSTALLED_OR_ADMIN_REQUIRED'
+          : 'SELECT_WIREGUARD_SERVER');
+      return;
+    }
+    setState(() { _vpnBusy = true; _vpnError = null; });
+    try {
+      if (_vpnUp || _vpnCleanup) {
+        await _vpn.stop();
+        if (!mounted) return;
+        setState(() {
+          _vpnUp = false;
+          _vpnVerified = false;
+          _vpnCleanup = false;
+          _vpnRx = 0;
+          _vpnTx = 0;
+        });
+      } else {
+        final selectedId = _selectedServerId!;
+        final policy = await _vpnPolicy.load(
+            widget.panel.namespace, widget.username);
+        final capabilities = await NativeVpnBridge.probe();
+        final native = await NativeVpnBridge.protocolReadiness();
+        final candidate = await ConnectionBootstrap(
+            api: TenantApi.fromBuildConfig()).prepare(
+          panel: widget.panel,
+          sessionToken: widget.sessionToken,
+          serverId: selectedId,
+          protocolCode: 'wireguard',
+          policy: policy,
+          capabilities: capabilities,
+          nativeProtocols: native,
+        );
+        final node = WindowsWireGuardController.configForSingleNode(
+            candidate.profiles, selectedId);
+        final status = await _vpn.start(
+          node: node, policy: policy, capabilities: capabilities,
+          nativeProtocols: native,
+        );
+        if (!mounted) return;
+        setState(() {
+          _vpnUp = status['state'] == 'interface_up' ||
+              status['state'] == 'peer_verified';
+          _vpnVerified = status['state'] == 'peer_verified' &&
+              status['peerHandshakeVerified'] == true;
+          _vpnRx = status['rxBytes'] is int ? status['rxBytes'] as int : 0;
+          _vpnTx = status['txBytes'] is int ? status['txBytes'] as int : 0;
+        });
+      }
+    } catch (error) {
+      if (mounted) setState(() => _vpnError = _errorText(error));
+    } finally {
+      if (mounted) setState(() => _vpnBusy = false);
+    }
+  }
+
   bool _persian = false;
   bool _dark = true;
   String _page = 'home';
@@ -311,7 +449,11 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           duration: const Duration(milliseconds: 240),
           child: KeyedSubtree(
             key: const ValueKey('dev-disconnected'),
-            child: smallPill(tr('وضعیت نامشخص', 'Status unknown'), icon: Icons.circle),
+            child: smallPill(_vpnVerified
+                ? tr('دست‌دهی تأیید شد', 'Handshake verified')
+                : _vpnUp ? tr('رابط فعال', 'Interface active')
+                : _vpnBusy ? tr('در حال اجرا', 'Working')
+                : tr('قطع', 'Disconnected'), icon: Icons.circle),
           ),
         ),
         const SizedBox(height: 13),
@@ -328,16 +470,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
             width: 94, height: 94,
             child: FilledButton(
               key: const Key('liveConnectionControlsButton'),
-              onPressed: () {
-                final message = widget.catalog == null || widget.servers == null
-                    ? tr('اطلاعات اتصال هنوز دریافت نشده است.',
-                        'Connection information is not loaded yet.')
-                    : tr('اتصال مستقیم هنوز برای این پروتکل فعال نشده است.',
-                        'Direct connection is not yet available for this protocol.');
-                ScaffoldMessenger.of(context)
-                  ..hideCurrentSnackBar()
-                  ..showSnackBar(SnackBar(content: Text(message)));
-              },
+              onPressed: _vpnBusy ? null : _toggleVpn,
               style: FilledButton.styleFrom(
                 padding: EdgeInsets.zero,
                 shape: const CircleBorder(),
@@ -346,17 +479,35 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                 side: const BorderSide(color: purple, width: 2.5),
                 elevation: 0,
               ),
-              child: const Icon(Icons.power_settings_new_rounded,
-                  size: 45, color: purple),
+              child: _vpnBusy
+                  ? const SizedBox.square(dimension: 28,
+                      child: CircularProgressIndicator(strokeWidth: 3))
+                  : Icon(_vpnUp ? Icons.stop_circle_outlined
+                      : Icons.power_settings_new_rounded,
+                      size: 45, color: _vpnVerified ? Colors.greenAccent : purple),
             ),
           ),
         ),
         const SizedBox(height: 12),
         txt(tr('اتصال سریع', 'Quick connect'), size: 20, bold: true),
         const SizedBox(height: 5),
-        txt(tr('برای اتصال، پروتکل و سرور مناسب را انتخاب کنید',
-              'Select a server and protocol to connect'),
+        txt(_vpnVerified
+              ? tr('دست‌دهی با سرور تأیید شد', 'Server handshake verified')
+              : _vpnUp ? tr('رابط فعال است؛ دست‌دهی هنوز تأیید نشده',
+                  'Interface active; handshake not verified')
+              : tr('سرور را انتخاب کنید؛ اتصال مستقیم فعلاً WireGuard است',
+                  'Select a server; direct connection currently supports WireGuard'),
             size: 12, color: sub),
+        if (_vpnError != null) ...[
+          const SizedBox(height: 8),
+          Text(_vpnError!, style: const TextStyle(
+              color: Colors.orangeAccent, fontSize: 11)),
+        ],
+        TextButton.icon(
+          onPressed: _vpnBusy ? null : _refreshVpnStatus,
+          icon: const Icon(Icons.refresh_rounded, size: 16),
+          label: Text(tr('بررسی وضعیت اتصال', 'Refresh tunnel status')),
+        ),
         const SizedBox(height: 12),
         ConnectionSignalArt(dark: _dark),
         const SizedBox(height: 12),
@@ -571,7 +722,9 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           Row(children: [
             Expanded(child: txt(tr('وضعیت شبکه', 'Network status'),
               size: 17, bold: true)),
-            smallPill(tr('وضعیت نامشخص', 'Status unknown')),
+            smallPill(_vpnVerified ? tr('دست‌دهی تأیید شد', 'Handshake verified') :
+                _vpnUp ? tr('رابط فعال', 'Interface active') :
+                tr('قطع', 'Disconnected')),
           ]),
           const SizedBox(height: 16),
           Row(children: [
@@ -584,12 +737,12 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           const SizedBox(height: 10),
           Row(children: [
             Expanded(child: metric(Icons.arrow_downward_rounded,
-              tr('دانلود', 'Download'), '— B/s',
-              detail: tr('مصرف: —', 'Used: —'))),
+              tr('دریافت', 'Received'), _vpnUp ? '$_vpnRx B' : '—',
+              detail: tr('مجموع رابط', 'Interface total'))),
             const SizedBox(width: 10),
             Expanded(child: metric(Icons.arrow_upward_rounded,
-              tr('آپلود', 'Upload'), '— B/s',
-              detail: tr('مصرف: —', 'Used: —'))),
+              tr('ارسال', 'Sent'), _vpnUp ? '$_vpnTx B' : '—',
+              detail: tr('مجموع رابط', 'Interface total'))),
           ]),
           const SizedBox(height: 14),
           Container(
