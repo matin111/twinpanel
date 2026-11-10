@@ -426,7 +426,9 @@ async def reverify_and_stage_existing_exit_v1(
             detail="CENTRAL_STAGE_INSTALL_STILL_RUNNING",
         )
 
-    live = await verify_new_exit_readiness(db, int(node_id))
+    live = await verify_new_exit_readiness(
+        db, int(node_id), require_tls_profiles=True, allow_partial=True,
+    )
     if live.get("ok") is not True:
         raise HTTPException(status_code=409, detail={
             "error": "CENTRAL_STAGE_LIVE_READINESS_FAILED",
