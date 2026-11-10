@@ -83,9 +83,9 @@ class _TwinConnectDevAppState extends State<TwinConnectDevApp> {
               }
             },
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 14),
+              padding: EdgeInsets.symmetric(horizontal: wide ? 15 : 8, vertical: 14),
               child: Row(children: [
-                Icon(icon, color: _page == code ? accent : muted, size: 22),
+                Icon(icon, color: _page == code ? accent : muted, size: wide ? 22 : 20),
                 if (wide) ...[
                   const SizedBox(width: 13),
                   Expanded(child: Text(title, style: TextStyle(
