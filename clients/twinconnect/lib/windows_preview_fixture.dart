@@ -11,7 +11,7 @@ class WindowsPreviewFixture {
         'namespace': namespace,
         'brand_name': 'TwinConnect Demo',
         'owner_type': 'reseller',
-        'account_status': 'active',
+        'account_status': 'demo',
         'app_username_prefix': namespace + '_R1_',
         'support_phone': '+00 000 000 0000',
         'telegram_url': null,
