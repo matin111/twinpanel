@@ -1095,141 +1095,40 @@ def _apply_sudoku_presence(
 
 
 async def _reconcile_node(db, node: Node) -> list[dict[str, Any]]:
+    """Collect all slow remote evidence BEFORE starting the quota write txn.
+
+    Previously, applying WireGuard to the ORM and then awaiting AmneziaWG,
+    TrustTunnel, Mieru and Sudoku left *writes* open on PostgreSQL for tens of
+    seconds. Moving only the SSH reads ahead of the existing atomic per-node
+    commit preserves all byte counter/cursor/session mutation logic.
+    """
     grouped = _devices_by_protocol(db, int(node.id))
     if not grouped:
         return []
 
     conn = None
-    results: list[dict[str, Any]] = []
+    readings: dict[str, tuple] = {}
     try:
         conn = await connect_protocol_runtime(node, db)
-        # Release credential-map and connection-setup read transactions before
-        # slow SSH telemetry. Canonical quota mutations below retain their
-        # existing per-node commit and idempotency rules.
+        # Release credential-map and saved SSH access reads before telemetry.
+        # No quota cursor, session or account writes have occurred yet.
         db.commit()
 
         if grouped.get("wireguard"):
-            ok, epoch, peers, error = await _collect_wireguard_like(
-                conn,
-                binary="wg",
-                interface="wg-access0",
+            readings["wireguard"] = await _collect_wireguard_like(
+                conn, binary="wg", interface="wg-access0",
             )
-            results.append(
-                {
-                    "ok": True,
-                    **_apply_wireguard_like(
-                        db,
-                        node=node,
-                        protocol="wireguard",
-                        devices=grouped["wireguard"],
-                        epoch=epoch,
-                        peers=peers,
-                        match_by_key=False,
-                    ),
-                }
-                if ok
-                else {
-                    "ok": False,
-                    "collector": "wireguard",
-                    "node_id": int(node.id),
-                    "error": error or "wireguard_source_unavailable",
-                }
-            )
-
         if grouped.get("amneziawg"):
-            ok, epoch, peers, error = await _collect_wireguard_like(
-                conn,
-                binary="awg",
-                interface="tpawg0",
+            readings["amneziawg"] = await _collect_wireguard_like(
+                conn, binary="awg", interface="tpawg0",
             )
-            results.append(
-                {
-                    "ok": True,
-                    **_apply_wireguard_like(
-                        db,
-                        node=node,
-                        protocol="amneziawg",
-                        devices=grouped["amneziawg"],
-                        epoch=epoch,
-                        peers=peers,
-                        match_by_key=True,
-                    ),
-                }
-                if ok
-                else {
-                    "ok": False,
-                    "collector": "amneziawg",
-                    "node_id": int(node.id),
-                    "error": error or "amneziawg_source_unavailable",
-                }
-            )
-
         if grouped.get("trusttunnel"):
-            ok, epoch, rows, error = await _collect_trusttunnel(conn)
-            results.append(
-                {
-                    "ok": True,
-                    **_apply_trusttunnel(
-                        db,
-                        node=node,
-                        devices=grouped["trusttunnel"],
-                        epoch=epoch,
-                        rows=rows,
-                    ),
-                }
-                if ok
-                else {
-                    "ok": False,
-                    "collector": "trusttunnel",
-                    "node_id": int(node.id),
-                    "error": error or "trusttunnel_source_unavailable",
-                }
-            )
-
+            readings["trusttunnel"] = await _collect_trusttunnel(conn)
         if grouped.get("mieru"):
-            ok, rows, error = await _collect_mieru(conn)
-            results.append(
-                {"ok": True, **_apply_mieru_presence(
-                    db, node=node, devices=grouped["mieru"], rows=rows,
-                )} if ok else {
-                    "ok": False, "collector": "mieru-presence",
-                    "node_id": int(node.id),
-                    "error": error or "mieru_presence_unavailable",
-                }
-            )
-            metrics_ok, metrics, metrics_error = await _collect_mieru_cumulative_metrics(conn)
-            results.append(
-                {"ok": True, **_apply_mieru_cumulative_metrics(
-                    db, node=node, devices=grouped["mieru"], metrics=metrics,
-                )} if metrics_ok else {
-                    "ok": False, "collector": "mieru-native-cumulative",
-                    "node_id": int(node.id),
-                    "error": metrics_error or "mieru_user_metrics_unavailable",
-                }
-            )
-
+            readings["mieru"] = await _collect_mieru(conn)
+            readings["mieru_metrics"] = await _collect_mieru_cumulative_metrics(conn)
         if grouped.get("sudoku"):
-            ok, ports, error = await _collect_established_tcp_ports(conn)
-            results.append(
-                {
-                    "ok": True,
-                    **_apply_sudoku_presence(
-                        db,
-                        node=node,
-                        devices=grouped["sudoku"],
-                        established_ports=ports,
-                    ),
-                }
-                if ok
-                else {
-                    "ok": False,
-                    "collector": "sudoku",
-                    "node_id": int(node.id),
-                    "error": error or "sudoku_source_unavailable",
-                }
-            )
-
-        return results
+            readings["sudoku"] = await _collect_established_tcp_ports(conn)
     finally:
         if conn is not None:
             conn.close()
@@ -1237,6 +1136,92 @@ async def _reconcile_node(db, node: Node) -> list[dict[str, Any]]:
                 await conn.wait_closed()
             except Exception:
                 pass
+
+    # No awaits inside this phase: all write operations retain their original
+    # protocol order and share the existing per-node outer db.commit().
+    results: list[dict[str, Any]] = []
+    if grouped.get("wireguard"):
+        ok, epoch, peers, error = readings["wireguard"]
+        results.append(
+            {"ok": True, **_apply_wireguard_like(
+                db, node=node, protocol="wireguard",
+                devices=grouped["wireguard"], epoch=epoch,
+                peers=peers, match_by_key=False,
+            )}
+            if ok else {
+                "ok": False, "collector": "wireguard",
+                "node_id": int(node.id),
+                "error": error or "wireguard_source_unavailable",
+            }
+        )
+
+    if grouped.get("amneziawg"):
+        ok, epoch, peers, error = readings["amneziawg"]
+        results.append(
+            {"ok": True, **_apply_wireguard_like(
+                db, node=node, protocol="amneziawg",
+                devices=grouped["amneziawg"], epoch=epoch,
+                peers=peers, match_by_key=True,
+            )}
+            if ok else {
+                "ok": False, "collector": "amneziawg",
+                "node_id": int(node.id),
+                "error": error or "amneziawg_source_unavailable",
+            }
+        )
+
+    if grouped.get("trusttunnel"):
+        ok, epoch, rows, error = readings["trusttunnel"]
+        results.append(
+            {"ok": True, **_apply_trusttunnel(
+                db, node=node, devices=grouped["trusttunnel"],
+                epoch=epoch, rows=rows,
+            )}
+            if ok else {
+                "ok": False, "collector": "trusttunnel",
+                "node_id": int(node.id),
+                "error": error or "trusttunnel_source_unavailable",
+            }
+        )
+
+    if grouped.get("mieru"):
+        ok, rows, error = readings["mieru"]
+        results.append(
+            {"ok": True, **_apply_mieru_presence(
+                db, node=node, devices=grouped["mieru"], rows=rows,
+            )}
+            if ok else {
+                "ok": False, "collector": "mieru-presence",
+                "node_id": int(node.id),
+                "error": error or "mieru_presence_unavailable",
+            }
+        )
+        metrics_ok, metrics, metrics_error = readings["mieru_metrics"]
+        results.append(
+            {"ok": True, **_apply_mieru_cumulative_metrics(
+                db, node=node, devices=grouped["mieru"], metrics=metrics,
+            )}
+            if metrics_ok else {
+                "ok": False, "collector": "mieru-native-cumulative",
+                "node_id": int(node.id),
+                "error": metrics_error or "mieru_user_metrics_unavailable",
+            }
+        )
+
+    if grouped.get("sudoku"):
+        ok, ports, error = readings["sudoku"]
+        results.append(
+            {"ok": True, **_apply_sudoku_presence(
+                db, node=node, devices=grouped["sudoku"],
+                established_ports=ports,
+            )}
+            if ok else {
+                "ok": False, "collector": "sudoku",
+                "node_id": int(node.id),
+                "error": error or "sudoku_source_unavailable",
+            }
+        )
+    return results
 
 
 async def reconcile_modern_quota_once() -> dict[str, Any]:

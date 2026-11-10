@@ -65,12 +65,13 @@ def main() -> None:
         assert capabilities[protocol]["presence"] is True
         assert capabilities[protocol]["traffic"] is True
 
-    for protocol in ("mieru", "sudoku"):
-        assert capabilities[protocol]["presence"] is True
-        assert capabilities[protocol]["traffic"] is False
-
-    for protocol in ("hysteria2", "tuic", "anytls", "naive", "shadowtls", "snell"):
-        assert capabilities[protocol]["traffic"] is False
+    # Mieru now reports authenticated native byte counters, while Sudoku
+    # remains presence-only. Never mislabel shared-inner ShadowTLS traffic.
+    assert capabilities["mieru"] == {"presence": True, "traffic": True}
+    assert capabilities["sudoku"] == {"presence": True, "traffic": False}
+    for protocol in ("hysteria2", "tuic", "anytls", "naive", "snell", "socks5"):
+        assert capabilities[protocol] == {"presence": True, "traffic": True}
+    assert capabilities["shadowtls"] == {"presence": False, "traffic": False}
 
     now = 1_800_000_000
     wg_dump = (
