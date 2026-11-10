@@ -269,10 +269,16 @@ class _TwinConnectDevAppState extends State<TwinConnectDevApp> {
         gradient: LinearGradient(
           begin: Alignment.topLeft, end: Alignment.bottomRight,
           colors: _dark
-              ? [const Color(0xFF262047), const Color(0xFF1B2842),
-                 const Color(0xFF182139)]
-              : [const Color(0xFFEDE4FF), const Color(0xFFF8F7FF),
-                 const Color(0xFFE6F1FF)],
+              ? [
+                  const Color(0xFF362A5E).withValues(alpha: 0.78),
+                  const Color(0xFF253754).withValues(alpha: 0.70),
+                  const Color(0xFF23364B).withValues(alpha: 0.70),
+                ]
+              : [
+                  const Color(0xFFEDE4FF).withValues(alpha: 0.79),
+                  Colors.white.withValues(alpha: 0.74),
+                  const Color(0xFFE6F1FF).withValues(alpha: 0.76),
+                ],
         ),
         border: Border.all(color: purple.withValues(alpha: 0.56)),
         boxShadow: [BoxShadow(
@@ -445,7 +451,11 @@ class _TwinConnectDevAppState extends State<TwinConnectDevApp> {
                 .toLowerCase().contains(_search.toLowerCase()))
             i,
       ];
-      return Column(
+      return glassCard(
+        key: const Key('devLocationListingCard'),
+        radius: 23,
+        padding: const EdgeInsets.all(16),
+        child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           heading(tr('مکان‌ها', 'Locations')),
@@ -483,6 +493,7 @@ class _TwinConnectDevAppState extends State<TwinConnectDevApp> {
                 align: TextAlign.center, color: sub),
             ),
         ],
+        ),
       );
     }
 
@@ -588,26 +599,40 @@ class _TwinConnectDevAppState extends State<TwinConnectDevApp> {
           );
         }),
         const SizedBox(height: 15),
-        Row(children: [
-          Expanded(child: txt(tr('انتخاب خودکار بهترین سرور',
-              'Automatic best server'), color: sub, size: 12)),
-          const Switch(
-            key: Key('devAutoBestServer'),
-            value: false,
-            onChanged: null,
-          ),
-        ]),
-        const SizedBox(height: 10),
-        Row(children: [
-          Expanded(child: txt(tr('مکان‌ها', 'Locations'),
-            size: 18, bold: true)),
-          TextButton(
-            onPressed: () => setState(() => _page = 'locations'),
-            child: Text(tr('نمایش همه', 'View all')),
-          ),
-        ]),
-        const SizedBox(height: 5),
-        for (int i = 0; i < 2; i++) serverRow(i),
+        glassCard(
+          key: const Key('devAutoSelectCard'),
+          radius: 19,
+          padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 8),
+          child: Row(children: [
+            const Icon(Icons.auto_awesome_rounded, size: 19, color: purple),
+            const SizedBox(width: 11),
+            Expanded(child: txt(tr('انتخاب خودکار بهترین سرور',
+                'Automatic best server'), size: 13, bold: true)),
+            const Switch(
+              key: Key('devAutoBestServer'),
+              value: false,
+              onChanged: null,
+            ),
+          ]),
+        ),
+        const SizedBox(height: 15),
+        glassCard(
+          key: const Key('devLocationsCard'),
+          radius: 23,
+          padding: const EdgeInsets.fromLTRB(15, 11, 15, 10),
+          child: Column(children: [
+            Row(children: [
+              Expanded(child: txt(tr('مکان‌ها', 'Locations'),
+                size: 18, bold: true)),
+              TextButton(
+                onPressed: () => setState(() => _page = 'locations'),
+                child: Text(tr('نمایش همه', 'View all')),
+              ),
+            ]),
+            const SizedBox(height: 5),
+            for (int i = 0; i < 2; i++) serverRow(i),
+          ]),
+        ),
       ],
     );
 
