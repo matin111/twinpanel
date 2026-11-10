@@ -2664,6 +2664,7 @@ async def _telegram_notification_worker(bot):
                     if (
                         row.kind == "payment_approved"
                         and subscription_link.startswith("https://")
+                        and len(text) <= 1024  # Telegram photo caption limit
                     ):
                         from .telegram_subscription_qr_v1 import (
                             subscription_qr_photo,
