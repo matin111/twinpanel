@@ -5,6 +5,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'protocols.dart';
 import 'country_flag.dart';
+import 'ambient_background.dart';
 
 /// Visual-only desktop preview. No real VPN session, ping or account is created.
 void main() => runApp(const TwinConnectDevApp());
@@ -763,24 +764,35 @@ class _TwinConnectDevAppState extends State<TwinConnectDevApp> {
 
     return Scaffold(
       body: Row(children: [
-        Expanded(child: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft, end: Alignment.bottomRight,
-              colors: _dark
-                  ? [const Color(0xFF10172C), const Color(0xFF171630),
-                     const Color(0xFF10182C)]
-                  : [const Color(0xFFF8F7FF), const Color(0xFFEDEFFE),
-                     const Color(0xFFFFFFFF)],
-            ),
-          ),
+        Expanded(child: TwinConnectAmbientBackground(
+          dark: _dark,
           child: SafeArea(child: ListView(
             padding: EdgeInsets.symmetric(
                 horizontal: wide ? 30 : 17, vertical: 25),
             children: [
               Center(child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 1000),
-                child: content(),
+                child: AnimatedSwitcher(
+                  key: const Key('devPageTransition'),
+                  duration: const Duration(milliseconds: 360),
+                  reverseDuration: const Duration(milliseconds: 210),
+                  switchInCurve: Curves.easeOutCubic,
+                  switchOutCurve: Curves.easeInCubic,
+                  transitionBuilder: (child, animation) => FadeTransition(
+                    opacity: animation,
+                    child: SlideTransition(
+                      position: Tween<Offset>(
+                        begin: const Offset(0, .025),
+                        end: Offset.zero,
+                      ).animate(animation),
+                      child: child,
+                    ),
+                  ),
+                  child: KeyedSubtree(
+                    key: ValueKey<String>(_page),
+                    child: content(),
+                  ),
+                ),
               )),
             ],
           )),
