@@ -1,0 +1,51 @@
+name: TwinConnect Android WireGuard Native Build
+
+on:
+  pull_request:
+    paths:
+      - "clients/twinconnect/native/android/**"
+      - "clients/twinconnect/tools/install_android_native.py"
+      - "clients/twinconnect/lib/android_*.dart"
+      - "clients/twinconnect/lib/main.dart"
+      - "clients/twinconnect/lib/native_vpn_bridge.dart"
+      - "clients/twinconnect/lib/vpn_policy.dart"
+      - "clients/twinconnect/pubspec.yaml"
+      - ".github/workflows/twinconnect-android-native.yml"
+
+jobs:
+  android-wireguard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    defaults:
+      run:
+        working-directory: clients/twinconnect
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Generate Android scaffold
+        run: flutter create --platforms=android --org com.twinpanel --project-name twinconnect .
+      - name: Install native source and pinned WireGuard dependency
+        run: python tools/install_android_native.py
+      - name: Verify explicit VPN permission and native service
+        shell: bash
+        run: |
+          grep -F 'GoBackend\$VpnService' android/app/src/main/AndroidManifest.xml
+          grep -F 'com.wireguard.android:tunnel:1.0.20260102' android/app/build.gradle.kts
+          grep -F 'OPENCONNECT_CORE_NOT_INSTALLED' lib/android_tunnel.dart
+      - name: Fetch packages
+        run: flutter pub get
+      - name: Dart static analysis
+        run: flutter analyze
+      - name: Dart tests
+        run: flutter test --reporter expanded
+      - name: Compile native Kotlin and Android debug APK
+        run: flutter build apk --debug
+      - name: Upload unsigned debugging APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: twinconnect-android-wireguard-debug
+          path: clients/twinconnect/build/app/outputs/flutter-apk/app-debug.apk
+          if-no-files-found: error
