@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'protocols.dart';
+import 'country_flag.dart';
 
 /// Visual-only desktop preview. No real VPN session, ping or account is created.
 void main() => runApp(const TwinConnectDevApp());
@@ -33,15 +34,15 @@ class _TwinConnectDevAppState extends State<TwinConnectDevApp> {
 
   static const purple = Color(0xFFA46AFF);
   static const demoServers = <_DemoServer>[
-    _DemoServer('🇩🇪', 'Germany', 'Frankfurt',
+    _DemoServer('DE', 'Germany', 'Frankfurt',
         ['openvpn', 'v2ray', 'hysteria2', 'shadowtls', 'sudoku']),
-    _DemoServer('🇳🇱', 'Netherlands', 'Amsterdam',
+    _DemoServer('NL', 'Netherlands', 'Amsterdam',
         ['wireguard', 'tuic', 'naive', 'trusttunnel']),
-    _DemoServer('🇬🇧', 'United Kingdom', 'London',
+    _DemoServer('GB', 'United Kingdom', 'London',
         ['cisco', 'anytls', 'snell', 'amneziawg']),
-    _DemoServer('🇺🇸', 'United States', 'New York',
+    _DemoServer('US', 'United States', 'New York',
         ['l2tp', 'socks5', 'mieru']),
-    _DemoServer('🇸🇬', 'Singapore', 'Singapore', [
+    _DemoServer('SG', 'Singapore', 'Singapore', [
         'openvpn', 'wireguard', 'v2ray', 'hysteria2', 'tuic', 'anytls',
         'naive', 'shadowtls', 'snell', 'socks5', 'mieru',
         'trusttunnel', 'amneziawg', 'sudoku', 'cisco', 'l2tp',
@@ -335,7 +336,12 @@ class _TwinConnectDevAppState extends State<TwinConnectDevApp> {
             Expanded(child: Column(children: [
               txt(tr('مکان', 'Location'), size: 10, color: sub),
               const SizedBox(height: 4),
-              txt('${demoServers[_selected].flag} ${demoServers[_selected].country}', size: 11, bold: true),
+              Row(mainAxisAlignment: MainAxisAlignment.center, mainAxisSize: MainAxisSize.min,
+                children: [
+                  CountryFlag(demoServers[_selected].flag, width: 24),
+                  const SizedBox(width: 6),
+                  Flexible(child: txt(demoServers[_selected].country, size: 11, bold: true)),
+                ]),
             ])),
             Expanded(child: Column(children: [
               txt(tr('آی‌پی', 'IP'), size: 10, color: sub),
@@ -393,7 +399,11 @@ class _TwinConnectDevAppState extends State<TwinConnectDevApp> {
               Expanded(child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  txt('${server.flag}  ${server.country} · ${server.city}', bold: true),
+                  Row(children: [
+                    CountryFlag(server.flag, width: 28),
+                    const SizedBox(width: 9),
+                    Expanded(child: txt('${server.country} · ${server.city}', bold: true)),
+                  ]),
                   const SizedBox(height: 3),
                   txt(tr('نمونه آزمایشی', 'Sample server'), size: 10, color: sub),
                 ],
@@ -554,11 +564,9 @@ class _TwinConnectDevAppState extends State<TwinConnectDevApp> {
             decoration: tile(radius: 14),
             padding: const EdgeInsets.all(12),
             child: Row(children: [
-              const Icon(Icons.place_outlined, color: purple, size: 20),
-              const SizedBox(width: 8),
-              Expanded(child: txt(
-                '${demoServers[_selected].flag} ${demoServers[_selected].country}',
-                bold: true)),
+              CountryFlag(demoServers[_selected].flag, width: 30),
+              const SizedBox(width: 9),
+              Expanded(child: txt(demoServers[_selected].country, bold: true)),
               txt(tr('نمونه', 'Demo'), color: sub, size: 10),
             ]),
           ),
