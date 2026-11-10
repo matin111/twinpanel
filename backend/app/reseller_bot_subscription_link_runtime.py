@@ -18,7 +18,6 @@ from .database import SessionLocal
 from .reseller_bot_runtime import _subscriptions, linked_user
 from .reseller_bot_wallet_menu_runtime import wallet_main_keyboard
 from .routers.account_delivery import _share_url
-from .central_app_credentials import app_delivery_payload
 
 
 ACCOUNT_LINK_BUTTON = "🔗 دریافت لینک اکانت"
@@ -193,21 +192,11 @@ def build_subscription_link_router(reseller_id: int) -> Router:
                 )
                 return
 
-            app_access = app_delivery_payload(db, sub)
-            if app_access is not None:
-                db.commit()
-            app_part = (
-                "\n\n📱 <b>ورود به اپ TwinConnect</b>\n"
-                f"👤 نام کاربری اپ: <code>{escape(app_access['username'])}</code>\n"
-                f"🔐 رمز اپ: <code>{escape(app_access['password'])}</code>"
-                if app_access else ""
-            )
             await state.clear()
             await message.answer(
-                "✅ <b>اطلاعات اشتراک</b>\n\n"
-                f"👤 نام کاربری VPN: <code>{escape(username)}</code>\n"
-                f"🔗 لینک اشتراک:\n<code>{escape(subscription_link)}</code>"
-                + app_part,
+                "✅ <b>لینک اکانت</b>\n\n"
+                f"👤 نام کاربری: <code>{escape(username)}</code>\n"
+                f"🔗 سابلینک:\n<code>{escape(subscription_link)}</code>",
                 reply_markup=_link_keyboard(subscription_link),
             )
             await message.answer(
