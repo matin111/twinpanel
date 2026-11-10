@@ -1048,7 +1048,7 @@ async def _ensure_modern_xray(
         f"config.json.bak-modern-{stamp}"
     )
 
-    await provision.cmd(
+    restart_output = await provision.cmd(
         conn,
         (
             "if [ -f /usr/local/etc/xray/config.json ]; "
@@ -1058,34 +1058,93 @@ async def _ensure_modern_xray(
             "/usr/local/etc/xray/config.json; "
             f"rm -f {shlex.quote(temp_path)}; "
             "systemctl enable xray >/dev/null; "
-            "systemctl restart xray"
+            "systemctl restart xray >/dev/null 2>&1 "
+            "|| echo XRAY_RESTART_FAILED"
         ),
+        # Preserve evidence even when systemctl returns a nonzero exit code.
+        check=False,
     )
+    restart_ok = "XRAY_RESTART_FAILED" not in str(restart_output)
 
     await asyncio.sleep(1)
 
     service_ok = await provision.active(conn, "xray")
-    listeners_ok = True
+    missing_listeners = []
 
     for candidate in candidate_ports:
         if not await provision.listener(conn, candidate, "tcp"):
-            listeners_ok = False
-            break
+            missing_listeners.append(candidate)
 
-    if not (service_ok and listeners_ok):
-        await provision.cmd(
-            conn,
-            (
-                f"if [ -f {shlex.quote(backup_path)} ]; "
-                f"then cp -a {shlex.quote(backup_path)} "
-                "/usr/local/etc/xray/config.json; "
-                "systemctl restart xray; fi"
-            ),
-            check=False,
-        )
+    if not (restart_ok and service_ok and not missing_listeners):
+        # Capture the reason BEFORE restoring the previous configuration.
+        # Only inspect systemd metadata and the listener table: journal excerpts
+        # can contain customer identifiers or credentials and are intentionally
+        # not exposed in API errors.
+        diagnostics = "unavailable"
+        try:
+            diagnostics = (
+                await provision.cmd(
+                    conn,
+                    "systemctl show xray.service "
+                    "-p ActiveState -p SubState -p Result "
+                    "-p ExecMainStatus -p NRestarts --no-pager",
+                    check=False,
+                    timeout=12,
+                )
+            ).strip().replace("\n", "; ")[:350]
+        except Exception:
+            pass
+        # Reduce recent Xray journal entries to fixed error categories on the
+        # node itself. Never return raw logs or attacker-controlled log text.
+        failure_reason = "UNKNOWN"
+        try:
+            reason_script = (
+                "python3 - <<'PYXRAYREASON'\n"
+                "import subprocess\n"
+                "p=subprocess.run(['journalctl','-u','xray.service',"
+                "'--since','-90 seconds','--no-pager','-n','80',"
+                "'--output=cat'],capture_output=True,text=True,timeout=8)\n"
+                "s=p.stdout.lower()\n"
+                "checks=[('ADDRESS_IN_USE',('address already in use','bind: address already in use')),"
+                "('CERTIFICATE_ERROR',('failed to load certificate','certificate verify failed','no such file or directory: certificate')),"
+                "('PERMISSION_DENIED',('permission denied','operation not permitted')),"
+                "('INVALID_CONFIG',('failed to load config','failed to parse','invalid configuration')),"
+                "('START_LIMIT',('start request repeated too quickly',))]\n"
+                "print(next((name for name,words in checks "
+                "if any(word in s for word in words)),'UNKNOWN'))\n"
+                "PYXRAYREASON"
+            )
+            candidate_reason = str(
+                await provision.cmd(conn, reason_script, check=False, timeout=12)
+            ).strip().splitlines()[-1]
+            if candidate_reason in {
+                "ADDRESS_IN_USE", "CERTIFICATE_ERROR", "PERMISSION_DENIED",
+                "INVALID_CONFIG", "START_LIMIT", "UNKNOWN",
+            }:
+                failure_reason = candidate_reason
+        except Exception:
+            pass
+        rollback_result = "not_attempted"
+        try:
+            await provision.cmd(
+                conn,
+                (
+                    f"if [ -f {shlex.quote(backup_path)} ]; "
+                    f"then cp -a {shlex.quote(backup_path)} "
+                    "/usr/local/etc/xray/config.json; "
+                    "systemctl restart xray; "
+                    "else exit 44; fi"
+                ),
+            )
+            rollback_result = "restored"
+        except Exception:
+            rollback_result = "failed"
         raise RuntimeError(
-            "modern Xray restart/listener verification failed; "
-            "previous config restored"
+            "XRAY_MODERN_START_VERIFICATION_FAILED "
+            f"restart_ok={restart_ok} service_active={service_ok} "
+            f"missing_tcp_ports={','.join(map(str, missing_listeners)) or 'none'} "
+            f"systemd={diagnostics} reason={failure_reason} "
+            f"rollback={rollback_result}"
         )
 
     for candidate in candidate_ports:
