@@ -27,6 +27,18 @@ class AppStrings {
     'برند و اطلاعات پشتیبانی مستقیماً از پنل دارای لایسنس شما دریافت می‌شود.',
     'Your brand and support details are retrieved directly from your licensed panel.',
   );
+  String get appLoginTitle => pick('ورود به حساب', 'Sign in');
+  String get appLoginGuide => pick(
+    'نام کاربری و رمز مخصوص اپ را وارد کنید.',
+    'Enter your app username and password.',
+  );
+  String get appUsername => pick('نام کاربری', 'Username');
+  String get appPassword => pick('رمز عبور', 'Password');
+  String get appLoginButton => pick('ورود', 'Sign in');
+  String get appPasswordRequired => pick(
+    'رمز عبور را وارد کنید.',
+    'Enter your password.',
+  );
   String get identifyAccount => pick('شناسایی حساب', 'Identify your account');
   String get accountUsername => pick('نام کاربری کامل', 'Full username');
   String get accountUsernameHint => 'TP0123456789ABCDEF_R2A_ali';
@@ -95,6 +107,13 @@ class AppStrings {
 
   String error(String code) {
     switch (code) {
+      case 'APP_LOGIN_INVALID':
+        return pick('نام کاربری یا رمز اپ اشتباه است.', 'Incorrect app username or password.');
+      case 'APP_LOGIN_LOCKED':
+        return pick('تلاش‌های ناموفق زیاد بوده؛ کمی بعد دوباره امتحان کنید.', 'Too many failed attempts. Try again later.');
+      case 'APP_SESSION_REVOKED':
+      case 'APP_SESSION_INVALID':
+        return pick('نشست اپ پایان یافته؛ دوباره وارد شوید.', 'Session ended. Please sign in again.');
       case 'INVALID_TENANT_CODE':
         return pick('شناسه پنل معتبر نیست.', 'Invalid panel code.');
       case 'TENANT_MISMATCH':
