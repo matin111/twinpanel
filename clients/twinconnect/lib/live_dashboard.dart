@@ -1653,20 +1653,42 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                     ),
                 ]),
                 const SizedBox(height: 20),
-                Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                  Flexible(child: Text(
-                    current == null ? '—' : _formatBytes(used),
-                    maxLines: 1, overflow: TextOverflow.ellipsis,
-                    style: TextStyle(color: ink, fontSize: 31,
-                      fontWeight: FontWeight.w800),
+                // Always show used / total. An unlimited subscription
+                // must explicitly read "Unlimited", not "Total usage".
+                Wrap(
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 9,
+                  runSpacing: 4,
+                  children: [
+                    Text(current == null ? '—' : _formatBytes(used),
+                      style: TextStyle(color: ink, fontSize: 30,
+                        fontWeight: FontWeight.w800)),
+                    Text('/',
+                      style: TextStyle(color: sub, fontSize: 20)),
+                    Text(current == null ? '—' :
+                        hasLimit ? _formatBytes(limit)
+                          : tr('نامحدود', 'Unlimited'),
+                      style: TextStyle(color: hasLimit ? ink
+                        : const Color(0xFF33D9B9), fontSize: 18,
+                        fontWeight: FontWeight.w700)),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(children: [
+                  Icon(Icons.account_balance_wallet_outlined,
+                    color: hasLimit ? purple
+                      : const Color(0xFF33D9B9), size: 17),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text(
+                    current == null
+                      ? tr('باقی‌مانده: نامشخص', 'Remaining: unavailable')
+                      : hasLimit
+                        ? tr('باقی‌مانده: ${_formatBytes((limit - used).clamp(0, limit).toInt())}',
+                             'Remaining: ${_formatBytes((limit - used).clamp(0, limit).toInt())}')
+                        : tr('باقی‌مانده: نامحدود', 'Remaining: Unlimited'),
+                    style: TextStyle(color: sub, fontSize: 13,
+                        fontWeight: FontWeight.w600),
                   )),
-                  const SizedBox(width: 10),
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 5),
-                    child: Text(hasLimit ? '/ ${_formatBytes(limit)}' :
-                        tr('مصرف کل', 'Total usage'),
-                        style: TextStyle(color: sub, fontSize: 12)),
-                  ),
                 ]),
                 const SizedBox(height: 18),
                 ClipRRect(
