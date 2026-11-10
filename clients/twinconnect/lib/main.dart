@@ -125,6 +125,7 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
   final _username = TextEditingController();
   final _password = TextEditingController();
 
+  int _dashboardTab = 0;
   bool _loading = false;
   String? _errorCode;
   BrandPreview? _brand;
@@ -256,10 +257,341 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
     }
   }
 
+
+  Widget _buildAuthenticatedDashboard(
+    BuildContext context,
+    AppStrings strings,
+    BrandPreview brand,
+  ) {
+    final theme = Theme.of(context);
+    final dark = theme.brightness == Brightness.dark;
+    final accent = theme.colorScheme.primary;
+    final isWide = MediaQuery.sizeOf(context).width >= 820;
+    final sections = [
+      strings.pick('اتصال', 'Connect'),
+      strings.pick('مکان‌ها', 'Locations'),
+      strings.pick('تنظیمات', 'Settings'),
+      strings.pick('حساب', 'Account'),
+    ];
+    final icons = [
+      Icons.power_settings_new_rounded,
+      Icons.public_rounded,
+      Icons.tune_rounded,
+      Icons.person_outline_rounded,
+    ];
+
+    Widget glass(Widget child) => TwinConnectGlassCard(
+      dark: dark,
+      radius: 24,
+      padding: const EdgeInsets.all(22),
+      child: child,
+    );
+
+    Widget header(String title, IconData icon, {Widget? trailing}) => Row(
+      children: [
+        Icon(icon, color: accent),
+        const SizedBox(width: 12),
+        Expanded(child: Text(title, style: theme.textTheme.titleLarge?.copyWith(
+          fontWeight: FontWeight.w800,
+        ))),
+        if (trailing != null) trailing,
+      ],
+    );
+
+    Widget serverInventory() {
+      if (_servers == null) {
+        return glass(Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            header(strings.pick('سرورهای اشتراک', 'Subscription servers'),
+              Icons.public_rounded,
+              trailing: IconButton(
+                tooltip: strings.pick('به‌روزرسانی', 'Refresh'),
+                onPressed: _refreshingServers ? null : _refreshServers,
+                icon: const Icon(Icons.refresh_rounded),
+              )),
+            const SizedBox(height: 14),
+            Text(_serverRefreshError == null
+              ? strings.pick('در حال دریافت اطلاعات سرورها…', 'Loading servers…')
+              : strings.pick('دریافت سرورها ناموفق بود', 'Could not refresh servers')),
+          ],
+        ));
+      }
+      return glass(Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          header(strings.pick('مکان‌های در دسترس', 'Available locations'),
+            Icons.public_rounded,
+            trailing: IconButton(
+              tooltip: strings.pick('به‌روزرسانی سرورها', 'Refresh servers'),
+              onPressed: _refreshingServers ? null : _refreshServers,
+              icon: _refreshingServers
+                ? const SizedBox.square(dimension: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2))
+                : const Icon(Icons.refresh_rounded),
+            )),
+          const SizedBox(height: 14),
+          if (_servers!.servers.isEmpty)
+            Text(strings.pick('سروری برای این اشتراک ثبت نشده',
+              'No servers assigned to this subscription')),
+          for (final server in _servers!.servers)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: ListTile(
+                key: Key('assignedServer_${server.id}'),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
+                tileColor: accent.withValues(alpha: 0.065),
+                leading: CountryFlag(server.countryCode, width: 31),
+                title: Text(server.name),
+                subtitle: Text(server.countryCode),
+                trailing: Text(server.nodeOnline
+                  ? strings.pick('نود آنلاین', 'Node online')
+                  : strings.pick('نود آفلاین', 'Node offline')),
+              ),
+            ),
+        ],
+      ));
+    }
+
+    Widget page;
+    switch (_dashboardTab) {
+      case 0:
+        page = Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            glass(Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                header(strings.pick('اتصال امن', 'Secure connection'),
+                  Icons.shield_outlined),
+                const SizedBox(height: 10),
+                Text(strings.pick(
+                  'برای اتصال، یکی از پروتکل‌های فعال اشتراک را انتخاب کنید.',
+                  'Choose an enabled subscription protocol to connect.')),
+              ],
+            )),
+            const SizedBox(height: 16),
+            if (_protocolCatalogUnavailable)
+              glass(Text(strings.protocolCatalogUnavailable)),
+            if (_catalog == null && !_protocolCatalogUnavailable)
+              glass(const Center(child: CircularProgressIndicator())),
+            if (_catalog != null) ...[
+              ProtocolCatalogCard(catalog: _catalog!, native: _nativeProtocols),
+              if (_confirmedPanel != null &&
+                  _confirmedUsername != null &&
+                  _confirmedSessionToken != null) ...[
+                const SizedBox(height: 12),
+                if (Theme.of(context).platform == TargetPlatform.android)
+                  AndroidConnectionCard(
+                    key: ValueKey(_confirmedUsername),
+                    panel: _confirmedPanel!,
+                    username: _confirmedUsername!,
+                    sessionToken: _confirmedSessionToken!,
+                    catalog: _catalog!,
+                    native: _nativeProtocols,
+                  ),
+                if (Theme.of(context).platform != TargetPlatform.android &&
+                    _servers != null)
+                  WindowsConnectionCard(
+                    key: ValueKey('windows_${_confirmedUsername!}'),
+                    panel: _confirmedPanel!,
+                    username: _confirmedUsername!,
+                    sessionToken: _confirmedSessionToken!,
+                    catalog: _catalog!,
+                    servers: _servers!,
+                  ),
+              ],
+            ],
+          ],
+        );
+        break;
+      case 1:
+        page = serverInventory();
+        break;
+      case 2:
+        page = Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            glass(Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                header(strings.pick('تنظیمات اتصال', 'Connection settings'),
+                  Icons.tune_rounded),
+                const SizedBox(height: 18),
+                FilledButton.icon(
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => VpnSettingsScreen(
+                        brand: brand,
+                        tenant: brand.namespace,
+                        account: _confirmedUsername ?? '',
+                      ),
+                    ),
+                  ),
+                  icon: const Icon(Icons.settings_rounded),
+                  label: Text(strings.vpnSettingsTitle),
+                ),
+              ],
+            )),
+            const SizedBox(height: 16),
+            glass(Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                header(strings.pick('زبان برنامه', 'App language'),
+                  Icons.language_rounded),
+                const SizedBox(height: 12),
+                DropdownButton<AppLanguage>(
+                  isExpanded: true,
+                  value: widget.language,
+                  onChanged: (language) {
+                    if (language != null) widget.onLanguageChanged(language);
+                  },
+                  items: [
+                    DropdownMenuItem(value: AppLanguage.automatic,
+                      child: Text(strings.systemLanguage)),
+                    DropdownMenuItem(value: AppLanguage.persian,
+                      child: Text(strings.persianLanguage)),
+                    DropdownMenuItem(value: AppLanguage.english,
+                      child: Text(strings.englishLanguage)),
+                  ],
+                ),
+              ],
+            )),
+          ],
+        );
+        break;
+      default:
+        page = Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            glass(Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                header(strings.pick('حساب کاربری', 'Account'),
+                  Icons.person_outline_rounded),
+                const SizedBox(height: 16),
+                Text(_confirmedUsername ?? '',
+                  style: theme.textTheme.titleMedium),
+                const SizedBox(height: 8),
+                Text(strings.pick('وضعیت اشتراک', 'Subscription status')),
+                Text(brand.accountStatus == 'active'
+                  ? strings.statusActive
+                  : brand.accountStatus == 'expired'
+                    ? strings.statusExpired
+                    : strings.statusOther(brand.accountStatus)),
+              ],
+            )),
+            const SizedBox(height: 16),
+            glass(Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                header(strings.pick('پشتیبانی و تمدید', 'Support and renewal'),
+                  Icons.help_outline_rounded),
+                const SizedBox(height: 12),
+                _CopyValue(label: strings.supportTelegram, value: brand.telegramUrl),
+                _CopyValue(label: strings.renewalLink, value: brand.renewalUrl),
+                _CopyValue(label: strings.supportPhone, value: brand.phone),
+                _CopyValue(label: strings.website, value: brand.websiteUrl),
+                if (brand.supportText != null) Text(brand.supportText!),
+              ],
+            )),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: () {
+                ++_lookupSerial;
+                setState(() {
+                  _brand = null;
+                  _confirmedPanel = null;
+                  _confirmedUsername = null;
+                  _confirmedSessionToken = null;
+                  _catalog = null;
+                  _servers = null;
+                  _dashboardTab = 0;
+                  _errorCode = null;
+                  widget.onBrandChanged(null);
+                });
+              },
+              icon: const Icon(Icons.logout_rounded),
+              label: Text(strings.pick('خروج از حساب', 'Sign out')),
+            ),
+          ],
+        );
+        break;
+    }
+
+    final content = ListView(
+      key: ValueKey('dashboard_page_$_dashboardTab'),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+      children: [
+        Text(sections[_dashboardTab],
+          style: theme.textTheme.headlineMedium?.copyWith(
+            fontWeight: FontWeight.w800)),
+        const SizedBox(height: 20),
+        page,
+      ],
+    );
+
+    return Scaffold(
+      key: const Key('authenticatedDashboard'),
+      extendBodyBehindAppBar: true,
+      body: TwinConnectAmbientBackground(
+        dark: dark,
+        child: SafeArea(
+          child: isWide
+            ? Row(children: [
+                Container(
+                  width: 224,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12, vertical: 20),
+                  child: glass(Column(
+                    children: [
+                      for (var i = 0; i < sections.length; i++)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: ListTile(
+                            key: Key('dashboardNav_$i'),
+                            selected: _dashboardTab == i,
+                            selectedTileColor: accent.withValues(alpha: 0.14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14)),
+                            leading: Icon(icons[i]),
+                            title: Text(sections[i]),
+                            onTap: () => setState(() => _dashboardTab = i),
+                          ),
+                        ),
+                    ],
+                  )),
+                ),
+                Expanded(child: content),
+              ])
+            : Column(children: [
+                Expanded(child: content),
+                NavigationBar(
+                  selectedIndex: _dashboardTab,
+                  onDestinationSelected: (index) =>
+                    setState(() => _dashboardTab = index),
+                  destinations: [
+                    for (var i = 0; i < sections.length; i++)
+                      NavigationDestination(
+                        icon: Icon(icons[i]),
+                        label: sections[i],
+                      ),
+                  ],
+                ),
+              ]),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final strings = AppStrings.of(context);
     final brand = _brand;
+    if (brand != null) {
+      return _buildAuthenticatedDashboard(context, strings, brand);
+    }
 
     final accent = Theme.of(context).colorScheme.primary;
     final dark = Theme.of(context).brightness == Brightness.dark;
