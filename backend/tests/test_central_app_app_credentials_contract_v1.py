@@ -13,6 +13,8 @@ FACTORY = ROOT / "backend/app/services/subscription_factory.py"
 MAIN = ROOT / "backend/app/main.py"
 BOT = ROOT / "backend/app/routers/reseller_bot_delivery_runtime_v2.py"
 BOT_LINK = ROOT / "backend/app/reseller_bot_subscription_link_runtime.py"
+MAIN_BOT = ROOT / "backend/app/telegram_runtime_bot.py"
+QR = ROOT / "backend/app/telegram_subscription_qr_v1.py"
 FLUTTER = ROOT / "clients/twinconnect/lib/main.dart"
 CLIENT = ROOT / "clients/twinconnect/lib/tenant_api.dart"
 
@@ -99,6 +101,33 @@ class SeparateAppCredentialContract(unittest.TestCase):
         self.assertIn("_owned_subscription_by_username(", owned)
         self.assertIn("linked_user(", owned)
         self.assertIn("app_delivery_payload(db, sub)", owned)
+
+    def test_main_bot_delivery_is_authenticated_and_owner_scoped(self):
+        api = ROUTES.read_text(encoding="utf-8")
+        section = api.split(
+            '@router.post("/customer/subscriptions/{subscription_id}/app-delivery")', 1
+        )[1].split(
+            '@router.post("/reseller/subscriptions/{subscription_id}/app-delivery")', 1
+        )[0]
+        self.assertIn("user: User = Depends(get_current_user)", section)
+        self.assertIn("int(sub.user_id) != int(user.id)", section)
+        self.assertIn("raise HTTPException(status_code=404", section)
+        self.assertIn("return _deliver(db, sub, reset=False)", section)
+
+        bot = MAIN_BOT.read_text(encoding="utf-8")
+        qr = QR.read_text(encoding="utf-8")
+        self.assertIn("int(owned.user_id) == int(row.user_id)", bot)
+        self.assertIn("app_delivery_payload(db, owned)", bot)
+        self.assertIn("نام کاربری مخصوص اپ:", bot)
+        self.assertIn("رمز مخصوص اپ:", bot)
+        self.assertIn("customer/subscriptions/{sub_id}/app-delivery", bot)
+        self.assertIn("app_credentials=app_credentials", bot)
+        self.assertIn("len(text) <= 1024", bot)
+        self.assertIn("subscription_qr_photo(value)", qr)
+        self.assertIn("app_credentials: dict | None = None", qr)
+        self.assertIn("if app_credentials:", qr)
+        self.assertIn('f"<code>{escape(value)}</code>', qr)
+        self.assertIn("escape(str(app_credentials.get(\"app_password\")", qr)
 
     def test_client_only_has_username_and_app_password_fields(self):
         flutter = FLUTTER.read_text()
