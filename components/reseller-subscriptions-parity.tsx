@@ -245,6 +245,53 @@ export function ResellerSubscriptionsParityRuntime(){
           <select value={statusFilter} onChange={e=>setStatusFilter(e.target.value)}><option value="all">{pick("همه وضعیت‌ها","All statuses")}</option>{statuses.map(status=><option key={status} value={status}>{status}</option>)}</select>
           <Badge tone="violet">{filtered.length}</Badge>
         </div>
+        <div className="reseller-sub-card-grid" aria-label={pick("اشتراک‌های نمایندگی","Reseller subscriptions")}>
+          {filtered.map((row,index)=>{
+            const id=Number(row.id||row.subscription_id||0);
+            const status=str(row,"status");
+            const limit=num(row,"traffic_limit_bytes"),used=num(row,"traffic_used_bytes");
+            const usage=limit>0?Math.min(100,Math.max(0,Math.round(used/limit*100))):0;
+            const planLabel=str(row,"plan_name")||(row.plan_id?`#${str(row,"plan_id")}`:pick("دستی","Manual"));
+            const customer=str(row,"customer_name")||`#${str(row,"customer_user_id")}`;
+            return <article className="reseller-sub-glass-card" key={id||index} data-reseller-subscription-id={id}>
+              <header className="reseller-sub-glass-head">
+                <div className="reseller-sub-identity"><span className="reseller-sub-avatar" aria-hidden="true">◈</span>
+                  <div><strong dir="auto">{str(row,"account_username")||customer}</strong><small dir="auto">{customer}</small></div>
+                </div>
+                <Badge tone={statusTone(status)}>{status||"—"}</Badge>
+              </header>
+              <div className="reseller-sub-glass-metadata">
+                <span className="reseller-sub-plan">{planLabel}</span>
+                <span dir="ltr">MV-{id}</span>
+                <span className="reseller-sub-price">{money(num(row,"sell_price_toman"))}</span>
+                <span className="reseller-sub-contact" dir="auto">{str(row,"customer_phone")||str(row,"customer_email")||"—"}</span>
+              </div>
+              <div className="reseller-sub-usage-grid">
+                <div className="reseller-sub-usage-block">
+                  <small>{pick("حجم مصرفی / کل","Used / Total traffic")}</small>
+                  <b dir="ltr">{gbText(used)} / {limit>0?gbText(limit):pick("نامحدود","Unlimited")}</b>
+                  <div className="progress"><i style={{width:`${usage}%`}}/></div>
+                </div>
+                <div className="reseller-sub-expiry-block">
+                  <small>{pick("انقضا","Expires")}</small><b>{dateText(row.expires_at)}</b>
+                </div>
+              </div>
+              <div className="reseller-sub-live-status" data-reseller-live-card-state aria-live="polite"/>
+              <div className="reseller-sub-quick-actions">
+                <button type="button" className="sub-action sub-action-connect" disabled={connectionLoading} onClick={()=>void openConnection(row)}>{pick("اتصال","Connect")}</button>
+                <button type="button" className="sub-action sub-action-renew" disabled={busy} onClick={()=>openExtend(row)}>{pick("تمدید","Renew")}</button>
+                <button type="button" className="sub-action sub-action-edit" disabled={busy} onClick={()=>openEdit(row)}>{pick("ویرایش","Edit")}</button>
+              </div>
+              <details className="reseller-sub-more">
+                <summary>{pick("عملیات بیشتر","More actions")} <span aria-hidden="true">⋯</span></summary>
+                <div className="reseller-sub-more-grid">
+                  <button type="button" className={status==="active"?"sub-action sub-action-suspend":"sub-action sub-action-activate"} disabled={busy} onClick={()=>void act(status==="active"?pick("اشتراک تعلیق شد","Subscription suspended"):pick("اشتراک فعال شد","Subscription activated"),()=>resellerApi.toggleSubscription(id))}>{status==="active"?pick("تعلیق","Suspend"):pick("فعال‌سازی","Activate")}</button>
+                  <button type="button" className="sub-action sub-action-delete" disabled={busy} onClick={()=>{if(window.confirm(pick("این اشتراک حذف شود؟ دسترسی آن از سرورها نیز لغو می‌شود.","Delete this subscription and revoke server access?")))void act(pick("اشتراک حذف شد","Subscription deleted"),()=>resellerApi.deleteSubscription(id));}}>{pick("حذف اشتراک","Delete subscription")}</button>
+                </div>
+              </details>
+            </article>;
+          })}
+        </div>
         <div className="table reseller-sub-table"><table><thead><tr><th>ID</th><th>{pick("مشتری","Customer")}</th><th>{pick("اکانت","Account")}</th><th>{pick("پلن","Plan")}</th><th>{pick("مصرف","Usage")}</th><th>{pick("انقضا","Expires")}</th><th>{pick("وضعیت","Status")}</th><th>{pick("عملیات","Actions")}</th></tr></thead><tbody>{filtered.map((row,index)=>{const id=Number(row.id||row.subscription_id||0),status=str(row,"status"),limit=num(row,"traffic_limit_bytes"),used=num(row,"traffic_used_bytes"),usage=limit?Math.min(100,Math.round(used/limit*100)):0;const planLabel=str(row,"plan_name")||(row.plan_id?`#${str(row,"plan_id")}`:pick("دستی","Manual"));return <tr key={id||index}><td>#{id}</td><td><b>{str(row,"customer_name")||`#${str(row,"customer_user_id")}`}</b><small dir="ltr">{str(row,"customer_phone")||str(row,"customer_email")||"—"}</small></td><td><code dir="ltr">{str(row,"account_username")||"—"}</code></td><td><b>{planLabel}</b><small>{money(num(row,"sell_price_toman"))}</small></td><td><div className="reseller-usage-cell"><span>{gbText(used)} / {gbText(limit)}</span><div className="progress"><i style={{width:`${usage}%`}}/></div></div></td><td>{dateText(row.expires_at)}</td><td><Badge tone={statusTone(status)}>{status||"—"}</Badge></td><td><div className="row-actions"><button className="mini-btn" onClick={()=>void openConnection(row)} disabled={connectionLoading}>{pick("سابلینک","Sub-link")}</button><button className="mini-btn" onClick={()=>openEdit(row)}>{pick("ویرایش","Edit")}</button><button className="mini-btn" onClick={()=>openExtend(row)}>{pick("تمدید","Extend")}</button><button className="mini-btn" disabled={busy} onClick={()=>void act(status==="active"?pick("اشتراک تعلیق شد","Subscription suspended"):pick("اشتراک فعال شد","Subscription activated"),()=>resellerApi.toggleSubscription(id))}>{status==="active"?pick("تعلیق","Suspend"):pick("فعال‌سازی","Activate")}</button><button className="mini-btn danger" disabled={busy} onClick={()=>{if(window.confirm(pick("این اشتراک حذف شود؟ دسترسی آن از سرورها نیز لغو می‌شود.","Delete this subscription and revoke server access?")))void act(pick("اشتراک حذف شد","Subscription deleted"),()=>resellerApi.deleteSubscription(id));}}>{pick("حذف","Delete")}</button></div></td></tr>})}</tbody></table></div>
         {!filtered.length&&<Empty>{pick("اشتراکی با این فیلتر پیدا نشد.","No subscription matches this filter.")}</Empty>}
       </Card>
