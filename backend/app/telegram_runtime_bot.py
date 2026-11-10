@@ -2443,8 +2443,32 @@ async def _telegram_notification_worker(bot):
                         )
                     )
 
+                    # Resolve the verification method from the payment row.
+                    # Notification event keys are canonicalized and cannot
+                    # reliably distinguish automatic from manual approval.
+                    verification_status = None
+                    payment_id = payload.get("payment_id")
+                    if payment_id is not None:
+                        try:
+                            from .payment_models import PaymentIntent
+
+                            payment_intent = db.get(
+                                PaymentIntent, int(payment_id)
+                            )
+                            if (
+                                payment_intent is not None
+                                and int(payment_intent.user_id) == int(row.user_id)
+                            ):
+                                verification_status = payment_intent.status
+                        except (TypeError, ValueError):
+                            pass
+
+                    from .telegram_payment_labels import (
+                        payment_approved_heading,
+                    )
+
                     lines = [
-                        "✅ <b>پرداخت شما تأیید شد</b>",
+                        payment_approved_heading(verification_status),
                         "",
                         (
                             "🧾 سفارش: "
