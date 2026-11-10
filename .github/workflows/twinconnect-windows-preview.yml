@@ -29,6 +29,8 @@ jobs:
           cache: true
       - name: Generate native Windows Flutter project
         run: flutter create --platforms=windows --org com.twinpanel --project-name twinconnect .
+      - name: Install fail-closed Windows VPN native bridge
+        run: python tools/install_windows_native.py
       - name: Fetch Flutter dependencies
         run: flutter pub get
       - name: Verify Dart compilation and tests
