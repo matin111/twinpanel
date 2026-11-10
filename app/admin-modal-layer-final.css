@@ -286,3 +286,155 @@ body > .runtime-modal.manual-subscription-modal .module-toggle{
     grid-template-columns:1fr!important;
   }
 }
+
+
+/* Subscription editor: keep essential fields visible, optional settings folded. */
+.admin-shell .legacy-subscriptions-page .runtime-modal-card.manage-card:has(.subs-edit-form){
+  width:min(870px,calc(100vw - 28px))!important;
+  max-height:min(84dvh,760px)!important;
+}
+.legacy-subscriptions-page .subs-edit-form{
+  display:grid;
+  gap:9px;
+  min-width:0;
+}
+.legacy-subscriptions-page .subs-edit-main{
+  display:grid;
+  gap:9px;
+}
+.legacy-subscriptions-page .subs-edit-main-title{
+  font-size:12px;
+  font-weight:800;
+  color:var(--text);
+}
+.legacy-subscriptions-page .subs-edit-grid{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:9px 12px;
+  align-items:start;
+}
+.legacy-subscriptions-page .subs-edit-grid .field,
+.legacy-subscriptions-page .subs-edit-credentials .field{
+  min-width:0;
+  margin:0!important;
+  display:grid;
+  gap:4px;
+}
+.legacy-subscriptions-page .subs-edit-grid .field>span,
+.legacy-subscriptions-page .subs-edit-credentials .field>span{
+  font-size:11px;
+  line-height:1.4;
+}
+.legacy-subscriptions-page .subs-edit-form .field input,
+.legacy-subscriptions-page .subs-edit-form .field select{
+  width:100%;
+  min-height:38px!important;
+  height:38px;
+}
+.legacy-subscriptions-page .subs-edit-form .field small{
+  font-size:10px;
+  line-height:1.4;
+  opacity:.76;
+}
+.legacy-subscriptions-page .subs-edit-section{
+  min-width:0;
+  border:1px solid var(--line);
+  border-radius:12px;
+  background:var(--surface2,var(--surface));
+  overflow:hidden;
+}
+.legacy-subscriptions-page .subs-edit-section summary{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  flex-wrap:wrap;
+  gap:7px 12px;
+  padding:11px 13px;
+  cursor:pointer;
+  font-size:12px;
+  font-weight:750;
+  color:var(--text);
+  list-style:none;
+}
+.legacy-subscriptions-page .subs-edit-section summary::-webkit-details-marker{
+  display:none;
+}
+.legacy-subscriptions-page .subs-edit-section summary>small{
+  font-size:10px;
+  font-weight:500;
+  color:var(--muted);
+}
+.legacy-subscriptions-page .subs-edit-section summary:before{
+  content:"＋";
+  font-size:15px;
+  line-height:1;
+  color:var(--accent,#7c5cff);
+  order:-1;
+}
+.legacy-subscriptions-page .subs-edit-section[open] summary:before{content:"−";}
+.legacy-subscriptions-page .subs-edit-section[open] summary{
+  border-bottom:1px solid var(--line);
+}
+.legacy-subscriptions-page .subs-edit-section-content{
+  padding:11px 13px 12px;
+}
+.legacy-subscriptions-page .subs-edit-credentials{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:11px;
+}
+.legacy-subscriptions-page .subs-edit-protocol-grid{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:7px;
+  max-height:310px;
+  overflow-y:auto;
+}
+.legacy-subscriptions-page .subs-edit-protocol-grid .toggle{
+  min-width:0;
+  min-height:52px;
+  padding:7px 9px;
+  margin:0;
+}
+.legacy-subscriptions-page .subs-edit-protocol-grid .toggle span{
+  min-width:0;
+  font-size:11px;
+}
+.legacy-subscriptions-page .subs-edit-protocol-grid .toggle small{
+  font-size:9px;
+}
+.legacy-subscriptions-page .subs-edit-advanced>.field{
+  margin:0!important;
+  display:flex!important;
+  align-items:center;
+  flex-direction:row;
+  gap:9px;
+}
+.legacy-subscriptions-page .subs-edit-advanced>.field input{
+  width:auto;
+  min-height:auto!important;
+  height:auto;
+}
+.legacy-subscriptions-page .subs-edit-advanced>.muted{
+  display:block;
+  margin-top:6px;
+  line-height:1.6;
+  font-size:10px;
+}
+.legacy-subscriptions-page .subs-edit-form .modalActions{
+  margin-top:2px!important;
+}
+@media(max-width:700px){
+  .legacy-subscriptions-page .subs-edit-grid{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+  .legacy-subscriptions-page .subs-edit-protocol-grid{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+}
+@media(max-width:420px){
+  .legacy-subscriptions-page .subs-edit-grid,
+  .legacy-subscriptions-page .subs-edit-credentials{
+    grid-template-columns:1fr;
+  }
+}
