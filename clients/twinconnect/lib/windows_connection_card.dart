@@ -1,0 +1,218 @@
+import 'dart:io';
+
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
+import 'app_strings.dart';
+import 'connection_bootstrap.dart';
+import 'native_vpn_bridge.dart';
+import 'protocols.dart';
+import 'server_inventory.dart';
+import 'tenant_api.dart';
+import 'tenant_models.dart';
+import 'vpn_policy_store.dart';
+import 'windows_wireguard.dart';
+
+/// Actual Windows WireGuard system-tunnel controls, distinct from the offline
+/// Dev dashboard. Requires the official WireGuard installation, Administrator
+/// privileges, current panel authorization and a strict full-tunnel profile.
+///
+/// A running Windows service is shown as "interface up", never "connected".
+class WindowsConnectionCard extends StatefulWidget {
+  const WindowsConnectionCard({
+    required this.panel,
+    required this.username,
+    required this.sessionToken,
+    required this.catalog,
+    required this.servers,
+    super.key,
+  });
+
+  final PanelDirectoryEntry panel;
+  final String username;
+  final String sessionToken;
+  final PanelProtocolCatalog catalog;
+  final AppServerInventory servers;
+
+  @override
+  State<WindowsConnectionCard> createState() => _WindowsConnectionCardState();
+}
+
+class _WindowsConnectionCardState extends State<WindowsConnectionCard> {
+  final _controller = const WindowsWireGuardController();
+  final _store = const VpnPolicyStore();
+  bool _busy = false;
+  bool _up = false;
+  bool _ready = false;
+  String? _selectedId;
+  String? _errorCode;
+
+  bool get _allowed => widget.catalog.entries.any((entry) =>
+    entry.protocol.code == 'wireguard' &&
+    entry.selected && entry.configRecordPresent);
+
+  @override
+  void initState() {
+    super.initState();
+    _refreshNative();
+  }
+
+  Future<void> _refreshNative() async {
+    if (!Platform.isWindows) return;
+    try {
+      final status = await _controller.status();
+      final native = await NativeVpnBridge.protocolReadiness();
+      if (!mounted) return;
+      setState(() {
+        _up = status['state'] == 'interface_up';
+        _ready = native.supports('wireguard');
+      });
+    } catch (_) {
+      if (mounted) setState(() => _ready = false);
+    }
+  }
+
+  String _safeError(Object error) {
+    if (error is PlatformException) return error.code;
+    if (error is TenantApiException) return error.message;
+    if (error is ConnectionBootstrapException) return error.code;
+    if (error is FormatException) return error.message;
+    return 'WINDOWS_WIREGUARD_FAILED';
+  }
+
+  Future<void> _connect() async {
+    final selectedId = _selectedId;
+    if (_busy || _up || !Platform.isWindows || !_ready || !_allowed ||
+        selectedId == null) return;
+    setState(() { _busy = true; _errorCode = null; });
+    try {
+      final api = TenantApi.fromBuildConfig();
+      final policy = await _store.load(widget.panel.namespace, widget.username);
+      final capabilities = await NativeVpnBridge.probe();
+      final native = await NativeVpnBridge.protocolReadiness();
+      // The panel authorization and assigned node list are re-fetched
+      // immediately before any private profile is requested.
+      final candidate = await ConnectionBootstrap(api: api).prepare(
+        panel: widget.panel,
+        sessionToken: widget.sessionToken,
+        serverId: selectedId,
+        protocolCode: 'wireguard',
+        policy: policy,
+        capabilities: capabilities,
+        nativeProtocols: native,
+      );
+      final node = WindowsWireGuardController.configForSingleNode(
+        candidate.profiles, selectedId);
+      await _controller.start(
+        node: node,
+        policy: policy,
+        capabilities: capabilities,
+        nativeProtocols: native,
+      );
+      if (!mounted) return;
+      setState(() => _up = true);
+    } catch (error) {
+      if (mounted) setState(() => _errorCode = _safeError(error));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _disconnect() async {
+    if (_busy || !_up || !Platform.isWindows) return;
+    setState(() { _busy = true; _errorCode = null; });
+    try {
+      await _controller.stop();
+      if (mounted) setState(() => _up = false);
+    } catch (error) {
+      if (mounted) setState(() => _errorCode = _safeError(error));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = AppStrings.of(context);
+    if (!Platform.isWindows || (!_allowed && !_up)) {
+      return const SizedBox.shrink();
+    }
+    final available = widget.servers.servers
+        .where((server) => server.nodeOnline).toList(growable: false);
+    final validSelection = available.any((server) => server.id == _selectedId)
+        ? _selectedId : null;
+
+    return Card(
+      key: const Key('windowsConnectionCard'),
+      child: Padding(
+        padding: const EdgeInsets.all(17),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(s.pick('اتصال WireGuard ویندوز', 'Windows WireGuard'),
+                style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 9),
+            Text(_up
+                ? s.pick(
+                    'رابط WireGuard در ویندوز فعال است؛ ارتباط با سرور هنوز تأیید نشده.',
+                    'WireGuard interface is up; peer handshake is not verified.')
+                : _ready
+                    ? s.pick(
+                        'WireGuard نصب است. برای اتصال، سرور مجاز را انتخاب کنید.',
+                        'WireGuard is installed. Select an authorized server.')
+                    : s.pick(
+                        'WireGuard رسمی را نصب کنید و TwinConnect را با Administrator اجرا کنید.',
+                        'Install official WireGuard and run TwinConnect as Administrator.')),
+            const SizedBox(height: 10),
+            if (!_up)
+              DropdownButtonFormField<String>(
+                key: const Key('windowsWireGuardServer'),
+                value: validSelection,
+                isExpanded: true,
+                decoration: InputDecoration(
+                  labelText: s.pick('سرور WireGuard', 'WireGuard server'),
+                ),
+                items: [
+                  for (final server in available)
+                    DropdownMenuItem(value: server.id, child: Text(server.name)),
+                ],
+                onChanged: _busy ? null : (value) => setState(() {
+                  _selectedId = value;
+                }),
+              ),
+            const SizedBox(height: 12),
+            FilledButton.icon(
+              key: const Key('windowsWireGuardAction'),
+              onPressed: _busy
+                  ? null
+                  : _up
+                      ? _disconnect
+                      : (_ready && _allowed && validSelection != null)
+                          ? _connect : null,
+              icon: Icon(_up ? Icons.stop_circle_outlined
+                  : Icons.power_settings_new_rounded),
+              label: Text(_up
+                  ? s.pick('قطع رابط', 'Stop interface')
+                  : s.pick('شروع WireGuard', 'Start WireGuard')),
+            ),
+            const SizedBox(height: 5),
+            OutlinedButton.icon(
+              key: const Key('windowsWireGuardRefresh'),
+              onPressed: _busy ? null : _refreshNative,
+              icon: const Icon(Icons.refresh_rounded),
+              label: Text(s.pick('بررسی وضعیت', 'Check status')),
+            ),
+            if (_errorCode != null) ...[
+              const SizedBox(height: 9),
+              Text(
+                s.pick('اتصال انجام نشد: $_errorCode',
+                    'Tunnel could not start: $_errorCode'),
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
