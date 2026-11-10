@@ -60,6 +60,9 @@ jobs:
       - name: Build Windows x64 standalone directory
         shell: pwsh
         run: flutter build windows --release "--dart-define=TWINCONNECT_DIRECTORY_URL=$env:TWINCONNECT_DIRECTORY_URL"
+      - name: Bundle pinned and verified sing-box engine (not yet enabled)
+        shell: pwsh
+        run: ./tools/bundle_singbox_windows.ps1
       - name: Package portable ZIP and usage instructions
         shell: pwsh
         run: |
@@ -90,8 +93,10 @@ jobs:
 
           IMPORTANT:
           - No WireGuard software or drivers are bundled with TwinConnect.
-          - Cisco/OpenConnect and the other 15 protocols have no Windows
-            tunnel adapter in this preview.
+          - The sing-box 1.14.4 executable is bundled and SHA256-verified,
+            but its native TUN lifecycle is not connected in this build.
+          - Only WireGuard has a verified Windows connection adapter.
+          - Do not interpret bundled executable as enabled protocol support.
           - Only one-peer WireGuard profiles with DNS and complete IPv4
             default coverage are accepted. The native adapter derives
             protected /0 routes in memory from panel split-/1 routes; it
