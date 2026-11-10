@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.778",
-  "source_sha": "d12c77d47d2f158ad167fcb504e1cabf7d53683a",
+  "version": "1.1.0-rc.779",
+  "source_sha": "af16e0d623587455c580e19c5bb2323b0f78de20",
   "notes": {
-    "fa": "بازطراحی نمایش اشتراک‌های پنل نماینده و کاربر با کارت‌های شیشه‌ای خوانا، رنگ‌بندی واضح دکمه‌ها و نمایش چندستونه در دسکتاپ ویندوز و تک‌ستونه در موبایل. وضعیت آنلاین، حجم، انقضا و عملیات قبلی حفظ شدند. بدون تغییر در اطلاعات کاربران یا پروتکل‌ها.",
-    "en": "Responsive glass-style reseller and customer subscription cards on Windows desktop and mobile. Clear primary actions, live online badges, traffic and expiry, safe overflow actions. No backend or customer data changes."
+    "fa": "اصلاح نمایش اشتراک‌های پنل ادمین در ویندوز و اندروید: کارت‌های یکسان به جای جدول دسکتاپ، سه یا چهار ستون در صفحه بزرگ، دو ستون تبلت و یک ستون موبایل؛ دکمه‌های ریست و ویرایش با رنگ جداگانه و عملیات بیشتر رنگی و خوانا. اطلاعات کاربران و تنظیمات پروتکل بدون تغییر.",
+    "en": "Fix admin subscription view across Windows and Android: responsive glass cards replace desktop table, visually distinct Reset and Edit, color-coded accessible overflow actions. No account, server, protocol or data mutation."
   }
 }
