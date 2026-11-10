@@ -16,6 +16,7 @@ import 'vpn_policy_store.dart';
 import 'windows_wireguard.dart';
 import 'tenant_models.dart';
 import 'plan_classification.dart';
+import 'account_snapshot.dart';
 import 'native_vpn_bridge.dart';
 import 'country_flag.dart';
 import 'ambient_background.dart';
@@ -36,6 +37,7 @@ class TwinConnectLiveDashboard extends StatefulWidget {
     required this.onRefresh,
     required this.plan,
     required this.accountStatus,
+    required this.account,
     required this.onLogout,
     super.key,
   });
@@ -48,6 +50,7 @@ class TwinConnectLiveDashboard extends StatefulWidget {
   final VoidCallback onRefresh;
   final AppPlanClassification? plan;
   final String accountStatus;
+  final AppAccountSnapshot? account;
   final VoidCallback onLogout;
   @override
   State<TwinConnectLiveDashboard> createState() => _TwinConnectLiveDashboardState();
@@ -380,6 +383,26 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   String _search = '';
   int _selected = 0;
   final Set<int> _favorites = <int>{};
+
+  String _formatBytes(int bytes) {
+    const gb = 1024 * 1024 * 1024;
+    return '${(bytes / gb).toStringAsFixed(2)} GB';
+  }
+
+  String _expiryLabel() {
+    final account = widget.account;
+    if (account == null) return '—';
+    if (account.expiresAt != null) {
+      final date = account.expiresAt!.toLocal();
+      return '${date.year}-${date.month.toString().padLeft(2, '0')}-'
+          '${date.day.toString().padLeft(2, '0')}';
+    }
+    if (account.activationDurationDays != null &&
+        account.activationDurationDays! > 0) {
+      return tr('پس از اولین اتصال', 'Starts on first use');
+    }
+    return tr('نامحدود', 'Unlimited');
+  }
 
   static const purple = Color(0xFFA46AFF);
   List<_DemoServer> get demoServers => [
@@ -1263,13 +1286,15 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
             (Icons.devices_rounded, tr('دستگاه مجاز', 'Device limit'),
               widget.plan == null ? '—' : widget.plan!.deviceLimit == 0
                 ? tr('نامحدود', 'Unlimited') : '${widget.plan!.deviceLimit}'),
-            (Icons.class_rounded, tr('نوع اشتراک', 'Subscription type'),
-              widget.plan?.subscriptionType ?? '—'),
-            (Icons.verified_user_rounded, tr('وضعیت حساب', 'Account status'),
-              widget.accountStatus == 'active' ? tr('فعال', 'Active')
-              : widget.accountStatus == 'expired' ? tr('منقضی', 'Expired')
-              : widget.accountStatus),
-          ]) ...[
+            (Icons.data_usage_rounded, tr('حجم مصرفی', 'Traffic used'),
+              widget.account == null ? '—' :
+                '${_formatBytes(widget.account!.trafficUsedBytes)} / '
+                '${widget.account!.trafficLimitBytes == 0
+                  ? tr('نامحدود', 'Unlimited')
+                  : _formatBytes(widget.account!.trafficLimitBytes)}'),
+            (Icons.event_outlined, tr('انقضا', 'Expiry'),
+              _expiryLabel()),
+                    ]) ...[
             Expanded(child: glassCard(
               padding: const EdgeInsets.symmetric(vertical: 18),
               radius: 18,
