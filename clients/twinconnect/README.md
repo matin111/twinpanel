@@ -64,3 +64,9 @@ The app must not bypass a panel-only license. No changes to active VPN traffic o
 ## Localization quality gate
 
 `lib/app_strings.dart` contains all static Persian/English labels and error translations. Platform/framework translations use the official Flutter Material/Widgets/Cupertino delegates, with fallback to English for other device languages. `test/widget_test.dart` exercises RTL-to-LTR switching, persistence and bilingual errors; `test/tenant_client_test.dart` covers panel-brand data which must stay unmodified across language changes.
+
+## Advanced routing & 2027 security foundation
+
+An additional preview page is available from the settings icon (works in both languages). It lets users **request** full-device tunneling, only-selected-apps or exclude-selected-apps routing, strict kill switch, DNS/IPv6 protection, local-network access, reconnect, auto-connect, and server auto-selection. Preferences are saved separately per tenant/account and do not contain credentials.
+
+**These settings do not affect OS networking yet.** The native VPN engine, app picker, firewall/lockdown enforcement and real connection are not implemented. The app always shows the actual kill-switch state as unprotected until native OS capabilities prove otherwise, and the Connect button remains disabled. Consumer iOS cannot offer unrestricted app selection; see the platform matrix in [2027 security specification](docs/VPN_2027_SECURITY_SPEC.md).
