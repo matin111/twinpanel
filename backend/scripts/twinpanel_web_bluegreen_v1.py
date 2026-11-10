@@ -38,6 +38,9 @@ WorkingDirectory=/opt/twinpanel
 ExecStart=/bin/bash -lc 'cd "$TP_WEB_RELEASE/.next/standalone" && exec env HOSTNAME=127.0.0.1 PORT="$TP_WEB_PORT" /usr/bin/node server.js'
 Restart=always
 RestartSec=4
+# Next.js standalone exits with 143 on normal SIGTERM; don't report a failed
+# service when the updater intentionally drains and disables the old slot.
+SuccessExitStatus=143
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=full
