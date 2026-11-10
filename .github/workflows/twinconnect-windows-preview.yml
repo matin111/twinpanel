@@ -66,6 +66,9 @@ jobs:
       - name: Verify bundled sing-box accepts synthetic Windows TUN config
         shell: pwsh
         run: ./tools/check_singbox_windows.ps1
+      - name: Exercise sing-box runtime with loopback-only synthetic proxy
+        shell: pwsh
+        run: ./tools/smoke_singbox_loopback_windows.ps1
       - name: Package portable ZIP and usage instructions
         shell: pwsh
         run: |
