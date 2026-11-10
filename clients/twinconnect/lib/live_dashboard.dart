@@ -137,7 +137,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         // when localized output cannot be parsed. This includes process
         // startup overhead and is explicitly marked approximate.
         if (latency == null) {
-          latency = clock.elapsedMilliseconds.clamp(1, 60000);
+          latency = clock.elapsedMilliseconds.clamp(1, 60000).toInt();
           error = 'APPROXIMATE_RTT';
         }
       } else {
