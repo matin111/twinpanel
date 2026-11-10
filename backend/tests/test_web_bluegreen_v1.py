@@ -41,12 +41,15 @@ class WebBlueGreenTests(TestCase):
         (self.enabled / "domains.conf").symlink_to(self.site_b)
         self.state = root / "license" / "handoff.json"
         self.backup = root / "license" / "backup"
+        self.standby_unit = root / "etc-systemd" / "standby.service"
+        self.standby_unit.parent.mkdir()
         self.patchers = [
             mock.patch.object(mod, "ROOT", self.nginx),
             mock.patch.object(mod, "STATE", self.state),
             mock.patch.object(mod, "BACKUP_ROOT", self.backup),
             mock.patch.object(mod, "CURRENT", self.main),
             mock.patch.object(mod, "RELEASE_ROOT", self.releases),
+            mock.patch.object(mod, "STANDBY_UNIT_FILE", self.standby_unit),
             mock.patch.object(mod, "_require_root"),
         ]
         for p in self.patchers:
@@ -98,7 +101,10 @@ class WebBlueGreenTests(TestCase):
             self.assertIn(":8095", self.site_a.read_text())
             self.assertFalse(self.state.exists())
             self.assertFalse(self.backup.exists())
-            self.assertIn(mock.call("systemctl", "stop", mod.STANDBY_UNIT), run.call_args_list)
+            self.assertIn(
+                mock.call("systemctl", "disable", "--now", mod.STANDBY_UNIT),
+                run.call_args_list,
+            )
 
     def test_crash_after_nginx_reload_before_state_write_restores_safely(self):
         self._staged()
@@ -163,10 +169,14 @@ class WebBlueGreenTests(TestCase):
         self.assertEqual(report["sites"], 2)
         self.assertTrue(self.state.exists())
         self.assertIn(":3000", self.site_a.read_text())
-        self.assertIn("systemd-run", run.call_args.args)
+        self.assertTrue(self.standby_unit.exists())
+        self.assertIn("PORT=33001", self.standby_unit.read_text())
+        self.assertIn(mock.call("systemctl", "enable", "--now", mod.STANDBY_UNIT),
+                      run.call_args_list)
         with mock.patch.object(mod, "_run"), \
              mock.patch.object(mod, "_http_health", return_value=True):
             mod.restore("1.1.0-rc.762")
+        self.assertFalse(self.standby_unit.exists())
 
     def test_staging_invalid_artifact_does_not_spawn_service(self):
         bad = self.releases / "invalid"
