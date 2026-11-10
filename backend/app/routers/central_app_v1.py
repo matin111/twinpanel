@@ -7,6 +7,8 @@ credential, matching the current /v1/connect contract.
 from __future__ import annotations
 
 import re
+import hmac
+from datetime import datetime
 from urllib.parse import urlsplit
 
 import httpx
@@ -44,6 +46,12 @@ class ContactIn(BaseModel):
 
 class RegisterIn(BaseModel):
     api_origin: str = Field(min_length=12, max_length=500)
+
+
+class BrandPreviewIn(BaseModel):
+    # The reseller prefix routes the request; the token authorizes this specific account.
+    account_username: str = Field(min_length=1, max_length=120)
+    share_token: str = Field(min_length=5, max_length=180)
 
 
 def _url(raw: str | None, *, relative_allowed: bool = False) -> str | None:
@@ -290,4 +298,44 @@ def subscription_app_brand(
         "support_text": None,
         "website_url": info["website_url"],
         "app_username_prefix": installation_namespace(ensure_installation_id()) + "_A_",
+    }
+
+@router.post("/public/brand-preview")
+def subscription_app_brand_preview(
+    payload: BrandPreviewIn,
+    db: Session = Depends(get_db),
+):
+    """Verify username + share-token ownership before displaying tenant branding.
+
+    The response is *not* a VPN login or a config-delivery API. A bearer share
+    token must be supplied, and the caller's typed username must match the
+    subscription actually associated with that token. No session is issued.
+    """
+    if not central_app_entitled():
+        raise HTTPException(status_code=403, detail="CENTRAL_APP_NOT_INCLUDED")
+
+    try:
+        sub = _subscription_from_share_token(payload.share_token, db)
+    except HTTPException as exc:
+        if exc.status_code != 403:
+            raise
+        # An expired persistent share token can still view renewal contacts.
+        sub = db.query(Subscription).filter(
+            Subscription.share_code == payload.share_token
+        ).first()
+        if sub is None:
+            raise
+
+    stored_name = str(sub.account_username or "").strip()
+    expected = payload.account_username.strip()
+    if not stored_name or not hmac.compare_digest(stored_name.encode(), expected.encode()):
+        raise HTTPException(status_code=403, detail="ACCOUNT_TOKEN_MISMATCH")
+
+    brand = subscription_app_brand(token=payload.share_token, db=db)
+    status_value = str(getattr(sub.status, "value", sub.status)).lower()
+    expired = bool(sub.expires_at and sub.expires_at <= datetime.utcnow())
+    return {
+        **brand,
+        "account_status": "expired" if expired else status_value,
+        "vpn_connection_available": False,  # Client engine/session flow not available yet.
     }
