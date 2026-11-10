@@ -2139,9 +2139,12 @@ async def _telegram_notification_worker(bot):
     from datetime import datetime
 
     from sqlalchemy import (
+        and_,
+        or_,
         inspect as sa_inspect,
         text as sa_text,
     )
+    from .telegram_models import TelegramUserLink
 
     from .database import SessionLocal
     from .telegram_notify_models import (
@@ -2217,15 +2220,43 @@ async def _telegram_notification_worker(bot):
                     .delivered_at
                     .is_(None)
                 )
-                # Fair durable outbox: prioritize never-attempted events
-                # (especially newly fulfilled purchases), then retry older
-                # failures. Ordering only by ID permanently starved every
-                # new purchase when 20 ancient blocked/unlinked recipients
-                # occupied the fixed-size poll window.
-                #
-                # This uses the existing attempts column and commits; no
-                # schema migration, re-created subscription or forced resend
-                # of already delivered notifications is involved.
+                # Keep the durable payment outbox intact but quarantine
+                # unreachable recipients. The previous code retried the
+                # first 20 missing/blocked recipients hundreds of thousands
+                # of times. Only newly pending or explicitly recoverable
+                # notices are candidates for dispatch.
+                .filter(
+                    or_(
+                        and_(
+                            TelegramNotification.attempts < 8,
+                            or_(
+                                TelegramNotification.last_error.is_(None),
+                                and_(
+                                    TelegramNotification.last_error
+                                    != "telegram link not found",
+                                    ~TelegramNotification.last_error.ilike(
+                                        "%blocked by the user%"
+                                    ),
+                                ),
+                            ),
+                        ),
+                        # Missing-link purchases revive automatically as
+                        # soon as the account is linked, with no manual
+                        # replay and no subscription re-provisioning.
+                        and_(
+                            TelegramNotification.last_error
+                            == "telegram link not found",
+                            db.query(TelegramUserLink.telegram_id)
+                            .filter(
+                                TelegramUserLink.user_id
+                                == TelegramNotification.user_id
+                            )
+                            .exists(),
+                        ),
+                    )
+                )
+                # Fresh paid orders retain priority over retries; delivery
+                # remains idempotent via delivered_at and unique event_key.
                 .order_by(
                     TelegramNotification.attempts.asc(),
                     TelegramNotification.id.asc(),

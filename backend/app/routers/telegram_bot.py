@@ -418,6 +418,33 @@ def touch_link(
     }
 
 
+def _wake_blocked_paid_deliveries(db: Session, user_id: int) -> None:
+    """Re-arm only undelivered paid orders after the recipient uses the bot.
+
+    A blocked user cannot send /start; their next authenticated bot call
+    proves interaction is possible again. Never replay a delivered event,
+    generate an account, or touch any unrelated user notifications.
+    """
+    from ..telegram_notify_models import TelegramNotification
+
+    (
+        db.query(TelegramNotification)
+        .filter(
+            TelegramNotification.user_id == int(user_id),
+            TelegramNotification.kind == "payment_approved",
+            TelegramNotification.delivered_at.is_(None),
+            TelegramNotification.last_error.ilike("%blocked by the user%"),
+        )
+        .update(
+            {
+                TelegramNotification.attempts: 0,
+                TelegramNotification.last_error: None,
+            },
+            synchronize_session=False,
+        )
+    )
+
+
 @router.post(
     "/ensure",
     dependencies=[Depends(bot_guard)],
@@ -476,6 +503,7 @@ def ensure_telegram_account(
             )
             link.last_seen_at = now
 
+            _wake_blocked_paid_deliveries(db, user.id)
             db.commit()
 
             return {
@@ -620,6 +648,7 @@ def ensure_telegram_account(
     )
 
     db.add(link)
+    _wake_blocked_paid_deliveries(db, user.id)
     db.commit()
     db.refresh(user)
     db.refresh(link)

@@ -41,7 +41,7 @@ class RuntimeResilienceProbe(unittest.TestCase):
                 if args[0] == "nginx":
                     return 0, ""
                 if args[0] == "runuser":
-                    return 0, "0|0"
+                    return 0, "0|0" if args[args.index("-d") + 1] == "postgres" else "0"
                 raise AssertionError(args)
             with mock.patch.object(probe, "CURRENT", current), \
                  mock.patch.object(probe, "SLOT_STATE", state), \
@@ -66,7 +66,7 @@ class RuntimeResilienceProbe(unittest.TestCase):
                         return 3, "inactive"
                     return 0, "active"
                 if args[0] == "runuser":
-                    return 0, "0|0"
+                    return 0, "0|0" if args[args.index("-d") + 1] == "postgres" else "0"
                 return 0, ""
             with mock.patch.object(probe, "CURRENT", current), \
                  mock.patch.object(probe, "SLOT_STATE", state), \
@@ -88,7 +88,7 @@ class RuntimeResilienceProbe(unittest.TestCase):
             }))
             def fake_run(*args, **kwargs):
                 if args[0] == "runuser":
-                    return 0, "2|90"
+                    return 0, "2|90" if args[args.index("-d") + 1] == "postgres" else "0"
                 return 0, "active"
             with mock.patch.object(probe, "CURRENT", current), \
                  mock.patch.object(probe, "SLOT_STATE", state), \
@@ -98,6 +98,27 @@ class RuntimeResilienceProbe(unittest.TestCase):
             self.assertFalse(result["healthy"])
             self.assertEqual(result["stale_db_transactions"], 2)
             self.assertIn("idle_postgres_transactions_over_60s", result["errors"])
+
+    def test_actionable_paid_delivery_stall_is_flagged(self):
+        with tempfile.TemporaryDirectory() as d:
+            current = Path(d) / "current"
+            current.mkdir()
+            (current / "VERSION").write_text("1.1.0-rc.768")
+            state = Path(d) / "state.json"
+            state.write_text(json.dumps({
+                "active_port": 3001, "release": str(current.resolve()),
+            }))
+            def fake_run(*args, **kwargs):
+                if args[0] == "runuser":
+                    return (0, "0|0") if args[args.index("-d") + 1] == "postgres" else (0, "2")
+                return 0, "active"
+            with mock.patch.object(probe, "CURRENT", current), \
+                 mock.patch.object(probe, "SLOT_STATE", state), \
+                 mock.patch.object(probe, "run", side_effect=fake_run), \
+                 mock.patch.object(probe, "http_version", return_value="1.1.0-rc.768"):
+                result = probe.report()
+            self.assertEqual(result["actionable_paid_delivery_pending"], 2)
+            self.assertIn("actionable_paid_telegram_deliveries_stalled", result["errors"])
 
     def test_updater_installs_timer_only_after_success_gate(self):
         updater = (ROOT / "scripts/twinpanel_public_updater.py").read_text()
