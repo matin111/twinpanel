@@ -72,8 +72,10 @@ jobs:
           - No WireGuard software or drivers are bundled with TwinConnect.
           - Cisco/OpenConnect and the other 15 protocols have no Windows
             tunnel adapter in this preview.
-          - WireGuard profiles are accepted only with one peer, both full-tunnel
-            /0 routes, and a configured DNS resolver.
+          - Only one-peer WireGuard profiles with DNS and complete IPv4
+            default coverage are accepted. The native adapter derives
+            protected /0 routes in memory from panel split-/1 routes; it
+            does not modify server endpoints, keys or panel records.
           - The native adapter writes a DPAPI-encrypted file with restrictive
             admin/SYSTEM ACLs; no plain private-key config is saved to disk.
           - The Dev Dashboard artifact remains entirely offline.
