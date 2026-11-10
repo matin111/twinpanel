@@ -377,8 +377,11 @@ inline flutter::EncodableValue ProtocolCapabilities() {
 }
 
 inline flutter::EncodableValue Status() {
+  const bool exists = ServiceExists();
+  const bool ownedConfig = IsFile(EncryptedPath());
+  if (exists && !ownedConfig) return Info("unmanaged_service");
   return Info(ServiceRunning() ? "interface_up" :
-      ServiceExists() ? "needs_cleanup" : "down");
+      exists ? "needs_cleanup" : "down");
 }
 
 inline bool Start(const std::string& config) {
@@ -406,6 +409,8 @@ inline bool Start(const std::string& config) {
 
 inline bool Stop() {
   if (!IsAdmin() || WireGuardExe().empty()) return false;
+  // Never remove a same-named tunnel created by another client/tool.
+  if (ServiceExists() && !IsFile(EncryptedPath())) return false;
   if (ServiceExists()) {
     if (!InvokeOfficialWireGuard(L"/uninstalltunnelservice", kTunnelName))
       return false;
