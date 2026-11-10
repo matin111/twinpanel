@@ -20,7 +20,10 @@ class XrayStartDiagnosticsTest(unittest.TestCase):
         end = text.index('raise RuntimeError(\n            "XRAY_MODERN_START_VERIFICATION_FAILED', start)
         block = text[start:end]
         self.assertIn("-p ExecMainStatus", block)
-        self.assertNotIn("journalctl", block)
+        self.assertIn("journalctl", block)
+        self.assertIn("if candidate_reason in {", block)
+        self.assertIn("failure_reason = candidate_reason", block)
+        self.assertIn("reason={failure_reason}", text)
         self.assertIn("missing_listeners", text)
         self.assertIn('rollback_result = "failed"', block)
 
