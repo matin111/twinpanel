@@ -12,7 +12,6 @@ import 'protocol_catalog_view.dart';
 import 'protocol_strings.dart';
 import 'native_vpn_bridge.dart';
 import 'android_connection_card.dart';
-import 'windows_preview_fixture.dart';
 import 'vpn_settings.dart';
 import 'vpn_strings.dart';
 
@@ -119,27 +118,24 @@ class TwinConnectHome extends StatefulWidget {
 class _TwinConnectHomeState extends State<TwinConnectHome> {
   final _formKey = GlobalKey<FormState>();
   final _username = TextEditingController();
-  final _subscription = TextEditingController();
-  final _tenantCode = TextEditingController();
+  final _password = TextEditingController();
 
   bool _loading = false;
   String? _errorCode;
   BrandPreview? _brand;
   PanelDirectoryEntry? _confirmedPanel;
   String? _confirmedUsername;
-  String? _confirmedToken;
+  String? _confirmedSessionToken;
   PanelProtocolCatalog? _catalog;
   NativeProtocolReadiness _nativeProtocols =
       const NativeProtocolReadiness(supportedCodes: {});
   bool _protocolCatalogUnavailable = false;
-  bool _offlineDemo = false;
   int _lookupSerial = 0;
 
   @override
   void dispose() {
     _username.dispose();
-    _subscription.dispose();
-    _tenantCode.dispose();
+    _password.dispose();
     super.dispose();
   }
 
@@ -151,11 +147,10 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
       _loading = true;
       _errorCode = null;
       _brand = null;
-      _offlineDemo = false;
       widget.onBrandChanged(null);
       _confirmedPanel = null;
       _confirmedUsername = null;
-      _confirmedToken = null;
+      _confirmedSessionToken = null;
       _catalog = null;
       _protocolCatalogUnavailable = false;
       _nativeProtocols = const NativeProtocolReadiness(supportedCodes: {});
@@ -163,33 +158,30 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
 
     try {
       final username = _username.text.trim();
-      final namespace = TenantIdentity.parseNamespace(
-        username,
-        _tenantCode.text,
-      );
-      final token = SubscriptionInput.tokenFromInput(_subscription.text);
+      final namespace = TenantIdentity.parseNamespace(username, '');
+      final password = _password.text;
       final api = TenantApi.fromBuildConfig();
       final panel = await api.resolve(namespace);
-      final brand = await api.loadBrand(
+      final loggedIn = await api.login(
         panel: panel,
         username: username,
-        shareToken: token,
+        password: password,
       );
+      final brand = loggedIn.brand;
       if (!mounted || serial != _lookupSerial) return;
       setState(() {
         _brand = brand;
         widget.onBrandChanged(brand);
         _confirmedPanel = panel;
         _confirmedUsername = username;
-        _confirmedToken = token;
+        _confirmedSessionToken = loggedIn.sessionToken;
       });
       // Subscription metadata is not secret and is fetched independently of
       // brand details. A temporary metadata error must not hide renewal links.
       try {
-        final catalog = await api.loadProtocolCatalog(
+        final catalog = await api.loadSessionProtocolCatalog(
           panel: panel,
-          username: username,
-          shareToken: token,
+          sessionToken: loggedIn.sessionToken,
         );
         final native = await NativeVpnBridge.protocolReadiness();
         if (mounted && serial == _lookupSerial) {
@@ -210,27 +202,9 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
     } catch (_) {
       if (mounted && serial == _lookupSerial) setState(() => _errorCode = 'UNKNOWN_ERROR');
     } finally {
+      _password.clear();
       if (mounted && serial == _lookupSerial) setState(() => _loading = false);
     }
-  }
-
-  void _showOfflineDemo() {
-    ++_lookupSerial; // Do not allow a late network response to replace demo state.
-    FocusScope.of(context).unfocus();
-    setState(() {
-      _offlineDemo = true;
-      _errorCode = null;
-      _loading = false;
-      _confirmedPanel = null;
-      _confirmedUsername = null;
-      _confirmedToken = null;
-      _brand = WindowsPreviewFixture.brand();
-      widget.onBrandChanged(_brand);
-      _catalog = WindowsPreviewFixture.protocolCatalog();
-      _nativeProtocols =
-          const NativeProtocolReadiness(supportedCodes: {});
-      _protocolCatalogUnavailable = false;
-    });
   }
 
   @override
@@ -250,9 +224,7 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
                 builder: (_) => VpnSettingsScreen(
                   brand: brand,
                   tenant: brand?.namespace ?? '',
-                  account: _offlineDemo
-                      ? 'offline-demo-only'
-                      : (brand == null ? '' : _username.text.trim()),
+                  account: brand == null ? '' : _username.text.trim(),
                 ),
               ),
             ),
@@ -302,21 +274,7 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
             child: ListView(
               padding: const EdgeInsets.all(18),
               children: [
-                const SizedBox(height: 14),
-                const Icon(Icons.shield_moon_outlined, size: 60),
-                const SizedBox(height: 12),
-                Text(
-                  strings.appHeadline,
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.headlineSmall,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  strings.appIntroduction,
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-                const SizedBox(height: 22),
+                const SizedBox(height: 35),
                 Card(
                   child: Padding(
                     padding: const EdgeInsets.all(18),
@@ -326,17 +284,18 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           Text(
-                            strings.identifyAccount,
+                            strings.appLoginTitle,
                             style: Theme.of(context).textTheme.titleLarge,
                           ),
+                          const SizedBox(height: 8),
+                          Text(strings.appLoginGuide),
                           const SizedBox(height: 18),
                           TextFormField(
                             key: const Key('accountUsername'),
                             controller: _username,
                             textDirection: TextDirection.ltr,
                             decoration: InputDecoration(
-                              labelText: strings.accountUsername,
-                              hintText: strings.accountUsernameHint,
+                              labelText: strings.appUsername,
                               border: const OutlineInputBorder(),
                             ),
                             validator: (text) =>
@@ -346,29 +305,19 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
                           ),
                           const SizedBox(height: 13),
                           TextFormField(
-                            key: const Key('subscriptionLink'),
-                            controller: _subscription,
+                            key: const Key('appPassword'),
+                            controller: _password,
+                            obscureText: true,
                             textDirection: TextDirection.ltr,
                             decoration: InputDecoration(
-                              labelText: strings.subscription,
-                              hintText: strings.subscriptionHint,
+                              labelText: strings.appPassword,
                               border: const OutlineInputBorder(),
                             ),
                             validator: (text) =>
-                                (text == null || text.trim().isEmpty)
-                                    ? strings.subscriptionRequired
+                                (text == null || text.isEmpty)
+                                    ? strings.appPasswordRequired
                                     : null,
-                          ),
-                          const SizedBox(height: 13),
-                          TextFormField(
-                            key: const Key('tenantCode'),
-                            controller: _tenantCode,
-                            textDirection: TextDirection.ltr,
-                            decoration: InputDecoration(
-                              labelText: strings.tenantCode,
-                              hintText: strings.tenantCodeHint,
-                              border: const OutlineInputBorder(),
-                            ),
+                            onFieldSubmitted: (_) => _identify(),
                           ),
                           const SizedBox(height: 18),
                           FilledButton.icon(
@@ -382,20 +331,7 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
                                     ),
                                   )
                                 : const Icon(Icons.verified_user_outlined),
-                            label: Text(strings.identifyButton),
-                          ),
-                          const SizedBox(height: 12),
-                          OutlinedButton.icon(
-                            key: const Key('windowsDemoButton'),
-                            onPressed: _showOfflineDemo,
-                            icon: const Icon(Icons.desktop_windows_outlined),
-                            label: Text(strings.previewButton),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            strings.previewSubtitle,
-                            textAlign: TextAlign.center,
-                            style: Theme.of(context).textTheme.bodySmall,
+                            label: Text(strings.appLoginButton),
                           ),
                         ],
                       ),
@@ -414,22 +350,6 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
                 ],
                 if (brand != null) ...[
                   const SizedBox(height: 20),
-                  if (_offlineDemo) ...[
-                    Card(
-                      key: const Key('offlineDemoBanner'),
-                      child: Padding(
-                        padding: const EdgeInsets.all(14),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.info_outline),
-                            const SizedBox(width: 12),
-                            Expanded(child: Text(strings.previewBanner)),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                  ],
                   BrandDetails(brand: brand),
                   if (_protocolCatalogUnavailable) ...[
                     const SizedBox(height: 16),
@@ -443,29 +363,19 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
                     ),
                     if (_confirmedPanel != null &&
                         _confirmedUsername != null &&
-                        _confirmedToken != null) ...[
+                        _confirmedSessionToken != null) ...[
                       const SizedBox(height: 12),
                       AndroidConnectionCard(
                         key: ValueKey(_confirmedUsername),
                         panel: _confirmedPanel!,
                         username: _confirmedUsername!,
-                        shareToken: _confirmedToken!,
+                        sessionToken: _confirmedSessionToken!,
                         catalog: _catalog!,
                         native: _nativeProtocols,
                       ),
                     ],
                   ],
                 ],
-                const SizedBox(height: 20),
-                Text(
-                  strings.windowsEnginePending,
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  strings.developmentNotice,
-                  textAlign: TextAlign.center,
-                ),
               ],
             ),
           ),
