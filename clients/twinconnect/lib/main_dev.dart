@@ -286,24 +286,40 @@ class _TwinConnectDevAppState extends State<TwinConnectDevApp> {
         ],
       ),
       child: Column(children: [
-        smallPill(tr('آفلاین', 'Offline'), icon: Icons.circle),
-        const SizedBox(height: 13),
-        Container(
-          height: 94, width: 94,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(color: purple, width: 3),
-            gradient: RadialGradient(colors: [
-              purple.withValues(alpha: 0.42),
-              purple.withValues(alpha: 0.05),
-            ]),
-            boxShadow: [
-              BoxShadow(color: purple.withValues(alpha: 0.32),
-                blurRadius: 43, spreadRadius: 4),
-            ],
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 240),
+          child: KeyedSubtree(
+            key: const ValueKey('dev-disconnected'),
+            child: smallPill(tr('آفلاین', 'Offline'), icon: Icons.circle),
           ),
-          child: const Icon(Icons.power_settings_new_rounded,
-              size: 45, color: purple),
+        ),
+        const SizedBox(height: 13),
+        TweenAnimationBuilder<double>(
+          key: const Key('devPowerEntranceAnimation'),
+          tween: Tween(begin: .86, end: 1),
+          duration: const Duration(milliseconds: 620),
+          curve: Curves.easeOutBack,
+          builder: (context, value, child) => Transform.scale(
+            scale: value,
+            child: child,
+          ),
+          child: Container(
+            height: 94, width: 94,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: purple, width: 2.5),
+              gradient: RadialGradient(colors: [
+                purple.withValues(alpha: 0.42),
+                purple.withValues(alpha: 0.05),
+              ]),
+              boxShadow: [
+                BoxShadow(color: purple.withValues(alpha: 0.32),
+                  blurRadius: 43, spreadRadius: 4),
+              ],
+            ),
+            child: const Icon(Icons.power_settings_new_rounded,
+                size: 45, color: purple),
+          ),
         ),
         const SizedBox(height: 12),
         txt(tr('اتصال سریع', 'Quick connect'), size: 20, bold: true),
