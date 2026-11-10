@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.769",
-  "source_sha": "e8b4e9ec28289ac4b820a5b29fbde21e29c47fad",
+  "version": "1.1.0-rc.770",
+  "source_sha": "1a2d1d411fbcabe7995cbb9bc2c81dbb7a8e2e8b",
   "notes": {
-    "fa": "افزودن بررسی زنده تداخل پورت در مدیریت پروتکل‌ها همراه هشدار و قابلیت انتخاب دستی پورت جایگزین، بدون توقف سرویس‌های سالم. تفکیک هشدار SSL دامنه از تداخل پورت Xray. حفظ اصلاحات rc.768 ربات، سرویس‌ها و اتصال‌ها.",
-    "en": "Live listener-port collision preflight and explicit manual port choice in Protocol Command Center without displacing running services; distinguish ACME HTTP-01 certificate failures from Xray listener conflicts. Preserve rc.768 fixes."
+    "fa": "رفع دائمی ازدحام صف تحویل اکانت در ربات: پیام‌های بدون اتصال تلگرام و کاربران مسدودکننده در قرنطینه باقی می‌مانند، از تکرار بی‌پایان جلوگیری می‌شود و با اتصال حساب یا تعامل دوباره کاربر، سفارش پرداخت‌شده به‌صورت ایمن دوباره قابل تحویل خواهد بود. اولویت سفارش‌های جدید، جلوگیری از ارسال مجدد اعلان‌های تحویل‌شده و پایش پرداخت‌های معطل فعال است. تغییرات قبلی پروتکل‌ها، پورت‌ها، کیف پول و اشتراک‌ها محفوظ‌اند.",
+    "en": "Harden Telegram paid subscription delivery: quarantine unreachable/unlinked recipients rather than retrying indefinitely, revive undelivered paid orders on Telegram account linking and authenticated bot return, preserve priority for new purchases and delivered-at/event-key deduplication, and alert on actionable stalled delivery. Includes prior rc.769 protocol port conflict warning features and preserves accounts, wallets, quotas and node settings."
   }
 }
