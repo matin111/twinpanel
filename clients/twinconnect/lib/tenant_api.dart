@@ -16,7 +16,7 @@ class TenantApi {
   factory TenantApi.fromBuildConfig() {
     if (configuredVendor.isEmpty) {
       throw const FormatException(
-        'آدرس سرویس مرکزی برای این نسخه برنامه تنظیم نشده است.',
+        'DIRECTORY_NOT_CONFIGURED',
       );
     }
     return TenantApi(vendorOrigin: parseDirectoryOrigin(configuredVendor));
@@ -29,7 +29,7 @@ class TenantApi {
     final map = await _requestJson(url);
     final entry = PanelDirectoryEntry.fromJson(map);
     if (entry.namespace != namespace) {
-      throw const FormatException('شناسه دریافت‌شده با پنل درخواستی متفاوت است.');
+      throw const FormatException('NAMESPACE_MISMATCH');
     }
     return entry;
   }
@@ -51,12 +51,12 @@ class TenantApi {
     );
     final brand = BrandPreview.fromJson(data);
     if (brand.namespace != panel.namespace) {
-      throw const FormatException('برند پاسخ‌داده‌شده متعلق به این پنل نیست.');
+      throw const FormatException('BRAND_MISMATCH');
     }
     if (brand.ownerType == 'reseller' &&
         (brand.appUsernamePrefix.isEmpty ||
             !username.trim().startsWith(brand.appUsernamePrefix))) {
-      throw const FormatException('پیشوند حساب با نماینده مطابقت ندارد.');
+      throw const FormatException('RESELLER_PREFIX_MISMATCH');
     }
     return brand;
   }
@@ -66,7 +66,7 @@ class TenantApi {
     Map<String, dynamic>? payload,
   }) async {
     if (url.scheme != 'https') {
-      throw const FormatException('ارتباط ناامن با سرور پذیرفته نیست.');
+      throw const FormatException('INSECURE_CONNECTION');
     }
     final client = HttpClient()
       ..connectionTimeout = const Duration(seconds: 7);
@@ -85,33 +85,33 @@ class TenantApi {
       );
       if (response.statusCode != HttpStatus.ok) {
         if (response.statusCode == HttpStatus.notFound) {
-          throw const TenantApiException('پنل یا اشتراک پیدا نشد.');
+          throw const TenantApiException('PANEL_NOT_FOUND');
         }
         if (response.statusCode == HttpStatus.forbidden) {
           throw const TenantApiException(
-            'لایسنس اپ فعال نیست یا اطلاعات حساب معتبر نیست.',
+            'APP_NOT_AUTHORIZED',
           );
         }
         throw TenantApiException(
-          'درخواست به سرور ناموفق بود (کد ${response.statusCode}).',
+          'SERVER_ERROR',
         );
       }
       final bytes = <int>[];
       await for (final chunk in response.timeout(const Duration(seconds: 15))) {
         if (bytes.length + chunk.length > 32768) {
-          throw const TenantApiException('پاسخ سرور بیش از حد بزرگ است.');
+          throw const TenantApiException('RESPONSE_TOO_LARGE');
         }
         bytes.addAll(chunk);
       }
       final decoded = jsonDecode(utf8.decode(bytes));
       if (decoded is! Map<String, dynamic>) {
-        throw const TenantApiException('پاسخ سرویس معتبر نیست.');
+        throw const TenantApiException('INVALID_SERVER_RESPONSE');
       }
       return decoded;
     } on SocketException {
-      throw const TenantApiException('اتصال به سرور برقرار نشد.');
+      throw const TenantApiException('NETWORK_UNAVAILABLE');
     } on HandshakeException {
-      throw const TenantApiException('گواهی امنیتی HTTPS معتبر نیست.');
+      throw const TenantApiException('INVALID_TLS');
     } finally {
       client.close(force: true);
     }
