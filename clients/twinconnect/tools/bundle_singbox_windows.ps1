@@ -30,6 +30,13 @@ $license = @(Get-ChildItem -LiteralPath $extract -Recurse -File |
   Select-Object -First 1)
 if ($license.Count -gt 0) {
   Copy-Item -LiteralPath $license[0].FullName -Destination (Join-Path $destination 'LICENSE') -Force
+} else {
+  # The Go binary archive may omit the upstream GPL text. Ship it explicitly.
+  Invoke-WebRequest -Uri "https://raw.githubusercontent.com/SagerNet/sing-box/v$version/LICENSE" `
+    -OutFile (Join-Path $destination 'LICENSE')
+}
+if (!(Test-Path (Join-Path $destination 'LICENSE'))) {
+  throw 'Bundled sing-box license is missing'
 }
 Set-Content -LiteralPath (Join-Path $destination 'SOURCE.txt') -Encoding UTF8 -Value @(
   "sing-box $version - upstream GPL-3.0-or-later component",
