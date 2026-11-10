@@ -12,6 +12,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'protocols.dart';
 import 'server_inventory.dart';
 import 'server_latency.dart';
+import 'windows_singbox_preflight.dart';
 import 'connection_bootstrap.dart';
 import 'tenant_api.dart';
 import 'vpn_policy_store.dart';
@@ -1558,6 +1559,22 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           ]),
         ),
         const SizedBox(height: 14),
+        settingLine(
+          Icons.hub_outlined,
+          tr('بررسی نصب موتور پروتکل‌های مدرن', 'Check modern engine installation'),
+          disabled: false,
+          onTap: () async {
+            final installed = await WindowsSingBoxPreflight.enginePresent();
+            if (!mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+              content: Text(installed
+                  ? tr('موتور sing-box نصب است؛ کنترل تونل هنوز فعال نشده است.',
+                       'sing-box is installed, but the native tunnel controller is not enabled.')
+                  : tr('موتور sing-box در نصب فعلی پیدا نشد.',
+                       'sing-box was not found in this installation.')),
+            ));
+          },
+        ),
         settingLine(
           Icons.speed_rounded,
           tr('بررسی وضعیت واقعی اتصال', 'Check live VPN status'),
