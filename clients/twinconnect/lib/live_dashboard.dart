@@ -103,12 +103,19 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     if (_pingingNodes.contains(node.id)) return;
     if (node.probeIp == null) {
       setState(() => _nodePings[node.id] = null);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(tr('پنل هنوز آدرس عمومی پینگ این سرور را ارسال نکرده است.',
+            'The panel has not provided a public probe address for this server.')),
+      ));
       return;
     }
     setState(() => _pingingNodes.add(node.id));
     int? latency;
     try {
-      final result = await Process.run('ping',
+      final windowsRoot = Platform.environment['SystemRoot'];
+      if (windowsRoot == null || windowsRoot.isEmpty) return;
+      final pingExe = '$windowsRoot\\System32\\PING.EXE';
+      final result = await Process.run(pingExe,
         ['-n', '1', '-w', '1500', node.probeIp!],
         runInShell: false).timeout(const Duration(seconds: 4));
       if (result.exitCode == 0) {
@@ -1407,7 +1414,10 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
               children: [
                 txt(widget.username, size: 22, bold: true),
                 const SizedBox(height: 6),
-                txt(tr('اطلاعات حساب از پنل دریافت شده', 'Account loaded from panel'),
+                txt(widget.account == null
+                    ? tr('اطلاعات مصرف و انقضا در دسترس نیست',
+                        'Usage and expiry are not yet available')
+                    : tr('اطلاعات حساب از پنل دریافت شده', 'Account loaded from panel'),
                     color: sub, size: 12),
               ],
             )),
