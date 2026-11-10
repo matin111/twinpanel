@@ -54,9 +54,12 @@ def eligible_count(db):
     """), {"now": datetime.utcnow()}).scalar() or 0)
 
 
-def establish_hidden_memberships(db, node_id):
+def establish_hidden_memberships(db, node_id, *, eligible_ids=None):
     """One INSERT for migrated and native subscriptions; do not alter plan rights."""
-    result = db.execute(text("""
+    if eligible_ids is not None and not eligible_ids:
+        return 0
+    ids_clause = "AND s.id = ANY(:eligible_ids)" if eligible_ids is not None else ""
+    result = db.execute(text(f"""
         INSERT INTO subscription_nodes (subscription_id, node_id, created_at)
         SELECT s.id, :node_id, :now FROM subscriptions s
         WHERE s.status='ACTIVE'
@@ -239,7 +242,9 @@ def _run_locked(node_id, limit, apply, *, families=None, delta_only=False):
                 node.node_type != NodeType.EXIT or
                 node.status != NodeStatus.ONLINE or not allow_central_node(db,node)):
             raise RuntimeError("NODE_CHANGED_DURING_STAGE")
-        added = establish_hidden_memberships(db, node_id)
+        added = establish_hidden_memberships(
+            db, node_id, eligible_ids=desired.subscription_ids,
+        )
         db.commit()
     print("CENTRAL_NODE_MEMBERSHIPS_READY", json.dumps({
         "node_id": node_id, "added": added,
