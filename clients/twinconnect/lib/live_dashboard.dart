@@ -408,6 +408,18 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   int _selected = 0;
   final Set<int> _favorites = <int>{};
 
+  String _formatTransferBytes(int bytes) {
+    if (bytes < 0) return '—';
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) {
+      return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    }
+    if (bytes < 1024 * 1024 * 1024) {
+      return '${(bytes / (1024 * 1024)).toStringAsFixed(2)} MB';
+    }
+    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
+  }
+
   String _formatBytes(int bytes) {
     const gb = 1024 * 1024 * 1024;
     return '${(bytes / gb).toStringAsFixed(2)} GB';
@@ -1033,11 +1045,11 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           const SizedBox(height: 18),
           Row(children: [
             Expanded(child: metric(Icons.arrow_downward_rounded,
-              tr('دریافت', 'Received'), _vpnUp ? '$_vpnRx B' : '—',
+              tr('دریافت', 'Received'), _vpnUp ? _formatTransferBytes(_vpnRx) : '—',
               detail: tr('مجموع رابط', 'Interface total'))),
             const SizedBox(width: 10),
             Expanded(child: metric(Icons.arrow_upward_rounded,
-              tr('ارسال', 'Sent'), _vpnUp ? '$_vpnTx B' : '—',
+              tr('ارسال', 'Sent'), _vpnUp ? _formatTransferBytes(_vpnTx) : '—',
               detail: tr('مجموع رابط', 'Interface total'))),
           ]),
           const SizedBox(height: 25),
