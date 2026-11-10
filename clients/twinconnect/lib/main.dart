@@ -6,6 +6,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'app_strings.dart';
 import 'tenant_api.dart';
 import 'tenant_models.dart';
+import 'protocols.dart';
+import 'protocol_catalog_view.dart';
+import 'protocol_strings.dart';
+import 'native_vpn_bridge.dart';
 import 'vpn_settings.dart';
 import 'vpn_strings.dart';
 
@@ -125,6 +129,10 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
   bool _loading = false;
   String? _errorCode;
   BrandPreview? _brand;
+  PanelProtocolCatalog? _catalog;
+  NativeProtocolReadiness _nativeProtocols =
+      const NativeProtocolReadiness(supportedCodes: {});
+  bool _protocolCatalogUnavailable = false;
 
   @override
   void dispose() {
@@ -141,6 +149,9 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
       _loading = true;
       _errorCode = null;
       _brand = null;
+      _catalog = null;
+      _protocolCatalogUnavailable = false;
+      _nativeProtocols = const NativeProtocolReadiness(supportedCodes: {});
     });
 
     try {
@@ -159,6 +170,26 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
       );
       if (!mounted) return;
       setState(() => _brand = brand);
+      // Subscription metadata is not secret and is fetched independently of
+      // brand details. A temporary metadata error must not hide renewal links.
+      try {
+        final catalog = await api.loadProtocolCatalog(
+          panel: panel,
+          username: username,
+          shareToken: token,
+        );
+        final native = await NativeVpnBridge.protocolReadiness();
+        if (mounted) {
+          setState(() {
+            _catalog = catalog;
+            _nativeProtocols = native;
+          });
+        }
+      } catch (_) {
+        if (mounted) {
+          setState(() => _protocolCatalogUnavailable = true);
+        }
+      }
     } on FormatException catch (error) {
       if (mounted) setState(() => _errorCode = error.message);
     } on TenantApiException catch (error) {
@@ -334,6 +365,17 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
                 if (brand != null) ...[
                   const SizedBox(height: 20),
                   BrandDetails(brand: brand),
+                  if (_protocolCatalogUnavailable) ...[
+                    const SizedBox(height: 16),
+                    Text(strings.protocolCatalogUnavailable),
+                  ],
+                  if (_catalog != null) ...[
+                    const SizedBox(height: 20),
+                    ProtocolCatalogCard(
+                      catalog: _catalog!,
+                      native: _nativeProtocols,
+                    ),
+                  ],
                 ],
                 const SizedBox(height: 20),
                 Text(

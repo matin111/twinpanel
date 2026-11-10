@@ -1,0 +1,36 @@
+name: TwinConnect 16 Protocol Contract V1
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/central_app_protocols.py"
+      - "backend/app/routers/central_app_v1.py"
+      - "backend/tests/test_central_app_protocol_contract_v1.py"
+      - "clients/twinconnect/lib/protocols.dart"
+      - "clients/twinconnect/lib/native_vpn_bridge.dart"
+      - "clients/twinconnect/lib/tenant_api.dart"
+      - "clients/twinconnect/lib/protocol_catalog_view.dart"
+      - "clients/twinconnect/test/protocols_test.dart"
+      - ".github/workflows/twinconnect-protocol-contract-v1.yml"
+
+jobs:
+  protocol-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Compile customer protocol API
+        run: |
+          python -m py_compile \
+            backend/app/central_app_protocols.py \
+            backend/app/routers/central_app_v1.py \
+            backend/tests/test_central_app_protocol_contract_v1.py
+      - name: Verify exact 16 protocol contract and credential boundary
+        run: python -m unittest discover -s backend/tests -p test_central_app_protocol_contract_v1.py -v

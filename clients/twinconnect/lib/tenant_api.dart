@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'tenant_models.dart';
+import 'protocols.dart';
 
 /// A fail-closed directory client. The vendor sees ONLY a tenant namespace.
 /// Username and bearer share token go directly to the licensed installation.
@@ -61,9 +62,63 @@ class TenantApi {
     return brand;
   }
 
+
+  Future<PanelProtocolCatalog> loadProtocolCatalog({
+    required PanelDirectoryEntry panel,
+    required String username,
+    required String shareToken,
+  }) async {
+    final url = panel.apiOrigin.resolve('/v1/central-app/public/protocols');
+    final result = await _requestJson(
+      url,
+      payload: {
+        'account_username': username.trim(),
+        'share_token': shareToken,
+      },
+    );
+    final catalog = PanelProtocolCatalog.fromJson(result);
+    if (catalog.namespace != panel.namespace) {
+      throw const FormatException('NAMESPACE_MISMATCH');
+    }
+    return catalog;
+  }
+
+  /// Returns credential-bearing profiles *only* after the OS native engine
+  /// explicitly advertises that it supports the requested protocol.
+  /// The current preview does not have these engines and will never fetch
+  /// private profiles. Never put profiles in shared preferences or logs.
+  Future<ClientProtocolProfiles> loadNativeProfiles({
+    required PanelDirectoryEntry panel,
+    required String username,
+    required String shareToken,
+    required VpnProtocolDefinition protocol,
+    required NativeProtocolReadiness native,
+  }) async {
+    if (!native.supports(protocol.code)) {
+      throw const TenantApiException('ENGINE_NOT_READY');
+    }
+    final url = panel.apiOrigin.resolve('/v1/central-app/public/profiles');
+    final result = await _requestJson(
+      url,
+      maxBytes: 1024 * 1024,
+      payload: {
+        'account_username': username.trim(),
+        'share_token': shareToken,
+        'protocol': protocol.code,
+      },
+    );
+    final profiles = ClientProtocolProfiles.fromJson(result);
+    if (profiles.namespace != panel.namespace ||
+        profiles.protocol.code != protocol.code) {
+      throw const FormatException('PROFILE_PROTOCOL_MISMATCH');
+    }
+    return profiles;
+  }
+
   Future<Map<String, dynamic>> _requestJson(
     Uri url, {
     Map<String, dynamic>? payload,
+    int maxBytes = 32768,
   }) async {
     if (url.scheme != 'https') {
       throw const FormatException('INSECURE_CONNECTION');
@@ -98,7 +153,7 @@ class TenantApi {
       }
       final bytes = <int>[];
       await for (final chunk in response.timeout(const Duration(seconds: 15))) {
-        if (bytes.length + chunk.length > 32768) {
+        if (bytes.length + chunk.length > maxBytes) {
           throw const TenantApiException('RESPONSE_TOO_LARGE');
         }
         bytes.addAll(chunk);
