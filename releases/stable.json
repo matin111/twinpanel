@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.770",
+  "version": "1.1.0-rc.771",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-10T03:32:20Z",
+  "released_at": "2026-11-10T04:41:13Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "1a2d1d411fbcabe7995cbb9bc2c81dbb7a8e2e8b",
+  "source_sha": "2cf4aeeffede25f1af0e534df3c7253098abf524",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.770/twinpanel-1.1.0-rc.770-linux-x86_64.tar.gz",
-    "sha256": "3b22829b32752a5e223e78be2f5cf45e5bba6684a99035b9e60f48c1bf248aa1",
-    "size_bytes": 30314954
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.771/twinpanel-1.1.0-rc.771-linux-x86_64.tar.gz",
+    "sha256": "864dd5deaf39c8326d4b549318e83d899bb7b6b5c20382bb168c1bc90c09698c",
+    "size_bytes": 30325926
   },
   "notes": {
-    "fa": "رفع دائمی ازدحام صف تحویل اکانت در ربات: پیام‌های بدون اتصال تلگرام و کاربران مسدودکننده در قرنطینه باقی می‌مانند، از تکرار بی‌پایان جلوگیری می‌شود و با اتصال حساب یا تعامل دوباره کاربر، سفارش پرداخت‌شده به‌صورت ایمن دوباره قابل تحویل خواهد بود. اولویت سفارش‌های جدید، جلوگیری از ارسال مجدد اعلان‌های تحویل‌شده و پایش پرداخت‌های معطل فعال است. تغییرات قبلی پروتکل‌ها، پورت‌ها، کیف پول و اشتراک‌ها محفوظ‌اند.",
-    "en": "Harden Telegram paid subscription delivery: quarantine unreachable/unlinked recipients rather than retrying indefinitely, revive undelivered paid orders on Telegram account linking and authenticated bot return, preserve priority for new purchases and delivered-at/event-key deduplication, and alert on actionable stalled delivery. Includes prior rc.769 protocol port conflict warning features and preserves accounts, wallets, quotas and node settings."
+    "fa": "افزودن نود با پروتکل‌های سالم حتی هنگام شکست یک یا چند پروتکل، بدون نیاز به سلامت اجباری ۱۶/۱۶؛ ثبت اکانت و ساخت کانفیگ فقط برای پروتکل‌های تأییدشده و مجاز، نمایش وضعیت نصب ناقص، بازیابی نودهای ناقص با کنترل سلامت زنده. حفظ تمام اصلاحات rc.770 و عدم تغییر اطلاعات اشتراک و کلیدها.",
+    "en": "Admit newly installed Exits with their individually live-verified supported protocol subset, without requiring all 16. Entitlement-scoped central membership and credential staging, explicit partial status and guarded recovery of failed hidden nodes; preserve all rc.770 fixes and customer identities."
   }
 }
