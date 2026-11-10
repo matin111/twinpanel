@@ -106,6 +106,16 @@ inline bool WgQuery(const wchar_t* fixedArgs, std::string* output) {
   HANDLE readPipe = nullptr, writePipe = nullptr;
   if (!CreatePipe(&readPipe, &writePipe, &pipeAttrs, 0)) return false;
   SetHandleInformation(readPipe, HANDLE_FLAG_INHERIT, 0);
+  // A Flutter GUI process may have no STDIN. Use an explicit inherited NUL
+  // handle instead of a missing console handle for subprocess creation.
+  HANDLE nullInput = CreateFileW(L"NUL", GENERIC_READ,
+      FILE_SHARE_READ | FILE_SHARE_WRITE, &pipeAttrs,
+      OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+  if (nullInput == INVALID_HANDLE_VALUE) {
+    CloseHandle(writePipe);
+    CloseHandle(readPipe);
+    return false;
+  }
 
   std::wstring command = L"\"" + exe + L"\" show TwinConnect " + fixedArgs;
   STARTUPINFOW startup = {};
@@ -113,12 +123,13 @@ inline bool WgQuery(const wchar_t* fixedArgs, std::string* output) {
   startup.dwFlags = STARTF_USESTDHANDLES;
   startup.hStdOutput = writePipe;
   startup.hStdError = writePipe;
-  startup.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
+  startup.hStdInput = nullInput;
   PROCESS_INFORMATION process = {};
   const BOOL started = CreateProcessW(
       exe.c_str(), command.data(), nullptr, nullptr, TRUE,
       CREATE_NO_WINDOW, nullptr, nullptr, &startup, &process);
   CloseHandle(writePipe);
+  CloseHandle(nullInput);
   if (!started) { CloseHandle(readPipe); return false; }
 
   const DWORD result = WaitForSingleObject(process.hProcess, 6000);
