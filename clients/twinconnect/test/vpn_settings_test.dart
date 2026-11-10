@@ -13,28 +13,18 @@ void main() {
     SharedPreferences.setMockInitialValues({});
   });
 
-  testWidgets('security settings open from app and warn no tunnel is active',
+  testWidgets('login has language picker but no VPN settings shortcut',
       (tester) async {
     SharedPreferences.setMockInitialValues({
       'twinconnect_ui_language_v1': 'en',
     });
     await tester.pumpWidget(const TwinConnectApp());
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('vpnSettingsButton')));
-    await tester.pumpAndSettle();
 
-    expect(find.text('VPN settings'), findsOneWidget);
-    expect(find.byKey(const Key('vpnNotActiveNotice')), findsOneWidget);
-    expect(find.text('Not installed'), findsOneWidget);
-    expect(find.byKey(const Key('vpnMode_fullTunnel')), findsOneWidget);
-    expect(find.byKey(const Key('vpnMode_onlySelectedApps')), findsOneWidget);
-    expect(find.byKey(const Key('vpnMode_excludeSelectedApps')), findsOneWidget);
-    final perApp = tester.widget<ChoiceChip>(
-      find.byKey(const Key('vpnMode_onlySelectedApps')),
-    );
-    // Tests run on Linux; this consumer platform cannot assert Android
-    // or Apple managed-device capabilities.
-    expect(perApp.onSelected, isNull);
+    expect(find.byKey(const Key('vpnSettingsButton')), findsNothing);
+    expect(find.byKey(const Key('languagePicker')), findsOneWidget);
+    expect(find.byKey(const Key('accountUsername')), findsOneWidget);
+    expect(find.byKey(const Key('appPassword')), findsOneWidget);
   });
 
   testWidgets('draft does not save without an identified account',
