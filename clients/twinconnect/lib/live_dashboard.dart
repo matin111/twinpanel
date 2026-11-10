@@ -584,19 +584,54 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
               key: const Key('liveConnectionControlsButton'),
               onPressed: _vpnBusy ? null : _toggleVpn,
               style: FilledButton.styleFrom(
+                backgroundColor: Colors.transparent,
+                foregroundColor: Colors.white,
+                disabledBackgroundColor: Colors.transparent,
                 padding: EdgeInsets.zero,
                 shape: const CircleBorder(),
-                disabledBackgroundColor: purple.withValues(alpha: .22),
-                disabledForegroundColor: purple,
-                side: const BorderSide(color: purple, width: 2.5),
                 elevation: 0,
               ),
-              child: _vpnBusy
-                  ? const SizedBox.square(dimension: 28,
-                      child: CircularProgressIndicator(strokeWidth: 3))
-                  : Icon(_vpnUp ? Icons.stop_circle_outlined
-                      : Icons.power_settings_new_rounded,
-                      size: 45, color: _vpnVerified ? Colors.greenAccent : purple),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 340),
+                curve: Curves.easeInOut,
+                width: 94, height: 94,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: _vpnVerified
+                      ? const [Color(0xFF34E8BD), Color(0xFF0EADBA)]
+                      : const [Color(0xFFC393FF), Color(0xFF7351E9)],
+                  ),
+                  border: Border.all(
+                    width: 2,
+                    color: Colors.white.withValues(alpha: 0.45),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: (_vpnVerified
+                        ? const Color(0xFF29E4BD) : purple)
+                        .withValues(alpha: 0.42),
+                      blurRadius: 28, spreadRadius: 3,
+                    ),
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.16),
+                      blurRadius: 11,
+                      offset: const Offset(0, 7),
+                    ),
+                  ],
+                ),
+                child: Center(
+                  child: _vpnBusy
+                    ? const SizedBox.square(dimension: 28,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 3, color: Colors.white))
+                    : Icon(_vpnUp ? Icons.stop_rounded
+                        : Icons.power_settings_new_rounded,
+                        size: 43, color: Colors.white),
+                ),
+              ),
             ),
           ),
         ),
