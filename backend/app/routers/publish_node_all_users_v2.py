@@ -303,7 +303,9 @@ async def _recover_hidden_cisco_node(node_id: int, *, publish: bool) -> None:
                 )
                 if not repaired.get("ok") or not repaired.get("enabled"):
                     raise RuntimeError("CISCO_REPAIR_NOT_CONFIRMED")
-                live = await verify_new_exit_readiness(db, int(node_id))
+                live = await verify_new_exit_readiness(
+        db, int(node_id), require_tls_profiles=True, allow_partial=True,
+    )
                 if not live.get("ok") or int(live.get("ready_count") or 0) != 16:
                     raise RuntimeError("CISCO_REPAIR_ALL_LISTENERS_NOT_READY")
                 job = db.query(NodeInstallProgressV1).filter(
@@ -432,6 +434,22 @@ async def reverify_and_stage_existing_exit_v1(
             "missing": live.get("missing") or [],
         })
 
+    # This recovery path also covers a failed 15/16 initial install.
+    # Keep unavailable protocols offline so customer delivery never emits them.
+    from ..models import NodeProtocolConfig
+    from ..protocol_account_registry import ALL_PROTOCOL_SET
+    missing = set(live.get("missing") or ())
+    for cfg in db.query(NodeProtocolConfig).filter(
+        NodeProtocolConfig.node_id == int(node_id),
+        NodeProtocolConfig.protocol.in_(list(missing)),
+    ).all():
+        cfg.status = "offline"
+    for key in missing.intersection({"cisco", "openvpn", "wireguard", "l2tp", "v2ray"}):
+        setattr(node, f"enable_{key}", False)
+    partial = int(live.get("ready_count") or 0) < len(ALL_PROTOCOL_SET)
+    if int(live.get("ready_count") or 0) < 1:
+        raise HTTPException(status_code=409, detail="NODE_NO_VERIFIED_PROTOCOLS")
+
     # A prior attempt may already have materialized thousands of node-local
     # credential pairs. Reuse them and sync ONLY missing daemon families;
     # never rebuild successful per-user identities on recovery.
@@ -441,7 +459,7 @@ async def reverify_and_stage_existing_exit_v1(
     job.stage = "verified_ready"
     job.state = "running"
     job.installed_protocols = int(live["ready_count"])
-    job.error_code = None
+    job.error_code = "PARTIAL_PROTOCOLS_PENDING" if partial else None
     admitted = False
     try:
         # Reuse the EXACT same fast set-based enrollment as a fresh Exit.
@@ -455,7 +473,7 @@ async def reverify_and_stage_existing_exit_v1(
         job.stage = "completed"
         job.state = "completed"
         job.users_assigned = int(admission["eligible_users"])
-        job.error_code = None
+        job.error_code = "PARTIAL_PROTOCOLS_PENDING" if partial else None
         db.commit()
     except CentralStageLaunchError as exc:
         db.rollback()
