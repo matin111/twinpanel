@@ -4,6 +4,7 @@ import Link from "next/link";
 import {FormEvent,useEffect,useMemo,useState} from "react";
 import {Badge,Card,Stat} from "./ui";
 import {PortalShell} from "./portal-shells";
+import {CentralAppAppearanceStudio} from "./central-app-appearance-studio";
 import {resellerApi,ResellerRow} from "../lib/reseller-runtime-api";
 import {useI18n} from "../lib/i18n";
 
