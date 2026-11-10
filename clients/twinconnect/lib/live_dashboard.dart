@@ -1565,7 +1565,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           disabled: false,
           onTap: () async {
             final installed = await WindowsSingBoxPreflight.enginePresent();
-            if (!mounted) return;
+            if (!context.mounted) return;
             ScaffoldMessenger.of(context).showSnackBar(SnackBar(
               content: Text(installed
                   ? tr('موتور sing-box نصب است؛ کنترل تونل هنوز فعال نشده است.',
