@@ -50,6 +50,12 @@ class NativeVpnBridge {
     if (platform == VpnPlatform.other) {
       return const NativeProtocolReadiness(supportedCodes: {});
     }
+    // This additional OS-level probe is mandatory: a plugin must not report
+    // protocol names without an actually initialized native VPN engine.
+    final capabilities = await probe();
+    if (!capabilities.engineReady || !capabilities.fullTunnel) {
+      return const NativeProtocolReadiness(supportedCodes: {});
+    }
     try {
       final raw = await _channel.invokeMethod<Map<dynamic, dynamic>>(
         'getProtocolCapabilities',
