@@ -30,7 +30,7 @@ def subscription_qr_photo(url: str) -> BufferedInputFile:
     return BufferedInputFile(out.getvalue(), filename="subscription-qr.png")
 
 
-async def send_subscription_link_and_qr(message, link: str, *, username: str = "", reply_markup=None):
+async def send_subscription_link_and_qr(message, link: str, *, username: str = "", reply_markup=None, app_credentials: dict | None = None):
     """One combined photo/caption, not separate link and QR messages."""
     value = str(link or "").strip()
     if not value:
@@ -47,6 +47,21 @@ async def send_subscription_link_and_qr(message, link: str, *, username: str = "
         f"<code>{escape(value)}</code>\n\n"
         "لینک و QR هر دو مربوط به یک اشتراک هستند. آن‌ها را در اختیار دیگران قرار ندهید."
     )
+    if app_credentials:
+        app_username = escape(str(app_credentials.get("app_username") or ""))
+        app_password = escape(str(app_credentials.get("app_password") or ""))
+        if app_username and app_password:
+            # Keep the share URL and QR together, but display the app-only
+            # credentials as independent fields. Only a verified subscription
+            # owner may supply this private delivery payload.
+            caption = (
+                "🔗 <b>لینک اشتراک و QR</b>\n\n"
+                f"👤 <b>{label}</b>\n"
+                f"<code>{escape(value)}</code>\n\n"
+                "📱 <b>ورود به اپ TwinConnect</b>\n"
+                f"نام کاربری اپ: <code>{app_username}</code>\n"
+                f"رمز اپ: <code>{app_password}</code>"
+            )
     if len(caption) > 1024:
         raise ValueError("متن ساب‌لینک برای کپشن QR بیش از حد طولانی است")
     return await message.answer_photo(
