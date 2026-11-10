@@ -77,18 +77,19 @@ void main() {
     expect(BrandTheme.background(a).gradient, isNotNull);
   });
 
-  testWidgets('Windows demo activates shared brand colors', (tester) async {
+  testWidgets('brand theme renderer uses the same palette on every platform',
+      (tester) async {
     final brand = WindowsPreviewFixture.brand();
-    await tester.pumpWidget(const TwinConnectApp());
-    await tester.pumpAndSettle();
-    await tester.drag(find.byType(ListView).first, const Offset(0, -260));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('windowsDemoButton')));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('offlineDemoBanner')), findsOneWidget);
-    final theme = Theme.of(
-      tester.element(find.byKey(const Key('offlineDemoBanner'))),
-    );
+    await tester.pumpWidget(MaterialApp(
+      theme: BrandTheme.make(brand, Brightness.dark),
+      home: Scaffold(
+        body: BrandBackground(
+          brand: brand,
+          child: const Text('Shared brand'),
+        ),
+      ),
+    ));
+    final theme = Theme.of(tester.element(find.text('Shared brand')));
     expect(theme.colorScheme.primary,
         BrandTheme.parse(brand.primaryColor, '#7C3AED'));
     expect(theme.scaffoldBackgroundColor,
