@@ -15,6 +15,7 @@ on:
       - "backend/tests/modern_accounting_deadlock_v314_smoke.py"
       - "backend/tests/test_modern_accounting_bounded_transactions_v1.py"
       - "backend/tests/test_accounting_bulk_read_boundary_v1.py"
+      - "backend/tests/test_presence_bulk_read_boundary_v1.py"
       - ".github/workflows/modern-accounting-v257.yml"
   workflow_dispatch:
 
@@ -97,6 +98,10 @@ jobs:
       - name: Verify clean CPU mapping read transaction boundary
         working-directory: backend
         run: PYTHONPATH=. python tests/test_accounting_bulk_read_boundary_v1.py -v
+
+      - name: Verify independent presence clean read boundaries
+        working-directory: backend
+        run: PYTHONPATH=. python tests/test_presence_bulk_read_boundary_v1.py -v
 
       - name: Verify application import with merged lifespan
         working-directory: backend
