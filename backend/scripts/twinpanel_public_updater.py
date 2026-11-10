@@ -322,7 +322,7 @@ def existing_units() -> list[str]:
     return units
 
 
-def restart_services() -> None:
+def restart_services(*, include_web: bool = True) -> None:
     """Dispatch one restart transaction; fail the release if systemd rejects it.
 
     This checks only the synchronous dispatch result, not eventual service
@@ -339,6 +339,8 @@ def restart_services() -> None:
     units = existing_units()
     if not {'twinpanel-api.service', 'twinpanel-web.service'}.issubset(units):
         raise RuntimeError('UPDATER_REQUIRED_SERVICE_UNIT_MISSING')
+    if not include_web:
+        units.remove('twinpanel-web.service')
     subprocess.run(
         ['systemctl', '--no-block', 'restart', *units],
         check=True,
@@ -346,6 +348,28 @@ def restart_services() -> None:
         stderr=subprocess.DEVNULL,
         timeout=15,
     )
+
+
+def converge_web_prestart_helpers_for_bluegreen(release: Path, env: dict[str, str]) -> None:
+    """Replay required global Web ExecStartPre migrations without restarting Web.
+
+    The pinned standby is deliberately side-effect-free; the legacy Web unit
+    previously owned these migrations. Run only canonical verified helpers and
+    do so while the old Web listener still serves all Nginx vhosts.
+    """
+    python = VENV if VENV.is_file() else Path(sys.executable)
+    scripts = (
+        ("twinpanel_nginx_reconcile.py", ("--reload",)),
+        ("twinpanel_updater_unit_reconcile_v69.py", ()),
+        ("twinpanel_api_update_handoff_v69.py", ()),
+        ("twinpanel_runtime_unit_reconcile.py", ("--verify",)),
+        ("twinpanel_accounting_unit_reconcile.py", ("--verify",)),
+    )
+    for script, args in scripts:
+        target = release / "backend/scripts" / script
+        if not target.is_file():
+            raise RuntimeError("WEB_BLUEGREEN_REQUIRED_PRESTART_MISSING:" + script)
+        run([str(python), str(target), *args], cwd=release / "backend", env=env, timeout=90)
 
 
 def install_node_auto_backfill_timer(release: Path) -> None:
@@ -902,6 +926,20 @@ def main() -> int:
     web_port = int(env.get('TWINPANEL_WEB_PORT', '3000') or 3000)
     api_port = int(env.get('TWINPANEL_API_PORT', '8095') or 8095)
     install_web_unit(final, web_port)
+    bg = None
+    bg_ports = None
+    if env.get('TWINPANEL_WEB_BLUEGREEN_ENABLED', '1').strip() == '1':
+        helper = final / 'backend/scripts/twinpanel_web_bluegreen_v1.py'
+        if helper.is_file() and web_port == 3000:
+            import importlib.util
+            spec = importlib.util.spec_from_file_location('twinpanel_web_bluegreen_v1', helper)
+            if spec is None or spec.loader is None:
+                raise RuntimeError('WEB_BLUEGREEN_IMPORT_FAILED')
+            bg = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(bg)
+            bg_ports = bg.prepare(final, current_release)
+        elif web_port != 3000:
+            raise RuntimeError('WEB_BLUEGREEN_UNSUPPORTED_CUSTOM_PORT')
     stage_end('runtime_prepare', started)
 
     previous = atomic_switch(final)
@@ -918,23 +956,35 @@ def main() -> int:
         )
 
         started = stage_begin()
-        restart_services()
+        restart_services(include_web=bg is None)
         stage_end('restart_dispatch', started)
 
         verify_activation(final, version)
         started = stage_begin()
+        target_web_port = bg_ports[1] if bg_ports else web_port
         health_ok_all, pending = wait_for_healthy(
             {
                 'api': f'http://127.0.0.1:{api_port}/health',
-                'web': f'http://127.0.0.1:{web_port}/health',
+                'web': f'http://127.0.0.1:{target_web_port}/health',
             },
             version,
             seconds=45,
         )
+        if health_ok_all and bg is not None:
+            # Preserve all prestart migrations formerly run by the restarted
+            # production Web unit, without shutting down the old listener.
+            converge_web_prestart_helpers_for_bluegreen(final, env)
+            health_ok_all = bg.wait_ready(target_web_port, version, final)
+            if not health_ok_all:
+                pending = ['web_canary_routes_assets']
         stage_end('health', started)
         verify_activation(final, version)
         if not health_ok_all:
             raise RuntimeError('POST_UPDATE_HEALTH_VERSION_FAILED:' + ','.join(pending))
+        if bg is not None:
+            bg.activate(bg_ports[0], bg_ports[1], final)
+            if not bg.readiness(bg_ports[1], version, final):
+                raise RuntimeError('WEB_POST_CUTOVER_CANARY_FAILED')
         install_node_auto_backfill_timer(final)
     except Exception:
         save(
@@ -943,9 +993,21 @@ def main() -> int:
             previous_version=current_version,
             error='ACTIVATION_OR_HEALTH_FAILED',
         )
-        rollback(previous)
+        if bg is None:
+            rollback(previous)
+        else:
+            if previous:
+                bg.revert(bg_ports[0], bg_ports[1], previous)
+                atomic_switch(previous)
+                restart_services(include_web=False)
+            subprocess.run(
+                ['systemctl', 'disable', '--now', f'twinpanel-web-slot@{bg_ports[1]}.service'],
+                check=False, timeout=25,
+            )
         raise
 
+    if bg is not None:
+        bg.stop_unused(bg_ports[0])
     retention = prune_old_releases(final, previous)
     save(
         state='completed',

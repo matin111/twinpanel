@@ -42,7 +42,8 @@ def main() -> None:
     # The release switch still records restarting before dispatching systemd;
     # this smoke only removes duplicate ownership, not the updater health gate.
     state_at = updater.index("state='restarting'")
-    restart_at = updater.index("restart_services()", state_at)
+    restart_at = updater.index("restart_services(include_web=bg is None)", state_at)
+    assert "units.remove('twinpanel-web.service')" in updater
     health_at = updater.index("wait_for_healthy(", restart_at)
     assert state_at < restart_at < health_at
 

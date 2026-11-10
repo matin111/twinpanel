@@ -1,0 +1,26 @@
+name: Web Blue-Green Update Smoke
+on:
+  pull_request:
+    paths:
+      - 'backend/scripts/twinpanel_web_bluegreen_v1.py'
+      - 'backend/scripts/twinpanel_public_updater.py'
+      - 'backend/tests/test_web_bluegreen_release_v1.py'
+      - '.github/workflows/web-bluegreen-release-smoke.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'backend/scripts/twinpanel_web_bluegreen_v1.py'
+      - 'backend/scripts/twinpanel_public_updater.py'
+      - 'backend/tests/test_web_bluegreen_release_v1.py'
+jobs:
+  isolated-bluegreen:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Python syntax
+        run: python -m py_compile backend/scripts/twinpanel_web_bluegreen_v1.py backend/scripts/twinpanel_public_updater.py
+      - name: Prove switch, rollback and no legacy restart
+        run: python backend/tests/test_web_bluegreen_release_v1.py -v
