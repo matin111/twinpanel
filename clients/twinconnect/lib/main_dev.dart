@@ -157,6 +157,19 @@ class _TwinConnectDevAppState extends State<TwinConnectDevApp> {
               Text(t('موتور ویندوز آماده نیست', 'Windows engine unavailable'),
                 style: TextStyle(color: muted, fontSize: 12)),
               const SizedBox(height: 20),
+              Tooltip(
+                message: t('پس از اتصال موتور و دریافت پینگ واقعی فعال می‌شود',
+                           'Requires native engine and measured latency'),
+                child: Row(mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.auto_awesome_rounded, size: 16),
+                    const SizedBox(width: 7),
+                    Text(t('انتخاب خودکار بهترین سرور',
+                           'Auto-select best server'),
+                         style: TextStyle(color: muted, fontSize: 12)),
+                  ]),
+              ),
+              const SizedBox(height: 12),
               SizedBox(
                 width: 230, height: 47,
                 child: FilledButton.icon(
@@ -216,6 +229,20 @@ class _TwinConnectDevAppState extends State<TwinConnectDevApp> {
               Row(children: [
                 Expanded(child: Text(t('پروتکل‌ها', 'Protocols'),
                     style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800))),
+                Tooltip(
+                  message: t('پس از ورود، تغییرات سرورها از پنل دریافت می‌شود',
+                             'Sign in to refresh servers from your panel'),
+                  child: IconButton(
+                    key: const Key('devRefreshServers'),
+                    onPressed: () {
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                        content: Text(t('برای دریافت سرورها، ورود به پنل لازم است',
+                                        'Sign in to fetch updated servers')),
+                      ));
+                    },
+                    icon: const Icon(Icons.refresh_rounded),
+                  ),
+                ),
                 Text('${filtered.length} / 16', style: TextStyle(color: muted)),
               ]),
               const SizedBox(height: 17),
