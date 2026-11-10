@@ -44,7 +44,7 @@ for required in (
     '"adm:review"', '"adm:lookup"', '"adm:broadcast"',
     '"adm:wallet:confirm"', '"adm:do:',
     '"adm:bcast:"', 'AdminOpsState.broadcast_text',
-    'receipt_base64', 'await check(',
+    'callback.message.edit_caption(', 'callback.message.edit_text(', 'await check(',
 ):
     assert required in bot, required
 
