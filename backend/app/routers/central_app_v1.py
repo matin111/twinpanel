@@ -164,6 +164,37 @@ def update_admin_app_profile(
     return _save_contact(db, 0, payload)
 
 
+@router.get("/admin/resellers/{reseller_id}/profile")
+def admin_reseller_app_profile(
+    reseller_id: int,
+    _=Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    reseller = db.get(Reseller, int(reseller_id))
+    if not reseller:
+        raise HTTPException(status_code=404, detail="RESELLER_NOT_FOUND")
+    return {
+        **_contact_out(_contact(db, reseller.id)),
+        "app_username_prefix": reseller_prefix(
+            ensure_installation_id(), int(reseller.id)
+        ),
+        "brand_name": reseller.brand_name or reseller.name,
+    }
+
+
+@router.put("/admin/resellers/{reseller_id}/profile")
+def admin_update_reseller_app_profile(
+    reseller_id: int,
+    payload: ContactIn,
+    _=Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    reseller = db.get(Reseller, int(reseller_id))
+    if not reseller:
+        raise HTTPException(status_code=404, detail="RESELLER_NOT_FOUND")
+    return _save_contact(db, reseller.id, payload)
+
+
 @router.get("/reseller/profile")
 def reseller_app_profile(
     reseller: Reseller = Depends(require_reseller),
