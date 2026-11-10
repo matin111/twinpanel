@@ -15,6 +15,7 @@ import 'tenant_api.dart';
 import 'vpn_policy_store.dart';
 import 'windows_wireguard.dart';
 import 'tenant_models.dart';
+import 'plan_classification.dart';
 import 'native_vpn_bridge.dart';
 import 'country_flag.dart';
 import 'ambient_background.dart';
@@ -33,6 +34,8 @@ class TwinConnectLiveDashboard extends StatefulWidget {
     required this.servers,
     required this.native,
     required this.onRefresh,
+    required this.plan,
+    required this.accountStatus,
     required this.onLogout,
     super.key,
   });
@@ -43,6 +46,8 @@ class TwinConnectLiveDashboard extends StatefulWidget {
   final AppServerInventory? servers;
   final NativeProtocolReadiness native;
   final VoidCallback onRefresh;
+  final AppPlanClassification? plan;
+  final String accountStatus;
   final VoidCallback onLogout;
   @override
   State<TwinConnectLiveDashboard> createState() => _TwinConnectLiveDashboardState();
@@ -1255,9 +1260,15 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         const SizedBox(height: 17),
         Row(children: [
           for (final entry in [
-            (Icons.devices_rounded, tr('دستگاه‌ها', 'Devices')),
-            (Icons.data_usage_rounded, tr('ترافیک', 'Traffic')),
-            (Icons.event_outlined, tr('انقضا', 'Expiry')),
+            (Icons.devices_rounded, tr('دستگاه مجاز', 'Device limit'),
+              widget.plan == null ? '—' : widget.plan!.deviceLimit == 0
+                ? tr('نامحدود', 'Unlimited') : '${widget.plan!.deviceLimit}'),
+            (Icons.class_rounded, tr('نوع اشتراک', 'Subscription type'),
+              widget.plan?.subscriptionType ?? '—'),
+            (Icons.verified_user_rounded, tr('وضعیت حساب', 'Account status'),
+              widget.accountStatus == 'active' ? tr('فعال', 'Active')
+              : widget.accountStatus == 'expired' ? tr('منقضی', 'Expired')
+              : widget.accountStatus),
           ]) ...[
             Expanded(child: glassCard(
               padding: const EdgeInsets.symmetric(vertical: 18),
@@ -1265,7 +1276,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
               child: Column(children: [
                 Icon(entry.$1, color: purple),
                 const SizedBox(height: 8),
-                txt('—', size: 20, bold: true),
+                txt(entry.$3, size: 17, bold: true),
                 txt(entry.$2, size: 11, color: sub),
               ]),
             )),
