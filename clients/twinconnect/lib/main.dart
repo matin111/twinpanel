@@ -19,6 +19,7 @@ import 'server_inventory.dart';
 import 'country_flag.dart';
 import 'ambient_background.dart';
 import 'interactive_glass_card.dart';
+import 'live_dashboard.dart';
 
 void main() => runApp(const TwinConnectApp());
 
@@ -589,8 +590,32 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
   Widget build(BuildContext context) {
     final strings = AppStrings.of(context);
     final brand = _brand;
-    if (brand != null) {
-      return _buildAuthenticatedDashboard(context, strings, brand);
+    if (brand != null && _confirmedPanel != null &&
+        _confirmedUsername != null && _confirmedSessionToken != null) {
+      return TwinConnectLiveDashboard(
+        key: ValueKey(_confirmedUsername),
+        panel: _confirmedPanel!,
+        username: _confirmedUsername!,
+        sessionToken: _confirmedSessionToken!,
+        catalog: _catalog,
+        servers: _servers,
+        native: _nativeProtocols,
+        onRefresh: _refreshServers,
+        onLogout: () {
+          ++_lookupSerial;
+          setState(() {
+            _brand = null;
+            _confirmedPanel = null;
+            _confirmedUsername = null;
+            _confirmedSessionToken = null;
+            _catalog = null;
+            _servers = null;
+            _dashboardTab = 0;
+            _errorCode = null;
+            widget.onBrandChanged(null);
+          });
+        },
+      );
     }
 
     final accent = Theme.of(context).colorScheme.primary;
