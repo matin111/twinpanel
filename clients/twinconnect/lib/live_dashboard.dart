@@ -1,5 +1,5 @@
 import 'dart:ui' show ImageFilter;
-import 'dart:io' show Platform, HttpClient, InternetAddress;
+import 'dart:io' show Platform, HttpClient, InternetAddress, Process;
 import 'dart:convert' show utf8;
 import 'dart:async' show Timer;
 
@@ -23,6 +23,7 @@ import 'ambient_background.dart';
 import 'interactive_glass_card.dart';
 import 'share_vpn_preview.dart';
 import 'connection_signal_art.dart';
+import 'vpn_settings.dart';
 
 /// Authenticated application uses the original visual dashboard layout with live data.
 
@@ -39,6 +40,8 @@ class TwinConnectLiveDashboard extends StatefulWidget {
     required this.accountStatus,
     required this.account,
     required this.onLogout,
+    required this.onRefreshAccount,
+    this.accountError,
     super.key,
   });
   final PanelDirectoryEntry panel;
@@ -52,6 +55,8 @@ class TwinConnectLiveDashboard extends StatefulWidget {
   final String accountStatus;
   final AppAccountSnapshot? account;
   final VoidCallback onLogout;
+  final VoidCallback onRefreshAccount;
+  final String? accountError;
   @override
   State<TwinConnectLiveDashboard> createState() => _TwinConnectLiveDashboardState();
 }
@@ -84,14 +89,70 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   Timer? _networkTimer;
   String? _activeNodeId;
 
+  final Map<String, int?> _nodePings = {};
+  final Set<String> _pingingNodes = {};
+  bool _pingAllBusy = false;
+  int? _latencyFor(AppServer node) => _nodePings.containsKey(node.id)
+    ? _nodePings[node.id] : node.latencyMs;
+
+  Future<void> _probeNode(int index) async {
+    final nodes = widget.servers?.servers;
+    if (!Platform.isWindows || nodes == null || index < 0 ||
+        index >= nodes.length) return;
+    final node = nodes[index];
+    if (_pingingNodes.contains(node.id)) return;
+    if (node.probeIp == null) {
+      setState(() => _nodePings[node.id] = null);
+      return;
+    }
+    setState(() => _pingingNodes.add(node.id));
+    int? latency;
+    try {
+      final result = await Process.run('ping',
+        ['-n', '1', '-w', '1500', node.probeIp!],
+        runInShell: false).timeout(const Duration(seconds: 4));
+      if (result.exitCode == 0) {
+        final output = result.stdout.toString();
+        final match = RegExp(r'time\s*[=<]\s*(\d+)\s*ms',
+          caseSensitive: false).firstMatch(output);
+        if (match != null) latency = int.tryParse(match.group(1)!);
+        if (latency == null && output.toLowerCase().contains('time<1ms')) latency = 1;
+      }
+    } catch (_) {
+      // ICMP blocked is not the same as a failed VPN tunnel.
+    } finally {
+      if (mounted) setState(() {
+        _nodePings[node.id] = latency;
+        _pingingNodes.remove(node.id);
+      });
+    }
+  }
+  Future<void> _probeAllNodes() async {
+    final nodes = widget.servers?.servers;
+    if (nodes == null || _pingAllBusy) return;
+    setState(() => _pingAllBusy = true);
+    try {
+      for (var start = 0; start < nodes.length && mounted; start += 4) {
+        final end = start + 4 < nodes.length ? start + 4 : nodes.length;
+        await Future.wait([
+          for (var i = start; i < end; i++) _probeNode(i),
+        ]);
+      }
+    } finally {
+      if (mounted) setState(() => _pingAllBusy = false);
+    }
+  }
+
+
   int? get _fastestKnownIndex {
     final servers = widget.servers?.servers;
     if (servers == null) return null;
     int? best;
     for (var i = 0; i < servers.length; i++) {
       final node = servers[i];
-      if (!node.nodeOnline || node.latencyMs == null) continue;
-      if (best == null || node.latencyMs! < servers[best].latencyMs!) {
+      final latency = _latencyFor(node);
+      if (!node.nodeOnline || latency == null) continue;
+      if (best == null || latency < _latencyFor(servers[best])!) {
         best = i;
       }
     }
@@ -892,8 +953,17 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                   txt(server.city, size: 10, color: sub),
                 ],
               )),
-              txt(widget.servers?.servers[index].latencyMs == null
-                  ? '— ms' : '${widget.servers!.servers[index].latencyMs} ms', size: 11, color: sub),
+              Text(_pingingNodes.contains(widget.servers!.servers[index].id) ? '…' :
+                  _latencyFor(widget.servers!.servers[index]) == null ? '— ms' :
+                  '${_latencyFor(widget.servers!.servers[index])} ms',
+                  style: TextStyle(fontSize: 11, color: sub)),
+              IconButton(
+                key: Key('probeNode_${widget.servers!.servers[index].id}'),
+                tooltip: tr('تست پینگ', 'Ping server'),
+                onPressed: _pingingNodes.contains(widget.servers!.servers[index].id)
+                    ? null : () => _probeNode(index),
+                icon: const Icon(Icons.network_ping_rounded, size: 18, color: purple),
+              ),
               const SizedBox(width: 8),
               Icon(_vpnUp && _activeNodeId == widget.servers?.servers[index].id
                 ? Icons.verified_rounded : Icons.chevron_right_rounded,
@@ -980,6 +1050,12 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
               icon: const Icon(Icons.refresh_rounded),
             ),
           ]),
+          const SizedBox(height: 10),
+          OutlinedButton.icon(
+            onPressed: _pingAllBusy ? null : _probeAllNodes,
+            icon: const Icon(Icons.network_ping_rounded),
+            label: Text(tr('تست پینگ همه سرورها', 'Ping all servers')),
+          ),
           const SizedBox(height: 13),
           filters(),
           const SizedBox(height: 12),
