@@ -495,7 +495,7 @@ export function LegacySubscriptionsRuntimePage(){
           .legacy-subscriptions-page .mobile-subscription-usage>div>small{display:block;color:#93a6c8;margin-bottom:3px}
           .legacy-subscriptions-page .mobile-subscription-usage .user-cell b{font-size:12px}
           .legacy-subscriptions-page .mobile-subscription-actions{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
-          .legacy-subscriptions-page .mobile-action{display:flex;align-items:center;justify-content:center;gap:4px;min-width:0;min-height:43px;padding:8px 3px;color:#f8faff;font:700 12px inherit;border:1px solid rgba(121,145,192,.46);border-radius:12px;background:linear-gradient(180deg,#25334e,#141e34);cursor:pointer;white-space:nowrap}
+          .legacy-subscriptions-page .mobile-action{display:flex;align-items:center;justify-content:center;gap:4px;min-width:0;min-height:43px;padding:8px 3px;color:#f8faff;font-size:12px;font-weight:700;border:1px solid rgba(121,145,192,.46);border-radius:12px;background:linear-gradient(180deg,#25334e,#141e34);cursor:pointer;white-space:nowrap}
           .legacy-subscriptions-page .mobile-action-renew{background:linear-gradient(125deg,#137ee9,#1351b7);border-color:#309cfb}
           .legacy-subscriptions-page .mobile-action-connect{background:linear-gradient(125deg,#7226ad,#4934aa);border-color:#a05aff}
           .legacy-subscriptions-page .mobile-action:disabled{opacity:.5;cursor:not-allowed}
