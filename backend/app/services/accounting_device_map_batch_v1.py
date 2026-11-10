@@ -13,6 +13,21 @@ from . import quota_node_sync as canonical
 
 _CACHE_KEY = "twinpanel_accounting_device_map_batch_v1"
 
+# Only the dedicated V314 accounting session opts in. Other callers may have
+# already flushed data, so blindly committing their reads would change billing.
+_CLEAN_READ_LOOKUP_FLAG = "twinpanel_v314_clean_lookup_session"
+
+
+def _release_bulk_read_if_safe(db: Session) -> None:
+    if db.info.get(_CLEAN_READ_LOOKUP_FLAG) is not True:
+        return
+    if db.new or db.dirty or db.deleted:
+        return
+    # SessionLocal(expire_on_commit=False) keeps fully loaded credential and
+    # device fields readable while decrypting/indexing thousands of rows.
+    db.commit()
+
+
 
 def _candidate_node_ids(db: Session) -> list[int]:
     return [
@@ -103,6 +118,8 @@ def build_accounting_devices_by_node(
     )
     if not credentials:
         return result
+    # Release SQL SELECT read locks before CPU-heavy credential decryption.
+    _release_bulk_read_if_safe(db)
 
     decoded_by_credential: dict[int, dict[int, dict[str, Any]]] = {}
     legacy_subscription_ids: set[int] = set()
@@ -126,6 +143,7 @@ def build_accounting_devices_by_node(
             .filter(SubscriptionNode.subscription_id.in_(legacy_subscription_ids))
             .all()
         )
+        _release_bulk_read_if_safe(db)
         for subscription_id, node_id in rows:
             legacy_nodes_by_subscription.setdefault(int(subscription_id), set()).add(
                 int(node_id)
@@ -139,6 +157,7 @@ def build_accounting_devices_by_node(
             .order_by(QuotaDevice.id.asc())
             .all()
         )
+        _release_bulk_read_if_safe(db)
         for device in devices:
             key = (int(device.subscription_id), str(device.protocol or "").strip().lower())
             devices_by_key.setdefault(key, device)
