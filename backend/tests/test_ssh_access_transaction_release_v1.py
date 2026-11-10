@@ -81,6 +81,47 @@ class SSHAccessTransactionTests(IsolatedAsyncioTestCase):
         self.db.commit.assert_not_called()
         self.ssh.assert_not_awaited()
 
+    async def test_exit_direct_failure_can_use_iran_fallback_without_db_read_wait(self):
+        from app import node_bootstrap_control_v74 as v74
+        iran = SimpleNamespace(id=3, public_ip="198.51.100.3",
+                               node_type=NodeType.IRAN)
+        iran_connection = SimpleNamespace()
+        successes = []
+        async def connect_with_fallback(host, **kwargs):
+            # Both direct and Iran access records are read BEFORE the await.
+            self.assertEqual(self.db.commit.call_count, len(successes) + 1)
+            successes.append(host)
+            if host == "192.0.2.77":
+                raise ConnectionError("direct unavailable")
+            return iran_connection
+        with mock.patch.object(provision.asyncssh, "connect",
+                               side_effect=connect_with_fallback), \
+             mock.patch.object(v74.v72, "_first_management_iran", return_value=iran), \
+             mock.patch.object(v74.v72.NativeIranExitConnection,
+                               "open_with_private_key",
+                               new_callable=mock.AsyncMock,
+                               return_value="native-fallback") as native:
+            result = await connect_protocol_runtime(
+                self.node, self.db, close_read_transaction_before_ssh=True
+            )
+        self.assertEqual(result, "native-fallback")
+        self.assertEqual(successes, ["192.0.2.77", "198.51.100.3"])
+        self.assertEqual(self.db.commit.call_count, 2)
+        native.assert_awaited_once()
+
+    async def test_failed_worker_read_commit_aborts_before_connect_or_fallback(self):
+        from app import node_bootstrap_control_v74 as v74
+        self.db.commit.side_effect = RuntimeError("database unavailable")
+        with mock.patch.object(provision.asyncssh, "connect", self.ssh), \
+             mock.patch.object(v74.v72, "_first_management_iran") as find_iran:
+            with self.assertRaisesRegex(RuntimeError, "SSH_READ_TXN_CLOSE_FAILED"):
+                await connect_protocol_runtime(
+                    self.node, self.db, close_read_transaction_before_ssh=True
+                )
+        self.db.rollback.assert_called_once()
+        self.ssh.assert_not_awaited()
+        find_iran.assert_not_called()
+
     async def test_opt_in_retains_exact_original_ssh_security_options(self):
         with mock.patch.object(provision.asyncssh, "connect", self.ssh):
             await connect_protocol_runtime(
