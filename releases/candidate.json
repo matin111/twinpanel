@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.771",
-  "source_sha": "2cf4aeeffede25f1af0e534df3c7253098abf524",
+  "version": "1.1.0-rc.772",
+  "source_sha": "b923113abd87101235fbcb39f9cabbe4ec26cebc",
   "notes": {
-    "fa": "افزودن نود با پروتکل‌های سالم حتی هنگام شکست یک یا چند پروتکل، بدون نیاز به سلامت اجباری ۱۶/۱۶؛ ثبت اکانت و ساخت کانفیگ فقط برای پروتکل‌های تأییدشده و مجاز، نمایش وضعیت نصب ناقص، بازیابی نودهای ناقص با کنترل سلامت زنده. حفظ تمام اصلاحات rc.770 و عدم تغییر اطلاعات اشتراک و کلیدها.",
-    "en": "Admit newly installed Exits with their individually live-verified supported protocol subset, without requiring all 16. Entitlement-scoped central membership and credential staging, explicit partial status and guarded recovery of failed hidden nodes; preserve all rc.770 fixes and customer identities."
+    "fa": "اصلاح بازیابی نودهای ناقص با تأیید زنده پروتکل‌های سالم بدون الزام ۱۶ از ۱۶؛ حفظ پروتکل‌های ناموفق در وضعیت غیرفعال. مناسب فعال‌سازی فنلاند با ۱۵ پروتکل سالم بدون نصب مجدد؛ حفظ کلیه اصلاحات RC771 و تنظیمات کاربر.",
+    "en": "Fix live-verified recovery of partially installed Exits without requiring all 16 protocols, preserving failed listeners disabled and scoped subscription entitlements; retains RC771 and all customer identities."
   }
 }
