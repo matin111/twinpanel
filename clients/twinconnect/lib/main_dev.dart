@@ -398,7 +398,6 @@ class _TwinConnectDevAppState extends State<TwinConnectDevApp> {
             ]),
           ),
         ),
-            ),
           ),
         ),
       );
