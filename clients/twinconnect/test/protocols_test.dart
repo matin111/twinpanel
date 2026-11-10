@@ -173,7 +173,7 @@ void main() {
     );
   });
 
-  testWidgets('read-only catalog displays 16 protocols, never connect action',
+  testWidgets('app shows only plan-selected protocols in horizontal chips',
       (tester) async {
     final catalog = PanelProtocolCatalog.fromJson(_catalog());
     await tester.pumpWidget(MaterialApp(
@@ -184,7 +184,11 @@ void main() {
       ),
     ));
     expect(find.byKey(const Key('protocolCatalogCard')), findsOneWidget);
-    expect(find.byType(ListTile).evaluate().length, 16);
+    expect(find.byKey(const Key('allowedProtocolFilters')), findsOneWidget);
+    expect(find.byType(ListTile), findsNothing);
+    expect(find.byKey(const Key('protocol_l2tp')), findsNothing);
+    expect(find.byKey(const Key('protocol_openvpn')), findsOneWidget);
+    expect(catalog.entries.where((entry) => entry.selected).length, 15);
     expect(find.byType(FilledButton), findsNothing);
   });
 }

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -8,13 +7,13 @@ import 'brand_theme.dart';
 import 'tenant_api.dart';
 import 'tenant_models.dart';
 import 'protocols.dart';
-import 'protocol_catalog_view.dart';
-import 'protocol_strings.dart';
 import 'native_vpn_bridge.dart';
-import 'android_connection_card.dart';
-import 'windows_preview_fixture.dart';
 import 'vpn_settings.dart';
 import 'vpn_strings.dart';
+import 'server_inventory.dart';
+import 'ambient_background.dart';
+import 'interactive_glass_card.dart';
+import 'authenticated_dashboard.dart';
 
 void main() => runApp(const TwinConnectApp());
 
@@ -119,27 +118,26 @@ class TwinConnectHome extends StatefulWidget {
 class _TwinConnectHomeState extends State<TwinConnectHome> {
   final _formKey = GlobalKey<FormState>();
   final _username = TextEditingController();
-  final _subscription = TextEditingController();
-  final _tenantCode = TextEditingController();
+  final _password = TextEditingController();
 
   bool _loading = false;
   String? _errorCode;
   BrandPreview? _brand;
   PanelDirectoryEntry? _confirmedPanel;
   String? _confirmedUsername;
-  String? _confirmedToken;
+  String? _confirmedSessionToken;
   PanelProtocolCatalog? _catalog;
+  AppServerInventory? _servers;
+  bool _refreshingServers = false;
   NativeProtocolReadiness _nativeProtocols =
       const NativeProtocolReadiness(supportedCodes: {});
   bool _protocolCatalogUnavailable = false;
-  bool _offlineDemo = false;
   int _lookupSerial = 0;
 
   @override
   void dispose() {
     _username.dispose();
-    _subscription.dispose();
-    _tenantCode.dispose();
+    _password.dispose();
     super.dispose();
   }
 
@@ -151,45 +149,45 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
       _loading = true;
       _errorCode = null;
       _brand = null;
-      _offlineDemo = false;
       widget.onBrandChanged(null);
       _confirmedPanel = null;
       _confirmedUsername = null;
-      _confirmedToken = null;
+      _confirmedSessionToken = null;
       _catalog = null;
+      _servers = null;
+      _refreshingServers = false;
       _protocolCatalogUnavailable = false;
       _nativeProtocols = const NativeProtocolReadiness(supportedCodes: {});
     });
 
     try {
       final username = _username.text.trim();
-      final namespace = TenantIdentity.parseNamespace(
-        username,
-        _tenantCode.text,
-      );
-      final token = SubscriptionInput.tokenFromInput(_subscription.text);
+      final namespace = TenantIdentity.parseNamespace(username, '');
+      final password = _password.text;
       final api = TenantApi.fromBuildConfig();
       final panel = await api.resolve(namespace);
-      final brand = await api.loadBrand(
+      final loggedIn = await api.login(
         panel: panel,
         username: username,
-        shareToken: token,
+        password: password,
       );
+      final brand = loggedIn.brand;
       if (!mounted || serial != _lookupSerial) return;
       setState(() {
         _brand = brand;
         widget.onBrandChanged(brand);
         _confirmedPanel = panel;
         _confirmedUsername = username;
-        _confirmedToken = token;
+        _confirmedSessionToken = loggedIn.sessionToken;
       });
+      // Refresh server inventory after authenticated login; failures are isolated.
+      _refreshServers();
       // Subscription metadata is not secret and is fetched independently of
       // brand details. A temporary metadata error must not hide renewal links.
       try {
-        final catalog = await api.loadProtocolCatalog(
+        final catalog = await api.loadSessionProtocolCatalog(
           panel: panel,
-          username: username,
-          shareToken: token,
+          sessionToken: loggedIn.sessionToken,
         );
         final native = await NativeVpnBridge.protocolReadiness();
         if (mounted && serial == _lookupSerial) {
@@ -210,27 +208,44 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
     } catch (_) {
       if (mounted && serial == _lookupSerial) setState(() => _errorCode = 'UNKNOWN_ERROR');
     } finally {
+      _password.clear();
       if (mounted && serial == _lookupSerial) setState(() => _loading = false);
     }
   }
 
-  void _showOfflineDemo() {
-    ++_lookupSerial; // Do not allow a late network response to replace demo state.
-    FocusScope.of(context).unfocus();
+  Future<void> _refreshServers() async {
+    final panel = _confirmedPanel;
+    final session = _confirmedSessionToken;
+    if (panel == null || session == null || _refreshingServers) return;
+    final serial = _lookupSerial;
     setState(() {
-      _offlineDemo = true;
-      _errorCode = null;
-      _loading = false;
-      _confirmedPanel = null;
-      _confirmedUsername = null;
-      _confirmedToken = null;
-      _brand = WindowsPreviewFixture.brand();
-      widget.onBrandChanged(_brand);
-      _catalog = WindowsPreviewFixture.protocolCatalog();
-      _nativeProtocols =
-          const NativeProtocolReadiness(supportedCodes: {});
-      _protocolCatalogUnavailable = false;
+      _refreshingServers = true;
     });
+    try {
+      final api = TenantApi.fromBuildConfig();
+      // Server refresh is also a plan/protocol entitlement refresh.
+      // Publish both together so removed permissions never remain in the UI
+      // alongside newly fetched servers.
+      final catalog = await api.loadSessionProtocolCatalog(
+        panel: panel, sessionToken: session,
+      );
+      final inventory = await api.refreshSessionServers(
+        panel: panel, sessionToken: session,
+      );
+      if (!mounted || serial != _lookupSerial) return;
+      setState(() {
+        _catalog = catalog;
+        _servers = inventory;
+        _protocolCatalogUnavailable = false;
+      });
+    } catch (_) {
+      if (!mounted || serial != _lookupSerial) return;
+      setState(() => _protocolCatalogUnavailable = true);
+    } finally {
+      if (mounted && serial == _lookupSerial) {
+        setState(() => _refreshingServers = false);
+      }
+    }
   }
 
   @override
@@ -238,9 +253,88 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
     final strings = AppStrings.of(context);
     final brand = _brand;
 
+    final accent = Theme.of(context).colorScheme.primary;
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final foreground = Theme.of(context).colorScheme.onSurface;
+
+    // Strictly separate sign-in and the authenticated four-page application.
+    // Never render the old BrandDetails / coming-soon screen after login.
+    if (brand != null &&
+        _confirmedPanel != null &&
+        _confirmedUsername != null &&
+        _confirmedSessionToken != null) {
+      return AuthenticatedDashboard(
+        key: const Key('authenticatedDashboard'),
+        panel: _confirmedPanel!,
+        username: _confirmedUsername!,
+        sessionToken: _confirmedSessionToken!,
+        brand: brand,
+        servers: _servers,
+        catalog: _catalog,
+        nativeProtocols: _nativeProtocols,
+        refreshServers: () { _refreshServers(); },
+        refreshingServers: _refreshingServers,
+        protocolCatalogUnavailable: _protocolCatalogUnavailable,
+        onLogout: () {
+          ++_lookupSerial;
+          _password.clear();
+          _username.clear();
+          widget.onBrandChanged(null);
+          setState(() {
+            _brand = null;
+            _confirmedPanel = null;
+            _confirmedUsername = null;
+            _confirmedSessionToken = null;
+            _catalog = null;
+            _servers = null;
+            _errorCode = null;
+                  _protocolCatalogUnavailable = false;
+            _refreshingServers = false;
+            _nativeProtocols =
+                const NativeProtocolReadiness(supportedCodes: {});
+          });
+        },
+      );
+    }
+
     return Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
-        title: Text(strings.appTitle),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        titleSpacing: 24,
+        // Before authentication, never display the app brand, reseller
+        // brand, panel brand or a customer-identifying title.
+        title: brand == null
+            ? const SizedBox.shrink()
+            : Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              height: 35,
+              width: 35,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [accent, Theme.of(context).colorScheme.secondary],
+                ),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.bolt_rounded, color: Colors.white, size: 23),
+            ),
+            const SizedBox(width: 10),
+            Text(
+              strings.appTitle,
+              style: const TextStyle(
+                fontWeight: FontWeight.w800,
+                fontSize: 19,
+                letterSpacing: -0.5,
+              ),
+            ),
+          ],
+        ),
         actions: [
           IconButton(
             key: const Key('vpnSettingsButton'),
@@ -250,27 +344,19 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
                 builder: (_) => VpnSettingsScreen(
                   brand: brand,
                   tenant: brand?.namespace ?? '',
-                  account: _offlineDemo
-                      ? 'offline-demo-only'
-                      : (brand == null ? '' : _username.text.trim()),
+                  account: brand == null ? '' : _username.text.trim(),
                 ),
               ),
             ),
-            icon: const Icon(Icons.tune_outlined),
-          ),
-          Tooltip(
-            message: strings.engineNotReady,
-            child: const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 8),
-              child: Icon(Icons.shield_outlined),
-            ),
+            icon: const Icon(Icons.tune_rounded),
           ),
           Padding(
-            padding: const EdgeInsetsDirectional.only(end: 12),
+            padding: const EdgeInsetsDirectional.only(start: 5, end: 18),
             child: DropdownButtonHideUnderline(
               child: DropdownButton<AppLanguage>(
                 key: const Key('languagePicker'),
                 value: widget.language,
+                icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 19),
                 onChanged: (value) {
                   if (value != null) widget.onLanguageChanged(value);
                 },
@@ -293,304 +379,237 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
           ),
         ],
       ),
-      body: BrandBackground(
-        brand: brand,
-        child: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 740),
-            child: ListView(
-              padding: const EdgeInsets.all(18),
-              children: [
-                const SizedBox(height: 14),
-                const Icon(Icons.shield_moon_outlined, size: 60),
-                const SizedBox(height: 12),
-                Text(
-                  strings.appHeadline,
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.headlineSmall,
+      body: TwinConnectAmbientBackground(
+        dark: dark,
+        child: Stack(
+          children: [
+            Positioned(
+              right: -140,
+              top: -160,
+              child: IgnorePointer(
+                child: Container(
+                  width: 560,
+                  height: 560,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      colors: [
+                        accent.withValues(alpha: dark ? 0.25 : 0.12),
+                        accent.withValues(alpha: 0),
+                      ],
+                    ),
+                  ),
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  strings.appIntroduction,
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.bodyMedium,
+              ),
+            ),
+            Positioned(
+              left: -160,
+              bottom: -250,
+              child: IgnorePointer(
+                child: Container(
+                  width: 550,
+                  height: 550,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      colors: [
+                        Theme.of(context).colorScheme.secondary.withValues(
+                          alpha: dark ? 0.17 : 0.10,
+                        ),
+                        Colors.transparent,
+                      ],
+                    ),
+                  ),
                 ),
-                const SizedBox(height: 22),
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(18),
-                    child: Form(
-                      key: _formKey,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Text(
-                            strings.identifyAccount,
-                            style: Theme.of(context).textTheme.titleLarge,
-                          ),
-                          const SizedBox(height: 18),
-                          TextFormField(
-                            key: const Key('accountUsername'),
-                            controller: _username,
-                            textDirection: TextDirection.ltr,
-                            decoration: InputDecoration(
-                              labelText: strings.accountUsername,
-                              hintText: strings.accountUsernameHint,
-                              border: const OutlineInputBorder(),
-                            ),
-                            validator: (text) =>
-                                (text == null || text.trim().isEmpty)
-                                    ? strings.usernameRequired
-                                    : null,
-                          ),
-                          const SizedBox(height: 13),
-                          TextFormField(
-                            key: const Key('subscriptionLink'),
-                            controller: _subscription,
-                            textDirection: TextDirection.ltr,
-                            decoration: InputDecoration(
-                              labelText: strings.subscription,
-                              hintText: strings.subscriptionHint,
-                              border: const OutlineInputBorder(),
-                            ),
-                            validator: (text) =>
-                                (text == null || text.trim().isEmpty)
-                                    ? strings.subscriptionRequired
-                                    : null,
-                          ),
-                          const SizedBox(height: 13),
-                          TextFormField(
-                            key: const Key('tenantCode'),
-                            controller: _tenantCode,
-                            textDirection: TextDirection.ltr,
-                            decoration: InputDecoration(
-                              labelText: strings.tenantCode,
-                              hintText: strings.tenantCodeHint,
-                              border: const OutlineInputBorder(),
+              ),
+            ),
+            SafeArea(
+              child: LayoutBuilder(
+                builder: (context, constraints) => Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 520),
+                    child: ListView(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 20,
+                      ),
+                      shrinkWrap: brand == null,
+                      children: [
+                        SizedBox(
+                          height: brand == null
+                              ? (constraints.maxHeight > 640 ? 38 : 8)
+                              : 8,
+                        ),
+                        TweenAnimationBuilder<double>(
+                          key: const Key('loginEntranceAnimation'),
+                          tween: Tween(begin: 0, end: 1),
+                          duration: const Duration(milliseconds: 720),
+                          curve: Curves.easeOutCubic,
+                          builder: (context, progress, child) => Opacity(
+                            opacity: progress,
+                            child: Transform.translate(
+                              offset: Offset(0, 22 * (1 - progress)),
+                              child: child,
                             ),
                           ),
-                          const SizedBox(height: 18),
-                          FilledButton.icon(
-                            key: const Key('identifyButton'),
-                            onPressed: _loading ? null : _identify,
-                            icon: _loading
-                                ? const SizedBox.square(
-                                    dimension: 18,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
+                          child: TwinConnectGlassCard(
+                            key: const Key('loginGlassCard'),
+                            dark: dark,
+                            radius: 28,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 30,
+                              vertical: 30,
+                            ),
+                            child: Form(
+                            key: _formKey,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Align(
+                                  alignment: AlignmentDirectional.centerStart,
+                                  child: Container(
+                                    height: 48,
+                                    width: 48,
+                                    decoration: BoxDecoration(
+                                      color: accent.withValues(alpha: 0.13),
+                                      border: Border.all(
+                                        color: accent.withValues(alpha: 0.25),
+                                      ),
+                                      borderRadius: BorderRadius.circular(17),
                                     ),
-                                  )
-                                : const Icon(Icons.verified_user_outlined),
-                            label: Text(strings.identifyButton),
+                                    child: Icon(
+                                      Icons.shield_moon_outlined,
+                                      color: accent,
+                                      size: 25,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 18),
+                                Text(
+                                  strings.appLoginTitle,
+                                  style: TextStyle(
+                                    color: foreground,
+                                    fontSize: 26,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: -0.6,
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  strings.appLoginGuide,
+                                  style: TextStyle(
+                                    color: foreground.withValues(alpha: 0.65),
+                                    fontSize: 13,
+                                  ),
+                                ),
+                                const SizedBox(height: 25),
+                                TextFormField(
+                                  key: const Key('accountUsername'),
+                                  controller: _username,
+                                  textDirection: TextDirection.ltr,
+                                  autocorrect: false,
+                                  decoration: InputDecoration(
+                                    labelText: strings.appUsername,
+                                    prefixIcon: const Icon(Icons.person_outline_rounded),
+                                    filled: true,
+                                    fillColor: foreground.withValues(alpha: 0.035),
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 16, vertical: 18,
+                                    ),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(15),
+                                    ),
+                                  ),
+                                  validator: (text) =>
+                                      (text == null || text.trim().isEmpty)
+                                          ? strings.usernameRequired
+                                          : null,
+                                ),
+                                const SizedBox(height: 15),
+                                TextFormField(
+                                  key: const Key('appPassword'),
+                                  controller: _password,
+                                  obscureText: true,
+                                  textDirection: TextDirection.ltr,
+                                  decoration: InputDecoration(
+                                    labelText: strings.appPassword,
+                                    prefixIcon: const Icon(Icons.lock_outline_rounded),
+                                    filled: true,
+                                    fillColor: foreground.withValues(alpha: 0.035),
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 16, vertical: 18,
+                                    ),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(15),
+                                    ),
+                                  ),
+                                  validator: (text) =>
+                                      (text == null || text.isEmpty)
+                                          ? strings.appPasswordRequired
+                                          : null,
+                                  onFieldSubmitted: (_) => _identify(),
+                                ),
+                                const SizedBox(height: 22),
+                                SizedBox(
+                                  height: 52,
+                                  child: FilledButton(
+                                    key: const Key('identifyButton'),
+                                    style: FilledButton.styleFrom(
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(15),
+                                      ),
+                                      elevation: 0,
+                                    ),
+                                    onPressed: _loading ? null : _identify,
+                                    child: _loading
+                                        ? const SizedBox.square(
+                                            dimension: 20,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              color: Colors.white,
+                                            ),
+                                          )
+                                        : Row(
+                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            children: [
+                                              Text(
+                                                strings.appLoginButton,
+                                                style: const TextStyle(
+                                                  fontSize: 15,
+                                                  fontWeight: FontWeight.w700,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 10),
+                                              const Icon(Icons.arrow_forward_rounded,
+                                                  size: 19),
+                                            ],
+                                          ),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
+                          ),
+                        ),
+                        if (_errorCode != null) ...[
                           const SizedBox(height: 12),
-                          OutlinedButton.icon(
-                            key: const Key('windowsDemoButton'),
-                            onPressed: _showOfflineDemo,
-                            icon: const Icon(Icons.desktop_windows_outlined),
-                            label: Text(strings.previewButton),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            strings.previewSubtitle,
+                          SelectableText(
+                            strings.error(_errorCode!),
                             textAlign: TextAlign.center,
-                            style: Theme.of(context).textTheme.bodySmall,
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.error,
+                            ),
                           ),
                         ],
-                      ),
+
+                      ],
                     ),
                   ),
                 ),
-                if (_errorCode != null) ...[
-                  const SizedBox(height: 12),
-                  SelectableText(
-                    strings.error(_errorCode!),
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.error,
-                    ),
-                  ),
-                ],
-                if (brand != null) ...[
-                  const SizedBox(height: 20),
-                  if (_offlineDemo) ...[
-                    Card(
-                      key: const Key('offlineDemoBanner'),
-                      child: Padding(
-                        padding: const EdgeInsets.all(14),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.info_outline),
-                            const SizedBox(width: 12),
-                            Expanded(child: Text(strings.previewBanner)),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                  ],
-                  BrandDetails(brand: brand),
-                  if (_protocolCatalogUnavailable) ...[
-                    const SizedBox(height: 16),
-                    Text(strings.protocolCatalogUnavailable),
-                  ],
-                  if (_catalog != null) ...[
-                    const SizedBox(height: 20),
-                    ProtocolCatalogCard(
-                      catalog: _catalog!,
-                      native: _nativeProtocols,
-                    ),
-                    if (_confirmedPanel != null &&
-                        _confirmedUsername != null &&
-                        _confirmedToken != null) ...[
-                      const SizedBox(height: 12),
-                      AndroidConnectionCard(
-                        key: ValueKey(_confirmedUsername),
-                        panel: _confirmedPanel!,
-                        username: _confirmedUsername!,
-                        shareToken: _confirmedToken!,
-                        catalog: _catalog!,
-                        native: _nativeProtocols,
-                      ),
-                    ],
-                  ],
-                ],
-                const SizedBox(height: 20),
-                Text(
-                  strings.windowsEnginePending,
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  strings.developmentNotice,
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-      ),
-    );
-  }
-}
-
-class BrandDetails extends StatelessWidget {
-  const BrandDetails({required this.brand, super.key});
-
-  final BrandPreview brand;
-
-  Color get _brandColor => Color(
-        int.parse('FF${brand.primaryColor.substring(1)}', radix: 16),
-      );
-
-  @override
-  Widget build(BuildContext context) {
-    final strings = AppStrings.of(context);
-    final status = switch (brand.accountStatus) {
-      'expired' => strings.statusExpired,
-      'active' => strings.statusActive,
-      _ => strings.statusOther(brand.accountStatus),
-    };
-
-    return Theme(
-      data: Theme.of(context).copyWith(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: _brandColor,
-          brightness: Theme.of(context).brightness,
-        ),
-      ),
-      child: Card(
-        key: const Key('brandCard'),
-        child: Padding(
-          padding: const EdgeInsets.all(18),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                children: [
-                  CircleAvatar(
-                    radius: 26,
-                    backgroundColor: _brandColor,
-                    child: const Icon(Icons.shield, color: Colors.white),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      brand.brandName,
-                      style: Theme.of(context).textTheme.headlineSmall,
-                    ),
-                  ),
-                ],
               ),
-              const SizedBox(height: 12),
-              Text(status),
-              const Divider(height: 30),
-              _CopyValue(label: strings.supportTelegram, value: brand.telegramUrl),
-              _CopyValue(label: strings.renewalLink, value: brand.renewalUrl),
-              _CopyValue(label: strings.supportPhone, value: brand.phone),
-              _CopyValue(label: strings.website, value: brand.websiteUrl),
-              if (brand.supportText != null) ...[
-                const SizedBox(height: 8),
-                Text(brand.supportText!),
-              ],
-              const SizedBox(height: 16),
-              FilledButton.icon(
-                onPressed: null,
-                icon: const Icon(Icons.power_settings_new),
-                label: Text(strings.connectionDisabled),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
-      ),
-    );
-  }
-}
-
-class _CopyValue extends StatelessWidget {
-  const _CopyValue({required this.label, required this.value});
-
-  final String label;
-  final String? value;
-
-  @override
-  Widget build(BuildContext context) {
-    final text = value;
-    if (text == null || text.isEmpty) return const SizedBox.shrink();
-    final strings = AppStrings.of(context);
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 125,
-            child: Text(
-              label,
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-          ),
-          Expanded(
-            child: SelectableText(
-              text,
-              textDirection: TextDirection.ltr,
-            ),
-          ),
-          IconButton(
-            tooltip: strings.copyTooltip(label),
-            onPressed: () async {
-              await Clipboard.setData(ClipboardData(text: text));
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(strings.copied(label))),
-                );
-              }
-            },
-            icon: const Icon(Icons.copy_outlined),
-          ),
-        ],
       ),
     );
   }

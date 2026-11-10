@@ -5,9 +5,9 @@ import 'package:flutter/services.dart';
 import 'vpn_policy.dart';
 import 'protocols.dart';
 
-/// Platform channel to future OS-native VPN engines.
+/// Versioned channel for OS-native VPN capabilities.
 ///
-/// This Flutter build intentionally has NO native tunnel implementation yet.
+/// Windows now has a real native channel, but no tunnel engine yet.
 /// Missing plugins, incompatible contract versions, or errors always return
 /// "unavailable" rather than making false kill-switch/connection claims.
 class NativeVpnBridge {
@@ -24,9 +24,8 @@ class NativeVpnBridge {
 
   static Future<NativeVpnCapabilities> probe() async {
     final os = platform;
-    if (os != VpnPlatform.android) {
-      // No native Windows/iOS/macOS engine is bundled in this preview.
-      // Never wait for a nonexistent desktop platform-channel implementation.
+    if (os != VpnPlatform.android && os != VpnPlatform.windows) {
+      // iOS/macOS have no native VPN bridge yet.
       return NativeVpnCapabilities.unavailable(os);
     }
     try {
@@ -49,8 +48,8 @@ class NativeVpnBridge {
 
   static Future<NativeProtocolReadiness> protocolReadiness() async {
     // Missing plugin is expected until real protocol engines are built.
-    if (platform != VpnPlatform.android) {
-      // No desktop protocol adapter has been installed in this build.
+    if (platform != VpnPlatform.android && platform != VpnPlatform.windows) {
+      // No iOS/macOS protocol adapter has been installed.
       return const NativeProtocolReadiness(supportedCodes: {});
     }
     // This additional OS-level probe is mandatory: a plugin must not report

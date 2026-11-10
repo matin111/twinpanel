@@ -19,6 +19,11 @@ jobs:
     defaults:
       run:
         working-directory: clients/twinconnect
+    env:
+      # Temporary panel-hosted HTTPS mirror of the vendor directory for preview.
+      # A dedicated owned HTTPS domain must replace this before production.
+      # Using a repository variable takes precedence without modifying code.
+      TWINCONNECT_DIRECTORY_URL: ${{ vars.TWINCONNECT_DIRECTORY_URL || 'https://panel.matindnspro.sbs' }}
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
@@ -27,14 +32,33 @@ jobs:
           cache: true
       - name: Generate native Windows Flutter project
         run: flutter create --platforms=windows --org com.twinpanel --project-name twinconnect .
+      - name: Install fail-closed Windows VPN native bridge
+        run: python tools/install_windows_native.py
       - name: Fetch Flutter dependencies
         run: flutter pub get
       - name: Verify Dart compilation and tests
         run: |
           flutter analyze
           flutter test --reporter expanded
+      - name: Verify HTTPS directory is configured and reachable
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $origin = [uri]$env:TWINCONNECT_DIRECTORY_URL
+          if ($origin.Scheme -ne "https" -or !$origin.Host -or $origin.UserInfo -or
+              $origin.Query -or $origin.Fragment -or $origin.AbsolutePath -ne "/") {
+            throw "TWINCONNECT_DIRECTORY_URL must be a clean HTTPS origin"
+          }
+          $probe = "$($origin.AbsoluteUri.TrimEnd('/'))/v1/app/resolve/TP934FE9"
+          $result = Invoke-RestMethod -Uri $probe -Method Get -TimeoutSec 15
+          if ($result.namespace -ne "TP934FE9" -or
+              $result.api_origin -ne "https://panel.matindnspro.sbs") {
+            throw "Tenant directory contract invalid or panel registration missing"
+          }
+          Write-Host "Verified HTTPS directory and registered panel namespace"
       - name: Build Windows x64 standalone directory
-        run: flutter build windows --release
+        shell: pwsh
+        run: flutter build windows --release "--dart-define=TWINCONNECT_DIRECTORY_URL=$env:TWINCONNECT_DIRECTORY_URL"
       - name: Package portable ZIP and usage instructions
         shell: pwsh
         run: |
@@ -49,24 +73,69 @@ jobs:
           
           1. Extract the complete ZIP to a folder (do not run from inside ZIP).
           2. Run twinconnect.exe from that folder. Keep DLL/data files beside it.
-          3. Click "Explore Windows demo" or "مشاهده نسخه آزمایشی ویندوز".
-          4. Test Persian/English, dark/light, brand, 16 protocol statuses and routing preferences.
-          5. This is an unsigned TEST build. If Windows SmartScreen warns,
-             only run it if you trust the GitHub source and this artifact.
-          
+          3. For UI-only demo: use the Dev Dashboard artifact instead.
+          4. For experimental REAL WireGuard:
+             - Install official WireGuard for Windows from wireguard.com/install.
+             - Run THIS Portable EXE as Administrator (Windows tunnel service).
+             - Sign in with a valid TwinConnect APP username/password.
+             - The vendor directory URL and licensed panel backend must be
+               deployed and reachable over HTTPS at build time.
+             - Pick an ONLINE authorized WireGuard server and Start.
+             - Read the actual service/handshake status; never assume that
+               an interface-up state means internet connectivity.
+             - Stop the tunnel before closing the app, and check for leaks.
+          5. Only one TwinConnect WireGuard tunnel is supported per PC.
+          6. This is an unsigned TEST build. Only run builds you trust.
+
           IMPORTANT:
-          - NO Windows VPN engine is installed in this preview.
-          - WireGuard and Cisco/OpenConnect CANNOT connect from this ZIP.
-          - The offline sample is fictional; no real subscription data is used.
-          - Live account verification needs the separately deployed license
-            registry and panel backend; it is not activated here.
-          - No administrator rights or driver installation is needed.
+          - No WireGuard software or drivers are bundled with TwinConnect.
+          - Cisco/OpenConnect and the other 15 protocols have no Windows
+            tunnel adapter in this preview.
+          - Only one-peer WireGuard profiles with DNS and complete IPv4
+            default coverage are accepted. The native adapter derives
+            protected /0 routes in memory from panel split-/1 routes; it
+            does not modify server endpoints, keys or panel records.
+          - The native adapter writes a DPAPI-encrypted file with restrictive
+            admin/SYSTEM ACLs; no plain private-key config is saved to disk.
+          - The directory URL is built in for this development preview.
+          - Until the project gets an owned HTTPS vendor domain, the
+            test directory uses an existing HTTPS panel reverse proxy.
+            Do not use it as a permanent customer deployment address.
+          - The Dev Dashboard artifact remains entirely offline.
+          - Do not deploy these experimental binaries to customers yet.
           '@ | Set-Content -Path (Join-Path $release "README-TEST.txt") -Encoding UTF8
           $zip = Join-Path (Get-Location) "TwinConnect-Windows-Preview.zip"
           if (Test-Path $zip) { Remove-Item $zip -Force }
           Compress-Archive -Path (Join-Path $release "*") -DestinationPath $zip -CompressionLevel Optimal
           if (!(Test-Path $zip)) { throw "ZIP packaging failed" }
           Write-Host ("Windows ZIP bytes: " + (Get-Item $zip).Length)
+      - name: Build isolated Windows Dev dashboard (no sign-in)
+        shell: pwsh
+        run: flutter build windows --release --target lib/main_dev.dart
+      - name: Package Windows Dev dashboard
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $release = Join-Path (Get-Location) "build/windows/x64/runner/Release"
+          if (!(Test-Path (Join-Path $release "twinconnect.exe"))) {
+            throw "Dev executable missing"
+          }
+          @'
+          TwinConnect DEV dashboard - Windows x64
+          Extract every file, then start twinconnect.exe.
+          Offline visual test: navigation, protocol filters, theme and language.
+          No account, license, VPN secrets or real connection is included.
+          This is a development-only build. Do not distribute to customers.
+          '@ | Set-Content -Path (Join-Path $release "README-DEV.txt") -Encoding UTF8
+          $zip = Join-Path (Get-Location) "TwinConnect-Windows-Dev.zip"
+          if (Test-Path $zip) { Remove-Item $zip -Force }
+          Compress-Archive -Path (Join-Path $release "*") -DestinationPath $zip -CompressionLevel Optimal
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TwinConnect-Windows-x64-Dev-Dashboard
+          path: clients/twinconnect/TwinConnect-Windows-Dev.zip
+          if-no-files-found: error
+          retention-days: 14
       - uses: actions/upload-artifact@v4
         with:
           name: TwinConnect-Windows-x64-Portable

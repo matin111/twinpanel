@@ -11,59 +11,37 @@ void main() {
         'twinconnect_ui_language_v1': 'en',
       }));
 
-  test('offline sample has 16 protocols without any real account secrets', () {
+  test('development sample has 16 protocols and no active engine', () {
     final brand = WindowsPreviewFixture.brand();
     final catalog = WindowsPreviewFixture.protocolCatalog();
-
-    expect(brand.namespace, WindowsPreviewFixture.namespace);
     expect(brand.brandName, 'TwinConnect Demo');
-    expect(brand.accountStatus, 'demo');
     expect(catalog.entries.length, 16);
-    expect(catalog.entries.map((e) => e.protocol.code).toSet().length, 16);
-    expect(catalog.entries.every((e) => e.selected), true);
     expect(catalog.entries.every((e) => !e.clientEngineReady), true);
-    expect(catalog.entries
-        .where((e) => e.configRecordPresent)
-        .map((e) => e.protocol.code)
-        .toSet(), {'wireguard', 'cisco', 'v2ray'});
   });
 
-  testWidgets('offline Windows demo opens without user credentials',
+  testWidgets('production login has only username, password and sign-in',
       (tester) async {
     await tester.pumpWidget(const TwinConnectApp());
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const Key('windowsDemoButton')), findsOneWidget);
-    await tester.drag(find.byType(ListView).first, const Offset(0, -260));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('windowsDemoButton')));
-    await tester.pumpAndSettle();
-
-    await tester.scrollUntilVisible(
-      find.byKey(const Key('offlineDemoBanner')), 280,
-      scrollable: find.byType(Scrollable).first,
-    );
-    expect(find.byKey(const Key('offlineDemoBanner')), findsOneWidget);
-    expect(
-      find.textContaining('Sample data only'),
-      findsOneWidget,
-    );
+    expect(find.byKey(const Key('accountUsername')), findsOneWidget);
+    expect(find.byKey(const Key('appPassword')), findsOneWidget);
+    expect(find.byKey(const Key('identifyButton')), findsOneWidget);
+    expect(find.text('Sign in'), findsWidgets);
+    expect(find.byKey(const Key('subscriptionLink')), findsNothing);
+    expect(find.byKey(const Key('tenantCode')), findsNothing);
+    expect(find.byKey(const Key('windowsDemoButton')), findsNothing);
+    expect(find.byKey(const Key('offlineDemoBanner')), findsNothing);
+    expect(find.textContaining('One app, many brands'), findsNothing);
   });
 
-  testWidgets('offline demo can inspect settings without live VPN engines',
-      (tester) async {
+  testWidgets('app password is masked', (tester) async {
     await tester.pumpWidget(const TwinConnectApp());
     await tester.pumpAndSettle();
-    await tester.drag(find.byType(ListView).first, const Offset(0, -260));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('windowsDemoButton')));
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.byKey(const Key('vpnSettingsButton')));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Advanced VPN settings'), findsOneWidget);
-    expect(find.byKey(const Key('vpnNotActiveNotice')), findsOneWidget);
-    expect(find.byKey(const Key('vpnMode_fullTunnel')), findsOneWidget);
+    final field = find.byKey(const Key('appPassword'));
+    final editable = tester.widget<EditableText>(
+      find.descendant(of: field, matching: find.byType(EditableText)),
+    );
+    expect(editable.obscureText, true);
   });
 }

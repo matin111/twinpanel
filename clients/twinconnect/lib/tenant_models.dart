@@ -3,9 +3,9 @@
 /// A namespace is a *routing hint*, never proof of subscription ownership.
 class TenantIdentity {
   static final RegExp _userPattern = RegExp(
-    r'^(TP[A-F0-9]{16})_(?:R[0-9A-F]+|A)_[A-Za-z0-9_.-]+$',
+    r'^(TP(?:[A-F0-9]{6}|[A-F0-9]{8}|[A-F0-9]{10}|[A-F0-9]{12}|[A-F0-9]{14}|[A-F0-9]{16}))_(?:R[0-9A-F]+|A)_[A-Za-z0-9_.-]+$',
   );
-  static final RegExp _namespace = RegExp(r'^TP[A-F0-9]{16}$');
+  static final RegExp _namespace = RegExp(r'^TP(?:[A-F0-9]{6}|[A-F0-9]{8}|[A-F0-9]{10}|[A-F0-9]{12}|[A-F0-9]{14}|[A-F0-9]{16})$');
 
   static String? namespaceFromUsername(String username) {
     final match = _userPattern.firstMatch(username.trim().toUpperCase());
@@ -76,7 +76,7 @@ class PanelDirectoryEntry {
     if (namespace is! String || originText is! String) {
       throw const FormatException('INVALID_DIRECTORY_RESPONSE');
     }
-    if (!RegExp(r'^TP[A-F0-9]{16}$').hasMatch(namespace.toUpperCase())) {
+    if (!RegExp(r'^TP(?:[A-F0-9]{6}|[A-F0-9]{8}|[A-F0-9]{10}|[A-F0-9]{12}|[A-F0-9]{14}|[A-F0-9]{16})$').hasMatch(namespace.toUpperCase())) {
       throw const FormatException('INVALID_DIRECTORY_RESPONSE');
     }
     return PanelDirectoryEntry(

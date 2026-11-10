@@ -8,8 +8,7 @@ import 'vpn_policy.dart';
 import 'vpn_policy_store.dart';
 import 'vpn_strings.dart';
 
-/// Desired settings only. There is no native tunnel implementation in the
-/// current TwinConnect preview; no controls on this page change OS networking.
+/// Controls are enabled only for verified native capabilities.
 class VpnSettingsScreen extends StatefulWidget {
   const VpnSettingsScreen({
     required this.tenant,
@@ -33,14 +32,12 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
   VpnPolicy _policy = const VpnPolicy();
   NativeVpnCapabilities _capabilities =
       NativeVpnCapabilities.unavailable(NativeVpnBridge.platform);
-  bool _loading = true;
+  // Show safe, disabled defaults immediately; the native probe runs in background.
+  bool _loading = false;
   bool _saving = false;
 
   bool get _identified =>
       widget.tenant.trim().isNotEmpty && widget.account.trim().isNotEmpty;
-
-  bool get _perAppDraftSupported =>
-      _includeAppsReady || _excludeAppsReady;
 
   // A platform name does not prove a working per-app routing engine.
   // Windows/Android options stay disabled until OS-native rules are verified.
@@ -101,7 +98,7 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
   }
 
   Future<void> _save() async {
-    if (_saving || !_identified) return;
+    if (_saving || !_identified || !_capabilities.engineReady) return;
     final problems = _policy.draftProblems(_capabilities.platform, managedDevice: _capabilities.managedDevice);
     if (problems.isNotEmpty) return;
 
@@ -147,7 +144,8 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
   Widget build(BuildContext context) {
     final s = AppStrings.of(context);
     final issues = _policy.draftProblems(_capabilities.platform, managedDevice: _capabilities.managedDevice);
-    final selectedMode = _policy.routingMode != VpnRoutingMode.fullTunnel;
+    final selectedMode = _capabilities.engineReady &&
+        _policy.routingMode != VpnRoutingMode.fullTunnel;
     final platformName = switch (_capabilities.platform) {
       VpnPlatform.android => s.vpnPlatformAndroid,
       VpnPlatform.windows => s.vpnPlatformWindows,
@@ -161,7 +159,10 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
       body: BrandBackground(
         brand: widget.brand,
         child: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? Center(
+              child: Text(AppStrings.of(context).pick(
+                'در حال بررسی تنظیمات', 'Checking settings')),
+            )
           : SafeArea(
               child: Center(
                 child: ConstrainedBox(
@@ -169,15 +170,14 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
                   child: ListView(
                     padding: const EdgeInsets.all(20),
                     children: [
-                      Text(
-                        s.vpnPolicyOnly,
-                        key: const Key('vpnNotActiveNotice'),
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
-                      const SizedBox(height: 10),
                       ListTile(
+                        key: const Key('vpnNotActiveNotice'),
                         contentPadding: EdgeInsets.zero,
-                        leading: const Icon(Icons.shield_outlined),
+                        leading: Icon(
+                          _capabilities.engineReady
+                              ? Icons.check_circle_outline
+                              : Icons.shield_outlined,
+                        ),
                         title: Text('${s.vpnPlatformStatus} · $platformName'),
                         subtitle: Text(
                           _capabilities.engineReady
@@ -190,7 +190,8 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
                         spacing: 8,
                         runSpacing: 8,
                         children: [
-                          _choice(VpnRoutingMode.fullTunnel, s.vpnFullTunnel),
+                          _choice(VpnRoutingMode.fullTunnel, s.vpnFullTunnel,
+                              enabled: _capabilities.engineReady && _capabilities.fullTunnel),
                           _choice(
                             VpnRoutingMode.onlySelectedApps,
                             s.vpnOnlyApps,
@@ -203,19 +204,10 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 10),
-                      Text(s.vpnFullTunnelHint),
-                      if (!_perAppDraftSupported) ...[
-                        const SizedBox(height: 8),
-                        Text(s.vpnAppSelectionUnavailable),
-                      ],
+
+
                       if (selectedMode) ...[
-                        const SizedBox(height: 10),
-                        Text(
-                          _policy.routingMode == VpnRoutingMode.onlySelectedApps
-                              ? s.vpnOnlyAppsHint
-                              : s.vpnExceptAppsHint,
-                        ),
+
                         const SizedBox(height: 14),
                         Text(
                           s.vpnAppIds,
@@ -249,8 +241,7 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
                             ),
                           ],
                         ),
-                        const SizedBox(height: 8),
-                        Text(s.vpnAppPickerNote),
+
                         const SizedBox(height: 8),
                         Wrap(
                           spacing: 8,
@@ -273,91 +264,73 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
                         key: const Key('vpnKillSwitch'),
                         title: Text(s.vpnKillSwitch),
                         subtitle: Text(s.vpnKillSwitchSubtitle),
-                        value: _policy.killSwitchRequested,
-                        onChanged: (value) => _update(
-                          _policy.copyWith(killSwitchRequested: value),
-                        ),
+                        value: _capabilities.engineReady && _capabilities.killSwitchEnforced && _policy.killSwitchRequested,
+                        onChanged: _capabilities.engineReady &&
+                                _capabilities.killSwitchEnforced
+                            ? (value) => _update(
+                                _policy.copyWith(killSwitchRequested: value))
+                            : null,
                       ),
-                      ListTile(
-                        leading: Icon(
-                          _capabilities.killSwitchEnforced
-                              ? Icons.verified_user
-                              : Icons.warning_amber_outlined,
-                        ),
-                        title: Text(
-                          _capabilities.killSwitchEnforced
-                              ? s.vpnKillSwitchOn
-                              : s.vpnKillSwitchOff,
-                        ),
-                      ),
+
                       SwitchListTile.adaptive(
                         key: const Key('vpnDnsGuard'),
                         title: Text(s.vpnDnsProtected),
                         subtitle: Text(s.vpnDnsHint),
-                        value: _policy.dnsMode == VpnDnsMode.protected,
-                        onChanged: (value) => _update(_policy.copyWith(
-                          dnsMode: value
-                              ? VpnDnsMode.protected
-                              : VpnDnsMode.system,
-                        )),
+                        value: _capabilities.engineReady && _capabilities.dnsGuard && _policy.dnsMode == VpnDnsMode.protected,
+                        onChanged: _capabilities.engineReady && _capabilities.dnsGuard
+                            ? (value) => _update(_policy.copyWith(
+                                dnsMode: value ? VpnDnsMode.protected : VpnDnsMode.system))
+                            : null,
                       ),
                       SwitchListTile.adaptive(
                         key: const Key('vpnIpv6Guard'),
                         title: Text(s.vpnIpv6Protected),
                         subtitle: Text(s.vpnIpv6Hint),
-                        value: _policy.ipv6Mode == VpnIpv6Mode.tunnelOrBlock,
-                        onChanged: (value) => _update(_policy.copyWith(
-                          ipv6Mode: value
-                              ? VpnIpv6Mode.tunnelOrBlock
-                              : VpnIpv6Mode.unprotected,
-                        )),
+                        value: _capabilities.engineReady && _capabilities.ipv6Guard && _policy.ipv6Mode == VpnIpv6Mode.tunnelOrBlock,
+                        onChanged: _capabilities.engineReady && _capabilities.ipv6Guard
+                            ? (value) => _update(_policy.copyWith(
+                                ipv6Mode: value ? VpnIpv6Mode.tunnelOrBlock : VpnIpv6Mode.unprotected))
+                            : null,
                       ),
                       SwitchListTile.adaptive(
                         key: const Key('vpnLanAccess'),
                         title: Text(s.vpnAllowLan),
                         subtitle: Text(s.vpnAllowLanHint),
-                        value: _policy.allowLan,
-                        onChanged: (value) =>
-                            _update(_policy.copyWith(allowLan: value)),
+                        value: _capabilities.engineReady && _capabilities.localNetworkBypass && _policy.allowLan,
+                        onChanged: _capabilities.engineReady && _capabilities.localNetworkBypass
+                            ? (value) => _update(_policy.copyWith(allowLan: value))
+                            : null,
                       ),
                       _section(context, s.vpnAutomationTitle),
                       SwitchListTile.adaptive(
                         key: const Key('vpnAutoReconnect'),
                         title: Text(s.vpnAutoReconnect),
-                        value: _policy.autoReconnect,
-                        onChanged: (value) =>
-                            _update(_policy.copyWith(autoReconnect: value)),
+                        value: _capabilities.engineReady && _capabilities.autoReconnect && _policy.autoReconnect,
+                        onChanged: _capabilities.engineReady && _capabilities.autoReconnect
+                            ? (value) => _update(_policy.copyWith(autoReconnect: value))
+                            : null,
                       ),
                       SwitchListTile.adaptive(
                         key: const Key('vpnAutoConnect'),
                         title: Text(s.vpnAutoConnect),
-                        value: _policy.autoConnect,
-                        onChanged: (value) =>
-                            _update(_policy.copyWith(autoConnect: value)),
+                        value: _capabilities.engineReady && _capabilities.autoConnect && _policy.autoConnect,
+                        onChanged: _capabilities.engineReady && _capabilities.autoConnect
+                            ? (value) => _update(_policy.copyWith(autoConnect: value))
+                            : null,
                       ),
                       SwitchListTile.adaptive(
                         key: const Key('vpnAutoSelect'),
                         title: Text(s.vpnAutoSelectServer),
-                        value: _policy.autoSelectServer,
-                        onChanged: (value) =>
-                            _update(_policy.copyWith(autoSelectServer: value)),
+                        value: false,
+                        onChanged: null, // No verified native auto-selection engine.
                       ),
-                      if (issues.isNotEmpty) ...[
-                        _section(context, s.vpnDraftProblems),
-                        for (final issue in issues)
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 6),
-                            child: Text('• ${s.vpnProblem(issue)}'),
-                          ),
-                      ],
-                      if (!_identified) ...[
-                        const SizedBox(height: 15),
-                        Text(s.vpnNotConfigured),
-                      ],
+
+
                       const SizedBox(height: 18),
                       FilledButton.icon(
                         key: const Key('vpnSaveButton'),
                         onPressed: !_identified ||
+                                !_capabilities.engineReady ||
                                 _saving ||
                                 issues.isNotEmpty
                             ? null
@@ -365,7 +338,7 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
                         icon: const Icon(Icons.save_outlined),
                         label: Text(s.vpnSave),
                       ),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 12),
                     ],
                   ),
                 ),

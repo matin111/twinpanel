@@ -3,6 +3,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:twinconnect/main.dart';
 import 'package:twinconnect/tenant_models.dart';
+import 'package:twinconnect/interactive_glass_card.dart';
+import 'package:twinconnect/authenticated_dashboard.dart';
+import 'package:twinconnect/tenant_api.dart';
+import 'package:twinconnect/protocols.dart';
+import 'package:twinconnect/server_inventory.dart';
 
 void main() {
   group('tenant routing', () {
@@ -19,6 +24,26 @@ void main() {
           '',
         ),
         'TP0123456789ABCDEF',
+      );
+    });
+
+    test('short reseller account routes by its unique short panel alias', () {
+      expect(
+        TenantIdentity.namespaceFromUsername('TPA1B2C3_R2A_APP0123456789ABCDEF'),
+        'TPA1B2C3',
+      );
+      expect(
+        TenantIdentity.namespaceFromUsername('TPA1B2C3D4E5F60718_R2A_APP0123456789ABCDEF'),
+        'TPA1B2C3D4E5F60718',
+      );
+      expect(
+        TenantIdentity.parseNamespace('TPA1B2C3_R1_APP0123456789ABCDEF', ''),
+        'TPA1B2C3',
+      );
+      expect(
+        () => TenantIdentity.parseNamespace(
+          'TPA1B2C3_R1_APP0123456789ABCDEF', 'TPB2C3D4'),
+        throwsFormatException,
       );
     });
 
@@ -106,38 +131,73 @@ void main() {
     SharedPreferences.setMockInitialValues({'twinconnect_ui_language_v1': 'en'});
     await tester.pumpWidget(const TwinConnectApp());
     await tester.pumpAndSettle();
-    expect(find.text('TwinConnect'), findsOneWidget);
+    // Login remains neutral until the account is authenticated.
+    expect(find.text('TwinConnect'), findsNothing);
+    expect(find.text('Matin Vpn'), findsNothing);
     expect(find.byKey(const Key('accountUsername')), findsOneWidget);
-    expect(find.byKey(const Key('subscriptionLink')), findsOneWidget);
+    expect(find.byKey(const Key('appPassword')), findsOneWidget);
     expect(find.byKey(const Key('identifyButton')), findsOneWidget);
-    expect(find.text('One app, many brands'), findsOneWidget);
+    expect(find.byKey(const Key('loginGlassCard')), findsOneWidget);
+    expect(find.byKey(const Key('loginEntranceAnimation')), findsOneWidget);
+    expect(find.byKey(const Key('devAnimatedBackground')), findsOneWidget);
+    expect(find.byType(TwinConnectGlassCard), findsOneWidget);
+    expect(find.byType(BackdropFilter), findsWidgets);
+    expect(find.text('Sign in'), findsWidgets);
     // The connection engine is deliberately not mounted to any action.
     expect(find.byKey(const Key('brandCard')), findsNothing);
   });
 
-  testWidgets('brand preview contains only reseller contact, not configs', (tester) async {
+  testWidgets('authenticated dashboard replaces sign-in with the approved four pages',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(1150, 850));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final panel = PanelDirectoryEntry.fromJson({
+      'namespace': 'TP0123456789ABCDEF',
+      'api_origin': 'https://panel.example.com',
+    });
     final brand = BrandPreview.fromJson({
       'namespace': 'TP0123456789ABCDEF',
       'brand_name': 'آریا VPN',
       'owner_type': 'reseller',
       'account_status': 'active',
       'app_username_prefix': 'TP0123456789ABCDEF_R2A_',
-      'telegram_url': 'https://t.me/aria_support',
-      'renewal_url': 'https://renew.example.com',
+    });
+    final inventory = AppServerInventory.fromJson({
+      'schema': 1,
+      'namespace': 'TP0123456789ABCDEF',
+      'servers': [
+        {
+          'id': '17', 'name': 'Germany - Frankfurt',
+          'country_code': 'DE', 'node_online': true, 'latency_ms': null,
+        },
+      ],
     });
     await tester.pumpWidget(MaterialApp(
-      home: Scaffold(
-        body: SingleChildScrollView(
-          child: BrandDetails(brand: brand),
-        ),
+      home: AuthenticatedDashboard(
+        panel: panel,
+        username: 'TP0123456789ABCDEF_R2A_APP0123',
+        sessionToken: 'test-token-not-for-network',
+        brand: brand, servers: inventory, catalog: null,
+        nativeProtocols: const NativeProtocolReadiness(supportedCodes: {}),
+        refreshingServers: false,
+        protocolCatalogUnavailable: false,
+        refreshServers: () {},
+        onLogout: () {},
       ),
     ));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('liveQuickConnectCard')), findsOneWidget);
+    expect(find.byKey(const Key('liveNetworkCard')), findsOneWidget);
+    expect(find.byKey(const Key('loginGlassCard')), findsNothing);
+    expect(find.text('Sign in'), findsNothing);
+    expect(find.textContaining('coming soon'), findsNothing);
+    expect(find.byKey(const Key('liveServer_17')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('liveNav_locations')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('liveServerSearch')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('liveNav_account')));
+    await tester.pumpAndSettle();
     expect(find.text('آریا VPN'), findsOneWidget);
-    expect(find.text('https://t.me/aria_support'), findsOneWidget);
-    expect(find.text('https://renew.example.com'), findsOneWidget);
-    final connect = tester.widget<FilledButton>(
-      find.widgetWithText(FilledButton, 'Connect VPN (coming soon)'),
-    );
-    expect(connect.onPressed, isNull);
+    expect(find.byKey(const Key('loginGlassCard')), findsNothing);
   });
 }

@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import os
 import time
 from datetime import datetime
@@ -2311,6 +2312,7 @@ async def _telegram_notification_worker(bot):
                     # TWINPANEL_MAIN_PAYMENT_DELIVERY_V2
                     password = ""
                     subscription_link = ""
+                    app_access = None
 
                     if sub_id:
                         try:
@@ -2370,6 +2372,28 @@ async def _telegram_notification_worker(bot):
 
                         except Exception:
                             pass
+
+                        # Payment notification belongs to row.user_id.
+                        # Re-check subscription ownership before including
+                        # app credentials in its private Telegram delivery.
+                        try:
+                            from .models import Subscription
+                            from .central_app_credentials import app_delivery_payload
+
+                            owned = db.get(Subscription, int(sub_id))
+                            if (
+                                owned is not None
+                                and int(owned.user_id) == int(row.user_id)
+                            ):
+                                app_access = app_delivery_payload(db, owned)
+                                if app_access is not None:
+                                    db.commit()
+                        except Exception:
+                            db.rollback()
+                            logging.getLogger(__name__).exception(
+                                "main bot app credential issue failed for subscription=%s",
+                                sub_id,
+                            )
 
                     if not username:
                         username = "-"
@@ -2442,6 +2466,16 @@ async def _telegram_notification_worker(bot):
                             "",
                             "🔗 <b>لینک اتصال:</b>",
                             f"<code>{safe_link}</code>",
+                        ])
+
+                    if app_access:
+                        lines.extend([
+                            "",
+                            "📱 <b>ورود به اپ TwinConnect</b>",
+                            "👤 نام کاربری مخصوص اپ:",
+                            f"<code>{escape(app_access['username'])}</code>",
+                            "🔐 رمز مخصوص اپ:",
+                            f"<code>{escape(app_access['password'])}</code>",
                         ])
 
                     lines.extend([
@@ -2613,6 +2647,7 @@ async def _telegram_notification_worker(bot):
                     if (
                         row.kind == "payment_approved"
                         and subscription_link.startswith("https://")
+                        and len(text) <= 1024  # Telegram photo caption limit
                     ):
                         from .telegram_subscription_qr_v1 import (
                             subscription_qr_photo,

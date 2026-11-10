@@ -16,7 +16,7 @@ void main() {
     const en = AppStrings(Locale('en'));
 
     expect(fa.identifyAccount, 'شناسایی حساب');
-    expect(en.identifyAccount, 'Identify your account');
+    expect(en.appLoginTitle, 'Sign in');
     expect(fa.statusExpired, 'اشتراک منقضی');
     expect(en.statusExpired, 'Expired subscription');
     expect(fa.error('TENANT_MISMATCH'), contains('شناسه'));
@@ -33,7 +33,7 @@ void main() {
     await tester.pumpWidget(const TwinConnectApp());
     await tester.pumpAndSettle();
 
-    expect(find.text('شناسایی حساب'), findsOneWidget);
+    expect(find.text('ورود به حساب'), findsOneWidget);
     expect(
       Directionality.of(tester.element(find.byKey(const Key('accountUsername')))),
       TextDirection.rtl,
@@ -44,7 +44,7 @@ void main() {
     await tester.tap(find.text('English').last);
     await tester.pumpAndSettle();
 
-    expect(find.text('Identify your account'), findsOneWidget);
+    expect(find.text('Sign in'), findsWidgets);
     expect(
       Directionality.of(tester.element(find.byKey(const Key('accountUsername')))),
       TextDirection.ltr,
@@ -56,7 +56,7 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pumpWidget(const TwinConnectApp());
     await tester.pumpAndSettle();
-    expect(find.text('Identify your account'), findsOneWidget);
+    expect(find.text('Sign in'), findsWidgets);
   });
 
   testWidgets('Persian selection is saved from English UI', (tester) async {
@@ -65,14 +65,14 @@ void main() {
     });
     await tester.pumpWidget(const TwinConnectApp());
     await tester.pumpAndSettle();
-    expect(find.text('Identify your account'), findsOneWidget);
+    expect(find.text('Sign in'), findsWidgets);
 
     await tester.tap(find.byKey(const Key('languagePicker')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('فارسی').last);
     await tester.pumpAndSettle();
 
-    expect(find.text('شناسایی حساب'), findsOneWidget);
+    expect(find.text('ورود به حساب'), findsOneWidget);
     final prefs = await SharedPreferences.getInstance();
     expect(prefs.getString('twinconnect_ui_language_v1'), 'fa');
   });

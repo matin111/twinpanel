@@ -23,12 +23,9 @@ void main() {
     await tester.tap(find.byKey(const Key('vpnSettingsButton')));
     await tester.pumpAndSettle();
 
-    expect(find.text('Advanced VPN settings'), findsOneWidget);
+    expect(find.text('VPN settings'), findsOneWidget);
     expect(find.byKey(const Key('vpnNotActiveNotice')), findsOneWidget);
-    expect(
-      find.textContaining('Protection is OFF'),
-      findsOneWidget,
-    );
+    expect(find.text('Not installed'), findsOneWidget);
     expect(find.byKey(const Key('vpnMode_fullTunnel')), findsOneWidget);
     expect(find.byKey(const Key('vpnMode_onlySelectedApps')), findsOneWidget);
     expect(find.byKey(const Key('vpnMode_excludeSelectedApps')), findsOneWidget);
@@ -57,7 +54,7 @@ void main() {
     expect(save.onPressed, isNull);
   });
 
-  testWidgets('saving a requested kill switch does not claim enforcement',
+  testWidgets('preview disables OS controls and never saves false protections',
       (tester) async {
     const tenant = 'TP0123456789ABCDEF';
     const account = 'TP0123456789ABCDEF_R1_alice';
@@ -67,28 +64,29 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.scrollUntilVisible(
+      find.byKey(const Key('vpnKillSwitch')), 180,
+    );
+    final kill = tester.widget<SwitchListTile>(
       find.byKey(const Key('vpnKillSwitch')),
-      150,
     );
-    await tester.tap(find.byKey(const Key('vpnKillSwitch')));
-    await tester.pumpAndSettle();
-
-    expect(
-      find.text('Actual kill switch: NOT ACTIVE'),
-      findsOneWidget,
+    expect(kill.onChanged, isNull);
+    expect(kill.value, isFalse);
+    final dns = tester.widget<SwitchListTile>(
+      find.byKey(const Key('vpnDnsGuard')),
     );
+    expect(dns.onChanged, isNull);
+    expect(dns.value, isFalse);
 
     await tester.scrollUntilVisible(
-      find.byKey(const Key('vpnSaveButton')),
-      220,
+      find.byKey(const Key('vpnSaveButton')), 230,
     );
-    await tester.tap(find.byKey(const Key('vpnSaveButton')));
-    await tester.pumpAndSettle();
-
+    final save = tester.widget<FilledButton>(
+      find.byKey(const Key('vpnSaveButton')),
+    );
+    expect(save.onPressed, isNull);
     final saved = await const VpnPolicyStore().load(tenant, account);
-    expect(saved.killSwitchRequested, true);
+    expect(saved.killSwitchRequested, false);
     expect(saved.routingMode, VpnRoutingMode.fullTunnel);
-    final other = await const VpnPolicyStore().load(tenant, 'different-user');
-    expect(other.killSwitchRequested, false);
   });
+
 }

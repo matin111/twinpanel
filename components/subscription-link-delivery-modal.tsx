@@ -4,6 +4,7 @@ import {useEffect,useMemo,useState} from "react";
 import {createPortal} from "react-dom";
 import {QRCodeSVG} from "qrcode.react";
 import {useI18n} from "../lib/i18n";
+import {AppCredentialDeliveryCard} from "./app-credential-delivery-card";
 
 type SubscriptionLinkDeliveryModalProps={
   open:boolean;
@@ -12,6 +13,8 @@ type SubscriptionLinkDeliveryModalProps={
   loading?:boolean;
   error?:string;
   onClose:()=>void;
+  appOwner?:"admin"|"reseller";
+  subscriptionId?:number;
 };
 
 function absoluteLink(value:string){
@@ -21,7 +24,7 @@ function absoluteLink(value:string){
   try{return new URL(value,window.location.origin).toString();}catch{return value;}
 }
 
-export function SubscriptionLinkDeliveryModal({open,link,reference,loading=false,error="",onClose}:SubscriptionLinkDeliveryModalProps){
+export function SubscriptionLinkDeliveryModal({open,link,reference,loading=false,error="",onClose,appOwner,subscriptionId}:SubscriptionLinkDeliveryModalProps){
   const {pick}=useI18n();
   const [mounted,setMounted]=useState(false);
   const [copied,setCopied]=useState(false);
@@ -85,6 +88,7 @@ export function SubscriptionLinkDeliveryModal({open,link,reference,loading=false
             <div className="subscription-link-hint"><span aria-hidden="true">✦</span>{pick("همین لینک برای کاربر، نماینده و ادمین یکسان است و همیشه آخرین تنظیمات اشتراک را نمایش می‌دهد.","The same link is used by customer, reseller and admin and always reflects the latest subscription settings.")}</div>
           </div>
         </div>:<div className="subscription-link-unified-empty"><span aria-hidden="true">⌁</span><b>{pick("سابلینک هنوز آماده نیست","Subscription link is not ready yet")}</b><small>{pick("پس از آماده‌شدن سرویس دوباره تلاش کنید.","Try again after the service is ready.")}</small></div>}
+        {appOwner&&subscriptionId&&<AppCredentialDeliveryCard key={`${appOwner}-${subscriptionId}`} owner={appOwner} subscriptionId={subscriptionId}/>}
       </section>
     </div>,
     document.body,
