@@ -56,6 +56,43 @@ class _FlagPainter extends CustomPainter {
         band(0, 1 / 3, const Color(0xFFAE1C28));
         band(1 / 3, 2 / 3, Colors.white);
         band(2 / 3, 1, const Color(0xFF21468B));
+      case 'FR':
+        fill(Colors.white);
+        canvas.drawRect(Rect.fromLTWH(0, 0, size.width / 3, size.height),
+            Paint()..color = const Color(0xFF002395));
+        canvas.drawRect(Rect.fromLTWH(size.width * 2 / 3, 0,
+            size.width / 3, size.height),
+            Paint()..color = const Color(0xFFED2939));
+      case 'IT':
+        fill(Colors.white);
+        canvas.drawRect(Rect.fromLTWH(0, 0, size.width / 3, size.height),
+            Paint()..color = const Color(0xFF009246));
+        canvas.drawRect(Rect.fromLTWH(size.width * 2 / 3, 0,
+            size.width / 3, size.height),
+            Paint()..color = const Color(0xFFCE2B37));
+      case 'FI':
+        fill(Colors.white);
+        canvas.drawRect(Rect.fromLTWH(size.width * .32, 0,
+            size.width * .15, size.height),
+            Paint()..color = const Color(0xFF003580));
+        band(.42, .60, const Color(0xFF003580));
+      case 'TR':
+        fill(const Color(0xFFE30A17));
+        canvas.drawCircle(Offset(size.width * .38, size.height * .5),
+            size.height * .28, Paint()..color = Colors.white);
+        canvas.drawCircle(Offset(size.width * .46, size.height * .47),
+            size.height * .23, Paint()..color = const Color(0xFFE30A17));
+        canvas.drawCircle(Offset(size.width * .65, size.height * .5),
+            size.height * .07, Paint()..color = Colors.white);
+      case 'IR':
+        band(0, 1 / 3, const Color(0xFF239F40));
+        band(1 / 3, 2 / 3, Colors.white);
+        band(2 / 3, 1, const Color(0xFFDA0000));
+        canvas.drawCircle(Offset(size.width * .5, size.height * .5),
+            size.height * .105, Paint()..color = const Color(0xFFDA0000));
+      case 'PL':
+        band(0, .5, Colors.white);
+        band(.5, 1, const Color(0xFFDC143C));
       case 'GB':
       case 'UK':
         fill(const Color(0xFF012169));
@@ -117,7 +154,7 @@ class _FlagPainter extends CustomPainter {
         fill(const Color(0xFF34425A));
         final text = TextPainter(
           text: TextSpan(
-            text: code.length == 2 ? code : '🌐',
+            text: code.length == 2 ? code : '??',
             style: TextStyle(
               fontSize: size.height * .55,
               fontWeight: FontWeight.bold,
