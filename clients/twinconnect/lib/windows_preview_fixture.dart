@@ -20,6 +20,11 @@ class WindowsPreviewFixture {
         'support_text': 'Sample data / اطلاعات نمایشی',
         'primary_color': '#7358DF',
         'secondary_color': '#312E81',
+        'button_color': '#6D28D9',
+        'background_color': '#0D1425',
+        'surface_color': '#19283F',
+        'background_style': 'gradient',
+        'theme_mode': 'dark',
       });
 
   static PanelProtocolCatalog protocolCatalog() =>

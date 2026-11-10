@@ -4,6 +4,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app_strings.dart';
+import 'brand_theme.dart';
 import 'tenant_api.dart';
 import 'tenant_models.dart';
 import 'protocols.dart';
@@ -29,6 +30,7 @@ class TwinConnectApp extends StatefulWidget {
 class _TwinConnectAppState extends State<TwinConnectApp> {
   static const _languageKey = 'twinconnect_ui_language_v1';
   AppLanguage _language = AppLanguage.automatic;
+  BrandPreview? _activeBrand;
 
   @override
   void initState() {
@@ -86,23 +88,13 @@ class _TwinConnectAppState extends State<TwinConnectApp> {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF7358DF),
-        ),
-      ),
-      darkTheme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF7358DF),
-          brightness: Brightness.dark,
-        ),
-      ),
-      themeMode: ThemeMode.system,
+      theme: BrandTheme.make(_activeBrand, Brightness.light),
+      darkTheme: BrandTheme.make(_activeBrand, Brightness.dark),
+      themeMode: BrandTheme.mode(_activeBrand),
       home: TwinConnectHome(
         language: _language,
         onLanguageChanged: _changeLanguage,
+        onBrandChanged: (brand) => setState(() => _activeBrand = brand),
       ),
     );
   }
@@ -112,11 +104,13 @@ class TwinConnectHome extends StatefulWidget {
   const TwinConnectHome({
     required this.language,
     required this.onLanguageChanged,
+    required this.onBrandChanged,
     super.key,
   });
 
   final AppLanguage language;
   final ValueChanged<AppLanguage> onLanguageChanged;
+  final ValueChanged<BrandPreview?> onBrandChanged;
 
   @override
   State<TwinConnectHome> createState() => _TwinConnectHomeState();
@@ -158,6 +152,7 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
       _errorCode = null;
       _brand = null;
       _offlineDemo = false;
+      widget.onBrandChanged(null);
       _confirmedPanel = null;
       _confirmedUsername = null;
       _confirmedToken = null;
@@ -183,6 +178,7 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
       if (!mounted || serial != _lookupSerial) return;
       setState(() {
         _brand = brand;
+        widget.onBrandChanged(brand);
         _confirmedPanel = panel;
         _confirmedUsername = username;
         _confirmedToken = token;
@@ -229,6 +225,7 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
       _confirmedUsername = null;
       _confirmedToken = null;
       _brand = WindowsPreviewFixture.brand();
+      widget.onBrandChanged(_brand);
       _catalog = WindowsPreviewFixture.protocolCatalog();
       _nativeProtocols =
           const NativeProtocolReadiness(supportedCodes: {});
@@ -251,6 +248,7 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
             onPressed: () => Navigator.of(context).push(
               MaterialPageRoute<void>(
                 builder: (_) => VpnSettingsScreen(
+                  brand: brand,
                   tenant: brand?.namespace ?? '',
                   account: _offlineDemo
                       ? 'offline-demo-only'
@@ -295,7 +293,9 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
           ),
         ],
       ),
-      body: SafeArea(
+      body: BrandBackground(
+        brand: brand,
+        child: SafeArea(
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 740),
@@ -470,6 +470,7 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
             ),
           ),
         ),
+      ),
       ),
     );
   }

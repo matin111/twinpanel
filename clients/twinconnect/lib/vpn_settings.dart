@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import 'app_strings.dart';
+import 'brand_theme.dart';
+import 'tenant_models.dart';
 import 'native_vpn_bridge.dart';
 import 'vpn_policy.dart';
 import 'vpn_policy_store.dart';
@@ -12,11 +14,13 @@ class VpnSettingsScreen extends StatefulWidget {
   const VpnSettingsScreen({
     required this.tenant,
     required this.account,
+    this.brand,
     super.key,
   });
 
   final String tenant;
   final String account;
+  final BrandPreview? brand;
 
   @override
   State<VpnSettingsScreen> createState() => _VpnSettingsScreenState();
@@ -154,7 +158,9 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
 
     return Scaffold(
       appBar: AppBar(title: Text(s.vpnSettingsTitle)),
-      body: _loading
+      body: BrandBackground(
+        brand: widget.brand,
+        child: _loading
           ? const Center(child: CircularProgressIndicator())
           : SafeArea(
               child: Center(
@@ -365,6 +371,7 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
                 ),
               ),
             ),
+      ),
     );
   }
 }

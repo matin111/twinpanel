@@ -19,6 +19,7 @@ from . import reseller_pool_models
 from . import reseller_owned_plan_models
 from . import domain_models
 from . import branding_models  # register reseller tables
+from . import central_app_appearance_models  # additive app-only theme table before create_all
 from . import storefront_settings_models  # TWINPANEL_STOREFRONT_CMS_V74
 from . import two_factor_models
 from . import runtime_settings_model
@@ -53,6 +54,7 @@ from .routers.public_connection_live_v4 import router as public_connection_live_
 from .routers.public_connection_v3 import router as public_connection_v3_router
 from .routers.reseller_admin_v2 import router as reseller_admin_v2_router
 from .routers.central_app_v1 import router as central_app_v1_router  # additive shared-client brand + discovery
+from .routers.central_app_appearance_v1 import router as central_app_appearance_v1_router
 from .routers.reseller_traffic_admin_v2 import router as reseller_traffic_admin_v2_router
 from .routers.reseller_traffic_purchase_v3 import router as reseller_traffic_purchase_v3_router
 from .routers.reseller_owned_plans import router as reseller_owned_plans_router
@@ -368,6 +370,7 @@ app.include_router(admin.router)
 # and traffic adjustment while keeping the older detail/plan endpoints available.
 app.include_router(reseller_admin_v2_router)
 app.include_router(central_app_v1_router)
+app.include_router(central_app_appearance_v1_router)
 app.include_router(reseller_traffic_admin_v2_router)
 app.include_router(resellers.router)
 # Reseller-owned plans and traffic purchase routes must win before legacy portal

@@ -1,0 +1,44 @@
+name: TwinConnect Admin & Reseller Appearance
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/central_app_appearance.py"
+      - "backend/app/central_app_appearance_models.py"
+      - "backend/app/routers/central_app_appearance_v1.py"
+      - "backend/app/routers/central_app_v1.py"
+      - "backend/tests/test_central_app_appearance_contract_v1.py"
+      - "components/central-app-appearance-studio.tsx"
+      - "components/central-app-appearance.module.css"
+      - "components/branding-settings.tsx"
+      - "components/reseller-portal-parity-v2.tsx"
+      - "lib/central-app-appearance-api.ts"
+      - ".github/workflows/twinconnect-appearance.yml"
+
+jobs:
+  appearance-api:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Python syntax (no production server)
+        run: |
+          python -m py_compile backend/app/central_app_appearance.py \
+            backend/app/central_app_appearance_models.py \
+            backend/app/routers/central_app_appearance_v1.py \
+            backend/app/routers/central_app_v1.py \
+            backend/tests/test_central_app_appearance_contract_v1.py
+      - name: Theme validation and tenant isolation tests
+        run: python -m unittest discover -s backend/tests -p test_central_app_appearance_contract_v1.py -v
+  web-types:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install Next/React types
+        run: npm install --no-audit --no-fund --ignore-scripts
+      - name: Check admin/reseller TypeScript
+        run: npx tsc --noEmit --pretty false

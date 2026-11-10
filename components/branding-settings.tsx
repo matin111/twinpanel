@@ -11,6 +11,7 @@ import {
   type BrandingConfig,
 } from "../lib/branding";
 import {brandingApi,type BrandingAssetKind,type BrandingRecord} from "../lib/branding-api";
+import {CentralAppAppearanceStudio} from "./central-app-appearance-studio";
 
 const COLOR_PRESETS=[
   ["#7C3AED","#4F46E5"],
@@ -156,6 +157,8 @@ export function BrandingSettingsPage(){
           </div>
           <div className="brandPresetRow"><span>{pick("پالت‌های سریع","Quick palettes")}</span><div>{COLOR_PRESETS.map(([primary,secondary])=><button type="button" key={`${primary}-${secondary}`} title={`${primary} · ${secondary}`} style={{background:`linear-gradient(135deg,${primary},${secondary})`}} onClick={()=>setDraft(current=>({...current,accent:primary,secondaryColor:secondary}))}/>)}</div></div>
         </Card>
+
+        <CentralAppAppearanceStudio role="admin"/>
 
         <Card className="brandingOwnershipCard">
           <div className="card-head"><div><b>{pick("تنظیمات مربوط به فروشگاه","Storefront-owned settings")}</b><small>{pick("برای جلوگیری از دو منبع تنظیمات، متن‌ها، فوتر، شبکه‌های اجتماعی و SEO فقط از بخش تنظیمات فروشگاه مدیریت می‌شوند.","To avoid duplicate sources of truth, copy, footer, social links and SEO are managed only in Store Settings.")}</small></div></div>
