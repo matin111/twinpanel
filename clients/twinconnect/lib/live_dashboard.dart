@@ -1363,112 +1363,213 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       ],
     );
 
-    Widget account() => Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        heading(tr('حساب', 'Account')),
-        const SizedBox(height: 16),
-        OutlinedButton.icon(
-          onPressed: () {
-            if (_vpnUp || _vpnBusy || _vpnCleanup) {
-              ScaffoldMessenger.of(context)
-                ..hideCurrentSnackBar()
-                ..showSnackBar(SnackBar(content: Text(tr(
-                  'پیش از خروج، اتصال VPN را قطع کنید.',
-                  'Disconnect VPN before signing out.'))));
-              return;
-            }
-            widget.onLogout();
-          },
-          icon: const Icon(Icons.logout),
-          label: Text(tr('خروج از حساب', 'Sign out')),
-        ),
-        const SizedBox(height: 14),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(26),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-            child: Container(
-              padding: const EdgeInsets.all(25),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(26),
-                gradient: LinearGradient(colors: _dark
-                    ? [const Color(0xFF3B275E).withValues(alpha: 0.75),
-                       const Color(0xFF252746).withValues(alpha: 0.70)]
-                    : [const Color(0xFFEDE1FF).withValues(alpha: 0.80),
-                       Colors.white.withValues(alpha: 0.74)]),
-                border: Border.all(color: purple.withValues(alpha: 0.45)),
-              ),
-              child: Row(children: [
-            Container(
-              width: 76, height: 76,
-              decoration: BoxDecoration(
-                color: purple.withValues(alpha: 0.17),
-                borderRadius: BorderRadius.circular(20)),
-              child: const Icon(Icons.workspace_premium_rounded,
-                  size: 43, color: purple),
+
+    Widget account() {
+      final current = widget.account;
+      final limit = current?.trafficLimitBytes ?? 0;
+      final used = current?.trafficUsedBytes ?? 0;
+      final hasLimit = current != null && limit > 0;
+      final fraction = hasLimit ? (used / limit).clamp(0.0, 1.0) : 0.0;
+      final daysLeft = current?.expiresAt?.difference(DateTime.now()).inDays;
+      final expiryText = _expiryLabel();
+      final deviceText = widget.plan == null ? '—' :
+          widget.plan!.deviceLimit == 0 ? tr('نامحدود', 'Unlimited')
+          : '${widget.plan!.deviceLimit}';
+      final active = current?.status.toLowerCase() == 'active';
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(children: [
+            Expanded(child: heading(tr('حساب من', 'My account'))),
+            IconButton(
+              tooltip: tr('به‌روزرسانی حساب', 'Refresh account'),
+              onPressed: widget.onRefreshAccount,
+              icon: const Icon(Icons.refresh_rounded, color: purple),
             ),
-            const SizedBox(width: 18),
-            Expanded(child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                txt(widget.username, size: 22, bold: true),
-                const SizedBox(height: 6),
-                txt(widget.account == null
-                    ? tr('اطلاعات مصرف و انقضا در دسترس نیست',
-                        'Usage and expiry are not yet available')
-                    : tr('اطلاعات حساب از پنل دریافت شده', 'Account loaded from panel'),
-                    color: sub, size: 12),
-              ],
-            )),
           ]),
+          const SizedBox(height: 16),
+          glassCard(
+            key: const Key('accountIdentityCard'),
+            radius: 25,
+            padding: const EdgeInsets.all(23),
+            child: Row(children: [
+              Container(
+                height: 64, width: 64,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(19),
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFAA7AFF), Color(0xFF6953D7)],
+                  ),
+                ),
+                child: const Icon(Icons.shield_outlined,
+                    color: Colors.white, size: 33),
+              ),
+              const SizedBox(width: 16),
+              Expanded(child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(widget.username, maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(color: ink,
+                      fontSize: 16, fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 9),
+                  Row(children: [
+                    Icon(active ? Icons.verified_rounded : Icons.info_outline,
+                        size: 16, color: active
+                            ? const Color(0xFF31D3B4) : purple),
+                    const SizedBox(width: 5),
+                    Flexible(child: txt(current == null
+                        ? tr('دریافت اطلاعات حساب', 'Loading account details')
+                        : active ? tr('اشتراک فعال', 'Active subscription')
+                        : current.status,
+                        size: 12, color: sub)),
+                  ]),
+                ],
+              )),
+            ]),
+          ),
+          const SizedBox(height: 15),
+          glassCard(
+            key: const Key('accountTrafficCard'),
+            radius: 24,
+            padding: const EdgeInsets.all(23),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: purple.withValues(alpha: .17),
+                      borderRadius: BorderRadius.circular(13)),
+                    child: const Icon(Icons.data_usage_rounded, color: purple),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(child: txt(tr('حجم مصرف‌شده', 'Data usage'),
+                      size: 15, bold: true)),
+                  if (current != null && !hasLimit)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 7),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF2ACFAE).withValues(alpha: .13),
+                        borderRadius: BorderRadius.circular(30)),
+                      child: Text(tr('نامحدود', 'Unlimited'),
+                        style: const TextStyle(color: Color(0xFF33D9B9),
+                          fontSize: 11, fontWeight: FontWeight.bold)),
+                    ),
+                ]),
+                const SizedBox(height: 20),
+                Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                  Flexible(child: Text(
+                    current == null ? '—' : _formatBytes(used),
+                    maxLines: 1, overflow: TextOverflow.ellipsis,
+                    style: TextStyle(color: ink, fontSize: 31,
+                      fontWeight: FontWeight.w800),
+                  )),
+                  const SizedBox(width: 10),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 5),
+                    child: Text(hasLimit ? '/ ${_formatBytes(limit)}' :
+                        tr('مصرف کل', 'Total usage'),
+                        style: TextStyle(color: sub, fontSize: 12)),
+                  ),
+                ]),
+                const SizedBox(height: 18),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: LinearProgressIndicator(
+                    minHeight: 9,
+                    value: hasLimit ? fraction : null,
+                    backgroundColor: purple.withValues(alpha: .13),
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      hasLimit && fraction >= .9
+                          ? const Color(0xFFFFB26B)
+                          : const Color(0xFF9B6CF1)),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                txt(current == null
+                    ? tr('در حال دریافت حجم از پنل', 'Fetching usage from panel')
+                    : hasLimit
+                        ? tr('${(fraction * 100).toStringAsFixed(1)}٪ مصرف‌شده',
+                            '${(fraction * 100).toStringAsFixed(1)}% used')
+                        : tr('بدون سقف ترافیک', 'No traffic cap'),
+                    size: 11, color: sub),
+              ],
             ),
           ),
-        ),
-        const SizedBox(height: 12),
-        Row(children: [
-          Expanded(child: OutlinedButton.icon(
-            onPressed: widget.onRefreshAccount,
-            icon: const Icon(Icons.refresh_rounded),
-            label: Text(tr('به‌روزرسانی حساب', 'Refresh account')),
-          )),
-        ]),
-        if (widget.accountError != null)
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Text(tr('اطلاعات حجم و انقضا از پنل دریافت نشد.',
-                'Usage and expiry could not be retrieved from the panel.'),
-              style: const TextStyle(color: Colors.orangeAccent, fontSize: 12))),
-        const SizedBox(height: 17),
-        Row(children: [
-          for (final entry in [
-            (Icons.devices_rounded, tr('دستگاه مجاز', 'Device limit'),
-              widget.plan == null ? '—' : widget.plan!.deviceLimit == 0
-                ? tr('نامحدود', 'Unlimited') : '${widget.plan!.deviceLimit}'),
-            (Icons.data_usage_rounded, tr('حجم مصرفی', 'Traffic used'),
-              widget.account == null ? '—' :
-                '${_formatBytes(widget.account!.trafficUsedBytes)} / '
-                '${widget.account!.trafficLimitBytes == 0
-                  ? tr('نامحدود', 'Unlimited')
-                  : _formatBytes(widget.account!.trafficLimitBytes)}'),
-            (Icons.event_outlined, tr('انقضا', 'Expiry'),
-              _expiryLabel()),
-                    ]) ...[
+          const SizedBox(height: 15),
+          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Expanded(child: glassCard(
-              padding: const EdgeInsets.symmetric(vertical: 18),
-              radius: 18,
-              child: Column(children: [
-                Icon(entry.$1, color: purple),
-                const SizedBox(height: 8),
-                txt(entry.$3, size: 17, bold: true),
-                txt(entry.$2, size: 11, color: sub),
-              ]),
+              key: const Key('accountExpiryCard'),
+              radius: 22,
+              padding: const EdgeInsets.all(19),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.calendar_month_rounded, color: purple,
+                    size: 25),
+                  const SizedBox(height: 14),
+                  txt(tr('تاریخ انقضا', 'Expires on'), size: 12, color: sub),
+                  const SizedBox(height: 6),
+                  Text(expiryText, maxLines: 2,
+                    style: TextStyle(fontWeight: FontWeight.bold,
+                      color: ink, fontSize: 16)),
+                  if (daysLeft != null) ...[
+                    const SizedBox(height: 6),
+                    Text(daysLeft < 0 ? tr('منقضی‌شده', 'Expired')
+                      : tr('${daysLeft + 1} روز باقی‌مانده',
+                           '${daysLeft + 1} days remaining'),
+                      style: TextStyle(fontSize: 11,
+                        color: daysLeft < 0
+                          ? const Color(0xFFFFAC80) : sub)),
+                  ],
+                ],
+              ),
             )),
-            const SizedBox(width: 8),
+            const SizedBox(width: 12),
+            Expanded(child: glassCard(
+              key: const Key('accountDeviceCard'),
+              radius: 22,
+              padding: const EdgeInsets.all(19),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.devices_other_rounded, color: purple,
+                    size: 25),
+                  const SizedBox(height: 14),
+                  txt(tr('دستگاه‌های مجاز', 'Device limit'),
+                    size: 12, color: sub),
+                  const SizedBox(height: 6),
+                  Text(deviceText, style: TextStyle(color: ink,
+                    fontSize: 22, fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 6),
+                  txt(tr('براساس پلن اشتراک', 'From subscription plan'),
+                    size: 11, color: sub),
+                ],
+              ),
+            )),
+          ]),
+          if (widget.accountError != null) ...[
+            const SizedBox(height: 12),
+            Text(tr('دریافت اطلاعات حساب ناموفق بود؛ دوباره تلاش کنید.',
+                    'Account details unavailable. Please refresh.'),
+                style: const TextStyle(color: Colors.orangeAccent)),
           ],
-        ]),
-      ],
-    );
+          const SizedBox(height: 18),
+          OutlinedButton.icon(
+            onPressed: _vpnUp || _vpnBusy || _vpnCleanup
+                ? null : widget.onLogout,
+            icon: const Icon(Icons.logout_rounded),
+            label: Text(tr('خروج از حساب', 'Sign out')),
+          ),
+          if (_vpnUp || _vpnBusy || _vpnCleanup)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: txt(tr('برای خروج ابتدا VPN را قطع کنید.',
+                    'Disconnect VPN before signing out.'),
+                  color: sub, size: 11)),
+        ],
+      );
+    }
 
     Widget content() => switch (_page) {
       'locations' => locations(),
