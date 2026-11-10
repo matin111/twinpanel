@@ -231,6 +231,38 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
     }
   }
 
+  Future<void> _signOutSafely() async {
+    // Invalidate stale account / inventory requests immediately, then
+    // erase the OS-protected session before displaying the login screen.
+    ++_lookupSerial;
+    try {
+      await _sessionStore.clearSession();
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Unable to clear saved session. Try again.'),
+        ));
+      }
+      return;
+    }
+    if (!mounted) return;
+    setState(() {
+      _brand = null;
+      _confirmedPanel = null;
+      _confirmedUsername = null;
+      _confirmedSessionToken = null;
+      _catalog = null;
+      _servers = null;
+      _plan = null;
+      _account = null;
+      _accountError = null;
+      _dashboardTab = 0;
+      _errorCode = null;
+      widget.onBrandChanged(null);
+      _password.clear();
+    });
+  }
+
   @override
   void dispose() {
     _username.dispose();
@@ -711,24 +743,7 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
         },
         accountStatus: _brand?.accountStatus ?? 'unknown',
         onRefresh: _refreshServers,
-        onLogout: () {
-          _sessionStore.clearSession();
-          ++_lookupSerial;
-          setState(() {
-            _brand = null;
-            _confirmedPanel = null;
-            _confirmedUsername = null;
-            _confirmedSessionToken = null;
-            _catalog = null;
-            _servers = null;
-            _plan = null;
-            _account = null;
-            _accountError = null;
-            _dashboardTab = 0;
-            _errorCode = null;
-            widget.onBrandChanged(null);
-          });
-        },
+        onLogout: _signOutSafely,
       );
     }
 
