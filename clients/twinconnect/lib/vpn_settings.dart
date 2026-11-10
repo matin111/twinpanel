@@ -32,7 +32,8 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
   VpnPolicy _policy = const VpnPolicy();
   NativeVpnCapabilities _capabilities =
       NativeVpnCapabilities.unavailable(NativeVpnBridge.platform);
-  bool _loading = true;
+  // Show safe, disabled defaults immediately; the native probe runs in background.
+  bool _loading = false;
   bool _saving = false;
 
   bool get _identified =>
