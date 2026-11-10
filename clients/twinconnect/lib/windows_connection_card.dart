@@ -44,6 +44,7 @@ class _WindowsConnectionCardState extends State<WindowsConnectionCard> {
   bool _busy = false;
   bool _up = false;
   bool _needsCleanup = false;
+  bool _unmanaged = false;
   bool _peerVerified = false;
   int _receivedBytes = 0;
   int _sentBytes = 0;
@@ -71,6 +72,7 @@ class _WindowsConnectionCardState extends State<WindowsConnectionCard> {
         _up = status['state'] == 'interface_up' ||
             status['state'] == 'peer_verified';
         _needsCleanup = status['state'] == 'needs_cleanup';
+        _unmanaged = status['state'] == 'unmanaged_service';
         _peerVerified = status['state'] == 'peer_verified' &&
             status['peerHandshakeVerified'] == true;
         _receivedBytes = status['rxBytes'] is int
@@ -126,6 +128,7 @@ class _WindowsConnectionCardState extends State<WindowsConnectionCard> {
         _up = result['state'] == 'interface_up' ||
             result['state'] == 'peer_verified';
         _needsCleanup = false;
+        _unmanaged = false;
         _peerVerified = result['peerHandshakeVerified'] == true;
         _receivedBytes = result['rxBytes'] is int ? result['rxBytes'] as int : 0;
         _sentBytes = result['txBytes'] is int ? result['txBytes'] as int : 0;
@@ -145,6 +148,7 @@ class _WindowsConnectionCardState extends State<WindowsConnectionCard> {
       if (mounted) setState(() {
         _up = false;
         _needsCleanup = false;
+        _unmanaged = false;
         _peerVerified = false;
         _receivedBytes = 0;
         _sentBytes = 0;
@@ -177,7 +181,13 @@ class _WindowsConnectionCardState extends State<WindowsConnectionCard> {
             Text(s.pick('اتصال WireGuard ویندوز', 'Windows WireGuard'),
                 style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 9),
-            Text(_needsCleanup
+            Text(_unmanaged
+                ? s.pick(
+                    'یک سرویس WireGuard با همین نام متعلق به این برنامه نیست؛ '
+                    'برای جلوگیری از اختلال، تغییری در آن ایجاد نمی‌شود.',
+                    'A same-named WireGuard service is not owned by TwinConnect. '
+                    'It will not be modified.')
+                : _needsCleanup
                 ? s.pick(
                     'سرویس قبلی ناقص مانده؛ برای پاک‌سازی روی دکمه پایین بزنید.',
                     'Previous tunnel service needs cleanup before reconnecting.')
@@ -207,7 +217,7 @@ class _WindowsConnectionCardState extends State<WindowsConnectionCard> {
               ]),
             ],
             const SizedBox(height: 10),
-            if (!_up && !_needsCleanup)
+            if (!_up && !_needsCleanup && !_unmanaged)
               DropdownButtonFormField<String>(
                 key: const Key('windowsWireGuardServer'),
                 initialValue: validSelection,
@@ -230,7 +240,8 @@ class _WindowsConnectionCardState extends State<WindowsConnectionCard> {
                   ? null
                   : (_up || _needsCleanup)
                       ? _disconnect
-                      : (_ready && _allowed && validSelection != null)
+                      : (_ready && !_unmanaged && _allowed &&
+                          validSelection != null)
                           ? _connect : null,
               icon: Icon(_up || _needsCleanup ? Icons.stop_circle_outlined
                   : Icons.power_settings_new_rounded),
