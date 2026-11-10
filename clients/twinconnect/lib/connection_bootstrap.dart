@@ -52,8 +52,11 @@ class ConnectionBootstrap {
 
     final inventory = await api.refreshSessionServers(
       panel: panel, sessionToken: sessionToken);
+    // A node-health heartbeat is advisory and is not proof the VPN endpoint
+    // works or fails. Authorization comes from this subscription-scoped
+    // inventory; the native peer handshake determines real connectivity.
     final selected = inventory.servers.where((server) =>
-        server.id == serverId && server.nodeOnline);
+        server.id == serverId);
     if (selected.length != 1) {
       throw const ConnectionBootstrapException('SERVER_NOT_AVAILABLE');
     }
