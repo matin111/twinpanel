@@ -100,12 +100,13 @@ def test_node_collector_is_local_authenticated_read_only():
     assert "http://127.0.0.1:19095/users" in script
     assert "secret" in script
     assert "SUDOKU_SHARED_CONTROLLER_CONFIG_MISMATCH" in script
-    assert "systemctl" not in script
+    assert '["systemctl","show"' in script  # InvocationID only; no restart
+    assert '"restart"' not in script and '"set-property"' not in script
     assert "iptables" not in script
     assert "write_text" not in script
     assert "conn.run" not in script
     assert "client_key" not in script
-    assert "upTotal" not in script and "downTotal" not in script
+    assert "upTotal" in script and "downTotal" in script
 
 
 def test_async_ssh_success_and_error_never_expose_native_credentials():
@@ -132,12 +133,52 @@ def test_dedicated_worker_retains_legacy_only_for_unregistered_exits():
     assert "if central_shared:" in text
     assert "collect_shared_native_users(conn)" in text
     assert "apply_shared_native_presence(" in text
+    assert "apply_shared_native_usage(" in text
     assert "canonical._collect_established_tcp_ports(conn)" in text
     assert "canonical._apply_sudoku_presence(" in text
     assert text.index("if central_shared:") < text.index(
         "canonical._collect_established_tcp_ports(conn)")
     # The two collector implementations must never run on the same node.
     assert "if central_shared:\n                    stats = apply_shared_native_presence" in text
+
+
+def test_native_verified_cumulative_counters_fail_closed():
+    epoch="a"*32+":"+"b"*32
+    payload={
+        "marker":"TP_SUDOKU_SHARED_NATIVE_PRESENCE_V1",
+        "names":["tp-sub-11","tp-sub-22"],
+        "online":{"tp-sub-11":1},
+        "total":2,"connections":1,
+        "counter_epoch":epoch,
+        "totals":{"tp-sub-11":[100,200],"tp-sub-22":[10,20]},
+    }
+    assert subject.validate_snapshot(payload)["counters"] == {
+        "tp-sub-11":(100,200),"tp-sub-22":(10,20)
+    }
+    invalid=[
+        {**payload,"counter_epoch":"bad"},
+        {**payload,"totals":{"tp-sub-11":[100,200]}},
+        {**payload,"totals":{"tp-sub-11":[100,200],"tp-sub-22":[-1,20]}},
+        {**payload,"totals":{"tp-sub-11":[100,200],"tp-sub-22":[True,20]}},
+        {**payload,"totals":{"tp-sub-11":[100,200],"tp-sub-22":[1.5,20]}},
+        {**payload,"totals":{"tp-sub-11":[100,200],"tp-sub-23":[5,6]}},
+    ]
+    for item in invalid:
+        try: subject.validate_snapshot(item)
+        except ValueError: pass
+        else: raise AssertionError("invalid Sudoku counter accepted")
+    assert subject.validate_snapshot({k:v for k,v in payload.items()
+        if k not in ("counter_epoch","totals")})["counters"] == {}
+
+
+def test_native_shared_quota_only_uses_authoritative_totals():
+    source=Path(subject.__file__).read_text()
+    assert "canonical._baseline_or_apply_cumulative(" in source
+    assert 'source_key=f"sudoku:shared:{sid}:{epoch}"' in source
+    assert "uplink=int(values[0]),downlink=int(values[1])" in source
+    assert "upTotal" in source and "downTotal" in source
+    assert "bytes_per_second" not in source
+    assert "systemctl\"restart" not in source
 
 
 if __name__=="__main__":
