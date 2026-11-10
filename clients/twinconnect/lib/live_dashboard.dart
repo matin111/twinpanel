@@ -655,7 +655,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
         child: Container(
       key: const Key('liveConnectionStatus'),
-      padding: const EdgeInsets.fromLTRB(18, 18, 18, 15),
+      constraints: const BoxConstraints(minHeight: 415),
+      padding: const EdgeInsets.fromLTRB(18, 26, 18, 25),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(29),
         gradient: LinearGradient(
@@ -811,9 +812,13 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                 ]),
             ])),
             Expanded(child: Column(children: [
-              txt(tr('آی‌پی', 'IP'), size: 10, color: sub),
+              txt(tr('آی‌پی عمومی', 'Public IP'), size: 10, color: sub),
               const SizedBox(height: 4),
-              txt('—', size: 11, bold: true),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: txt(_vpnVerified ? (_publicIp ?? '—') : '—',
+                    size: 12, bold: true),
+              ),
             ])),
             Expanded(child: Column(children: [
               txt(tr('پروتکل', 'Protocol'), size: 10, color: sub),
@@ -981,7 +986,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     Widget metric(IconData icon, String title, String value,
         {String? detail}) => glassCard(
       radius: 17,
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -990,7 +995,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
             const SizedBox(width: 8),
             Expanded(child: txt(title, size: 11, color: sub)),
           ]),
-          const SizedBox(height: 10),
+          const SizedBox(height: 16),
           txt(value, size: 18, bold: true),
           if (detail != null) ...[
             const SizedBox(height: 4),
@@ -1003,7 +1008,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     Widget connectionStats() => glassCard(
       key: const Key('devConnectionStats'),
       radius: 23,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(22),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -1014,7 +1019,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                 _vpnUp ? tr('رابط فعال', 'Interface active') :
                 tr('قطع', 'Disconnected')),
           ]),
-          const SizedBox(height: 16),
+          const SizedBox(height: 23),
           Row(children: [
             Expanded(child: metric(Icons.speed_rounded,
               tr('تاخیر HTTPS', 'HTTPS latency'),
@@ -1025,7 +1030,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
               tr('آی‌پی عمومی', 'Public IP'),
               _vpnVerified ? (_publicIp ?? '—') : '—')),
           ]),
-          const SizedBox(height: 10),
+          const SizedBox(height: 18),
           Row(children: [
             Expanded(child: metric(Icons.arrow_downward_rounded,
               tr('دریافت', 'Received'), _vpnUp ? '$_vpnRx B' : '—',
@@ -1035,7 +1040,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
               tr('ارسال', 'Sent'), _vpnUp ? '$_vpnTx B' : '—',
               detail: tr('مجموع رابط', 'Interface total'))),
           ]),
-          const SizedBox(height: 14),
+          const SizedBox(height: 25),
           Container(
             decoration: tile(radius: 14),
             padding: const EdgeInsets.all(12),
@@ -1124,24 +1129,6 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                 });
               },
             ),
-          ]),
-        ),
-        const SizedBox(height: 15),
-        glassCard(
-          key: const Key('devLocationsCard'),
-          radius: 23,
-          padding: const EdgeInsets.fromLTRB(15, 11, 15, 10),
-          child: Column(children: [
-            Row(children: [
-              Expanded(child: txt(tr('مکان‌ها', 'Locations'),
-                size: 18, bold: true)),
-              TextButton(
-                onPressed: () => setState(() => _page = 'locations'),
-                child: Text(tr('نمایش همه', 'View all')),
-              ),
-            ]),
-            const SizedBox(height: 5),
-            for (int i = 0; i < demoServers.length && i < 2; i++) serverRow(i),
           ]),
         ),
       ],
