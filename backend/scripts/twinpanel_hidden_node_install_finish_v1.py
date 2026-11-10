@@ -225,6 +225,14 @@ async def finish(node_id: int, job_id: str, *, xray_port: int,
         )
         ready_count = int(readiness.get("ready_count") or 0)
         missing = frozenset(readiness.get("missing") or [])
+        # Extra fail-closed check: a mocked or regressed health probe must
+        # never admit Xray without its verified dedicated TLS certificate.
+        if not tls_certificate_ready and "v2ray" not in missing:
+            _status(job_id, "failed", node_id,
+                    installed_protocols=max(0, ready_count - 1),
+                    error_code=tls_error_code)
+            return {"ok": False, "node_id": node_id,
+                    "reason": tls_error_code}
         if not readiness.get("ok") or ready_count < 1:
             _status(job_id, "failed", node_id,
                     installed_protocols=ready_count,
@@ -246,8 +254,10 @@ async def finish(node_id: int, job_id: str, *, xray_port: int,
             NodeProtocolConfig.protocol.in_(list(missing)),
         ).all():
             row.status = "offline"
-        if "v2ray" in missing:
-            node.enable_v2ray = False
+        for protocol in missing.intersection({
+            "cisco", "openvpn", "wireguard", "l2tp", "v2ray",
+        }):
+            setattr(node, f"enable_{protocol}", False)
         db.commit()
         partial = ready_count < len(ALL_PROTOCOL_KEYS)
         if partial:
