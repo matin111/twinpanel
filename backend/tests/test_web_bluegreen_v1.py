@@ -100,6 +100,33 @@ class WebBlueGreenTests(TestCase):
             self.assertFalse(self.backup.exists())
             self.assertIn(mock.call("systemctl", "stop", mod.STANDBY_UNIT), run.call_args_list)
 
+    def test_crash_after_nginx_reload_before_state_write_restores_safely(self):
+        self._staged()
+        before = json.loads(self.state.read_text())
+        # Simulate an interrupted handoff after nginx reload but before
+        # phase becomes serving_standby: state remains "staged".
+        plan = mod.plan()
+        self.site_a.write_text(plan["replacements"][str(self.site_a)])
+        self.site_b.write_text(plan["replacements"][str(self.site_b)])
+        self.assertEqual(before["phase"], "staged")
+        with mock.patch.object(mod, "_http_health", return_value=True), \
+             mock.patch.object(mod, "_run"):
+            mod.restore("1.1.0-rc.762")
+        self.assertIn("127.0.0.1:3000", self.site_a.read_text())
+        self.assertIn("127.0.0.1:3000", self.site_b.read_text())
+        self.assertFalse(self.state.exists())
+        self.assertFalse(self.backup.exists())
+
+    def test_stale_backup_directory_aborts_without_removing_evidence(self):
+        self.backup.mkdir(parents=True)
+        marker_path = self.backup / "orphaned.bak"
+        marker_path.write_text("leave untouched")
+        with mock.patch.object(mod, "_run") as run:
+            with self.assertRaisesRegex(RuntimeError, "EXISTING_STATE_OR_BACKUP"):
+                mod.stage(self.releases, "1.1.0-rc.763")
+        self.assertTrue(marker_path.exists())
+        run.assert_not_called()
+
     def test_detects_external_nginx_change_without_overwriting_it(self):
         self._staged()
         self.site_a.write_text(self.site_a.read_text() + "\n# external edit\n")
