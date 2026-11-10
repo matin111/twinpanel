@@ -165,8 +165,10 @@ def _validate_release(release: Path, version: str) -> Path:
 
 def stage(release: Path, version: str) -> dict:
     _require_root()
-    if STATE.exists():
-        raise RuntimeError("WEB_BLUEGREEN_ALREADY_STAGED")
+    if STATE.exists() or BACKUP_ROOT.exists():
+        # A backup directory without state may be an interrupted handoff.
+        # Preserve its contents for operator recovery: never overwrite it.
+        raise RuntimeError("WEB_BLUEGREEN_EXISTING_STATE_OR_BACKUP")
     before = plan()
     working = _validate_release(release, version)
     # Staging must never change the already active frontend on 3000.
@@ -230,7 +232,10 @@ def _switch_files(state: dict, *, to_standby: bool) -> None:
         target = Path(path).resolve(strict=True)
         if not target.is_relative_to(ROOT.resolve()):
             raise RuntimeError("WEB_BLUEGREEN_CONFIG_PATH_INVALID")
-        original = (BACKUP_ROOT / meta["backup"]).read_bytes()
+        relative = Path(str(meta["backup"]))
+        if relative.name != str(relative) or relative.suffix != ".bak":
+            raise RuntimeError("WEB_BLUEGREEN_BACKUP_PATH_INVALID")
+        original = (BACKUP_ROOT / relative).read_bytes()
         if _sha(original) != meta["before"]:
             raise RuntimeError("WEB_BLUEGREEN_BACKUP_HASH_MISMATCH")
         staged_text, _ = _rewrite_site(
@@ -280,8 +285,9 @@ def restore(version: str) -> dict:
     # Only return traffic to a verified healthy primary instance.
     if not _http_health(MAIN_PORT, version, seconds=6):
         raise RuntimeError("WEB_BLUEGREEN_PRIMARY_NOT_READY_KEEP_STANDBY")
-    if state["phase"] == "serving_standby":
-        _switch_files(state, to_standby=False)
+    # A crash may occur between Nginx reload and the phase state write.
+    # Always restore upstreams, even if state still says "staged".
+    _switch_files(state, to_standby=False)
     _run("systemctl", "stop", STANDBY_UNIT)
     shutil.rmtree(BACKUP_ROOT)
     STATE.unlink(missing_ok=True)
