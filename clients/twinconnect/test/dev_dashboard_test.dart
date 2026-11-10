@@ -16,6 +16,10 @@ void main() {
     await tester.pumpWidget(const TwinConnectDevApp());
     await tester.pumpAndSettle();
 
+    expect(find.byKey(const Key('devAnimatedBackground')), findsOneWidget);
+    expect(find.byKey(const Key('devAmbientGrid')), findsOneWidget);
+    expect(find.byKey(const Key('devPageTransition')), findsOneWidget);
+    expect(find.byType(AnimatedSwitcher), findsWidgets);
     expect(find.byKey(const Key('devConnectionStatus')), findsOneWidget);
     expect(find.byKey(const Key('devConnectionStats')), findsOneWidget);
     expect(find.text('— ms'), findsWidgets);
