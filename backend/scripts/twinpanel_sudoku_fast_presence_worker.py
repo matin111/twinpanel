@@ -35,6 +35,10 @@ INTERVAL_SECONDS = 20.0
 
 async def reconcile_once() -> dict:
     db = SessionLocal()
+    # This brand-new presence-only session has no pending writes. The shared
+    # batch builder may release credential/device SELECT transactions before
+    # decrypting large identity maps; pending mutations still fail closed.
+    db.info["twinpanel_v314_clean_lookup_session"] = True
     results = []
     try:
         node_ids = [
