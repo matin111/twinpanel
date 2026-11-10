@@ -44,7 +44,7 @@ class PartialRecoveryTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["users_assigned"],2)
         self.assertEqual(job.error_code,"PARTIAL_PROTOCOLS_PENDING")
         self.assertEqual(job.state,"completed")
-        self.assertTrue(node.show_to_users is False or node.show_to_users is True)
+        self.assertEqual(node.enable_v2ray,False)
 
 if __name__=="__main__":
     unittest.main()
