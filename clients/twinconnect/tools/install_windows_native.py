@@ -152,41 +152,17 @@ def install() -> None:
             "  RegisterPlugins(flutter_controller_->engine());\n\n" + injection,
         )
 
-    # Windows tunnel service creation requires elevation on every launch.
-    # Encode this in the executable manifest rather than relying on the
-    # user's shortcut or a one-time elevated setup process.
-    manifest = ROOT / "windows" / "runner" / "runner.exe.manifest"
-    if not manifest.is_file():
-        raise RuntimeError("Missing Windows executable manifest")
-    xml = manifest.read_text(encoding="utf-8-sig")
-    # Flutter's stock Windows manifest normally has no UAC declaration.
-    # Inject it once, or safely update an existing level.
-    import re
-    if re.search(r"<requestedExecutionLevel\\b", xml):
-        xml, count = re.subn(
-            r'(<requestedExecutionLevel\\b[^>]*\\blevel\\s*=\\s*["\\\'])[^"\\\']+(["\\\'])',
-            r'\\g<1>requireAdministrator\\g<2>',
-            xml,
-            count=1,
-        )
-        if count != 1:
-            raise RuntimeError("Existing UAC level could not be updated")
-    else:
-        trust_info = (
-            '  <trustInfo xmlns="urn:schemas-microsoft-com:asm.v2">\\n'
-            '    <security>\\n'
-            '      <requestedPrivileges xmlns="urn:schemas-microsoft-com:asm.v3">\\n'
-            '        <requestedExecutionLevel level="requireAdministrator" uiAccess="false" />\\n'
-            '      </requestedPrivileges>\\n'
-            '    </security>\\n'
-            '  </trustInfo>\\n'
-        )
-        if xml.count("</assembly>") != 1:
-            raise RuntimeError("Unexpected Windows application manifest")
-        xml = xml.replace("</assembly>", trust_info + "</assembly>", 1)
-    if 'level="requireAdministrator"' not in xml:
-        raise RuntimeError("Windows manifest elevation contract missing")
-    manifest.write_text(xml, encoding="utf-8")
+    # Request elevation through the MSVC linker-generated manifest. Do not
+    # insert trustInfo directly into runner.exe.manifest: the linker also
+    # generates a UAC manifest, and mt.exe can fail merging both.
+    runner_cmake = ROOT / "windows" / "runner" / "CMakeLists.txt"
+    if not runner_cmake.is_file():
+        raise RuntimeError("Missing generated Windows runner CMakeLists.txt")
+    cmake = runner_cmake.read_text(encoding="utf-8-sig")
+    uac_line = 'target_link_options(${BINARY_NAME} PRIVATE "/MANIFESTUAC:level=\\'requireAdministrator\\' uiAccess=\\'false\\'")'
+    if uac_line not in cmake:
+        cmake += "\\n# TwinConnect native VPN needs elevation for service management.\\n" + uac_line + "\\n"
+    runner_cmake.write_text(cmake, encoding="utf-8")
 
     HEADER.write_text(header, encoding="utf-8")
     SOURCE.write_text(cpp, encoding="utf-8")
