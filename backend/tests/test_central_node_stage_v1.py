@@ -10,6 +10,7 @@ from app.models import NodeStatus, NodeType
 def desired_state(count):
     return SimpleNamespace(
         count=count, pair_count=count, fingerprint="0"*64,
+        subscription_ids=tuple(range(1,count+1)),
         entitled_pairs=((1,"sudoku"),) if count else (),
         invalid_protocols=(), without_entitlements=(),
     )
