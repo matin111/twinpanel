@@ -37,8 +37,8 @@ class SingBoxProfileValidator {
       throw const FormatException('NOT_SINGBOX_PROTOCOL');
     }
     dynamic candidate = item['outbound'];
-    if (candidate == null) candidate = item['singbox_outbound'];
-    if (candidate == null) candidate = item['config'];
+    candidate ??= item['singbox_outbound'];
+    candidate ??= item['config'];
     if (candidate is String) {
       if (candidate.length > 131072) {
         throw const FormatException('SINGBOX_CONFIG_TOO_LARGE');
