@@ -188,7 +188,7 @@ void main() {
     expect(find.byType(ListTile), findsNothing);
     expect(find.byKey(const Key('protocol_l2tp')), findsNothing);
     expect(find.byKey(const Key('protocol_openvpn')), findsOneWidget);
-    expect(find.byType(Chip).evaluate().length, 15);
+    expect(catalog.entries.where((entry) => entry.selected).length, 15);
     expect(find.byType(FilledButton), findsNothing);
   });
 }
