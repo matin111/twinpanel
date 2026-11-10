@@ -135,6 +135,12 @@ class BrandPreview {
     this.logoUrl,
     this.primaryColor = '#7C3AED',
     this.secondaryColor = '#4F46E5',
+    this.buttonColor = '#7C3AED',
+    this.backgroundColor = '#101018',
+    this.surfaceColor = '#20202A',
+    this.backgroundStyle = 'gradient',
+    this.backgroundImageUrl,
+    this.themeMode = 'dark',
   });
 
   final String namespace;
@@ -150,6 +156,12 @@ class BrandPreview {
   final String? logoUrl;
   final String primaryColor;
   final String secondaryColor;
+  final String buttonColor;
+  final String backgroundColor;
+  final String surfaceColor;
+  final String backgroundStyle;
+  final String? backgroundImageUrl;
+  final String themeMode;
 
   factory BrandPreview.fromJson(Map<String, dynamic> json) {
     String field(String key, [String fallback = '']) {
@@ -169,6 +181,17 @@ class BrandPreview {
       return RegExp(r'^#[A-Fa-f0-9]{6}$').hasMatch(value) ? value : fallback;
     }
 
+    final backgroundUrl = optional('background_image_url');
+    final uri = backgroundUrl == null ? null : Uri.tryParse(backgroundUrl);
+    final safeImageUrl = uri != null &&
+            uri.scheme == 'https' &&
+            uri.host.contains('.') &&
+            uri.userInfo.isEmpty &&
+            !uri.hasQuery && !uri.hasFragment
+        ? backgroundUrl
+        : null;
+    final style = field('background_style', 'gradient');
+    final mode = field('theme_mode', 'dark');
     return BrandPreview(
       namespace: field('namespace'),
       brandName: field('brand_name', 'TwinPanel'),
@@ -183,6 +206,13 @@ class BrandPreview {
       logoUrl: optional('logo_url'),
       primaryColor: color('primary_color', '#7C3AED'),
       secondaryColor: color('secondary_color', '#4F46E5'),
+      buttonColor: color('button_color', color('primary_color', '#7C3AED')),
+      backgroundColor: color('background_color', '#101018'),
+      surfaceColor: color('surface_color', '#20202A'),
+      backgroundStyle: ['solid', 'gradient', 'image'].contains(style)
+          ? style : 'gradient',
+      backgroundImageUrl: safeImageUrl,
+      themeMode: ['light', 'dark', 'system'].contains(mode) ? mode : 'dark',
     );
   }
 }
