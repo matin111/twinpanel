@@ -29,6 +29,7 @@ def validators():
     env = {
         "re": re, "urlsplit": urlsplit, "ipaddress": ipaddress,
         "HTTPException": FakeHTTPException,
+        "AppearanceIn": object,
         "LABEL": re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$"),
         "COLOR": re.compile(r"^#[0-9A-Fa-f]{6}$"),
     }
