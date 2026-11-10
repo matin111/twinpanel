@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'tenant_models.dart';
 import 'protocols.dart';
+import 'server_inventory.dart';
 
 /// A fail-closed directory client. The vendor sees ONLY a tenant namespace.
 /// Username and bearer share token go directly to the licensed installation.
@@ -74,6 +75,24 @@ class TenantApi {
       throw const FormatException('NAMESPACE_MISMATCH');
     }
     return catalog;
+  }
+
+  /// Fetch fresh nodes from the owning panel using the existing app session.
+  /// There is deliberately no local cache and no fabricated latency.
+  Future<AppServerInventory> refreshSessionServers({
+    required PanelDirectoryEntry panel,
+    required String sessionToken,
+  }) async {
+    final data = await _requestJson(
+      panel.apiOrigin.resolve('/v1/central-app/session/servers'),
+      bearerToken: sessionToken,
+      maxBytes: 128 * 1024,
+    );
+    final inventory = AppServerInventory.fromJson(data);
+    if (inventory.namespace != panel.namespace) {
+      throw const FormatException('NAMESPACE_MISMATCH');
+    }
+    return inventory;
   }
 
   Future<ClientProtocolProfiles> loadSessionNativeProfiles({
