@@ -22,6 +22,26 @@ void main() {
       );
     });
 
+    test('short reseller account routes by its unique short panel alias', () {
+      expect(
+        TenantIdentity.namespaceFromUsername('TPA1B2C3_R2A_APP0123456789ABCDEF'),
+        'TPA1B2C3',
+      );
+      expect(
+        TenantIdentity.namespaceFromUsername('TPA1B2C3D4E5F60718_R2A_APP0123456789ABCDEF'),
+        'TPA1B2C3D4E5F60718',
+      );
+      expect(
+        TenantIdentity.parseNamespace('TPA1B2C3_R1_APP0123456789ABCDEF', ''),
+        'TPA1B2C3',
+      );
+      expect(
+        () => TenantIdentity.parseNamespace(
+          'TPA1B2C3_R1_APP0123456789ABCDEF', 'TPB2C3D4'),
+        throwsFormatException,
+      );
+    });
+
     test('admin account can use a separate tenant code', () {
       expect(
         TenantIdentity.parseNamespace('ordinary_admin_user', 'TP0123456789ABCDEF'),
