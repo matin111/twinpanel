@@ -57,7 +57,7 @@ class ExistingLicenseIntegrationContract(unittest.TestCase):
             encoding="utf-8"
         )
         self.assertIn('return f"{installation_namespace(installation_id)}_R{ident:X}_"', identity)
-        self.assertIn("reseller_prefix(installation, reseller_id)", credentials)
+        self.assertIn("app_reseller_prefix(installation, reseller_id)", credentials)
         self.assertIn("_current_reseller_id(db, sub.id)", credentials)
         self.assertIn("APP_OWNER_MISMATCH", credentials)
         self.assertIn("APP_OWNER_CHANGED", credentials)
