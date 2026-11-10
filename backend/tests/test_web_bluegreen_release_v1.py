@@ -73,6 +73,25 @@ class WebSlots(unittest.TestCase):
         self.assertIn('TP_WEB_RELEASE', web.UNIT)
         self.assertNotIn("/opt/twinpanel/current/.next", web.UNIT)
 
+    def test_reboot_persistence_and_safe_retire(self):
+        source = FILE.read_text()
+        self.assertIn('cmd("systemctl", "enable", unit)', source)
+        self.assertIn('cmd("systemctl", "disable", "--now", "twinpanel-web.service")', source)
+        self.assertIn('cmd("systemctl", "disable", "--now", f"twinpanel-web-slot@{old}.service")', source)
+
+    def test_legacy_prestart_migrations_are_preserved(self):
+        updater = (FILE.parent / "twinpanel_public_updater.py").read_text()
+        for helper in (
+            "twinpanel_nginx_reconcile.py",
+            "twinpanel_updater_unit_reconcile_v69.py",
+            "twinpanel_api_update_handoff_v69.py",
+            "twinpanel_runtime_unit_reconcile.py",
+            "twinpanel_accounting_unit_reconcile.py",
+        ):
+            self.assertIn(helper, updater)
+        self.assertIn("converge_web_prestart_helpers_for_bluegreen(final, env)", updater)
+
+
     def test_updater_never_restarts_legacy_web_when_bluegreen_enabled(self):
         updater = (FILE.parent / "twinpanel_public_updater.py").read_text()
         self.assertIn("restart_services(include_web=bg is None)", updater)
