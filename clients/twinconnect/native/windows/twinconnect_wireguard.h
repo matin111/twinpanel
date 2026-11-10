@@ -509,8 +509,11 @@ inline bool Stop() {
   // Never remove a same-named tunnel created by another client/tool.
   if (ServiceExists() && !IsFile(EncryptedPath())) return false;
   if (ServiceExists()) {
-    if (!InvokeOfficialWireGuard(L"/uninstalltunnelservice", kTunnelName))
-      return false;
+    // A helper timeout does not prove the service is still running.
+    // Check the actual SCM state before failing or clearing local data.
+    const bool command_ok =
+        InvokeOfficialWireGuard(L"/uninstalltunnelservice", kTunnelName);
+    if (!command_ok && ServiceExists()) return false;
     for (int i = 0; i < 20; i++) {
       if (!ServiceExists()) break;
       Sleep(250);
