@@ -17,7 +17,7 @@ from ..central_app_credentials import (
 from ..central_app_identity import central_app_entitled, installation_namespace, subscription_app_namespace
 from ..database import get_db
 from ..deps import get_current_user, require_admin, require_reseller
-from ..models import Subscription, User
+from ..models import Subscription, User, Node, SubscriptionNode, NodeStatus
 from ..models_reseller import Reseller, ResellerSubscription
 from ..system_release import ensure_installation_id
 from .account_delivery import _share_token, _share_url
@@ -133,6 +133,44 @@ def session_protocols(
     )
     response.headers.update(_PRIVATE_HEADERS)
     return response
+
+
+@router.get("/session/servers")
+def session_servers(
+    sub: Subscription = Depends(_session_subscription),
+    db: Session = Depends(get_db),
+):
+    """Current assigned, visible nodes for this one authenticated app account.
+
+    This is an inventory refresh, not a ping or connection success check.
+    Never return server credentials, agent URLs, or other customers' nodes.
+    """
+    nodes = (
+        db.query(Node)
+        .join(SubscriptionNode, SubscriptionNode.node_id == Node.id)
+        .filter(
+            SubscriptionNode.subscription_id == sub.id,
+            Node.show_to_users.is_(True),
+            Node.retired_at.is_(None),
+        )
+        .order_by(Node.id)
+        .limit(500)
+        .all()
+    )
+    return JSONResponse({
+        "schema": 1,
+        "namespace": subscription_app_namespace(db, sub),
+        "servers": [
+            {
+                "id": str(node.id),
+                "name": node.name,
+                "country_code": node.country_code,
+                "node_online": node.status == NodeStatus.ONLINE,
+                "latency_ms": None,
+            }
+            for node in nodes
+        ],
+    }, headers=_PRIVATE_HEADERS)
 
 
 @router.post("/session/profiles")
