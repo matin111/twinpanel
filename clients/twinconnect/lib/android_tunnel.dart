@@ -30,7 +30,7 @@ class AndroidTunnelController {
       final nodeName = item['node'] ?? item['server'] ?? item['name'];
       final displayName = nodeName is String && nodeName.trim().isNotEmpty
           ? nodeName.trim()
-          : 'WireGuard server ' + (results.length + 1).toString();
+          : 'WireGuard server ${results.length + 1}';
       // The configuration itself is kept in process memory only.
       results.add(WireGuardNode(name: displayName, config: raw));
     }
@@ -44,7 +44,7 @@ class AndroidTunnelController {
     required NativeProtocolReadiness nativeProtocols,
   }) async {
     if (!Platform.isAndroid) {
-      throw const PlatformException(
+      throw PlatformException(
         code: 'PLATFORM_UNSUPPORTED',
         message: 'WireGuard native integration is Android-only in this build.',
       );
@@ -71,7 +71,7 @@ class AndroidTunnelController {
 
   Future<Map<String, dynamic>> stop() async {
     if (!Platform.isAndroid) {
-      throw const PlatformException(
+      throw PlatformException(
         code: 'PLATFORM_UNSUPPORTED',
         message: 'No Android native VPN bridge.',
       );
@@ -97,7 +97,7 @@ class AndroidTunnelController {
   /// Cisco cannot be started by WireGuard; fail closed until a reviewed
   /// libopenconnect engine forwards packets via Android VpnService.
   Future<Never> connectCisco() async {
-    throw const PlatformException(
+    throw PlatformException(
       code: 'OPENCONNECT_CORE_NOT_INSTALLED',
       message: 'Cisco/OpenConnect native core is not installed in this build.',
     );

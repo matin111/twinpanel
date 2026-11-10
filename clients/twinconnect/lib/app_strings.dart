@@ -60,6 +60,22 @@ class AppStrings {
     'This preview only identifies your panel and shows your brand. '
     'VPN connections will become available after the native engines are implemented.',
   );
+  String get previewButton => pick(
+    'مشاهده نسخه آزمایشی ویندوز',
+    'Explore Windows demo',
+  );
+  String get previewBanner => pick(
+    'حالت نمایشی آفلاین — این اطلاعات واقعی نیستند و هیچ VPN متصل نشده است.',
+    'OFFLINE DEMO — Sample data only. No VPN is connected.',
+  );
+  String get previewSubtitle => pick(
+    'برای بررسی ظاهر، فارسی/انگلیسی، تنظیمات و فهرست ۱۶ پروتکل بدون ورود حساب.',
+    'Preview layout, Persian/English, settings and all 16 protocols without an account.',
+  );
+  String get windowsEnginePending => pick(
+    'موتور اتصال ویندوز و Cisco/OpenConnect هنوز آماده نیست. این خروجی فقط برای آزمایش رابط برنامه است.',
+    'Windows VPN engines and Cisco/OpenConnect are not ready. This build is for interface testing only.',
+  );
   String get engineNotReady => pick(
     'نسخه اولیه: بدون موتور اتصال VPN',
     'Preview: VPN engine is not yet available',
