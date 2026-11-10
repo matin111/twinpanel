@@ -502,6 +502,9 @@ async def _reconcile_node(db, node: Node) -> list[dict[str, Any]]:
 
 async def reconcile_modern_quota_once() -> dict[str, Any]:
     db = SessionLocal()
+    # The fresh dedicated worker session has no pending billing writes before
+    # its first credential/device-map cache build.
+    db.info["twinpanel_v314_clean_lookup_session"] = True
     results: list[dict[str, Any]] = []
     try:
         node_ids = [
