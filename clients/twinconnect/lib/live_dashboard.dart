@@ -5,7 +5,6 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'protocols.dart';
 import 'server_inventory.dart';
-import 'windows_connection_card.dart';
 import 'tenant_models.dart';
 import 'native_vpn_bridge.dart';
 import 'country_flag.dart';
@@ -329,22 +328,16 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
             width: 94, height: 94,
             child: FilledButton(
               key: const Key('liveConnectionControlsButton'),
-              onPressed: widget.catalog == null || widget.servers == null
-                  ? null
-                  : () => showModalBottomSheet<void>(
-                      context: context,
-                      isScrollControlled: true,
-                      builder: (context) => SafeArea(child: Padding(
-                        padding: const EdgeInsets.all(20),
-                        child: SingleChildScrollView(child: WindowsConnectionCard(
-                          panel: widget.panel,
-                          username: widget.username,
-                          sessionToken: widget.sessionToken,
-                          catalog: widget.catalog!,
-                          servers: widget.servers!,
-                        )),
-                      )),
-                    ),
+              onPressed: () {
+                final message = widget.catalog == null || widget.servers == null
+                    ? tr('اطلاعات اتصال هنوز دریافت نشده است.',
+                        'Connection information is not loaded yet.')
+                    : tr('اتصال مستقیم هنوز برای این پروتکل فعال نشده است.',
+                        'Direct connection is not yet available for this protocol.');
+                ScaffoldMessenger.of(context)
+                  ..hideCurrentSnackBar()
+                  ..showSnackBar(SnackBar(content: Text(message)));
+              },
               style: FilledButton.styleFrom(
                 padding: EdgeInsets.zero,
                 shape: const CircleBorder(),
@@ -361,8 +354,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         const SizedBox(height: 12),
         txt(tr('اتصال سریع', 'Quick connect'), size: 20, bold: true),
         const SizedBox(height: 5),
-        txt(tr('وضعیت اتصال را از کنترل WireGuard بررسی کنید',
-              'Check actual status in WireGuard controls'),
+        txt(tr('برای اتصال، پروتکل و سرور مناسب را انتخاب کنید',
+              'Select a server and protocol to connect'),
             size: 12, color: sub),
         const SizedBox(height: 12),
         ConnectionSignalArt(dark: _dark),
@@ -578,7 +571,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           Row(children: [
             Expanded(child: txt(tr('وضعیت شبکه', 'Network status'),
               size: 17, bold: true)),
-            smallPill(tr('بررسی در کنترل اتصال', 'Check VPN controls')),
+            smallPill(tr('وضعیت نامشخص', 'Status unknown')),
           ]),
           const SizedBox(height: 16),
           Row(children: [
@@ -645,16 +638,6 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
             ),
           );
         }),
-        if (widget.catalog != null && widget.servers != null) ...[
-          const SizedBox(height: 15),
-          WindowsConnectionCard(
-            panel: widget.panel,
-            username: widget.username,
-            sessionToken: widget.sessionToken,
-            catalog: widget.catalog!,
-            servers: widget.servers!,
-          ),
-        ],
         const SizedBox(height: 15),
         glassCard(
           key: const Key('devAutoSelectCard'),
