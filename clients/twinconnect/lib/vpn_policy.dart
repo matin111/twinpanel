@@ -119,12 +119,12 @@ class VpnPolicy {
   }
 
   /// Validate a *draft* before persisting it. This does not enable any VPN.
-  List<String> draftProblems(VpnPlatform platform) {
+  List<String> draftProblems(VpnPlatform platform, {bool managedDevice = false}) {
     final issues = <String>[];
     final selectedMode = routingMode != VpnRoutingMode.fullTunnel;
     if (selectedMode) {
       if (platform != VpnPlatform.android &&
-          platform != VpnPlatform.windows) {
+          platform != VpnPlatform.windows && !managedDevice) {
         issues.add('PER_APP_REQUIRES_MANAGED_OR_UNAVAILABLE');
       }
       if (appIds.isEmpty) issues.add('NO_SELECTED_APPS');
@@ -156,7 +156,7 @@ class VpnPolicy {
   /// Never report protection as active based on a saved toggle.
   /// Only platform-level verified capabilities can authorize future connect.
   List<String> connectionProblems(NativeVpnCapabilities native) {
-    final issues = draftProblems(native.platform);
+    final issues = draftProblems(native.platform, managedDevice: native.managedDevice);
     if (!native.engineReady) issues.add('ENGINE_NOT_READY');
     if (!native.fullTunnel) issues.add('FULL_TUNNEL_UNSUPPORTED');
     if (routingMode == VpnRoutingMode.onlySelectedApps &&
