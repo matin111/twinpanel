@@ -43,6 +43,9 @@ class _WindowsConnectionCardState extends State<WindowsConnectionCard> {
   final _store = const VpnPolicyStore();
   bool _busy = false;
   bool _up = false;
+  bool _peerVerified = false;
+  int _receivedBytes = 0;
+  int _sentBytes = 0;
   bool _ready = false;
   String? _selectedId;
   String? _errorCode;
@@ -64,7 +67,14 @@ class _WindowsConnectionCardState extends State<WindowsConnectionCard> {
       final native = await NativeVpnBridge.protocolReadiness();
       if (!mounted) return;
       setState(() {
-        _up = status['state'] == 'interface_up';
+        _up = status['state'] == 'interface_up' ||
+            status['state'] == 'peer_verified';
+        _peerVerified = status['state'] == 'peer_verified' &&
+            status['peerHandshakeVerified'] == true;
+        _receivedBytes = status['rxBytes'] is int
+            ? status['rxBytes'] as int : 0;
+        _sentBytes = status['txBytes'] is int
+            ? status['txBytes'] as int : 0;
         _ready = native.supports('wireguard');
       });
     } catch (_) {
@@ -103,14 +113,20 @@ class _WindowsConnectionCardState extends State<WindowsConnectionCard> {
       );
       final node = WindowsWireGuardController.configForSingleNode(
         candidate.profiles, selectedId);
-      await _controller.start(
+      final result = await _controller.start(
         node: node,
         policy: policy,
         capabilities: capabilities,
         nativeProtocols: native,
       );
       if (!mounted) return;
-      setState(() => _up = true);
+      setState(() {
+        _up = result['state'] == 'interface_up' ||
+            result['state'] == 'peer_verified';
+        _peerVerified = result['peerHandshakeVerified'] == true;
+        _receivedBytes = result['rxBytes'] is int ? result['rxBytes'] as int : 0;
+        _sentBytes = result['txBytes'] is int ? result['txBytes'] as int : 0;
+      });
     } catch (error) {
       if (mounted) setState(() => _errorCode = _safeError(error));
     } finally {
@@ -123,7 +139,12 @@ class _WindowsConnectionCardState extends State<WindowsConnectionCard> {
     setState(() { _busy = true; _errorCode = null; });
     try {
       await _controller.stop();
-      if (mounted) setState(() => _up = false);
+      if (mounted) setState(() {
+        _up = false;
+        _peerVerified = false;
+        _receivedBytes = 0;
+        _sentBytes = 0;
+      });
     } catch (error) {
       if (mounted) setState(() => _errorCode = _safeError(error));
     } finally {
@@ -153,9 +174,14 @@ class _WindowsConnectionCardState extends State<WindowsConnectionCard> {
                 style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 9),
             Text(_up
-                ? s.pick(
-                    'رابط WireGuard در ویندوز فعال است؛ ارتباط با سرور هنوز تأیید نشده.',
-                    'WireGuard interface is up; peer handshake is not verified.')
+                ? (_peerVerified
+                    ? s.pick('دست‌دهی WireGuard با سرور تأیید شد؛ '
+                            'دسترسی اینترنت و نبود نشت هنوز آزموده نشده‌اند.',
+                            'WireGuard peer handshake verified; '
+                            'internet access and leak tests remain unverified.')
+                    : s.pick(
+                        'رابط WireGuard فعال است؛ ارتباط با سرور هنوز تأیید نشده.',
+                        'Interface is up; peer handshake not yet verified.'))
                 : _ready
                     ? s.pick(
                         'WireGuard نصب است. برای اتصال، سرور مجاز را انتخاب کنید.',
@@ -163,6 +189,15 @@ class _WindowsConnectionCardState extends State<WindowsConnectionCard> {
                     : s.pick(
                         'WireGuard رسمی را نصب کنید و TwinConnect را با Administrator اجرا کنید.',
                         'Install official WireGuard and run TwinConnect as Administrator.')),
+            if (_up) ...[
+              const SizedBox(height: 10),
+              Wrap(spacing: 18, runSpacing: 7, children: [
+                Text(s.pick('دریافت: $_receivedBytes بایت',
+                    'Received: $_receivedBytes bytes')),
+                Text(s.pick('ارسال: $_sentBytes بایت',
+                    'Sent: $_sentBytes bytes')),
+              ]),
+            ],
             const SizedBox(height: 10),
             if (!_up)
               DropdownButtonFormField<String>(
