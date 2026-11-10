@@ -1286,8 +1286,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                 txt(tr('تنظیمات اتصال', 'Connection preferences'),
                     size: 16, bold: true),
                 const SizedBox(height: 5),
-                txt(tr('تنظیمات سیستم پس از نصب موتور فعال می‌شوند',
-                       'System options unlock after engine installation'),
+                txt(tr('قابلیت‌های امنیتی فقط پس از تأیید موتور ویندوز فعال می‌شوند',
+                       'Security controls require verified Windows engine support'),
                     size: 11, color: sub),
               ],
             )),
@@ -1306,6 +1306,53 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
               ),
             ),
           ),
+        ),
+        glassCard(
+          key: const Key('settingsSecurityStatus'),
+          radius: 18,
+          padding: const EdgeInsets.all(15),
+          child: Row(children: [
+            const Icon(Icons.gpp_maybe_outlined,
+                color: Color(0xFFFFB66A), size: 23),
+            const SizedBox(width: 12),
+            Expanded(child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                txt(tr('Kill Switch هنوز تأیید نشده',
+                    'Kill Switch not yet enforced'),
+                    size: 13, bold: true),
+                const SizedBox(height: 4),
+                txt(tr('تا زمانی که محافظت شبکه در ویندوز اجرا و تأیید نشود،'
+                       ' این کلید فعال نخواهد شد.',
+                       'The switch stays unavailable until OS-level traffic'
+                       ' blocking is implemented and verified.'),
+                       color: sub, size: 11),
+              ],
+            )),
+          ]),
+        ),
+        const SizedBox(height: 14),
+        settingLine(
+          Icons.speed_rounded,
+          tr('بررسی وضعیت واقعی اتصال', 'Check live VPN status'),
+          disabled: false,
+          onTap: () {
+            _refreshVpnStatus();
+            setState(() => _page = 'home');
+          },
+        ),
+        settingLine(
+          Icons.auto_awesome_rounded,
+          tr('انتخاب سریع‌ترین سرور', 'Fastest server selection'),
+          disabled: false,
+          onTap: () {
+            setState(() => _page = 'home');
+            if (_fastestKnownIndex == null) {
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                content: Text(tr('ابتدا از بخش مکان‌ها پینگ سرورها را تست کنید.',
+                    'Test server latencies in Locations first.'))));
+            }
+          },
         ),
         settingLine(
           Icons.refresh_rounded,
@@ -1479,7 +1526,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                   borderRadius: BorderRadius.circular(12),
                   child: LinearProgressIndicator(
                     minHeight: 9,
-                    value: hasLimit ? fraction : null,
+                    value: hasLimit ? fraction : 0,
                     backgroundColor: purple.withValues(alpha: .13),
                     valueColor: AlwaysStoppedAnimation<Color>(
                       hasLimit && fraction >= .9
