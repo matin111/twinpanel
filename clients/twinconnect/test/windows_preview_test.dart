@@ -34,12 +34,14 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('windowsDemoButton')), findsOneWidget);
-    await tester.ensureVisible(find.byKey(const Key('windowsDemoButton')));
+    await tester.drag(find.byType(ListView).first, const Offset(0, -260));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('windowsDemoButton')));
     await tester.pumpAndSettle();
 
     await tester.scrollUntilVisible(
       find.byKey(const Key('offlineDemoBanner')), 280,
+      scrollable: find.byType(Scrollable).first,
     );
     expect(find.byKey(const Key('offlineDemoBanner')), findsOneWidget);
     expect(
@@ -52,7 +54,8 @@ void main() {
       (tester) async {
     await tester.pumpWidget(const TwinConnectApp());
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.byKey(const Key('windowsDemoButton')));
+    await tester.drag(find.byType(ListView).first, const Offset(0, -260));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('windowsDemoButton')));
     await tester.pumpAndSettle();
 
