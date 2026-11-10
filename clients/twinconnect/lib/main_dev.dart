@@ -255,7 +255,7 @@ class _TwinConnectDevAppState extends State<TwinConnectDevApp> {
                 child: Row(children: [
                   for (final entry in options.entries) ...[
                     ChoiceChip(
-                      key: Key('devFilter_\${entry.key}'),
+                      key: Key('devFilter_${entry.key}'),
                       label: Text(entry.value),
                       selected: _section == entry.key,
                       onSelected: (_) => setState(() => _section = entry.key),
@@ -273,7 +273,7 @@ class _TwinConnectDevAppState extends State<TwinConnectDevApp> {
                 children: [
                   for (final item in filtered)
                     Container(
-                      key: Key('devProtocol_\${item.protocol.code}'),
+                      key: Key('devProtocol_${item.protocol.code}'),
                       alignment: Alignment.center,
                       margin: const EdgeInsetsDirectional.only(end: 8),
                       padding: const EdgeInsets.symmetric(horizontal: 12),
