@@ -98,7 +98,9 @@ class _WindowsConnectionCardState extends State<WindowsConnectionCard> {
   Future<void> _connect() async {
     final selectedId = _selectedId;
     if (_busy || _up || !Platform.isWindows || !_ready || !_allowed ||
-        selectedId == null) return;
+        selectedId == null) {
+      return;
+    }
     setState(() { _busy = true; _errorCode = null; });
     try {
       final api = TenantApi.fromBuildConfig();
@@ -146,14 +148,16 @@ class _WindowsConnectionCardState extends State<WindowsConnectionCard> {
     setState(() { _busy = true; _errorCode = null; });
     try {
       await _controller.stop();
-      if (mounted) setState(() {
-        _up = false;
-        _needsCleanup = false;
-        _unmanaged = false;
-        _peerVerified = false;
-        _receivedBytes = 0;
-        _sentBytes = 0;
-      });
+      if (mounted) {
+        setState(() {
+          _up = false;
+          _needsCleanup = false;
+          _unmanaged = false;
+          _peerVerified = false;
+          _receivedBytes = 0;
+          _sentBytes = 0;
+        });
+      }
     } catch (error) {
       if (mounted) setState(() => _errorCode = _safeError(error));
     } finally {
