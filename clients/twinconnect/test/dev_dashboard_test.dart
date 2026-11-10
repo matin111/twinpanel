@@ -18,6 +18,10 @@ void main() {
         find.byKey(const Key('devConnectButton')));
     expect(connect.onPressed, isNull);
     expect(find.byKey(const Key('devProtocol_openvpn')), findsOneWidget);
+    expect(find.byKey(const Key('devRefreshServers')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('devRefreshServers')));
+    await tester.pump();
+    expect(find.text('Sign in to fetch updated servers'), findsOneWidget);
   });
 
   testWidgets('dev dashboard supports filters without fake connections',
