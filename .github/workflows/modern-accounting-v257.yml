@@ -12,6 +12,7 @@ on:
       - "backend/scripts/twinpanel_modern_accounting_worker.py"
       - "backend/tests/modern_accounting_v257_smoke.py"
       - "backend/tests/modern_accounting_deadlock_v314_smoke.py"
+      - "backend/tests/test_modern_accounting_bounded_transactions_v1.py"
       - ".github/workflows/modern-accounting-v257.yml"
   workflow_dispatch:
 
@@ -75,7 +76,8 @@ jobs:
             backend/app/routers/public_connection_hub_live_v5.py \
             backend/scripts/twinpanel_modern_accounting_worker.py \
             backend/tests/modern_accounting_v257_smoke.py \
-            backend/tests/modern_accounting_deadlock_v314_smoke.py
+            backend/tests/modern_accounting_deadlock_v314_smoke.py \\
+            backend/tests/test_modern_accounting_bounded_transactions_v1.py
 
       - name: Run modern accounting regression smoke
         working-directory: backend
@@ -84,6 +86,10 @@ jobs:
       - name: Run accounting deadlock regression smoke
         working-directory: backend
         run: PYTHONPATH=. python tests/modern_accounting_deadlock_v314_smoke.py
+
+      - name: Verify bounded quota transaction and salvage semantics
+        working-directory: backend
+        run: PYTHONPATH=. python tests/test_modern_accounting_bounded_transactions_v1.py -v
 
       - name: Verify application import with merged lifespan
         working-directory: backend
