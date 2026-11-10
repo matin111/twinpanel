@@ -131,6 +131,7 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
   final AppSessionStore _sessionStore = const AppSessionStore();
   AppPlanClassification? _plan;
   AppAccountSnapshot? _account;
+  String? _accountError;
 
   int _dashboardTab = 0;
   bool _loading = false;
@@ -205,10 +206,13 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
         panel: panel, sessionToken: session,
       );
       if (mounted && serial == _lookupSerial) {
-        setState(() => _account = snapshot);
+        setState(() { _account = snapshot; _accountError = null; });
       }
-    } catch (_) {
-      // Unsupported or temporarily unavailable account endpoints are not fatal.
+    } catch (error) {
+      if (mounted && serial == _lookupSerial) {
+        setState(() => _accountError = error is TenantApiException
+            ? error.message : 'ACCOUNT_RESPONSE_INVALID');
+      }
     }
   }
 
@@ -250,6 +254,7 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
       _servers = null;
       _plan = null;
       _account = null;
+      _accountError = null;
       _refreshingServers = false;
       _serverRefreshError = null;
       _protocolCatalogUnavailable = false;
@@ -696,6 +701,13 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
         native: _nativeProtocols,
         plan: _plan,
         account: _account,
+        accountError: _accountError,
+        onRefreshAccount: () {
+          if (_confirmedPanel != null && _confirmedSessionToken != null) {
+            _loadAccountSnapshot(_confirmedPanel!, _confirmedSessionToken!, _lookupSerial);
+            _loadAccountPlan(_confirmedPanel!, _confirmedSessionToken!, _lookupSerial);
+          }
+        },
         accountStatus: _brand?.accountStatus ?? 'unknown',
         onRefresh: _refreshServers,
         onLogout: () {
@@ -710,6 +722,7 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
             _servers = null;
             _plan = null;
             _account = null;
+            _accountError = null;
             _dashboardTab = 0;
             _errorCode = null;
             widget.onBrandChanged(null);
