@@ -129,6 +129,7 @@ class _TwinConnectDevAppState extends State<TwinConnectDevApp> {
         color: _page == page ? purple.withValues(alpha: 0.19)
             : Colors.transparent,
         child: InkWell(
+          key: Key('devNav_' + page),
           borderRadius: BorderRadius.circular(13),
           onTap: () => setState(() => _page = page),
           child: Padding(
