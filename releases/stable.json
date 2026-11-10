@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.771",
+  "version": "1.1.0-rc.772",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-10T04:41:13Z",
+  "released_at": "2026-11-10T05:12:46Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "2cf4aeeffede25f1af0e534df3c7253098abf524",
+  "source_sha": "b923113abd87101235fbcb39f9cabbe4ec26cebc",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.771/twinpanel-1.1.0-rc.771-linux-x86_64.tar.gz",
-    "sha256": "864dd5deaf39c8326d4b549318e83d899bb7b6b5c20382bb168c1bc90c09698c",
-    "size_bytes": 30325926
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.772/twinpanel-1.1.0-rc.772-linux-x86_64.tar.gz",
+    "sha256": "7063c3fd0ac909c8aa25586b2b92746018eee8aae680ae30ed366abe34726479",
+    "size_bytes": 30326899
   },
   "notes": {
-    "fa": "افزودن نود با پروتکل‌های سالم حتی هنگام شکست یک یا چند پروتکل، بدون نیاز به سلامت اجباری ۱۶/۱۶؛ ثبت اکانت و ساخت کانفیگ فقط برای پروتکل‌های تأییدشده و مجاز، نمایش وضعیت نصب ناقص، بازیابی نودهای ناقص با کنترل سلامت زنده. حفظ تمام اصلاحات rc.770 و عدم تغییر اطلاعات اشتراک و کلیدها.",
-    "en": "Admit newly installed Exits with their individually live-verified supported protocol subset, without requiring all 16. Entitlement-scoped central membership and credential staging, explicit partial status and guarded recovery of failed hidden nodes; preserve all rc.770 fixes and customer identities."
+    "fa": "اصلاح بازیابی نودهای ناقص با تأیید زنده پروتکل‌های سالم بدون الزام ۱۶ از ۱۶؛ حفظ پروتکل‌های ناموفق در وضعیت غیرفعال. مناسب فعال‌سازی فنلاند با ۱۵ پروتکل سالم بدون نصب مجدد؛ حفظ کلیه اصلاحات RC771 و تنظیمات کاربر.",
+    "en": "Fix live-verified recovery of partially installed Exits without requiring all 16 protocols, preserving failed listeners disabled and scoped subscription entitlements; retains RC771 and all customer identities."
   }
 }
