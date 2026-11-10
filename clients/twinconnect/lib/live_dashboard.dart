@@ -130,12 +130,12 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
 
   void _startNetworkStats() {
     _networkTimer?.cancel();
-    if (!_vpnVerified) return;
-    _readNetworkStats();
+    if (!_vpnUp) return;
+    if (_vpnVerified) _readNetworkStats();
     _networkTimer = Timer.periodic(const Duration(seconds: 12), (_) {
       if (!mounted) return;
       _refreshVpnStatus();
-      _readNetworkStats();
+      if (_vpnVerified) _readNetworkStats();
     });
   }
 
@@ -193,6 +193,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
 
   Future<void> _refreshVpnStatus() async {
     if (!Platform.isWindows || _vpnBusy) return;
+    final wasUp = _vpnUp;
     try {
       final status = await _vpn.status();
       final native = await NativeVpnBridge.protocolReadiness();
@@ -208,13 +209,17 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         _vpnTx = status['txBytes'] is int ? status['txBytes'] as int : 0;
         _vpnReady = native.supports('wireguard');
         _vpnError = null;
+        if (!_vpnUp) _resetNetworkStats();
       });
+      if (_vpnUp && (!wasUp || _networkTimer == null)) _startNetworkStats();
+      if (_vpnUp && _vpnVerified && _publicIp == null) _readNetworkStats();
     } catch (error) {
       if (mounted) setState(() {
         _vpnReady = false;
         _vpnUp = false;
         _vpnVerified = false;
         _vpnError = _errorText(error);
+        _resetNetworkStats();
       });
     }
   }
@@ -244,8 +249,15 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           _vpnCleanup = false;
           _vpnRx = 0;
           _vpnTx = 0;
+          _activeNodeId = null;
+          _resetNetworkStats();
         });
       } else {
+        if (_autoFastest) {
+          final best = _fastestKnownIndex;
+          if (best == null) throw const FormatException('NO_MEASURED_SERVER');
+          _selected = best;
+        }
         final selectedId = _selectedServerId!;
         final policy = await _vpnPolicy.load(
             widget.panel.namespace, widget.username);
@@ -275,7 +287,9 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
               status['peerHandshakeVerified'] == true;
           _vpnRx = status['rxBytes'] is int ? status['rxBytes'] as int : 0;
           _vpnTx = status['txBytes'] is int ? status['txBytes'] as int : 0;
+          _activeNodeId = selectedId;
         });
+        if (_vpnUp) _startNetworkStats();
       }
     } catch (error) {
       if (mounted) setState(() => _vpnError = _errorText(error));
