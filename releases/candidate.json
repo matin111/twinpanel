@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.767",
-  "source_sha": "301f87144f519ed796cb7582ce5136e0910b2108",
+  "version": "1.1.0-rc.768",
+  "source_sha": "49c4b3749fe42bc189c83dd9d6772032e1936128",
   "notes": {
-    "fa": "رفع نقص گزارش خطای راه‌اندازی Xray در نودهای موجود: ثبت وضعیت سرویس، پورت‌های غیرفعال و علت استاندارد خرابی قبل از بازیابی ایمن تنظیمات. جلوگیری از اعلام موفقیت اشتباه هنگام شکست restart. هیچ تغییری در پورت‌ها، کاربران، ۱۵ پروتکل دیگر و نصب سالم نودهای جدید اعمال نشده است.",
-    "en": "Improve Xray failed-start diagnosis for existing nodes: capture safe systemd and listener status plus normalized failure reason before restoring prior config; do not report success when restart fails. No automatic port migration, identity changes or changes to other healthy protocols."
+    "fa": "رفع فوری مشکل گیرکردن تحویل اکانت‌های تأییدشده به ربات تلگرام: اولویت‌بندی صف اعلان‌ها براساس تعداد تلاش، جلوگیری از مسدودشدن ارسال‌های جدید پشت گیرندگان قدیمی، حفظ جلوگیری از ارسال تکراری و تحویل QR/لینک خرید. همچنین پایش دوره‌ای سلامت وب/API/PostgreSQL، اصلاح بازیابی Web Blue/Green و افزایش هوشمند سهمیه CPU حسابداری بدون قطع سرویس. اطلاعات کاربران، خریدها، نودها و محدودیت دستگاه‌ها بدون تغییر.",
+    "en": "Restore pending Telegram purchased-account delivery with fair durable notification outbox priority (fewest attempts first); old blocked/unlinked notices cannot starve new payment-approval QR/link messages. Preserve event-key uniqueness and delivered-at deduplication, all user/account/payment data, bot handlers and existing protocols. Also includes periodic read-only Web/API/PostgreSQL resilience probe, blue-green standby cleanup and adaptive non-disruptive accounting CPU headroom."
   }
 }
