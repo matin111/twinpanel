@@ -1,0 +1,75 @@
+name: TwinConnect Windows Portable Preview
+
+on:
+  pull_request:
+    paths:
+      - "clients/twinconnect/**"
+      - ".github/workflows/twinconnect-windows-preview.yml"
+  push:
+    branches:
+      - feat/twinconnect-windows-preview-v1
+    paths:
+      - "clients/twinconnect/**"
+      - ".github/workflows/twinconnect-windows-preview.yml"
+
+jobs:
+  windows-preview:
+    runs-on: windows-latest
+    timeout-minutes: 35
+    defaults:
+      run:
+        working-directory: clients/twinconnect
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Generate native Windows Flutter project
+        run: flutter create --platforms=windows --org com.twinpanel --project-name twinconnect .
+      - name: Fetch Flutter dependencies
+        run: flutter pub get
+      - name: Verify Dart compilation and tests
+        run: |
+          flutter analyze
+          flutter test --reporter expanded
+      - name: Build Windows x64 standalone directory
+        run: flutter build windows --release
+      - name: Package portable ZIP and usage instructions
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $release = Join-Path (Get-Location) "build/windows/x64/runner/Release"
+          $exe = Join-Path $release "twinconnect.exe"
+          if (!(Test-Path $exe)) {
+            throw "Windows release executable missing: $exe"
+          }
+          @'
+          TwinConnect - Windows portable PREVIEW (x64)
+          
+          1. Extract the complete ZIP to a folder (do not run from inside ZIP).
+          2. Run twinconnect.exe from that folder. Keep DLL/data files beside it.
+          3. Click "Explore Windows demo" or "مشاهده نسخه آزمایشی ویندوز".
+          4. Test Persian/English, dark/light, brand, 16 protocol statuses and routing preferences.
+          5. This is an unsigned TEST build. If Windows SmartScreen warns,
+             only run it if you trust the GitHub source and this artifact.
+          
+          IMPORTANT:
+          - NO Windows VPN engine is installed in this preview.
+          - WireGuard and Cisco/OpenConnect CANNOT connect from this ZIP.
+          - The offline sample is fictional; no real subscription data is used.
+          - Live account verification needs the separately deployed license
+            registry and panel backend; it is not activated here.
+          - No administrator rights or driver installation is needed.
+          '@ | Set-Content -Path (Join-Path $release "README-TEST.txt") -Encoding UTF8
+          $zip = Join-Path (Get-Location) "TwinConnect-Windows-Preview.zip"
+          if (Test-Path $zip) { Remove-Item $zip -Force }
+          Compress-Archive -Path (Join-Path $release "*") -DestinationPath $zip -CompressionLevel Optimal
+          if (!(Test-Path $zip)) { throw "ZIP packaging failed" }
+          Write-Host ("Windows ZIP bytes: " + (Get-Item $zip).Length)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TwinConnect-Windows-x64-Portable
+          path: clients/twinconnect/TwinConnect-Windows-Preview.zip
+          if-no-files-found: error
+          retention-days: 30
