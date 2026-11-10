@@ -70,6 +70,37 @@ if not BINARY.is_file() or BINARY.is_symlink():
 if BASE.is_symlink() or MASTER.is_symlink() or CONF.is_symlink() or UNIT.is_symlink():
     raise RuntimeError("SUDOKU_SHARED_UNSAFE_PATH")
 
+def ensure_public_shared_sudoku_port():
+    """Make the authenticated shared listener reachable when UFW is enabled.
+
+    Idempotent, persistent firewall change only; do not touch any credentials,
+    control ports, existing services or VPN routing. Absent/inactive UFW is
+    already permissive for this purpose and needs no mutation.
+    """
+    try:
+        check=subprocess.run(["ufw","status"],capture_output=True,text=True,
+                             check=False,timeout=12)
+    except FileNotFoundError:
+        return
+    if check.returncode:
+        raise RuntimeError("SUDOKU_SHARED_UFW_STATUS_FAILED")
+    if check.stdout.strip().startswith("Status: inactive"):
+        return
+    if not check.stdout.strip().startswith("Status: active"):
+        raise RuntimeError("SUDOKU_SHARED_UFW_STATUS_UNRECOGNIZED")
+    if re.search(r"(?m)^18553/tcp\s+ALLOW\b",check.stdout):
+        return
+    result=subprocess.run(
+        ["ufw","allow",f"{PORT}/tcp","comment","TwinPanel Sudoku shared service"],
+        capture_output=True,text=True,check=False,timeout=18,
+    )
+    if result.returncode:
+        raise RuntimeError("SUDOKU_SHARED_UFW_ALLOW_FAILED")
+    verified=subprocess.run(["ufw","status"],capture_output=True,text=True,
+                            check=False,timeout=12)
+    if verified.returncode or not re.search(r"(?m)^18553/tcp\s+ALLOW\b",verified.stdout):
+        raise RuntimeError("SUDOKU_SHARED_UFW_RULE_NOT_APPLIED")
+
 # A zero-entitlement whitelist must never run as a blank/unrestricted
 # Sudoku server. Stop only the owned shared daemon and retain encrypted
 # identities/config for a future reactivation or rollback. No legacy units,
@@ -189,6 +220,7 @@ else:
     new=json.dumps(cfg,sort_keys=True,separators=(",",":")).encode()+b"\n"
     if previous==new and subprocess.run(
         ["systemctl","is-active","--quiet",SERVICE],check=False).returncode==0:
+        ensure_public_shared_sudoku_port()
         print(json.dumps({"ok":True,"changed":False,"users":len(clean),"port":PORT}))
         sys.exit(0)
     if UNIT.exists():
@@ -258,6 +290,7 @@ else:
             time.sleep(0.2)
         if not verified:
             raise RuntimeError("SUDOKU_SHARED_RUNTIME_USER_COUNT_MISMATCH")
+        ensure_public_shared_sudoku_port()
         print(json.dumps({"ok":True,"changed":True,"users":len(clean),"port":PORT}))
     except BaseException:
         if previous is None:
