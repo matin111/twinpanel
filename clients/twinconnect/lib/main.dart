@@ -10,6 +10,7 @@ import 'protocols.dart';
 import 'protocol_catalog_view.dart';
 import 'protocol_strings.dart';
 import 'native_vpn_bridge.dart';
+import 'android_connection_card.dart';
 import 'vpn_settings.dart';
 import 'vpn_strings.dart';
 
@@ -129,6 +130,9 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
   bool _loading = false;
   String? _errorCode;
   BrandPreview? _brand;
+  PanelDirectoryEntry? _confirmedPanel;
+  String? _confirmedUsername;
+  String? _confirmedToken;
   PanelProtocolCatalog? _catalog;
   NativeProtocolReadiness _nativeProtocols =
       const NativeProtocolReadiness(supportedCodes: {});
@@ -149,6 +153,9 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
       _loading = true;
       _errorCode = null;
       _brand = null;
+      _confirmedPanel = null;
+      _confirmedUsername = null;
+      _confirmedToken = null;
       _catalog = null;
       _protocolCatalogUnavailable = false;
       _nativeProtocols = const NativeProtocolReadiness(supportedCodes: {});
@@ -169,7 +176,12 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
         shareToken: token,
       );
       if (!mounted) return;
-      setState(() => _brand = brand);
+      setState(() {
+        _brand = brand;
+        _confirmedPanel = panel;
+        _confirmedUsername = username;
+        _confirmedToken = token;
+      });
       // Subscription metadata is not secret and is fetched independently of
       // brand details. A temporary metadata error must not hide renewal links.
       try {
@@ -375,6 +387,19 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
                       catalog: _catalog!,
                       native: _nativeProtocols,
                     ),
+                    if (_confirmedPanel != null &&
+                        _confirmedUsername != null &&
+                        _confirmedToken != null) ...[
+                      const SizedBox(height: 12),
+                      AndroidConnectionCard(
+                        key: ValueKey(_confirmedUsername),
+                        panel: _confirmedPanel!,
+                        username: _confirmedUsername!,
+                        shareToken: _confirmedToken!,
+                        catalog: _catalog!,
+                        native: _nativeProtocols,
+                      ),
+                    ],
                   ],
                 ],
                 const SizedBox(height: 20),
