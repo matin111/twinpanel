@@ -8,6 +8,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import secrets
+from functools import lru_cache
 from datetime import datetime, timedelta, timezone
 
 from cryptography.fernet import Fernet
@@ -27,7 +28,10 @@ from .system_release import ensure_installation_id
 
 _APP_PURPOSE = "twinconnect-session-v1"
 _BAD_LOGIN = "APP_LOGIN_INVALID"
-_DUMMY_HASH = hash_password("twinconnect-nonexistent-account")
+@lru_cache(maxsize=1)
+def _dummy_hash() -> str:
+    # Delay bcrypt initialization until an unknown account is actually tried.
+    return hash_password("twinconnect-nonexistent-account")
 
 
 def _fernet() -> Fernet:
@@ -91,6 +95,8 @@ def get_or_issue_app_credentials(
     owner = int(reseller_id) if reseller_id is not None else _current_reseller_id(db, sub.id)
     if owner < 0:
         raise ValueError("invalid_app_owner")
+    # Serialize concurrent first-issue requests for historical subscriptions.
+    db.query(Subscription.id).filter(Subscription.id == int(sub.id)).with_for_update().first()
     row = db.get(SubscriptionAppCredential, int(sub.id))
     if row:
         if int(row.reseller_id) != owner:
@@ -159,7 +165,7 @@ def authenticate_app(db: Session, username: str, password: str) -> tuple[Subscri
         SubscriptionAppCredential.app_username == username.strip()
     ).with_for_update().first()
     if row is None:
-        verify_password(password[:72], _DUMMY_HASH)
+        verify_password(password[:72], _dummy_hash())
         raise HTTPException(status_code=401, detail=_BAD_LOGIN)
     now = datetime.utcnow()
     if row.locked_until and row.locked_until > now:
