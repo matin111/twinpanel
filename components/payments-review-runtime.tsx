@@ -20,6 +20,7 @@ type ReviewRow={
   amount:number;
   method:string;
   status:string;
+  displayStatus:string;
   createdAt:unknown;
   submittedAt:unknown;
   hasReceipt:boolean;
@@ -36,6 +37,18 @@ function money(value:number){return `${Number(value||0).toLocaleString("fa-IR")}
 function dateText(value:unknown){return paymentDateTehran(value);}
 function n(value:unknown){const x=Number(value||0);return Number.isFinite(x)?x:0;}
 function s(value:unknown){return String(value??"").trim();}
+
+// Keep accounting statuses untouched. A wallet credit is persisted as
+// "approved" for ledger idempotency even when its origin is an automatic
+// SMS-reader or confirmed blockchain verification.
+function adminPaymentDisplayStatus(kind:PaymentKind,status:string,reviewNote:unknown):string{
+  const value=status.trim().toLowerCase();
+  if(kind==="wallet"&&value==="approved"&&
+      /^auto-credit:(?:sms-reader:|crypto:)/i.test(String(reviewNote??"").trim())){
+    return "auto_verified";
+  }
+  return value;
+}
 
 function statusLabel(status:string,pick:(fa:string,en:string)=>string){
   switch(status.toLowerCase()){
@@ -114,6 +127,7 @@ export function PaymentsReviewRuntime(){
       amount:n(row.payable_amount_toman||row.base_amount_toman||row.amount_toman),
       method:s(row.method),
       status:s(row.status),
+      displayStatus:s(row.status),
       createdAt:row.created_at,
       submittedAt:row.receipt_submitted_at||row.submitted_at,
       hasReceipt:Boolean(row.has_receipt),
@@ -138,6 +152,7 @@ export function PaymentsReviewRuntime(){
         amount:n(row.payable_amount_toman||row.amount_toman),
         method,
         status,
+        displayStatus:adminPaymentDisplayStatus("wallet",status,row.review_note),
         createdAt:row.created_at,
         submittedAt:row.submitted_at,
         hasReceipt,
@@ -362,7 +377,7 @@ export function PaymentsReviewRuntime(){
               {row.hasReceipt&&<button type="button" className="payment-review-receipt-link" onClick={()=>void openReceipt(row)}>{pick("✓ مشاهده رسید تصویری","✓ View receipt image")}</button>}
               {proofCode?<span dir="ltr" style={{display:"block",wordBreak:"break-all",fontSize:11}}>{proofCode}</span>:!row.hasReceipt?<span>{pick("ارسال نشده","Not submitted")}</span>:null}
             </div></td>
-            <td><Badge tone={statusTone(status)}>{statusLabel(status,pick)}</Badge></td>
+            <td><Badge tone={statusTone(status)}>{statusLabel(row.displayStatus,pick)}</Badge></td>
             <td>{dateText(row.submittedAt||row.createdAt)}</td>
             <td><div className="row-actions">
               {row.hasReceipt&&<button className="mini-btn" onClick={()=>void openReceipt(row)}>{pick("مشاهده رسید","View receipt")}</button>}
