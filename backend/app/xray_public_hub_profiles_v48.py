@@ -80,7 +80,7 @@ def render_xray_quick_connect_profiles(item: dict[str, Any]) -> str | None:
         qr = str(profile.get("qr") or "").strip()
 
         qr_html = (
-            f'<img class="qr" src="{_h(qr)}" alt="QR {_h(title)}">'
+            f'<img class="qr" loading="lazy" decoding="async" src="{_h(qr)}" alt="QR {_h(title)}">'
             if qr
             else ""
         )

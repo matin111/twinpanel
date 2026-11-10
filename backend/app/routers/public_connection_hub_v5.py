@@ -109,7 +109,7 @@ def _file_action(protocol: str, item: dict[str, Any], index: int, prefix: str) -
     filename = str(item.get("filename") or f"{protocol}-{index + 1}.{ext}")
     source_id = f"{prefix}-{protocol}-{index}"
     qr = str(item.get("qr") or "").strip()
-    qr_html = f'<img class="qr" src="{h(qr)}" alt="QR">' if qr and protocol == "wireguard" else ""
+    qr_html = f'<img class="qr" loading="lazy" decoding="async" src="{h(qr)}" alt="QR">' if qr and protocol == "wireguard" else ""
     return (
         '<div class="action-row">'
         f'{qr_html}'
@@ -125,7 +125,7 @@ def _v2ray_action(item: dict[str, Any]) -> str:
     if not uri:
         return '<div class="empty-inline">لینک اتصال هنوز آماده نشده است.</div>'
     qr = str(item.get("qr") or "").strip()
-    qr_html = f'<img class="qr" src="{h(qr)}" alt="QR V2Ray">' if qr else ""
+    qr_html = f'<img class="qr" loading="lazy" decoding="async" src="{h(qr)}" alt="QR V2Ray">' if qr else ""
     return (
         '<div class="action-row">'
         f'{qr_html}'

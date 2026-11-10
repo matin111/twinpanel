@@ -434,6 +434,13 @@ def _qr_data_uri(value: str) -> str:
     URI/config byte and QR error-correction semantics; only the image encoding
     changes. The browser can scan it via the existing <img src=...> tags.
     """
+    # Customer page QR images are requested only when visible. All other
+    # callers keep the original inline, directly scannable PNG contract.
+    from .public_connection_qr_deferred_v1 import deferred_qr_src
+    deferred = deferred_qr_src(value)
+    if deferred is not None:
+        return deferred
+
     image = qrcode.make(
         value,
         image_factory=qrcode.image.pil.PilImage,

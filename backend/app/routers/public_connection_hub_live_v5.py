@@ -49,6 +49,10 @@ from . import public_connection_hub_v5 as _public_connection_hub_v5_module
 from .public_connection_hub_v5 import public_connection_hub_v5
 from .public_connection_live_v4 import public_connection_live
 from .public_connection_payload_fast_v1 import public_connection_payload_fast_v1
+from .public_connection_qr_deferred_v1 import (
+    defer_public_connection_qr,
+    router as public_connection_qr_deferred_router,
+)
 
 
 # TWINPANEL_PUBLIC_CONNECT_PAYLOAD_FAST_V1
@@ -62,6 +66,7 @@ router = APIRouter(
     prefix="/v1/connect",
     tags=["public-connection-hub-live-v5"],
 )
+router.include_router(public_connection_qr_deferred_router)
 router.include_router(public_connection_multilink_v7_router)
 router.include_router(public_connection_files_v9_router)
 router.include_router(public_connection_modern_delivery_v13_router)
@@ -281,7 +286,8 @@ def public_connection_hub_live_v5(
     # V48 is idempotent and resolves the final V47 customer profile selector at
     # request time. Install it before Hub V5 renders this response.
     apply_xray_public_hub_profiles_v48()
-    base = public_connection_hub_v5(token, db)
+    with defer_public_connection_qr(token):
+        base = public_connection_hub_v5(token, db)
     source = base.body.decode(getattr(base, "charset", None) or "utf-8")
 
     source = source.replace(
