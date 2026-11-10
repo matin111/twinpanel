@@ -372,6 +372,30 @@ def converge_web_prestart_helpers_for_bluegreen(release: Path, env: dict[str, st
         run([str(python), str(target), *args], cwd=release / "backend", env=env, timeout=90)
 
 
+def install_resilience_probe_timer(release: Path) -> None:
+    """Install read-only resilience visibility for every verified release.
+
+    Probing only logs evidence; it has no service restart authority. Older
+    releases without these files remain compatible with rollback.
+    """
+    names = ("twinpanel-resilience-probe.service", "twinpanel-resilience-probe.timer")
+    if not all((release / "deploy/systemd" / name).is_file() for name in names):
+        return
+    if not (release / "backend/scripts/twinpanel_runtime_resilience_probe_v1.py").is_file():
+        raise RuntimeError("RESILIENCE_PROBE_SCRIPT_MISSING")
+    changed = False
+    for name in names:
+        source = release / "deploy/systemd" / name
+        target = Path("/etc/systemd/system") / name
+        if not same_file(source, target):
+            shutil.copyfile(source, target)
+            target.chmod(0o644)
+            changed = True
+    if changed:
+        run(["systemctl", "daemon-reload"], timeout=20)
+    run(["systemctl", "enable", "--now", "twinpanel-resilience-probe.timer"], timeout=20)
+
+
 def install_node_auto_backfill_timer(release: Path) -> None:
     """Install durable worker units from the exact verified, pinned release.
 
@@ -986,6 +1010,15 @@ def main() -> int:
             if not bg.readiness(bg_ports[1], version, final):
                 raise RuntimeError('WEB_POST_CUTOVER_CANARY_FAILED')
         install_node_auto_backfill_timer(final)
+        # Visibility is best-effort and must never roll back a healthy
+        # production deployment because a monitoring timer is unavailable.
+        try:
+            install_resilience_probe_timer(final)
+        except Exception as probe_exc:
+            print(
+                f"UPDATER_RESILIENCE_PROBE_INSTALL_WARNING {type(probe_exc).__name__}:{probe_exc}",
+                flush=True,
+            )
     except Exception:
         save(
             state='rollback',
