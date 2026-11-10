@@ -323,6 +323,83 @@ def classic_protocol_inventory(
     }
 
 
+class ClassicPortCheckIn(BaseModel):
+    node_id: int = Field(gt=0)
+    protocol: ClassicProtocol
+    port: int = Field(ge=1, le=65535)
+    transport: Literal["udp", "tcp"] | None = None
+
+
+@router.post("/classic-port-check")
+async def classic_port_check(
+    payload: ClassicPortCheckIn,
+    db: Session = Depends(get_db),
+):
+    """Read-only socket conflict warning. No automatic listener relocation."""
+    import re
+
+    node = _runtime_node(db, payload.node_id)
+    if payload.protocol == "l2tp":
+        raise HTTPException(status_code=422, detail="L2TP uses fixed ports")
+    transport = (
+        payload.transport or "udp"
+        if payload.protocol == "openvpn"
+        else "udp" if payload.protocol == "wireguard" else "tcp"
+    )
+    try:
+        ports = (
+            sorted(__import__(
+                "app.services.xray_port_reservation_v1",
+                fromlist=["_required_ports"],
+            )._required_ports(payload.port))
+            if payload.protocol == "v2ray"
+            else [payload.port]
+        )
+    except Exception:
+        raise HTTPException(status_code=422, detail="Invalid protocol port group")
+    if any(port < 1 or port > 65535 for port in ports):
+        raise HTTPException(status_code=422, detail="Port group out of range")
+
+    conn = await connect_protocol_runtime(node, db)
+    try:
+        sockets = await cmd(conn, "ss -H -lntup 2>/dev/null", check=False, timeout=12)
+    finally:
+        conn.close()
+        await conn.wait_closed()
+
+    conflicts = []
+    for line in sockets.splitlines():
+        parts = line.split()
+        if len(parts) < 5:
+            continue
+        socket_type = parts[0].lower()
+        if not socket_type.startswith(transport):
+            continue
+        local = parts[4]
+        match = re.search(r":([0-9]+)$", local)
+        if match and int(match.group(1)) in ports:
+            # Keep this response free of PIDs, command lines and identities.
+            conflicts.append({"port": int(match.group(1)), "transport": transport})
+    conflicts = sorted(
+        { (item["port"], item["transport"]) for item in conflicts }
+    )
+    return {
+        "ok": True,
+        "node_id": node.id,
+        "protocol": payload.protocol,
+        "checked_ports": ports,
+        "conflicts": [
+            {"port": port, "transport": mode} for port, mode in conflicts
+        ],
+        "available": not conflicts,
+        "note": (
+            "TLS HTTP-01 validation requires public TCP port 80. "
+            "Changing the Xray listener port does not change that requirement."
+            if payload.protocol == "v2ray" else None
+        ),
+    }
+
+
 @router.post("/ensure-classic-protocol")
 async def ensure_classic_protocol(
     payload: EnsureClassicProtocolIn,
