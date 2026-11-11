@@ -40,6 +40,36 @@ void main() {
     expect((item['outbound'] as Map).containsKey('tag'), isFalse);
   });
 
+  test('pins the resolved endpoint without weakening TLS identity', () {
+    final config = SingBoxWindowsConfig.compose(
+      protocol: 'hysteria2',
+      item: {
+        'outbound': {
+          'type': 'hysteria2', 'server': 'vpn.example.org',
+          'server_port': 443, 'password': 'private-test-key',
+          'tls': {'enabled': true},
+        },
+      },
+      resolvedServer: '203.0.113.15',
+    );
+    final outbound = (config['outbounds'] as List).single as Map;
+    expect(outbound['server'], '203.0.113.15');
+    expect((outbound['tls'] as Map)['server_name'], 'vpn.example.org');
+    expect((config['route'] as Map)['auto_detect_interface'], isTrue);
+    expect(() => SingBoxWindowsConfig.compose(
+      protocol: 'hysteria2', item: item, resolvedServer: 'not-an-ip'),
+      throwsFormatException);
+  });
+
+  test('preserves explicit TLS SNI when pinning an endpoint', () {
+    final config = SingBoxWindowsConfig.compose(
+      protocol: 'hysteria2', item: item, resolvedServer: '203.0.113.20');
+    final outbound = (config['outbounds'] as List).single as Map;
+    expect(outbound['server'], '203.0.113.20');
+    expect((outbound['tls'] as Map)['server_name'], 'vpn.example.org');
+    expect((item['outbound'] as Map)['server'], 'vpn.example.org');
+  });
+
   test('rejects a wrong or unstructured outbound without fallbacks', () {
     expect(() => SingBoxWindowsConfig.compose(
       protocol: 'tuic', item: item), throwsFormatException);
