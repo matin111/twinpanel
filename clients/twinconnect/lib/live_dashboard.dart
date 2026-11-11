@@ -16,8 +16,6 @@ import 'windows_singbox_preflight.dart';
 import 'singbox_profile_validator.dart';
 import 'singbox_windows_config.dart';
 import 'windows_singbox_tunnel.dart';
-import 'windows_openconnect_tunnel.dart';
-import 'cisco_openconnect_profile.dart';
 import 'connection_bootstrap.dart';
 import 'tenant_api.dart';
 import 'vpn_policy_store.dart';
@@ -90,20 +88,6 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         _modernUp = false;
         _vpnError = 'SINGBOX_TUNNEL_EXITED';
         _publicIp = null;
-      });
-    },
-  );
-  late final WindowsOpenConnectTunnel _ciscoTunnel = WindowsOpenConnectTunnel(
-    onUnexpectedExit: () {
-      _modernHealthTimer?.cancel();
-      _stopModernTrafficMonitoring();
-      if (!mounted) return;
-      setState(() {
-        _modernUp = false;
-        _modernProtocol = null;
-        _modernNodeId = null;
-        _publicIp = null;
-        _vpnError = 'CISCO_PROCESS_EXITED';
       });
     },
   );
@@ -326,12 +310,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     try {
       if (_modernTunnel.isRunning || _modernUp) {
         _modernHealthTimer?.cancel();
-        _stopModernTrafficMonitoring();
-        if (_ciscoTunnel.isRunning) {
-          await _ciscoTunnel.stop();
-        } else if (_modernTunnel.isRunning) {
-          await _modernTunnel.stop();
-        }
+        await _modernTunnel.stop();
         if (!mounted) return;
         setState(() { _modernUp = false; _modernProtocol = null; _modernNodeId = null; });
       }
@@ -384,8 +363,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   }
 
   Future<void> _refreshModernTraffic() async {
-    if (!mounted || !_modernUp || _modernProtocol == 'cisco' ||
-        _modernTrafficBusy) return;
+    if (!mounted || !_modernUp || _modernTrafficBusy) return;
     _modernTrafficBusy = true;
     try {
       final totals = await _modernTunnel.readTrafficTotals();
@@ -417,9 +395,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       if (!mounted || !_modernUp || _vpnBusy || _modernHealthBusy) return;
       _modernHealthBusy = true;
       try {
-        final healthy = _modernProtocol == 'cisco'
-            ? await _ciscoTunnel.checkHealth()
-            : await _modernTunnel.checkHealth();
+        final healthy = await _modernTunnel.checkHealth();
         if (!mounted || !_modernUp || _vpnBusy) return;
         if (healthy) {
           _modernHealthFailures = 0;
@@ -437,96 +413,6 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         _modernHealthBusy = false;
       }
     });
-  }
-
-  Future<void> _startCiscoTunnel(String serverId) async {
-    if (_vpnBusy) return;
-    setState(() { _vpnBusy = true; _vpnError = null; });
-    try {
-      if (_vpnUnmanaged) {
-        throw const FormatException('UNMANAGED_WIREGUARD_SERVICE');
-      }
-      final authorized = widget.catalog?.entries.any((entry) =>
-          entry.protocol.code == 'cisco' && entry.selected &&
-          entry.configRecordPresent) ?? false;
-      if (!authorized) {
-        throw const FormatException('PROTOCOL_NOT_INCLUDED_IN_SUBSCRIPTION');
-      }
-      if (await WindowsOpenConnectTunnel.findInstalledEngine() == null) {
-        throw const FormatException('CISCO_OPENCONNECT_NOT_INSTALLED');
-      }
-      final definition = VpnProtocols.byCode('cisco')!;
-      final profiles = await TenantApi.fromBuildConfig().loadSessionNativeProfiles(
-        panel: widget.panel,
-        sessionToken: widget.sessionToken,
-        protocol: definition,
-        native: const NativeProtocolReadiness(supportedCodes: {'cisco'}),
-      );
-      final matches = profiles.items.where((item) =>
-          item['node_id']?.toString() == serverId).toList(growable: false);
-      if (matches.length != 1) {
-        throw const FormatException('CISCO_SERVER_PROFILE_MISSING');
-      }
-      final destination = CiscoOpenConnectProfile.fromItem(matches.single);
-      // Validate next profile BEFORE interrupting a working VPN.
-      if (_vpnUp || _vpnCleanup) {
-        await _vpn.stop().timeout(const Duration(seconds: 20));
-        final stopped = await _vpn.status().timeout(
-            const Duration(seconds: 10));
-        if (stopped['state'] != 'down') {
-          throw const FormatException('PREVIOUS_TUNNEL_NOT_STOPPED');
-        }
-        if (!mounted) return;
-        setState(() {
-          _vpnUp = false;
-          _vpnVerified = false;
-          _vpnCleanup = false;
-          _activeNodeId = null;
-          _vpnRx = 0;
-          _vpnTx = 0;
-          _resetNetworkStats();
-        });
-      }
-      if (_modernTunnel.isRunning || _ciscoTunnel.isRunning) {
-        _modernHealthTimer?.cancel();
-        _stopModernTrafficMonitoring();
-        if (_ciscoTunnel.isRunning) {
-          await _ciscoTunnel.stop();
-        } else {
-          await _modernTunnel.stop();
-        }
-        if (!mounted) return;
-        setState(() {
-          _modernUp = false;
-          _modernProtocol = null;
-          _modernNodeId = null;
-          _publicIp = null;
-        });
-      }
-      final verified = await _ciscoTunnel.start(destination);
-      if (!mounted) return;
-      setState(() {
-        _modernUp = true;
-        _modernProtocol = 'cisco';
-        _modernNodeId = serverId;
-        _publicIp = verified;
-      });
-      _startModernTrafficMonitoring();
-      _startModernHealthMonitoring();
-    } catch (error) {
-      if (mounted) {
-        setState(() {
-          _modernUp = _ciscoTunnel.isRunning || _modernTunnel.isRunning;
-          if (!_modernUp) {
-            _modernProtocol = null;
-            _modernNodeId = null;
-          }
-          _vpnError = _errorText(error);
-        });
-      }
-    } finally {
-      if (mounted) setState(() => _vpnBusy = false);
-    }
   }
 
   Future<void> _startModernTunnel(String protocol, String serverId) async {
@@ -590,18 +476,6 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           _resetNetworkStats();
         });
       }
-      if (_ciscoTunnel.isRunning) {
-        _modernHealthTimer?.cancel();
-        _stopModernTrafficMonitoring();
-        await _ciscoTunnel.stop();
-        if (!mounted) return;
-        setState(() {
-          _modernUp = false;
-          _modernProtocol = null;
-          _modernNodeId = null;
-          _publicIp = null;
-        });
-      }
       if (_modernTunnel.isRunning) {
         _modernHealthTimer?.cancel();
         _stopModernTrafficMonitoring();
@@ -646,11 +520,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     _stopModernTrafficMonitoring();
     setState(() { _vpnBusy = true; _vpnError = null; });
     try {
-      if (_ciscoTunnel.isRunning) {
-        await _ciscoTunnel.stop();
-      } else if (_modernTunnel.isRunning) {
-        await _modernTunnel.stop();
-      }
+      await _modernTunnel.stop();
       if (!mounted) return;
       setState(() {
         _modernUp = false;
@@ -696,11 +566,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       // a verified handoff, after validating the replacement profile.
       if (_modernUp &&
           (_modernNodeId != nodes[index].id || _modernProtocol != _filter)) {
-        if (_filter == 'cisco') {
-          await _startCiscoTunnel(nodes[index].id);
-        } else {
-          await _startModernTunnel(_filter, nodes[index].id);
-        }
+        await _startModernTunnel(_filter, nodes[index].id);
       }
       return;
     }
@@ -747,11 +613,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
 
       if (_modernTunnel.isRunning || _modernUp) {
         _stopModernTrafficMonitoring();
-        if (_ciscoTunnel.isRunning) {
-          await _ciscoTunnel.stop();
-        } else if (_modernTunnel.isRunning) {
-          await _modernTunnel.stop();
-        }
+        await _modernTunnel.stop();
         if (!mounted) return;
         setState(() {
           _modernUp = false;
@@ -811,7 +673,6 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     _modernHealthTimer?.cancel();
     _stopModernTrafficMonitoring();
     _modernTunnel.dispose();
-    _ciscoTunnel.dispose();
     _resetNetworkStats();
     super.dispose();
   }
@@ -930,11 +791,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         }
         setState(() => _selected = best);
       }
-      if (_filter == 'cisco') {
-        await _startCiscoTunnel(_selectedServerId!);
-      } else {
-        await _startModernTunnel(_filter, _selectedServerId!);
-      }
+      await _startModernTunnel(_filter, _selectedServerId!);
       return;
     }
     if (_vpnUnmanaged) {
