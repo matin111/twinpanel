@@ -110,6 +110,9 @@ class WindowsSingBoxTunnel {
       if (verified == null) {
         throw const FormatException('SINGBOX_EXIT_IP_NOT_VERIFIED');
       }
+      if (exited || !identical(_child, current)) {
+        throw const FormatException('SINGBOX_PROCESS_EXITED');
+      }
       _activeServerId = serverId;
       _activeProtocol = protocol;
       _exitIp = verified;
