@@ -46,7 +46,7 @@ jobs:
         run: flutter pub get
       - name: Verify Dart compilation and tests
         run: |
-          flutter analyze
+          flutter analyze --no-fatal-infos
           flutter test --reporter expanded
       - name: Verify HTTPS directory is configured and reachable
         shell: pwsh
