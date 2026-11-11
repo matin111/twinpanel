@@ -1737,6 +1737,9 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
               'CISCO_TAP_ADAPTER_FAILED' => tr(
                 'راه‌اندازی آداپتور مجازی OpenConnect در ویندوز ناموفق بود.',
                 'OpenConnect virtual network adapter failed to initialize.'),
+              'CISCO_POST_AUTH_TUNNEL_FAILED' => tr(
+                'احراز هویت سیسکو انجام شد اما تونل یا تنظیم شبکه کامل نشد.',
+                'Cisco authenticated, but tunnel or network setup did not complete.'),
               'CISCO_ENGINE_DEPENDENCY_FAILED' => tr(
                 'موتور OpenConnect به علت مشکل DLL یا وابستگی ویندوز اجرا نشد.',
                 'OpenConnect could not load a required Windows DLL or dependency.'),
