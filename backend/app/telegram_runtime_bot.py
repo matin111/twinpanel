@@ -25,6 +25,10 @@ from aiogram.types import (
 from .telegram_navigation_v1 import show_navigation_page, acknowledge_navigation
 from .routers.telegram_manager import load_bot_token
 from .telegram_learning_center import register_learning_handlers
+from .telegram_renewal_catalog_main_v1 import (
+    show_renewal_stage,
+    load_selected_renewal_plan,
+)
 
 
 API_BASE = os.getenv(
@@ -486,21 +490,21 @@ def subscription_actions_keyboard(info):
     )
 
 
-def renewal_confirm_keyboard(sub_id):
+def renewal_confirm_keyboard(sub_id, plan_id, nonce):
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
                 InlineKeyboardButton(
                     text="✅ ادامه و پرداخت",
                     callback_data=(
-                        f"renewconfirm:{sub_id}"
+                        f"renewconfirm:{sub_id}:{plan_id}:{nonce}"
                     ),
                 )
             ],
             [
                 InlineKeyboardButton(
-                    text="⬅️ بازگشت",
-                    callback_data=f"sub:{sub_id}",
+                    text="⬅️ انتخاب پلن دیگر",
+                    callback_data=f"subrenew:{sub_id}",
                 )
             ],
         ]
@@ -1636,130 +1640,156 @@ async def subscription_connection(
     )
 
 
-@router.callback_query(
-    F.data.startswith("subrenew:")
-)
-async def subscription_renew(
-    callback: CallbackQuery,
-):
+async def _renewal_choose(callback, sub_id, step="type",
+                          type_index=None, user_count=None,
+                          category_index=None, page=0):
+    await callback.answer()
     try:
-        sub_id = int(
-            callback.data.split(":")[1]
+        await show_renewal_stage(
+            callback, sub_id, request_fn=request,
+            load_manage_fn=_load_subscription_manage,
+            step=step, type_index=type_index, user_count=user_count,
+            category_index=category_index, page=page,
         )
-
-        _, info = (
-            await _load_subscription_manage(
-                callback.from_user.id,
-                sub_id,
-            )
-        )
-
-        plan = (
-            info.get("renew_plan")
-            or {}
-        )
-
-        if not plan:
-            raise RuntimeError(
-                "پلن این اشتراک برای تمدید فعال نیست"
-            )
-
     except Exception as exc:
-        await callback.answer(
-            str(exc),
-            show_alert=True,
+        if callback.message:
+            await callback.message.answer("❌ " + escape(str(exc)[:180]))
+
+
+@router.callback_query(F.data.startswith("subrenew:"))
+async def subscription_renew(callback: CallbackQuery):
+    try:
+        sub_id = int((callback.data or "").split(":")[1])
+    except (ValueError, IndexError):
+        await callback.answer("اشتراک نامعتبر است", show_alert=True)
+        return
+    await _renewal_choose(callback, sub_id)
+
+
+@router.callback_query(F.data.startswith("subrntype:"))
+async def subscription_renew_type(callback: CallbackQuery):
+    try:
+        _, sub_id, kind = (callback.data or "").split(":")
+        await _renewal_choose(callback, int(sub_id), "users", int(kind))
+    except (TypeError, ValueError) as exc:
+        await callback.answer("نوع اشتراک نامعتبر است", show_alert=True)
+
+
+@router.callback_query(F.data.startswith("subrnusers:"))
+async def subscription_renew_users(callback: CallbackQuery):
+    try:
+        _, sub_id, kind, users = (callback.data or "").split(":")
+        await _renewal_choose(callback, int(sub_id), "category",
+                              int(kind), int(users))
+    except (TypeError, ValueError):
+        await callback.answer("تعداد کاربر نامعتبر است", show_alert=True)
+
+
+@router.callback_query(F.data.startswith("subrncat:"))
+async def subscription_renew_category(callback: CallbackQuery):
+    try:
+        _, sub_id, kind, users, cat = (callback.data or "").split(":")
+        await _renewal_choose(callback, int(sub_id), "plans",
+                              int(kind), int(users), int(cat))
+    except (TypeError, ValueError):
+        await callback.answer("دسته‌بندی نامعتبر است", show_alert=True)
+
+
+@router.callback_query(F.data.startswith("subrnpage:"))
+async def subscription_renew_page(callback: CallbackQuery):
+    try:
+        _, sub_id, kind, users, cat, page = (callback.data or "").split(":")
+        await _renewal_choose(callback, int(sub_id), "plans",
+                              int(kind), int(users), int(cat), int(page))
+    except (TypeError, ValueError):
+        await callback.answer("صفحه پلن نامعتبر است", show_alert=True)
+
+
+@router.callback_query(F.data.startswith("subrnplan:"))
+async def subscription_renew_plan(callback: CallbackQuery):
+    try:
+        _, raw_sub_id, raw_plan_id = (callback.data or "").split(":")
+        sub_id, plan_id = int(raw_sub_id), int(raw_plan_id)
+        plan = await load_selected_renewal_plan(
+            callback.from_user.id, sub_id, plan_id,
+            request_fn=request, load_manage_fn=_load_subscription_manage,
         )
+        # A nonce is part of the displayed confirmation button, not generated
+        # when pressed. Double-taps therefore reuse the *same* order key.
+        import secrets
+        nonce = secrets.token_hex(5)
+    except Exception as exc:
+        await callback.answer(str(exc)[:180], show_alert=True)
         return
 
     await callback.answer()
-
-    await callback.message.edit_text(
+    await show_navigation_page(
+        callback.message,
         f"🔄 <b>تمدید اشتراک #{sub_id}</b>\n\n"
-        f"پلن: <b>{escape(str(plan.get('name') or '-'))}</b>\n"
+        f"پلن انتخابی: <b>{escape(str(plan.get('name') or '-'))}</b>\n"
         f"➕ حجم: <b>{int(plan.get('traffic_gb') or 0)} GB</b>\n"
         f"➕ اعتبار: <b>{int(plan.get('duration_days') or 0)} روز</b>\n"
         f"💳 مبلغ: <b>{_fmt_money(plan.get('price_toman'))} تومان</b>\n\n"
-        "بعد از تأیید پرداخت، همین اکانت تمدید "
-        "می‌شود و اکانت جدید ساخته نمی‌شود.",
-        reply_markup=(
-            renewal_confirm_keyboard(
-                sub_id
-            )
-        ),
+        "پس از پرداخت، حجم و اعتبار همین اکانت افزایش می‌یابد. "
+        "نام کاربری، رمز، دستگاه‌های مجاز و پروتکل‌های موجود تغییر نمی‌کنند.",
+        reply_markup=renewal_confirm_keyboard(sub_id, plan_id, nonce),
     )
 
 
-@router.callback_query(
-    F.data.startswith("renewconfirm:")
-)
-async def renewal_create_order(
-    callback: CallbackQuery,
-):
+@router.callback_query(F.data.startswith("renewconfirm:"))
+async def renewal_create_order(callback: CallbackQuery):
+    parts = (callback.data or "").split(":")
+    if len(parts) == 2:
+        # An old callback button is still on Telegram; never silently charge
+        # the old plan. Show the new catalog instead.
+        try:
+            await _renewal_choose(callback, int(parts[1]))
+        except (TypeError, ValueError):
+            await callback.answer("اشتراک نامعتبر است", show_alert=True)
+        return
+
     try:
-        sub_id = int(
-            callback.data.split(":")[1]
+        if len(parts) != 4:
+            raise ValueError("ابتدا پلن تمدید را انتخاب کنید")
+        _, raw_sub_id, raw_plan_id, nonce = parts
+        sub_id, plan_id = int(raw_sub_id), int(raw_plan_id)
+        if not (len(nonce) == 10 and all(c in "0123456789abcdef" for c in nonce)):
+            raise ValueError("دکمه تمدید نامعتبر است")
+        # Recheck the public price / entitlement before creating an order.
+        await load_selected_renewal_plan(
+            callback.from_user.id, sub_id, plan_id,
+            request_fn=request, load_manage_fn=_load_subscription_manage,
         )
-
-        token = (
-            await _telegram_session_token(
-                callback.from_user.id
-            )
-        )
-
+        token = await _telegram_session_token(callback.from_user.id)
         order = await request(
             "POST",
-            (
-                "/v1/customer/subscriptions/"
-                f"{sub_id}/renew-order"
-            ),
+            f"/v1/customer/subscriptions/{sub_id}/renew-order",
             token=token,
             payload={
                 "idempotency_key": (
-                    "tg-renew-"
-                    f"{callback.from_user.id}-"
-                    f"{sub_id}-"
-                    f"{int(time.time())}"
-                )
+                    f"tg-renew-{callback.from_user.id}-{sub_id}-{plan_id}-{nonce}"
+                ),
+                "plan_id": plan_id,
             },
         )
-
-        method_data = await request(
-            "GET",
-            "/v1/payments/methods",
-        )
-
-        methods = (
-            method_data.get("methods")
-            or []
-        )
-
+        method_data = await request("GET", "/v1/payments/methods")
+        methods = method_data.get("methods") or []
         if not methods:
             raise RuntimeError(
-                "روش پرداخت فعالی وجود ندارد"
+                "روش پرداخت فعالی وجود ندارد؛ سفارش ثبت شده است"
             )
-
     except Exception as exc:
-        await callback.answer(
-            str(exc),
-            show_alert=True,
-        )
+        await callback.answer(str(exc)[:180], show_alert=True)
         return
 
     await callback.answer()
-
-    await callback.message.edit_text(
+    await show_navigation_page(
+        callback.message,
         "✅ <b>سفارش تمدید ساخته شد</b>\n\n"
-        f"شماره سفارش: "
-        f"<b>#{order.get('id')}</b>\n"
-        f"مبلغ: "
-        f"<b>{_fmt_money(order.get('amount_toman'))} تومان</b>\n\n"
+        f"شماره سفارش: <b>#{order.get('id')}</b>\n"
+        f"مبلغ: <b>{_fmt_money(order.get('amount_toman'))} تومان</b>\n\n"
         "روش پرداخت را انتخاب کنید:",
-        reply_markup=(
-            renewal_payment_methods_keyboard(
-                int(order["id"]),
-                methods,
-            )
-        ),
+        reply_markup=renewal_payment_methods_keyboard(int(order["id"]), methods),
     )
 
 
