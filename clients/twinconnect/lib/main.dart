@@ -497,7 +497,9 @@ class _TwinConnectHomeState extends State<TwinConnectHome> with WidgetsBindingOb
         result = await fetch(session);
       } on TenantApiException catch (error) {
         if (error.message != 'APP_LOGIN_INVALID' ||
-            _sessionRefreshToken == null) rethrow;
+            _sessionRefreshToken == null) {
+          rethrow;
+        }
         await _renewSession();
         if (!mounted || serial != _lookupSerial) return;
         final updated = _confirmedSessionToken;
