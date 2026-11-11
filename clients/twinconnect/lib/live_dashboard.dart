@@ -1649,6 +1649,33 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
               'SINGBOX_TUN_ADAPTER_START_FAILED' => tr(
                 'ساخت رابط مجازی TUN با خطا روبه‌رو شد.',
                 'Virtual TUN interface could not start.'),
+              'CISCO_ENGINE_UNAVAILABLE' => tr(
+                'موتور سیسکو در بسته ویندوز آماده نیست.',
+                'Bundled Cisco engine is not available.'),
+              'CISCO_SERVER_PROFILE_MISSING' => tr(
+                'اطلاعات اتصال سیسکو برای سرور انتخاب‌شده موجود نیست.',
+                'Cisco credentials for this server are unavailable.'),
+              'CISCO_PROFILE_MISSING_FIELDS' => tr(
+                'آدرس یا اطلاعات ورود سیسکو ناقص است.',
+                'Cisco endpoint or sign-in credentials are incomplete.'),
+              'CISCO_NATIVE_START_FAILED' => tr(
+                'موتور Cisco/OpenConnect نتوانست اجرا شود؛ وضعیت درایور و دسترسی مدیر را بررسی کنید.',
+                'Cisco/OpenConnect could not start; check driver and Administrator access.'),
+              'CISCO_PROCESS_EXITED' => tr(
+                'موتور Cisco/OpenConnect قبل از تأیید اتصال بسته شد.',
+                'Cisco/OpenConnect exited before the connection was verified.'),
+              'CISCO_EGRESS_NOT_VERIFIED' => tr(
+                'اتصال سیسکو تأیید نشد؛ ترافیک اینترنت از تونل عبور نکرد.',
+                'Cisco connection was not verified: internet traffic did not use the tunnel.'),
+              'CISCO_GRACEFUL_DISCONNECT_FAILED' => tr(
+                'قطع امن Cisco انجام نشد؛ تونل هنوز ممکن است فعال باشد.',
+                'Cisco could not disconnect safely; the tunnel may still be active.'),
+              'CISCO_ROUTE_RESTORE_UNVERIFIED' => tr(
+                'سیسکو بسته شد ولی بازگشت مسیر اینترنت به حالت قبلی تأیید نشد.',
+                'Cisco stopped but normal network routing was not verified.'),
+              'CISCO_HEALTH_DEGRADED' => tr(
+                'مسیر اینترنت سیسکو پاسخ تأییدشده ندارد.',
+                'Cisco internet route is no longer verified.'),
               final code => tr('خطای اتصال: $code', 'Connection error: $code'),
             },
             style: const TextStyle(color: Colors.orangeAccent, fontSize: 11),
