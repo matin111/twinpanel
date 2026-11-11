@@ -206,7 +206,7 @@ def install() -> None:
     # The Flutter runner may inherit an older SDK target from templates.
     windows_target = 'target_compile_definitions(${BINARY_NAME} PRIVATE WINVER=0x0A00 _WIN32_WINNT=0x0A00 NTDDI_VERSION=0x0A000000)'
     if windows_target not in cmake:
-        cmake += "\\n# Enable Win10 IP Helper v2 routing inspection.\\n" + windows_target + "\\n"
+        cmake += "\n# Enable Win10 IP Helper v2 routing inspection.\n" + windows_target + "\n"
     runner_cmake.write_text(cmake, encoding="utf-8")
 
     HEADER.write_text(header, encoding="utf-8")
