@@ -411,11 +411,31 @@ export function AdminResellersManagementRuntime(){
         .reseller-admin-card-actions .reseller-card-delete{border-color:rgba(244,93,115,.35);color:#ff9aa9}
         .reseller-admin-card-actions button:hover:not(:disabled){background:rgba(91,74,167,.32);border-color:rgba(165,146,255,.7)}.reseller-admin-card-actions button:disabled{opacity:.42;cursor:not-allowed}
         @media(max-width:1200px){.reseller-admin-cards{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:720px){.reseller-admin-cards{grid-template-columns:minmax(0,1fr);gap:10px}.reseller-admin-card{padding:13px}}
+
+        /* Compact reseller management: keep all controls, reduce wasted vertical space. */
+        .reseller-management-modal{gap:10px!important;padding:14px 16px!important;scrollbar-gutter:stable;overscroll-behavior:contain}
+        .reseller-management-modal>.card-head{gap:8px;align-items:center;margin:0!important;padding:0 0 8px!important}
+        .reseller-management-modal>.card-head b{font-size:14px}
+        .reseller-management-modal>.card-head small{font-size:10px}
+        .reseller-management-modal>.stats.dashboard-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;margin:0!important}
+        .reseller-management-modal>.stats.dashboard-stats>div{min-width:0;min-height:76px;padding:10px!important;border-radius:13px}
+        .reseller-management-modal>.stats.dashboard-stats strong,.reseller-management-modal>.stats.dashboard-stats b{font-size:17px!important;line-height:1.25;overflow-wrap:anywhere}
+        .reseller-management-modal>.stats.dashboard-stats small{font-size:10px!important}
+        .reseller-management-modal .reseller-admin-tabs{display:flex;flex-wrap:wrap;gap:6px;margin:0!important}
+        .reseller-management-modal .reseller-admin-tabs button{min-height:35px;padding:5px 10px;font-size:11px}
+        .reseller-management-modal .setting-grid{gap:9px 12px!important}
+        .reseller-management-modal .field{gap:5px!important;margin:0!important;font-size:11px}
+        .reseller-management-modal .field input,.reseller-management-modal .field select{min-height:38px!important;height:38px!important;padding:5px 10px!important;font-size:12px}
+        .reseller-management-modal .field textarea{min-height:58px!important;padding:8px 10px!important;font-size:12px}
+        .reseller-management-modal .module-grid{gap:9px!important}
+        .reseller-management-modal .module-grid .card{padding:12px!important}
+        .reseller-management-modal .action-row{gap:6px}
+        @media(max-width:760px){.reseller-management-modal{padding:12px!important;max-height:calc(100dvh - 16px)!important}.reseller-management-modal>.stats.dashboard-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.reseller-management-modal>.stats.dashboard-stats>div{min-height:65px;padding:8px!important}.reseller-management-modal .reseller-admin-tabs button{flex:1 1 auto}}
         @media(prefers-reduced-motion:reduce){.reseller-admin-card{transition:none}.reseller-admin-card:hover{transform:none}}
       `}</style>
     </Card>
 
-    {selectedId&&<div className="runtime-modal" role="dialog" aria-modal="true" aria-label="مدیریت نماینده"><button type="button" className="runtime-modal-bg" aria-label="بستن" onClick={()=>!busy&&(setSelectedId(null),setSelected(null))}/><div className="runtime-modal-card reseller-management-modal" style={{width:"min(990px,calc(100vw - 24px))",maxHeight:"90vh",overflowY:"auto"}}><RuntimeMessage error={error} ok={ok}/>
+    {selectedId&&<div className="runtime-modal" role="dialog" aria-modal="true" aria-label="مدیریت نماینده"><button type="button" className="runtime-modal-bg" aria-label="بستن" onClick={()=>!busy&&(setSelectedId(null),setSelected(null))}/><div className="runtime-modal-card reseller-management-modal" style={{width:"min(850px,calc(100vw - 24px))",maxHeight:"calc(100dvh - 36px)",overflowY:"auto"}}><RuntimeMessage error={error} ok={ok}/>
       <div className="card-head"><div><b>{pick("مدیریت کامل نماینده","Full reseller management")}{selected?` · ${text(selected,"name")}`:""}</b><small>{selected?`${text(selected,"code")} · #${selectedId}`:pick("در حال دریافت اطلاعات…","Loading…")}</small></div><div className="action-row"><button className="ghost" onClick={()=>void refreshSelected()}>{pick("بروزرسانی","Refresh")}</button><button className="mini-btn" disabled={busy} onClick={()=>{setSelectedId(null);setSelected(null);}}>×</button></div></div>
 
       {selected&&<>
