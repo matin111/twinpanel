@@ -13,6 +13,8 @@ import 'windows_singbox_preflight.dart';
 /// service or a guaranteed kill switch. A separate native Job Object/recovery
 /// helper is needed before advertising crash-safe always-on protection.
 class WindowsSingBoxTunnel {
+  WindowsSingBoxTunnel({this.onUnexpectedExit});
+  final void Function()? onUnexpectedExit;
   Process? _child;
   String? _activeProtocol;
   String? _activeServerId;
@@ -65,7 +67,16 @@ class WindowsSingBoxTunnel {
       current.stdin.add(utf8.encode(jsonEncode(config)));
       await current.stdin.close();
       var exited = false;
-      unawaited(current.exitCode.then((_) { exited = true; }));
+      unawaited(current.exitCode.then((_) {
+        exited = true;
+        if (identical(_child, current) && !_changing) {
+          _child = null;
+          _activeServerId = null;
+          _activeProtocol = null;
+          _exitIp = null;
+          onUnexpectedExit?.call();
+        }
+      }));
       String? verified;
       for (var attempt = 0; attempt < 8; attempt++) {
         await Future<void>.delayed(const Duration(seconds: 2));
