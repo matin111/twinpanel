@@ -5,6 +5,7 @@ import 'tenant_models.dart';
 import 'vpn_policy.dart';
 import 'native_vpn_bridge.dart';
 import 'singbox_profile_validator.dart';
+import 'cisco_openconnect_profile.dart';
 
 /// A validated, subscription-scoped connection candidate. These checks do
 /// not start a VPN tunnel and must never be shown as "connected".
@@ -82,6 +83,18 @@ class ConnectionBootstrap {
     }).toList(growable: false);
     if (nodeItems.isEmpty) {
       throw const ConnectionBootstrapException('SERVER_PROFILE_MISSING');
+    }
+    if (definition.code == 'cisco') {
+      // Never pass an incomplete manual-credential profile into the native
+      // OpenConnect transport once that engine becomes available.
+      for (final item in nodeItems) {
+        try {
+          CiscoOpenConnectProfile.fromItem(item);
+        } on FormatException {
+          throw const ConnectionBootstrapException(
+              'CISCO_PROFILE_NOT_NATIVE_READY');
+        }
+      }
     }
     if (SingBoxProfileValidator.supportsFamily(definition.code)) {
       // Do not attempt a mixed-engine or lossy URI conversion. Once the
