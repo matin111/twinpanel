@@ -39,6 +39,26 @@ void main() {
     });
   }
 
+  test('preflight pins the same endpoint while keeping TLS host validation', () {
+    final item = {'outbound': {
+      'type': 'hysteria2',
+      'server': 'vpn.example.org',
+      'server_port': 443,
+      'password': 'synthetic',
+      'tls': {'enabled': true},
+    }};
+    final config = ModernTransportProbe.proxyConfig(
+      protocol: 'hysteria2', profile: item, port: 32567,
+      resolvedServer: '203.0.113.17');
+    final outbound = (config['outbounds'] as List).single as Map;
+    expect(outbound['server'], '203.0.113.17');
+    expect((outbound['tls'] as Map)['server_name'], 'vpn.example.org');
+    expect(((item['outbound'] as Map)['server']), 'vpn.example.org');
+    expect(() => ModernTransportProbe.proxyConfig(
+      protocol: 'hysteria2', profile: item, port: 32567,
+      resolvedServer: 'not-an-ip'), throwsFormatException);
+  });
+
   test('remote listener and unsupported protocols are rejected', () {
     expect(() => ModernTransportProbe.proxyConfig(
       protocol: 'hysteria2', profile: {'outbound': {
