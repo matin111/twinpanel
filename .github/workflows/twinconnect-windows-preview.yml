@@ -25,7 +25,7 @@ jobs:
       # A dedicated owned HTTPS domain must replace this before production.
       # Using a repository variable takes precedence without modifying code.
       TWINCONNECT_DIRECTORY_URL: ${{ vars.TWINCONNECT_DIRECTORY_URL || 'https://panel.matindnspro.sbs' }}
-      SIGNING_CONFIGURED: ${{ secrets.TWINCONNECT_SIGN_PFX_BASE64 != '' && secrets.TWINCONNECT_SIGN_PFX_PASSWORD != '' }}
+      SIGNING_CONFIGURED: ${{ github.event_name == 'push' && github.ref == 'refs/heads/integration/twinconnect-windows-app-20261110' && secrets.TWINCONNECT_SIGN_PFX_BASE64 != '' && secrets.TWINCONNECT_SIGN_PFX_PASSWORD != '' }}
     steps:
       - uses: actions/checkout@v4
       # Avoid a stalled Flutter SDK cache restore on GitHub Windows runners.
