@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.780",
+  "version": "1.1.0-rc.781",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-10T22:06:14Z",
+  "released_at": "2026-11-11T01:52:26Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "0e7a4ebe7b833e4066599359735e45404b303b6d",
+  "source_sha": "911334c11fa6d76b7ac182491f77567c22b2a7f0",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.780/twinpanel-1.1.0-rc.780-linux-x86_64.tar.gz",
-    "sha256": "af596518a4c908b46da4902d62cb1c9d378fbe8c8521b159463ff1f9c56c11f4",
-    "size_bytes": 30446342
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.781/twinpanel-1.1.0-rc.781-linux-x86_64.tar.gz",
+    "sha256": "e6123a41399341460ba47386a6b34bdd19c926c219ddd988bf1d75e191fc95dc",
+    "size_bytes": 30454880
   },
   "notes": {
-    "fa": "دکمه ریست حجم مصرفی اشتراک در پنل ادمین بدون ورود به صفحه ویرایش: پنجره بله/خیر و اجرای مستقیم فقط پس از تأیید. حجم کل، انقضا، اطلاعات اتصال و شمارنده‌های ضدتکرار حفظ می‌شوند؛ تمام تغییرات RC779 باقی می‌مانند.",
-    "en": "Admin subscription usage reset now opens Yes/No confirmation instead of Edit, sending a usage-only, accounting-safe reset request on Yes. Quota, expiry, credentials, node counters and RC779 changes remain intact."
+    "fa": "نسخه یکپارچه طراحی کارتی کاربران و نمایندگان، نمایش تعداد اکانت هر کاربر، ریست حجم مصرفی با تأیید بله/خیر و پنجره جمع‌وجور مدیریت نماینده؛ بدون حذف امکانات و با کنترل جلوگیری از بازگشت تغییرات در انتشارهای بعدی.",
+    "en": "Consolidated admin UI: responsive user and reseller cards, per-user account count, confirmed usage reset, compact reseller management dialog, and release regression guard."
   }
 }
