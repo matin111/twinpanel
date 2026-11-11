@@ -1231,6 +1231,21 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
               'UNMANAGED_WIREGUARD_SERVICE' => tr(
                 'سرویس WireGuard متعلق به برنامه نیست؛ تغییری ایجاد نشد.',
                 'WireGuard service is not managed by this app.'),
+              'SINGBOX_SERVER_TRANSPORT_UNREACHABLE' => tr(
+                'ارتباط پروتکل انتخابی با سرور برقرار نشد؛ پیش از تغییر تونل، اتصال متوقف شد.',
+                'Selected protocol could not reach the server; existing tunnel was preserved.'),
+              'SINGBOX_TUN_INTERNET_UNREACHABLE' => tr(
+                'تونل اجرا شد اما درخواست اینترنت از مسیر آن پاسخ نگرفت؛ اتصال تأیید نشد.',
+                'TUN started but the internet test failed; connection not verified.'),
+              'SINGBOX_TUN_ROUTE_NOT_VERIFIED' => tr(
+                'IP اینترنت تغییر نکرد؛ مسیر TUN تأیید نشد و اتصال متوقف شد.',
+                'Public IP did not change; TUN routing could not be verified.'),
+              'SINGBOX_PROCESS_EXITED' => tr(
+                'موتور اتصال قبل از تأیید متوقف شد.',
+                'Connection engine stopped before verification.'),
+              'SINGBOX_TUN_CONFIG_INVALID' => tr(
+                'کانفیگ این پروتکل برای موتور ویندوز معتبر نیست.',
+                'This protocol configuration was rejected by the Windows engine.'),
               final code => tr('خطای اتصال: $code', 'Connection error: $code'),
             },
             style: const TextStyle(color: Colors.orangeAccent, fontSize: 11),
