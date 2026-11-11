@@ -15,12 +15,30 @@ class ModernTransportProbe {
     required String protocol,
     required Map<String, dynamic> profile,
     required int port,
+    String? resolvedServer,
   }) {
     if (port < 1024 || port > 65535) {
       throw const FormatException('INVALID_LOCAL_PROXY_PORT');
     }
     final outbound = SingBoxProfileValidator.validateOutbound(
       protocolCode: protocol, item: profile);
+    final dialOutbound = <String, dynamic>{...outbound, 'tag': 'proxy'};
+    if (resolvedServer != null) {
+      final address = InternetAddress.tryParse(resolvedServer);
+      if (address == null || address.type != InternetAddressType.IPv4) {
+        throw const FormatException('SINGBOX_BOOTSTRAP_IP_INVALID');
+      }
+      final originalServer = outbound['server'] as String;
+      if (InternetAddress.tryParse(originalServer) == null &&
+          dialOutbound['tls'] is Map) {
+        final tls = Map<String, dynamic>.from(dialOutbound['tls'] as Map);
+        if (tls['server_name'] == null || tls['server_name'] == '') {
+          tls['server_name'] = originalServer;
+        }
+        dialOutbound['tls'] = tls;
+      }
+      dialOutbound['server'] = resolvedServer;
+    }
     return {
       'log': {'level': 'error'},
       'inbounds': [{
@@ -29,7 +47,7 @@ class ModernTransportProbe {
         'listen': '127.0.0.1',
         'listen_port': port,
       }],
-      'outbounds': [{...outbound, 'tag': 'proxy'}],
+      'outbounds': [dialOutbound],
       'route': {'final': 'proxy'},
     };
   }
@@ -37,6 +55,7 @@ class ModernTransportProbe {
   static Future<ModernProbeResult> verify({
     required String protocol,
     required Map<String, dynamic> profile,
+    String? resolvedServer,
   }) async {
     if (!Platform.isWindows || !await WindowsSingBoxPreflight.enginePresent()) {
       throw const FormatException('SINGBOX_ENGINE_UNAVAILABLE');
@@ -47,7 +66,9 @@ class ModernTransportProbe {
       InternetAddress.loopbackIPv4, 0);
     final port = reservation.port;
     await reservation.close();
-    final config = proxyConfig(protocol: protocol, profile: profile, port: port);
+    final config = proxyConfig(
+      protocol: protocol, profile: profile, port: port,
+      resolvedServer: resolvedServer);
     if (!await WindowsSingBoxPreflight.checkInMemory(config)) {
       throw const FormatException('SINGBOX_PROXY_CONFIG_REJECTED');
     }
