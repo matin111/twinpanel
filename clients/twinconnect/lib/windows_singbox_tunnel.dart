@@ -126,7 +126,7 @@ class WindowsSingBoxTunnel {
         if (exited) {
           throw FormatException(nativeFailure ?? 'SINGBOX_PROCESS_EXITED');
         }
-        routeIssue = await _windowsTunRouteIssue();
+        routeIssue = await inspectWindowsTunRoutes();
         if (routeIssue == null ||
             routeIssue == 'SINGBOX_TUN_ROUTE_INSPECTION_FAILED') {
           // A failed inspector is not a missing adapter; fail once rather
@@ -224,7 +224,7 @@ class WindowsSingBoxTunnel {
 
   /// Read-only Windows inspection. Never modifies routes or adapters.
   /// Route presence alone is not a proof of an operating VPN.
-  static Future<String?> _windowsTunRouteIssue() async {
+  static Future<String?> inspectWindowsTunRoutes() async {
     // PowerShell's NetTCPIP module can take more than six seconds to load
     // on Windows 10/11. Run one native inspection with a bounded 18-second
     // budget; don't interpret command timeout as a missing default route.
