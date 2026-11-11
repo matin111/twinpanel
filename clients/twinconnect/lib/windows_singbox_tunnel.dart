@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:flutter/services.dart';
 
@@ -25,12 +26,47 @@ class WindowsSingBoxTunnel {
   String? _activeProtocol;
   String? _activeServerId;
   String? _exitIp;
+  int? _statsPort;
+  String? _statsSecret;
   bool _changing = false;
 
   bool get isRunning => _child != null && _exitIp != null;
   String? get protocol => isRunning ? _activeProtocol : null;
   String? get serverId => isRunning ? _activeServerId : null;
   String? get publicIp => isRunning ? _exitIp : null;
+
+  /// Accurate sing-box totals for the active modern tunnel. No VPN secrets,
+  /// routes or user profiles are exposed by the local authenticated endpoint.
+  Future<({int received, int sent})?> readTrafficTotals() async {
+    final port = _statsPort;
+    final secret = _statsSecret;
+    if (!isRunning || port == null || secret == null) return null;
+    final client = HttpClient()
+      ..connectionTimeout = const Duration(seconds: 2)
+      ..findProxy = (_) => 'DIRECT';
+    try {
+      final request = await client.getUrl(
+        Uri.parse('http://127.0.0.1:$port/connections'),
+      ).timeout(const Duration(seconds: 3));
+      request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $secret');
+      final response = await request.close().timeout(const Duration(seconds: 3));
+      if (response.statusCode != HttpStatus.ok) return null;
+      final body = await utf8.decoder.bind(response).join()
+          .timeout(const Duration(seconds: 3));
+      if (body.length > 262144) return null;
+      final parsed = jsonDecode(body);
+      if (parsed is! Map) return null;
+      final rx = parsed['downloadTotal'];
+      final tx = parsed['uploadTotal'];
+      if (rx is! int || tx is! int || rx < 0 || tx < 0) return null;
+      if (!isRunning || _statsPort != port || _statsSecret != secret) return null;
+      return (received: rx, sent: tx);
+    } catch (_) {
+      return null;
+    } finally {
+      client.close(force: true);
+    }
+  }
 
   /// Read-only route health check. Never starts, stops or reroutes a tunnel.
   /// A transient failure returns false; the caller decides whether to warn.
@@ -83,8 +119,22 @@ class WindowsSingBoxTunnel {
           throw const FormatException('SINGBOX_ENDPOINT_DNS_UNAVAILABLE');
         }
       }
+      // Reserve an OS-assigned loopback port, then let sing-box bind it.
+      // A cryptographically random secret protects diagnostics from other
+      // local clients. No token is written to disk or to process arguments.
+      final reservation = await ServerSocket.bind(
+        InternetAddress.loopbackIPv4, 0);
+      final statsPort = reservation.port;
+      await reservation.close();
+      final random = Random.secure();
+      final statsSecret = List<int>.generate(
+        32, (_) => random.nextInt(256),
+      ).map((value) => value.toRadixString(16).padLeft(2, '0')).join();
       final config = SingBoxWindowsConfig.compose(
-        protocol: protocol, item: profile, resolvedServer: resolvedServer);
+        protocol: protocol, item: profile, resolvedServer: resolvedServer,
+        statsPort: statsPort, statsSecret: statsSecret);
+      _statsPort = statsPort;
+      _statsSecret = statsSecret;
       if (!await WindowsSingBoxPreflight.checkInMemory(config)) {
         throw const FormatException('SINGBOX_TUN_CONFIG_INVALID');
       }
@@ -150,6 +200,8 @@ class WindowsSingBoxTunnel {
         exited = true;
         if (identical(_child, current) && !_changing) {
           _child = null;
+          _statsPort = null;
+          _statsSecret = null;
           _activeServerId = null;
           _activeProtocol = null;
           _exitIp = null;
@@ -252,6 +304,8 @@ class WindowsSingBoxTunnel {
   Future<void> _killChild() async {
     final child = _child;
     if (child == null) {
+      _statsPort = null;
+      _statsSecret = null;
       _activeServerId = null;
       _activeProtocol = null;
       _exitIp = null;
@@ -265,6 +319,8 @@ class WindowsSingBoxTunnel {
       throw const FormatException('SINGBOX_PROCESS_DID_NOT_STOP');
     }
     if (identical(child, _child)) {
+      _statsPort = null;
+      _statsSecret = null;
       _child = null;
       _activeServerId = null;
       _activeProtocol = null;
