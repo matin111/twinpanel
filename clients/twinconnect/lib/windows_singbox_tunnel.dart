@@ -31,6 +31,20 @@ class WindowsSingBoxTunnel {
   String? get serverId => isRunning ? _activeServerId : null;
   String? get publicIp => isRunning ? _exitIp : null;
 
+  /// Read-only route health check. Never starts, stops or reroutes a tunnel.
+  /// A transient failure returns false; the caller decides whether to warn.
+  Future<bool> checkHealth() async {
+    final expected = _exitIp;
+    if (!isRunning || expected == null) return false;
+    try {
+      final actual = await _requestPublicIp()
+          .timeout(const Duration(seconds: 7));
+      return isRunning && actual == expected;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<String> start({
     required String protocol,
     required String serverId,
