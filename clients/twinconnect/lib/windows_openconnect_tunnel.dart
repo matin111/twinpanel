@@ -134,7 +134,26 @@ class WindowsOpenConnectTunnel {
             .timeout(const Duration(seconds: 5));
         if (running != true) {
           _nativeActive = false;
-          throw const FormatException('CISCO_PROCESS_EXITED');
+          // Only a coarse native category is exposed. Raw upstream stderr
+          // could contain endpoint/user details and must never reach UI.
+          String reason = 'CISCO_PROCESS_EXITED';
+          try {
+            final result = await _channel.invokeMethod<String>(
+                'openConnectExitReason').timeout(const Duration(seconds: 4));
+            if (result != null && const {
+              'CISCO_CERTIFICATE_UNTRUSTED',
+              'CISCO_AUTHENTICATION_FAILED',
+              'CISCO_ROUTE_SCRIPT_FAILED',
+              'CISCO_TAP_ADAPTER_FAILED',
+              'CISCO_GATEWAY_UNREACHABLE',
+              'CISCO_PROCESS_EXITED',
+            }.contains(result)) {
+              reason = result;
+            }
+          } catch (_) {
+            // A missing diagnostic never bypasses the fail-closed state.
+          }
+          throw FormatException(reason);
         }
         try {
           final ip = await _publicIp().timeout(const Duration(seconds: 7));
