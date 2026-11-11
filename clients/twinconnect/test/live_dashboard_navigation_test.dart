@@ -79,6 +79,9 @@ void main() {
     await tester.pump(const Duration(milliseconds: 800));
     expect(find.byKey(const Key('devServer_1')), findsOneWidget);
     await tester.ensureVisible(find.byKey(const Key('devServer_1')));
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.ensureVisible(find.byKey(const Key('devServer_1')));
+    await tester.pump(const Duration(milliseconds: 500));
     await tester.tap(find.byKey(const Key('devServer_1')));
     await tester.pump(const Duration(milliseconds: 800));
     expect(find.byKey(const Key('liveConnectionStatus')), findsWidgets);
@@ -96,6 +99,9 @@ void main() {
     await tester.tap(find.byKey(const Key('countryToggle_TR')));
     await tester.pump(const Duration(milliseconds: 800));
     expect(find.byKey(const Key('devServer_0')), findsOneWidget);
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.ensureVisible(find.byKey(const Key('devServer_0')));
+    await tester.pump(const Duration(milliseconds: 500));
     await tester.tap(find.byKey(const Key('devServer_0')));
     await tester.pump(const Duration(milliseconds: 800));
     expect(find.byKey(const Key('liveConnectionStatus')), findsWidgets);
