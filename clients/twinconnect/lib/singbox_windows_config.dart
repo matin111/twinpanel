@@ -56,8 +56,7 @@ class SingBoxWindowsConfig {
         // sing-box 1.14: cache repeated DNS answers and update stale
         // entries in the background. DNS still travels through the proxy.
         'cache_capacity': 4096,
-        // Do not serve stale/potentially poisoned answers while reconnecting.
-        'optimistic': false,
+        'optimistic': true,
       },
       'inbounds': [
         {
@@ -76,18 +75,9 @@ class SingBoxWindowsConfig {
         'auto_detect_interface': true,
         // Resolve outbound server hostnames BEFORE creating a proxy session.
         // The regular DNS final remains protected by the proxy.
-        // With a pinned endpoint (or a literal IP) there is no outbound DNS
-        // bootstrap dependency, so prevent default lookups from falling back
-        // to the local potentially filtered resolver.
-        'default_domain_resolver':
-            (resolvedServer != null || InternetAddress.tryParse(
-              outbound['server'] as String) != null)
-                ? 'dns-remote' : 'dns-bootstrap',
+        'default_domain_resolver': 'dns-bootstrap',
         'final': 'proxy',
         'rules': [
-          // Handle plaintext DNS from apps using arbitrary resolvers inside
-          // sing-box, instead of allowing filtered answers via the LAN.
-          {'port': 53, 'action': 'hijack-dns'},
           {'action': 'sniff'},
         ],
       },
