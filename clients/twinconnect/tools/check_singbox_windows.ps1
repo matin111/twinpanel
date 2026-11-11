@@ -22,7 +22,7 @@ foreach ($outbound in $profiles) {
     dns = @{
       servers = @(
         @{ type = 'local'; tag = 'dns-bootstrap' }
-        @{ type = 'udp'; tag = 'dns-remote'; server = '1.1.1.1'; server_port = 53; detour = 'proxy' }
+        @{ type = 'https'; tag = 'dns-remote'; server = '1.1.1.1'; server_port = 443; path = '/dns-query'; tls = @{ enabled = $true; server_name = 'one.one.one.one' }; headers = @{ Host = 'one.one.one.one' }; detour = 'proxy' }
       )
       final = 'dns-remote'
       cache_capacity = 4096
