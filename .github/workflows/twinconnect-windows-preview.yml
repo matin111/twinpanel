@@ -79,6 +79,21 @@ jobs:
       - name: Verify actual TUN adapter creation without changing system routes
         shell: pwsh
         run: ./tools/smoke_singbox_tun_windows.ps1
+      - name: Bundle signed OpenConnect Windows prerequisite
+        shell: pwsh
+        env:
+          TWINCONNECT_OPENCONNECT_SHA256: ${{ vars.TWINCONNECT_OPENCONNECT_SHA256 }}
+        run: ./tools/bundle_openconnect_windows.ps1
+      - name: Verify packaged OpenConnect upstream provenance
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $exe = Join-Path (Get-Location) 'build/windows/x64/runner/Release/prerequisites/openconnect-gui-1.6.2-win64.exe'
+          if (!(Test-Path $exe)) { throw 'OpenConnect prerequisite is missing from release' }
+          $sig = Get-AuthenticodeSignature -LiteralPath $exe
+          if ($sig.Status -ne 'Valid') { throw 'Bundled OpenConnect vendor signature invalid' }
+          $provenance = Join-Path (Split-Path $exe) 'OPENCONNECT-SOURCE.txt'
+          if (!(Test-Path $provenance)) { throw 'OpenConnect provenance missing' }
       - name: Inspect release binaries with Windows Defender (when available)
         shell: pwsh
         run: |
