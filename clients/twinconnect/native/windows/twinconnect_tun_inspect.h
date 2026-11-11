@@ -90,6 +90,15 @@ inline flutter::EncodableValue Inspect() {
   }
   put("inspectionOk", true);
   put("defaultRoutePresent", default_route);
+  // GetBestRoute uses Windows' effective IPv4 route lookup, including
+  // metrics. A route being present isn't enough if another VPN wins.
+  // 1.1.1.1 is a public destination and symmetric in network byte order.
+  MIB_IPFORWARDROW best = {};
+  const DWORD best_status = GetBestRoute(0x01010101UL, 0, &best);
+  put("bestRouteKnown", best_status == NO_ERROR);
+  if (best_status == NO_ERROR) {
+    put("tunPreferred", best.dwForwardIfIndex == target_index);
+  }
   return flutter::EncodableValue(output);
 }
 
