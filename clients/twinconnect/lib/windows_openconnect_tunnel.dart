@@ -147,6 +147,7 @@ class WindowsOpenConnectTunnel {
               'CISCO_TAP_ADAPTER_FAILED',
               'CISCO_GATEWAY_UNREACHABLE',
               'CISCO_ENGINE_DEPENDENCY_FAILED',
+              'CISCO_POST_AUTH_TUNNEL_FAILED',
               'CISCO_PROCESS_EXITED',
             }.contains(result)) {
               reason = result;
