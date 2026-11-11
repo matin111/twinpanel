@@ -484,8 +484,10 @@ def install_telegram_admin_ops(router, request_fn):
             return
         await state.set_state(AdminOpsState.broadcast_text)
         await callback.message.answer(
-            "📢 متن پیام همگانی را بفرستید (حداکثر ۴۰۰۰ کاراکتر).\n"
-            "قبل از ارسال، پیش‌نمایش و تعداد گیرندگان نشان داده می‌شود."
+            "📢 <b>ارسال پیام همگانی</b>\n\n"
+            "متن پیام یا یک عکس با کپشن اختیاری بفرستید.\n"
+            "متن: حداکثر ۴۰۰۰ کاراکتر | کپشن عکس: حداکثر ۱۰۲۴ کاراکتر.\n"
+            "قبل از ارسال، عکس یا متن و تعداد گیرندگان نمایش داده می‌شود."
         )
 
     @router.message(AdminOpsState.broadcast_text)
@@ -493,21 +495,52 @@ def install_telegram_admin_ops(router, request_fn):
         if message.chat.type != "private" or not await check(message.from_user.id):
             await state.clear()
             return
-        text = (message.text or "").strip()
-        if not (1 <= len(text) <= 4000):
-            await message.answer("متن پیام نامعتبر است.")
+
+        photo_file_id = message.photo[-1].file_id if message.photo else None
+        text = ((message.caption if photo_file_id else message.text) or "").strip()
+        if photo_file_id:
+            if len(text) > 1024:
+                await message.answer("کپشن عکس نباید بیشتر از ۱۰۲۴ کاراکتر باشد.")
+                return
+        elif not (1 <= len(text) <= 4000):
+            await message.answer(
+                "متن پیام نامعتبر است. متن بنویسید یا یک عکس با کپشن اختیاری بفرستید."
+            )
             return
+
+        # Never accept an unsupported document/video as an empty text draft.
         await state.clear()
         try:
             preview = await api(
                 "POST", "/broadcast/preview", message.from_user.id,
-                {"telegram_id": message.from_user.id, "text": text},
+                {
+                    "telegram_id": message.from_user.id,
+                    "text": text,
+                    "photo_file_id": photo_file_id,
+                },
             )
+            if photo_file_id:
+                # Show the exact Telegram photo and caption that recipients see.
+                # Confirmation buttons are separate to avoid exceeding the
+                # 1024-character photo caption limit.
+                await message.answer_photo(
+                    photo=photo_file_id,
+                    caption=escape(text) if text else None,
+                )
+                summary = (
+                    "📢 <b>پیش‌نمایش ارسال عکس همگانی</b>\n"
+                    f"گیرندگان: {int(preview['total']):,}\n\n"
+                    "⚠️ با تأیید نهایی عکس برای گیرندگان ارسال می‌شود."
+                )
+            else:
+                summary = (
+                    "📢 <b>پیش‌نمایش ارسال همگانی</b>\n"
+                    f"گیرندگان: {int(preview['total']):,}\n\n"
+                    + escape(str(preview["preview"])) + "\n\n"
+                    "⚠️ تأیید نهایی باعث شروع ارسال می‌شود."
+                )
             await message.answer(
-                f"📢 <b>پیش‌نمایش ارسال همگانی</b>\n"
-                f"گیرندگان: {int(preview['total']):,}\n\n"
-                + escape(str(preview["preview"])) + "\n\n"
-                "⚠️ تأیید نهایی باعث شروع ارسال می‌شود.",
+                summary,
                 reply_markup=_buttons(
                     [("✅ ارسال نهایی", "adm:bcast:" + preview["nonce"])],
                     [("❌ لغو", "adm:home")],
