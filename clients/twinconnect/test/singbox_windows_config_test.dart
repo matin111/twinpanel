@@ -36,7 +36,9 @@ void main() {
     expect(dns['final'], 'dns-remote');
     expect(routing['default_domain_resolver'], 'dns-bootstrap');
     expect(dns['cache_capacity'], 4096);
-    expect(dns['optimistic'], isTrue);
+    expect(dns['optimistic'], isFalse);
+    expect(((routing['rules'] as List).first as Map)['port'], 53);
+    expect(((routing['rules'] as List).first as Map)['action'], 'hijack-dns');
     expect((item['outbound'] as Map).containsKey('tag'), isFalse);
   });
 
@@ -68,6 +70,21 @@ void main() {
     expect(outbound['server'], '203.0.113.20');
     expect((outbound['tls'] as Map)['server_name'], 'vpn.example.org');
     expect((item['outbound'] as Map)['server'], 'vpn.example.org');
+  });
+
+  test('local traffic API requires an authenticated loopback secret', () {
+    final config = SingBoxWindowsConfig.compose(
+      protocol: 'hysteria2', item: item,
+      telemetryPort: 23781, telemetrySecret: 'a' * 64);
+    final api = ((config['experimental'] as Map)['clash_api']) as Map;
+    expect(api['external_controller'], '127.0.0.1:23781');
+    expect(api['secret'], 'a' * 64);
+    expect(() => SingBoxWindowsConfig.compose(
+      protocol: 'hysteria2', item: item,
+      telemetryPort: 23781, telemetrySecret: 'short'), throwsFormatException);
+    expect(() => SingBoxWindowsConfig.compose(
+      protocol: 'hysteria2', item: item,
+      telemetryPort: 23781), throwsFormatException);
   });
 
   test('rejects a wrong or unstructured outbound without fallbacks', () {
