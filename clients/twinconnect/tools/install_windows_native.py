@@ -14,6 +14,8 @@ NATIVE = ROOT / "native" / "windows" / "twinconnect_wireguard.h"
 INSTALLED = ROOT / "windows" / "runner" / "twinconnect_wireguard.h"
 SINGBOX_GUARD = ROOT / "native" / "windows" / "twinconnect_singbox_guard.h"
 SINGBOX_INSTALLED = ROOT / "windows" / "runner" / "twinconnect_singbox_guard.h"
+OPENCONNECT_NATIVE = ROOT / "native" / "windows" / "twinconnect_openconnect.h"
+OPENCONNECT_INSTALLED = ROOT / "windows" / "runner" / "twinconnect_openconnect.h"
 
 HEADER_MARKER = "  std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> vpn_channel_;"
 CPP_MARKER = "  // TwinConnect: fail-closed Windows native capability handshake."
@@ -33,6 +35,9 @@ def install() -> None:
     if not SINGBOX_GUARD.is_file():
         raise RuntimeError("Missing sing-box process guard header")
     shutil.copyfile(SINGBOX_GUARD, SINGBOX_INSTALLED)
+    if not OPENCONNECT_NATIVE.is_file():
+        raise RuntimeError("Missing OpenConnect native runtime header")
+    shutil.copyfile(OPENCONNECT_NATIVE, OPENCONNECT_INSTALLED)
 
     header = HEADER.read_text(encoding="utf-8-sig")
     cpp = SOURCE.read_text(encoding="utf-8-sig")
@@ -57,7 +62,8 @@ def install() -> None:
             '#include "flutter_window.h"\n'
             '#include <flutter/standard_method_codec.h>\n'
             '#include "twinconnect_wireguard.h"\n'
-            '#include "twinconnect_singbox_guard.h"',
+            '#include "twinconnect_singbox_guard.h"\n'
+            '#include "twinconnect_openconnect.h"',
         )
         injection = """  // TwinConnect: fail-closed Windows native capability handshake.
   vpn_channel_ = std::make_unique<
@@ -69,7 +75,33 @@ def install() -> None:
   vpn_channel_->SetMethodCallHandler(
       [](const flutter::MethodCall<flutter::EncodableValue>& call,
          std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result) {
-        if (call.method_name() == "guardSingBoxProcess") {
+        if (call.method_name() == "startOpenConnect") {
+          const auto* args = std::get_if<flutter::EncodableMap>(
+              call.arguments());
+          if (!args) { result->Error("CISCO_INVALID_REQUEST"); return; }
+          const auto field = [&](const char* key) -> std::string {
+            const auto it = args->find(flutter::EncodableValue(key));
+            if (it == args->end()) return "";
+            const auto* value = std::get_if<std::string>(&it->second);
+            return value ? *value : "";
+          };
+          if (!twinconnect_openconnect::Start(
+                  field("executable"), field("script"), field("gateway"),
+                  field("username"), field("password"), field("servercert"))) {
+            result->Error("CISCO_NATIVE_START_FAILED");
+            return;
+          }
+          result->Success(flutter::EncodableValue(true));
+        } else if (call.method_name() == "openConnectStatus") {
+          result->Success(flutter::EncodableValue(
+              twinconnect_openconnect::Running()));
+        } else if (call.method_name() == "stopOpenConnect") {
+          if (!twinconnect_openconnect::Stop()) {
+            result->Error("CISCO_GRACEFUL_DISCONNECT_FAILED");
+            return;
+          }
+          result->Success(flutter::EncodableValue(true));
+        } else if (call.method_name() == "guardSingBoxProcess") {
           const auto* args = std::get_if<flutter::EncodableMap>(
               call.arguments());
           if (!args) {
