@@ -403,7 +403,7 @@ inline bool ValidConfig(const std::string& text) {
       if (key == "privatekey") private_key = true;
       else if (key == "address") {
         address = true;
-        ipv6_address = value.find(':') != std::string::npos;
+        ipv6_address = ipv6_address || value.find(':') != std::string::npos;
       }
       else if (key == "dns") dns = true;
       else if (key == "mtu" || key == "listenport") {}
