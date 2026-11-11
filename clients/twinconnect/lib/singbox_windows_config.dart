@@ -23,8 +23,13 @@ class SingBoxWindowsConfig {
           // no outbound connection exists until its endpoint is resolved.
           {'type': 'local', 'tag': 'dns-bootstrap'},
           // Ordinary in-tunnel DNS continues to use the selected proxy.
-          {'type': 'udp', 'tag': 'dns-remote', 'server': '1.1.1.1',
-           'server_port': 53, 'detour': 'proxy'},
+          // Use HTTPS/TCP for protected DNS: not all modern proxies
+          // implement UDP relay (notably NaiveProxy).
+          {'type': 'https', 'tag': 'dns-remote', 'server': '1.1.1.1',
+           'server_port': 443, 'path': '/dns-query',
+           'tls': {'enabled': true, 'server_name': 'one.one.one.one'},
+           'headers': {'Host': 'one.one.one.one'},
+           'detour': 'proxy'},
         ],
         'final': 'dns-remote',
         // sing-box 1.14: cache repeated DNS answers and update stale
