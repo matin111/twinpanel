@@ -20,8 +20,10 @@ inline HANDLE& Reader() { static HANDLE reader = nullptr; return reader; }
 inline volatile LONG& Failure() { static volatile LONG category = 0; return category; }
 enum FailureCode : LONG {
   kUnknown = 0, kCertificate = 1, kAuthentication = 2,
-  kRouteScript = 3, kAdapter = 4, kGateway = 5, kDependency = 6
+  kRouteScript = 3, kAdapter = 4, kGateway = 5, kDependency = 6,
+  kPostAuthExit = 7
 };
+inline volatile LONG& Authenticated() { static volatile LONG seen = 0; return seen; }
 inline void Classify(const std::string& data) {
   std::string lower(data);
   std::transform(lower.begin(), lower.end(), lower.begin(),
@@ -29,6 +31,10 @@ inline void Classify(const std::string& data) {
   auto has = [&](const char* needle) {
     return lower.find(needle) != std::string::npos;
   };
+  if (has("authentication completed") || has("authenticated successfully") ||
+      has("got connect response") || has("cookie obtained")) {
+    InterlockedExchange(&Authenticated(), 1);
+  }
   LONG reason = kUnknown;
   if (has("certificate verify failed") || has("server certificate verify failed") ||
       has("untrusted certificate") || has("certificate validation failed") ||
@@ -76,7 +82,8 @@ inline const char* FailureName() {
     case kAdapter: return "CISCO_TAP_ADAPTER_FAILED";
     case kGateway: return "CISCO_GATEWAY_UNREACHABLE";
     case kDependency: return "CISCO_ENGINE_DEPENDENCY_FAILED";
-    default: return "CISCO_PROCESS_EXITED";
+    default: return InterlockedCompareExchange(&Authenticated(), 0, 0)
+        ? "CISCO_POST_AUTH_TUNNEL_FAILED" : "CISCO_PROCESS_EXITED";
   }
 }
 
@@ -222,15 +229,8 @@ inline bool Start(const std::string& executableUtf8,
     CloseHandle(inputRead); CloseHandle(inputWrite);
     return false;
   }
-  HANDLE logNull = CreateFileW(L"NUL", GENERIC_WRITE,
-      FILE_SHARE_READ | FILE_SHARE_WRITE, &sa, OPEN_EXISTING,
-      FILE_ATTRIBUTE_NORMAL, nullptr);
-  if (logNull == INVALID_HANDLE_VALUE) {
-    CloseHandle(inputRead); CloseHandle(inputWrite);
-    CloseHandle(errorRead); CloseHandle(errorWrite);
-    return false;
-  }
   InterlockedExchange(&Failure(), kUnknown);
+  InterlockedExchange(&Authenticated(), 0);
   std::wstring command = Quote(executable) +
       L" --protocol=anyconnect --non-inter --passwd-on-stdin --no-proxy" +
       L" --user=" + Quote(FromUtf8(user)) +
@@ -244,7 +244,9 @@ inline bool Start(const std::string& executableUtf8,
   startup.dwFlags = STARTF_USESTDHANDLES | STARTF_USESHOWWINDOW;
   startup.wShowWindow = SW_HIDE;
   startup.hStdInput = inputRead;
-  startup.hStdOutput = logNull;
+  // Merge stdout and stderr into the private classifier pipe: upstream
+  // OpenConnect emits lifecycle diagnostics to either stream.
+  startup.hStdOutput = errorWrite;
   startup.hStdError = errorWrite;
   PROCESS_INFORMATION pi = {};
   const bool created = CreateProcessW(executable.c_str(),
@@ -252,7 +254,6 @@ inline bool Start(const std::string& executableUtf8,
       CREATE_NEW_PROCESS_GROUP,
       nullptr, nullptr, &startup, &pi) != FALSE;
   CloseHandle(inputRead);
-  CloseHandle(logNull);
   CloseHandle(errorWrite);
   if (!created) {
     CloseHandle(inputWrite);
