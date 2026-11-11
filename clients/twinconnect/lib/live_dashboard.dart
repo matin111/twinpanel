@@ -1280,8 +1280,14 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                 'سرویس WireGuard متعلق به برنامه نیست؛ تغییری ایجاد نشد.',
                 'WireGuard service is not managed by this app.'),
               'SINGBOX_SERVER_TRANSPORT_UNREACHABLE' => tr(
-                'ارتباط پروتکل انتخابی با سرور برقرار نشد؛ پیش از تغییر تونل، اتصال متوقف شد.',
-                'Selected protocol could not reach the server; existing tunnel was preserved.'),
+                'آزمایش اولیه ارتباط پروتکل با سرور موفق نبود؛ اتصال جدید برقرار نشد.',
+                'Selected protocol failed the transport preflight; no new connection was established.'),
+              'SINGBOX_ENDPOINT_DNS_POISONED' => tr(
+                'DNS آدرس خصوصی یا نامعتبر برای سرور برگرداند. پاسخ شبکه محلی مشکوک است.',
+                'DNS returned a private address for the VPN endpoint; local DNS may be filtered.'),
+              'SINGBOX_ENDPOINT_DNS_UNAVAILABLE' => tr(
+                'نام دامنه سرور قبل از اتصال VPN قابل تبدیل به IP نبود.',
+                'Could not resolve VPN server domain before starting the tunnel.'),
               'SINGBOX_TUN_INTERNET_UNREACHABLE' => tr(
                 'تونل اجرا شد اما درخواست اینترنت از مسیر آن پاسخ نگرفت؛ اتصال تأیید نشد.',
                 'TUN started but the internet test failed; connection not verified.'),
