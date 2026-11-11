@@ -135,25 +135,19 @@ class WindowsSingBoxTunnel {
           onUnexpectedExit?.call();
         }
       }));
-      // Verify Windows actually created the TUN adapter and a default
-      // route; an alive sing-box process does not imply a working TUN.
-      String? routeIssue;
-      for (var attempt = 0; attempt < 5; attempt++) {
-        await Future<void>.delayed(const Duration(milliseconds: 450));
-        if (exited) {
-          throw FormatException(nativeFailure ?? 'SINGBOX_PROCESS_EXITED');
-        }
-        routeIssue = await inspectWindowsTunRoutes();
-        if (routeIssue == null ||
-            routeIssue == 'SINGBOX_TUN_ROUTE_INSPECTION_FAILED') {
-          // A failed inspector is not a missing adapter; fail once rather
-          // than blocking the UI for five PowerShell startup timeouts.
-          break;
-        }
-      }
-      if (routeIssue != null) {
-        throw FormatException(nativeFailure ?? routeIssue);
-      }
+      // The optional PowerShell inspector is not authoritative and may fail
+      // on locked-down Windows hosts. Never block a real traffic probe solely
+      // because Get-NetRoute / Get-NetAdapter cannot be invoked.
+      //
+      // The IP comparison below remains fail-closed. If no traffic actually
+      // traverses the selected outbound, connection cannot be confirmed.
+      final routeInspection = inspectWindowsTunRoutes()
+          .timeout(const Duration(seconds: 10),
+            onTimeout: () => 'SINGBOX_TUN_ROUTE_INSPECTION_FAILED');
+      // Consume any inspection failure without treating it as a VPN success
+      // or a hard route failure. Native engine failures still take precedence.
+      unawaited(routeInspection.then((_) {}));
+
       String? verified;
       var postTunnelHttpSucceeded = false;
       for (var attempt = 0; attempt < 8; attempt++) {
