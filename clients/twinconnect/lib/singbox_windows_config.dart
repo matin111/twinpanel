@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'singbox_profile_validator.dart';
 
 /// Prepares an isolated Windows TUN config IN MEMORY.
@@ -10,10 +12,29 @@ class SingBoxWindowsConfig {
   static Map<String, dynamic> compose({
     required String protocol,
     required Map<String, dynamic> item,
+    String? resolvedServer,
   }) {
     final outbound = SingBoxProfileValidator.validateOutbound(
       protocolCode: protocol, item: item);
     final serverOutbound = {...outbound, 'tag': 'proxy'};
+    // Resolve the endpoint before installing TUN routes to avoid a DNS
+    // bootstrap loop. Preserve the original TLS identity when dialing an IP.
+    if (resolvedServer != null) {
+      if (InternetAddress.tryParse(resolvedServer) == null) {
+        throw const FormatException('SINGBOX_BOOTSTRAP_IP_INVALID');
+      }
+      final originalServer = outbound['server'] as String;
+      if (InternetAddress.tryParse(originalServer) == null &&
+          serverOutbound['tls'] is Map) {
+        final tls = Map<String, dynamic>.from(serverOutbound['tls'] as Map);
+        final name = tls['server_name'];
+        if (name == null || (name is String && name.isEmpty)) {
+          tls['server_name'] = originalServer;
+        }
+        serverOutbound['tls'] = tls;
+      }
+      serverOutbound['server'] = resolvedServer;
+    }
     return {
       'log': {'level': 'error', 'timestamp': true},
       'dns': {
