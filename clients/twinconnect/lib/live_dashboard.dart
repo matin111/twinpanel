@@ -663,7 +663,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           _vpnUnmanaged = nextUnmanaged;
           _vpnRx = nextRx;
           _vpnTx = nextTx;
-          if (!nextUp) _resetNetworkStats();
+          if (!nextUp && !_modernUp) _resetNetworkStats();
         });
       }
       if (nextUp && (!wasUp || _networkTimer == null)) _startNetworkStats();
@@ -1538,7 +1538,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
             const SizedBox(width: 10),
             Expanded(child: metric(Icons.public_rounded,
               tr('آی‌پی عمومی', 'Public IP'),
-              _vpnVerified ? (_publicIp ?? '—') : '—')),
+              (_vpnVerified || _modernUp) ? (_publicIp ?? '—') : '—')),
           ]),
           const SizedBox(height: 18),
           Row(children: [
