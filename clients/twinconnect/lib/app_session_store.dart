@@ -14,12 +14,14 @@ class PersistedAppSession {
     required this.sessionToken,
     required this.brand,
     this.refreshToken,
+    this.panelOrigin,
   });
 
   final String username;
   final String sessionToken;
   final BrandPreview brand;
   final String? refreshToken;
+  final Uri? panelOrigin;
 }
 
 class AppSessionStore {
@@ -46,9 +48,15 @@ class AppSessionStore {
         return null;
       }
       final refresh = parsed['refresh_token'];
+      final storedOrigin = parsed['panel_origin'];
+      Uri? panelOrigin;
+      if (storedOrigin is String) {
+        try { panelOrigin = parseDirectoryOrigin(storedOrigin); } catch (_) {}
+      }
       return PersistedAppSession(
         username: username, sessionToken: token, brand: brand,
-        refreshToken: refresh is String && refresh.length >= 40 ? refresh : null);
+        refreshToken: refresh is String && refresh.length >= 40 ? refresh : null,
+        panelOrigin: panelOrigin);
     } catch (_) {
       // A corrupted or unavailable OS vault must never bypass authentication.
       return null;
@@ -60,6 +68,7 @@ class AppSessionStore {
     required String sessionToken,
     required BrandPreview brand,
     String? refreshToken,
+    Uri? panelOrigin,
   }) async {
     // Save username only in ordinary preferences, never secrets.
     final prefs = await SharedPreferences.getInstance();
@@ -70,6 +79,7 @@ class AppSessionStore {
         'username': username,
         'token': sessionToken,
         if (refreshToken != null) 'refresh_token': refreshToken,
+        if (panelOrigin != null) 'panel_origin': parseDirectoryOrigin(panelOrigin.toString()).toString(),
         'brand': brand.toJson(),
       }),
     );
