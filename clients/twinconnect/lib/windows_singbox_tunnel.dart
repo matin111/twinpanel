@@ -91,24 +91,31 @@ class WindowsSingBoxTunnel {
         }
       }));
       String? verified;
+      var postTunnelHttpSucceeded = false;
       for (var attempt = 0; attempt < 8; attempt++) {
         await Future<void>.delayed(const Duration(seconds: 2));
         if (exited) {
           throw const FormatException('SINGBOX_PROCESS_EXITED');
         }
         try {
-          final ip = await _requestPublicIp().timeout(
-              const Duration(seconds: 4));
+          // Do not use the same HTTPS service for every probe: a single
+          // blocked IP-echo domain must not be confused with TUN failure.
+          final ip = await _requestPublicIp(
+            alternative: attempt.isOdd,
+          ).timeout(const Duration(seconds: 6));
+          postTunnelHttpSucceeded = true;
           if (ip != before) {
             verified = ip;
             break;
           }
         } catch (_) {
-          // A temporarily unavailable network is not a verified connection.
+          // No successful HTTP response is not evidence of a working TUN.
         }
       }
       if (verified == null) {
-        throw const FormatException('SINGBOX_EXIT_IP_NOT_VERIFIED');
+        throw FormatException(postTunnelHttpSucceeded
+          ? 'SINGBOX_TUN_ROUTE_NOT_VERIFIED'
+          : 'SINGBOX_TUN_INTERNET_UNREACHABLE');
       }
       if (exited || !identical(_child, current)) {
         throw const FormatException('SINGBOX_PROCESS_EXITED');
@@ -161,13 +168,15 @@ class WindowsSingBoxTunnel {
   /// Direct HTTPS request using the current Windows network routes.
   /// A different IP than the pre-TUN baseline is necessary (not sufficient)
   /// to prove that traffic left through the selected outbound.
-  static Future<String> _requestPublicIp() async {
+  static Future<String> _requestPublicIp({bool alternative = false}) async {
     final client = HttpClient()
       ..connectionTimeout = const Duration(seconds: 3)
       ..findProxy = (_) => 'DIRECT';
     try {
       final request = await client.getUrl(
-        Uri.https('api.ipify.org', '/', {'format': 'json'}));
+        alternative
+          ? Uri.https('ifconfig.me', '/ip')
+          : Uri.https('api.ipify.org', '/', {'format': 'json'}));
       request.followRedirects = false;
       final response = await request.close().timeout(
         const Duration(seconds: 5));
@@ -179,12 +188,19 @@ class WindowsSingBoxTunnel {
       if (body.length > 512) {
         throw const FormatException('PUBLIC_IP_RESPONSE_TOO_LARGE');
       }
-      final data = jsonDecode(body);
-      if (data is! Map || data['ip'] is! String ||
-          InternetAddress.tryParse(data['ip'] as String) == null) {
+      final ip = alternative
+          ? body.trim()
+          : (() {
+              final data = jsonDecode(body);
+              if (data is! Map || data['ip'] is! String) {
+                throw const FormatException('PUBLIC_IP_RESPONSE_INVALID');
+              }
+              return data['ip'] as String;
+            })();
+      if (InternetAddress.tryParse(ip) == null) {
         throw const FormatException('PUBLIC_IP_RESPONSE_INVALID');
       }
-      return data['ip'] as String;
+      return ip;
     } finally {
       client.close(force: true);
     }
