@@ -349,6 +349,7 @@ class AppLoginSession {
   final String namespace;
   /// Sensitive, short-lived. Do not persist or log.
   final String sessionToken;
+  final String? refreshToken;
   final BrandPreview brand;
 
   factory AppLoginSession.fromJson(Map<String, dynamic> data) {
