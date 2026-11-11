@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 
 from ..central_app_credentials import (
     app_delivery_payload, authenticate_app, rotate_app_credentials,
-    verify_app_session,
+    verify_app_session, issue_app_refresh_token, renew_app_session,
 )
 from ..central_app_identity import central_app_entitled, installation_namespace, subscription_app_namespace
 from ..database import get_db
@@ -42,6 +42,10 @@ _PRIVATE_HEADERS = {
 class AppLoginIn(BaseModel):
     username: str = Field(min_length=6, max_length=120)
     password: str = Field(min_length=8, max_length=256)
+
+
+class AppRefreshIn(BaseModel):
+    refresh_token: str = Field(min_length=40, max_length=3000)
 
 
 class SessionProtocolIn(BaseModel):
@@ -104,8 +108,18 @@ def login_app(payload: AppLoginIn, db: Session = Depends(get_db)):
         "schema": 1,
         "namespace": subscription_app_namespace(db, sub),
         "session_token": token,
+        "refresh_token": issue_app_refresh_token(db, sub),
         "account_status": brand.get("account_status"),
         "brand": brand,
+    }, headers=_PRIVATE_HEADERS)
+
+
+@router.post("/session/refresh")
+def refresh_app_session(payload: AppRefreshIn, db: Session = Depends(get_db)):
+    _, token, refresh = renew_app_session(db, payload.refresh_token)
+    return JSONResponse({
+        "session_token": token,
+        "refresh_token": refresh,
     }, headers=_PRIVATE_HEADERS)
 
 
