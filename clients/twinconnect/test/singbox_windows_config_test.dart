@@ -30,6 +30,9 @@ void main() {
     expect((servers[0] as Map)['type'], 'local');
     expect((servers[0] as Map).containsKey('detour'), isFalse);
     expect((servers[1] as Map)['detour'], 'proxy');
+    expect((servers[1] as Map)['type'], 'https');
+    expect((servers[1] as Map)['server_port'], 443);
+    expect((servers[1] as Map)['path'], '/dns-query');
     expect(dns['final'], 'dns-remote');
     expect(routing['default_domain_resolver'], 'dns-bootstrap');
     expect(dns['cache_capacity'], 4096);
