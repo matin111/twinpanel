@@ -391,39 +391,29 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       if (mounted) setState(() => _vpnError = 'SERVER_NOT_AVAILABLE');
       return;
     }
-    if (_vpnBusy) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(tr('در حال انجام اتصال قبلی هستیم.',
-            'Previous connection is still running.'))));
-      return;
-    }
-    // Row selection and page navigation must never be gated by engine readiness.
+    // Selection is a UI operation, never dependent on a protocol engine,
+    // subscription profile, or an in-flight transport diagnostic.
+    final busy = _vpnBusy;
     setState(() {
       _selected = index;
       _page = 'home';
       _autoFastest = false;
-      _vpnError = null;
+      if (!busy) _vpnError = null;
     });
+    if (busy) {
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(
+        content: Text(tr('سرور انتخاب شد؛ عملیات قبلی هنوز در حال اجراست.',
+            'Server selected; previous connection operation is still running.'))));
+      return;
+    }
     if (!Platform.isWindows) {
       setState(() => _vpnError = 'WINDOWS_ENGINE_REQUIRED');
       return;
     }
     if (_filter != 'all' && _filter != 'wireguard') {
-      final protocol = _filter;
-      if (SingBoxProfileValidator.supportsFamily(protocol) &&
-          protocol != 'shadowtls') {
-        // Explicitly verify the selected proxy transport instead of silently
-        // connecting WireGuard or claiming a system-wide VPN tunnel.
-        await _testModernServerTransport(protocol, nodes[index].id);
-        return;
-      }
-      setState(() => _vpnError = 'PROTOCOL_ENGINE_NOT_READY');
-      ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(
-        content: Text(tr(
-          'موتور $protocol هنوز آماده نیست؛ سرور انتخاب شد.',
-          '$protocol engine is not ready. Server selected.',
-        )),
-      ));
+      // Do not automatically launch a network probe on row selection.
+      // Users can choose any node instantly. The power button explicitly
+      // tests modern transports, and unsupported engines stay disconnected.
       return;
     }
     final targetId = nodes[index].id;
@@ -1341,9 +1331,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     Widget locations() {
       final matching = <int>[
         for (int i = 0; i < demoServers.length; i++)
-          if ((_filter == 'all' ||
-                  (widget.catalog?.entries.any((entry) => entry.protocol.code == _filter && entry.selected) ?? false)) &&
-              '${demoServers[i].country} ${demoServers[i].city}'
+          if ('${demoServers[i].country} ${demoServers[i].city}'
                 .toLowerCase().contains(_search.toLowerCase()))
             i,
       ];
