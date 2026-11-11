@@ -27,10 +27,12 @@ jobs:
       TWINCONNECT_DIRECTORY_URL: ${{ vars.TWINCONNECT_DIRECTORY_URL || 'https://panel.matindnspro.sbs' }}
     steps:
       - uses: actions/checkout@v4
+      # Avoid a stalled Flutter SDK cache restore on GitHub Windows runners.
+      # This build needs a fresh SDK setup; pub dependencies are fetched below.
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
-          cache: true
+          cache: false
       - name: Generate native Windows Flutter project
         run: flutter create --platforms=windows --org com.twinpanel --project-name twinconnect .
       - name: Install fail-closed Windows VPN native bridge
