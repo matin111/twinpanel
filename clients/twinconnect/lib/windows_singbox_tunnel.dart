@@ -145,6 +145,25 @@ class WindowsSingBoxTunnel {
       // Do not spawn slow PowerShell diagnostics in the connection path;
       // inspectWindowsTunRoutes remains available for explicit diagnostics.
 
+      // Observe the actual Windows interface and default route directly
+      // before judging egress. No PowerShell or guessed error-string mapping.
+      // Poll briefly because auto_route is installed after TUN startup.
+      String? tunState;
+      for (var readiness = 0; readiness < 5; readiness++) {
+        if (exited) {
+          throw FormatException(nativeFailure ?? 'SINGBOX_PROCESS_EXITED');
+        }
+        tunState = await inspectNativeTunRoutes();
+        if (tunState == null ||
+            tunState == 'SINGBOX_TUN_NATIVE_INSPECTION_FAILED') break;
+        await Future<void>.delayed(const Duration(milliseconds: 500));
+      }
+      // An unavailable native inspector does not prove a connection failed.
+      // Real HTTP traffic verification remains mandatory below.
+      if (tunState != null &&
+          tunState != 'SINGBOX_TUN_NATIVE_INSPECTION_FAILED') {
+        throw FormatException(nativeFailure ?? tunState);
+      }
       String? verified;
       var postTunnelHttpSucceeded = false;
       for (var attempt = 0; attempt < 8; attempt++) {
@@ -227,6 +246,32 @@ class WindowsSingBoxTunnel {
       _activeServerId = null;
       _activeProtocol = null;
       _exitIp = null;
+    }
+  }
+
+  /// Native Windows IP Helper inspection: no PowerShell startup, no
+  /// dependency on shell policy, and no modification of adapter/routes.
+  static Future<String?> inspectNativeTunRoutes() async {
+    if (!Platform.isWindows) return 'SINGBOX_WINDOWS_ONLY';
+    try {
+      final state = await _native.invokeMapMethod<String, dynamic>(
+        'inspectSingBoxTun',
+      ).timeout(const Duration(seconds: 3));
+      if (state == null || state['inspectionOk'] != true) {
+        return 'SINGBOX_TUN_NATIVE_INSPECTION_FAILED';
+      }
+      if (state['adapterPresent'] != true) {
+        return 'SINGBOX_TUN_ADAPTER_MISSING';
+      }
+      if (state['adapterUp'] != true) {
+        return 'SINGBOX_TUN_ADAPTER_DOWN';
+      }
+      if (state['defaultRoutePresent'] != true) {
+        return 'SINGBOX_TUN_DEFAULT_ROUTE_MISSING';
+      }
+      return null;
+    } catch (_) {
+      return 'SINGBOX_TUN_NATIVE_INSPECTION_FAILED';
     }
   }
 
