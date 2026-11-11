@@ -1129,14 +1129,14 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         ),
         const SizedBox(height: 12),
         txt(tr('اتصال سریع', 'Quick connect'), size: 20, bold: true),
-        const SizedBox(height: 5),
-        txt(_vpnVerified
-              ? tr('دست‌دهی با سرور تأیید شد', 'Server handshake verified')
-              : _vpnUp ? tr('رابط فعال است؛ دست‌دهی هنوز تأیید نشده',
-                  'Interface active; handshake not verified')
-              : tr('برای اتصال، سرور و پروتکل را انتخاب کنید',
-                  'Choose a server and protocol to connect'),
-            size: 12, color: sub),
+        if (_vpnUp) ...[
+          const SizedBox(height: 5),
+          txt(_vpnVerified
+                ? tr('دست‌دهی با سرور تأیید شد', 'Server handshake verified')
+                : tr('رابط فعال است؛ دست‌دهی هنوز تأیید نشده',
+                    'Interface active; handshake not verified'),
+              size: 12, color: sub),
+        ],
         if (_vpnError != null) ...[
           const SizedBox(height: 8),
           Text(
