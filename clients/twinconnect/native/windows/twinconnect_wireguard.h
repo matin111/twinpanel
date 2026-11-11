@@ -310,26 +310,6 @@ inline std::string ProtectedFullTunnelConfig(const std::string& raw) {
       raw.find('\0') != std::string::npos) return "";
   std::string result;
   bool peer = false, found = false;
-  // A Windows adapter with no tunnel IPv6 address must not advertise a
-  // working ::/0 route. Keep IPv4 /0 so the official WireGuard service
-  // still installs its WFP kill-switch (including blocking IPv6 leaks).
-  bool tunnelHasIpv6 = false;
-  {
-    bool inInterface = false;
-    std::istringstream lines(raw);
-    std::string item;
-    while (std::getline(lines, item)) {
-      const auto clean = TrimLower(item);
-      if (clean == "[interface]") inInterface = true;
-      else if (clean == "[peer]") inInterface = false;
-      if (inInterface && clean.rfind("address", 0) == 0) {
-        const auto equal = clean.find('=');
-        if (equal != std::string::npos &&
-            clean.substr(equal + 1).find(':') != std::string::npos)
-          tunnelHasIpv6 = true;
-      }
-    }
-  }
   size_t pos = 0;
   while (pos <= raw.size()) {
     const auto end = raw.find('\n', pos);
@@ -360,9 +340,7 @@ inline std::string ProtectedFullTunnelConfig(const std::string& raw) {
       }
       if (!full && !(firstHalf && secondHalf)) return "";
       if (full && (firstHalf || secondHalf)) return "";
-      result += tunnelHasIpv6
-          ? "AllowedIPs = 0.0.0.0/0, ::/0\n"
-          : "AllowedIPs = 0.0.0.0/0\n";
+      result += "AllowedIPs = 0.0.0.0/0, ::/0\n";
       found = true;
     } else {
       result += line + "\n";
@@ -376,7 +354,6 @@ inline bool ValidConfig(const std::string& text) {
       text.find('\0') != std::string::npos) return false;
   bool iface = false, peer = false;
   bool private_key = false, address = false, dns = false;
-  bool ipv6_address = false;
   bool public_key = false, endpoint = false, full_v4 = false, full_v6 = false;
   int peer_count = 0;
   size_t pos = 0;
@@ -401,10 +378,7 @@ inline bool ValidConfig(const std::string& text) {
     if (value.empty()) return false;
     if (iface) {
       if (key == "privatekey") private_key = true;
-      else if (key == "address") {
-        address = true;
-        ipv6_address = ipv6_address || value.find(':') != std::string::npos;
-      }
+      else if (key == "address") address = true;
       else if (key == "dns") dns = true;
       else if (key == "mtu" || key == "listenport") {}
       else return false;
@@ -426,11 +400,10 @@ inline bool ValidConfig(const std::string& text) {
       else return false;
     }
   }
-  // IPv4 /0 alone triggers the official Windows WireGuard WFP kill-switch:
-  // DNS and IPv6 cannot escape to the physical interface. Require a ::/0
-  // route only when the tunnel actually has an IPv6 interface address.
+  // A single peer + both /0 routes activates official Windows WireGuard's
+  // restrictive firewall rules, including DNS to the configured resolver.
   return private_key && address && dns && public_key && endpoint &&
-         peer_count == 1 && full_v4 && (ipv6_address == full_v6);
+         peer_count == 1 && full_v4 && full_v6;
 }
 
 inline flutter::EncodableValue Info(const char* state) {
