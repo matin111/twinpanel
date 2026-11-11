@@ -78,7 +78,20 @@ class WindowsSingBoxTunnel {
           if (addresses.isEmpty) {
             throw const FormatException('SINGBOX_ENDPOINT_DNS_UNAVAILABLE');
           }
-          resolvedServer = addresses.first.address;
+          // A poisoned local DNS answer (for example 10.x.x.x for a
+          // public VPN hostname) must never be treated as the VPN server.
+          final candidate = addresses.first;
+          final bytes = candidate.rawAddress;
+          final privateAddress = bytes.length == 4 &&
+              (bytes[0] == 10 ||
+               (bytes[0] == 172 && bytes[1] >= 16 && bytes[1] <= 31) ||
+               (bytes[0] == 192 && bytes[1] == 168) ||
+               bytes[0] == 127 || bytes[0] == 0 ||
+               (bytes[0] == 169 && bytes[1] == 254));
+          if (privateAddress) {
+            throw const FormatException('SINGBOX_ENDPOINT_DNS_POISONED');
+          }
+          resolvedServer = candidate.address;
         } catch (_) {
           throw const FormatException('SINGBOX_ENDPOINT_DNS_UNAVAILABLE');
         }
@@ -95,6 +108,7 @@ class WindowsSingBoxTunnel {
       // connection setup does not wait for their latencies sequentially.
       final proxyCheck = ModernTransportProbe.verify(
         protocol: protocol, profile: profile,
+        resolvedServer: resolvedServer,
       ).then((result) => result.publicIp).catchError((Object _) {
         throw const FormatException('SINGBOX_SERVER_TRANSPORT_UNREACHABLE');
       });
