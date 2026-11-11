@@ -161,7 +161,7 @@ inline bool Start(const std::string& executableUtf8,
   PROCESS_INFORMATION pi = {};
   const bool created = CreateProcessW(executable.c_str(),
       mutableCommand.data(), nullptr, nullptr, TRUE,
-      CREATE_NEW_PROCESS_GROUP | CREATE_NO_WINDOW,
+      CREATE_NEW_PROCESS_GROUP,
       nullptr, nullptr, &startup, &pi) != FALSE;
   CloseHandle(inputRead);
   CloseHandle(logNull);
