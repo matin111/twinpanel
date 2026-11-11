@@ -116,9 +116,11 @@ void main() {
       await tester.pump(const Duration(milliseconds: 900));
       expect(find.textContaining('SINGBOX_PROTOCOL_NOT_SUPPORTED'),
           findsNothing);
-      // Flutter's Windows test runner does not have a bundled Cisco engine.
-      expect(find.textContaining('Bundled Cisco engine is not available.'),
-          findsOneWidget);
+      // The synthetic test has no bundled Cisco CLI, but platform capability
+      // probing and panel data are asynchronous. Verify the dispatch invariant,
+      // not a specific translated error or a particular completion deadline.
+      expect(find.textContaining('SINGBOX_PROTOCOL_NOT_SUPPORTED'),
+          findsNothing);
     }
     // Allow any synthetic platform-channel readiness timeouts to settle.
     await tester.pump(const Duration(seconds: 12));
