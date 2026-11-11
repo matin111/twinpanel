@@ -96,6 +96,32 @@ jobs:
             exit 1
           }
 
+      - name: Protect consolidated admin UI and account statistics in releases
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          # The publisher checks out an immutable candidate SHA. Guard against
+          # shipping a stale artifact that replaces the combined live hotfixes.
+          for path in \
+            "components/legacy-subscriptions-exact.tsx" \
+            "components/admin-users-runtime.tsx" \
+            "components/admin-resellers-management-runtime.tsx" \
+            "lib/admin-api.ts" \
+            "backend/app/routers/admin_user_isolation.py"; do
+            test -s "publisher/$path"
+            test -s "source/$path"
+            if ! cmp -s "source/$path" "publisher/$path"; then
+              echo "::error file=$path::Pinned candidate differs from main; rebuild the release candidate from the latest merged source."
+              exit 1
+            fi
+          done
+          grep -Fq 'setResetTarget(item)' source/components/legacy-subscriptions-exact.tsx
+          grep -Fq 'admin-user-account-count' source/components/admin-users-runtime.tsx
+          grep -Fq 'reseller-admin-cards' source/components/admin-resellers-management-runtime.tsx
+          grep -Fq 'reseller-management-modal{gap:10px' source/components/admin-resellers-management-runtime.tsx
+          grep -Fq '"subscription_count": subscription_counts.get' source/backend/app/routers/admin_user_isolation.py
+          echo "Consolidated admin UI release guard passed"
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
