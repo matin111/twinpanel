@@ -86,7 +86,7 @@ def renewal_stage_markup(
                 title = "📂 <b>دسته‌بندی پلن تمدید</b>\n\nدسته‌بندی را انتخاب کنید:"
                 for index, category in enumerate(categories[:30]):
                     rows.append([InlineKeyboardButton(
-                        text=(f"{category_icon(category, index)} {category}")[:60],
+                        text=(f"{category_icon(category, index)} {category}".strip())[:60],
                         callback_data=f"subrncat:{sub_id}:{type_index}:{user_count}:{index}",
                     )])
                 back = f"subrntype:{sub_id}:{type_index}"
