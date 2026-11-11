@@ -63,6 +63,9 @@ void main() {
     await tester.tap(find.byKey(const Key('devNav_home')));
     await tester.pump(const Duration(milliseconds: 800));
     expect(find.byKey(const Key('liveConnectionStatus')), findsWidgets);
+    // The duration is visible even while offline, and begins at zero.
+    expect(find.byKey(const Key('liveConnectionDuration')), findsOneWidget);
+    expect(find.text('00:00:00'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('devNav_locations')));
     await tester.pump(const Duration(milliseconds: 800));
