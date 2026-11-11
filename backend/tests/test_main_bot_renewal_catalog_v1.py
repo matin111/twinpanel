@@ -6,6 +6,7 @@ from app.telegram_renewal_catalog_main_v1 import (
     renewal_stage_markup,
     load_renewal_catalog,
     load_selected_renewal_plan,
+    renewal_plan_button_label,
 )
 
 
@@ -46,6 +47,25 @@ class RenewalCatalogTests(unittest.IsolatedAsyncioTestCase):
             [p["id"] for p in eligible_renewal_plans(FIXTURES)],
             [301, 302, 303, 304],
         )
+
+    def test_plan_labels_are_compact_with_no_repeated_quota_or_duration(self):
+        item = {
+            "id": 501, "name": "30 گیگ", "traffic_gb": 30,
+            "duration_days": 30, "price_toman": 450000,
+            "subscription_type": "حرفه‌ای", "device_limit": 3,
+            "category": "۱ ماهه", "is_active": True,
+        }
+        label = renewal_plan_button_label(item)
+        self.assertEqual(label, "30 گیگ  |  450,000 تومان")
+        self.assertNotIn("30GB", label)
+        self.assertNotIn("روز", label)
+        _title, markup = renewal_stage_markup(
+            [item], 3800, "plans", type_index=0,
+            user_count=3, category_index=0,
+        )
+        buttons = [button for row in markup.inline_keyboard for button in row]
+        self.assertEqual(buttons[0].text, label)
+        self.assertEqual(buttons[0].callback_data, "subrnplan:3800:501")
 
     def test_type_then_devices_then_category_then_new_plan(self):
         plans = eligible_renewal_plans(FIXTURES)
