@@ -364,16 +364,55 @@ export function AdminResellersManagementRuntime(){
 
     <Card>
       <div className="card-head"><div><b>{pick("لیست نمایندگان","Reseller list")}</b></div><input className="table-search" value={query} onChange={event=>setQuery(event.target.value)} placeholder={pick("جستجو نام، کد، ایمیل یا تلفن…","Search name, code, email or phone…")}/></div>
-      <div className="table"><table><thead><tr><th>{pick("نماینده","Reseller")}</th><th>{pick("کد","Code")}</th><th>{pick("مالک","Owner")}</th><th>{pick("مشتری / اشتراک","Customers / Subs")}</th><th>{pick("حجم","Traffic")}</th><th>{pick("وضعیت","Status")}</th><th>{pick("عملیات","Actions")}</th></tr></thead>
-      <tbody>{filtered.map(row=>{const rid=num(row,"id");const owner=(row.owner&&typeof row.owner==="object")?row.owner as AnyRow:{};const active=bool(row,"is_active");return <tr key={rid}>
-        <td><b>{text(row,"name")||`#${rid}`}</b><small>{tierLabel(text(row,"reseller_tier"))}</small></td>
-        <td dir="ltr">{text(row,"code")||"—"}</td>
-        <td><b>{text(owner,"name","email")||`#${text(row,"owner_user_id")}`}</b><small dir="ltr">{text(owner,"email")}</small></td>
-        <td>{num(row,"customer_count")} / {num(row,"subscription_count")}</td>
-        <td>{gb(num(row,"traffic_balance_gb"))}</td>
-        <td><Badge tone={active?"ok":"warn"}>{active?pick("فعال","Active"):pick("تعلیق","Suspended")}</Badge></td>
-        <td><div className="row-actions"><button className="mini-btn primary" onClick={()=>void openManage(rid)}>{pick("مدیریت","Manage")}</button><button className="mini-btn" onClick={()=>toggleReseller(rid)}>{active?pick("تعلیق","Suspend"):pick("فعال‌سازی","Activate")}</button><button className="mini-btn danger" onClick={()=>deleteReseller(rid)}>{pick("حذف","Delete")}</button></div></td>
-      </tr>;})}</tbody></table></div>
+      <div className="reseller-admin-cards" aria-label={pick("لیست نمایندگان","Reseller list")}>
+        {filtered.map(row=>{
+          const rid=num(row,"id"),active=bool(row,"is_active");
+          const owner=(row.owner&&typeof row.owner==="object")?row.owner as AnyRow:{};
+          return <article className="reseller-admin-card" key={rid}>
+            <div className="reseller-admin-card-head">
+              <div className="reseller-admin-card-identity">
+                <span className="reseller-admin-card-avatar" aria-hidden="true">{(text(row,"name")||"R").slice(0,1).toUpperCase()}</span>
+                <div className="reseller-admin-card-title"><b dir="auto">{text(row,"name")||`#${rid}`}</b><small>{tierLabel(text(row,"reseller_tier"))}</small></div>
+              </div>
+              <Badge tone={active?"ok":"warn"}>{active?pick("فعال","Active"):pick("تعلیق","Suspended")}</Badge>
+            </div>
+            <div className="reseller-admin-card-code"><small>{pick("کد نمایندگی","Reseller code")}</small><b dir="ltr">{text(row,"code")||"—"}</b></div>
+            <div className="reseller-admin-card-owner"><small>{pick("مالک","Owner")}</small><b dir="auto">{text(owner,"name","email")||`#${text(row,"owner_user_id")}`}</b><span dir="ltr">{text(owner,"email")||"—"}</span></div>
+            <div className="reseller-admin-card-stats">
+              <span><small>{pick("مشتریان","Customers")}</small><b>{num(row,"customer_count").toLocaleString("fa-IR")}</b></span>
+              <span><small>{pick("اشتراک‌ها","Subscriptions")}</small><b>{num(row,"subscription_count").toLocaleString("fa-IR")}</b></span>
+              <span><small>{pick("موجودی حجم","Traffic balance")}</small><b dir="ltr">{gb(num(row,"traffic_balance_gb"))}</b></span>
+            </div>
+            <div className="reseller-admin-card-actions">
+              <button type="button" className="reseller-card-manage" disabled={busy} onClick={()=>void openManage(rid)}>{pick("مدیریت","Manage")}</button>
+              <button type="button" disabled={busy} onClick={()=>toggleReseller(rid)}>{active?pick("تعلیق","Suspend"):pick("فعال‌سازی","Activate")}</button>
+              <button type="button" className="reseller-card-delete" disabled={busy} onClick={()=>deleteReseller(rid)}>{pick("حذف","Delete")}</button>
+            </div>
+          </article>;
+        })}
+        {!filtered.length&&<div className="runtime-empty">{pick("نماینده‌ای پیدا نشد","No resellers found")}</div>}
+      </div>
+      <style>{`
+        .reseller-admin-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;direction:rtl}
+        .reseller-admin-card{min-width:0;display:flex;flex-direction:column;gap:12px;padding:15px;overflow:hidden;color:#e9efff;border:1px solid rgba(119,118,240,.45);border-radius:19px;background:linear-gradient(145deg,rgba(52,44,106,.33),rgba(12,23,44,.94) 58%,rgba(11,21,40,.97));box-shadow:inset 0 1px rgba(255,255,255,.075),0 8px 23px rgba(0,0,0,.14);transition:border-color .2s,transform .2s}
+        .reseller-admin-card:hover{border-color:rgba(157,131,255,.82);transform:translateY(-2px)}
+        .reseller-admin-card-head,.reseller-admin-card-identity{display:flex;align-items:center;gap:10px;min-width:0}.reseller-admin-card-head{justify-content:space-between}.reseller-admin-card-identity{flex:1}
+        .reseller-admin-card-avatar{display:grid;place-items:center;flex:none;width:39px;height:39px;border:1px solid rgba(151,114,255,.65);border-radius:50%;color:#f0e6ff;background:linear-gradient(135deg,#6430b8,#263d91);font-weight:800}
+        .reseller-admin-card-title{display:grid;gap:3px;min-width:0}.reseller-admin-card-title b{font-size:15px;overflow-wrap:anywhere}
+        .reseller-admin-card-title small,.reseller-admin-card-code small,.reseller-admin-card-owner small,.reseller-admin-card-stats small{color:#aebbd5;font-size:11px}
+        .reseller-admin-card-code{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:7px;padding:9px 11px;background:rgba(5,12,30,.2);border:1px solid rgba(139,158,206,.13);border-radius:11px}.reseller-admin-card-code b{font-size:12px;overflow-wrap:anywhere}
+        .reseller-admin-card-owner{display:grid;gap:4px;min-width:0}.reseller-admin-card-owner b{font-size:13px;overflow-wrap:anywhere}.reseller-admin-card-owner span{font-size:11px;color:#aebbd5;overflow-wrap:anywhere;text-align:start}
+        .reseller-admin-card-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+        .reseller-admin-card-stats>span{display:grid;align-content:center;gap:5px;text-align:center;padding:10px 4px;min-width:0;border:1px solid rgba(139,158,206,.2);border-radius:11px;background:rgba(13,25,51,.55)}
+        .reseller-admin-card-stats b{font-size:14px;overflow-wrap:anywhere}.reseller-admin-card-stats span:last-child b{font-size:12px;color:#a7d0ff}
+        .reseller-admin-card-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin-top:auto}
+        .reseller-admin-card-actions button{min-height:39px;min-width:0;padding:5px;border:1px solid rgba(128,147,204,.25);border-radius:9px;background:rgba(29,42,72,.48);color:#eef3ff;font:inherit;font-size:12px;cursor:pointer}
+        .reseller-admin-card-actions .reseller-card-manage{background:rgba(44,93,185,.33);border-color:rgba(100,160,255,.48);color:#d4e5ff}
+        .reseller-admin-card-actions .reseller-card-delete{border-color:rgba(244,93,115,.35);color:#ff9aa9}
+        .reseller-admin-card-actions button:hover:not(:disabled){background:rgba(91,74,167,.32);border-color:rgba(165,146,255,.7)}.reseller-admin-card-actions button:disabled{opacity:.42;cursor:not-allowed}
+        @media(max-width:1200px){.reseller-admin-cards{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:720px){.reseller-admin-cards{grid-template-columns:minmax(0,1fr);gap:10px}.reseller-admin-card{padding:13px}}
+        @media(prefers-reduced-motion:reduce){.reseller-admin-card{transition:none}.reseller-admin-card:hover{transform:none}}
+      `}</style>
     </Card>
 
     {selectedId&&<div className="runtime-modal" role="dialog" aria-modal="true" aria-label="مدیریت نماینده"><button type="button" className="runtime-modal-bg" aria-label="بستن" onClick={()=>!busy&&(setSelectedId(null),setSelected(null))}/><div className="runtime-modal-card reseller-management-modal" style={{width:"min(990px,calc(100vw - 24px))",maxHeight:"90vh",overflowY:"auto"}}><RuntimeMessage error={error} ok={ok}/>
