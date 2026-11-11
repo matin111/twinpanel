@@ -13,6 +13,8 @@ class SingBoxWindowsConfig {
     required String protocol,
     required Map<String, dynamic> item,
     String? resolvedServer,
+    int? telemetryPort,
+    String? telemetrySecret,
   }) {
     final outbound = SingBoxProfileValidator.validateOutbound(
       protocolCode: protocol, item: item);
@@ -35,7 +37,20 @@ class SingBoxWindowsConfig {
       }
       serverOutbound['server'] = resolvedServer;
     }
+    if ((telemetryPort == null) != (telemetrySecret == null) ||
+        (telemetryPort != null &&
+         (telemetryPort < 1024 || telemetryPort > 65535 ||
+          telemetrySecret == null || telemetrySecret.length < 32))) {
+      throw const FormatException('SINGBOX_TELEMETRY_INVALID');
+    }
     return {
+      if (telemetryPort != null)
+        'experimental': {
+          'clash_api': {
+            'external_controller': '127.0.0.1:$telemetryPort',
+            'secret': telemetrySecret,
+          },
+        },
       'log': {'level': 'error', 'timestamp': true},
       'dns': {
         'servers': [
@@ -56,7 +71,7 @@ class SingBoxWindowsConfig {
         // sing-box 1.14: cache repeated DNS answers and update stale
         // entries in the background. DNS still travels through the proxy.
         'cache_capacity': 4096,
-        'optimistic': true,
+        'optimistic': false,
       },
       'inbounds': [
         {
@@ -78,6 +93,7 @@ class SingBoxWindowsConfig {
         'default_domain_resolver': 'dns-bootstrap',
         'final': 'proxy',
         'rules': [
+          {'port': 53, 'action': 'hijack-dns'},
           {'action': 'sniff'},
         ],
       },
