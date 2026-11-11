@@ -146,6 +146,7 @@ class WindowsOpenConnectTunnel {
               'CISCO_ROUTE_SCRIPT_FAILED',
               'CISCO_TAP_ADAPTER_FAILED',
               'CISCO_GATEWAY_UNREACHABLE',
+              'CISCO_ENGINE_DEPENDENCY_FAILED',
               'CISCO_PROCESS_EXITED',
             }.contains(result)) {
               reason = result;
