@@ -35,13 +35,13 @@ class WindowsOpenConnectTunnel {
     final script = value('Windows route script');
     if (cli == null || script == null) return null;
     String? verifiedPath(String relative, Set<String> basenames) {
-      final normalized = relative.replaceAll('/', r'\');
+      final normalized = relative.replaceAll('/', String.fromCharCode(92));
       if (normalized.contains('..') || normalized.contains(':') ||
-          normalized.startsWith(r'\') || normalized.contains('\n') ||
+          normalized.startsWith(String.fromCharCode(92)) || normalized.contains('\n') ||
           normalized.contains('\r')) return null;
-      final leaf = normalized.split(r'\').last.toLowerCase();
+      final leaf = normalized.split(String.fromCharCode(92)).last.toLowerCase();
       if (!basenames.contains(leaf)) return null;
-      return folder.path + r'\' + normalized;
+      return folder.path + String.fromCharCode(92) + normalized;
     }
     final executable = verifiedPath(cli, {'openconnect.exe'});
     final vpnScript = verifiedPath(script, {
