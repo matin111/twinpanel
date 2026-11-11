@@ -417,7 +417,9 @@ def manage_subscription(
 
 class BroadcastDraftIn(BaseModel):
     telegram_id: int = Field(gt=0)
-    text: str = Field(min_length=1, max_length=4000)
+    # A photo can be sent without a caption; text-only drafts still need text.
+    text: str = Field(default="", max_length=4000)
+    photo_file_id: str | None = Field(default=None, min_length=1, max_length=1024)
 
 
 class BroadcastConfirmIn(BaseModel):
@@ -434,6 +436,12 @@ _BROADCAST_WINDOW = 300
 @router.post("/broadcast/preview")
 def broadcast_preview(payload: BroadcastDraftIn, db: Session = Depends(get_db)):
     actor = _admin(db, payload.telegram_id)
+    text = payload.text.strip()
+    photo_file_id = (payload.photo_file_id or "").strip() or None
+    if not photo_file_id and not text:
+        raise HTTPException(status_code=422, detail="متن یا عکس برای ارسال الزامی است")
+    if photo_file_id and len(text) > 1024:
+        raise HTTPException(status_code=422, detail="کپشن عکس حداکثر ۱۰۲۴ کاراکتر است")
     now = time.monotonic()
     for key, value in list(_broadcast_drafts.items()):
         if now - value["created"] > _BROADCAST_WINDOW:
@@ -442,38 +450,53 @@ def broadcast_preview(payload: BroadcastDraftIn, db: Session = Depends(get_db)):
     total = len(_broadcast_target_ids(db))
     _broadcast_drafts[nonce] = {
         "actor": int(actor.id), "telegram_id": int(payload.telegram_id),
-        "text": payload.text.strip(), "created": now, "total": total,
+        "text": text, "photo_file_id": photo_file_id,
+        "created": now, "total": total,
     }
-    return {"nonce": nonce, "total": total, "preview": payload.text.strip()}
+    return {"nonce": nonce, "total": total, "preview": text,
+            "has_photo": bool(photo_file_id)}
 
 
-async def _deliver_broadcast(text: str, targets: list[int], admin_chat_id: int) -> None:
+async def _deliver_broadcast(
+    text: str, targets: list[int], admin_chat_id: int,
+    photo_file_id: str | None = None,
+) -> None:
     # Existing panel sends at the same conservative rate. BackgroundTasks
     # keeps the Telegram callback responsive; failed recipients do not block others.
     try:
         token = load_bot_token()
     except Exception:
         return
-    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    endpoint = "sendPhoto" if photo_file_id else "sendMessage"
+    url = f"https://api.telegram.org/bot{token}/{endpoint}"
     sent = failed = blocked = 0
     async with httpx.AsyncClient(timeout=15.0) as client:
         for telegram_id in targets:
+            body = {"chat_id": int(telegram_id)}
+            if photo_file_id:
+                # file_id belongs to this same bot; Telegram reuses its stored
+                # photo without downloading, re-uploading or saving credentials.
+                body["photo"] = photo_file_id
+                if text:
+                    body["caption"] = text
+            else:
+                body["text"] = text
+                body["disable_web_page_preview"] = True
             try:
-                response = await client.post(url, json={
-                    "chat_id": int(telegram_id), "text": text,
-                    "disable_web_page_preview": True,
-                })
-                if response.status_code == 200:
+                response = await client.post(url, json=body)
+                if response.status_code == 200 and response.json().get("ok"):
                     sent += 1
                 else:
                     failed += 1
                     if response.status_code == 403:
                         blocked += 1
-            except httpx.HTTPError:
+            except (httpx.HTTPError, ValueError):
                 failed += 1
-            await asyncio.sleep(0.045)
+            await asyncio.sleep(0.065 if photo_file_id else 0.045)
         try:
-            await client.post(url, json={
+            # The report is always a text message, even for photo campaigns.
+            await client.post(
+                f"https://api.telegram.org/bot{token}/sendMessage", json={
                 "chat_id": int(admin_chat_id),
                 "text": (
                     "📢 گزارش ارسال همگانی\\n"
@@ -503,6 +526,14 @@ async def broadcast_send(
     # Pop before scheduling prevents repeated callback delivery.
     _broadcast_drafts.pop(payload.nonce, None)
     targets = _broadcast_target_ids(db)
-    background_tasks.add_task(_deliver_broadcast, draft["text"], targets, payload.telegram_id)
-    audit_log.info("broadcast_started actor=%s recipients=%s sha256=%s", actor.id, len(targets), hashlib.sha256(draft["text"].encode("utf-8")).hexdigest())
+    background_tasks.add_task(
+        _deliver_broadcast, draft["text"], targets, payload.telegram_id,
+        draft.get("photo_file_id"),
+    )
+    audit_log.info(
+        "broadcast_started actor=%s recipients=%s type=%s sha256=%s",
+        actor.id, len(targets),
+        "photo" if draft.get("photo_file_id") else "text",
+        hashlib.sha256(draft["text"].encode("utf-8")).hexdigest(),
+    )
     return {"ok": True, "queued": len(targets)}
