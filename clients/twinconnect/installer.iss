@@ -81,8 +81,8 @@ begin
       Ok := Exec(OpenConnectInstaller, '/S', '', SW_HIDE,
                  ewWaitUntilTerminated, ExitCode);
       if (not Ok) or (ExitCode <> 0) then
-        MsgBox('Cisco vendor prerequisites could not be installed.' +
-          #13#10 + 'Other VPN protocols remain available.', mbError, MB_OK);
+        MsgBox('Cisco vendor prerequisites could not be installed.' + #13#10 +
+          'Other VPN protocols remain available.', mbError, MB_OK);
     end;
   end;
 end;
