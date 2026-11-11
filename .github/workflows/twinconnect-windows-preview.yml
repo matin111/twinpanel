@@ -94,37 +94,9 @@ jobs:
           if ($sig.Status -ne 'Valid') { throw 'Bundled OpenConnect vendor signature invalid' }
           $provenance = Join-Path (Split-Path $exe) 'OPENCONNECT-SOURCE.txt'
           if (!(Test-Path $provenance)) { throw 'OpenConnect provenance missing' }
-      - name: Smoke-test bundled OpenConnect CLI and routing script on Windows runner
+      - name: Extract and execute verified OpenConnect CLI from vendor package
         shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $package = Join-Path (Get-Location) 'build/windows/x64/runner/Release/prerequisites/openconnect-gui-1.6.2-win64.exe'
-          # GUI installers may spawn a child and return before `$LASTEXITCODE`
-          # is populated. Start-Process -Wait tracks their actual exit.
-          $installer = Start-Process -FilePath $package -ArgumentList '/S' -Wait -PassThru -NoNewWindow
-          if ($installer.ExitCode -ne 0) {
-            throw "Bundled OpenConnect silent prerequisite failed: $($installer.ExitCode)"
-          }
-          $roots = @($env:ProgramFiles, ${env:ProgramFiles(x86)})
-          $engines = foreach ($root in $roots) {
-            if (!$root) { continue }
-            foreach ($dir in @('OpenConnect-GUI', 'OpenConnect')) {
-              $exe = Join-Path $root "$dir/openconnect.exe"
-              if (Test-Path $exe) { $exe }
-            }
-          }
-          if (!$engines) {
-            throw 'Upstream silent installer did not install the OpenConnect CLI component'
-          }
-          $engine = $engines | Select-Object -First 1
-          $scripts = @('vpnc-script-win.js', 'vpnc-script.js')
-          $found = @($scripts | Where-Object {
-            Test-Path (Join-Path (Split-Path $engine) $_)
-          })
-          if (!$found) {
-            throw 'Upstream OpenConnect CLI routing/DNS script missing'
-          }
-          Write-Host 'OpenConnect CLI + routing script are present after silent installation'
+        run: ./tools/extract_openconnect_windows.ps1
       - name: Inspect release binaries with Windows Defender (when available)
         shell: pwsh
         run: |
