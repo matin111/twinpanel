@@ -141,12 +141,9 @@ class WindowsSingBoxTunnel {
       //
       // The IP comparison below remains fail-closed. If no traffic actually
       // traverses the selected outbound, connection cannot be confirmed.
-      final routeInspection = inspectWindowsTunRoutes()
-          .timeout(const Duration(seconds: 10),
-            onTimeout: () => 'SINGBOX_TUN_ROUTE_INSPECTION_FAILED');
-      // Consume any inspection failure without treating it as a VPN success
-      // or a hard route failure. Native engine failures still take precedence.
-      unawaited(routeInspection.then((_) {}));
+      // Native engine failures are still checked while testing traffic.
+      // Do not spawn slow PowerShell diagnostics in the connection path;
+      // inspectWindowsTunRoutes remains available for explicit diagnostics.
 
       String? verified;
       var postTunnelHttpSucceeded = false;
