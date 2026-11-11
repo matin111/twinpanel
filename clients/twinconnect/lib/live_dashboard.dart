@@ -1306,6 +1306,9 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
               'SINGBOX_TUN_ADAPTER_MISSING' => tr(
                 'آداپتور TwinConnectSB ساخته نشد؛ درایور یا مجوز ویندوز را بررسی کنید.',
                 'TwinConnectSB adapter was not created; check Windows driver and permissions.'),
+              'SINGBOX_TUN_NOT_PREFERRED' => tr(
+                'آداپتور VPN ساخته شده اما ویندوز اینترنت را از مسیر دیگری می‌فرستد؛ احتمال تداخل VPN یا اولویت مسیر شبکه وجود دارد.',
+                'VPN adapter is present, but Windows is routing via another interface; another VPN or route priority may be interfering.'),
               'SINGBOX_TUN_DEFAULT_ROUTE_MISSING' => tr(
                 'آداپتور ساخته شد، اما مسیر اینترنت از آن عبور نمی‌کند.',
                 'TUN adapter exists but its default internet route is missing.'),
