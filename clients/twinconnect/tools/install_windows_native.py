@@ -12,6 +12,8 @@ HEADER = ROOT / "windows" / "runner" / "flutter_window.h"
 SOURCE = ROOT / "windows" / "runner" / "flutter_window.cpp"
 NATIVE = ROOT / "native" / "windows" / "twinconnect_wireguard.h"
 INSTALLED = ROOT / "windows" / "runner" / "twinconnect_wireguard.h"
+SINGBOX_GUARD = ROOT / "native" / "windows" / "twinconnect_singbox_guard.h"
+SINGBOX_INSTALLED = ROOT / "windows" / "runner" / "twinconnect_singbox_guard.h"
 
 HEADER_MARKER = "  std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> vpn_channel_;"
 CPP_MARKER = "  // TwinConnect: fail-closed Windows native capability handshake."
@@ -28,6 +30,9 @@ def install() -> None:
         raise RuntimeError("Generate the Windows Flutter runner before installing native bridge.")
 
     shutil.copyfile(NATIVE, INSTALLED)
+    if not SINGBOX_GUARD.is_file():
+        raise RuntimeError("Missing sing-box process guard header")
+    shutil.copyfile(SINGBOX_GUARD, SINGBOX_INSTALLED)
 
     header = HEADER.read_text(encoding="utf-8-sig")
     cpp = SOURCE.read_text(encoding="utf-8-sig")
@@ -51,7 +56,8 @@ def install() -> None:
             cpp, '#include "flutter_window.h"',
             '#include "flutter_window.h"\n'
             '#include <flutter/standard_method_codec.h>\n'
-            '#include "twinconnect_wireguard.h"',
+            '#include "twinconnect_wireguard.h"\n'
+            '#include "twinconnect_singbox_guard.h"',
         )
         injection = """  // TwinConnect: fail-closed Windows native capability handshake.
   vpn_channel_ = std::make_unique<
@@ -63,7 +69,33 @@ def install() -> None:
   vpn_channel_->SetMethodCallHandler(
       [](const flutter::MethodCall<flutter::EncodableValue>& call,
          std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result) {
-        if (call.method_name() == "getCapabilities") {
+        if (call.method_name() == "guardSingBoxProcess") {
+          const auto* args = std::get_if<flutter::EncodableMap>(
+              call.arguments());
+          if (!args) {
+            result->Error("INVALID_PROCESS_REQUEST");
+            return;
+          }
+          const auto it = args->find(flutter::EncodableValue("pid"));
+          if (it == args->end()) {
+            result->Error("INVALID_PROCESS_ID");
+            return;
+          }
+          int64_t pid = 0;
+          if (const auto* v = std::get_if<int32_t>(&it->second)) {
+            pid = *v;
+          } else if (const auto* v64 = std::get_if<int64_t>(&it->second)) {
+            pid = *v64;
+          } else {
+            result->Error("INVALID_PROCESS_ID");
+            return;
+          }
+          if (!twinconnect_singbox_guard::Guard(pid)) {
+            result->Error("SINGBOX_PROCESS_GUARD_FAILED");
+            return;
+          }
+          result->Success(flutter::EncodableValue(true));
+        } else if (call.method_name() == "getCapabilities") {
           result->Success(twinconnect_wireguard::Capabilities());
         } else if (call.method_name() == "getProtocolCapabilities") {
           result->Success(twinconnect_wireguard::ProtocolCapabilities());
