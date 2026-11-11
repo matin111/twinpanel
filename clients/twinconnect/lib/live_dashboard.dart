@@ -343,8 +343,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     if (_vpnBusy) return;
     setState(() { _vpnBusy = true; _vpnError = null; });
     try {
-      if (_vpnUp || _vpnCleanup || _vpnUnmanaged) {
-        throw const FormatException('DISCONNECT_WIREGUARD_FIRST');
+      if (_vpnUnmanaged) {
+        throw const FormatException('UNMANAGED_WIREGUARD_SERVICE');
       }
       final authorized = widget.catalog?.entries.any((entry) =>
           entry.protocol.code == protocol && entry.selected &&
@@ -372,8 +372,30 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       if (matches.length != 1) {
         throw const FormatException('MODERN_SERVER_PROFILE_MISSING');
       }
-      // Prepare/validate the destination before stopping a prior sing-box TUN.
-      SingBoxWindowsConfig.compose(protocol: protocol, item: matches.single);
+      // Prepare/validate the destination before disconnecting any VPN.
+      final targetConfig = SingBoxWindowsConfig.compose(
+          protocol: protocol, item: matches.single);
+      if (!await WindowsSingBoxPreflight.checkInMemory(targetConfig)) {
+        throw const FormatException('SINGBOX_TUN_CONFIG_INVALID');
+      }
+      if (_vpnUp || _vpnCleanup) {
+        await _vpn.stop().timeout(const Duration(seconds: 20));
+        final stopped = await _vpn.status().timeout(
+          const Duration(seconds: 10));
+        if (stopped['state'] != 'down') {
+          throw const FormatException('PREVIOUS_TUNNEL_NOT_STOPPED');
+        }
+        if (!mounted) return;
+        setState(() {
+          _vpnUp = false;
+          _vpnVerified = false;
+          _vpnCleanup = false;
+          _activeNodeId = null;
+          _vpnRx = 0;
+          _vpnTx = 0;
+          _resetNetworkStats();
+        });
+      }
       if (_modernTunnel.isRunning) {
         await _modernTunnel.stop();
         if (!mounted) return;
@@ -453,9 +475,13 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       return;
     }
     if (_filter != 'all' && _filter != 'wireguard') {
-      // Do not automatically launch a network probe on row selection.
-      // Users can choose any node instantly. The power button explicitly
-      // tests modern transports, and unsupported engines stay disconnected.
+      // Selecting a node when disconnected only changes the selection.
+      // While a modern tunnel is connected, switching nodes triggers
+      // a verified handoff, after validating the replacement profile.
+      if (_modernUp &&
+          (_modernNodeId != nodes[index].id || _modernProtocol != _filter)) {
+        await _startModernTunnel(_filter, nodes[index].id);
+      }
       return;
     }
     final targetId = nodes[index].id;
