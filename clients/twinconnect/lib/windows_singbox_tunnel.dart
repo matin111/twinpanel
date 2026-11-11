@@ -92,6 +92,9 @@ class WindowsSingBoxTunnel {
             throw const FormatException('SINGBOX_ENDPOINT_DNS_POISONED');
           }
           resolvedServer = candidate.address;
+        } on FormatException catch (error) {
+          if (error.message == 'SINGBOX_ENDPOINT_DNS_POISONED') rethrow;
+          throw const FormatException('SINGBOX_ENDPOINT_DNS_UNAVAILABLE');
         } catch (_) {
           throw const FormatException('SINGBOX_ENDPOINT_DNS_UNAVAILABLE');
         }
