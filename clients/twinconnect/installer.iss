@@ -43,6 +43,7 @@ var
   Ok: Boolean;
   PowershellPath: String;
   Parameters: String;
+  OpenConnectInstaller: String;
 begin
   if CurStep = ssPostInstall then
   begin
@@ -56,6 +57,26 @@ begin
         'TwinConnect was installed, but native VPN connections may not work.' + #13#10 +
         'See: C:\\ProgramData\\TwinConnect\\install-prerequisites.log',
         mbError, MB_OK);
+    end;
+    { One installer for the customer: the signed upstream OpenConnect
+      package and its TAP driver are bundled, never fetched at install time.
+      NSIS silent installation avoids requiring a separate download. }
+    OpenConnectInstaller := ExpandConstant(
+      '{app}\\prerequisites\\openconnect-gui-1.6.2-win64.exe');
+    if not FileExists(OpenConnectInstaller) then
+    begin
+      MsgBox('Cisco/OpenConnect prerequisite missing from TwinConnect installer.',
+        mbError, MB_OK);
+    end
+    else
+    begin
+      Ok := Exec(OpenConnectInstaller, '/S', '', SW_HIDE,
+                 ewWaitUntilTerminated, ExitCode);
+      if (not Ok) or (ExitCode <> 0) then
+      begin
+        MsgBox('The bundled Cisco/OpenConnect prerequisite could not be installed.' +
+          #13#10 + 'Other VPN protocols remain available.', mbError, MB_OK);
+      end;
     end;
   end;
 end;
