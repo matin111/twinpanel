@@ -127,7 +127,12 @@ class WindowsSingBoxTunnel {
           throw FormatException(nativeFailure ?? 'SINGBOX_PROCESS_EXITED');
         }
         routeIssue = await _windowsTunRouteIssue();
-        if (routeIssue == null) break;
+        if (routeIssue == null ||
+            routeIssue == 'SINGBOX_TUN_ROUTE_INSPECTION_FAILED') {
+          // A failed inspector is not a missing adapter; fail once rather
+          // than blocking the UI for five PowerShell startup timeouts.
+          break;
+        }
       }
       if (routeIssue != null) {
         throw FormatException(nativeFailure ?? routeIssue);
