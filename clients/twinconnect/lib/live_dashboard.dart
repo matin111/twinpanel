@@ -120,6 +120,33 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   bool _networkRefreshing = false;
   int _networkEpoch = 0;
   Timer? _networkTimer;
+  // Only a verified tunnel counts as connected. Tick just the duration label,
+  // not the whole blurred dashboard, to avoid unnecessary GPU work.
+  final ValueNotifier<int> _connectedSeconds = ValueNotifier<int>(0);
+  DateTime? _connectedSince;
+  Timer? _durationTicker;
+
+  bool get _verifiedConnectionActive => _modernUp || _vpnVerified;
+
+  void _updateConnectionClock() {
+    if (!_verifiedConnectionActive) {
+      _connectedSince = null;
+      if (_connectedSeconds.value != 0) _connectedSeconds.value = 0;
+      return;
+    }
+    _connectedSince ??= DateTime.now();
+    final seconds = DateTime.now().difference(_connectedSince!).inSeconds;
+    if (_connectedSeconds.value != seconds) _connectedSeconds.value = seconds;
+  }
+
+  static String _formatConnectedSeconds(int seconds) {
+    final duration = Duration(seconds: seconds);
+    final hours = duration.inHours.toString().padLeft(2, '0');
+    final minutes = (duration.inMinutes % 60).toString().padLeft(2, '0');
+    final remainder = (duration.inSeconds % 60).toString().padLeft(2, '0');
+    return '$hours:$minutes:$remainder';
+  }
+
   String? _activeNodeId;
 
   final Map<String, int?> _nodePings = {};
@@ -834,6 +861,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
 
   @override
   void dispose() {
+    _durationTicker?.cancel();
+    _connectedSeconds.dispose();
     _modernHealthTimer?.cancel();
     _stopModernTrafficMonitoring();
     _modernTunnel.dispose();
@@ -865,6 +894,9 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   @override
   void initState() {
     super.initState();
+    _durationTicker = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) _updateConnectionClock();
+    });
     _restoreAppearance();
     _refreshNativeReadiness();
     _refreshVpnStatus();
@@ -1562,6 +1594,35 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                         ? tr('در حال تأیید اتصال', 'Verifying connection')
                         : tr('برای اتصال لمس کنید', 'Tap to connect'),
             size: 19, bold: true),
+        ),
+        const SizedBox(height: 9),
+        ValueListenableBuilder<int>(
+          valueListenable: _connectedSeconds,
+          builder: (context, elapsed, child) => AnimatedOpacity(
+            duration: const Duration(milliseconds: 260),
+            opacity: _verifiedConnectionActive ? 1 : .68,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.timer_outlined, size: 17,
+                    color: _verifiedConnectionActive
+                        ? const Color(0xFF36E5BB) : sub),
+                const SizedBox(width: 7),
+                txt(tr('مدت اتصال', 'Connected for'),
+                    size: 12, color: sub),
+                const SizedBox(width: 8),
+                Text(_formatConnectedSeconds(elapsed),
+                    key: const Key('liveConnectionDuration'),
+                    textDirection: TextDirection.ltr,
+                    style: TextStyle(
+                      fontSize: 15, fontWeight: FontWeight.w700,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                      color: _verifiedConnectionActive
+                          ? const Color(0xFF36E5BB) : sub,
+                    )),
+              ],
+            ),
+          ),
         ),
         if (_vpnUp || _modernUp) ...[
           const SizedBox(height: 6),
