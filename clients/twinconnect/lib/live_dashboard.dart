@@ -439,6 +439,96 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     });
   }
 
+  Future<void> _startCiscoTunnel(String serverId) async {
+    if (_vpnBusy) return;
+    setState(() { _vpnBusy = true; _vpnError = null; });
+    try {
+      if (_vpnUnmanaged) {
+        throw const FormatException('UNMANAGED_WIREGUARD_SERVICE');
+      }
+      final authorized = widget.catalog?.entries.any((entry) =>
+          entry.protocol.code == 'cisco' && entry.selected &&
+          entry.configRecordPresent) ?? false;
+      if (!authorized) {
+        throw const FormatException('PROTOCOL_NOT_INCLUDED_IN_SUBSCRIPTION');
+      }
+      if (await WindowsOpenConnectTunnel.findInstalledEngine() == null) {
+        throw const FormatException('CISCO_OPENCONNECT_NOT_INSTALLED');
+      }
+      final definition = VpnProtocols.byCode('cisco')!;
+      final profiles = await TenantApi.fromBuildConfig().loadSessionNativeProfiles(
+        panel: widget.panel,
+        sessionToken: widget.sessionToken,
+        protocol: definition,
+        native: const NativeProtocolReadiness(supportedCodes: {'cisco'}),
+      );
+      final matches = profiles.items.where((item) =>
+          item['node_id']?.toString() == serverId).toList(growable: false);
+      if (matches.length != 1) {
+        throw const FormatException('CISCO_SERVER_PROFILE_MISSING');
+      }
+      final destination = CiscoOpenConnectProfile.fromItem(matches.single);
+      // Validate next profile BEFORE interrupting a working VPN.
+      if (_vpnUp || _vpnCleanup) {
+        await _vpn.stop().timeout(const Duration(seconds: 20));
+        final stopped = await _vpn.status().timeout(
+            const Duration(seconds: 10));
+        if (stopped['state'] != 'down') {
+          throw const FormatException('PREVIOUS_TUNNEL_NOT_STOPPED');
+        }
+        if (!mounted) return;
+        setState(() {
+          _vpnUp = false;
+          _vpnVerified = false;
+          _vpnCleanup = false;
+          _activeNodeId = null;
+          _vpnRx = 0;
+          _vpnTx = 0;
+          _resetNetworkStats();
+        });
+      }
+      if (_modernTunnel.isRunning || _ciscoTunnel.isRunning) {
+        _modernHealthTimer?.cancel();
+        _stopModernTrafficMonitoring();
+        if (_ciscoTunnel.isRunning) {
+          await _ciscoTunnel.stop();
+        } else {
+          await _modernTunnel.stop();
+        }
+        if (!mounted) return;
+        setState(() {
+          _modernUp = false;
+          _modernProtocol = null;
+          _modernNodeId = null;
+          _publicIp = null;
+        });
+      }
+      final verified = await _ciscoTunnel.start(destination);
+      if (!mounted) return;
+      setState(() {
+        _modernUp = true;
+        _modernProtocol = 'cisco';
+        _modernNodeId = serverId;
+        _publicIp = verified;
+      });
+      _startModernTrafficMonitoring();
+      _startModernHealthMonitoring();
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _modernUp = _ciscoTunnel.isRunning || _modernTunnel.isRunning;
+          if (!_modernUp) {
+            _modernProtocol = null;
+            _modernNodeId = null;
+          }
+          _vpnError = _errorText(error);
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _vpnBusy = false);
+    }
+  }
+
   Future<void> _startModernTunnel(String protocol, String serverId) async {
     if (_vpnBusy) return;
     setState(() { _vpnBusy = true; _vpnError = null; });
