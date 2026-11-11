@@ -1209,7 +1209,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     Widget powerCard() => ClipRRect(
       borderRadius: BorderRadius.circular(28),
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+        filter: ImageFilter.blur(sigmaX: 11, sigmaY: 11),
         child: Container(
       key: const Key('liveConnectionStatus'),
       constraints: const BoxConstraints(minHeight: 415),
@@ -1220,14 +1220,14 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           begin: Alignment.topLeft, end: Alignment.bottomRight,
           colors: _dark
               ? [
-                  const Color(0xFF362A5E).withValues(alpha: 0.78),
-                  const Color(0xFF253754).withValues(alpha: 0.70),
-                  const Color(0xFF23364B).withValues(alpha: 0.70),
+                  const Color(0xFF362A5E).withValues(alpha: 0.44),
+                  const Color(0xFF253754).withValues(alpha: 0.40),
+                  const Color(0xFF23364B).withValues(alpha: 0.42),
                 ]
               : [
-                  const Color(0xFFEDE4FF).withValues(alpha: 0.79),
-                  Colors.white.withValues(alpha: 0.74),
-                  const Color(0xFFE6F1FF).withValues(alpha: 0.76),
+                  const Color(0xFFEDE4FF).withValues(alpha: 0.58),
+                  Colors.white.withValues(alpha: 0.56),
+                  const Color(0xFFE6F1FF).withValues(alpha: 0.56),
                 ],
         ),
         border: Border.all(color: purple.withValues(alpha: 0.56)),
