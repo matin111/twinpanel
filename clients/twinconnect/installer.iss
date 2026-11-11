@@ -44,8 +44,7 @@ var
   PowershellPath: String;
   Parameters: String;
   OpenConnectInstaller: String;
-  OpenConnectCli: String;
-  OpenConnectScript: String;
+  OpenConnectManifest: String;
 begin
   if CurStep = ssPostInstall then
   begin
@@ -65,39 +64,25 @@ begin
       NSIS silent installation avoids requiring a separate download. }
     OpenConnectInstaller := ExpandConstant(
       '{app}\\prerequisites\\openconnect-gui-1.6.2-win64.exe');
-    OpenConnectCli := ExpandConstant('{autopf}\\OpenConnect-GUI\\openconnect.exe');
-    OpenConnectScript := ExpandConstant('{autopf}\\OpenConnect-GUI\\vpnc-script-win.js');
-    { Do not reinstall shared upstream dependencies on every TwinConnect update. }
-    if not FileExists(OpenConnectCli) then
+    { The signed vendor setup has an OPTIONAL CLI component which /S omits.
+      CI extracts and checks the CLI and Windows route script into our app
+      bundle, independent of the vendor's GUI installer defaults. }
+    OpenConnectManifest := ExpandConstant(
+      '{app}\engines\openconnect\OPENCONNECT-ENGINE-MANIFEST.txt');
+    if not FileExists(OpenConnectManifest) then
     begin
-      if not FileExists(OpenConnectInstaller) then
-      begin
-        MsgBox('Cisco/OpenConnect prerequisite missing from TwinConnect installer.',
-          mbError, MB_OK);
-      end
-      else
-      begin
-        Ok := Exec(OpenConnectInstaller, '/S', '', SW_HIDE,
-                   ewWaitUntilTerminated, ExitCode);
-        if (not Ok) or (ExitCode <> 0) then
-        begin
-          MsgBox('The bundled Cisco/OpenConnect prerequisite could not be installed.' +
-            #13#10 + 'Other VPN protocols remain available.', mbError, MB_OK);
-        end;
-      end;
+      MsgBox('Cisco engine bundle missing; Cisco remains disabled.',
+        mbError, MB_OK);
     end;
-    if not FileExists(OpenConnectCli) then
+    { Vendor GUI setup may still supply adapter/driver prerequisites.
+      Its success is NOT proof that Cisco tunnel routing is functional. }
+    if FileExists(OpenConnectInstaller) then
     begin
-      MsgBox('Cisco CLI component was not installed by upstream setup.' +
-        #13#10 + 'Cisco will remain disabled; other VPN protocols are unaffected.',
-        mbError, MB_OK);
-    end
-    else if (not FileExists(OpenConnectScript)) and
-      (not FileExists(ExpandConstant('{autopf}\\OpenConnect-GUI\\vpnc-script.js'))) then
-    begin
-      MsgBox('Cisco/OpenConnect routing script is missing.' +
-        #13#10 + 'Cisco will remain disabled to prevent broken Windows routes.',
-        mbError, MB_OK);
+      Ok := Exec(OpenConnectInstaller, '/S', '', SW_HIDE,
+                 ewWaitUntilTerminated, ExitCode);
+      if (not Ok) or (ExitCode <> 0) then
+        MsgBox('Cisco vendor prerequisites could not be installed.' +
+          #13#10 + 'Other VPN protocols remain available.', mbError, MB_OK);
     end;
   end;
 end;
