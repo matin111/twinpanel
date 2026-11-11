@@ -53,9 +53,20 @@ class CiscoOpenConnectProfile {
         password.contains('\x00')) {
       throw const FormatException('CISCO_PROFILE_UNSAFE');
     }
-    final pinned = field(['servercert', 'server_certificate']);
+    // Accept only explicit, authenticated panel-supplied certificate pins.
+    // Never learn a pin from an untrusted connection attempt (TOFU).
+    final pinned = field([
+      'servercert', 'server_certificate', 'server_cert_fingerprint',
+      'certificate_fingerprint', 'cert_fingerprint',
+    ]);
     if (pinned != null &&
-        !RegExp(r'^(sha256:[0-9a-fA-F]{64}|sha1:[0-9a-fA-F]{40})$')
+        !RegExp(r'^(sha256:[0-9a-fA-F]{64}|sha1:[0-9a-fA-F]{40}|pin-sha256:[A-Za-z0-9+/]{43}=)
+    return CiscoOpenConnectProfile(
+        host: host, port: port, username: username, password: password,
+        serverCertificate: pinned);
+  }
+}
+)
             .hasMatch(pinned)) {
       throw const FormatException('CISCO_CERT_PIN_INVALID');
     }
