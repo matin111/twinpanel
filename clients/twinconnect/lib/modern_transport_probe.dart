@@ -92,7 +92,11 @@ class ModernTransportProbe {
       final clock = Stopwatch()..start();
       Object? lastError;
       for (var attempt = 0; attempt < 3; attempt++) {
-        await Future<void>.delayed(const Duration(milliseconds: 500));
+        // Probe as soon as the loopback listener is ready. The previous
+        // unconditional 500ms wait slowed every successful connection.
+        // Subsequent attempts back off to preserve cold-start reliability.
+        await Future<void>.delayed(Duration(milliseconds:
+            attempt == 0 ? 100 : attempt == 1 ? 250 : 500));
         try {
           final request = await client.getUrl(
             Uri.https('api.ipify.org', '/', {'format': 'json'}),
