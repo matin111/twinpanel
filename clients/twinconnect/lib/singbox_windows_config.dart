@@ -22,6 +22,10 @@ class SingBoxWindowsConfig {
            'server_port': 53, 'detour': 'proxy'},
         ],
         'final': 'dns-remote',
+        // sing-box 1.14: cache repeated DNS answers and update stale
+        // entries in the background. DNS still travels through the proxy.
+        'cache_capacity': 4096,
+        'optimistic': true,
       },
       'inbounds': [
         {
