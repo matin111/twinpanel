@@ -38,7 +38,7 @@ def _expiry_keyboard(subscription_id: int) -> InlineKeyboardMarkup:
                 InlineKeyboardButton(
                     text="💳 تمدید اشتراک",
                     callback_data=f"subrenew:{subscription_id}",
-                    style="success",
+                    style="primary",
                 )
             ],
             [
@@ -49,7 +49,6 @@ def _expiry_keyboard(subscription_id: int) -> InlineKeyboardMarkup:
                 InlineKeyboardButton(
                     text="🏠 منوی اصلی",
                     callback_data="main:home",
-                    style="primary",
                 ),
             ],
         ]

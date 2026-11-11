@@ -9,13 +9,13 @@ def test_expiry_keyboard_has_renew_back_and_home_actions():
 
     assert rows[0][0].text == "💳 تمدید اشتراک"
     assert rows[0][0].callback_data == "subrenew:2170"
-    assert rows[0][0].style == "success"
+    assert rows[0][0].style == "primary"
 
     assert rows[1][0].text == "⬅️ بازگشت"
     assert rows[1][0].callback_data == "subs:list"
     assert rows[1][1].text == "🏠 منوی اصلی"
     assert rows[1][1].callback_data == "main:home"
-    assert rows[1][1].style == "primary"
+    assert rows[1][1].style is None
 
 
 def test_expiry_proxy_injects_keyboard_for_expiry_notification():

@@ -106,7 +106,8 @@ def plan_categories(plans):
 
 
 DEFAULT_SUBSCRIPTION_TYPE = "اشتراک عمومی"
-COLOR_ICONS = ("🟢", "🔵", "🟣", "🟠", "🔴", "🟡", "🩵", "🩷")
+# Neutral markers render consistently in light/dark Telegram themes.
+COLOR_ICONS = ("▫️",)
 
 
 def plan_subscription_type(plan):
@@ -159,15 +160,9 @@ def user_count_icon(count):
 
 
 def category_icon(name, index):
-    if "💎" in name:
-        return ""  # Already present in the category name; avoid duplicate icons.
-    if "ویژه" in name or "حرفه" in name:
-        return "💎"
-    if "🎮" in name:
-        return ""
-    if "گیم" in name:
-        return "🎮"
-    return COLOR_ICONS[index % len(COLOR_ICONS)] + " 📂"
+    # Category titles may already contain an icon; adding another colorful
+    # one makes the purchase/renewal keyboards cluttered.
+    return ""
 
 
 def plan_user_count(plan):

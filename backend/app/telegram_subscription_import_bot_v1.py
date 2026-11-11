@@ -22,8 +22,8 @@ class PasswordChangeState(StatesGroup):
 
 def _navigation():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="📦 اکانت‌های من", callback_data="subs:list", style="primary")],
-        [InlineKeyboardButton(text="🏠 منوی اصلی", callback_data="main:home", style="primary")],
+        [InlineKeyboardButton(text="📦 اکانت‌های من", callback_data="subs:list")],
+        [InlineKeyboardButton(text="🏠 منوی اصلی", callback_data="main:home")],
     ])
 
 
@@ -149,8 +149,7 @@ def install(router, request_fn):
                 ),
             ],
             [InlineKeyboardButton(
-                text="♻️ بروزرسانی اطلاعات", callback_data=f"subimp:refresh:{sub_id}",
-                style="success",
+                text="↻ بروزرسانی اطلاعات", callback_data=f"subimp:refresh:{sub_id}",
             )],
             [InlineKeyboardButton(
                 text="🎫 پشتیبانی", callback_data="ts:send",
@@ -163,7 +162,7 @@ def install(router, request_fn):
                 text="⬅️ اکانت‌های من", callback_data="subs:list",
             )],
             [InlineKeyboardButton(
-                text="🏠 منوی اصلی", callback_data="main:home", style="primary",
+                text="🏠 منوی اصلی", callback_data="main:home",
             )],
         ])
 
@@ -338,9 +337,9 @@ def install(router, request_fn):
                 "مالکیت اکانت تغییر نمی‌کند.",
                 reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                     [InlineKeyboardButton(
-                        text="✅ ادامه و پرداخت",
+                        text="ادامه و پرداخت",
                         callback_data=f"subimprenewconfirm:{sub_id}:{int(plan['id'])}",
-                        style="success",
+                        style="primary",
                     )],
                     [InlineKeyboardButton(
                         text="⬅️ مدیریت اکانت",
@@ -578,13 +577,13 @@ def install(router, request_fn):
                 "آیا درخواست ثبت شود؟",
                 reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                     [InlineKeyboardButton(
-                        text=f"✅ ثبت درخواست {title}",
+                        text=f"ثبت درخواست {title}",
                         callback_data=f"subimp:confirm:{kind}:{sub_id}",
-                        style="success",
+                        style="primary",
                     )],
                     [InlineKeyboardButton(
-                        text="❌ انصراف",
-                        callback_data=f"subimp:{sub_id}", style="danger",
+                        text="انصراف",
+                        callback_data=f"subimp:{sub_id}",
                     )],
                 ]),
             )
