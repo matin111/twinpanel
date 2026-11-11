@@ -526,12 +526,11 @@ async def broadcast_send(
     # Pop before scheduling prevents repeated callback delivery.
     _broadcast_drafts.pop(payload.nonce, None)
     targets = _broadcast_target_ids(db)
-    background_tasks.add_task(
-        _deliver_broadcast, draft["text"], targets, payload.telegram_id,
+    background_tasks.add_task(_deliver_broadcast,
+        draft["text"], targets, payload.telegram_id,
         draft.get("photo_file_id"),
     )
-    audit_log.info(
-        "broadcast_started actor=%s recipients=%s type=%s sha256=%s",
+    audit_log.info("broadcast_started actor=%s recipients=%s type=%s sha256=%s",
         actor.id, len(targets),
         "photo" if draft.get("photo_file_id") else "text",
         hashlib.sha256(draft["text"].encode("utf-8")).hexdigest(),
