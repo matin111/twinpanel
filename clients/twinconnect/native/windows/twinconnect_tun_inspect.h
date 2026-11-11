@@ -51,10 +51,9 @@ inline flutter::EncodableValue Inspect() {
     const MIB_IPFORWARD_ROW2& route = routes->Table[i];
     if (route.InterfaceLuid.Value != target.Value) continue;
     const auto& prefix = route.DestinationPrefix;
-    if (prefix.PrefixLength == 0 ||
-        (prefix.PrefixLength == 1 &&
-         (ntohl(prefix.Prefix.Ipv4.sin_addr.S_un.S_addr) == 0 ||
-          ntohl(prefix.Prefix.Ipv4.sin_addr.S_un.S_addr) == 0x80000000U))) {
+    // Valid IPv4 /1 routes are always 0.0.0.0/1 or 128.0.0.0/1.
+    // Avoid endianness-dependent address parsing in the native runner.
+    if (prefix.PrefixLength == 0 || prefix.PrefixLength == 1) {
       found_route = true;
       break;
     }
