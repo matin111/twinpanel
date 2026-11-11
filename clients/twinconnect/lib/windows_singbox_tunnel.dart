@@ -100,6 +100,16 @@ class WindowsSingBoxTunnel {
           onUnexpectedExit?.call();
         }
       }));
+      // Verify Windows actually created the TUN adapter and a default
+      // route; an alive sing-box process does not imply a working TUN.
+      String? routeIssue;
+      for (var attempt = 0; attempt < 5; attempt++) {
+        await Future<void>.delayed(const Duration(milliseconds: 450));
+        if (exited) throw const FormatException('SINGBOX_PROCESS_EXITED');
+        routeIssue = await _windowsTunRouteIssue();
+        if (routeIssue == null) break;
+      }
+      if (routeIssue != null) throw FormatException(routeIssue);
       String? verified;
       var postTunnelHttpSucceeded = false;
       for (var attempt = 0; attempt < 8; attempt++) {
@@ -110,9 +120,10 @@ class WindowsSingBoxTunnel {
         try {
           // Do not use the same HTTPS service for every probe: a single
           // blocked IP-echo domain must not be confused with TUN failure.
-          final ip = await _requestPublicIp(
-            alternative: attempt.isOdd,
-          ).timeout(const Duration(seconds: 6));
+          // Always use the SAME IPv4 echo endpoint used for the baseline
+          // and for the independent sing-box proxy probe.
+          final ip = await _requestPublicIp()
+              .timeout(const Duration(seconds: 6));
           final observed = InternetAddress.tryParse(ip);
           final baseline = InternetAddress.tryParse(before);
           if (observed == null || baseline == null ||
@@ -121,16 +132,11 @@ class WindowsSingBoxTunnel {
             continue;
           }
           postTunnelHttpSucceeded = true;
-          if (ip != before) {
-            // Record the observed system-route IP, even when a server uses
-            // multiple legitimate exits behind one selected outbound.
+          if (ip != before && ip == verifiedProxyIp) {
+            // Require the actual Windows route to agree with the SAME
+            // outbound's separately verified exit, not just any IP change.
             verified = ip;
             break;
-          }
-          if (ip == verifiedProxyIp && verifiedProxyIp == before) {
-            // Identical exit IP is ambiguous: this may already be routed
-            // through the same VPN. Never call it verified solely on IP.
-            postTunnelHttpSucceeded = true;
           }
         } catch (_) {
           // No successful HTTP response is not evidence of a working TUN.
@@ -189,18 +195,37 @@ class WindowsSingBoxTunnel {
     }
   }
 
+  /// Read-only Windows inspection. Never modifies routes or adapters.
+  /// Route presence alone is not a proof of an operating VPN.
+  static Future<String?> _windowsTunRouteIssue() async {
+    const command = r'''$a=Get-NetAdapter -Name 'TwinConnectSB' -ErrorAction SilentlyContinue; $r=@(Get-NetRoute -AddressFamily IPv4 -ErrorAction SilentlyContinue | Where-Object { $_.InterfaceAlias -eq 'TwinConnectSB' -and $_.DestinationPrefix -in @('0.0.0.0/0','0.0.0.0/1','128.0.0.0/1') }); [pscustomobject]@{adapter=[bool]$a; routes=$r.Count} | ConvertTo-Json -Compress''';
+    try {
+      final result = await Process.run('powershell.exe',
+        ['-NoProfile', '-NonInteractive', '-Command', command],
+        runInShell: false).timeout(const Duration(seconds: 6));
+      if (result.exitCode != 0) return 'SINGBOX_TUN_ROUTE_INSPECTION_FAILED';
+      final data = jsonDecode(result.stdout.toString());
+      if (data is! Map) return 'SINGBOX_TUN_ROUTE_INSPECTION_FAILED';
+      if (data['adapter'] != true) return 'SINGBOX_TUN_ADAPTER_MISSING';
+      if (data['routes'] is! num || (data['routes'] as num) < 1) {
+        return 'SINGBOX_TUN_DEFAULT_ROUTE_MISSING';
+      }
+      return null;
+    } catch (_) {
+      return 'SINGBOX_TUN_ROUTE_INSPECTION_FAILED';
+    }
+  }
+
   /// Direct HTTPS request using the current Windows network routes.
   /// A different IP than the pre-TUN baseline is necessary (not sufficient)
   /// to prove that traffic left through the selected outbound.
-  static Future<String> _requestPublicIp({bool alternative = false}) async {
+  static Future<String> _requestPublicIp() async {
     final client = HttpClient()
       ..connectionTimeout = const Duration(seconds: 3)
       ..findProxy = (_) => 'DIRECT';
     try {
       final request = await client.getUrl(
-        alternative
-          ? Uri.https('ifconfig.me', '/ip')
-          : Uri.https('api.ipify.org', '/', {'format': 'json'}));
+        Uri.https('api.ipify.org', '/', {'format': 'json'}));
       request.followRedirects = false;
       final response = await request.close().timeout(
         const Duration(seconds: 5));
@@ -212,15 +237,11 @@ class WindowsSingBoxTunnel {
       if (body.length > 512) {
         throw const FormatException('PUBLIC_IP_RESPONSE_TOO_LARGE');
       }
-      final ip = alternative
-          ? body.trim()
-          : (() {
-              final data = jsonDecode(body);
-              if (data is! Map || data['ip'] is! String) {
-                throw const FormatException('PUBLIC_IP_RESPONSE_INVALID');
-              }
-              return data['ip'] as String;
-            })();
+      final data = jsonDecode(body);
+      if (data is! Map || data['ip'] is! String) {
+        throw const FormatException('PUBLIC_IP_RESPONSE_INVALID');
+      }
+      final ip = data['ip'] as String;
       if (InternetAddress.tryParse(ip) == null) {
         throw const FormatException('PUBLIC_IP_RESPONSE_INVALID');
       }
