@@ -481,18 +481,42 @@ class _TwinConnectHomeState extends State<TwinConnectHome> with WidgetsBindingOb
       // Server refresh is also a plan/protocol entitlement refresh.
       // Publish both together so removed permissions never remain in the UI
       // alongside newly fetched servers.
-      final catalog = await api.loadSessionProtocolCatalog(
-        panel: panel, sessionToken: session,
-      );
-      final inventory = await api.refreshSessionServers(
-        panel: panel, sessionToken: session,
-      );
+      // An access JWT expires after 30 minutes. Renew and retry once, instead
+      // of silently presenting an empty server list while still signed in.
+      Future<(PanelProtocolCatalog, AppServerInventory)> fetch(String token) async {
+        final catalog = await api.loadSessionProtocolCatalog(
+          panel: panel, sessionToken: token,
+        );
+        final inventory = await api.refreshSessionServers(
+          panel: panel, sessionToken: token,
+        );
+        return (catalog, inventory);
+      }
+      (PanelProtocolCatalog, AppServerInventory) result;
+      try {
+        result = await fetch(session);
+      } on TenantApiException catch (error) {
+        if (error.message != 'APP_LOGIN_INVALID' ||
+            _sessionRefreshToken == null) rethrow;
+        await _renewSession();
+        if (!mounted || serial != _lookupSerial) return;
+        final updated = _confirmedSessionToken;
+        if (updated == null || updated == session) rethrow;
+        result = await fetch(updated);
+      }
+      final (catalog, inventory) = result;
       if (!mounted || serial != _lookupSerial) return;
       setState(() {
         _catalog = catalog;
         _servers = inventory;
         _protocolCatalogUnavailable = false;
       });
+    } on TenantApiException catch (error) {
+      if (!mounted || serial != _lookupSerial) return;
+      setState(() => _serverRefreshError =
+          error.message == 'APP_LOGIN_INVALID'
+              ? 'APP_SESSION_EXPIRED'
+              : 'SERVER_REFRESH_FAILED');
     } catch (_) {
       if (!mounted || serial != _lookupSerial) return;
       setState(() => _serverRefreshError = 'SERVER_REFRESH_FAILED');
@@ -832,6 +856,7 @@ class _TwinConnectHomeState extends State<TwinConnectHome> with WidgetsBindingOb
         sessionToken: _confirmedSessionToken!,
         catalog: _catalog,
         servers: _servers,
+        serverRefreshError: _serverRefreshError,
         native: _nativeProtocols,
         plan: _plan,
         account: _account,
