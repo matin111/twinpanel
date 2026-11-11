@@ -15,6 +15,10 @@ on:
 
 jobs:
   windows-preview:
+    # PRs have read-only permissions; only trusted branch pushes may publish
+    # unsigned preview assets to a clearly marked prerelease.
+    permissions:
+      contents: write
     runs-on: windows-latest
     timeout-minutes: 35
     defaults:
@@ -239,6 +243,41 @@ jobs:
           path: clients/twinconnect/TwinConnect-Windows-x64-Setup.exe
           if-no-files-found: error
           retention-days: 30
+      # GitHub Actions artifact delivery sometimes returns HTTP 502 even
+      # after successful builds. Publish an immutable versioned prerelease
+      # with ordinary release assets as an alternative download path.
+      - name: Publish test installer as GitHub prerelease assets
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/integration/twinconnect-windows-app-20261110' }}
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $tag = 'twinconnect-windows-preview-' + $env:GITHUB_SHA.Substring(0, 12)
+          $files = @(
+            'TwinConnect-Windows-x64-Setup.exe',
+            'TwinConnect-Windows-Preview.zip',
+            'TwinConnect-Windows-SHA256SUMS.txt'
+          )
+          foreach ($file in $files) {
+            if (!(Test-Path -LiteralPath $file)) { throw "Missing release file: $file" }
+          }
+          $notes = @'
+          UNSIGNED TEST BUILD — do not distribute to customers.
+          Built from the TwinConnect integration branch. Contains the Windows
+          installer, standalone portable ZIP, and SHA-256 integrity manifest.
+          This preview may trigger SmartScreen or browser security warnings.
+          Do not disable antivirus protections to run it.
+          The Windows Defender on-demand CI scan is separate from a professional
+          security audit and does not certify malware-free binaries.
+          '@
+          gh release create $tag @files --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "TwinConnect Windows Preview ($($env:GITHUB_SHA.Substring(0, 12)))" --notes $notes --prerelease
+          if ($LASTEXITCODE -ne 0) { throw 'Failed to publish TwinConnect preview release' }
+          $assets = gh release view $tag --repo $env:GITHUB_REPOSITORY --json assets --jq '.assets[].name'
+          if ($LASTEXITCODE -ne 0 -or !($assets -contains 'TwinConnect-Windows-x64-Setup.exe') -or !($assets -contains 'TwinConnect-Windows-SHA256SUMS.txt')) {
+            throw 'GitHub prerelease asset verification failed'
+          }
+          Write-Host "TwinConnect release: https://github.com/$env:GITHUB_REPOSITORY/releases/tag/$tag"
       - name: Build isolated Windows Dev dashboard (no sign-in)
         shell: pwsh
         run: flutter build windows --release --target lib/main_dev.dart
