@@ -25,6 +25,7 @@ jobs:
       # A dedicated owned HTTPS domain must replace this before production.
       # Using a repository variable takes precedence without modifying code.
       TWINCONNECT_DIRECTORY_URL: ${{ vars.TWINCONNECT_DIRECTORY_URL || 'https://panel.matindnspro.sbs' }}
+      SIGNING_CONFIGURED: ${{ secrets.TWINCONNECT_SIGN_PFX_BASE64 != '' && secrets.TWINCONNECT_SIGN_PFX_PASSWORD != '' }}
     steps:
       - uses: actions/checkout@v4
       # Avoid a stalled Flutter SDK cache restore on GitHub Windows runners.
@@ -74,6 +75,55 @@ jobs:
       - name: Verify actual TUN adapter creation without changing system routes
         shell: pwsh
         run: ./tools/smoke_singbox_tun_windows.ps1
+      - name: Inspect release binaries with Windows Defender (when available)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $release = Join-Path (Get-Location) 'build/windows/x64/runner/Release'
+          $defender = Join-Path $env:ProgramFiles 'Windows Defender/MpCmdRun.exe'
+          if (!(Test-Path $defender)) {
+            Write-Warning 'Defender command-line scanner is not available on this runner. No malware-clean claim is made.'
+          } else {
+            & $defender -Scan -ScanType 3 -File $release -DisableRemediation
+            $scanExit = $LASTEXITCODE
+            if ($scanExit -ne 0) {
+              throw "Windows Defender scan did not complete cleanly (exit code $scanExit); refusing artifact publication."
+            }
+            Write-Host 'Windows Defender on-demand scan completed successfully'
+          }
+      - name: Authenticode-sign app when a publisher certificate is configured
+        if: ${{ env.SIGNING_CONFIGURED == 'true' }}
+        shell: pwsh
+        env:
+          TWINCONNECT_SIGN_PFX_BASE64: ${{ secrets.TWINCONNECT_SIGN_PFX_BASE64 }}
+          TWINCONNECT_SIGN_PFX_PASSWORD: ${{ secrets.TWINCONNECT_SIGN_PFX_PASSWORD }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if (!$env:TWINCONNECT_SIGN_PFX_BASE64 -or !$env:TWINCONNECT_SIGN_PFX_PASSWORD) {
+            throw 'Incomplete signing configuration'
+          }
+          $pfx = Join-Path $env:RUNNER_TEMP 'twinconnect-signing.pfx'
+          try {
+            [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:TWINCONNECT_SIGN_PFX_BASE64))
+            $password = ConvertTo-SecureString $env:TWINCONNECT_SIGN_PFX_PASSWORD -AsPlainText -Force
+            $certificate = Get-PfxCertificate -FilePath $pfx -Password $password
+            if (!$certificate.HasPrivateKey -or
+                $certificate.NotAfter -le (Get-Date) -or
+                !$certificate.EnhancedKeyUsageList.ObjectId.Value.Contains('1.3.6.1.5.5.7.3.3')) {
+              throw 'Code signing certificate is invalid, expired, or lacks code-signing usage'
+            }
+            $signtool = Get-ChildItem '${env:ProgramFiles(x86)}\Windows Kits\10\bin' -Filter signtool.exe -Recurse -File |
+              Where-Object { $_.FullName -match '\\x64\\' } |
+              Sort-Object FullName -Descending | Select-Object -First 1
+            if (!$signtool) { throw 'Windows SDK signtool.exe not available' }
+            $exe = Join-Path (Get-Location) 'build/windows/x64/runner/Release/twinconnect.exe'
+            & $signtool.FullName sign /fd SHA256 /f $pfx /p $env:TWINCONNECT_SIGN_PFX_PASSWORD /tr http://timestamp.digicert.com /td SHA256 $exe
+            if ($LASTEXITCODE -ne 0) { throw 'App signing failed' }
+            & $signtool.FullName verify /pa /all $exe
+            if ($LASTEXITCODE -ne 0) { throw 'App Authenticode verification failed' }
+          } finally {
+            Remove-Item -LiteralPath $pfx -Force -ErrorAction SilentlyContinue
+          }
       - name: Package portable ZIP and usage instructions
         shell: pwsh
         run: |
@@ -140,6 +190,49 @@ jobs:
           if (!(Test-Path "TwinConnect-Windows-x64-Setup.exe")) {
             throw "TwinConnect setup executable missing"
           }
+      - name: Sign installer when a publisher certificate is configured
+        if: ${{ env.SIGNING_CONFIGURED == 'true' }}
+        shell: pwsh
+        env:
+          TWINCONNECT_SIGN_PFX_BASE64: ${{ secrets.TWINCONNECT_SIGN_PFX_BASE64 }}
+          TWINCONNECT_SIGN_PFX_PASSWORD: ${{ secrets.TWINCONNECT_SIGN_PFX_PASSWORD }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $pfx = Join-Path $env:RUNNER_TEMP 'twinconnect-signing.pfx'
+          try {
+            [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:TWINCONNECT_SIGN_PFX_BASE64))
+            $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin" -Filter signtool.exe -Recurse -File |
+              Where-Object { $_.FullName -match '\\x64\\' } |
+              Sort-Object FullName -Descending | Select-Object -First 1
+            if (!$signtool) { throw 'Windows SDK signtool.exe not available' }
+            & $signtool.FullName sign /fd SHA256 /f $pfx /p $env:TWINCONNECT_SIGN_PFX_PASSWORD /tr http://timestamp.digicert.com /td SHA256 'TwinConnect-Windows-x64-Setup.exe'
+            if ($LASTEXITCODE -ne 0) { throw 'Installer signing failed' }
+            & $signtool.FullName verify /pa /all 'TwinConnect-Windows-x64-Setup.exe'
+            if ($LASTEXITCODE -ne 0) { throw 'Installer Authenticode verification failed' }
+          } finally {
+            Remove-Item -LiteralPath $pfx -Force -ErrorAction SilentlyContinue
+          }
+      - name: Publish release integrity manifest
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $files = @('TwinConnect-Windows-x64-Setup.exe', 'TwinConnect-Windows-Preview.zip')
+          $files | ForEach-Object {
+            if (!(Test-Path $_)) { throw "Missing artifact: $_" }
+            $hash = (Get-FileHash $_ -Algorithm SHA256).Hash.ToLowerInvariant()
+            "$hash  $_"
+          } | Set-Content -Path 'TwinConnect-Windows-SHA256SUMS.txt' -Encoding ascii
+          $setup = Get-AuthenticodeSignature 'TwinConnect-Windows-x64-Setup.exe'
+          Write-Host "Setup Authenticode status: $($setup.Status)"
+          if ($env:SIGNING_CONFIGURED -eq 'true' -and $setup.Status -ne 'Valid') {
+            throw 'Signed build did not retain a valid installer signature'
+          }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TwinConnect-Windows-SHA256SUMS
+          path: clients/twinconnect/TwinConnect-Windows-SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 30
       - uses: actions/upload-artifact@v4
         with:
           name: TwinConnect-Windows-x64-Setup
