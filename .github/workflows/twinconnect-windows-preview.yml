@@ -71,6 +71,9 @@ jobs:
       - name: Exercise sing-box runtime with loopback-only synthetic proxy
         shell: pwsh
         run: ./tools/smoke_singbox_loopback_windows.ps1
+      - name: Verify actual TUN adapter creation without changing system routes
+        shell: pwsh
+        run: ./tools/smoke_singbox_tun_windows.ps1
       - name: Package portable ZIP and usage instructions
         shell: pwsh
         run: |
