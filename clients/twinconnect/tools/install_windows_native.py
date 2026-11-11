@@ -95,6 +95,12 @@ def install() -> None:
         } else if (call.method_name() == "openConnectStatus") {
           result->Success(flutter::EncodableValue(
               twinconnect_openconnect::Running()));
+        } else if (call.method_name() == "openConnectExitReason") {
+          // Reap the child so stderr is fully classified before responding.
+          const bool active = twinconnect_openconnect::Running();
+          result->Success(flutter::EncodableValue(active
+              ? std::string("CISCO_STILL_RUNNING")
+              : std::string(twinconnect_openconnect::FailureName())));
         } else if (call.method_name() == "stopOpenConnect") {
           if (!twinconnect_openconnect::Stop()) {
             result->Error("CISCO_GRACEFUL_DISCONNECT_FAILED");
