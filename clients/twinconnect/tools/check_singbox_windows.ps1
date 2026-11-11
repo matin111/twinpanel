@@ -22,6 +22,8 @@ foreach ($outbound in $profiles) {
     dns = @{
       servers = @(@{ type = 'udp'; tag = 'dns-remote'; server = '1.1.1.1'; server_port = 53; detour = 'proxy' })
       final = 'dns-remote'
+      cache_capacity = 4096
+      optimistic = $true
     }
     inbounds = @(@{
       type = 'tun'; tag = 'twinconnect-tun'; interface_name = 'TwinConnectSB'
