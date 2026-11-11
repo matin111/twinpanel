@@ -24,7 +24,14 @@ void main() {
     expect(routing['auto_detect_interface'], isTrue);
     expect(routing['final'], 'proxy');
     expect((outbounds.first as Map)['password'], 'private-test-key');
-    expect((dns['servers'] as List).single['detour'], 'proxy');
+    final servers = dns['servers'] as List;
+    expect(servers, hasLength(2));
+    expect((servers[0] as Map)['tag'], 'dns-bootstrap');
+    expect((servers[0] as Map)['type'], 'local');
+    expect((servers[0] as Map).containsKey('detour'), isFalse);
+    expect((servers[1] as Map)['detour'], 'proxy');
+    expect(dns['final'], 'dns-remote');
+    expect(routing['default_domain_resolver'], 'dns-bootstrap');
     expect(dns['cache_capacity'], 4096);
     expect(dns['optimistic'], isTrue);
     expect((item['outbound'] as Map).containsKey('tag'), isFalse);
