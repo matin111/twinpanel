@@ -193,7 +193,8 @@ class _TwinConnectHomeState extends State<TwinConnectHome> with WidgetsBindingOb
       // Save first, so a crash/restart retains the new credentials.
       await _sessionStore.save(
         username: username, sessionToken: tokens.sessionToken,
-        refreshToken: tokens.refreshToken, brand: brand);
+        refreshToken: tokens.refreshToken,
+        panelOrigin: panel.apiOrigin, brand: brand);
       if (!mounted || serial != _lookupSerial) return;
       setState(() {
         _confirmedSessionToken = tokens.sessionToken;
@@ -215,10 +216,34 @@ class _TwinConnectHomeState extends State<TwinConnectHome> with WidgetsBindingOb
       if (remembered != null) _username.text = remembered;
       final saved = await _sessionStore.read();
       if (saved == null) return;
-      final api = TenantApi.fromBuildConfig();
       final namespace = TenantIdentity.parseNamespace(saved.username, '');
       if (namespace != saved.brand.namespace) return;
-      final panel = await api.resolve(namespace);
+
+      // Restore the locally authenticated app shell immediately. Losing the
+      // network does not discard the user's secure-storage session; the
+      // backend still checks token validity before revealing any profiles.
+      PanelDirectoryEntry? panel;
+      if (saved.panelOrigin != null) {
+        panel = PanelDirectoryEntry(
+          namespace: namespace, apiOrigin: saved.panelOrigin!);
+        if (!mounted || serial != _lookupSerial) return;
+        setState(() {
+          _brand = saved.brand;
+          widget.onBrandChanged(saved.brand);
+          _confirmedPanel = panel;
+          _confirmedUsername = saved.username;
+          _confirmedSessionToken = saved.sessionToken;
+          _sessionRefreshToken = saved.refreshToken;
+        });
+      }
+
+      final api = TenantApi.fromBuildConfig();
+      try {
+        panel = await api.resolve(namespace);
+      } catch (_) {
+        if (panel == null) return;
+        // Use the last verified origin if the vendor directory is offline.
+      }
       var accessToken = saved.sessionToken;
       var refreshToken = saved.refreshToken;
       if (refreshToken != null) {
@@ -230,18 +255,27 @@ class _TwinConnectHomeState extends State<TwinConnectHome> with WidgetsBindingOb
         } on TenantApiException catch (error) {
           if (error.message == 'APP_LOGIN_INVALID' ||
               error.message == 'APP_NOT_AUTHORIZED') {
-            return; // Revoked credentials require a fresh sign-in.
+            // A definitive authorization denial requires authentication.
+            await _sessionStore.clearSession();
+            if (mounted && serial == _lookupSerial) {
+              setState(() {
+                _brand = null;
+                _confirmedPanel = null;
+                _confirmedUsername = null;
+                _confirmedSessionToken = null;
+                _sessionRefreshToken = null;
+                widget.onBrandChanged(null);
+              });
+            }
+            return;
           }
-          // A temporary network failure may still allow a valid access token.
         } catch (_) {
-          // Try the saved access token while the panel is reconnecting.
+          // Transient errors preserve the saved session.
         }
       }
-      // OS storage does not make a session valid: always revalidate
-      // with the owning panel before restoring an authenticated screen.
+      // Never fabricate account/server permissions from locally cached data.
       final catalog = await api.loadSessionProtocolCatalog(
-        panel: panel, sessionToken: accessToken,
-      );
+        panel: panel, sessionToken: accessToken);
       final native = await NativeVpnBridge.protocolReadiness();
       if (!mounted || serial != _lookupSerial) return;
       setState(() {
@@ -254,26 +288,18 @@ class _TwinConnectHomeState extends State<TwinConnectHome> with WidgetsBindingOb
         _catalog = catalog;
         _nativeProtocols = native;
       });
-      if (refreshToken != null && accessToken != saved.sessionToken) {
-        try {
-          await _sessionStore.save(username: saved.username,
-            sessionToken: accessToken, refreshToken: refreshToken,
-            brand: saved.brand);
-        } catch (_) {}
-      }
+      try {
+        await _sessionStore.save(username: saved.username,
+          sessionToken: accessToken, refreshToken: refreshToken,
+          panelOrigin: panel.apiOrigin, brand: saved.brand);
+      } catch (_) {}
       _startSessionRenewal();
       _refreshServers();
       _loadAccountPlan(panel, accessToken, serial);
       _loadAccountSnapshot(panel, accessToken, serial);
-    } on TenantApiException catch (error) {
-      if (error.message == 'APP_LOGIN_INVALID' ||
-          error.message == 'APP_NOT_AUTHORIZED') {
-        try { await _sessionStore.clearSession(); } catch (_) {}
-      }
     } catch (_) {
-      // An offline panel keeps the remembered username, not access.
-    } finally {
-      // No blocking splash: login stays responsive while secure storage is checked.
+      // Keep the offline app shell intact; user explicitly signs out.
+      // The panel continues to authorize every sensitive API operation.
     }
   }
 
@@ -402,7 +428,8 @@ class _TwinConnectHomeState extends State<TwinConnectHome> with WidgetsBindingOb
       try {
         await _sessionStore.save(username: username,
           sessionToken: loggedIn.sessionToken,
-          refreshToken: loggedIn.refreshToken, brand: brand);
+          refreshToken: loggedIn.refreshToken,
+          panelOrigin: panel.apiOrigin, brand: brand);
       } catch (_) {}
       _loadAccountPlan(panel, loggedIn.sessionToken, serial);
       _loadAccountSnapshot(panel, loggedIn.sessionToken, serial);
