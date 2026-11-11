@@ -13,6 +13,8 @@ class SingBoxWindowsConfig {
     required String protocol,
     required Map<String, dynamic> item,
     String? resolvedServer,
+    int? statsPort,
+    String? statsSecret,
   }) {
     final outbound = SingBoxProfileValidator.validateOutbound(
       protocolCode: protocol, item: item);
@@ -35,7 +37,19 @@ class SingBoxWindowsConfig {
       }
       serverOutbound['server'] = resolvedServer;
     }
+    if ((statsPort == null) != (statsSecret == null) ||
+        (statsPort != null && (statsPort < 1024 || statsPort > 65535 ||
+          statsSecret == null || statsSecret.length < 32))) {
+      throw const FormatException('SINGBOX_STATS_CONFIGURATION_INVALID');
+    }
     return {
+      if (statsPort != null)
+        'experimental': {
+          'clash_api': {
+            'external_controller': '127.0.0.1:$statsPort',
+            'secret': statsSecret,
+          },
+        },
       'log': {'level': 'error', 'timestamp': true},
       'dns': {
         'servers': [
