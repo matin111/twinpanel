@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -105,6 +107,19 @@ void main() {
     await tester.tap(find.byKey(const Key('devServer_0')));
     await tester.pump(const Duration(milliseconds: 800));
     expect(find.byKey(const Key('liveConnectionStatus')), findsWidgets);
+    // Regression: selecting Cisco must use the OpenConnect adapter, NEVER
+    // the sing-box protocol family (the original screenshot error).
+    if (Platform.isWindows) {
+      await tester.ensureVisible(
+          find.byKey(const Key('liveConnectionControlsButton')));
+      await tester.tap(find.byKey(const Key('liveConnectionControlsButton')));
+      await tester.pump(const Duration(milliseconds: 900));
+      expect(find.textContaining('SINGBOX_PROTOCOL_NOT_SUPPORTED'),
+          findsNothing);
+      // Flutter's Windows test runner does not have a bundled Cisco engine.
+      expect(find.textContaining('Bundled Cisco engine is not available.'),
+          findsOneWidget);
+    }
     // Allow any synthetic platform-channel readiness timeouts to settle.
     await tester.pump(const Duration(seconds: 12));
   });
