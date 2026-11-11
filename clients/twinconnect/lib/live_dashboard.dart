@@ -82,6 +82,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   late final WindowsSingBoxTunnel _modernTunnel = WindowsSingBoxTunnel(
     onUnexpectedExit: () {
       _modernHealthTimer?.cancel();
+      _stopModernTrafficMonitoring();
       if (!mounted) return;
       setState(() {
         _modernUp = false;
@@ -92,6 +93,10 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   );
   bool _modernUp = false;
   Timer? _modernHealthTimer;
+  Timer? _modernTrafficTimer;
+  bool _modernTrafficBusy = false;
+  int? _modernRx;
+  int? _modernTx;
   bool _modernHealthBusy = false;
   int _modernHealthFailures = 0;
   String? _modernProtocol;
@@ -350,6 +355,39 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   // Check the active route periodically without restarting a functioning
   // tunnel. Two consecutive failures flag degraded routing, but do not
   // override a user's selection or unexpectedly disconnect them.
+  void _stopModernTrafficMonitoring() {
+    _modernTrafficTimer?.cancel();
+    _modernTrafficTimer = null;
+    _modernRx = null;
+    _modernTx = null;
+  }
+
+  Future<void> _refreshModernTraffic() async {
+    if (!mounted || !_modernUp || _modernTrafficBusy) return;
+    _modernTrafficBusy = true;
+    try {
+      final totals = await _modernTunnel.readTrafficTotals();
+      if (!mounted || !_modernUp || totals == null) return;
+      if (_modernRx != totals.received || _modernTx != totals.sent) {
+        setState(() {
+          _modernRx = totals.received;
+          _modernTx = totals.sent;
+        });
+      }
+    } finally {
+      _modernTrafficBusy = false;
+    }
+  }
+
+  void _startModernTrafficMonitoring() {
+    _stopModernTrafficMonitoring();
+    if (!_modernUp) return;
+    _refreshModernTraffic();
+    _modernTrafficTimer = Timer.periodic(
+      const Duration(seconds: 2), (_) => _refreshModernTraffic(),
+    );
+  }
+
   void _startModernHealthMonitoring() {
     _modernHealthTimer?.cancel();
     _modernHealthFailures = 0;
@@ -436,6 +474,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       }
       if (_modernTunnel.isRunning) {
         _modernHealthTimer?.cancel();
+        _stopModernTrafficMonitoring();
         await _modernTunnel.stop();
         if (!mounted) return;
         setState(() {
@@ -453,6 +492,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         _publicIp = newIp;
         _vpnError = null;
       });
+      _startModernTrafficMonitoring();
       _startModernHealthMonitoring();
     } catch (error) {
       if (mounted) {
@@ -473,6 +513,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   Future<void> _stopModernTunnel() async {
     if (_vpnBusy) return;
     _modernHealthTimer?.cancel();
+    _stopModernTrafficMonitoring();
     setState(() { _vpnBusy = true; _vpnError = null; });
     try {
       await _modernTunnel.stop();
@@ -567,6 +608,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       if (!mounted) return;
 
       if (_modernTunnel.isRunning || _modernUp) {
+        _stopModernTrafficMonitoring();
         await _modernTunnel.stop();
         if (!mounted) return;
         setState(() {
@@ -625,6 +667,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   @override
   void dispose() {
     _modernHealthTimer?.cancel();
+    _stopModernTrafficMonitoring();
     _modernTunnel.dispose();
     _resetNetworkStats();
     super.dispose();
@@ -1213,7 +1256,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                   gradient: LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
-                    colors: _vpnVerified
+                    colors: (_vpnVerified || _modernUp)
                       ? const [Color(0xFF34E8BD), Color(0xFF0EADBA)]
                       : const [Color(0xFFC393FF), Color(0xFF7351E9)],
                   ),
@@ -1223,7 +1266,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: (_vpnVerified
+                      color: ((_vpnVerified || _modernUp)
                         ? const Color(0xFF29E4BD) : purple)
                         .withValues(alpha: 0.42),
                       blurRadius: 28, spreadRadius: 3,
@@ -1667,11 +1710,11 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           const SizedBox(height: 18),
           Row(children: [
             Expanded(child: metric(Icons.arrow_downward_rounded,
-              tr('دریافت', 'Received'), _vpnUp ? _formatTransferBytes(_vpnRx) : '—',
+              tr('دریافت', 'Received'), _modernUp ? (_modernRx == null ? '—' : _formatTransferBytes(_modernRx!)) : _vpnUp ? _formatTransferBytes(_vpnRx) : '—',
               detail: tr('مجموع رابط', 'Interface total'))),
             const SizedBox(width: 10),
             Expanded(child: metric(Icons.arrow_upward_rounded,
-              tr('ارسال', 'Sent'), _vpnUp ? _formatTransferBytes(_vpnTx) : '—',
+              tr('ارسال', 'Sent'), _modernUp ? (_modernTx == null ? '—' : _formatTransferBytes(_modernTx!)) : _vpnUp ? _formatTransferBytes(_vpnTx) : '—',
               detail: tr('مجموع رابط', 'Interface total'))),
           ]),
           const SizedBox(height: 25),
