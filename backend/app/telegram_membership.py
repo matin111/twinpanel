@@ -88,7 +88,7 @@ def membership_keyboard(config: MembershipConfig) -> InlineKeyboardMarkup:
             _button("📢 عضویت در کانال", url=config.join_url, style="primary")
         ])
     rows.append([
-        _button("✅ بررسی عضویت", callback_data="tpmember:check", style="success")
+        _button("بررسی عضویت", callback_data="tpmember:check")
     ])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
