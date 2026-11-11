@@ -429,6 +429,21 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
             ? await _ciscoTunnel.checkHealth()
             : await _modernTunnel.checkHealth();
         if (!mounted || !_modernUp || _vpnBusy) return;
+        // Losing the Cisco child or its verified egress must never leave
+        // an "online" badge visible for an unverified tunnel.
+        if (!healthy && _modernProtocol == 'cisco') {
+          _modernHealthFailures++;
+          if (!_ciscoTunnel.isRunning || _modernHealthFailures >= 2) {
+            _modernHealthTimer?.cancel();
+            setState(() {
+              _modernUp = false;
+              _publicIp = null;
+              _vpnError = _ciscoTunnel.isRunning
+                  ? 'CISCO_HEALTH_DEGRADED' : 'CISCO_PROCESS_EXITED';
+            });
+            return;
+          }
+        }
         if (healthy) {
           _modernHealthFailures = 0;
           if (_vpnError == 'SINGBOX_TUN_HEALTH_DEGRADED') {
@@ -523,7 +538,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     } catch (error) {
       if (mounted) {
         setState(() {
-          _modernUp = _ciscoTunnel.isRunning || _modernTunnel.isRunning;
+          _modernUp = (_ciscoTunnel.isRunning &&
+                  _ciscoTunnel.exitIp != null) || _modernTunnel.isRunning;
           if (!_modernUp) {
             _modernProtocol = null;
             _modernNodeId = null;
@@ -659,7 +675,17 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         _publicIp = null;
       });
     } catch (error) {
-      if (mounted) setState(() => _vpnError = _errorText(error));
+      if (mounted) {
+        setState(() {
+          if (_modernProtocol == 'cisco' && !_ciscoTunnel.isRunning) {
+            _modernUp = false;
+            _publicIp = null;
+            _modernNodeId = null;
+            _modernProtocol = null;
+          }
+          _vpnError = _errorText(error);
+        });
+      }
     } finally {
       if (mounted) setState(() => _vpnBusy = false);
     }
