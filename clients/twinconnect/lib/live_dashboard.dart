@@ -1725,6 +1725,21 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
               'CISCO_PROCESS_EXITED' => tr(
                 'موتور Cisco/OpenConnect قبل از تأیید اتصال بسته شد.',
                 'Cisco/OpenConnect exited before the connection was verified.'),
+              'CISCO_CERTIFICATE_UNTRUSTED' => tr(
+                'گواهی TLS سرور سیسکو تأیید نشد؛ اتصال برای امنیت متوقف شد.',
+                'Cisco server TLS certificate was not trusted; connection stopped safely.'),
+              'CISCO_AUTHENTICATION_FAILED' => tr(
+                'سرور سیسکو نام کاربری یا رمز عبور را نپذیرفت.',
+                'Cisco server rejected the account credentials.'),
+              'CISCO_ROUTE_SCRIPT_FAILED' => tr(
+                'اسکریپت تنظیم شبکه OpenConnect در ویندوز خطا داد.',
+                'OpenConnect Windows route/DNS script failed.'),
+              'CISCO_TAP_ADAPTER_FAILED' => tr(
+                'راه‌اندازی آداپتور مجازی OpenConnect در ویندوز ناموفق بود.',
+                'OpenConnect virtual network adapter failed to initialize.'),
+              'CISCO_GATEWAY_UNREACHABLE' => tr(
+                'ارتباط با درگاه سیسکو برقرار نشد.',
+                'Cisco gateway could not be reached.'),
               'CISCO_EGRESS_NOT_VERIFIED' => tr(
                 'اتصال سیسکو تأیید نشد؛ ترافیک اینترنت از تونل عبور نکرد.',
                 'Cisco connection was not verified: internet traffic did not use the tunnel.'),
