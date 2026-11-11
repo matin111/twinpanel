@@ -54,6 +54,15 @@ void main() {
     }), throwsFormatException);
   });
 
+  test('uses a verified certificate fingerprint provided by the panel', () {
+    final profile = CiscoOpenConnectProfile.fromItem({
+      'host': 'vpn.example.org', 'username': 'customer',
+      'password': 'secret',
+      'certificate_fingerprint': 'sha256:${'b' * 64}',
+    });
+    expect(profile.serverCertificate, 'sha256:${'b' * 64}');
+  });
+
   test('certificate pin is validated rather than silently ignored', () {
     expect(() => CiscoOpenConnectProfile.fromItem({
       'host': 'vpn.example.org', 'username': 'customer',
