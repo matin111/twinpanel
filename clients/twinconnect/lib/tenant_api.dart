@@ -38,6 +38,17 @@ class TenantApi {
     return entry;
   }
 
+  Future<AppRefreshTokens> refreshSession({
+    required PanelDirectoryEntry panel,
+    required String refreshToken,
+  }) async {
+    final data = await _requestJson(
+      panel.apiOrigin.resolve('/v1/central-app/session/refresh'),
+      payload: {'refresh_token': refreshToken},
+    );
+    return AppRefreshTokens.fromJson(data);
+  }
+
   /// Dedicated app login: the vendor sees only a namespace, never a
   /// username/password. Credentials are posted directly to the owning panel.
   Future<AppLoginSession> login({
@@ -307,11 +318,32 @@ class TenantApiException implements Exception {
   String toString() => message;
 }
 
+class AppRefreshTokens {
+  const AppRefreshTokens({
+    required this.sessionToken,
+    required this.refreshToken,
+  });
+
+  final String sessionToken;
+  final String refreshToken;
+
+  factory AppRefreshTokens.fromJson(Map<String, dynamic> data) {
+    final token = data['session_token'];
+    final refresh = data['refresh_token'];
+    if (token is! String || token.length < 40 ||
+        refresh is! String || refresh.length < 40) {
+      throw const FormatException('INVALID_SESSION_REFRESH_RESPONSE');
+    }
+    return AppRefreshTokens(sessionToken: token, refreshToken: refresh);
+  }
+}
+
 class AppLoginSession {
   const AppLoginSession({
     required this.namespace,
     required this.sessionToken,
     required this.brand,
+    this.refreshToken,
   });
 
   final String namespace;
@@ -332,6 +364,7 @@ class AppLoginSession {
     return AppLoginSession(
       namespace: namespace.toUpperCase(),
       sessionToken: token,
+      refreshToken: data['refresh_token'] is String ? data['refresh_token'] as String : null,
       brand: BrandPreview.fromJson(brand),
     );
   }
