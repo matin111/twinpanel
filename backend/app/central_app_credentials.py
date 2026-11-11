@@ -223,16 +223,55 @@ def authenticate_app(db: Session, username: str, password: str) -> tuple[Subscri
     row.failed_attempts = 0
     row.locked_until = None
     db.commit()
+    return sub, _issue_session_token(sub.id, row.revision)
+
+
+def _issue_session_token(subscription_id: int, revision: int) -> str:
     expiry = datetime.now(timezone.utc) + timedelta(minutes=30)
-    scope = installation_namespace(ensure_installation_id())
-    session = jwt.encode({
+    return jwt.encode({
         "purpose": _APP_PURPOSE,
-        "sid": int(sub.id),
-        "revision": int(row.revision),
-        "namespace": scope,
+        "sid": int(subscription_id),
+        "revision": int(revision),
+        "namespace": installation_namespace(ensure_installation_id()),
         "exp": expiry,
     }, settings.app_secret_key, algorithm="HS256")
-    return sub, session
+
+
+def issue_app_refresh_token(db: Session, sub: Subscription) -> str:
+    """A revocable renewable credential; never authorizes config delivery."""
+    row = db.get(SubscriptionAppCredential, int(sub.id))
+    if row is None:
+        raise HTTPException(status_code=401, detail="APP_SESSION_REVOKED")
+    expiry = datetime.now(timezone.utc) + timedelta(days=30)
+    return jwt.encode({
+        "purpose": "twinconnect-refresh-v1",
+        "sid": int(sub.id),
+        "revision": int(row.revision),
+        "namespace": installation_namespace(ensure_installation_id()),
+        "exp": expiry,
+    }, settings.app_secret_key, algorithm="HS256")
+
+
+def renew_app_session(db: Session, refresh_token: str) -> tuple[Subscription, str, str]:
+    _check_app_entitlement()
+    try:
+        payload = jwt.decode(refresh_token, settings.app_secret_key,
+                             algorithms=["HS256"])
+        if (payload.get("purpose") != "twinconnect-refresh-v1"
+                or payload.get("namespace") !=
+                installation_namespace(ensure_installation_id())):
+            raise ValueError("invalid_refresh_scope")
+        sid = int(payload["sid"])
+        revision = int(payload["revision"])
+    except (JWTError, ValueError, KeyError, TypeError):
+        raise HTTPException(status_code=401, detail="APP_REFRESH_INVALID") from None
+    row = db.get(SubscriptionAppCredential, sid)
+    if row is None or int(row.revision) != revision:
+        raise HTTPException(status_code=401, detail="APP_SESSION_REVOKED")
+    sub = _active_subscription(db, sid)
+    if int(row.reseller_id) != _current_reseller_id(db, sid):
+        raise HTTPException(status_code=401, detail="APP_OWNER_CHANGED")
+    return sub, _issue_session_token(sid, revision), issue_app_refresh_token(db, sub)
 
 
 def verify_app_session(db: Session, token: str) -> Subscription:
