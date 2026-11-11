@@ -1297,6 +1297,12 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
               'SINGBOX_TUN_CONFIG_INVALID' => tr(
                 'کانفیگ این پروتکل برای موتور ویندوز معتبر نیست.',
                 'This protocol configuration was rejected by the Windows engine.'),
+              'SINGBOX_TUN_ADAPTER_DOWN' => tr(
+                'آداپتور مجازی ساخته شده ولی فعال نشده است؛ درایور TUN را بررسی کنید.',
+                'TUN adapter exists but is not up; inspect the TUN driver.'),
+              'SINGBOX_TUN_NATIVE_INSPECTION_FAILED' => tr(
+                'ویندوز اجازه بررسی مستقیم وضعیت آداپتور را نداد؛ آزمایش مسیر اینترنت ادامه دارد.',
+                'Windows native adapter inspection unavailable; internet route testing continues.'),
               'SINGBOX_TUN_ADAPTER_MISSING' => tr(
                 'آداپتور TwinConnectSB ساخته نشد؛ درایور یا مجوز ویندوز را بررسی کنید.',
                 'TwinConnectSB adapter was not created; check Windows driver and permissions.'),
