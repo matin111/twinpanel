@@ -36,7 +36,9 @@ void main() {
     expect(dns['final'], 'dns-remote');
     expect(routing['default_domain_resolver'], 'dns-bootstrap');
     expect(dns['cache_capacity'], 4096);
-    expect(dns['optimistic'], isTrue);
+    expect(dns['optimistic'], isFalse);
+    expect(((routing['rules'] as List).first as Map)['action'], 'hijack-dns');
+    expect(((routing['rules'] as List).first as Map)['protocol'], 'dns');
     expect((item['outbound'] as Map).containsKey('tag'), isFalse);
   });
 
@@ -56,6 +58,7 @@ void main() {
     expect(outbound['server'], '203.0.113.15');
     expect((outbound['tls'] as Map)['server_name'], 'vpn.example.org');
     expect((config['route'] as Map)['auto_detect_interface'], isTrue);
+    expect((config['route'] as Map)['default_domain_resolver'], 'dns-remote');
     expect(() => SingBoxWindowsConfig.compose(
       protocol: 'hysteria2', item: item, resolvedServer: 'not-an-ip'),
       throwsFormatException);
@@ -68,6 +71,23 @@ void main() {
     expect(outbound['server'], '203.0.113.20');
     expect((outbound['tls'] as Map)['server_name'], 'vpn.example.org');
     expect((item['outbound'] as Map)['server'], 'vpn.example.org');
+  });
+
+
+  test('literal IP needs no local DNS resolver for TUN operation', () {
+    final config = SingBoxWindowsConfig.compose(
+      protocol: 'hysteria2',
+      item: {
+        'outbound': {
+          'type': 'hysteria2', 'server': '203.0.113.20',
+          'server_port': 443, 'password': 'private-test-key',
+          'tls': {'enabled': true, 'server_name': 'vpn.example.org'},
+        },
+      },
+    );
+    expect((config['route'] as Map)['default_domain_resolver'], 'dns-remote');
+    expect(((config['outbounds'] as List).single as Map)['server'],
+        '203.0.113.20');
   });
 
   test('rejects a wrong or unstructured outbound without fallbacks', () {
