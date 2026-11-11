@@ -20,7 +20,10 @@ foreach ($outbound in $profiles) {
   $sample = @{
     log = @{ level = 'error'; timestamp = $true }
     dns = @{
-      servers = @(@{ type = 'udp'; tag = 'dns-remote'; server = '1.1.1.1'; server_port = 53; detour = 'proxy' })
+      servers = @(
+        @{ type = 'local'; tag = 'dns-bootstrap' }
+        @{ type = 'udp'; tag = 'dns-remote'; server = '1.1.1.1'; server_port = 53; detour = 'proxy' }
+      )
       final = 'dns-remote'
       cache_capacity = 4096
       optimistic = $true
@@ -31,7 +34,7 @@ foreach ($outbound in $profiles) {
       mtu = 1400; auto_route = $true; strict_route = $true; dns_mode = 'hijack'
     })
     outbounds = @($outbound)
-    route = @{ auto_detect_interface = $true; final = 'proxy'; rules = @(@{ action = 'sniff' }) }
+    route = @{ auto_detect_interface = $true; default_domain_resolver = 'dns-bootstrap'; final = 'proxy'; rules = @(@{ action = 'sniff' }) }
   }
   $json = $sample | ConvertTo-Json -Depth 30
   $json | & $engine check -c stdin
