@@ -25,6 +25,8 @@ void main() {
     expect(routing['final'], 'proxy');
     expect((outbounds.first as Map)['password'], 'private-test-key');
     expect((dns['servers'] as List).single['detour'], 'proxy');
+    expect(dns['cache_capacity'], 4096);
+    expect(dns['optimistic'], isTrue);
     expect((item['outbound'] as Map).containsKey('tag'), isFalse);
   });
 
