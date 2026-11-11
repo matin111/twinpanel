@@ -47,7 +47,7 @@ class _TwinConnectGlassCardState extends State<TwinConnectGlassCard> {
         child: ClipRRect(
           borderRadius: radius,
           child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 240),
               curve: Curves.easeOutCubic,
@@ -56,7 +56,7 @@ class _TwinConnectGlassCardState extends State<TwinConnectGlassCard> {
                 color: (bright
                         ? const Color(0xFF273753)
                         : const Color(0xFFFFFFFF))
-                    .withValues(alpha: bright ? .67 : .83),
+                    .withValues(alpha: bright ? .34 : .52),
                 borderRadius: radius,
                 border: Border.all(
                   color: active
@@ -75,21 +75,21 @@ class _TwinConnectGlassCardState extends State<TwinConnectGlassCard> {
                         : (bright
                                 ? const Color(0xFF5E7092)
                                 : const Color(0xFFFFFFFF))
-                            .withValues(alpha: bright ? .22 : .94),
+                            .withValues(alpha: bright ? .13 : .52),
                     (bright
                             ? const Color(0xFF24324B)
                             : const Color(0xFFF9F8FF))
-                        .withValues(alpha: bright ? .68 : .78),
+                        .withValues(alpha: bright ? .32 : .50),
                     (bright
                             ? const Color(0xFF19243C)
                             : const Color(0xFFEDEBFA))
-                        .withValues(alpha: bright ? .72 : .65),
+                        .withValues(alpha: bright ? .38 : .44),
                   ],
                 ),
                 boxShadow: [
                   BoxShadow(
                     color: (active ? _accent : Colors.black).withValues(
-                      alpha: active ? .15 : (bright ? .10 : .04)),
+                      alpha: active ? .11 : (bright ? .06 : .03)),
                     blurRadius: active ? 28 : 15,
                     offset: const Offset(0, 8),
                   ),
