@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -124,7 +126,7 @@ class TwinConnectHome extends StatefulWidget {
   State<TwinConnectHome> createState() => _TwinConnectHomeState();
 }
 
-class _TwinConnectHomeState extends State<TwinConnectHome> {
+class _TwinConnectHomeState extends State<TwinConnectHome> with WidgetsBindingObserver {
   final _formKey = GlobalKey<FormState>();
   final _username = TextEditingController();
   final _password = TextEditingController();
@@ -140,6 +142,9 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
   PanelDirectoryEntry? _confirmedPanel;
   String? _confirmedUsername;
   String? _confirmedSessionToken;
+  String? _sessionRefreshToken;
+  Timer? _sessionRefreshTimer;
+  bool _renewingSession = false;
   PanelProtocolCatalog? _catalog;
   AppServerInventory? _servers;
   bool _refreshingServers = false;
@@ -152,7 +157,54 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _restoreSession();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_renewSession());
+    }
+  }
+
+  void _startSessionRenewal() {
+    _sessionRefreshTimer?.cancel();
+    if (_sessionRefreshToken == null) return;
+    // Access JWT expires after 30 min. Renew proactively, and on app resume.
+    _sessionRefreshTimer = Timer.periodic(
+      const Duration(minutes: 15), (_) => unawaited(_renewSession()),
+    );
+  }
+
+  Future<void> _renewSession() async {
+    if (_renewingSession) return;
+    final panel = _confirmedPanel;
+    final username = _confirmedUsername;
+    final refresh = _sessionRefreshToken;
+    final brand = _brand;
+    if (panel == null || username == null || refresh == null || brand == null) return;
+    final serial = _lookupSerial;
+    _renewingSession = true;
+    try {
+      final tokens = await TenantApi.fromBuildConfig().refreshSession(
+        panel: panel, refreshToken: refresh);
+      if (!mounted || serial != _lookupSerial) return;
+      // Save first, so a crash/restart retains the new credentials.
+      await _sessionStore.save(
+        username: username, sessionToken: tokens.sessionToken,
+        refreshToken: tokens.refreshToken, brand: brand);
+      if (!mounted || serial != _lookupSerial) return;
+      setState(() {
+        _confirmedSessionToken = tokens.sessionToken;
+        _sessionRefreshToken = tokens.refreshToken;
+      });
+    } catch (_) {
+      // Offline/temporarily unavailable panel NEVER signs out the user.
+      // A revoked or expired account remains server-side unauthorized.
+    } finally {
+      _renewingSession = false;
+    }
   }
 
   Future<void> _restoreSession() async {
@@ -167,10 +219,28 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
       final namespace = TenantIdentity.parseNamespace(saved.username, '');
       if (namespace != saved.brand.namespace) return;
       final panel = await api.resolve(namespace);
+      var accessToken = saved.sessionToken;
+      var refreshToken = saved.refreshToken;
+      if (refreshToken != null) {
+        try {
+          final renewed = await api.refreshSession(
+            panel: panel, refreshToken: refreshToken);
+          accessToken = renewed.sessionToken;
+          refreshToken = renewed.refreshToken;
+        } on TenantApiException catch (error) {
+          if (error.message == 'APP_LOGIN_INVALID' ||
+              error.message == 'APP_NOT_AUTHORIZED') {
+            return; // Revoked credentials require a fresh sign-in.
+          }
+          // A temporary network failure may still allow a valid access token.
+        } catch (_) {
+          // Try the saved access token while the panel is reconnecting.
+        }
+      }
       // OS storage does not make a session valid: always revalidate
       // with the owning panel before restoring an authenticated screen.
       final catalog = await api.loadSessionProtocolCatalog(
-        panel: panel, sessionToken: saved.sessionToken,
+        panel: panel, sessionToken: accessToken,
       );
       final native = await NativeVpnBridge.protocolReadiness();
       if (!mounted || serial != _lookupSerial) return;
@@ -179,13 +249,22 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
         widget.onBrandChanged(saved.brand);
         _confirmedPanel = panel;
         _confirmedUsername = saved.username;
-        _confirmedSessionToken = saved.sessionToken;
+        _confirmedSessionToken = accessToken;
+        _sessionRefreshToken = refreshToken;
         _catalog = catalog;
         _nativeProtocols = native;
       });
+      if (refreshToken != null && accessToken != saved.sessionToken) {
+        try {
+          await _sessionStore.save(username: saved.username,
+            sessionToken: accessToken, refreshToken: refreshToken,
+            brand: saved.brand);
+        } catch (_) {}
+      }
+      _startSessionRenewal();
       _refreshServers();
-      _loadAccountPlan(panel, saved.sessionToken, serial);
-      _loadAccountSnapshot(panel, saved.sessionToken, serial);
+      _loadAccountPlan(panel, accessToken, serial);
+      _loadAccountSnapshot(panel, accessToken, serial);
     } on TenantApiException catch (error) {
       if (error.message == 'APP_LOGIN_INVALID' ||
           error.message == 'APP_NOT_AUTHORIZED') {
@@ -235,6 +314,7 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
     // Invalidate stale account / inventory requests immediately, then
     // erase the OS-protected session before displaying the login screen.
     ++_lookupSerial;
+    _sessionRefreshTimer?.cancel();
     try {
       await _sessionStore.clearSession();
     } catch (_) {
@@ -251,6 +331,7 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
       _confirmedPanel = null;
       _confirmedUsername = null;
       _confirmedSessionToken = null;
+      _sessionRefreshToken = null;
       _catalog = null;
       _servers = null;
       _plan = null;
@@ -265,6 +346,8 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
 
   @override
   void dispose() {
+    _sessionRefreshTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
     _username.dispose();
     _password.dispose();
     super.dispose();
@@ -312,11 +395,14 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
         _confirmedPanel = panel;
         _confirmedUsername = username;
         _confirmedSessionToken = loggedIn.sessionToken;
+        _sessionRefreshToken = loggedIn.refreshToken;
       });
+      _startSessionRenewal();
       // Persist only in OS secure storage; invalid sessions must reauthenticate.
       try {
         await _sessionStore.save(username: username,
-          sessionToken: loggedIn.sessionToken, brand: brand);
+          sessionToken: loggedIn.sessionToken,
+          refreshToken: loggedIn.refreshToken, brand: brand);
       } catch (_) {}
       _loadAccountPlan(panel, loggedIn.sessionToken, serial);
       _loadAccountSnapshot(panel, loggedIn.sessionToken, serial);
@@ -631,20 +717,7 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
             )),
             const SizedBox(height: 12),
             OutlinedButton.icon(
-              onPressed: () {
-                ++_lookupSerial;
-                setState(() {
-                  _brand = null;
-                  _confirmedPanel = null;
-                  _confirmedUsername = null;
-                  _confirmedSessionToken = null;
-                  _catalog = null;
-                  _servers = null;
-                  _dashboardTab = 0;
-                  _errorCode = null;
-                  widget.onBrandChanged(null);
-                });
-              },
+              onPressed: _signOutSafely,
               icon: const Icon(Icons.logout_rounded),
               label: Text(strings.pick('خروج از حساب', 'Sign out')),
             ),
