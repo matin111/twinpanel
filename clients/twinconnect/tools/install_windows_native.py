@@ -14,6 +14,8 @@ NATIVE = ROOT / "native" / "windows" / "twinconnect_wireguard.h"
 INSTALLED = ROOT / "windows" / "runner" / "twinconnect_wireguard.h"
 SINGBOX_GUARD = ROOT / "native" / "windows" / "twinconnect_singbox_guard.h"
 SINGBOX_INSTALLED = ROOT / "windows" / "runner" / "twinconnect_singbox_guard.h"
+TUN_INSPECT = ROOT / "native" / "windows" / "twinconnect_tun_inspect.h"
+TUN_INSTALLED = ROOT / "windows" / "runner" / "twinconnect_tun_inspect.h"
 
 HEADER_MARKER = "  std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> vpn_channel_;"
 CPP_MARKER = "  // TwinConnect: fail-closed Windows native capability handshake."
@@ -33,6 +35,9 @@ def install() -> None:
     if not SINGBOX_GUARD.is_file():
         raise RuntimeError("Missing sing-box process guard header")
     shutil.copyfile(SINGBOX_GUARD, SINGBOX_INSTALLED)
+    if not TUN_INSPECT.is_file():
+        raise RuntimeError('Missing Windows TUN inspection header')
+    shutil.copyfile(TUN_INSPECT, TUN_INSTALLED)
 
     header = HEADER.read_text(encoding="utf-8-sig")
     cpp = SOURCE.read_text(encoding="utf-8-sig")
@@ -57,7 +62,8 @@ def install() -> None:
             '#include "flutter_window.h"\n'
             '#include <flutter/standard_method_codec.h>\n'
             '#include "twinconnect_wireguard.h"\n'
-            '#include "twinconnect_singbox_guard.h"',
+            '#include "twinconnect_singbox_guard.h"\n'
+            '#include "twinconnect_tun_inspect.h"',
         )
         injection = """  // TwinConnect: fail-closed Windows native capability handshake.
   vpn_channel_ = std::make_unique<
@@ -95,6 +101,8 @@ def install() -> None:
             return;
           }
           result->Success(flutter::EncodableValue(true));
+        } else if (call.method_name() == "inspectSingBoxTun") {
+          result->Success(twinconnect_tun_inspect::Inspect());
         } else if (call.method_name() == "getCapabilities") {
           result->Success(twinconnect_wireguard::Capabilities());
         } else if (call.method_name() == "getProtocolCapabilities") {
