@@ -121,6 +121,27 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
 
   final Map<String, int?> _nodePings = {};
   final Map<String, String> _nodePingErrors = {};
+  // Group headers are collapsed by default. Keep expansion state per country,
+  // not per server, so refreshed inventories never make the list jump around.
+  final Set<String> _expandedCountries = {};
+  static const Map<String, String> _countryNamesFa = {
+    'DE': 'آلمان', 'TR': 'ترکیه', 'US': 'آمریکا', 'FR': 'فرانسه',
+    'GB': 'انگلیس', 'UK': 'انگلیس', 'NL': 'هلند', 'FI': 'فنلاند',
+    'IR': 'ایران', 'CA': 'کانادا', 'SE': 'سوئد', 'CH': 'سوئیس',
+    'AT': 'اتریش', 'IT': 'ایتالیا', 'ES': 'اسپانیا', 'RU': 'روسیه',
+  };
+  static const Map<String, String> _countryNamesEn = {
+    'DE': 'Germany', 'TR': 'Turkey', 'US': 'United States',
+    'FR': 'France', 'GB': 'United Kingdom', 'UK': 'United Kingdom',
+    'NL': 'Netherlands', 'FI': 'Finland', 'IR': 'Iran',
+    'CA': 'Canada', 'SE': 'Sweden', 'CH': 'Switzerland',
+    'AT': 'Austria', 'IT': 'Italy', 'ES': 'Spain', 'RU': 'Russia',
+  };
+  String _countryLabel(String code) {
+    final normalized = code.trim().toUpperCase();
+    return (_persian ? _countryNamesFa : _countryNamesEn)[normalized]
+        ?? normalized;
+  }
   final Set<String> _pingingNodes = {};
   bool _pingAllBusy = false;
   bool _statusRefreshing = false;
@@ -1562,12 +1583,90 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     );
 
     Widget locations() {
+      final query = _search.trim().toLowerCase();
       final matching = <int>[
         for (int i = 0; i < demoServers.length; i++)
-          if ('${demoServers[i].country} ${demoServers[i].city}'
-                .toLowerCase().contains(_search.toLowerCase()))
+          if (query.isEmpty ||
+              ('${demoServers[i].country} ${demoServers[i].city} '
+               '${_countryLabel(demoServers[i].flag)}')
+                .toLowerCase().contains(query))
             i,
       ];
+      final grouped = <String, List<int>>{};
+      for (final i in matching) {
+        final country = demoServers[i].flag.trim().toUpperCase();
+        grouped.putIfAbsent(country, () => <int>[]).add(i);
+      }
+      Widget countryGroup(String country, List<int> indices) {
+        final opened = query.isNotEmpty || _expandedCountries.contains(country);
+        final connectedInGroup = indices.any((i) {
+          final id = widget.servers?.servers[i].id;
+          return (_vpnUp && _activeNodeId == id) ||
+              (_modernUp && _modernNodeId == id);
+        });
+        return Padding(
+          key: Key('countryGroup_$country'),
+          padding: const EdgeInsets.only(bottom: 10),
+          child: glassCard(
+            radius: 17,
+            child: Column(children: [
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  key: Key('countryToggle_$country'),
+                  borderRadius: BorderRadius.circular(16),
+                  onTap: () => setState(() {
+                    if (!_expandedCountries.add(country)) {
+                      _expandedCountries.remove(country);
+                    }
+                  }),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 15, vertical: 15),
+                    child: Row(children: [
+                      CountryFlag(country, width: 30),
+                      const SizedBox(width: 12),
+                      Expanded(child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          txt(_countryLabel(country), bold: true, size: 14),
+                          const SizedBox(height: 3),
+                          txt(tr('${indices.length} سرور', '${indices.length} servers'),
+                              size: 11, color: sub),
+                        ],
+                      )),
+                      if (connectedInGroup)
+                        Icon(Icons.verified_rounded,
+                            color: const Color(0xFF32D5A5), size: 20),
+                      const SizedBox(width: 10),
+                      AnimatedRotation(
+                        turns: opened ? .5 : 0,
+                        duration: const Duration(milliseconds: 230),
+                        child: Icon(Icons.keyboard_arrow_down_rounded,
+                            color: sub, size: 25),
+                      ),
+                    ]),
+                  ),
+                ),
+              ),
+              AnimatedSize(
+                duration: const Duration(milliseconds: 260),
+                curve: Curves.easeInOutCubic,
+                alignment: Alignment.topCenter,
+                child: opened
+                    ? Padding(
+                        padding: const EdgeInsets.fromLTRB(9, 0, 9, 7),
+                        child: Column(children: [
+                          Divider(color: line),
+                          for (final i in indices) serverRow(i),
+                        ]),
+                      )
+                    : const SizedBox(width: double.infinity),
+              ),
+            ]),
+          ),
+        );
+      }
       return glassCard(
         key: const Key('devLocationListingCard'),
         radius: 23,
@@ -1611,7 +1710,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           const SizedBox(height: 13),
           filters(),
           const SizedBox(height: 12),
-          for (final i in matching) serverRow(i),
+          for (final country in grouped.keys)
+            countryGroup(country, grouped[country]!),
           if (widget.serverRefreshError != null)
             Padding(
               padding: const EdgeInsets.all(18),
