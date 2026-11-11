@@ -34,6 +34,11 @@ void main() {
     expect((servers[1] as Map)['server_port'], 443);
     expect((servers[1] as Map)['path'], '/dns-query');
     expect(dns['final'], 'dns-remote');
+    expect(dns['strategy'], 'ipv4_only');
+    final rules = (routing['rules'] as List);
+    expect((rules[0] as Map)['action'], 'hijack-dns');
+    expect((rules[1] as Map)['ip_version'], 6);
+    expect((rules[1] as Map)['action'], 'reject');
     expect(routing['default_domain_resolver'], 'dns-bootstrap');
     expect(dns['cache_capacity'], 4096);
     expect(dns['optimistic'], isFalse);
