@@ -7,12 +7,77 @@
 #include <string>
 #include <cstdint>
 #include <algorithm>
+#include <cctype>
 
 namespace twinconnect_openconnect {
 
 inline HANDLE& Child() { static HANDLE process = nullptr; return process; }
 inline DWORD& Pid() { static DWORD pid = 0; return pid; }
 inline bool& ConsoleReady() { static bool ready = false; return ready; }
+inline HANDLE& Reader() { static HANDLE reader = nullptr; return reader; }
+// No raw OpenConnect output is ever persisted or returned to Dart.
+// Only these coarse classifications can cross the native boundary.
+inline volatile LONG& Failure() { static volatile LONG category = 0; return category; }
+enum FailureCode : LONG {
+  kUnknown = 0, kCertificate = 1, kAuthentication = 2,
+  kRouteScript = 3, kAdapter = 4, kGateway = 5
+};
+inline void Classify(const std::string& data) {
+  std::string lower(data);
+  std::transform(lower.begin(), lower.end(), lower.begin(),
+      [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+  auto has = [&](const char* needle) {
+    return lower.find(needle) != std::string::npos;
+  };
+  LONG reason = kUnknown;
+  if (has("certificate verify failed") || has("server certificate verify failed") ||
+      has("untrusted certificate") || has("certificate validation failed") ||
+      has("server certificate is invalid") || has("certificate has changed")) {
+    reason = kCertificate;
+  } else if (has("authentication failed") || has("login failed") ||
+             has("invalid password") || has("password incorrect") ||
+             has("failed to obtain cookie") || has("authentication error")) {
+    reason = kAuthentication;
+  } else if (has("failed to spawn script") || has("script returned error") ||
+             has("script did not complete") || has("script failed") ||
+             has("cscript") || has("vpnc-script") && has("error")) {
+    reason = kRouteScript;
+  } else if (has("failed to open tun") || has("tap-windows") ||
+             has("tun device") && has("failed") ||
+             has("could not open tun")) {
+    reason = kAdapter;
+  } else if (has("connection refused") || has("could not connect") ||
+             has("failed to connect") || has("name resolution failed") ||
+             has("network is unreachable")) {
+    reason = kGateway;
+  }
+  if (reason != kUnknown) InterlockedExchange(&Failure(), reason);
+}
+inline DWORD WINAPI ConsumeErrors(LPVOID context) {
+  HANDLE pipe = static_cast<HANDLE>(context);
+  char buffer[2048];
+  std::string trailing;
+  DWORD read = 0;
+  while (ReadFile(pipe, buffer, sizeof(buffer), &read, nullptr) && read) {
+    // A short rolling window handles messages split across pipe reads.
+    // It exists only inside this worker and is never logged or sent to Flutter.
+    const std::string joined = trailing + std::string(buffer, read);
+    Classify(joined);
+    trailing = joined.substr(joined.size() > 160 ? joined.size() - 160 : 0);
+  }
+  CloseHandle(pipe);
+  return 0;
+}
+inline const char* FailureName() {
+  switch (InterlockedCompareExchange(&Failure(), 0, 0)) {
+    case kCertificate: return "CISCO_CERTIFICATE_UNTRUSTED";
+    case kAuthentication: return "CISCO_AUTHENTICATION_FAILED";
+    case kRouteScript: return "CISCO_ROUTE_SCRIPT_FAILED";
+    case kAdapter: return "CISCO_TAP_ADAPTER_FAILED";
+    case kGateway: return "CISCO_GATEWAY_UNREACHABLE";
+    default: return "CISCO_PROCESS_EXITED";
+  }
+}
 
 inline std::wstring FromUtf8(const std::string& utf8) {
   if (utf8.empty()) return {};
@@ -100,6 +165,11 @@ inline bool Running() {
   CloseHandle(process);
   process = nullptr;
   Pid() = 0;
+  if (Reader()) {
+    WaitForSingleObject(Reader(), 1500);
+    CloseHandle(Reader());
+    Reader() = nullptr;
+  }
   return false;
 }
 
@@ -136,13 +206,23 @@ inline bool Start(const std::string& executableUtf8,
     CloseHandle(inputRead); CloseHandle(inputWrite);
     return false;
   }
+  HANDLE errorRead = nullptr, errorWrite = nullptr;
+  if (!CreatePipe(&errorRead, &errorWrite, &sa, 0) ||
+      !SetHandleInformation(errorRead, HANDLE_FLAG_INHERIT, 0)) {
+    if (errorRead) CloseHandle(errorRead);
+    if (errorWrite) CloseHandle(errorWrite);
+    CloseHandle(inputRead); CloseHandle(inputWrite);
+    return false;
+  }
   HANDLE logNull = CreateFileW(L"NUL", GENERIC_WRITE,
       FILE_SHARE_READ | FILE_SHARE_WRITE, &sa, OPEN_EXISTING,
       FILE_ATTRIBUTE_NORMAL, nullptr);
   if (logNull == INVALID_HANDLE_VALUE) {
     CloseHandle(inputRead); CloseHandle(inputWrite);
+    CloseHandle(errorRead); CloseHandle(errorWrite);
     return false;
   }
+  InterlockedExchange(&Failure(), kUnknown);
   std::wstring command = Quote(executable) +
       L" --protocol=anyconnect --non-inter --passwd-on-stdin --no-proxy" +
       L" --user=" + Quote(FromUtf8(user)) +
@@ -157,7 +237,7 @@ inline bool Start(const std::string& executableUtf8,
   startup.wShowWindow = SW_HIDE;
   startup.hStdInput = inputRead;
   startup.hStdOutput = logNull;
-  startup.hStdError = logNull;
+  startup.hStdError = errorWrite;
   PROCESS_INFORMATION pi = {};
   const bool created = CreateProcessW(executable.c_str(),
       mutableCommand.data(), nullptr, nullptr, TRUE,
@@ -165,7 +245,22 @@ inline bool Start(const std::string& executableUtf8,
       nullptr, nullptr, &startup, &pi) != FALSE;
   CloseHandle(inputRead);
   CloseHandle(logNull);
-  if (!created) { CloseHandle(inputWrite); return false; }
+  CloseHandle(errorWrite);
+  if (!created) {
+    CloseHandle(inputWrite);
+    CloseHandle(errorRead);
+    return false;
+  }
+  Reader() = CreateThread(nullptr, 0, ConsumeErrors, errorRead, 0, nullptr);
+  if (!Reader()) {
+    CloseHandle(errorRead);
+    CloseHandle(inputWrite);
+    GenerateConsoleCtrlEvent(CTRL_BREAK_EVENT, pi.dwProcessId);
+    WaitForSingleObject(pi.hProcess, 5000);
+    CloseHandle(pi.hThread);
+    CloseHandle(pi.hProcess);
+    return false;
+  }
   // Credential is delivered through a one-shot stdin pipe, never via argv.
   const std::string secret = password + "\n";
   DWORD written = 0;
@@ -179,6 +274,9 @@ inline bool Start(const std::string& executableUtf8,
     WaitForSingleObject(pi.hProcess, 5000);
     CloseHandle(pi.hThread);
     CloseHandle(pi.hProcess);
+    WaitForSingleObject(Reader(), 1500);
+    CloseHandle(Reader());
+    Reader() = nullptr;
     return false;
   }
   Child() = pi.hProcess;
@@ -195,6 +293,11 @@ inline bool Stop() {
   CloseHandle(Child());
   Child() = nullptr;
   Pid() = 0;
+  if (Reader()) {
+    WaitForSingleObject(Reader(), 1500);
+    CloseHandle(Reader());
+    Reader() = nullptr;
+  }
   return true;
 }
 }  // namespace twinconnect_openconnect
