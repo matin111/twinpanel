@@ -64,10 +64,29 @@ void main() {
 
     await tester.tap(find.byKey(const Key('devNav_locations')));
     await tester.pump(const Duration(milliseconds: 800));
+    // A modern protocol chip must never hide servers just because a
+    // subscription profile or a native VPN engine isn't ready yet.
+    await tester.ensureVisible(find.byKey(const Key('devFilter_hysteria2')));
+    await tester.tap(find.byKey(const Key('devFilter_hysteria2')));
+    await tester.pump(const Duration(milliseconds: 800));
+    expect(find.byKey(const Key('devServer_0')), findsOneWidget);
+    expect(find.byKey(const Key('devServer_1')), findsOneWidget);
     await tester.ensureVisible(find.byKey(const Key('devServer_1')));
     await tester.tap(find.byKey(const Key('devServer_1')));
-    await tester.pump();
-    // Selecting a node is never a no-op, even without a Windows engine.
+    await tester.pump(const Duration(milliseconds: 800));
+    expect(find.byKey(const Key('liveConnectionStatus')), findsWidgets);
+    expect(find.text('Hysteria2'), findsWidgets);
+
+    // A native engine not yet implemented (Cisco) also permits choosing
+    // a server; this is a selection, not a simulated VPN connection.
+    await tester.tap(find.byKey(const Key('devNav_locations')));
+    await tester.pump(const Duration(milliseconds: 800));
+    await tester.ensureVisible(find.byKey(const Key('devFilter_cisco')));
+    await tester.tap(find.byKey(const Key('devFilter_cisco')));
+    await tester.pump(const Duration(milliseconds: 800));
+    expect(find.byKey(const Key('devServer_0')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('devServer_0')));
+    await tester.pump(const Duration(milliseconds: 800));
     expect(find.byKey(const Key('liveConnectionStatus')), findsWidgets);
     // Allow any synthetic platform-channel readiness timeouts to settle.
     await tester.pump(const Duration(seconds: 12));
