@@ -231,9 +231,10 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     int? best;
     for (var i = 0; i < servers.length; i++) {
       final node = servers[i];
-      final latency = _latencyFor(node);
-      if (!node.nodeOnline || latency == null) continue;
-      if (best == null || latency < _latencyFor(servers[best])!) {
+      // Only a measured ICMP value qualifies; panel hints are not live ping.
+      final latency = _nodePings[node.id];
+      if (!node.nodeOnline || latency == null || latency < 0) continue;
+      if (best == null || latency < _nodePings[servers[best].id]!) {
         best = i;
       }
     }
@@ -733,7 +734,15 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         setState(() => _vpnError = 'SELECT_MODERN_SERVER');
         return;
       }
-      await _startModernTunnel(_filter, id);
+      if (_autoFastest) {
+        final best = _fastestKnownIndex;
+        if (best == null) {
+          setState(() => _vpnError = 'NO_MEASURED_SERVER');
+          return;
+        }
+        setState(() => _selected = best);
+      }
+      await _startModernTunnel(_filter, _selectedServerId!);
       return;
     }
     if (_vpnUnmanaged) {
@@ -1693,14 +1702,15 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                     ? tr('تاخیر قابل‌اندازه‌گیری موجود نیست',
                         'No measured server latency available')
                     : tr('بر اساس تاخیر گزارش‌شده پنل',
-                        'Based on panel-reported server latency'),
+                        'Based on measured server ICMP latency'),
                     size: 11, color: sub),
               ],
             )),
             Switch(
               key: const Key('autoFastestServerToggle'),
               value: _autoFastest,
-              onChanged: _vpnBusy || _vpnUp ? null : (enabled) {
+              onChanged: _vpnBusy || _vpnUp || _modernUp
+                  ? null : (enabled) {
                 final best = _fastestKnownIndex;
                 if (enabled && best == null) {
                   ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -1712,7 +1722,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                   _autoFastest = enabled;
                   if (enabled) {
                     _selected = best!;
-                    _filter = 'wireguard';
+                    // Never switch to WireGuard when the user selected
+                    // Hysteria2, TUIC or another protocol.
                   }
                 });
               },
