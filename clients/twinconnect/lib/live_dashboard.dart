@@ -615,6 +615,18 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
 
   Future<void> _toggleVpn() async {
     if (_vpnBusy || !Platform.isWindows) return;
+    if (_filter != 'all' && _filter != 'wireguard' && !_vpnUp && !_vpnCleanup) {
+      if (_selectedServerId == null) {
+        setState(() => _vpnError = 'SELECT_MODERN_SERVER');
+        return;
+      }
+      if (SingBoxProfileValidator.supportsFamily(_filter) && _filter != 'shadowtls') {
+        await _testModernServerTransport(_filter, _selectedServerId!);
+      } else {
+        setState(() => _vpnError = 'PROTOCOL_ENGINE_NOT_READY');
+      }
+      return;
+    }
     if (_vpnUnmanaged) {
       setState(() => _vpnError = 'UNMANAGED_WIREGUARD_SERVICE');
       return;
@@ -1122,8 +1134,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
               ? tr('دست‌دهی با سرور تأیید شد', 'Server handshake verified')
               : _vpnUp ? tr('رابط فعال است؛ دست‌دهی هنوز تأیید نشده',
                   'Interface active; handshake not verified')
-              : tr('سرور را انتخاب کنید؛ اتصال مستقیم فعلاً WireGuard است',
-                  'Select a server; direct connection currently supports WireGuard'),
+              : tr('برای اتصال، سرور و پروتکل را انتخاب کنید',
+                  'Choose a server and protocol to connect'),
             size: 12, color: sub),
         if (_vpnError != null) ...[
           const SizedBox(height: 8),
@@ -1136,8 +1148,14 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                 'WireGuard رسمی را نصب کرده و برنامه را با دسترسی مدیر اجرا کنید.',
                 'Install official WireGuard and run this app as Administrator.'),
               'SELECT_WIREGUARD_SERVER' => tr(
-                'در مکان‌ها سرور WireGuard انتخاب کنید.',
-                'Select a WireGuard server in Locations.'),
+                'لطفاً یک سرور انتخاب کنید.',
+                'Please select a server.'),
+              'SELECT_MODERN_SERVER' => tr(
+                'لطفاً یک سرور انتخاب کنید.',
+                'Please select a server.'),
+              'SINGBOX_NATIVE_TUN_NOT_READY' => tr(
+                'آزمایش پروکسی انجام می‌شود؛ VPN سراسری هنوز فعال نیست.',
+                'Proxy check is available; system VPN is not enabled.'),
               'UNMANAGED_WIREGUARD_SERVICE' => tr(
                 'سرویس WireGuard متعلق به برنامه نیست؛ تغییری ایجاد نشد.',
                 'WireGuard service is not managed by this app.'),
