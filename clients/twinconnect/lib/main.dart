@@ -245,7 +245,6 @@ class _TwinConnectHomeState extends State<TwinConnectHome> with WidgetsBindingOb
         // Use the last verified origin if the vendor directory is offline.
       }
       final activePanel = panel;
-      if (activePanel == null) return;
       var accessToken = saved.sessionToken;
       var refreshToken = saved.refreshToken;
       if (refreshToken != null) {
