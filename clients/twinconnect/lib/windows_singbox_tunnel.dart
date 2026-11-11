@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/services.dart';
+
 import 'singbox_windows_config.dart';
 import 'windows_singbox_preflight.dart';
 
@@ -13,6 +15,8 @@ import 'windows_singbox_preflight.dart';
 /// service or a guaranteed kill switch. A separate native Job Object/recovery
 /// helper is needed before advertising crash-safe always-on protection.
 class WindowsSingBoxTunnel {
+  static const MethodChannel _native =
+      MethodChannel('com.twinpanel.twinconnect/vpn');
   WindowsSingBoxTunnel({this.onUnexpectedExit});
   final void Function()? onUnexpectedExit;
   Process? _child;
@@ -60,6 +64,15 @@ class WindowsSingBoxTunnel {
       ).timeout(const Duration(seconds: 8));
       _child = started;
       final current = started;
+      // Attach to JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE before supplying the
+      // credential-bearing config or allowing any Windows route changes.
+      // If the guard isn't available this connection MUST fail closed.
+      final guarded = await _native.invokeMethod<bool>(
+        'guardSingBoxProcess', {'pid': current.pid},
+      ).timeout(const Duration(seconds: 6));
+      if (guarded != true) {
+        throw const FormatException('SINGBOX_PROCESS_GUARD_UNAVAILABLE');
+      }
       // Ensure pipes can never block the child. They are not logged because
       // native client diagnostics might contain account secrets.
       unawaited(current.stdout.drain<void>());
