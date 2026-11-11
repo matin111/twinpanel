@@ -16,6 +16,8 @@ SINGBOX_GUARD = ROOT / "native" / "windows" / "twinconnect_singbox_guard.h"
 SINGBOX_INSTALLED = ROOT / "windows" / "runner" / "twinconnect_singbox_guard.h"
 TUN_INSPECT = ROOT / "native" / "windows" / "twinconnect_tun_inspect.h"
 TUN_INSTALLED = ROOT / "windows" / "runner" / "twinconnect_tun_inspect.h"
+TUN_SOURCE = ROOT / "native" / "windows" / "twinconnect_tun_inspect.cpp"
+TUN_SOURCE_INSTALLED = ROOT / "windows" / "runner" / "twinconnect_tun_inspect.cpp"
 
 HEADER_MARKER = "  std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> vpn_channel_;"
 CPP_MARKER = "  // TwinConnect: fail-closed Windows native capability handshake."
@@ -38,6 +40,9 @@ def install() -> None:
     if not TUN_INSPECT.is_file():
         raise RuntimeError('Missing Windows TUN inspection header')
     shutil.copyfile(TUN_INSPECT, TUN_INSTALLED)
+    if not TUN_SOURCE.is_file():
+        raise RuntimeError("Missing native TUN inspector implementation")
+    shutil.copyfile(TUN_SOURCE, TUN_SOURCE_INSTALLED)
 
     header = HEADER.read_text(encoding="utf-8-sig")
     cpp = SOURCE.read_text(encoding="utf-8-sig")
@@ -207,6 +212,9 @@ def install() -> None:
     windows_target = 'target_compile_definitions(${BINARY_NAME} PRIVATE WINVER=0x0A00 _WIN32_WINNT=0x0A00 NTDDI_VERSION=0x0A000000)'
     if windows_target not in cmake:
         cmake += "\n# Enable Win10 IP Helper v2 routing inspection.\n" + windows_target + "\n"
+    native_source = 'target_sources(${BINARY_NAME} PRIVATE "twinconnect_tun_inspect.cpp")'
+    if native_source not in cmake:
+        cmake += "\n# Native TUN diagnostic in a separate Windows SDK translation unit.\n" + native_source + "\n"
     runner_cmake.write_text(cmake, encoding="utf-8")
 
     HEADER.write_text(header, encoding="utf-8")
