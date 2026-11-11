@@ -436,9 +436,9 @@ def subscription_list_keyboard(rows, imported=None):
 
     buttons.append([
         InlineKeyboardButton(
-            text="➕ افزودن اکانت با ساب‌لینک",
+            text="＋ افزودن اکانت با ساب‌لینک",
             callback_data="subimp:add",
-            style="success",
+            style="primary",
         )
     ])
     return InlineKeyboardMarkup(
@@ -495,10 +495,11 @@ def renewal_confirm_keyboard(sub_id, plan_id, nonce):
         inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text="✅ ادامه و پرداخت",
+                    text="ادامه و پرداخت",
                     callback_data=(
                         f"renewconfirm:{sub_id}:{plan_id}:{nonce}"
                     ),
+                    style="primary",
                 )
             ],
             [
