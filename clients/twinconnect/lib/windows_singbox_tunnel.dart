@@ -1,0 +1,174 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+
+import 'singbox_windows_config.dart';
+import 'windows_singbox_preflight.dart';
+
+/// Owns a single sing-box Windows TUN child process.
+/// The process is launched only after the user's authorized native profile
+/// passes engine syntax validation. No credentials are written to disk or logs.
+///
+/// Important: this is an application-lifetime TUN controller, not a Windows
+/// service or a guaranteed kill switch. A separate native Job Object/recovery
+/// helper is needed before advertising crash-safe always-on protection.
+class WindowsSingBoxTunnel {
+  Process? _child;
+  StreamSubscription<int>? _exitSubscription;
+  String? _activeProtocol;
+  String? _activeServerId;
+  String? _exitIp;
+  bool _changing = false;
+
+  bool get isRunning => _child != null && _exitIp != null;
+  String? get protocol => isRunning ? _activeProtocol : null;
+  String? get serverId => isRunning ? _activeServerId : null;
+  String? get publicIp => isRunning ? _exitIp : null;
+
+  Future<String> start({
+    required String protocol,
+    required String serverId,
+    required Map<String, dynamic> profile,
+  }) async {
+    if (_changing || _child != null) {
+      throw const FormatException('SINGBOX_TUNNEL_ALREADY_RUNNING');
+    }
+    if (!Platform.isWindows) {
+      throw const FormatException('SINGBOX_WINDOWS_ONLY');
+    }
+    _changing = true;
+    Process? started;
+    try {
+      if (!await WindowsSingBoxPreflight.enginePresent()) {
+        throw const FormatException('SINGBOX_ENGINE_NOT_INSTALLED');
+      }
+      final config = SingBoxWindowsConfig.compose(
+        protocol: protocol, item: profile);
+      if (!await WindowsSingBoxPreflight.checkInMemory(config)) {
+        throw const FormatException('SINGBOX_TUN_CONFIG_INVALID');
+      }
+      // Network baseline must be measured before changing the Windows route.
+      final before = await _requestPublicIp().timeout(
+        const Duration(seconds: 10),
+        onTimeout: () => throw const FormatException('BASELINE_IP_UNAVAILABLE'),
+      );
+
+      started = await Process.start(
+        WindowsSingBoxPreflight.enginePath(Platform.resolvedExecutable),
+        const ['run', '-c', 'stdin'], runInShell: false,
+      ).timeout(const Duration(seconds: 8));
+      _child = started;
+      final current = started;
+      // Ensure pipes can never block the child. They are not logged because
+      // native client diagnostics might contain account secrets.
+      unawaited(current.stdout.drain<void>());
+      unawaited(current.stderr.drain<void>());
+      current.stdin.add(utf8.encode(jsonEncode(config)));
+      await current.stdin.close();
+      final exitSignal = current.exitCode.then((_) => true);
+      String? verified;
+      for (var attempt = 0; attempt < 8; attempt++) {
+        await Future<void>.delayed(const Duration(seconds: 2));
+        if (await Future.any([
+          exitSignal,
+          Future<bool>.delayed(const Duration(milliseconds: 1), () => false),
+        ])) {
+          throw const FormatException('SINGBOX_PROCESS_EXITED');
+        }
+        try {
+          final ip = await _requestPublicIp().timeout(
+              const Duration(seconds: 4));
+          if (ip != before) {
+            verified = ip;
+            break;
+          }
+        } catch (_) {
+          // A temporarily unavailable network is not a verified connection.
+        }
+      }
+      if (verified == null) {
+        throw const FormatException('SINGBOX_EXIT_IP_NOT_VERIFIED');
+      }
+      _activeServerId = serverId;
+      _activeProtocol = protocol;
+      _exitIp = verified;
+      return verified;
+    } catch (_) {
+      await _killChild();
+      rethrow;
+    } finally {
+      _changing = false;
+    }
+  }
+
+  Future<void> stop() async {
+    if (_changing) throw const FormatException('SINGBOX_TUNNEL_BUSY');
+    _changing = true;
+    try {
+      await _killChild();
+    } finally {
+      _changing = false;
+    }
+  }
+
+  Future<void> _killChild() async {
+    final child = _child;
+    if (child == null) {
+      _activeServerId = null;
+      _activeProtocol = null;
+      _exitIp = null;
+      return;
+    }
+    // Do not claim stopped before Windows confirms child termination.
+    child.kill();
+    try {
+      await child.exitCode.timeout(const Duration(seconds: 8));
+    } on TimeoutException {
+      throw const FormatException('SINGBOX_PROCESS_DID_NOT_STOP');
+    }
+    if (identical(child, _child)) {
+      _child = null;
+      _activeServerId = null;
+      _activeProtocol = null;
+      _exitIp = null;
+    }
+  }
+
+  /// Direct HTTPS request using the current Windows network routes.
+  /// A different IP than the pre-TUN baseline is necessary (not sufficient)
+  /// to prove that traffic left through the selected outbound.
+  static Future<String> _requestPublicIp() async {
+    final client = HttpClient()
+      ..connectionTimeout = const Duration(seconds: 3)
+      ..findProxy = (_) => 'DIRECT';
+    try {
+      final request = await client.getUrl(
+        Uri.https('api.ipify.org', '/', {'format': 'json'}));
+      request.followRedirects = false;
+      final response = await request.close().timeout(
+        const Duration(seconds: 5));
+      if (response.statusCode != HttpStatus.ok) {
+        throw const FormatException('PUBLIC_IP_CHECK_FAILED');
+      }
+      final body = await utf8.decoder.bind(response).join()
+          .timeout(const Duration(seconds: 5));
+      if (body.length > 512) {
+        throw const FormatException('PUBLIC_IP_RESPONSE_TOO_LARGE');
+      }
+      final data = jsonDecode(body);
+      if (data is! Map || data['ip'] is! String ||
+          InternetAddress.tryParse(data['ip'] as String) == null) {
+        throw const FormatException('PUBLIC_IP_RESPONSE_INVALID');
+      }
+      return data['ip'] as String;
+    } finally {
+      client.close(force: true);
+    }
+  }
+
+  /// Best-effort cleanup on view disposal. Not a crash recovery guarantee.
+  void dispose() {
+    final child = _child;
+    child?.kill();
+  }
+}
