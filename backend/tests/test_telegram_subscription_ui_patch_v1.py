@@ -11,7 +11,7 @@ def _button_by_callback(markup, callback_data):
     raise AssertionError(f"button {callback_data!r} not found")
 
 
-def test_protocol_buttons_receive_clean_icons_and_primary_style():
+def test_protocol_buttons_receive_clean_icons_with_neutral_style():
     markup = InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text="⚡ Hysteria2", callback_data="proto:hysteria2")],
@@ -24,9 +24,9 @@ def test_protocol_buttons_receive_clean_icons_and_primary_style():
     hysteria = _button_by_callback(decorated, "proto:hysteria2")
     wireguard = _button_by_callback(decorated, "proto:wireguard")
     assert hysteria.text == "🌐 Hysteria2"
-    assert hysteria.style == "primary"
+    assert hysteria.style is None
     assert wireguard.text == "⚡ WireGuard"
-    assert wireguard.style == "primary"
+    assert wireguard.style is None
 
 
 def test_delete_is_danger_and_navigation_is_always_present():
@@ -45,4 +45,4 @@ def test_delete_is_danger_and_navigation_is_always_present():
     assert delete.style == "danger"
     assert back.text == "⬅️ بازگشت"
     assert home.text == "🏠 منوی اصلی"
-    assert home.style == "primary"
+    assert home.style is None
