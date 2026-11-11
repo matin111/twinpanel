@@ -15,6 +15,7 @@ import 'server_latency.dart';
 import 'windows_singbox_preflight.dart';
 import 'singbox_profile_validator.dart';
 import 'modern_transport_probe.dart';
+import 'windows_singbox_tunnel.dart';
 import 'connection_bootstrap.dart';
 import 'tenant_api.dart';
 import 'vpn_policy_store.dart';
@@ -76,6 +77,19 @@ class _DemoServer {
 
 class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   final WindowsWireGuardController _vpn = const WindowsWireGuardController();
+  late final WindowsSingBoxTunnel _modernTunnel = WindowsSingBoxTunnel(
+    onUnexpectedExit: () {
+      if (!mounted) return;
+      setState(() {
+        _modernUp = false;
+        _vpnError = 'SINGBOX_TUNNEL_EXITED';
+        _publicIp = null;
+      });
+    },
+  );
+  bool _modernUp = false;
+  String? _modernProtocol;
+  String? _modernNodeId;
   final VpnPolicyStore _vpnPolicy = const VpnPolicyStore();
   bool _vpnBusy = false;
   bool _vpnUp = false;
@@ -282,6 +296,11 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     }
     setState(() { _vpnBusy = true; _vpnError = null; });
     try {
+      if (_modernTunnel.isRunning || _modernUp) {
+        await _modernTunnel.stop();
+        if (!mounted) return;
+        setState(() { _modernUp = false; _modernProtocol = null; _modernNodeId = null; });
+      }
       // Do not clear the stored login while a managed VPN is still active.
       // Always read the native state, even if the UI appears disconnected.
       var status = await _vpn.status().timeout(const Duration(seconds: 10));
@@ -315,6 +334,94 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           'Could not safely disconnect; account remains signed in.',
         )),
       ));
+    } finally {
+      if (mounted) setState(() => _vpnBusy = false);
+    }
+  }
+
+  Future<void> _startModernTunnel(String protocol, String serverId) async {
+    if (_vpnBusy) return;
+    setState(() { _vpnBusy = true; _vpnError = null; });
+    try {
+      if (_vpnUp || _vpnCleanup || _vpnUnmanaged) {
+        throw const FormatException('DISCONNECT_WIREGUARD_FIRST');
+      }
+      final authorized = widget.catalog?.entries.any((entry) =>
+          entry.protocol.code == protocol && entry.selected &&
+          entry.configRecordPresent) ?? false;
+      if (!authorized) {
+        throw const FormatException('PROTOCOL_NOT_INCLUDED_IN_SUBSCRIPTION');
+      }
+      final definition = VpnProtocols.byCode(protocol);
+      if (definition == null ||
+          !SingBoxProfileValidator.supportsFamily(protocol) ||
+          protocol == 'shadowtls') {
+        throw const FormatException('SINGBOX_PROTOCOL_NOT_SUPPORTED');
+      }
+      if (!await WindowsSingBoxPreflight.enginePresent()) {
+        throw const FormatException('SINGBOX_ENGINE_UNAVAILABLE');
+      }
+      final profiles = await TenantApi.fromBuildConfig().loadSessionNativeProfiles(
+        panel: widget.panel,
+        sessionToken: widget.sessionToken,
+        protocol: definition,
+        native: NativeProtocolReadiness(supportedCodes: {protocol}),
+      );
+      final matches = profiles.items.where((item) =>
+          item['node_id']?.toString() == serverId).toList(growable: false);
+      if (matches.length != 1) {
+        throw const FormatException('MODERN_SERVER_PROFILE_MISSING');
+      }
+      // Prepare/validate the destination before stopping a prior sing-box TUN.
+      SingBoxWindowsConfig.compose(protocol: protocol, item: matches.single);
+      if (_modernTunnel.isRunning) {
+        await _modernTunnel.stop();
+        if (!mounted) return;
+        setState(() {
+          _modernUp = false;
+          _publicIp = null;
+        });
+      }
+      final newIp = await _modernTunnel.start(
+        protocol: protocol, serverId: serverId, profile: matches.single);
+      if (!mounted) return;
+      setState(() {
+        _modernUp = true;
+        _modernProtocol = protocol;
+        _modernNodeId = serverId;
+        _publicIp = newIp;
+        _vpnError = null;
+      });
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _modernUp = _modernTunnel.isRunning;
+          if (!_modernUp) {
+            _modernProtocol = null;
+            _modernNodeId = null;
+          }
+          _vpnError = _errorText(error);
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _vpnBusy = false);
+    }
+  }
+
+  Future<void> _stopModernTunnel() async {
+    if (_vpnBusy) return;
+    setState(() { _vpnBusy = true; _vpnError = null; });
+    try {
+      await _modernTunnel.stop();
+      if (!mounted) return;
+      setState(() {
+        _modernUp = false;
+        _modernProtocol = null;
+        _modernNodeId = null;
+        _publicIp = null;
+      });
+    } catch (error) {
+      if (mounted) setState(() => _vpnError = _errorText(error));
     } finally {
       if (mounted) setState(() => _vpnBusy = false);
     }
@@ -505,6 +612,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
 
   @override
   void dispose() {
+    _modernTunnel.dispose();
     _resetNetworkStats();
     super.dispose();
   }
@@ -605,16 +713,17 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
 
   Future<void> _toggleVpn() async {
     if (_vpnBusy || !Platform.isWindows) return;
-    if (_filter != 'all' && _filter != 'wireguard' && !_vpnUp && !_vpnCleanup) {
-      if (_selectedServerId == null) {
+    if (_modernUp || _modernTunnel.isRunning) {
+      await _stopModernTunnel();
+      return;
+    }
+    if (_filter != 'all' && _filter != 'wireguard') {
+      final id = _selectedServerId;
+      if (id == null) {
         setState(() => _vpnError = 'SELECT_MODERN_SERVER');
         return;
       }
-      if (SingBoxProfileValidator.supportsFamily(_filter) && _filter != 'shadowtls') {
-        await _testModernServerTransport(_filter, _selectedServerId!);
-      } else {
-        setState(() => _vpnError = 'PROTOCOL_ENGINE_NOT_READY');
-      }
+      await _startModernTunnel(_filter, id);
       return;
     }
     if (_vpnUnmanaged) {
@@ -1043,7 +1152,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           duration: const Duration(milliseconds: 240),
           child: KeyedSubtree(
             key: const ValueKey('dev-disconnected'),
-            child: smallPill(_vpnVerified
+            child: smallPill(_modernUp ? tr('تونل فعال', 'Tunnel active')
+                : _vpnVerified
                 ? tr('دست‌دهی تأیید شد', 'Handshake verified')
                 : _vpnUp ? tr('رابط فعال', 'Interface active')
                 : _vpnBusy ? tr('در حال اجرا', 'Working')
@@ -1109,7 +1219,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                     ? const SizedBox.square(dimension: 28,
                         child: CircularProgressIndicator(
                           strokeWidth: 3, color: Colors.white))
-                    : Icon(_vpnUp ? Icons.stop_rounded
+                    : Icon((_vpnUp || _modernUp) ? Icons.stop_rounded
                         : Icons.power_settings_new_rounded,
                         size: 43, color: Colors.white),
                 ),
@@ -1119,9 +1229,10 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         ),
         const SizedBox(height: 12),
         txt(tr('اتصال سریع', 'Quick connect'), size: 20, bold: true),
-        if (_vpnUp) ...[
+        if (_vpnUp || _modernUp) ...[
           const SizedBox(height: 5),
-          txt(_vpnVerified
+          txt(_modernUp ? tr('IP خروجی تونل تأیید شد', 'Tunnel exit IP verified')
+                : _vpnVerified
                 ? tr('دست‌دهی با سرور تأیید شد', 'Server handshake verified')
                 : tr('رابط فعال است؛ دست‌دهی هنوز تأیید نشده',
                     'Interface active; handshake not verified'),
@@ -1181,14 +1292,14 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
               const SizedBox(height: 4),
               FittedBox(
                 fit: BoxFit.scaleDown,
-                child: txt(_vpnVerified ? (_publicIp ?? '—') : '—',
+                child: txt((_vpnVerified || _modernUp) ? (_publicIp ?? '—') : '—',
                     size: 12, bold: true),
               ),
             ])),
             Expanded(child: Column(children: [
               txt(tr('پروتکل', 'Protocol'), size: 10, color: sub),
               const SizedBox(height: 4),
-              txt(_vpnUp ? 'WireGuard' : _filter == 'all'
+              txt(_modernUp ? (VpnProtocols.byCode(_modernProtocol ?? '')?.name ?? 'sing-box') : _vpnUp ? 'WireGuard' : _filter == 'all'
                   ? tr('خودکار', 'Auto')
                   : (VpnProtocols.byCode(_filter)?.name ?? '—'),
                   size: 11, bold: true),
@@ -1422,7 +1533,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           Row(children: [
             Expanded(child: txt(tr('وضعیت شبکه', 'Network status'),
               size: 17, bold: true)),
-            smallPill(_vpnVerified ? tr('دست‌دهی تأیید شد', 'Handshake verified') :
+            smallPill(_modernUp ? tr('تونل فعال', 'Tunnel active') :
+                _vpnVerified ? tr('دست‌دهی تأیید شد', 'Handshake verified') :
                 _vpnUp ? tr('رابط فعال', 'Interface active') :
                 tr('قطع', 'Disconnected')),
           ]),
