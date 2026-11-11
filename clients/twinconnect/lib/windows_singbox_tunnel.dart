@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:flutter/services.dart';
 
@@ -25,12 +26,51 @@ class WindowsSingBoxTunnel {
   String? _activeProtocol;
   String? _activeServerId;
   String? _exitIp;
+  int? _telemetryPort;
+  String? _telemetrySecret;
   bool _changing = false;
 
   bool get isRunning => _child != null && _exitIp != null;
   String? get protocol => isRunning ? _activeProtocol : null;
   String? get serverId => isRunning ? _activeServerId : null;
   String? get publicIp => isRunning ? _exitIp : null;
+
+  /// Read actual sing-box byte totals without exposing the local API on LAN.
+  /// The authenticated loopback API is active only for the owned TUN process.
+  Future<({int received, int sent})?> readTrafficTotals() async {
+    final port = _telemetryPort;
+    final secret = _telemetrySecret;
+    if (!isRunning || port == null || secret == null) return null;
+    final client = HttpClient()
+      ..connectionTimeout = const Duration(seconds: 2)
+      ..findProxy = (_) => 'DIRECT';
+    try {
+      final request = await client.getUrl(
+        Uri.parse('http://127.0.0.1:$port/connections'),
+      ).timeout(const Duration(seconds: 3));
+      request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $secret');
+      final response = await request.close().timeout(const Duration(seconds: 3));
+      if (response.statusCode != HttpStatus.ok) return null;
+      final bytes = <int>[];
+      await for (final chunk in response.timeout(const Duration(seconds: 3))) {
+        if (bytes.length + chunk.length > 262144) return null;
+        bytes.addAll(chunk);
+      }
+      final parsed = jsonDecode(utf8.decode(bytes));
+      if (parsed is! Map) return null;
+      final rx = parsed['downloadTotal'];
+      final tx = parsed['uploadTotal'];
+      if (rx is! int || tx is! int || rx < 0 || tx < 0) return null;
+      if (!isRunning || _telemetryPort != port || _telemetrySecret != secret) {
+        return null;
+      }
+      return (received: rx, sent: tx);
+    } catch (_) {
+      return null;
+    } finally {
+      client.close(force: true);
+    }
+  }
 
   /// Read-only route health check. Never starts, stops or reroutes a tunnel.
   /// A transient failure returns false; the caller decides whether to warn.
@@ -99,8 +139,17 @@ class WindowsSingBoxTunnel {
           throw const FormatException('SINGBOX_ENDPOINT_DNS_UNAVAILABLE');
         }
       }
+      // Reserve a free localhost-only port and a non-guessable API secret.
+      final reservation = await ServerSocket.bind(
+        InternetAddress.loopbackIPv4, 0);
+      final telemetryPort = reservation.port;
+      await reservation.close();
+      final random = Random.secure();
+      final telemetrySecret = List<int>.generate(32, (_) => random.nextInt(256))
+          .map((value) => value.toRadixString(16).padLeft(2, '0')).join();
       final config = SingBoxWindowsConfig.compose(
-        protocol: protocol, item: profile, resolvedServer: resolvedServer);
+        protocol: protocol, item: profile, resolvedServer: resolvedServer,
+        telemetryPort: telemetryPort, telemetrySecret: telemetrySecret);
       if (!await WindowsSingBoxPreflight.checkInMemory(config)) {
         throw const FormatException('SINGBOX_TUN_CONFIG_INVALID');
       }
@@ -128,6 +177,8 @@ class WindowsSingBoxTunnel {
         const ['run', '-c', 'stdin'], runInShell: false,
       ).timeout(const Duration(seconds: 8));
       _child = started;
+      _telemetryPort = telemetryPort;
+      _telemetrySecret = telemetrySecret;
       final current = started;
       // Attach to JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE before supplying the
       // credential-bearing config or allowing any Windows route changes.
@@ -167,6 +218,8 @@ class WindowsSingBoxTunnel {
         exited = true;
         if (identical(_child, current) && !_changing) {
           _child = null;
+          _telemetryPort = null;
+          _telemetrySecret = null;
           _activeServerId = null;
           _activeProtocol = null;
           _exitIp = null;
@@ -269,6 +322,8 @@ class WindowsSingBoxTunnel {
   Future<void> _killChild() async {
     final child = _child;
     if (child == null) {
+      _telemetryPort = null;
+      _telemetrySecret = null;
       _activeServerId = null;
       _activeProtocol = null;
       _exitIp = null;
@@ -282,6 +337,8 @@ class WindowsSingBoxTunnel {
       throw const FormatException('SINGBOX_PROCESS_DID_NOT_STOP');
     }
     if (identical(child, _child)) {
+      _telemetryPort = null;
+      _telemetrySecret = null;
       _child = null;
       _activeServerId = null;
       _activeProtocol = null;
