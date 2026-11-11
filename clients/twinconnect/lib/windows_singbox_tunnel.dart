@@ -155,7 +155,9 @@ class WindowsSingBoxTunnel {
         }
         tunState = await inspectNativeTunRoutes();
         if (tunState == null ||
-            tunState == 'SINGBOX_TUN_NATIVE_INSPECTION_FAILED') break;
+            tunState == 'SINGBOX_TUN_NATIVE_INSPECTION_FAILED') {
+          break;
+        }
         await Future<void>.delayed(const Duration(milliseconds: 500));
       }
       // An unavailable native inspector does not prove a connection failed.
