@@ -32,6 +32,17 @@ def eligible_renewal_plans(rows):
     ]
 
 
+def renewal_plan_button_label(plan):
+    """Small readable label; the category already carries the duration.
+
+    The plan name commonly already includes quota (e.g. «30 گیگ»), so do
+    not repeat the volume or show day counts in each inline keyboard button.
+    """
+    name = " ".join(str(plan.get("name") or "پلن").split())
+    price = int(plan.get("price_toman") or 0)
+    return f"{name}  |  {price:,} تومان"[:64]
+
+
 def renewal_stage_markup(
     plans, subscription_id, step="type",
     type_index=None, user_count=None, category_index=None, page=0,
@@ -95,12 +106,7 @@ def renewal_stage_markup(
                 )
                 for item in matching[start:start + 12]:
                     rows.append([InlineKeyboardButton(
-                        text=(
-                            f"{item.get('name') or 'پلن'} | "
-                            f"{int(item['traffic_gb'])}GB | "
-                            f"{int(item['duration_days'])} روز | "
-                            f"{int(item['price_toman']):,} تومان"
-                        )[:64],
+                        text=renewal_plan_button_label(item),
                         callback_data=f"subrnplan:{sub_id}:{int(item['id'])}",
                     )])
                 nav = []

@@ -207,6 +207,7 @@ def install(router, request_fn):
         plan_subscription_type, plan_category, plan_user_count,
         subscription_type_icon, category_icon, user_count_icon,
     )
+    from .telegram_renewal_catalog_main_v1 import renewal_plan_button_label
 
     async def _renewal_catalog(callback, sub_id):
         info = await _read_import(callback, sub_id)
@@ -281,8 +282,7 @@ def install(router, request_fn):
                         )
                         for p in matching[start:start + 12]:
                             rows.append([InlineKeyboardButton(
-                                text=(f"{p['name']} | {p['duration_days']} روز | "
-                                      f"{p['traffic_gb']}GB | {int(p['price_toman']):,} تومان")[:64],
+                                text=renewal_plan_button_label(p),
                                 callback_data=f"subimprenewplan:{sub_id}:{int(p['id'])}",
                             )])
                         navigation = []
@@ -333,8 +333,6 @@ def install(router, request_fn):
                 "♻️ <b>تمدید همین اکانت</b>\n\n"
                 "👤 نام کاربری: <code>" + escape(str(info.get("account_username") or "-")) + "</code>\n"
                 "📋 پلن: <b>" + escape(str(plan.get("name") or "-")) + "</b>\n"
-                f"➕ حجم: <b>{int(plan.get('traffic_gb') or 0)} گیگابایت</b>\n"
-                f"➕ اعتبار: <b>{int(plan.get('duration_days') or 0)} روز</b>\n"
                 f"💳 مبلغ: <b>{int(plan.get('price_toman') or 0):,} تومان</b>\n\n"
                 "پس از پرداخت و تأیید، همین اشتراک تمدید می‌شود. "
                 "مالکیت اکانت تغییر نمی‌کند.",

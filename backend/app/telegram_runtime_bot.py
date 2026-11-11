@@ -1726,9 +1726,7 @@ async def subscription_renew_plan(callback: CallbackQuery):
     await show_navigation_page(
         callback.message,
         f"🔄 <b>تمدید اشتراک #{sub_id}</b>\n\n"
-        f"پلن انتخابی: <b>{escape(str(plan.get('name') or '-'))}</b>\n"
-        f"➕ حجم: <b>{int(plan.get('traffic_gb') or 0)} GB</b>\n"
-        f"➕ اعتبار: <b>{int(plan.get('duration_days') or 0)} روز</b>\n"
+        f"📦 پلن انتخابی: <b>{escape(str(plan.get('name') or '-'))}</b>\n"
         f"💳 مبلغ: <b>{_fmt_money(plan.get('price_toman'))} تومان</b>\n\n"
         "پس از پرداخت، حجم و اعتبار همین اکانت افزایش می‌یابد. "
         "نام کاربری، رمز، دستگاه‌های مجاز و پروتکل‌های موجود تغییر نمی‌کنند.",
