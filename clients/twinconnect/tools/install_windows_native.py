@@ -216,6 +216,19 @@ def install() -> None:
             "  RegisterPlugins(flutter_controller_->engine());\n\n" + injection,
         )
 
+    # Do not leave a Cisco child/process-owned VPN route behind when the user
+    # closes the main desktop window while OpenConnect is connected.
+    # The native Stop() sends CTRL_BREAK and awaits upstream disconnect script.
+    cleanup_anchor = "void FlutterWindow::OnDestroy() {"
+    if cleanup_anchor not in cpp:
+        raise RuntimeError("Flutter OnDestroy hook changed; Cisco cleanup unsafe")
+    cpp = cpp.replace(
+        cleanup_anchor,
+        cleanup_anchor + "\\n  if (twinconnect_openconnect::Running()) {\\n"
+        "    twinconnect_openconnect::Stop();\\n  }",
+        1,
+    )
+
     # Request elevation through the MSVC linker-generated manifest. Do not
     # insert trustInfo directly into runner.exe.manifest: the linker also
     # generates a UAC manifest, and mt.exe can fail merging both.
