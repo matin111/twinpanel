@@ -224,8 +224,8 @@ def install() -> None:
         raise RuntimeError("Flutter OnDestroy hook changed; Cisco cleanup unsafe")
     cpp = cpp.replace(
         cleanup_anchor,
-        cleanup_anchor + "\\n  if (twinconnect_openconnect::Running()) {\\n"
-        "    twinconnect_openconnect::Stop();\\n  }",
+        cleanup_anchor + "\n  if (twinconnect_openconnect::Running()) {\n"
+        "    twinconnect_openconnect::Stop();\n  }",
         1,
     )
 
