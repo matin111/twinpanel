@@ -244,12 +244,14 @@ class _TwinConnectHomeState extends State<TwinConnectHome> with WidgetsBindingOb
         if (panel == null) return;
         // Use the last verified origin if the vendor directory is offline.
       }
+      final activePanel = panel;
+      if (activePanel == null) return;
       var accessToken = saved.sessionToken;
       var refreshToken = saved.refreshToken;
       if (refreshToken != null) {
         try {
           final renewed = await api.refreshSession(
-            panel: panel, refreshToken: refreshToken);
+            panel: activePanel, refreshToken: refreshToken);
           accessToken = renewed.sessionToken;
           refreshToken = renewed.refreshToken;
         } on TenantApiException catch (error) {
@@ -275,13 +277,13 @@ class _TwinConnectHomeState extends State<TwinConnectHome> with WidgetsBindingOb
       }
       // Never fabricate account/server permissions from locally cached data.
       final catalog = await api.loadSessionProtocolCatalog(
-        panel: panel, sessionToken: accessToken);
+        panel: activePanel, sessionToken: accessToken);
       final native = await NativeVpnBridge.protocolReadiness();
       if (!mounted || serial != _lookupSerial) return;
       setState(() {
         _brand = saved.brand;
         widget.onBrandChanged(saved.brand);
-        _confirmedPanel = panel;
+        _confirmedPanel = activePanel;
         _confirmedUsername = saved.username;
         _confirmedSessionToken = accessToken;
         _sessionRefreshToken = refreshToken;
@@ -291,12 +293,12 @@ class _TwinConnectHomeState extends State<TwinConnectHome> with WidgetsBindingOb
       try {
         await _sessionStore.save(username: saved.username,
           sessionToken: accessToken, refreshToken: refreshToken,
-          panelOrigin: panel.apiOrigin, brand: saved.brand);
+          panelOrigin: activePanel.apiOrigin, brand: saved.brand);
       } catch (_) {}
       _startSessionRenewal();
       _refreshServers();
-      _loadAccountPlan(panel, accessToken, serial);
-      _loadAccountSnapshot(panel, accessToken, serial);
+      _loadAccountPlan(activePanel, accessToken, serial);
+      _loadAccountSnapshot(activePanel, accessToken, serial);
     } catch (_) {
       // Keep the offline app shell intact; user explicitly signs out.
       // The panel continues to authorize every sensitive API operation.
