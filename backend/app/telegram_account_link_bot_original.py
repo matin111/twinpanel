@@ -148,6 +148,7 @@ def _connect_keyboard():
                 InlineKeyboardButton(
                     text="🔗 اتصال حساب",
                     callback_data="main:connect-account",
+                    style="primary",
                 )
             ],
             [
