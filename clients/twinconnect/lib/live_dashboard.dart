@@ -14,7 +14,7 @@ import 'server_inventory.dart';
 import 'server_latency.dart';
 import 'windows_singbox_preflight.dart';
 import 'singbox_profile_validator.dart';
-import 'modern_transport_probe.dart';
+import 'singbox_windows_config.dart';
 import 'windows_singbox_tunnel.dart';
 import 'connection_bootstrap.dart';
 import 'tenant_api.dart';
@@ -422,71 +422,6 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       });
     } catch (error) {
       if (mounted) setState(() => _vpnError = _errorText(error));
-    } finally {
-      if (mounted) setState(() => _vpnBusy = false);
-    }
-  }
-
-  Future<void> _testModernServerTransport(String protocol, String serverId) async {
-    // Diagnostic transport check, NOT Windows full-device VPN connectivity.
-    // The existing WireGuard tunnel is neither stopped nor replaced.
-    if (_vpnBusy) return;
-    setState(() { _vpnBusy = true; _vpnError = null; });
-    try {
-      if (_vpnUp || _vpnCleanup || _vpnUnmanaged) {
-        throw const FormatException('DISCONNECT_WIREGUARD_BEFORE_TRANSPORT_TEST');
-      }
-      final selected = widget.catalog?.entries.any((entry) =>
-        entry.protocol.code == protocol && entry.selected &&
-        entry.configRecordPresent) ?? false;
-      if (!selected) {
-        throw const FormatException('PROTOCOL_NOT_INCLUDED_IN_SUBSCRIPTION');
-      }
-      if (!await WindowsSingBoxPreflight.enginePresent()) {
-        throw const FormatException('SINGBOX_ENGINE_UNAVAILABLE');
-      }
-      final definition = VpnProtocols.byCode(protocol);
-      if (definition == null) {
-        throw const FormatException('UNKNOWN_MODERN_PROTOCOL');
-      }
-      // The authenticated profiles endpoint uses the native readiness gate.
-      // This diagnostic only advertises the single verified installed engine,
-      // after validating the plan, and never enables TUN capability in the UI.
-      final profiles = await TenantApi.fromBuildConfig().loadSessionNativeProfiles(
-        panel: widget.panel,
-        sessionToken: widget.sessionToken,
-        protocol: definition,
-        native: NativeProtocolReadiness(supportedCodes: {protocol}),
-      );
-      final matching = profiles.items.where((item) {
-        final id = item['node_id'];
-        return (id is int && id.toString() == serverId) ||
-            (id is String && id == serverId);
-      }).toList(growable: false);
-      if (matching.length != 1) {
-        throw const FormatException('MODERN_SERVER_PROFILE_MISSING');
-      }
-      final result = await ModernTransportProbe.verify(
-        protocol: protocol, profile: matching.single);
-      if (!mounted) return;
-      ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(
-        duration: const Duration(seconds: 7),
-        content: Text(tr(
-          'ارتباط $protocol تأیید شد؛ IP خروجی: ${result.publicIp}. این آزمایش، VPN سراسری را روشن نمی‌کند.',
-          '$protocol proxy verified; exit IP: ${result.publicIp}. System VPN is not enabled.',
-        )),
-      ));
-    } catch (error) {
-      if (!mounted) return;
-      final code = _errorText(error);
-      setState(() => _vpnError = code);
-      ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(
-        duration: const Duration(seconds: 6),
-        content: Text(tr(
-          'آزمایش اتصال $protocol موفق نشد: $code',
-          '$protocol transport test failed: $code',
-        )),
-      ));
     } finally {
       if (mounted) setState(() => _vpnBusy = false);
     }
