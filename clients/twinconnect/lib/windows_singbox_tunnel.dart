@@ -86,7 +86,25 @@ class WindowsSingBoxTunnel {
       // Ensure pipes can never block the child. They are not logged because
       // native client diagnostics might contain account secrets.
       unawaited(current.stdout.drain<void>());
-      unawaited(current.stderr.drain<void>());
+      // Keep only a coarse diagnostic classification in memory, never the
+      // potentially credential-bearing text of an engine error.
+      String? nativeFailure;
+      unawaited(utf8.decoder.bind(current.stderr)
+          .transform(const LineSplitter()).forEach((line) {
+        final safe = line.toLowerCase();
+        if (safe.contains('wintun') || safe.contains('driver')) {
+          nativeFailure = 'SINGBOX_TUN_DRIVER_ERROR';
+        } else if (safe.contains('access is denied') ||
+            safe.contains('permission denied') ||
+            safe.contains('administrator')) {
+          nativeFailure = 'SINGBOX_TUN_PERMISSION_DENIED';
+        } else if (safe.contains('route') && safe.contains('fail')) {
+          nativeFailure = 'SINGBOX_TUN_ROUTE_INSTALL_FAILED';
+        } else if (safe.contains('create tun') ||
+            safe.contains('start tun')) {
+          nativeFailure = 'SINGBOX_TUN_ADAPTER_START_FAILED';
+        }
+      }));
       current.stdin.add(utf8.encode(jsonEncode(config)));
       await current.stdin.close();
       var exited = false;
@@ -105,17 +123,21 @@ class WindowsSingBoxTunnel {
       String? routeIssue;
       for (var attempt = 0; attempt < 5; attempt++) {
         await Future<void>.delayed(const Duration(milliseconds: 450));
-        if (exited) throw const FormatException('SINGBOX_PROCESS_EXITED');
+        if (exited) {
+          throw FormatException(nativeFailure ?? 'SINGBOX_PROCESS_EXITED');
+        }
         routeIssue = await _windowsTunRouteIssue();
         if (routeIssue == null) break;
       }
-      if (routeIssue != null) throw FormatException(routeIssue);
+      if (routeIssue != null) {
+        throw FormatException(nativeFailure ?? routeIssue);
+      }
       String? verified;
       var postTunnelHttpSucceeded = false;
       for (var attempt = 0; attempt < 8; attempt++) {
         await Future<void>.delayed(const Duration(seconds: 2));
         if (exited) {
-          throw const FormatException('SINGBOX_PROCESS_EXITED');
+          throw FormatException(nativeFailure ?? 'SINGBOX_PROCESS_EXITED');
         }
         try {
           // Do not use the same HTTPS service for every probe: a single
