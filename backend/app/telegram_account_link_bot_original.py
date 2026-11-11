@@ -56,14 +56,12 @@ def _cancel_keyboard():
                 InlineKeyboardButton(
                     text="❌ لغو عملیات",
                     callback_data=CANCEL_CALLBACK,
-                    style="danger",
                 )
             ],
             [
                 InlineKeyboardButton(
                     text="🏠 منوی اصلی",
                     callback_data=MAIN_HOME_CALLBACK,
-                    style="primary",
                 )
             ],
         ],
@@ -77,7 +75,6 @@ def _home_keyboard():
                 InlineKeyboardButton(
                     text="🏠 منوی اصلی",
                     callback_data=MAIN_HOME_CALLBACK,
-                    style="primary",
                 )
             ]
         ],
@@ -91,62 +88,53 @@ def _main_menu_keyboard():
                 InlineKeyboardButton(
                     text=ACCOUNT_LINK_BUTTON,
                     callback_data=ACCOUNT_LINK_CALLBACK,
-                    style="success",
                 )
             ],
             [
                 InlineKeyboardButton(
                     text="🏠 داشبورد",
                     callback_data="main:dashboard",
-                    style="primary",
                 ),
                 InlineKeyboardButton(
                     text="📦 اشتراک‌های من",
                     callback_data="subs:list",
-                    style="primary",
                 ),
             ],
             [
                 InlineKeyboardButton(
                     text="🛒 خرید اشتراک",
                     callback_data="shop:list",
-                    style="success",
+                    style="primary",  # One restrained accent for primary purchase action.
                 ),
                 InlineKeyboardButton(
                     text="💰 کیف پول",
                     callback_data="wallet:refresh",
-                    style="primary",
                 ),
             ],
             [
                 InlineKeyboardButton(
                     text="📚 آموزش",
                     callback_data="mlearn:g:root",
-                    style="primary",
                 ),
                 InlineKeyboardButton(
                     text="⬇️ دانلود برنامه",
                     callback_data="mlearn:d:root",
-                    style="primary",
                 ),
             ],
             [
                 InlineKeyboardButton(
                     text="🤝 درخواست نمایندگی",
                     callback_data="ts:send",
-                    style="success",
                 )
             ],
             [
                 InlineKeyboardButton(
                     text="🎫 پشتیبانی",
                     callback_data="ts:send",
-                    style="danger",
                 ),
                 InlineKeyboardButton(
                     text="👤 حساب من",
                     callback_data="main:account",
-                    style="primary",
                 ),
             ],
         ],
@@ -160,14 +148,12 @@ def _connect_keyboard():
                 InlineKeyboardButton(
                     text="🔗 اتصال حساب",
                     callback_data="main:connect-account",
-                    style="success",
                 )
             ],
             [
                 InlineKeyboardButton(
                     text="🏠 منوی اصلی",
                     callback_data=MAIN_HOME_CALLBACK,
-                    style="primary",
                 )
             ],
         ],
@@ -194,7 +180,6 @@ def _with_home(markup):
             InlineKeyboardButton(
                 text="🏠 منوی اصلی",
                 callback_data=MAIN_HOME_CALLBACK,
-                style="primary",
             )
         ])
 
