@@ -108,14 +108,13 @@ def _conditions_keyboard():
                 InlineKeyboardButton(
                     text="✅ شرایط را دارم — ثبت درخواست",
                     callback_data=RESELLER_CONFIRM_CALLBACK,
-                    style="success",
+                    style="primary",
                 )
             ],
             [
                 InlineKeyboardButton(
                     text="🏠 منوی اصلی",
                     callback_data=_base.MAIN_HOME_CALLBACK,
-                    style="primary",
                 )
             ],
         ]
