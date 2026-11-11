@@ -1,67 +1,96 @@
 #pragma once
 
-// Read-only Windows IP Helper inspection for TwinConnect sing-box TUN.
-// No shell, PowerShell, route mutation, or sensitive account information.
+// Windows TUN diagnostics based on long-supported IP Helper APIs.
+// No PowerShell or network mutation. No account data is inspected or logged.
 #include <windows.h>
 #include <iphlpapi.h>
-#include <netioapi.h>
+#include <iptypes.h>
+#include <iprtrmib.h>
 #include <flutter/encodable_value.h>
 #include <string>
+#include <vector>
+#include <cwchar>
 #pragma comment(lib, "Iphlpapi.lib")
 
 namespace twinconnect_tun_inspect {
 
 inline flutter::EncodableValue Inspect() {
-  flutter::EncodableMap data;
-  auto put = [&](const char* name, bool v) {
-    data[flutter::EncodableValue(name)] = flutter::EncodableValue(v);
+  flutter::EncodableMap output;
+  const auto put = [&](const char* key, bool value) {
+    output[flutter::EncodableValue(key)] = flutter::EncodableValue(value);
   };
-  MIB_IF_TABLE2* interfaces = nullptr;
-  const DWORD interfaces_status = GetIfTable2(&interfaces);
-  if (interfaces_status != NO_ERROR || interfaces == nullptr) {
+
+  // GetAdaptersAddresses is supported on Windows XP and later and does not
+  // depend on the newer MIB_IF_TABLE2 SDK feature guards.
+  ULONG buffer_size = 0;
+  ULONG status = GetAdaptersAddresses(
+      AF_UNSPEC, GAA_FLAG_INCLUDE_ALL_INTERFACES,
+      nullptr, nullptr, &buffer_size);
+  if (status != ERROR_BUFFER_OVERFLOW || buffer_size == 0 ||
+      buffer_size > 8 * 1024 * 1024) {
     put("inspectionOk", false);
-    return flutter::EncodableValue(data);
+    return flutter::EncodableValue(output);
   }
-  NET_LUID target = {};
-  bool found = false;
-  for (ULONG i = 0; i < interfaces->NumEntries; ++i) {
-    const MIB_IF_ROW2& row = interfaces->Table[i];
-    if (_wcsicmp(row.Alias, L"TwinConnectSB") == 0) {
-      target = row.InterfaceLuid;
-      found = true;
-      put("adapterUp", row.OperStatus == IfOperStatusUp);
+  std::vector<BYTE> adapter_buffer(buffer_size);
+  auto adapters = reinterpret_cast<PIP_ADAPTER_ADDRESSES>(
+      adapter_buffer.data());
+  status = GetAdaptersAddresses(
+      AF_UNSPEC, GAA_FLAG_INCLUDE_ALL_INTERFACES,
+      nullptr, adapters, &buffer_size);
+  if (status != NO_ERROR) {
+    put("inspectionOk", false);
+    return flutter::EncodableValue(output);
+  }
+  ULONG target_index = 0;
+  bool adapter_up = false;
+  for (auto* adapter = adapters; adapter; adapter = adapter->Next) {
+    if (adapter->FriendlyName &&
+        _wcsicmp(adapter->FriendlyName, L"TwinConnectSB") == 0) {
+      target_index = adapter->IfIndex;
+      adapter_up = static_cast<unsigned>(adapter->OperStatus) == 1;
       break;
     }
   }
-  FreeMibTable(interfaces);
-  put("adapterPresent", found);
-  if (!found) {
+  put("adapterPresent", target_index != 0);
+  if (target_index == 0) {
     put("inspectionOk", true);
     put("defaultRoutePresent", false);
-    return flutter::EncodableValue(data);
+    return flutter::EncodableValue(output);
   }
-  MIB_IPFORWARD_TABLE2* routes = nullptr;
-  const DWORD routes_status = GetIpForwardTable2(AF_INET, &routes);
-  if (routes_status != NO_ERROR || routes == nullptr) {
+  put("adapterUp", adapter_up);
+
+  // GetIpForwardTable is also available on Windows XP+, unlike the API v2
+  // structs which some Flutter SDK templates hide behind older target macros.
+  ULONG route_bytes = 0;
+  status = GetIpForwardTable(nullptr, &route_bytes, FALSE);
+  if (status != ERROR_INSUFFICIENT_BUFFER || route_bytes == 0 ||
+      route_bytes > 8 * 1024 * 1024) {
     put("inspectionOk", false);
-    return flutter::EncodableValue(data);
+    return flutter::EncodableValue(output);
   }
-  bool found_route = false;
-  for (ULONG i = 0; i < routes->NumEntries; ++i) {
-    const MIB_IPFORWARD_ROW2& route = routes->Table[i];
-    if (route.InterfaceLuid.Value != target.Value) continue;
-    const auto& prefix = route.DestinationPrefix;
-    // Valid IPv4 /1 routes are always 0.0.0.0/1 or 128.0.0.0/1.
-    // Avoid endianness-dependent address parsing in the native runner.
-    if (prefix.PrefixLength == 0 || prefix.PrefixLength == 1) {
-      found_route = true;
+  std::vector<BYTE> route_buffer(route_bytes);
+  auto* routes = reinterpret_cast<PMIB_IPFORWARDTABLE>(route_buffer.data());
+  status = GetIpForwardTable(routes, &route_bytes, FALSE);
+  if (status != NO_ERROR) {
+    put("inspectionOk", false);
+    return flutter::EncodableValue(output);
+  }
+  bool default_route = false;
+  for (DWORD i = 0; i < routes->dwNumEntries; ++i) {
+    const auto& route = routes->table[i];
+    if (route.dwForwardIfIndex != target_index) continue;
+    // 0.0.0.0/0 and /1 split default, including network-byte-order
+    // representations of the /1 mask on little-endian hosts.
+    if (route.dwForwardMask == 0 ||
+        route.dwForwardMask == 0x80000000UL ||
+        route.dwForwardMask == 0x00000080UL) {
+      default_route = true;
       break;
     }
   }
-  FreeMibTable(routes);
   put("inspectionOk", true);
-  put("defaultRoutePresent", found_route);
-  return flutter::EncodableValue(data);
+  put("defaultRoutePresent", default_route);
+  return flutter::EncodableValue(output);
 }
 
 }  // namespace twinconnect_tun_inspect
