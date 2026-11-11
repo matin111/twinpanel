@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:flutter/services.dart';
 
 import 'singbox_windows_config.dart';
+import 'singbox_profile_validator.dart';
 import 'modern_transport_probe.dart';
 import 'windows_singbox_preflight.dart';
 
@@ -62,8 +63,28 @@ class WindowsSingBoxTunnel {
       if (!await WindowsSingBoxPreflight.enginePresent()) {
         throw const FormatException('SINGBOX_ENGINE_NOT_INSTALLED');
       }
+      // Bootstrap the selected endpoint on the physical network BEFORE
+      // strict-route TUN changes system DNS or routes. Use the same pinned IP
+      // for the real tunnel, retaining the original TLS server_name.
+      final outbound = SingBoxProfileValidator.validateOutbound(
+        protocolCode: protocol, item: profile);
+      final endpoint = outbound['server'] as String;
+      String? resolvedServer;
+      if (InternetAddress.tryParse(endpoint) == null) {
+        try {
+          final addresses = await InternetAddress.lookup(
+            endpoint, type: InternetAddressType.IPv4,
+          ).timeout(const Duration(seconds: 8));
+          if (addresses.isEmpty) {
+            throw const FormatException('SINGBOX_ENDPOINT_DNS_UNAVAILABLE');
+          }
+          resolvedServer = addresses.first.address;
+        } catch (_) {
+          throw const FormatException('SINGBOX_ENDPOINT_DNS_UNAVAILABLE');
+        }
+      }
       final config = SingBoxWindowsConfig.compose(
-        protocol: protocol, item: profile);
+        protocol: protocol, item: profile, resolvedServer: resolvedServer);
       if (!await WindowsSingBoxPreflight.checkInMemory(config)) {
         throw const FormatException('SINGBOX_TUN_CONFIG_INVALID');
       }
