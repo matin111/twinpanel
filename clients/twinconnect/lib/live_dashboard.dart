@@ -1246,6 +1246,27 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
               'SINGBOX_TUN_CONFIG_INVALID' => tr(
                 'کانفیگ این پروتکل برای موتور ویندوز معتبر نیست.',
                 'This protocol configuration was rejected by the Windows engine.'),
+              'SINGBOX_TUN_ADAPTER_MISSING' => tr(
+                'آداپتور TwinConnectSB ساخته نشد؛ درایور یا مجوز ویندوز را بررسی کنید.',
+                'TwinConnectSB adapter was not created; check Windows driver and permissions.'),
+              'SINGBOX_TUN_DEFAULT_ROUTE_MISSING' => tr(
+                'آداپتور ساخته شد، اما مسیر اینترنت از آن عبور نمی‌کند.',
+                'TUN adapter exists but its default internet route is missing.'),
+              'SINGBOX_TUN_ROUTE_INSPECTION_FAILED' => tr(
+                'وضعیت مسیر شبکه ویندوز قابل بررسی نبود.',
+                'Could not inspect Windows TUN routes.'),
+              'SINGBOX_TUN_DRIVER_ERROR' => tr(
+                'درایور رابط TUN در ویندوز راه‌اندازی نشد.',
+                'Windows TUN driver failed to start.'),
+              'SINGBOX_TUN_PERMISSION_DENIED' => tr(
+                'دسترسی مدیریت برای راه‌اندازی TUN کافی نیست.',
+                'Administrator permission required for TUN setup.'),
+              'SINGBOX_TUN_ROUTE_INSTALL_FAILED' => tr(
+                'ویندوز نتوانست مسیر شبکه TUN را نصب کند.',
+                'Windows failed to install TUN routes.'),
+              'SINGBOX_TUN_ADAPTER_START_FAILED' => tr(
+                'ساخت رابط مجازی TUN با خطا روبه‌رو شد.',
+                'Virtual TUN interface could not start.'),
               final code => tr('خطای اتصال: $code', 'Connection error: $code'),
             },
             style: const TextStyle(color: Colors.orangeAccent, fontSize: 11),
