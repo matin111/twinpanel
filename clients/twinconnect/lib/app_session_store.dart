@@ -13,11 +13,13 @@ class PersistedAppSession {
     required this.username,
     required this.sessionToken,
     required this.brand,
+    this.refreshToken,
   });
 
   final String username;
   final String sessionToken;
   final BrandPreview brand;
+  final String? refreshToken;
 }
 
 class AppSessionStore {
@@ -43,8 +45,10 @@ class AppSessionStore {
           TenantIdentity.namespaceFromUsername(username) != brand.namespace) {
         return null;
       }
+      final refresh = parsed['refresh_token'];
       return PersistedAppSession(
-        username: username, sessionToken: token, brand: brand);
+        username: username, sessionToken: token, brand: brand,
+        refreshToken: refresh is String && refresh.length >= 40 ? refresh : null);
     } catch (_) {
       // A corrupted or unavailable OS vault must never bypass authentication.
       return null;
@@ -55,6 +59,7 @@ class AppSessionStore {
     required String username,
     required String sessionToken,
     required BrandPreview brand,
+    String? refreshToken,
   }) async {
     // Save username only in ordinary preferences, never secrets.
     final prefs = await SharedPreferences.getInstance();
@@ -64,6 +69,7 @@ class AppSessionStore {
       value: jsonEncode({
         'username': username,
         'token': sessionToken,
+        if (refreshToken != null) 'refresh_token': refreshToken,
         'brand': brand.toJson(),
       }),
     );
