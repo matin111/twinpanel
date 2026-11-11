@@ -378,27 +378,13 @@ def users_fast_page(
     page_user_ids = [int(row.id) for row in rows]
     subscription_counts = {}
     if page_user_ids:
-        stats_rows = (
-            db.query(
-                Subscription.user_id,
-                func.count(Subscription.id).label("total"),
-                func.sum(case((Subscription.status == SubscriptionStatus.ACTIVE, 1), else_=0)).label("active"),
-                func.sum(case((Subscription.status == SubscriptionStatus.EXPIRED, 1), else_=0)).label("expired"),
-                func.sum(case((Subscription.status == SubscriptionStatus.SUSPENDED, 1), else_=0)).label("suspended"),
-            )
+        counts = (
+            db.query(Subscription.user_id, func.count(Subscription.id))
             .filter(Subscription.user_id.in_(page_user_ids))
             .group_by(Subscription.user_id)
             .all()
         )
-        subscription_counts = {
-            int(stat.user_id): {
-                "total": int(stat.total or 0),
-                "active": int(stat.active or 0),
-                "expired": int(stat.expired or 0),
-                "suspended": int(stat.suspended or 0),
-            }
-            for stat in stats_rows
-        }
+        subscription_counts = {int(user_id): int(count) for user_id, count in counts}
     return {
         "items": [
             {
@@ -409,7 +395,7 @@ def users_fast_page(
                 "role": row.role,
                 "is_active": row.is_active,
                 "created_at": row.created_at,
-                "subscription_stats": subscription_counts.get(int(row.id), {"total": 0, "active": 0, "expired": 0, "suspended": 0}),
+                "subscription_count": subscription_counts.get(int(row.id), 0),
             }
             for row in rows
         ],
