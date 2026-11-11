@@ -38,7 +38,7 @@ void main() {
     expect(dns['cache_capacity'], 4096);
     expect(dns['optimistic'], isFalse);
     expect(((routing['rules'] as List).first as Map)['action'], 'hijack-dns');
-    expect(((routing['rules'] as List).first as Map)['protocol'], 'dns');
+    expect(((routing['rules'] as List).first as Map)['port'], 53);
     expect((item['outbound'] as Map).containsKey('tag'), isFalse);
   });
 
