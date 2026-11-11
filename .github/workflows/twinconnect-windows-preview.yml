@@ -99,8 +99,12 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $package = Join-Path (Get-Location) 'build/windows/x64/runner/Release/prerequisites/openconnect-gui-1.6.2-win64.exe'
-          & $package /S
-          if ($LASTEXITCODE -ne 0) { throw "Bundled OpenConnect silent prerequisite failed: $LASTEXITCODE" }
+          # GUI installers may spawn a child and return before `$LASTEXITCODE`
+          # is populated. Start-Process -Wait tracks their actual exit.
+          $installer = Start-Process -FilePath $package -ArgumentList '/S' -Wait -PassThru -NoNewWindow
+          if ($installer.ExitCode -ne 0) {
+            throw "Bundled OpenConnect silent prerequisite failed: $($installer.ExitCode)"
+          }
           $roots = @($env:ProgramFiles, ${env:ProgramFiles(x86)})
           $engines = foreach ($root in $roots) {
             if (!$root) { continue }
