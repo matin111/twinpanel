@@ -69,7 +69,14 @@ void main() {
     await tester.ensureVisible(find.byKey(const Key('devFilter_hysteria2')));
     await tester.tap(find.byKey(const Key('devFilter_hysteria2')));
     await tester.pump(const Duration(milliseconds: 800));
-    expect(find.byKey(const Key('devServer_0')), findsOneWidget);
+    // Countries are initially collapsed, even when a protocol is selected.
+    expect(find.byKey(const Key('countryToggle_TR')), findsOneWidget);
+    expect(find.byKey(const Key('countryToggle_DE')), findsOneWidget);
+    expect(find.byKey(const Key('devServer_0')), findsNothing);
+    expect(find.byKey(const Key('devServer_1')), findsNothing);
+    await tester.ensureVisible(find.byKey(const Key('countryToggle_DE')));
+    await tester.tap(find.byKey(const Key('countryToggle_DE')));
+    await tester.pump(const Duration(milliseconds: 800));
     expect(find.byKey(const Key('devServer_1')), findsOneWidget);
     await tester.ensureVisible(find.byKey(const Key('devServer_1')));
     await tester.tap(find.byKey(const Key('devServer_1')));
@@ -83,6 +90,10 @@ void main() {
     await tester.pump(const Duration(milliseconds: 800));
     await tester.ensureVisible(find.byKey(const Key('devFilter_cisco')));
     await tester.tap(find.byKey(const Key('devFilter_cisco')));
+    await tester.pump(const Duration(milliseconds: 800));
+    expect(find.byKey(const Key('devServer_0')), findsNothing);
+    await tester.ensureVisible(find.byKey(const Key('countryToggle_TR')));
+    await tester.tap(find.byKey(const Key('countryToggle_TR')));
     await tester.pump(const Duration(milliseconds: 800));
     expect(find.byKey(const Key('devServer_0')), findsOneWidget);
     await tester.tap(find.byKey(const Key('devServer_0')));
