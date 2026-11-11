@@ -79,6 +79,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   final WindowsWireGuardController _vpn = const WindowsWireGuardController();
   late final WindowsSingBoxTunnel _modernTunnel = WindowsSingBoxTunnel(
     onUnexpectedExit: () {
+      _modernHealthTimer?.cancel();
       if (!mounted) return;
       setState(() {
         _modernUp = false;
@@ -88,6 +89,9 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     },
   );
   bool _modernUp = false;
+  Timer? _modernHealthTimer;
+  bool _modernHealthBusy = false;
+  int _modernHealthFailures = 0;
   String? _modernProtocol;
   String? _modernNodeId;
   final VpnPolicyStore _vpnPolicy = const VpnPolicyStore();
@@ -297,6 +301,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     setState(() { _vpnBusy = true; _vpnError = null; });
     try {
       if (_modernTunnel.isRunning || _modernUp) {
+        _modernHealthTimer?.cancel();
         await _modernTunnel.stop();
         if (!mounted) return;
         setState(() { _modernUp = false; _modernProtocol = null; _modernNodeId = null; });
@@ -337,6 +342,36 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     } finally {
       if (mounted) setState(() => _vpnBusy = false);
     }
+  }
+
+  // Check the active route periodically without restarting a functioning
+  // tunnel. Two consecutive failures flag degraded routing, but do not
+  // override a user's selection or unexpectedly disconnect them.
+  void _startModernHealthMonitoring() {
+    _modernHealthTimer?.cancel();
+    _modernHealthFailures = 0;
+    _modernHealthTimer = Timer.periodic(const Duration(seconds: 25), (_) async {
+      if (!mounted || !_modernUp || _vpnBusy || _modernHealthBusy) return;
+      _modernHealthBusy = true;
+      try {
+        final healthy = await _modernTunnel.checkHealth();
+        if (!mounted || !_modernUp || _vpnBusy) return;
+        if (healthy) {
+          _modernHealthFailures = 0;
+          if (_vpnError == 'SINGBOX_TUN_HEALTH_DEGRADED') {
+            setState(() => _vpnError = null);
+          }
+        } else {
+          _modernHealthFailures++;
+          if (_modernHealthFailures >= 2 &&
+              _vpnError != 'SINGBOX_TUN_HEALTH_DEGRADED') {
+            setState(() => _vpnError = 'SINGBOX_TUN_HEALTH_DEGRADED');
+          }
+        }
+      } finally {
+        _modernHealthBusy = false;
+      }
+    });
   }
 
   Future<void> _startModernTunnel(String protocol, String serverId) async {
@@ -397,6 +432,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         });
       }
       if (_modernTunnel.isRunning) {
+        _modernHealthTimer?.cancel();
         await _modernTunnel.stop();
         if (!mounted) return;
         setState(() {
@@ -414,6 +450,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         _publicIp = newIp;
         _vpnError = null;
       });
+      _startModernHealthMonitoring();
     } catch (error) {
       if (mounted) {
         setState(() {
@@ -432,6 +469,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
 
   Future<void> _stopModernTunnel() async {
     if (_vpnBusy) return;
+    _modernHealthTimer?.cancel();
     setState(() { _vpnBusy = true; _vpnError = null; });
     try {
       await _modernTunnel.stop();
@@ -583,6 +621,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
 
   @override
   void dispose() {
+    _modernHealthTimer?.cancel();
     _modernTunnel.dispose();
     _resetNetworkStats();
     super.dispose();
@@ -1237,6 +1276,9 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
               'SINGBOX_TUN_INTERNET_UNREACHABLE' => tr(
                 'تونل اجرا شد اما درخواست اینترنت از مسیر آن پاسخ نگرفت؛ اتصال تأیید نشد.',
                 'TUN started but the internet test failed; connection not verified.'),
+              'SINGBOX_TUN_HEALTH_DEGRADED' => tr(
+                'کیفیت مسیر اتصال کاهش یافته؛ اینترنت را بررسی کنید.',
+                'VPN route health degraded; check internet connectivity.'),
               'SINGBOX_TUN_ROUTE_NOT_VERIFIED' => tr(
                 'IP اینترنت تغییر نکرد؛ مسیر TUN تأیید نشد و اتصال متوقف شد.',
                 'Public IP did not change; TUN routing could not be verified.'),
