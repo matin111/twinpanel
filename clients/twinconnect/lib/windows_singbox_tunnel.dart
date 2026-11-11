@@ -14,7 +14,6 @@ import 'windows_singbox_preflight.dart';
 /// helper is needed before advertising crash-safe always-on protection.
 class WindowsSingBoxTunnel {
   Process? _child;
-  StreamSubscription<int>? _exitSubscription;
   String? _activeProtocol;
   String? _activeServerId;
   String? _exitIp;
@@ -65,14 +64,12 @@ class WindowsSingBoxTunnel {
       unawaited(current.stderr.drain<void>());
       current.stdin.add(utf8.encode(jsonEncode(config)));
       await current.stdin.close();
-      final exitSignal = current.exitCode.then((_) => true);
+      var exited = false;
+      unawaited(current.exitCode.then((_) { exited = true; }));
       String? verified;
       for (var attempt = 0; attempt < 8; attempt++) {
         await Future<void>.delayed(const Duration(seconds: 2));
-        if (await Future.any([
-          exitSignal,
-          Future<bool>.delayed(const Duration(milliseconds: 1), () => false),
-        ])) {
+        if (exited) {
           throw const FormatException('SINGBOX_PROCESS_EXITED');
         }
         try {
