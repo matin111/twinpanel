@@ -40,6 +40,7 @@ class TwinConnectLiveDashboard extends StatefulWidget {
     required this.sessionToken,
     required this.catalog,
     required this.servers,
+    this.serverRefreshError,
     required this.native,
     required this.onRefresh,
     required this.plan,
@@ -55,6 +56,7 @@ class TwinConnectLiveDashboard extends StatefulWidget {
   final String sessionToken;
   final PanelProtocolCatalog? catalog;
   final AppServerInventory? servers;
+  final String? serverRefreshError;
   final NativeProtocolReadiness native;
   final VoidCallback onRefresh;
   final AppPlanClassification? plan;
@@ -1563,10 +1565,30 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           filters(),
           const SizedBox(height: 12),
           for (final i in matching) serverRow(i),
-          if (matching.isEmpty)
+          if (widget.serverRefreshError != null)
+            Padding(
+              padding: const EdgeInsets.all(18),
+              child: Column(children: [
+                txt(widget.serverRefreshError == 'APP_SESSION_EXPIRED'
+                  ? tr('نشست ورود منقضی شده است. برای دریافت سرورها دوباره وارد حساب شوید.',
+                       'Session expired. Sign in again to restore servers.')
+                  : tr('دریافت فهرست سرورها ناموفق بود. اتصال پنل را بررسی و دوباره تلاش کنید.',
+                       'Server refresh failed. Check panel access and retry.'),
+                  align: TextAlign.center, color: const Color(0xFFFFBE67)),
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  onPressed: widget.onRefresh,
+                  icon: const Icon(Icons.refresh_rounded),
+                  label: Text(tr('تلاش دوباره', 'Retry')),
+                ),
+              ]),
+            )
+          else if (matching.isEmpty)
             Padding(
               padding: const EdgeInsets.all(22),
-              child: txt(tr('سروری پیدا نشد', 'No servers found'),
+              child: txt(widget.servers == null
+                ? tr('در حال دریافت سرورها...', 'Loading servers...')
+                : tr('سروری پیدا نشد', 'No servers found'),
                 align: TextAlign.center, color: sub),
             ),
         ],
