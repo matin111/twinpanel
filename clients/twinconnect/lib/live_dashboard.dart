@@ -448,11 +448,15 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       if (matches.length != 1) {
         throw const FormatException('MODERN_SERVER_PROFILE_MISSING');
       }
-      // Prepare/validate the destination before disconnecting any VPN.
-      final targetConfig = SingBoxWindowsConfig.compose(
-          protocol: protocol, item: matches.single);
-      if (!await WindowsSingBoxPreflight.checkInMemory(targetConfig)) {
-        throw const FormatException('SINGBOX_TUN_CONFIG_INVALID');
+      // When switching away from a working VPN, validate before stopping
+      // it. For a fresh connect the tunnel controller performs the exact
+      // same native config validation; avoid starting sing-box twice.
+      if (_vpnUp || _vpnCleanup || _modernTunnel.isRunning) {
+        final targetConfig = SingBoxWindowsConfig.compose(
+            protocol: protocol, item: matches.single);
+        if (!await WindowsSingBoxPreflight.checkInMemory(targetConfig)) {
+          throw const FormatException('SINGBOX_TUN_CONFIG_INVALID');
+        }
       }
       if (_vpnUp || _vpnCleanup) {
         await _vpn.stop().timeout(const Duration(seconds: 20));
