@@ -68,6 +68,9 @@ class SingBoxWindowsConfig {
            'detour': 'proxy'},
         ],
         'final': 'dns-remote',
+        // Diagnostic IPv4-only mode: do not return AAAA targets while
+        // the modern TUN's IPv6 HTTPS route is failing on Windows.
+        'strategy': 'ipv4_only',
         // sing-box 1.14: cache repeated DNS answers and update stale
         // entries in the background. DNS still travels through the proxy.
         'cache_capacity': 4096,
@@ -94,6 +97,9 @@ class SingBoxWindowsConfig {
         'final': 'proxy',
         'rules': [
           {'port': 53, 'action': 'hijack-dns'},
+          // Fail closed for literal IPv6 targets; never bypass the TUN via
+          // the physical Wi-Fi route while testing IPv4 compatibility.
+          {'ip_version': 6, 'action': 'reject'},
           {'action': 'sniff'},
         ],
       },
