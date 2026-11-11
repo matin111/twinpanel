@@ -220,16 +220,51 @@ class WindowsSingBoxTunnel {
   /// Read-only Windows inspection. Never modifies routes or adapters.
   /// Route presence alone is not a proof of an operating VPN.
   static Future<String?> _windowsTunRouteIssue() async {
-    const command = r'''$a=Get-NetAdapter -Name 'TwinConnectSB' -ErrorAction SilentlyContinue; $r=@(Get-NetRoute -AddressFamily IPv4 -ErrorAction SilentlyContinue | Where-Object { $_.InterfaceAlias -eq 'TwinConnectSB' -and $_.DestinationPrefix -in @('0.0.0.0/0','0.0.0.0/1','128.0.0.0/1') }); [pscustomobject]@{adapter=[bool]$a; routes=$r.Count} | ConvertTo-Json -Compress''';
+    // PowerShell's NetTCPIP module can take more than six seconds to load
+    // on Windows 10/11. Run one native inspection with a bounded 18-second
+    // budget; don't interpret command timeout as a missing default route.
+    const command = r'''
+$ErrorActionPreference = 'Stop'
+try {
+  $adapter = Get-NetAdapter -Name 'TwinConnectSB' -ErrorAction SilentlyContinue
+  if ($null -eq $adapter) {
+    [pscustomobject]@{ state='adapter_missing'; routes=0 } |
+      ConvertTo-Json -Compress
+    exit 0
+  }
+  $routes = @(Get-NetRoute -AddressFamily IPv4 -InterfaceIndex $adapter.ifIndex -ErrorAction Stop |
+    Where-Object {
+      $_.DestinationPrefix -eq '0.0.0.0/0' -or
+      $_.DestinationPrefix -eq '0.0.0.0/1' -or
+      $_.DestinationPrefix -eq '128.0.0.0/1'
+    })
+  [pscustomobject]@{ state='inspected'; routes=$routes.Count } |
+    ConvertTo-Json -Compress
+} catch {
+  [pscustomobject]@{ state='inspection_error'; routes=0 } |
+    ConvertTo-Json -Compress
+}
+''';
     try {
-      final result = await Process.run('powershell.exe',
-        ['-NoProfile', '-NonInteractive', '-Command', command],
-        runInShell: false).timeout(const Duration(seconds: 6));
-      if (result.exitCode != 0) return 'SINGBOX_TUN_ROUTE_INSPECTION_FAILED';
-      final data = jsonDecode(result.stdout.toString());
+      final result = await Process.run(
+        'powershell.exe',
+        ['-NoLogo', '-NoProfile', '-NonInteractive', '-Command', command],
+        runInShell: false,
+      ).timeout(const Duration(seconds: 18));
+      if (result.exitCode != 0) {
+        return 'SINGBOX_TUN_ROUTE_INSPECTION_FAILED';
+      }
+      final raw = result.stdout.toString().trim();
+      final data = jsonDecode(raw);
       if (data is! Map) return 'SINGBOX_TUN_ROUTE_INSPECTION_FAILED';
-      if (data['adapter'] != true) return 'SINGBOX_TUN_ADAPTER_MISSING';
-      if (data['routes'] is! num || (data['routes'] as num) < 1) {
+      if (data['state'] == 'adapter_missing') {
+        return 'SINGBOX_TUN_ADAPTER_MISSING';
+      }
+      if (data['state'] != 'inspected') {
+        return 'SINGBOX_TUN_ROUTE_INSPECTION_FAILED';
+      }
+      final routeCount = data['routes'];
+      if (routeCount is! num || routeCount < 1) {
         return 'SINGBOX_TUN_DEFAULT_ROUTE_MISSING';
       }
       return null;
