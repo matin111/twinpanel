@@ -383,7 +383,7 @@ class WindowsSingBoxTunnel {
   /// Route presence alone is not a proof of an operating VPN.
   static Future<String?> inspectWindowsTunRoutes() async {
     // PowerShell's NetTCPIP module can take more than six seconds to load
-    // on Windows 10/11. Run one native inspection with a bounded 18-second
+    // on Windows 10/11 and cold CI runners. Use a bounded 45-second
     // budget; don't interpret command timeout as a missing default route.
     const command = r'''
 $ErrorActionPreference = 'Stop'
@@ -412,7 +412,7 @@ try {
         'powershell.exe',
         ['-NoLogo', '-NoProfile', '-NonInteractive', '-Command', command],
         runInShell: false,
-      ).timeout(const Duration(seconds: 18));
+      ).timeout(const Duration(seconds: 45));
       if (result.exitCode != 0) {
         return 'SINGBOX_TUN_ROUTE_INSPECTION_FAILED';
       }
