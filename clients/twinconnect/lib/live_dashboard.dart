@@ -1,4 +1,4 @@
-import 'dart:ui' show ImageFilter;
+import 'dart:ui' show ImageFilter, FontFeature;
 import 'dart:io' show Platform, HttpClient, InternetAddress, Process;
 import 'dart:convert' show utf8;
 import 'dart:async' show Timer;
