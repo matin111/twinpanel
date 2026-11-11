@@ -87,7 +87,7 @@ class SingBoxWindowsConfig {
         'rules': [
           // Handle plaintext DNS from apps using arbitrary resolvers inside
           // sing-box, instead of allowing filtered answers via the LAN.
-          {'protocol': 'dns', 'action': 'hijack-dns'},
+          {'port': 53, 'action': 'hijack-dns'},
           {'action': 'sniff'},
         ],
       },
