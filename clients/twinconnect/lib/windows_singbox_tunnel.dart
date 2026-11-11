@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:flutter/services.dart';
 
 import 'singbox_windows_config.dart';
+import 'modern_transport_probe.dart';
 import 'windows_singbox_preflight.dart';
 
 /// Owns a single sing-box Windows TUN child process.
@@ -52,7 +53,16 @@ class WindowsSingBoxTunnel {
       if (!await WindowsSingBoxPreflight.checkInMemory(config)) {
         throw const FormatException('SINGBOX_TUN_CONFIG_INVALID');
       }
-      // Network baseline must be measured before changing the Windows route.
+      // Independently verify that the selected Hysteria2/TUIC/etc outbound
+      // can reach the internet before changing any Windows routes.
+      // A failure here points to profile/transport rather than TUN routing.
+      String verifiedProxyIp;
+      try {
+        verifiedProxyIp = (await ModernTransportProbe.verify(
+          protocol: protocol, profile: profile)).publicIp;
+      } catch (_) {
+        throw const FormatException('SINGBOX_SERVER_TRANSPORT_UNREACHABLE');
+      }
       final before = await _requestPublicIp().timeout(
         const Duration(seconds: 10),
         onTimeout: () => throw const FormatException('BASELINE_IP_UNAVAILABLE'),
@@ -105,8 +115,15 @@ class WindowsSingBoxTunnel {
           ).timeout(const Duration(seconds: 6));
           postTunnelHttpSucceeded = true;
           if (ip != before) {
+            // Record the observed system-route IP, even when a server uses
+            // multiple legitimate exits behind one selected outbound.
             verified = ip;
             break;
+          }
+          if (ip == verifiedProxyIp && verifiedProxyIp == before) {
+            // Identical exit IP is ambiguous: this may already be routed
+            // through the same VPN. Never call it verified solely on IP.
+            postTunnelHttpSucceeded = true;
           }
         } catch (_) {
           // No successful HTTP response is not evidence of a working TUN.
