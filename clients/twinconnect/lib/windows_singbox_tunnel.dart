@@ -259,8 +259,12 @@ class WindowsSingBoxTunnel {
       }
       String? verified;
       var postTunnelHttpSucceeded = false;
-      for (var attempt = 0; attempt < 8; attempt++) {
-        await Future<void>.delayed(const Duration(seconds: 2));
+      // Check promptly after TUN creation. Keep approximately the same
+      // overall readiness window as before (16s), but avoid imposing a
+      // mandatory two-second delay on an already healthy connection.
+      for (var attempt = 0; attempt < 40; attempt++) {
+        await Future<void>.delayed(
+          const Duration(milliseconds: 400));
         if (exited) {
           throw FormatException(nativeFailure ?? 'SINGBOX_PROCESS_EXITED');
         }
