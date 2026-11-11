@@ -113,6 +113,13 @@ class WindowsSingBoxTunnel {
           final ip = await _requestPublicIp(
             alternative: attempt.isOdd,
           ).timeout(const Duration(seconds: 6));
+          final observed = InternetAddress.tryParse(ip);
+          final baseline = InternetAddress.tryParse(before);
+          if (observed == null || baseline == null ||
+              observed.type != baseline.type) {
+            // IPv4/IPv6 differences are not proof of a VPN route change.
+            continue;
+          }
           postTunnelHttpSucceeded = true;
           if (ip != before) {
             // Record the observed system-route IP, even when a server uses
