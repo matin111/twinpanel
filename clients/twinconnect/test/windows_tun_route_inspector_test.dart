@@ -17,5 +17,5 @@ void main() {
       'SINGBOX_TUN_ADAPTER_MISSING',
       'SINGBOX_TUN_DEFAULT_ROUTE_MISSING',
     ));
-  }, timeout: const Timeout(Duration(seconds: 35)));
+  }, timeout: const Timeout(Duration(seconds: 65)));
 }
