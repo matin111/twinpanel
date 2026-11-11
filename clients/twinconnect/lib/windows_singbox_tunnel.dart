@@ -271,6 +271,9 @@ class WindowsSingBoxTunnel {
       if (state['defaultRoutePresent'] != true) {
         return 'SINGBOX_TUN_DEFAULT_ROUTE_MISSING';
       }
+      if (state['bestRouteKnown'] == true && state['tunPreferred'] != true) {
+        return 'SINGBOX_TUN_NOT_PREFERRED';
+      }
       return null;
     } catch (_) {
       return 'SINGBOX_TUN_NATIVE_INSPECTION_FAILED';
