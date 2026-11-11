@@ -41,6 +41,8 @@ class RenewOrderIn(BaseModel):
         default=None,
         max_length=180,
     )
+    # Optional for legacy clients; bot now submits the explicit chosen plan.
+    plan_id: int | None = Field(default=None, gt=0)
 
 
 def _status(value) -> str:
@@ -337,18 +339,23 @@ def create_renewal_order(
             detail="این اشتراک قابل تمدید نیست",
         )
 
-    plan = db.get(
-        Plan,
-        sub.plan_id,
-    )
+    from ..reseller_owned_plans import is_internal_reseller_plan
 
+    # Renewal can add credit from any public plan, without creating a new
+    # account or changing the beneficiary's credentials/ownership.
+    selected_plan_id = payload.plan_id if payload.plan_id is not None else sub.plan_id
+    plan = db.get(Plan, selected_plan_id) if selected_plan_id is not None else None
     if (
         not plan
-        or not plan.is_active
+        or not bool(plan.is_active)
+        or is_internal_reseller_plan(plan)
+        or int(plan.price_toman or 0) <= 0
+        or int(plan.duration_days or 0) <= 0
+        or int(plan.traffic_gb or 0) <= 0
     ):
         raise HTTPException(
             status_code=409,
-            detail="پلن این اشتراک برای تمدید فعال نیست",
+            detail="پلن تمدید انتخاب‌شده فعال و قابل خرید نیست",
         )
 
     key = (
@@ -373,9 +380,19 @@ def create_renewal_order(
     )
 
     if existing:
-        return _order_out(
-            existing
-        )
+        # An idempotency key must never authorize renewal of a different
+        # subscription or plan, even if the payer is the same.
+        linked = db.query(SubscriptionRenewalOrder).filter(
+            SubscriptionRenewalOrder.order_id == existing.id,
+            SubscriptionRenewalOrder.subscription_id == sub.id,
+            SubscriptionRenewalOrder.plan_id == plan.id,
+        ).first()
+        if linked is None:
+            raise HTTPException(
+                status_code=409,
+                detail="کلید سفارش برای اشتراک یا پلن دیگری استفاده شده است",
+            )
+        return _order_out(existing)
 
     protocols = _protocols(
         db,
