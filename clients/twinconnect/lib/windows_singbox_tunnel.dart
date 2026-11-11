@@ -56,17 +56,20 @@ class WindowsSingBoxTunnel {
       // Independently verify that the selected Hysteria2/TUIC/etc outbound
       // can reach the internet before changing any Windows routes.
       // A failure here points to profile/transport rather than TUN routing.
-      String verifiedProxyIp;
-      try {
-        verifiedProxyIp = (await ModernTransportProbe.verify(
-          protocol: protocol, profile: profile)).publicIp;
-      } catch (_) {
+      // Both checks are read-only and independent. Run concurrently so
+      // connection setup does not wait for their latencies sequentially.
+      final proxyCheck = ModernTransportProbe.verify(
+        protocol: protocol, profile: profile,
+      ).then((result) => result.publicIp).catchError((Object _) {
         throw const FormatException('SINGBOX_SERVER_TRANSPORT_UNREACHABLE');
-      }
-      final before = await _requestPublicIp().timeout(
+      });
+      final baselineCheck = _requestPublicIp().timeout(
         const Duration(seconds: 10),
         onTimeout: () => throw const FormatException('BASELINE_IP_UNAVAILABLE'),
       );
+      final checked = await Future.wait<String>([proxyCheck, baselineCheck]);
+      final verifiedProxyIp = checked[0];
+      final before = checked[1];
 
       started = await Process.start(
         WindowsSingBoxPreflight.enginePath(Platform.resolvedExecutable),
