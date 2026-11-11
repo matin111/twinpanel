@@ -45,15 +45,14 @@ def _pretty_button(button: InlineKeyboardButton) -> InlineKeyboardButton:
     for needle, label in _PROTOCOL_LABELS:
         if needle in lower:
             update["text"] = label
-            update["style"] = "primary"
+            # Protocol navigation stays neutral; no rainbow of blue buttons.
             break
 
     if "حذف اکانت" in text or "حذف اشتراک" in text:
         update["text"] = "🗑️ حذف اکانت"
         update["style"] = "danger"
     elif "تمدید" in text:
-        update["text"] = "💳 تمدید اشتراک"
-        update["style"] = "success"
+        update["text"] = "↻ تمدید اشتراک"
     elif "اطلاعات اتصال" in text or "لینک کانفیگ" in text or "کانفیگ" in text:
         update.setdefault("text", "🔐 اطلاعات اتصال")
         update["style"] = "primary"
@@ -84,7 +83,6 @@ def _decorate(markup: InlineKeyboardMarkup | None) -> InlineKeyboardMarkup:
             InlineKeyboardButton(
                 text="🏠 منوی اصلی",
                 callback_data="main:home",
-                style="primary",
             ),
         ])
     elif "main:home" not in callbacks:
@@ -96,8 +94,7 @@ def _decorate(markup: InlineKeyboardMarkup | None) -> InlineKeyboardMarkup:
                     InlineKeyboardButton(
                         text="🏠 منوی اصلی",
                         callback_data="main:home",
-                        style="primary",
-                    )
+                            )
                 )
                 break
 
