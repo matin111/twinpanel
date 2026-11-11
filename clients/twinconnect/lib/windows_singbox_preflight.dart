@@ -17,12 +17,48 @@ class WindowsSingBoxPreflight {
     return '$base\\engines\\sing-box\\sing-box.exe';
   }
 
+  // One version subprocess is enough per unchanged binary. Multiple parts
+  // of the connect pipeline invoke this concurrently and sequentially.
+  // Revalidate after 60s, or immediately when the executable changes.
+  static Future<bool>? _versionCheck;
+  static DateTime? _checkedAt;
+  static DateTime? _binaryModified;
+  static int? _binarySize;
+  static String? _binaryPath;
+
   static Future<bool> enginePresent() async {
     if (!Platform.isWindows) return false;
     final binary = File(enginePath(Platform.resolvedExecutable));
-    if (!await binary.exists()) return false;
     try {
-      final result = await Process.run(binary.path, ['version'],
+      final stat = await binary.stat();
+      if (stat.type != FileSystemEntityType.file) {
+        _versionCheck = null;
+        return false;
+      }
+      final now = DateTime.now();
+      if (_versionCheck != null &&
+          _binaryPath == binary.path &&
+          _binaryModified == stat.modified &&
+          _binarySize == stat.size &&
+          _checkedAt != null &&
+          now.difference(_checkedAt!) < const Duration(seconds: 60)) {
+        return await _versionCheck!;
+      }
+      _binaryPath = binary.path;
+      _binaryModified = stat.modified;
+      _binarySize = stat.size;
+      _checkedAt = now;
+      _versionCheck = _verifyVersion(binary.path);
+      return await _versionCheck!;
+    } catch (_) {
+      _versionCheck = null;
+      return false;
+    }
+  }
+
+  static Future<bool> _verifyVersion(String path) async {
+    try {
+      final result = await Process.run(path, ['version'],
           runInShell: false).timeout(const Duration(seconds: 6));
       return result.exitCode == 0 &&
           RegExp(r'\b1\.14\.4\b').hasMatch(result.stdout.toString());
