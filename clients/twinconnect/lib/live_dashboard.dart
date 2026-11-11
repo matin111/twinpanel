@@ -1237,94 +1237,193 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         ],
       ),
       child: Column(children: [
+        // The primary indicator must reflect a verified tunnel, not simply
+        // an adapter that Windows reports as enabled.
         AnimatedSwitcher(
-          duration: const Duration(milliseconds: 240),
-          child: KeyedSubtree(
-            key: const ValueKey('dev-disconnected'),
-            child: smallPill(_modernUp ? tr('تونل فعال', 'Tunnel active')
-                : _vpnVerified
-                ? tr('دست‌دهی تأیید شد', 'Handshake verified')
-                : _vpnUp ? tr('رابط فعال', 'Interface active')
-                : _vpnBusy ? tr('در حال اجرا', 'Working')
-                : tr('قطع', 'Disconnected'), icon: Icons.circle),
+          key: const Key('liveOnlineStatus'),
+          duration: const Duration(milliseconds: 360),
+          switchInCurve: Curves.easeOutBack,
+          switchOutCurve: Curves.easeIn,
+          transitionBuilder: (child, animation) => FadeTransition(
+            opacity: animation,
+            child: ScaleTransition(
+              scale: Tween<double>(begin: .89, end: 1).animate(animation),
+              child: child,
+            ),
+          ),
+          child: Container(
+            key: ValueKey<String>(_vpnBusy ? 'busy' :
+                (_modernUp || _vpnVerified) ? 'online' :
+                (_vpnUp || _vpnCleanup) ? 'unverified' : 'offline'),
+            padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 10),
+            decoration: BoxDecoration(
+              color: (_modernUp || _vpnVerified)
+                  ? const Color(0xFF16D6A4).withValues(alpha: .15)
+                  : _vpnBusy ? purple.withValues(alpha: .16)
+                  : sub.withValues(alpha: .11),
+              border: Border.all(
+                color: (_modernUp || _vpnVerified)
+                    ? const Color(0xFF36E5BB).withValues(alpha: .60)
+                    : _vpnBusy ? purple.withValues(alpha: .52)
+                    : sub.withValues(alpha: .24),
+              ),
+              borderRadius: BorderRadius.circular(30),
+            ),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              Icon(
+                (_modernUp || _vpnVerified)
+                    ? Icons.verified_rounded
+                    : _vpnBusy ? Icons.sync_rounded
+                    : (_vpnUp || _vpnCleanup)
+                        ? Icons.shield_outlined : Icons.power_off_rounded,
+                size: 18,
+                color: (_modernUp || _vpnVerified)
+                    ? const Color(0xFF36E5BB) : _vpnBusy ? purple : sub,
+              ),
+              const SizedBox(width: 9),
+              txt((_modernUp || _vpnVerified)
+                  ? tr('آنلاین هستید', 'You are online')
+                  : _vpnBusy
+                      ? tr('در حال اتصال...', 'Connecting...')
+                      : (_vpnUp || _vpnCleanup)
+                          ? tr('روشن؛ در انتظار تأیید', 'On; awaiting verification')
+                          : tr('آفلاین هستید', 'You are offline'),
+                  bold: true, size: 13),
+            ]),
           ),
         ),
-        const SizedBox(height: 13),
+        const SizedBox(height: 18),
         TweenAnimationBuilder<double>(
           key: const Key('devPowerEntranceAnimation'),
           tween: Tween(begin: .86, end: 1),
-          duration: const Duration(milliseconds: 620),
+          duration: const Duration(milliseconds: 650),
           curve: Curves.easeOutBack,
           builder: (context, value, child) => Transform.scale(
-            scale: value,
-            child: child,
-          ),
+            scale: value, child: child),
           child: SizedBox(
-            width: 94, height: 94,
-            child: FilledButton(
-              key: const Key('liveConnectionControlsButton'),
-              onPressed: _vpnBusy ? null : _toggleVpn,
-              style: FilledButton.styleFrom(
-                backgroundColor: Colors.transparent,
-                foregroundColor: Colors.white,
-                disabledBackgroundColor: Colors.transparent,
-                padding: EdgeInsets.zero,
-                shape: const CircleBorder(),
-                elevation: 0,
-              ),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 340),
-                curve: Curves.easeInOut,
-                width: 94, height: 94,
+            height: 150, width: 150,
+            child: Stack(alignment: Alignment.center, children: [
+              // Outer double halo provides a premium depth cue without
+              // running an endless animation at idle.
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 480),
+                curve: Curves.easeOutCubic,
+                height: _vpnBusy ? 147 : 143,
+                width: _vpnBusy ? 147 : 143,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: (_vpnVerified || _modernUp)
-                      ? const [Color(0xFF34E8BD), Color(0xFF0EADBA)]
-                      : const [Color(0xFFC393FF), Color(0xFF7351E9)],
-                  ),
                   border: Border.all(
-                    width: 2,
-                    color: Colors.white.withValues(alpha: 0.45),
-                  ),
+                    color: ((_modernUp || _vpnVerified)
+                        ? const Color(0xFF39E2BA) : purple)
+                        .withValues(alpha: _vpnBusy ? .75 : .35),
+                    width: _vpnBusy ? 3 : 1.5),
                   boxShadow: [
                     BoxShadow(
-                      color: ((_vpnVerified || _modernUp)
-                        ? const Color(0xFF29E4BD) : purple)
-                        .withValues(alpha: 0.42),
-                      blurRadius: 28, spreadRadius: 3,
-                    ),
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.16),
-                      blurRadius: 11,
-                      offset: const Offset(0, 7),
-                    ),
+                      color: ((_modernUp || _vpnVerified)
+                          ? const Color(0xFF1BE4B3) : purple)
+                          .withValues(alpha: .16),
+                      blurRadius: 27, spreadRadius: 6),
                   ],
                 ),
-                child: Center(
-                  child: _vpnBusy
-                    ? const SizedBox.square(dimension: 28,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 3, color: Colors.white))
-                    : Icon((_vpnUp || _modernUp) ? Icons.stop_rounded
-                        : Icons.power_settings_new_rounded,
-                        size: 43, color: Colors.white),
+              ),
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 450),
+                height: (_modernUp || _vpnVerified) ? 125 : 119,
+                width: (_modernUp || _vpnVerified) ? 125 : 119,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white.withValues(
+                      alpha: _dark ? .20 : .50), width: 1),
                 ),
               ),
-            ),
+              FilledButton(
+                key: const Key('liveConnectionControlsButton'),
+                onPressed: _vpnBusy ? null : _toggleVpn,
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.transparent,
+                  foregroundColor: Colors.white,
+                  disabledBackgroundColor: Colors.transparent,
+                  padding: EdgeInsets.zero,
+                  shape: const CircleBorder(),
+                  elevation: 0,
+                ),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 440),
+                  curve: Curves.easeInOutCubic,
+                  width: _vpnBusy ? 105 : 110,
+                  height: _vpnBusy ? 105 : 110,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: (_modernUp || _vpnVerified)
+                          ? const [Color(0xFF4AEDD1), Color(0xFF058F9F)]
+                          : const [Color(0xFFBE92FF), Color(0xFF6037CE)],
+                    ),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: .55), width: 2),
+                    boxShadow: [
+                      BoxShadow(
+                        color: ((_modernUp || _vpnVerified)
+                            ? const Color(0xFF1CE4BD) : purple)
+                            .withValues(alpha: .40),
+                        blurRadius: _vpnBusy ? 35 : 23,
+                        spreadRadius: _vpnBusy ? 6 : 2),
+                      BoxShadow(color: Colors.black.withValues(alpha: .15),
+                        blurRadius: 13, offset: const Offset(0, 6)),
+                    ],
+                  ),
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 300),
+                    transitionBuilder: (child, animation) =>
+                        ScaleTransition(scale: animation, child: child),
+                    child: _vpnBusy
+                        ? const SizedBox(
+                            key: ValueKey('connectingSpinner'),
+                            height: 39, width: 39,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 3, color: Colors.white))
+                        : Icon(
+                            key: ValueKey((_vpnUp || _modernUp)
+                                ? 'turnOff' : 'turnOn'),
+                            (_vpnUp || _modernUp)
+                                ? Icons.stop_rounded
+                                : Icons.power_settings_new_rounded,
+                            color: Colors.white, size: 47),
+                  ),
+                ),
+              ),
+              if (_vpnBusy)
+                const Positioned(
+                  top: 0,
+                  child: Icon(Icons.auto_awesome_rounded,
+                      color: Color(0xFFD6BDFF), size: 17),
+                ),
+            ]),
           ),
         ),
         const SizedBox(height: 12),
-        txt(tr('اتصال سریع', 'Quick connect'), size: 20, bold: true),
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 280),
+          child: txt(
+            _vpnBusy
+                ? tr('در حال برقراری اتصال', 'Establishing connection')
+                : (_modernUp || _vpnVerified)
+                    ? tr('اتصال امن برقرار است', 'Secure connection active')
+                    : (_vpnUp || _vpnCleanup)
+                        ? tr('در حال تأیید اتصال', 'Verifying connection')
+                        : tr('برای اتصال لمس کنید', 'Tap to connect'),
+            size: 19, bold: true),
+        ),
         if (_vpnUp || _modernUp) ...[
-          const SizedBox(height: 5),
-          txt(_modernUp ? tr('IP خروجی تونل تأیید شد', 'Tunnel exit IP verified')
-                : _vpnVerified
-                ? tr('دست‌دهی با سرور تأیید شد', 'Server handshake verified')
-                : tr('رابط فعال است؛ دست‌دهی هنوز تأیید نشده',
-                    'Interface active; handshake not verified'),
+          const SizedBox(height: 6),
+          txt(_modernUp
+              ? tr('IP خروجی تونل تأیید شد', 'Tunnel exit IP verified')
+              : _vpnVerified
+                  ? tr('دست‌دهی با سرور تأیید شد', 'Server handshake verified')
+                  : tr('رابط روشن است؛ دست‌دهی هنوز تأیید نشده',
+                      'Interface is on; handshake is not yet verified'),
               size: 12, color: sub),
         ],
         if (_vpnError != null) ...[
