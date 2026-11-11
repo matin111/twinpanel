@@ -119,11 +119,11 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     ? _nodePings[node.id] : node.latencyMs;
 
   int? get _connectedServerRtt {
-    if (!_vpnUp || _activeNodeId == null) return null;
+    if ((!_vpnUp && !_modernUp) || (_modernUp ? _modernNodeId : _activeNodeId) == null) return null;
     final nodes = widget.servers?.servers;
     if (nodes == null) return null;
     for (final node in nodes) {
-      if (node.id == _activeNodeId) return _latencyFor(node);
+      if (node.id == (_modernUp ? _modernNodeId : _activeNodeId)) return _latencyFor(node);
     }
     return null;
   }
@@ -524,7 +524,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       return;
     }
     final targetId = nodes[index].id;
-    if (_vpnUp && _activeNodeId == targetId) {
+    if (_vpnUp && _activeNodeId == targetId && !_modernUp) {
       setState(() { _selected = index; _page = 'home'; });
       return;
     }
@@ -564,6 +564,16 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           candidate.profiles, targetId);
       if (!mounted) return;
 
+      if (_modernTunnel.isRunning || _modernUp) {
+        await _modernTunnel.stop();
+        if (!mounted) return;
+        setState(() {
+          _modernUp = false;
+          _modernProtocol = null;
+          _modernNodeId = null;
+          _publicIp = null;
+        });
+      }
       if (_vpnUp || _vpnCleanup) {
         await _vpn.stop();
         if (!mounted) return;
@@ -1394,9 +1404,9 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                 icon: const Icon(Icons.network_ping_rounded, size: 18, color: purple),
               ),
               const SizedBox(width: 8),
-              Icon(_vpnUp && _activeNodeId == widget.servers?.servers[index].id
+              Icon(((_vpnUp && _activeNodeId == widget.servers?.servers[index].id) || (_modernUp && _modernNodeId == widget.servers?.servers[index].id))
                 ? Icons.verified_rounded : Icons.chevron_right_rounded,
-                size: 19, color: _vpnUp && _activeNodeId == widget.servers?.servers[index].id
+                size: 19, color: ((_vpnUp && _activeNodeId == widget.servers?.servers[index].id) || (_modernUp && _modernNodeId == widget.servers?.servers[index].id))
                   ? const Color(0xFF33D6A6) : sub),
             ]),
           ),
