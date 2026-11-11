@@ -97,6 +97,12 @@ export function AdminUsersRuntime(){
               <div><small>{pick("ایمیل","Email")}</small><b dir="ltr" title={u.email||""}>{u.email||"—"}</b></div>
               <div><small>{pick("شماره تماس","Phone")}</small><b dir="ltr">{u.phone||"—"}</b></div>
             </div>
+            <div className="admin-user-subscription-stats" aria-label={pick("آمار اشتراک‌های کاربر","User subscription statistics")}>
+              <span><small>{pick("کل اکانت‌ها","Total")}</small><b>{u.subscription_stats?.total ?? "—"}</b></span>
+              <span className="active"><small>{pick("فعال","Active")}</small><b>{u.subscription_stats?.active ?? "—"}</b></span>
+              <span className="expired"><small>{pick("منقضی","Expired")}</small><b>{u.subscription_stats?.expired ?? "—"}</b></span>
+              <span className="suspended"><small>{pick("معلق","Suspended")}</small><b>{u.subscription_stats?.suspended ?? "—"}</b></span>
+            </div>
             <div className="admin-user-card-meta">
               <span><small>{pick("نقش","Role")}</small><Badge tone={u.role==="admin"?"violet":"ok"}>{u.role}</Badge></span>
               <span><small>{pick("تاریخ عضویت","Joined")}</small><b>{fmtDate(u.created_at)}</b></span>
@@ -123,6 +129,13 @@ export function AdminUsersRuntime(){
         .admin-users-runtime .admin-user-contact{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,.75fr);gap:9px;padding:12px;border:1px solid rgba(139,158,206,.13);background:rgba(5,12,30,.2);border-radius:12px}
         .admin-users-runtime .admin-user-contact>div{display:grid;gap:5px;min-width:0}
         .admin-users-runtime .admin-user-contact b{font-size:12px;overflow-wrap:anywhere;text-align:start;direction:ltr}
+        .admin-users-runtime .admin-user-subscription-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+        .admin-users-runtime .admin-user-subscription-stats>span{display:grid;gap:5px;text-align:center;padding:10px 3px;border:1px solid rgba(139,158,206,.2);border-radius:11px;background:rgba(13,25,51,.55)}
+        .admin-users-runtime .admin-user-subscription-stats small{color:#aebbd5;font-size:10px}
+        .admin-users-runtime .admin-user-subscription-stats b{font-size:17px;line-height:1.2}
+        .admin-users-runtime .admin-user-subscription-stats .active b{color:#6be3ae}
+        .admin-users-runtime .admin-user-subscription-stats .expired b{color:#f0bc7b}
+        .admin-users-runtime .admin-user-subscription-stats .suspended b{color:#f093a2}
         .admin-users-runtime .admin-user-card-meta{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
         .admin-users-runtime .admin-user-card-meta>span{display:flex;align-items:center;gap:8px}
         .admin-users-runtime .admin-user-card-meta b{font-size:12px;font-weight:600}
