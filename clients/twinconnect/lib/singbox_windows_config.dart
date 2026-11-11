@@ -18,6 +18,11 @@ class SingBoxWindowsConfig {
       'log': {'level': 'error', 'timestamp': true},
       'dns': {
         'servers': [
+          // Bootstrap ONLY the proxy server's domain via the local resolver.
+          // Sending its own hostname lookup through 'proxy' is circular:
+          // no outbound connection exists until its endpoint is resolved.
+          {'type': 'local', 'tag': 'dns-bootstrap'},
+          // Ordinary in-tunnel DNS continues to use the selected proxy.
           {'type': 'udp', 'tag': 'dns-remote', 'server': '1.1.1.1',
            'server_port': 53, 'detour': 'proxy'},
         ],
@@ -42,6 +47,9 @@ class SingBoxWindowsConfig {
       'outbounds': [serverOutbound],
       'route': {
         'auto_detect_interface': true,
+        // Resolve outbound server hostnames BEFORE creating a proxy session.
+        // The regular DNS final remains protected by the proxy.
+        'default_domain_resolver': 'dns-bootstrap',
         'final': 'proxy',
         'rules': [
           {'action': 'sniff'},
