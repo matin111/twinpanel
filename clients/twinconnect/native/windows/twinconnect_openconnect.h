@@ -20,7 +20,7 @@ inline HANDLE& Reader() { static HANDLE reader = nullptr; return reader; }
 inline volatile LONG& Failure() { static volatile LONG category = 0; return category; }
 enum FailureCode : LONG {
   kUnknown = 0, kCertificate = 1, kAuthentication = 2,
-  kRouteScript = 3, kAdapter = 4, kGateway = 5
+  kRouteScript = 3, kAdapter = 4, kGateway = 5, kDependency = 6
 };
 inline void Classify(const std::string& data) {
   std::string lower(data);
@@ -75,6 +75,7 @@ inline const char* FailureName() {
     case kRouteScript: return "CISCO_ROUTE_SCRIPT_FAILED";
     case kAdapter: return "CISCO_TAP_ADAPTER_FAILED";
     case kGateway: return "CISCO_GATEWAY_UNREACHABLE";
+    case kDependency: return "CISCO_ENGINE_DEPENDENCY_FAILED";
     default: return "CISCO_PROCESS_EXITED";
   }
 }
@@ -162,6 +163,13 @@ inline bool Running() {
   auto& process = Child();
   if (!process) return false;
   if (WaitForSingleObject(process, 0) == WAIT_TIMEOUT) return true;
+  DWORD exitCode = 0;
+  if (GetExitCodeProcess(process, &exitCode) &&
+      (exitCode == 0xC0000135u || // STATUS_DLL_NOT_FOUND
+       exitCode == 0xC000007Bu || // STATUS_INVALID_IMAGE_FORMAT
+       exitCode == 0xC0000142u)) { // STATUS_DLL_INIT_FAILED
+    InterlockedExchange(&Failure(), kDependency);
+  }
   CloseHandle(process);
   process = nullptr;
   Pid() = 0;
