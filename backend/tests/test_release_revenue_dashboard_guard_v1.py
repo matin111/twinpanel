@@ -95,6 +95,30 @@ class ReleaseRevenueGuardTests(unittest.TestCase):
                 '@media(prefers-reduced-motion:reduce){.protocolGrid{animation:none}}',
                 encoding="utf-8",
             )
+            (directory / "components/legacy-subscriptions-exact.tsx").write_text(
+                'const a = "mobile-subscription-actions toggleStatus(item)"; '
+                'const b = \'html[data-theme="light"] .legacy-subscriptions-page .mobile-subscription-card\'; '
+                'const c = \'html[data-theme="light"] .legacy-subscriptions-page .mobile-subscription-identities b\'; '
+                'const d = \'html[data-theme="light"] .legacy-subscriptions-page .mobile-subscription-usage\'; '
+                'const e = \'html[data-theme="light"] .legacy-subscriptions-page .subscription-presence-offline\';',
+                encoding="utf-8",
+            )
+            (directory / "components/admin-users-runtime.tsx").write_text(
+                'const a = "adminApi.usersFastPage adminApi.toggleUser"; '
+                'const b = \'html[data-theme="light"] .admin-users-runtime .admin-user-card\'; '
+                'const c = \'html[data-theme="light"] .admin-users-runtime .admin-user-contact\'; '
+                'const d = \'html[data-theme="light"] .admin-users-runtime .admin-user-action\'; '
+                'const e = \'html[data-theme="light"] .admin-users-runtime .admin-user-account-count\';',
+                encoding="utf-8",
+            )
+            (directory / "components/central-app-brand-studio.css").write_text(
+                'html[data-theme="light"] .tbs-page{color:#1c2941} '
+                'html[data-theme="light"] .tbs-page .tbs-tabs{display:flex} '
+                'html[data-theme="light"] .tbs-page .tbs-readonly{color:#1c2941} '
+                'html[data-theme="light"] .tbs-page .tbs-preview{background:white} '
+                'html[data-theme="light"] .tbs-page .tbs-save:disabled{color:#506080}',
+                encoding="utf-8",
+            )
 
     def test_up_to_date_pinned_chart_passes(self):
         guard.verify_ui_release(self.source, self.current)
@@ -171,6 +195,23 @@ class ReleaseRevenueGuardTests(unittest.TestCase):
         (self.source / "components/admin-dashboard-network-panels.module.css").write_text(
             ".legacy-tunnel{display:block}",encoding="utf-8"
         )
+        with self.assertRaisesRegex(ValueError, "stale"):
+            guard.verify_ui_release(self.source, self.current)
+
+    def test_missing_light_subscription_card_is_blocked(self):
+        (self.source / "components/legacy-subscriptions-exact.tsx").unlink()
+        with self.assertRaisesRegex(ValueError, "Missing"):
+            guard.verify_ui_release(self.source, self.current)
+
+    def test_light_users_card_reverts_are_blocked(self):
+        p = self.source / "components/admin-users-runtime.tsx"
+        p.write_text('old dark-only styling',encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "stale"):
+            guard.verify_ui_release(self.source, self.current)
+
+    def test_missing_brand_studio_light_theme_is_blocked(self):
+        p = self.source / "components/central-app-brand-studio.css"
+        p.write_text('html[data-theme="light"] .tbs-page{}',encoding="utf-8")
         with self.assertRaisesRegex(ValueError, "stale"):
             guard.verify_ui_release(self.source, self.current)
 
