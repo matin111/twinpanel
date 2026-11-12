@@ -129,6 +129,31 @@ jobs:
           grep -Fq '"subscription_count": subscription_counts.get' source/backend/app/routers/admin_user_isolation.py
           echo "Consolidated admin UI release guard passed"
 
+      - name: Prevent stale Add server and subscription light-mode UI
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          # A candidate is built from a pinned SHA, so reject a release that
+          # would reintroduce dark Add server panels or dark subscription actions.
+          for path in \
+            "components/node-add-modal-bridge.tsx" \
+            "app/subscription-light-actions.css"; do
+            test -s "source/$path"
+            test -s "publisher/$path"
+            if ! cmp -s "source/$path" "publisher/$path"; then
+              echo "::error file=$path::Pinned release would overwrite the latest light-mode fix. Recreate candidate from main."
+              exit 1
+            fi
+          done
+          grep -Fq 'import "./subscription-light-actions.css";' source/app/layout.tsx || {
+            echo "::error file=app/layout.tsx::Subscription light-mode palette is not imported."
+            exit 1
+          }
+          grep -Fq 'Light-only overrides for dark, low-contrast sections' source/components/node-add-modal-bridge.tsx
+          grep -Fq 'html[data-theme="light"] .tp-add-node-modal .tp-add-node-card form .runtime-choice-section' source/components/node-add-modal-bridge.tsx
+          grep -Fq 'html[data-theme="light"] .legacy-subscriptions-page .mobile-subscription-more-actions button' source/app/subscription-light-actions.css
+          echo "Light-mode Add server and subscription UI release guard passed"
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -422,6 +447,23 @@ jobs:
           git -C publisher reset --hard origin/main
           python3 publisher/scripts/verify_release_ui_parity.py \
             --source source --main publisher --check-bundle
+
+      - name: Recheck light-mode UI against current main before asset publication
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          # The previous step refreshed publisher/main after the build. Check
+          # again so an intervening UI change cannot be replaced by stale code.
+          for path in \
+            "components/node-add-modal-bridge.tsx" \
+            "app/subscription-light-actions.css"; do
+            if ! cmp -s "source/$path" "publisher/$path"; then
+              echo "::error file=$path::Light-mode UI changed since the pinned build. Publish a fresh candidate."
+              exit 1
+            fi
+          done
+          grep -Fq 'import "./subscription-light-actions.css";' source/app/layout.tsx
+          grep -Fq 'import "./subscription-light-actions.css";' publisher/app/layout.tsx
 
       - name: Publish GitHub Release asset
         env:
