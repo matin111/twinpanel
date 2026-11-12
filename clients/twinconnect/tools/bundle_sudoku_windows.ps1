@@ -20,9 +20,25 @@ New-Item -ItemType Directory -Force -Path $root | Out-Null
 Copy-Item -LiteralPath $matches[0].FullName -Destination (Join-Path $root 'sudoku.exe') -Force
 # Ship the upstream GPL-3.0 license with this independent CLI executable.
 $licenseUrl = 'https://raw.githubusercontent.com/SUDOKU-ASCII/sudoku/v0.5.2-1/LICENSE'
-Invoke-WebRequest -Uri $licenseUrl -OutFile (Join-Path $root 'LICENSE.txt')
-if ((Get-Item (Join-Path $root 'LICENSE.txt')).Length -lt 1000) {
-  throw 'Sudoku upstream GPL license is missing'
+$upstreamLicense = Join-Path $root 'LICENSE.txt'
+Invoke-WebRequest -Uri $licenseUrl -OutFile $upstreamLicense
+# Upstream's LICENSE is a short GPLv3 copyright/exception notice (778 bytes),
+# not the full FSF license text. Never reject it based on a 1000-byte minimum.
+$notice = Get-Content -LiteralPath $upstreamLicense -Raw
+if (!$notice -or
+    !$notice.Contains('GNU General Public License') -or
+    !$notice.Contains('Copyright (C) 2026')) {
+  throw 'Sudoku upstream license notice missing or invalid'
+}
+# Keep the exact upstream notice, including its additional naming restriction,
+# and distribute the full GPLv3 text alongside the binary.
+$gplFile = Join-Path $root 'GPL-3.0.txt'
+Invoke-WebRequest -Uri 'https://www.gnu.org/licenses/gpl-3.0.txt' -OutFile $gplFile
+$gplText = Get-Content -LiteralPath $gplFile -Raw
+if ($gplText.Length -lt 30000 -or
+    !$gplText.Contains('GNU GENERAL PUBLIC LICENSE') -or
+    !$gplText.Contains('Version 3, 29 June 2007')) {
+  throw 'Official GPLv3 license text missing or invalid'
 }
 $exe = Join-Path $root 'sudoku.exe'
 & $exe -h 2>&1 | Out-Null
