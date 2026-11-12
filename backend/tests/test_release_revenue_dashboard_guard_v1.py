@@ -38,6 +38,17 @@ class ReleaseRevenueGuardTests(unittest.TestCase):
                 ".line{stroke:#9178ff;}@media(prefers-reduced-motion:reduce){.line{animation:none;}}",
                 encoding="utf-8",
             )
+            (directory / "components/admin-dashboard-server-card.tsx").write_text(
+                'function ResourceGauge(){} function NetworkGauge(){} '
+                'const serverSample=(payload)=>payload; '
+                'const handler=()=>setSamples(before=>before);',
+                encoding="utf-8",
+            )
+            (directory / "components/admin-dashboard-server-card.module.css").write_text(
+                ':global(html[data-theme="light"]) .panel{background:white;} '
+                '@media(prefers-reduced-motion:reduce){.panel{animation:none;}}',
+                encoding="utf-8",
+            )
 
     def test_up_to_date_pinned_chart_passes(self):
         guard.verify_ui_release(self.source, self.current)
@@ -69,10 +80,22 @@ class ReleaseRevenueGuardTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Compiled"):
             guard.verify_ui_release(self.source, self.current, check_bundle=True)
 
+    def test_missing_server_resource_chart_is_blocked(self):
+        (self.source / "components/admin-dashboard-server-card.tsx").unlink()
+        with self.assertRaisesRegex(ValueError, "Missing"):
+            guard.verify_ui_release(self.source, self.current)
+
+    def test_old_server_chart_is_blocked_even_when_sales_chart_is_current(self):
+        (self.source / "components/admin-dashboard-server-card.module.css").write_text(
+            ".old-bars{height:5px}", encoding="utf-8",
+        )
+        with self.assertRaisesRegex(ValueError, "stale"):
+            guard.verify_ui_release(self.source, self.current)
+
     def test_compiled_premium_chart_passes(self):
         folder = self.source / ".next/standalone/.next/static/chunks"
         folder.mkdir(parents=True)
-        (folder / "chunk.js").write_text("Sales pulse", encoding="utf-8")
+        (folder / "chunk.js").write_text("Sales pulse Server pulse", encoding="utf-8")
         guard.verify_ui_release(self.source, self.current, check_bundle=True)
 
 
