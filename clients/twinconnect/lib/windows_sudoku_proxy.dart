@@ -20,6 +20,39 @@ class WindowsSudokuProxy {
   String? _verifiedExit;
   String? _endpointIpv4;
   bool _changing = false;
+  // Never retain engine stderr: it can contain customer credentials.
+  // Store only a coarse, known-safe error category and numeric exit code.
+  String? _lastFailureCategory;
+  int? _lastUnexpectedExitCode;
+  String? get lastUnexpectedExitReason {
+    final failure = _lastFailureCategory;
+    if (failure != null) return failure;
+    if (_lastUnexpectedExitCode == 0) return 'SUDOKU_CORE_EXITED_CLEANLY';
+    return 'SUDOKU_CORE_EXITED';
+  }
+
+  static String? _classifyNativeFailure(String line) {
+    final value = line.toLowerCase();
+    if (value.contains('address already in use') ||
+        (value.contains('listen') && value.contains('bind'))) {
+      return 'SUDOKU_LOCAL_PORT_CONFLICT';
+    }
+    if (value.contains('access is denied') ||
+        value.contains('permission denied')) {
+      return 'SUDOKU_CORE_ACCESS_DENIED';
+    }
+    if (value.contains('config') &&
+        (value.contains('invalid') || value.contains('open') ||
+         value.contains('parse') || value.contains('decode'))) {
+      return 'SUDOKU_CONFIG_LOAD_FAILED';
+    }
+    if (value.contains('key') &&
+        (value.contains('invalid') || value.contains('decode') ||
+         value.contains('recover'))) {
+      return 'SUDOKU_KEY_REJECTED';
+    }
+    return null;
+  }
 
   bool get isRunning => _child != null && _port != null;
   int? get socksPort => isRunning ? _port : null;
@@ -68,6 +101,8 @@ class WindowsSudokuProxy {
       throw const FormatException('SUDOKU_PROXY_BUSY');
     }
     _changing = true;
+    _lastFailureCategory = null;
+    _lastUnexpectedExitCode = null;
     try {
       if (!await enginePresent()) {
         throw const FormatException('SUDOKU_ENGINE_NOT_BUNDLED');
@@ -100,9 +135,17 @@ class WindowsSudokuProxy {
       // The config handle remains open until the core has opened SOCKS.
       // Never log the native core's output: it may contain private keys.
       unawaited(owned.stdout.drain<void>());
-      unawaited(owned.stderr.drain<void>());
-      unawaited(owned.exitCode.then((_) {
+      unawaited(utf8.decoder.bind(owned.stderr)
+          .transform(const LineSplitter()).forEach((line) {
+        // No logging or persistence of native output or private keys.
+        final classified = _classifyNativeFailure(line);
+        if (classified != null && identical(_child, owned)) {
+          _lastFailureCategory = classified;
+        }
+      }).catchError((Object _) {}));
+      unawaited(owned.exitCode.then((code) {
         if (identical(_child, owned)) {
+          _lastUnexpectedExitCode = code;
           _child = null;
           _port = null;
           _verifiedExit = null;
