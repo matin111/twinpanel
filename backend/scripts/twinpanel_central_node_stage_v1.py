@@ -131,7 +131,9 @@ _GLOBAL_STAGE_LOCK = Path("/tmp/twinpanel-central-node-stage-global.lock")
 
 
 def run(node_id, limit, apply, *, delta_only=False):
-    if not apply:
+    if not apply or os.environ.get("TP_CENTRAL_STAGE_GLOBAL_LOCK_HELD") == "1":
+        # systemd-run's flock wrapper acquires admission before heavy imports;
+        # direct/manual invocations still take the same kernel flock below.
         return _run_serialized(node_id, limit, apply, delta_only=delta_only)
     with _GLOBAL_STAGE_LOCK.open("a+", encoding="utf-8") as admission:
         print("CENTRAL_STAGE_GLOBAL_SLOT_WAIT", json.dumps({"node_id": node_id}), flush=True)
