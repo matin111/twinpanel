@@ -13,11 +13,12 @@ export type AppAccessDelivery={
 };
 
 export async function getAppAccess(
-  owner:"admin"|"reseller",subscriptionId:number,reset=false
+  owner:"admin"|"reseller"|"customer",subscriptionId:number,reset=false
 ):Promise<AppAccessDelivery>{
   if(!Number.isSafeInteger(subscriptionId)||subscriptionId<=0)throw new Error("Invalid subscription ID");
   const token=getCustomerToken();
   if(!token)throw new Error("Login required");
+  if(owner==="customer"&&reset)throw new Error("Customer password reset is not available");
   const action=reset?"app-password-reset":"app-delivery";
   const response=await fetch(
     `${API_BASE}/v1/central-app/${owner}/subscriptions/${subscriptionId}/${action}`,{
