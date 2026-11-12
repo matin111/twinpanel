@@ -66,11 +66,15 @@ class ShadowTlsChain {
     final tlsOptions = tls['tls'];
     if (version != 3 || outerPassword is! String || outerPassword.isEmpty ||
         server is! String || server.isEmpty || server.length > 255 ||
-        server.contains(RegExp(r'[\\/\\s@?#]')) ||
+        server.contains('/') || server.contains('\\\\') ||
+        server.contains(' ') || server.contains('@') ||
+        server.contains('?') || server.contains('#') ||
         port is! int || port < 1 || port > 65535 ||
         tlsOptions is! Map || tlsOptions['enabled'] != true ||
+        tlsOptions['insecure'] == true ||
         tlsOptions['server_name'] is! String ||
-        (tlsOptions['server_name'] as String).isEmpty) {
+        (tlsOptions['server_name'] as String).isEmpty ||
+        tls.containsKey('detour')) {
       throw const FormatException('SHADOWTLS_TRANSPORT_INVALID');
     }
     // Only use the known endpoint fields. A subscription cannot inject
