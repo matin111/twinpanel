@@ -29,6 +29,7 @@ import 'cisco_openconnect_profile.dart';
 import 'connection_bootstrap.dart';
 import 'tenant_api.dart';
 import 'vpn_policy_store.dart';
+import 'vpn_policy.dart';
 import 'windows_wireguard.dart';
 import 'tenant_models.dart';
 import 'brand_theme.dart';
@@ -1253,10 +1254,15 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     // removing the working tunnel. A failed preflight keeps it running.
     setState(() { _vpnBusy = true; _vpnError = null; });
     try {
-      final policy = await _vpnPolicy.load(
-          widget.panel.namespace, widget.username);
-      final capabilities = await NativeVpnBridge.probe();
-      final native = await NativeVpnBridge.protocolReadiness();
+      final checks = await Future.wait<Object>([
+        _vpnPolicy.load(widget.panel.namespace, widget.username),
+        NativeVpnBridge.probe(),
+      ]);
+      final policy = checks[0] as VpnPolicy;
+      final capabilities = checks[1] as NativeVpnCapabilities;
+      final native = await NativeVpnBridge.protocolReadiness(
+        validatedCapabilities: capabilities,
+      );
       final candidate = await ConnectionBootstrap(
           api: TenantApi.fromBuildConfig()).prepare(
         panel: widget.panel,
@@ -1538,10 +1544,18 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           _selected = best;
         }
         final selectedId = _selectedServerId!;
-        final policy = await _vpnPolicy.load(
-            widget.panel.namespace, widget.username);
-        final capabilities = await NativeVpnBridge.probe();
-        final native = await NativeVpnBridge.protocolReadiness();
+        // Policy storage and native OS readiness are independent.
+        // Probe both concurrently, then reuse the SAME native capability
+        // snapshot for the mandatory per-protocol readiness gate.
+        final checks = await Future.wait<Object>([
+          _vpnPolicy.load(widget.panel.namespace, widget.username),
+          NativeVpnBridge.probe(),
+        ]);
+        final policy = checks[0] as VpnPolicy;
+        final capabilities = checks[1] as NativeVpnCapabilities;
+        final native = await NativeVpnBridge.protocolReadiness(
+          validatedCapabilities: capabilities,
+        );
         final candidate = await ConnectionBootstrap(
             api: TenantApi.fromBuildConfig()).prepare(
           panel: widget.panel,
