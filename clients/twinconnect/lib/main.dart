@@ -22,6 +22,7 @@ import 'country_flag.dart';
 import 'ambient_background.dart';
 import 'interactive_glass_card.dart';
 import 'live_dashboard.dart';
+import 'frameless_window_controls.dart';
 import 'app_session_store.dart';
 import 'account_snapshot.dart';
 import 'plan_classification.dart';
@@ -101,6 +102,10 @@ class _TwinConnectAppState extends State<TwinConnectApp> {
       theme: BrandTheme.make(_activeBrand, Brightness.light),
       darkTheme: BrandTheme.make(_activeBrand, Brightness.dark),
       themeMode: BrandTheme.mode(_activeBrand),
+      builder: (context, child) => Stack(children: [
+        Positioned.fill(child: child ?? const SizedBox.shrink()),
+        const Positioned.fill(child: TwinConnectFramelessControls()),
+      ]),
       home: TwinConnectHome(
         language: _language,
         onLanguageChanged: _changeLanguage,
