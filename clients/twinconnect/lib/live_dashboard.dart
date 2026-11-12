@@ -98,6 +98,11 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     onUnexpectedExit: () {
       _modernHealthTimer?.cancel();
       _stopModernTrafficMonitoring();
+      // Never leave a credential-bearing local Xray proxy running if
+      // the Windows TUN that owns system routes exits unexpectedly.
+      if (_xrayProxy.isRunning) {
+        _xrayProxy.stop().catchError((Object _) {});
+      }
       if (!mounted) return;
       setState(() {
         _modernUp = false;
