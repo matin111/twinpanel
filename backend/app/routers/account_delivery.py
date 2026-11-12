@@ -80,11 +80,11 @@ def _cisco_pin_key(node_id: int) -> str:
 def _cisco_saved_pin(db: Session, node_id: int) -> str | None:
     row = db.get(RuntimeSetting, _cisco_pin_key(node_id))
     pin = str(row.setting_value or "") if row else ""
-    return pin if re.fullmatch(r"sha256:[0-9a-f]{64}", pin) else None
+    return pin if re.fullmatch(r"pin-sha256:[A-Za-z0-9+/]{43}=", pin) else None
 
 
 def _save_cisco_pin(db: Session, node_id: int, pin: str) -> None:
-    if not re.fullmatch(r"sha256:[0-9a-f]{64}", pin):
+    if not re.fullmatch(r"pin-sha256:[A-Za-z0-9+/]{43}=", pin):
         raise ValueError("INVALID_CISCO_CERT_PIN")
     key = _cisco_pin_key(node_id)
     row = db.get(RuntimeSetting, key)
@@ -98,32 +98,32 @@ async def _cisco_pin_from_management_ssh(node: Node, db: Session) -> str | None:
     conn = await ssh_connect_saved(node, db)
     try:
         raw = await cmd(conn, """python3 - <<'PY'
-from pathlib import Path
-import re, subprocess
-config = Path('/etc/ocserv/ocserv.conf')
-if config.is_file():
-    for line in config.read_text(errors='replace').splitlines():
+import base64, hashlib, pathlib, re, subprocess
+cfg = pathlib.Path('/etc/ocserv/ocserv.conf')
+if cfg.is_file():
+    for line in cfg.read_text(errors='replace').splitlines():
         match = re.match(r'^\s*server-cert\s*=\s*(\S+)\s*$', line)
-        if match:
-            cert = Path(match.group(1))
-            if cert.is_file():
-                proc = subprocess.run(
-                    ['openssl', 'x509', '-in', str(cert), '-noout',
-                     '-fingerprint', '-sha256'],
-                    capture_output=True, text=True, timeout=5, check=False)
-                if proc.returncode == 0:
-                    print(proc.stdout.strip())
-            break
+        if not match:
+            continue
+        cert = pathlib.Path(match.group(1))
+        if cert.is_file():
+            pub = subprocess.run(
+                ['openssl', 'x509', '-in', str(cert), '-pubkey', '-noout'],
+                capture_output=True, timeout=5, check=False)
+            if pub.returncode == 0:
+                spki = subprocess.run(
+                    ['openssl', 'pkey', '-pubin', '-outform', 'DER'],
+                    input=pub.stdout, capture_output=True, timeout=5, check=False)
+                if spki.returncode == 0 and spki.stdout:
+                    digest = hashlib.sha256(spki.stdout).digest()
+                    print('pin-sha256:' + base64.b64encode(digest).decode('ascii'))
+        break
 PY""", timeout=15, check=False)
     finally:
         conn.close()
         await conn.wait_closed()
-    match = re.search(r"sha256 Fingerprint=([0-9A-Fa-f:]{95})", raw, re.IGNORECASE)
-    if not match:
-        return None
-    candidate = "sha256:" + match.group(1).replace(":", "").lower()
-    return candidate if re.fullmatch(r"sha256:[0-9a-f]{64}", candidate) else None
-
+    match = re.search(r"pin-sha256:([A-Za-z0-9+/]{43}=)", raw)
+    return match.group(0) if match else None
 
 @router.post("/admin/cisco/certificate-pins/refresh")
 async def refresh_cisco_certificate_pins(db: Session = Depends(get_db)):
@@ -811,36 +811,35 @@ async def _cisco(db: Session, node: Node, sub: Subscription, user: User, usernam
             "username": username,
             "password": password,
         }
-        # The authenticated management SSH connection is the source of trust,
-        # not an unverified public TLS connection.
+        # Read the authentic server public-key pin over the same trusted SSH.
         try:
-            fingerprint = await cmd(conn, """python3 - <<'PY'
-import pathlib, re, subprocess
-config = pathlib.Path('/etc/ocserv/ocserv.conf')
-if config.is_file():
-    for line in config.read_text(errors='replace').splitlines():
+            pin = await cmd(conn, """python3 - <<'PY'
+import base64, hashlib, pathlib, re, subprocess
+cfg = pathlib.Path('/etc/ocserv/ocserv.conf')
+if cfg.is_file():
+    for line in cfg.read_text(errors='replace').splitlines():
         match = re.match(r'^\s*server-cert\s*=\s*(\S+)\s*$', line)
-        if match:
-            cert = pathlib.Path(match.group(1))
-            if cert.is_file():
-                process = subprocess.run(
-                    ['openssl', 'x509', '-in', str(cert), '-noout',
-                     '-fingerprint', '-sha256'],
-                    capture_output=True, text=True, timeout=5, check=False,
-                )
-                if process.returncode == 0:
-                    print(process.stdout.strip())
-            break
-PY""", timeout=12, check=False)
-            match = re.search(r"sha256 Fingerprint=([0-9a-fA-F:]{95})",
-                              fingerprint, re.IGNORECASE)
+        if not match:
+            continue
+        cert = pathlib.Path(match.group(1))
+        if cert.is_file():
+            pub = subprocess.run(
+                ['openssl', 'x509', '-in', str(cert), '-pubkey', '-noout'],
+                capture_output=True, timeout=5, check=False)
+            if pub.returncode == 0:
+                spki = subprocess.run(
+                    ['openssl', 'pkey', '-pubin', '-outform', 'DER'],
+                    input=pub.stdout, capture_output=True, timeout=5, check=False)
+                if spki.returncode == 0 and spki.stdout:
+                    digest = hashlib.sha256(spki.stdout).digest()
+                    print('pin-sha256:' + base64.b64encode(digest).decode('ascii'))
+        break
+PY""", timeout=15, check=False)
+            match = re.search(r"pin-sha256:([A-Za-z0-9+/]{43}=)", pin)
             if match:
-                value = match.group(1).replace(":", "").lower()
-                if re.fullmatch(r"[0-9a-f]{64}", value):
-                    result["servercert"] = "sha256:" + value
-                    _save_cisco_pin(db, node.id, result["servercert"])
+                result["servercert"] = match.group(0)
+                _save_cisco_pin(db, node.id, result["servercert"])
         except Exception:
-            # An unknown fingerprint stays untrusted; never invent a pin.
             pass
         return result
     finally:
