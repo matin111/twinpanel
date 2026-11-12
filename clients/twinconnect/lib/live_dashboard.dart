@@ -1644,6 +1644,26 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
               ? WidgetsBinding.instance.platformDispatcher.platformBrightness == Brightness.dark
               : true;
     }
+    if (oldWidget.username != widget.username ||
+        oldWidget.panel.namespace != widget.panel.namespace ||
+        oldWidget.panel.apiOrigin != widget.panel.apiOrigin) {
+      // No in-memory Xray credentials may cross tenants or accounts.
+      _xrayGroups = const [];
+      _xrayGroupsLoaded = false;
+      _xrayGroupsError = null;
+      _selectedXrayNodeId = null;
+      _selectedXrayInboundId = null;
+      _xrayInboundRtts.clear();
+      unawaited(_restoreCachedXrayInbounds());
+    } else if (oldWidget.servers != widget.servers ||
+        oldWidget.catalog != widget.catalog) {
+      // The first session inventory often arrives after the dashboard
+      // initializes; retry restore once authorized nodes become available.
+      _xrayGroups = _assignedXrayGroups(_xrayGroups);
+      if (_xrayGroups.isEmpty && !_xrayGroupsLoaded) {
+        unawaited(_restoreCachedXrayInbounds());
+      }
+    }
     if (oldWidget.servers != widget.servers) {
       final ids = widget.servers?.servers.map((node) => node.id).toSet()
           ?? <String>{};
@@ -1974,14 +1994,22 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       _xrayGroupsError = null;
     });
     try {
+      final username = widget.username;
+      final namespace = widget.panel.namespace;
+      final origin = widget.panel.apiOrigin;
+      final token = widget.sessionToken;
       final response = await TenantApi.fromBuildConfig()
           .loadSessionNativeProfiles(
         panel: widget.panel,
-        sessionToken: widget.sessionToken,
+        sessionToken: token,
         protocol: VpnProtocols.byCode('v2ray')!,
         native: const NativeProtocolReadiness(supportedCodes: {'v2ray'}),
       );
-      if (!mounted) return;
+      if (!mounted || !_xrayAuthorized ||
+          username != widget.username ||
+          namespace != widget.panel.namespace ||
+          origin != widget.panel.apiOrigin ||
+          token != widget.sessionToken) return;
       final visible = _assignedXrayGroups(response.xrayServerGroups);
       setState(() {
         _xrayGroups = visible;
@@ -1995,8 +2023,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           await _xrayCache.clear();
         } else {
           await _xrayCache.save(
-            username: widget.username, namespace: widget.panel.namespace,
-            panelOrigin: widget.panel.apiOrigin, groups: visible);
+            username: username, namespace: namespace,
+            panelOrigin: origin, groups: visible);
         }
       } catch (_) {
         // Secure-storage availability must never block a live connection.
