@@ -118,6 +118,7 @@ class _ReferenceDesktopShellState extends State<ReferenceDesktopShell> {
     return Padding(
       padding: const EdgeInsets.only(bottom: 11),
       child: InkWell(
+        key: Key('referenceNav$value'),
         onTap: () => setState(() => tab = value),
         borderRadius: BorderRadius.circular(16),
         child: Container(
@@ -154,7 +155,12 @@ class _ReferenceDesktopShellState extends State<ReferenceDesktopShell> {
       border: Border(left: BorderSide(color: Color(0x664A3B9D))),
     ),
     child: Column(children: [
-      const Icon(Icons.change_history_rounded, size: 68, color: violet),
+      SizedBox(height: 68, width: 85,
+        child: widget.brand.logoUrl == null
+          ? const Icon(Icons.change_history_rounded, size: 68, color: violet)
+          : Image.network(widget.brand.logoUrl!, fit: BoxFit.contain,
+              errorBuilder: (_, _, _) => const Icon(Icons.change_history_rounded,
+                size: 68, color: violet))),
       const SizedBox(height: 8),
       title(widget.brand.brandName, size: 25),
       const SizedBox(height: 42),
@@ -180,7 +186,7 @@ class _ReferenceDesktopShellState extends State<ReferenceDesktopShell> {
       const Tooltip(message: 'Dark theme (light theme not yet available)',
         child: Icon(Icons.dark_mode, color: violet, size: 30)),
       const SizedBox(height: 14),
-      IconButton(onPressed: widget.onSettings,
+      IconButton(key: const Key('referenceSettingsButton'), onPressed: widget.onSettings,
           icon: const Icon(Icons.settings_outlined, color: Colors.white, size: 29)),
     ]),
   );
@@ -208,6 +214,7 @@ class _ReferenceDesktopShellState extends State<ReferenceDesktopShell> {
           ? 'VPN tunnel controller not available in this build'
           : widget.connected ? 'Disconnect' : 'Connect',
       child: NeonRing(active: widget.connected, child: InkWell(
+        key: const Key('referenceConnectAction'),
         onTap: widget.onToggleConnection,
         customBorder: const CircleBorder(),
         child: Container(
@@ -356,6 +363,7 @@ class _ReferenceDesktopShellState extends State<ReferenceDesktopShell> {
   Widget build(BuildContext context) {
     // Desktop visual reference uses 1536x1024. Scroll when available height is smaller.
     return Theme(data: ThemeData.dark(useMaterial3: true), child: Scaffold(
+      key: const Key('referenceDesktopShell'),
       backgroundColor: navy,
       body: DecoratedBox(
         decoration: const BoxDecoration(gradient: LinearGradient(
