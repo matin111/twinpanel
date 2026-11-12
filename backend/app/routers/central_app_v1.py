@@ -172,7 +172,9 @@ def admin_app_profile(
     _=Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    return _contact_out(_contact(db, 0))
+    contact = _contact_out(_contact(db, 0))
+    branding = db.query(BrandingSettings).first()
+    return {**contact, "brand_name": getattr(branding, "brand_name", None) or "TwinPanel"}
 
 
 @router.put("/admin/profile")
