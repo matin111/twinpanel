@@ -885,7 +885,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     }
   }
 
-  Future<void> _startXrayTunnel(String serverId) async {
+  Future<void> _startXrayTunnel(String serverId, {String? inboundId}) async {
     if (_vpnBusy || !Platform.isWindows) return;
     setState(() { _vpnBusy = true; _vpnError = null; });
     try {
@@ -917,37 +917,21 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       if (matches.isEmpty) {
         throw const FormatException('XRAY_SERVER_PROFILES_MISSING');
       }
-      // Every server can advertise up to three REAL, independent inbounds.
-      // The user explicitly chooses the transport; we never synthesize one.
-      XrayInboundProfile? chosen;
-      if (matches.length == 1) {
-        chosen = matches.single;
-      } else {
-        chosen = await showDialog<XrayInboundProfile>(
-          context: context,
-          builder: (dialogContext) => AlertDialog(
-            title: Text(tr('انتخاب اینباند ویتوری', 'Choose Xray inbound')),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                for (final item in matches)
-                  ListTile(
-                    title: Text(item.title),
-                    subtitle: Text(item.id),
-                    onTap: () => Navigator.of(dialogContext).pop(item),
-                  ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(dialogContext).pop(),
-                child: Text(tr('انصراف', 'Cancel')),
-              ),
-            ],
-          ),
-        );
+      // Each inbound is a separate server-list choice. Never interrupt the
+      // user's connection to show a second selection dialog.
+      final requestedInboundId = inboundId ??
+          (_selectedXrayNodeId == serverId ? _selectedXrayInboundId : null);
+      final eligible = requestedInboundId == null
+          ? matches
+          : matches.where((item) => item.id == requestedInboundId)
+              .toList(growable: false);
+      if (eligible.isEmpty) {
+        throw const FormatException('XRAY_INBOUND_NOT_AVAILABLE');
       }
-      if (!mounted || chosen == null) return;
+      // Legacy Quick Connect (before choosing a specific inbound) uses the
+      // first *real* profile from the panel, never a synthetic transport.
+      final chosen = eligible.first;
+      if (!mounted) return;
 
       // Prepare and validate the subscription-scoped Xray endpoint BEFORE
       // changing any Windows routes or interrupting an existing tunnel.
@@ -1003,6 +987,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         _modernUp = true;
         _modernProtocol = 'v2ray';
         _modernNodeId = serverId;
+        _selectedXrayNodeId = serverId;
+        _selectedXrayInboundId = chosen.id;
         _publicIp = publicIp;
         _vpnError = null;
       });
