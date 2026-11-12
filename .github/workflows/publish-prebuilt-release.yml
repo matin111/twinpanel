@@ -141,7 +141,8 @@ jobs:
             "components/tunnel-protocol-runtime-v307.tsx" \
             "components/tunnel-protocol-runtime-v307.module.css" \
             "components/tunnel-server-pair-selector-v293.tsx" \
-            "components/tunnel-control-center-v1.module.css"; do
+            "components/tunnel-control-center-v1.module.css" \
+            "app/admin-manual-subscription-light.css"; do
             test -s "source/$path"
             test -s "publisher/$path"
             if ! cmp -s "source/$path" "publisher/$path"; then
@@ -162,6 +163,8 @@ jobs:
           grep -Fq ':global(html[data-theme="light"]) .createModalCard' source/components/tunnel-protocol-runtime-v307.module.css
           grep -Fq 'createPortal(<div className={styles.modal}' source/components/tunnel-server-pair-selector-v293.tsx
           grep -Fq 'z-index:6000!important' source/components/tunnel-control-center-v1.module.css
+          grep -Fq 'import "./admin-manual-subscription-light.css";' source/app/layout.tsx
+          grep -Fq 'html[data-theme="light"] body > .runtime-modal.manual-subscription-modal' source/app/admin-manual-subscription-light.css
           echo "Light-mode and tunnel UI release guard passed"
 
       - name: Setup Node.js
@@ -470,7 +473,8 @@ jobs:
             "components/tunnel-protocol-runtime-v307.tsx" \
             "components/tunnel-protocol-runtime-v307.module.css" \
             "components/tunnel-server-pair-selector-v293.tsx" \
-            "components/tunnel-control-center-v1.module.css"; do
+            "components/tunnel-control-center-v1.module.css" \
+            "app/admin-manual-subscription-light.css"; do
             if ! cmp -s "source/$path" "publisher/$path"; then
               echo "::error file=$path::Light-mode UI changed since the pinned build. Publish a fresh candidate."
               exit 1
@@ -478,6 +482,7 @@ jobs:
           done
           grep -Fq 'import "./subscription-light-actions.css";' source/app/layout.tsx
           grep -Fq 'import "./subscription-light-actions.css";' publisher/app/layout.tsx
+          grep -Fq 'import "./admin-manual-subscription-light.css";' publisher/app/layout.tsx
 
       - name: Publish GitHub Release asset
         env:
