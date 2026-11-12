@@ -1658,6 +1658,51 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   String _search = '';
   int _selected = 0;
   final Set<int> _favorites = <int>{};
+  // User-facing Xray inbounds are separate connection choices, but retain
+  // the assigned node ID for subscription accounting and server selection.
+  // Credential-bearing URIs remain in memory only while this view is open.
+  List<XrayServerProfiles> _xrayGroups = const [];
+  bool _xrayGroupsLoading = false;
+  String? _xrayGroupsError;
+  String? _selectedXrayInboundId;
+  String? _selectedXrayNodeId;
+
+  Future<void> _loadXrayGroups({bool refresh = false}) async {
+    if (_xrayGroupsLoading || (!refresh && _xrayGroups.isNotEmpty)) return;
+    if (!mounted) return;
+    setState(() {
+      _xrayGroupsLoading = true;
+      _xrayGroupsError = null;
+    });
+    try {
+      final response = await TenantApi.fromBuildConfig()
+          .loadSessionNativeProfiles(
+        panel: widget.panel,
+        sessionToken: widget.sessionToken,
+        protocol: VpnProtocols.byCode('v2ray')!,
+        native: const NativeProtocolReadiness(supportedCodes: {'v2ray'}),
+      );
+      if (!mounted) return;
+      setState(() => _xrayGroups = response.xrayServerGroups);
+    } catch (error) {
+      if (!mounted) return;
+      // Do not render errors that may embed session tokens, UUIDs or paths.
+      setState(() {
+        _xrayGroupsError = 'XRAY_SERVER_PROFILES_UNAVAILABLE';
+        if (refresh) _xrayGroups = const [];
+      });
+    } finally {
+      if (mounted) setState(() => _xrayGroupsLoading = false);
+    }
+  }
+
+  List<XrayInboundProfile> _inboundsForNode(String nodeId) {
+    for (final group in _xrayGroups) {
+      if (group.serverId == nodeId) return group.inbounds;
+    }
+    return const [];
+  }
+
 
   String _formatTransferBytes(int bytes) {
     if (bytes < 0) return '—';
