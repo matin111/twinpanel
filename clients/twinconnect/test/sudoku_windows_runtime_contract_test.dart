@@ -63,15 +63,19 @@ void main() {
     expect(config, contains("'route_exclude_address': ['\$endpointRoute/32']"));
   });
 
-  test('native ownership uses delete-on-close private files and limited child', () {
+  test('Windows Go-readable Sudoku staging retains user-only ACL and cleanup', () {
     final native = File('native/windows/twinconnect_sudoku_guard.h')
         .readAsStringSync();
     expect(native, contains('JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE'));
     expect(native, contains('IsBundledEngine(child)'));
-    expect(native, contains('FILE_FLAG_DELETE_ON_CLOSE'));
     expect(native, contains('ConvertSidToStringSidW'));
-    expect(native, contains('FILE_SHARE_READ | FILE_SHARE_DELETE'));
+    expect(native, contains('FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE'));
+    expect(native, contains('CreateFileW(path.c_str(), GENERIC_READ,'));
+    expect(native, contains('CleanupStaleConfigs(dir)'));
+    expect(native, contains('DeleteFileW(ConfigPath().c_str())'));
     expect(native, contains('ReleaseConfig()'));
+    // Go os.Open uses normal share flags, unlike FILE_FLAG_DELETE_ON_CLOSE.
+    expect(native, isNot(contains('FILE_ATTRIBUTE_TEMPORARY | FILE_FLAG_DELETE_ON_CLOSE')));
   });
 
   test('official release is pinned and smoke tested in Windows CI', () {
