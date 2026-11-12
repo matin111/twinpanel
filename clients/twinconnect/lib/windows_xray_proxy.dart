@@ -21,10 +21,12 @@ class WindowsXrayProxy {
 
   Process? _child;
   int? _port;
+  String? _verifiedExitIp;
   bool _changing = false;
 
   bool get isRunning => _child != null && _port != null;
   int? get socksPort => isRunning ? _port : null;
+  String? get verifiedExitIp => isRunning ? _verifiedExitIp : null;
 
   Future<int> start(XrayInboundProfile inbound) async {
     if (!Platform.isWindows) {
@@ -43,8 +45,14 @@ class WindowsXrayProxy {
           InternetAddress.loopbackIPv4, 0);
       final port = reservation.port;
       await reservation.close();
+      // Separate ephemeral HTTP CONNECT listener for independent, pre-TUN
+      // proof that the real remote Xray outbound can reach the internet.
+      final httpReservation = await ServerSocket.bind(
+          InternetAddress.loopbackIPv4, 0);
+      final httpPort = httpReservation.port;
+      await httpReservation.close();
       final config = XrayWindowsConfig.compose(
-          inbound: inbound, localSocksPort: port);
+          inbound: inbound, localSocksPort: port, localHttpPort: httpPort);
       if (!await WindowsXrayPreflight.checkInMemory(config)) {
         throw const FormatException('XRAY_CONFIG_INVALID');
       }
@@ -71,6 +79,7 @@ class WindowsXrayProxy {
         if (identical(_child, ownedProcess)) {
           _child = null;
           _port = null;
+          _verifiedExitIp = null;
           if (!_changing) onUnexpectedExit?.call();
         }
       }));
@@ -88,6 +97,13 @@ class WindowsXrayProxy {
       if (!ready || !identical(_child, ownedProcess)) {
         throw const FormatException('XRAY_SOCKS_LISTENER_UNAVAILABLE');
       }
+      // A responding local SOCKS listener is not proof of remote connectivity.
+      // Require an HTTPS response through the chosen Xray endpoint first.
+      final verifiedExitIp = await _probeHttpExit(httpPort);
+      if (!identical(_child, ownedProcess)) {
+        throw const FormatException('XRAY_PROCESS_EXITED');
+      }
+      _verifiedExitIp = verifiedExitIp;
       _port = port;
       return port;
     } catch (_) {
@@ -119,6 +135,48 @@ class WindowsXrayProxy {
     }
   }
 
+  static Future<String> _probeHttpExit(int port) async {
+    final client = HttpClient()
+      ..connectionTimeout = const Duration(seconds: 3)
+      ..findProxy = (_) => 'PROXY 127.0.0.1:$port';
+    try {
+      for (var attempt = 0; attempt < 4; attempt++) {
+        try {
+          final request = await client.getUrl(
+            Uri.https('api.ipify.org', '/', {'format': 'json'}),
+          ).timeout(const Duration(seconds: 4));
+          request.followRedirects = false;
+          final response = await request.close()
+              .timeout(const Duration(seconds: 5));
+          if (response.statusCode != HttpStatus.ok) {
+            throw const FormatException('XRAY_EXIT_HTTP_REJECTED');
+          }
+          final body = await utf8.decoder.bind(response).join()
+              .timeout(const Duration(seconds: 5));
+          if (body.length > 512) {
+            throw const FormatException('XRAY_EXIT_RESPONSE_TOO_LARGE');
+          }
+          final decoded = jsonDecode(body);
+          if (decoded is! Map || decoded['ip'] is! String) {
+            throw const FormatException('XRAY_EXIT_RESPONSE_INVALID');
+          }
+          final ip = decoded['ip'] as String;
+          final addr = InternetAddress.tryParse(ip);
+          if (addr == null || addr.type != InternetAddressType.IPv4 ||
+              addr.isLoopback || addr.isLinkLocal || addr.isMulticast) {
+            throw const FormatException('XRAY_EXIT_RESPONSE_INVALID');
+          }
+          return ip;
+        } catch (_) {
+          await Future<void>.delayed(const Duration(milliseconds: 400));
+        }
+      }
+      throw const FormatException('XRAY_REMOTE_EGRESS_NOT_VERIFIED');
+    } finally {
+      client.close(force: true);
+    }
+  }
+
   Future<void> stop() async {
     if (_changing) throw const FormatException('XRAY_PROXY_BUSY');
     _changing = true;
@@ -133,6 +191,7 @@ class WindowsXrayProxy {
     final process = _child;
     if (process == null) {
       _port = null;
+      _verifiedExitIp = null;
       return;
     }
     process.kill();
@@ -144,6 +203,7 @@ class WindowsXrayProxy {
     if (identical(_child, process)) {
       _child = null;
       _port = null;
+      _verifiedExitIp = null;
     }
   }
 }
