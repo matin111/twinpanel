@@ -196,6 +196,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     'GB': 'انگلیس', 'UK': 'انگلیس', 'NL': 'هلند', 'FI': 'فنلاند',
     'IR': 'ایران', 'CA': 'کانادا', 'SE': 'سوئد', 'CH': 'سوئیس',
     'AT': 'اتریش', 'IT': 'ایتالیا', 'ES': 'اسپانیا', 'RU': 'روسیه',
+    'HK': 'هنگ‌کنگ', 'JP': 'ژاپن', 'AE': 'امارات', 'SG': 'سنگاپور',
   };
   static const Map<String, String> _countryNamesEn = {
     'DE': 'Germany', 'TR': 'Turkey', 'US': 'United States',
@@ -203,9 +204,11 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     'NL': 'Netherlands', 'FI': 'Finland', 'IR': 'Iran',
     'CA': 'Canada', 'SE': 'Sweden', 'CH': 'Switzerland',
     'AT': 'Austria', 'IT': 'Italy', 'ES': 'Spain', 'RU': 'Russia',
+    'HK': 'Hong Kong', 'JP': 'Japan', 'AE': 'United Arab Emirates',
+    'SG': 'Singapore',
   };
   String _countryLabel(String code) {
-    final normalized = code.trim().toUpperCase();
+    final normalized = CountryFlag.normalizedCode(code);
     return (_persian ? _countryNamesFa : _countryNamesEn)[normalized]
         ?? normalized;
   }
@@ -2715,7 +2718,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       ];
       final grouped = <String, List<int>>{};
       for (final i in matching) {
-        final country = demoServers[i].flag.trim().toUpperCase();
+        final country = CountryFlag.normalizedCode(demoServers[i].flag);
         grouped.putIfAbsent(country, () => <int>[]).add(i);
       }
       Widget countryGroup(String country, List<int> indices) {
