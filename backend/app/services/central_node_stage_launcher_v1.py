@@ -57,7 +57,8 @@ def launch(db, node_id: int, *, initial_full: bool = False) -> dict:
         raise CentralStageLaunchError("CENTRAL_STAGE_INVALID_NODE_ID")
     ensure_launchable(db, node_id)
     systemd = shutil.which("systemd-run")
-    if not systemd or not STAGE.is_file():
+    flock = shutil.which("flock")
+    if not systemd or not flock or not STAGE.is_file():
         raise CentralStageLaunchError("CENTRAL_STAGE_RUNNER_UNAVAILABLE")
     unit = f"twinpanel-central-node-stage-{node_id}"
     # Only already-registered visible Exits use the first-pass delta path.
@@ -70,6 +71,7 @@ def launch(db, node_id: int, *, initial_full: bool = False) -> dict:
         systemd, "--system", "--no-block", "--collect",
         f"--unit={unit}", f"--working-directory={ROOT}",
         f"--setenv=PYTHONPATH={ROOT}",
+        "--setenv=TP_CENTRAL_STAGE_GLOBAL_LOCK_HELD=1",
         # Detached transient units do NOT inherit the API service EnvironmentFile.
         # Without these settings, Pydantic fails before stage startup and the
         # visible Exit delta reconciler loops every 30 seconds indefinitely.
@@ -81,6 +83,9 @@ def launch(db, node_id: int, *, initial_full: bool = False) -> dict:
         # controller must not be starved by bulk provisioning.
         "--property=CPUQuota=200%", "--property=CPUWeight=20",
         "--property=IOWeight=30",
+        # Acquire the shared fleet slot BEFORE Python imports its heavyweight
+        # ORM/protocol modules. This prevents simultaneous startup CPU spikes.
+        flock, "-x", "/tmp/twinpanel-central-node-stage-global.lock",
         sys.executable, str(STAGE),
         "--node-id", str(node_id),
         "--limit", str(MAX_USERS),
