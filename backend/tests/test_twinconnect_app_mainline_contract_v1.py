@@ -85,9 +85,11 @@ class TwinConnectMainlineContract(unittest.TestCase):
 
     def test_connection_glass_is_visible_and_last_in_cascade(self):
         source = PUBLIC_CONNECTION.read_text(encoding="utf-8")
-        self.assertIn("TWINPANEL_CONNECTION_GLASS_SYSTEM_V2", source)
-        self.assertIn("radial-gradient(ellipse", source)
-        self.assertIn("backdrop-filter:blur(24px)", source)
+        self.assertIn("TWINPANEL_CONNECTION_GLASS_SYSTEM_V3", source)
+        self.assertIn("backdrop-filter: blur(16px)", source)
+        self.assertIn("--tp-card-glass: rgba(255,255,255,.055)", source)
+        self.assertIn("Preserve the page background", source)
+        self.assertNotIn("radial-gradient(ellipse", source)
         self.assertIn('html[data-theme="light"]', source)
         self.assertIn(".protocol-choice", source)
         self.assertIn(".traffic", source)
