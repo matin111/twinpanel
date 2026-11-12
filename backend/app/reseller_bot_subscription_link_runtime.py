@@ -15,6 +15,7 @@ from aiogram.types import (
 )
 
 from .database import SessionLocal
+from .central_app_credentials import app_delivery_payload
 from .reseller_bot_runtime import _subscriptions, linked_user
 from .reseller_bot_wallet_menu_runtime import wallet_main_keyboard
 from .routers.account_delivery import _share_url
@@ -192,11 +193,20 @@ def build_subscription_link_router(reseller_id: int) -> Router:
                 )
                 return
 
+            app_access = app_delivery_payload(db, sub)
+            if app_access:
+                db.commit()
+            app_lines = (
+                "\n\n📱 <b>ورود به اپ هوشمند</b>\n"
+                f"👤 نام کاربری اپ: <code>{escape(app_access['username'])}</code>\n"
+                f"🔑 رمز اپ: <code>{escape(app_access['password'])}</code>"
+            ) if app_access else ""
             await state.clear()
             await message.answer(
                 "✅ <b>لینک اکانت</b>\n\n"
                 f"👤 نام کاربری: <code>{escape(username)}</code>\n"
-                f"🔗 سابلینک:\n<code>{escape(subscription_link)}</code>",
+                f"🔗 سابلینک:\n<code>{escape(subscription_link)}</code>"
+                + app_lines,
                 reply_markup=_link_keyboard(subscription_link),
             )
             await message.answer(
