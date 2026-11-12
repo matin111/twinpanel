@@ -67,6 +67,11 @@ def open_session(db: Session, node_id: int, data: SessionOpenIn, *, observed_tel
     if limit > 0 and used >= limit:
         raise HTTPException(status_code=403, detail="subscription_quota_exhausted")
 
+    # An absent device identifier is not a real primary key. Reject it
+    # explicitly instead of issuing an invalid NULL-PK lookup (SQLAlchemy
+    # warning on every telemetry sweep) and then treating it as a session.
+    if data.device_id is None:
+        raise HTTPException(status_code=403, detail="device_not_allowed")
     device = db.get(QuotaDevice, data.device_id)
     if (
         device is None
