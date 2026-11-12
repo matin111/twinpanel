@@ -2381,6 +2381,8 @@ async def _telegram_notification_worker(bot):
                     # TWINPANEL_MAIN_PAYMENT_DELIVERY_V2
                     password = ""
                     subscription_link = ""
+                    app_username = ""
+                    app_password = ""
 
                     if sub_id:
                         try:
@@ -2437,6 +2439,15 @@ async def _telegram_notification_worker(bot):
                                     )
                                     or ""
                                 ).strip()
+
+                                # App login is separate from VPN credentials.
+                                # Only the authenticated purchaser receives it.
+                                from .central_app_credentials import app_delivery_payload
+                                app_access = app_delivery_payload(db, delivery_sub)
+                                if app_access:
+                                    app_username = str(app_access["username"])
+                                    app_password = str(app_access["password"])
+                                    db.commit()
 
                         except Exception:
                             pass
@@ -2512,6 +2523,14 @@ async def _telegram_notification_worker(bot):
                             "",
                             "🔗 <b>لینک اتصال:</b>",
                             f"<code>{safe_link}</code>",
+                        ])
+
+                    if app_username and app_password:
+                        lines.extend([
+                            "",
+                            "📱 <b>ورود به اپ هوشمند</b>",
+                            f"👤 نام کاربری اپ: <code>{escape(app_username)}</code>",
+                            f"🔑 رمز اپ: <code>{escape(app_password)}</code>",
                         ])
 
                     lines.extend([
