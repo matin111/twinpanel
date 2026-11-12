@@ -109,9 +109,7 @@ export function PremiumRevenueChart({series,pick}:Props){
   return <div className={styles.root} dir="rtl">
     <header className={styles.header}>
       <div className={styles.headline}>
-        <span className={styles.eyebrow}><i/>{pick("تحلیل زنده فروش","LIVE SALES ANALYTICS")}</span>
         <h2>{pick("نبض فروش","Sales pulse")}</h2>
-        <p>{pick("روند فروش اشتراک و شارژ کیف پول، بر اساس تراکنش‌های ثبت‌شده","Subscription sales and wallet top-ups from recorded transactions")}</p>
       </div>
       <div className={styles.period} role="group" aria-label={pick("بازه نمایش نمودار","Chart period")}>
         {([7,14,30] as const).map(n=><button key={n} type="button" aria-pressed={days===n} className={days===n?styles.activePeriod:""} onClick={()=>{setDays(n);setHover(null);}}>{amount(n)} {pick("روز","days")}</button>)}
@@ -122,12 +120,10 @@ export function PremiumRevenueChart({series,pick}:Props){
       <div className={styles.insight}>
         <div className={styles.insightLabel}><i className={styles.violetDot}/>{pick("فروش اشتراک","Subscription sales")}</div>
         <strong>{amount(salesTotal)} <small>{pick("تومان","IRR toman")}</small></strong>
-        <span>{pick("جمع فروش در بازه انتخابی","Total sales in selected period")}</span>
       </div>
       <div className={styles.insight}>
         <div className={styles.insightLabel}><i className={styles.mintDot}/>{pick("شارژ کیف پول","Wallet top-ups")}</div>
         <strong>{amount(walletTotal)} <small>{pick("تومان","IRR toman")}</small></strong>
-        <span>{pick("ورودی کیف پول؛ جدا از درآمد فروش","Wallet inflow, separate from sales revenue")}</span>
       </div>
       <div className={styles.insight}>
         <div className={styles.insightLabel}><span className={styles.peakIcon}>↗</span>{pick("اوج فروش روزانه","Peak sales day")}</div>
@@ -142,7 +138,6 @@ export function PremiumRevenueChart({series,pick}:Props){
           <button type="button" aria-pressed={seriesVisible.subscription_revenue_toman} className={!seriesVisible.subscription_revenue_toman?styles.dimmed:""} onClick={()=>show({key:"subscription_revenue_toman"})}><i className={styles.violetDot}/>{pick("فروش اشتراک","Subscription sales")}</button>
           <button type="button" aria-pressed={seriesVisible.wallet_topup_revenue_toman} className={!seriesVisible.wallet_topup_revenue_toman?styles.dimmed:""} onClick={()=>show({key:"wallet_topup_revenue_toman"})}><i className={styles.mintDot}/>{pick("شارژ کیف پول","Wallet top-ups")}</button>
         </div>
-        <span className={styles.livePill}><i/>{pick("داده واقعی","Real data")}</span>
       </div>
 
       {hasData?<div className={styles.graphArea}>
@@ -207,7 +202,6 @@ export function PremiumRevenueChart({series,pick}:Props){
       </div>:<div className={styles.empty}>
         <span>◌</span>
         <b>{pick("در این بازه تراکنشی ثبت نشده","No transactions in this period")}</b>
-        <small>{pick("با ثبت فروش یا شارژ کیف پول، روند واقعی اینجا نمایش داده می‌شود.","The trend will appear when sales or wallet credits are recorded.")}</small>
       </div>}
       <div className={styles.graphFooter}>
         <span>{pick("مبالغ به تومان • آخرین داده‌های ثبت‌شده","Amounts in toman • Latest recorded data")}</span>
