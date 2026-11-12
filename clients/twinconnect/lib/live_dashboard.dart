@@ -22,6 +22,7 @@ import 'windows_sudoku_proxy.dart';
 import 'sudoku_client_profile.dart';
 import 'windows_xray_preflight.dart';
 import 'xray_inbound_profiles.dart';
+import 'xray_inbound_secure_cache.dart';
 import 'xray_inbound_latency.dart';
 import 'windows_openconnect_tunnel.dart';
 import 'windows_openvpn_tunnel.dart';
@@ -1626,6 +1627,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     _restoreAppearance();
     _refreshNativeReadiness();
     _refreshVpnStatus();
+    unawaited(_restoreCachedXrayInbounds());
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && (widget.servers?.servers.isNotEmpty ?? false)) {
         _probeAllNodes();
@@ -1889,10 +1891,40 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   String _search = '';
   int _selected = 0;
   final Set<int> _favorites = <int>{};
-  // User-facing Xray inbounds are separate connection choices, but retain
-  // the assigned node ID for subscription accounting and server selection.
-  // Credential-bearing URIs remain in memory only while this view is open.
+  // User-facing Xray inbounds remain distinct choices. Last validated
+  // entries are stored in OS-encrypted short-lived display cache only.
+  // A connection ALWAYS fetches fresh authorized profiles from the panel.
+  final XrayInboundSecureCache _xrayCache = const XrayInboundSecureCache();
   List<XrayServerProfiles> _xrayGroups = const [];
+
+  bool get _xrayAuthorized => widget.catalog?.entries.any((entry) =>
+      entry.protocol.code == 'v2ray' && entry.selected &&
+      entry.configRecordPresent) ?? false;
+
+  List<XrayServerProfiles> _assignedXrayGroups(
+      List<XrayServerProfiles> groups) {
+    final allowed = widget.servers?.servers.map((s) => s.id).toSet()
+        ?? <String>{};
+    return List.unmodifiable(groups.where((g) =>
+        allowed.contains(g.serverId) && g.inbounds.isNotEmpty));
+  }
+
+  Future<void> _restoreCachedXrayInbounds() async {
+    if (!_xrayAuthorized) return;
+    final username = widget.username;
+    final namespace = widget.panel.namespace;
+    final origin = widget.panel.apiOrigin;
+    final previous = await _xrayCache.read(
+      username: username, namespace: namespace, panelOrigin: origin);
+    if (!mounted || !_xrayAuthorized ||
+        widget.username != username ||
+        widget.panel.namespace != namespace ||
+        widget.panel.apiOrigin != origin ||
+        _xrayGroupsLoaded || _xrayGroups.isNotEmpty || previous == null) return;
+    final visible = _assignedXrayGroups(previous);
+    if (visible.isEmpty) return;
+    setState(() => _xrayGroups = visible);
+  }
   bool _xrayGroupsLoading = false;
   bool _xrayGroupsLoaded = false;
   String? _xrayGroupsError;
@@ -1950,18 +1982,32 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         native: const NativeProtocolReadiness(supportedCodes: {'v2ray'}),
       );
       if (!mounted) return;
+      final visible = _assignedXrayGroups(response.xrayServerGroups);
       setState(() {
-        _xrayGroups = response.xrayServerGroups;
+        _xrayGroups = visible;
         _xrayGroupsLoaded = true;
         _xrayInboundRtts.clear();
       });
-      unawaited(_probeAllXrayInbounds());
-    } catch (error) {
+      // Never cache a rejected or empty response. A successful panel
+      // refresh replaces previous display data without manufacturing inbounds.
+      try {
+        if (visible.isEmpty) {
+          await _xrayCache.clear();
+        } else {
+          await _xrayCache.save(
+            username: widget.username, namespace: widget.panel.namespace,
+            panelOrigin: widget.panel.apiOrigin, groups: visible);
+        }
+      } catch (_) {
+        // Secure-storage availability must never block a live connection.
+      }
+      if (mounted) unawaited(_probeAllXrayInbounds());
+    } catch (_) {
       if (!mounted) return;
-      // Do not render errors that may embed session tokens, UUIDs or paths.
+      // Failed refresh retains already validated in-memory/cached choices.
+      // Display cache never authorizes connection or substitutes live data.
       setState(() {
         _xrayGroupsError = 'XRAY_SERVER_PROFILES_UNAVAILABLE';
-        if (refresh) _xrayGroups = const [];
       });
     } finally {
       if (mounted) setState(() => _xrayGroupsLoading = false);
