@@ -124,7 +124,26 @@ def missing_runtime_families(node_id, limit):
         return selected
 
 
+# Serial admission across ALL Exits. Per-node locks alone allow many
+# disjoint node stages to exhaust CPU and DB simultaneously.
+# Kernel flock is released automatically on process exit or crash.
+_GLOBAL_STAGE_LOCK = Path("/run/twinpanel-central-node-stage-global.lock")
+
+
 def run(node_id, limit, apply, *, delta_only=False):
+    if not apply:
+        return _run_serialized(node_id, limit, apply, delta_only=delta_only)
+    with _GLOBAL_STAGE_LOCK.open("a+", encoding="utf-8") as admission:
+        print("CENTRAL_STAGE_GLOBAL_SLOT_WAIT", json.dumps({"node_id": node_id}), flush=True)
+        fcntl.flock(admission, fcntl.LOCK_EX)
+        try:
+            print("CENTRAL_STAGE_GLOBAL_SLOT_ACQUIRED", json.dumps({"node_id": node_id}), flush=True)
+            return _run_serialized(node_id, limit, apply, delta_only=delta_only)
+        finally:
+            fcntl.flock(admission, fcntl.LOCK_UN)
+
+
+def _run_serialized(node_id, limit, apply, *, delta_only=False):
     # Prevent two independent staging processes from racing on the same node.
     lock_path = Path(f"/tmp/twinpanel-central-node-stage-{node_id}.lock")
     with lock_path.open("a+", encoding="utf-8") as lock:
