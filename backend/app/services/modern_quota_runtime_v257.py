@@ -707,6 +707,23 @@ def _apply_trusttunnel(
     matched = online_count = opened = closed = 0
     baselined = usage_events = accepted_bytes = epoch_changes = 0
 
+    # Query active sessions ONCE. Missing controller identities cannot be
+    # treated as online, but only previously active devices require a close.
+    # The old code referenced an undefined variable and dropped the entire
+    # TrustTunnel accounting pass for nodes with missing users.
+    previously_active_devices = {
+        int(device_id) for (device_id,) in (
+            db.query(QuotaSession.device_id)
+            .filter(
+                QuotaSession.node_id == int(node.id),
+                QuotaSession.protocol == "trusttunnel",
+                QuotaSession.status == "active",
+            )
+            .distinct()
+            .all()
+        )
+    }
+
     for device in devices:
         username = str(
             device.get("telemetry_identity") or device.get("identity") or ""
