@@ -36,6 +36,11 @@ class CentralStageLauncherTests(unittest.TestCase):
         command=run.call_args.args[0]
         self.assertIn("--unit=twinpanel-central-node-stage-14",command)
         self.assertIn("--no-block",command)
+        self.assertIn("--property=CPUQuota=200%",command)
+        self.assertIn("--setenv=TP_CENTRAL_STAGE_GLOBAL_LOCK_HELD=1",command)
+        self.assertIn("-x",command)
+        self.assertIn("/tmp/twinpanel-central-node-stage-global.lock",command)
+        self.assertLess(command.index("/tmp/twinpanel-central-node-stage-global.lock"), command.index(str(launcher.STAGE)))
         self.assertEqual(command[-5:],
                          ["--limit","3000","--apply","--confirm-node-id","14"])
         self.assertFalse(run.call_args.kwargs.get("shell",False))
