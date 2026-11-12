@@ -16,6 +16,8 @@ PROTECTED_FILES = (
     "components/admin-dashboard-runtime.tsx",
     "components/premium-revenue-chart.tsx",
     "components/premium-revenue-chart.module.css",
+    "components/admin-dashboard-server-card.tsx",
+    "components/admin-dashboard-server-card.module.css",
 )
 
 
@@ -42,6 +44,15 @@ def verify_ui_release(source: Path, reference: Path, *, check_bundle: bool = Fal
     if "@media(prefers-reduced-motion:reduce)" not in css:
         raise ValueError("Premium chart reduced-motion accessibility has been dropped")
 
+    # Do not let a later version silently revert the live server resource
+    # monitor to the old four text bars. Preserve both themes and real trends.
+    server_card = (source / PROTECTED_FILES[3]).read_text(encoding="utf-8")
+    server_css = (source / PROTECTED_FILES[4]).read_text(encoding="utf-8")
+    if not all(key in server_card for key in ("ResourceGauge", "NetworkGauge", "serverSample(payload)", "setSamples(before=>")):
+        raise ValueError("Live server resource charts are missing from the dashboard")
+    if "html[data-theme=\"light\"]" not in server_css or "prefers-reduced-motion:reduce" not in server_css:
+        raise ValueError("Server chart light theme or accessibility rules are missing")
+
     if check_bundle:
         bundle = source / ".next/standalone/.next/static"
         if not bundle.is_dir():
@@ -51,6 +62,11 @@ def verify_ui_release(source: Path, reference: Path, *, check_bundle: bool = Fal
             for path in bundle.rglob("*.js")
         ):
             raise ValueError("Compiled production assets are missing the premium sales chart")
+        if not any(
+            b"Server pulse" in path.read_bytes() or "نبض سرور".encode("utf-8") in path.read_bytes()
+            for path in bundle.rglob("*.js")
+        ):
+            raise ValueError("Compiled production assets are missing the live server resource charts")
 
 
 def main() -> None:
@@ -60,7 +76,7 @@ def main() -> None:
     parser.add_argument("--check-bundle", action="store_true")
     args = parser.parse_args()
     verify_ui_release(args.source, args.main, check_bundle=args.check_bundle)
-    print("Premium sales dashboard is present and matches latest main")
+    print("Sales and server resource charts match latest main and compiled assets")
 
 
 if __name__ == "__main__":
