@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:twinconnect/live_dashboard.dart';
 import 'package:twinconnect/account_snapshot.dart';
+import 'package:twinconnect/tunnel_traffic_chart.dart';
 import 'package:twinconnect/protocols.dart';
 import 'package:twinconnect/server_inventory.dart';
 import 'package:twinconnect/tenant_models.dart';
@@ -135,6 +136,15 @@ void main() {
     expect(find.byKey(const Key('liveConnectionStatus')), findsWidgets);
     // The duration is visible even while offline, and begins at zero.
     expect(find.byKey(const Key('liveConnectionDuration')), findsOneWidget);
+    expect(find.byKey(const Key('liveConnectionControlsButton')),
+        findsOneWidget);
+    expect(find.text('Connect now'), findsOneWidget);
+    expect(find.byKey(const Key('liveHomeDataProgress')), findsOneWidget);
+    expect(find.byKey(const Key('liveHomeExpiryChip')), findsOneWidget);
+    expect(find.byKey(const Key('liveHomeTimeChip')), findsOneWidget);
+    expect(find.byType(TunnelTrafficChart), findsNWidgets(2));
+    expect(find.byType(BackdropFilter), findsWidgets);
+
     // The original authenticated dashboard must expose account data directly
     // on Quick Connect, with no invented values while the snapshot is pending.
     expect(find.byKey(const Key('devAnimatedBackground')), findsOneWidget);
