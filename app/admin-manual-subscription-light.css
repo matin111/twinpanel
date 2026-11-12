@@ -157,3 +157,87 @@ body > .runtime-modal.manual-subscription-modal.tp-light-create .icon-button{
     padding:9px 10px!important;
   }
 }
+
+
+/* Active Admin > Subscriptions create dialog. The routed page mounts
+   AdminSubscriptionCreateUnified (not AdminManualSubscriptionCreate).
+   This theme-bound class makes the actual modal readable in light mode. */
+.runtime-modal.tp-unified-create-light {
+  --surface:#ffffff;
+  --surface2:#f1f5fb;
+  --line:#d8e2ef;
+  --text:#1c2d46;
+  --muted:#5d7089;
+  color-scheme:light;
+}
+.runtime-modal.tp-unified-create-light > .runtime-modal-card {
+  background:#fff!important;
+  color:#1c2d46!important;
+  border-color:#d8e2ef!important;
+}
+.runtime-modal.tp-unified-create-light > .runtime-modal-card > div:first-child {
+  background:linear-gradient(115deg,#f8faff,#eef4fd)!important;
+  color:#1e2f4b!important;
+  border-color:#dbe4f0!important;
+}
+.runtime-modal.tp-unified-create-light form > div:first-child {
+  background:#fff!important;
+}
+.runtime-modal.tp-unified-create-light form section {
+  background:linear-gradient(180deg,#f8faff,#f0f5fc)!important;
+  border:1px solid #d9e3f0!important;
+  color:#263957!important;
+}
+.runtime-modal.tp-unified-create-light form section b {
+  color:#263957!important;
+}
+.runtime-modal.tp-unified-create-light .field > span,
+.runtime-modal.tp-unified-create-light .field > small,
+.runtime-modal.tp-unified-create-light form section > div small {
+  color:#546983!important;
+  opacity:1!important;
+}
+.runtime-modal.tp-unified-create-light .field input,
+.runtime-modal.tp-unified-create-light .field select {
+  background:#fff!important;
+  color:#233551!important;
+  -webkit-text-fill-color:#233551!important;
+  border:1px solid #cbd9e9!important;
+}
+.runtime-modal.tp-unified-create-light .field input::placeholder {
+  color:#8394a9!important;
+  opacity:1!important;
+}
+.runtime-modal.tp-unified-create-light .tp-create-choice {
+  background:#fff!important;
+  color:#253854!important;
+  border-color:#d6e1ee!important;
+}
+.runtime-modal.tp-unified-create-light .tp-create-choice[aria-pressed="true"] {
+  background:#f1ebff!important;
+  border-color:#a78bf2!important;
+}
+.runtime-modal.tp-unified-create-light .tp-create-choice small {
+  color:#61728a!important;
+  opacity:1!important;
+}
+.runtime-modal.tp-unified-create-light form > div:last-child {
+  background:#f8faff!important;
+  border-color:#dce5f0!important;
+  color:#334762!important;
+}
+.runtime-modal.tp-unified-create-light button.ghost {
+  background:#fff!important;
+  border:1px solid #cedbea!important;
+  color:#3d526f!important;
+}
+.runtime-modal.tp-unified-create-light button.primary {
+  background:#2267db!important;
+  border:1px solid #2363c9!important;
+  color:#fff!important;
+}
+.runtime-modal.tp-unified-create-light .icon-button {
+  background:#fff!important;
+  color:#344965!important;
+  border:1px solid #d5e0ed!important;
+}
