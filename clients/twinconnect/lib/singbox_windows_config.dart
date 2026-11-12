@@ -18,7 +18,21 @@ class SingBoxWindowsConfig {
     String? telemetrySecret,
     int? xraySocksPort,
     String? xrayEndpointIPv4,
+    int? sudokuSocksPort,
+    String? sudokuEndpointIPv4,
   }) {
+    if (xraySocksPort != null && sudokuSocksPort != null) {
+      throw const FormatException('MULTIPLE_LOCAL_PROXY_UPSTREAMS');
+    }
+    if (sudokuSocksPort != null &&
+        (protocol != 'sudoku' || sudokuSocksPort < 1024 ||
+         sudokuSocksPort > 65535 || resolvedServer != null)) {
+      throw const FormatException('SUDOKU_SOCKS_BRIDGE_INVALID');
+    }
+    if ((sudokuSocksPort == null) != (sudokuEndpointIPv4 == null)) {
+      throw const FormatException('SUDOKU_ENDPOINT_ROUTE_MISSING');
+    }
+    final activeSocksPort = xraySocksPort ?? sudokuSocksPort;
     // An app-owned, loopback-only Xray-core SOCKS bridge is the sole
     // supported external outbound. Never accept an arbitrary proxy host.
     if (xraySocksPort != null &&
@@ -31,15 +45,16 @@ class SingBoxWindowsConfig {
     }
     // A narrow /32 exception only for the exact preverified VLESS server.
     // Never make a general LAN/IPv4 exception or weaken strict_route.
-    final endpointRoute = xrayEndpointIPv4 == null
-        ? null : XrayEndpointRoute.requirePublicIPv4(xrayEndpointIPv4);
-    final outbound = xraySocksPort == null
+    final pinnedEndpoint = xrayEndpointIPv4 ?? sudokuEndpointIPv4;
+    final endpointRoute = pinnedEndpoint == null
+        ? null : XrayEndpointRoute.requirePublicIPv4(pinnedEndpoint);
+    final outbound = activeSocksPort == null
         ? SingBoxProfileValidator.validateOutbound(
             protocolCode: protocol, item: item)
         : <String, dynamic>{
             'type': 'socks',
             'server': '127.0.0.1',
-            'server_port': xraySocksPort,
+            'server_port': activeSocksPort,
             'version': '5',
           };
     final serverOutbound = {...outbound, 'tag': 'proxy'};
