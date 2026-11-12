@@ -39,6 +39,15 @@ def node_supported_protocols(db, node_id: int) -> frozenset[str]:
         NodeProtocolConfig.status == "online",
     ).all()
     ready = frozenset(str(row.protocol) for row in rows)
-    if len(ready) != count or not ready.issubset(ALL_PROTOCOL_SET):
+    if not ready or not ready.issubset(ALL_PROTOCOL_SET):
         raise RuntimeError("CENTRAL_PARTIAL_NODE_PROTOCOL_COUNT_DRIFT")
+    if len(ready) != count:
+        # A completed install may retain a stale numeric progress counter
+        # (e.g. 15/16) even though all 16 per-protocol rows are already
+        # individually marked online. The persisted live protocol registry
+        # is the authoritative eligible scope; never run costly node-wide
+        # reconciliation repeatedly to repair a display-only counter.
+        # Incomplete installs remain fail-closed on any count mismatch.
+        if job.stage != "completed":
+            raise RuntimeError("CENTRAL_PARTIAL_NODE_PROTOCOL_COUNT_DRIFT")
     return ready
