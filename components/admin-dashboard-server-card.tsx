@@ -200,9 +200,7 @@ export function AdminDashboardServerCard(){
     <section className={styles.panel} aria-label={pick("مانیتور منابع سرور","Server resources monitor")}>
       <div className={styles.header}>
         <div className={styles.heading}>
-          <span className={styles.eyebrow}><i/>{pick("مانیتورینگ زیرساخت","INFRASTRUCTURE MONITOR")}</span>
           <h2>{pick("نبض سرور","Server pulse")}</h2>
-          <p>{pick("مصرف لحظه‌ای منابع سرور اصلی پنل","Live utilization on the main panel server")}</p>
         </div>
         <div className={styles.headerInfo}>
           <div className={telemetryState==="online"?styles.online:styles.stale}><i/>{telemetryState==="online"?pick("داده زنده","Live data"):telemetryState==="waiting"?pick("در حال دریافت","Fetching data"):pick("داده قدیمی / قطع دریافت","Telemetry unavailable")}</div>
@@ -217,8 +215,7 @@ export function AdminDashboardServerCard(){
         <NetworkGauge health={health} samples={samples} pick={pick}/>
       </div>
       <footer className={styles.footer}>
-        <span><i/>{pick("نمودارها فقط از نمونه‌های واقعی ثبت‌شده بعد از بازشدن صفحه تشکیل می‌شوند.","Charts include real samples collected since opening this page only.")}</span>
-        <span>{last?pick("آخرین نمونه","Last reading")+": "+new Date(last).toLocaleTimeString(pick("fa-IR","en-US"),{hour:"2-digit",minute:"2-digit",second:"2-digit"}):pick("منتظر اولین نمونه","Awaiting first reading")} · {pick("هر ۱۵ ثانیه","Every 15s")}</span>
+        <span>{last?new Date(last).toLocaleTimeString(pick("fa-IR","en-US"),{hour:"2-digit",minute:"2-digit"}):"—"}</span>
       </footer>
     </section>,
     mount
