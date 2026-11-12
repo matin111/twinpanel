@@ -215,10 +215,33 @@ class ReleaseRevenueGuardTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "stale"):
             guard.verify_ui_release(self.source, self.current)
 
+    def test_missing_compiled_light_users_is_blocked(self):
+        folder = self.source / ".next/standalone/.next/static/chunks"
+        folder.mkdir(parents=True)
+        (folder / "chunk.js").write_text(
+            "Sales pulse Server pulse Service health Subscription overview Recent activity "
+            "Tunnel monitor Service protocols "
+            'html[data-theme="light"] .legacy-subscriptions-page .mobile-subscription-card',
+            encoding="utf-8",
+        )
+        with self.assertRaisesRegex(ValueError, "Compiled"):
+            guard.verify_ui_release(self.source, self.current, check_bundle=True)
+
     def test_compiled_premium_chart_passes(self):
         folder = self.source / ".next/standalone/.next/static/chunks"
         folder.mkdir(parents=True)
-        (folder / "chunk.js").write_text("Sales pulse Server pulse Service health Subscription overview Recent activity Tunnel monitor Service protocols", encoding="utf-8")
+        (folder / "chunk.js").write_text(
+            "Sales pulse Server pulse Service health Subscription overview Recent activity "
+            "Tunnel monitor Service protocols "
+            'html[data-theme="light"] .legacy-subscriptions-page .mobile-subscription-card '
+            'html[data-theme="light"] .admin-users-runtime .admin-user-card',
+            encoding="utf-8",
+        )
+        (folder / "theme.css").write_text(
+            'html[data-theme=light] .tbs-page .tbs-tabs{color:#1b2a45}'
+            '--tbs-input:#f8faff',
+            encoding="utf-8",
+        )
         guard.verify_ui_release(self.source, self.current, check_bundle=True)
 
 
