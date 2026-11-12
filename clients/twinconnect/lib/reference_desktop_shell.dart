@@ -30,6 +30,9 @@ class ReferenceDesktopShell extends StatefulWidget {
     this.protocol,
     this.connectedFor,
     this.exitIpVerified = false,
+    this.onRefreshStatus,
+    this.fastestServerEnabled = false,
+    this.onFastestServerChanged,
   });
 
   final BrandPreview brand;
@@ -46,6 +49,9 @@ class ReferenceDesktopShell extends StatefulWidget {
   final String? country, city, protocol;
   final Duration? connectedFor;
   final bool exitIpVerified;
+  final VoidCallback? onRefreshStatus;
+  final bool fastestServerEnabled;
+  final ValueChanged<bool>? onFastestServerChanged;
 
   @override
   State<ReferenceDesktopShell> createState() => _ReferenceDesktopShellState();
@@ -271,7 +277,12 @@ class _ReferenceDesktopShellState extends State<ReferenceDesktopShell> {
           style: const TextStyle(color: muted)),
     ]),
     const SizedBox(height: 16),
-    const Text('Refresh tunnel status', style: TextStyle(color: violet)),
+    TextButton.icon(
+      onPressed: widget.onRefreshStatus,
+      icon: const Icon(Icons.refresh, size: 19),
+      label: Text(widget.onRefreshStatus == null
+          ? 'Tunnel status unavailable' : 'Refresh tunnel status'),
+    ),
     const Spacer(),
     const AmbientWave(height: 52),
     Container(height: 53, width: 355, alignment: Alignment.center,
@@ -376,8 +387,10 @@ class _ReferenceDesktopShellState extends State<ReferenceDesktopShell> {
         title('Select fastest server', size: 20),
         const Text('Based on measured server latency', style: TextStyle(color: muted)),
       ])),
-      const Tooltip(message: 'Waiting for the native fastest-server selector',
-        child: Switch(value: false, onChanged: null)),
+      Tooltip(message: widget.onFastestServerChanged == null
+          ? 'Waiting for native fastest-server selection' : 'Fastest measured server',
+        child: Switch(value: widget.fastestServerEnabled,
+          onChanged: widget.onFastestServerChanged)),
     ]), padding: const EdgeInsets.all(19)),
   ]);
 
@@ -418,7 +431,7 @@ class _ReferenceDesktopShellState extends State<ReferenceDesktopShell> {
                   width: math.max(900, limits.maxWidth),
                   child: SingleChildScrollView(
                     child: SizedBox(
-                      height: math.max(850, limits.maxHeight),
+                      height: math.max(950, limits.maxHeight),
                       child: page,
                     ),
                   ),
