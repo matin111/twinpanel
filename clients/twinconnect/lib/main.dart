@@ -420,9 +420,6 @@ class _TwinConnectHomeState extends State<TwinConnectHome> with WidgetsBindingOb
     _brandRefreshTimer?.cancel();
     try {
       await _sessionStore.clearSession();
-      // Removing an authenticated session must also remove any credential-
-      // bearing Xray display cache for that device.
-      await const XrayInboundSecureCache().clear();
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
@@ -431,6 +428,11 @@ class _TwinConnectHomeState extends State<TwinConnectHome> with WidgetsBindingOb
       }
       return;
     }
+    // Session deletion has succeeded. Best-effort removal of the encrypted
+    // display cache must never prevent sign-out if OS vault I/O fails.
+    try {
+      await const XrayInboundSecureCache().clear();
+    } catch (_) {}
     if (!mounted) return;
     setState(() {
       _brand = null;
