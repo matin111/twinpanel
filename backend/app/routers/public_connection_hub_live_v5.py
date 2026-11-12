@@ -359,6 +359,55 @@ color:var(--text,#f4f7fb);box-shadow:0 8px 32px #0002}
         return source.replace(anchor, card + anchor, 1)
     return source.replace("</body>", card + "</body>", 1)
 
+
+_CONNECTION_GLASS_CSS = r"""
+/* TWINPANEL_CONNECTION_GLASS_SYSTEM_V1 — shared visual treatment only */
+:root{
+  --tp-glass-bg:rgba(28,44,70,.48);
+  --tp-glass-bg-strong:rgba(25,40,64,.58);
+  --tp-glass-line:rgba(168,197,240,.23);
+  --tp-glass-highlight:rgba(255,255,255,.11);
+  --tp-glass-shadow:0 12px 36px rgba(1,8,24,.22),inset 0 1px 0 var(--tp-glass-highlight);
+}
+html[data-theme="light"],body[data-theme="light"]{
+  --tp-glass-bg:rgba(255,255,255,.58);
+  --tp-glass-bg-strong:rgba(255,255,255,.72);
+  --tp-glass-line:rgba(103,139,186,.26);
+  --tp-glass-highlight:rgba(255,255,255,.78);
+  --tp-glass-shadow:0 12px 32px rgba(28,53,87,.10),inset 0 1px 0 var(--tp-glass-highlight);
+}
+body{background-image:radial-gradient(ellipse 68% 55% at 14% 30%,rgba(49,117,228,.10),transparent 75%),radial-gradient(ellipse 55% 48% at 92% 70%,rgba(125,82,229,.09),transparent 76%)!important;background-attachment:fixed!important}
+.traffic,.protocol-choice,.protocol-panel,.server-tab,.server-view,.profile,
+.platform-group,.app-card,.v38-all-card,.v34-subscription-card,
+.v9-config-card,.v9-server-row,.config-card,.server-card,.node-card,
+#tp-app-access,.subscription-card,.protocol-card,.device-card{
+  background:var(--tp-glass-bg)!important;
+  background-image:linear-gradient(135deg,rgba(255,255,255,.065),transparent 54%)!important;
+  border:1px solid var(--tp-glass-line)!important;
+  box-shadow:var(--tp-glass-shadow)!important;
+  -webkit-backdrop-filter:blur(19px) saturate(145%);
+  backdrop-filter:blur(19px) saturate(145%);
+}
+.traffic,.protocol-panel,#tp-app-access,.platform-group,.v38-all-card{background-color:var(--tp-glass-bg-strong)!important}
+.protocol-choice.active,.protocol-choice.live-online,.server-tab.active{
+  border-color:color-mix(in srgb,var(--p,#3989ff) 66%,var(--tp-glass-line))!important;
+  box-shadow:var(--tp-glass-shadow),0 0 0 1px color-mix(in srgb,var(--p,#3989ff) 34%,transparent)!important;
+}
+.protocol-choice:hover,.server-tab:hover,.app-card:hover{
+  border-color:color-mix(in srgb,var(--p,#3989ff) 46%,var(--tp-glass-line))!important;
+  background-color:color-mix(in srgb,var(--tp-glass-bg-strong) 88%,var(--p,#3989ff))!important;
+}
+#tp-app-access code{background:color-mix(in srgb,var(--tp-glass-bg-strong) 66%,transparent)!important;border:1px solid var(--tp-glass-line);border-radius:10px}
+html[data-theme="light"] .protocol-choice,html[data-theme="light"] .traffic,html[data-theme="light"] #tp-app-access,
+body[data-theme="light"] .protocol-choice,body[data-theme="light"] .traffic,body[data-theme="light"] #tp-app-access{color:var(--text,#172b46)}
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  .traffic,.protocol-choice,.protocol-panel,.server-tab,.server-view,.profile,#tp-app-access{background:var(--surface,#162238)!important}
+}
+@media(prefers-reduced-motion:no-preference){
+  .protocol-choice,.server-tab,.app-card{transition:border-color .2s ease,background-color .2s ease,box-shadow .2s ease}
+}
+"""
+
 @router.get("/{token}", response_class=HTMLResponse)
 def public_connection_hub_live_v5(
     token: str,
@@ -555,6 +604,8 @@ def public_connection_hub_live_v5(
     from .account_delivery import _subscription_from_share_token
     sub = _subscription_from_share_token(token, db)
     source = _add_authenticated_app_login_panel(source, int(sub.id))
+
+    source = source.replace("</head>", "<style>" + _CONNECTION_GLASS_CSS + "</style></head>", 1)
 
     return HTMLResponse(
         content=source,
