@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.785",
+  "version": "1.1.0-rc.786",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-12T02:21:40Z",
+  "released_at": "2026-11-12T02:36:57Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "442041d3b1368f35f084c2131aee7a7d9c216c96",
+  "source_sha": "be2f21252cee28ed631d58d2ef116c52032c48b4",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.785/twinpanel-1.1.0-rc.785-linux-x86_64.tar.gz",
-    "sha256": "bdb8f1b54b049a656a695289e2bf776d61401c2dad58c46f879a19886e6574dc",
-    "size_bytes": 30542186
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.786/twinpanel-1.1.0-rc.786-linux-x86_64.tar.gz",
+    "sha256": "619691b609f5c1d5480f2270b11c7a6f2613d0f4482166f1906f29ce7e64909e",
+    "size_bytes": 30544485
   },
   "notes": {
-    "fa": "انتشار رسمی نمودار مالی حرفه‌ای و تعاملی داشبورد با نمودار گرادیانی و انیمیشن نرم، بازه‌های ۷/۱۴/۳۰ روز، نمایش دقیق مبلغ هر روز، تفکیک فروش اشتراک از شارژ کیف پول و رفع دائمی بازگشت ظاهر قدیمی پس از آپدیت؛ حفاظت از نسخه‌های جدید با کنترل تازگی سورس و فایل خروجی.",
-    "en": "Official premium interactive sales dashboard with smooth animated gradient chart, 7/14/30-day ranges, precise daily tooltips, separate subscription/wallet views and release guard against stale bundles overwriting the redesign."
+    "fa": "نمایش تبلتی ۴:۳ استودیوی برند TwinConnect، اصلاح پیش‌نمایش و جداسازی داده‌های نمونه از وضعیت واقعی اپ. به‌همراه اصلاحات موجود در سورس اصلی پنل. اتصال زنده رنگ و لوگو در کلاینت ویندوز روی شاخه مستقل ویندوز توسعه و تست می‌شود.",
+    "en": "4:3 landscape tablet Brand Studio preview, improved preview labeling and removal of misleading simulated live connection values, plus existing mainline panel fixes. Windows live-brand refresh is built separately from the integration branch."
   }
 }
