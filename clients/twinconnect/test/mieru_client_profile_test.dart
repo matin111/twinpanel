@@ -34,12 +34,14 @@ Map<String, dynamic> mieruItem() => {
 void main() {
   test('keeps actual Mieru account identity and fixes only loopback ports', () {
     final valid = MieruClientProfile.fromItem(mieruItem());
-    final runtime = valid.runtimeConfig(socks5Port: 34101, rpcPort: 34102);
+    final runtime = valid.runtimeConfig(socks5Port: 34101, rpcPort: 34102, httpProxyPort: 34103);
     expect(runtime['activeProfile'], 'account-1');
     expect(runtime['socks5Port'], 34101);
     expect(runtime['rpcPort'], 34102);
     expect(runtime['socks5ListenLAN'], false);
-    expect(runtime.containsKey('httpProxyPort'), false);
+    expect(runtime['httpProxyPort'], 34103);
+    expect(runtime['httpProxyListenLAN'], false);
+    expect(valid.endpointIpv4, '93.184.216.34');
     final account = (runtime['profiles'] as List).single as Map;
     expect((account['user'] as Map)['password'], 'synthetic-secret');
     expect(((account['servers'] as List).single as Map)['portBindings'],
@@ -62,9 +64,9 @@ void main() {
 
   test('Mieru cannot collide local SOCKS5 and RPC ports', () {
     final valid = MieruClientProfile.fromItem(mieruItem());
-    expect(() => valid.runtimeConfig(socks5Port: 1080, rpcPort: 1080),
+    expect(() => valid.runtimeConfig(socks5Port: 1080, rpcPort: 1080, httpProxyPort: 2080),
         throwsFormatException);
-    expect(() => valid.runtimeConfig(socks5Port: 80, rpcPort: 2000),
+    expect(() => valid.runtimeConfig(socks5Port: 80, rpcPort: 2000, httpProxyPort: 3000),
         throwsFormatException);
   });
 }
