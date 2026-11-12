@@ -31,7 +31,9 @@ class PartialRecoveryTests(unittest.IsolatedAsyncioTestCase):
                       "ready_protocols":["openvpn","wireguard"],
                   }) as health,
             patch("app.services.central_progressive_exit_admission_v1.admit_verified_exit",
-                  return_value=admission) as admit,
+                  side_effect=lambda *_: (
+                      self.assertTrue(db.flush.called) or admission
+                  )) as admit,
             patch("app.services.central_node_stage_launcher_v1.launch",
                   return_value={"scheduled":True,"unit":"ci-safe"}),
         ):
@@ -39,6 +41,7 @@ class PartialRecoveryTests(unittest.IsolatedAsyncioTestCase):
         health.assert_awaited_once_with(
             db, 27, require_tls_profiles=True, allow_partial=True,
         )
+        db.flush.assert_called_once()
         admit.assert_called_once_with(db,27)
         self.assertEqual(result["live_protocols"],15)
         self.assertEqual(result["users_assigned"],2)
