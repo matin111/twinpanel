@@ -157,6 +157,8 @@ function Body(){
     })}</div>}
 
     <SubscriptionLinkDeliveryModal
+      appOwner="customer"
+      subscriptionId={linkModalId??undefined}
       open={linkModalId!==null}
       link={modalConnection?.subscription_link||""}
       reference={linkModalId?`MV-${linkModalId}`:""}
