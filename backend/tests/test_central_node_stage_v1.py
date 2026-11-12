@@ -35,6 +35,13 @@ class CentralNodeStageTests(unittest.TestCase):
                 self.assertTrue((Path(temp) / "fleet.lock").is_file())
                 execute.assert_called_once_with(19, 3000, True, delta_only=True)
 
+    def test_systemd_prelocked_stage_does_not_deadlock_itself(self):
+        with (patch.dict(stage.os.environ, {"TP_CENTRAL_STAGE_GLOBAL_LOCK_HELD":"1"}),
+              patch.object(stage, "_run_serialized", return_value=0) as execute,
+              patch.object(stage.fcntl, "flock", side_effect=AssertionError("recursive lock"))):
+            self.assertEqual(stage.run(19, 3000, True, delta_only=True), 0)
+            execute.assert_called_once_with(19, 3000, True, delta_only=True)
+
     def test_readonly_stage_does_not_wait_for_fleet_write_lock(self):
         with patch.object(stage, "_run_serialized", return_value=0) as execute:
             self.assertEqual(stage.run(19, 3000, False), 0)
