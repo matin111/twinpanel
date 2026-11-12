@@ -755,7 +755,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       // When switching away from a working VPN, validate before stopping
       // it. For a fresh connect the tunnel controller performs the exact
       // same native config validation; avoid starting sing-box twice.
-      if (_vpnUp || _vpnCleanup || _modernTunnel.isRunning) {
+      if (_vpnUp || _vpnCleanup || _modernTunnel.isRunning ||
+          _ciscoTunnel.isRunning || _openVpnTunnel.isRunning) {
         final targetConfig = SingBoxWindowsConfig.compose(
             protocol: protocol, item: matches.single);
         if (!await WindowsSingBoxPreflight.checkInMemory(targetConfig)) {
