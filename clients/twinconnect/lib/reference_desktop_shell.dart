@@ -15,6 +15,7 @@ class ReferenceDesktopShell extends StatefulWidget {
     required this.locations,
     required this.onLogout,
     required this.onSettings,
+    this.onLogin,
     this.connected = false,
     this.onToggleConnection,
     this.publicIp,
@@ -40,6 +41,7 @@ class ReferenceDesktopShell extends StatefulWidget {
   final Widget locations;
   final VoidCallback onLogout;
   final VoidCallback onSettings;
+  final VoidCallback? onLogin;
   final bool connected;
   final VoidCallback? onToggleConnection;
   final String? publicIp;
@@ -203,12 +205,12 @@ class _ReferenceDesktopShellState extends State<ReferenceDesktopShell> {
         linkIcon(Icons.language, 'Website', widget.brand.websiteUrl),
       ]), padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 4), radius: 20),
       const Spacer(),
-      glass(Row(children: [const Icon(Icons.circle, color: green, size: 12),
+      glass(Row(children: [Icon(Icons.circle, color: widget.onLogin == null ? green : muted, size: 12),
         const SizedBox(width: 10), Expanded(child: Column(
           crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(widget.username, maxLines: 1, overflow: TextOverflow.ellipsis,
                 style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
-            const Text('Signed in', style: TextStyle(color: muted, fontSize: 12)),
+            Text(widget.onLogin == null ? 'Signed in' : 'Not signed in', style: const TextStyle(color: muted, fontSize: 12)),
           ]))]), padding: const EdgeInsets.all(16), radius: 17),
       const SizedBox(height: 18),
       const Tooltip(message: 'Dark theme (light theme not yet available)',
@@ -413,10 +415,15 @@ class _ReferenceDesktopShellState extends State<ReferenceDesktopShell> {
                 2 => Center(child: FilledButton.icon(onPressed: widget.onSettings,
                     icon: const Icon(Icons.settings), label: const Text('Open Settings'))),
                 3 => Center(child: glass(Column(mainAxisSize: MainAxisSize.min, children: [
-                  title(widget.username), const SizedBox(height: 16),
-                  Text(widget.brand.brandName),
+                  title(widget.onLogin == null ? widget.username : 'Sign in to your account'),
+                  const SizedBox(height: 16),
+                  Text(widget.onLogin == null ? widget.brand.brandName : 'Connect your subscription to unlock account details'),
                   const SizedBox(height: 18),
-                  FilledButton(onPressed: widget.onLogout, child: const Text('Sign out')),
+                  FilledButton(
+                    key: const Key('referenceLoginAction'),
+                    onPressed: widget.onLogin ?? widget.onLogout,
+                    child: Text(widget.onLogin == null ? 'Sign out' : 'Sign in'),
+                  ),
                 ]))),
                 _ => quickConnect(),
               };
