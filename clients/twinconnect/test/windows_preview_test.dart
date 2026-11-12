@@ -35,10 +35,6 @@ void main() {
     await tester.pumpWidget(const TwinConnectApp());
     await tester.pumpAndSettle();
 
-    await tester.drag(find.byType(ListView).first, const Offset(0, -260));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('windowsDemoButton')));
-    await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('referenceDesktopShell')), findsOneWidget);
     expect(find.text('Network status'), findsOneWidget);
@@ -49,7 +45,7 @@ void main() {
 
     await tester.tap(find.byKey(const Key('referenceNav1')));
     await tester.pumpAndSettle();
-    expect(find.textContaining('Offline preview:'), findsOneWidget);
+    expect(find.textContaining('Sign in to retrieve'), findsOneWidget);
     await tester.tap(find.byKey(const Key('referenceNav0')));
     await tester.pumpAndSettle();
     expect(find.text('Quick Connect'), findsOneWidget);
@@ -66,7 +62,11 @@ void main() {
     await tester.tap(find.byKey(const Key('windowsDemoButton')));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const Key('referenceSettingsButton')));
+    await tester.tap(find.byKey(const Key('referenceNav3')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('referenceLoginAction')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('vpnSettingsButton')));
     await tester.pumpAndSettle();
 
     expect(find.text('Advanced VPN settings'), findsOneWidget);
