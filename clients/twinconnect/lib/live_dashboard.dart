@@ -3459,6 +3459,42 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       ),
     );
 
+    Widget trafficCard(IconData icon, String label,
+        double? bytesPerSecond, List<double> history, String total,
+        Color color) => glassCard(
+      radius: 19,
+      padding: const EdgeInsets.fromLTRB(12, 13, 12, 12),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(9),
+                color: color.withValues(alpha: .13)),
+              child: Icon(icon, color: color, size: 19)),
+            const SizedBox(width: 7),
+            Expanded(child: Text(label, overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: ink, fontSize: 12,
+                fontWeight: FontWeight.w700))),
+          ]),
+          const SizedBox(height: 10),
+          Text(bytesPerSecond == null ? '—'
+              : _formatTransferBytes(bytesPerSecond.round()) + '/s',
+            maxLines: 1, overflow: TextOverflow.ellipsis,
+            style: TextStyle(color: ink, fontSize: 19,
+              fontWeight: FontWeight.w800)),
+          const SizedBox(height: 9),
+          TunnelTrafficChart(samples: history,
+            color: color, dark: _dark, height: 49),
+          const SizedBox(height: 7),
+          Text(tr('کل این اتصال: ', 'Session total: ') + total,
+            maxLines: 1, overflow: TextOverflow.ellipsis,
+            style: TextStyle(color: sub, fontSize: 10)),
+        ],
+      ),
+    );
+
     Widget connectionStats() => glassCard(
       key: const Key('devConnectionStats'),
       radius: 23,
@@ -3510,13 +3546,25 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           ]),
           const SizedBox(height: 18),
           Row(children: [
-            Expanded(child: metric(Icons.arrow_downward_rounded,
-              tr('دریافت', 'Received'), _modernUp ? (_modernRx == null ? '—' : _formatTransferBytes(_modernRx!)) : _vpnUp ? _formatTransferBytes(_vpnRx) : '—',
-              detail: tr('مجموع رابط', 'Interface total'))),
+            Expanded(child: trafficCard(
+              Icons.arrow_downward_rounded,
+              tr('دانلود', 'Download'),
+              _rxBytesPerSecond, _rxHistory,
+              _modernUp
+                  ? (_modernRx == null ? '—'
+                      : _formatTransferBytes(_modernRx!))
+                  : _vpnUp ? _formatTransferBytes(_vpnRx) : '—',
+              const Color(0xFF00DFF5))),
             const SizedBox(width: 10),
-            Expanded(child: metric(Icons.arrow_upward_rounded,
-              tr('ارسال', 'Sent'), _modernUp ? (_modernTx == null ? '—' : _formatTransferBytes(_modernTx!)) : _vpnUp ? _formatTransferBytes(_vpnTx) : '—',
-              detail: tr('مجموع رابط', 'Interface total'))),
+            Expanded(child: trafficCard(
+              Icons.arrow_upward_rounded,
+              tr('آپلود', 'Upload'),
+              _txBytesPerSecond, _txHistory,
+              _modernUp
+                  ? (_modernTx == null ? '—'
+                      : _formatTransferBytes(_modernTx!))
+                  : _vpnUp ? _formatTransferBytes(_vpnTx) : '—',
+              const Color(0xFFC765FF))),
           ]),
           const SizedBox(height: 25),
           glassCard(
