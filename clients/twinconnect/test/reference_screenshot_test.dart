@@ -35,13 +35,18 @@ void main() {
     final render = tester.renderObject<RenderRepaintBoundary>(
       find.byKey(captureKey),
     );
-    final image = await render.toImage(pixelRatio: 1);
-    final data = await image.toByteData(format: ui.ImageByteFormat.png);
-    expect(data, isNotNull);
-    final file = File('build/reference/desktop-1536x1024.png');
-    await file.parent.create(recursive: true);
-    await file.writeAsBytes(data!.buffer.asUint8List());
-    image.dispose();
-    expect(await file.length(), greaterThan(10000));
+    await tester.runAsync(() async {
+      final image = await render.toImage(pixelRatio: 1);
+      try {
+        final data = await image.toByteData(format: ui.ImageByteFormat.png);
+        expect(data, isNotNull);
+        final file = File('build/reference/desktop-1536x1024.png');
+        await file.parent.create(recursive: true);
+        await file.writeAsBytes(data!.buffer.asUint8List());
+        expect(await file.length(), greaterThan(10000));
+      } finally {
+        image.dispose();
+      }
+    });
   });
 }
