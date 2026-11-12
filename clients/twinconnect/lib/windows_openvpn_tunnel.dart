@@ -173,7 +173,7 @@ class WindowsOpenVpnTunnel {
     final sent = Completer<void>();
     var authenticated = false;
     var passwordSubmitted = false;
-    socket.transform(utf8.decoder).listen((response) {
+    socket.cast<List<int>>().transform(utf8.decoder).listen((response) {
       if (response.contains('ENTER PASSWORD:')) {
         passwordSubmitted = true;
         socket.write(password + '\n');
