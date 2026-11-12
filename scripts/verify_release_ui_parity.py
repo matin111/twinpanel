@@ -27,6 +27,8 @@ PROTECTED_FILES = (
     "components/legacy-subscriptions-exact.tsx",
     "components/admin-users-runtime.tsx",
     "components/central-app-brand-studio.css",
+    "app/node-observability-v1.css",
+    "components/legacy-nodes-runtime-v2.tsx",
 )
 
 
@@ -146,6 +148,23 @@ def verify_ui_release(source: Path, reference: Path, *, check_bundle: bool = Fal
         'html[data-theme="light"] .tbs-page .tbs-save:disabled'
     )):
         raise ValueError("App Brand Studio light-mode input, tab, or preview contrast is missing")
+
+    node_css = (source / PROTECTED_FILES[14]).read_text(encoding="utf-8")
+    node_view = (source / PROTECTED_FILES[15]).read_text(encoding="utf-8")
+    if not all(marker in node_css for marker in (
+        'html[data-theme="light"] .legacy-control-page .node-list-quick-filters .node-list-filter-card.active',
+        'html[data-theme="light"] .legacy-control-page .node-list-quick-filters .node-list-stat-text b',
+        'html[data-theme="light"] .legacy-control-page .node-list-quick-filters .stat-icon',
+        'html[data-theme="light"] .legacy-control-page .table .primary-soft',
+        'html[data-theme="light"] .legacy-control-page .runtime-toolbar input',
+        '#f3edff', '#1b2942'
+    )):
+        raise ValueError("Admin node list light-mode KPI, table or controls are missing")
+    if not all(marker in node_view for marker in (
+        'node-list-quick-filters', 'node-list-filter-card', 'aria-pressed={filter===item.id}',
+        'node-list-filter-summary', 'selectFilter(item.id)'
+    )):
+        raise ValueError("Admin node status quick filters or actual node counts are missing")
 
     if check_bundle:
         bundle = source / ".next/standalone/.next/static"
