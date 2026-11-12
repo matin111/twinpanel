@@ -80,9 +80,51 @@ class WindowsSingBoxTunnel {
     try {
       final actual = await _requestPublicIp()
           .timeout(const Duration(seconds: 7));
+      // An explicit different exit is never accepted as healthy.
       return isRunning && actual == expected;
     } catch (_) {
-      return false;
+      // A single IPv4 echo domain can fail while the TUN remains healthy.
+      // Confirm the SAME verified exit through an independent endpoint,
+      // never silently treat network errors as successful VPN traffic.
+      try {
+        final alternate = await _requestAlternativePublicIp()
+            .timeout(const Duration(seconds: 6));
+        return isRunning && alternate == expected;
+      } catch (_) {
+        return false;
+      }
+    }
+  }
+
+  static Future<String> _requestAlternativePublicIp() async {
+    final client = HttpClient()
+      ..connectionTimeout = const Duration(seconds: 3)
+      ..findProxy = (_) => 'DIRECT';
+    try {
+      final request = await client.getUrl(
+        Uri.https('ipv4.icanhazip.com', '/'))
+        .timeout(const Duration(seconds: 4));
+      request.followRedirects = false;
+      final response = await request.close()
+          .timeout(const Duration(seconds: 4));
+      if (response.statusCode != HttpStatus.ok) {
+        throw const FormatException('PUBLIC_IP_CHECK_FAILED');
+      }
+      final body = await utf8.decoder.bind(response).join()
+          .timeout(const Duration(seconds: 4));
+      if (body.length > 64) {
+        throw const FormatException('PUBLIC_IP_RESPONSE_TOO_LARGE');
+      }
+      final ip = body.trim();
+      final address = InternetAddress.tryParse(ip);
+      if (address == null || address.type != InternetAddressType.IPv4 ||
+          address.isLoopback || address.isLinkLocal ||
+          address.isMulticast) {
+        throw const FormatException('PUBLIC_IP_RESPONSE_INVALID');
+      }
+      return ip;
+    } finally {
+      client.close(force: true);
     }
   }
 
