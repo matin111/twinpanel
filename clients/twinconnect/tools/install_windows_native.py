@@ -251,10 +251,10 @@ def install() -> None:
             result->Error("INVALID_XRAY_PROCESS_ID"); return;
           }
           int64_t pid = 0;
-          if (const auto* v = std::get_if<int32_t>(&it->second)) {
-            pid = *v;
-          } else if (const auto* v = std::get_if<int64_t>(&it->second)) {
-            pid = *v;
+          if (const auto* xray_pid32 = std::get_if<int32_t>(&it->second)) {
+            pid = *xray_pid32;
+          } else if (const auto* xray_pid64 = std::get_if<int64_t>(&it->second)) {
+            pid = *xray_pid64;
           } else {
             result->Error("INVALID_XRAY_PROCESS_ID"); return;
           }
