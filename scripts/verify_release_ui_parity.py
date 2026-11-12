@@ -176,6 +176,24 @@ def verify_ui_release(source: Path, reference: Path, *, check_bundle: bool = Fal
             for path in bundle.rglob("*.js")
         ):
             raise ValueError("Compiled production assets are missing the modern tunnel and protocol monitors")
+        # Validate the actual browser-delivered bundles as well as checked-in
+        # source so a stale Next.js artifact cannot silently ship dark roster
+        # cards under a light page theme.
+        light_sub = b'html[data-theme="light"] .legacy-subscriptions-page .mobile-subscription-card'
+        light_user = b'html[data-theme="light"] .admin-users-runtime .admin-user-card'
+        compiled_js = tuple(bundle.rglob("*.js"))
+        for marker, screen in (
+            (light_sub, "subscription"),
+            (light_user, "user"),
+        ):
+            if not any(marker in path.read_bytes() for path in compiled_js):
+                raise ValueError(f"Compiled production assets are missing {screen} light-mode card styles")
+        if not any(
+            b'html[data-theme=light] .tbs-page .tbs-tabs' in path.read_bytes()
+            and b'--tbs-input:#f8faff' in path.read_bytes()
+            for path in bundle.rglob("*.css")
+        ):
+            raise ValueError("Compiled production CSS is missing App Brand Studio light-mode styles")
 
 
 def main() -> None:
