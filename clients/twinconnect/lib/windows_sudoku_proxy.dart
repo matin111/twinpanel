@@ -38,6 +38,8 @@ class WindowsSudokuProxy {
   }
 
   static String? _classifyNativeFailure(String line) {
+    // The official SUDOKU-ASCII logx implementation emits fatal errors to
+    // stdout, not stderr. Keep no raw output or credential-bearing message.
     final value = line.toLowerCase();
     if (value.contains('address already in use') ||
         (value.contains('listen') && value.contains('bind'))) {
@@ -47,10 +49,18 @@ class WindowsSudokuProxy {
         value.contains('permission denied')) {
       return 'SUDOKU_CORE_ACCESS_DENIED';
     }
-    if (value.contains('config') &&
-        (value.contains('invalid') || value.contains('open') ||
-         value.contains('parse') || value.contains('decode'))) {
+    if (value.contains('failed to load config') ||
+        (value.contains('config') &&
+         (value.contains('invalid') || value.contains('open') ||
+          value.contains('parse') || value.contains('decode')))) {
       return 'SUDOKU_CONFIG_LOAD_FAILED';
+    }
+    if (value.contains('failed to build client table') ||
+        value.contains('failed to build table')) {
+      return 'SUDOKU_TABLE_INIT_FAILED';
+    }
+    if (value.contains('failed to initialize client nodes')) {
+      return 'SUDOKU_CLIENT_INIT_FAILED';
     }
     if (value.contains('key') &&
         (value.contains('invalid') || value.contains('decode') ||
@@ -58,6 +68,16 @@ class WindowsSudokuProxy {
       return 'SUDOKU_KEY_REJECTED';
     }
     return null;
+  }
+
+  void _consumeNativeDiagnostic(Process owned, Stream<List<int>> output) {
+    unawaited(utf8.decoder.bind(output)
+        .transform(const LineSplitter()).forEach((line) {
+      final category = _classifyNativeFailure(line);
+      if (category != null && identical(_child, owned)) {
+        _lastFailureCategory = category;
+      }
+    }).catchError((Object _) {}));
   }
 
   bool get isRunning => _child != null && _port != null;
@@ -143,15 +163,10 @@ class WindowsSudokuProxy {
       }
       // The config handle remains open until the core has opened SOCKS.
       // Never log the native core's output: it may contain private keys.
-      unawaited(owned.stdout.drain<void>());
-      unawaited(utf8.decoder.bind(owned.stderr)
-          .transform(const LineSplitter()).forEach((line) {
-        // No logging or persistence of native output or private keys.
-        final classified = _classifyNativeFailure(line);
-        if (classified != null && identical(_child, owned)) {
-          _lastFailureCategory = classified;
-        }
-      }).catchError((Object _) {}));
+      // Official Sudoku Fatalf -> logx.Errorf -> stdout, so both streams
+      // must be consumed. Never persist or print either stream.
+      _consumeNativeDiagnostic(owned, owned.stdout);
+      _consumeNativeDiagnostic(owned, owned.stderr);
       unawaited(owned.exitCode.then((code) {
         if (identical(_child, owned)) {
           _lastUnexpectedExitCode = code;
