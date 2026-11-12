@@ -361,87 +361,38 @@ color:var(--text,#f4f7fb);box-shadow:0 8px 32px #0002}
 
 
 _CONNECTION_GLASS_CSS = r"""
-/* TWINPANEL_CONNECTION_GLASS_SYSTEM_V2: visibly translucent, luminous glass */
-:root{
-  --tp-glass-fill:rgba(34,58,96,.33);
-  --tp-glass-strong:rgba(35,60,99,.40);
-  --tp-glass-stroke:rgba(186,218,255,.32);
-  --tp-glass-top:rgba(255,255,255,.22);
-  --tp-glass-shadow:0 14px 40px rgba(1,8,26,.24),inset 0 1px 0 rgba(255,255,255,.18);
+/* TWINPANEL_CONNECTION_GLASS_SYSTEM_V3: clean transparent glass, no decoration */
+:root {
+  --tp-card-glass: rgba(255,255,255,.055);
+  --tp-card-edge: rgba(255,255,255,.17);
+  --tp-card-shadow: 0 8px 24px rgba(0,0,0,.10), inset 0 1px 0 rgba(255,255,255,.06);
 }
-html[data-theme="light"],body[data-theme="light"]{
-  --tp-glass-fill:rgba(255,255,255,.38);
-  --tp-glass-strong:rgba(255,255,255,.50);
-  --tp-glass-stroke:rgba(100,146,202,.36);
-  --tp-glass-top:rgba(255,255,255,.85);
-  --tp-glass-shadow:0 14px 36px rgba(49,92,151,.13),inset 0 1px 0 rgba(255,255,255,.88);
+html[data-theme="light"], body[data-theme="light"] {
+  --tp-card-glass: rgba(255,255,255,.32);
+  --tp-card-edge: rgba(64,93,140,.20);
+  --tp-card-shadow: 0 8px 24px rgba(32,56,93,.07), inset 0 1px 0 rgba(255,255,255,.35);
 }
-/* Without variation behind the glass, blur is visually indistinguishable from an opaque card. */
-html body{
-  background:
-    radial-gradient(ellipse 480px 390px at 12% 34%,rgba(45,132,242,.27),transparent 77%),
-    radial-gradient(ellipse 520px 420px at 85% 66%,rgba(131,75,234,.21),transparent 79%),
-    radial-gradient(ellipse 330px 250px at 48% 93%,rgba(20,199,199,.13),transparent 78%),
-    linear-gradient(145deg,#080f20,#0c1428 50%,#081123) !important;
-  background-attachment:fixed!important;
-}
-html[data-theme="light"] body,body[data-theme="light"]{
-  background:
-    radial-gradient(ellipse 490px 380px at 15% 32%,rgba(45,132,242,.23),transparent 78%),
-    radial-gradient(ellipse 540px 440px at 88% 70%,rgba(146,110,235,.16),transparent 78%),
-    linear-gradient(135deg,#edf4ff,#f6f8ff 52%,#e7f0ff)!important;
-  background-attachment:fixed!important;
-}
-/* Every visible card gets light transmission and specular highlights; target current V38 selectors too. */
+/* Preserve the page background, spacing, accents and button styling. */
 html body :is(.traffic,.protocol-choice,.protocol-panel,.server-tab,.server-view,
 .profile,.platform-group,.app-card,.v38-all-card,.v34-subscription-card,
 .v9-config-card,.v9-server-row,.config-card,.server-card,.node-card,
-.subscription-card,.protocol-card,.device-card,#tp-app-access){
-  background-color:transparent!important;
-  background-image:
-    linear-gradient(146deg,rgba(255,255,255,.14),rgba(255,255,255,.025) 36%,transparent 65%),
-    linear-gradient(105deg,var(--tp-glass-fill),var(--tp-glass-fill))!important;
-  border:1px solid var(--tp-glass-stroke)!important;
-  box-shadow:var(--tp-glass-shadow)!important;
-  -webkit-backdrop-filter:blur(24px) saturate(165%)!important;
-  backdrop-filter:blur(24px) saturate(165%)!important;
+.subscription-card,.protocol-card,.device-card,#tp-app-access) {
+  background: var(--tp-card-glass) !important;
+  border-color: var(--tp-card-edge) !important;
+  box-shadow: var(--tp-card-shadow) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  backdrop-filter: blur(16px) !important;
 }
-html body :is(.traffic,.protocol-panel,#tp-app-access,.platform-group,.v38-all-card){
-  background-image:
-    linear-gradient(150deg,rgba(255,255,255,.12),transparent 47%),
-    linear-gradient(100deg,var(--tp-glass-strong),var(--tp-glass-strong))!important;
-}
-html body :is(.traffic,.protocol-choice,.protocol-panel,#tp-app-access){
-  position:relative;
-  overflow:hidden;
-}
-html body :is(.traffic,.protocol-choice,.protocol-panel,#tp-app-access)::before{
-  content:"";position:absolute;inset:0 0 auto 0;height:1px;pointer-events:none;
-  background:linear-gradient(90deg,transparent,var(--tp-glass-top),transparent);
-  z-index:1;
-}
+/* Retain the existing active/online outlines and colors. */
 html body .protocol-choice.active,
-html body .protocol-choice.live-online,
-html body .server-tab.active{
-  border-color:color-mix(in srgb,var(--p,#3b82f6) 58%,var(--tp-glass-stroke))!important;
-  box-shadow:var(--tp-glass-shadow),0 0 19px color-mix(in srgb,var(--p,#3b82f6) 17%,transparent)!important;
+html body .protocol-choice.live-online {
+  border-color: var(--ok, #20bd83) !important;
 }
-html body .protocol-choice:hover,html body .server-tab:hover{
-  background-image:linear-gradient(130deg,rgba(255,255,255,.19),transparent 60%),linear-gradient(90deg,var(--tp-glass-strong),var(--tp-glass-strong))!important;
-  border-color:rgba(178,218,255,.56)!important;
-}
-html body #tp-app-access code{
-  background:rgba(4,13,31,.19)!important;
-  border:1px solid var(--tp-glass-stroke);
-  border-radius:10px;
-}
-html[data-theme="light"] body #tp-app-access code{background:rgba(255,255,255,.29)!important}
-html[data-theme="light"] body :is(.traffic,.protocol-choice,.protocol-panel,#tp-app-access){color:var(--text,#172b46)}
-@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
-  html body :is(.traffic,.protocol-choice,.protocol-panel,#tp-app-access){background:var(--surface,#17243c)!important}
-}
-@media(prefers-reduced-motion:no-preference){
-  html body :is(.protocol-choice,.server-tab,.app-card){transition:border-color .2s ease,box-shadow .2s ease,background .2s ease}
+/* Do not change element hierarchy, text colors or existing transitions. */
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))) {
+  html body :is(.traffic,.protocol-choice,.protocol-panel,#tp-app-access) {
+    background:var(--surface,#142035)!important;
+  }
 }
 """
 
