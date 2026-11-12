@@ -3,7 +3,11 @@
 // OpenConnect processes or accepts an external executable outside our bundle.
 // A console process group lets CTRL_BREAK reach OpenConnect so vpnc-script
 // can restore Windows routes and DNS on disconnect.
+#include <winsock2.h>
 #include <windows.h>
+#include <iphlpapi.h>
+#include <netioapi.h>
+#pragma comment(lib, "Iphlpapi.lib")
 #include <string>
 #include <cstdint>
 #include <algorithm>
@@ -11,6 +15,38 @@
 
 namespace twinconnect_openconnect {
 
+// Only the route chosen for the VPN's own verified egress is measured.
+// Capturing the pre-VPN route prevents presenting Wi-Fi/system traffic as VPN.
+inline DWORD& BaselineRouteIndex() { static DWORD index = 0; return index; }
+inline bool EgressInterface(DWORD* index) {
+  if (!index) return false;
+  SOCKADDR_IN destination = {};
+  destination.sin_family = AF_INET;
+  destination.sin_addr.S_un.S_un_b.s_b1 = 1;
+  destination.sin_addr.S_un.S_un_b.s_b2 = 1;
+  destination.sin_addr.S_un.S_un_b.s_b3 = 1;
+  destination.sin_addr.S_un.S_un_b.s_b4 = 1;
+  DWORD found = 0;
+  if (GetBestInterfaceEx(reinterpret_cast<sockaddr*>(&destination), &found)
+      != NO_ERROR || found == 0) return false;
+  *index = found;
+  return true;
+}
+inline bool Running();
+struct TrafficTotals { uint64_t received; uint64_t sent; };
+inline bool ReadTraffic(TrafficTotals* totals) {
+  if (!totals || !Running()) return false;
+  DWORD index = 0;
+  if (!EgressInterface(&index) || BaselineRouteIndex() == 0 ||
+      index == BaselineRouteIndex()) return false;
+  MIB_IF_ROW2 row = {};
+  row.InterfaceIndex = index;
+  if (GetIfEntry2(&row) != NO_ERROR || row.OperStatus != IfOperStatusUp)
+    return false;
+  totals->received = static_cast<uint64_t>(row.InOctets);
+  totals->sent = static_cast<uint64_t>(row.OutOctets);
+  return true;
+}
 inline HANDLE& Child() { static HANDLE process = nullptr; return process; }
 inline DWORD& Pid() { static DWORD pid = 0; return pid; }
 inline bool& ConsoleReady() { static bool ready = false; return ready; }
@@ -231,6 +267,8 @@ inline bool Start(const std::string& executableUtf8,
   }
   InterlockedExchange(&Failure(), kUnknown);
   InterlockedExchange(&Authenticated(), 0);
+  DWORD initialRoute = 0;
+  BaselineRouteIndex() = EgressInterface(&initialRoute) ? initialRoute : 0;
   std::wstring command = Quote(executable) +
       L" --protocol=anyconnect --non-inter --passwd-on-stdin --no-proxy" +
       L" --user=" + Quote(FromUtf8(user)) +
