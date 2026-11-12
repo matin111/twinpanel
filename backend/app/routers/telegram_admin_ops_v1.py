@@ -470,9 +470,19 @@ async def _deliver_broadcast(
     endpoint = "sendPhoto" if photo_file_id else "sendMessage"
     url = f"https://api.telegram.org/bot{token}/{endpoint}"
     sent = failed = blocked = 0
+    # Callback is handled by this same bot and opens a NEW shopping menu.
+    # Keep the broadcast text/photo intact rather than editing it on click.
+    buy_markup = {
+        "inline_keyboard": [[
+            {"text": "🛒 خرید اکانت", "callback_data": "shop:broadcast"}
+        ]]
+    }
     async with httpx.AsyncClient(timeout=15.0) as client:
         for telegram_id in targets:
-            body = {"chat_id": int(telegram_id)}
+            body = {
+                "chat_id": int(telegram_id),
+                "reply_markup": buy_markup,
+            }
             if photo_file_id:
                 # file_id belongs to this same bot; Telegram reuses its stored
                 # photo without downloading, re-uploading or saving credentials.

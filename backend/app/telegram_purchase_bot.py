@@ -593,6 +593,36 @@ def create_purchase_router(
             reply_markup=subscription_types_keyboard(plans),
         )
 
+    @router.callback_query(F.data == "shop:broadcast")
+    async def shop_from_broadcast(callback: CallbackQuery, state: FSMContext):
+        """Open purchase in a separate message; preserve the announcement.
+
+        Ordinary shop:list navigates by editing its source message. Broadcast
+        announcements must remain visible even after the customer clicks Buy.
+        """
+        await acknowledge_navigation(callback)
+        await state.clear()
+        if not callback.message:
+            return
+        try:
+            await user_token(callback.from_user.id)
+            plans = await load_plans()
+        except Exception as exc:
+            await callback.message.answer(
+                "❌ دریافت منوی خرید ناموفق بود: " + escape(str(exc)[:150])
+            )
+            return
+        if not plans:
+            await callback.message.answer(
+                "در حال حاضر پلن فعالی برای خرید وجود ندارد."
+            )
+            return
+        await callback.message.answer(
+            "🛒 <b>خرید اشتراک</b>\n\n"
+            "ابتدا نوع اشتراک را انتخاب کنید:",
+            reply_markup=subscription_types_keyboard(plans),
+        )
+
     @router.callback_query(F.data.startswith("shop:type:"))
     async def shop_subscription_type(callback: CallbackQuery):
         try:
