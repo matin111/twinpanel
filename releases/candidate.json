@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.810",
-  "source_sha": "b987427900e3a914b572b83563358e43b28accc7",
+  "version": "1.1.0-rc.811",
+  "source_sha": "aaed9d4d678cdaa0bb7fa3788ea4d61cec6e40b4",
   "notes": {
-    "fa": "رفع مشکل دریافت لینک اشتراک در ربات تلگرام: بازیابی لینک اکانت‌های معلق و منقضی با نام کاربری، بدون فعال‌سازی یا تغییر تاریخ/حجم. اولویت با حساب فعال یکتا، جلوگیری از انتخاب اشتراک‌های تکراری و لغوشده، حفظ محدودیت درخواست و امنیت احراز ربات. همراه تمام اصلاحات عملکردی نسخه rc.809.",
-    "en": "Fix Telegram bot account-link recovery for suspended and expired subscriptions without enabling them or changing expiry/quota. Retain unique active-account priority, fail-closed duplicates, canceled/pending exclusions, owner scoping, rate limits, and all rc.809 performance fixes."
+    "fa": "رفع تعلیق اشتباه اشتراک‌های تازه در زمان آماده‌سازی: اعتبارسنجی سهمیه تنها برای اکانت تازه با نگاشت رسمی نود انجام می‌شود، نه بازسازی همه کاربران. کنترل سخت‌گیرانه سهمیه و مسیر اصلی برای موارد ناقص حفظ می‌شوند؛ اطلاعات و وضعیت اشتراک‌های قدیمی تغییر نمی‌کند.",
+    "en": "Fix false suspensions of newly created accounts caused by the 20-second full-fleet quota sync deadline. Validate the new account's own canonical quota-agent mappings; retain fail-closed full synchronization fallback and existing account/traffic enforcement unchanged."
   }
 }
