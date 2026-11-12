@@ -1181,8 +1181,18 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     if (error is TenantApiException) return error.message;
     if (error is ConnectionBootstrapException) return error.code;
     if (error is FormatException) return error.message;
+    // Only display error categories; OS exception messages may contain local
+    // paths, server addresses, or other secret-bearing process arguments.
+    if (error is ProcessException) return 'VPN_NATIVE_PROCESS_LAUNCH_FAILED';
+    if (error is FileSystemException) return 'VPN_PRIVATE_STORAGE_FAILED';
+    if (error is SocketException) return 'VPN_NETWORK_UNAVAILABLE';
+    if (error is HttpException) return 'VPN_HTTP_UNAVAILABLE';
+    if (error is TimeoutException) return 'VPN_OPERATION_TIMEOUT';
     if (error is StateError) return 'NATIVE_ENGINE_UNAVAILABLE';
-    return 'VPN_CONNECTION_FAILED';
+    if (error is ArgumentError || error is TypeError) {
+      return 'VPN_PROFILE_RUNTIME_TYPE_ERROR';
+    }
+    return 'VPN_INTERNAL_UNEXPECTED_FAILURE';
   }
 
   @override
