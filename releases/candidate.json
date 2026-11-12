@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.802",
-  "source_sha": "d42c63699d583572bd5f053847695b77fee65919",
+  "version": "1.1.0-rc.803",
+  "source_sha": "e13a4d39e4b45a7a9b4946cd4cf177f631d9df29",
   "notes": {
-    "fa": "رفع اختلاف رنگ دارک‌مود صفحه تانل با سایر بخش‌های پنل و اصلاح پنجره انتخاب سرور بدون نصب مجدد در لایت و دارک؛ پنجره اکنون بالاتر از کارت‌ها با پس‌زمینه خوانا نمایش داده می‌شود. بدون تغییر در منطق ساخت تانل و تنظیمات سرورها.",
-    "en": "Align the tunnels dark palette with global admin colors and fix the logical-pair selector dialog stacking over all cards in both light and dark modes. No changes to tunnel installation or configuration logic."
+    "fa": "اصلاح کامل لایت‌مود مدیریت بلاگ فروشگاه: پس‌زمینه و رنگ متن فیلدهای عنوان، شناسه، توضیحات و مقاله، نوار تصاویر، کارت‌های فهرست مقالات، پیش‌نمایش عکس و وضعیت‌ها هماهنگ با قالب روشن؛ دارک‌مود بدون تغییر عملکرد و حفظ تغییرات نسخه rc.802.",
+    "en": "Fix the Nova store blog manager light-mode editor input, textarea, toolbar, previews, article list, placeholder and label contrast using CSS-module-scoped theme tokens. Preserve dark mode and rc.802 functionality."
   }
 }
