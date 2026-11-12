@@ -149,10 +149,10 @@ export function CentralAppBrandManager({role}:{role:"admin"|"reseller"}){
     </div>
     <p className="tbs-connection-label">{pick("آماده اتصال","Ready to connect")}</p>
     <small className="tbs-connection-sub">{pick("برای اتصال ضربه بزنید","Tap to connect")}</small>
-    <div className="tbs-server" style={{background:appearance?.surface_color}}>
+    <div className="tbs-server tbs-server-one" style={{background:appearance?.surface_color}}>
       <div><b>🇩🇪 Germany</b><small>WireGuard · 46 ms</small></div><span style={{color:appearance?.primary_color}}>✓</span>
     </div>
-    <div className="tbs-server" style={{background:appearance?.surface_color}}>
+    <div className="tbs-server tbs-server-two" style={{background:appearance?.surface_color}}>
       <div><b>🇹🇷 Turkey</b><small>OpenConnect · 58 ms</small></div><span>›</span>
     </div>
     <div className="tbs-device-bottom"><span>⌂</span><span>◈</span><span>⚙</span></div>
