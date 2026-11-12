@@ -1,6 +1,6 @@
-/* Readable, standalone Admin subscription creation dialog in LIGHT mode.
+/* Theme-bound modal: use the same resolved theme state as the toolbar, including system mode.\n   Portal rendering is independent of the admin shell and document theme attr. */\n/* Readable, standalone Admin subscription creation dialog in LIGHT mode.
    This dialog is portaled under body; keep its palette independent from cards in admin-shell. */
-html[data-theme="light"] body > .runtime-modal.manual-subscription-modal {
+body > .runtime-modal.manual-subscription-modal.tp-light-create {
   --surface:#fff;
   --surface2:#f2f5fa;
   --line:#dae3ef;
@@ -10,150 +10,150 @@ html[data-theme="light"] body > .runtime-modal.manual-subscription-modal {
   color-scheme:light;
   color:var(--text);
 }
-html[data-theme="light"] body > .runtime-modal.manual-subscription-modal > .runtime-modal-card.manual-subscription-create-card{
+body > .runtime-modal.manual-subscription-modal.tp-light-create > .runtime-modal-card.manual-subscription-create-card{
   background:#fff!important;
   border:1px solid #d9e3f1!important;
   color:#192840!important;
   box-shadow:0 24px 70px rgba(26,43,77,.22)!important;
 }
-html[data-theme="light"] body > .runtime-modal.manual-subscription-modal > .manual-subscription-create-card > .card-head{
+body > .runtime-modal.manual-subscription-modal.tp-light-create > .manual-subscription-create-card > .card-head{
   background:linear-gradient(125deg,#f9faff,#edf3fc)!important;
   border-bottom:1px solid #dce5f2!important;
   color:#172640!important;
 }
-html[data-theme="light"] body > .runtime-modal.manual-subscription-modal > .manual-subscription-create-card > .card-head b{
+body > .runtime-modal.manual-subscription-modal.tp-light-create > .manual-subscription-create-card > .card-head b{
   color:#16243b!important;
   opacity:1!important;
 }
-html[data-theme="light"] body > .runtime-modal.manual-subscription-modal > .manual-subscription-create-card > .card-head small{
+body > .runtime-modal.manual-subscription-modal.tp-light-create > .manual-subscription-create-card > .card-head small{
   color:#586d89!important;
   opacity:1!important;
 }
-html[data-theme="light"] body > .runtime-modal.manual-subscription-modal .card-head b,
-html[data-theme="light"] body > .runtime-modal.manual-subscription-modal .manual-create-selection-summary b{
+body > .runtime-modal.manual-subscription-modal.tp-light-create .card-head b,
+body > .runtime-modal.manual-subscription-modal.tp-light-create .manual-create-selection-summary b{
   color:#243651!important;
   opacity:1!important;
 }
-html[data-theme="light"] body > .runtime-modal.manual-subscription-modal .card-head small,
-html[data-theme="light"] body > .runtime-modal.manual-subscription-modal .manual-create-selection-summary>small{
+body > .runtime-modal.manual-subscription-modal.tp-light-create .card-head small,
+body > .runtime-modal.manual-subscription-modal.tp-light-create .manual-create-selection-summary>small{
   color:#647790!important;
   opacity:1!important;
 }
-html[data-theme="light"] body > .runtime-modal.manual-subscription-modal .setting-grid.compact-create-grid,
-html[data-theme="light"] body > .runtime-modal.manual-subscription-modal .runtime-choice-section,
-html[data-theme="light"] body > .runtime-modal.manual-subscription-modal .manual-create-selection-summary{
+body > .runtime-modal.manual-subscription-modal.tp-light-create .setting-grid.compact-create-grid,
+body > .runtime-modal.manual-subscription-modal.tp-light-create .runtime-choice-section,
+body > .runtime-modal.manual-subscription-modal.tp-light-create .manual-create-selection-summary{
   background:linear-gradient(175deg,#f8faff 0%,#eef3fa 100%)!important;
   border:1px solid #dce4ef!important;
   border-radius:14px!important;
   color:#233650!important;
   box-shadow:inset 0 1px 0 rgba(255,255,255,.9)!important;
 }
-html[data-theme="light"] body > .runtime-modal.manual-subscription-modal .setting-grid.compact-create-grid{
+body > .runtime-modal.manual-subscription-modal.tp-light-create .setting-grid.compact-create-grid{
   padding:12px!important;
 }
-html[data-theme="light"] body > .runtime-modal.manual-subscription-modal .runtime-choice-section{
+body > .runtime-modal.manual-subscription-modal.tp-light-create .runtime-choice-section{
   padding:11px 12px!important;
 }
-html[data-theme="light"] body > .runtime-modal.manual-subscription-modal .manual-create-selection-summary>div{
+body > .runtime-modal.manual-subscription-modal.tp-light-create .manual-create-selection-summary>div{
   background:#fff!important;
   border:1px solid #dde5f0!important;
   color:#263853!important;
 }
-html[data-theme="light"] body > .runtime-modal.manual-subscription-modal .manual-create-selection-summary strong{
+body > .runtime-modal.manual-subscription-modal.tp-light-create .manual-create-selection-summary strong{
   color:#624ac6!important;
 }
-html[data-theme="light"] body > .runtime-modal.manual-subscription-modal .field>span,
-html[data-theme="light"] body > .runtime-modal.manual-subscription-modal .module-toggle>span,
-html[data-theme="light"] body > .runtime-modal.manual-subscription-modal label>span{
+body > .runtime-modal.manual-subscription-modal.tp-light-create .field>span,
+body > .runtime-modal.manual-subscription-modal.tp-light-create .module-toggle>span,
+body > .runtime-modal.manual-subscription-modal.tp-light-create label>span{
   color:#465d7a!important;
   font-weight:700!important;
   opacity:1!important;
 }
-html[data-theme="light"] body > .runtime-modal.manual-subscription-modal .module-toggle{
+body > .runtime-modal.manual-subscription-modal.tp-light-create .module-toggle{
   background:#fff!important;
   border:1px solid #dce5f0!important;
   color:#263b5a!important;
   box-shadow:0 1px 3px rgba(29,59,106,.035)!important;
 }
-html[data-theme="light"] body > .runtime-modal.manual-subscription-modal .module-toggle small{
+body > .runtime-modal.manual-subscription-modal.tp-light-create .module-toggle small{
   display:block;
   color:#62758e!important;
   opacity:1!important;
 }
-html[data-theme="light"] body > .runtime-modal.manual-subscription-modal .field input,
-html[data-theme="light"] body > .runtime-modal.manual-subscription-modal .field select{
+body > .runtime-modal.manual-subscription-modal.tp-light-create .field input,
+body > .runtime-modal.manual-subscription-modal.tp-light-create .field select{
   background:#fff!important;
   border:1px solid #cbd8e9!important;
   color:#213450!important;
   -webkit-text-fill-color:#213450;
   box-shadow:0 1px 2px rgba(41,65,102,.04)!important;
 }
-html[data-theme="light"] body > .runtime-modal.manual-subscription-modal .field input:disabled,
-html[data-theme="light"] body > .runtime-modal.manual-subscription-modal .field select:disabled{
+body > .runtime-modal.manual-subscription-modal.tp-light-create .field input:disabled,
+body > .runtime-modal.manual-subscription-modal.tp-light-create .field select:disabled{
   background:#edf2f9!important;
   color:#64758d!important;
   -webkit-text-fill-color:#64758d;
 }
-html[data-theme="light"] body > .runtime-modal.manual-subscription-modal .field input::placeholder{
+body > .runtime-modal.manual-subscription-modal.tp-light-create .field input::placeholder{
   color:#8393ab!important;
   opacity:1!important;
 }
-html[data-theme="light"] body > .runtime-modal.manual-subscription-modal .field input:focus-visible,
-html[data-theme="light"] body > .runtime-modal.manual-subscription-modal .field select:focus-visible,
-html[data-theme="light"] body > .runtime-modal.manual-subscription-modal button:focus-visible{
+body > .runtime-modal.manual-subscription-modal.tp-light-create .field input:focus-visible,
+body > .runtime-modal.manual-subscription-modal.tp-light-create .field select:focus-visible,
+body > .runtime-modal.manual-subscription-modal.tp-light-create button:focus-visible{
   outline:2px solid #8b73e6!important;
   outline-offset:2px;
 }
-html[data-theme="light"] body > .runtime-modal.manual-subscription-modal .row-actions .ghost,
-html[data-theme="light"] body > .runtime-modal.manual-subscription-modal .modalActions .ghost{
+body > .runtime-modal.manual-subscription-modal.tp-light-create .row-actions .ghost,
+body > .runtime-modal.manual-subscription-modal.tp-light-create .modalActions .ghost{
   background:#fff!important;
   border:1px solid #cdd9ea!important;
   color:#3c5072!important;
   box-shadow:0 1px 3px rgba(33,58,102,.05)!important;
 }
-html[data-theme="light"] body > .runtime-modal.manual-subscription-modal .row-actions .ghost:hover:not(:disabled),
-html[data-theme="light"] body > .runtime-modal.manual-subscription-modal .modalActions .ghost:hover:not(:disabled){
+body > .runtime-modal.manual-subscription-modal.tp-light-create .row-actions .ghost:hover:not(:disabled),
+body > .runtime-modal.manual-subscription-modal.tp-light-create .modalActions .ghost:hover:not(:disabled){
   background:#edf2fb!important;
   border-color:#a9bedf!important;
 }
-html[data-theme="light"] body > .runtime-modal.manual-subscription-modal .row-actions button:disabled{
+body > .runtime-modal.manual-subscription-modal.tp-light-create .row-actions button:disabled{
   opacity:.55!important;
   cursor:not-allowed!important;
 }
-html[data-theme="light"] body > .runtime-modal.manual-subscription-modal .module-toggle input:checked+i{
+body > .runtime-modal.manual-subscription-modal.tp-light-create .module-toggle input:checked+i{
   background:#7855dd!important;
 }
-html[data-theme="light"] body > .runtime-modal.manual-subscription-modal .runtime-error{
+body > .runtime-modal.manual-subscription-modal.tp-light-create .runtime-error{
   color:#9b3247!important;
   background:#fff1f3!important;
   border-color:#eec5ce!important;
 }
-html[data-theme="light"] body > .runtime-modal.manual-subscription-modal .runtime-success{
+body > .runtime-modal.manual-subscription-modal.tp-light-create .runtime-success{
   color:#116e54!important;
   background:#ebf9f2!important;
   border-color:#b9e6d1!important;
 }
-html[data-theme="light"] body > .runtime-modal.manual-subscription-modal .modalActions{
+body > .runtime-modal.manual-subscription-modal.tp-light-create .modalActions{
   background:#f9fbff!important;
   border-top:1px solid #dce5f2!important;
   color:#344c70!important;
 }
-html[data-theme="light"] body > .runtime-modal.manual-subscription-modal .modalActions .primary{
+body > .runtime-modal.manual-subscription-modal.tp-light-create .modalActions .primary{
   background:#276bdc!important;
   color:#fff!important;
   border:1px solid #2867cf!important;
   box-shadow:0 6px 18px rgba(47,107,212,.16)!important;
 }
-html[data-theme="light"] body > .runtime-modal.manual-subscription-modal .icon-button{
+body > .runtime-modal.manual-subscription-modal.tp-light-create .icon-button{
   background:#fff!important;
   border:1px solid #d5e0ee!important;
   color:#344962!important;
 }
 @media(max-width:640px){
-  html[data-theme="light"] body > .runtime-modal.manual-subscription-modal .setting-grid.compact-create-grid{
+  body > .runtime-modal.manual-subscription-modal.tp-light-create .setting-grid.compact-create-grid{
     padding:10px!important;
   }
-  html[data-theme="light"] body > .runtime-modal.manual-subscription-modal .runtime-choice-section{
+  body > .runtime-modal.manual-subscription-modal.tp-light-create .runtime-choice-section{
     padding:9px 10px!important;
   }
 }
