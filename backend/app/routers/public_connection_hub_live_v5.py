@@ -361,50 +361,87 @@ color:var(--text,#f4f7fb);box-shadow:0 8px 32px #0002}
 
 
 _CONNECTION_GLASS_CSS = r"""
-/* TWINPANEL_CONNECTION_GLASS_SYSTEM_V1 — shared visual treatment only */
+/* TWINPANEL_CONNECTION_GLASS_SYSTEM_V2: visibly translucent, luminous glass */
 :root{
-  --tp-glass-bg:rgba(28,44,70,.48);
-  --tp-glass-bg-strong:rgba(25,40,64,.58);
-  --tp-glass-line:rgba(168,197,240,.23);
-  --tp-glass-highlight:rgba(255,255,255,.11);
-  --tp-glass-shadow:0 12px 36px rgba(1,8,24,.22),inset 0 1px 0 var(--tp-glass-highlight);
+  --tp-glass-fill:rgba(34,58,96,.33);
+  --tp-glass-strong:rgba(35,60,99,.40);
+  --tp-glass-stroke:rgba(186,218,255,.32);
+  --tp-glass-top:rgba(255,255,255,.22);
+  --tp-glass-shadow:0 14px 40px rgba(1,8,26,.24),inset 0 1px 0 rgba(255,255,255,.18);
 }
 html[data-theme="light"],body[data-theme="light"]{
-  --tp-glass-bg:rgba(255,255,255,.58);
-  --tp-glass-bg-strong:rgba(255,255,255,.72);
-  --tp-glass-line:rgba(103,139,186,.26);
-  --tp-glass-highlight:rgba(255,255,255,.78);
-  --tp-glass-shadow:0 12px 32px rgba(28,53,87,.10),inset 0 1px 0 var(--tp-glass-highlight);
+  --tp-glass-fill:rgba(255,255,255,.38);
+  --tp-glass-strong:rgba(255,255,255,.50);
+  --tp-glass-stroke:rgba(100,146,202,.36);
+  --tp-glass-top:rgba(255,255,255,.85);
+  --tp-glass-shadow:0 14px 36px rgba(49,92,151,.13),inset 0 1px 0 rgba(255,255,255,.88);
 }
-body{background-image:radial-gradient(ellipse 68% 55% at 14% 30%,rgba(49,117,228,.10),transparent 75%),radial-gradient(ellipse 55% 48% at 92% 70%,rgba(125,82,229,.09),transparent 76%)!important;background-attachment:fixed!important}
-.traffic,.protocol-choice,.protocol-panel,.server-tab,.server-view,.profile,
-.platform-group,.app-card,.v38-all-card,.v34-subscription-card,
+/* Without variation behind the glass, blur is visually indistinguishable from an opaque card. */
+html body{
+  background:
+    radial-gradient(ellipse 480px 390px at 12% 34%,rgba(45,132,242,.27),transparent 77%),
+    radial-gradient(ellipse 520px 420px at 85% 66%,rgba(131,75,234,.21),transparent 79%),
+    radial-gradient(ellipse 330px 250px at 48% 93%,rgba(20,199,199,.13),transparent 78%),
+    linear-gradient(145deg,#080f20,#0c1428 50%,#081123) !important;
+  background-attachment:fixed!important;
+}
+html[data-theme="light"] body,body[data-theme="light"]{
+  background:
+    radial-gradient(ellipse 490px 380px at 15% 32%,rgba(45,132,242,.23),transparent 78%),
+    radial-gradient(ellipse 540px 440px at 88% 70%,rgba(146,110,235,.16),transparent 78%),
+    linear-gradient(135deg,#edf4ff,#f6f8ff 52%,#e7f0ff)!important;
+  background-attachment:fixed!important;
+}
+/* Every visible card gets light transmission and specular highlights; target current V38 selectors too. */
+html body :is(.traffic,.protocol-choice,.protocol-panel,.server-tab,.server-view,
+.profile,.platform-group,.app-card,.v38-all-card,.v34-subscription-card,
 .v9-config-card,.v9-server-row,.config-card,.server-card,.node-card,
-#tp-app-access,.subscription-card,.protocol-card,.device-card{
-  background:var(--tp-glass-bg)!important;
-  background-image:linear-gradient(135deg,rgba(255,255,255,.065),transparent 54%)!important;
-  border:1px solid var(--tp-glass-line)!important;
+.subscription-card,.protocol-card,.device-card,#tp-app-access){
+  background-color:transparent!important;
+  background-image:
+    linear-gradient(146deg,rgba(255,255,255,.14),rgba(255,255,255,.025) 36%,transparent 65%),
+    linear-gradient(105deg,var(--tp-glass-fill),var(--tp-glass-fill))!important;
+  border:1px solid var(--tp-glass-stroke)!important;
   box-shadow:var(--tp-glass-shadow)!important;
-  -webkit-backdrop-filter:blur(19px) saturate(145%);
-  backdrop-filter:blur(19px) saturate(145%);
+  -webkit-backdrop-filter:blur(24px) saturate(165%)!important;
+  backdrop-filter:blur(24px) saturate(165%)!important;
 }
-.traffic,.protocol-panel,#tp-app-access,.platform-group,.v38-all-card{background-color:var(--tp-glass-bg-strong)!important}
-.protocol-choice.active,.protocol-choice.live-online,.server-tab.active{
-  border-color:color-mix(in srgb,var(--p,#3989ff) 66%,var(--tp-glass-line))!important;
-  box-shadow:var(--tp-glass-shadow),0 0 0 1px color-mix(in srgb,var(--p,#3989ff) 34%,transparent)!important;
+html body :is(.traffic,.protocol-panel,#tp-app-access,.platform-group,.v38-all-card){
+  background-image:
+    linear-gradient(150deg,rgba(255,255,255,.12),transparent 47%),
+    linear-gradient(100deg,var(--tp-glass-strong),var(--tp-glass-strong))!important;
 }
-.protocol-choice:hover,.server-tab:hover,.app-card:hover{
-  border-color:color-mix(in srgb,var(--p,#3989ff) 46%,var(--tp-glass-line))!important;
-  background-color:color-mix(in srgb,var(--tp-glass-bg-strong) 88%,var(--p,#3989ff))!important;
+html body :is(.traffic,.protocol-choice,.protocol-panel,#tp-app-access){
+  position:relative;
+  overflow:hidden;
 }
-#tp-app-access code{background:color-mix(in srgb,var(--tp-glass-bg-strong) 66%,transparent)!important;border:1px solid var(--tp-glass-line);border-radius:10px}
-html[data-theme="light"] .protocol-choice,html[data-theme="light"] .traffic,html[data-theme="light"] #tp-app-access,
-body[data-theme="light"] .protocol-choice,body[data-theme="light"] .traffic,body[data-theme="light"] #tp-app-access{color:var(--text,#172b46)}
+html body :is(.traffic,.protocol-choice,.protocol-panel,#tp-app-access)::before{
+  content:"";position:absolute;inset:0 0 auto 0;height:1px;pointer-events:none;
+  background:linear-gradient(90deg,transparent,var(--tp-glass-top),transparent);
+  z-index:1;
+}
+html body .protocol-choice.active,
+html body .protocol-choice.live-online,
+html body .server-tab.active{
+  border-color:color-mix(in srgb,var(--p,#3b82f6) 58%,var(--tp-glass-stroke))!important;
+  box-shadow:var(--tp-glass-shadow),0 0 19px color-mix(in srgb,var(--p,#3b82f6) 17%,transparent)!important;
+}
+html body .protocol-choice:hover,html body .server-tab:hover{
+  background-image:linear-gradient(130deg,rgba(255,255,255,.19),transparent 60%),linear-gradient(90deg,var(--tp-glass-strong),var(--tp-glass-strong))!important;
+  border-color:rgba(178,218,255,.56)!important;
+}
+html body #tp-app-access code{
+  background:rgba(4,13,31,.19)!important;
+  border:1px solid var(--tp-glass-stroke);
+  border-radius:10px;
+}
+html[data-theme="light"] body #tp-app-access code{background:rgba(255,255,255,.29)!important}
+html[data-theme="light"] body :is(.traffic,.protocol-choice,.protocol-panel,#tp-app-access){color:var(--text,#172b46)}
 @supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
-  .traffic,.protocol-choice,.protocol-panel,.server-tab,.server-view,.profile,#tp-app-access{background:var(--surface,#162238)!important}
+  html body :is(.traffic,.protocol-choice,.protocol-panel,#tp-app-access){background:var(--surface,#17243c)!important}
 }
 @media(prefers-reduced-motion:no-preference){
-  .protocol-choice,.server-tab,.app-card{transition:border-color .2s ease,background-color .2s ease,box-shadow .2s ease}
+  html body :is(.protocol-choice,.server-tab,.app-card){transition:border-color .2s ease,box-shadow .2s ease,background .2s ease}
 }
 """
 
@@ -605,7 +642,8 @@ def public_connection_hub_live_v5(
     sub = _subscription_from_share_token(token, db)
     source = _add_authenticated_app_login_panel(source, int(sub.id))
 
-    source = source.replace("</head>", "<style>" + _CONNECTION_GLASS_CSS + "</style></head>", 1)
+    # Inject last so legacy inline styles cannot obscure glass surfaces.
+    source = source.replace("</body>", "<style>" + _CONNECTION_GLASS_CSS + "</style></body>", 1)
 
     return HTMLResponse(
         content=source,
