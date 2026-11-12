@@ -100,6 +100,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   bool _modernTrafficBusy = false;
   int? _modernRx;
   int? _modernTx;
+  int? _ciscoOriginRx;
+  int? _ciscoOriginTx;
   bool _modernHealthBusy = false;
   int _modernHealthFailures = 0;
   String? _modernProtocol;
@@ -416,19 +418,33 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     _modernTrafficTimer = null;
     _modernRx = null;
     _modernTx = null;
+    _ciscoOriginRx = null;
+    _ciscoOriginTx = null;
   }
 
   Future<void> _refreshModernTraffic() async {
-    if (!mounted || !_modernUp || _modernProtocol == 'cisco' ||
-        _modernTrafficBusy) return;
+    if (!mounted || !_modernUp || _modernTrafficBusy) return;
     _modernTrafficBusy = true;
     try {
-      final totals = await _modernTunnel.readTrafficTotals();
-      if (!mounted || !_modernUp || totals == null) return;
-      if (_modernRx != totals.received || _modernTx != totals.sent) {
+      final isCisco = _modernProtocol == 'cisco';
+      final totals = isCisco
+          ? await _ciscoTunnel.readTrafficTotals()
+          : await _modernTunnel.readTrafficTotals();
+      if (!mounted || !_modernUp || totals == null ||
+          isCisco != (_modernProtocol == 'cisco')) return;
+      int rx = totals.received;
+      int tx = totals.sent;
+      if (isCisco) {
+        _ciscoOriginRx ??= rx;
+        _ciscoOriginTx ??= tx;
+        // Show bytes transferred during this connection, not lifetime totals.
+        rx = rx >= _ciscoOriginRx! ? rx - _ciscoOriginRx! : 0;
+        tx = tx >= _ciscoOriginTx! ? tx - _ciscoOriginTx! : 0;
+      }
+      if (_modernRx != rx || _modernTx != tx) {
         setState(() {
-          _modernRx = totals.received;
-          _modernTx = totals.sent;
+          _modernRx = rx;
+          _modernTx = tx;
         });
       }
     } finally {
@@ -561,6 +577,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         _publicIp = verifiedIp;
         _vpnError = null;
       });
+      _startModernTrafficMonitoring();
       _startModernHealthMonitoring();
     } catch (error) {
       if (mounted) {
