@@ -133,6 +133,10 @@ inline void DialWorker(std::wstring entry, std::wstring host,
                          RASEO_RequireMsCHAP2;
   settings.dwfOptions2 = RASEO2_UsePreSharedKey;
   settings.dwFramingProtocol = RASFP_Ppp;
+  // Force Windows VPN's maximum encryption level. Without an explicit
+  // level, Windows negotiated ESP NULL and the secure server rejected it.
+  // Never weaken server ESP policy to permit unencrypted payloads.
+  settings.dwEncryptionType = ET_RequireMax;
   // Required for IPv4 IPCP negotiation. Leaving this field at zero creates
   // a VPN entry with no PPP network protocol and causes RAS error 720.
   settings.dwfNetProtocols = RASNP_Ip;
