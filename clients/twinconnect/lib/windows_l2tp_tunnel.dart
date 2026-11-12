@@ -156,25 +156,36 @@ class WindowsL2tpTunnel {
       }
       _ownsEntry = true;
       final deadline = DateTime.now().add(const Duration(seconds: 65));
+      DateTime? routeDeadline;
       while (DateTime.now().isBefore(deadline)) {
         final status = await _status();
         if (status.state == 2) {
-          final newIp = await _publicIp();
-          if (!hasVpnEgress(baselineIp: baselineIp, currentIp: newIp)) {
+          // RAS negotiation can finish before Windows has installed the
+          // default route. Do not fail on the first old-IP observation.
+          routeDeadline ??= DateTime.now().add(
+              const Duration(seconds: 10));
+          try {
+            final newIp = await _publicIp();
+            if (hasVpnEgress(baselineIp: baselineIp, currentIp: newIp)) {
+              _verifiedIp = newIp;
+              _lastHealthError = null;
+              return newIp;
+            }
+          } catch (_) {
+            // A temporary IP-check failure never confirms connectivity.
+          }
+          if (DateTime.now().isAfter(routeDeadline)) {
             throw const FormatException('L2TP_EGRESS_NOT_VERIFIED');
           }
-          _verifiedIp = newIp;
-          _lastHealthError = null;
-          return newIp;
         }
         if (status.state == -1) {
           throw FormatException(_failure(status.code));
         }
-        // Poll RAS promptly; its negotiation is asynchronous and remains the
-        // authoritative connection gate, so shorter polls cannot fake success.
+        // Native RAS state and a genuinely different VPN exit stay mandatory.
         await Future<void>.delayed(const Duration(milliseconds: 250));
       }
-      throw const FormatException('L2TP_CONNECT_TIMEOUT');
+      throw FormatException(routeDeadline != null
+          ? 'L2TP_EGRESS_NOT_VERIFIED' : 'L2TP_CONNECT_TIMEOUT');
     } catch (_) {
       // Never claim successful connection if Windows RAS remains pending.
       if (_ownsEntry) {
