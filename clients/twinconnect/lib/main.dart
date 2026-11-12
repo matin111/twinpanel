@@ -24,6 +24,7 @@ import 'interactive_glass_card.dart';
 import 'live_dashboard.dart';
 import 'frameless_window_controls.dart';
 import 'app_session_store.dart';
+import 'xray_inbound_secure_cache.dart';
 import 'account_snapshot.dart';
 import 'plan_classification.dart';
 
@@ -419,6 +420,9 @@ class _TwinConnectHomeState extends State<TwinConnectHome> with WidgetsBindingOb
     _brandRefreshTimer?.cancel();
     try {
       await _sessionStore.clearSession();
+      // Removing an authenticated session must also remove any credential-
+      // bearing Xray display cache for that device.
+      await const XrayInboundSecureCache().clear();
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
