@@ -33,6 +33,7 @@ from ..openvpn_profile_delivery_guard_v1 import (
     disambiguate_openvpn_filenames, validate_openvpn_profile,
 )
 from ..database import get_db
+from ..runtime_settings_model import RuntimeSetting
 from ..deps import require_admin, get_current_user
 from ..quota_models import QuotaUsageEvent
 from ..subscription_enforcement import queue_subscription_enforcement
@@ -68,6 +69,16 @@ customer_router = APIRouter(
     prefix="/v1/customer/subscriptions",
     tags=["customer-account-delivery"],
 )
+
+
+# TWINCONNECT_CISCO_TRUSTED_PIN_LIVE_V1
+# The known, SSH-verified certificate pin is persisted by exit node.
+# Do not introduce unverified trust-on-first-use or alter user credentials.
+def _cisco_trusted_pin_for_client(db: Session, node_id: int) -> str | None:
+    key = f"cisco.trusted_servercert.node.{int(node_id)}"
+    row = db.get(RuntimeSetting, key)
+    pin = str(row.setting_value or "") if row else ""
+    return pin if re.fullmatch(r"pin-sha256:[A-Za-z0-9+/]{43}=", pin) else None
 
 
 DEFAULT_PORTS = {"cisco": 4443, "openvpn": 1194, "wireguard": 51820, "l2tp": 1701, "v2ray": 8443}
@@ -1338,6 +1349,11 @@ def _live_client_item(
         protocol
         or ""
     ).strip().lower()
+
+    if protocol == "cisco":
+        verified_pin = _cisco_trusted_pin_for_client(db, node_id)
+        if verified_pin:
+            result["servercert"] = verified_pin
 
     try:
 
