@@ -1110,6 +1110,131 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     }
   }
 
+  Future<void> _startSudokuTunnel(String serverId) async {
+    if (_vpnBusy || !Platform.isWindows) return;
+    setState(() { _vpnBusy = true; _vpnError = null; });
+    try {
+      if (_vpnUnmanaged || _vpnCleanup) {
+        throw const FormatException('PREVIOUS_TUNNEL_NOT_STOPPED');
+      }
+      final authorized = widget.catalog?.entries.any((entry) =>
+          entry.protocol.code == 'sudoku' && entry.selected &&
+          entry.configRecordPresent) ?? false;
+      if (!authorized) {
+        throw const FormatException('PROTOCOL_NOT_INCLUDED_IN_SUBSCRIPTION');
+      }
+      final ready = await Future.wait<bool>([
+        WindowsSudokuProxy.enginePresent(),
+        WindowsSingBoxPreflight.enginePresent(),
+      ]);
+      if (!ready[0] || !ready[1]) {
+        throw const FormatException('SUDOKU_OR_TUN_ENGINE_UNAVAILABLE');
+      }
+      final profiles = await TenantApi.fromBuildConfig()
+          .loadSessionNativeProfiles(
+        panel: widget.panel,
+        sessionToken: widget.sessionToken,
+        protocol: VpnProtocols.byCode('sudoku')!,
+        native: const NativeProtocolReadiness(supportedCodes: {'sudoku'}),
+      );
+      final matches = profiles.items
+          .where((item) => item['node_id']?.toString() == serverId)
+          .toList(growable: false);
+      if (matches.length != 1) {
+        throw const FormatException('SUDOKU_SERVER_PROFILE_MISSING');
+      }
+      final profile = SudokuClientProfile.fromItem(matches.single, serverId);
+      if (profile == null) {
+        throw const FormatException('SUDOKU_PROFILE_NOT_READY');
+      }
+      // Delivery and native engine validation happen BEFORE touching a
+      // running VPN. Never leave two active TUN devices or core processes.
+      if (_modernTunnel.isRunning) await _modernTunnel.stop();
+      if (_xrayProxy.isRunning) await _xrayProxy.stop();
+      if (_sudokuProxy.isRunning) await _sudokuProxy.stop();
+      if (_ciscoTunnel.isRunning) await _ciscoTunnel.stop();
+      if (_openVpnTunnel.hasChild) await _openVpnTunnel.stop();
+      if (_l2tpTunnel.hasChild) await _l2tpTunnel.stop();
+      if (_vpnUp || _vpnCleanup) {
+        await _vpn.stop().timeout(const Duration(seconds: 20));
+        final status = await _vpn.status()
+            .timeout(const Duration(seconds: 10));
+        if (status['state'] != 'down') {
+          throw const FormatException('PREVIOUS_TUNNEL_NOT_STOPPED');
+        }
+        if (mounted) setState(() {
+          _vpnUp = false;
+          _vpnVerified = false;
+          _vpnCleanup = false;
+          _activeNodeId = null;
+          _vpnRx = 0;
+          _vpnTx = 0;
+          _resetNetworkStats();
+        });
+      }
+      _modernHealthTimer?.cancel();
+      _stopModernTrafficMonitoring();
+      if (mounted) setState(() {
+        _modernUp = false;
+        _modernProtocol = null;
+        _modernNodeId = null;
+        _publicIp = null;
+      });
+
+      // The Sudoku core performs its own authenticated Sudoku handshake.
+      // In parallel, get a DIRECT pre-TUN public-IP baseline. Both are
+      // required before sing-box is allowed to modify Windows routes.
+      final preTunnel = await Future.wait<Object>([
+        _sudokuProxy.start(profile),
+        WindowsSingBoxTunnel.measureBaselineIp(),
+      ]);
+      final socksPort = preTunnel[0] as int;
+      final baselineIp = preTunnel[1] as String;
+      final verifiedExit = _sudokuProxy.verifiedExitIp;
+      final endpoint = _sudokuProxy.endpointIpv4;
+      if (verifiedExit == null || endpoint == null) {
+        throw const FormatException('SUDOKU_REMOTE_EGRESS_UNVERIFIED');
+      }
+      final ip = await _modernTunnel.start(
+        protocol: 'sudoku',
+        serverId: serverId,
+        profile: const <String, dynamic>{},
+        sudokuSocksPort: socksPort,
+        sudokuVerifiedExitIp: verifiedExit,
+        sudokuEndpointIPv4: endpoint,
+        baselinePublicIp: baselineIp,
+      );
+      if (!mounted) return;
+      setState(() {
+        _modernUp = true;
+        _modernProtocol = 'sudoku';
+        _modernNodeId = serverId;
+        _publicIp = ip;
+        _vpnError = null;
+      });
+      _startModernTrafficMonitoring();
+      _startModernHealthMonitoring();
+    } catch (error) {
+      if (_sudokuProxy.isRunning && !_modernTunnel.isRunning) {
+        try { await _sudokuProxy.stop(); } catch (_) {}
+      }
+      if (mounted) setState(() {
+        _modernUp = _modernTunnel.isRunning ||
+            _ciscoTunnel.isRunning ||
+            _openVpnTunnel.isRunning ||
+            _l2tpTunnel.isRunning;
+        if (!_modernUp) {
+          _modernProtocol = null;
+          _modernNodeId = null;
+          _publicIp = null;
+        }
+        _vpnError = _errorText(error);
+      });
+    } finally {
+      if (mounted) setState(() => _vpnBusy = false);
+    }
+  }
+
   Future<void> _startModernTunnel(String protocol, String serverId) async {
     if (_vpnBusy) return;
     setState(() { _vpnBusy = true; _vpnError = null; });
