@@ -80,7 +80,9 @@ def open_session(db: Session, node_id: int, data: SessionOpenIn, *, observed_tel
     ):
         raise HTTPException(status_code=403, detail="device_not_allowed")
 
-    plan = db.get(Plan, subscription.plan_id)
+    # Migrated/planless subscriptions have a NULL plan_id. Do not issue
+    # db.get(Plan, None): it emits warnings and unnecessary ORM work each poll.
+    plan = db.get(Plan, subscription.plan_id) if subscription.plan_id is not None else None
     max_sessions = effective_device_limit(db, subscription, plan)
 
     active_count = int(
