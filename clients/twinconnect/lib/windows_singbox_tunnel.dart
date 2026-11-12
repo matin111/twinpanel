@@ -329,9 +329,14 @@ class WindowsSingBoxTunnel {
       }
       String? verified;
       var postTunnelHttpSucceeded = false;
-      // Probe immediately, then use short early backoff. The verified
-      // public IP and installed Windows route are still mandatory gates.
-      for (var attempt = 0; attempt < 40; attempt++) {
+      // A bounded total readiness budget prevents 40 independent HTTP
+      // timeouts from turning one failed connection into minutes of waiting.
+      // A verified HTTPS exit is still required; a timeout never means online.
+      final routeDeadline = Stopwatch()..start();
+      for (var attempt = 0;
+          attempt < 40 &&
+          routeDeadline.elapsed < const Duration(seconds: 14);
+          attempt++) {
         if (attempt > 0) {
           await Future<void>.delayed(Duration(milliseconds:
               attempt < 5 ? 150 : 400));
@@ -345,7 +350,7 @@ class WindowsSingBoxTunnel {
           // Always use the SAME IPv4 echo endpoint used for the baseline
           // and for the independent sing-box proxy probe.
           final ip = await _requestPublicIp()
-              .timeout(const Duration(seconds: 6));
+              .timeout(const Duration(seconds: 3));
           final observed = InternetAddress.tryParse(ip);
           final baseline = InternetAddress.tryParse(before);
           if (observed == null || baseline == null ||
