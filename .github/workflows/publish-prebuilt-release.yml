@@ -143,7 +143,8 @@ jobs:
             "components/tunnel-server-pair-selector-v293.tsx" \
             "components/tunnel-control-center-v1.module.css" \
             "app/admin-manual-subscription-light.css" \
-            "components/admin-manual-subscription-create.tsx"; do
+            "components/admin-manual-subscription-create.tsx" \
+            "components/admin-subscription-create-unified.tsx"; do
             test -s "source/$path"
             test -s "publisher/$path"
             if ! cmp -s "source/$path" "publisher/$path"; then
@@ -167,6 +168,8 @@ jobs:
           grep -Fq 'import "./admin-manual-subscription-light.css";' source/app/layout.tsx
           grep -Fq 'body > .runtime-modal.manual-subscription-modal.tp-light-create' source/app/admin-manual-subscription-light.css
           grep -Fq 'resolved==="light"?" tp-light-create":""' source/components/admin-manual-subscription-create.tsx
+          grep -Fq 'tp-unified-create-light' source/components/admin-subscription-create-unified.tsx
+          grep -Fq '.runtime-modal.tp-unified-create-light form section' source/app/admin-manual-subscription-light.css
           echo "Light-mode and tunnel UI release guard passed"
 
       - name: Setup Node.js
@@ -477,7 +480,8 @@ jobs:
             "components/tunnel-server-pair-selector-v293.tsx" \
             "components/tunnel-control-center-v1.module.css" \
             "app/admin-manual-subscription-light.css" \
-            "components/admin-manual-subscription-create.tsx"; do
+            "components/admin-manual-subscription-create.tsx" \
+            "components/admin-subscription-create-unified.tsx"; do
             if ! cmp -s "source/$path" "publisher/$path"; then
               echo "::error file=$path::Light-mode UI changed since the pinned build. Publish a fresh candidate."
               exit 1
