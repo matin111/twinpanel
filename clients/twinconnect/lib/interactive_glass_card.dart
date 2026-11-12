@@ -10,6 +10,8 @@ class TwinConnectGlassCard extends StatefulWidget {
   const TwinConnectGlassCard({
     required this.child,
     required this.dark,
+    this.surfaceColor,
+    this.accentColor,
     this.radius = 20,
     this.padding = EdgeInsets.zero,
     this.selected = false,
@@ -18,6 +20,8 @@ class TwinConnectGlassCard extends StatefulWidget {
 
   final Widget child;
   final bool dark;
+  final Color? surfaceColor;
+  final Color? accentColor;
   final double radius;
   final EdgeInsetsGeometry padding;
   final bool selected;
@@ -28,11 +32,13 @@ class TwinConnectGlassCard extends StatefulWidget {
 
 class _TwinConnectGlassCardState extends State<TwinConnectGlassCard> {
   bool _hovered = false;
-  static const _accent = Color(0xFFA46AFF);
 
   @override
   Widget build(BuildContext context) {
     final bright = widget.dark;
+    final accent = widget.accentColor ?? const Color(0xFFA46AFF);
+    final surface = widget.surfaceColor ??
+        (bright ? const Color(0xFF273753) : Colors.white);
     final active = widget.selected || _hovered;
     final radius = BorderRadius.circular(widget.radius);
     return MouseRegion(
@@ -53,14 +59,11 @@ class _TwinConnectGlassCardState extends State<TwinConnectGlassCard> {
               curve: Curves.easeOutCubic,
               padding: widget.padding,
               decoration: BoxDecoration(
-                color: (bright
-                        ? const Color(0xFF273753)
-                        : const Color(0xFFFFFFFF))
-                    .withValues(alpha: bright ? .34 : .52),
+                color: surface.withValues(alpha: bright ? .82 : .90),
                 borderRadius: radius,
                 border: Border.all(
                   color: active
-                      ? _accent.withValues(alpha: .68)
+                      ? accent.withValues(alpha: .68)
                       : (bright ? Colors.white : const Color(0xFF6575AB))
                           .withValues(alpha: bright ? .20 : .16),
                   width: active ? 1.15 : .9,
@@ -70,25 +73,15 @@ class _TwinConnectGlassCardState extends State<TwinConnectGlassCard> {
                   end: Alignment.bottomRight,
                   stops: const [0, .42, 1],
                   colors: [
-                    active
-                        ? _accent.withValues(alpha: bright ? .24 : .12)
-                        : (bright
-                                ? const Color(0xFF5E7092)
-                                : const Color(0xFFFFFFFF))
-                            .withValues(alpha: bright ? .13 : .52),
-                    (bright
-                            ? const Color(0xFF24324B)
-                            : const Color(0xFFF9F8FF))
-                        .withValues(alpha: bright ? .32 : .50),
-                    (bright
-                            ? const Color(0xFF19243C)
-                            : const Color(0xFFEDEBFA))
-                        .withValues(alpha: bright ? .38 : .44),
+                    Color.lerp(surface, accent, active ? .16 : .06)!,
+                    surface,
+                    Color.lerp(surface, Colors.black,
+                        bright ? .12 : .025)!,
                   ],
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: (active ? _accent : Colors.black).withValues(
+                    color: (active ? accent : Colors.black).withValues(
                       alpha: active ? .11 : (bright ? .06 : .03)),
                     blurRadius: active ? 28 : 15,
                     offset: const Offset(0, 8),
@@ -109,8 +102,8 @@ class _TwinConnectGlassCardState extends State<TwinConnectGlassCard> {
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             gradient: RadialGradient(colors: [
-                              _accent.withValues(alpha: bright ? .16 : .11),
-                              _accent.withValues(alpha: 0),
+                              accent.withValues(alpha: bright ? .16 : .11),
+                              accent.withValues(alpha: 0),
                             ]),
                           ),
                         ),
