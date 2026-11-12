@@ -2596,6 +2596,68 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       );
     }
 
+    Widget xrayInboundRow(int index, XrayInboundProfile inbound) {
+      final server = demoServers[index];
+      final nodeId = widget.servers!.servers[index].id;
+      final connected = _modernUp && _modernProtocol == 'v2ray' &&
+          _modernNodeId == nodeId &&
+          _selectedXrayInboundId == inbound.id;
+      final label = switch (inbound.id) {
+        'websocket_tls' => 'WS TLS',
+        'xhttp_reality' => 'XHTTP Reality',
+        'tcp_tls' => 'TCP TLS',
+        _ => inbound.id,
+      };
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 9),
+        child: glassCard(
+          key: Key('xrayInbound_${nodeId}_${inbound.id}'),
+          selected: connected,
+          radius: 16,
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              key: Key('connectXray_${nodeId}_${inbound.id}'),
+              borderRadius: BorderRadius.circular(16),
+              onTap: _vpnBusy ? null : () {
+                setState(() {
+                  _selected = index;
+                  _selectedXrayNodeId = nodeId;
+                  _selectedXrayInboundId = inbound.id;
+                  _filter = 'v2ray';
+                  _page = 'home';
+                  _autoFastest = false;
+                  _vpnError = null;
+                });
+                _startXrayTunnel(nodeId, inboundId: inbound.id);
+              },
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14, vertical: 13),
+                child: Row(children: [
+                  CountryFlag(server.flag, width: 28),
+                  const SizedBox(width: 10),
+                  Expanded(child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      txt('${server.country} · $label', bold: true),
+                      const SizedBox(height: 3),
+                      txt('V2Ray / Xray', size: 10, color: sub),
+                    ],
+                  )),
+                  const SizedBox(width: 10),
+                  Icon(connected ? Icons.verified_rounded :
+                    Icons.power_settings_new_rounded,
+                    size: 20,
+                    color: connected ? const Color(0xFF33D6A6) : purple),
+                ]),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     // All 16 chips remain visible. Admin-selected protocols will replace
     // the preview's complete catalog after an authenticated panel session.
     Widget filters() => Container(
