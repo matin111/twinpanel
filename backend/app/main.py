@@ -58,6 +58,7 @@ from .routers.reseller_admin_v2 import router as reseller_admin_v2_router
 from .routers.central_app_v1 import router as central_app_v1_router
 from .routers.central_app_credentials_v1 import router as central_app_credentials_v1_router
 from .routers.central_app_appearance_v1 import router as central_app_appearance_v1_router
+from .routers.central_app_assets_v1 import router as central_app_assets_v1_router
 from .routers.reseller_traffic_admin_v2 import router as reseller_traffic_admin_v2_router
 from .routers.reseller_traffic_purchase_v3 import router as reseller_traffic_purchase_v3_router
 from .routers.reseller_owned_plans import router as reseller_owned_plans_router
@@ -375,6 +376,7 @@ app.include_router(reseller_admin_v2_router)
 app.include_router(central_app_v1_router)
 app.include_router(central_app_credentials_v1_router)
 app.include_router(central_app_appearance_v1_router)
+app.include_router(central_app_assets_v1_router)
 app.include_router(reseller_traffic_admin_v2_router)
 app.include_router(resellers.router)
 # Reseller-owned plans and traffic purchase routes must win before legacy portal
