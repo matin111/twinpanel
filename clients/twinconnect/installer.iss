@@ -45,6 +45,8 @@ var
   Parameters: String;
   OpenConnectInstaller: String;
   OpenConnectManifest: String;
+  OpenVpnInstaller: String;
+  OpenVpnBinary: String;
 begin
   if CurStep = ssPostInstall then
   begin
@@ -73,6 +75,28 @@ begin
     begin
       MsgBox('Cisco engine bundle missing; Cisco remains disabled.',
         mbError, MB_OK);
+    end;
+    { Install official vendor-signed OpenVPN Community x64 package only if
+      its CLI is absent. The MSI was verified in Windows CI and is bundled.
+      Inno Setup is already elevated: users need no separate installation. }
+    OpenVpnBinary := ExpandConstant('{pf}\OpenVPN\bin\openvpn.exe');
+    OpenVpnInstaller := ExpandConstant(
+      '{app}\prerequisites\OpenVPN-2.7.9-I001-amd64.msi');
+    if not FileExists(OpenVpnBinary) then
+    begin
+      if FileExists(OpenVpnInstaller) then
+      begin
+        Ok := Exec(ExpandConstant('{sys}\msiexec.exe'),
+                   '/i "' + OpenVpnInstaller + '" /qn /norestart',
+                   '', SW_HIDE, ewWaitUntilTerminated, ExitCode);
+        if (not Ok) or ((ExitCode <> 0) and (ExitCode <> 3010)) then
+          MsgBox('OpenVPN engine installation failed; OpenVPN will remain disabled.' +
+                 #13#10 + 'Other VPN connections are unaffected.',
+                 mbError, MB_OK);
+      end
+      else
+        MsgBox('OpenVPN signed vendor prerequisite is missing from Setup.',
+               mbError, MB_OK);
     end;
     { Vendor GUI setup may still supply adapter/driver prerequisites.
       Its success is NOT proof that Cisco tunnel routing is functional. }
