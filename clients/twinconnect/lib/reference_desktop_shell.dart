@@ -170,7 +170,9 @@ class _ReferenceDesktopShellState extends State<ReferenceDesktopShell> {
   Widget metric(IconData icon, String name, String value, Color accent) =>
     glass(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Row(children: [Icon(icon, color: accent, size: 25),
-        const SizedBox(width: 14), Text(name, style: const TextStyle(color: Colors.white))]),
+        const SizedBox(width: 9), Expanded(child: Text(name,
+          overflow: TextOverflow.ellipsis, maxLines: 1,
+          style: const TextStyle(color: Colors.white)))]),
       const Spacer(), title(value, size: 26, color: value == '—' ? muted : accent),
       const SizedBox(height: 7),
     ]), radius: 21, padding: const EdgeInsets.all(18));
@@ -184,7 +186,7 @@ class _ReferenceDesktopShellState extends State<ReferenceDesktopShell> {
       border: Border(left: BorderSide(color: Color(0x664A3B9D))),
     ),
     child: LayoutBuilder(builder: (context, bounds) => SingleChildScrollView(
-      child: SizedBox(height: math.max(850, bounds.maxHeight),
+      child: SizedBox(height: math.max(1000, bounds.maxHeight),
         child: Column(children: [
       SizedBox(height: 68, width: 85,
         child: widget.brand.logoUrl == null
@@ -320,7 +322,7 @@ class _ReferenceDesktopShellState extends State<ReferenceDesktopShell> {
     const SizedBox(height: 23),
     Expanded(child: GridView.count(
       crossAxisCount: 2, crossAxisSpacing: 17, mainAxisSpacing: 17,
-      childAspectRatio: 2.2, physics: const NeverScrollableScrollPhysics(),
+      mainAxisExtent: 118, physics: const NeverScrollableScrollPhysics(),
       children: [
         metric(Icons.timer_outlined, 'Server ping',
           widget.pingMs == null ? '—' : '${widget.pingMs} ms', green),
@@ -438,7 +440,7 @@ class _ReferenceDesktopShellState extends State<ReferenceDesktopShell> {
                   width: math.max(900, limits.maxWidth),
                   child: SingleChildScrollView(
                     child: SizedBox(
-                      height: math.max(950, limits.maxHeight),
+                      height: math.max(1020, limits.maxHeight),
                       child: page,
                     ),
                   ),
