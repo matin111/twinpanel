@@ -12,9 +12,11 @@ DIRECTORY = ROOT / "backend/app/routers/central_app_v1.py"
 IDENTITY = ROOT / "backend/app/central_app_identity.py"
 ADMIN = ROOT / "components/legacy-subscriptions-exact.tsx"
 RESELLER = ROOT / "components/reseller-subscriptions-parity.tsx"
-DELIVERY = ROOT / "components/app-credential-delivery-card.tsx"
+DELIVERY = ROOT / "components/central-app-brand-manager.tsx"
 LINK_MODAL = ROOT / "components/subscription-link-delivery-modal.tsx"
 FRONT_API = ROOT / "lib/central-app-credential-api.ts"
+LICENSE = ROOT / "components/license-center.tsx"
+ROUTER_UI = ROOT / "components/routed-page-client-v2.tsx"
 
 
 class TwinConnectMainlineContract(unittest.TestCase):
@@ -68,9 +70,11 @@ class TwinConnectMainlineContract(unittest.TestCase):
         self.assertIn('data-testid="admin-app-delivery-action"', admin)
         self.assertIn('owner="admin"', admin)
         self.assertIn('appOwner="reseller"', reseller)
-        self.assertIn("<AppCredentialDeliveryCard", link)
-        self.assertIn("getAppAccess(owner,subscriptionId,reset)", delivery)
-        self.assertIn("registerAppDirectory(origin.trim())", delivery)
+        self.assertIn("getAppAccess(appOwner,subscriptionId)", link)
+        self.assertIn("appearanceApi.save(role,appearance,resellerId)", delivery)
+        self.assertIn("registerAppDirectory(appOrigin.trim())", LICENSE.read_text(encoding="utf-8"))
+        self.assertIn('routeKey==="admin/smart-app"', ROUTER_UI.read_text(encoding="utf-8"))
+        self.assertIn('routeKey==="reseller/smart-app"', ROUTER_UI.read_text(encoding="utf-8"))
         self.assertIn("/v1/central-app/admin/register", api)
         self.assertIn('@router.post("/admin/register")', DIRECTORY.read_text(encoding="utf-8"))
 
