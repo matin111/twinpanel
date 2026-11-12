@@ -493,8 +493,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
               _vpnError = _openVpnTunnel.isRunning
                   ? 'OPENVPN_HEALTH_DEGRADED' : 'OPENVPN_PROCESS_EXITED';
             });
-            return;
           }
+          return; // OpenVPN must not fall through to sing-box diagnostics.
         }
         if (!healthy && _modernProtocol == 'cisco') {
           _modernHealthFailures++;
