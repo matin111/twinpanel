@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.807",
-  "source_sha": "6944ce33ac864980f05365629a1a1973ae72813f",
+  "version": "1.1.0-rc.808",
+  "source_sha": "15572c5ce0da2b6b812a11e2fca5bd51a97b5c3f",
   "notes": {
-    "fa": "اصلاح واقعی لایت‌مود فرم ساخت اشتراک در کامپوننت فعال AdminSubscriptionCreateUnified: حذف پس‌زمینه‌های تیره ثابت هدر، بخش‌های انتخاب پلن و کاربر، پروتکل‌ها، سرورها و نوار پایینی؛ رنگ‌های خوانا در روشن و حفظ دارک‌مود. محافظت از فایل فعال در انتشارهای بعدی. بدون تغییر منطق صدور اشتراک.",
-    "en": "Fix the actual unified subscription creation component used on the Admin subscriptions page. Hardcoded dark inline surfaces for header, choices, sections and footer are now light/dark-aware; adds active component CSS and pinned-release regression protection. No provisioning logic changes."
+    "fa": "کاهش ریشه‌ای فشار CPU و دیتابیس: صف‌بندی سراسری ثبت گروهی نودها با قفل مشترک بدون ایجاد صف کاربر، حداکثر یک نود سنگین هم‌زمان، سقف مصرف CPU کل پروسه و زیرپردازش‌های ثبت گروهی ۲۰۰٪، حفظ قفل مستقل هر نود و تحویل کانفیگ‌های موجود. حسابداری CPU به طور ماندگار محدود شده است.",
+    "en": "Prevent multi-node central bulk provisioning storms with crash-safe fleet-wide serial admission, while retaining per-node locks and existing delivery. Limit each detached stage and all family adapters to 200% CPU. Preserve VPN data and connectivity."
   }
 }
