@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'singbox_profile_validator.dart';
+import 'shadowtls_chain.dart';
 import 'xray_endpoint_route.dart';
 
 /// Prepares an isolated Windows TUN config IN MEMORY.
@@ -48,9 +49,13 @@ class SingBoxWindowsConfig {
     final pinnedEndpoint = xrayEndpointIPv4 ?? sudokuEndpointIPv4;
     final endpointRoute = pinnedEndpoint == null
         ? null : XrayEndpointRoute.requirePublicIPv4(pinnedEndpoint);
+    final chain = activeSocksPort == null && protocol == 'shadowtls'
+        ? ShadowTlsChain.fromItem(item) : null;
     final outbound = activeSocksPort == null
-        ? SingBoxProfileValidator.validateOutbound(
-            protocolCode: protocol, item: item)
+        ? chain == null
+            ? SingBoxProfileValidator.validateOutbound(
+                protocolCode: protocol, item: item)
+            : chain.transport
         : <String, dynamic>{
             'type': 'socks',
             'server': '127.0.0.1',
@@ -129,7 +134,9 @@ class SingBoxWindowsConfig {
           'dns_mode': 'hijack',
         },
       ],
-      'outbounds': [serverOutbound],
+      'outbounds': chain == null
+          ? [serverOutbound]
+          : chain.outbounds(resolvedServer: resolvedServer),
       'route': {
         'auto_detect_interface': true,
         // Resolve outbound server hostnames BEFORE creating a proxy session.
