@@ -1,6 +1,7 @@
 "use client";
 
 import {type FormEvent,useMemo,useState} from "react";
+import {createPortal} from "react-dom";
 
 import styles from "./tunnel-control-center-v1.module.css";
 import type {AdminNode,AdminTunnel} from "../lib/admin-api";
@@ -56,7 +57,7 @@ export function TunnelServerPairSelectorV293({disabled=false,onSelected}:{disabl
 
   return <>
     <button type="button" className={styles.secondaryButton} disabled={disabled||busy} onClick={()=>void openSelector()}>{busy?"…":`⇄ ${pick("انتخاب سرور","Select servers")}`}</button>
-    {open&&<div className={styles.modal} role="dialog" aria-modal="true">
+    {open&&typeof document!=="undefined"&&createPortal(<div className={styles.modal} role="dialog" aria-modal="true" aria-label={pick("انتخاب سرور بدون نصب مجدد","Select servers without reinstall")}>
       <button type="button" className={styles.modalBackdrop} aria-label="close" onClick={()=>!busy&&setOpen(false)}/>
       <div className={styles.modalCard}>
         <div className={styles.modalHead}><b>{pick("انتخاب سرور بدون نصب مجدد","Select servers without reinstall")}</b><button type="button" className={styles.iconButton} disabled={busy} onClick={()=>setOpen(false)}>×</button></div>
@@ -73,6 +74,6 @@ export function TunnelServerPairSelectorV293({disabled=false,onSelected}:{disabl
           <div className={styles.createFooter}><button type="button" className={styles.secondaryButton} disabled={busy} onClick={()=>setOpen(false)}>{pick("انصراف","Cancel")}</button><button type="submit" className={styles.primaryButton} disabled={busy||!draft.iran_node_id||!draft.exit_node_id}>{busy?pick("در حال انتخاب...","Selecting..."):pick("انتخاب / ثبت Pair","Select / register pair")}</button></div>
         </form>
       </div>
-    </div>}
+    </div>,document.body)}
   </>;
 }
