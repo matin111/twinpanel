@@ -83,10 +83,6 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('فارسی').last);
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('referenceNav3')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('referenceLoginAction')));
-    await tester.pumpAndSettle();
 
     expect(find.text('شناسایی حساب'), findsOneWidget);
     final prefs = await SharedPreferences.getInstance();
