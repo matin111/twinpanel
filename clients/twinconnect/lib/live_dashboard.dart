@@ -2572,112 +2572,104 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         const SizedBox(height: 18),
         TweenAnimationBuilder<double>(
           key: const Key('devPowerEntranceAnimation'),
-          tween: Tween(begin: .86, end: 1),
-          duration: const Duration(milliseconds: 650),
-          curve: Curves.easeOutBack,
-          builder: (context, value, child) => Transform.scale(
-            scale: value, child: child),
-          child: SizedBox(
-            height: 150, width: 150,
-            child: Stack(alignment: Alignment.center, children: [
-              // Outer double halo provides a premium depth cue without
-              // running an endless animation at idle.
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 480),
-                curve: Curves.easeOutCubic,
-                height: _vpnBusy ? 147 : 143,
-                width: _vpnBusy ? 147 : 143,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: ((_modernUp || _vpnVerified)
-                        ? const Color(0xFF39E2BA) : purple)
-                        .withValues(alpha: _vpnBusy ? .75 : .35),
-                    width: _vpnBusy ? 3 : 1.5),
-                  boxShadow: [
-                    BoxShadow(
-                      color: ((_modernUp || _vpnVerified)
-                          ? const Color(0xFF1BE4B3) : purple)
-                          .withValues(alpha: .16),
-                      blurRadius: 27, spreadRadius: 6),
-                  ],
-                ),
+          tween: Tween(begin: .94, end: 1.0),
+          duration: const Duration(milliseconds: 480),
+          curve: Curves.easeOutCubic,
+          builder: (context, scale, child) =>
+              Transform.scale(scale: scale, child: child),
+          child: Container(
+            width: 250,
+            padding: const EdgeInsets.all(5),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: (_modernUp || _vpnVerified)
+                    ? const Color(0xFF00E6B0).withValues(alpha: .72)
+                    : purple.withValues(alpha: .66)),
+              boxShadow: [
+                BoxShadow(
+                  color: (_modernUp || _vpnVerified)
+                      ? const Color(0xFF00E6B0).withValues(alpha: .19)
+                      : purple.withValues(alpha: .23),
+                  blurRadius: 24, spreadRadius: 2),
+              ],
+            ),
+            child: FilledButton(
+              key: const Key('liveConnectionControlsButton'),
+              onPressed: _vpnBusy ? null : _toggleVpn,
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(238, 80),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 19, vertical: 10),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(19)),
+                backgroundColor: Colors.transparent,
+                foregroundColor: Colors.white,
+                disabledBackgroundColor: Colors.transparent,
+                elevation: 0,
+              ).copyWith(
+                backgroundColor: WidgetStateProperty.resolveWith((states) {
+                  if (states.contains(WidgetState.disabled)) {
+                    return purple.withValues(alpha: .35);
+                  }
+                  return (_modernUp || _vpnVerified)
+                      ? const Color(0xFF0E997E)
+                      : const Color(0xFF7943DF);
+                }),
               ),
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 450),
-                height: (_modernUp || _vpnVerified) ? 125 : 119,
-                width: (_modernUp || _vpnVerified) ? 125 : 119,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white.withValues(
-                      alpha: _dark ? .20 : .50), width: 1),
-                ),
-              ),
-              FilledButton(
-                key: const Key('liveConnectionControlsButton'),
-                onPressed: _vpnBusy ? null : _toggleVpn,
-                style: FilledButton.styleFrom(
-                  backgroundColor: Colors.transparent,
-                  foregroundColor: Colors.white,
-                  disabledBackgroundColor: Colors.transparent,
-                  padding: EdgeInsets.zero,
-                  shape: const CircleBorder(),
-                  elevation: 0,
-                ),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 440),
-                  curve: Curves.easeInOutCubic,
-                  width: _vpnBusy ? 105 : 110,
-                  height: _vpnBusy ? 105 : 110,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: (_modernUp || _vpnVerified)
-                          ? const [Color(0xFF4AEDD1), Color(0xFF058F9F)]
-                          : const [Color(0xFFBE92FF), Color(0xFF6037CE)],
-                    ),
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: .55), width: 2),
-                    boxShadow: [
-                      BoxShadow(
-                        color: ((_modernUp || _vpnVerified)
-                            ? const Color(0xFF1CE4BD) : purple)
-                            .withValues(alpha: .40),
-                        blurRadius: _vpnBusy ? 35 : 23,
-                        spreadRadius: _vpnBusy ? 6 : 2),
-                      BoxShadow(color: Colors.black.withValues(alpha: .15),
-                        blurRadius: 13, offset: const Offset(0, 6)),
-                    ],
-                  ),
-                  child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 300),
-                    transitionBuilder: (child, animation) =>
-                        ScaleTransition(scale: animation, child: child),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 47, height: 47,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(14),
+                      color: Colors.white.withValues(alpha: .13),
+                      border: Border.all(
+                          color: Colors.white.withValues(alpha: .20))),
                     child: _vpnBusy
-                        ? const SizedBox(
-                            key: ValueKey('connectingSpinner'),
-                            height: 39, width: 39,
+                        ? const Padding(
+                            padding: EdgeInsets.all(12),
                             child: CircularProgressIndicator(
-                              strokeWidth: 3, color: Colors.white))
-                        : Icon(
-                            key: ValueKey((_vpnUp || _modernUp)
-                                ? 'turnOff' : 'turnOn'),
-                            (_vpnUp || _modernUp)
-                                ? Icons.stop_rounded
-                                : Icons.power_settings_new_rounded,
-                            color: Colors.white, size: 47),
+                              strokeWidth: 2.5,
+                              color: Colors.white))
+                        : Icon((_vpnUp || _modernUp)
+                            ? Icons.stop_rounded
+                            : Icons.power_settings_new_rounded,
+                            size: 28, color: Colors.white),
                   ),
-                ),
+                  const SizedBox(width: 13),
+                  Expanded(child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(_vpnBusy
+                          ? tr('در حال اتصال', 'Connecting')
+                          : (_vpnUp || _modernUp)
+                              ? tr('قطع اتصال', 'Disconnect')
+                              : tr('اتصال سریع', 'Connect now'),
+                          style: const TextStyle(color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800)),
+                      const SizedBox(height: 3),
+                      Text(_vpnBusy
+                          ? tr('در حال بررسی مسیر', 'Checking route')
+                          : (_modernUp || _vpnVerified)
+                              ? tr('تونل فعال', 'Tunnel active')
+                              : (_vpnUp || _vpnCleanup)
+                                  ? tr('در انتظار تأیید', 'Awaiting verification')
+                                  : tr('با سرور انتخابی', 'Selected server'),
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: .77),
+                          fontSize: 10.5)),
+                    ],
+                  )),
+                  Icon(Icons.arrow_forward_ios_rounded,
+                    size: 14,
+                    color: Colors.white.withValues(alpha: .70)),
+                ],
               ),
-              if (_vpnBusy)
-                const Positioned(
-                  top: 0,
-                  child: Icon(Icons.auto_awesome_rounded,
-                      color: Color(0xFFD6BDFF), size: 17),
-                ),
-            ]),
+            ),
           ),
         ),
         const SizedBox(height: 12),
