@@ -141,6 +141,9 @@ class WindowsSingBoxTunnel {
     int? xraySocksPort,
     String? xrayVerifiedExitIp,
     String? xrayEndpointIPv4,
+    int? sudokuSocksPort,
+    String? sudokuVerifiedExitIp,
+    String? sudokuEndpointIPv4,
     String? baselinePublicIp,
   }) async {
     if (_changing || _child != null) {
@@ -155,8 +158,28 @@ class WindowsSingBoxTunnel {
       if (!await WindowsSingBoxPreflight.enginePresent()) {
         throw const FormatException('SINGBOX_ENGINE_NOT_INSTALLED');
       }
-      // Xray has already dialled the pinned upstream via the physical NIC.
-      // Only that IP can be exempted from TUN routes, preventing loopback.
+      // An independently verified native core (Xray or Sudoku) must keep
+      // its upstream TCP dial on the physical network after TUN auto_route.
+      if (xraySocksPort != null && sudokuSocksPort != null) {
+        throw const FormatException('MULTIPLE_LOCAL_PROXY_UPSTREAMS');
+      }
+      if ((sudokuSocksPort == null) != (sudokuEndpointIPv4 == null) ||
+          (sudokuSocksPort == null) != (sudokuVerifiedExitIp == null)) {
+        throw const FormatException('SUDOKU_BRIDGE_NOT_VERIFIED');
+      }
+      if (sudokuSocksPort != null &&
+          (protocol != 'sudoku' || sudokuSocksPort < 1024 ||
+           sudokuSocksPort > 65535 ||
+           InternetAddress.tryParse(sudokuVerifiedExitIp!)?.type !=
+               InternetAddressType.IPv4)) {
+        throw const FormatException('SUDOKU_BRIDGE_NOT_VERIFIED');
+      }
+      if (sudokuEndpointIPv4 != null) {
+        XrayEndpointRoute.requirePublicIPv4(sudokuEndpointIPv4);
+      }
+      final activeSocksPort = xraySocksPort ?? sudokuSocksPort;
+      final activeVerifiedExit = xrayVerifiedExitIp ?? sudokuVerifiedExitIp;
+      // Only that server IP can be exempted from TUN routes, preventing loopback.
       if ((xraySocksPort == null) != (xrayEndpointIPv4 == null)) {
         throw const FormatException('XRAY_ENDPOINT_ROUTE_MISSING');
       }
@@ -170,7 +193,7 @@ class WindowsSingBoxTunnel {
             InternetAddress.tryParse(xrayVerifiedExitIp!) == null))) {
         throw const FormatException('XRAY_PROXY_NOT_VERIFIED');
       }
-      final outbound = xraySocksPort == null
+      final outbound = activeSocksPort == null
           ? SingBoxProfileValidator.validateOutbound(
               protocolCode: protocol, item: profile)
           : <String, dynamic>{'server': '127.0.0.1'};
@@ -217,20 +240,22 @@ class WindowsSingBoxTunnel {
         protocol: protocol, item: profile, resolvedServer: resolvedServer,
         telemetryPort: telemetryPort, telemetrySecret: telemetrySecret,
         xraySocksPort: xraySocksPort,
-        xrayEndpointIPv4: xrayEndpointIPv4);
+        xrayEndpointIPv4: xrayEndpointIPv4,
+        sudokuSocksPort: sudokuSocksPort,
+        sudokuEndpointIPv4: sudokuEndpointIPv4);
       // Independently verify that the selected Hysteria2/TUIC/etc outbound
       // can reach the internet before changing any Windows routes.
       // A failure here points to profile/transport rather than TUN routing.
       // Both checks are read-only and independent. Run concurrently so
       // connection setup does not wait for their latencies sequentially.
-      final Future<String> proxyCheck = xraySocksPort == null
+      final Future<String> proxyCheck = activeSocksPort == null
           ? ModernTransportProbe.verify(
               protocol: protocol, profile: profile,
               resolvedServer: resolvedServer,
             ).then((result) => result.publicIp).catchError((Object _) {
               throw const FormatException('SINGBOX_SERVER_TRANSPORT_UNREACHABLE');
             })
-          : Future<String>.value(xrayVerifiedExitIp!);
+          : Future<String>.value(activeVerifiedExit!);
       if (baselinePublicIp != null &&
           (InternetAddress.tryParse(baselinePublicIp)?.type !=
               InternetAddressType.IPv4)) {
