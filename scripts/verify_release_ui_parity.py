@@ -102,7 +102,7 @@ def verify_ui_release(source: Path, reference: Path, *, check_bundle: bool = Fal
     if not all(marker in network for marker in (
         "export function TunnelMonitor", "export function ProtocolMonitor",
         "CLASSIC", "setGroup(option.id)", "aria-pressed",
-        "reported online nodes", "reported tunnel state"
+        "reported online nodes", "classify(t.status)", "latency(t.latency_ms)"
     )):
         raise ValueError("Tunnel/protocol status, grouping, or honest telemetry logic missing")
     if not all(marker in network_css for marker in (
@@ -133,12 +133,12 @@ def verify_ui_release(source: Path, reference: Path, *, check_bundle: bool = Fal
         ):
             raise ValueError("Compiled production assets are missing premium KPIs and operational service health")
         if not any(
-            b"SUBSCRIPTION MIX" in path.read_bytes() and b"LATEST TRANSACTIONS" in path.read_bytes()
+            b"Subscription overview" in path.read_bytes() and b"Recent activity" in path.read_bytes()
             for path in bundle.rglob("*.js")
         ):
             raise ValueError("Compiled production assets are missing subscription and payment visuals")
         if not any(
-            b"NETWORK TRANSPORTS" in path.read_bytes() and b"PROTOCOL COVERAGE" in path.read_bytes()
+            b"Tunnel monitor" in path.read_bytes() and b"Service protocols" in path.read_bytes()
             for path in bundle.rglob("*.js")
         ):
             raise ValueError("Compiled production assets are missing the modern tunnel and protocol monitors")
