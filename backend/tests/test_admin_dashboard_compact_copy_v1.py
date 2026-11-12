@@ -38,7 +38,7 @@ class DashboardCompactCopyTests(unittest.TestCase):
         required={
             "network":["<h2>", "Tunnel monitor","Service protocols","t.latency_ms",
                        "t.iran_node_id","t.exit_node_id","setGroup(option.id)"],
-            "lower":["Subscription overview","Recent activity","ServerFleetVisual",
+            "lower":["Subscription overview","Recent activity","export function ServerFleetVisual",
                      "dashboardPaymentAmount(row)","cpu_percent","memory_percent","disk_percent"],
             "health":["<h2>", "safeFraction", "aria-valuetext",
                       "className={styles.healthRing}","className={styles.kpiValue}"],
