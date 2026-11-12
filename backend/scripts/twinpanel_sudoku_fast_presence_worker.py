@@ -23,7 +23,9 @@ from app.database import SessionLocal
 from app.models import Node, NodeType
 from app.node_runtime_connection import connect_protocol_runtime
 from app.services import modern_quota_runtime_v257 as canonical
-from app.services.accounting_device_map_batch_v1 import install_accounting_device_batch_cache
+from app.services.accounting_device_map_batch_v1 import (
+    install_accounting_device_batch_cache, build_presence_devices_for_protocols,
+)
 from app.services.central_runtime_ownership_v1 import is_central_node
 from app.services.sudoku_shared_native_presence_v1 import (
     collect_shared_native_users, apply_shared_native_presence,
@@ -51,13 +53,16 @@ async def reconcile_once() -> dict:
             ).order_by(Node.id).all()
         ]
         db.commit()
+        # Avoid decrypting every protocol's credentials for each Sudoku sweep.
+        # This preserves per-node entitlement and authenticated device mapping.
+        sudoku_by_node = build_presence_devices_for_protocols(
+            db, source_protocols={"sudoku"},
+        )
+        db.commit()
         for node_id in node_ids:
             conn = None
             try:
-                devices = [
-                    d for d in canonical.build_node_devices(db, node_id)
-                    if str(d.get("protocol") or "").lower() == "sudoku"
-                ]
+                devices = sudoku_by_node.get(node_id, [])
                 db.commit()
                 if not devices:
                     continue
