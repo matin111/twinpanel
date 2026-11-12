@@ -266,16 +266,23 @@ jobs:
           path: clients/twinconnect/TwinConnect-Windows-x64-Setup.exe
           if-no-files-found: error
           retention-days: 30
-      # GitHub Actions artifact delivery sometimes returns HTTP 502 even
-      # after successful builds. Publish an immutable versioned prerelease
-      # with ordinary release assets as an alternative download path.
-      - name: Publish test installer as GitHub prerelease assets
-        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/integration/twinconnect-windows-app-20261110' }}
+      # Unsigned artifacts are for internal testing only. Never distribute
+      # unsigned Windows executables as public GitHub Release assets.
+      # A publisher code-signing certificate is mandatory for prereleases.
+      - name: Publish signed installer as GitHub prerelease assets
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/integration/twinconnect-windows-app-20261110' && env.SIGNING_CONFIGURED == 'true' }}
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = 'Stop'
+          # Fail closed: do not publish unsigned or unverified executables.
+          foreach ($file in @('TwinConnect-Windows-x64-Setup.exe', 'build/windows/x64/runner/Release/twinconnect.exe')) {
+            $signature = Get-AuthenticodeSignature -LiteralPath $file
+            if ($signature.Status -ne 'Valid') {
+              throw "Refusing release: invalid or missing Authenticode signature for $file ($($signature.Status))"
+            }
+          }
           $tag = 'twinconnect-windows-preview-' + $env:GITHUB_SHA.Substring(0, 12)
           $files = @(
             'TwinConnect-Windows-x64-Setup.exe',
@@ -286,10 +293,10 @@ jobs:
             if (!(Test-Path -LiteralPath $file)) { throw "Missing release file: $file" }
           }
           $notes = @'
-          UNSIGNED TEST BUILD — do not distribute to customers.
-          Built from the TwinConnect integration branch. Contains the Windows
+          SIGNED DEVELOPMENT PRERELEASE — not approved for customers.
+          Built from the TwinConnect integration branch. Contains the signed Windows
           installer, standalone portable ZIP, and SHA-256 integrity manifest.
-          This preview may trigger SmartScreen or browser security warnings.
+          Signature verification is required but does not guarantee malware-free code.
           Do not disable antivirus protections to run it.
           The Windows Defender on-demand CI scan is separate from a professional
           security audit and does not certify malware-free binaries.
