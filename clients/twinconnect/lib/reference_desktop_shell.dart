@@ -84,9 +84,13 @@ class _ReferenceDesktopShellState extends State<ReferenceDesktopShell> {
   Future<void> openLink(String? url) async {
     final uri = Uri.tryParse(url ?? '');
     if (uri == null || !['https', 'http', 'tg'].contains(uri.scheme) ||
-        uri.host.isEmpty) return;
+        uri.host.isEmpty) {
+      return;
+    }
     try {
-      if (await launchUrl(uri, mode: LaunchMode.externalApplication)) return;
+      if (await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+        return;
+      }
     } catch (_) {
       // Preserve the user-provided URL when an external handler is missing.
     }
