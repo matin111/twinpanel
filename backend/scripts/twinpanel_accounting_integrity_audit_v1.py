@@ -41,7 +41,8 @@ def reliability_label(*, source_protocol: str, active_devices: int,
 
 
 def build_report(sources: dict[str, dict], events: dict[str, dict],
-                 devices: dict[str, int]) -> dict:
+                 devices: dict[str, int], sessions: dict[str, dict] | None = None) -> dict:
+    sessions = sessions or {}
     items=[]
     for source in sorted(ALL_PROTOCOL_KEYS):
         canonical=_PROTOCOL_TO_QUOTA.get(source)
@@ -53,6 +54,7 @@ def build_report(sources: dict[str, dict], events: dict[str, dict],
         invalid=int(row.get("invalid_count") or 0)
         bytes_accepted=int(row.get("accepted_bytes") or 0)
         bytes_billable=int(row.get("billable_bytes") or 0)
+        source_sessions=sessions.get(canonical,{})
         if min(count,positive,invalid,bytes_accepted,bytes_billable)<0:
             raise RuntimeError("METERING_LEDGER_NEGATIVE_AGGREGATE")
         items.append({
@@ -62,6 +64,12 @@ def build_report(sources: dict[str, dict], events: dict[str, dict],
             "active_quota_devices":int(devices.get(source,0)),
             "recent_events":count,
             "recent_positive_events":positive,
+            # Audit-only evidence: zero-byte ledger records are not proof of
+            # zero actual traffic. Keep accepted and billable totals separate.
+            "recent_zero_byte_events":int(row.get("zero_count") or 0),
+            "last_positive_event_utc":str(row.get("last_positive_event") or "") or None,
+            "recent_authenticated_session_rows":int(source_sessions.get("recent") or 0),
+            "stale_open_session_rows":int(source_sessions.get("stale") or 0),
             "recent_invalid_counter_events":invalid,
             "recent_accepted_bytes":bytes_accepted,
             "recent_billable_bytes":bytes_billable,
@@ -83,6 +91,7 @@ def build_report(sources: dict[str, dict], events: dict[str, dict],
             "Do not reconcile historic usage against a subscription balance after reset or renewal.",
             "Unattributable shared ShadowTLS traffic must not be assigned to a subscriber.",
             "Zero-only events may mean no real traffic OR failed node-side metering.",
+            "An active ledger session without a recent authenticated heartbeat is stale, not confirmed online.",
         ],
     }
 
@@ -117,14 +126,36 @@ def collect() -> dict:
                                             OR downlink_delta < 0) AS invalid_count,
                        COALESCE(SUM(accepted_bytes),0) AS accepted_bytes,
                        COALESCE(SUM(billable_bytes),0) AS billable_bytes,
-                       MAX(created_at) AS last_event
+                       MAX(created_at) AS last_event,
+                       MAX(created_at) FILTER (WHERE accepted_bytes > 0) AS last_positive_event,
+                       COUNT(*) FILTER (WHERE accepted_bytes = 0) AS zero_count
                 FROM quota_usage_events
                 WHERE created_at >= (NOW() AT TIME ZONE 'UTC') - interval '24 hours'
                 GROUP BY protocol
             """)).mappings()
         }
+        sessions={
+            str(row["protocol"]):{
+                "recent":int(row["recent"] or 0),
+                "stale":int(row["stale"] or 0),
+            }
+            for row in db.execute(text("""
+                SELECT protocol,
+                       COUNT(*) FILTER (
+                           WHERE last_seen_at >=
+                             (NOW() AT TIME ZONE 'UTC') - interval '180 seconds'
+                       ) AS recent,
+                       COUNT(*) FILTER (
+                           WHERE last_seen_at <
+                             (NOW() AT TIME ZONE 'UTC') - interval '180 seconds'
+                       ) AS stale
+                FROM quota_sessions
+                WHERE status='active'
+                GROUP BY protocol
+            """)).mappings()
+        }
         db.rollback()
-    return build_report(credentials,events,devices)
+    return build_report(credentials,events,devices,sessions)
 
 
 if __name__=="__main__":
