@@ -132,7 +132,7 @@ export function CentralAppBrandManager({role}:{role:"admin"|"reseller"}){
   const brand=role==="reseller"
     ?contact.brand_name||pick("برند نمایندگی شما","Your reseller brand")
     :resellerId>0?resellers.find(r=>r.id===resellerId)?.name||""
-    :pick("پنل اصلی","Main panel");
+    :contact.brand_name||pick("پنل اصلی","Main panel");
   const previewLogo=imageUrl(contact.logo_url);
   const preview=<div className="tbs-device" style={{
     background:appearance?.background_color,
