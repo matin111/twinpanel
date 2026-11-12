@@ -1,4 +1,5 @@
 import 'xray_inbound_profiles.dart';
+import 'xray_endpoint_route.dart';
 
 /// Creates an Xray-core VLESS outbound and an isolated local SOCKS listener.
 /// This is only a configuration builder. It does NOT start a process, install
@@ -10,6 +11,7 @@ class XrayWindowsConfig {
     required XrayInboundProfile inbound,
     required int localSocksPort,
     int? localHttpPort,
+    String? pinnedServerIPv4,
   }) {
     if (localHttpPort != null &&
         (localHttpPort < 1024 || localHttpPort > 65535 ||
@@ -20,6 +22,8 @@ class XrayWindowsConfig {
       throw const FormatException('XRAY_SOCKS_PORT_INVALID');
     }
     final uri = inbound.uri;
+    final String? pinnedAddress = pinnedServerIPv4 == null
+        ? null : XrayEndpointRoute.requirePublicIPv4(pinnedServerIPv4);
     final query = uri.queryParameters;
     final uuid = uri.userInfo;
     if (!RegExp(
@@ -53,14 +57,19 @@ class XrayWindowsConfig {
       if (transport == 'ws')
         'wsSettings': {
           'path': query['path']!,
-          if ((query['host'] ?? '').isNotEmpty)
-            'headers': {'Host': query['host']},
+          if ((query['host'] ?? '').isNotEmpty ||
+              (pinnedAddress != null && uri.host != pinnedAddress))
+            'headers': {'Host': (query['host'] ?? '').isNotEmpty
+                ? query['host'] : uri.host},
         },
       if (transport == 'xhttp')
         'xhttpSettings': {
           'path': query['path']!,
           'mode': query['mode'] ?? 'stream-one',
-          if ((query['host'] ?? '').isNotEmpty) 'host': query['host'],
+          if ((query['host'] ?? '').isNotEmpty ||
+              (pinnedAddress != null && uri.host != pinnedAddress))
+            'host': (query['host'] ?? '').isNotEmpty
+                ? query['host'] : uri.host,
         },
     };
     return {
@@ -85,7 +94,7 @@ class XrayWindowsConfig {
           'protocol': 'vless',
           'settings': {
             'vnext': [{
-              'address': uri.host,
+              'address': pinnedAddress ?? uri.host,
               'port': uri.port,
               'users': [{'id': uuid, 'encryption': 'none'}],
             }],
