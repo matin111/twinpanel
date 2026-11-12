@@ -409,6 +409,7 @@ class _TwinConnectHomeState extends State<TwinConnectHome> with WidgetsBindingOb
     // erase the OS-protected session before displaying the login screen.
     ++_lookupSerial;
     _sessionRefreshTimer?.cancel();
+    _brandRefreshTimer?.cancel();
     try {
       await _sessionStore.clearSession();
     } catch (_) {
