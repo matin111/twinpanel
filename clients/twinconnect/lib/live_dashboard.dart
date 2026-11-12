@@ -1035,7 +1035,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       final socksPort = preTunnel[0] as int;
       final baselineIp = preTunnel[1] as String;
       final verifiedExit = _xrayProxy.verifiedExitIp;
-      if (verifiedExit == null) {
+      final pinnedEndpointIPv4 = _xrayProxy.pinnedServerIPv4;
+      if (verifiedExit == null || pinnedEndpointIPv4 == null) {
         throw const FormatException('XRAY_REMOTE_EGRESS_NOT_VERIFIED');
       }
       // The existing Windows sing-box TUN remains responsible for routing,
@@ -1046,6 +1047,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         profile: const <String, dynamic>{},
         xraySocksPort: socksPort,
         xrayVerifiedExitIp: verifiedExit,
+        xrayEndpointIPv4: pinnedEndpointIPv4,
         baselinePublicIp: baselineIp,
       );
       if (!mounted) return;
