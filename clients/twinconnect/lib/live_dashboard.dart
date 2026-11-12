@@ -1588,28 +1588,6 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       ),
     );
 
-    BoxDecoration tile({bool selected = false, double radius = 17}) =>
-        BoxDecoration(
-          color: selected
-              ? purple.withValues(alpha: _dark ? 0.17 : 0.10)
-              : panel.withValues(alpha: 0.95),
-          borderRadius: BorderRadius.circular(radius),
-          border: Border.all(
-            color: selected
-                ? purple.withValues(alpha: 0.80)
-                : (_dark ? Colors.white : const Color(0xFF6971AC))
-                    .withValues(alpha: _dark ? 0.20 : 0.19),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: (selected ? purple : Colors.black)
-                  .withValues(alpha: selected ? 0.14 : 0.08),
-              blurRadius: selected ? 26 : 20,
-              offset: const Offset(0, 10),
-            ),
-          ],
-        );
-
     // Reusable frosted-glass surface for cards in both light and dark themes.
     // The blur samples only the background behind each translucent surface.
     Widget glassCard({
@@ -2240,8 +2218,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         const SizedBox(height: 12),
         ConnectionSignalArt(dark: _dark),
         const SizedBox(height: 12),
-        Container(
-          decoration: tile(radius: 15),
+        glassCard(
+          radius: 15,
           padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 12),
           child: Row(children: [
             Expanded(child: Column(children: [
@@ -2646,8 +2624,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
               detail: tr('مجموع رابط', 'Interface total'))),
           ]),
           const SizedBox(height: 25),
-          Container(
-            decoration: tile(radius: 14),
+          glassCard(
+            radius: 14,
             padding: const EdgeInsets.all(12),
             child: Row(children: [
               if (selectedServer != null) CountryFlag(selectedServer!.flag, width: 30),
