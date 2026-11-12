@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.799",
-  "source_sha": "298d0e9313b25b09e554f06d32872e806352644f",
+  "version": "1.1.0-rc.800",
+  "source_sha": "7d62a78342ba458ad06bfb9f9cad92d01cad961c",
   "notes": {
-    "fa": "اصلاح محسوس استایل شیشه‌ای تمام کارت‌های صفحه Connection: افزایش شفافیت، پس‌زمینه گرادیانی چندلایه پشت کارت‌ها، انعکاس نور در لبه‌ها، Blur قوی‌تر و اولویت بالای CSS نهایی در دارک و لایت مود. بدون تغییر در اطلاعات حساب یا کانفیگ VPN.",
-    "en": "Make the Connection glass design visibly distinct with ambient colored gradients behind translucent cards, brighter specular highlights, stronger blur, and final CSS cascade precedence for both themes. VPN and account data unchanged."
+    "fa": "نسخه هماهنگ جدید با اصلاح رنگ لایت‌مود فرم افزودن سرور، دکمه‌های اصلی و مخفی اشتراک‌ها و نمای شیشه‌ای اتصال؛ محافظ انتشار برای جلوگیری از حذف این تغییرات در آپدیت‌های بعدی.",
+    "en": "Fresh pinned build preserving Add server light-mode sections, main and hidden subscription action colors, and Connection glass UI. Release guards prevent stale UI replacements."
   }
 }
