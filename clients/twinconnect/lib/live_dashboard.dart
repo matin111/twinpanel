@@ -1801,6 +1801,10 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         return;
       }
       if (_autoFastest) {
+        if (_filter == 'all') {
+          setState(() => _vpnError = 'SELECT_PROTOCOL_FOR_FASTEST');
+          return;
+        }
         final best = _fastestKnownIndex;
         if (best == null) {
           setState(() => _vpnError = 'NO_MEASURED_SERVER');
@@ -1853,6 +1857,9 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         });
       } else {
         if (_autoFastest) {
+          if (_filter != 'wireguard') {
+            throw const FormatException('SELECT_PROTOCOL_FOR_FASTEST');
+          }
           final best = _fastestKnownIndex;
           if (best == null) throw const FormatException('NO_MEASURED_SERVER');
           _selected = best;
@@ -3209,6 +3216,68 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
 
     // All 16 chips remain visible. Admin-selected protocols will replace
     // the preview's complete catalog after an authenticated panel session.
+    Widget fastestServerControl() => Container(
+      key: const Key('liveAutoFastestServer'),
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        color: purple.withValues(alpha: _dark ? .12 : .06),
+        border: Border.all(color: purple.withValues(alpha: .32)),
+      ),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(Icons.auto_awesome_rounded, color: purple, size: 17),
+        const SizedBox(width: 6),
+        Text(tr('سریع‌ترین سرور', 'Fastest server'),
+          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700,
+            color: ink)),
+        const SizedBox(width: 4),
+        Tooltip(
+          message: _filter == 'all'
+            ? tr('ابتدا یک پروتکل انتخاب کنید', 'Choose a protocol first')
+            : _fastestKnownIndex == null
+            ? tr('پینگ معتبر موجود نیست', 'No measured server latency')
+            : tr('انتخاب بر اساس پینگ اندازه‌گیری‌شده',
+                 'Select by measured server latency'),
+          child: Switch(
+            key: const Key('autoFastestServerToggle'),
+            value: _autoFastest,
+            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            onChanged: _vpnBusy || _vpnUp || _modernUp
+                ? null : (enabled) {
+              if (enabled && _filter == 'all') {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  content: Text(tr('ابتدا یک پروتکل انتخاب کنید.',
+                    'Choose a protocol before enabling fastest server.'))));
+                return;
+              }
+              final allowed = widget.catalog?.entries.any((entry) =>
+                entry.protocol.code == _filter && entry.selected &&
+                entry.configRecordPresent) ?? false;
+              if (enabled && !allowed) {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  content: Text(tr('کانفیگ مجاز این پروتکل موجود نیست.',
+                    'No authorized configuration for this protocol.'))));
+                return;
+              }
+              final best = _fastestKnownIndex;
+              if (enabled && best == null) {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  content: Text(tr('برای انتخاب خودکار، پینگ معتبر لازم است.',
+                    'Measured server latency is required.'))));
+                return;
+              }
+              setState(() {
+                _autoFastest = enabled;
+                if (enabled) {
+                  _selected = best!;
+                }
+              });
+            },
+          ),
+        ),
+      ]),
+    );
+
     Widget filters() => Container(
       key: const Key('devProtocolFilters'),
       width: double.infinity,
@@ -3235,7 +3304,11 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12)),
               onSelected: (_) {
-                setState(() => _filter = entry.$1);
+                setState(() {
+                  // An automatic choice is valid only for its selected protocol.
+                  _filter = entry.$1;
+                  _autoFastest = false;
+                });
                 if (entry.$1 == 'v2ray') _loadXrayGroups();
               },
             ),
@@ -3384,6 +3457,11 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           ),
           const SizedBox(height: 13),
           filters(),
+          const SizedBox(height: 10),
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: fastestServerControl(),
+          ),
           const SizedBox(height: 12),
           if (_filter == 'v2ray' && _xrayGroupsLoading)
             const Padding(
@@ -3736,70 +3814,11 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       );
     }
 
-    Widget fastestServerControl() => Container(
-      key: const Key('liveAutoFastestServer'),
-      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        color: purple.withValues(alpha: _dark ? .12 : .06),
-        border: Border.all(color: purple.withValues(alpha: .32)),
-      ),
-      child: Row(mainAxisSize: MainAxisSize.min, children: [
-        Icon(Icons.auto_awesome_rounded, color: purple, size: 17),
-        const SizedBox(width: 6),
-        Text(tr('سریع‌ترین سرور', 'Fastest server'),
-          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700,
-            color: ink)),
-        const SizedBox(width: 4),
-        Tooltip(
-          message: _fastestKnownIndex == null
-            ? tr('پینگ معتبر موجود نیست', 'No measured server latency')
-            : tr('انتخاب بر اساس پینگ اندازه‌گیری‌شده',
-                 'Select by measured server latency'),
-          child: Switch(
-            key: const Key('autoFastestServerToggle'),
-            value: _autoFastest,
-            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            onChanged: _vpnBusy || _vpnUp || _modernUp
-                ? null : (enabled) {
-              final best = _fastestKnownIndex;
-              if (enabled && best == null) {
-                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                  content: Text(tr('برای انتخاب خودکار، پینگ معتبر لازم است.',
-                    'Measured server latency is required.'))));
-                return;
-              }
-              setState(() {
-                _autoFastest = enabled;
-                if (enabled) {
-                  _selected = best!;
-                }
-              });
-            },
-          ),
-        ),
-      ]),
-    );
 
     Widget home() => Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        LayoutBuilder(builder: (context, constraints) {
-          if (constraints.maxWidth < 690) {
-            return Column(crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                heading(tr('اتصال سریع', 'Quick connect')),
-                const SizedBox(height: 9),
-                Align(alignment: AlignmentDirectional.centerStart,
-                  child: fastestServerControl()),
-              ]);
-          }
-          return Row(children: [
-            Expanded(child: heading(tr('اتصال سریع', 'Quick connect'))),
-            const SizedBox(width: 10),
-            fastestServerControl(),
-          ]);
-        }),
+        heading(tr('اتصال سریع', 'Quick connect')),
         const SizedBox(height: 16),
         LayoutBuilder(builder: (context, constraints) {
           final split = constraints.maxWidth >= 740;
