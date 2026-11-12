@@ -86,7 +86,7 @@ class TwinConnectMainlineContract(unittest.TestCase):
         self.assertIn('appDelivery.app_password', link)
         self.assertIn('if(open&&appOwner&&subscriptionId&&subscriptionId>0)', link)
         self.assertNotIn('<QRCodeSVG value={appDelivery', link)
-        self.assertIn('/customer/subscriptions/{subscription_id}/app-delivery', routes)
+        self.assertIn('/customer/subscriptions/{subscription_id}/app-delivery', ROUTES.read_text(encoding="utf-8"))
         self.assertIn("getAppAccess(appOwner,subscriptionId)", link)
         self.assertIn("appearanceApi.save(role,appearance,resellerId)", delivery)
         self.assertIn("registerAppDirectory(appOrigin.trim())", LICENSE.read_text(encoding="utf-8"))
