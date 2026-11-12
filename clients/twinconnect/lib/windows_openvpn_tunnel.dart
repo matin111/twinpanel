@@ -17,6 +17,7 @@ class WindowsOpenVpnTunnel {
   bool _ready = false, _busy = false;
 
   bool get isRunning => _ready && _process != null;
+  bool get hasChild => _process != null;
   String? get exitIp => _exitIp;
 
   static String? get enginePath {
