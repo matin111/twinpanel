@@ -36,7 +36,9 @@ class TwinConnectFramelessControls extends StatelessWidget {
         ),
         Positioned(
           top: 4, right: 6,
-          child: DecoratedBox(
+          child: Material(
+            type: MaterialType.transparency,
+            child: DecoratedBox(
             decoration: BoxDecoration(
               color: backdrop.withValues(alpha: .24),
               borderRadius: BorderRadius.circular(12),
@@ -67,6 +69,7 @@ class TwinConnectFramelessControls extends StatelessWidget {
                 ),
               ],
             ),
+          ),
           ),
         ),
       ],
