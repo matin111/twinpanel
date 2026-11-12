@@ -79,6 +79,12 @@ jobs:
       - name: Verify official Sudoku core accepts synthetic client config
         shell: pwsh
         run: ./tools/check_sudoku_windows.ps1
+      - name: Bundle official SHA256-pinned Mieru Windows client
+        shell: pwsh
+        run: ./tools/bundle_mieru_windows.ps1
+      - name: Verify independent Mieru engine with synthetic loopback SOCKS5
+        shell: pwsh
+        run: ./tools/check_mieru_windows.ps1
       - name: Bundle pinned and verified sing-box engine (not yet enabled)
         shell: pwsh
         run: ./tools/bundle_singbox_windows.ps1
