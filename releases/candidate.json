@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.797",
-  "source_sha": "c00be78c05bef3cddf4f2f2e6f715a6a607639f8",
+  "version": "1.1.0-rc.798",
+  "source_sha": "e2e1867d82c89617c81f9303b25ea44c39e1fa10",
   "notes": {
-    "fa": "حذف فرم ایمیل و رمز و کد دومرحله‌ای از صفحه Connection؛ دریافت نام کاربری و رمز TwinConnect با یک کلیک از لینک اشتراک همان کاربر، با پاسخ بدون کش. همراه اصلاح خوانایی آمار و کنترل‌های نود در لایت مود. توجه: دارنده لینک اشتراک به اطلاعات اپ دسترسی دارد.",
-    "en": "Remove email/password/2FA form from the Connection page. Show TwinConnect credentials on one click, scoped to the subscription bearer link and served with no-store headers. Also restore light-mode node KPI/control readability. Holders of the share URL can retrieve app credentials."
+    "fa": "شیشه‌ای‌سازی یکپارچه کارت‌های صفحه Connection، شامل اطلاعات ورود اپ، آمار اشتراک، پروتکل‌ها، سرورها و کارت‌های تنظیمات اتصال؛ افکت شفاف و Blur هماهنگ در دارک و لایت مود، بدون تغییر در کانفیگ یا اطلاعات اشتراک.",
+    "en": "Apply unified translucent glass backgrounds, blur, borders and shadows across all Connection page cards in dark and light themes, including app login, account statistics, protocol and server panels. No changes to VPN configuration or subscription data."
   }
 }
