@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.797",
+  "version": "1.1.0-rc.798",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-12T06:46:49Z",
+  "released_at": "2026-11-12T07:09:09Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "c00be78c05bef3cddf4f2f2e6f715a6a607639f8",
+  "source_sha": "e2e1867d82c89617c81f9303b25ea44c39e1fa10",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.797/twinpanel-1.1.0-rc.797-linux-x86_64.tar.gz",
-    "sha256": "95e056c396d394aa99764db7794090b4c3f83b6b4ed0f37046644b354e155f19",
-    "size_bytes": 30637763
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.798/twinpanel-1.1.0-rc.798-linux-x86_64.tar.gz",
+    "sha256": "b0d15951453d5281304dc10019773f3b29e3dc1c6d34801c66d93d3fe253dd06",
+    "size_bytes": 30645984
   },
   "notes": {
-    "fa": "حذف فرم ایمیل و رمز و کد دومرحله‌ای از صفحه Connection؛ دریافت نام کاربری و رمز TwinConnect با یک کلیک از لینک اشتراک همان کاربر، با پاسخ بدون کش. همراه اصلاح خوانایی آمار و کنترل‌های نود در لایت مود. توجه: دارنده لینک اشتراک به اطلاعات اپ دسترسی دارد.",
-    "en": "Remove email/password/2FA form from the Connection page. Show TwinConnect credentials on one click, scoped to the subscription bearer link and served with no-store headers. Also restore light-mode node KPI/control readability. Holders of the share URL can retrieve app credentials."
+    "fa": "شیشه‌ای‌سازی یکپارچه کارت‌های صفحه Connection، شامل اطلاعات ورود اپ، آمار اشتراک، پروتکل‌ها، سرورها و کارت‌های تنظیمات اتصال؛ افکت شفاف و Blur هماهنگ در دارک و لایت مود، بدون تغییر در کانفیگ یا اطلاعات اشتراک.",
+    "en": "Apply unified translucent glass backgrounds, blur, borders and shadows across all Connection page cards in dark and light themes, including app login, account statistics, protocol and server panels. No changes to VPN configuration or subscription data."
   }
 }
