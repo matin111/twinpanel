@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.796",
+  "version": "1.1.0-rc.797",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-12T06:34:42Z",
+  "released_at": "2026-11-12T06:46:49Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "d203bebd0404798d6b3862275375d84be19462c6",
+  "source_sha": "c00be78c05bef3cddf4f2f2e6f715a6a607639f8",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.796/twinpanel-1.1.0-rc.796-linux-x86_64.tar.gz",
-    "sha256": "0c78dacb96e73c2a6290636ff8860a5b26bc5b85449bbf29e64d92e1201cae69",
-    "size_bytes": 30636483
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.797/twinpanel-1.1.0-rc.797-linux-x86_64.tar.gz",
+    "sha256": "95e056c396d394aa99764db7794090b4c3f83b6b4ed0f37046644b354e155f19",
+    "size_bytes": 30637763
   },
   "notes": {
-    "fa": "رفع خطای اسکریپت دکمه نمایش اطلاعات ورود TwinConnect در صفحه واقعی Connection و تأیید صحت JavaScript تولیدشده؛ حذف کادر تکراری و دریافت خودکار اطلاعات اپ از پنجره ساب‌لینک ادمین و نماینده و کاربر. حفظ دکمه مستقل ورود اپ و QR و تنظیمات VPN.",
-    "en": "Fix generated JavaScript syntax so TwinConnect app login opens on the actual Connection page. Remove redundant app credentials from the panel's QR/link modal. Preserve standalone reseller/admin app access, public QR and VPN configurations."
+    "fa": "حذف فرم ایمیل و رمز و کد دومرحله‌ای از صفحه Connection؛ دریافت نام کاربری و رمز TwinConnect با یک کلیک از لینک اشتراک همان کاربر، با پاسخ بدون کش. همراه اصلاح خوانایی آمار و کنترل‌های نود در لایت مود. توجه: دارنده لینک اشتراک به اطلاعات اپ دسترسی دارد.",
+    "en": "Remove email/password/2FA form from the Connection page. Show TwinConnect credentials on one click, scoped to the subscription bearer link and served with no-store headers. Also restore light-mode node KPI/control readability. Holders of the share URL can retrieve app credentials."
   }
 }
