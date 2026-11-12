@@ -438,16 +438,19 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       final activeProtocol = _modernProtocol;
       final isCisco = activeProtocol == 'cisco';
       final isOpenVpn = activeProtocol == 'openvpn';
+      final isL2tp = activeProtocol == 'l2tp';
       final totals = isCisco
           ? await _ciscoTunnel.readTrafficTotals()
           : isOpenVpn
               ? await _openVpnTunnel.readTrafficTotals()
-              : await _modernTunnel.readTrafficTotals();
+              : isL2tp
+                  ? await _l2tpTunnel.readTrafficTotals()
+                  : await _modernTunnel.readTrafficTotals();
       if (!mounted || !_modernUp || totals == null ||
           activeProtocol != _modernProtocol) return;
       int rx = totals.received;
       int tx = totals.sent;
-      if (isCisco || isOpenVpn) {
+      if (isCisco || isOpenVpn || isL2tp) {
         _tunnelOriginRx ??= rx;
         _tunnelOriginTx ??= tx;
         // Show bytes transferred during this connection, not lifetime totals.
@@ -485,10 +488,25 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
             ? await _ciscoTunnel.checkHealth()
             : _modernProtocol == 'openvpn'
                 ? await _openVpnTunnel.checkHealth()
-                : await _modernTunnel.checkHealth();
+                : _modernProtocol == 'l2tp'
+                    ? await _l2tpTunnel.checkHealth()
+                    : await _modernTunnel.checkHealth();
         if (!mounted || !_modernUp || _vpnBusy) return;
         // Losing the Cisco child or its verified egress must never leave
         // an "online" badge visible for an unverified tunnel.
+        if (!healthy && _modernProtocol == 'l2tp') {
+          _modernHealthFailures++;
+          if (!_l2tpTunnel.isRunning || _modernHealthFailures >= 2) {
+            _modernHealthTimer?.cancel();
+            setState(() {
+              _modernUp = false;
+              _publicIp = null;
+              _vpnError = _l2tpTunnel.hasChild
+                  ? 'L2TP_HEALTH_DEGRADED' : 'L2TP_CONNECTION_FAILED';
+            });
+          }
+          return;
+        }
         if (!healthy && _modernProtocol == 'openvpn') {
           _modernHealthFailures++;
           if (!_openVpnTunnel.isRunning || _modernHealthFailures >= 2) {
@@ -998,6 +1016,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           await _startCiscoTunnel(nodes[index].id);
         } else if (_filter == 'openvpn') {
           await _startOpenVpnTunnel(nodes[index].id);
+        } else if (_filter == 'l2tp') {
+          await _startL2tpTunnel(nodes[index].id);
         } else if (SingBoxProfileValidator.supportsFamily(_filter)) {
           await _startModernTunnel(_filter, nodes[index].id);
         }
@@ -1250,6 +1270,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         await _startCiscoTunnel(_selectedServerId!);
       } else if (_filter == 'openvpn') {
         await _startOpenVpnTunnel(_selectedServerId!);
+      } else if (_filter == 'l2tp') {
+        await _startL2tpTunnel(_selectedServerId!);
       } else if (SingBoxProfileValidator.supportsFamily(_filter)) {
         await _startModernTunnel(_filter, _selectedServerId!);
       } else {
@@ -1903,6 +1925,30 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
               'SELECT_MODERN_SERVER' => tr(
                 'لطفاً یک سرور انتخاب کنید.',
                 'Please select a server.'),
+              'L2TP_NATIVE_START_FAILED' => tr(
+                'شروع اتصال L2TP ویندوز ناموفق بود.',
+                'Windows L2TP could not start.'),
+              'L2TP_IPSEC_NEGOTIATION_FAILED' => tr(
+                'مذاکره IPsec با سرور ناموفق بود.',
+                'IPsec negotiation with the server failed.'),
+              'L2TP_LOGIN_REJECTED' => tr(
+                'نام کاربری یا رمز L2TP اشتباه است.',
+                'L2TP authentication was rejected.'),
+              'L2TP_SERVER_UNREACHABLE' => tr(
+                'سرور L2TP یا UDP 500/4500 در دسترس نیست.',
+                'L2TP server or UDP ports 500/4500 are unreachable.'),
+              'L2TP_EGRESS_NOT_VERIFIED' => tr(
+                'IP خروجی L2TP تأیید نشد.',
+                'L2TP internet egress was not verified.'),
+              'L2TP_CONNECT_TIMEOUT' => tr(
+                'زمان اتصال L2TP به پایان رسید.',
+                'L2TP connection timed out.'),
+              'L2TP_HEALTH_DEGRADED' => tr(
+                'اتصال L2TP پایدار نیست.',
+                'L2TP tunnel health has degraded.'),
+              'L2TP_DISCONNECT_PENDING' => tr(
+                'قطع اتصال L2TP هنوز کامل نشده است.',
+                'Windows L2TP disconnect is pending.'),
               'OPENVPN_ENGINE_NOT_INSTALLED' => tr(
                 'موتور OpenVPN همراه نصب این نسخه آماده نیست.',
                 'The OpenVPN engine was not installed with this version.'),
