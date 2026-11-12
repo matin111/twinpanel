@@ -17,6 +17,8 @@ import 'singbox_profile_validator.dart';
 import 'singbox_windows_config.dart';
 import 'windows_singbox_tunnel.dart';
 import 'windows_openconnect_tunnel.dart';
+import 'windows_openvpn_tunnel.dart';
+import 'openvpn_profile_validator.dart';
 import 'cisco_openconnect_profile.dart';
 import 'connection_bootstrap.dart';
 import 'tenant_api.dart';
@@ -94,14 +96,15 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     },
   );
   final WindowsOpenConnectTunnel _ciscoTunnel = WindowsOpenConnectTunnel();
+  final WindowsOpenVpnTunnel _openVpnTunnel = WindowsOpenVpnTunnel();
   bool _modernUp = false;
   Timer? _modernHealthTimer;
   Timer? _modernTrafficTimer;
   bool _modernTrafficBusy = false;
   int? _modernRx;
   int? _modernTx;
-  int? _ciscoOriginRx;
-  int? _ciscoOriginTx;
+  int? _tunnelOriginRx;
+  int? _tunnelOriginTx;
   bool _modernHealthBusy = false;
   int _modernHealthFailures = 0;
   String? _modernProtocol;
@@ -418,28 +421,32 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     _modernTrafficTimer = null;
     _modernRx = null;
     _modernTx = null;
-    _ciscoOriginRx = null;
-    _ciscoOriginTx = null;
+    _tunnelOriginRx = null;
+    _tunnelOriginTx = null;
   }
 
   Future<void> _refreshModernTraffic() async {
     if (!mounted || !_modernUp || _modernTrafficBusy) return;
     _modernTrafficBusy = true;
     try {
-      final isCisco = _modernProtocol == 'cisco';
+      final activeProtocol = _modernProtocol;
+      final isCisco = activeProtocol == 'cisco';
+      final isOpenVpn = activeProtocol == 'openvpn';
       final totals = isCisco
           ? await _ciscoTunnel.readTrafficTotals()
-          : await _modernTunnel.readTrafficTotals();
+          : isOpenVpn
+              ? await _openVpnTunnel.readTrafficTotals()
+              : await _modernTunnel.readTrafficTotals();
       if (!mounted || !_modernUp || totals == null ||
-          isCisco != (_modernProtocol == 'cisco')) return;
+          activeProtocol != _modernProtocol) return;
       int rx = totals.received;
       int tx = totals.sent;
-      if (isCisco) {
-        _ciscoOriginRx ??= rx;
-        _ciscoOriginTx ??= tx;
+      if (isCisco || isOpenVpn) {
+        _tunnelOriginRx ??= rx;
+        _tunnelOriginTx ??= tx;
         // Show bytes transferred during this connection, not lifetime totals.
-        rx = rx >= _ciscoOriginRx! ? rx - _ciscoOriginRx! : 0;
-        tx = tx >= _ciscoOriginTx! ? tx - _ciscoOriginTx! : 0;
+        rx = rx >= _tunnelOriginRx! ? rx - _tunnelOriginRx! : 0;
+        tx = tx >= _tunnelOriginTx! ? tx - _tunnelOriginTx! : 0;
       }
       if (_modernRx != rx || _modernTx != tx) {
         setState(() {
@@ -470,10 +477,25 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       try {
         final healthy = _modernProtocol == 'cisco'
             ? await _ciscoTunnel.checkHealth()
-            : await _modernTunnel.checkHealth();
+            : _modernProtocol == 'openvpn'
+                ? await _openVpnTunnel.checkHealth()
+                : await _modernTunnel.checkHealth();
         if (!mounted || !_modernUp || _vpnBusy) return;
         // Losing the Cisco child or its verified egress must never leave
         // an "online" badge visible for an unverified tunnel.
+        if (!healthy && _modernProtocol == 'openvpn') {
+          _modernHealthFailures++;
+          if (!_openVpnTunnel.isRunning || _modernHealthFailures >= 2) {
+            _modernHealthTimer?.cancel();
+            setState(() {
+              _modernUp = false;
+              _publicIp = null;
+              _vpnError = _openVpnTunnel.isRunning
+                  ? 'OPENVPN_HEALTH_DEGRADED' : 'OPENVPN_PROCESS_EXITED';
+            });
+            return;
+          }
+        }
         if (!healthy && _modernProtocol == 'cisco') {
           _modernHealthFailures++;
           if (!_ciscoTunnel.isRunning || _modernHealthFailures >= 2) {
@@ -552,11 +574,14 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           _resetNetworkStats();
         });
       }
-      if (_modernTunnel.isRunning || _ciscoTunnel.isRunning) {
+      if (_modernTunnel.isRunning || _ciscoTunnel.isRunning ||
+          _openVpnTunnel.isRunning) {
         _modernHealthTimer?.cancel();
         _stopModernTrafficMonitoring();
         if (_ciscoTunnel.isRunning) {
           await _ciscoTunnel.stop();
+        } else if (_openVpnTunnel.isRunning) {
+          await _openVpnTunnel.stop();
         } else {
           await _modernTunnel.stop();
         }
@@ -584,6 +609,103 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         setState(() {
           _modernUp = (_ciscoTunnel.isRunning &&
                   _ciscoTunnel.exitIp != null) || _modernTunnel.isRunning;
+          if (!_modernUp) {
+            _modernProtocol = null;
+            _modernNodeId = null;
+            _publicIp = null;
+          }
+          _vpnError = _errorText(error);
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _vpnBusy = false);
+    }
+  }
+
+  Future<void> _startOpenVpnTunnel(String serverId) async {
+    if (_vpnBusy) return;
+    setState(() { _vpnBusy = true; _vpnError = null; });
+    try {
+      if (_vpnUnmanaged) {
+        throw const FormatException('UNMANAGED_WIREGUARD_SERVICE');
+      }
+      final authorized = widget.catalog?.entries.any((entry) =>
+          entry.protocol.code == 'openvpn' && entry.selected &&
+          entry.configRecordPresent) ?? false;
+      if (!authorized) {
+        throw const FormatException('PROTOCOL_NOT_INCLUDED_IN_SUBSCRIPTION');
+      }
+      if (!await WindowsOpenVpnTunnel.enginePresent()) {
+        throw const FormatException('OPENVPN_ENGINE_NOT_INSTALLED');
+      }
+      final definition = VpnProtocols.byCode('openvpn')!;
+      final profiles = await TenantApi.fromBuildConfig().loadSessionNativeProfiles(
+        panel: widget.panel, sessionToken: widget.sessionToken,
+        protocol: definition,
+        native: const NativeProtocolReadiness(supportedCodes: {'openvpn'}),
+      );
+      final matches = profiles.items.where((item) =>
+          item['node_id']?.toString() == serverId).toList(growable: false);
+      if (matches.length != 1) {
+        throw const FormatException('OPENVPN_SERVER_PROFILE_MISSING');
+      }
+      // Validate the replacement credentials before disconnecting any VPN.
+      OpenVpnProfileValidator.validate(matches.single);
+      final target = matches.single;
+      if (_vpnUp || _vpnCleanup) {
+        await _vpn.stop().timeout(const Duration(seconds: 20));
+        final stopped = await _vpn.status().timeout(
+            const Duration(seconds: 10));
+        if (stopped['state'] != 'down') {
+          throw const FormatException('PREVIOUS_TUNNEL_NOT_STOPPED');
+        }
+        if (!mounted) return;
+        setState(() {
+          _vpnUp = false;
+          _vpnVerified = false;
+          _vpnCleanup = false;
+          _activeNodeId = null;
+          _vpnRx = 0;
+          _vpnTx = 0;
+          _resetNetworkStats();
+        });
+      }
+      if (_modernTunnel.isRunning || _ciscoTunnel.isRunning ||
+          _openVpnTunnel.isRunning) {
+        _modernHealthTimer?.cancel();
+        _stopModernTrafficMonitoring();
+        if (_ciscoTunnel.isRunning) {
+          await _ciscoTunnel.stop();
+        } else if (_openVpnTunnel.isRunning) {
+          await _openVpnTunnel.stop();
+        } else {
+          await _modernTunnel.stop();
+        }
+        if (!mounted) return;
+        setState(() {
+          _modernUp = false;
+          _modernProtocol = null;
+          _modernNodeId = null;
+          _publicIp = null;
+        });
+      }
+      final verifiedIp = await _openVpnTunnel.start(target);
+      if (!mounted) return;
+      setState(() {
+        _modernUp = true;
+        _modernProtocol = 'openvpn';
+        _modernNodeId = serverId;
+        _publicIp = verifiedIp;
+        _vpnError = null;
+      });
+      _startModernTrafficMonitoring();
+      _startModernHealthMonitoring();
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _modernUp = (_openVpnTunnel.isRunning &&
+                  _openVpnTunnel.exitIp != null) ||
+              _ciscoTunnel.isRunning || _modernTunnel.isRunning;
           if (!_modernUp) {
             _modernProtocol = null;
             _modernNodeId = null;
@@ -658,11 +780,14 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           _resetNetworkStats();
         });
       }
-      if (_modernTunnel.isRunning || _ciscoTunnel.isRunning) {
+      if (_modernTunnel.isRunning || _ciscoTunnel.isRunning ||
+          _openVpnTunnel.isRunning) {
         _modernHealthTimer?.cancel();
         _stopModernTrafficMonitoring();
         if (_ciscoTunnel.isRunning) {
           await _ciscoTunnel.stop();
+        } else if (_openVpnTunnel.isRunning) {
+          await _openVpnTunnel.stop();
         } else {
           await _modernTunnel.stop();
         }
@@ -708,6 +833,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     try {
       if (_ciscoTunnel.isRunning) {
         await _ciscoTunnel.stop();
+      } else if (_openVpnTunnel.isRunning) {
+        await _openVpnTunnel.stop();
       } else if (_modernTunnel.isRunning) {
         await _modernTunnel.stop();
       }
@@ -768,9 +895,12 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           (_modernNodeId != nodes[index].id || _modernProtocol != _filter)) {
         if (_filter == 'cisco') {
           await _startCiscoTunnel(nodes[index].id);
-        } else {
+        } else if (_filter == 'openvpn') {
+          await _startOpenVpnTunnel(nodes[index].id);
+        } else if (SingBoxProfileValidator.supportsFamily(_filter)) {
           await _startModernTunnel(_filter, nodes[index].id);
         }
+
       }
       return;
     }
@@ -986,7 +1116,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
 
   Future<void> _toggleVpn() async {
     if (_vpnBusy || !Platform.isWindows) return;
-    if (_modernUp || _modernTunnel.isRunning || _ciscoTunnel.isRunning) {
+    if (_modernUp || _modernTunnel.isRunning ||
+        _ciscoTunnel.isRunning || _openVpnTunnel.isRunning) {
       await _stopModernTunnel();
       return;
     }
@@ -1006,8 +1137,12 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       }
       if (_filter == 'cisco') {
         await _startCiscoTunnel(_selectedServerId!);
-      } else {
+      } else if (_filter == 'openvpn') {
+        await _startOpenVpnTunnel(_selectedServerId!);
+      } else if (SingBoxProfileValidator.supportsFamily(_filter)) {
         await _startModernTunnel(_filter, _selectedServerId!);
+      } else {
+        setState(() => _vpnError = 'NATIVE_PROTOCOL_ENGINE_NOT_READY');
       }
       return;
     }
@@ -1667,6 +1802,24 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
               'SELECT_MODERN_SERVER' => tr(
                 'لطفاً یک سرور انتخاب کنید.',
                 'Please select a server.'),
+              'OPENVPN_ENGINE_NOT_INSTALLED' => tr(
+                'موتور OpenVPN همراه نصب این نسخه آماده نیست.',
+                'The OpenVPN engine was not installed with this version.'),
+              'OPENVPN_ENGINE_START_FAILED' => tr(
+                'موتور OpenVPN هنگام شروع اتصال خطا داد.',
+                'OpenVPN failed during tunnel initialization.'),
+              'OPENVPN_PROCESS_EXITED' => tr(
+                'موتور OpenVPN قبل از تأیید اتصال بسته شد.',
+                'OpenVPN exited before the connection was verified.'),
+              'OPENVPN_EGRESS_NOT_VERIFIED' => tr(
+                'آدرس خروجی OpenVPN تغییر نکرد؛ اتصال تأیید نشده است.',
+                'OpenVPN egress did not change; connection is unverified.'),
+              'OPENVPN_HEALTH_DEGRADED' => tr(
+                'مسیر شبکه OpenVPN پاسخ معتبر نمی‌دهد.',
+                'OpenVPN route health is degraded.'),
+              'NATIVE_PROTOCOL_ENGINE_NOT_READY' => tr(
+                'موتور مستقل این پروتکل هنوز آماده نیست.',
+                'This protocol requires a native engine that is not ready yet.'),
               'SINGBOX_NATIVE_TUN_NOT_READY' => tr(
                 'آزمایش پروکسی انجام می‌شود؛ VPN سراسری هنوز فعال نیست.',
                 'Proxy check is available; system VPN is not enabled.'),
