@@ -898,8 +898,13 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       if (!authorized) {
         throw const FormatException('PROTOCOL_NOT_INCLUDED_IN_SUBSCRIPTION');
       }
-      if (!await WindowsXrayPreflight.enginePresent() ||
-          !await WindowsSingBoxPreflight.enginePresent()) {
+      // Both native binaries are checked independently. Parallel probing
+      // removes a redundant serial subprocess wait on cold Windows startup.
+      final engines = await Future.wait<bool>([
+        WindowsXrayPreflight.enginePresent(),
+        WindowsSingBoxPreflight.enginePresent(),
+      ]);
+      if (!engines[0] || !engines[1]) {
         throw const FormatException('XRAY_OR_TUN_ENGINE_UNAVAILABLE');
       }
       final definition = VpnProtocols.byCode('v2ray')!;
