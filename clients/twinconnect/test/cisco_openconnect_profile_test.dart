@@ -63,6 +63,15 @@ void main() {
     expect(profile.serverCertificate, 'sha256:${'b' * 64}');
   });
 
+  test('accepts the OpenConnect SPKI certificate pin format', () {
+    final profile = CiscoOpenConnectProfile.fromItem({
+      'host': 'vpn.example.org', 'username': 'customer',
+      'password': 'secret',
+      'servercert': 'pin-sha256:${'A' * 43}=',
+    });
+    expect(profile.serverCertificate, 'pin-sha256:${'A' * 43}=');
+  });
+
   test('certificate pin is validated rather than silently ignored', () {
     expect(() => CiscoOpenConnectProfile.fromItem({
       'host': 'vpn.example.org', 'username': 'customer',
