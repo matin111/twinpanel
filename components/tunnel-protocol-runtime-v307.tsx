@@ -70,11 +70,14 @@ async function modernRequest<T>(path:string,init:RequestInit={}):Promise<T>{
   return payload as T;
 }
 
-function Modal({title,onClose,children,wide=false}:{title:string;onClose:()=>void;children:ReactNode;wide?:boolean}){
-  return <div className="runtime-modal" role="dialog" aria-modal="true" aria-label={title}>
+function Modal({title,onClose,children,wide=false,create=false}:{title:string;onClose:()=>void;children:ReactNode;wide?:boolean;create?:boolean}){
+  return <div className={`runtime-modal ${create?styles.createOverlay:""}`} role="dialog" aria-modal="true" aria-label={title}>
     <button type="button" className="runtime-modal-bg" aria-label="close" onClick={onClose}/>
-    <div className={wide?`runtime-modal-card ${styles.modalCard}`:"runtime-modal-card"}>
-      {wide?children:<><div className="card-head"><b>{title}</b><button type="button" className="icon-button" onClick={onClose}>×</button></div>{children}</>}
+    <div className={wide?`runtime-modal-card ${styles.modalCard}`:create?`runtime-modal-card ${styles.createModalCard}`:"runtime-modal-card"}>
+      {wide?children:create?<><div className={`card-head ${styles.createModalHeader}`}>
+        <div className={styles.createModalHeading}><span className={styles.createModalSymbol} aria-hidden="true">⇄</span><div><b>{title}</b><small>{title==="New tunnel"?"Iran ⇄ Exit · Route setup":"ایران ⇄ خارج · تنظیم مسیر"}</small></div></div>
+        <button type="button" className={`icon-button ${styles.createClose}`} onClick={onClose} aria-label={title==="New tunnel"?"Close":"بستن"}>×</button>
+      </div>{children}</>:<><div className="card-head"><b>{title}</b><button type="button" className="icon-button" onClick={onClose}>×</button></div>{children}</>}
     </div>
   </div>;
 }
@@ -277,8 +280,8 @@ export function TunnelProtocolRuntimeV307(){
   const openFullProtocolManager=()=>{if(selectedTunnel&&typeof window!=="undefined")window.location.href=`/admin/modern-protocols?node=${selectedTunnel.exit_node_id}`;};
 
   return <Shell active="/admin/tunnels">
-    <div className="page legacy-control-page">
-      <div className="page-head">
+    <div className={`page legacy-control-page ${styles.tunnelPage}`}>
+      <div className={`page-head ${styles.pageHero}`}>
         <div><h1>{pick("تانل‌ها و پروتکل‌ها","Tunnels & Protocols")}</h1><small>{pick("نمای اصلی فقط وضعیت Pairها را نشان می‌دهد؛ مدیریت کامل هر Tunnel داخل پنجره جدا باز می‌شود.","The main view stays compact; full tunnel management opens in a dedicated dialog.")}</small></div>
         <div className="action-row">
           <button type="button" className="ghost" disabled={loading||Boolean(busy)} onClick={()=>void load()}>{loading?"…":pick("بروزرسانی","Refresh")}</button>
@@ -291,16 +294,16 @@ export function TunnelProtocolRuntimeV307(){
       {error&&<div className="runtime-error">{error}</div>}
       {notice&&<div className="runtime-success">{notice}</div>}
 
-      <div className="stats dashboard-stats">
+      <div className={`stats dashboard-stats ${styles.kpiGrid}`}>
         <Stat label={pick("کل Tunnelها","Total tunnels")} value={tunnels.length.toLocaleString("fa-IR")} icon="⇄"/>
         <Stat label={pick("پروتکل‌های انتخاب‌شده","Selected protocols")} value={protocols.length.toLocaleString("fa-IR")} icon="◫"/>
         <Stat label={pick("نصب‌شده","Installed")} value={activeProtocols.toLocaleString("fa-IR")} icon="✓"/>
         <Stat label={pick("سالم","Healthy")} value={healthyProtocols.toLocaleString("fa-IR")} icon="●"/>
       </div>
 
-      <Card>
+      <Card className={styles.listSurface}>
         <div className={styles.tunnelListCard}>
-          <div className="card-head"><div><b>{pick("Tunnelها","Tunnels")}</b><small>{pick("برای جزئیات و مدیریت روی دکمه مدیریت بزنید.","Open Manage for details and protocol controls.")}</small></div><Badge tone="violet">Iran → Exit</Badge></div>
+          <div className={`card-head ${styles.listHeader}`}><div><b>{pick("Tunnelها","Tunnels")}</b><small>{pick("برای جزئیات و مدیریت روی دکمه مدیریت بزنید.","Open Manage for details and protocol controls.")}</small></div><Badge tone="violet">Iran → Exit</Badge></div>
           <div className={styles.searchRow}><div className="runtime-toolbar"><label>⌕ <input value={search} onChange={event=>setSearch(event.target.value)} placeholder={pick("نام، IP یا ID...","Name, IP or ID...")}/></label></div></div>
           <div className={styles.tunnelGrid}>
             {filteredTunnels.map(tunnel=>{
@@ -354,7 +357,49 @@ export function TunnelProtocolRuntimeV307(){
         </div>
       </Modal>}
 
-      {createOpen&&<Modal title={pick("Tunnel جدید","New tunnel")} onClose={()=>!busy&&setCreateOpen(false)}><form className="runtime-form" onSubmit={createTunnel}><label>{pick("نود ایران","Iran node")}<select value={draft.iran_node_id} onChange={event=>setDraft(value=>({...value,iran_node_id:Number(event.target.value)}))}>{readyIranNodes.map(node=><option key={node.id} value={node.id}>{node.name} · {node.public_ip}</option>)}</select></label><label>{pick("نود خارج","Exit node")}<select value={draft.exit_node_id} onChange={event=>setDraft(value=>({...value,exit_node_id:Number(event.target.value)}))}>{readyExitNodes.map(node=><option key={node.id} value={node.id}>{node.name} · {node.public_ip}</option>)}</select></label><label>{pick("مسیر اولیه","Initial transport")}<select value={draft.initial_transport} onChange={event=>setDraft(value=>({...value,initial_transport:event.target.value as InitialTransport}))}><option value="tp27_fast">TP27 Fast</option><option value="spoof_wg">Spoof Tunnel</option></select></label>{draft.initial_transport==="spoof_wg"&&<><label>{pick("IP Spoof ایران","Iran spoof IP")}<input dir="ltr" value={draft.iran_spoof_ip} onChange={event=>setDraft(value=>({...value,iran_spoof_ip:event.target.value}))}/></label><label>{pick("IP Spoof خارج","Exit spoof IP")}<input dir="ltr" value={draft.exit_spoof_ip} onChange={event=>setDraft(value=>({...value,exit_spoof_ip:event.target.value}))}/></label></>}<label>{pick("اولویت","Priority")}<input type="number" value={draft.priority} onChange={event=>setDraft(value=>({...value,priority:Number(event.target.value)||100}))}/></label><div className="action-row"><button type="submit" className="primary" disabled={Boolean(busy)||!draft.iran_node_id||!draft.exit_node_id||(draft.initial_transport==="spoof_wg"&&(!draft.iran_spoof_ip.trim()||!draft.exit_spoof_ip.trim()))}>{busy==="create"?"…":pick("ساخت و نصب مسیر","Create & install")}</button></div></form></Modal>}
+      {createOpen&&<Modal create title={pick("تانل جدید","New tunnel")} onClose={()=>!busy&&setCreateOpen(false)}>
+        <form className={styles.createForm} onSubmit={createTunnel}>
+          <div className={styles.createSectionLabel}><span className={styles.createIndex}>01</span>{pick("انتخاب دو سرور","Select server pair")}</div>
+          <div className={styles.createPairGrid}>
+            <label className={styles.createField}>
+              <span className={styles.createFieldTitle}><i className={styles.createIranDot} aria-hidden="true"/>{pick("نود ایران","Iran node")}</span>
+              <select value={draft.iran_node_id} onChange={event=>setDraft(value=>({...value,iran_node_id:Number(event.target.value)}))}>
+                {readyIranNodes.map(node=><option key={node.id} value={node.id}>{node.name} · {node.public_ip}</option>)}
+              </select>
+            </label>
+            <span className={styles.createPairArrow} aria-hidden="true">⇄</span>
+            <label className={styles.createField}>
+              <span className={styles.createFieldTitle}><i className={styles.createExitDot} aria-hidden="true"/>{pick("نود خارج","Exit node")}</span>
+              <select value={draft.exit_node_id} onChange={event=>setDraft(value=>({...value,exit_node_id:Number(event.target.value)}))}>
+                {readyExitNodes.map(node=><option key={node.id} value={node.id}>{node.name} · {node.public_ip}</option>)}
+              </select>
+            </label>
+          </div>
+          <div className={styles.createDivider}/>
+          <div className={styles.createSectionLabel}><span className={styles.createIndex}>02</span>{pick("تنظیمات مسیر","Route settings")}</div>
+          <div className={styles.createSettingsGrid}>
+            <label className={styles.createField}>
+              <span className={styles.createFieldTitle}>{pick("مسیر اولیه","Initial transport")}</span>
+              <select value={draft.initial_transport} onChange={event=>setDraft(value=>({...value,initial_transport:event.target.value as InitialTransport}))}>
+                <option value="tp27_fast">TP27 Fast</option>
+                <option value="spoof_wg">Spoof Tunnel</option>
+              </select>
+            </label>
+            <label className={styles.createField}>
+              <span className={styles.createFieldTitle}>{pick("اولویت","Priority")}</span>
+              <input type="number" value={draft.priority} onChange={event=>setDraft(value=>({...value,priority:Number(event.target.value)||100}))}/>
+            </label>
+          </div>
+          {draft.initial_transport==="spoof_wg"&&<div className={styles.createSpoofGrid}>
+            <label className={styles.createField}><span className={styles.createFieldTitle}>{pick("IP Spoof ایران","Iran spoof IP")}</span><input dir="ltr" value={draft.iran_spoof_ip} onChange={event=>setDraft(value=>({...value,iran_spoof_ip:event.target.value}))}/></label>
+            <label className={styles.createField}><span className={styles.createFieldTitle}>{pick("IP Spoof خارج","Exit spoof IP")}</span><input dir="ltr" value={draft.exit_spoof_ip} onChange={event=>setDraft(value=>({...value,exit_spoof_ip:event.target.value}))}/></label>
+          </div>}
+          <div className={styles.createFooter}>
+            <button type="button" className={`ghost ${styles.createCancel}`} disabled={Boolean(busy)} onClick={()=>setCreateOpen(false)}>{pick("انصراف","Cancel")}</button>
+            <button type="submit" className={`primary ${styles.createSubmit}`} disabled={Boolean(busy)||!draft.iran_node_id||!draft.exit_node_id||(draft.initial_transport==="spoof_wg"&&(!draft.iran_spoof_ip.trim()||!draft.exit_spoof_ip.trim()))}><span aria-hidden="true">{busy==="create"?"◌":"↗"}</span>{busy==="create"?pick("در حال ساخت...","Creating..."):pick("ساخت و نصب مسیر","Create & install")}</button>
+          </div>
+        </form>
+      </Modal>}
     </div>
   </Shell>;
 }
