@@ -1,4 +1,5 @@
 from __future__ import annotations
+from starlette.concurrency import run_in_threadpool
 from ..services.public_urls import subscription_base_url, shop_base_url
 from ..xray_live_reality_sni_delivery_v1 import applied_reality_snis, rewrite_reality_sni_item
 
@@ -2146,7 +2147,8 @@ async def customer_connection_info(
         sub,
     )
 
-    return _stored_info(db, sub)
+    # Keep synchronous, potentially large credential projection off the event loop.
+    return await run_in_threadpool(_stored_info, db, sub)
 
 
 @router.get("/{subscription_id}/connection-info")
@@ -2171,10 +2173,8 @@ async def connection_info(
         sub,
     )
 
-    return _stored_info(
-        db,
-        sub,
-    )
+    # Avoid blocking all HTTP requests on synchronous ORM credential filtering.
+    return await run_in_threadpool(_stored_info, db, sub)
 
 
 
