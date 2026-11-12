@@ -18,6 +18,8 @@ PROTECTED_FILES = (
     "components/premium-revenue-chart.module.css",
     "components/admin-dashboard-server-card.tsx",
     "components/admin-dashboard-server-card.module.css",
+    "components/admin-overview-visuals.tsx",
+    "components/admin-overview-visuals.module.css",
 )
 
 
@@ -53,6 +55,22 @@ def verify_ui_release(source: Path, reference: Path, *, check_bundle: bool = Fal
     if "html[data-theme=\"light\"]" not in server_css or "prefers-reduced-motion:reduce" not in server_css:
         raise ValueError("Server chart light theme or accessibility rules are missing")
 
+    overview = (source / PROTECTED_FILES[5]).read_text(encoding="utf-8")
+    overview_css = (source / PROTECTED_FILES[6]).read_text(encoding="utf-8")
+    if not all(marker in dashboard for marker in (
+        "OverviewKpiCard", "OperationalHealthVisual", "tunnelsLoaded", "nodesLoaded"
+    )):
+        raise ValueError("Premium admin KPIs or service health status are no longer mounted")
+    if not all(marker in overview for marker in (
+        "function HealthRow", "export function OperationalHealthVisual",
+        "export function OverviewKpiCard", "safeFraction", "aria-valuetext"
+    )):
+        raise ValueError("Premium admin overview status logic is missing")
+    if not all(marker in overview_css for marker in (
+        'html[data-theme="light"]', "prefers-reduced-motion:reduce", ".healthTrack", ".kpiValue"
+    )):
+        raise ValueError("Admin overview light theme or accessibility styles are missing")
+
     if check_bundle:
         bundle = source / ".next/standalone/.next/static"
         if not bundle.is_dir():
@@ -67,6 +85,11 @@ def verify_ui_release(source: Path, reference: Path, *, check_bundle: bool = Fal
             for path in bundle.rglob("*.js")
         ):
             raise ValueError("Compiled production assets are missing the live server resource charts")
+        if not any(
+            b"Service health" in path.read_bytes() or "وضعیت سرویس‌ها".encode("utf-8") in path.read_bytes()
+            for path in bundle.rglob("*.js")
+        ):
+            raise ValueError("Compiled production assets are missing premium KPIs and operational service health")
 
 
 def main() -> None:
