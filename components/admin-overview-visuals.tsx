@@ -100,9 +100,6 @@ export function OperationalHealthVisual({pick,nodeOnline,nodeTotal,tunnelOnline,
           <span>{pick("دسترسی نودها","Node availability")}</span>
         </div>
       </div>
-      <div className={styles.healthHeroText}>
-        <b>{headTitle}</b>
-      </div>
     </div>
     <div className={styles.healthList}>
       {lines.map(item=><HealthRow key={item.type} line={item} pick={pick}/>)}
