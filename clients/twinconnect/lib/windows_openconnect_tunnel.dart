@@ -183,7 +183,9 @@ class WindowsOpenConnectTunnel {
         } catch (_) {
           // No green/connected state before real HTTPS egress.
         }
-        await Future<void>.delayed(const Duration(milliseconds: 850));
+        // No fixed ~1s penalty after every RAS/route check; the real
+        // HTTPS exit probe and native status remain mandatory.
+        await Future<void>.delayed(const Duration(milliseconds: 300));
       }
       throw const FormatException('CISCO_EGRESS_NOT_VERIFIED');
     } catch (_) {
