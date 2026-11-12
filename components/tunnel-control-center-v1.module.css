@@ -14,3 +14,51 @@
 @media(max-width:1100px){.workspace{grid-template-columns:1fr}.sidebar{position:static;max-height:none}.tunnelList{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));max-height:340px}.controlBar{grid-template-columns:repeat(2,1fr)}.controlBar>div:not(.controlActions){border-left:0}.controlActions{grid-column:1/-1;justify-content:flex-start}}
 @media(max-width:780px){.hero{align-items:stretch;flex-direction:column;padding:20px}.heroActions{width:100%}.heroActions>*{flex:1}.stats{grid-template-columns:repeat(2,1fr)}.tunnelList{grid-template-columns:1fr}.topology{grid-template-columns:1fr}.linkBox{min-height:95px}.linkLine{transform:rotate(90deg);max-width:70px}.candidateGrid{grid-template-columns:1fr}.controlBar{grid-template-columns:1fr}.controlActions{grid-column:auto}.controlActions>*{flex:1}.topologyHead,.sectionHead{align-items:flex-start;flex-direction:column}.topologyActions{width:100%;justify-content:space-between}.inlineFields{grid-template-columns:1fr}}
 @media(max-width:520px){.page{gap:13px}.hero h1{font-size:25px}.stats{grid-template-columns:1fr 1fr;gap:8px}.metric{min-height:76px;padding:13px}.metric b{font-size:20px}.topologyCard{padding:14px}.candidateCard{padding:13px}.cardActions>*{flex:1}.createFooter>*{flex:1}}
+
+/* Logical-pair selector is portaled directly to body so the fixed dialog
+   cannot be clipped by the hero's overflow/isolation/blur stacking context. */
+.modal{
+  position:fixed!important;inset:0!important;z-index:6000!important;
+  isolation:isolate;display:grid;place-items:center;padding:clamp(12px,3vw,24px);
+  overflow-y:auto;overscroll-behavior:contain;
+}
+.modalBackdrop{
+  position:fixed!important;inset:0!important;z-index:0!important;
+  background:rgba(5,9,18,.68)!important;backdrop-filter:blur(7px);
+  -webkit-backdrop-filter:blur(7px);
+}
+.modalCard{
+  position:relative!important;z-index:1!important;
+  width:min(560px,100%)!important;max-height:calc(100dvh - 36px)!important;
+  overflow-y:auto!important;overscroll-behavior:contain;
+  padding:clamp(16px,2.5vw,24px)!important;
+  background:var(--surface)!important;color:var(--text)!important;
+  border:1px solid var(--line)!important;
+  box-shadow:0 26px 75px rgba(0,0,0,.33)!important;
+  opacity:1!important;
+}
+.modalHead{
+  position:sticky;top:-24px;z-index:2;padding:4px 0 12px;
+  background:var(--surface);border-bottom:1px solid var(--line);
+}
+.createIntro{
+  background:color-mix(in srgb,var(--purple) 7%,var(--surface));
+  border-color:color-mix(in srgb,var(--purple) 22%,var(--line));
+}
+.createIntro b{color:var(--text);}
+.createIntro p{color:var(--muted);}
+.createForm label>span{color:var(--muted);font-size:11px;font-weight:750;}
+.createForm select,.createForm input{
+  min-height:42px;border-color:var(--line)!important;
+  background:var(--surface2)!important;color:var(--text)!important;
+}
+.createFooter{
+  position:sticky;bottom:-24px;z-index:2;padding:12px 0 3px;
+  background:var(--surface);border-top:1px solid var(--line);
+}
+@media(max-width:560px){
+  .modal{padding:10px;}
+  .modalCard{max-height:calc(100dvh - 20px)!important;border-radius:16px;}
+  .modalHead{top:-16px;}
+  .createFooter{bottom:-16px;}
+}
