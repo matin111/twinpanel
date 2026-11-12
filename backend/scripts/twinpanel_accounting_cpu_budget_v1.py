@@ -14,7 +14,7 @@ import re
 import subprocess
 
 SERVICE = "twinpanel-modern-accounting.service"
-MAX_QUOTA_PERCENT = 400
+MAX_QUOTA_PERCENT = 250
 MIN_QUOTA_PERCENT = 75
 CORE_PERCENT = 25
 
@@ -52,6 +52,7 @@ def inspect() -> dict:
         "service": SERVICE, "cores": cores, "target_quota_percent": target,
         "current_quota_percent": current, "service_active": active == "active",
         "needs_increase": current is not None and current < target,
+        "needs_adjustment": current is not None and current != target,
     }
 
 
@@ -61,13 +62,13 @@ def apply() -> dict:
     report = inspect()
     if not report["service_active"]:
         raise RuntimeError("ACCOUNTING_CPU_BUDGET_SERVICE_NOT_ACTIVE")
-    if report["needs_increase"]:
+    if report["needs_adjustment"]:
         # No restart: systemd updates cgroup cpu.max in place. Persist the
-        # minimum required headroom on this controller across reboots.
+        # stable CPU headroom budget on this controller across reboots.
         run(["systemctl", "set-property", SERVICE,
              f"CPUQuota={report['target_quota_percent']}%"])
     after = inspect()
-    if after["needs_increase"]:
+    if after["needs_adjustment"]:
         raise RuntimeError("ACCOUNTING_CPU_BUDGET_VERIFY_FAILED")
     return after
 
