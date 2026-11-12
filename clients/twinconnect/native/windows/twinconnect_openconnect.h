@@ -11,35 +11,55 @@
 #include <cstdint>
 #include <algorithm>
 #include <cctype>
+#include <cwctype>
 
 namespace twinconnect_openconnect {
 
 // Only the route chosen for the VPN's own verified egress is measured.
 // Capturing the pre-VPN route prevents presenting Wi-Fi/system traffic as VPN.
-inline DWORD& BaselineRouteIndex() { static DWORD index = 0; return index; }
-inline bool EgressInterface(DWORD* index) {
-  if (!index) return false;
-  // 1.1.1.1 has identical host- and network-order DWORD representation,
-  // so GetBestInterface needs no Winsock declarations or byte swapping.
-  DWORD found = 0;
-  if (GetBestInterface(0x01010101u, &found) != NO_ERROR || found == 0)
-    return false;
-  *index = found;
-  return true;
-}
+// Explicitly bind statistics to OpenConnect's tunnel adapter rather than
+// a public-IP route; split routes and existing default routes may not change.
 inline bool Running();
 struct TrafficTotals { uint64_t received; uint64_t sent; };
+
+inline bool CiscoAdapterName(const wchar_t* text) {
+  if (!text || !*text) return false;
+  std::wstring name(text);
+  std::transform(name.begin(), name.end(), name.begin(), ::towlower);
+  return name.find(L"tap-windows") != std::wstring::npos ||
+         name.find(L"openconnect") != std::wstring::npos ||
+         name.find(L"vpn client adapter") != std::wstring::npos;
+}
+
 inline bool ReadTraffic(TrafficTotals* totals) {
   if (!totals || !Running()) return false;
-  DWORD index = 0;
-  if (!EgressInterface(&index) || BaselineRouteIndex() == 0 ||
-      index == BaselineRouteIndex()) return false;
-  MIB_IF_ROW2 row = {};
-  row.InterfaceIndex = index;
-  if (GetIfEntry2(&row) != NO_ERROR || row.OperStatus != IfOperStatusUp)
-    return false;
-  totals->received = static_cast<uint64_t>(row.InOctets);
-  totals->sent = static_cast<uint64_t>(row.OutOctets);
+  MIB_IF_TABLE2* table = nullptr;
+  if (GetIfTable2(&table) != NO_ERROR || !table) return false;
+  DWORD candidate = 0;
+  uint64_t received = 0, sent = 0;
+  DWORD route = 0;
+  // The default route is only a tie-breaker; it is not required for split VPN.
+  GetBestInterface(0x01010101u, &route);
+  for (ULONG i = 0; i < table->NumEntries; ++i) {
+    const auto& row = table->Table[i];
+    if (row.OperStatus != IfOperStatusUp ||
+        (!CiscoAdapterName(row.Alias) && !CiscoAdapterName(row.Description)))
+      continue;
+    if (candidate != 0 && route != row.InterfaceIndex &&
+        route != candidate) {
+      candidate = 0;  // Multiple tunnel-like NICs: fail closed.
+      break;
+    }
+    if (candidate == 0 || route == row.InterfaceIndex) {
+      candidate = row.InterfaceIndex;
+      received = static_cast<uint64_t>(row.InOctets);
+      sent = static_cast<uint64_t>(row.OutOctets);
+    }
+  }
+  FreeMibTable(table);
+  if (!candidate) return false;
+  totals->received = received;
+  totals->sent = sent;
   return true;
 }
 inline HANDLE& Child() { static HANDLE process = nullptr; return process; }
@@ -262,8 +282,7 @@ inline bool Start(const std::string& executableUtf8,
   }
   InterlockedExchange(&Failure(), kUnknown);
   InterlockedExchange(&Authenticated(), 0);
-  DWORD initialRoute = 0;
-  BaselineRouteIndex() = EgressInterface(&initialRoute) ? initialRoute : 0;
+
   std::wstring command = Quote(executable) +
       L" --protocol=anyconnect --non-inter --passwd-on-stdin --no-proxy" +
       L" --user=" + Quote(FromUtf8(user)) +
