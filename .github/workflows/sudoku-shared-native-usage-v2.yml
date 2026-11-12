@@ -1,0 +1,28 @@
+name: Sudoku Shared Native Byte Accounting V2
+on:
+  pull_request:
+    paths:
+      - 'backend/app/services/sudoku_shared_native_presence_v1.py'
+      - 'backend/scripts/twinpanel_sudoku_fast_presence_worker.py'
+      - 'backend/tests/sudoku_shared_native_presence_v1_smoke.py'
+      - '.github/workflows/sudoku-shared-native-usage-v2.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'backend/app/services/sudoku_shared_native_presence_v1.py'
+      - 'backend/scripts/twinpanel_sudoku_fast_presence_worker.py'
+      - 'backend/tests/sudoku_shared_native_presence_v1_smoke.py'
+jobs:
+  safe-native-metering:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Dependencies
+        run: pip install -r backend/requirements.txt
+      - name: Verify per-identity native byte counters and epoch
+        run: PYTHONPATH=backend python backend/tests/sudoku_shared_native_presence_v1_smoke.py
