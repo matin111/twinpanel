@@ -35,3 +35,77 @@
 .tbs-alert{border-radius:13px;padding:12px 15px;margin-bottom:15px;font-size:12px}.tbs-error{background:#e34f6320;border:1px solid #e34f6359;color:#ff9cab}.tbs-success{background:#20c88d20;border:1px solid #20c88d55;color:#55dfb6}.tbs-loading{padding:65px;text-align:center;color:var(--muted)}
 @media(max-width:950px){.tbs-layout{grid-template-columns:1fr}.tbs-preview{position:static}.tbs-device{min-height:475px}.tbs-page{padding:18px 12px}}
 @media(max-width:600px){.tbs-hero{align-items:flex-start;gap:12px}.tbs-hero-icon{width:45px;height:45px;flex-basis:45px;border-radius:14px}.tbs-hero h1{font-size:23px}.tbs-active{display:none}.tbs-tenant{flex-direction:column;align-items:stretch}.tbs-tenant select{min-width:0;max-width:none}.tbs-panel{padding:20px 14px}.tbs-colors{grid-template-columns:1fr}.tbs-tabs button{font-size:10px;padding:12px 3px}.tbs-tabs button span{margin-left:4px}.tbs-upload{flex-direction:column;text-align:center;padding:19px}.tbs-upload-copy button{justify-self:center}.tbs-actions{flex-direction:column;align-items:stretch}.tbs-actions>div{justify-content:space-between}.tbs-actions button{flex:1}}
+
+/* TwinConnect Brand Studio: theme-aware UI, without affecting the app preview theme. */
+.tbs-page{
+ --tbs-pane:linear-gradient(145deg,#1b2437,#111827);
+ --tbs-line:rgba(140,157,191,.25);
+ --tbs-ink:#edf2fc;
+ --tbs-muted:#aebbd2;
+ --tbs-input:#111a2c;
+ --tbs-input-border:#3b4762;
+ --tbs-highlight:#2d3961;
+ color:var(--tbs-ink);
+}
+.tbs-page .tbs-hero h1{color:var(--text)}
+.tbs-page .tbs-hero p,.tbs-page .tbs-kicker{color:var(--muted)}
+.tbs-page .tbs-tenant,.tbs-page .tbs-editor,.tbs-page .tbs-preview{color:var(--tbs-ink)}
+.tbs-page .tbs-section-head p,.tbs-page .tbs-preview-head small,.tbs-page .tbs-preview-note,
+.tbs-page .tbs-field small,.tbs-page .tbs-tenant small,.tbs-page .tbs-actions>span,
+.tbs-page .tbs-upload-copy p,.tbs-page .tbs-tabs button:not(.selected){color:var(--tbs-muted)}
+.tbs-page select,.tbs-page input:not([type=color]):not([type=file]){
+ background:var(--tbs-input);color:var(--tbs-ink);border-color:var(--tbs-input-border);
+}
+.tbs-page .tbs-readonly{background:var(--tbs-input);border-color:var(--tbs-input-border)}
+.tbs-page .tbs-tabs button.selected{background:var(--tbs-highlight);color:var(--tbs-ink)}
+.tbs-page .tbs-tabs button:hover{color:var(--tbs-ink)}
+.tbs-page .tbs-color-field{border-color:var(--tbs-line)}
+.tbs-page .tbs-reset{color:var(--tbs-ink)}
+html[data-theme="light"] .tbs-page{
+ --tbs-pane:linear-gradient(150deg,#fff 0%,#f9fbff 100%);
+ --tbs-line:#dce4f1;
+ --tbs-ink:#1d2940;
+ --tbs-muted:#61718b;
+ --tbs-input:#f5f8fe;
+ --tbs-input-border:#ccd7ea;
+ --tbs-highlight:#e8eeff;
+}
+html[data-theme="light"] .tbs-page .tbs-tenant,
+html[data-theme="light"] .tbs-page .tbs-editor,
+html[data-theme="light"] .tbs-page .tbs-preview{
+ box-shadow:0 12px 35px rgba(37,54,89,.07);
+}
+html[data-theme="light"] .tbs-page .tbs-kicker{color:#4d60c6}
+html[data-theme="light"] .tbs-page .tbs-tabs button.selected{border-color:#b4c6fa;color:#33469d}
+html[data-theme="light"] .tbs-page .tbs-upload{background:linear-gradient(135deg,#f2f5ff,#edfafd);border-color:#b3bff3}
+html[data-theme="light"] .tbs-page .tbs-upload:hover{background:#e9efff}
+html[data-theme="light"] .tbs-page .tbs-upload-copy small{color:#647691}
+html[data-theme="light"] .tbs-page .tbs-actions{background:#f6f9fe}
+html[data-theme="light"] .tbs-page .tbs-active{background:#d9f7eb;color:#097755;border-color:#9be2c6}
+html[data-theme="light"] .tbs-page .tbs-text-action{color:#ad3752}
+html[data-theme="light"] .tbs-page .tbs-preview-head>span{background:#e7f8ee;color:#137c58}
+.tbs-preview{display:flex;flex-direction:column;align-items:stretch}
+.tbs-device{
+ width:min(100%,360px);
+ max-width:360px;
+ aspect-ratio:9 / 19.5;
+ min-height:0;
+ height:auto;
+ box-sizing:border-box;
+ display:flex;flex-direction:column;
+ padding:17px 18px 15px;
+ border-radius:42px;
+ flex-shrink:0;
+}
+.tbs-device-brand{margin-top:18px}
+.tbs-connect-orb{margin-top:auto;width:clamp(104px,10vw,136px);height:auto;aspect-ratio:1}
+.tbs-connect-orb>span{width:73%;height:73%}
+.tbs-connection-sub{margin-bottom:auto}
+.tbs-server{margin:5px 0;padding:10px}
+.tbs-device-bottom{margin-top:16px}
+@media(max-width:950px){
+ .tbs-device{width:min(100%,360px);aspect-ratio:9 / 19.5;min-height:0}
+}
+@media(max-width:600px){
+ .tbs-device{width:min(100%,340px);border-width:5px}
+}
