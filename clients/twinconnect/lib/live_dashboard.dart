@@ -222,6 +222,12 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     ? _nodePings[node.id] : node.latencyMs;
 
   int? get _connectedServerRtt {
+    if (_modernUp && _modernProtocol == 'v2ray' &&
+        _selectedXrayNodeId != null && _selectedXrayInboundId != null) {
+      final value = _xrayInboundRtts[
+          '${_selectedXrayNodeId!}:${_selectedXrayInboundId!}'];
+      if (value != null) return value;
+    }
     if ((!_vpnUp && !_modernUp) || (_modernUp ? _modernNodeId : _activeNodeId) == null) return null;
     final nodes = widget.servers?.servers;
     if (nodes == null) return null;
@@ -3030,7 +3036,10 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                   const SizedBox(height: 5),
                   Text(_vpnVerified && _httpsLatencyMs != null
                     ? 'HTTPS: $_httpsLatencyMs ms'
-                    : tr('زمان پاسخ ICMP', 'ICMP round-trip time'),
+                    : _modernUp && _modernProtocol == 'v2ray' &&
+                          _connectedServerRtt != null
+                          ? tr('زمان برقراری TCP اینباند', 'Inbound TCP handshake time')
+                          : tr('زمان پاسخ ICMP', 'ICMP round-trip time'),
                     style: TextStyle(fontSize: 10, color: sub)),
                 ],
               ),
