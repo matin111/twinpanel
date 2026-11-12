@@ -9,6 +9,7 @@ void main() {
       protocol: 'v2ray',
       item: const <String, dynamic>{},
       xraySocksPort: 19768,
+      xrayEndpointIPv4: '203.0.113.45',
     );
     final outbounds = config['outbounds'] as List;
     final bridge = outbounds.single as Map;
@@ -20,6 +21,7 @@ void main() {
     expect(tun['type'], 'tun');
     expect(tun['auto_route'], true);
     expect(tun['strict_route'], true);
+    expect(tun['route_exclude_address'], ['203.0.113.45/32']);
     final dns = config['dns'] as Map;
     expect(dns['final'], 'dns-remote');
     final routes = config['route'] as Map;
@@ -37,6 +39,25 @@ void main() {
     ), throwsFormatException);
   });
 
+  test('Xray bridge never accepts missing or broad route exceptions', () {
+    expect(() => SingBoxWindowsConfig.compose(
+      protocol: 'v2ray', item: const <String, dynamic>{},
+      xraySocksPort: 19768,
+    ), throwsFormatException);
+    expect(() => SingBoxWindowsConfig.compose(
+      protocol: 'v2ray', item: const <String, dynamic>{},
+      xraySocksPort: 19768, xrayEndpointIPv4: '10.0.0.1',
+    ), throwsFormatException);
+    final ordinary = SingBoxWindowsConfig.compose(
+      protocol: 'v2ray',
+      item: const <String, dynamic>{},
+      xraySocksPort: 19768,
+      xrayEndpointIPv4: '203.0.113.45',
+    );
+    expect(ordinary['route']?['final'], 'proxy');
+    expect((ordinary['inbounds'] as List).single['strict_route'], true);
+  });
+
   test('real connection path checks both remote exit and post-TUN route', () {
     final xray = File('lib/windows_xray_proxy.dart').readAsStringSync();
     final tunnel = File('lib/windows_singbox_tunnel.dart').readAsStringSync();
@@ -46,6 +67,7 @@ void main() {
     expect(tunnel, contains('xraySocksPort'));
     expect(tunnel, contains('ip != before && ip == verifiedProxyIp'));
     expect(dashboard, contains('_startXrayTunnel'));
+    expect(dashboard, contains('xrayEndpointIPv4: pinnedEndpointIPv4'));
     // Inbounds are direct-selectable server rows: no extra modal.
     expect(dashboard, isNot(contains('showDialog<XrayInboundProfile>')));
     expect(dashboard, contains('xrayInboundRow(i, inbound)'));
