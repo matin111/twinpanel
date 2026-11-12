@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.808",
+  "version": "1.1.0-rc.809",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-12T18:45:47Z",
+  "released_at": "2026-11-12T18:58:15Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "15572c5ce0da2b6b812a11e2fca5bd51a97b5c3f",
+  "source_sha": "91bbf00b3ad1aadfd0916a97f2ec6b5bc632e82f",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.808/twinpanel-1.1.0-rc.808-linux-x86_64.tar.gz",
-    "sha256": "9d230b067d6c1ae0f938458eb618b8b29a5d8566b56df1b4acf694596034dea3",
-    "size_bytes": 30667166
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.809/twinpanel-1.1.0-rc.809-linux-x86_64.tar.gz",
+    "sha256": "0484f4b37f8115367ae6304b8a56bf826b16994014ebbbb642df634024095e4d",
+    "size_bytes": 30667508
   },
   "notes": {
-    "fa": "کاهش ریشه‌ای فشار CPU و دیتابیس: صف‌بندی سراسری ثبت گروهی نودها با قفل مشترک بدون ایجاد صف کاربر، حداکثر یک نود سنگین هم‌زمان، سقف مصرف CPU کل پروسه و زیرپردازش‌های ثبت گروهی ۲۰۰٪، حفظ قفل مستقل هر نود و تحویل کانفیگ‌های موجود. حسابداری CPU به طور ماندگار محدود شده است.",
-    "en": "Prevent multi-node central bulk provisioning storms with crash-safe fleet-wide serial admission, while retaining per-node locks and existing delivery. Limit each detached stage and all family adapters to 200% CPU. Preserve VPN data and connectivity."
+    "fa": "رفع ریشه‌ای فشار CPU در TwinPanel: قفل سراسری ثبت گروهی نودها قبل از بارگذاری پایتون و دیتابیس برای جلوگیری از جهش CPU هنگام شروع چند نود، صف‌بندی امن با قفل مشترک، سهمیه CPU دو هسته برای کل پردازش نود و زیرپردازش‌ها؛ تثبیت سقف ۲٫۵ هسته برای حسابداری با جلوگیری از بازنشانی خودکار به چهار هسته. بدون تغییر داده کاربران، سهمیه‌ها یا کانفیگ پروتکل‌ها.",
+    "en": "Fix fleet CPU overload at the root by locking global staging before Python imports, serializing node bulk provisioning safely while keeping per-node isolation and a 200% stage CPU quota. Persist 250% accounting CPU cap and prevent updater budget re-escalation to 400%. No VPN data or configuration changes."
   }
 }
