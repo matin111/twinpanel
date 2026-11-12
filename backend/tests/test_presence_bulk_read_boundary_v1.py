@@ -59,6 +59,34 @@ class CleanPresenceReadBoundary(unittest.TestCase):
         self.assertIn("build_accounting_devices_by_node(db)",
                       inspect.getsource(batch.build_node_devices_cached))
 
+    def test_scoped_builder_executes_database_protocol_filter(self):
+        from unittest.mock import MagicMock,patch
+        from app.services import accounting_device_map_batch_v1 as batch
+        db=MagicMock()
+        db.query.return_value.filter.return_value.order_by.return_value.all.return_value=[]
+        with (patch.object(batch,"_candidate_node_ids",return_value=[19]),
+              patch.object(batch,"is_openvpn_central_pki_enabled",return_value=False)):
+            actual=batch.build_presence_devices_for_protocols(
+                db,source_protocols={"sudoku"})
+        self.assertEqual(actual,{19:[]})
+        filter_expressions=[
+            str(call.args[0]) for call in
+            db.query.return_value.filter.call_args_list
+        ]
+        self.assertTrue(any("protocol_credentials.protocol IN" in x
+                            for x in filter_expressions))
+        self.assertTrue(any("protocol_credentials.is_active" in x
+                            for x in filter_expressions))
+
+    def test_scoped_builder_rejects_invalid_or_empty_source_protocol(self):
+        from unittest.mock import MagicMock,patch
+        from app.services import accounting_device_map_batch_v1 as batch
+        with patch.object(batch,"_candidate_node_ids",return_value=[19]):
+            for source in (set(),{"not-real-protocol"}):
+                with self.assertRaisesRegex(ValueError,"ACCOUNTING_SOURCE_PROTOCOL_SCOPE_INVALID"):
+                    batch.build_presence_devices_for_protocols(
+                        MagicMock(),source_protocols=source)
+
     def test_guarded_shared_read_helper_preserves_pending_mutations(self):
         from app.services import accounting_device_map_batch_v1 as batch
         class Fake:
