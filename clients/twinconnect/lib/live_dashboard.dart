@@ -376,6 +376,10 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         _stopModernTrafficMonitoring();
         if (_ciscoTunnel.isRunning) {
           await _ciscoTunnel.stop();
+        } else if (_openVpnTunnel.hasChild) {
+          await _openVpnTunnel.stop();
+        } else if (_l2tpTunnel.hasChild) {
+          await _l2tpTunnel.stop();
         } else if (_modernTunnel.isRunning) {
           await _modernTunnel.stop();
         }
