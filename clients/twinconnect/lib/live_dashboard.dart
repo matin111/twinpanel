@@ -1265,17 +1265,21 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     // removing the working tunnel. A failed preflight keeps it running.
     setState(() { _vpnBusy = true; _vpnError = null; });
     try {
+      final api = TenantApi.fromBuildConfig();
       final checks = await Future.wait<Object>([
         _vpnPolicy.load(widget.panel.namespace, widget.username),
         NativeVpnBridge.probe(),
+        // The same fresh authenticated catalog is reused by bootstrap.
+        // No extra catalog request is made after native readiness.
+        api.loadSessionProtocolCatalog(
+          panel: widget.panel, sessionToken: widget.sessionToken),
       ]);
       final policy = checks[0] as VpnPolicy;
       final capabilities = checks[1] as NativeVpnCapabilities;
       final native = await NativeVpnBridge.protocolReadiness(
         validatedCapabilities: capabilities,
       );
-      final candidate = await ConnectionBootstrap(
-          api: TenantApi.fromBuildConfig()).prepare(
+      final candidate = await ConnectionBootstrap(api: api).prepare(
         panel: widget.panel,
         sessionToken: widget.sessionToken,
         serverId: targetId,
@@ -1283,6 +1287,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         policy: policy,
         capabilities: capabilities,
         nativeProtocols: native,
+        currentAttemptCatalog: Future<PanelProtocolCatalog>.value(
+            checks[2] as PanelProtocolCatalog),
       );
       final node = WindowsWireGuardController.configForSingleNode(
           candidate.profiles, targetId);
@@ -1558,17 +1564,19 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         // Policy storage and native OS readiness are independent.
         // Probe both concurrently, then reuse the SAME native capability
         // snapshot for the mandatory per-protocol readiness gate.
+        final api = TenantApi.fromBuildConfig();
         final checks = await Future.wait<Object>([
           _vpnPolicy.load(widget.panel.namespace, widget.username),
           NativeVpnBridge.probe(),
+          api.loadSessionProtocolCatalog(
+            panel: widget.panel, sessionToken: widget.sessionToken),
         ]);
         final policy = checks[0] as VpnPolicy;
         final capabilities = checks[1] as NativeVpnCapabilities;
         final native = await NativeVpnBridge.protocolReadiness(
           validatedCapabilities: capabilities,
         );
-        final candidate = await ConnectionBootstrap(
-            api: TenantApi.fromBuildConfig()).prepare(
+        final candidate = await ConnectionBootstrap(api: api).prepare(
           panel: widget.panel,
           sessionToken: widget.sessionToken,
           serverId: selectedId,
@@ -1576,6 +1584,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           policy: policy,
           capabilities: capabilities,
           nativeProtocols: native,
+          currentAttemptCatalog: Future<PanelProtocolCatalog>.value(
+              checks[2] as PanelProtocolCatalog),
         );
         final node = WindowsWireGuardController.configForSingleNode(
             candidate.profiles, selectedId);
