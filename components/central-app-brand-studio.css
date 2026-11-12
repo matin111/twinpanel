@@ -151,3 +151,26 @@ html[data-theme="light"] .tbs-page .tbs-preview-head>span{background:#e7f8ee;col
  .tbs-server small{font-size:8px}
  .tbs-device-bottom{font-size:14px}
 }
+
+/* Tablet preview requires actual horizontal room; never squeeze into sidebar. */
+.tbs-layout{grid-template-columns:minmax(0,1fr);align-items:stretch}
+.tbs-preview{position:static;max-width:none;width:100%;display:grid;grid-template-columns:minmax(0,1fr);justify-items:center;padding:24px}
+.tbs-preview-head{width:100%;max-width:760px;justify-self:center}
+.tbs-device{width:min(100%,760px);max-width:760px;aspect-ratio:4 / 3;
+  grid-template-rows:24px 68px minmax(120px,1fr) auto 38px;
+  padding:20px 28px;gap:10px 22px;overflow:hidden}
+.tbs-preview-note{width:min(100%,760px)}
+.tbs-device-brand{margin:0}
+.tbs-connect-orb{width:clamp(100px,15vw,156px)}
+.tbs-connect-orb>span{font-size:clamp(28px,4vw,48px)}
+.tbs-connection-label{font-size:14px}
+.tbs-server{min-height:54px;padding:12px}
+.tbs-server b{font-size:12px}
+.tbs-server small{font-size:10px}
+@media(max-width:600px){
+ .tbs-preview{padding:12px}
+ .tbs-device{width:100%;padding:12px;gap:6px 10px;
+   grid-template-rows:18px 45px minmax(80px,1fr) auto 26px}
+ .tbs-connect-orb{width:clamp(76px,25vw,110px)}
+ .tbs-server{min-height:40px;padding:7px}
+}
