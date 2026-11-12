@@ -45,7 +45,7 @@ class AdminDashboardNetworkPanelsTests(unittest.TestCase):
                      'NETWORK TRANSPORTS','PROTOCOL COVERAGE','fleetSummary'):
             self.assertIn(text,GUARD)
         self.assertIn('<TunnelMonitor tunnels={tunnels} nodes={nodes} loaded={tunnelsLoaded} pick={pick}/>',DASH)
-        self.assertIn('classify(status:unknown)',NETWORK)
+        self.assertIn('const classify=(status:unknown)',NETWORK)
 
 if __name__=="__main__":
     unittest.main()
