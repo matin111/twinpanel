@@ -62,7 +62,7 @@ async function requestOrigin(){
 async function getJson(url:string):Promise<JsonRecord>{
   if(!url)return {};
   try{
-    const response=await fetch(url,{cache:"no-store",headers:{Accept:"application/json"}});
+    const response=await fetch(url,{cache:"no-store",headers:{Accept:"application/json"},signal:AbortSignal.timeout(2500)});
     if(!response.ok)return {};
     return record(await response.json());
   }catch{return {};}
