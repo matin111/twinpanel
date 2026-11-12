@@ -6,6 +6,7 @@ import {AdminOperationFeedback} from "./admin-operation-feedback";
 import {AdminTrialSettings} from "./admin-trial-settings";
 import {LegacyNodesRuntimePage} from "./legacy-nodes-runtime-v2";
 import {LicenseCenter} from "./license-center";
+import {CentralAppBrandManager} from "./central-app-brand-manager";
 import {NodeAddModalBridge} from "./node-add-modal-bridge";
 import {ResellerTrialSettings} from "./reseller-trial-settings";
 import {RoutedPageClient as BaseRoutedPageClient} from "./routed-page-client";
@@ -21,6 +22,8 @@ export function RoutedPageClient({routeKey}:{routeKey:string}){
   if(routeKey==="admin"){
     return <><BaseRoutedPageClient routeKey={routeKey}/><AdminDashboardServerCard/></>;
   }
+  if(routeKey==="admin/smart-app")return admin(<CentralAppBrandManager role="admin"/>);
+  if(routeKey==="reseller/smart-app")return <CentralAppBrandManager role="reseller"/>;
   if(routeKey==="admin/license"){
     return admin(<LicenseCenter/>);
   }
