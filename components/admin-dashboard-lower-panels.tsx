@@ -93,8 +93,9 @@ function ResourceMeter({name,value}:{name:string;value:number|null}){
 export function ServerFleetVisual({nodes,health,loaded,pick}:{
  nodes:AdminNode[];health:Record<number,RuntimeRow>;loaded:boolean;pick:Pick;
 }){
+ const onlineCount=nodes.filter(node=>String(node.status||"").toLowerCase()==="online").length;
  return <section className={styles.fleet}>
-  <div className={styles.top}><div className={styles.heading}><span className={styles.eyebrow}>{pick("زیرساخت","INFRASTRUCTURE")}</span><h3>{pick("وضعیت سرورها","Server fleet")}</h3><small>{pick("وضعیت نودها، ظرفیت و منابع گزارش‌شده","Node status, capacity and reported resources")}</small></div><Link href="/admin/nodes" className={styles.more}>{pick("مدیریت سرورها","Manage servers")} ↗</Link></div>
+  <div className={styles.top}><div className={styles.heading}><span className={styles.eyebrow}>{pick("زیرساخت","INFRASTRUCTURE")}</span><h3>{pick("وضعیت سرورها","Server fleet")}</h3><small>{pick("وضعیت نودها، ظرفیت و منابع گزارش‌شده","Node status, capacity and reported resources")}</small></div><div className={styles.fleetActions}><span className={styles.fleetSummary}><i/>{loaded?num(onlineCount)+" / "+num(nodes.length):"—"} {pick("نود آنلاین","nodes online")}</span><Link href="/admin/nodes" className={styles.more}>{pick("مدیریت سرورها","Manage servers")} ↗</Link></div></div>
   <div className={styles.nodeGrid}>{nodes.slice(0,6).map(n=>{
    const row=n as unknown as RuntimeRow,h=health[n.id]||{};
    const status=String(n.status||"").toLowerCase(),state=status==="online"?"online":status==="offline"?"offline":"unknown";
@@ -109,7 +110,11 @@ export function ServerFleetVisual({nodes,health,loaded,pick}:{
     <div className={styles.nodeHead}><span className={styles.country} aria-hidden="true">{flag(n.country_code)}</span><div className={styles.nodeName}><b>{n.name}</b><small dir="ltr">{n.public_ip||n.country_code||"—"}</small></div><span className={styles.nodeStatus}><i/>{state==="online"?pick("آنلاین","Online"):state==="offline"?pick("آفلاین","Offline"):pick("نامشخص","Unknown")}</span></div>
     <div className={styles.capacity}><div><span>{pick("کاربران نود","Node users")}</span><b dir="ltr">{use?num(used!):"—"} / {cap?num(capacity!):pick("نامحدود","Unlimited")}</b></div><div className={styles.track}><i style={{width:(fullness??0)+"%"}}/></div><small>{fullness==null?pick("ظرفیت محدود ثبت نشده","No finite capacity"):percentText(fullness)+" "+pick("ظرفیت","capacity")}</small></div>
     <div className={styles.resources}><ResourceMeter name="CPU" value={cpu}/><ResourceMeter name="RAM" value={ram}/><ResourceMeter name="Disk" value={disk}/></div>
-    <div className={styles.nodeFoot}><span>{last&&!Number.isNaN(last.getTime())?pick("آخرین گزارش","Last seen")+": "+last.toLocaleString(pick("fa-IR","en-US"),{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"}):pick("پایش منابع نود","Node resource telemetry")}</span><Link href="/admin/nodes" aria-label={pick("مدیریت نود","Manage node")+" "+n.name}>↗</Link></div>
+    <div className={styles.nodeFoot}>
+      <span className={styles.nodeRole} data-role={String(n.node_type||"").toLowerCase()==="iran"?"iran":"exit"}>{String(n.node_type||"").toLowerCase()==="iran"?pick("ورودی ایران","Iran ingress"):String(n.node_type||"").toLowerCase()==="exit"?pick("سرور خروجی","Exit server"):pick("نود","Node")}</span>
+      <span className={styles.lastSeen}>{last&&!Number.isNaN(last.getTime())?pick("آخرین گزارش","Last seen")+": "+last.toLocaleString(pick("fa-IR","en-US"),{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"}):pick("پایش منابع نود","Node resource telemetry")}</span>
+      <Link href="/admin/nodes" aria-label={pick("مدیریت نود","Manage node")+" "+n.name}>↗</Link>
+    </div>
    </article>;
   })}{!nodes.length&&<div className={styles.empty}>{loaded?pick("نودی دریافت نشد","No nodes returned"):pick("در حال دریافت سرورها","Loading servers")}</div>}</div>
  </section>;
