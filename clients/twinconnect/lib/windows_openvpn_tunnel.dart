@@ -107,6 +107,28 @@ class WindowsOpenVpnTunnel {
     } catch (_) { return false; }
   }
 
+  // This phase never starts a VPN or changes Windows routes.
+  // It may safely overlap the read-only baseline HTTPS request.
+  Future<int> _prepareRuntimeFiles(String config) async {
+      final local = Platform.environment['LOCALAPPDATA'];
+      if (local == null || local.isEmpty) {
+        throw const FormatException('OPENVPN_STORAGE_UNAVAILABLE');
+      }
+      final privateDir = Directory(local + r'\TwinConnect\private');
+      await privateDir.create(recursive: true);
+      final id = secret();
+      _config = File(privateDir.path + '\\' + id + '.ovpn');
+      _password = File(privateDir.path + '\\' + id + '.pwd');
+      await _config!.writeAsString(config, flush: true);
+      await _password!.writeAsString(secret() + '\n', flush: true);
+
+      final reservation = await ServerSocket.bind(
+          InternetAddress.loopbackIPv4, 0);
+      _managementPort = reservation.port;
+      await reservation.close();
+      return _managementPort!;
+  }
+
   Future<String> start(Map<String, dynamic> item) async {
     if (!Platform.isWindows) throw const FormatException('OPENVPN_WINDOWS_ONLY');
     if (_busy || _process != null) {
@@ -127,24 +149,12 @@ class WindowsOpenVpnTunnel {
     _busy = true;
     var phase = 'EGRESS_BASELINE';
     try {
-      final before = await publicIp();
-      phase = 'PRIVATE_FILES';
-      final local = Platform.environment['LOCALAPPDATA'];
-      if (local == null || local.isEmpty) {
-        throw const FormatException('OPENVPN_STORAGE_UNAVAILABLE');
-      }
-      final privateDir = Directory(local + r'\TwinConnect\private');
-      await privateDir.create(recursive: true);
-      final id = secret();
-      _config = File(privateDir.path + '\\' + id + '.ovpn');
-      _password = File(privateDir.path + '\\' + id + '.pwd');
-      await _config!.writeAsString(config, flush: true);
-      await _password!.writeAsString(secret() + '\n', flush: true);
-
-      final reservation = await ServerSocket.bind(
-          InternetAddress.loopbackIPv4, 0);
-      _managementPort = reservation.port;
-      await reservation.close();
+      phase = 'EGRESS_BASELINE_AND_PRIVATE_FILES';
+      final prerequisites = await Future.wait<Object>([
+        publicIp(),
+        _prepareRuntimeFiles(config),
+      ]);
+      final before = prerequisites[0] as String;
       final ready = Completer<void>();
       phase = 'PROCESS_LAUNCH';
       final child = await Process.start(binary, [
