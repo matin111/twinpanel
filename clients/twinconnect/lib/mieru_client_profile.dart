@@ -1,12 +1,20 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'xray_endpoint_route.dart';
+
 /// Validates the official mieru JSON delivered per subscription.
 /// Do not persist plaintext user passwords or use this as a sing-box
 /// outbound. The independent mieru CLI exposes a SOCKS5 loopback proxy.
 class MieruClientProfile {
   const MieruClientProfile(this._config);
   final Map<String, dynamic> _config;
+
+  String get endpointIpv4 {
+    final profile = (_config['profiles'] as List).single as Map;
+    final server = (profile['servers'] as List).single as Map;
+    return XrayEndpointRoute.requirePublicIPv4(server['ipAddress'] as String);
+  }
 
   static MieruClientProfile fromItem(Map<String, dynamic> item) {
     if (item['config_format'] != 'mieru-json') {
@@ -61,6 +69,7 @@ class MieruClientProfile {
         decoded.containsKey('dialer') || profile.containsKey('dialer')) {
       throw const FormatException('MIERU_UNTRUSTED_PROXY_SETTINGS');
     }
+    XrayEndpointRoute.requirePublicIPv4(host);
     return MieruClientProfile(decoded);
   }
 
@@ -69,9 +78,13 @@ class MieruClientProfile {
   Map<String, dynamic> runtimeConfig({
     required int socks5Port,
     required int rpcPort,
+    required int httpProxyPort,
   }) {
     if (socks5Port < 1025 || socks5Port > 65535 ||
-        rpcPort < 1025 || rpcPort > 65535 || socks5Port == rpcPort) {
+        rpcPort < 1025 || rpcPort > 65535 ||
+        httpProxyPort < 1025 || httpProxyPort > 65535 ||
+        socks5Port == rpcPort || socks5Port == httpProxyPort ||
+        rpcPort == httpProxyPort) {
       throw const FormatException('MIERU_LOCAL_PORT_INVALID');
     }
     return <String, dynamic>{
@@ -79,7 +92,9 @@ class MieruClientProfile {
       'activeProfile': _config['activeProfile'],
       'socks5Port': socks5Port,
       'rpcPort': rpcPort,
+      'httpProxyPort': httpProxyPort,
       'socks5ListenLAN': false,
+      'httpProxyListenLAN': false,
       'loggingLevel': 'ERROR',
     };
   }
