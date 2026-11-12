@@ -43,24 +43,20 @@ class ConnectionBootstrap {
       throw const ConnectionBootstrapException('NATIVE_ENGINE_UNAVAILABLE');
     }
 
-    // Catalog and non-secret server inventory are independent read-only
-    // authenticated requests. Run them concurrently to remove one complete
-    // HTTPS round trip from EVERY native connection attempt. Credential-
-    // bearing profiles still load only after both authorizations pass.
-    final preflight = await Future.wait<Object>([
-      api.loadSessionProtocolCatalog(
-        panel: panel, sessionToken: sessionToken),
-      api.refreshSessionServers(
-        panel: panel, sessionToken: sessionToken),
-    ]);
-    final catalog = preflight[0] as PanelProtocolCatalog;
-    final inventory = preflight[1] as AppServerInventory;
+    // Refresh the entitlement gate before asking for any node metadata.
+    // Revoked plans must NOT cause a speculative server lookup, even when
+    // such a request would not include connection secrets.
+    final catalog = await api.loadSessionProtocolCatalog(
+      panel: panel, sessionToken: sessionToken);
     final allowed = catalog.entries.where((entry) =>
         entry.protocol.code == definition.code &&
         entry.selected && entry.configRecordPresent);
     if (allowed.length != 1) {
       throw const ConnectionBootstrapException('PROTOCOL_NOT_ALLOWED');
     }
+
+    final inventory = await api.refreshSessionServers(
+      panel: panel, sessionToken: sessionToken);
 
     // A node-health heartbeat is advisory and is not proof the VPN endpoint
     // works or fails. Authorization comes from this subscription-scoped
