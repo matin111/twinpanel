@@ -83,7 +83,7 @@ def verify_ui_release(source: Path, reference: Path, *, check_bundle: bool = Fal
     if not all(marker in lower for marker in (
         "export function SubscriptionAnalytics", "export function RecentPaymentActivity",
         "export function ServerFleetVisual", "dashboardPaymentAmount",
-        "classifyPayment" if False else "paymentStatus", "aria-valuenow"
+        "paymentStatus", "aria-valuenow"
     )):
         raise ValueError("Subscription, payment or server visual component is missing")
     if not all(marker in lower_css for marker in (
