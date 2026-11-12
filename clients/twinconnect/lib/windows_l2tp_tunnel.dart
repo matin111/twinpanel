@@ -16,6 +16,13 @@ class WindowsL2tpTunnel {
 
   bool get isRunning => _verifiedIp != null;
   bool get hasChild => _ownsEntry;
+  // An exit IP can rotate without disconnecting the same L2TP session.
+  // The security boundary is the address observed BEFORE VPN activation.
+  static bool hasVpnEgress({
+    required String baselineIp,
+    required String currentIp,
+  }) => currentIp != baselineIp;
+
   String? get exitIp => _verifiedIp;
 
   String? _baselineIp;
@@ -146,7 +153,7 @@ class WindowsL2tpTunnel {
         final status = await _status();
         if (status.state == 2) {
           final newIp = await _publicIp();
-          if (newIp == baselineIp) {
+          if (!hasVpnEgress(baselineIp: baselineIp, currentIp: newIp)) {
             throw const FormatException('L2TP_EGRESS_NOT_VERIFIED');
           }
           _verifiedIp = newIp;
@@ -205,7 +212,8 @@ class WindowsL2tpTunnel {
       _lastHealthError = 'L2TP_HEALTH_PROBE_UNAVAILABLE';
       return false;
     }
-    if (currentIp == _baselineIp) {
+    if (_baselineIp == null || !hasVpnEgress(
+        baselineIp: _baselineIp!, currentIp: currentIp)) {
       // RAS may still report connected even after the default route is lost.
       // Do not claim "online" when direct traffic has bypassed the VPN.
       _lastHealthError = 'L2TP_ROUTE_BYPASS_DETECTED';
