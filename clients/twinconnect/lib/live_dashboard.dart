@@ -2127,7 +2127,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       return;
     }
     try {
-      final launched = await launchUrl(url!, mode: LaunchMode.externalApplication);
+      final launched = await launchUrl(url, mode: LaunchMode.externalApplication);
       if (!launched && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(tr('بازکردن لینک $label ممکن نشد.',
