@@ -128,11 +128,18 @@ class WindowsOpenConnectTunnel {
     }
     _pending = true;
     try {
-      final engine = await _engine();
+      // Engine file inspection and the direct baseline HTTPS request are
+      // both read-only. Run them together, but never start the OS tunnel
+      // until BOTH succeeded. Baseline remains measured before route changes.
+      final prerequisites = await Future.wait<Object?>([
+        _engine(),
+        _publicIp().timeout(const Duration(seconds: 10)),
+      ]);
+      final engine = prerequisites[0] as ({String executable, String script})?;
       if (engine == null) {
         throw const FormatException('CISCO_ENGINE_UNAVAILABLE');
       }
-      _baselineIp = await _publicIp().timeout(const Duration(seconds: 10));
+      _baselineIp = prerequisites[1] as String;
       final started = await _channel.invokeMethod<bool>('startOpenConnect', {
         'executable': engine.executable,
         'script': engine.script,
