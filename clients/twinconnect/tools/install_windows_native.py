@@ -441,6 +441,10 @@ def install() -> None:
     uac_line = "target_link_options(${BINARY_NAME} PRIVATE \"/MANIFESTUAC:level='requireAdministrator' uiAccess='false'\")"
     if uac_line not in cmake:
         cmake += "\n# TwinConnect native VPN needs elevation for service management.\n" + uac_line + "\n"
+    # Sudoku's private Windows user-SID ACL uses Advapi32 SDDL helpers.
+    sudoku_link = "target_link_libraries(${BINARY_NAME} PRIVATE advapi32)"
+    if sudoku_link not in cmake:
+        cmake += "\\n# Sudoku ephemeral private config ACL and process guard.\\n" + sudoku_link + "\\n"
     runner_cmake.write_text(cmake, encoding="utf-8")
 
     HEADER.write_text(header, encoding="utf-8")
@@ -450,7 +454,7 @@ def install() -> None:
         import re
         cpp, patched = re.subn(
             r"FlutterWindow::~FlutterWindow\(\)\s*\{\s*\}",
-            "FlutterWindow::~FlutterWindow() {\n  twinconnect_l2tp::Stop();\n}",
+            "FlutterWindow::~FlutterWindow() {\n  twinconnect_l2tp::Stop();\n  twinconnect_sudoku_guard::ReleaseConfig();\n}",
             cpp, count=1,
         )
         if patched != 1:
