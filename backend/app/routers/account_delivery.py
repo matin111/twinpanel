@@ -72,8 +72,8 @@ customer_router = APIRouter(
 
 
 # TWINCONNECT_CISCO_TRUSTED_PIN_LIVE_V1
-# The known, SSH-verified certificate pin is persisted by exit node.
-# Do not introduce unverified trust-on-first-use or alter user credentials.
+# Central SSH-verified certificate pin, keyed by the exit-node ID.
+# No unverified TLS trust-on-first-use, no changes to stored user credentials.
 def _cisco_trusted_pin_for_client(db: Session, node_id: int) -> str | None:
     key = f"cisco.trusted_servercert.node.{int(node_id)}"
     row = db.get(RuntimeSetting, key)
