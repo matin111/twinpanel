@@ -285,7 +285,7 @@ def _add_authenticated_app_login_panel(source: str, subscription_id: int) -> str
     The public share token never returns app passwords. An existing authenticated
     panel session must authorize a customer/reseller/admin delivery API call.
     """
-    card = """
+    card = r"""
 <style>
 #tp-app-access{margin:16px 0;padding:18px;border:1px solid var(--line,#31394b);
 border-radius:18px;background:color-mix(in srgb,var(--surface,#111722) 82%,transparent);
