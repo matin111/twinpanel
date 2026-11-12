@@ -53,7 +53,7 @@ inline bool ReadTunnelAdapterTraffic(TrafficTotals* totals) {
   bool ambiguous = false;
   for (DWORD i = 0; i < table->dwNumEntries; ++i) {
     const auto& row = table->table[i];
-    if (row.dwOperStatus != MIB_IF_OPER_STATUS_OPERATIONAL ||
+    if (row.dwOperStatus != IF_OPER_STATUS_OPERATIONAL ||
         row.dwIndex == 0 || row.dwDescrLen == 0 ||
         row.dwDescrLen > MAXLEN_IFDESCR) continue;
     std::string description(reinterpret_cast<const char*>(row.bDescr),
