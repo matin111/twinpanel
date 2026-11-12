@@ -22,6 +22,8 @@ PROTECTED_FILES = (
     "components/admin-overview-visuals.module.css",
     "components/admin-dashboard-lower-panels.tsx",
     "components/admin-dashboard-lower-panels.module.css",
+    "components/admin-dashboard-network-panels.tsx",
+    "components/admin-dashboard-network-panels.module.css",
 )
 
 
@@ -91,6 +93,26 @@ def verify_ui_release(source: Path, reference: Path, *, check_bundle: bool = Fal
     )):
         raise ValueError("Dashboard lower panels light theme, grid or accessibility missing")
 
+    network = (source / PROTECTED_FILES[9]).read_text(encoding="utf-8")
+    network_css = (source / PROTECTED_FILES[10]).read_text(encoding="utf-8")
+    if not all(marker in dashboard for marker in (
+        "TunnelMonitor", "ProtocolMonitor", "tunnelsLoaded", "protocols={protocols}"
+    )):
+        raise ValueError("New tunnel and protocol monitors are missing from the dashboard")
+    if not all(marker in network for marker in (
+        "export function TunnelMonitor", "export function ProtocolMonitor",
+        "CLASSIC", "setGroup(option.id)", "aria-pressed",
+        "reported online nodes", "reported tunnel state"
+    )):
+        raise ValueError("Tunnel/protocol status, grouping, or honest telemetry logic missing")
+    if not all(marker in network_css for marker in (
+        'html[data-theme="light"]', "prefers-reduced-motion:reduce",
+        ".protocolGrid", ".tunnelRoute", ".protocolState"
+    )):
+        raise ValueError("Modern tunnel/protocol theme or accessibility styles are missing")
+    if not all(marker in lower for marker in ("fleetSummary", "nodeRole")):
+        raise ValueError("Modern node fleet status summary or role badges missing")
+
     if check_bundle:
         bundle = source / ".next/standalone/.next/static"
         if not bundle.is_dir():
@@ -115,6 +137,11 @@ def verify_ui_release(source: Path, reference: Path, *, check_bundle: bool = Fal
             for path in bundle.rglob("*.js")
         ):
             raise ValueError("Compiled production assets are missing subscription and payment visuals")
+        if not any(
+            b"NETWORK TRANSPORTS" in path.read_bytes() and b"PROTOCOL COVERAGE" in path.read_bytes()
+            for path in bundle.rglob("*.js")
+        ):
+            raise ValueError("Compiled production assets are missing the modern tunnel and protocol monitors")
 
 
 def main() -> None:
