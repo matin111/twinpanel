@@ -75,6 +75,23 @@ class TenantApi {
     return session;
   }
 
+  /// Fetch current tenant branding using the authenticated app session.
+  /// A saved app brand is only an offline placeholder and must be refreshed.
+  Future<BrandPreview> loadSessionBrand({
+    required PanelDirectoryEntry panel,
+    required String sessionToken,
+  }) async {
+    final data = await _requestJson(
+      panel.apiOrigin.resolve('/v1/central-app/session/brand'),
+      bearerToken: sessionToken,
+    );
+    final brand = BrandPreview.fromJson(data);
+    if (brand.namespace != panel.namespace) {
+      throw const FormatException('BRAND_MISMATCH');
+    }
+    return brand;
+  }
+
   Future<PanelProtocolCatalog> loadSessionProtocolCatalog({
     required PanelDirectoryEntry panel,
     required String sessionToken,
