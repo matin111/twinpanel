@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.805",
+  "version": "1.1.0-rc.806",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-12T09:39:07Z",
+  "released_at": "2026-11-12T10:32:53Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "cef164a766d17cac964d894baaddc0efb5b21279",
+  "source_sha": "863cf0e1888c7cde4cd1ff6dd824184301f5169d",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.805/twinpanel-1.1.0-rc.805-linux-x86_64.tar.gz",
-    "sha256": "64fa5fe116a9784076b8336e745523fcaa8d6e665f6f504a7947da29e1bef0c9",
-    "size_bytes": 30669449
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.806/twinpanel-1.1.0-rc.806-linux-x86_64.tar.gz",
+    "sha256": "1dffff620a9177e3911bb73e3f797488758787008a816a5e5f7df9d7d1a795b4",
+    "size_bytes": 30671415
   },
   "notes": {
-    "fa": "رفع مشکل لایت‌مود پنجره ساخت اشتراک: پس‌زمینه روشن، نوشته‌های خوانا، فرم انتخاب کاربر و پلن، پروتکل‌ها، سرورها، فیلدهای حجم و مدت و دکمه‌ها. بدون تغییر منطق صدور اکانت یا تنظیمات سرورها. محافظ انتشار برای جلوگیری از بازگشت خطا.",
-    "en": "Fix low-contrast light-mode Create subscription modal: readable light surfaces, header, account fields, protocol/server selection, controls and footer. Retain latest main features and add release regression safeguards. No subscription logic changes."
+    "fa": "اصلاح قطعی اتصال تم پنجره ساخت اشتراک به حالت روشن/تاریک برنامه: رنگ زمینه فرم، هدر، پروتکل‌ها، سرورها و قسمت‌های پایینی در لایت‌مود، با استایل مستقل از پوسته اصلی؛ حفظ تغییرات جدید و رفع کندی API. بدون تغییر منطق اشتراک‌ها.",
+    "en": "Bind the Admin Create subscription dialog light palette directly to the resolved application theme and restore readable surfaces in the modal. Includes latest API responsiveness fixes; subscription provisioning logic unchanged."
   }
 }
