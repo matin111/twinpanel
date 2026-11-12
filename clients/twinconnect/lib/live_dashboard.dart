@@ -1578,6 +1578,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     }) => TwinConnectGlassCard(
       key: key,
       dark: _dark,
+      surfaceColor: BrandTheme.parse(widget.brand.surfaceColor, '#20202A'),
+      accentColor: BrandTheme.parse(widget.brand.primaryColor, '#7C3AED'),
       selected: selected,
       radius: radius,
       padding: padding,
