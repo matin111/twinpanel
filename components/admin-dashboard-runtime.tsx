@@ -8,6 +8,8 @@ import {dashboardPaymentAmount} from "../lib/admin-dashboard-revenue";
 import {salesAnalyticsApi,SalesAnalyticsResponse} from "../lib/sales-analytics-api";
 import {PremiumRevenueChart} from "./premium-revenue-chart";
 import {OverviewKpiCard,OperationalHealthVisual} from "./admin-overview-visuals";
+import {RecentPaymentActivity,ServerFleetVisual,SubscriptionAnalytics} from "./admin-dashboard-lower-panels";
+import type {SubscriptionBreakdown} from "./admin-dashboard-lower-panels";
 import {useI18n} from "../lib/i18n";
 
 const money=(value:number)=>`${Number(value||0).toLocaleString("fa-IR")} تومان`;
@@ -45,8 +47,9 @@ export function AdminDashboardRuntime(){
   const [tunnels,setTunnels]=useState<AdminTunnel[]>([]);
   const [tunnelsLoaded,setTunnelsLoaded]=useState(false);
   const [nodesLoaded,setNodesLoaded]=useState(false);
-  const [subscriptions,setSubscriptions]=useState<RuntimeRow[]>([]);
+  const [subscriptionBreakdown,setSubscriptionBreakdown]=useState<SubscriptionBreakdown|null>(null);
   const [payments,setPayments]=useState<RuntimeRow[]>([]);
+  const [paymentsLoaded,setPaymentsLoaded]=useState(false);
   const [salesAnalytics,setSalesAnalytics]=useState<SalesAnalyticsResponse|null>(null);
   const [loading,setLoading]=useState(true);
   const [refreshing,setRefreshing]=useState(false);
@@ -91,8 +94,21 @@ export function AdminDashboardRuntime(){
         try{const value=await promise;if(active())apply(value);}catch{/* Partial data is preferable to a blocked dashboard. */}
       };
       void run(adminApi.tunnels(),loaded=>{setTunnels(loaded);setTunnelsLoaded(true);});
-      void run(adminApi.subscriptions(),setSubscriptions);
-      void run(adminApi.payments(),setPayments);
+      // One-row paginated request returns authoritative global counters.
+      // Avoid downloading and serializing 2,000+ subscription credentials
+      // merely to paint this donut.
+      void run(adminApi.subscriptionsPageV3({limit:1,offset:0,q:"",status:"all"}),page=>{
+        const counts=page.stats;
+        const total=Math.max(0,Number(counts.total)||0);
+        const active=Math.max(0,Number(counts.active)||0);
+        const expired=Math.max(0,Number(counts.expired)||0);
+        const suspended=Math.max(0,Number(counts.suspended)||0);
+        setSubscriptionBreakdown({
+          total,active,expired,suspended,
+          other:Math.max(0,total-active-expired-suspended)
+        });
+      });
+      void run(adminApi.payments(),loaded=>{setPayments(loaded);setPaymentsLoaded(true);});
       void run(salesAnalyticsApi.admin("daily"),setSalesAnalytics);
 
       void run(adminApi.nodes(),loadedNodes=>{
@@ -155,27 +171,13 @@ export function AdminDashboardRuntime(){
   const protocolOnline=protocols.filter(p=>p.online).length;
   const protocolReported=protocols.filter(p=>p.reported).length;
 
-  const subStats=useMemo(()=>{
-    const counts={active:0,expired:0,suspended:0,pending:0,other:0};
-    for(const row of subscriptions){
-      const status=stringOf(row,"status").toLowerCase();
-      if(status in counts)(counts as Record<string,number>)[status]++;
-      else counts.other++;
-    }
-    const total=subscriptions.length;
-    const activePct=total?Math.round((counts.active/total)*100):0;
-    const expiredPct=total?Math.round((counts.expired/total)*100):0;
-    const suspendedPct=total?Math.round((counts.suspended/total)*100):0;
-    const otherPct=Math.max(0,100-activePct-expiredPct-suspendedPct);
-    return {...counts,total,activePct,expiredPct,suspendedPct,otherPct};
-  },[subscriptions]);
+  const subStats=subscriptionBreakdown;
   const sales=salesAnalytics?.series||[];
   const recentPayments=useMemo(()=>[...payments].sort((a,b)=>{
     const ad=Date.parse(stringOf(a,"verified_at","paid_at","submitted_at","created_at"))||0;
     const bd=Date.parse(stringOf(b,"verified_at","paid_at","submitted_at","created_at"))||0;
     return bd-ad;
   }).slice(0,5),[payments]);
-  const donutStyle={background:`conic-gradient(#7c5cff 0 ${subStats.activePct}%,#f59e0b ${subStats.activePct}% ${subStats.activePct+subStats.expiredPct}%,#f06a78 ${subStats.activePct+subStats.expiredPct}% ${subStats.activePct+subStats.expiredPct+subStats.suspendedPct}%,#20c997 ${subStats.activePct+subStats.expiredPct+subStats.suspendedPct}% 100%)`};
   const generatedAt=summary?.generated_at?new Date(summary.generated_at):null;
 
   return <Shell active="/admin"><div className="page dash27">
@@ -196,7 +198,7 @@ export function AdminDashboardRuntime(){
 
     <section className="dash27-kpis" aria-label={pick("شاخص‌های کلیدی داشبورد","Dashboard key performance indicators")}>
       <OverviewKpiCard kind="users" label={pick("کل کاربران","Total users")} value={(summary?.total_users??stats?.users??"—").toLocaleString("fa-IR")} meta={pick("کاربران ثبت‌شده","Registered customers")} pick={pick}/>
-      <OverviewKpiCard kind="subscriptions" label={pick("اشتراک فعال","Active subscriptions")} value={(subStats.total?subStats.active:stats?.active_subscriptions??"—").toLocaleString("fa-IR")} meta={subStats.total?pick("از کل اشتراک‌ها","Of all subscriptions")+": "+subStats.total.toLocaleString("fa-IR"):pick("اشتراک‌های معتبر","Valid subscriptions")} ratio={subStats.total?100*subStats.active/subStats.total:null} pick={pick}/>
+      <OverviewKpiCard kind="subscriptions" label={pick("اشتراک فعال","Active subscriptions")} value={(subStats?subStats.active:stats?.active_subscriptions??"—").toLocaleString("fa-IR")} meta={subStats?pick("از کل اشتراک‌ها","Of all subscriptions")+": "+subStats.total.toLocaleString("fa-IR"):pick("اشتراک‌های معتبر","Valid subscriptions")} ratio={subStats?.total?100*subStats.active/subStats.total:null} pick={pick}/>
       <OverviewKpiCard kind="online" label={pick("آنلاین اکنون","Online now")} value={(summary?.online_users??"—").toLocaleString("fa-IR")} meta={pick("نشست‌های فعال گزارش‌شده","Reported active sessions")} pick={pick}/>
       <OverviewKpiCard kind="sales" label={pick("فروش امروز","Sales today")} value={summary?money(summary.sales_today):"—"} meta={summary?pick("فروش ماه جاری","This month's sales")+": "+money(summary.sales_month):pick("فروش تأییدشده","Confirmed sales")} pick={pick}/>
       <OverviewKpiCard kind="nodes" label={pick("سلامت نودها","Node availability")} value={summary?(summary.online_nodes.toLocaleString("fa-IR")+" / "+summary.total_nodes.toLocaleString("fa-IR")):nodesLoaded?(onlineNodes.toLocaleString("fa-IR")+" / "+nodes.length.toLocaleString("fa-IR")):"—"} meta={pick("نودهای گزارش‌شده فعال","Reported online nodes")} ratio={summary?.total_nodes?100*summary.online_nodes/summary.total_nodes:nodes.length?100*onlineNodes/nodes.length:null} pick={pick}/>
@@ -224,34 +226,15 @@ export function AdminDashboardRuntime(){
 
     <section className="dash27-mid-grid">
       <Card className="dash27-sub-card">
-        <div className="dash27-card-head"><div><span>{pick("اشتراک‌ها","SUBSCRIPTIONS")}</span><h2>{pick("وضعیت اشتراک‌ها","Subscription status")}</h2></div><Link href="/admin/subscriptions">{pick("مشاهده همه","View all")} ←</Link></div>
-        <div className="dash27-sub-body"><div className="donut dash27-donut" style={donutStyle}><div><b>{subStats.total.toLocaleString("fa-IR")}</b><small>{pick("کل اشتراک","Total")}</small></div></div><div className="dash27-legend"><div><i style={{background:"#7c5cff"}}/><span>{pick("فعال","Active")}</span><b>{subStats.activePct}%</b></div><div><i style={{background:"#f59e0b"}}/><span>{pick("منقضی","Expired")}</span><b>{subStats.expiredPct}%</b></div><div><i style={{background:"#f06a78"}}/><span>{pick("تعلیق","Suspended")}</span><b>{subStats.suspendedPct}%</b></div><div><i style={{background:"#20c997"}}/><span>{pick("سایر","Other")}</span><b>{subStats.otherPct}%</b></div></div></div>
+        <SubscriptionAnalytics breakdown={subscriptionBreakdown} loaded={subscriptionBreakdown!==null} pick={pick}/>
       </Card>
-
       <Card className="dash27-activity-card">
-        <div className="dash27-card-head"><div><span>{pick("جریان زنده","ACTIVITY STREAM")}</span><h2>{pick("فعالیت اخیر","Recent activity")}</h2></div><Link href="/admin/payments">{pick("همه تراکنش‌ها","All payments")} ←</Link></div>
-        <div className="dash27-activity-list">{recentPayments.length?recentPayments.map((row,index)=><div className="dash27-activity" key={stringOf(row,"id")||index}><span className="dash27-activity-icon">↗</span><div><b>{paymentTitle(row,pick)}</b><small>{stringOf(row,"status","payment_status")||"—"}</small></div><i/></div>):<p className="muted">{pick("فعالیتی دریافت نشد","No activity returned")}</p>}</div>
+        <RecentPaymentActivity payments={recentPayments} loaded={paymentsLoaded} pick={pick}/>
       </Card>
     </section>
 
-    <section className="dash27-nodes-section">
-      <div className="dash27-section-title"><div><span>{pick("زیرساخت","INFRASTRUCTURE")}</span><h2>{pick("وضعیت سرورها","Server fleet")}</h2><p>{pick("وضعیت، کاربران و متریک‌های منابع هر نود","Status, users and resource telemetry for each node")}</p></div><Link href="/admin/nodes">{pick("مدیریت سرورها","Manage servers")} ←</Link></div>
-      <div className="dash27-node-grid">{nodes.slice(0,6).map(n=>{
-        const health=nodeHealth[n.id]||{};
-        const row=n as unknown as RuntimeRow;
-        const cpu=numOf(valueOf(health,"cpu_percent","cpu")??valueOf(row,"cpu_percent"));
-        const ram=numOf(valueOf(health,"memory_percent","ram_percent","memory")??valueOf(row,"memory_percent"));
-        const disk=numOf(valueOf(health,"disk_percent","disk")??valueOf(row,"disk_percent"));
-        const isOnline=String(n.status).toLowerCase()==="online";
-        const usage=n.capacity_users?Math.round(((n.current_users||0)/n.capacity_users)*100):0;
-        return <div className="dash27-node" key={n.id}>
-          <div className="dash27-node-head"><div className={`dash27-server-icon ${isOnline?"online":"offline"}`}>▣</div><div className="grow"><b>{n.name}</b><small dir="ltr">{n.public_ip||n.country_code||""}</small></div><span className={`dash27-state ${isOnline?"online":"offline"}`}><i/>{isOnline?pick("آنلاین","Online"):pick("آفلاین","Offline")}</span></div>
-          <div className="dash27-node-users"><span>{pick("کاربران","Users")}</span><b>{n.current_users||0} / {n.capacity_users||0}</b><em>{usage}%</em></div>
-          <div className="dash27-resources"><MetricBar label="CPU" value={cpu}/><MetricBar label="RAM" value={ram}/><MetricBar label="Disk" value={disk}/></div>
-          {(cpu==null&&ram==null&&disk==null)&&<small className="dash27-telemetry-note">{pick("متریک منابع هنوز در پاسخ Health این نود گزارش نشده است","Resource telemetry is not yet exposed by this node health response")}</small>}
-        </div>;
-      })}{!nodes.length&&!loading&&<div className="dash27-empty">{pick("نودی دریافت نشد","No nodes returned")}</div>}</div>
-    </section>
+    <ServerFleetVisual nodes={nodes} health={nodeHealth} loaded={nodesLoaded} pick={pick}/>
+
 
     <section className="dash27-bottom-grid">
       <Card className="dash27-tunnels-card"><div className="dash27-card-head"><div><span>{pick("مسیرهای شبکه","NETWORK PATHS")}</span><h2>{pick("تانل‌ها","Tunnels")}</h2></div><Link href="/admin/tunnels">{pick("مدیریت","Manage")} ←</Link></div><div className="dash27-tunnel-list">{tunnels.slice(0,6).map(t=>{const on=String(t.status).toLowerCase()==="online";return <div className="dash27-tunnel" key={t.id}><span className={`status-dot ${on?"online":"offline"}`}/><div><b>#{t.id} · {t.active_transport||t.transport||"Transport"}</b><small>{t.mode||pick("مسیر تونل","Tunnel path")}</small></div><strong>{t.latency_ms==null?"—":`${t.latency_ms} ms`}</strong><Badge tone={on?"ok":"warn"}>{t.status||"—"}</Badge></div>})}</div></Card>
