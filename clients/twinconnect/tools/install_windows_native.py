@@ -81,7 +81,34 @@ def install() -> None:
   vpn_channel_->SetMethodCallHandler(
       [](const flutter::MethodCall<flutter::EncodableValue>& call,
          std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result) {
-        if (call.method_name() == "startL2tp") {
+        if (call.method_name() == "windowControl") {
+          const auto* args = std::get_if<flutter::EncodableMap>(
+              call.arguments());
+          if (!args) { result->Error("WINDOW_CONTROL_INVALID"); return; }
+          const auto it = args->find(flutter::EncodableValue("action"));
+          if (it == args->end()) {
+            result->Error("WINDOW_ACTION_REQUIRED"); return;
+          }
+          const auto* action = std::get_if<std::string>(&it->second);
+          const HWND hwnd = ::GetActiveWindow();
+          if (!action || !hwnd) {
+            result->Error("WINDOW_NOT_AVAILABLE"); return;
+          }
+          if (*action == "minimize") {
+            ::ShowWindow(hwnd, SW_MINIMIZE);
+          } else if (*action == "maximize") {
+            ::ShowWindow(hwnd, ::IsZoomed(hwnd) ? SW_RESTORE : SW_MAXIMIZE);
+          } else if (*action == "close") {
+            // This must run normal OnDestroy VPN cleanup, not ExitProcess().
+            ::PostMessageW(hwnd, WM_CLOSE, 0, 0);
+          } else if (*action == "drag") {
+            ::ReleaseCapture();
+            ::SendMessageW(hwnd, WM_NCLBUTTONDOWN, HTCAPTION, 0);
+          } else {
+            result->Error("WINDOW_ACTION_INVALID"); return;
+          }
+          result->Success(flutter::EncodableValue(true));
+        } else if (call.method_name() == "startL2tp") {
           const auto* args = std::get_if<flutter::EncodableMap>(
               call.arguments());
           if (!args) { result->Error("L2TP_INVALID_REQUEST"); return; }
@@ -310,6 +337,29 @@ def install() -> None:
         "    twinconnect_openconnect::Stop();\n  }",
         1,
     )
+
+    # Hide the native OS caption on every screen, including login. Retain
+    # WS_THICKFRAME for resize and standard WM_CLOSE destruction semantics.
+    frameless_marker = "  // TwinConnect: frameless Windows shell."
+    if frameless_marker not in cpp:
+        on_create_marker = "  RegisterPlugins(flutter_controller_->engine());"
+        if cpp.count(on_create_marker) != 1:
+            raise RuntimeError("Cannot safely locate Flutter window initialization")
+        native_shell = """  // TwinConnect: frameless Windows shell.
+  // The app renders compact window actions in its existing layout.
+  HWND shell = GetHandle();
+  if (shell) {
+    const LONG_PTR style = ::GetWindowLongPtrW(shell, GWL_STYLE);
+    ::SetWindowLongPtrW(shell, GWL_STYLE,
+        style & ~(static_cast<LONG_PTR>(WS_CAPTION) |
+                  static_cast<LONG_PTR>(WS_SYSMENU)));
+    ::SetWindowPos(shell, nullptr, 0, 0, 0, 0,
+        SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER |
+        SWP_NOACTIVATE | SWP_FRAMECHANGED);
+  }
+"""
+        cpp = cpp.replace(on_create_marker,
+            on_create_marker + "\\n" + native_shell, 1)
 
     # Request elevation through the MSVC linker-generated manifest. Do not
     # insert trustInfo directly into runner.exe.manifest: the linker also
