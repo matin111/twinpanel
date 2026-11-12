@@ -73,8 +73,13 @@ class WindowsMieruProxy {
       final socksPort = ports.elementAt(0);
       final rpcPort = ports.elementAt(1);
       final httpPort = ports.elementAt(2);
+      // In Mieru, domainName takes priority over ipAddress. DNS resolution
+      // must be direct, before TUN routes exist, and use the same pinned /32
+      // endpoint for both the native engine and the route exception.
+      final resolvedEndpoint = await profile.resolveEndpointIpv4();
       final config = profile.runtimeConfig(
-        socks5Port: socksPort, rpcPort: rpcPort, httpProxyPort: httpPort);
+        socks5Port: socksPort, rpcPort: rpcPort, httpProxyPort: httpPort,
+        resolvedEndpointIpv4: resolvedEndpoint);
       final path = await _native.invokeMethod<String>(
         'stageMieruConfig', {'config': jsonEncode(config)},
       ).timeout(const Duration(seconds: 5));
@@ -122,7 +127,7 @@ class WindowsMieruProxy {
       if (!identical(_child, owned)) throw FormatException(exitReason);
       _port = socksPort;
       _verifiedExitIp = exitIp;
-      _endpointIpv4 = profile.endpointIpv4;
+      _endpointIpv4 = resolvedEndpoint;
       return socksPort;
     } catch (_) {
       await _terminate();
