@@ -46,6 +46,7 @@ import 'ambient_background.dart';
 import 'interactive_glass_card.dart';
 import 'share_vpn_preview.dart';
 import 'connection_signal_art.dart';
+import 'tunnel_traffic_chart.dart';
 import 'vpn_settings.dart';
 
 /// Authenticated application uses the original visual dashboard layout with live data.
@@ -172,6 +173,57 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   bool _vpnCleanup = false;
   int _vpnRx = 0;
   int _vpnTx = 0;
+  final List<double> _rxHistory = [];
+  final List<double> _txHistory = [];
+  DateTime? _lastSampleAt;
+  int? _lastSampleRx;
+  int? _lastSampleTx;
+  String? _lastSampleSource;
+  double? _rxBytesPerSecond;
+  double? _txBytesPerSecond;
+
+  void _clearTrafficSamples() {
+    _rxHistory.clear();
+    _txHistory.clear();
+    _lastSampleAt = null;
+    _lastSampleRx = null;
+    _lastSampleTx = null;
+    _lastSampleSource = null;
+    _rxBytesPerSecond = null;
+    _txBytesPerSecond = null;
+  }
+
+  // Only measured native byte deltas are plotted; a new connection,
+  // counter reset or protocol change starts a fresh baseline.
+  void _recordTraffic(String source, int rx, int tx) {
+    final now = DateTime.now();
+    if (_lastSampleSource != source || _lastSampleAt == null ||
+        _lastSampleRx == null || _lastSampleTx == null ||
+        rx < _lastSampleRx! || tx < _lastSampleTx!) {
+      _clearTrafficSamples();
+      _lastSampleSource = source;
+      _lastSampleAt = now;
+      _lastSampleRx = rx;
+      _lastSampleTx = tx;
+      return;
+    }
+    final elapsed = now.difference(_lastSampleAt!).inMilliseconds / 1000;
+    if (elapsed < .3) return;
+    final rxRate = (rx - _lastSampleRx!) / elapsed;
+    final txRate = (tx - _lastSampleTx!) / elapsed;
+    _lastSampleAt = now;
+    _lastSampleRx = rx;
+    _lastSampleTx = tx;
+    if (!rxRate.isFinite || !txRate.isFinite ||
+        rxRate < 0 || txRate < 0) return;
+    _rxBytesPerSecond = rxRate;
+    _txBytesPerSecond = txRate;
+    _rxHistory.add(rxRate);
+    _txHistory.add(txRate);
+    if (_rxHistory.length > 24) _rxHistory.removeAt(0);
+    if (_txHistory.length > 24) _txHistory.removeAt(0);
+  }
+
   String? _vpnError;
   String? _publicIp;
   int? _httpsLatencyMs;
@@ -494,6 +546,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     _modernTx = null;
     _tunnelOriginRx = null;
     _tunnelOriginTx = null;
+    _clearTrafficSamples();
   }
 
   Future<void> _refreshModernTraffic() async {
@@ -526,6 +579,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         setState(() {
           _modernRx = rx;
           _modernTx = tx;
+          _recordTraffic('modern:$activeProtocol', rx, tx);
         });
       }
     } finally {
@@ -1708,6 +1762,11 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           _vpnUnmanaged = nextUnmanaged;
           _vpnRx = nextRx;
           _vpnTx = nextTx;
+          if (nextUp) {
+            _recordTraffic('wireguard', nextRx, nextTx);
+          } else if (!_modernUp) {
+            _clearTrafficSamples();
+          }
           if (!nextUp && !_modernUp) _resetNetworkStats();
         });
       }
