@@ -870,6 +870,151 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     }
   }
 
+  Future<void> _startXrayTunnel(String serverId) async {
+    if (_vpnBusy || !Platform.isWindows) return;
+    setState(() { _vpnBusy = true; _vpnError = null; });
+    try {
+      if (_vpnUnmanaged || _vpnCleanup) {
+        throw const FormatException('PREVIOUS_TUNNEL_NOT_STOPPED');
+      }
+      final authorized = widget.catalog?.entries.any((entry) =>
+          entry.protocol.code == 'v2ray' && entry.selected &&
+          entry.configRecordPresent) ?? false;
+      if (!authorized) {
+        throw const FormatException('PROTOCOL_NOT_INCLUDED_IN_SUBSCRIPTION');
+      }
+      if (!await WindowsXrayPreflight.enginePresent() ||
+          !await WindowsSingBoxPreflight.enginePresent()) {
+        throw const FormatException('XRAY_OR_TUN_ENGINE_UNAVAILABLE');
+      }
+      final definition = VpnProtocols.byCode('v2ray')!;
+      final response = await TenantApi.fromBuildConfig()
+          .loadSessionNativeProfiles(
+        panel: widget.panel,
+        sessionToken: widget.sessionToken,
+        protocol: definition,
+        native: const NativeProtocolReadiness(supportedCodes: {'v2ray'}),
+      );
+      final matches = response.xrayServerGroups
+          .where((group) => group.serverId == serverId)
+          .expand((group) => group.inbounds)
+          .toList(growable: false);
+      if (matches.isEmpty) {
+        throw const FormatException('XRAY_SERVER_PROFILES_MISSING');
+      }
+      // Every server can advertise up to three REAL, independent inbounds.
+      // The user explicitly chooses the transport; we never synthesize one.
+      XrayInboundProfile? chosen;
+      if (matches.length == 1) {
+        chosen = matches.single;
+      } else {
+        chosen = await showDialog<XrayInboundProfile>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: Text(tr('انتخاب اینباند ویتوری', 'Choose Xray inbound')),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (final item in matches)
+                  ListTile(
+                    title: Text(item.title),
+                    subtitle: Text(item.id),
+                    onTap: () => Navigator.of(dialogContext).pop(item),
+                  ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(),
+                child: Text(tr('انصراف', 'Cancel')),
+              ),
+            ],
+          ),
+        );
+      }
+      if (!mounted || chosen == null) return;
+
+      // Prepare and validate the subscription-scoped Xray endpoint BEFORE
+      // changing any Windows routes or interrupting an existing tunnel.
+      // An existing Xray bridge is stopped only after the replacement was
+      // selected; no stale profile or node address is reused.
+      if (_modernTunnel.isRunning) await _modernTunnel.stop();
+      if (_xrayProxy.isRunning) await _xrayProxy.stop();
+      if (_ciscoTunnel.isRunning) await _ciscoTunnel.stop();
+      if (_openVpnTunnel.hasChild) await _openVpnTunnel.stop();
+      if (_l2tpTunnel.hasChild) await _l2tpTunnel.stop();
+      if (_vpnUp || _vpnCleanup) {
+        await _vpn.stop().timeout(const Duration(seconds: 20));
+        final status = await _vpn.status().timeout(
+          const Duration(seconds: 10));
+        if (status['state'] != 'down') {
+          throw const FormatException('PREVIOUS_TUNNEL_NOT_STOPPED');
+        }
+        if (mounted) setState(() {
+          _vpnUp = false;
+          _vpnVerified = false;
+          _vpnCleanup = false;
+          _activeNodeId = null;
+          _vpnRx = 0;
+          _vpnTx = 0;
+          _resetNetworkStats();
+        });
+      }
+      _modernHealthTimer?.cancel();
+      _stopModernTrafficMonitoring();
+      if (mounted) setState(() {
+        _modernUp = false;
+        _modernProtocol = null;
+        _modernNodeId = null;
+        _publicIp = null;
+      });
+
+      final socksPort = await _xrayProxy.start(chosen);
+      final verifiedExit = _xrayProxy.verifiedExitIp;
+      if (verifiedExit == null) {
+        throw const FormatException('XRAY_REMOTE_EGRESS_NOT_VERIFIED');
+      }
+      // The existing Windows sing-box TUN remains responsible for routing,
+      // DNS isolation, and an independent post-route public IP verification.
+      final publicIp = await _modernTunnel.start(
+        protocol: 'v2ray',
+        serverId: serverId,
+        profile: const <String, dynamic>{},
+        xraySocksPort: socksPort,
+        xrayVerifiedExitIp: verifiedExit,
+      );
+      if (!mounted) return;
+      setState(() {
+        _modernUp = true;
+        _modernProtocol = 'v2ray';
+        _modernNodeId = serverId;
+        _publicIp = publicIp;
+        _vpnError = null;
+      });
+      _startModernTrafficMonitoring();
+      _startModernHealthMonitoring();
+    } catch (error) {
+      // Never leave a local Xray upstream alive without its verified TUN.
+      if (_xrayProxy.isRunning && !_modernTunnel.isRunning) {
+        try { await _xrayProxy.stop(); } catch (_) {}
+      }
+      if (mounted) setState(() {
+        _modernUp = _modernTunnel.isRunning ||
+            _ciscoTunnel.isRunning ||
+            _openVpnTunnel.isRunning ||
+            _l2tpTunnel.isRunning;
+        if (!_modernUp) {
+          _modernProtocol = null;
+          _modernNodeId = null;
+          _publicIp = null;
+        }
+        _vpnError = _errorText(error);
+      });
+    } finally {
+      if (mounted) setState(() => _vpnBusy = false);
+    }
+  }
+
   Future<void> _startModernTunnel(String protocol, String serverId) async {
     if (_vpnBusy) return;
     setState(() { _vpnBusy = true; _vpnError = null; });
