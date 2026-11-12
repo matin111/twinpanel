@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.812",
+  "version": "1.1.0-rc.813",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-12T20:36:52Z",
+  "released_at": "2026-11-12T21:52:51Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "c8f5786fb5128ab825d5eccc65787f5927de190f",
+  "source_sha": "d590fdeec1f23e8fc31c269e85fe87960c7fdd95",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.812/twinpanel-1.1.0-rc.812-linux-x86_64.tar.gz",
-    "sha256": "66499ff39727d08da4a2f910e116fdea9d4e8030f23e5f4b92b51e3db83868ae",
-    "size_bytes": 30699751
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.813/twinpanel-1.1.0-rc.813-linux-x86_64.tar.gz",
+    "sha256": "9edafddbbadd567082af8244ad82e07c265dc0e05c46f7ed7112db3b8ab38fec",
+    "size_bytes": 30679172
   },
   "notes": {
-    "fa": "بهینه‌سازی و صحت‌سنجی حسابداری ۱۶ پروتکل: رفع خطای آفلاین TrustTunnel، جلوگیری از تولید صدها هزار رویداد مصرف صفر هنگام تعویض دوره شمارنده، رفع جست‌وجوی NULL در اعتبارسنجی دستگاه و پلن، استراحت و عقب‌نشینی هوشمند ۵ پردازش حسابداری و آنلاین پس از پیمایش‌های سنگین و خطاها، گزارش فقط‌خواندنی قابلیت انتساب/مصرف برای تمام پروتکل‌ها. ShadowTLS بدون شمارنده قابل‌انتساب جعلی و TrustTunnel با رویداد صفر به عنوان نیازمند بررسی منبع نمایش داده می‌شوند. حفظ مصرف، سهمیه، کانفیگ و داده‌های موجود.",
-    "en": "Improve accounting integrity and CPU use across 16 VPN protocols: fix TrustTunnel missing-user accounting failure, baseline zero-byte counter epoch resets without mass zero-usage events, avoid NULL device/plan ORM lookups, add adaptive cooldown to five collector loops, and provide read-only attribution/ledger integrity report for all protocols. Never fabricate bytes for unauthenticated ShadowTLS or zero-only TrustTunnel."
+    "fa": "بهینه‌سازی ثبت آمار و مصرف ۱۶ پروتکل بدون دست‌کاری مبالغ مصرف: بارگذاری گروهی اعتبارنامه‌های فقط Naive و Sudoku به جای رمزگشایی همه پروتکل‌ها در هر چرخه آنلاین، حذف سربار تکراری بک‌فیل قدیمی هنگام فعالیت نودهای مرکزی، گزارش ممیزی دقیق‌تر با تفکیک رویداد صفر، آخرین حجم مثبت، نشست‌های تازه و نشست‌های منقضی از نظر مشاهده؛ شمارنده‌های واقعی و سهمیه کاربران محفوظ.",
+    "en": "Lower CPU and DB load via source-protocol-filtered Naive/Sudoku presence mapping and early legacy backfill preflight when central node stages are busy. Expand read-only 16-protocol accounting audit to distinguish zero-byte events, verified positive readings and stale vs fresh authenticated sessions. Do not change counter math, quotas, live protocol configs or historical balances."
   }
 }
