@@ -6,14 +6,17 @@ import {adminApi,type AdminNode,type AdminUser,type RuntimeRow} from "../lib/adm
 import {createSubscriptionFastV1} from "../lib/subscription-create-fast-api";
 import {subscriptionProtocolApi,type SubscriptionProtocolDefinition} from "../lib/subscription-protocol-api";
 import {useI18n} from "../lib/i18n";
+import {useTheme} from "../lib/theme";
 
 const num=(value:unknown)=>{const n=Number(value??0);return Number.isFinite(n)?n:0;};
 const clean=(value:string)=>{const raw=value.trim();if(!raw)return null;const n=Number(raw);return Number.isFinite(n)?n:null;};
-const box={border:"1px solid rgba(148,163,184,.16)",background:"rgba(15,23,42,.46)",borderRadius:16};
 const tinyButton={height:32,padding:"0 11px",borderRadius:10,fontSize:12};
 
 export function AdminSubscriptionCreateUnified(){
   const {pick}=useI18n();
+  const {resolved}=useTheme();
+  const light=resolved==="light";
+  const box={border:light?"1px solid #d9e3f0":"1px solid rgba(148,163,184,.16)",background:light?"linear-gradient(180deg,#f8faff 0%,#f0f5fc 100%)":"rgba(15,23,42,.46)",borderRadius:16};
   const [mounted,setMounted]=useState(false);
   const [open,setOpen]=useState(false);
   const [loading,setLoading]=useState(false);
@@ -113,18 +116,18 @@ export function AdminSubscriptionCreateUnified(){
 
   if(!mounted||!open)return null;
 
-  const choice=(checked:boolean,label:string,sub:string,onToggle:()=>void)=><button type="button" onClick={onToggle} style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,minHeight:42,padding:"9px 11px",borderRadius:12,border:checked?"1px solid rgba(124,92,255,.62)":"1px solid rgba(148,163,184,.14)",background:checked?"rgba(109,74,255,.13)":"rgba(15,23,42,.26)",color:"inherit",cursor:"pointer",textAlign:"right"}}><span style={{display:"grid",gap:2,minWidth:0}}><b style={{fontSize:12,fontWeight:700,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{label}</b>{sub&&<small dir="ltr" style={{fontSize:10,opacity:.58,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{sub}</small>}</span><span aria-hidden="true" style={{width:20,height:20,borderRadius:999,border:checked?"6px solid #7c5cff":"2px solid rgba(148,163,184,.42)",background:checked?"white":"transparent",flex:"0 0 auto"}}/></button>;
+  const choice=(checked:boolean,label:string,sub:string,onToggle:()=>void)=><button type="button" className="tp-create-choice" aria-pressed={checked} onClick={onToggle} style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,minHeight:42,padding:"9px 11px",borderRadius:12,border:light?(checked?"1px solid #9c84ee":"1px solid #d6e1ee"):(checked?"1px solid rgba(124,92,255,.62)":"1px solid rgba(148,163,184,.14)"),background:light?(checked?"#f0ebff":"#fff"):(checked?"rgba(109,74,255,.13)":"rgba(15,23,42,.26)"),color:light?"#253854":"inherit",cursor:"pointer",textAlign:"right"}}><span style={{display:"grid",gap:2,minWidth:0}}><b style={{fontSize:12,fontWeight:700,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{label}</b>{sub&&<small dir="ltr" style={{fontSize:10,opacity:light?1:.58,color:light?"#5c6c86":undefined,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{sub}</small>}</span><span aria-hidden="true" style={{width:20,height:20,borderRadius:999,border:checked?"6px solid #7c5cff":"2px solid rgba(148,163,184,.42)",background:checked?"white":"transparent",flex:"0 0 auto"}}/></button>;
 
-  return createPortal(<div className="runtime-modal manual-subscription-modal" role="dialog" aria-modal="true">
+  return createPortal(<div className={`runtime-modal manual-subscription-modal tp-unified-create${light?" tp-unified-create-light":""}`} role="dialog" aria-modal="true" aria-label={pick("ساخت اشتراک","Create subscription")}>
     <button type="button" className="runtime-modal-bg" onClick={()=>!busy&&setOpen(false)}/>
-    <div className="runtime-modal-card" style={{width:"min(920px,calc(100vw - 24px))",maxHeight:"86dvh",padding:0,overflow:"hidden",borderRadius:20,boxShadow:"0 28px 80px rgba(0,0,0,.42)"}}>
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:16,padding:"14px 16px",borderBottom:"1px solid rgba(148,163,184,.12)",background:"rgba(15,23,42,.82)",position:"sticky",top:0,zIndex:5}}>
-        <div><b style={{fontSize:16}}>{pick("ساخت اشتراک","Create subscription")}</b><div style={{fontSize:11,opacity:.58,marginTop:3}}>{pick("همه انتخاب‌ها در یک صفحه؛ ساخت اکانت بعد از ثبت در پس‌زمینه ادامه پیدا می‌کند.","Everything in one compact view; provisioning continues in the background.")}</div></div>
+    <div className="runtime-modal-card" style={{width:"min(920px,calc(100vw - 24px))",maxHeight:"86dvh",padding:0,overflow:"hidden",borderRadius:20,background:light?"#fff":undefined,border:light?"1px solid #d8e2ef":undefined,color:light?"#1c2d46":undefined,boxShadow:light?"0 28px 80px rgba(32,47,82,.20)":"0 28px 80px rgba(0,0,0,.42)"}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:16,padding:"14px 16px",borderBottom:light?"1px solid #dae4f0":"1px solid rgba(148,163,184,.12)",background:light?"linear-gradient(115deg,#f8faff,#eef4fd)":"rgba(15,23,42,.82)",color:light?"#1f2f4b":undefined,position:"sticky",top:0,zIndex:5}}>
+        <div><b style={{fontSize:16}}>{pick("ساخت اشتراک","Create subscription")}</b><div style={{fontSize:11,opacity:light?1:.58,color:light?"#60748e":undefined,marginTop:3}}>{pick("همه انتخاب‌ها در یک صفحه؛ ساخت اکانت بعد از ثبت در پس‌زمینه ادامه پیدا می‌کند.","Everything in one compact view; provisioning continues in the background.")}</div></div>
         <button type="button" className="icon-button" disabled={busy} onClick={()=>setOpen(false)}>×</button>
       </div>
 
       <form onSubmit={submit} style={{display:"grid",gridTemplateRows:"1fr auto",minHeight:0,maxHeight:"calc(86dvh - 64px)"}}>
-        <div style={{overflowY:"auto",padding:"14px",display:"grid",gap:12}}>
+        <div style={{overflowY:"auto",padding:"14px",display:"grid",gap:12,background:light?"#fff":undefined}}>
           {error&&<div className="runtime-error" style={{margin:0}}>{error}</div>}
 
           <section style={{...box,padding:12}}>
@@ -155,8 +158,8 @@ export function AdminSubscriptionCreateUnified(){
           </section>
         </div>
 
-        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,padding:"11px 14px",borderTop:"1px solid rgba(148,163,184,.12)",background:"rgba(15,23,42,.92)",position:"sticky",bottom:0,zIndex:5}}>
-          <small style={{opacity:.55}}>{pick(`${protocols.length} پروتکل • ${nodeIds.length} سرور`,`${protocols.length} protocols • ${nodeIds.length} servers`)}</small>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,padding:"11px 14px",borderTop:light?"1px solid #dce5f0":"1px solid rgba(148,163,184,.12)",background:light?"#f8faff":"rgba(15,23,42,.92)",color:light?"#344b68":undefined,position:"sticky",bottom:0,zIndex:5}}>
+          <small style={{opacity:light?1:.55,color:light?"#5b6e87":undefined}}>{pick(`${protocols.length} پروتکل • ${nodeIds.length} سرور`,`${protocols.length} protocols • ${nodeIds.length} servers`)}</small>
           <div style={{display:"flex",gap:8}}><button type="button" className="ghost" disabled={busy} onClick={()=>setOpen(false)}>{pick("انصراف","Cancel")}</button><button type="button" className="primary" disabled={busy||loading} onClick={()=>void submitNow()}>{busy?pick("در حال ثبت…","Submitting…"):pick("ساخت اکانت","Create account")}</button></div>
         </div>
       </form>
