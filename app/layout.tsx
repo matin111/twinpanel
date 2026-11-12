@@ -79,6 +79,7 @@ import "./admin-overlay-fixes.css";
 import "./store-orbit-public-cleanup.css";
 import "./admin-notification-readability.css";
 import "./trial-settings.css";
+import "./subscription-light-actions.css";
 
 // The public login/register pages must start with the saved brand before client
 // hydration. Fetch via the local backend (no user credential required), rather

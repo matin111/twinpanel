@@ -1,0 +1,85 @@
+/* Subscription action palette: light mode only. Dark mode keeps its existing colors. */
+html[data-theme="light"] .legacy-subscriptions-page .mobile-subscription-actions .mobile-action,
+html[data-theme="light"] .legacy-subscriptions-page .mobile-subscription-more-actions button,
+html[data-theme="light"] .reseller-subscriptions-parity .sub-action,
+html[data-theme="light"] .customerSubscriptionsParity .customerSubActions > button {
+  background:linear-gradient(145deg,#f8faff,#edf2f8);
+  border:1px solid #d4deec;
+  color:#364963;
+  box-shadow:0 2px 6px rgba(37,58,98,.045),inset 0 1px 0 rgba(255,255,255,.9);
+  transition:background .16s ease,border-color .16s ease,box-shadow .16s ease,transform .16s ease;
+}
+html[data-theme="light"] .legacy-subscriptions-page .mobile-subscription-actions .mobile-action-renew,
+html[data-theme="light"] .reseller-subscriptions-parity .sub-action-renew,
+html[data-theme="light"] .customerSubscriptionsParity .customerSubActions > .primary {
+  background:linear-gradient(145deg,#eff6ff,#e4eeff);
+  border-color:#bcd2f5;
+  color:#2459a8;
+}
+html[data-theme="light"] .legacy-subscriptions-page .mobile-subscription-actions .mobile-action-connect,
+html[data-theme="light"] .reseller-subscriptions-parity .sub-action-connect,
+html[data-theme="light"] .customerSubscriptionsParity .customerSubActions > .ghost {
+  background:linear-gradient(145deg,#f5f1ff,#eae5fb);
+  border-color:#d2c5f5;
+  color:#5e42ad;
+}
+html[data-theme="light"] .legacy-subscriptions-page .mobile-subscription-actions .mobile-action-edit,
+html[data-theme="light"] .reseller-subscriptions-parity .sub-action-edit {
+  background:linear-gradient(145deg,#f8fafc,#eaf0f7);
+  border-color:#ced9e8;
+  color:#354a66;
+}
+html[data-theme="light"] .legacy-subscriptions-page .mobile-subscription-actions .mobile-action-reset {
+  background:linear-gradient(145deg,#fffaf2,#fff0d9);
+  border-color:#f0d5ad;
+  color:#8f5517;
+}
+html[data-theme="light"] .legacy-subscriptions-page .mobile-subscription-more-actions .mobile-more-suspend,
+html[data-theme="light"] .reseller-subscriptions-parity .sub-action-suspend {
+  background:#fff5e7;border-color:#edcfa3;color:#92571b;
+}
+html[data-theme="light"] .legacy-subscriptions-page .mobile-subscription-more-actions .mobile-more-activate,
+html[data-theme="light"] .reseller-subscriptions-parity .sub-action-activate {
+  background:#eaf8f1;border-color:#b8e4d1;color:#146d52;
+}
+html[data-theme="light"] .legacy-subscriptions-page .mobile-subscription-more-actions .mobile-more-transfer {
+  background:#f1f5fa;border-color:#cad8e8;color:#3b5676;
+}
+html[data-theme="light"] .legacy-subscriptions-page .mobile-subscription-more-actions .mobile-more-app {
+  background:#ebf3ff;border-color:#c1d7fb;color:#2459a3;
+}
+html[data-theme="light"] .legacy-subscriptions-page .mobile-subscription-more-actions .mobile-more-delete,
+html[data-theme="light"] .reseller-subscriptions-parity .sub-action-delete {
+  background:#fff1f3;border-color:#f0c8d0;color:#a43c51;
+}
+html[data-theme="light"] .legacy-subscriptions-page .mobile-subscription-more-actions .danger.mobile-more-delete {
+  color:#a43c51;
+}
+html[data-theme="light"] .legacy-subscriptions-page .mobile-subscription-actions .mobile-action:hover:not(:disabled),
+html[data-theme="light"] .legacy-subscriptions-page .mobile-subscription-more-actions button:hover:not(:disabled),
+html[data-theme="light"] .reseller-subscriptions-parity .sub-action:hover:not(:disabled),
+html[data-theme="light"] .customerSubscriptionsParity .customerSubActions > button:hover:not(:disabled) {
+  filter:none;
+  border-color:#a6bde2;
+  transform:translateY(-1px);
+  box-shadow:0 5px 12px rgba(36,57,98,.10),inset 0 1px 0 rgba(255,255,255,.9);
+}
+html[data-theme="light"] .legacy-subscriptions-page .mobile-subscription-actions .mobile-action:focus-visible,
+html[data-theme="light"] .legacy-subscriptions-page .mobile-subscription-more-actions button:focus-visible,
+html[data-theme="light"] .reseller-subscriptions-parity .sub-action:focus-visible,
+html[data-theme="light"] .customerSubscriptionsParity .customerSubActions > button:focus-visible {
+  outline:2px solid #7560cf;outline-offset:2px;
+}
+html[data-theme="light"] .legacy-subscriptions-page .mobile-subscription-actions .mobile-action:disabled,
+html[data-theme="light"] .legacy-subscriptions-page .mobile-subscription-more-actions button:disabled,
+html[data-theme="light"] .reseller-subscriptions-parity .sub-action:disabled,
+html[data-theme="light"] .customerSubscriptionsParity .customerSubActions > button:disabled {
+  opacity:.55;filter:none;transform:none;box-shadow:none;cursor:not-allowed;
+}
+@media (prefers-reduced-motion:reduce) {
+  html[data-theme="light"] .legacy-subscriptions-page .mobile-action,
+  html[data-theme="light"] .reseller-subscriptions-parity .sub-action,
+  html[data-theme="light"] .customerSubscriptionsParity .customerSubActions > button {
+    transition:none;
+  }
+}
