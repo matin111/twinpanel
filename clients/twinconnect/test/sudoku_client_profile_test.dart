@@ -56,9 +56,15 @@ void main() {
     expect(config.containsKey('external_controller'), false);
   });
 
-  test('refuses stale per-user ports and foreign node identities', () {
+  test('honors tunnel-forwarded port and refuses foreign node identities', () {
+    final forwarded = SudokuClientProfile.fromItem(
+        profile(endpoint: 'vpn.example.org:50022'), '42');
+    expect(forwarded?.port, 50022);
+    expect(forwarded?.runtimeConfig(
+        serverIpv4: '203.0.113.33', localPort: 17559)['server_address'],
+        '203.0.113.33:50022');
     expect(SudokuClientProfile.fromItem(
-        profile(endpoint: 'vpn.example.org:35422'), '42'), isNull);
+        profile(endpoint: 'vpn.example.org:bad'), '42'), isNull);
     expect(SudokuClientProfile.fromItem(profile(), '41'), isNull);
   });
 
