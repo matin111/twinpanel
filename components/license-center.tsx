@@ -5,6 +5,7 @@ import {API_BASE} from "../lib/api";
 import {getCustomerToken} from "../lib/customer-api";
 import {useI18n} from "../lib/i18n";
 import {Shell} from "./ui";
+import {registerAppDirectory} from "../lib/central-app-credential-api";
 
 type LicenseState={
   status?:string;
@@ -63,6 +64,9 @@ export function LicenseCenter(){
   const locale=fa?"fa-IR":"en-US";
   const [data,setData]=useState<ReleaseStatus|null>(null);
   const [licenseKey,setLicenseKey]=useState("");
+  const [appOrigin,setAppOrigin]=useState("");
+  const [appNamespace,setAppNamespace]=useState("");
+  const [appRegisterBusy,setAppRegisterBusy]=useState(false);
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState("");
   const [notice,setNotice]=useState("");
@@ -85,7 +89,7 @@ export function LicenseCenter(){
     }catch(e){setError(e instanceof Error?e.message:String(e))}
   };
 
-  useEffect(()=>{void load()},[]);
+  useEffect(()=>{void load();setAppOrigin(window.location.origin);},[]);
 
   const close=()=>{
     if(typeof window==="undefined")return;
@@ -104,6 +108,18 @@ export function LicenseCenter(){
       await load();
     }catch(e){setError(e instanceof Error?e.message:String(e))}
     finally{setBusy(false)}
+  };
+
+  const saveAppOrigin=async()=>{
+    if(appRegisterBusy)return;
+    setAppRegisterBusy(true);setError("");setNotice("");
+    try{
+      const result=await registerAppDirectory(appOrigin.trim());
+      setAppOrigin(result.api_origin||appOrigin.trim());
+      setAppNamespace(result.short_namespace);
+      setNotice(pick("آدرس پنل برای اپ ثبت یا به‌روزرسانی شد.","Panel app address registered or updated."));
+    }catch(e){setError(e instanceof Error?e.message:String(e))}
+    finally{setAppRegisterBusy(false)}
   };
 
   const infoBox=(label:string,value:string,ltr=false,accent="124,92,255")=><div style={{padding:"14px",border:"1px solid rgba(124,92,255,.14)",borderRadius:16,background:`linear-gradient(135deg,rgba(${accent},.08),rgba(${accent},.025))`,boxShadow:"inset 0 1px 0 rgba(255,255,255,.04)"}}>
@@ -147,6 +163,15 @@ export function LicenseCenter(){
           <span style={{color:"#27a7e7",fontSize:18}}>↗</span>
         </a>}
 
+        <div style={{display:"grid",gap:9,padding:12,border:"1px solid var(--border)",borderRadius:14}}>
+          <b>{pick("آدرس پنل در لایسنس اپ هوشمند","Smart app panel address in license")}</b>
+          <label style={{fontSize:11,color:"var(--muted)"}}>{pick("آدرس HTTPS پنل (قابل تغییر)","Panel HTTPS address (editable)")}</label>
+          <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+            <input dir="ltr" type="url" value={appOrigin} onChange={e=>setAppOrigin(e.target.value)} placeholder="https://panel.example.com" style={{flex:1,minWidth:210}}/>
+            <button className="primary" type="button" disabled={appRegisterBusy||!appOrigin.startsWith("https://")} onClick={()=>void saveAppOrigin()}>{appRegisterBusy?"…":pick("ثبت / تغییر آدرس","Register / Update address")}</button>
+          </div>
+          {appNamespace&&<small dir="ltr">{appNamespace}</small>}
+        </div>
         {error&&<div className="runtime-error">{error}</div>}
         {notice&&<div className="runtime-message">{notice}</div>}
 
