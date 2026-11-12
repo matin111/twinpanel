@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.789",
-  "source_sha": "fe3e519bd1581ed3a47637738df53d4b98b33d40",
+  "version": "1.1.0-rc.790",
+  "source_sha": "e6b79cac87b0bae1918d7a005b9840dd91c0ab33",
   "notes": {
-    "fa": "قرارگیری پیش‌نمایش تبلتی ۴:۳ اپ کنار تنظیمات رنگ و ظاهر در استودیوی برند روی دسکتاپ؛ نمایش عمودی فقط در صفحه‌های باریک. با حفظ تنظیمات نماینده‌ها و کانفیگ‌های VPN.",
-    "en": "Show the 4:3 tablet app preview beside the brand appearance editor on desktop, and stack on narrow screens. Keep reseller settings and VPN configurations untouched."
+    "fa": "بازطراحی حرفه‌ای پنج کارت آمار بالای داشبورد کاربران، اشتراک‌ها، آنلاین‌ها، فروش امروز و نودها، همراه پایش بصری سلامت نودها، تانل‌ها و پروتکل‌ها با حلقه و نوارهای پیشرفت واقعی. پشتیبانی دارک‌مود و لایت‌مود، نمایش صادقانه اطلاعات نامشخص و محافظت از تغییرات در آپدیت‌های بعدی. حفظ امکانات فعلی پنل، ربات و VPN.",
+    "en": "Professional five-KPI admin overview and reliable reported service health with node gauge, tunnel/protocol status tracks, responsive dark/light styling, and release parity protection. Preserve existing VPN, bot and customer features."
   }
 }
