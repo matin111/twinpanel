@@ -458,7 +458,7 @@ def subscription_protocol_profiles(
         # Reuse the same public projection as the canonical Xray feed so that
         # TCP/WS/XHTTP profiles, Reality SNI, and availability stay consistent.
         from .public_connection_multilink_v7 import (
-            _subscription_and_payload, _v2ray_items,
+            _subscription_and_payload, _v2ray_items, _v2ray_profile_groups,
         )
         _verified, projected = _subscription_and_payload(
             payload.share_token, db
@@ -466,6 +466,12 @@ def subscription_protocol_profiles(
         profile_items = [
             dict(item) for item in _v2ray_items(projected)
         ]
+        # Add a non-breaking per-server projection for native clients. The
+        # canonical Xray subscription feed resolves live inbound SNI, path,
+        # domain and customer-safe profile order; never invent missing links.
+        server_groups = _v2ray_profile_groups(
+            db, projected, str(sub.account_username or ""),
+        )
     else:
         info = getattr(db, "info", None)
         if isinstance(info, dict):
@@ -506,6 +512,7 @@ def subscription_protocol_profiles(
         "namespace": subscription_app_namespace(db, sub),
         "protocol": protocol,
         "items": jsonable_encoder(profile_items),
+        **({"server_groups": jsonable_encoder(server_groups)} if protocol == "v2ray" else {}),
         "native_engine_ready": False,
     }
     raw = json.dumps(response, ensure_ascii=False, separators=(",", ":"))
