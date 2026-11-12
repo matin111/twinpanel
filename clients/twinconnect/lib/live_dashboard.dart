@@ -1,7 +1,7 @@
 import 'dart:ui' show ImageFilter, FontFeature;
 import 'dart:io' show Platform, HttpClient, InternetAddress, Process, ProcessException, FileSystemException, SocketException, HttpException;
 import 'dart:convert' show utf8;
-import 'dart:async' show Timer, TimeoutException;
+import 'dart:async' show Timer, TimeoutException, unawaited;
 
 import 'package:flutter/services.dart' show PlatformException;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -20,6 +20,7 @@ import 'windows_singbox_tunnel.dart';
 import 'windows_xray_proxy.dart';
 import 'windows_xray_preflight.dart';
 import 'xray_inbound_profiles.dart';
+import 'xray_inbound_latency.dart';
 import 'windows_openconnect_tunnel.dart';
 import 'windows_openvpn_tunnel.dart';
 import 'windows_l2tp_tunnel.dart';
@@ -1661,6 +1662,41 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   String? _xrayGroupsError;
   String? _selectedXrayInboundId;
   String? _selectedXrayNodeId;
+  final Map<String, int?> _xrayInboundRtts = {};
+  final Set<String> _xrayInboundsProbing = {};
+  bool _xrayPingAllBusy = false;
+
+  Future<void> _probeXrayInbound(XrayInboundProfile inbound) async {
+    if (!Platform.isWindows || !mounted) return;
+    final key = XrayInboundLatency.key(inbound);
+    if (_xrayInboundsProbing.contains(key)) return;
+    setState(() => _xrayInboundsProbing.add(key));
+    final latency = await XrayInboundLatency.probe(inbound);
+    if (!mounted) return;
+    setState(() {
+      _xrayInboundRtts[key] = latency;
+      _xrayInboundsProbing.remove(key);
+    });
+  }
+
+  Future<void> _probeAllXrayInbounds() async {
+    if (_xrayPingAllBusy || !mounted) return;
+    _xrayPingAllBusy = true;
+    try {
+      final inbounds = [
+        for (final group in _xrayGroups) ...group.inbounds,
+      ];
+      // Limit parallel sockets to avoid saturating the user's network.
+      for (var i = 0; i < inbounds.length && mounted; i += 6) {
+        final last = i + 6 < inbounds.length ? i + 6 : inbounds.length;
+        await Future.wait([
+          for (var j = i; j < last; j++) _probeXrayInbound(inbounds[j]),
+        ]);
+      }
+    } finally {
+      _xrayPingAllBusy = false;
+    }
+  }
 
   Future<void> _loadXrayGroups({bool refresh = false}) async {
     if (_xrayGroupsLoading || (!refresh && _xrayGroupsLoaded)) return;
@@ -1681,7 +1717,9 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       setState(() {
         _xrayGroups = response.xrayServerGroups;
         _xrayGroupsLoaded = true;
+        _xrayInboundRtts.clear();
       });
+      unawaited(_probeAllXrayInbounds());
     } catch (error) {
       if (!mounted) return;
       // Do not render errors that may embed session tokens, UUIDs or paths.
@@ -2657,7 +2695,39 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                       txt('V2Ray / Xray', size: 10, color: sub),
                     ],
                   )),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 8),
+                  Tooltip(
+                    message: tr(
+                      'زمان برقراری TCP با پورت اینباند، نه زمان دست‌دهی VLESS',
+                      'Real TCP handshake to this inbound port; not VLESS authentication',
+                    ),
+                    child: Text(
+                      _xrayInboundsProbing.contains(
+                          XrayInboundLatency.key(inbound))
+                          ? '…'
+                          : _xrayInboundRtts.containsKey(
+                              XrayInboundLatency.key(inbound))
+                              ? (_xrayInboundRtts[
+                                      XrayInboundLatency.key(inbound)] == null
+                                  ? tr('بدون پاسخ', 'No reply')
+                                  : 'TCP ${_xrayInboundRtts[
+                                      XrayInboundLatency.key(inbound)]} ms')
+                              : '—',
+                      key: Key('xrayRtt_${nodeId}_${inbound.id}'),
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
+                          color: sub),
+                    ),
+                  ),
+                  IconButton(
+                    key: Key('probeXray_${nodeId}_${inbound.id}'),
+                    tooltip: tr('تست پورت اینباند', 'Probe inbound TCP port'),
+                    onPressed: _xrayInboundsProbing.contains(
+                            XrayInboundLatency.key(inbound))
+                        ? null : () => _probeXrayInbound(inbound),
+                    icon: Icon(Icons.network_ping_rounded,
+                        color: purple, size: 18),
+                  ),
+                  const SizedBox(width: 4),
                   Icon(connected ? Icons.verified_rounded :
                     Icons.power_settings_new_rounded,
                     size: 20,
@@ -2838,7 +2908,10 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           ]),
           const SizedBox(height: 10),
           OutlinedButton.icon(
-            onPressed: _pingAllBusy ? null : _probeAllNodes,
+            onPressed: _pingAllBusy ? null : () {
+              _probeAllNodes();
+              if (_filter == 'v2ray') _probeAllXrayInbounds();
+            },
             icon: const Icon(Icons.network_ping_rounded),
             label: Text(tr('تست پینگ همه سرورها', 'Ping all servers')),
           ),
