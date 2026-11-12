@@ -86,12 +86,18 @@ class WindowsSingBoxTunnel {
     }
   }
 
+  // Optional pre-TUN baseline is measured by this same helper while
+  // Xray independently verifies its upstream. It is never cached across
+  // connections or reused after the system's routes change.
+  static Future<String> measureBaselineIp() => _requestPublicIp();
+
   Future<String> start({
     required String protocol,
     required String serverId,
     required Map<String, dynamic> profile,
     int? xraySocksPort,
     String? xrayVerifiedExitIp,
+    String? baselinePublicIp,
   }) async {
     if (_changing || _child != null) {
       throw const FormatException('SINGBOX_TUNNEL_ALREADY_RUNNING');
@@ -178,10 +184,18 @@ class WindowsSingBoxTunnel {
               throw const FormatException('SINGBOX_SERVER_TRANSPORT_UNREACHABLE');
             })
           : Future<String>.value(xrayVerifiedExitIp!);
-      final baselineCheck = _requestPublicIp().timeout(
-        const Duration(seconds: 10),
-        onTimeout: () => throw const FormatException('BASELINE_IP_UNAVAILABLE'),
-      );
+      if (baselinePublicIp != null &&
+          (InternetAddress.tryParse(baselinePublicIp)?.type !=
+              InternetAddressType.IPv4)) {
+        throw const FormatException('BASELINE_IP_UNAVAILABLE');
+      }
+      final Future<String> baselineCheck = baselinePublicIp != null
+          ? Future<String>.value(baselinePublicIp)
+          : _requestPublicIp().timeout(
+              const Duration(seconds: 10),
+              onTimeout: () =>
+                  throw const FormatException('BASELINE_IP_UNAVAILABLE'),
+            );
       final checked = await Future.wait<String>([proxyCheck, baselineCheck]);
       final verifiedProxyIp = checked[0];
       final before = checked[1];
@@ -273,12 +287,13 @@ class WindowsSingBoxTunnel {
       }
       String? verified;
       var postTunnelHttpSucceeded = false;
-      // Check promptly after TUN creation. Keep approximately the same
-      // overall readiness window as before (16s), but avoid imposing a
-      // mandatory two-second delay on an already healthy connection.
+      // Probe immediately, then use short early backoff. The verified
+      // public IP and installed Windows route are still mandatory gates.
       for (var attempt = 0; attempt < 40; attempt++) {
-        await Future<void>.delayed(
-          const Duration(milliseconds: 400));
+        if (attempt > 0) {
+          await Future<void>.delayed(Duration(milliseconds:
+              attempt < 5 ? 150 : 400));
+        }
         if (exited) {
           throw FormatException(nativeFailure ?? 'SINGBOX_PROCESS_EXITED');
         }
