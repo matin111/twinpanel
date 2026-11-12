@@ -37,7 +37,7 @@ export function SubscriptionAnalytics({breakdown,loaded,pick}:{
  const ring=total>0&&!missing?"conic-gradient("+sections.map(s=>s.sector).join(",")+")":"var(--line)";
  return <div className={styles.subscriptions}>
   <div className={styles.top}>
-   <div className={styles.heading}><span className={styles.eyebrow}>{pick("گزارش وضعیت","SUBSCRIPTION MIX")}</span><h3>{pick("وضعیت اشتراک‌ها","Subscription overview")}</h3><small>{pick("تعداد و سهم واقعی هر وضعیت","Actual counts and distribution")}</small></div>
+   <div className={styles.heading}><h3>{pick("وضعیت اشتراک‌ها","Subscription overview")}</h3></div>
    <Link href="/admin/subscriptions" className={styles.more}>{pick("مشاهده همه","View all")} ↗</Link>
   </div>
   <div className={styles.subBody}>
@@ -50,7 +50,6 @@ export function SubscriptionAnalytics({breakdown,loaded,pick}:{
     <small>{missing?"—":percentText(s.p)}</small>
    </div>)}</div>
   </div>
-  <p className={styles.footnote}>{pick("اعداد از شمارش تجمیعی اشتراک‌های پنل هستند؛ آمار دریافت‌نشده صفر فرض نمی‌شود.","Counts come from the aggregate subscription API; missing data is not treated as zero.")}</p>
  </div>;
 }
 type Tone="good"|"pending"|"bad"|"unknown";
@@ -68,7 +67,7 @@ function paymentTime(row:RuntimeRow,pick:Pick){
 }
 export function RecentPaymentActivity({payments,loaded,pick}:{payments:RuntimeRow[];loaded:boolean;pick:Pick}){
  return <div className={styles.activity}>
-  <div className={styles.top}><div className={styles.heading}><span className={styles.eyebrow}>{pick("آخرین تراکنش‌ها","LATEST TRANSACTIONS")}</span><h3>{pick("فعالیت اخیر","Recent activity")}</h3><small>{pick("آخرین پرداخت‌های ثبت‌شده در پنل","Latest recorded payment events")}</small></div><Link href="/admin/payments" className={styles.more}>{pick("همه تراکنش‌ها","All payments")} ↗</Link></div>
+  <div className={styles.top}><div className={styles.heading}><h3>{pick("فعالیت اخیر","Recent activity")}</h3></div><Link href="/admin/payments" className={styles.more}>{pick("همه تراکنش‌ها","All payments")} ↗</Link></div>
   <div className={styles.activityList}>{payments.length?payments.map((row,index)=>{
    const status=paymentStatus(row),amount=dashboardPaymentAmount(row),id=txt(row,"id")||String(index+1);
    return <Link key={id+"-"+index} href="/admin/payments" className={styles.event}>
@@ -95,7 +94,7 @@ export function ServerFleetVisual({nodes,health,loaded,pick}:{
 }){
  const onlineCount=nodes.filter(node=>String(node.status||"").toLowerCase()==="online").length;
  return <section className={styles.fleet}>
-  <div className={styles.top}><div className={styles.heading}><span className={styles.eyebrow}>{pick("زیرساخت","INFRASTRUCTURE")}</span><h3>{pick("وضعیت سرورها","Server fleet")}</h3><small>{pick("وضعیت نودها، ظرفیت و منابع گزارش‌شده","Node status, capacity and reported resources")}</small></div><div className={styles.fleetActions}><span className={styles.fleetSummary}><i/>{loaded?num(onlineCount)+" / "+num(nodes.length):"—"} {pick("نود آنلاین","nodes online")}</span><Link href="/admin/nodes" className={styles.more}>{pick("مدیریت سرورها","Manage servers")} ↗</Link></div></div>
+  <div className={styles.top}><div className={styles.heading}><h3>{pick("وضعیت سرورها","Server fleet")}</h3></div><div className={styles.fleetActions}><span className={styles.fleetSummary}><i/>{loaded?num(onlineCount)+" / "+num(nodes.length):"—"} {pick("نود آنلاین","nodes online")}</span><Link href="/admin/nodes" className={styles.more}>{pick("مدیریت سرورها","Manage servers")} ↗</Link></div></div>
   <div className={styles.nodeGrid}>{nodes.slice(0,6).map(n=>{
    const row=n as unknown as RuntimeRow,h=health[n.id]||{};
    const status=String(n.status||"").toLowerCase(),state=status==="online"?"online":status==="offline"?"offline":"unknown";
@@ -108,11 +107,11 @@ export function ServerFleetVisual({nodes,health,loaded,pick}:{
    const last=n.last_seen_at?new Date(n.last_seen_at):null;
    return <article key={n.id} className={styles.node} data-state={state}>
     <div className={styles.nodeHead}><span className={styles.country} aria-hidden="true">{flag(n.country_code)}</span><div className={styles.nodeName}><b>{n.name}</b><small dir="ltr">{n.public_ip||n.country_code||"—"}</small></div><span className={styles.nodeStatus}><i/>{state==="online"?pick("آنلاین","Online"):state==="offline"?pick("آفلاین","Offline"):pick("نامشخص","Unknown")}</span></div>
-    <div className={styles.capacity}><div><span>{pick("کاربران نود","Node users")}</span><b dir="ltr">{use?num(used!):"—"} / {cap?num(capacity!):pick("نامحدود","Unlimited")}</b></div><div className={styles.track}><i style={{width:(fullness??0)+"%"}}/></div><small>{fullness==null?pick("ظرفیت محدود ثبت نشده","No finite capacity"):percentText(fullness)+" "+pick("ظرفیت","capacity")}</small></div>
+    <div className={styles.capacity}><div><span>{pick("کاربران نود","Node users")}</span><b dir="ltr">{use?num(used!):"—"} / {cap?num(capacity!):pick("نامحدود","Unlimited")}</b></div><div className={styles.track}><i style={{width:(fullness??0)+"%"}}/></div><small>{fullness==null?"—":percentText(fullness)}</small></div>
     <div className={styles.resources}><ResourceMeter name="CPU" value={cpu}/><ResourceMeter name="RAM" value={ram}/><ResourceMeter name="Disk" value={disk}/></div>
     <div className={styles.nodeFoot}>
       <span className={styles.nodeRole} data-role={String(n.node_type||"").toLowerCase()==="iran"?"iran":"exit"}>{String(n.node_type||"").toLowerCase()==="iran"?pick("ورودی ایران","Iran ingress"):String(n.node_type||"").toLowerCase()==="exit"?pick("سرور خروجی","Exit server"):pick("نود","Node")}</span>
-      <span className={styles.lastSeen}>{last&&!Number.isNaN(last.getTime())?pick("آخرین گزارش","Last seen")+": "+last.toLocaleString(pick("fa-IR","en-US"),{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"}):pick("پایش منابع نود","Node resource telemetry")}</span>
+      <span className={styles.lastSeen}>{last&&!Number.isNaN(last.getTime())?pick("آخرین گزارش","Last seen")+": "+last.toLocaleString(pick("fa-IR","en-US"),{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"}):""}</span>
       <Link href="/admin/nodes" aria-label={pick("مدیریت نود","Manage node")+" "+n.name}>↗</Link>
     </div>
    </article>;
