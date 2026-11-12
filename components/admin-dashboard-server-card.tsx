@@ -1,16 +1,19 @@
 "use client";
 
-import {useEffect,useState} from "react";
+import {useEffect,useId,useState} from "react";
+import type {CSSProperties} from "react";
 import {createPortal} from "react-dom";
 import {API_BASE} from "../lib/api";
 import {getCustomerToken} from "../lib/customer-api";
 import {useI18n} from "../lib/i18n";
+import styles from "./admin-dashboard-server-card.module.css";
 
 type SystemHealth={
   hostname?:string;
-  cpu?:{percent?:number;cores?:number};
+  cpu?:{percent?:number;cores?:number;load_1?:number};
   memory?:{percent?:number;used_bytes?:number;total_bytes?:number};
   disk?:{percent?:number;used_bytes?:number;total_bytes?:number};
+  network?:{rx_mbps?:number;tx_mbps?:number};
   uptime_seconds?:number;
 };
 
@@ -33,13 +36,103 @@ function formatGiB(value:number|undefined){
   return `${(bytes/1073741824).toFixed(bytes>=10737418240?0:1)} GB`;
 }
 
-function Resource({label,value,capacity}:{label:string;value:number|null;capacity?:string}){
-  const safe=value??0;
-  return <div className="dash-server-resource">
-    <div><span>{label}</span><b>{value==null?"—":`${Math.round(value)}%`}</b></div>
-    {capacity?<small>{capacity}</small>:null}
-    <i><em style={{width:`${safe}%`}}/></i>
-  </div>;
+
+type Sample={at:number;cpu:number|null;ram:number|null;disk:number|null;rx:number|null;tx:number|null};
+type Kind="cpu"|"ram"|"disk"|"rx";
+type Pick=(fa:string,en:string)=>string;
+const WINDOW_MS=8*60*1000;
+const MAX_SAMPLES=33;
+const RADIUS=40;
+const CIRCUMFERENCE=2*Math.PI*RADIUS;
+const usage=(value:unknown)=>value===null||value===undefined||value===""?null:percent(value);
+const positive=(value:unknown)=>{
+  if(value===null||value===undefined||value==="")return null;
+  const n=Number(value);
+  return Number.isFinite(n)&&n>=0?n:null;
+};
+const metricPercent=(value:number|null)=>value==null?"—":Math.round(value).toLocaleString("fa-IR")+"%";
+const fmt=(value:number|null)=>value==null?"—":value.toLocaleString("fa-IR",{maximumFractionDigits:2});
+const serverSample=(health:SystemHealth):Sample=>({
+  at:Date.now(),cpu:usage(health.cpu?.percent),ram:usage(health.memory?.percent),
+  disk:usage(health.disk?.percent),rx:positive(health.network?.rx_mbps),
+  tx:positive(health.network?.tx_mbps),
+});
+
+function smoothPath(points:{x:number;y:number}[]){
+  if(points.length<2)return "";
+  let result="M "+points[0].x.toFixed(2)+" "+points[0].y.toFixed(2);
+  for(let i=1;i<points.length;i++){
+    const a=points[i-1],b=points[i],dx=(b.x-a.x)*.34;
+    result+=" C "+(a.x+dx).toFixed(2)+" "+a.y.toFixed(2)+
+      " "+(b.x-dx).toFixed(2)+" "+b.y.toFixed(2)+
+      " "+b.x.toFixed(2)+" "+b.y.toFixed(2);
+  }
+  return result;
+}
+
+function ResourceTrend({samples,kind,pick}:{samples:Sample[];kind:Kind;pick:Pick}){
+  const uid=useId().replace(/:/g,"");
+  const valid=samples.filter(row=>row[kind]!=null);
+  if(!valid.length)return <div className={styles.awaiting}>{pick("در انتظار داده زنده","Waiting for live samples")}</div>;
+  const last=valid[valid.length-1];
+  const peak=kind==="rx"?Math.max(1,...valid.map(x=>x.rx||0))*1.15:100;
+  const points=valid.map(row=>({
+    x:10+Math.max(0,Math.min(1,(row.at-(last.at-WINDOW_MS))/WINDOW_MS))*300,
+    y:70-((row[kind]||0)/peak)*56,
+  }));
+  const line=smoothPath(points),end=points[points.length-1],first=points[0];
+  const area=line?line+" L "+end.x.toFixed(2)+" 70 L "+first.x.toFixed(2)+" 70 Z":"";
+  const gradient="server-area-"+uid;
+  return <svg className={styles.trend} viewBox="0 0 320 80" preserveAspectRatio="none"
+    role="img" aria-label={pick("روند استفاده؛ "+valid.length.toLocaleString("fa-IR")+" نمونه واقعی",
+                           "Usage trend from "+valid.length+" real samples")}>
+    <defs><linearGradient id={gradient} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="var(--metric)" stopOpacity=".22"/><stop offset="100%" stopColor="var(--metric)" stopOpacity="0"/></linearGradient></defs>
+    <path className={styles.grid} d="M 10 42 H 310 M 10 70 H 310"/>
+    {area&&<path d={area} fill={"url(#"+gradient+")"} className={styles.area}/>}
+    {line&&<path d={line} className={styles.line}/>}
+    <circle cx={end.x} cy={end.y} r="9" className={styles.halo}/>
+    <circle cx={end.x} cy={end.y} r="4" className={styles.point}/>
+  </svg>;
+}
+
+function ResourceGauge({kind,label,value,capacity,samples,pick}:{
+  kind:"cpu"|"ram"|"disk";label:string;value:number|null;
+  capacity:string;samples:Sample[];pick:Pick;
+}){
+  const danger=value!=null&&value>=90;
+  const warning=value!=null&&value>=75&&!danger;
+  const color=danger?"#f07483":warning?"#e4ae57":kind==="cpu"?"#9b80ff":kind==="ram"?"#22c8c4":"#63a1ff";
+  const status=value==null?pick("بدون داده","No data"):danger?pick("مصرف بحرانی","Critical"):warning?pick("مصرف بالا","Elevated"):pick("مصرف عادی","Normal");
+  const dash=(CIRCUMFERENCE*(value||0)/100).toFixed(2)+" "+CIRCUMFERENCE.toFixed(2);
+  return <article className={styles.resource} style={{"--metric":color} as CSSProperties}>
+    <div className={styles.resourceHeader}><div><span>{pick("میزان استفاده","UTILIZATION")}</span><h3>{label}</h3></div><small className={styles.state}><i/>{status}</small></div>
+    <div className={styles.resourceBody}>
+      <div className={styles.gauge}>
+        <svg viewBox="0 0 112 112" role="img" aria-label={label+" "+metricPercent(value)}>
+          <circle className={styles.gaugeTrack} cx="56" cy="56" r={RADIUS}/>
+          <circle className={styles.gaugeProgress} cx="56" cy="56" r={RADIUS} strokeDasharray={dash}/>
+        </svg>
+        <div className={styles.gaugeValue}><strong>{metricPercent(value)}</strong><small>{pick("مصرف‌شده","USED")}</small></div>
+      </div>
+      <div className={styles.resourceMeta}><b dir="ltr">{capacity}</b><span>{pick("وضعیت فعلی سرور","Current server usage")}</span></div>
+    </div>
+    <div className={styles.trendHeader}><span>{pick("روند مصرف","USAGE TREND")}</span><span>{pick("۸ دقیقه اخیر","Last 8 min")}</span></div>
+    <ResourceTrend samples={samples} kind={kind} pick={pick}/>
+  </article>;
+}
+
+function NetworkGauge({health,samples,pick}:{health:SystemHealth|null;samples:Sample[];pick:Pick}){
+  const rx=positive(health?.network?.rx_mbps);
+  const tx=positive(health?.network?.tx_mbps);
+  return <article className={styles.resource} style={{"--metric":"#21cda5"} as CSSProperties}>
+    <div className={styles.resourceHeader}><div><span>{pick("نرخ انتقال لحظه‌ای","LIVE THROUGHPUT")}</span><h3>{pick("شبکه","Network")}</h3></div><small className={styles.state}><i/>{pick("لحظه‌ای","Live")}</small></div>
+    <div className={styles.networkMetrics}>
+      <div><i className={styles.download}>↓</i><span>{pick("دریافت","Download")}</span><b>{fmt(rx)} <small>Mbps</small></b></div>
+      <div><i className={styles.upload}>↑</i><span>{pick("ارسال","Upload")}</span><b>{fmt(tx)} <small>Mbps</small></b></div>
+    </div>
+    <div className={styles.trendHeader}><span>{pick("روند دریافت","DOWNLOAD TREND")}</span><span>{pick("۸ دقیقه اخیر","Last 8 min")}</span></div>
+    <ResourceTrend samples={samples} kind="rx" pick={pick}/>
+  </article>;
 }
 
 export function AdminDashboardServerCard(){
