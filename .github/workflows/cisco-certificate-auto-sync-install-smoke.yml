@@ -1,0 +1,32 @@
+name: Cisco Certificate Auto Sync Install Smoke
+
+on:
+  push:
+    paths:
+      - 'backend/scripts/twinpanel_cisco_cert_pin_sync_v1.py'
+      - 'backend/scripts/twinpanel_public_updater.py'
+      - 'backend/routers/**'
+      - 'backend/app/routers/account_delivery.py'
+      - 'backend/tests/test_cisco_cert_auto_sync_install_v1.py'
+      - 'installer/install.sh'
+      - 'deploy/systemd/twinpanel-cisco-pin-sync.*'
+      - '.github/workflows/cisco-certificate-auto-sync-install-smoke.yml'
+  pull_request:
+    paths:
+      - 'backend/scripts/twinpanel_cisco_cert_pin_sync_v1.py'
+      - 'backend/scripts/twinpanel_public_updater.py'
+      - 'backend/app/routers/account_delivery.py'
+      - 'backend/tests/test_cisco_cert_auto_sync_install_v1.py'
+      - 'installer/install.sh'
+      - 'deploy/systemd/twinpanel-cisco-pin-sync.*'
+      - '.github/workflows/cisco-certificate-auto-sync-install-smoke.yml'
+
+jobs:
+  install-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify installer and updater always register Cisco pin sync
+        run: |
+          python3 -m unittest discover -s backend/tests -p 'test_cisco_cert_auto_sync_install_v1.py' -v
+          bash -n installer/install.sh

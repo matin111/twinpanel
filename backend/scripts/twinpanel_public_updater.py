@@ -428,6 +428,21 @@ def install_node_auto_backfill_timer(release: Path) -> None:
     run(["systemctl", "enable", "--now", "twinpanel-node-auto-backfill.timer"], timeout=20)
 
 
+def install_cisco_cert_pin_timer(release: Path) -> None:
+    """Install Cisco certificate trust sync from the verified update release."""
+    names = ("twinpanel-cisco-pin-sync.service", "twinpanel-cisco-pin-sync.timer")
+    for name in names:
+        source = release / "deploy/systemd" / name
+        if not source.is_file():
+            return
+        target = Path("/etc/systemd/system") / name
+        if not same_file(source, target):
+            shutil.copyfile(source, target)
+            target.chmod(0o644)
+    run(["systemctl", "daemon-reload"], timeout=20)
+    run(["systemctl", "enable", "--now", "twinpanel-cisco-pin-sync.timer"], timeout=20)
+
+
 def health_ok(url: str, expected_version: str) -> bool:
     try:
         req = urllib.request.Request(url, headers={'User-Agent': 'TwinPanel-Update-Health/3'})
@@ -1023,6 +1038,7 @@ def main() -> int:
             if not bg.readiness(bg_ports[1], version, final):
                 raise RuntimeError('WEB_POST_CUTOVER_CANARY_FAILED')
         install_node_auto_backfill_timer(final)
+        install_cisco_cert_pin_timer(final)
         # Visibility is best-effort and must never roll back a healthy
         # production deployment because a monitoring timer is unavailable.
         try:
