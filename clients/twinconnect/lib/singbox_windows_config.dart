@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'singbox_profile_validator.dart';
+import 'xray_endpoint_route.dart';
 
 /// Prepares an isolated Windows TUN config IN MEMORY.
 /// Only a privileged and verified native runner may apply it. This function
@@ -16,6 +17,7 @@ class SingBoxWindowsConfig {
     int? telemetryPort,
     String? telemetrySecret,
     int? xraySocksPort,
+    String? xrayEndpointIPv4,
   }) {
     // An app-owned, loopback-only Xray-core SOCKS bridge is the sole
     // supported external outbound. Never accept an arbitrary proxy host.
@@ -24,6 +26,13 @@ class SingBoxWindowsConfig {
          xraySocksPort > 65535 || resolvedServer != null)) {
       throw const FormatException('XRAY_SOCKS_BRIDGE_INVALID');
     }
+    if ((xraySocksPort == null) != (xrayEndpointIPv4 == null)) {
+      throw const FormatException('XRAY_ENDPOINT_ROUTE_MISSING');
+    }
+    // A narrow /32 exception only for the exact preverified VLESS server.
+    // Never make a general LAN/IPv4 exception or weaken strict_route.
+    final endpointRoute = xrayEndpointIPv4 == null
+        ? null : XrayEndpointRoute.requirePublicIPv4(xrayEndpointIPv4);
     final outbound = xraySocksPort == null
         ? SingBoxProfileValidator.validateOutbound(
             protocolCode: protocol, item: item)
@@ -100,6 +109,8 @@ class SingBoxWindowsConfig {
           'mtu': 1400,
           'auto_route': true,
           'strict_route': true,
+          if (endpointRoute != null)
+            'route_exclude_address': ['$endpointRoute/32'],
           'dns_mode': 'hijack',
         },
       ],
