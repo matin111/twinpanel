@@ -1706,6 +1706,7 @@ async def singbox_native_accounting_loop() -> None:
                     continue
 
             started = time.monotonic()
+            result = None
             try:
                 result = await reconcile_singbox_quota_once()
                 if not bool(result.get("ok")):
@@ -1733,9 +1734,13 @@ async def singbox_native_accounting_loop() -> None:
                     flush=True,
                 )
 
+            # Avoid a CPU/DB hot-loop when a full fleet collection takes
+            # longer than the nominal 45-second accounting interval.
+            # Errors back off longer; source-unavailable is not zero traffic.
+            min_rest = 15.0 if result is None or not result.get("ok", False) else 5.0
             delay = max(
                 SINGBOX_ACCOUNTING_INTERVAL_SECONDS - (time.monotonic() - started),
-                0.25,
+                min_rest,
             )
             await asyncio.sleep(delay)
     finally:
