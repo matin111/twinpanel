@@ -90,6 +90,8 @@ class WindowsSingBoxTunnel {
     required String protocol,
     required String serverId,
     required Map<String, dynamic> profile,
+    int? xraySocksPort,
+    String? xrayVerifiedExitIp,
   }) async {
     if (_changing || _child != null) {
       throw const FormatException('SINGBOX_TUNNEL_ALREADY_RUNNING');
@@ -106,8 +108,17 @@ class WindowsSingBoxTunnel {
       // Bootstrap the selected endpoint on the physical network BEFORE
       // strict-route TUN changes system DNS or routes. Use the same pinned IP
       // for the real tunnel, retaining the original TLS server_name.
-      final outbound = SingBoxProfileValidator.validateOutbound(
-        protocolCode: protocol, item: profile);
+      if ((xraySocksPort == null) != (xrayVerifiedExitIp == null) ||
+          (xraySocksPort != null &&
+           (protocol != 'v2ray' || xraySocksPort < 1024 ||
+            xraySocksPort > 65535 ||
+            InternetAddress.tryParse(xrayVerifiedExitIp!) == null))) {
+        throw const FormatException('XRAY_PROXY_NOT_VERIFIED');
+      }
+      final outbound = xraySocksPort == null
+          ? SingBoxProfileValidator.validateOutbound(
+              protocolCode: protocol, item: profile)
+          : <String, dynamic>{'server': '127.0.0.1'};
       final endpoint = outbound['server'] as String;
       String? resolvedServer;
       if (InternetAddress.tryParse(endpoint) == null) {
@@ -149,7 +160,8 @@ class WindowsSingBoxTunnel {
           .map((value) => value.toRadixString(16).padLeft(2, '0')).join();
       final config = SingBoxWindowsConfig.compose(
         protocol: protocol, item: profile, resolvedServer: resolvedServer,
-        telemetryPort: telemetryPort, telemetrySecret: telemetrySecret);
+        telemetryPort: telemetryPort, telemetrySecret: telemetrySecret,
+        xraySocksPort: xraySocksPort);
       if (!await WindowsSingBoxPreflight.checkInMemory(config)) {
         throw const FormatException('SINGBOX_TUN_CONFIG_INVALID');
       }
@@ -158,12 +170,14 @@ class WindowsSingBoxTunnel {
       // A failure here points to profile/transport rather than TUN routing.
       // Both checks are read-only and independent. Run concurrently so
       // connection setup does not wait for their latencies sequentially.
-      final proxyCheck = ModernTransportProbe.verify(
-        protocol: protocol, profile: profile,
-        resolvedServer: resolvedServer,
-      ).then((result) => result.publicIp).catchError((Object _) {
-        throw const FormatException('SINGBOX_SERVER_TRANSPORT_UNREACHABLE');
-      });
+      final Future<String> proxyCheck = xraySocksPort == null
+          ? ModernTransportProbe.verify(
+              protocol: protocol, profile: profile,
+              resolvedServer: resolvedServer,
+            ).then((result) => result.publicIp).catchError((Object _) {
+              throw const FormatException('SINGBOX_SERVER_TRANSPORT_UNREACHABLE');
+            })
+          : Future<String>.value(xrayVerifiedExitIp!);
       final baselineCheck = _requestPublicIp().timeout(
         const Duration(seconds: 10),
         onTimeout: () => throw const FormatException('BASELINE_IP_UNAVAILABLE'),
