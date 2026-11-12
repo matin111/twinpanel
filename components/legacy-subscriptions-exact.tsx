@@ -579,6 +579,64 @@ export function LegacySubscriptionsRuntimePage(){
           @media(max-width:760px){
             .legacy-subscriptions-page .mobile-subscription-cards{grid-template-columns:1fr}
           }
+
+        /* Light mode must invert the complete subscription card, not only the page. */
+        html[data-theme="light"] .legacy-subscriptions-page .mobile-subscription-card{
+          color:#1c2941;
+          background:linear-gradient(155deg,#ffffff 0%,#f8faff 66%,#f1f5ff 100%);
+          border-color:#d7dff0;
+          box-shadow:0 9px 24px rgba(48,66,108,.08),inset 0 1px 0 #fff;
+        }
+        html[data-theme="light"] .legacy-subscriptions-page .mobile-subscription-card:hover{
+          border-color:#aa99f0;
+          box-shadow:0 14px 28px rgba(63,77,140,.12);
+        }
+        html[data-theme="light"] .legacy-subscriptions-page .mobile-subscription-identities b{
+          color:#1b2a45;
+        }
+        html[data-theme="light"] .legacy-subscriptions-page .mobile-subscription-identities small,
+        html[data-theme="light"] .legacy-subscriptions-page .mobile-subscription-meta,
+        html[data-theme="light"] .legacy-subscriptions-page .mobile-subscription-usage>div>small{
+          color:#51637e;
+        }
+        html[data-theme="light"] .legacy-subscriptions-page .mobile-subscription-meta>span{
+          color:#3c4f6b;
+        }
+        html[data-theme="light"] .legacy-subscriptions-page .mobile-subscription-plan{
+          color:#17549f;
+          background:#e8f1ff;
+          border-color:#b7d1fa;
+        }
+        html[data-theme="light"] .legacy-subscriptions-page .mobile-subscription-usage{
+          border-top-color:#e0e7f1;
+        }
+        html[data-theme="light"] .legacy-subscriptions-page .mobile-subscription-usage .user-cell b,
+        html[data-theme="light"] .legacy-subscriptions-page .mobile-subscription-usage>div>strong,
+        html[data-theme="light"] .legacy-subscriptions-page .mobile-subscription-usage>div>b{
+          color:#1b2a45;
+        }
+        html[data-theme="light"] .legacy-subscriptions-page .mobile-subscription-more{
+          border-top-color:#e0e7f1;
+        }
+        html[data-theme="light"] .legacy-subscriptions-page .mobile-subscription-more summary{
+          color:#3b4d69;
+        }
+        html[data-theme="light"] .legacy-subscriptions-page .subscription-presence-online{
+          color:#087f61;background:#e3f8ee;border-color:#a9e1ca;
+        }
+        html[data-theme="light"] .legacy-subscriptions-page .subscription-presence-offline{
+          color:#536580;background:#eef2f8;border-color:#d2dce9;
+        }
+        html[data-theme="light"] .legacy-subscriptions-page .subscription-presence-unknown{
+          color:#8c5d05;background:#fff5dd;border-color:#eed49f;
+        }
+        html[data-theme="light"] .legacy-subscriptions-page .mobile-subscription-more-actions button{
+          box-shadow:0 2px 7px rgba(40,56,93,.09);
+        }
+        html[data-theme="light"] .legacy-subscriptions-page .mobile-action:focus-visible,
+        html[data-theme="light"] .legacy-subscriptions-page .mobile-subscription-more summary:focus-visible{
+          outline:2px solid #7056d9;outline-offset:2px;
+        }
         @media(max-width:355px){
           .legacy-subscriptions-page .mobile-subscription-actions{grid-template-columns:repeat(2,minmax(0,1fr))}
         }

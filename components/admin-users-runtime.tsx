@@ -137,6 +137,63 @@ export function AdminUsersRuntime(){
         .admin-users-runtime .admin-user-action.danger{border-color:rgba(244,93,115,.35);color:#ff9aa9}
         .admin-users-runtime .admin-user-action:hover:not(:disabled){background:rgba(91,74,167,.32);border-color:rgba(165,146,255,.7)}
         .admin-users-runtime .admin-user-action:disabled{opacity:.42;cursor:not-allowed}
+
+        /* Explicit contrast-safe light-mode palette for the customer grid. */
+        html[data-theme="light"] .admin-users-runtime .admin-user-card{
+          color:#1c2941;
+          background:linear-gradient(155deg,#fff 0%,#f8faff 70%,#f1f5ff 100%);
+          border-color:#d7dff0;
+          box-shadow:0 9px 24px rgba(48,66,108,.08),inset 0 1px 0 #fff;
+        }
+        html[data-theme="light"] .admin-users-runtime .admin-user-card:hover{
+          border-color:#aa99f0;
+          box-shadow:0 14px 28px rgba(63,77,140,.12);
+        }
+        html[data-theme="light"] .admin-users-runtime .admin-user-names b,
+        html[data-theme="light"] .admin-users-runtime .admin-user-contact b,
+        html[data-theme="light"] .admin-users-runtime .admin-user-card-meta b{
+          color:#1c2941;
+        }
+        html[data-theme="light"] .admin-users-runtime .admin-user-names small,
+        html[data-theme="light"] .admin-users-runtime .admin-user-contact small,
+        html[data-theme="light"] .admin-users-runtime .admin-user-card-meta small,
+        html[data-theme="light"] .admin-users-runtime .admin-user-account-count small{
+          color:#51637e;
+        }
+        html[data-theme="light"] .admin-users-runtime .admin-user-contact{
+          background:#f1f5fb;
+          border-color:#dce5f1;
+        }
+        html[data-theme="light"] .admin-users-runtime .admin-user-account-count{
+          background:#f1f5fc;
+          border-color:#dce5f1;
+        }
+        html[data-theme="light"] .admin-users-runtime .admin-user-account-count b{
+          color:#29549e;
+        }
+        html[data-theme="light"] .admin-users-runtime .admin-user-action{
+          background:#f7f9fe;
+          color:#314361;
+          border-color:#cbd6e8;
+        }
+        html[data-theme="light"] .admin-users-runtime .admin-user-action.edit{
+          color:#1554a4;background:#edf4ff;border-color:#a9c5f1;
+        }
+        html[data-theme="light"] .admin-users-runtime .admin-user-action.password{
+          color:#664bbb;background:#f3edff;border-color:#d2c3f7;
+        }
+        html[data-theme="light"] .admin-users-runtime .admin-user-action.danger{
+          color:#b42340;background:#fff1f2;border-color:#f5c0c9;
+        }
+        html[data-theme="light"] .admin-users-runtime .admin-user-action:hover:not(:disabled){
+          color:#362e78;background:#edeaff;border-color:#a997ed;
+        }
+        html[data-theme="light"] .admin-users-runtime .admin-user-action.danger:hover:not(:disabled){
+          color:#941c33;background:#fee5ea;border-color:#e9a5b4;
+        }
+        html[data-theme="light"] .admin-users-runtime .admin-user-card button:focus-visible{
+          outline:2px solid #7056d9;outline-offset:2px;
+        }
         @media(max-width:1200px){.admin-users-runtime .admin-user-cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
         @media(max-width:720px){.admin-users-runtime .admin-user-cards{grid-template-columns:minmax(0,1fr);gap:10px}.admin-users-runtime .admin-user-card{padding:13px}.admin-users-runtime .admin-user-contact{grid-template-columns:repeat(2,minmax(0,1fr))}}
         @media(prefers-reduced-motion:reduce){.admin-users-runtime .admin-user-card{transition:none}.admin-users-runtime .admin-user-card:hover{transform:none}}

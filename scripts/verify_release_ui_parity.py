@@ -24,6 +24,9 @@ PROTECTED_FILES = (
     "components/admin-dashboard-lower-panels.module.css",
     "components/admin-dashboard-network-panels.tsx",
     "components/admin-dashboard-network-panels.module.css",
+    "components/legacy-subscriptions-exact.tsx",
+    "components/admin-users-runtime.tsx",
+    "components/central-app-brand-studio.css",
 )
 
 
@@ -113,6 +116,37 @@ def verify_ui_release(source: Path, reference: Path, *, check_bundle: bool = Fal
     if not all(marker in lower for marker in ("fleetSummary", "nodeRole")):
         raise ValueError("Modern node fleet status summary or role badges missing")
 
+    # The dark-mode-only admin roster cards rendered unreadable when the
+    # global page theme became light. Keep explicit, scoped light-mode rules
+    # for subscriptions, users, and the branded app settings editor.
+    roster_subs = (source / PROTECTED_FILES[11]).read_text(encoding="utf-8")
+    roster_users = (source / PROTECTED_FILES[12]).read_text(encoding="utf-8")
+    brand_css = (source / PROTECTED_FILES[13]).read_text(encoding="utf-8")
+    if not all(marker in roster_subs for marker in (
+        'html[data-theme="light"] .legacy-subscriptions-page .mobile-subscription-card',
+        'html[data-theme="light"] .legacy-subscriptions-page .mobile-subscription-identities b',
+        'html[data-theme="light"] .legacy-subscriptions-page .mobile-subscription-usage',
+        'html[data-theme="light"] .legacy-subscriptions-page .subscription-presence-offline',
+        "mobile-subscription-actions", "toggleStatus(item)"
+    )):
+        raise ValueError("Subscription roster light-mode contrast or actions are missing")
+    if not all(marker in roster_users for marker in (
+        'html[data-theme="light"] .admin-users-runtime .admin-user-card',
+        'html[data-theme="light"] .admin-users-runtime .admin-user-contact',
+        'html[data-theme="light"] .admin-users-runtime .admin-user-action',
+        'html[data-theme="light"] .admin-users-runtime .admin-user-account-count',
+        "adminApi.usersFastPage", "adminApi.toggleUser"
+    )):
+        raise ValueError("User roster light-mode contrast or actions are missing")
+    if not all(marker in brand_css for marker in (
+        'html[data-theme="light"] .tbs-page',
+        'html[data-theme="light"] .tbs-page .tbs-tabs',
+        'html[data-theme="light"] .tbs-page .tbs-readonly',
+        'html[data-theme="light"] .tbs-page .tbs-preview',
+        'html[data-theme="light"] .tbs-page .tbs-save:disabled'
+    )):
+        raise ValueError("App Brand Studio light-mode input, tab, or preview contrast is missing")
+
     if check_bundle:
         bundle = source / ".next/standalone/.next/static"
         if not bundle.is_dir():
@@ -142,6 +176,24 @@ def verify_ui_release(source: Path, reference: Path, *, check_bundle: bool = Fal
             for path in bundle.rglob("*.js")
         ):
             raise ValueError("Compiled production assets are missing the modern tunnel and protocol monitors")
+        # Validate the actual browser-delivered bundles as well as checked-in
+        # source so a stale Next.js artifact cannot silently ship dark roster
+        # cards under a light page theme.
+        light_sub = b'html[data-theme="light"] .legacy-subscriptions-page .mobile-subscription-card'
+        light_user = b'html[data-theme="light"] .admin-users-runtime .admin-user-card'
+        compiled_js = tuple(bundle.rglob("*.js"))
+        for marker, screen in (
+            (light_sub, "subscription"),
+            (light_user, "user"),
+        ):
+            if not any(marker in path.read_bytes() for path in compiled_js):
+                raise ValueError(f"Compiled production assets are missing {screen} light-mode card styles")
+        if not any(
+            b'html[data-theme=light] .tbs-page .tbs-tabs' in path.read_bytes()
+            and b'--tbs-input:#f8faff' in path.read_bytes()
+            for path in bundle.rglob("*.css")
+        ):
+            raise ValueError("Compiled production CSS is missing App Brand Studio light-mode styles")
 
 
 def main() -> None:
