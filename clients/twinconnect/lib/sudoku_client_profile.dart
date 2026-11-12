@@ -1,0 +1,106 @@
+import 'dart:convert';
+
+/// Official SUDOKU-ASCII standalone client format; NOT sing-box / Xray.
+/// Only the panel's active centrally shared, per-subscription credentials
+/// are accepted. This parser never changes account keys or node settings.
+class SudokuClientProfile {
+  const SudokuClientProfile({
+    required this.nodeId,
+    required this.host,
+    required this.port,
+    required this.config,
+  });
+
+  final String nodeId;
+  final String host;
+  final int port;
+  final Map<String, dynamic> config;
+
+  static SudokuClientProfile? fromItem(
+      Map<String, dynamic> item, String nodeId) {
+    if (nodeId.isEmpty || item['node_id']?.toString() != nodeId ||
+        item['config_format'] != 'sudoku-json') return null;
+    dynamic raw = item['config'];
+    if (raw is! String || raw.isEmpty || raw.length > 16384) return null;
+    try {
+      raw = jsonDecode(raw);
+      if (raw is! Map<String, dynamic> ||
+          raw['mode'] != 'client' || raw['transport'] != 'tcp') return null;
+      final endpoint = raw['server_address'];
+      final key = raw['key'];
+      if (endpoint is! String || endpoint.length > 300 ||
+          key is! String ||
+          !RegExp(r'^(?:[a-fA-F0-9]{64}|[a-fA-F0-9]{128})$')
+              .hasMatch(key)) return null;
+      final parsed = Uri.tryParse('tcp://$endpoint');
+      if (parsed == null || parsed.userInfo.isNotEmpty ||
+          parsed.host.isEmpty || !parsed.hasPort ||
+          parsed.port != 18553 || parsed.path.isNotEmpty ||
+          parsed.query.isNotEmpty || parsed.fragment.isNotEmpty) return null;
+      // Fail closed on unsupported or intentionally weakened crypto.
+      if (raw['aead'] != 'chacha20-poly1305' &&
+          raw['aead'] != 'aes-128-gcm') return null;
+      if (raw['enable_pure_downlink'] != true) return null;
+      final ascii = raw['ascii'];
+      if (ascii != 'prefer_entropy' && ascii != 'prefer_ascii') return null;
+      final paddingMin = raw['padding_min'], paddingMax = raw['padding_max'];
+      if (paddingMin is! int || paddingMax is! int ||
+          paddingMin < 0 || paddingMax > 100 || paddingMax < paddingMin) {
+        return null;
+      }
+      final mask = raw['httpmask'];
+      if (mask is! Map || mask['disable'] != false ||
+          mask['mode'] != 'auto') return null;
+      if (raw['multiplex'] != 'off') return null;
+      // Keep the original node-approved obfuscation settings, but never
+      // accept controller, routing or server-mode instructions in a user
+      // profile. Only known fields will be serialized for the core.
+      return SudokuClientProfile(
+        nodeId: nodeId, host: parsed.host, port: parsed.port,
+        config: Map<String, dynamic>.from(raw),
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Set a new loopback port, preserve the original per-user Sudoku split key
+  /// and mask; pin the public server IPv4 before Windows TUN routing begins.
+  Map<String, dynamic> runtimeConfig({
+    required String serverIpv4,
+    required int localPort,
+  }) {
+    if (localPort < 1024 || localPort > 65535) {
+      throw const FormatException('SUDOKU_LOCAL_PORT_INVALID');
+    }
+    final mask = Map<String, dynamic>.from(config['httpmask'] as Map);
+    return {
+      'mode': 'client',
+      'transport': 'tcp',
+      'server_address': '$serverIpv4:$port',
+      'local_address': '127.0.0.1',
+      'local_port': localPort,
+      'key': config['key'],
+      'aead': config['aead'],
+      'padding_min': config['padding_min'],
+      'padding_max': config['padding_max'],
+      'ascii': config['ascii'],
+      'enable_pure_downlink': true,
+      'multiplex': 'off',
+      'httpmask': {
+        'disable': false,
+        'mode': 'auto',
+        if (mask['tls'] is bool) 'tls': mask['tls'],
+        if (mask['host'] is String &&
+            (mask['host'] as String).trim().isNotEmpty)
+          'host': mask['host'],
+        if (mask['path_root'] is String &&
+            (mask['path_root'] as String).trim().isNotEmpty)
+          'path_root': mask['path_root'],
+      },
+      // Never fetch external rule lists or allow a direct egress decision
+      // from the standalone core: the TUN's SOCKS proxy is full tunnel.
+      'rule_urls': ['global'],
+    };
+  }
+}
