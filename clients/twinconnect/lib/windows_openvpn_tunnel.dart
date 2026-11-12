@@ -67,9 +67,13 @@ class WindowsOpenVpnTunnel {
   // Do not announce online unless a genuine public IPv4 differs from baseline.
   static Future<String> verifiedEgressAfterConnect(String baseline) async {
     Object? last;
-    for (var attempt = 0; attempt < 5; attempt++) {
+    // Probe immediately, then use shorter early backoff while Windows
+    // installs the route. Preserve the overall verification window and
+    // always require a different observed public IP before declaring online.
+    for (var attempt = 0; attempt < 10; attempt++) {
       if (attempt > 0) {
-        await Future<void>.delayed(const Duration(seconds: 2));
+        await Future<void>.delayed(Duration(milliseconds:
+            attempt <= 2 ? 350 : attempt <= 4 ? 750 : 1500));
       }
       try {
         final ip = await publicIp().timeout(const Duration(seconds: 7));
