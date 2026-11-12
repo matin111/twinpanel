@@ -46,7 +46,8 @@ const menuGroups=[
   {fa:"محتوا و برند",en:"Content & Brand",items:[
     ["مدیریت بلاگ","Blog Manager","/admin/store-blog","✎"],
     ["فایل‌های دانلود","Downloads","/admin/downloads","⇩"],
-    ["برندینگ","Branding","/admin/branding","✦"]
+    ["برندینگ","Branding","/admin/branding","✦"],
+    ["مدیریت اپ هوشمند","Smart App","/admin/smart-app","◉"]
   ]},
   {fa:"سیستم و نگهداری",en:"System & Maintenance",items:[
     ["لایسنس","License","/admin/license","◇"],
