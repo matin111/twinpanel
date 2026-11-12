@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.792",
+  "version": "1.1.0-rc.793",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-12T04:35:43Z",
+  "released_at": "2026-11-12T05:17:51Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "73ef8e11092bc66bef18384c29be4296a96d4a18",
+  "source_sha": "e31a3571da0f312baeb347bd5872383b5645e4f3",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.792/twinpanel-1.1.0-rc.792-linux-x86_64.tar.gz",
-    "sha256": "a20b20804e69b1eaf4f8959ef1d2b4228811a249f0feeaaeb45a1d6ce7474f3b",
-    "size_bytes": 30623699
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.793/twinpanel-1.1.0-rc.793-linux-x86_64.tar.gz",
+    "sha256": "e47d2c82be2d0a41de765eba6d0dae70c3d835b7417e8a76938b46dc8bd32644",
+    "size_bytes": 30623077
   },
   "notes": {
-    "fa": "بازطراحی حرفه‌ای بخش تانل‌ها و پروتکل‌های داشبورد؛ نمایش مسیر واقعی ایران به خروجی، نوع انتقال و تأخیر گزارش‌شده، کارت‌های پروتکل با فیلتر همه/کلاسیک/مدرن و شمارش صحیح ۱۶ پروتکل، تفکیک وضعیت آنلاین/آفلاین/نامشخص، تعداد آنلاین نودها و نشان ورودی ایران/سرور خروجی. دارک‌مود و لایت‌مود، موبایل و محافظت از ظاهر در آپدیت‌های بعدی. بدون تغییر کانفیگ سرورها یا اطلاعات مشتریان.",
-    "en": "Professional dark/light admin dashboard tunnel-route monitor and accurate 16-protocol status matrix with All/Classic/Modern filters, real reported latency and states, node online summary and Iran/Exit role badges. Responsive and release-parity protected; existing VPN/user/payment configurations unchanged."
+    "fa": "حذف کامل توضیحات اضافی و تکراری در داشبورد مدیریت، نمودار فروش، مانیتور منابع سرور، وضعیت سرویس‌ها، فعالیت‌های اخیر، اشتراک‌ها، نودها، تانل‌ها و پروتکل‌ها. حفظ اطلاعات ضروری شامل عنوان، اعداد، وضعیت، نمودار و دکمه‌های مدیریتی با چیدمان خلاصه‌تر و پشتیبانی از دارک‌مود و لایت‌مود. بدون تغییر در تنظیمات VPN، کیف پول و اطلاعات کاربران.",
+    "en": "Remove decorative and explanatory copy throughout the admin dashboard, sales and control-server charts, service health, payments, subscriptions, nodes, tunnels and protocols. Retain essential labels, numerical telemetry, filters, statuses and actions; compact responsive light/dark layout and release parity tests. No VPN, wallet or customer data changes."
   }
 }
