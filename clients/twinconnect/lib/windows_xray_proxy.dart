@@ -177,6 +177,14 @@ class WindowsXrayProxy {
     }
   }
 
+  /// Best-effort process cleanup when the dashboard is disposed.
+  void dispose() {
+    _child?.kill();
+    _child = null;
+    _port = null;
+    _verifiedExitIp = null;
+  }
+
   Future<void> stop() async {
     if (_changing) throw const FormatException('XRAY_PROXY_BUSY');
     _changing = true;
