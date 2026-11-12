@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.811",
-  "source_sha": "aaed9d4d678cdaa0bb7fa3788ea4d61cec6e40b4",
+  "version": "1.1.0-rc.812",
+  "source_sha": "01a2ad62f599e0fc402311ca2d1849d8be183822",
   "notes": {
-    "fa": "رفع تعلیق اشتباه اشتراک‌های تازه در زمان آماده‌سازی: اعتبارسنجی سهمیه تنها برای اکانت تازه با نگاشت رسمی نود انجام می‌شود، نه بازسازی همه کاربران. کنترل سخت‌گیرانه سهمیه و مسیر اصلی برای موارد ناقص حفظ می‌شوند؛ اطلاعات و وضعیت اشتراک‌های قدیمی تغییر نمی‌کند.",
-    "en": "Fix false suspensions of newly created accounts caused by the 20-second full-fleet quota sync deadline. Validate the new account's own canonical quota-agent mappings; retain fail-closed full synchronization fallback and existing account/traffic enforcement unchanged."
+    "fa": "بهینه‌سازی و صحت‌سنجی حسابداری ۱۶ پروتکل: رفع خطای آفلاین TrustTunnel، جلوگیری از تولید صدها هزار رویداد مصرف صفر هنگام تعویض دوره شمارنده، رفع جست‌وجوی NULL در اعتبارسنجی دستگاه و پلن، استراحت و عقب‌نشینی هوشمند ۵ پردازش حسابداری و آنلاین پس از پیمایش‌های سنگین و خطاها، گزارش فقط‌خواندنی قابلیت انتساب/مصرف برای تمام پروتکل‌ها. ShadowTLS بدون شمارنده قابل‌انتساب جعلی و TrustTunnel با رویداد صفر به عنوان نیازمند بررسی منبع نمایش داده می‌شوند. حفظ مصرف، سهمیه، کانفیگ و داده‌های موجود.",
+    "en": "Improve accounting integrity and CPU use across 16 VPN protocols: fix TrustTunnel missing-user accounting failure, baseline zero-byte counter epoch resets without mass zero-usage events, avoid NULL device/plan ORM lookups, add adaptive cooldown to five collector loops, and provide read-only attribution/ledger integrity report for all protocols. Never fabricate bytes for unauthenticated ShadowTLS or zero-only TrustTunnel."
   }
 }
