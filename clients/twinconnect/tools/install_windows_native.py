@@ -444,7 +444,7 @@ def install() -> None:
     # Sudoku's private Windows user-SID ACL uses Advapi32 SDDL helpers.
     sudoku_link = "target_link_libraries(${BINARY_NAME} PRIVATE advapi32)"
     if sudoku_link not in cmake:
-        cmake += "\\n# Sudoku ephemeral private config ACL and process guard.\\n" + sudoku_link + "\\n"
+        cmake += "\n# Sudoku ephemeral private config ACL and process guard.\n" + sudoku_link + "\n"
     runner_cmake.write_text(cmake, encoding="utf-8")
 
     HEADER.write_text(header, encoding="utf-8")
