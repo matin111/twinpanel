@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'singbox_profile_validator.dart';
+import 'shadowtls_chain.dart';
 import 'windows_singbox_preflight.dart';
 
 /// Transport-only proof using a loopback HTTP CONNECT proxy.
@@ -20,8 +21,12 @@ class ModernTransportProbe {
     if (port < 1024 || port > 65535) {
       throw const FormatException('INVALID_LOCAL_PROXY_PORT');
     }
-    final outbound = SingBoxProfileValidator.validateOutbound(
-      protocolCode: protocol, item: profile);
+    final chain = protocol == 'shadowtls'
+        ? ShadowTlsChain.fromItem(profile) : null;
+    final outbound = chain == null
+        ? SingBoxProfileValidator.validateOutbound(
+            protocolCode: protocol, item: profile)
+        : chain.transport;
     final dialOutbound = <String, dynamic>{...outbound, 'tag': 'proxy'};
     if (resolvedServer != null) {
       final address = InternetAddress.tryParse(resolvedServer);
@@ -47,7 +52,9 @@ class ModernTransportProbe {
         'listen': '127.0.0.1',
         'listen_port': port,
       }],
-      'outbounds': [dialOutbound],
+      'outbounds': chain == null
+          ? [dialOutbound]
+          : chain.outbounds(resolvedServer: resolvedServer),
       'route': {'final': 'proxy'},
     };
   }
