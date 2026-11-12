@@ -9,7 +9,13 @@ class XrayWindowsConfig {
   static Map<String, dynamic> compose({
     required XrayInboundProfile inbound,
     required int localSocksPort,
+    int? localHttpPort,
   }) {
+    if (localHttpPort != null &&
+        (localHttpPort < 1024 || localHttpPort > 65535 ||
+         localHttpPort == localSocksPort)) {
+      throw const FormatException('XRAY_HTTP_PORT_INVALID');
+    }
     if (localSocksPort < 1024 || localSocksPort > 65535) {
       throw const FormatException('XRAY_SOCKS_PORT_INVALID');
     }
@@ -65,6 +71,13 @@ class XrayWindowsConfig {
         'port': localSocksPort,
         'protocol': 'socks',
         'settings': {'auth': 'noauth', 'udp': false},
+      },
+      if (localHttpPort != null) {
+        'tag': 'twinconnect-loopback-probe',
+        'listen': '127.0.0.1',
+        'port': localHttpPort,
+        'protocol': 'http',
+        'settings': {'allowTransparent': false},
       }],
       'outbounds': [
         {
