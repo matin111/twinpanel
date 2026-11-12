@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.804",
-  "source_sha": "063b569865c9128acb6fe2440adbeab8aba01a15",
+  "version": "1.1.0-rc.805",
+  "source_sha": "cef164a766d17cac964d894baaddc0efb5b21279",
   "notes": {
-    "fa": "اصلاح هم‌زمان لایت‌مود مدیریت وبلاگ و کارت‌های نمایندگان: فیلدها، متن مقاله، نوار تصویر و فهرست مطالب روشن و خوانا؛ کارت نماینده، باکس آمار، کد، دکمه‌های مدیریت و حذف با زمینه روشن و کنتراست مناسب. بدون تغییر در منطق اشتراک‌ها، کاربرها و عملکرد دارک‌مود.",
-    "en": "Fix light-mode styling for both store blog editor and admin reseller cards, including form fields, image toolbar, blog list, reseller card statistics and action buttons. Preserve dark mode and subscription business logic."
+    "fa": "رفع مشکل لایت‌مود پنجره ساخت اشتراک: پس‌زمینه روشن، نوشته‌های خوانا، فرم انتخاب کاربر و پلن، پروتکل‌ها، سرورها، فیلدهای حجم و مدت و دکمه‌ها. بدون تغییر منطق صدور اکانت یا تنظیمات سرورها. محافظ انتشار برای جلوگیری از بازگشت خطا.",
+    "en": "Fix low-contrast light-mode Create subscription modal: readable light surfaces, header, account fields, protocol/server selection, controls and footer. Retain latest main features and add release regression safeguards. No subscription logic changes."
   }
 }
