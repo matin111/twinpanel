@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.803",
-  "source_sha": "e13a4d39e4b45a7a9b4946cd4cf177f631d9df29",
+  "version": "1.1.0-rc.804",
+  "source_sha": "063b569865c9128acb6fe2440adbeab8aba01a15",
   "notes": {
-    "fa": "اصلاح کامل لایت‌مود مدیریت بلاگ فروشگاه: پس‌زمینه و رنگ متن فیلدهای عنوان، شناسه، توضیحات و مقاله، نوار تصاویر، کارت‌های فهرست مقالات، پیش‌نمایش عکس و وضعیت‌ها هماهنگ با قالب روشن؛ دارک‌مود بدون تغییر عملکرد و حفظ تغییرات نسخه rc.802.",
-    "en": "Fix the Nova store blog manager light-mode editor input, textarea, toolbar, previews, article list, placeholder and label contrast using CSS-module-scoped theme tokens. Preserve dark mode and rc.802 functionality."
+    "fa": "اصلاح هم‌زمان لایت‌مود مدیریت وبلاگ و کارت‌های نمایندگان: فیلدها، متن مقاله، نوار تصویر و فهرست مطالب روشن و خوانا؛ کارت نماینده، باکس آمار، کد، دکمه‌های مدیریت و حذف با زمینه روشن و کنتراست مناسب. بدون تغییر در منطق اشتراک‌ها، کاربرها و عملکرد دارک‌مود.",
+    "en": "Fix light-mode styling for both store blog editor and admin reseller cards, including form fields, image toolbar, blog list, reseller card statistics and action buttons. Preserve dark mode and subscription business logic."
   }
 }
