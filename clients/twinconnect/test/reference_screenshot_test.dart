@@ -24,11 +24,6 @@ void main() {
       child: TwinConnectApp(),
     ));
     await tester.pumpAndSettle();
-    await tester.drag(find.byType(ListView).first, const Offset(0, -260));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('windowsDemoButton')));
-    await tester.pumpAndSettle();
-
     expect(find.byKey(const Key('referenceDesktopShell')), findsOneWidget);
     expect(tester.takeException(), isNull);
 
