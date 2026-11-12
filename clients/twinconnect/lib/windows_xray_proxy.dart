@@ -53,9 +53,11 @@ class WindowsXrayProxy {
       await httpReservation.close();
       final config = XrayWindowsConfig.compose(
           inbound: inbound, localSocksPort: port, localHttpPort: httpPort);
-      if (!await WindowsXrayPreflight.checkInMemory(config)) {
-        throw const FormatException('XRAY_CONFIG_INVALID');
-      }
+      // Xray never installs Windows routes. Running an extra -test process
+      // here duplicated the actual engine's parser and delayed EVERY connect.
+      // The single guarded runtime below must open its local SOCKS listener
+      // and prove genuine remote HTTPS egress before the TUN is ever started.
+      // Invalid configuration exits without acquiring system VPN routes.
       process = await Process.start(
         WindowsXrayPreflight.enginePath(Platform.resolvedExecutable),
         const ['run', '-config', 'stdin:'],
