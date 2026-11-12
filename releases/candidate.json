@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.806",
-  "source_sha": "863cf0e1888c7cde4cd1ff6dd824184301f5169d",
+  "version": "1.1.0-rc.807",
+  "source_sha": "6944ce33ac864980f05365629a1a1973ae72813f",
   "notes": {
-    "fa": "اصلاح قطعی اتصال تم پنجره ساخت اشتراک به حالت روشن/تاریک برنامه: رنگ زمینه فرم، هدر، پروتکل‌ها، سرورها و قسمت‌های پایینی در لایت‌مود، با استایل مستقل از پوسته اصلی؛ حفظ تغییرات جدید و رفع کندی API. بدون تغییر منطق اشتراک‌ها.",
-    "en": "Bind the Admin Create subscription dialog light palette directly to the resolved application theme and restore readable surfaces in the modal. Includes latest API responsiveness fixes; subscription provisioning logic unchanged."
+    "fa": "اصلاح واقعی لایت‌مود فرم ساخت اشتراک در کامپوننت فعال AdminSubscriptionCreateUnified: حذف پس‌زمینه‌های تیره ثابت هدر، بخش‌های انتخاب پلن و کاربر، پروتکل‌ها، سرورها و نوار پایینی؛ رنگ‌های خوانا در روشن و حفظ دارک‌مود. محافظت از فایل فعال در انتشارهای بعدی. بدون تغییر منطق صدور اشتراک.",
+    "en": "Fix the actual unified subscription creation component used on the Admin subscriptions page. Hardcoded dark inline surfaces for header, choices, sections and footer are now light/dark-aware; adds active component CSS and pinned-release regression protection. No provisioning logic changes."
   }
 }
