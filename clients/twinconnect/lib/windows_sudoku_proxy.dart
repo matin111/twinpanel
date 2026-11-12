@@ -88,24 +88,21 @@ class WindowsSudokuProxy {
       if (path == null || path.isEmpty) {
         throw const FormatException('SUDOKU_PRIVATE_CONFIG_STAGE_FAILED');
       }
-      try {
-        process = await Process.start(
-          binaryPath(), ['-c', path], runInShell: false,
-        ).timeout(const Duration(seconds: 7));
-        _child = process;
-        final guarded = await _native.invokeMethod<bool>(
-          'guardSudokuProcess', {'pid': process.pid},
-        ).timeout(const Duration(seconds: 5));
-        if (guarded != true) {
-          throw const FormatException('SUDOKU_PROCESS_GUARD_UNAVAILABLE');
-        }
-      } finally {
-        // Core reads the JSON during bootstrap. Keep the private Windows
-        // file alive until it has opened the local listener below.
+      final owned = await Process.start(
+        binaryPath(), ['-c', path], runInShell: false,
+      ).timeout(const Duration(seconds: 7));
+      process = owned;
+      _child = owned;
+      final guarded = await _native.invokeMethod<bool>(
+        'guardSudokuProcess', {'pid': owned.pid},
+      ).timeout(const Duration(seconds: 5));
+      if (guarded != true) {
+        throw const FormatException('SUDOKU_PROCESS_GUARD_UNAVAILABLE');
       }
-      unawaited(process.stdout.drain<void>());
-      unawaited(process.stderr.drain<void>());
-      final owned = process;
+      // The config handle remains open until the core has opened SOCKS.
+      // Never log the native core's output: it may contain private keys.
+      unawaited(owned.stdout.drain<void>());
+      unawaited(owned.stderr.drain<void>());
       unawaited(process.exitCode.then((_) {
         if (identical(_child, owned)) {
           _child = null;
