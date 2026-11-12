@@ -139,6 +139,8 @@ export function AdminDashboardServerCard(){
   const {pick}=useI18n();
   const [health,setHealth]=useState<SystemHealth|null>(null);
   const [mount,setMount]=useState<HTMLElement|null>(null);
+  const [samples,setSamples]=useState<Sample[]>([]);
+  const [telemetryState,setTelemetryState]=useState<"waiting"|"online"|"stale">("waiting");
 
   useEffect(()=>{
     let created:HTMLElement|null=null;
@@ -163,17 +165,21 @@ export function AdminDashboardServerCard(){
 
   useEffect(()=>{
     const token=getCustomerToken();
-    if(!token)return;
+    if(!token){setTelemetryState("stale");return;}
     let active=true;
     const load=async()=>{
       try{
         const response=await fetch(`${API_BASE}/v1/admin/system-health`,{
           headers:{Authorization:`Bearer ${token}`},cache:"no-store"
         });
-        if(!response.ok)return;
+        if(!response.ok)throw new Error("Telemetry temporarily unavailable");
         const payload=await response.json() as SystemHealth;
-        if(active)setHealth(payload);
-      }catch{}
+        if(!active)return;
+        const sample=serverSample(payload);
+        setHealth(payload);
+        setSamples(before=>[...before.filter(item=>item.at>=sample.at-WINDOW_MS),sample].slice(-MAX_SAMPLES));
+        setTelemetryState("online");
+      }catch{if(active)setTelemetryState("stale");}
     };
     void load();
     const timer=window.setInterval(()=>void load(),15000);
@@ -181,27 +187,40 @@ export function AdminDashboardServerCard(){
   },[]);
 
   if(!mount)return null;
-  const cpu=percent(health?.cpu?.percent);
-  const ram=percent(health?.memory?.percent);
-  const disk=percent(health?.disk?.percent);
-  const cores=Number(health?.cpu?.cores);
-  const cpuCapacity=Number.isFinite(cores)&&cores>0?`${Math.round(cores)} vCPU`:"—";
-  const ramCapacity=`${formatGiB(health?.memory?.used_bytes)} / ${formatGiB(health?.memory?.total_bytes)}`;
-  const diskCapacity=`${formatGiB(health?.disk?.used_bytes)} / ${formatGiB(health?.disk?.total_bytes)}`;
+  const cpu=usage(health?.cpu?.percent);
+  const ram=usage(health?.memory?.percent);
+  const disk=usage(health?.disk?.percent);
+  const cores=positive(health?.cpu?.cores);
+  const cpuCapacity=cores==null?"—":Math.round(cores).toLocaleString("en-US")+" vCPU";
+  const ramCapacity=formatGiB(health?.memory?.used_bytes)+" / "+formatGiB(health?.memory?.total_bytes);
+  const diskCapacity=formatGiB(health?.disk?.used_bytes)+" / "+formatGiB(health?.disk?.total_bytes);
+  const last=samples.length?samples[samples.length-1].at:null;
 
   return createPortal(
-    <div className="dash-server-card">
-      <div className="dash-server-head">
-        <h2>{pick("سرور","Server")}</h2>
-        <b><span>Hostname</span> · {health?.hostname||"—"}</b>
+    <section className={styles.panel} aria-label={pick("مانیتور منابع سرور","Server resources monitor")}>
+      <div className={styles.header}>
+        <div className={styles.heading}>
+          <span className={styles.eyebrow}><i/>{pick("مانیتورینگ زیرساخت","INFRASTRUCTURE MONITOR")}</span>
+          <h2>{pick("نبض سرور","Server pulse")}</h2>
+          <p>{pick("مصرف لحظه‌ای منابع سرور اصلی پنل","Live utilization on the main panel server")}</p>
+        </div>
+        <div className={styles.headerInfo}>
+          <div className={telemetryState==="online"?styles.online:styles.stale}><i/>{telemetryState==="online"?pick("داده زنده","Live data"):telemetryState==="waiting"?pick("در حال دریافت","Fetching data"):pick("داده قدیمی / قطع دریافت","Telemetry unavailable")}</div>
+          <div className={styles.infoPill}><span>{pick("نام سرور","Hostname")}</span><b dir="ltr">{health?.hostname||"—"}</b></div>
+          <div className={styles.infoPill}><span>{pick("مدت فعالیت","Uptime")}</span><b dir="ltr">{formatUptime(health?.uptime_seconds)}</b></div>
+        </div>
       </div>
-      <div className="dash-server-grid">
-        <Resource label="CPU" value={cpu} capacity={cpuCapacity}/>
-        <Resource label="RAM" value={ram} capacity={ramCapacity}/>
-        <Resource label="Disk" value={disk} capacity={diskCapacity}/>
-        <div className="dash-server-uptime"><span>Uptime</span><b>{formatUptime(health?.uptime_seconds)}</b></div>
+      <div className={styles.cards}>
+        <ResourceGauge kind="cpu" label="CPU" value={cpu} capacity={cpuCapacity} samples={samples} pick={pick}/>
+        <ResourceGauge kind="ram" label="RAM" value={ram} capacity={ramCapacity} samples={samples} pick={pick}/>
+        <ResourceGauge kind="disk" label={pick("دیسک","Disk")} value={disk} capacity={diskCapacity} samples={samples} pick={pick}/>
+        <NetworkGauge health={health} samples={samples} pick={pick}/>
       </div>
-    </div>,
+      <footer className={styles.footer}>
+        <span><i/>{pick("نمودارها فقط از نمونه‌های واقعی ثبت‌شده بعد از بازشدن صفحه تشکیل می‌شوند.","Charts include real samples collected since opening this page only.")}</span>
+        <span>{last?pick("آخرین نمونه","Last reading")+": "+new Date(last).toLocaleTimeString(pick("fa-IR","en-US"),{hour:"2-digit",minute:"2-digit",second:"2-digit"}):pick("منتظر اولین نمونه","Awaiting first reading")} · {pick("هر ۱۵ ثانیه","Every 15s")}</span>
+      </footer>
+    </section>,
     mount
   );
 }
