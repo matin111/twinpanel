@@ -220,8 +220,13 @@ inline int Status() {
   if (state == 2) {
     RASCONNSTATUSW info = {};
     info.dwSize = sizeof(info);
-    if (RasGetConnectStatusW(Tunnel().load(), &info) != ERROR_SUCCESS ||
-        info.rasconnstate == RASCS_Disconnected) {
+    const HRASCONN connection = Tunnel().load();
+    const DWORD rc = connection
+        ? RasGetConnectStatusW(connection, &info)
+        : ERROR_INVALID_HANDLE;
+    if (rc != ERROR_SUCCESS || info.rasconnstate == RASCS_Disconnected) {
+      LastErrorCode().store(rc != ERROR_SUCCESS
+          ? rc : (info.dwError ? info.dwError : ERROR_PORT_NOT_CONNECTED));
       State().store(-1);
       return -1;
     }
