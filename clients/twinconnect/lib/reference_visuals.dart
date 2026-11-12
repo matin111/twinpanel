@@ -128,10 +128,12 @@ class RingGauge extends StatelessWidget {
     children: [
       SizedBox(height: 55, width: 112, child: CustomPaint(
         painter: _RingGaugePainter(color))),
-      Row(mainAxisSize: MainAxisSize.min, children: [
+      Row(children: [
         Icon(icon, size: 23, color: color),
         const SizedBox(width: 7),
-        Text(label, style: const TextStyle(color: Color(0xFFADB4D8), fontSize: 13)),
+        Expanded(child: Text(label, maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(color: Color(0xFFADB4D8), fontSize: 13))),
       ]),
       const SizedBox(height: 7),
       Text(value, overflow: TextOverflow.ellipsis, maxLines: 1,
