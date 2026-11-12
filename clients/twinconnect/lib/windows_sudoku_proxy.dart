@@ -124,17 +124,20 @@ class WindowsSudokuProxy {
       // temporary Windows file, never as a CLI argument or public JSON.
       final path = await _native.invokeMethod<String>(
         'stageSudokuConfig', {'config': jsonEncode(config)},
-      ).timeout(const Duration(seconds: 5));
+      ).timeout(const Duration(seconds: 5), onTimeout: () =>
+          throw const FormatException('SUDOKU_CONFIG_STAGE_TIMEOUT'));
       if (path == null || path.isEmpty) {
         throw const FormatException('SUDOKU_PRIVATE_CONFIG_STAGE_FAILED');
       }
       final owned = await Process.start(
         binaryPath(), ['-c', path], runInShell: false,
-      ).timeout(const Duration(seconds: 7));
+      ).timeout(const Duration(seconds: 7), onTimeout: () =>
+          throw const FormatException('SUDOKU_PROCESS_START_TIMEOUT'));
       _child = owned;
       final guarded = await _native.invokeMethod<bool>(
         'guardSudokuProcess', {'pid': owned.pid},
-      ).timeout(const Duration(seconds: 5));
+      ).timeout(const Duration(seconds: 5), onTimeout: () =>
+          throw const FormatException('SUDOKU_PROCESS_GUARD_TIMEOUT'));
       if (guarded != true) {
         throw const FormatException('SUDOKU_PROCESS_GUARD_UNAVAILABLE');
       }
