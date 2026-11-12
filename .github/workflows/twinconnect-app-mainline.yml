@@ -7,6 +7,7 @@ on:
       - 'backend/app/routers/central_app_*.py'
       - 'backend/app/main.py'
       - 'backend/tests/test_twinconnect_app_mainline_contract_v1.py'
+      - 'backend/tests/test_central_app_xray_three_inbounds_contract_v1.py'
       - 'components/app-credential-delivery-card.tsx'
       - 'components/legacy-subscriptions-exact.tsx'
       - 'components/reseller-subscriptions-parity.tsx'
@@ -40,3 +41,5 @@ jobs:
           python -m py_compile backend/app/central_app_*.py backend/app/routers/central_app_*.py backend/app/main.py
       - name: Verify app-only auth and panel UI wiring
         run: python -m unittest discover -s backend/tests -p test_twinconnect_app_mainline_contract_v1.py -v
+      - name: Verify three-inbound Xray delivery contract
+        run: python -m unittest discover -s backend/tests -p test_central_app_xray_three_inbounds_contract_v1.py -v
