@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.801",
+  "version": "1.1.0-rc.804",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-12T08:30:55Z",
+  "released_at": "2026-11-12T09:13:08Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "ad8f8b0501c91d005a8f3f481d32f03d12ccd165",
+  "source_sha": "063b569865c9128acb6fe2440adbeab8aba01a15",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.801/twinpanel-1.1.0-rc.801-linux-x86_64.tar.gz",
-    "sha256": "24d99cc6cdbb8c697020daaf71a5ba8a64fa84c1e09c3dc02f64c5f5f59cc09c",
-    "size_bytes": 30662781
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.804/twinpanel-1.1.0-rc.804-linux-x86_64.tar.gz",
+    "sha256": "81d49e995a292edb6c9fb584fbc775e8a5303eaaec45d9a43a3928e0ccc625b2",
+    "size_bytes": 30669091
   },
   "notes": {
-    "fa": "بازطراحی مدرن و شیشه‌ای صفحه تانل‌ها و پنجره ساخت تانل: کارت‌ها و آمار حرفه‌ای‌تر، فرم انتخاب ایران/خارج واضح، تنظیمات مسیر و اولویت منظم، هماهنگی لایت‌مود و دارک‌مود، سازگاری موبایل. بدون تغییر منطق ساخت یا کانفیگ تانل.",
-    "en": "Polished tunnel control center and New Tunnel dialog: translucent responsive cards/KPIs, clear Iran-to-Exit route selection, grouped route settings, accessible light/dark themes; tunnel creation and VPN configuration logic unchanged."
+    "fa": "اصلاح هم‌زمان لایت‌مود مدیریت وبلاگ و کارت‌های نمایندگان: فیلدها، متن مقاله، نوار تصویر و فهرست مطالب روشن و خوانا؛ کارت نماینده، باکس آمار، کد، دکمه‌های مدیریت و حذف با زمینه روشن و کنتراست مناسب. بدون تغییر در منطق اشتراک‌ها، کاربرها و عملکرد دارک‌مود.",
+    "en": "Fix light-mode styling for both store blog editor and admin reseller cards, including form fields, image toolbar, blog list, reseller card statistics and action buttons. Preserve dark mode and subscription business logic."
   }
 }
