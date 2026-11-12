@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.790",
+  "version": "1.1.0-rc.791",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-12T03:38:56Z",
+  "released_at": "2026-11-12T04:09:55Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "e6b79cac87b0bae1918d7a005b9840dd91c0ab33",
+  "source_sha": "1f2e41b18d9b99d22c387a34bb6eeb36b4ca6f8c",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.790/twinpanel-1.1.0-rc.790-linux-x86_64.tar.gz",
-    "sha256": "6e68cc8459df73bd38d4f0d9860161ae4ddd84bbcd15f5401590dd3d8b6d4310",
-    "size_bytes": 30581832
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.791/twinpanel-1.1.0-rc.791-linux-x86_64.tar.gz",
+    "sha256": "c3d68ae0213bca328a79a721b94635f3b1a66ebe420c02acac196c915bf7540f",
+    "size_bytes": 30601981
   },
   "notes": {
-    "fa": "بازطراحی حرفه‌ای پنج کارت آمار بالای داشبورد کاربران، اشتراک‌ها، آنلاین‌ها، فروش امروز و نودها، همراه پایش بصری سلامت نودها، تانل‌ها و پروتکل‌ها با حلقه و نوارهای پیشرفت واقعی. پشتیبانی دارک‌مود و لایت‌مود، نمایش صادقانه اطلاعات نامشخص و محافظت از تغییرات در آپدیت‌های بعدی. حفظ امکانات فعلی پنل، ربات و VPN.",
-    "en": "Professional five-KPI admin overview and reliable reported service health with node gauge, tunnel/protocol status tracks, responsive dark/light styling, and release parity protection. Preserve existing VPN, bot and customer features."
+    "fa": "بازطراحی مدرن و حرفه‌ای بخش فعالیت‌های اخیر، وضعیت اشتراک‌ها و سرورها در داشبورد مدیریت؛ نمایش دقیق وضعیت و مبلغ پرداخت‌ها، تفکیک تعداد و درصد اشتراک‌های فعال، منقضی و معلق از API تجمیعی، کارت‌های سرور با پرچم کشور و نمودار ظرفیت و مصرف واقعی CPU/RAM/Disk. طراحی سازگار با دارک‌مود، لایت‌مود و موبایل، افزایش سرعت دریافت آمار اشتراک‌ها و حفاظت در آپدیت‌های آینده.",
+    "en": "Modern, responsive dark/light admin dashboard activity, subscription breakdown and server fleet cards; accurate aggregate counts without full roster fetch, payment status and amount, country flag and real resource metrics, with source and artifact release guards."
   }
 }
