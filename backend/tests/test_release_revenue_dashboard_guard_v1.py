@@ -26,7 +26,9 @@ class ReleaseRevenueGuardTests(unittest.TestCase):
             (directory / "components/admin-dashboard-runtime.tsx").write_text(
                 'import {PremiumRevenueChart} from "./premium-revenue-chart";\n'
                 '<PremiumRevenueChart series={sales} pick={pick}/>\n'
-                'OverviewKpiCard OperationalHealthVisual tunnelsLoaded nodesLoaded',
+                'OverviewKpiCard OperationalHealthVisual tunnelsLoaded nodesLoaded '
+                'SubscriptionAnalytics RecentPaymentActivity ServerFleetVisual '
+                'subscriptionsPageV3 subscriptionBreakdown',
                 encoding="utf-8",
             )
             (directory / "components/premium-revenue-chart.tsx").write_text(
@@ -62,6 +64,20 @@ class ReleaseRevenueGuardTests(unittest.TestCase):
                 ':global(html[data-theme="light"]) .kpiValue{color:#234;} '
                 '.healthTrack{height:4px} '
                 '@media(prefers-reduced-motion:reduce){.healthTrack{animation:none}}',
+                encoding="utf-8",
+            )
+            (directory / "components/admin-dashboard-lower-panels.tsx").write_text(
+                'export function SubscriptionAnalytics(){} '
+                'export function RecentPaymentActivity(){} '
+                'export function ServerFleetVisual(){} '
+                'function paymentStatus(){} '
+                'const a = "dashboardPaymentAmount aria-valuenow";',
+                encoding="utf-8",
+            )
+            (directory / "components/admin-dashboard-lower-panels.module.css").write_text(
+                ':global(html[data-theme="light"]) .donutInner{background:white} '
+                '.nodeGrid{display:grid} '
+                '@media(prefers-reduced-motion:reduce){.nodeGrid{transition:none}}',
                 encoding="utf-8",
             )
 
@@ -119,10 +135,22 @@ class ReleaseRevenueGuardTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "stale"):
             guard.verify_ui_release(self.source, self.current)
 
+    def test_missing_subscription_chart_is_blocked(self):
+        (self.source / "components/admin-dashboard-lower-panels.tsx").unlink()
+        with self.assertRaisesRegex(ValueError, "Missing"):
+            guard.verify_ui_release(self.source, self.current)
+
+    def test_outdated_server_fleet_style_is_blocked(self):
+        (self.source / "components/admin-dashboard-lower-panels.module.css").write_text(
+            ".old-cards{display:grid}",encoding="utf-8"
+        )
+        with self.assertRaisesRegex(ValueError, "stale"):
+            guard.verify_ui_release(self.source, self.current)
+
     def test_compiled_premium_chart_passes(self):
         folder = self.source / ".next/standalone/.next/static/chunks"
         folder.mkdir(parents=True)
-        (folder / "chunk.js").write_text("Sales pulse Server pulse Service health", encoding="utf-8")
+        (folder / "chunk.js").write_text("Sales pulse Server pulse Service health SUBSCRIPTION MIX LATEST TRANSACTIONS", encoding="utf-8")
         guard.verify_ui_release(self.source, self.current, check_bundle=True)
 
 
