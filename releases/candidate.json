@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.781",
-  "source_sha": "911334c11fa6d76b7ac182491f77567c22b2a7f0",
+  "version": "1.1.0-rc.782",
+  "source_sha": "030f30d91f415c264e98e601f916def34d698f63",
   "notes": {
-    "fa": "نسخه یکپارچه طراحی کارتی کاربران و نمایندگان، نمایش تعداد اکانت هر کاربر، ریست حجم مصرفی با تأیید بله/خیر و پنجره جمع‌وجور مدیریت نماینده؛ بدون حذف امکانات و با کنترل جلوگیری از بازگشت تغییرات در انتشارهای بعدی.",
-    "en": "Consolidated admin UI: responsive user and reseller cards, per-user account count, confirmed usage reset, compact reseller management dialog, and release regression guard."
+    "fa": "مدیریت برند و ظاهر اپ هوشمند در پنل اصلی و نماینده، ثبت آدرس اپ در لایسنس، تحویل اطلاعات ورود اپ همراه ساب‌لینک و QR در ربات‌ها، محدودیت پروتکل‌های اپ بر اساس اشتراک، همراه اصلاحات جدید وضعیت آنلاین اشتراک‌ها، تمدید پلن، پیام همگانی عکس‌دار و دکمه خرید؛ با حفظ کانفیگ‌ها و سرویس‌های فعلی.",
+    "en": "Smart app branding management for admin and resellers, license-directory origin management, app-only credentials in subscription and bot delivery, subscription-scoped protocols, plus the latest subscription status, renewal and Telegram broadcast improvements."
   }
 }
