@@ -191,6 +191,26 @@ jobs:
           grep -Fq '_lookup_single_recoverable_subscription(' source/backend/app/routers/telegram_account_link_lookup.py
           grep -Fq 'Subscription.status.in_(_LINK_RECOVERY_STATES)' source/backend/app/routers/telegram_account_link_lookup.py
 
+      - name: Protect fast new-subscription quota validation in release source
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          # A pinned artifact must not regress to the full-fleet 20-second
+          # quota inventory path that falsely suspends newly created accounts.
+          for path in \
+            "backend/app/services/quota_refresh.py" \
+            "backend/app/routers/modern_account_delivery_v1.py" \
+            "backend/tests/test_new_subscription_quota_targeted_validation.py"; do
+            test -s "source/$path"
+            test -s "publisher/$path"
+            if ! cmp -s "source/$path" "publisher/$path"; then
+              echo "::error file=$path::Pinned quota fix differs from latest main. Re-pin release."
+              exit 1
+            fi
+          done
+          grep -Fq '_verify_new_subscription_quota_mapping(' source/backend/app/services/quota_refresh.py
+          grep -Fq 'fast_validate=prefer_new_singbox_batch' source/backend/app/routers/modern_account_delivery_v1.py
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -521,6 +541,20 @@ jobs:
               echo "::error file=$path::Bot account link recovery changed during build. Re-pin the release."
               exit 1
             fi
+          done
+
+      - name: Recheck new-subscription quota validation before publication
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          for path in \
+            "backend/app/services/quota_refresh.py" \
+            "backend/app/routers/modern_account_delivery_v1.py" \
+            "backend/tests/test_new_subscription_quota_targeted_validation.py"; do
+            cmp -s "source/$path" "publisher/$path" || {
+              echo "::error file=$path::Quota fix changed during build; create a new candidate."
+              exit 1
+            }
           done
 
       - name: Publish GitHub Release asset
