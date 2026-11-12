@@ -2765,24 +2765,26 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                   const SizedBox(width: 8),
                   Tooltip(
                     message: tr(
-                      'زمان برقراری TCP با پورت اینباند، نه زمان دست‌دهی VLESS',
-                      'Real TCP handshake to this inbound port; not VLESS authentication',
+                      'زمان برقراری TCP با پورت اینباند، نه پینگ ICMP',
+                      'TCP handshake to inbound port, not ICMP ping',
                     ),
                     child: Text(
                       _xrayInboundsProbing.contains(
                           XrayInboundLatency.key(inbound))
                           ? '…'
                           : _xrayInboundRtts.containsKey(
-                              XrayInboundLatency.key(inbound))
-                              ? (_xrayInboundRtts[
-                                      XrayInboundLatency.key(inbound)] == null
-                                  ? tr('بدون پاسخ', 'No reply')
-                                  : 'TCP ${_xrayInboundRtts[
-                                      XrayInboundLatency.key(inbound)]} ms')
-                              : '—',
+                              XrayInboundLatency.key(inbound)) &&
+                              _xrayInboundRtts[XrayInboundLatency.key(inbound)] == null
+                              ? tr('بدون پاسخ', 'No reply')
+                              : ServerLatency.label(
+                                  _xrayInboundRtts[XrayInboundLatency.key(inbound)]),
                       key: Key('xrayRtt_${nodeId}_${inbound.id}'),
-                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
-                          color: sub),
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: ServerLatency.color(
+                            _xrayInboundRtts[XrayInboundLatency.key(inbound)]),
+                      ),
                     ),
                   ),
                   IconButton(
