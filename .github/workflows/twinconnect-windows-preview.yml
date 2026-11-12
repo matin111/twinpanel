@@ -97,6 +97,11 @@ jobs:
       - name: Extract and execute verified OpenConnect CLI from vendor package
         shell: pwsh
         run: ./tools/extract_openconnect_windows.ps1
+      - name: Bundle official signed OpenVPN Community MSI for integrated setup
+        shell: pwsh
+        env:
+          TWINCONNECT_OPENVPN_SHA256: ${{ vars.TWINCONNECT_OPENVPN_SHA256 }}
+        run: ./tools/bundle_openvpn_windows.ps1
       - name: Inspect release binaries with Windows Defender (when available)
         shell: pwsh
         run: |
