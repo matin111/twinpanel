@@ -35,6 +35,13 @@ void main() {
           apiOrigin: Uri.parse('https://panel.example.org'),
         ),
         username: 'test-account',
+        brand: const BrandPreview(
+          namespace: WindowsPreviewFixture.namespace,
+          brandName: 'Test Reseller',
+          ownerType: 'admin',
+          accountStatus: 'active',
+          appUsernamePrefix: '',
+        ),
         sessionToken: List.filled(64, 'a').join(),
         catalog: WindowsPreviewFixture.protocolCatalog(),
         servers: const AppServerInventory(
