@@ -83,17 +83,17 @@ class TwinConnectMainlineContract(unittest.TestCase):
         self.assertIn('_subscription_from_share_token(token, db)', routes)
         self.assertIn('headers=_PRIVATE_HEADERS', routes)
 
-    def test_connection_glass_is_visible_and_last_in_cascade(self):
+    def test_connection_glass_is_translucent_without_decorative_background(self):
         source = PUBLIC_CONNECTION.read_text(encoding="utf-8")
-        self.assertIn("TWINPANEL_CONNECTION_GLASS_SYSTEM_V3", source)
-        self.assertIn("backdrop-filter: blur(16px)", source)
-        self.assertIn("--tp-card-glass: rgba(255,255,255,.055)", source)
-        self.assertIn("Preserve the page background", source)
-        self.assertNotIn("radial-gradient(ellipse", source)
+        self.assertIn("TWINPANEL_CONNECTION_GLASS_SYSTEM_V4", source)
+        self.assertIn("background-color:transparent!important", source)
+        self.assertIn("backdrop-filter:blur(22px)", source)
+        self.assertIn("--tp-glass-veil:rgba(255,255,255,.025)", source)
         self.assertIn('html[data-theme="light"]', source)
         self.assertIn(".protocol-choice", source)
         self.assertIn(".traffic", source)
         self.assertIn("#tp-app-access", source)
+        self.assertNotIn("radial-gradient(ellipse", source)
         self.assertIn('source.replace("</body>", "<style>" + _CONNECTION_GLASS_CSS + "</style></body>", 1)', source)
 
     def test_frontend_entry_and_vendor_registration_are_reachable(self):
