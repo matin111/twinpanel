@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'tenant_models.dart';
 import 'reference_visuals.dart';
 
@@ -82,11 +83,17 @@ class _ReferenceDesktopShellState extends State<ReferenceDesktopShell> {
 
   Future<void> openLink(String? url) async {
     final uri = Uri.tryParse(url ?? '');
-    if (uri == null || !['https', 'http', 'tg'].contains(uri.scheme)) return;
+    if (uri == null || !['https', 'http', 'tg'].contains(uri.scheme) ||
+        uri.host.isEmpty) return;
+    try {
+      if (await launchUrl(uri, mode: LaunchMode.externalApplication)) return;
+    } catch (_) {
+      // Preserve the user-provided URL when an external handler is missing.
+    }
     await Clipboard.setData(ClipboardData(text: uri.toString()));
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Link copied to clipboard')),
+        const SnackBar(content: Text('Unable to open link. Copied to clipboard.')),
       );
     }
   }
@@ -108,6 +115,16 @@ class _ReferenceDesktopShellState extends State<ReferenceDesktopShell> {
       child: child,
     );
   }
+
+  Widget logoFallback() => ShaderMask(
+    shaderCallback: (bounds) => const LinearGradient(
+      colors: [Color(0xFF00E5F2), Color(0xFF9F43FF), Color(0xFFEA48FF)],
+      begin: Alignment.topLeft, end: Alignment.bottomRight,
+    ).createShader(bounds),
+    child: const Text('V', style: TextStyle(
+      fontSize: 70, fontStyle: FontStyle.italic,
+      fontWeight: FontWeight.w900, height: 1, color: Colors.white)),
+  );
 
   Widget title(String text, {double size = 21, Color? color}) => Text(text,
       style: TextStyle(fontSize: size, fontWeight: FontWeight.w700,
@@ -159,10 +176,9 @@ class _ReferenceDesktopShellState extends State<ReferenceDesktopShell> {
         child: Column(children: [
       SizedBox(height: 68, width: 85,
         child: widget.brand.logoUrl == null
-          ? const Icon(Icons.change_history_rounded, size: 68, color: violet)
+          ? logoFallback()
           : Image.network(widget.brand.logoUrl!, fit: BoxFit.contain,
-              errorBuilder: (context, error, stackTrace) => const Icon(Icons.change_history_rounded,
-                size: 68, color: violet))),
+              errorBuilder: (context, error, stackTrace) => logoFallback())),
       const SizedBox(height: 8),
       title(widget.brand.brandName, size: 25),
       const SizedBox(height: 42),
