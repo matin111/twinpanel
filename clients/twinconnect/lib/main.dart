@@ -140,6 +140,7 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
       const NativeProtocolReadiness(supportedCodes: {});
   bool _protocolCatalogUnavailable = false;
   bool _offlineDemo = false;
+  bool _showLogin = false;
   int _lookupSerial = 0;
 
   @override
@@ -184,6 +185,7 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
       if (!mounted || serial != _lookupSerial) return;
       setState(() {
         _brand = brand;
+        _showLogin = false;
         _confirmedPanel = panel;
         _confirmedUsername = username;
         _confirmedToken = token;
@@ -229,6 +231,7 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
       _confirmedPanel = null;
       _confirmedUsername = null;
       _confirmedToken = null;
+      _showLogin = false;
       _brand = WindowsPreviewFixture.brand();
       _catalog = WindowsPreviewFixture.protocolCatalog();
       _nativeProtocols =
@@ -242,6 +245,23 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
     final strings = AppStrings.of(context);
     final brand = _brand;
 
+    // The reference dashboard is the actual initial Windows surface.
+    // Preview state is explicitly signed out; account identification is
+    // accessible from Account -> Sign in and never fakes tunnel connectivity.
+    if (brand == null && !_showLogin) {
+      return ReferenceDesktopShell(
+        brand: WindowsPreviewFixture.brand(),
+        username: 'Guest preview',
+        onLogin: () => setState(() => _showLogin = true),
+        onLogout: () => setState(() => _showLogin = true),
+        onSettings: () => setState(() => _showLogin = true),
+        locations: const Center(child: Text(
+          'Sign in to retrieve your available servers and protocols.',
+          style: TextStyle(color: Colors.white),
+        )),
+      );
+    }
+
     if (brand != null) {
       return ReferenceDesktopShell(
         brand: brand,
@@ -253,6 +273,7 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
           _confirmedUsername = null;
           _confirmedToken = null;
           _offlineDemo = false;
+          _showLogin = false;
         }),
         onSettings: () => Navigator.of(context).push(
           MaterialPageRoute<void>(
