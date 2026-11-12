@@ -30,7 +30,9 @@ inline bool CiscoAdapterName(const wchar_t* text) {
       [](wchar_t ch) { return static_cast<wchar_t>(towlower(ch)); });
   return name.find(L"tap-windows") != std::wstring::npos ||
          name.find(L"openconnect") != std::wstring::npos ||
-         name.find(L"vpn client adapter") != std::wstring::npos;
+         name.find(L"vpn client adapter") != std::wstring::npos ||
+         name.find(L"ovpn-dco") != std::wstring::npos ||
+         name.find(L"openvpn") != std::wstring::npos;
 }
 inline bool CiscoAdapterDescription(const char* text) {
   if (!text || !*text) return false;
@@ -39,11 +41,13 @@ inline bool CiscoAdapterDescription(const char* text) {
       [](unsigned char ch) { return static_cast<char>(tolower(ch)); });
   return name.find("tap-windows") != std::string::npos ||
          name.find("openconnect") != std::string::npos ||
-         name.find("vpn client adapter") != std::string::npos;
+         name.find("vpn client adapter") != std::string::npos ||
+         name.find("ovpn-dco") != std::string::npos ||
+         name.find("openvpn") != std::string::npos;
 }
 
-inline bool ReadTraffic(TrafficTotals* totals) {
-  if (!totals || !Running()) return false;
+inline bool ReadTunnelAdapterTraffic(TrafficTotals* totals) {
+  if (!totals) return false;
   ULONG size = 0;
   const ULONG flags = GAA_FLAG_INCLUDE_ALL_INTERFACES;
   DWORD code = GetAdaptersAddresses(AF_INET, flags, nullptr, nullptr, &size);
@@ -79,6 +83,10 @@ inline bool ReadTraffic(TrafficTotals* totals) {
   totals->sent = static_cast<uint64_t>(row.OutOctets);
   return true;
 }
+inline bool ReadTraffic(TrafficTotals* totals) {
+  return Running() && ReadTunnelAdapterTraffic(totals);
+}
+
 inline HANDLE& Child() { static HANDLE process = nullptr; return process; }
 inline DWORD& Pid() { static DWORD pid = 0; return pid; }
 inline bool& ConsoleReady() { static bool ready = false; return ready; }
