@@ -887,7 +887,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       // it. For a fresh connect the tunnel controller performs the exact
       // same native config validation; avoid starting sing-box twice.
       if (_vpnUp || _vpnCleanup || _modernTunnel.isRunning ||
-          _ciscoTunnel.isRunning || _openVpnTunnel.hasChild) {
+          _ciscoTunnel.isRunning || _openVpnTunnel.hasChild ||
+          _l2tpTunnel.hasChild) {
         final targetConfig = SingBoxWindowsConfig.compose(
             protocol: protocol, item: matches.single);
         if (!await WindowsSingBoxPreflight.checkInMemory(targetConfig)) {
@@ -946,7 +947,10 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     } catch (error) {
       if (mounted) {
         setState(() {
-          _modernUp = _modernTunnel.isRunning || _ciscoTunnel.isRunning;
+          _modernUp = _modernTunnel.isRunning ||
+              _ciscoTunnel.isRunning ||
+              _openVpnTunnel.isRunning ||
+              _l2tpTunnel.isRunning;
           if (!_modernUp) {
             _modernProtocol = null;
             _modernNodeId = null;
