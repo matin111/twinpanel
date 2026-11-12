@@ -40,6 +40,12 @@ void main() {
     expect(ui, contains('_sudokuProxy.lastUnexpectedExitReason'));
     expect(ui, contains('SUDOKU_CONFIG_LOAD_FAILED'));
     expect(ui, contains('SUDOKU_LOCAL_PORT_CONFLICT'));
+    // Native startup and pre-TUN probe timeouts remain explicit and safe.
+    expect(proxy, contains('SUDOKU_CONFIG_STAGE_TIMEOUT'));
+    expect(proxy, contains('SUDOKU_PROCESS_START_TIMEOUT'));
+    expect(proxy, contains('SUDOKU_PROCESS_GUARD_TIMEOUT'));
+    expect(ui, contains('SUDOKU_BASELINE_IP_TIMEOUT'));
+    expect(ui, contains('WindowsSingBoxTunnel.measureBaselineIp().timeout('));
     expect(proxy, contains('SUDOKU_CORE_EXIT_CODE_'));
     expect(proxy, contains('code.toUnsigned(32)'));
     expect(proxy, contains('lastUnexpectedExitReason ??'));
