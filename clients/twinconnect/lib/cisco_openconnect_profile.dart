@@ -60,7 +60,7 @@ class CiscoOpenConnectProfile {
       'certificate_fingerprint', 'cert_fingerprint',
     ]);
     if (pinned != null &&
-        !RegExp(r'^(sha256:[0-9a-fA-F]{64}|sha1:[0-9a-fA-F]{40})$')
+        !RegExp(r'^(sha256:[0-9a-fA-F]{64}|sha1:[0-9a-fA-F]{40}|pin-sha256:[A-Za-z0-9+/]{43}=)$')
             .hasMatch(pinned)) {
       throw const FormatException('CISCO_CERT_PIN_INVALID');
     }
