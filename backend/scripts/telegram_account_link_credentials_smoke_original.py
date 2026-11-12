@@ -8,7 +8,7 @@ lookup = (
 ).read_text(encoding="utf-8")
 bot = (
     ROOT
-    / "backend/app/telegram_account_link_bot.py"
+    / "backend/app/telegram_account_link_bot_original.py"
 ).read_text(encoding="utf-8")
 routers_init = (
     ROOT
