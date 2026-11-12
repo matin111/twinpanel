@@ -361,38 +361,48 @@ color:var(--text,#f4f7fb);box-shadow:0 8px 32px #0002}
 
 
 _CONNECTION_GLASS_CSS = r"""
-/* TWINPANEL_CONNECTION_GLASS_SYSTEM_V3: clean transparent glass, no decoration */
-:root {
-  --tp-card-glass: rgba(255,255,255,.055);
-  --tp-card-edge: rgba(255,255,255,.17);
-  --tp-card-shadow: 0 8px 24px rgba(0,0,0,.10), inset 0 1px 0 rgba(255,255,255,.06);
+/* TWINPANEL_CONNECTION_GLASS_SYSTEM_V4: translucent cards; original page background untouched. */
+:root{
+  --tp-glass-rim:rgba(235,246,255,.32);
+  --tp-glass-specular:rgba(255,255,255,.15);
+  --tp-glass-veil:rgba(255,255,255,.025);
+  --tp-glass-shadow:0 9px 26px rgba(0,0,0,.12),inset 0 1px 0 rgba(255,255,255,.23),inset 0 -1px 0 rgba(255,255,255,.025);
 }
-html[data-theme="light"], body[data-theme="light"] {
-  --tp-card-glass: rgba(255,255,255,.32);
-  --tp-card-edge: rgba(64,93,140,.20);
-  --tp-card-shadow: 0 8px 24px rgba(32,56,93,.07), inset 0 1px 0 rgba(255,255,255,.35);
+html[data-theme="light"],body[data-theme="light"]{
+  --tp-glass-rim:rgba(83,120,165,.33);
+  --tp-glass-specular:rgba(255,255,255,.48);
+  --tp-glass-veil:rgba(255,255,255,.085);
+  --tp-glass-shadow:0 9px 24px rgba(31,59,108,.08),inset 0 1px 0 rgba(255,255,255,.72),inset 0 -1px 0 rgba(91,124,172,.06);
 }
-/* Preserve the page background, spacing, accents and button styling. */
+/* Only the surface is frosted. No opaque background color, full-page gradient, color overlay or layout change. */
 html body :is(.traffic,.protocol-choice,.protocol-panel,.server-tab,.server-view,
 .profile,.platform-group,.app-card,.v38-all-card,.v34-subscription-card,
 .v9-config-card,.v9-server-row,.config-card,.server-card,.node-card,
-.subscription-card,.protocol-card,.device-card,#tp-app-access) {
-  background: var(--tp-card-glass) !important;
-  border-color: var(--tp-card-edge) !important;
-  box-shadow: var(--tp-card-shadow) !important;
-  -webkit-backdrop-filter: blur(16px) !important;
-  backdrop-filter: blur(16px) !important;
+.subscription-card,.protocol-card,.device-card,#tp-app-access){
+  background-color:transparent!important;
+  background-image:linear-gradient(138deg,
+    var(--tp-glass-specular) 0%,
+    rgba(255,255,255,.055) 19%,
+    var(--tp-glass-veil) 55%,
+    rgba(255,255,255,.006) 100%)!important;
+  border:1px solid var(--tp-glass-rim)!important;
+  box-shadow:var(--tp-glass-shadow)!important;
+  -webkit-backdrop-filter:blur(22px) saturate(135%)!important;
+  backdrop-filter:blur(22px) saturate(135%)!important;
 }
-/* Retain the existing active/online outlines and colors. */
-html body .protocol-choice.active,
-html body .protocol-choice.live-online {
-  border-color: var(--ok, #20bd83) !important;
+/* Preserve protocol online/selected status, not an extra panel decoration. */
+html body .protocol-choice.live-online,
+html body .protocol-choice.live-online.active{
+  border-color:var(--ok,#20bd83)!important;
 }
-/* Do not change element hierarchy, text colors or existing transitions. */
-@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))) {
-  html body :is(.traffic,.protocol-choice,.protocol-panel,#tp-app-access) {
-    background:var(--surface,#142035)!important;
-  }
+html body .protocol-choice.active:not(.live-online){
+  border-color:var(--p,#3b82f6)!important;
+}
+/* Support browsers without frosted-background support while keeping text readable. */
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+ html body :is(.traffic,.protocol-choice,.protocol-panel,#tp-app-access){
+   background:var(--surface,#17243c)!important;
+ }
 }
 """
 
