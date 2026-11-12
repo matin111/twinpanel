@@ -168,21 +168,27 @@ class WindowsOpenVpnTunnel {
     final port = _managementPort;
     if (port == null || _password == null || _process == null) return;
     final password = (await _password!.readAsString()).trim();
+    final child = _process!;
     final socket = await Socket.connect(InternetAddress.loopbackIPv4, port,
         timeout: const Duration(seconds: 4));
     final sent = Completer<void>();
     var authenticated = false;
     var passwordSubmitted = false;
-    socket.cast<List<int>>().transform(utf8.decoder).listen((response) {
-      if (response.contains('ENTER PASSWORD:')) {
+    var reply = '';
+    socket.cast<List<int>>().transform(utf8.decoder).listen((message) {
+      reply = (reply + message);
+      if (reply.length > 2048) reply = reply.substring(reply.length - 2048);
+      if (!passwordSubmitted && reply.contains('ENTER PASSWORD:')) {
         passwordSubmitted = true;
+        reply = '';
         socket.write(password + '\n');
       } else if (passwordSubmitted && !authenticated &&
-          (response.contains('SUCCESS:') || response.contains('>INFO:'))) {
+          (reply.contains('SUCCESS:') || reply.contains('>INFO:'))) {
         authenticated = true;
+        reply = '';
         socket.write('signal SIGTERM\n');
         if (!sent.isCompleted) sent.complete();
-      } else if (response.contains('ERROR:') && !sent.isCompleted) {
+      } else if (reply.contains('ERROR:') && !sent.isCompleted) {
         sent.completeError(const FormatException('OPENVPN_STOP_REJECTED'));
       }
     }, onError: (_) {
@@ -192,7 +198,7 @@ class WindowsOpenVpnTunnel {
     });
     try {
       await sent.future.timeout(const Duration(seconds: 6));
-      await _process!.exitCode.timeout(const Duration(seconds: 15));
+      await child.exitCode.timeout(const Duration(seconds: 15));
     } finally { socket.destroy(); }
   }
 
