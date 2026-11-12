@@ -286,6 +286,25 @@ def admin_app_reset(
     return _deliver(db, _owner_delivery(db, subscription_id, None), reset=True)
 
 
+# The subscription Connection link is treated as a bearer capability.
+# Whoever possesses the link can retrieve this app password; never cache or
+# log the credential response. It is not included in page HTML or QR payload.
+@router.post("/public/connection/{token}/app-delivery")
+def connection_link_app_delivery(token: str, db: Session = Depends(get_db)):
+    from .account_delivery import _subscription_from_share_token
+    sub = _subscription_from_share_token(token, db)
+    if not central_app_entitled():
+        raise HTTPException(status_code=403, detail="CENTRAL_APP_NOT_INCLUDED")
+    creds = app_delivery_payload(db, sub)
+    if creds is None:
+        raise HTTPException(status_code=403, detail="CENTRAL_APP_NOT_INCLUDED")
+    db.commit()
+    return JSONResponse({
+        "app_username": creds["username"],
+        "app_password": creds["password"],
+    }, headers=_PRIVATE_HEADERS)
+
+
 @router.post("/customer/subscriptions/{subscription_id}/app-delivery")
 def customer_app_delivery(
     subscription_id: int,
