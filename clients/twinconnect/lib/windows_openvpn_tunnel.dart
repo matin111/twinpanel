@@ -112,10 +112,10 @@ class WindowsOpenVpnTunnel {
     // Old panel-issued inline profiles don't include Windows DNS. Force a
     // resolver through the VPN instead of retaining an unreachable LAN DNS.
     // This modifies only the ephemeral local OpenVPN profile for this session.
-    final hasDns = RegExp(r'(?mi)^dhcp-option\\s+DNS\\s+').hasMatch(validated);
+    final hasDns = RegExp(r'(?mi)^dhcp-option\s+DNS\s+').hasMatch(validated);
     final config = hasDns
         ? validated
-        : '$validated\\ndhcp-option DNS 1.1.1.1\\ndhcp-option DNS 8.8.8.8\\n';
+        : '$validated\ndhcp-option DNS 1.1.1.1\ndhcp-option DNS 8.8.8.8\n';
     final binary = enginePath;
     if (binary == null || !await File(binary).exists()) {
       throw const FormatException('OPENVPN_ENGINE_NOT_INSTALLED');
