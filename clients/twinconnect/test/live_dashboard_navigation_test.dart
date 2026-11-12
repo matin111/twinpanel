@@ -72,6 +72,14 @@ void main() {
     expect(find.byKey(const Key('liveConnectionStatus')), findsWidgets);
     // The duration is visible even while offline, and begins at zero.
     expect(find.byKey(const Key('liveConnectionDuration')), findsOneWidget);
+    // The original authenticated dashboard must expose account data directly
+    // on Quick Connect, with no invented values while the snapshot is pending.
+    expect(find.byKey(const Key('liveHomeSubscriptionSummary')), findsOneWidget);
+    expect(find.byKey(const Key('liveHomeRefreshAccount')), findsOneWidget);
+    expect(find.text('Subscription details'), findsOneWidget);
+    expect(find.text('Data usage'), findsOneWidget);
+    expect(find.text('Expiry date'), findsOneWidget);
+    expect(find.text('Time remaining'), findsOneWidget);
     expect(find.text('00:00:00'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('devNav_locations')));
