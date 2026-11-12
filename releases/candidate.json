@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.796",
-  "source_sha": "d203bebd0404798d6b3862275375d84be19462c6",
+  "version": "1.1.0-rc.797",
+  "source_sha": "c00be78c05bef3cddf4f2f2e6f715a6a607639f8",
   "notes": {
-    "fa": "رفع خطای اسکریپت دکمه نمایش اطلاعات ورود TwinConnect در صفحه واقعی Connection و تأیید صحت JavaScript تولیدشده؛ حذف کادر تکراری و دریافت خودکار اطلاعات اپ از پنجره ساب‌لینک ادمین و نماینده و کاربر. حفظ دکمه مستقل ورود اپ و QR و تنظیمات VPN.",
-    "en": "Fix generated JavaScript syntax so TwinConnect app login opens on the actual Connection page. Remove redundant app credentials from the panel's QR/link modal. Preserve standalone reseller/admin app access, public QR and VPN configurations."
+    "fa": "اصلاح کامل لایت‌مود صفحه نودها: کارت انتخاب‌شدهٔ کل نودها روشن و خوانا شد؛ رنگ اعداد، آیکون‌ها، فیلترها، جدول و دکمه مدیریت هماهنگ شد. حفظ دارک‌مود، عملکرد فیلتر نودها و سایر امکانات. حفاظت از این اصلاح در سورس و آپدیت‌های بعدی.",
+    "en": "Fix admin nodes light-mode selected KPI dark gradient and improve node counts, table and management controls contrast; preserve existing dark mode, real filters and prior functionality. Protect node view CSS and JSX in official source release parity gate."
   }
 }
