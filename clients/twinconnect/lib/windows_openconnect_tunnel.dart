@@ -119,12 +119,19 @@ class WindowsOpenConnectTunnel {
     }
   }
 
-  Future<String> start(CiscoOpenConnectProfile profile) async {
+  static Future<String> directPublicIp() => _publicIp();
+
+  Future<String> start(CiscoOpenConnectProfile profile, {String? baselinePublicIp}) async {
     if (!Platform.isWindows) {
       throw const FormatException('CISCO_WINDOWS_ONLY');
     }
     if (_pending || _nativeActive) {
       throw const FormatException('CISCO_TUNNEL_BUSY');
+    }
+    if (baselinePublicIp != null &&
+        InternetAddress.tryParse(baselinePublicIp)?.type !=
+            InternetAddressType.IPv4) {
+      throw const FormatException('BASELINE_IP_UNAVAILABLE');
     }
     _pending = true;
     try {
@@ -133,7 +140,9 @@ class WindowsOpenConnectTunnel {
       // until BOTH succeeded. Baseline remains measured before route changes.
       final prerequisites = await Future.wait<Object?>([
         _engine(),
-        _publicIp().timeout(const Duration(seconds: 10)),
+        baselinePublicIp == null
+            ? _publicIp().timeout(const Duration(seconds: 10))
+            : Future<String>.value(baselinePublicIp),
       ]);
       final engine = prerequisites[0] as ({String executable, String script})?;
       if (engine == null) {
