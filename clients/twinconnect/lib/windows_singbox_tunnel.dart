@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'singbox_windows_config.dart';
 import 'xray_endpoint_route.dart';
 import 'singbox_profile_validator.dart';
+import 'shadowtls_chain.dart';
 import 'modern_transport_probe.dart';
 import 'windows_singbox_preflight.dart';
 
@@ -193,9 +194,13 @@ class WindowsSingBoxTunnel {
             InternetAddress.tryParse(xrayVerifiedExitIp!) == null))) {
         throw const FormatException('XRAY_PROXY_NOT_VERIFIED');
       }
+      final shadowChain = activeSocksPort == null && protocol == 'shadowtls'
+          ? ShadowTlsChain.fromItem(profile) : null;
       final outbound = activeSocksPort == null
-          ? SingBoxProfileValidator.validateOutbound(
-              protocolCode: protocol, item: profile)
+          ? shadowChain == null
+              ? SingBoxProfileValidator.validateOutbound(
+                  protocolCode: protocol, item: profile)
+              : shadowChain.transport
           : <String, dynamic>{'server': '127.0.0.1'};
       final endpoint = outbound['server'] as String;
       String? resolvedServer;
