@@ -3,7 +3,6 @@
 // OpenConnect processes or accepts an external executable outside our bundle.
 // A console process group lets CTRL_BREAK reach OpenConnect so vpnc-script
 // can restore Windows routes and DNS on disconnect.
-#include <winsock2.h>
 #include <windows.h>
 #include <iphlpapi.h>
 #include <netioapi.h>
@@ -20,15 +19,11 @@ namespace twinconnect_openconnect {
 inline DWORD& BaselineRouteIndex() { static DWORD index = 0; return index; }
 inline bool EgressInterface(DWORD* index) {
   if (!index) return false;
-  SOCKADDR_IN destination = {};
-  destination.sin_family = AF_INET;
-  destination.sin_addr.S_un.S_un_b.s_b1 = 1;
-  destination.sin_addr.S_un.S_un_b.s_b2 = 1;
-  destination.sin_addr.S_un.S_un_b.s_b3 = 1;
-  destination.sin_addr.S_un.S_un_b.s_b4 = 1;
+  // 1.1.1.1 has identical host- and network-order DWORD representation,
+  // so GetBestInterface needs no Winsock declarations or byte swapping.
   DWORD found = 0;
-  if (GetBestInterfaceEx(reinterpret_cast<sockaddr*>(&destination), &found)
-      != NO_ERROR || found == 0) return false;
+  if (GetBestInterface(0x01010101u, &found) != NO_ERROR || found == 0)
+    return false;
   *index = found;
   return true;
 }
