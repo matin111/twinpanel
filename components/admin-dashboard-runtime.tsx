@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import {useEffect,useMemo,useRef,useState} from "react";
-import {Badge,Card,Shell} from "./ui";
+import {Card,Shell} from "./ui";
 import {adminApi,AdminNode,AdminStats,AdminTunnel,DashboardSummary,RuntimeRow} from "../lib/admin-api";
 import {dashboardPaymentAmount} from "../lib/admin-dashboard-revenue";
 import {salesAnalyticsApi,SalesAnalyticsResponse} from "../lib/sales-analytics-api";
 import {PremiumRevenueChart} from "./premium-revenue-chart";
 import {OverviewKpiCard,OperationalHealthVisual} from "./admin-overview-visuals";
+import {TunnelMonitor,ProtocolMonitor} from "./admin-dashboard-network-panels";
 import {RecentPaymentActivity,ServerFleetVisual,SubscriptionAnalytics} from "./admin-dashboard-lower-panels";
 import type {SubscriptionBreakdown} from "./admin-dashboard-lower-panels";
 import {useI18n} from "../lib/i18n";
@@ -237,9 +238,12 @@ export function AdminDashboardRuntime(){
 
 
     <section className="dash27-bottom-grid">
-      <Card className="dash27-tunnels-card"><div className="dash27-card-head"><div><span>{pick("مسیرهای شبکه","NETWORK PATHS")}</span><h2>{pick("تانل‌ها","Tunnels")}</h2></div><Link href="/admin/tunnels">{pick("مدیریت","Manage")} ←</Link></div><div className="dash27-tunnel-list">{tunnels.slice(0,6).map(t=>{const on=String(t.status).toLowerCase()==="online";return <div className="dash27-tunnel" key={t.id}><span className={`status-dot ${on?"online":"offline"}`}/><div><b>#{t.id} · {t.active_transport||t.transport||"Transport"}</b><small>{t.mode||pick("مسیر تونل","Tunnel path")}</small></div><strong>{t.latency_ms==null?"—":`${t.latency_ms} ms`}</strong><Badge tone={on?"ok":"warn"}>{t.status||"—"}</Badge></div>})}</div></Card>
-
-      <Card className="dash27-protocol-card"><div className="dash27-card-head"><div><span>{pick("ماتریس سلامت","HEALTH MATRIX")}</span><h2>{pick("۱۵ پروتکل سرویس","15 service protocols")}</h2><small>{pick("۵ Classic + ۱۰ Modern","5 Classic + 10 Modern")}</small></div><Link href="/admin/protocols">{pick("مدیریت پروتکل‌ها","Manage protocols")} ←</Link></div><div className="dash27-protocol-grid">{protocols.map(p=><div className={`dash27-protocol ${p.reported?(p.online?"online":"offline"):"unknown"}`} key={p.key}><span className="dash27-protocol-icon">{p.online?"✓":p.reported?"!":"·"}</span><div><b>{p.label}</b><small>{p.reported?`${p.onlineNodes} ${pick("نود آنلاین","online nodes")}`:pick("بدون گزارش سلامت","No health report")}</small></div><span className="dash27-protocol-state">{p.reported?(p.online?pick("سالم","Healthy"):pick("آفلاین","Offline")):pick("نامشخص","Unknown")}</span></div>)}</div></Card>
+      <Card className="dash27-tunnels-card">
+        <TunnelMonitor tunnels={tunnels} nodes={nodes} loaded={tunnelsLoaded} pick={pick}/>
+      </Card>
+      <Card className="dash27-protocol-card">
+        <ProtocolMonitor protocols={protocols} pick={pick}/>
+      </Card>
     </section>
 
     <style jsx global>{`
