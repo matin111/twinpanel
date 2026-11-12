@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.782",
+  "version": "1.1.0-rc.783",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-12T01:27:24Z",
+  "released_at": "2026-11-12T01:34:43Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "030f30d91f415c264e98e601f916def34d698f63",
+  "source_sha": "1591eaae85fa4519f19ca99904d9ee2e2272f72a",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.782/twinpanel-1.1.0-rc.782-linux-x86_64.tar.gz",
-    "sha256": "052fcbc4fce4d759227c15636da5f448b4a7567be7198cbd54a7f003518ab5c1",
-    "size_bytes": 30494183
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.783/twinpanel-1.1.0-rc.783-linux-x86_64.tar.gz",
+    "sha256": "158886e408a10d31e737324602dfb7678e241e458f6d71a88b8755cbeb7eb54f",
+    "size_bytes": 30494629
   },
   "notes": {
-    "fa": "مدیریت برند و ظاهر اپ هوشمند در پنل اصلی و نماینده، ثبت آدرس اپ در لایسنس، تحویل اطلاعات ورود اپ همراه ساب‌لینک و QR در ربات‌ها، محدودیت پروتکل‌های اپ بر اساس اشتراک، همراه اصلاحات جدید وضعیت آنلاین اشتراک‌ها، تمدید پلن، پیام همگانی عکس‌دار و دکمه خرید؛ با حفظ کانفیگ‌ها و سرویس‌های فعلی.",
-    "en": "Smart app branding management for admin and resellers, license-directory origin management, app-only credentials in subscription and bot delivery, subscription-scoped protocols, plus the latest subscription status, renewal and Telegram broadcast improvements."
+    "fa": "مدیریت برند و ظاهر اپ هوشمند در پنل اصلی و نماینده، ثبت آدرس اپ در لایسنس، تحویل اطلاعات ورود اپ همراه ساب‌لینک و QR در ربات‌ها، محدودیت پروتکل‌های اپ بر اساس اشتراک، همراه اصلاحات جدید وضعیت آنلاین اشتراک‌ها، تمدید پلن، پیام همگانی عکس‌دار و دکمه خرید؛ با حفظ کانفیگ‌ها و سرویس‌های فعلی. حذف کامل دکمه و پنجره مدیریت جداگانه اپ از صفحه اشتراک‌ها در دسکتاپ و موبایل.",
+    "en": "Smart app branding management for admin and resellers, license-directory origin management, app-only credentials in subscription and bot delivery, subscription-scoped protocols, plus the latest subscription status, renewal and Telegram broadcast improvements. Removes legacy per-account app buttons and dialogs on desktop and mobile."
   }
 }
