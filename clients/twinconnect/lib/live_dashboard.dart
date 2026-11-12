@@ -1189,7 +1189,11 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       // required before sing-box is allowed to modify Windows routes.
       final preTunnel = await Future.wait<Object>([
         _sudokuProxy.start(profile),
-        WindowsSingBoxTunnel.measureBaselineIp(),
+        WindowsSingBoxTunnel.measureBaselineIp().timeout(
+          const Duration(seconds: 9),
+          onTimeout: () =>
+              throw const FormatException('SUDOKU_BASELINE_IP_TIMEOUT'),
+        ),
       ]);
       final socksPort = preTunnel[0] as int;
       final baselineIp = preTunnel[1] as String;
@@ -2643,6 +2647,18 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
               String status when status.startsWith('SUDOKU_CORE_EXIT_CODE_') => tr(
                 'موتور سودوکو متوقف شد (کد خروج 0x${status.substring('SUDOKU_CORE_EXIT_CODE_'.length)})؛ تونل به‌صورت امن قطع شد.',
                 'Sudoku exited with Windows code 0x${status.substring('SUDOKU_CORE_EXIT_CODE_'.length)}; the tunnel was closed safely.'),
+              'SUDOKU_CONFIG_STAGE_TIMEOUT' => tr(
+                'ویندوز هنگام آماده‌سازی امن کانفیگ سودوکو پاسخ نداد.',
+                'Windows timed out while staging the protected Sudoku config.'),
+              'SUDOKU_PROCESS_START_TIMEOUT' => tr(
+                'اجرای موتور Sudoku در ویندوز بیش از حد طول کشید.',
+                'Windows timed out while starting the Sudoku executable.'),
+              'SUDOKU_PROCESS_GUARD_TIMEOUT' => tr(
+                'محافظ پردازش سودوکو در ویندوز به‌موقع پاسخ نداد.',
+                'Windows timed out while attaching the Sudoku process guard.'),
+              'SUDOKU_BASELINE_IP_TIMEOUT' => tr(
+                'بررسی IP اینترنت پیش از راه‌اندازی تونل پاسخ نداد؛ اتصال برای امنیت متوقف شد.',
+                'Direct pre-VPN public IP check timed out; no tunnel was enabled.'),
               'SUDOKU_CORE_EXITED' => tr(
                 'موتور سودوکو متوقف شد؛ تونل نیز برای جلوگیری از نشتی قطع شد.',
                 'The Sudoku core stopped; the VPN tunnel was closed safely.'),
