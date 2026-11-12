@@ -2166,7 +2166,9 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   }
 
   Widget _shell(BuildContext context) {
-    final wide = MediaQuery.sizeOf(context).width >= 870;
+    // Keep the authenticated desktop sidebar spacious; compact mode is only
+    // for narrow windows where a full sidebar would crowd live connection cards.
+    final wide = MediaQuery.sizeOf(context).width >= 980;
     final ink = _dark ? const Color(0xFFF7F4FF) : const Color(0xFF21233F);
     final sub = _dark ? const Color(0xFFABB4C9) : const Color(0xFF565D75);
     final line = _dark ? const Color(0xFF3C4564) : const Color(0xFFDADCEA);
@@ -2219,16 +2221,16 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           onTap: () => setState(() => _page = page),
           child: Padding(
             padding: EdgeInsets.symmetric(
-              horizontal: wide ? 15 : 8, vertical: 13),
+              horizontal: wide ? 19 : 8, vertical: wide ? 16 : 13),
             child: Row(
               mainAxisAlignment: wide ? MainAxisAlignment.start
                   : MainAxisAlignment.center,
               children: [
                 Icon(icon, color: _page == page ? purple
                     : (_dark ? const Color(0xFFD2CCEA)
-                        : const Color(0xFF53496D)), size: 21),
+                        : const Color(0xFF53496D)), size: wide ? 24 : 21),
                 if (wide) ...[
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 15),
                   Expanded(child: txt(title,
                     color: _page == page ? ink
                         : (_dark ? const Color(0xFFE7E2F8)
@@ -2243,9 +2245,9 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     );
 
     Widget sideBar() => Container(
-      width: wide ? 195 : 74,
+      width: wide ? 258 : 74,
       padding: EdgeInsets.symmetric(
-        horizontal: wide ? 13 : 7, vertical: 22),
+        horizontal: wide ? 17 : 7, vertical: 22),
       decoration: BoxDecoration(color: sidebar,
         border: Border(left: BorderSide(color: line))),
       child: Column(children: [
@@ -2269,7 +2271,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           const SizedBox(height: 9),
           txt(widget.brand.brandName, size: 17, bold: true),
         ],
-        const SizedBox(height: 34),
+        const SizedBox(height: 38),
         sideNav('home', Icons.bolt_rounded, tr('اتصال سریع', 'Quick connect')),
         sideNav('locations', Icons.place_outlined, tr('مکان‌ها', 'Locations')),
         sideNav('settings', Icons.tune_rounded, tr('تنظیمات', 'Settings')),
@@ -3437,6 +3439,107 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       ),
     );
 
+    // Main connection page: compact, real subscription lifecycle details.
+    // The account page still owns the full breakdown and edit/refresh actions.
+    // A missing snapshot displays dashes, never fictitious quota/dates.
+    Widget homeSubscriptionSummary() {
+      final account = widget.account;
+      final used = account?.trafficUsedBytes ?? 0;
+      final limit = account?.trafficLimitBytes ?? 0;
+      final unlimited = account != null && limit <= 0;
+      final expires = account?.expiresAt;
+      final days = expires?.difference(DateTime.now()).inDays;
+      final remaining = account == null
+          ? '—'
+          : unlimited
+              ? tr('نامحدود', 'Unlimited')
+              : _formatBytes((limit - used).clamp(0, limit).toInt());
+      final total = account == null
+          ? '—'
+          : unlimited ? tr('نامحدود', 'Unlimited') : _formatBytes(limit);
+      final date = _expiryLabel();
+      final daysLabel = account == null ? '—'
+          : expires == null
+              ? (account.activationDurationDays != null &&
+                 account.activationDurationDays! > 0
+                    ? tr('پس از اولین اتصال', 'After first connection')
+                    : tr('نامحدود', 'Unlimited'))
+              : days == null ? '—'
+                : days < 0 ? tr('منقضی', 'Expired')
+                  : tr('${days + 1} روز', '${days + 1} days');
+      Widget tile(IconData icon, String label, String value, {
+        String? subtitle,
+      }) => Expanded(child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            Icon(icon, color: purple, size: 19),
+            const SizedBox(width: 7),
+            Expanded(child: txt(label, size: 11, color: sub)),
+          ]),
+          const SizedBox(height: 10),
+          Text(value, maxLines: 1, overflow: TextOverflow.ellipsis,
+            style: TextStyle(color: ink, fontSize: 16,
+              fontWeight: FontWeight.w800)),
+          if (subtitle != null) ...[
+            const SizedBox(height: 5),
+            Text(subtitle, maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: sub, fontSize: 10)),
+          ],
+        ],
+      ));
+      return glassCard(
+        key: const Key('liveHomeSubscriptionSummary'),
+        radius: 21,
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 17),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(children: [
+              Icon(Icons.perm_contact_calendar_outlined,
+                color: purple, size: 20),
+              const SizedBox(width: 9),
+              Expanded(child: txt(tr('وضعیت اشتراک', 'Subscription details'),
+                size: 14, bold: true)),
+              IconButton(
+                key: const Key('liveHomeRefreshAccount'),
+                tooltip: tr('به‌روزرسانی اشتراک', 'Refresh subscription'),
+                onPressed: widget.onRefreshAccount,
+                icon: Icon(Icons.refresh_rounded, color: purple, size: 20)),
+            ]),
+            const SizedBox(height: 13),
+            Row(crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                tile(Icons.data_usage_rounded,
+                  tr('حجم مصرفی', 'Data usage'),
+                  account == null ? '—' : _formatBytes(used),
+                  subtitle: tr('از $total', 'of $total')),
+                const SizedBox(width: 14),
+                tile(Icons.inventory_2_outlined,
+                  tr('حجم باقی‌مانده', 'Remaining data'), remaining),
+              ]),
+            const SizedBox(height: 17),
+            Divider(color: line.withValues(alpha: .55), height: 1),
+            const SizedBox(height: 16),
+            Row(crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                tile(Icons.calendar_month_outlined,
+                  tr('تاریخ انقضا', 'Expiry date'), date),
+                const SizedBox(width: 14),
+                tile(Icons.timelapse_rounded,
+                  tr('زمان باقی‌مانده', 'Time remaining'), daysLabel),
+              ]),
+            if (widget.accountError != null) ...[
+              const SizedBox(height: 10),
+              txt(tr('اطلاعات اشتراک در دسترس نیست؛ تازه‌سازی کنید.',
+                  'Subscription information unavailable. Refresh to retry.'),
+                size: 11, color: const Color(0xFFFFB878)),
+            ],
+          ],
+        ),
+      );
+    }
+
     Widget home() => Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -3469,6 +3572,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
             ),
           );
         }),
+        const SizedBox(height: 15),
+        homeSubscriptionSummary(),
         const SizedBox(height: 15),
         glassCard(
           key: const Key('liveAutoFastestServer'),
