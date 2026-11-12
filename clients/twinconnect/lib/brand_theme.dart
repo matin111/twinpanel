@@ -84,8 +84,9 @@ class BrandTheme {
     );
   }
 
-  static BoxDecoration background(BrandPreview? brand) {
-    final base = parse(brand?.backgroundColor ?? '', '#101018');
+  static BoxDecoration background(BrandPreview? brand,
+      {Brightness brightness = Brightness.dark}) {
+    final base = backgroundColor(brand, brightness);
     final secondary = parse(brand?.secondaryColor ?? '', '#4F46E5');
     final style = brand?.backgroundStyle ?? 'gradient';
     if (style == 'image' && brand?.backgroundImageUrl != null) {
@@ -130,7 +131,8 @@ class BrandBackground extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DecoratedBox(
-      decoration: BrandTheme.background(brand),
+      decoration: BrandTheme.background(brand,
+          brightness: Theme.of(context).brightness),
       child: child,
     );
   }
