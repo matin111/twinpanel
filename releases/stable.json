@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.799",
+  "version": "1.1.0-rc.800",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-12T07:35:59Z",
+  "released_at": "2026-11-12T07:56:12Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "298d0e9313b25b09e554f06d32872e806352644f",
+  "source_sha": "7d62a78342ba458ad06bfb9f9cad92d01cad961c",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.799/twinpanel-1.1.0-rc.799-linux-x86_64.tar.gz",
-    "sha256": "b6e9dffb19767a19c9e1c63e1703e4abfa59c16913231fdbe123fd15bb53fd14",
-    "size_bytes": 30645151
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.800/twinpanel-1.1.0-rc.800-linux-x86_64.tar.gz",
+    "sha256": "75b6f7220d82fbd8d17837b7df30fd2a8e94516c4357dee621ef7f07e97bb776",
+    "size_bytes": 30646508
   },
   "notes": {
-    "fa": "اصلاح محسوس استایل شیشه‌ای تمام کارت‌های صفحه Connection: افزایش شفافیت، پس‌زمینه گرادیانی چندلایه پشت کارت‌ها، انعکاس نور در لبه‌ها، Blur قوی‌تر و اولویت بالای CSS نهایی در دارک و لایت مود. بدون تغییر در اطلاعات حساب یا کانفیگ VPN.",
-    "en": "Make the Connection glass design visibly distinct with ambient colored gradients behind translucent cards, brighter specular highlights, stronger blur, and final CSS cascade precedence for both themes. VPN and account data unchanged."
+    "fa": "نسخه هماهنگ جدید با اصلاح رنگ لایت‌مود فرم افزودن سرور، دکمه‌های اصلی و مخفی اشتراک‌ها و نمای شیشه‌ای اتصال؛ محافظ انتشار برای جلوگیری از حذف این تغییرات در آپدیت‌های بعدی.",
+    "en": "Fresh pinned build preserving Add server light-mode sections, main and hidden subscription action colors, and Connection glass UI. Release guards prevent stale UI replacements."
   }
 }
