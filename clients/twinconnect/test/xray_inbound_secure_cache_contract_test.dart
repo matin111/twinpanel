@@ -11,7 +11,12 @@ void main() {
     expect(cache, contains("data['namespace'] != namespace"));
     expect(cache, contains("data['origin'] != panelOrigin.origin"));
     expect(cache, contains('XrayServerProfiles.fromResponse'));
-    expect(cache, isNot(contains('SharedPreferences')));
+    // Comments may name insecure storage as a prohibited technique.
+    // Reject actual imports or API calls rather than matching prose.
+    expect(cache, isNot(contains('package:shared_preferences/shared_preferences.dart')));
+    expect(cache, isNot(contains('SharedPreferences.getInstance(')));
+    expect(cache, contains('_secure.write('));
+    expect(cache, contains('_secure.read('));
     expect(cache, isNot(contains('sessionToken')));
   });
 
