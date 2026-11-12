@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.807",
+  "version": "1.1.0-rc.808",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-12T11:01:22Z",
+  "released_at": "2026-11-12T18:45:47Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "6944ce33ac864980f05365629a1a1973ae72813f",
+  "source_sha": "15572c5ce0da2b6b812a11e2fca5bd51a97b5c3f",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.807/twinpanel-1.1.0-rc.807-linux-x86_64.tar.gz",
-    "sha256": "3cbf68abf1754706fa7e1f23c33953422d2a3a865e7e21fa9ea09309ae8705fb",
-    "size_bytes": 30668512
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.808/twinpanel-1.1.0-rc.808-linux-x86_64.tar.gz",
+    "sha256": "9d230b067d6c1ae0f938458eb618b8b29a5d8566b56df1b4acf694596034dea3",
+    "size_bytes": 30667166
   },
   "notes": {
-    "fa": "اصلاح واقعی لایت‌مود فرم ساخت اشتراک در کامپوننت فعال AdminSubscriptionCreateUnified: حذف پس‌زمینه‌های تیره ثابت هدر، بخش‌های انتخاب پلن و کاربر، پروتکل‌ها، سرورها و نوار پایینی؛ رنگ‌های خوانا در روشن و حفظ دارک‌مود. محافظت از فایل فعال در انتشارهای بعدی. بدون تغییر منطق صدور اشتراک.",
-    "en": "Fix the actual unified subscription creation component used on the Admin subscriptions page. Hardcoded dark inline surfaces for header, choices, sections and footer are now light/dark-aware; adds active component CSS and pinned-release regression protection. No provisioning logic changes."
+    "fa": "کاهش ریشه‌ای فشار CPU و دیتابیس: صف‌بندی سراسری ثبت گروهی نودها با قفل مشترک بدون ایجاد صف کاربر، حداکثر یک نود سنگین هم‌زمان، سقف مصرف CPU کل پروسه و زیرپردازش‌های ثبت گروهی ۲۰۰٪، حفظ قفل مستقل هر نود و تحویل کانفیگ‌های موجود. حسابداری CPU به طور ماندگار محدود شده است.",
+    "en": "Prevent multi-node central bulk provisioning storms with crash-safe fleet-wide serial admission, while retaining per-node locks and existing delivery. Limit each detached stage and all family adapters to 200% CPU. Preserve VPN data and connectivity."
   }
 }
