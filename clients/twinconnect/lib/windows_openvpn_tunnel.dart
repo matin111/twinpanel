@@ -129,10 +129,15 @@ class WindowsOpenVpnTunnel {
       return _managementPort!;
   }
 
-  Future<String> start(Map<String, dynamic> item) async {
+  Future<String> start(Map<String, dynamic> item, {String? baselinePublicIp}) async {
     if (!Platform.isWindows) throw const FormatException('OPENVPN_WINDOWS_ONLY');
     if (_busy || _process != null) {
       throw const FormatException('OPENVPN_ALREADY_RUNNING');
+    }
+    if (baselinePublicIp != null &&
+        InternetAddress.tryParse(baselinePublicIp)?.type !=
+            InternetAddressType.IPv4) {
+      throw const FormatException('BASELINE_IP_UNAVAILABLE');
     }
     final validated = OpenVpnProfileValidator.validate(item);
     // Old panel-issued inline profiles don't include Windows DNS. Force a
@@ -151,7 +156,8 @@ class WindowsOpenVpnTunnel {
     try {
       phase = 'EGRESS_BASELINE_AND_PRIVATE_FILES';
       final prerequisites = await Future.wait<Object>([
-        publicIp(),
+        baselinePublicIp == null ? publicIp() :
+            Future<String>.value(baselinePublicIp),
         _prepareRuntimeFiles(config),
       ]);
       final before = prerequisites[0] as String;
