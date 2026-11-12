@@ -13,6 +13,29 @@ class BrandTheme {
     return Color(int.parse('FF${value.substring(1)}', radix: 16));
   }
 
+  // The panel stores one tenant palette, generally authored for dark mode.
+  // Derive *separate* readable light surfaces while keeping the owner hue.
+  static Color surface(BrandPreview? brand, Brightness brightness) {
+    final base = parse(brand?.surfaceColor ?? '', '#20202A');
+    return brightness == Brightness.dark
+        ? base
+        : Color.lerp(base, Colors.white, 0.95)!;
+  }
+
+  static Color backgroundColor(BrandPreview? brand, Brightness brightness) {
+    final base = parse(brand?.backgroundColor ?? '', '#101018');
+    return brightness == Brightness.dark
+        ? base
+        : Color.lerp(base, Colors.white, 0.97)!;
+  }
+
+  static Color accent(BrandPreview? brand, Brightness brightness) {
+    final base = parse(brand?.primaryColor ?? '', '#7C3AED');
+    return brightness == Brightness.dark || base.computeLuminance() < .18
+        ? base
+        : Color.lerp(base, const Color(0xFF352166), .45)!;
+  }
+
   static ThemeMode mode(BrandPreview? brand) => switch (brand?.themeMode) {
         'light' => ThemeMode.light,
         'system' => ThemeMode.system,
@@ -20,11 +43,11 @@ class BrandTheme {
       };
 
   static ThemeData make(BrandPreview? brand, Brightness brightness) {
-    final primary = parse(brand?.primaryColor ?? '', '#7C3AED');
+    final primary = accent(brand, brightness);
     final secondary = parse(brand?.secondaryColor ?? '', '#4F46E5');
     final button = parse(brand?.buttonColor ?? '', '#7C3AED');
-    final bg = parse(brand?.backgroundColor ?? '', '#101018');
-    final surface = parse(brand?.surfaceColor ?? '', '#20202A');
+    final bg = backgroundColor(brand, brightness);
+    final surface = BrandTheme.surface(brand, brightness);
     final onSurface = ThemeData.estimateBrightnessForColor(surface) ==
             Brightness.dark ? Colors.white : const Color(0xFF101827);
     final buttonForeground = ThemeData.estimateBrightnessForColor(button) ==
