@@ -1807,9 +1807,9 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                   const Color(0xFF23364B).withValues(alpha: 0.42),
                 ]
               : [
-                  const Color(0xFFEDE4FF).withValues(alpha: 0.58),
-                  Colors.white.withValues(alpha: 0.56),
-                  const Color(0xFFE6F1FF).withValues(alpha: 0.56),
+                  const Color(0xFFEDE4FF).withValues(alpha: 0.76),
+                  Colors.white.withValues(alpha: 0.64),
+                  const Color(0xFFE6F1FF).withValues(alpha: 0.72),
                 ],
         ),
         border: Border.all(color: purple.withValues(alpha: 0.56)),
