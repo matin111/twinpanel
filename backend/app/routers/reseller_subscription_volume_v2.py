@@ -1,4 +1,5 @@
 from __future__ import annotations
+from starlette.concurrency import run_in_threadpool
 
 from datetime import datetime, timedelta, timezone
 import re
@@ -436,7 +437,9 @@ async def _reseller_delivery_info(
             db=db,
         )
 
-    info = _stored_info(db, sub)
+    # _stored_info performs many synchronous ORM lookups; offload it instead
+    # of blocking the single Uvicorn event loop for every reseller request.
+    info = await run_in_threadpool(_stored_info, db, sub)
     if provision_result is not None:
         info["provision"] = {
             "ok": bool(provision_result.get("ok", True)) if isinstance(provision_result, dict) else True,
@@ -451,7 +454,7 @@ async def reseller_connection_info_volume_v2(
     reseller: Reseller = Depends(require_reseller),
     db: Session = Depends(get_db),
 ):
-    _owned_link(db, int(reseller.id), subscription_id)
+    await run_in_threadpool(_owned_link, db, int(reseller.id), subscription_id)
     return await _reseller_delivery_info(db, subscription_id)
 
 
