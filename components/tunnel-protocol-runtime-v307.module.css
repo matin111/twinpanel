@@ -206,6 +206,101 @@
 :global(html[data-theme="light"]) .createFooter{background:rgba(250,252,255,.98);border-top-color:#e0e8f4;}
 :global(html[data-theme="light"]) .createCancel{color:#425675!important;background:#f0f4fb!important;border-color:#d6e0ee!important;}
 :global(html[data-theme="light"]) .createSubmit{color:#fff!important;}
+
+/* Dark mode inherits the same neutral design tokens as every admin page.
+   Do not hardcode navy surfaces here: that made /admin/tunnels unlike the rest. */
+:global(html:not([data-theme="light"])) .tunnelPage {
+  --tp-tunnel-line:var(--line);
+  --tp-tunnel-glass:var(--surface);
+  --tp-tunnel-panel:var(--surface2);
+  --tp-tunnel-soft:color-mix(in srgb,var(--surface2) 88%,var(--surface));
+  --tp-tunnel-ink:var(--text);
+  --tp-tunnel-muted:var(--muted);
+  --tp-tunnel-accent:var(--purple2);
+}
+:global(html:not([data-theme="light"])) .pageHero {
+  background:var(--surface)!important;
+  border-color:var(--line)!important;
+  box-shadow:var(--shadow)!important;
+}
+:global(html:not([data-theme="light"])) .pageHero::before {
+  height:2px;background:var(--purple2);opacity:.24;
+}
+:global(html:not([data-theme="light"])) .kpiGrid :global(.stat),
+:global(html:not([data-theme="light"])) .listSurface {
+  background:var(--surface)!important;
+  border-color:var(--line)!important;
+  box-shadow:var(--shadow)!important;
+}
+:global(html:not([data-theme="light"])) .kpiGrid :global(.stat-icon){
+  background:color-mix(in srgb,var(--purple) 20%,var(--surface2))!important;
+  color:var(--purple2)!important;
+}
+:global(html:not([data-theme="light"])) .tunnelCard {
+  background:var(--surface2);
+  border-color:var(--line);
+  box-shadow:0 6px 20px rgba(0,0,0,.12),inset 0 1px 0 rgba(255,255,255,.02);
+}
+:global(html:not([data-theme="light"])) .nodeBox,
+:global(html:not([data-theme="light"])) .metric,
+:global(html:not([data-theme="light"])) .searchRow :global(.runtime-toolbar label){
+  background:color-mix(in srgb,var(--surface2) 82%,var(--surface))!important;
+  border-color:var(--line)!important;
+}
+:global(html:not([data-theme="light"])) .createModalCard {
+  background:var(--surface)!important;
+  border-color:var(--line)!important;
+  color:var(--text)!important;
+  box-shadow:var(--shadow)!important;
+}
+:global(html:not([data-theme="light"])) .createModalHeader,
+:global(html:not([data-theme="light"])) .createFooter {
+  background:var(--surface2)!important;
+  border-color:var(--line)!important;
+}
+:global(html:not([data-theme="light"])) .createModalHeading b,
+:global(html:not([data-theme="light"])) .createSectionLabel {
+  color:var(--text)!important;
+}
+:global(html:not([data-theme="light"])) .createModalHeading small,
+:global(html:not([data-theme="light"])) .createFieldTitle {
+  color:var(--muted)!important;
+}
+:global(html:not([data-theme="light"])) .createModalSymbol {
+  background:color-mix(in srgb,var(--purple) 34%,var(--surface2));
+  border-color:var(--line);
+  color:var(--text);
+  box-shadow:none;
+}
+:global(html:not([data-theme="light"])) .createField input,
+:global(html:not([data-theme="light"])) .createField select {
+  background:var(--surface2)!important;
+  border-color:var(--line)!important;
+  color:var(--text)!important;
+}
+:global(html:not([data-theme="light"])) .createField option {
+  background:var(--surface2);color:var(--text);
+}
+:global(html:not([data-theme="light"])) .createSpoofGrid {
+  background:var(--surface2);border-color:var(--line);
+}
+:global(html:not([data-theme="light"])) .createDivider {background:var(--line);}
+:global(html:not([data-theme="light"])) .createClose,
+:global(html:not([data-theme="light"])) .createCancel {
+  background:var(--surface)!important;
+  border-color:var(--line)!important;
+  color:var(--text)!important;
+}
+:global(html:not([data-theme="light"])) .createSubmit {
+  background:var(--purple)!important;
+  border-color:color-mix(in srgb,var(--purple2) 40%,var(--line))!important;
+  color:white!important;
+}
+:global(html:not([data-theme="light"])) .createPairArrow {
+  background:color-mix(in srgb,var(--purple) 16%,var(--surface2));
+  border-color:var(--line);color:var(--purple2);
+}
+
 @media(max-width:760px){
   .pageHero{padding:18px!important;}
   .pageHero :global(.action-row){width:100%;justify-content:flex-start;}
