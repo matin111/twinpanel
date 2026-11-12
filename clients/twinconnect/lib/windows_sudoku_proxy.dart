@@ -28,6 +28,12 @@ class WindowsSudokuProxy {
     final failure = _lastFailureCategory;
     if (failure != null) return failure;
     if (_lastUnexpectedExitCode == 0) return 'SUDOKU_CORE_EXITED_CLEANLY';
+    final code = _lastUnexpectedExitCode;
+    if (code != null) {
+      // Windows NTSTATUS and ordinary process return codes are numeric,
+      // not raw native logs. Show only these safe, bounded diagnostics.
+      return 'SUDOKU_CORE_EXIT_CODE_${code.toUnsigned(32).toRadixString(16).padLeft(8, '0')}';
+    }
     return 'SUDOKU_CORE_EXITED';
   }
 
@@ -156,7 +162,7 @@ class WindowsSudokuProxy {
       var ready = false;
       for (var attempt = 0; attempt < 30; attempt++) {
         if (!identical(_child, owned)) {
-          throw const FormatException('SUDOKU_CORE_EXITED');
+          throw FormatException(lastUnexpectedExitReason ?? 'SUDOKU_CORE_EXITED');
         }
         if (await _socksReady(localPort)) {
           ready = true;
@@ -172,7 +178,7 @@ class WindowsSudokuProxy {
       await _finishConfigStage();
       final exit = await _verifyRemoteExit(localPort);
       if (!identical(_child, owned)) {
-        throw const FormatException('SUDOKU_CORE_EXITED');
+        throw FormatException(lastUnexpectedExitReason ?? 'SUDOKU_CORE_EXITED');
       }
       _port = localPort;
       _verifiedExit = exit;
