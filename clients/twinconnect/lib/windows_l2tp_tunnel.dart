@@ -130,12 +130,19 @@ class WindowsL2tpTunnel {
     }
   }
 
-  Future<String> start(L2tpProfile profile) async {
+  static Future<String> directPublicIp() => _publicIp();
+
+  Future<String> start(L2tpProfile profile, {String? baselinePublicIp}) async {
     if (!Platform.isWindows) throw const FormatException('L2TP_WINDOWS_ONLY');
     if (_busy || _ownsEntry) throw const FormatException('L2TP_ALREADY_RUNNING');
+    if (baselinePublicIp != null &&
+        InternetAddress.tryParse(baselinePublicIp)?.type !=
+            InternetAddressType.IPv4) {
+      throw const FormatException('BASELINE_IP_UNAVAILABLE');
+    }
     _busy = true;
     try {
-      final baselineIp = await _publicIp();
+      final baselineIp = baselinePublicIp ?? await _publicIp();
       _baselineIp = baselineIp;
       _lastHealthError = null;
       final started = await _channel.invokeMethod<bool>('startL2tp', {
