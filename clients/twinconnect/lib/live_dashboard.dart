@@ -3784,11 +3784,22 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     Widget home() => Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(children: [
-          Expanded(child: heading(tr('اتصال سریع', 'Quick connect'))),
-          const SizedBox(width: 10),
-          fastestServerControl(),
-        ]),
+        LayoutBuilder(builder: (context, constraints) {
+          if (constraints.maxWidth < 690) {
+            return Column(crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                heading(tr('اتصال سریع', 'Quick connect')),
+                const SizedBox(height: 9),
+                Align(alignment: AlignmentDirectional.centerStart,
+                  child: fastestServerControl()),
+              ]);
+          }
+          return Row(children: [
+            Expanded(child: heading(tr('اتصال سریع', 'Quick connect'))),
+            const SizedBox(width: 10),
+            fastestServerControl(),
+          ]);
+        }),
         const SizedBox(height: 16),
         LayoutBuilder(builder: (context, constraints) {
           final split = constraints.maxWidth >= 740;
