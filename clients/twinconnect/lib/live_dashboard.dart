@@ -580,7 +580,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         _stopModernTrafficMonitoring();
         if (_ciscoTunnel.isRunning) {
           await _ciscoTunnel.stop();
-        } else if (_openVpnTunnel.isRunning) {
+        } else if (_openVpnTunnel.hasChild) {
           await _openVpnTunnel.stop();
         } else {
           await _modernTunnel.stop();
@@ -676,7 +676,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         _stopModernTrafficMonitoring();
         if (_ciscoTunnel.isRunning) {
           await _ciscoTunnel.stop();
-        } else if (_openVpnTunnel.isRunning) {
+        } else if (_openVpnTunnel.hasChild) {
           await _openVpnTunnel.stop();
         } else {
           await _modernTunnel.stop();
@@ -756,7 +756,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       // it. For a fresh connect the tunnel controller performs the exact
       // same native config validation; avoid starting sing-box twice.
       if (_vpnUp || _vpnCleanup || _modernTunnel.isRunning ||
-          _ciscoTunnel.isRunning || _openVpnTunnel.isRunning) {
+          _ciscoTunnel.isRunning || _openVpnTunnel.hasChild) {
         final targetConfig = SingBoxWindowsConfig.compose(
             protocol: protocol, item: matches.single);
         if (!await WindowsSingBoxPreflight.checkInMemory(targetConfig)) {
@@ -787,7 +787,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         _stopModernTrafficMonitoring();
         if (_ciscoTunnel.isRunning) {
           await _ciscoTunnel.stop();
-        } else if (_openVpnTunnel.isRunning) {
+        } else if (_openVpnTunnel.hasChild) {
           await _openVpnTunnel.stop();
         } else {
           await _modernTunnel.stop();
@@ -834,7 +834,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     try {
       if (_ciscoTunnel.isRunning) {
         await _ciscoTunnel.stop();
-      } else if (_openVpnTunnel.isRunning) {
+      } else if (_openVpnTunnel.hasChild) {
         await _openVpnTunnel.stop();
       } else if (_modernTunnel.isRunning) {
         await _modernTunnel.stop();
@@ -1118,7 +1118,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   Future<void> _toggleVpn() async {
     if (_vpnBusy || !Platform.isWindows) return;
     if (_modernUp || _modernTunnel.isRunning ||
-        _ciscoTunnel.isRunning || _openVpnTunnel.isRunning) {
+        _ciscoTunnel.isRunning || _openVpnTunnel.hasChild) {
       await _stopModernTunnel();
       return;
     }
