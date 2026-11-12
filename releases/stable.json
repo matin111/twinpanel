@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.800",
+  "version": "1.1.0-rc.801",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-12T07:56:12Z",
+  "released_at": "2026-11-12T08:30:55Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "7d62a78342ba458ad06bfb9f9cad92d01cad961c",
+  "source_sha": "ad8f8b0501c91d005a8f3f481d32f03d12ccd165",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.800/twinpanel-1.1.0-rc.800-linux-x86_64.tar.gz",
-    "sha256": "75b6f7220d82fbd8d17837b7df30fd2a8e94516c4357dee621ef7f07e97bb776",
-    "size_bytes": 30646508
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.801/twinpanel-1.1.0-rc.801-linux-x86_64.tar.gz",
+    "sha256": "24d99cc6cdbb8c697020daaf71a5ba8a64fa84c1e09c3dc02f64c5f5f59cc09c",
+    "size_bytes": 30662781
   },
   "notes": {
-    "fa": "نسخه هماهنگ جدید با اصلاح رنگ لایت‌مود فرم افزودن سرور، دکمه‌های اصلی و مخفی اشتراک‌ها و نمای شیشه‌ای اتصال؛ محافظ انتشار برای جلوگیری از حذف این تغییرات در آپدیت‌های بعدی.",
-    "en": "Fresh pinned build preserving Add server light-mode sections, main and hidden subscription action colors, and Connection glass UI. Release guards prevent stale UI replacements."
+    "fa": "بازطراحی مدرن و شیشه‌ای صفحه تانل‌ها و پنجره ساخت تانل: کارت‌ها و آمار حرفه‌ای‌تر، فرم انتخاب ایران/خارج واضح، تنظیمات مسیر و اولویت منظم، هماهنگی لایت‌مود و دارک‌مود، سازگاری موبایل. بدون تغییر منطق ساخت یا کانفیگ تانل.",
+    "en": "Polished tunnel control center and New Tunnel dialog: translucent responsive cards/KPIs, clear Iran-to-Exit route selection, grouped route settings, accessible light/dark themes; tunnel creation and VPN configuration logic unchanged."
   }
 }
