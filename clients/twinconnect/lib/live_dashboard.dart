@@ -1520,8 +1520,11 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     final ink = _dark ? const Color(0xFFF7F4FF) : const Color(0xFF21233F);
     final sub = _dark ? const Color(0xFFABB4C9) : const Color(0xFF565D75);
     final line = _dark ? const Color(0xFF3C4564) : const Color(0xFFDADCEA);
-    final panel = _dark ? const Color(0xFF202B43) : const Color(0xFFFFFFFF);
-    final sidebar = _dark ? const Color(0xFF11182F) : const Color(0xFFF0EDFB);
+    // Both colors are tenant-managed in the main panel and reseller studio.
+    // Keep explicit overrides for dark/light while the owner's palette remains
+    // authoritative across the dashboard, cards and side navigation.
+    final panel = BrandTheme.parse(widget.brand.surfaceColor, '#20202A');
+    final sidebar = BrandTheme.parse(widget.brand.backgroundColor, '#101018');
 
     Text txt(String s, {double size = 13, bool bold = false, Color? color,
         TextAlign? align}) => Text(
@@ -1536,8 +1539,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         BoxDecoration(
           color: selected
               ? purple.withValues(alpha: _dark ? 0.17 : 0.10)
-              : (_dark ? const Color(0xFF344360) : const Color(0xFFFDFDFF))
-                  .withValues(alpha: _dark ? 0.55 : 0.76),
+              : panel.withValues(alpha: 0.95),
           borderRadius: BorderRadius.circular(radius),
           border: Border.all(
             color: selected
