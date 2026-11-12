@@ -40,6 +40,10 @@ void main() {
     expect(ui, contains('_sudokuProxy.lastUnexpectedExitReason'));
     expect(ui, contains('SUDOKU_CONFIG_LOAD_FAILED'));
     expect(ui, contains('SUDOKU_LOCAL_PORT_CONFLICT'));
+    expect(proxy, contains('SUDOKU_CORE_EXIT_CODE_'));
+    expect(proxy, contains('code.toUnsigned(32)'));
+    expect(proxy, contains('lastUnexpectedExitReason ??'));
+    expect(ui, contains("status.startsWith('SUDOKU_CORE_EXIT_CODE_')"));
     expect(proxy, contains("['-c', path]"));
     expect(native, contains('twinconnect_sudoku_guard.h'));
     expect(native, contains('stageSudokuConfig'));
