@@ -306,7 +306,12 @@ color:var(--text,#f4f7fb);box-shadow:0 8px 32px #0002}
   <div class="tp-app-row"><code id="tp-app-access-password"></code><button type="button" data-app-copy="password">کپی رمز</button></div>
   <button id="tp-app-access-copy-all" type="button">کپی هر دو</button>
  </div>
- <a id="tp-app-access-signin" href="/panel/subscription" hidden>ورود به پنل برای دریافت اطلاعات اپ</a>
+ <form id="tp-app-access-auth" hidden autocomplete="on" style="margin-top:12px;display:grid;gap:9px;max-width:420px">
+  <label>ایمیل حساب پنل<input id="tp-app-email" type="email" autocomplete="username" required style="width:100%;padding:10px;border-radius:9px"></label>
+  <label>رمز حساب پنل<input id="tp-app-login-password" type="password" autocomplete="current-password" required style="width:100%;padding:10px;border-radius:9px"></label>
+  <label id="tp-app-otp-wrap" hidden>کد تأیید دومرحله‌ای<input id="tp-app-otp" inputmode="numeric" autocomplete="one-time-code" style="width:100%;padding:10px;border-radius:9px"></label>
+  <button type="submit">تأیید هویت و نمایش اطلاعات اپ</button>
+ </form>
 </section>
 <script>
 (() => {
@@ -316,7 +321,9 @@ color:var(--text,#f4f7fb);box-shadow:0 8px 32px #0002}
   const load = document.getElementById("tp-app-access-load");
   const info = document.getElementById("tp-app-access-status");
   const values = document.getElementById("tp-app-access-values");
-  const signin = document.getElementById("tp-app-access-signin");
+  const auth = document.getElementById("tp-app-access-auth");
+  const otpWrap = document.getElementById("tp-app-otp-wrap");
+  let twoFactorToken = null;
   const username = document.getElementById("tp-app-access-username");
   const password = document.getElementById("tp-app-access-password");
   let credentials = null;
@@ -346,8 +353,8 @@ color:var(--text,#f4f7fb);box-shadow:0 8px 32px #0002}
   load.addEventListener("click", async () => {
     const token = getToken();
     if (!token) {
-      signin.hidden = false;
-      showStatus("برای نمایش رمز اپ، ابتدا وارد حساب پنل خود شوید.");
+      auth.hidden = false;
+      showStatus("برای دریافت رمز اپ، با حساب پنل خود تأیید هویت کنید.");
       return;
     }
     load.disabled = true;
@@ -355,21 +362,70 @@ color:var(--text,#f4f7fb);box-shadow:0 8px 32px #0002}
     try {
       const result = await fetchOwnerDelivery(token);
       if (!result) {
-        signin.hidden = false;
-        showStatus("نشست ورود معتبر نیست؛ دوباره وارد پنل شوید.");
+        auth.hidden = false;
+        showStatus("نشست ورود معتبر نیست؛ با حساب پنل تأیید هویت کنید.");
         return;
       }
       credentials = {username:result.app_username,password:result.app_password};
       username.textContent = credentials.username;
       password.textContent = credentials.password;
       values.hidden = false;
-      signin.hidden = true;
+      auth.hidden = true;
       showStatus("اطلاعات ورود مخصوص همین اشتراک");
     } catch (error) {
       showStatus(error.message === "APP_DISABLED" ? "ورود اپ در لایسنس این پنل فعال نیست." :
         error.message === "ACCESS_DENIED" ? "دسترسی به اطلاعات این اشتراک مجاز نیست." :
         "دریافت اطلاعات اپ ممکن نشد. دوباره تلاش کنید.");
     } finally { load.disabled = false; }
+  });
+  // The Connection page is on a separate subdomain; panel localStorage
+  // is intentionally not readable here. Authenticate directly with the
+  // panel's same-origin API without persisting credentials or access tokens.
+  auth.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const button = auth.querySelector('button[type="submit"]');
+    button.disabled = true;
+    const email = document.getElementById("tp-app-email");
+    const secret = document.getElementById("tp-app-login-password");
+    const otp = document.getElementById("tp-app-otp");
+    try {
+      let loginResponse;
+      if (twoFactorToken) {
+        loginResponse = await fetch("/v1/auth/2fa/login/verify", {
+          method:"POST",headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({two_factor_token:twoFactorToken,code:otp.value}),
+          cache:"no-store"
+        });
+      } else {
+        loginResponse = await fetch("/v1/auth/login", {
+          method:"POST",headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({email:email.value,password:secret.value}),
+          cache:"no-store"
+        });
+      }
+      secret.value = "";
+      if (!loginResponse.ok) throw new Error("LOGIN_FAILED");
+      const login = await loginResponse.json();
+      if (login.requires_2fa) {
+        twoFactorToken = login.two_factor_token;
+        otpWrap.hidden = false;
+        showStatus("کد تأیید دومرحله‌ای را وارد کنید.");
+        return;
+      }
+      twoFactorToken = null;
+      const result = await fetchOwnerDelivery(login.access_token);
+      if (!result) throw new Error("ACCESS_DENIED");
+      credentials = {username:result.app_username,password:result.app_password};
+      username.textContent = credentials.username;
+      password.textContent = credentials.password;
+      values.hidden = false;
+      auth.hidden = true;
+      showStatus("اطلاعات ورود مخصوص همین اشتراک");
+    } catch (error) {
+      showStatus(error.message === "ACCESS_DENIED" ?
+        "این حساب به اشتراک موردنظر دسترسی ندارد." :
+        "تأیید هویت یا دریافت اطلاعات انجام نشد؛ اطلاعات را بررسی کنید.");
+    } finally { button.disabled = false; }
   });
   root.querySelectorAll("[data-app-copy]").forEach((button) =>
     button.addEventListener("click", () => {
