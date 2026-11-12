@@ -210,9 +210,6 @@ class WindowsSingBoxTunnel {
         protocol: protocol, item: profile, resolvedServer: resolvedServer,
         telemetryPort: telemetryPort, telemetrySecret: telemetrySecret,
         xraySocksPort: xraySocksPort);
-      if (!await WindowsSingBoxPreflight.checkInMemory(config)) {
-        throw const FormatException('SINGBOX_TUN_CONFIG_INVALID');
-      }
       // Independently verify that the selected Hysteria2/TUIC/etc outbound
       // can reach the internet before changing any Windows routes.
       // A failure here points to profile/transport rather than TUN routing.
@@ -238,9 +235,19 @@ class WindowsSingBoxTunnel {
               onTimeout: () =>
                   throw const FormatException('BASELINE_IP_UNAVAILABLE'),
             );
-      final checked = await Future.wait<String>([proxyCheck, baselineCheck]);
-      final verifiedProxyIp = checked[0];
-      final before = checked[1];
+      // All three pre-TUN checks are independent. Overlap CPU-only config
+      // validation with the two read-only HTTPS checks. The engine MUST
+      // pass all of them BEFORE its route-changing process is started.
+      final preTunnelChecks = await Future.wait<Object>([
+        WindowsSingBoxPreflight.checkInMemory(config),
+        proxyCheck,
+        baselineCheck,
+      ]);
+      if (preTunnelChecks[0] != true) {
+        throw const FormatException('SINGBOX_TUN_CONFIG_INVALID');
+      }
+      final verifiedProxyIp = preTunnelChecks[1] as String;
+      final before = preTunnelChecks[2] as String;
 
       started = await Process.start(
         WindowsSingBoxPreflight.enginePath(Platform.resolvedExecutable),
