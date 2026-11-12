@@ -157,10 +157,11 @@ class WindowsSingBoxTunnel {
       }
       // Xray has already dialled the pinned upstream via the physical NIC.
       // Only that IP can be exempted from TUN routes, preventing loopback.
-      if ((xraySocksPort == null) != (xrayEndpointIPv4 == null) ||
-          (xrayEndpointIPv4 != null &&
-           XrayEndpointRoute.requirePublicIPv4(xrayEndpointIPv4).isEmpty)) {
+      if ((xraySocksPort == null) != (xrayEndpointIPv4 == null)) {
         throw const FormatException('XRAY_ENDPOINT_ROUTE_MISSING');
+      }
+      if (xrayEndpointIPv4 != null) {
+        XrayEndpointRoute.requirePublicIPv4(xrayEndpointIPv4);
       }
       if ((xraySocksPort == null) != (xrayVerifiedExitIp == null) ||
           (xraySocksPort != null &&
