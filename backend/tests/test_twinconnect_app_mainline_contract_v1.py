@@ -63,21 +63,25 @@ class TwinConnectMainlineContract(unittest.TestCase):
         self.assertIn("int(sub.user_id) != int(user.id)", routes)
         self.assertIn('"vpn_credentials_unchanged"', routes)
 
-    def test_real_public_connection_has_secure_app_login_card(self):
+    def test_real_public_connection_has_one_click_app_login_card(self):
         connection = PUBLIC_CONNECTION.read_text(encoding="utf-8")
         ast.parse(connection)
         self.assertIn("TWINPANEL_CONNECTION_APP_LOGIN_AUTHENTICATED_V1", connection)
         self.assertIn("_add_authenticated_app_login_panel(source, int(sub.id))", connection)
         self.assertIn("tp-app-access-load", connection)
-        self.assertIn('    card = r"""', connection)  # Preserve JS escaped newlines
-        self.assertIn('id="tp-app-access-auth"', connection)
-        self.assertIn('role of ["customer","reseller","admin"]', connection)
-        self.assertIn('"twinpanel_customer_token"', connection)
-        self.assertIn('"twinpanel_customer_remember_token"', connection)
-        self.assertIn('"/app-delivery"', connection)
-        self.assertIn('cache:"no-store"', connection)
+        self.assertIn('    card = r"""', connection)
+        self.assertIn('public/connection/', connection)
+        self.assertIn('cache: "no-store"', connection)
         self.assertIn('navigator.clipboard.writeText', connection)
+        self.assertNotIn('id="tp-app-access-auth"', connection)
+        self.assertNotIn('tp-app-email', connection)
+        self.assertNotIn('tp-app-login-password', connection)
+        self.assertNotIn('tp-app-otp', connection)
         self.assertNotIn("app_delivery_payload(db, sub)", connection)
+        routes = ROUTES.read_text(encoding="utf-8")
+        self.assertIn('/public/connection/{token}/app-delivery', routes)
+        self.assertIn('_subscription_from_share_token(token, db)', routes)
+        self.assertIn('headers=_PRIVATE_HEADERS', routes)
 
     def test_frontend_entry_and_vendor_registration_are_reachable(self):
         admin = ADMIN.read_text(encoding="utf-8")
