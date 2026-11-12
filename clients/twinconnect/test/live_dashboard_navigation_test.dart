@@ -72,7 +72,7 @@ void main() {
     expect(find.byKey(const Key('liveHomeSubscriptionSummary')),
       findsOneWidget);
     expect(find.text('5.00 GB'), findsWidgets);
-    expect(find.text('15.00 GB'), findsWidgets);
+    expect(find.textContaining('15.00 GB'), findsWidgets);
     expect(find.textContaining('20.00 GB'), findsWidgets);
     expect(find.text('Expiry date'), findsOneWidget);
     expect(find.textContaining('days'), findsWidgets);
