@@ -2615,6 +2615,36 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
               'OPENVPN_HEALTH_DEGRADED' => tr(
                 'مسیر شبکه OpenVPN پاسخ معتبر نمی‌دهد.',
                 'OpenVPN route health is degraded.'),
+              'SUDOKU_OR_TUN_ENGINE_UNAVAILABLE' => tr(
+                'موتور رسمی سودوکو یا موتور تونل ویندوز در این نسخه وجود ندارد.',
+                'Sudoku core or the Windows tunnel engine is unavailable.'),
+              'SUDOKU_ENGINE_NOT_BUNDLED' => tr(
+                'فایل اجرایی سودوکو همراه برنامه نصب نشده است.',
+                'The official Sudoku executable is missing from this build.'),
+              'SUDOKU_SERVER_PROFILE_MISSING' => tr(
+                'کانفیگ سودوکو برای این سرور در اشتراک پیدا نشد.',
+                'No Sudoku profile was delivered for this server.'),
+              'SUDOKU_PROFILE_NOT_READY' => tr(
+                'کانفیگ سودوکو معتبر نیست یا هنوز برای اتصال آماده نشده است.',
+                'Sudoku configuration is invalid or not ready yet.'),
+              'SUDOKU_ENDPOINT_DNS_UNAVAILABLE' => tr(
+                'آدرس سرور سودوکو به IP عمومی معتبر تبدیل نشد.',
+                'The Sudoku endpoint did not resolve to a valid public IPv4.'),
+              'SUDOKU_PRIVATE_CONFIG_STAGE_FAILED' => tr(
+                'ویندوز اجازه ساخت فایل رمزگذاری‌شده موقت سودوکو را نداد.',
+                'Windows could not securely stage the temporary Sudoku configuration.'),
+              'SUDOKU_PROCESS_GUARD_UNAVAILABLE' => tr(
+                'محافظ پردازش سودوکو در ویندوز فعال نشد؛ اتصال برای امنیت متوقف شد.',
+                'The native Sudoku process guard failed; connection was stopped.'),
+              'SUDOKU_CORE_EXITED' => tr(
+                'موتور سودوکو متوقف شد؛ تونل نیز برای جلوگیری از نشتی قطع شد.',
+                'The Sudoku core stopped; the VPN tunnel was closed safely.'),
+              'SUDOKU_LOOPBACK_PROXY_UNAVAILABLE' => tr(
+                'پروکسی محلی سودوکو بعد از اجرای موتور آماده نشد.',
+                'Sudoku local SOCKS5 proxy did not become ready.'),
+              'SUDOKU_REMOTE_EGRESS_UNVERIFIED' => tr(
+                'ارتباط واقعی سودوکو با سرور تأیید نشد؛ اینترنت از آن عبور نکرد.',
+                'Sudoku remote handshake/HTTPS egress could not be verified.'),
               'NATIVE_PROTOCOL_ENGINE_NOT_READY' => tr(
                 'موتور مستقل این پروتکل هنوز آماده نیست.',
                 'This protocol requires a native engine that is not ready yet.'),
