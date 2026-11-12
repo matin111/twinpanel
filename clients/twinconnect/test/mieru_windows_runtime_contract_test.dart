@@ -54,7 +54,12 @@ void main() {
     expect(install, contains('guardMieruProcess'));
     expect(runner, contains('MIERU_CONFIG_JSON_FILE'));
     expect(runner, contains('WindowsMieruProxy'));
-    expect(runner, contains('mieruVerifiedExitIp'));
+    // Native proxy only exposes a verified exit via its getter; the
+    // Windows TUN adapter receives it as mieruVerifiedExitIp.
+    expect(runner, contains('String? get verifiedExitIp'));
+    final bridge = File('lib/windows_singbox_tunnel.dart').readAsStringSync();
+    expect(bridge, contains('mieruVerifiedExitIp'));
+    expect(ui, contains('mieruVerifiedExitIp: verifiedExit'));
     expect(runner, isNot(contains('print(config)')));
     expect(ui, contains('_startMieruTunnel'));
     expect(ui, contains('protocol: \'mieru\''));
