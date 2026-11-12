@@ -16,6 +16,7 @@ DELIVERY = ROOT / "components/central-app-brand-manager.tsx"
 LINK_MODAL = ROOT / "components/subscription-link-delivery-modal.tsx"
 CUSTOMER = ROOT / "components/customer-subscriptions-runtime.tsx"
 FRONT_API = ROOT / "lib/central-app-credential-api.ts"
+PUBLIC_CONNECTION = ROOT / "backend/app/routers/public_connection_hub_live_v5.py"
 LICENSE = ROOT / "components/license-center.tsx"
 ROUTER_UI = ROOT / "components/routed-page-client-v2.tsx"
 
@@ -61,6 +62,20 @@ class TwinConnectMainlineContract(unittest.TestCase):
         self.assertIn("ResellerSubscription.reseller_id == int(reseller_id)", routes)
         self.assertIn("int(sub.user_id) != int(user.id)", routes)
         self.assertIn('"vpn_credentials_unchanged"', routes)
+
+    def test_real_public_connection_has_secure_app_login_card(self):
+        connection = PUBLIC_CONNECTION.read_text(encoding="utf-8")
+        ast.parse(connection)
+        self.assertIn("TWINPANEL_CONNECTION_APP_LOGIN_AUTHENTICATED_V1", connection)
+        self.assertIn("_add_authenticated_app_login_panel(source, int(sub.id))", connection)
+        self.assertIn("tp-app-access-load", connection)
+        self.assertIn('role of ["customer","reseller","admin"]', connection)
+        self.assertIn('"twinpanel_customer_token"', connection)
+        self.assertIn('"twinpanel_customer_remember_token"', connection)
+        self.assertIn('"/app-delivery"', connection)
+        self.assertIn('cache:"no-store"', connection)
+        self.assertIn('navigator.clipboard.writeText', connection)
+        self.assertNotIn("app_delivery_payload(db, sub)", connection)
 
     def test_frontend_entry_and_vendor_registration_are_reachable(self):
         admin = ADMIN.read_text(encoding="utf-8")
