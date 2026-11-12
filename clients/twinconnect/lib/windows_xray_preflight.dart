@@ -56,8 +56,9 @@ class WindowsXrayPreflight {
         path, ['version'], runInShell: false,
       ).timeout(const Duration(seconds: 6));
       final output = result.stdout.toString();
-      return result.exitCode == 0 && output.startsWith('Xray ') &&
-          RegExp(r'\\b26\\.11\\.9\\b').hasMatch(output);
+      return result.exitCode == 0 &&
+          (output.startsWith('Xray 26.11.9 ') ||
+           output.trim() == 'Xray 26.11.9');
     } catch (_) {
       return false;
     }
