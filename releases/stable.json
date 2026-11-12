@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.804",
+  "version": "1.1.0-rc.805",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-12T09:13:08Z",
+  "released_at": "2026-11-12T09:39:07Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "063b569865c9128acb6fe2440adbeab8aba01a15",
+  "source_sha": "cef164a766d17cac964d894baaddc0efb5b21279",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.804/twinpanel-1.1.0-rc.804-linux-x86_64.tar.gz",
-    "sha256": "81d49e995a292edb6c9fb584fbc775e8a5303eaaec45d9a43a3928e0ccc625b2",
-    "size_bytes": 30669091
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.805/twinpanel-1.1.0-rc.805-linux-x86_64.tar.gz",
+    "sha256": "64fa5fe116a9784076b8336e745523fcaa8d6e665f6f504a7947da29e1bef0c9",
+    "size_bytes": 30669449
   },
   "notes": {
-    "fa": "اصلاح هم‌زمان لایت‌مود مدیریت وبلاگ و کارت‌های نمایندگان: فیلدها، متن مقاله، نوار تصویر و فهرست مطالب روشن و خوانا؛ کارت نماینده، باکس آمار، کد، دکمه‌های مدیریت و حذف با زمینه روشن و کنتراست مناسب. بدون تغییر در منطق اشتراک‌ها، کاربرها و عملکرد دارک‌مود.",
-    "en": "Fix light-mode styling for both store blog editor and admin reseller cards, including form fields, image toolbar, blog list, reseller card statistics and action buttons. Preserve dark mode and subscription business logic."
+    "fa": "رفع مشکل لایت‌مود پنجره ساخت اشتراک: پس‌زمینه روشن، نوشته‌های خوانا، فرم انتخاب کاربر و پلن، پروتکل‌ها، سرورها، فیلدهای حجم و مدت و دکمه‌ها. بدون تغییر منطق صدور اکانت یا تنظیمات سرورها. محافظ انتشار برای جلوگیری از بازگشت خطا.",
+    "en": "Fix low-contrast light-mode Create subscription modal: readable light surfaces, header, account fields, protocol/server selection, controls and footer. Retain latest main features and add release regression safeguards. No subscription logic changes."
   }
 }
