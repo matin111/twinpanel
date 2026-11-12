@@ -108,7 +108,7 @@ export function SubscriptionLinkDeliveryModal({open,link,reference,loading=false
           <button type="button" className="subscription-link-copy" onClick={()=>void navigator.clipboard.writeText(
             [`${pick("نام کاربری اپ","App username")}: ${appDelivery.app_username}`,
              `${pick("رمز اپ","App password")}: ${appDelivery.app_password}`,
-             `${pick("سابلینک","Subscription link")}: ${publicLink}`].join("\\n")
+             `${pick("سابلینک","Subscription link")}: ${publicLink}`].join("\n")
           )}>{pick("کپی متن کامل تحویل","Copy complete delivery text")}</button>
         </div>}
       </section>
