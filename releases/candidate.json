@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.783",
-  "source_sha": "1591eaae85fa4519f19ca99904d9ee2e2272f72a",
+  "version": "1.1.0-rc.784",
+  "source_sha": "a2c58bef26d03c93e7524110c4365dfcbd757a40",
   "notes": {
-    "fa": "مدیریت برند و ظاهر اپ هوشمند در پنل اصلی و نماینده، ثبت آدرس اپ در لایسنس، تحویل اطلاعات ورود اپ همراه ساب‌لینک و QR در ربات‌ها، محدودیت پروتکل‌های اپ بر اساس اشتراک، همراه اصلاحات جدید وضعیت آنلاین اشتراک‌ها، تمدید پلن، پیام همگانی عکس‌دار و دکمه خرید؛ با حفظ کانفیگ‌ها و سرویس‌های فعلی. حذف کامل دکمه و پنجره مدیریت جداگانه اپ از صفحه اشتراک‌ها در دسکتاپ و موبایل.",
-    "en": "Smart app branding management for admin and resellers, license-directory origin management, app-only credentials in subscription and bot delivery, subscription-scoped protocols, plus the latest subscription status, renewal and Telegram broadcast improvements. Removes legacy per-account app buttons and dialogs on desktop and mobile."
+    "fa": "بازطراحی کامل استودیوی برند اپ هوشمند با تب‌بندی، رنگ‌های حرفه‌ای، پیش‌نمایش موبایل و آپلود امن لوگوی مستقل برای پنل اصلی و هر نماینده؛ تحویل لوگو و تنظیمات از طریق API برند TwinConnect بدون تغییر کانفیگ‌ها و سرویس‌های VPN.",
+    "en": "Redesigned TwinConnect brand studio with responsive tabs, live preview and tenant-isolated logo uploads. Logo and appearance delivered by the app brand API without changing VPN configurations."
   }
 }
