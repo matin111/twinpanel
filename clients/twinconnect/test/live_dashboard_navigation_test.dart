@@ -77,20 +77,28 @@ void main() {
     expect(find.text('Expiry date'), findsOneWidget);
     expect(find.textContaining('days'), findsWidgets);
     expect(find.byKey(const Key('liveHomeUsageCompact')), findsOneWidget);
-    expect(find.byKey(const Key('liveAutoFastestServer')), findsOneWidget);
-    expect(find.byKey(const Key('autoFastestServerToggle')), findsOneWidget);
+    // Fastest-server selection lives with protocol choices, never on Home.
+    expect(find.byKey(const Key('liveAutoFastestServer')), findsNothing);
+    expect(find.byKey(const Key('autoFastestServerToggle')), findsNothing);
     // The subscription summary is now a compact strip, not a giant panel.
     final summary = find.byKey(const Key('liveHomeSubscriptionSummary'));
     await tester.ensureVisible(summary);
     await tester.pump();
     expect(tester.getSize(summary).height, lessThan(210));
-    // Fastest server belongs in the connection header before the stats cards.
-    final fastest = find.byKey(const Key('liveAutoFastestServer'));
-    final power = find.byKey(const Key('liveConnectionStatus'));
-    await tester.ensureVisible(fastest);
+    // Fastest server is exclusively in Locations beside the protocol filters.
+    await tester.tap(find.byKey(const Key('devNav_locations')));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.byKey(const Key('devProtocolFilters')), findsOneWidget);
+    expect(find.byKey(const Key('liveAutoFastestServer')), findsOneWidget);
+    expect(find.byKey(const Key('autoFastestServerToggle')), findsOneWidget);
+    await tester.ensureVisible(find.byKey(const Key('liveAutoFastestServer')));
+    expect(find.text('Fastest server'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('devFilter_hysteria2')));
     await tester.pump();
-    expect(tester.getTopLeft(fastest).dy,
-      lessThan(tester.getTopLeft(power).dy));
+    expect(find.byKey(const Key('devFilter_hysteria2')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('devNav_home')));
+    await tester.pump();
+    expect(find.byKey(const Key('liveAutoFastestServer')), findsNothing);
     await tester.ensureVisible(find.byKey(const Key('liveHomeRefreshAccount')));
     await tester.tap(find.byKey(const Key('liveHomeRefreshAccount')));
     expect(refreshes, 1);
@@ -145,6 +153,8 @@ void main() {
     await tester.tap(find.byKey(const Key('devNav_locations')));
     await tester.pump(const Duration(milliseconds: 800));
     expect(find.byKey(const Key('devLocationListingCard')), findsOneWidget);
+    expect(find.byKey(const Key('devProtocolFilters')), findsOneWidget);
+    expect(find.byKey(const Key('liveAutoFastestServer')), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('devNav_home')));
     await tester.pump(const Duration(milliseconds: 800));
