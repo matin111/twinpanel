@@ -3581,214 +3581,214 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       final used = account?.trafficUsedBytes ?? 0;
       final limit = account?.trafficLimitBytes ?? 0;
       final unlimited = account != null && limit <= 0;
-      final expiry = account?.expiresAt;
-      final days = expiry?.difference(DateTime.now()).inDays;
       final fraction = account == null || limit <= 0
           ? 0.0 : (used / limit).clamp(0.0, 1.0);
+      final expiry = account?.expiresAt;
+      final days = expiry?.difference(DateTime.now()).inDays;
       final total = account == null ? '—'
           : unlimited ? tr('نامحدود', 'Unlimited') : _formatBytes(limit);
       final remaining = account == null ? '—'
           : unlimited ? tr('نامحدود', 'Unlimited')
           : _formatBytes((limit - used).clamp(0, limit).toInt());
-      final daysLabel = account == null ? '—'
-          : expiry == null
-              ? (account.activationDurationDays != null &&
+      final daysLabel = account == null ? '—' : expiry == null
+          ? (account.activationDurationDays != null &&
                  account.activationDurationDays! > 0
-                  ? tr('پس از اولین اتصال', 'After first connection')
-                  : tr('نامحدود', 'Unlimited'))
-              : days == null ? '—' : days < 0
-                  ? tr('منقضی', 'Expired')
-                  : (days + 1).toString() +
-                      tr(' روز', ' days');
+              ? tr('پس از اولین اتصال', 'After first connection')
+              : tr('نامحدود', 'Unlimited'))
+          : days == null ? '—' : days < 0
+              ? tr('منقضی', 'Expired')
+              : tr('${days + 1} روز', '${days + 1} days');
       const cyan = Color(0xFF00DCF5);
       const magenta = Color(0xFFC965FF);
 
-      Widget detail(IconData icon, String label, String value,
-          Color accent, Key key) => Container(
+      Widget infoTile(Key key, IconData icon, String label,
+          String value, Color accent) => Container(
         key: key,
-        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          color: (_dark ? const Color(0xFF1D1A49) : Colors.white)
-              .withValues(alpha: .38),
-          border: Border.all(color: accent.withValues(alpha: .24)),
+          borderRadius: BorderRadius.circular(14),
+          color: accent.withValues(alpha: _dark ? .075 : .045),
+          border: Border.all(color: accent.withValues(alpha: .22)),
         ),
         child: Row(children: [
-          Container(
-            height: 34, width: 34,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(10),
-              color: accent.withValues(alpha: .14),
-            ),
-            child: Icon(icon, color: accent, size: 19),
-          ),
-          const SizedBox(width: 11),
+          Icon(icon, color: accent, size: 20),
+          const SizedBox(width: 9),
           Expanded(child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(label, maxLines: 1, overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: sub, fontSize: 11)),
+                style: TextStyle(color: sub, fontSize: 10)),
               const SizedBox(height: 4),
               Text(value, maxLines: 1, overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: ink, fontWeight: FontWeight.w800, fontSize: 15)),
+                style: TextStyle(color: ink, fontSize: 14,
+                  fontWeight: FontWeight.w800)),
             ],
           )),
         ]),
       );
 
+      final usage = Container(
+        key: const Key('liveHomeUsageCompact'),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(14),
+          color: purple.withValues(alpha: _dark ? .12 : .05),
+          border: Border.all(color: purple.withValues(alpha: .23)),
+        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min, children: [
+            Row(children: [
+              Icon(Icons.data_usage_rounded, color: purple, size: 19),
+              const SizedBox(width: 7),
+              Expanded(child: Text(tr('حجم مصرفی', 'Data usage'),
+                maxLines: 1, overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: sub, fontSize: 10))),
+            ]),
+            const SizedBox(height: 5),
+            Row(children: [
+              Flexible(child: Text(
+                account == null ? '—' : _formatBytes(used),
+                maxLines: 1, overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: ink, fontSize: 16,
+                  fontWeight: FontWeight.w800))),
+              const SizedBox(width: 5),
+              Flexible(child: Text('/ $total',
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: sub, fontSize: 10))),
+            ]),
+            const SizedBox(height: 7),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: LinearProgressIndicator(
+                key: const Key('liveHomeDataProgress'),
+                value: fraction,
+                minHeight: 5,
+                color: fraction >= .9
+                  ? const Color(0xFFFFB26B) : purple,
+                backgroundColor: purple.withValues(alpha: .16))),
+            const SizedBox(height: 5),
+            Text(tr('باقی‌مانده: ', 'Remaining: ') + remaining,
+              maxLines: 1, overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: cyan, fontSize: 10)),
+          ]),
+      );
+
+      final expiryTile = infoTile(const Key('liveHomeExpiryChip'),
+        Icons.event_outlined, tr('تاریخ انقضا', 'Expiry date'),
+        _expiryLabel(), magenta);
+      final daysTile = infoTile(const Key('liveHomeTimeChip'),
+        Icons.timelapse_rounded, tr('زمان باقی‌مانده', 'Time remaining'),
+        daysLabel, cyan);
+
       return glassCard(
         key: const Key('liveHomeSubscriptionSummary'),
-        radius: 23,
-        padding: const EdgeInsets.all(16),
+        radius: 20,
+        padding: const EdgeInsets.fromLTRB(13, 11, 13, 13),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
+          mainAxisSize: MainAxisSize.min, children: [
             Row(children: [
-              Container(
-                height: 36, width: 36,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(colors: [purple, magenta]),
-                  borderRadius: BorderRadius.circular(12)),
-                child: const Icon(Icons.donut_large_rounded,
-                    color: Colors.white, size: 20),
-              ),
-              const SizedBox(width: 11),
-              Expanded(child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  txt(tr('وضعیت اشتراک', 'Subscription details'),
-                    size: 15, bold: true),
-                  const SizedBox(height: 3),
-                  txt(tr('گزارش حساب', 'Account overview'),
-                    size: 10, color: sub),
-                ],
-              )),
+              Icon(Icons.shield_outlined, color: purple, size: 19),
+              const SizedBox(width: 8),
+              Expanded(child: txt(tr('وضعیت اشتراک', 'Subscription details'),
+                size: 13, bold: true)),
               if (account != null)
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(20),
-                    color: cyan.withValues(alpha: .11),
-                    border: Border.all(color: cyan.withValues(alpha: .26)),
-                  ),
-                  child: Text(unlimited
-                    ? tr('نامحدود', 'Unlimited')
+                Text(unlimited ? tr('نامحدود', 'Unlimited')
                     : tr('حجمی', 'Metered'),
-                    style: const TextStyle(color: cyan,
-                      fontSize: 10, fontWeight: FontWeight.w700)),
-                ),
+                  style: const TextStyle(color: cyan, fontSize: 10)),
+              const SizedBox(width: 4),
               IconButton(
                 key: const Key('liveHomeRefreshAccount'),
                 tooltip: tr('به‌روزرسانی اشتراک', 'Refresh subscription'),
                 onPressed: widget.onRefreshAccount,
-                icon: Icon(Icons.refresh_rounded, color: purple, size: 21)),
+                visualDensity: VisualDensity.compact,
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                icon: Icon(Icons.refresh_rounded, size: 19, color: purple)),
             ]),
-            const SizedBox(height: 13),
-            Container(
-              padding: const EdgeInsets.fromLTRB(16, 13, 16, 12),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(18),
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft, end: Alignment.bottomRight,
-                  colors: [
-                    purple.withValues(alpha: .19),
-                    cyan.withValues(alpha: .05),
-                  ]),
-                border: Border.all(color: purple.withValues(alpha: .26)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(children: [
-                    Expanded(child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        txt(tr('حجم مصرفی', 'Data usage'),
-                          size: 11, color: sub),
-                        const SizedBox(height: 6),
-                        Text(account == null ? '—' : _formatBytes(used),
-                          maxLines: 1, overflow: TextOverflow.ellipsis,
-                          style: TextStyle(color: ink, fontSize: 25,
-                            fontWeight: FontWeight.w800)),
-                        const SizedBox(height: 3),
-                        Text(tr('از ', 'of ') + total,
-                          style: TextStyle(color: sub, fontSize: 11)),
-                      ],
-                    )),
-                    const SizedBox(width: 10),
-                    Column(crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        txt(tr('حجم باقی‌مانده', 'Remaining data'),
-                          size: 11, color: sub),
-                        const SizedBox(height: 6),
-                        Text(remaining, maxLines: 1,
-                          style: const TextStyle(color: cyan, fontSize: 18,
-                            fontWeight: FontWeight.w800)),
-                      ],
-                    ),
-                  ]),
-                  const SizedBox(height: 14),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: LinearProgressIndicator(
-                      key: const Key('liveHomeDataProgress'),
-                      value: fraction,
-                      backgroundColor: purple.withValues(alpha: .16),
-                      color: fraction >= .9
-                          ? const Color(0xFFFFB26B) : purple,
-                      minHeight: 7),
-                  ),
-                  const SizedBox(height: 7),
-                  txt(account == null
-                    ? tr('دریافت اطلاعات از پنل',
-                        'Waiting for account data')
-                    : unlimited
-                        ? tr('بدون سقف مصرف', 'No traffic limit')
-                        : (fraction * 100).toStringAsFixed(0) +
-                            tr('٪ مصرف‌شده', '% used'),
-                    size: 10, color: sub),
-                ],
-              ),
-            ),
-            const SizedBox(height: 11),
+            const SizedBox(height: 6),
             LayoutBuilder(builder: (context, constraints) {
-              final expiryChip = detail(
-                Icons.event_outlined,
-                tr('تاریخ انقضا', 'Expiry date'),
-                _expiryLabel(), magenta,
-                const Key('liveHomeExpiryChip'));
-              final remainingChip = detail(
-                Icons.timelapse_rounded,
-                tr('زمان باقی‌مانده', 'Time remaining'),
-                daysLabel, cyan,
-                const Key('liveHomeTimeChip'));
-              if (constraints.maxWidth < 430) {
+              if (constraints.maxWidth < 620) {
                 return Column(children: [
-                  expiryChip, const SizedBox(height: 9), remainingChip]);
+                  usage, const SizedBox(height: 8),
+                  Row(children: [
+                    Expanded(child: expiryTile), const SizedBox(width: 8),
+                    Expanded(child: daysTile),
+                  ]),
+                ]);
               }
-              return Row(children: [
-                Expanded(child: expiryChip),
-                const SizedBox(width: 12),
-                Expanded(child: remainingChip),
-              ]);
+              return Row(crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(flex: 5, child: usage),
+                  const SizedBox(width: 9),
+                  Expanded(flex: 3, child: expiryTile),
+                  const SizedBox(width: 9),
+                  Expanded(flex: 3, child: daysTile),
+                ]);
             }),
             if (widget.accountError != null) ...[
-              const SizedBox(height: 9),
+              const SizedBox(height: 7),
               txt(tr('اطلاعات اشتراک در دسترس نیست؛ دوباره تلاش کنید.',
-                  'Account details unavailable. Please refresh.'),
-                color: const Color(0xFFFFB878), size: 11),
+                'Account details unavailable. Please refresh.'),
+                size: 10, color: const Color(0xFFFFB878)),
             ],
           ],
         ),
       );
     }
 
+    Widget fastestServerControl() => Container(
+      key: const Key('liveAutoFastestServer'),
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        color: purple.withValues(alpha: _dark ? .12 : .06),
+        border: Border.all(color: purple.withValues(alpha: .32)),
+      ),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(Icons.auto_awesome_rounded, color: purple, size: 17),
+        const SizedBox(width: 6),
+        Text(tr('سریع‌ترین سرور', 'Fastest server'),
+          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700,
+            color: ink)),
+        const SizedBox(width: 4),
+        Tooltip(
+          message: _fastestKnownIndex == null
+            ? tr('پینگ معتبر موجود نیست', 'No measured server latency')
+            : tr('انتخاب بر اساس پینگ اندازه‌گیری‌شده',
+                 'Select by measured server latency'),
+          child: Switch(
+            key: const Key('autoFastestServerToggle'),
+            value: _autoFastest,
+            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            onChanged: _vpnBusy || _vpnUp || _modernUp
+                ? null : (enabled) {
+              final best = _fastestKnownIndex;
+              if (enabled && best == null) {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  content: Text(tr('برای انتخاب خودکار، پینگ معتبر لازم است.',
+                    'Measured server latency is required.'))));
+                return;
+              }
+              setState(() {
+                _autoFastest = enabled;
+                if (enabled) {
+                  _selected = best!;
+                }
+              });
+            },
+          ),
+        ),
+      ]),
+    );
+
     Widget home() => Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        heading(tr('اتصال سریع', 'Quick connect')),
+        Row(children: [
+          Expanded(child: heading(tr('اتصال سریع', 'Quick connect'))),
+          const SizedBox(width: 10),
+          fastestServerControl(),
+        ]),
         const SizedBox(height: 16),
         LayoutBuilder(builder: (context, constraints) {
           final split = constraints.maxWidth >= 740;
@@ -3819,52 +3819,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         }),
         const SizedBox(height: 15),
         homeSubscriptionSummary(),
-        const SizedBox(height: 15),
-        glassCard(
-          key: const Key('liveAutoFastestServer'),
-          radius: 19,
-          padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 10),
-          child: Row(children: [
-            Icon(Icons.auto_awesome_rounded, size: 22, color: purple),
-            const SizedBox(width: 12),
-            Expanded(child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                txt(tr('انتخاب سریع‌ترین سرور', 'Select fastest server'),
-                    size: 13, bold: true),
-                const SizedBox(height: 4),
-                txt(_fastestKnownIndex == null
-                    ? tr('تاخیر قابل‌اندازه‌گیری موجود نیست',
-                        'No measured server latency available')
-                    : tr('بر اساس تاخیر گزارش‌شده پنل',
-                        'Based on measured server ICMP latency'),
-                    size: 11, color: sub),
-              ],
-            )),
-            Switch(
-              key: const Key('autoFastestServerToggle'),
-              value: _autoFastest,
-              onChanged: _vpnBusy || _vpnUp || _modernUp
-                  ? null : (enabled) {
-                final best = _fastestKnownIndex;
-                if (enabled && best == null) {
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                    content: Text(tr('برای انتخاب خودکار، پینگ معتبر لازم است.',
-                        'Measured server latency is required.'))));
-                  return;
-                }
-                setState(() {
-                  _autoFastest = enabled;
-                  if (enabled) {
-                    _selected = best!;
-                    // Never switch to WireGuard when the user selected
-                    // Hysteria2, TUIC or another protocol.
-                  }
-                });
-              },
-            ),
-          ]),
-        ),
+
       ],
     );
 
