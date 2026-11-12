@@ -86,6 +86,7 @@ def protocol_catalog(selected: set[str], configured: set[str]) -> list[dict]:
             "note": definition.note,
         }
         for definition in _PROTOCOLS
+        if definition.code in selected
     ]
 
 
