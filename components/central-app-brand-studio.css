@@ -215,3 +215,120 @@ html[data-theme="light"] .tbs-page .tbs-preview-head>span{background:#e7f8ee;col
   .tbs-layout { grid-template-columns: minmax(0, 1fr); }
   .tbs-preview { position: static; }
 }
+
+
+/* Readable Brand Studio in panel light mode; the device preview is controlled
+   independently by the customer's app theme and chosen brand colors. */
+html[data-theme="light"] .tbs-page{
+  --tbs-pane:linear-gradient(155deg,#fff 0%,#f8faff 100%);
+  --tbs-line:#ced9ea;
+  --tbs-ink:#1b2a45;
+  --tbs-muted:#536581;
+  --tbs-input:#f8faff;
+  --tbs-input-border:#bac9e1;
+  --tbs-highlight:#e9eeff;
+}
+html[data-theme="light"] .tbs-page .tbs-tenant,
+html[data-theme="light"] .tbs-page .tbs-editor,
+html[data-theme="light"] .tbs-page .tbs-preview{
+  color:var(--tbs-ink);
+  border-color:var(--tbs-line);
+  background:var(--tbs-pane);
+}
+html[data-theme="light"] .tbs-page .tbs-tenant b,
+html[data-theme="light"] .tbs-page .tbs-section-head h2,
+html[data-theme="light"] .tbs-page .tbs-preview-head strong,
+html[data-theme="light"] .tbs-page .tbs-upload-copy strong,
+html[data-theme="light"] .tbs-page .tbs-field,
+html[data-theme="light"] .tbs-page .tbs-selects label,
+html[data-theme="light"] .tbs-page .tbs-color-field label{
+  color:#20314c;
+}
+html[data-theme="light"] .tbs-page .tbs-tenant small,
+html[data-theme="light"] .tbs-page .tbs-section-head p,
+html[data-theme="light"] .tbs-page .tbs-preview-head small,
+html[data-theme="light"] .tbs-page .tbs-preview-note,
+html[data-theme="light"] .tbs-page .tbs-field small,
+html[data-theme="light"] .tbs-page .tbs-upload-copy p,
+html[data-theme="light"] .tbs-page .tbs-actions>span{
+  color:#50627e;
+}
+html[data-theme="light"] .tbs-page select,
+html[data-theme="light"] .tbs-page input:not([type=color]):not([type=file]){
+  color:#1b2c48;
+  background:#f7f9fe;
+  border-color:#c2cfe3;
+  box-shadow:inset 0 1px 2px rgba(45,59,86,.025);
+}
+html[data-theme="light"] .tbs-page input::placeholder{
+  color:#7888a1;
+}
+html[data-theme="light"] .tbs-page select:focus-visible,
+html[data-theme="light"] .tbs-page input:focus-visible{
+  outline:2px solid #7867dc;
+  outline-offset:2px;
+  border-color:#8e7cde;
+}
+html[data-theme="light"] .tbs-page .tbs-readonly{
+  color:#22334e;
+  background:#f3f6fc;
+  border-color:#cdd9ea;
+}
+html[data-theme="light"] .tbs-page .tbs-tabs{
+  border-bottom-color:#dce5f0;
+  background:#fbfcff;
+}
+html[data-theme="light"] .tbs-page .tbs-tabs button{
+  color:#4a5d7b;
+}
+html[data-theme="light"] .tbs-page .tbs-tabs button.selected{
+  color:#3c388d;
+  background:linear-gradient(135deg,#e8ebff,#edf4ff);
+  border-color:#acbcf2;
+}
+html[data-theme="light"] .tbs-page .tbs-tabs button:hover:not(.selected){
+  color:#273954;
+  background:#edf1fc;
+}
+html[data-theme="light"] .tbs-page .tbs-upload{
+  background:linear-gradient(135deg,#f5f7ff,#f0f8ff);
+  border-color:#b4c2e7;
+}
+html[data-theme="light"] .tbs-page .tbs-upload-copy small{
+  color:#586a88;
+}
+html[data-theme="light"] .tbs-page .tbs-color-field{
+  background:#f8faff;
+  border-color:#d9e3f0;
+}
+html[data-theme="light"] .tbs-page .tbs-actions{
+  background:#f7f9fe;
+  border-top-color:#dce5f0;
+}
+html[data-theme="light"] .tbs-page .tbs-reset{
+  background:#fff;
+  color:#3a4c69;
+  border-color:#c4d1e5;
+}
+html[data-theme="light"] .tbs-page .tbs-reset:hover{
+  background:#edf2fc;
+}
+html[data-theme="light"] .tbs-page .tbs-save{
+  color:#fff;
+}
+html[data-theme="light"] .tbs-page .tbs-save:disabled{
+  color:#526389;
+  background:#e2e8fb;
+  border-color:#cad4ee;
+  opacity:1;
+}
+html[data-theme="light"] .tbs-page .tbs-preview-head>span{
+  color:#087d61;
+  background:#e7f8ef;
+  border-color:#b7e7d3;
+}
+@media(max-width:600px){
+  html[data-theme="light"] .tbs-page .tbs-tenant,
+  html[data-theme="light"] .tbs-page .tbs-editor,
+  html[data-theme="light"] .tbs-page .tbs-preview{border-radius:18px}
+}
