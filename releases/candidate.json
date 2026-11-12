@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.786",
-  "source_sha": "be2f21252cee28ed631d58d2ef116c52032c48b4",
+  "version": "1.1.0-rc.787",
+  "source_sha": "db51d88936cfa89d57653ed105173fcf3f159d0d",
   "notes": {
-    "fa": "نمایش تبلتی ۴:۳ استودیوی برند TwinConnect، اصلاح پیش‌نمایش و جداسازی داده‌های نمونه از وضعیت واقعی اپ. به‌همراه اصلاحات موجود در سورس اصلی پنل. اتصال زنده رنگ و لوگو در کلاینت ویندوز روی شاخه مستقل ویندوز توسعه و تست می‌شود.",
-    "en": "4:3 landscape tablet Brand Studio preview, improved preview labeling and removal of misleading simulated live connection values, plus existing mainline panel fixes. Windows live-brand refresh is built separately from the integration branch."
+    "fa": "اصلاح نهایی برش پیش‌نمایش استودیوی برند TwinConnect در حالت تبلت: اختصاص عرض کامل به قاب ۴:۳، حفظ کادر و جای صحیح سرورها. هیچ تغییری در سرویس VPN، پروتکل‌ها و اطلاعات اشتراک انجام نشده.",
+    "en": "Fix clipped 4:3 tablet brand preview with full-width, responsive layout. No VPN protocol or subscription data changes."
   }
 }
