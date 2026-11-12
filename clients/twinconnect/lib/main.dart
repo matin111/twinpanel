@@ -144,6 +144,8 @@ class _TwinConnectHomeState extends State<TwinConnectHome> with WidgetsBindingOb
   String? _confirmedSessionToken;
   String? _sessionRefreshToken;
   Timer? _sessionRefreshTimer;
+  Timer? _brandRefreshTimer;
+  bool _brandRefreshBusy = false;
   bool _renewingSession = false;
   PanelProtocolCatalog? _catalog;
   AppServerInventory? _servers;
@@ -165,16 +167,80 @@ class _TwinConnectHomeState extends State<TwinConnectHome> with WidgetsBindingOb
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       unawaited(_renewSession());
+      unawaited(_refreshBrand());
     }
   }
 
   void _startSessionRenewal() {
     _sessionRefreshTimer?.cancel();
+    _startBrandRefresh();
     if (_sessionRefreshToken == null) return;
     // Access JWT expires after 30 min. Renew proactively, and on app resume.
     _sessionRefreshTimer = Timer.periodic(
       const Duration(minutes: 15), (_) => unawaited(_renewSession()),
     );
+  }
+
+  void _startBrandRefresh() {
+    _brandRefreshTimer?.cancel();
+    _brandRefreshTimer = Timer.periodic(
+      const Duration(minutes: 1), (_) => unawaited(_refreshBrand()),
+    );
+  }
+
+  /// Refresh the brand from the account owner's panel, not a vendor/global
+  /// default or the last saved snapshot. Transient failures retain the
+  /// last verified brand and never log or expose the app session token.
+  Future<void> _refreshBrand() async {
+    if (_brandRefreshBusy) return;
+    final panel = _confirmedPanel;
+    final username = _confirmedUsername;
+    final token = _confirmedSessionToken;
+    if (panel == null || username == null || token == null) return;
+    final serial = _lookupSerial;
+    _brandRefreshBusy = true;
+    try {
+      final api = TenantApi.fromBuildConfig();
+      BrandPreview latest;
+      try {
+        latest = await api.loadSessionBrand(
+          panel: panel, sessionToken: token,
+        );
+      } on TenantApiException catch (error) {
+        if (error.message != 'APP_LOGIN_INVALID' ||
+            _sessionRefreshToken == null) rethrow;
+        await _renewSession();
+        final renewed = _confirmedSessionToken;
+        if (renewed == null || renewed == token) return;
+        latest = await api.loadSessionBrand(
+          panel: panel, sessionToken: renewed,
+        );
+      }
+      if (!mounted || serial != _lookupSerial ||
+          username != _confirmedUsername || panel != _confirmedPanel) return;
+      if (latest.ownerType == 'reseller' &&
+          !username.startsWith(latest.appUsernamePrefix)) {
+        return;
+      }
+      setState(() => _brand = latest);
+      widget.onBrandChanged(latest);
+      final currentToken = _confirmedSessionToken;
+      if (currentToken != null) {
+        try {
+          await _sessionStore.save(
+            username: username,
+            sessionToken: currentToken,
+            refreshToken: _sessionRefreshToken,
+            panelOrigin: panel.apiOrigin,
+            brand: latest,
+          );
+        } catch (_) {/* A storage failure must not undo the live brand. */}
+      }
+    } catch (_) {
+      // Offline mode keeps the last authenticated brand.
+    } finally {
+      _brandRefreshBusy = false;
+    }
   }
 
   Future<void> _renewSession() async {
@@ -296,6 +362,7 @@ class _TwinConnectHomeState extends State<TwinConnectHome> with WidgetsBindingOb
       } catch (_) {}
       _startSessionRenewal();
       _refreshServers();
+      unawaited(_refreshBrand());
       _loadAccountPlan(activePanel, accessToken, serial);
       _loadAccountSnapshot(activePanel, accessToken, serial);
     } catch (_) {
@@ -374,6 +441,7 @@ class _TwinConnectHomeState extends State<TwinConnectHome> with WidgetsBindingOb
   @override
   void dispose() {
     _sessionRefreshTimer?.cancel();
+    _brandRefreshTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     _username.dispose();
     _password.dispose();
@@ -436,6 +504,7 @@ class _TwinConnectHomeState extends State<TwinConnectHome> with WidgetsBindingOb
       _loadAccountSnapshot(panel, loggedIn.sessionToken, serial);
       // Refresh server inventory after authenticated login; failures are isolated.
       _refreshServers();
+      unawaited(_refreshBrand());
       // Subscription metadata is not secret and is fetched independently of
       // brand details. A temporary metadata error must not hide renewal links.
       try {
@@ -471,6 +540,7 @@ class _TwinConnectHomeState extends State<TwinConnectHome> with WidgetsBindingOb
     final panel = _confirmedPanel;
     final session = _confirmedSessionToken;
     if (panel == null || session == null || _refreshingServers) return;
+    unawaited(_refreshBrand());
     final serial = _lookupSerial;
     setState(() {
       _refreshingServers = true;
@@ -853,6 +923,7 @@ class _TwinConnectHomeState extends State<TwinConnectHome> with WidgetsBindingOb
         _confirmedUsername != null && _confirmedSessionToken != null) {
       return TwinConnectLiveDashboard(
         key: ValueKey(_confirmedUsername),
+        brand: brand,
         panel: _confirmedPanel!,
         username: _confirmedUsername!,
         sessionToken: _confirmedSessionToken!,
