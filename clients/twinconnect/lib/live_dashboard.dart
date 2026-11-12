@@ -2248,8 +2248,13 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       width: wide ? 258 : 74,
       padding: EdgeInsets.symmetric(
         horizontal: wide ? 17 : 7, vertical: 22),
-      decoration: BoxDecoration(color: sidebar,
-        border: Border(left: BorderSide(color: line))),
+      // Share the exact ambient gradient with the main connection view.
+      // A solid sidebar fill previously made the menu look like another app.
+      decoration: BoxDecoration(
+        color: Colors.transparent,
+        border: Border(left: BorderSide(
+          color: line.withValues(alpha: .25))),
+      ),
       child: Column(children: [
         Container(
           width: 42, height: 42,
@@ -4072,11 +4077,11 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     };
 
     return Scaffold(
-      body: Row(children: [
-        Expanded(child: TwinConnectAmbientBackground(
-          dark: _dark,
-          backgroundColor: sidebar,
-          child: SafeArea(child: ListView(
+      body: TwinConnectAmbientBackground(
+        dark: _dark,
+        backgroundColor: sidebar,
+        child: Row(children: [
+          Expanded(child: SafeArea(child: ListView(
             padding: EdgeInsets.symmetric(
                 horizontal: wide ? 30 : 17, vertical: 25),
             children: [
@@ -4105,10 +4110,10 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                 ),
               )),
             ],
-          )),
-        )),
-        sideBar(),
-      ]),
+          ))),
+          sideBar(),
+        ]),
+      ),
     );
   }
 }
