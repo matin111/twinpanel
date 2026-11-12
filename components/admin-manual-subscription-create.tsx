@@ -7,6 +7,7 @@ import {adminApi,type AdminNode,type AdminUser,type RuntimeRow} from "../lib/adm
 import {createSubscriptionFastV1} from "../lib/subscription-create-fast-api";
 import {subscriptionProtocolApi,type SubscriptionProtocolDefinition} from "../lib/subscription-protocol-api";
 import {useI18n} from "../lib/i18n";
+import {useTheme} from "../lib/theme";
 
 const cleanNumber=(value:string)=>{
   const raw=value.trim();
@@ -21,6 +22,7 @@ const num=(value:unknown)=>{
 
 export function AdminManualSubscriptionCreate(){
   const {pick}=useI18n();
+  const {resolved}=useTheme();
   const [mounted,setMounted]=useState(false);
   const [actionHost,setActionHost]=useState<HTMLElement|null>(null);
   const [open,setOpen]=useState(false);
@@ -206,7 +208,7 @@ export function AdminManualSubscriptionCreate(){
   );
 
   const modal=open?createPortal(
-    <div className="runtime-modal manual-subscription-modal" role="dialog" aria-modal="true" aria-label={pick("ساخت اشتراک","Create subscription")}>
+    <div className={`runtime-modal manual-subscription-modal${resolved==="light"?" tp-light-create":""}`} role="dialog" aria-modal="true" aria-label={pick("ساخت اشتراک","Create subscription")}>
       <button type="button" className="runtime-modal-bg" aria-label="close" onClick={()=>!busy&&setOpen(false)}/>
       <div className="runtime-modal-card manage-card manual-subscription-create-card">
         <style>{`
