@@ -16,6 +16,8 @@ SINGBOX_GUARD = ROOT / "native" / "windows" / "twinconnect_singbox_guard.h"
 SINGBOX_INSTALLED = ROOT / "windows" / "runner" / "twinconnect_singbox_guard.h"
 OPENCONNECT_NATIVE = ROOT / "native" / "windows" / "twinconnect_openconnect.h"
 OPENCONNECT_INSTALLED = ROOT / "windows" / "runner" / "twinconnect_openconnect.h"
+L2TP_NATIVE = ROOT / "native" / "windows" / "twinconnect_l2tp.h"
+L2TP_INSTALLED = ROOT / "windows" / "runner" / "twinconnect_l2tp.h"
 
 HEADER_MARKER = "  std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> vpn_channel_;"
 CPP_MARKER = "  // TwinConnect: fail-closed Windows native capability handshake."
@@ -38,6 +40,9 @@ def install() -> None:
     if not OPENCONNECT_NATIVE.is_file():
         raise RuntimeError("Missing OpenConnect native runtime header")
     shutil.copyfile(OPENCONNECT_NATIVE, OPENCONNECT_INSTALLED)
+    if not L2TP_NATIVE.is_file():
+        raise RuntimeError("Missing Windows L2TP native RAS implementation")
+    shutil.copyfile(L2TP_NATIVE, L2TP_INSTALLED)
 
     header = HEADER.read_text(encoding="utf-8-sig")
     cpp = SOURCE.read_text(encoding="utf-8-sig")
@@ -63,7 +68,8 @@ def install() -> None:
             '#include <flutter/standard_method_codec.h>\n'
             '#include "twinconnect_wireguard.h"\n'
             '#include "twinconnect_singbox_guard.h"\n'
-            '#include "twinconnect_openconnect.h"',
+            '#include "twinconnect_openconnect.h"\n'
+            '#include "twinconnect_l2tp.h"',
         )
         injection = """  // TwinConnect: fail-closed Windows native capability handshake.
   vpn_channel_ = std::make_unique<
@@ -75,7 +81,53 @@ def install() -> None:
   vpn_channel_->SetMethodCallHandler(
       [](const flutter::MethodCall<flutter::EncodableValue>& call,
          std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result) {
-        if (call.method_name() == "startOpenConnect") {
+        if (call.method_name() == "startL2tp") {
+          const auto* args = std::get_if<flutter::EncodableMap>(
+              call.arguments());
+          if (!args) { result->Error("L2TP_INVALID_REQUEST"); return; }
+          const auto field = [&](const char* key) -> std::string {
+            const auto it = args->find(flutter::EncodableValue(key));
+            if (it == args->end()) return "";
+            const auto* value = std::get_if<std::string>(&it->second);
+            return value ? *value : "";
+          };
+          if (!twinconnect_l2tp::Start(
+                  field("server"), field("username"),
+                  field("password"), field("psk"))) {
+            result->Error("L2TP_NATIVE_START_FAILED");
+            return;
+          }
+          result->Success(flutter::EncodableValue(true));
+        } else if (call.method_name() == "l2tpStatus") {
+          flutter::EncodableMap values;
+          values[flutter::EncodableValue("state")] =
+              flutter::EncodableValue(twinconnect_l2tp::Status());
+          values[flutter::EncodableValue("code")] =
+              flutter::EncodableValue(static_cast<int64_t>(
+                  twinconnect_l2tp::Error()));
+          result->Success(flutter::EncodableValue(values));
+        } else if (call.method_name() == "l2tpTraffic") {
+          uint64_t rx = 0, tx = 0;
+          if (!twinconnect_l2tp::Bytes(&rx, &tx)) {
+            result->Success(flutter::EncodableValue());
+          } else {
+            flutter::EncodableMap values;
+            values[flutter::EncodableValue("rxBytes")] =
+                flutter::EncodableValue(static_cast<int64_t>(rx));
+            values[flutter::EncodableValue("txBytes")] =
+                flutter::EncodableValue(static_cast<int64_t>(tx));
+            result->Success(flutter::EncodableValue(values));
+          }
+        } else if (call.method_name() == "stopL2tp") {
+          if (!twinconnect_l2tp::Stop()) {
+            result->Error("L2TP_DISCONNECT_PENDING");
+            return;
+          }
+          result->Success(flutter::EncodableValue(true));
+        } else if (call.method_name() == "resetL2tpFailure") {
+          twinconnect_l2tp::ResetError();
+          result->Success(flutter::EncodableValue(true));
+        } else if (call.method_name() == "startOpenConnect") {
           const auto* args = std::get_if<flutter::EncodableMap>(
               call.arguments());
           if (!args) { result->Error("CISCO_INVALID_REQUEST"); return; }
