@@ -41,6 +41,7 @@ class ReleaseRevenueGuardTests(unittest.TestCase):
             (directory / "components/admin-dashboard-server-card.tsx").write_text(
                 'function ResourceGauge(){} function NetworkGauge(){} '
                 'const serverSample=(payload)=>payload; '
+                'const sample=serverSample(payload); '
                 'const handler=()=>setSamples(before=>before);',
                 encoding="utf-8",
             )
