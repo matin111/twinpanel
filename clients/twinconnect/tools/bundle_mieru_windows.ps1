@@ -14,7 +14,14 @@ $archive = Join-Path $work $archiveName
 $manifest = Join-Path $work "$archiveName.sha256.txt"
 Invoke-WebRequest -Uri $manifestUrl -OutFile $manifest -TimeoutSec 90
 $manifestText = (Get-Content -LiteralPath $manifest -Raw).Trim()
-$expectedPattern = '^([a-fA-F0-9]{64})\\s+\\*?' + [regex]::Escape($archiveName) + '
+$expectedPattern = '^([a-fA-F0-9]{64})\s+\*?' + [regex]::Escape($archiveName) + '$'
+if ($manifestText -notmatch $expectedPattern) {
+  throw 'Official Mieru release checksum manifest is missing or malformed'
+}
+$expected = $Matches[1].ToLowerInvariant()
+Invoke-WebRequest -Uri $url -OutFile $archive -TimeoutSec 90
+$actual = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+if ($actual -ne $expected) { throw 'Mieru archive SHA256 differs from upstream release checksum' }
 $unpacked = Join-Path $work 'unpacked'
 Expand-Archive -LiteralPath $archive -DestinationPath $unpacked -Force
 $executables = @(Get-ChildItem -LiteralPath $unpacked -Recurse -File |
