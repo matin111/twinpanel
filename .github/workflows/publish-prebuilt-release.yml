@@ -345,12 +345,20 @@ jobs:
           TMP="$(mktemp)"
           trap 'rm -f "$TMP"' EXIT
 
-          curl --fail --location --silent --show-error \
-            --retry 4 --retry-delay 3 --retry-all-errors \
-            -H 'Accept: application/octet-stream' \
-            -H 'X-GitHub-Api-Version: 2022-11-28' \
-            -H 'User-Agent: TwinPanel-Verified-Release-Builder' \
-            "$ASSET_API" -o "$TMP"
+          # Prefer the official browser asset, with the same pinned version.
+          # The GitHub Assets API can return HTTP 403 for anonymous requests.
+          # Both paths MUST pass the identical checksum below.
+          ASSET_DIRECT='https://github.com/ParsaKSH/spoof-tunnel/releases/download/v3.1.0-beta.0/spoof-linux-amd64'
+          if ! curl --fail --location --silent --show-error \
+            --retry 3 --retry-delay 2 --retry-all-errors \
+            "$ASSET_DIRECT" -o "$TMP"; then
+            curl --fail --location --silent --show-error \
+              --retry 4 --retry-delay 3 --retry-all-errors \
+              -H 'Accept: application/octet-stream' \
+              -H 'X-GitHub-Api-Version: 2022-11-28' \
+              -H 'User-Agent: TwinPanel-Verified-Release-Builder' \
+              "$ASSET_API" -o "$TMP"
+          fi
           ACTUAL="$(sha256sum "$TMP" | awk '{print $1}')"
           test "$ACTUAL" = "$EXPECTED"
           test -s "$TMP"
