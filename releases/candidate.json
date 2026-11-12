@@ -1,6 +1,6 @@
 {
   "version": "1.1.0-rc.785",
-  "source_sha": "30968ce243b0af08a3c3e2bbdd684a2fe54a653c",
+  "source_sha": "442041d3b1368f35f084c2131aee7a7d9c216c96",
   "notes": {
     "fa": "انتشار رسمی نمودار مالی حرفه‌ای و تعاملی داشبورد با نمودار گرادیانی و انیمیشن نرم، بازه‌های ۷/۱۴/۳۰ روز، نمایش دقیق مبلغ هر روز، تفکیک فروش اشتراک از شارژ کیف پول و رفع دائمی بازگشت ظاهر قدیمی پس از آپدیت؛ حفاظت از نسخه‌های جدید با کنترل تازگی سورس و فایل خروجی.",
     "en": "Official premium interactive sales dashboard with smooth animated gradient chart, 7/14/30-day ranges, precise daily tooltips, separate subscription/wallet views and release guard against stale bundles overwriting the redesign."
