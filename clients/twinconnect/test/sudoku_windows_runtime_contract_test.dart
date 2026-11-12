@@ -34,6 +34,12 @@ void main() {
     // Diagnose abrupt core exits without leaking keys, config, or raw stderr.
     expect(proxy, contains('lastUnexpectedExitReason'));
     expect(proxy, contains('_classifyNativeFailure(line)'));
+    // Official Sudoku emits Fatalf/ERROR through stdout. Check both streams
+    // are read and reduced to safe categories, never logged raw.
+    expect(proxy, contains('_consumeNativeDiagnostic(owned, owned.stdout)'));
+    expect(proxy, contains('_consumeNativeDiagnostic(owned, owned.stderr)'));
+    expect(proxy, contains('SUDOKU_CLIENT_INIT_FAILED'));
+    expect(proxy, contains('SUDOKU_TABLE_INIT_FAILED'));
     expect(proxy, contains('owned.exitCode.then((code)'));
     expect(proxy, isNot(contains('print(line)')));
     expect(proxy, isNot(contains('stderr.listen((chunk) => print')));
