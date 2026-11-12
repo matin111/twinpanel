@@ -31,6 +31,63 @@ try {
   if ($LASTEXITCODE -ne 0) {
     throw 'Official Sudoku CLI rejected a synthetic TwinConnect client profile'
   }
+  # Also exercise the real Windows listener. A successful -test is not proof
+  # that the native Sudoku process can stay alive as a SOCKS5 server.
+  # This uses only a generated test key and an unroutable RFC5737 upstream;
+  # it never changes Windows routes or contacts a customer server.
+  $listener = [System.Net.Sockets.TcpListener]::new(
+    [System.Net.IPAddress]::Loopback, 0)
+  $listener.Start()
+  $localPort = ([System.Net.IPEndPoint]$listener.LocalEndpoint).Port
+  $listener.Stop()
+  $sample.local_port = $localPort
+  $sample | ConvertTo-Json -Depth 6 -Compress |
+    Set-Content -LiteralPath $file -NoNewline -Encoding utf8
+  $stdout = Join-Path $env:RUNNER_TEMP 'sudoku-smoke-stdout.txt'
+  $stderr = Join-Path $env:RUNNER_TEMP 'sudoku-smoke-stderr.txt'
+  $child = $null
+  try {
+    $child = Start-Process -FilePath $exe -ArgumentList @('-c', ('"' + $file + '"')) `
+      -PassThru -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+    $ready = $false
+    for ($attempt = 0; $attempt -lt 40; $attempt++) {
+      $child.Refresh()
+      if ($child.HasExited) { throw 'Sudoku core exited before local SOCKS readiness' }
+      $socket = [System.Net.Sockets.TcpClient]::new()
+      try {
+        $connection = $socket.BeginConnect('127.0.0.1', $localPort, $null, $null)
+        if (!$connection.AsyncWaitHandle.WaitOne(200)) { continue }
+        $socket.EndConnect($connection)
+        $stream = $socket.GetStream()
+        $stream.ReadTimeout = 800
+        $stream.WriteTimeout = 800
+        $stream.Write([byte[]]@(5, 1, 0), 0, 3)
+        $response = [byte[]]@(0, 0)
+        if ($stream.Read($response, 0, 2) -eq 2 -and
+            $response[0] -eq 5 -and $response[1] -eq 0) {
+          $ready = $true
+          break
+        }
+      } catch {
+        # Startup race: retry while the child remains running.
+      } finally {
+        $socket.Dispose()
+      }
+      Start-Sleep -Milliseconds 150
+    }
+    if (!$ready) { throw 'Sudoku core did not expose a live loopback SOCKS5 listener' }
+    Start-Sleep -Seconds 2
+    $child.Refresh()
+    if ($child.HasExited) { throw 'Sudoku core exited after SOCKS5 readiness' }
+    Write-Host 'Official Sudoku core stayed alive with a synthetic local SOCKS5 listener'
+  } finally {
+    if ($null -ne $child) {
+      try { if (!$child.HasExited) { $child.Kill() } } catch {}
+      try { $child.WaitForExit(5000) | Out-Null } catch {}
+      $child.Dispose()
+    }
+    Remove-Item -LiteralPath $stdout, $stderr -Force -ErrorAction SilentlyContinue
+  }
 } finally {
   Remove-Item -LiteralPath $file -Force -ErrorAction SilentlyContinue
 }
