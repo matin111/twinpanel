@@ -1649,12 +1649,13 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   // Credential-bearing URIs remain in memory only while this view is open.
   List<XrayServerProfiles> _xrayGroups = const [];
   bool _xrayGroupsLoading = false;
+  bool _xrayGroupsLoaded = false;
   String? _xrayGroupsError;
   String? _selectedXrayInboundId;
   String? _selectedXrayNodeId;
 
   Future<void> _loadXrayGroups({bool refresh = false}) async {
-    if (_xrayGroupsLoading || (!refresh && _xrayGroups.isNotEmpty)) return;
+    if (_xrayGroupsLoading || (!refresh && _xrayGroupsLoaded)) return;
     if (!mounted) return;
     setState(() {
       _xrayGroupsLoading = true;
@@ -1669,7 +1670,10 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         native: const NativeProtocolReadiness(supportedCodes: {'v2ray'}),
       );
       if (!mounted) return;
-      setState(() => _xrayGroups = response.xrayServerGroups);
+      setState(() {
+        _xrayGroups = response.xrayServerGroups;
+        _xrayGroupsLoaded = true;
+      });
     } catch (error) {
       if (!mounted) return;
       // Do not render errors that may embed session tokens, UUIDs or paths.
@@ -2685,7 +2689,10 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
               side: BorderSide(color: _filter == entry.$1 ? purple : line),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12)),
-              onSelected: (_) => setState(() => _filter = entry.$1),
+              onSelected: (_) {
+                setState(() => _filter = entry.$1);
+                if (entry.$1 == 'v2ray') _loadXrayGroups();
+              },
             ),
         ],
       ),
@@ -2707,6 +2714,10 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         grouped.putIfAbsent(country, () => <int>[]).add(i);
       }
       Widget countryGroup(String country, List<int> indices) {
+        final inboundCount = _filter == 'v2ray'
+            ? indices.fold<int>(0, (total, i) => total +
+                _inboundsForNode(widget.servers!.servers[i].id).length)
+            : indices.length;
         final opened = query.isNotEmpty || _expandedCountries.contains(country);
         final connectedInGroup = indices.any((i) {
           final id = widget.servers?.servers[i].id;
@@ -2740,7 +2751,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                         children: [
                           txt(_countryLabel(country), bold: true, size: 14),
                           const SizedBox(height: 3),
-                          txt(tr('${indices.length} سرور', '${indices.length} servers'),
+                          txt(tr('$inboundCount سرور', '$inboundCount servers'),
                               size: 11, color: sub),
                         ],
                       )),
@@ -2767,7 +2778,13 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                         padding: const EdgeInsets.fromLTRB(9, 0, 9, 7),
                         child: Column(children: [
                           Divider(color: line),
-                          for (final i in indices) serverRow(i),
+                          for (final i in indices)
+                             if (_filter == 'v2ray')
+                               for (final inbound in
+                                   _inboundsForNode(widget.servers!.servers[i].id))
+                                 xrayInboundRow(i, inbound)
+                             else
+                               serverRow(i),
                         ]),
                       )
                     : const SizedBox(width: double.infinity),
@@ -2805,6 +2822,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
               tooltip: tr('به‌روزرسانی', 'Refresh'),
               onPressed: () {
                 widget.onRefresh();
+                if (_filter == 'v2ray') _loadXrayGroups(refresh: true);
                 _probeAllNodes();
               },
               icon: const Icon(Icons.refresh_rounded),
@@ -2819,6 +2837,17 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           const SizedBox(height: 13),
           filters(),
           const SizedBox(height: 12),
+          if (_filter == 'v2ray' && _xrayGroupsLoading)
+            const Padding(
+              padding: EdgeInsets.all(12),
+              child: Center(child: CircularProgressIndicator()),
+            ),
+          if (_filter == 'v2ray' && _xrayGroupsError != null)
+            TextButton.icon(
+              onPressed: () => _loadXrayGroups(refresh: true),
+              icon: const Icon(Icons.refresh_rounded),
+              label: Text(tr('دریافت دوباره اینباندها', 'Retry loading inbounds')),
+            ),
           for (final country in grouped.keys)
             countryGroup(country, grouped[country]!),
           if (widget.serverRefreshError != null)
