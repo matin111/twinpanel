@@ -7,6 +7,7 @@ import {adminApi,AdminNode,AdminStats,AdminTunnel,DashboardSummary,RuntimeRow} f
 import {dashboardPaymentAmount} from "../lib/admin-dashboard-revenue";
 import {salesAnalyticsApi,SalesAnalyticsResponse} from "../lib/sales-analytics-api";
 import {PremiumRevenueChart} from "./premium-revenue-chart";
+import {OverviewKpiCard,OperationalHealthVisual} from "./admin-overview-visuals";
 import {useI18n} from "../lib/i18n";
 
 const money=(value:number)=>`${Number(value||0).toLocaleString("fa-IR")} تومان`;
@@ -34,13 +35,6 @@ function MetricBar({label,value}:{label:string;value:number|null}){
   </div>;
 }
 
-function KpiCard({label,value,meta,icon,tone="violet"}:{label:string;value:string;meta:string;icon:string;tone?:string}){
-  return <div className={`dash-kpi dash-kpi-${tone}`}>
-    <div className="dash-kpi-icon">{icon}</div>
-    <div className="dash-kpi-copy"><span>{label}</span><strong>{value}</strong><small>{meta}</small></div>
-  </div>;
-}
-
 export function AdminDashboardRuntime(){
   const {pick}=useI18n();
   const [stats,setStats]=useState<AdminStats|null>(null);
@@ -49,6 +43,8 @@ export function AdminDashboardRuntime(){
   const [nodeHealth,setNodeHealth]=useState<Record<number,RuntimeRow>>({});
   const [modernProtocols,setModernProtocols]=useState<Record<string,{online:boolean;online_nodes:number;reported:boolean}>>({});
   const [tunnels,setTunnels]=useState<AdminTunnel[]>([]);
+  const [tunnelsLoaded,setTunnelsLoaded]=useState(false);
+  const [nodesLoaded,setNodesLoaded]=useState(false);
   const [subscriptions,setSubscriptions]=useState<RuntimeRow[]>([]);
   const [payments,setPayments]=useState<RuntimeRow[]>([]);
   const [salesAnalytics,setSalesAnalytics]=useState<SalesAnalyticsResponse|null>(null);
@@ -94,13 +90,14 @@ export function AdminDashboardRuntime(){
       const run=async<T,>(promise:Promise<T>,apply:(value:T)=>void)=>{
         try{const value=await promise;if(active())apply(value);}catch{/* Partial data is preferable to a blocked dashboard. */}
       };
-      void run(adminApi.tunnels(),setTunnels);
+      void run(adminApi.tunnels(),loaded=>{setTunnels(loaded);setTunnelsLoaded(true);});
       void run(adminApi.subscriptions(),setSubscriptions);
       void run(adminApi.payments(),setPayments);
       void run(salesAnalyticsApi.admin("daily"),setSalesAnalytics);
 
       void run(adminApi.nodes(),loadedNodes=>{
         setNodes(loadedNodes);
+        setNodesLoaded(true);
         if(!loadedNodes.length)return;
 
         // Dashboard displays only six node resource cards. Limit remote
@@ -197,14 +194,13 @@ export function AdminDashboardRuntime(){
     {error&&<div className="runtime-error dash27-error">{error}</div>}
     {loading&&<div className="dash27-loading"><span className="spinner"/>{pick("در حال ساخت نمای زنده داشبورد...","Building live dashboard view...")}</div>}
 
-    <section className="dash27-kpis">
-      <KpiCard label={pick("کل کاربران","Total users")} value={String(summary?.total_users??stats?.users??"—")} meta={pick("کاربران ثبت‌شده","Registered customers")} icon="◌" tone="violet"/>
-      <KpiCard label={pick("اشتراک فعال","Active subscriptions")} value={String(subStats.total?subStats.active:stats?.active_subscriptions??"—")} meta={subStats.total?`${subStats.activePct}% ${pick("از کل اشتراک‌ها","of subscriptions")}`:pick("وضعیت حساب‌ها","Account status")} icon="◇" tone="blue"/>
-      <KpiCard label={pick("آنلاین اکنون","Online now")} value={String(summary?.online_users??"—")} meta={pick("اتصال زنده کاربران","Live user sessions")} icon="◎" tone="green"/>
-      <KpiCard label={pick("فروش امروز","Sales today")} value={summary?money(summary.sales_today):"—"} meta={summary?`${pick("این ماه","Month")}: ${money(summary.sales_month)}`:pick("درآمد تأییدشده","Confirmed revenue")} icon="↗" tone="amber"/>
-      <KpiCard label={pick("سلامت نودها","Node health")} value={summary?`${summary.online_nodes} / ${summary.total_nodes}`:stats?String(stats.online_nodes):"—"} meta={`${nodeHealthPct}% ${pick("در دسترس","available")}`} icon="▦" tone="cyan"/>
+    <section className="dash27-kpis" aria-label={pick("شاخص‌های کلیدی داشبورد","Dashboard key performance indicators")}>
+      <OverviewKpiCard kind="users" label={pick("کل کاربران","Total users")} value={(summary?.total_users??stats?.users??"—").toLocaleString("fa-IR")} meta={pick("کاربران ثبت‌شده","Registered customers")} pick={pick}/>
+      <OverviewKpiCard kind="subscriptions" label={pick("اشتراک فعال","Active subscriptions")} value={(subStats.total?subStats.active:stats?.active_subscriptions??"—").toLocaleString("fa-IR")} meta={subStats.total?pick("از کل اشتراک‌ها","Of all subscriptions")+": "+subStats.total.toLocaleString("fa-IR"):pick("اشتراک‌های معتبر","Valid subscriptions")} ratio={subStats.total?100*subStats.active/subStats.total:null} pick={pick}/>
+      <OverviewKpiCard kind="online" label={pick("آنلاین اکنون","Online now")} value={(summary?.online_users??"—").toLocaleString("fa-IR")} meta={pick("نشست‌های فعال گزارش‌شده","Reported active sessions")} pick={pick}/>
+      <OverviewKpiCard kind="sales" label={pick("فروش امروز","Sales today")} value={summary?money(summary.sales_today):"—"} meta={summary?pick("فروش ماه جاری","This month's sales")+": "+money(summary.sales_month):pick("فروش تأییدشده","Confirmed sales")} pick={pick}/>
+      <OverviewKpiCard kind="nodes" label={pick("سلامت نودها","Node availability")} value={summary?(summary.online_nodes.toLocaleString("fa-IR")+" / "+summary.total_nodes.toLocaleString("fa-IR")):nodesLoaded?(onlineNodes.toLocaleString("fa-IR")+" / "+nodes.length.toLocaleString("fa-IR")):"—"} meta={pick("نودهای گزارش‌شده فعال","Reported online nodes")} ratio={summary?.total_nodes?100*summary.online_nodes/summary.total_nodes:nodes.length?100*onlineNodes/nodes.length:null} pick={pick}/>
     </section>
-
     <section className="dash27-main-grid">
       <Card className="dash27-revenue-card">
         <PremiumRevenueChart series={sales} pick={pick}/>
@@ -216,13 +212,13 @@ export function AdminDashboardRuntime(){
       </Card>
 
       <Card className="dash27-health-card">
-        <div className="dash27-card-head"><div><span>{pick("وضعیت سرویس","SERVICE HEALTH")}</span><h2>{pick("سلامت عملیاتی","Operational health")}</h2></div></div>
-        <div className="dash27-health-score"><div className="dash27-ring" style={{"--score":`${nodeHealthPct}%`} as React.CSSProperties}><strong>{nodeHealthPct}%</strong><small>{pick("نودها","Nodes")}</small></div><div className="dash27-health-copy"><b>{nodeHealthPct>=90?pick("وضعیت عالی","Excellent"):nodeHealthPct>=70?pick("وضعیت پایدار","Stable"):pick("نیاز به بررسی","Needs attention")}</b><p>{pick("خلاصه وضعیت زیرساخت در لحظه","Real-time infrastructure overview")}</p></div></div>
-        <div className="dash27-health-lines">
-          <div><span><i className="green"/>{pick("نودهای آنلاین","Online nodes")}</span><b>{onlineNodes}/{nodes.length}</b></div>
-          <div><span><i className="violet"/>{pick("تانل‌های آنلاین","Online tunnels")}</span><b>{onlineTunnels}/{tunnels.length} · {tunnelHealthPct}%</b></div>
-          <div><span><i className="cyan"/>{pick("پروتکل‌های سالم","Healthy protocols")}</span><b>{protocolOnline}/{protocolReported||15}</b></div>
-        </div>
+        <OperationalHealthVisual pick={pick}
+          nodeOnline={nodesLoaded?onlineNodes:summary?.online_nodes??null}
+          nodeTotal={nodesLoaded?nodes.length:summary?.total_nodes??null}
+          tunnelOnline={tunnelsLoaded?onlineTunnels:null}
+          tunnelTotal={tunnelsLoaded?tunnels.length:null}
+          protocolOnline={protocolReported?protocolOnline:null}
+          protocolTotal={protocolReported||null}/>
       </Card>
     </section>
 
