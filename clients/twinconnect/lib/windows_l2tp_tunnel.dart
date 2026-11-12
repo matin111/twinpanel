@@ -18,33 +18,67 @@ class WindowsL2tpTunnel {
   bool get hasChild => _ownsEntry;
   String? get exitIp => _verifiedIp;
 
-  static Future<String> _publicIp() async {
+  String? _baselineIp;
+  String? _lastHealthError;
+
+  /// A RAS status, HTTPS outage, and real route bypass are different failures.
+  /// Do not collapse them into a generic "server disconnected" diagnostic.
+  String? get lastHealthError => _lastHealthError;
+
+  static Future<String> _readIp({
+    required Uri url,
+    required bool jsonBody,
+  }) async {
     final client = HttpClient()
       ..connectionTimeout = const Duration(seconds: 4)
       ..findProxy = (_) => 'DIRECT';
     try {
-      final request = await client.getUrl(
-        Uri.https('api.ipify.org', '/', {'format': 'json'}),
-      ).timeout(const Duration(seconds: 6));
+      final request = await client.getUrl(url)
+          .timeout(const Duration(seconds: 6));
+      request.followRedirects = false;
       final response = await request.close()
           .timeout(const Duration(seconds: 6));
-      if (response.statusCode != 200) {
+      if (response.statusCode != HttpStatus.ok) {
         throw const FormatException('L2TP_PUBLIC_IP_UNAVAILABLE');
       }
-      final body = await utf8.decoder.bind(response).join()
+      final content = await utf8.decoder.bind(response).join()
           .timeout(const Duration(seconds: 6));
-      if (body.length > 512) {
+      if (content.length > 512) {
         throw const FormatException('L2TP_PUBLIC_IP_INVALID');
       }
-      final json = jsonDecode(body);
-      final raw = json is Map ? json['ip'] : null;
-      final ip = raw is String ? InternetAddress.tryParse(raw) : null;
-      if (ip == null || ip.type != InternetAddressType.IPv4) {
+      final String? text;
+      if (jsonBody) {
+        final decoded = jsonDecode(content);
+        text = decoded is Map && decoded['ip'] is String
+            ? decoded['ip'] as String : null;
+      } else {
+        text = content.trim();
+      }
+      final address = text == null ? null : InternetAddress.tryParse(text);
+      if (address == null || address.type != InternetAddressType.IPv4 ||
+          address.isLoopback || address.isLinkLocal ||
+          address.isMulticast || address.isUnspecified) {
         throw const FormatException('L2TP_PUBLIC_IP_INVALID');
       }
-      return ip.address;
+      return address.address;
     } finally {
       client.close(force: true);
+    }
+  }
+
+  /// Probe two independent HTTPS IPv4 echo services, on the current OS route.
+  /// Both use DIRECT: an OS-level L2TP route must carry these packets.
+  static Future<String> _publicIp() async {
+    try {
+      return await _readIp(
+        url: Uri.https('api.ipify.org', '/', {'format': 'json'}),
+        jsonBody: true,
+      );
+    } catch (_) {
+      return _readIp(
+        url: Uri.https('ipv4.icanhazip.com', '/'),
+        jsonBody: false,
+      );
     }
   }
 
@@ -95,6 +129,8 @@ class WindowsL2tpTunnel {
     _busy = true;
     try {
       final baselineIp = await _publicIp();
+      _baselineIp = baselineIp;
+      _lastHealthError = null;
       final started = await _channel.invokeMethod<bool>('startL2tp', {
         'server': profile.server,
         'username': profile.username,
@@ -114,6 +150,7 @@ class WindowsL2tpTunnel {
             throw const FormatException('L2TP_EGRESS_NOT_VERIFIED');
           }
           _verifiedIp = newIp;
+          _lastHealthError = null;
           return newIp;
         }
         if (status.state == -1) {
@@ -130,6 +167,7 @@ class WindowsL2tpTunnel {
         catch (_) {}
       }
       _verifiedIp = null;
+      _baselineIp = null;
       try {
         final status = await _status();
         _ownsEntry = status.state != 0;
@@ -141,17 +179,43 @@ class WindowsL2tpTunnel {
   }
 
   Future<bool> checkHealth() async {
-    if (_verifiedIp == null) return false;
+    if (_verifiedIp == null) {
+      _lastHealthError = 'L2TP_RAS_DISCONNECTED';
+      return false;
+    }
     try {
       final status = await _status();
       if (status.state != 2) {
+        _lastHealthError = status.state == -1 && status.code > 0
+            ? _failure(status.code)
+            : 'L2TP_RAS_DISCONNECTED';
         _verifiedIp = null;
         return false;
       }
-      return await _publicIp() == _verifiedIp;
     } catch (_) {
+      _lastHealthError = 'L2TP_RAS_STATUS_UNAVAILABLE';
       return false;
     }
+    String currentIp;
+    try {
+      currentIp = await _publicIp();
+    } catch (_) {
+      // One failed HTTPS provider is not evidence of a broken L2TP server;
+      // two separate providers have both failed by the time we get here.
+      _lastHealthError = 'L2TP_HEALTH_PROBE_UNAVAILABLE';
+      return false;
+    }
+    if (currentIp == _baselineIp) {
+      // RAS may still report connected even after the default route is lost.
+      // Do not claim "online" when direct traffic has bypassed the VPN.
+      _lastHealthError = 'L2TP_ROUTE_BYPASS_DETECTED';
+      return false;
+    }
+    // An exit-side IP can legitimately rotate while the same RAS session is
+    // still connected. Compare against pre-VPN baseline, not the first exit.
+    _verifiedIp = currentIp;
+    _lastHealthError = null;
+    return true;
   }
 
   Future<({int received, int sent})?> readTrafficTotals() async {
@@ -179,6 +243,8 @@ class WindowsL2tpTunnel {
       }
       _ownsEntry = false;
       _verifiedIp = null;
+      _baselineIp = null;
+      _lastHealthError = null;
     } finally {
       _busy = false;
     }
