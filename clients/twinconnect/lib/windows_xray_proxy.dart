@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 
 import 'windows_xray_preflight.dart';
 import 'xray_inbound_profiles.dart';
+import 'xray_endpoint_route.dart';
 import 'xray_windows_config.dart';
 
 /// Owns a single bundled Xray-core LOCAL SOCKS5 proxy subprocess.
@@ -22,11 +23,13 @@ class WindowsXrayProxy {
   Process? _child;
   int? _port;
   String? _verifiedExitIp;
+  String? _pinnedServerIPv4;
   bool _changing = false;
 
   bool get isRunning => _child != null && _port != null;
   int? get socksPort => isRunning ? _port : null;
   String? get verifiedExitIp => isRunning ? _verifiedExitIp : null;
+  String? get pinnedServerIPv4 => isRunning ? _pinnedServerIPv4 : null;
 
   Future<int> start(XrayInboundProfile inbound) async {
     if (!Platform.isWindows) {
@@ -41,6 +44,9 @@ class WindowsXrayProxy {
       if (!await WindowsXrayPreflight.enginePresent()) {
         throw const FormatException('XRAY_ENGINE_UNAVAILABLE');
       }
+      // Resolve BEFORE changing routes. Reconnects dial the same pinned IP,
+      // never a new DNS answer that would recirculate through the TUN.
+      final pinnedServerIPv4 = await XrayEndpointRoute.resolve(inbound);
       final reservation = await ServerSocket.bind(
           InternetAddress.loopbackIPv4, 0);
       final port = reservation.port;
@@ -52,7 +58,8 @@ class WindowsXrayProxy {
       final httpPort = httpReservation.port;
       await httpReservation.close();
       final config = XrayWindowsConfig.compose(
-          inbound: inbound, localSocksPort: port, localHttpPort: httpPort);
+          inbound: inbound, localSocksPort: port, localHttpPort: httpPort,
+          pinnedServerIPv4: pinnedServerIPv4);
       // Xray never installs Windows routes. Running an extra -test process
       // here duplicated the actual engine's parser and delayed EVERY connect.
       // The single guarded runtime below must open its local SOCKS listener
@@ -82,6 +89,7 @@ class WindowsXrayProxy {
           _child = null;
           _port = null;
           _verifiedExitIp = null;
+          _pinnedServerIPv4 = null;
           if (!_changing) onUnexpectedExit?.call();
         }
       }));
@@ -106,6 +114,7 @@ class WindowsXrayProxy {
         throw const FormatException('XRAY_PROCESS_EXITED');
       }
       _verifiedExitIp = verifiedExitIp;
+      _pinnedServerIPv4 = pinnedServerIPv4;
       _port = port;
       return port;
     } catch (_) {
@@ -195,6 +204,7 @@ class WindowsXrayProxy {
     _child = null;
     _port = null;
     _verifiedExitIp = null;
+    _pinnedServerIPv4 = null;
   }
 
   Future<void> stop() async {
@@ -212,6 +222,7 @@ class WindowsXrayProxy {
     if (process == null) {
       _port = null;
       _verifiedExitIp = null;
+      _pinnedServerIPv4 = null;
       return;
     }
     process.kill();
@@ -224,6 +235,7 @@ class WindowsXrayProxy {
       _child = null;
       _port = null;
       _verifiedExitIp = null;
+      _pinnedServerIPv4 = null;
     }
   }
 }
