@@ -20,6 +20,8 @@ PROTECTED_FILES = (
     "components/admin-dashboard-server-card.module.css",
     "components/admin-overview-visuals.tsx",
     "components/admin-overview-visuals.module.css",
+    "components/admin-dashboard-lower-panels.tsx",
+    "components/admin-dashboard-lower-panels.module.css",
 )
 
 
@@ -71,6 +73,24 @@ def verify_ui_release(source: Path, reference: Path, *, check_bundle: bool = Fal
     )):
         raise ValueError("Admin overview light theme or accessibility styles are missing")
 
+    lower = (source / PROTECTED_FILES[7]).read_text(encoding="utf-8")
+    lower_css = (source / PROTECTED_FILES[8]).read_text(encoding="utf-8")
+    if not all(marker in dashboard for marker in (
+        "SubscriptionAnalytics", "RecentPaymentActivity", "ServerFleetVisual",
+        "subscriptionsPageV3", "subscriptionBreakdown"
+    )):
+        raise ValueError("Premium subscription/activity/server dashboards are not mounted")
+    if not all(marker in lower for marker in (
+        "export function SubscriptionAnalytics", "export function RecentPaymentActivity",
+        "export function ServerFleetVisual", "dashboardPaymentAmount",
+        "classifyPayment" if False else "paymentStatus", "aria-valuenow"
+    )):
+        raise ValueError("Subscription, payment or server visual component is missing")
+    if not all(marker in lower_css for marker in (
+        'html[data-theme="light"]', "prefers-reduced-motion:reduce", ".donutInner", ".nodeGrid"
+    )):
+        raise ValueError("Dashboard lower panels light theme, grid or accessibility missing")
+
     if check_bundle:
         bundle = source / ".next/standalone/.next/static"
         if not bundle.is_dir():
@@ -90,6 +110,11 @@ def verify_ui_release(source: Path, reference: Path, *, check_bundle: bool = Fal
             for path in bundle.rglob("*.js")
         ):
             raise ValueError("Compiled production assets are missing premium KPIs and operational service health")
+        if not any(
+            b"SUBSCRIPTION MIX" in path.read_bytes() and b"LATEST TRANSACTIONS" in path.read_bytes()
+            for path in bundle.rglob("*.js")
+        ):
+            raise ValueError("Compiled production assets are missing subscription and payment visuals")
 
 
 def main() -> None:
