@@ -1048,6 +1048,10 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     _durationTicker = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) _updateConnectionClock();
     });
+    _dark = widget.brand.themeMode == 'light' ? false
+        : widget.brand.themeMode == 'system'
+            ? WidgetsBinding.instance.platformDispatcher.platformBrightness == Brightness.dark
+            : true;
     _restoreAppearance();
     _refreshNativeReadiness();
     _refreshVpnStatus();
@@ -1061,6 +1065,12 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   @override
   void didUpdateWidget(covariant TwinConnectLiveDashboard oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.brand.themeMode != widget.brand.themeMode) {
+      _dark = widget.brand.themeMode == 'light' ? false
+          : widget.brand.themeMode == 'system'
+              ? WidgetsBinding.instance.platformDispatcher.platformBrightness == Brightness.dark
+              : true;
+    }
     if (oldWidget.servers != widget.servers) {
       final ids = widget.servers?.servers.map((node) => node.id).toSet()
           ?? <String>{};
@@ -2053,7 +2063,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                 tooltip: tr('تست پینگ', 'Ping server'),
                 onPressed: _pingingNodes.contains(widget.servers!.servers[index].id)
                     ? null : () => _probeNode(index),
-                icon: const Icon(Icons.network_ping_rounded, size: 18, color: purple),
+                icon: Icon(Icons.network_ping_rounded, size: 18, color: purple),
               ),
               const SizedBox(width: 8),
               Icon(((_vpnUp && _activeNodeId == widget.servers?.servers[index].id) || (_modernUp && _modernNodeId == widget.servers?.servers[index].id))
@@ -2393,7 +2403,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           radius: 19,
           padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 10),
           child: Row(children: [
-            const Icon(Icons.auto_awesome_rounded, size: 22, color: purple),
+            Icon(Icons.auto_awesome_rounded, size: 22, color: purple),
             const SizedBox(width: 12),
             Expanded(child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -2484,7 +2494,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                 borderRadius: BorderRadius.circular(16),
                 color: purple.withValues(alpha: .17),
               ),
-              child: const Icon(Icons.tune_rounded, color: purple, size: 24),
+              child: Icon(Icons.tune_rounded, color: purple, size: 24),
             ),
             const SizedBox(width: 13),
             Expanded(child: Column(
@@ -2654,7 +2664,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
             IconButton(
               tooltip: tr('به‌روزرسانی حساب', 'Refresh account'),
               onPressed: widget.onRefreshAccount,
-              icon: const Icon(Icons.refresh_rounded, color: purple),
+              icon: Icon(Icons.refresh_rounded, color: purple),
             ),
           ]),
           const SizedBox(height: 16),
@@ -2711,7 +2721,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                     decoration: BoxDecoration(
                       color: purple.withValues(alpha: .17),
                       borderRadius: BorderRadius.circular(13)),
-                    child: const Icon(Icons.data_usage_rounded, color: purple),
+                    child: Icon(Icons.data_usage_rounded, color: purple),
                   ),
                   const SizedBox(width: 12),
                   Expanded(child: txt(tr('حجم مصرف‌شده', 'Data usage'),
@@ -2798,7 +2808,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
               padding: const EdgeInsets.all(19),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(Icons.calendar_month_rounded, color: purple,
+                  Icon(Icons.calendar_month_rounded, color: purple,
                     size: 25),
                   const SizedBox(height: 14),
                   txt(tr('تاریخ انقضا', 'Expires on'), size: 12, color: sub),
@@ -2825,7 +2835,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
               padding: const EdgeInsets.all(19),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(Icons.devices_other_rounded, color: purple,
+                  Icon(Icons.devices_other_rounded, color: purple,
                     size: 25),
                   const SizedBox(height: 14),
                   txt(tr('دستگاه‌های مجاز', 'Device limit'),
