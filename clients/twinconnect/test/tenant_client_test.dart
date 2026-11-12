@@ -103,6 +103,8 @@ void main() {
   });
 
   testWidgets('screen explains that VPN engine is not yet connected', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(1536, 1024));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
     SharedPreferences.setMockInitialValues({'twinconnect_ui_language_v1': 'en'});
     await tester.pumpWidget(const TwinConnectApp());
     await tester.pumpAndSettle();
