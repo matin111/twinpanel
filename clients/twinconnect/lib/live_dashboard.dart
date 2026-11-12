@@ -3541,93 +3541,204 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       final used = account?.trafficUsedBytes ?? 0;
       final limit = account?.trafficLimitBytes ?? 0;
       final unlimited = account != null && limit <= 0;
-      final expires = account?.expiresAt;
-      final days = expires?.difference(DateTime.now()).inDays;
-      final remaining = account == null
-          ? '—'
-          : unlimited
-              ? tr('نامحدود', 'Unlimited')
-              : _formatBytes((limit - used).clamp(0, limit).toInt());
-      final total = account == null
-          ? '—'
+      final expiry = account?.expiresAt;
+      final days = expiry?.difference(DateTime.now()).inDays;
+      final fraction = account == null || limit <= 0
+          ? 0.0 : (used / limit).clamp(0.0, 1.0);
+      final total = account == null ? '—'
           : unlimited ? tr('نامحدود', 'Unlimited') : _formatBytes(limit);
-      final date = _expiryLabel();
+      final remaining = account == null ? '—'
+          : unlimited ? tr('نامحدود', 'Unlimited')
+          : _formatBytes((limit - used).clamp(0, limit).toInt());
       final daysLabel = account == null ? '—'
-          : expires == null
+          : expiry == null
               ? (account.activationDurationDays != null &&
                  account.activationDurationDays! > 0
-                    ? tr('پس از اولین اتصال', 'After first connection')
-                    : tr('نامحدود', 'Unlimited'))
-              : days == null ? '—'
-                : days < 0 ? tr('منقضی', 'Expired')
-                  : tr('${days + 1} روز', '${days + 1} days');
-      Widget tile(IconData icon, String label, String value, {
-        String? subtitle,
-      }) => Expanded(child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(children: [
-            Icon(icon, color: purple, size: 19),
-            const SizedBox(width: 7),
-            Expanded(child: txt(label, size: 11, color: sub)),
-          ]),
-          const SizedBox(height: 10),
-          Text(value, maxLines: 1, overflow: TextOverflow.ellipsis,
-            style: TextStyle(color: ink, fontSize: 16,
-              fontWeight: FontWeight.w800)),
-          if (subtitle != null) ...[
-            const SizedBox(height: 5),
-            Text(subtitle, maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: sub, fontSize: 10)),
-          ],
-        ],
-      ));
+                  ? tr('پس از اولین اتصال', 'After first connection')
+                  : tr('نامحدود', 'Unlimited'))
+              : days == null ? '—' : days < 0
+                  ? tr('منقضی', 'Expired')
+                  : (days + 1).toString() +
+                      tr(' روز', ' days');
+      const cyan = Color(0xFF00DCF5);
+      const magenta = Color(0xFFC965FF);
+
+      Widget detail(IconData icon, String label, String value,
+          Color accent, Key key) => Container(
+        key: key,
+        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          color: (_dark ? const Color(0xFF1D1A49) : Colors.white)
+              .withValues(alpha: .38),
+          border: Border.all(color: accent.withValues(alpha: .24)),
+        ),
+        child: Row(children: [
+          Container(
+            height: 34, width: 34,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(10),
+              color: accent.withValues(alpha: .14),
+            ),
+            child: Icon(icon, color: accent, size: 19),
+          ),
+          const SizedBox(width: 11),
+          Expanded(child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(label, maxLines: 1, overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: sub, fontSize: 11)),
+              const SizedBox(height: 4),
+              Text(value, maxLines: 1, overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: ink, fontWeight: FontWeight.w800, fontSize: 15)),
+            ],
+          )),
+        ]),
+      );
+
       return glassCard(
         key: const Key('liveHomeSubscriptionSummary'),
-        radius: 21,
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 17),
+        radius: 23,
+        padding: const EdgeInsets.all(16),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Row(children: [
-              Icon(Icons.perm_contact_calendar_outlined,
-                color: purple, size: 20),
-              const SizedBox(width: 9),
-              Expanded(child: txt(tr('وضعیت اشتراک', 'Subscription details'),
-                size: 14, bold: true)),
+              Container(
+                height: 36, width: 36,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(colors: [purple, magenta]),
+                  borderRadius: BorderRadius.circular(12)),
+                child: const Icon(Icons.donut_large_rounded,
+                    color: Colors.white, size: 20),
+              ),
+              const SizedBox(width: 11),
+              Expanded(child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  txt(tr('وضعیت اشتراک', 'Subscription details'),
+                    size: 15, bold: true),
+                  const SizedBox(height: 3),
+                  txt(tr('گزارش حساب', 'Account overview'),
+                    size: 10, color: sub),
+                ],
+              )),
+              if (account != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(20),
+                    color: cyan.withValues(alpha: .11),
+                    border: Border.all(color: cyan.withValues(alpha: .26)),
+                  ),
+                  child: Text(unlimited
+                    ? tr('نامحدود', 'Unlimited')
+                    : tr('حجمی', 'Metered'),
+                    style: const TextStyle(color: cyan,
+                      fontSize: 10, fontWeight: FontWeight.w700)),
+                ),
               IconButton(
                 key: const Key('liveHomeRefreshAccount'),
                 tooltip: tr('به‌روزرسانی اشتراک', 'Refresh subscription'),
                 onPressed: widget.onRefreshAccount,
-                icon: Icon(Icons.refresh_rounded, color: purple, size: 20)),
+                icon: Icon(Icons.refresh_rounded, color: purple, size: 21)),
             ]),
             const SizedBox(height: 13),
-            Row(crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                tile(Icons.data_usage_rounded,
-                  tr('حجم مصرفی', 'Data usage'),
-                  account == null ? '—' : _formatBytes(used),
-                  subtitle: tr('از $total', 'of $total')),
-                const SizedBox(width: 14),
-                tile(Icons.inventory_2_outlined,
-                  tr('حجم باقی‌مانده', 'Remaining data'), remaining),
-              ]),
-            const SizedBox(height: 17),
-            Divider(color: line.withValues(alpha: .55), height: 1),
-            const SizedBox(height: 16),
-            Row(crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                tile(Icons.calendar_month_outlined,
-                  tr('تاریخ انقضا', 'Expiry date'), date),
-                const SizedBox(width: 14),
-                tile(Icons.timelapse_rounded,
-                  tr('زمان باقی‌مانده', 'Time remaining'), daysLabel),
-              ]),
+            Container(
+              padding: const EdgeInsets.fromLTRB(16, 13, 16, 12),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(18),
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft, end: Alignment.bottomRight,
+                  colors: [
+                    purple.withValues(alpha: .19),
+                    cyan.withValues(alpha: .05),
+                  ]),
+                border: Border.all(color: purple.withValues(alpha: .26)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(children: [
+                    Expanded(child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        txt(tr('حجم مصرفی', 'Data usage'),
+                          size: 11, color: sub),
+                        const SizedBox(height: 6),
+                        Text(account == null ? '—' : _formatBytes(used),
+                          maxLines: 1, overflow: TextOverflow.ellipsis,
+                          style: TextStyle(color: ink, fontSize: 25,
+                            fontWeight: FontWeight.w800)),
+                        const SizedBox(height: 3),
+                        Text(tr('از ', 'of ') + total,
+                          style: TextStyle(color: sub, fontSize: 11)),
+                      ],
+                    )),
+                    const SizedBox(width: 10),
+                    Column(crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        txt(tr('حجم باقی‌مانده', 'Remaining data'),
+                          size: 11, color: sub),
+                        const SizedBox(height: 6),
+                        Text(remaining, maxLines: 1,
+                          style: const TextStyle(color: cyan, fontSize: 18,
+                            fontWeight: FontWeight.w800)),
+                      ],
+                    ),
+                  ]),
+                  const SizedBox(height: 14),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: LinearProgressIndicator(
+                      key: const Key('liveHomeDataProgress'),
+                      value: fraction,
+                      backgroundColor: purple.withValues(alpha: .16),
+                      color: fraction >= .9
+                          ? const Color(0xFFFFB26B) : purple,
+                      minHeight: 7),
+                  ),
+                  const SizedBox(height: 7),
+                  txt(account == null
+                    ? tr('دریافت اطلاعات از پنل',
+                        'Waiting for account data')
+                    : unlimited
+                        ? tr('بدون سقف مصرف', 'No traffic limit')
+                        : (fraction * 100).toStringAsFixed(0) +
+                            tr('٪ مصرف‌شده', '% used'),
+                    size: 10, color: sub),
+                ],
+              ),
+            ),
+            const SizedBox(height: 11),
+            LayoutBuilder(builder: (context, constraints) {
+              final expiryChip = detail(
+                Icons.event_outlined,
+                tr('تاریخ انقضا', 'Expiry date'),
+                _expiryLabel(), magenta,
+                const Key('liveHomeExpiryChip'));
+              final remainingChip = detail(
+                Icons.timelapse_rounded,
+                tr('زمان باقی‌مانده', 'Time remaining'),
+                daysLabel, cyan,
+                const Key('liveHomeTimeChip'));
+              if (constraints.maxWidth < 430) {
+                return Column(children: [
+                  expiryChip, const SizedBox(height: 9), remainingChip]);
+              }
+              return Row(children: [
+                Expanded(child: expiryChip),
+                const SizedBox(width: 12),
+                Expanded(child: remainingChip),
+              ]);
+            }),
             if (widget.accountError != null) ...[
-              const SizedBox(height: 10),
-              txt(tr('اطلاعات اشتراک در دسترس نیست؛ تازه‌سازی کنید.',
-                  'Subscription information unavailable. Refresh to retry.'),
-                size: 11, color: const Color(0xFFFFB878)),
+              const SizedBox(height: 9),
+              txt(tr('اطلاعات اشتراک در دسترس نیست؛ دوباره تلاش کنید.',
+                  'Account details unavailable. Please refresh.'),
+                color: const Color(0xFFFFB878), size: 11),
             ],
           ],
         ),
