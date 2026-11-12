@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.809",
+  "version": "1.1.0-rc.810",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-12T18:58:15Z",
+  "released_at": "2026-11-12T19:04:48Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "91bbf00b3ad1aadfd0916a97f2ec6b5bc632e82f",
+  "source_sha": "b987427900e3a914b572b83563358e43b28accc7",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.809/twinpanel-1.1.0-rc.809-linux-x86_64.tar.gz",
-    "sha256": "0484f4b37f8115367ae6304b8a56bf826b16994014ebbbb642df634024095e4d",
-    "size_bytes": 30667508
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.810/twinpanel-1.1.0-rc.810-linux-x86_64.tar.gz",
+    "sha256": "26341ce18cc020c15f6d1f45fbce82782d46c503715cf4b7c74e0aee46723003",
+    "size_bytes": 30656570
   },
   "notes": {
-    "fa": "رفع ریشه‌ای فشار CPU در TwinPanel: قفل سراسری ثبت گروهی نودها قبل از بارگذاری پایتون و دیتابیس برای جلوگیری از جهش CPU هنگام شروع چند نود، صف‌بندی امن با قفل مشترک، سهمیه CPU دو هسته برای کل پردازش نود و زیرپردازش‌ها؛ تثبیت سقف ۲٫۵ هسته برای حسابداری با جلوگیری از بازنشانی خودکار به چهار هسته. بدون تغییر داده کاربران، سهمیه‌ها یا کانفیگ پروتکل‌ها.",
-    "en": "Fix fleet CPU overload at the root by locking global staging before Python imports, serializing node bulk provisioning safely while keeping per-node isolation and a 200% stage CPU quota. Persist 250% accounting CPU cap and prevent updater budget re-escalation to 400%. No VPN data or configuration changes."
+    "fa": "رفع مشکل دریافت لینک اشتراک در ربات تلگرام: بازیابی لینک اکانت‌های معلق و منقضی با نام کاربری، بدون فعال‌سازی یا تغییر تاریخ/حجم. اولویت با حساب فعال یکتا، جلوگیری از انتخاب اشتراک‌های تکراری و لغوشده، حفظ محدودیت درخواست و امنیت احراز ربات. همراه تمام اصلاحات عملکردی نسخه rc.809.",
+    "en": "Fix Telegram bot account-link recovery for suspended and expired subscriptions without enabling them or changing expiry/quota. Retain unique active-account priority, fail-closed duplicates, canceled/pending exclusions, owner scoping, rate limits, and all rc.809 performance fixes."
   }
 }
