@@ -23,17 +23,6 @@ namespace twinconnect_openconnect {
 inline bool Running();
 struct TrafficTotals { uint64_t received; uint64_t sent; };
 
-inline bool CiscoAdapterName(const wchar_t* text) {
-  if (!text || !*text) return false;
-  std::wstring name(text);
-  std::transform(name.begin(), name.end(), name.begin(),
-      [](wchar_t ch) { return static_cast<wchar_t>(towlower(ch)); });
-  return name.find(L"tap-windows") != std::wstring::npos ||
-         name.find(L"openconnect") != std::wstring::npos ||
-         name.find(L"vpn client adapter") != std::wstring::npos ||
-         name.find(L"ovpn-dco") != std::wstring::npos ||
-         name.find(L"openvpn") != std::wstring::npos;
-}
 inline bool CiscoAdapterDescription(const char* text) {
   if (!text || !*text) return false;
   std::string name(text);
@@ -48,39 +37,59 @@ inline bool CiscoAdapterDescription(const char* text) {
 
 inline bool ReadTunnelAdapterTraffic(TrafficTotals* totals) {
   if (!totals) return false;
-  ULONG size = 0;
-  const ULONG flags = GAA_FLAG_INCLUDE_ALL_INTERFACES;
-  DWORD code = GetAdaptersAddresses(AF_INET, flags, nullptr, nullptr, &size);
-  if (code != ERROR_BUFFER_OVERFLOW || size == 0 || size > 1048576)
-    return false;
-  std::vector<BYTE> buffer(size);
-  auto* adapters = reinterpret_cast<IP_ADAPTER_ADDRESSES*>(buffer.data());
-  code = GetAdaptersAddresses(AF_INET, flags, nullptr, adapters, &size);
-  if (code != NO_ERROR) return false;
-
-  DWORD route = 0;
-  GetBestInterface(0x01010101u, &route);
-  DWORD chosen = 0;
+  // The legacy IP Helper interface table works with Flutter's existing
+  // Windows SDK target without forcing project-wide WINVER changes.
+  ULONG bytesNeeded = 0;
+  DWORD rc = GetIfTable(nullptr, &bytesNeeded, FALSE);
+  if (rc != ERROR_INSUFFICIENT_BUFFER || bytesNeeded == 0 ||
+      bytesNeeded > 1048576) return false;
+  std::vector<BYTE> buffer(bytesNeeded);
+  auto* table = reinterpret_cast<MIB_IFTABLE*>(buffer.data());
+  rc = GetIfTable(table, &bytesNeeded, FALSE);
+  if (rc != NO_ERROR) return false;
+  DWORD bestIndex = 0;
+  GetBestInterface(0x01010101u, &bestIndex);
+  const MIB_IFROW* selected = nullptr;
   bool ambiguous = false;
-  for (auto* a = adapters; a != nullptr; a = a->Next) {
-    if (a->OperStatus != IfOperStatusUp || a->IfIndex == 0 ||
-        (!CiscoAdapterName(a->FriendlyName) &&
-         !CiscoAdapterDescription(a->Description))) continue;
-    if (!chosen || route == a->IfIndex) {
-      ambiguous = chosen != 0 && chosen != a->IfIndex &&
-                  route != a->IfIndex;
-      chosen = a->IfIndex;
-    } else if (route != chosen) {
+  for (DWORD i = 0; i < table->dwNumEntries; ++i) {
+    const auto& row = table->table[i];
+    if (row.dwOperStatus != MIB_IF_OPER_STATUS_OPERATIONAL ||
+        row.dwIndex == 0 || row.dwDescrLen == 0 ||
+        row.dwDescrLen > MAXLEN_IFDESCR) continue;
+    std::string description(reinterpret_cast<const char*>(row.bDescr),
+                            row.dwDescrLen);
+    if (!CiscoAdapterDescription(description.c_str())) continue;
+    if (!selected || bestIndex == row.dwIndex) {
+      ambiguous = selected && selected->dwIndex != row.dwIndex &&
+                  bestIndex != row.dwIndex;
+      selected = &row;
+    } else if (bestIndex != selected->dwIndex) {
       ambiguous = true;
     }
   }
-  if (!chosen || ambiguous) return false;
-  MIB_IF_ROW2 row = {};
-  row.InterfaceIndex = chosen;
-  if (GetIfEntry2(&row) != NO_ERROR || row.OperStatus != IfOperStatusUp)
-    return false;
-  totals->received = static_cast<uint64_t>(row.InOctets);
-  totals->sent = static_cast<uint64_t>(row.OutOctets);
+  if (!selected || ambiguous) return false;
+  // IP Helper's legacy row uses 32-bit octets. Accumulate modulo deltas
+  // into 64 bits; reset suspicious jumps instead of showing huge false use.
+  static DWORD lastIndex = 0, lastRx = 0, lastTx = 0;
+  static uint64_t totalRx = 0, totalTx = 0;
+  const DWORD currentRx = selected->dwInOctets;
+  const DWORD currentTx = selected->dwOutOctets;
+  if (selected->dwIndex != lastIndex) {
+    lastIndex = selected->dwIndex;
+    lastRx = currentRx;
+    lastTx = currentTx;
+    totalRx = 0;
+    totalTx = 0;
+  } else {
+    const DWORD deltaRx = currentRx - lastRx;
+    const DWORD deltaTx = currentTx - lastTx;
+    totalRx = deltaRx <= 0x7FFFFFFFu ? totalRx + deltaRx : 0;
+    totalTx = deltaTx <= 0x7FFFFFFFu ? totalTx + deltaTx : 0;
+    lastRx = currentRx;
+    lastTx = currentTx;
+  }
+  totals->received = totalRx;
+  totals->sent = totalTx;
   return true;
 }
 inline bool ReadTraffic(TrafficTotals* totals) {
