@@ -2631,7 +2631,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                 'آدرس سرور سودوکو به IP عمومی معتبر تبدیل نشد.',
                 'The Sudoku endpoint did not resolve to a valid public IPv4.'),
               'SUDOKU_PRIVATE_CONFIG_STAGE_FAILED' => tr(
-                'ویندوز اجازه ساخت فایل رمزگذاری‌شده موقت سودوکو را نداد.',
+                'ویندوز اجازه ساخت فایل موقت حفاظت‌شده سودوکو را نداد.',
                 'Windows could not securely stage the temporary Sudoku configuration.'),
               'SUDOKU_PROCESS_GUARD_UNAVAILABLE' => tr(
                 'محافظ پردازش سودوکو در ویندوز فعال نشد؛ اتصال برای امنیت متوقف شد.',
