@@ -70,6 +70,8 @@ void main() {
   });
 
   testWidgets('Persian selection is saved from English UI', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(1536, 1024));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
     SharedPreferences.setMockInitialValues({
       'twinconnect_ui_language_v1': 'en',
     });
