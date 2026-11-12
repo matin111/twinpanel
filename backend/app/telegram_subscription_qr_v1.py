@@ -30,7 +30,7 @@ def subscription_qr_photo(url: str) -> BufferedInputFile:
     return BufferedInputFile(out.getvalue(), filename="subscription-qr.png")
 
 
-async def send_subscription_link_and_qr(message, link: str, *, username: str = "", reply_markup=None):
+async def send_subscription_link_and_qr(message, link: str, *, username: str = "", app_username: str = "", app_password: str = "", reply_markup=None):
     """One combined photo/caption, not separate link and QR messages."""
     value = str(link or "").strip()
     if not value:
@@ -47,6 +47,19 @@ async def send_subscription_link_and_qr(message, link: str, *, username: str = "
         f"<code>{escape(value)}</code>\n\n"
         "لینک و QR هر دو مربوط به یک اشتراک هستند. آن‌ها را در اختیار دیگران قرار ندهید."
     )
+    if app_username and app_password:
+        app_text = (
+            "\\n\\n📱 <b>ورود به اپ هوشمند</b>\\n"
+            f"👤 نام کاربری اپ: <code>{escape(app_username)}</code>\\n"
+            f"🔑 رمز اپ: <code>{escape(app_password)}</code>"
+        )
+        # Telegram photo captions are bounded; never truncate credentials.
+        if len(caption) + len(app_text) <= 1024:
+            caption += app_text
+        else:
+            # The main sublink must still be delivered even for long URLs.
+            # Credential delivery can be retried from an authenticated view.
+            pass
     if len(caption) > 1024:
         raise ValueError("متن ساب‌لینک برای کپشن QR بیش از حد طولانی است")
     return await message.answer_photo(
