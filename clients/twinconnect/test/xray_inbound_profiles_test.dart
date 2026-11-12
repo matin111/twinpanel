@@ -55,6 +55,20 @@ void main() {
     expect(groups.single.inbounds.single.id, 'websocket_tls');
   });
 
+  test('infers inbound identity only from a real VLESS URI', () {
+    final parsed = XrayInboundProfile.tryParse({
+      'id': null,
+      'uri': 'vless://$uuid@example.com:443?encryption=none'
+          '&type=tcp&security=tls&sni=example.org',
+    }, '3');
+    expect(parsed?.id, 'tcp_tls');
+    expect(XrayInboundProfile.tryParse({
+      'id': 'xhttp_reality',
+      'uri': 'vless://$uuid@example.com:443?encryption=none'
+          '&type=tcp&security=tls&sni=example.org',
+    }, '3'), isNull);
+  });
+
   test('rejects duplicate server identity', () {
     expect(() => XrayServerProfiles.fromResponse({
       'schema': 1,
