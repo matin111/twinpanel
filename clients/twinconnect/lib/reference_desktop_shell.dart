@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'tenant_models.dart';
+import 'reference_visuals.dart';
 
 /// Reference-aligned Windows shell. Never synthesizes connection telemetry.
 /// Connection controls stay disabled until a real tunnel controller is supplied.
@@ -51,8 +52,6 @@ class ReferenceDesktopShell extends StatefulWidget {
 
 class _ReferenceDesktopShellState extends State<ReferenceDesktopShell> {
   int tab = 0;
-  bool dark = true;
-  bool fastest = false;
 
   static const navy = Color(0xFF080D2D);
   static const violet = Color(0xFF9F43FF);
@@ -178,9 +177,8 @@ class _ReferenceDesktopShellState extends State<ReferenceDesktopShell> {
             const Text('Signed in', style: TextStyle(color: muted, fontSize: 12)),
           ]))]), padding: const EdgeInsets.all(16), radius: 17),
       const SizedBox(height: 18),
-      IconButton(onPressed: null,
-        tooltip: 'Light mode will be enabled after theme validation',
-        icon: Icon(dark ? Icons.dark_mode : Icons.light_mode, color: violet, size: 30)),
+      const Tooltip(message: 'Dark theme (light theme not yet available)',
+        child: Icon(Icons.dark_mode, color: violet, size: 30)),
       const SizedBox(height: 14),
       IconButton(onPressed: widget.onSettings,
           icon: const Icon(Icons.settings_outlined, color: Colors.white, size: 29)),
@@ -209,7 +207,7 @@ class _ReferenceDesktopShellState extends State<ReferenceDesktopShell> {
       message: widget.onToggleConnection == null
           ? 'VPN tunnel controller not available in this build'
           : widget.connected ? 'Disconnect' : 'Connect',
-      child: InkWell(
+      child: NeonRing(active: widget.connected, child: InkWell(
         onTap: widget.onToggleConnection,
         customBorder: const CircleBorder(),
         child: Container(
@@ -228,7 +226,7 @@ class _ReferenceDesktopShellState extends State<ReferenceDesktopShell> {
             title(widget.connected ? 'active' : 'inactive', size: 17),
           ]),
         ),
-      ),
+      )),
     ),
     const Spacer(),
     Row(mainAxisAlignment: MainAxisAlignment.center, children: [
@@ -246,6 +244,7 @@ class _ReferenceDesktopShellState extends State<ReferenceDesktopShell> {
     const SizedBox(height: 16),
     const Text('Refresh tunnel status', style: TextStyle(color: violet)),
     const Spacer(),
+    const AmbientWave(height: 52),
     Container(height: 53, width: 355, alignment: Alignment.center,
       decoration: BoxDecoration(borderRadius: BorderRadius.circular(24),
         color: const Color(0x663B2D8C), border: Border.all(color: violet)),
@@ -302,7 +301,7 @@ class _ReferenceDesktopShellState extends State<ReferenceDesktopShell> {
     glass(Row(children: [
       Expanded(child: gauge(Icons.arrow_downward, 'Download',
           speed(widget.downloadBytesPerSecond), cyan)),
-      const VerticalDivider(color: muted),
+      const SizedBox(width: 12),
       Expanded(child: gauge(Icons.arrow_upward, 'Upload',
           speed(widget.uploadBytesPerSecond), violet)),
       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -322,11 +321,7 @@ class _ReferenceDesktopShellState extends State<ReferenceDesktopShell> {
   ]), padding: const EdgeInsets.all(22));
 
   Widget gauge(IconData icon, String name, String value, Color color) =>
-    Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Icon(icon, color: color, size: 27), const SizedBox(height: 6),
-      Text(name, style: const TextStyle(color: muted)),
-      const SizedBox(height: 8), title(value, size: 19),
-    ]);
+    RingGauge(color: color, icon: icon, label: name, value: value);
 
   Widget quickConnect() => Column(children: [
     Row(children: [const Icon(Icons.bolt, color: violet, size: 57),
@@ -352,7 +347,8 @@ class _ReferenceDesktopShellState extends State<ReferenceDesktopShell> {
         title('Select fastest server', size: 20),
         const Text('Based on measured server latency', style: TextStyle(color: muted)),
       ])),
-      Switch(value: fastest, onChanged: null, activeThumbColor: violet),
+      const Tooltip(message: 'Waiting for the native fastest-server selector',
+        child: Switch(value: false, onChanged: null)),
     ]), padding: const EdgeInsets.all(19)),
   ]);
 
