@@ -25,6 +25,7 @@ import 'tenant_api.dart';
 import 'vpn_policy_store.dart';
 import 'windows_wireguard.dart';
 import 'tenant_models.dart';
+import 'brand_theme.dart';
 import 'plan_classification.dart';
 import 'account_snapshot.dart';
 import 'native_vpn_bridge.dart';
@@ -41,6 +42,7 @@ class TwinConnectLiveDashboard extends StatefulWidget {
   const TwinConnectLiveDashboard({
     required this.panel,
     required this.username,
+    required this.brand,
     required this.sessionToken,
     required this.catalog,
     required this.servers,
@@ -57,6 +59,7 @@ class TwinConnectLiveDashboard extends StatefulWidget {
   });
   final PanelDirectoryEntry panel;
   final String username;
+  final BrandPreview brand;
   final String sessionToken;
   final PanelProtocolCatalog? catalog;
   final AppServerInventory? servers;
@@ -1319,7 +1322,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     return tr('نامحدود', 'Unlimited');
   }
 
-  static const purple = Color(0xFFA46AFF);
+  Color get purple => BrandTheme.parse(widget.brand.primaryColor, '#A46AFF');
   List<_DemoServer> get demoServers => [
     for (final server in widget.servers?.servers ?? const <AppServer>[])
       _DemoServer(
@@ -1350,24 +1353,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         GlobalCupertinoLocalizations.delegate,
       ],
       themeMode: _dark ? ThemeMode.dark : ThemeMode.light,
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: purple,
-          brightness: Brightness.light,
-          surface: const Color(0xFFFFFFFF),
-        ),
-        scaffoldBackgroundColor: const Color(0xFFF5F3FD),
-      ),
-      darkTheme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: purple,
-          brightness: Brightness.dark,
-          surface: const Color(0xFF1B253C),
-        ),
-        scaffoldBackgroundColor: const Color(0xFF10162B),
-      ),
+      theme: BrandTheme.make(widget.brand, Brightness.light),
+      darkTheme: BrandTheme.make(widget.brand, Brightness.dark),
       home: Builder(builder: _shell),
     );
   }
@@ -1474,17 +1461,23 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       child: Column(children: [
         Container(
           width: 42, height: 42,
+          clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
-            gradient: const LinearGradient(colors: [
-              Color(0xFFC68AFF), Color(0xFF7051D4)]),
+            gradient: LinearGradient(colors: [
+              purple, BrandTheme.parse(widget.brand.secondaryColor, '#7051D4')]),
             borderRadius: BorderRadius.circular(13),
           ),
-          child: const Icon(Icons.all_inclusive_rounded,
-            color: Colors.white, size: 27),
+          child: widget.brand.logoUrl != null &&
+                  Uri.tryParse(widget.brand.logoUrl!)?.scheme == 'https'
+            ? Image.network(widget.brand.logoUrl!, fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) => const Icon(
+                  Icons.all_inclusive_rounded, color: Colors.white, size: 27))
+            : const Icon(Icons.all_inclusive_rounded,
+                color: Colors.white, size: 27),
         ),
         if (wide) ...[
           const SizedBox(height: 9),
-          txt('TwinConnect', size: 17, bold: true),
+          txt(widget.brand.brandName, size: 17, bold: true),
         ],
         const SizedBox(height: 34),
         sideNav('home', Icons.bolt_rounded, tr('اتصال سریع', 'Quick connect')),
