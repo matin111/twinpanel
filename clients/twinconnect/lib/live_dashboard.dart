@@ -1431,6 +1431,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           await _startL2tpTunnel(nodes[index].id);
         } else if (_filter == 'v2ray') {
           await _startXrayTunnel(nodes[index].id);
+        } else if (_filter == 'sudoku') {
+          await _startSudokuTunnel(nodes[index].id);
         } else if (SingBoxProfileValidator.supportsFamily(_filter)) {
           await _startModernTunnel(_filter, nodes[index].id);
         }
@@ -1719,6 +1721,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         await _startL2tpTunnel(_selectedServerId!);
       } else if (_filter == 'v2ray') {
         await _startXrayTunnel(_selectedServerId!);
+      } else if (_filter == 'sudoku') {
+        await _startSudokuTunnel(_selectedServerId!);
       } else if (SingBoxProfileValidator.supportsFamily(_filter)) {
         await _startModernTunnel(_filter, _selectedServerId!);
       } else {
