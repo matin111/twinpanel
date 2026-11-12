@@ -575,13 +575,14 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         rx = rx >= _tunnelOriginRx! ? rx - _tunnelOriginRx! : 0;
         tx = tx >= _tunnelOriginTx! ? tx - _tunnelOriginTx! : 0;
       }
-      if (_modernRx != rx || _modernTx != tx) {
-        setState(() {
-          _modernRx = rx;
-          _modernTx = tx;
-          _recordTraffic('modern:$activeProtocol', rx, tx);
-        });
-      }
+      // A zero-traffic interval must report 0 B/s, not leave the last
+      // nonzero speed on screen. Reuse the existing 2-second counter poll:
+      // no downloads, speed tests, or per-server background probes.
+      setState(() {
+        _modernRx = rx;
+        _modernTx = tx;
+        _recordTraffic('modern:$activeProtocol', rx, tx);
+      });
     } finally {
       _modernTrafficBusy = false;
     }
@@ -3031,6 +3032,13 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
 
     Widget serverRow(int index) {
       final server = demoServers[index];
+      final nodeId = widget.servers!.servers[index].id;
+      // Speed belongs to the currently connected tunnel only. Other nodes
+      // cannot have truthful download/upload numbers without an active test.
+      final activeHere = (_vpnUp && _activeNodeId == nodeId &&
+              (_filter == 'wireguard' || _filter == 'all')) ||
+          (_modernUp && _modernNodeId == nodeId &&
+              _modernProtocol == _filter);
       return Padding(
         padding: const EdgeInsets.only(bottom: 9),
         child: glassCard(
@@ -3066,6 +3074,26 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                   ]),
                   const SizedBox(height: 3),
                   txt(server.city, size: 10, color: sub),
+                  if (activeHere) ...[
+                    const SizedBox(height: 6),
+                    Row(children: [
+                      Icon(Icons.arrow_downward_rounded,
+                        size: 12, color: const Color(0xFF00DFF5)),
+                      const SizedBox(width: 3),
+                      Text(_rxBytesPerSecond == null
+                          ? '—' : '${_formatTransferBytes(_rxBytesPerSecond!.round())}/s',
+                        key: Key('activeServerDownload_$nodeId'),
+                        style: TextStyle(fontSize: 10, color: sub)),
+                      const SizedBox(width: 12),
+                      Icon(Icons.arrow_upward_rounded,
+                        size: 12, color: const Color(0xFFC765FF)),
+                      const SizedBox(width: 3),
+                      Text(_txBytesPerSecond == null
+                          ? '—' : '${_formatTransferBytes(_txBytesPerSecond!.round())}/s',
+                        key: Key('activeServerUpload_$nodeId'),
+                        style: TextStyle(fontSize: 10, color: sub)),
+                    ]),
+                  ],
                 ],
               )),
               Tooltip(
