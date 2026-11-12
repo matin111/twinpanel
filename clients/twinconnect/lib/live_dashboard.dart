@@ -2102,7 +2102,9 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
               'CISCO_HEALTH_DEGRADED' => tr(
                 'مسیر اینترنت سیسکو پاسخ تأییدشده ندارد.',
                 'Cisco internet route is no longer verified.'),
-              final code => tr('خطای اتصال: $code', 'Connection error: $code'),
+              final code => tr(
+                'خطای اتصال ${(_modernProtocol ?? _filter).toUpperCase()}: $code',
+                '${(_modernProtocol ?? _filter).toUpperCase()} connection error: $code'),
             },
             style: const TextStyle(color: Colors.orangeAccent, fontSize: 11),
           ),
