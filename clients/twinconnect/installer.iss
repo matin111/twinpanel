@@ -90,8 +90,8 @@ begin
                    '/i "' + OpenVpnInstaller + '" /qn /norestart',
                    '', SW_HIDE, ewWaitUntilTerminated, ExitCode);
         if (not Ok) or ((ExitCode <> 0) and (ExitCode <> 3010)) then
-          MsgBox('OpenVPN engine installation failed; OpenVPN will remain disabled.' +
-                 #13#10 + 'Other VPN connections are unaffected.',
+          MsgBox('OpenVPN engine installation failed; OpenVPN will remain disabled.' + #13#10 +
+                 'Other VPN connections are unaffected.',
                  mbError, MB_OK);
       end
       else
