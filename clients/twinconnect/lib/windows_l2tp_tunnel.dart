@@ -57,7 +57,7 @@ class WindowsL2tpTunnel {
       final address = text == null ? null : InternetAddress.tryParse(text);
       if (address == null || address.type != InternetAddressType.IPv4 ||
           address.isLoopback || address.isLinkLocal ||
-          address.isMulticast || address.isUnspecified) {
+          address.isMulticast || address.address == '0.0.0.0') {
         throw const FormatException('L2TP_PUBLIC_IP_INVALID');
       }
       return address.address;
