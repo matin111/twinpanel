@@ -86,6 +86,14 @@ void main() {
     expect(script, contains('sudoku-windows-amd64.zip'));
     expect(script, contains('52051b7b30d6af66ee151d6a978fa20434edeb5eaaecc4c9bb27063bed33efe1'));
     expect(script, contains('LICENSE.txt'));
+    expect(script, contains('licenses/SUDOKU-LICENSE.txt'));
+    expect(script, contains('licenses/GPL-3.0.txt'));
+    expect(script, isNot(contains('www.gnu.org/licenses/gpl-3.0.txt')));
+    final license = File('licenses/GPL-3.0.txt').readAsStringSync();
+    final notice = File('licenses/SUDOKU-LICENSE.txt').readAsStringSync();
+    expect(license, contains('GNU GENERAL PUBLIC LICENSE'));
+    expect(license, contains('Version 3, 29 June 2007'));
+    expect(notice, contains('GNU General Public License'));
     expect(flow, contains('bundle_sudoku_windows.ps1'));
     expect(flow, contains('check_sudoku_windows.ps1'));
   });
