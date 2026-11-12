@@ -34,7 +34,6 @@ export function TunnelMonitor({tunnels,nodes,loaded,pick}:{
   const byId=useMemo(()=>new Map(nodes.map(node=>[node.id,node.name])),[nodes]);
   const online=tunnels.filter(t=>classify(t.status)==="online").length;
   const offline=tunnels.filter(t=>classify(t.status)==="offline").length;
-  const unknown=Math.max(0,tunnels.length-online-offline);
   const title=(t:AdminTunnel,kind:"iran"|"exit")=>{
     const id=kind==="iran"?t.iran_node_id:t.exit_node_id;
     const resolved=byId.get(id);
@@ -44,9 +43,7 @@ export function TunnelMonitor({tunnels,nodes,loaded,pick}:{
   return <div className={styles.tunnels} dir="rtl">
     <div className={styles.header}>
       <div className={styles.heading}>
-        <span className={styles.eyebrow}><i/>{pick("مسیرهای ارتباطی","NETWORK TRANSPORTS")}</span>
         <h2>{pick("مانیتور تانل‌ها","Tunnel monitor")}</h2>
-        <p>{pick("مسیرهای ثبت‌شده بین نود ایران و خروجی","Reported links between Iran ingress and exit nodes")}</p>
       </div>
       <Link href="/admin/tunnels" className={styles.more}>{pick("مدیریت","Manage")} <span aria-hidden="true">↗</span></Link>
     </div>
@@ -90,7 +87,6 @@ export function TunnelMonitor({tunnels,nodes,loaded,pick}:{
       })}
       {!tunnels.length&&<div className={styles.empty}>{loaded?pick("تانلی گزارش نشده","No tunnels reported"):pick("در حال دریافت وضعیت تانل‌ها","Loading tunnel telemetry")}</div>}
     </div>
-    <div className={styles.note}>{pick("آنلاین بودن، وضعیت ثبت‌شده تانل است؛ تست سرعت یا عبور واقعی ترافیک کاربران نیست.","Online reflects the reported tunnel state, not a verified user traffic or throughput test.")}{unknown>0&&loaded?" · "+display(unknown)+" "+pick("مسیر نامشخص","unknown routes"):""}</div>
   </div>;
 }
 
@@ -106,9 +102,7 @@ export function ProtocolMonitor({protocols,pick}:{
   return <div className={styles.protocols} dir="rtl">
     <div className={styles.header}>
       <div className={styles.heading}>
-        <span className={styles.eyebrow}><i/>{pick("پوشش سرویس","PROTOCOL COVERAGE")}</span>
         <h2>{pick("پروتکل‌های سرویس","Service protocols")}</h2>
-        <p>{pick("وضعیت گزارش‌شده هر پروتکل در نودها","Status reported by the associated server nodes")}</p>
       </div>
       <Link href="/admin/protocols" className={styles.more}>{pick("مدیریت پروتکل‌ها","Manage")} <span aria-hidden="true">↗</span></Link>
     </div>
@@ -139,6 +133,5 @@ export function ProtocolMonitor({protocols,pick}:{
         </article>;
       })}
     </div>
-    <div className={styles.note}>{pick("نشان سبز به‌معنی گزارش فعال از پنل است، نه تأیید اتصال واقعی کاربر. برای بررسی اتصال، تست جداگانه لازم است.","A green indicator means reported active state, not a verified live client connection.")}</div>
   </div>;
 }
