@@ -86,7 +86,7 @@ class ReleaseRevenueGuardTests(unittest.TestCase):
                 'export function TunnelMonitor(){} '
                 'export function ProtocolMonitor(){} '
                 'const f=()=>setGroup(option.id); '
-                'const note="reported online nodes reported tunnel state aria-pressed";',
+                'const note="reported online nodes classify(t.status) latency(t.latency_ms) aria-pressed";',
                 encoding="utf-8",
             )
             (directory / "components/admin-dashboard-network-panels.module.css").write_text(
@@ -177,7 +177,7 @@ class ReleaseRevenueGuardTests(unittest.TestCase):
     def test_compiled_premium_chart_passes(self):
         folder = self.source / ".next/standalone/.next/static/chunks"
         folder.mkdir(parents=True)
-        (folder / "chunk.js").write_text("Sales pulse Server pulse Service health SUBSCRIPTION MIX LATEST TRANSACTIONS NETWORK TRANSPORTS PROTOCOL COVERAGE", encoding="utf-8")
+        (folder / "chunk.js").write_text("Sales pulse Server pulse Service health Subscription overview Recent activity Tunnel monitor Service protocols", encoding="utf-8")
         guard.verify_ui_release(self.source, self.current, check_bundle=True)
 
 
