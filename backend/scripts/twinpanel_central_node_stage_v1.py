@@ -127,7 +127,7 @@ def missing_runtime_families(node_id, limit):
 # Serial admission across ALL Exits. Per-node locks alone allow many
 # disjoint node stages to exhaust CPU and DB simultaneously.
 # Kernel flock is released automatically on process exit or crash.
-_GLOBAL_STAGE_LOCK = Path("/run/twinpanel-central-node-stage-global.lock")
+_GLOBAL_STAGE_LOCK = Path("/tmp/twinpanel-central-node-stage-global.lock")
 
 
 def run(node_id, limit, apply, *, delta_only=False):
