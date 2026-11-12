@@ -597,6 +597,44 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     });
   }
 
+  // Only a fresh connection with NO existing Windows VPN can overlap the
+  // DIRECT pre-TUN IP snapshot with authorized profile delivery. During a
+  // protocol switch the baseline MUST be sampled after old routes are gone.
+  bool get _canPrefetchDirectBaseline =>
+      !_vpnUp && !_vpnCleanup && !_vpnUnmanaged && !_modernUp &&
+      !_modernTunnel.isRunning && !_xrayProxy.isRunning &&
+      !_ciscoTunnel.isRunning && !_openVpnTunnel.hasChild &&
+      !_l2tpTunnel.hasChild;
+
+  Future<({ClientProtocolProfiles profiles, String? baselineIp})>
+      _loadNativeProfilesWithBaseline({
+    required VpnProtocolDefinition definition,
+    required Future<String> Function() directIp,
+  }) async {
+    final api = TenantApi.fromBuildConfig();
+    Future<ClientProtocolProfiles> load() => api.loadSessionNativeProfiles(
+      panel: widget.panel, sessionToken: widget.sessionToken,
+      protocol: definition,
+      native: NativeProtocolReadiness(
+        supportedCodes: {definition.code},
+      ),
+    );
+    if (!_canPrefetchDirectBaseline) {
+      return (profiles: await load(), baselineIp: null);
+    }
+    // The sample records its OWN completion time; a slow panel response
+    // cannot cause an old baseline to be reused after 8 seconds.
+    final both = await Future.wait<Object>([
+      load(),
+      directIp().then((ip) => (ip: ip, measuredAt: DateTime.now())),
+    ]);
+    final sample = both[1] as ({String ip, DateTime measuredAt});
+    final fresh = DateTime.now().difference(sample.measuredAt) <
+        const Duration(seconds: 8);
+    return (profiles: both[0] as ClientProtocolProfiles,
+            baselineIp: fresh ? sample.ip : null);
+  }
+
   Future<void> _startCiscoTunnel(String serverId) async {
     if (_vpnBusy) return;
     setState(() { _vpnBusy = true; _vpnError = null; });
@@ -614,11 +652,11 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         throw const FormatException('CISCO_ENGINE_UNAVAILABLE');
       }
       final definition = VpnProtocols.byCode('cisco')!;
-      final profiles = await TenantApi.fromBuildConfig().loadSessionNativeProfiles(
-        panel: widget.panel, sessionToken: widget.sessionToken,
-        protocol: definition,
-        native: const NativeProtocolReadiness(supportedCodes: {'cisco'}),
+      final prepared = await _loadNativeProfilesWithBaseline(
+        definition: definition,
+        directIp: WindowsOpenConnectTunnel.directPublicIp,
       );
+      final profiles = prepared.profiles;
       final matches = profiles.items.where((item) =>
           item['node_id']?.toString() == serverId).toList(growable: false);
       if (matches.length != 1) {
@@ -667,7 +705,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           _publicIp = null;
         });
       }
-      final verifiedIp = await _ciscoTunnel.start(target);
+      final verifiedIp = await _ciscoTunnel.start(target,
+          baselinePublicIp: prepared.baselineIp);
       if (!mounted) return;
       setState(() {
         _modernUp = true;
@@ -713,11 +752,11 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         throw const FormatException('OPENVPN_ENGINE_NOT_INSTALLED');
       }
       final definition = VpnProtocols.byCode('openvpn')!;
-      final profiles = await TenantApi.fromBuildConfig().loadSessionNativeProfiles(
-        panel: widget.panel, sessionToken: widget.sessionToken,
-        protocol: definition,
-        native: const NativeProtocolReadiness(supportedCodes: {'openvpn'}),
+      final prepared = await _loadNativeProfilesWithBaseline(
+        definition: definition,
+        directIp: WindowsOpenVpnTunnel.publicIp,
       );
+      final profiles = prepared.profiles;
       final matches = profiles.items.where((item) =>
           item['node_id']?.toString() == serverId).toList(growable: false);
       if (matches.length != 1) {
@@ -767,7 +806,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           _publicIp = null;
         });
       }
-      final verifiedIp = await _openVpnTunnel.start(target);
+      final verifiedIp = await _openVpnTunnel.start(target,
+          baselinePublicIp: prepared.baselineIp);
       if (!mounted) return;
       setState(() {
         _modernUp = true;
@@ -811,11 +851,11 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         throw const FormatException('PROTOCOL_NOT_INCLUDED_IN_SUBSCRIPTION');
       }
       final definition = VpnProtocols.byCode('l2tp')!;
-      final profiles = await TenantApi.fromBuildConfig().loadSessionNativeProfiles(
-        panel: widget.panel, sessionToken: widget.sessionToken,
-        protocol: definition,
-        native: const NativeProtocolReadiness(supportedCodes: {'l2tp'}),
+      final prepared = await _loadNativeProfilesWithBaseline(
+        definition: definition,
+        directIp: WindowsL2tpTunnel.directPublicIp,
       );
+      final profiles = prepared.profiles;
       final matches = profiles.items.where((item) =>
           item['node_id']?.toString() == serverId).toList(growable: false);
       if (matches.length != 1) {
@@ -864,7 +904,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           _publicIp = null;
         });
       }
-      final verifiedIp = await _l2tpTunnel.start(target);
+      final verifiedIp = await _l2tpTunnel.start(target,
+          baselinePublicIp: prepared.baselineIp);
       if (!mounted) return;
       setState(() {
         _modernUp = true;
