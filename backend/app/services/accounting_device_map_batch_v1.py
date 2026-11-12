@@ -81,6 +81,7 @@ def _stored_identity(
 
 def build_accounting_devices_by_node(
     db: Session, *, selected_node_ids: set[int] | None = None,
+    source_protocols: set[str] | None = None,
 ) -> dict[int, list[dict[str, Any]]]:
     """Build every accounting node's device map in one database pass.
 
@@ -107,15 +108,24 @@ def build_accounting_devices_by_node(
     candidate_nodes = set(node_ids)
     openvpn_central_pki_enabled = is_openvpn_central_pki_enabled(db)
 
-    credentials = (
-        db.query(ProtocolCredential)
-        .filter(ProtocolCredential.is_active.is_(True))
-        .order_by(
-            ProtocolCredential.subscription_id.asc(),
-            ProtocolCredential.id.asc(),
-        )
-        .all()
+    # Independent per-protocol presence collectors must not decrypt every
+    # protocol credential (20k+ on production) to inspect just one family.
+    # Filter source credentials BEFORE decoding, keeping the canonical
+    # identity, quota-device and node-membership reconciliation unchanged.
+    credential_query = db.query(ProtocolCredential).filter(
+        ProtocolCredential.is_active.is_(True)
     )
+    if source_protocols is not None:
+        selected = {str(p).strip().lower() for p in source_protocols}
+        if not selected or not selected.issubset(canonical._PROTOCOL_TO_QUOTA):
+            raise ValueError("ACCOUNTING_SOURCE_PROTOCOL_SCOPE_INVALID")
+        credential_query = credential_query.filter(
+            ProtocolCredential.protocol.in_(sorted(selected))
+        )
+    credentials = credential_query.order_by(
+        ProtocolCredential.subscription_id.asc(),
+        ProtocolCredential.id.asc(),
+    ).all()
     if not credentials:
         return result
     # Release SQL SELECT read locks before CPU-heavy credential decryption.
@@ -240,6 +250,20 @@ def build_accounting_devices_by_node(
     return result
 
 
+def build_presence_devices_for_protocols(
+    db: Session, *, source_protocols: set[str],
+) -> dict[int, list[dict[str, Any]]]:
+    """One-pass source-filtered identities for independent live collectors.
+
+    No cross-sweep cache: each fresh Session sees new subscriptions, devices
+    and node memberships. The full quota ledger continues using the existing
+    authoritative all-protocol builder.
+    """
+    return build_accounting_devices_by_node(
+        db, source_protocols=source_protocols,
+    )
+
+
 def build_node_devices_cached(db: Session, node_id: int):
     cache = db.info.get(_CACHE_KEY)
     if cache is None:
@@ -266,5 +290,6 @@ def install_accounting_device_batch_cache() -> None:
 __all__ = [
     "build_accounting_devices_by_node",
     "build_node_devices_cached",
+    "build_presence_devices_for_protocols",
     "install_accounting_device_batch_cache",
 ]
