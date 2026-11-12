@@ -132,7 +132,11 @@ void main() {
       expect(find.textContaining('SINGBOX_PROTOCOL_NOT_SUPPORTED'),
           findsNothing);
     }
-    // Allow any synthetic platform-channel readiness timeouts to settle.
-    await tester.pump(const Duration(seconds: 12));
+    // Unmount the dashboard so its periodic connection/UI timers are
+    // cancelled, then let outstanding synthetic platform-channel timeouts
+    // complete before Flutter verifies that the test has no pending timers.
+    // This keeps the real navigation assertions intact.
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(seconds: 30));
   });
 }
