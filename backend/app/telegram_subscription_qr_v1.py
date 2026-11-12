@@ -49,8 +49,8 @@ async def send_subscription_link_and_qr(message, link: str, *, username: str = "
     )
     if app_username and app_password:
         app_text = (
-            "\\n\\n📱 <b>ورود به اپ هوشمند</b>\\n"
-            f"👤 نام کاربری اپ: <code>{escape(app_username)}</code>\\n"
+            "\n\n📱 <b>ورود به اپ هوشمند</b>\n"
+            f"👤 نام کاربری اپ: <code>{escape(app_username)}</code>\n"
             f"🔑 رمز اپ: <code>{escape(app_password)}</code>"
         )
         # Telegram photo captions are bounded; never truncate credentials.
