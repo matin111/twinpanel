@@ -17,6 +17,9 @@ import 'windows_singbox_preflight.dart';
 import 'singbox_profile_validator.dart';
 import 'singbox_windows_config.dart';
 import 'windows_singbox_tunnel.dart';
+import 'windows_xray_proxy.dart';
+import 'windows_xray_preflight.dart';
+import 'xray_inbound_profiles.dart';
 import 'windows_openconnect_tunnel.dart';
 import 'windows_openvpn_tunnel.dart';
 import 'windows_l2tp_tunnel.dart';
@@ -99,6 +102,20 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       setState(() {
         _modernUp = false;
         _vpnError = 'SINGBOX_TUNNEL_EXITED';
+        _publicIp = null;
+      });
+    },
+  );
+  late final WindowsXrayProxy _xrayProxy = WindowsXrayProxy(
+    onUnexpectedExit: () {
+      _modernHealthTimer?.cancel();
+      _stopModernTrafficMonitoring();
+      // The TUN must also stop if its upstream SOCKS process disappears.
+      _modernTunnel.stop().catchError((Object _) {});
+      if (!mounted) return;
+      setState(() {
+        _modernUp = false;
+        _vpnError = 'XRAY_PROCESS_EXITED';
         _publicIp = null;
       });
     },
@@ -492,7 +509,9 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       if (!mounted || !_modernUp || _vpnBusy || _modernHealthBusy) return;
       _modernHealthBusy = true;
       try {
-        final healthy = _modernProtocol == 'cisco'
+        final healthy = _modernProtocol == 'v2ray' && !_xrayProxy.isRunning
+            ? false
+            : _modernProtocol == 'cisco'
             ? await _ciscoTunnel.checkHealth()
             : _modernProtocol == 'openvpn'
                 ? await _openVpnTunnel.checkHealth()
@@ -979,6 +998,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       } else if (_modernTunnel.isRunning) {
         await _modernTunnel.stop();
       }
+      if (_xrayProxy.isRunning) await _xrayProxy.stop();
       if (!mounted) return;
       setState(() {
         _modernUp = false;
@@ -1040,6 +1060,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           await _startOpenVpnTunnel(nodes[index].id);
         } else if (_filter == 'l2tp') {
           await _startL2tpTunnel(nodes[index].id);
+        } else if (_filter == 'v2ray') {
+          await _startXrayTunnel(nodes[index].id);
         } else if (SingBoxProfileValidator.supportsFamily(_filter)) {
           await _startModernTunnel(_filter, nodes[index].id);
         }
@@ -1161,6 +1183,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     _modernHealthTimer?.cancel();
     _stopModernTrafficMonitoring();
     _modernTunnel.dispose();
+    _xrayProxy.dispose();
     _resetNetworkStats();
     super.dispose();
   }
@@ -1284,7 +1307,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
 
   Future<void> _toggleVpn() async {
     if (_vpnBusy || !Platform.isWindows) return;
-    if (_modernUp || _modernTunnel.isRunning ||
+    if (_modernUp || _modernTunnel.isRunning || _xrayProxy.isRunning ||
         _ciscoTunnel.isRunning || _openVpnTunnel.hasChild ||
         _l2tpTunnel.hasChild) {
       await _stopModernTunnel();
@@ -1310,6 +1333,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         await _startOpenVpnTunnel(_selectedServerId!);
       } else if (_filter == 'l2tp') {
         await _startL2tpTunnel(_selectedServerId!);
+      } else if (_filter == 'v2ray') {
+        await _startXrayTunnel(_selectedServerId!);
       } else if (SingBoxProfileValidator.supportsFamily(_filter)) {
         await _startModernTunnel(_filter, _selectedServerId!);
       } else {
