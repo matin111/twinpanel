@@ -359,7 +359,7 @@ def install() -> None:
   }
 """
         cpp = cpp.replace(on_create_marker,
-            on_create_marker + "\\n" + native_shell, 1)
+            on_create_marker + "\n" + native_shell, 1)
 
     # Request elevation through the MSVC linker-generated manifest. Do not
     # insert trustInfo directly into runner.exe.manifest: the linker also
