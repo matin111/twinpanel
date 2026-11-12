@@ -36,7 +36,8 @@ void main() {
     final ui = File('lib/live_dashboard.dart').readAsStringSync();
     expect(ui, contains('xrayRtt_'));
     expect(ui, contains('probeXray_'));
-    expect(ui, contains(r'TCP ${_xrayInboundRtts['));
+    expect(ui, contains('ServerLatency.label('));
+    expect(ui, contains('ServerLatency.color('));
     expect(ui, contains('Inbound TCP handshake time'));
     expect(ui, contains('_probeAllXrayInbounds'));
   });
