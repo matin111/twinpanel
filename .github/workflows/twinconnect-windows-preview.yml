@@ -64,6 +64,22 @@ jobs:
             throw "Tenant directory contract invalid or panel registration missing"
           }
           Write-Host "Verified HTTPS directory and registered panel namespace"
+      - name: Verify real TwinConnect dashboard redesign is present
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $dashboard = Get-Content -LiteralPath 'lib/live_dashboard.dart' -Raw
+          foreach ($marker in @('TunnelTrafficChart(', 'liveHomeDataProgress',
+              'liveConnectionControlsButton', 'Connect now',
+              'BackdropFilter(', 'liveHomeExpiryChip')) {
+            if (!$dashboard.Contains($marker)) {
+              throw "Operational dashboard update missing from this checkout: $marker"
+            }
+          }
+          if (!(Test-Path 'lib/tunnel_traffic_chart.dart')) {
+            throw 'Real native tunnel traffic chart source missing'
+          }
+          Write-Host "Verified operational TwinConnect UI redesign in commit $env:GITHUB_SHA"
       - name: Build Windows x64 standalone directory
         shell: pwsh
         run: flutter build windows --release "--dart-define=TWINCONNECT_DIRECTORY_URL=$env:TWINCONNECT_DIRECTORY_URL"
@@ -210,6 +226,13 @@ jobs:
           - The Dev Dashboard artifact remains entirely offline.
           - Do not deploy these experimental binaries to customers yet.
           '@ | Set-Content -Path (Join-Path $release "README-TEST.txt") -Encoding UTF8
+          @(
+            'TwinConnect real operational Windows client (not the Dev dashboard)',
+            "Source commit: $env:GITHUB_SHA",
+            "Workflow run: $env:GITHUB_RUN_ID",
+            'Check this file when replacing an older installed TwinConnect.',
+            'This is an internal test build. Do not distribute to customers.'
+          ) | Set-Content -Path (Join-Path $release 'BUILD-SOURCE.txt') -Encoding UTF8
           $zip = Join-Path (Get-Location) "TwinConnect-Windows-Preview.zip"
           if (Test-Path $zip) { Remove-Item $zip -Force }
           Compress-Archive -Path (Join-Path $release "*") -DestinationPath $zip -CompressionLevel Optimal
