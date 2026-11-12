@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.788",
-  "source_sha": "2598672c827822ce1f83b7ee29927bdccdd153e8",
+  "version": "1.1.0-rc.789",
+  "source_sha": "fe3e519bd1581ed3a47637738df53d4b98b33d40",
   "notes": {
-    "fa": "نسخه یکپارچه rc.788 شامل پیش‌نمایش تبلتی ۴:۳ تمام‌عرض و رفع برش آن در استودیوی برند TwinConnect، همراه اصلاحات جدید داشبورد منابع سرورها و تغییرات جاری پنل. بدون تغییر عمدی در کانفیگ‌های VPN.",
-    "en": "Integrated rc.788 release: full-width 4:3 tablet brand studio preview clipping fix, new server resource dashboard changes and current mainline fixes, without intentional changes to existing VPN configurations."
+    "fa": "قرارگیری پیش‌نمایش تبلتی ۴:۳ اپ کنار تنظیمات رنگ و ظاهر در استودیوی برند روی دسکتاپ؛ نمایش عمودی فقط در صفحه‌های باریک. با حفظ تنظیمات نماینده‌ها و کانفیگ‌های VPN.",
+    "en": "Show the 4:3 tablet app preview beside the brand appearance editor on desktop, and stack on narrow screens. Keep reseller settings and VPN configurations untouched."
   }
 }
