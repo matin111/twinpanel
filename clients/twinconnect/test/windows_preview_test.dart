@@ -57,11 +57,7 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(const TwinConnectApp());
     await tester.pumpAndSettle();
-    await tester.drag(find.byType(ListView).first, const Offset(0, -260));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('windowsDemoButton')));
-    await tester.pumpAndSettle();
-
+    expect(find.byKey(const Key('referenceDesktopShell')), findsOneWidget);
     await tester.tap(find.byKey(const Key('referenceNav3')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('referenceLoginAction')));
