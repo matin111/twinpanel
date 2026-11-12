@@ -1137,16 +1137,19 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         protocol: VpnProtocols.byCode('sudoku')!,
         native: const NativeProtocolReadiness(supportedCodes: {'sudoku'}),
       );
-      final matches = profiles.items
-          .where((item) => item['node_id']?.toString() == serverId)
-          .toList(growable: false);
-      if (matches.length != 1) {
+      final profile = SudokuClientProfile.resolveDeliveredProfile(
+        requestedNodeId: serverId,
+        items: profiles.items,
+        inventory: widget.servers,
+      );
+      if (profile == null) {
         throw const FormatException('SUDOKU_SERVER_PROFILE_MISSING');
       }
-      final profile = SudokuClientProfile.fromItem(matches.single, serverId);
-      if (profile == null) {
-        throw const FormatException('SUDOKU_PROFILE_NOT_READY');
-      }
+      // An old displayed Exit can lack a central Sudoku identity while a
+      // verified same-country Exit is deliverable. Report the actual node.
+      final resolvedServerId = profile.nodeId;
+      final fallbackIndex = widget.servers?.servers.indexWhere(
+          (server) => server.id == resolvedServerId) ?? -1;
       // Delivery and native engine validation happen BEFORE touching a
       // running VPN. Never leave two active TUN devices or core processes.
       if (_modernTunnel.isRunning) await _modernTunnel.stop();
@@ -1197,7 +1200,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       }
       final ip = await _modernTunnel.start(
         protocol: 'sudoku',
-        serverId: serverId,
+        serverId: resolvedServerId,
         profile: const <String, dynamic>{},
         sudokuSocksPort: socksPort,
         sudokuVerifiedExitIp: verifiedExit,
@@ -1208,7 +1211,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       setState(() {
         _modernUp = true;
         _modernProtocol = 'sudoku';
-        _modernNodeId = serverId;
+        _modernNodeId = resolvedServerId;
+        if (fallbackIndex >= 0) _selected = fallbackIndex;
         _publicIp = ip;
         _vpnError = null;
       });
