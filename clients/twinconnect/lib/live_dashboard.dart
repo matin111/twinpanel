@@ -1743,16 +1743,15 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
             tooltip: tr('پشتیبانی و پیوندها', 'Support and links'),
             icon: Icon(Icons.open_in_new_rounded, color: purple),
             onSelected: (value) {
-              switch (value) {
-                case 'support':
-                  _openTenantLink(widget.brand.telegramUrl,
-                      tr('پشتیبانی', 'Support'));
-                case 'renewal':
-                  _openTenantLink(widget.brand.renewalUrl,
-                      tr('تمدید', 'Renew'));
-                case 'website':
-                  _openTenantLink(widget.brand.websiteUrl,
-                      tr('سایت', 'Website'));
+              if (value == 'support') {
+                _openTenantLink(widget.brand.telegramUrl,
+                    tr('پشتیبانی', 'Support'));
+              } else if (value == 'renewal') {
+                _openTenantLink(widget.brand.renewalUrl,
+                    tr('تمدید', 'Renew'));
+              } else if (value == 'website') {
+                _openTenantLink(widget.brand.websiteUrl,
+                    tr('سایت', 'Website'));
               }
             },
             itemBuilder: (_) => [
