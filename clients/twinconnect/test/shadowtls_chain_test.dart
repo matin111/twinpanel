@@ -73,8 +73,11 @@ void main() {
     ss['detour'] = 'direct';
     expect(() => ShadowTlsChain.fromItem(changed()), throwsFormatException);
     ss['detour'] = 'outer-tls';
+    // Preserve the actual panel trust policy instead of silently changing
+    // it. Legacy delivery may have insecure=true pending certificate repair.
     tls['tls']['insecure'] = true;
-    expect(() => ShadowTlsChain.fromItem(changed()), throwsFormatException);
+    expect((ShadowTlsChain.fromItem(changed()).transport['tls'] as Map)
+        ['insecure'], isTrue);
     tls['tls'].remove('insecure');
     tls['detour'] = 'direct';
     expect(() => ShadowTlsChain.fromItem(changed()), throwsFormatException);
