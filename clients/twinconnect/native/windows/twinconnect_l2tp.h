@@ -133,6 +133,9 @@ inline void DialWorker(std::wstring entry, std::wstring host,
                          RASEO_RequireMsCHAP2;
   settings.dwfOptions2 = RASEO2_UsePreSharedKey;
   settings.dwFramingProtocol = RASFP_Ppp;
+  // Required for IPv4 IPCP negotiation. Leaving this field at zero creates
+  // a VPN entry with no PPP network protocol and causes RAS error 720.
+  settings.dwfNetProtocols = RASNP_Ip;
   settings.dwType = RASET_Vpn;
   settings.dwVpnStrategy = VS_L2tpOnly;
   if (!Copy(settings.szLocalPhoneNumber, host)) {
