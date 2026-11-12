@@ -717,57 +717,7 @@ async def _cisco(db: Session, node: Node, sub: Subscription, user: User, usernam
     try:
         encoded = base64.b64encode((password + "\n" + password + "\n").encode()).decode()
         await cmd(conn, f"printf '%s' {shlex.quote(encoded)} | base64 -d | ocpasswd -c /etc/ocserv/ocpasswd {shlex.quote(username)}")
-        host, port = _tunnel_access_endpoint(
-            db,
-            node,
-            "cisco",
-        )
-        # Read the certificate locally over the authenticated management SSH
-        # connection, never via the untrusted public TLS handshake.
-        # A missing/unreadable certificate does not break provisioning.
-        cert_pin = None
-        try:
-            fingerprint = await cmd(conn, """python3 - <<'PY'
-import pathlib, re, subprocess
-cfg = pathlib.Path('/etc/ocserv/ocserv.conf')
-if cfg.is_file():
-    for line in cfg.read_text(errors='replace').splitlines():
-        m = re.match(r'^\\s*server-cert\\s*=\\s*(\\S+)\\s*
-            "node": node.name,
-            "server": host,
-            "server_ip": host,
-            "port": port,
-            "username": username,
-            "password": password,
-        }
-        if cert_pin:
-            result["servercert"] = cert_pin
-        return result
-    finally:
-        conn.close(); await conn.wait_closed()
-, line)
-        if not m:
-            continue
-        cert = pathlib.Path(m.group(1))
-        if cert.is_file():
-            p = subprocess.run(
-                ['openssl', 'x509', '-in', str(cert), '-noout',
-                 '-fingerprint', '-sha256'],
-                capture_output=True, text=True, timeout=5, check=False)
-            if p.returncode == 0:
-                print(p.stdout.strip())
-        break
-PY""", timeout=12, check=False)
-            match = re.search(
-                r"sha256 Fingerprint=([0-9A-Fa-f:]{95})",
-                fingerprint, re.IGNORECASE,
-            )
-            if match:
-                hex_pin = match.group(1).replace(":", "").lower()
-                if re.fullmatch(r"[0-9a-f]{64}", hex_pin):
-                    cert_pin = "sha256:" + hex_pin
-        except Exception:
-            pass
+        host, port = _tunnel_access_endpoint(db, node, "cisco")
         result = {
             "node_id": node.id,
             "node": node.name,
@@ -777,9 +727,39 @@ PY""", timeout=12, check=False)
             "username": username,
             "password": password,
         }
+        # The authenticated management SSH connection is the source of trust,
+        # not an unverified public TLS connection.
+        try:
+            fingerprint = await cmd(conn, """python3 - <<'PY'
+import pathlib, re, subprocess
+config = pathlib.Path('/etc/ocserv/ocserv.conf')
+if config.is_file():
+    for line in config.read_text(errors='replace').splitlines():
+        match = re.match(r'^\s*server-cert\s*=\s*(\S+)\s*$', line)
+        if match:
+            cert = pathlib.Path(match.group(1))
+            if cert.is_file():
+                process = subprocess.run(
+                    ['openssl', 'x509', '-in', str(cert), '-noout',
+                     '-fingerprint', '-sha256'],
+                    capture_output=True, text=True, timeout=5, check=False,
+                )
+                if process.returncode == 0:
+                    print(process.stdout.strip())
+            break
+PY""", timeout=12, check=False)
+            match = re.search(r"sha256 Fingerprint=([0-9a-fA-F:]{95})",
+                              fingerprint, re.IGNORECASE)
+            if match:
+                value = match.group(1).replace(":", "").lower()
+                if re.fullmatch(r"[0-9a-f]{64}", value):
+                    result["servercert"] = "sha256:" + value
+        except Exception:
+            # An unknown fingerprint stays untrusted; never invent a pin.
+            pass
+        return result
     finally:
         conn.close(); await conn.wait_closed()
-
 
 # TWINPANEL_L2TP_IRAN_ENTRY_V1
 def _l2tp_tunnel_access_host(
