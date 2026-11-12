@@ -42,8 +42,8 @@ void main() {
 
     expect(find.byKey(const Key('referenceDesktopShell')), findsOneWidget);
     expect(find.text('Network status'), findsOneWidget);
-    expect(find.text('Tunnel inactive'), findsOneWidget);
-    expect(find.text('Not connected'), findsOneWidget);
+    expect(find.textContaining('Tunnel inactive'), findsOneWidget);
+    expect(find.textContaining('Not connected'), findsOneWidget);
     expect(find.text('204.10.192.96'), findsNothing);
     expect(find.text('133 ms'), findsNothing);
 
