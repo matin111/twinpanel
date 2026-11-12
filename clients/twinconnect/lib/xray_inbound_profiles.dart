@@ -21,18 +21,29 @@ class XrayInboundProfile {
 
   static XrayInboundProfile? tryParse(
       Map<String, dynamic> row, String serverId) {
-    final id = row['id'];
     final raw = row['uri'];
-    if (id is! String || raw is! String ||
-        !supported.containsKey(id) || serverId.isEmpty) {
-      return null;
-    }
+    if (raw is! String || serverId.isEmpty) return null;
     final uri = Uri.tryParse(raw);
     if (uri == null || uri.scheme != 'vless' ||
         uri.userInfo.isEmpty || uri.host.isEmpty ||
         !uri.hasPort || uri.port < 1 || uri.port > 65535) {
       return null;
     }
+    // A legacy feed can omit profile.id while still delivering a valid
+    // VLESS URI. Derive identity ONLY from that URI's actual transport and
+    // security. Never change or manufacture its endpoint or path.
+    final transport = uri.queryParameters['type'];
+    final security = uri.queryParameters['security'];
+    final inferred = supported.entries
+        .where((entry) => entry.value.$1 == transport &&
+            entry.value.$2 == security)
+        .map((entry) => entry.key)
+        .toList(growable: false);
+    final declaredId = row['id'];
+    final id = declaredId == null || declaredId == ''
+        ? (inferred.length == 1 ? inferred.single : null)
+        : declaredId;
+    if (id is! String || !supported.containsKey(id)) return null;
     final expected = supported[id]!;
     if (uri.queryParameters['type'] != expected.$1 ||
         uri.queryParameters['security'] != expected.$2 ||
