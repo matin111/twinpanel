@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.795",
-  "source_sha": "e829ffdd6eaa83d21c78b1babbb23e4597be28ac",
+  "version": "1.1.0-rc.796",
+  "source_sha": "d203bebd0404798d6b3862275375d84be19462c6",
   "notes": {
-    "fa": "افزودن کارت ورود امن TwinConnect داخل خود صفحه Connection اشتراک؛ پشتیبانی از احراز هویت مستقیم و دومرحله‌ای روی دامنه اشتراک، نمایش و کپی نام کاربری و رمز اپ برای صاحب مجاز، حفظ QR و کانفیگ و حساب VPN. تکمیل دسترسی ورود اپ برای نمایندگان و مشتریان.",
-    "en": "Add authenticated TwinConnect app login card directly to subscription Connection page, with same-origin login and 2FA, scoped credential display and copy, without changing public QR, VPN secrets or subscription configs. Complete reseller and customer app delivery entry points."
+    "fa": "رفع خطای اسکریپت دکمه نمایش اطلاعات ورود TwinConnect در صفحه واقعی Connection و تأیید صحت JavaScript تولیدشده؛ حذف کادر تکراری و دریافت خودکار اطلاعات اپ از پنجره ساب‌لینک ادمین و نماینده و کاربر. حفظ دکمه مستقل ورود اپ و QR و تنظیمات VPN.",
+    "en": "Fix generated JavaScript syntax so TwinConnect app login opens on the actual Connection page. Remove redundant app credentials from the panel's QR/link modal. Preserve standalone reseller/admin app access, public QR and VPN configurations."
   }
 }
