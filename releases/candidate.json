@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.794",
-  "source_sha": "8dc063796d85ff18bdfd2b6e3e330f51c62c4ad3",
+  "version": "1.1.0-rc.795",
+  "source_sha": "e829ffdd6eaa83d21c78b1babbb23e4597be28ac",
   "notes": {
-    "fa": "اصلاح کامل لایت‌مود صفحه اشتراک‌ها، کارت‌های کاربران و تنظیمات برند اپ TwinConnect؛ رنگ روشن واقعی کارت‌ها، متن‌های خوانا، کنتراست مناسب اعداد و دکمه‌ها، تم روشن فرم‌ها، تب‌ها و بارگذاری لوگو. حفظ دارک‌مود و رنگ‌های اختصاصی پیش‌نمایش خود اپ. حفاظت از این اصلاحات در سورس و فایل‌های نهایی آپدیت. بدون تغییر اطلاعات کاربران، اشتراک‌ها، کیف پول و تنظیمات VPN.",
-    "en": "Fix unreadable hardcoded dark subscription and user cards under panel light theme; restore high-contrast labels, badges, usage, contact/count panels and actions. Correct Brand Studio tabs, fields, upload and save button contrast while preserving each app preview's independent chosen colors. Dark mode unchanged; release source and compiled bundle parity protected, no VPN/customer/payment changes."
+    "fa": "افزودن کارت ورود امن TwinConnect داخل خود صفحه Connection اشتراک؛ پشتیبانی از احراز هویت مستقیم و دومرحله‌ای روی دامنه اشتراک، نمایش و کپی نام کاربری و رمز اپ برای صاحب مجاز، حفظ QR و کانفیگ و حساب VPN. تکمیل دسترسی ورود اپ برای نمایندگان و مشتریان.",
+    "en": "Add authenticated TwinConnect app login card directly to subscription Connection page, with same-origin login and 2FA, scoped credential display and copy, without changing public QR, VPN secrets or subscription configs. Complete reseller and customer app delivery entry points."
   }
 }
