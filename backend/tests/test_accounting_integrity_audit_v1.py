@@ -41,6 +41,33 @@ class AccountingIntegrityAuditTests(TestCase):
         self.assertEqual(by["cisco"]["reliability"],"positive_attributed_ledger_evidence")
         self.assertEqual(by["shadowtls"]["reliability"],"per_user_attribution_unavailable")
 
+    def test_zero_only_source_and_stale_sessions_are_exposed_not_counted_as_online(self):
+        result=audit.build_report(
+            {"trusttunnel":{"active_credentials":1200}},
+            {"trusttunnel":{"event_count":200000,"positive_count":0,
+                            "zero_count":200000,"accepted_bytes":0,"billable_bytes":0}},
+            {"trusttunnel":1200},
+            {"trusttunnel":{"recent":0,"stale":6}},
+        )
+        row=next(x for x in result["protocols"]
+                 if x["protocol"]=="trusttunnel")
+        self.assertEqual(row["recent_zero_byte_events"],200000)
+        self.assertEqual(row["recent_authenticated_session_rows"],0)
+        self.assertEqual(row["stale_open_session_rows"],6)
+        self.assertIsNone(row["last_positive_event_utc"])
+        self.assertEqual(row["reliability"],"only_zero_byte_events_verify_at_source")
+
+    def test_canonical_cisco_online_session_joins_openconnect_ledger(self):
+        result=audit.build_report({},{"openconnect":{
+            "event_count":4,"positive_count":2,"zero_count":2,
+            "accepted_bytes":1024,"billable_bytes":1024,
+            "last_positive_event":"2026-11-12 12:00:00"}},
+            {"cisco":1},{"openconnect":{"recent":1,"stale":2}})
+        row=next(x for x in result["protocols"] if x["protocol"]=="cisco")
+        self.assertEqual(row["recent_authenticated_session_rows"],1)
+        self.assertEqual(row["stale_open_session_rows"],2)
+        self.assertEqual(row["last_positive_event_utc"],"2026-11-12 12:00:00")
+
     def test_negative_counters_are_flagged_not_clamped(self):
         result=audit.build_report({},{"wireguard":{"event_count":4,"positive_count":2,
           "invalid_count":1,"accepted_bytes":100,"billable_bytes":100}},
