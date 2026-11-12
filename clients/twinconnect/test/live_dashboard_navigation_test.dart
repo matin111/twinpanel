@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:twinconnect/live_dashboard.dart';
+import 'package:twinconnect/account_snapshot.dart';
 import 'package:twinconnect/protocols.dart';
 import 'package:twinconnect/server_inventory.dart';
 import 'package:twinconnect/tenant_models.dart';
@@ -17,6 +18,68 @@ void main() {
       'twinconnect_ui_language_v1': 'en',
       'twinconnect_ui_dark_v1': true,
     });
+  });
+
+  testWidgets('original connection page shows authenticated quota and expiration',
+      (tester) async {
+    tester.view.physicalSize = const Size(1536, 1024);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    var refreshes = 0;
+    final expiry = DateTime.now().toUtc().add(const Duration(days: 10));
+    await tester.pumpWidget(MaterialApp(
+      home: TwinConnectLiveDashboard(
+        panel: PanelDirectoryEntry(
+          namespace: WindowsPreviewFixture.namespace,
+          apiOrigin: Uri.parse('https://panel.example.org'),
+        ),
+        username: 'real-account-test',
+        brand: const BrandPreview(
+          namespace: WindowsPreviewFixture.namespace,
+          brandName: 'Test Reseller',
+          ownerType: 'admin',
+          accountStatus: 'active',
+          appUsernamePrefix: '',
+        ),
+        sessionToken: List.filled(64, 'a').join(),
+        catalog: WindowsPreviewFixture.protocolCatalog(),
+        servers: const AppServerInventory(
+          namespace: WindowsPreviewFixture.namespace,
+          servers: [],
+        ),
+        native: const NativeProtocolReadiness(supportedCodes: {}),
+        onRefresh: () {},
+        plan: null,
+        accountStatus: 'active',
+        account: AppAccountSnapshot(
+          namespace: WindowsPreviewFixture.namespace,
+          trafficLimitBytes: 20 * 1024 * 1024 * 1024,
+          trafficUsedBytes: 5 * 1024 * 1024 * 1024,
+          expiresAt: expiry,
+          activationDurationDays: null,
+          status: 'active',
+        ),
+        onLogout: () {},
+        onRefreshAccount: () { refreshes++; },
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 700));
+    expect(find.byKey(const Key('liveHomeSubscriptionSummary')),
+      findsOneWidget);
+    expect(find.text('5.00 GB'), findsWidgets);
+    expect(find.text('15.00 GB'), findsWidgets);
+    expect(find.text('20.00 GB'), findsWidgets);
+    expect(find.text('Expiry date'), findsOneWidget);
+    expect(find.textContaining('days'), findsWidgets);
+    await tester.ensureVisible(find.byKey(const Key('liveHomeRefreshAccount')));
+    await tester.tap(find.byKey(const Key('liveHomeRefreshAccount')));
+    expect(refreshes, 1);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(seconds: 30));
   });
 
   testWidgets('Quick Connect remains navigable from other pages',
