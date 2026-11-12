@@ -31,3 +31,62 @@
 .inlinePreview{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:12px;border:1px solid #7183b454;border-radius:12px;background:#101b33}
 .inlinePreview img{height:110px;max-width:180px;object-fit:cover;border-radius:9px;border:1px solid #8194c466}
 .inlinePreview b{color:#c3ccea;font-size:12px}
+
+
+/* Blog manager theme tokens: scope all colors to this component. */
+.layout{
+  --blog-panel:var(--surface,#17213b);
+  --blog-field:#0b1227;
+  --blog-field-text:#eef1ff;
+  --blog-field-placeholder:#9daac8;
+  --blog-muted:#aab7d4;
+  --blog-toolbar:#111c33;
+  --blog-toolbar-button:#29244b;
+  --blog-toolbar-button-text:#eee7ff;
+  --blog-preview:#0f182d;
+  --blog-inline:#101b33;
+  --blog-divider:#7785b34d;
+  --blog-entry-border:#7785b33a;
+  --blog-entry-active:#6e54ca33;
+  --blog-title:var(--text,#eef1ff);
+}
+.sidebar,.editor{background:var(--blog-panel);border-color:var(--blog-divider);color:var(--blog-title)}
+.entry,.activeEntry{border-color:var(--blog-entry-border);color:var(--blog-title)}
+.activeEntry{background:var(--blog-entry-active);border-color:var(--purple,#a38cff)}
+.entry small,.activeEntry small,.caption,.note{color:var(--blog-muted)}
+.editor input:not([type=checkbox]),.editor textarea{
+  background:var(--blog-field);
+  color:var(--blog-field-text);
+  border-color:var(--blog-divider);
+}
+.editor input:not([type=checkbox])::placeholder,.editor textarea::placeholder{color:var(--blog-field-placeholder);opacity:1}
+.editor input:focus-visible,.editor textarea:focus-visible{outline:2px solid var(--purple,#8e75ff);outline-offset:1px}
+.imageToolbar{background:var(--blog-toolbar);border-color:var(--blog-divider)}
+.imageToolbar button{background:var(--blog-toolbar-button);color:var(--blog-toolbar-button-text)}
+.imageToolbar small{color:var(--blog-muted)}
+.coverPreview{background:var(--blog-preview);border-color:var(--blog-divider)}
+.inlinePreview{background:var(--blog-inline);border-color:var(--blog-divider)}
+.inlinePreview b{color:var(--blog-title)}
+:global(html[data-theme="light"]) .layout{
+  --blog-panel:#fff;
+  --blog-field:#fff;
+  --blog-field-text:#263349;
+  --blog-field-placeholder:#7b879b;
+  --blog-muted:#59677d;
+  --blog-toolbar:#f7f8fd;
+  --blog-toolbar-button:#f0ebff;
+  --blog-toolbar-button-text:#4d328f;
+  --blog-preview:#f8faff;
+  --blog-inline:#f8faff;
+  --blog-divider:#d9e0eb;
+  --blog-entry-border:#dce3ed;
+  --blog-entry-active:#f1edff;
+  --blog-title:#202c40;
+  color-scheme:light;
+}
+:global(html[data-theme="light"]) .sidebar,
+:global(html[data-theme="light"]) .editor{box-shadow:0 8px 26px rgba(21,37,68,.045)}
+:global(html[data-theme="light"]) .entry:hover{background:#f6f7fc}
+:global(html[data-theme="light"]) .activeEntry{border-color:#b6a5ee}
+:global(html[data-theme="light"]) .imageToolbar button{border-color:#d6c9f4}
+:global(html[data-theme="light"]) .coverPreview button{color:#9f3253;background:#fff0f4;border-color:#f3bed0}
