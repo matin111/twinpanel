@@ -10,7 +10,18 @@ void main() {
 
     expect(ui, contains('_startSudokuTunnel('));
     expect(ui, contains('WindowsSudokuProxy.enginePresent()'));
-    expect(ui, contains('SudokuClientProfile.fromItem('));
+    // The profile resolver validates delivered Sudoku identities and may
+    // choose a verified same-country node when a legacy node has no profile.
+    expect(ui, contains('SudokuClientProfile.resolveDeliveredProfile('));
+    expect(ui, contains('requestedNodeId: serverId'));
+    expect(ui, contains('inventory: widget.servers'));
+    expect(ui, contains('serverId: resolvedServerId'));
+    expect(ui, contains('_modernNodeId = resolvedServerId'));
+    final resolver = File('lib/sudoku_client_profile.dart').readAsStringSync();
+    expect(resolver, contains('fromItem(matches.single, candidate.id)'));
+    expect(resolver, contains('server.nodeOnline'));
+    expect(resolver, contains('server.countryCode.toUpperCase()'));
+    expect(resolver, contains('requested!.countryCode.toUpperCase()'));
     expect(ui, contains("protocol: 'sudoku'"));
     expect(ui, contains('sudokuSocksPort: socksPort'));
     expect(ui, contains('sudokuVerifiedExitIp: verifiedExit'));
