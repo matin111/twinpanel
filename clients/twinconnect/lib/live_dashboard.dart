@@ -2640,6 +2640,9 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
               'SUDOKU_PROCESS_GUARD_UNAVAILABLE' => tr(
                 'محافظ پردازش سودوکو در ویندوز فعال نشد؛ اتصال برای امنیت متوقف شد.',
                 'The native Sudoku process guard failed; connection was stopped.'),
+              String status when status.startsWith('SUDOKU_CORE_EXIT_CODE_') => tr(
+                'موتور سودوکو متوقف شد (کد خروج 0x${status.substring('SUDOKU_CORE_EXIT_CODE_'.length)})؛ تونل به‌صورت امن قطع شد.',
+                'Sudoku exited with Windows code 0x${status.substring('SUDOKU_CORE_EXIT_CODE_'.length)}; the tunnel was closed safely.'),
               'SUDOKU_CORE_EXITED' => tr(
                 'موتور سودوکو متوقف شد؛ تونل نیز برای جلوگیری از نشتی قطع شد.',
                 'The Sudoku core stopped; the VPN tunnel was closed safely.'),
