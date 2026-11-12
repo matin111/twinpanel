@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:country_flags/country_flags.dart' as iso_flags;
 
 /// Vector flags rendered by Flutter itself. Windows does not consistently
 /// support Unicode regional-indicator flag emojis, which can show as DE/NL/etc.
@@ -9,19 +10,46 @@ class CountryFlag extends StatelessWidget {
   final String countryCode;
   final double width;
 
+  /// Normalize legacy panel aliases, not geographic guesses from IPs.
+  /// All other standard ISO 3166-1 codes are handled by bundled SVG assets.
+  static String normalizedCode(String raw) {
+    final code = raw.trim().toUpperCase();
+    return switch (code) {
+      'UK' => 'GB',
+      'EL' => 'GR',
+      'USA' => 'US',
+      'UAE' => 'AE',
+      'KSA' => 'SA',
+      _ => code,
+    };
+  }
+
   @override
   Widget build(BuildContext context) {
-    final code = countryCode.trim().toUpperCase();
+    final rawCode = countryCode.trim().toUpperCase();
+    final code = normalizedCode(rawCode);
+    // The bundled country_flags package contains an offline SVG catalogue
+    // (including HK, JP, UAE, CA, etc.). Windows flag emoji fonts and
+    // network-hosted PNGs are not required. Unknown/malformed codes alone
+    // retain the previous neutral fallback instead of inventing a flag.
+    final validFlag = iso_flags.FlagCode.fromCountryCode(code) != null;
     return Semantics(
       label: 'Country flag $code',
       image: true,
       child: SizedBox(
+        key: Key('countryFlag_$rawCode'),
         width: width,
         height: width * 2 / 3,
-        child: CustomPaint(
-          key: Key('countryFlag_$code'),
-          painter: _FlagPainter(code),
-        ),
+        child: validFlag
+            ? iso_flags.CountryFlag.fromCountryCode(
+                code,
+                theme: iso_flags.ImageTheme(
+                  width: width,
+                  height: width * 2 / 3,
+                  shape: iso_flags.RoundedRectangle(width * .13),
+                ),
+              )
+            : CustomPaint(painter: _FlagPainter(code)),
       ),
     );
   }
