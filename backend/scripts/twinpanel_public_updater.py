@@ -367,6 +367,25 @@ def install_node_auto_backfill_timer(release: Path) -> None:
     run(["systemctl", "enable", "--now", "twinpanel-node-auto-backfill.timer"], timeout=20)
 
 
+def install_cisco_cert_pin_timer(release: Path) -> None:
+    """Install trusted Cisco identity sync from the verified current release.
+
+    Older releases may not carry it; account credentials and node configs are
+    left intact. The timer only reads verified certificate identities via SSH.
+    """
+    names = ("twinpanel-cisco-pin-sync.service", "twinpanel-cisco-pin-sync.timer")
+    for name in names:
+        source = release / "deploy/systemd" / name
+        if not source.is_file():
+            return
+        target = Path("/etc/systemd/system") / name
+        if not same_file(source, target):
+            shutil.copyfile(source, target)
+            target.chmod(0o644)
+    run(["systemctl", "daemon-reload"], timeout=20)
+    run(["systemctl", "enable", "--now", "twinpanel-cisco-pin-sync.timer"], timeout=20)
+
+
 def health_ok(url: str, expected_version: str) -> bool:
     try:
         req = urllib.request.Request(url, headers={'User-Agent': 'TwinPanel-Update-Health/3'})
@@ -936,6 +955,7 @@ def main() -> int:
         if not health_ok_all:
             raise RuntimeError('POST_UPDATE_HEALTH_VERSION_FAILED:' + ','.join(pending))
         install_node_auto_backfill_timer(final)
+        install_cisco_cert_pin_timer(final)
     except Exception:
         save(
             state='rollback',
