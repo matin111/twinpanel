@@ -18,6 +18,8 @@ import 'singbox_windows_config.dart';
 import 'windows_singbox_tunnel.dart';
 import 'windows_openconnect_tunnel.dart';
 import 'windows_openvpn_tunnel.dart';
+import 'windows_l2tp_tunnel.dart';
+import 'l2tp_profile.dart';
 import 'openvpn_profile_validator.dart';
 import 'cisco_openconnect_profile.dart';
 import 'connection_bootstrap.dart';
@@ -100,6 +102,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   );
   final WindowsOpenConnectTunnel _ciscoTunnel = WindowsOpenConnectTunnel();
   final WindowsOpenVpnTunnel _openVpnTunnel = WindowsOpenVpnTunnel();
+  final WindowsL2tpTunnel _l2tpTunnel = WindowsL2tpTunnel();
   bool _modernUp = false;
   Timer? _modernHealthTimer;
   Timer? _modernTrafficTimer;
@@ -708,6 +711,100 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         setState(() {
           _modernUp = (_openVpnTunnel.isRunning &&
                   _openVpnTunnel.exitIp != null) ||
+              _ciscoTunnel.isRunning || _modernTunnel.isRunning;
+          if (!_modernUp) {
+            _modernProtocol = null;
+            _modernNodeId = null;
+            _publicIp = null;
+          }
+          _vpnError = _errorText(error);
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _vpnBusy = false);
+    }
+  }
+
+  Future<void> _startL2tpTunnel(String serverId) async {
+    if (_vpnBusy) return;
+    setState(() { _vpnBusy = true; _vpnError = null; });
+    try {
+      if (_vpnUnmanaged) {
+        throw const FormatException('UNMANAGED_WIREGUARD_SERVICE');
+      }
+      final authorized = widget.catalog?.entries.any((entry) =>
+          entry.protocol.code == 'l2tp' && entry.selected &&
+          entry.configRecordPresent) ?? false;
+      if (!authorized) {
+        throw const FormatException('PROTOCOL_NOT_INCLUDED_IN_SUBSCRIPTION');
+      }
+      final definition = VpnProtocols.byCode('l2tp')!;
+      final profiles = await TenantApi.fromBuildConfig().loadSessionNativeProfiles(
+        panel: widget.panel, sessionToken: widget.sessionToken,
+        protocol: definition,
+        native: const NativeProtocolReadiness(supportedCodes: {'l2tp'}),
+      );
+      final matches = profiles.items.where((item) =>
+          item['node_id']?.toString() == serverId).toList(growable: false);
+      if (matches.length != 1) {
+        throw const FormatException('L2TP_SERVER_PROFILE_MISSING');
+      }
+      // Validate the replacement credentials before disconnecting any VPN.
+      final target = L2tpProfile.fromItem(matches.single);
+      if (_vpnUp || _vpnCleanup) {
+        await _vpn.stop().timeout(const Duration(seconds: 20));
+        final stopped = await _vpn.status().timeout(
+            const Duration(seconds: 10));
+        if (stopped['state'] != 'down') {
+          throw const FormatException('PREVIOUS_TUNNEL_NOT_STOPPED');
+        }
+        if (!mounted) return;
+        setState(() {
+          _vpnUp = false;
+          _vpnVerified = false;
+          _vpnCleanup = false;
+          _activeNodeId = null;
+          _vpnRx = 0;
+          _vpnTx = 0;
+          _resetNetworkStats();
+        });
+      }
+      if (_modernTunnel.isRunning || _ciscoTunnel.isRunning ||
+          _openVpnTunnel.isRunning) {
+        _modernHealthTimer?.cancel();
+        _stopModernTrafficMonitoring();
+        if (_ciscoTunnel.isRunning) {
+          await _ciscoTunnel.stop();
+        } else if (_openVpnTunnel.hasChild) {
+          await _openVpnTunnel.stop();
+        } else {
+          await _modernTunnel.stop();
+        }
+        if (!mounted) return;
+        setState(() {
+          _modernUp = false;
+          _modernProtocol = null;
+          _modernNodeId = null;
+          _publicIp = null;
+        });
+      }
+      final verifiedIp = await _l2tpTunnel.start(target);
+      if (!mounted) return;
+      setState(() {
+        _modernUp = true;
+        _modernProtocol = 'l2tp';
+        _modernNodeId = serverId;
+        _publicIp = verifiedIp;
+        _vpnError = null;
+      });
+      _startModernTrafficMonitoring();
+      _startModernHealthMonitoring();
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _modernUp = (_l2tpTunnel.isRunning &&
+                  _l2tpTunnel.exitIp != null) ||
+              _openVpnTunnel.isRunning ||
               _ciscoTunnel.isRunning || _modernTunnel.isRunning;
           if (!_modernUp) {
             _modernProtocol = null;
