@@ -178,9 +178,9 @@ jobs:
           assert "High Availability Config" in v9
           assert "v9-config-card" in v9
           assert "v9-server-row" in v9
-          assert "sendRealFile" in v9
-          assert "response.arrayBuffer()" in v9
-          assert "navigator.share" in v9
+          assert "sendRealFile" not in v9  # Legacy V9 is source-only; live actions are V11/V34
+          assert "response.arrayBuffer()" not in v9  # Legacy V9 is source-only; live actions are V11/V34
+          assert "navigator.share" not in v9  # Legacy V9 is source-only; live actions are V11/V34
           assert "!important" not in v9
 
           # V11 owns platform/client detection. V36 owns responsive layout only.
