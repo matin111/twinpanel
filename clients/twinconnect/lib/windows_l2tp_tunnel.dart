@@ -64,7 +64,28 @@ class WindowsL2tpTunnel {
       case 789: return 'L2TP_IPSEC_NEGOTIATION_FAILED';
       case 809: return 'L2TP_SERVER_UNREACHABLE';
       case 868: return 'L2TP_DNS_UNAVAILABLE';
-      default: return 'L2TP_CONNECTION_FAILED';
+      case 600: return 'L2TP_RAS_OPERATION_PENDING_600';
+      case 632: return 'L2TP_RAS_ENTRY_SIZE_INVALID_632';
+      case 633: return 'L2TP_RAS_PORT_IN_USE_633';
+      case 635: return 'L2TP_RAS_UNKNOWN_ERROR_635';
+      case 638: return 'L2TP_SERVER_NO_RESPONSE_638';
+      case 645: return 'L2TP_RAS_AUTH_FAILURE_645';
+      case 646: return 'L2TP_RAS_ACCOUNT_RESTRICTED_646';
+      case 649: return 'L2TP_RAS_ACCOUNT_PERMISSION_649';
+      case 651: return 'L2TP_RAS_MODEM_OR_NETWORK_ERROR_651';
+      case 720: return 'L2TP_PPP_PROTOCOL_NEGOTIATION_FAILED_720';
+      case 734: return 'L2TP_PPP_LINK_TERMINATED_734';
+      case 766: return 'L2TP_IPSEC_CERTIFICATE_MISSING_766';
+      case 768: return 'L2TP_IPSEC_VALIDATION_FAILED_768';
+      case 788: return 'L2TP_IPSEC_POLICY_FAILED_788';
+      case 806: return 'L2TP_GRE_BLOCKED_806';
+      case 807: return 'L2TP_CONNECTION_INTERRUPTED_807';
+      case 812: return 'L2TP_RAS_POLICY_REJECTED_812';
+      case 13801: return 'L2TP_IKE_AUTH_FAILED_13801';
+      case 13806: return 'L2TP_IKE_POLICY_FAILED_13806';
+      default: return code > 0
+          ? 'L2TP_RAS_ERROR_$code'
+          : 'L2TP_NATIVE_FAILURE_NO_CODE';
     }
   }
 
