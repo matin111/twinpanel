@@ -137,6 +137,8 @@ void main() {
     expect(find.byKey(const Key('liveConnectionDuration')), findsOneWidget);
     // The original authenticated dashboard must expose account data directly
     // on Quick Connect, with no invented values while the snapshot is pending.
+    expect(find.byKey(const Key('devAnimatedBackground')), findsOneWidget);
+    expect(find.byKey(const Key('devAmbientGrid')), findsOneWidget);
     expect(find.byKey(const Key('liveHomeSubscriptionSummary')), findsOneWidget);
     expect(find.byKey(const Key('liveHomeRefreshAccount')), findsOneWidget);
     expect(find.text('Subscription details'), findsOneWidget);
