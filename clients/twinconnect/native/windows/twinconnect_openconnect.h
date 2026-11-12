@@ -12,6 +12,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cwctype>
+#include <vector>
 
 namespace twinconnect_openconnect {
 
@@ -25,41 +26,57 @@ struct TrafficTotals { uint64_t received; uint64_t sent; };
 inline bool CiscoAdapterName(const wchar_t* text) {
   if (!text || !*text) return false;
   std::wstring name(text);
-  std::transform(name.begin(), name.end(), name.begin(), ::towlower);
+  std::transform(name.begin(), name.end(), name.begin(),
+      [](wchar_t ch) { return static_cast<wchar_t>(towlower(ch)); });
   return name.find(L"tap-windows") != std::wstring::npos ||
          name.find(L"openconnect") != std::wstring::npos ||
          name.find(L"vpn client adapter") != std::wstring::npos;
 }
+inline bool CiscoAdapterDescription(const char* text) {
+  if (!text || !*text) return false;
+  std::string name(text);
+  std::transform(name.begin(), name.end(), name.begin(),
+      [](unsigned char ch) { return static_cast<char>(tolower(ch)); });
+  return name.find("tap-windows") != std::string::npos ||
+         name.find("openconnect") != std::string::npos ||
+         name.find("vpn client adapter") != std::string::npos;
+}
 
 inline bool ReadTraffic(TrafficTotals* totals) {
   if (!totals || !Running()) return false;
-  MIB_IF_TABLE2* table = nullptr;
-  if (GetIfTable2(&table) != NO_ERROR || !table) return false;
-  DWORD candidate = 0;
-  uint64_t received = 0, sent = 0;
+  ULONG size = 0;
+  const ULONG flags = GAA_FLAG_INCLUDE_ALL_INTERFACES;
+  DWORD code = GetAdaptersAddresses(AF_INET, flags, nullptr, nullptr, &size);
+  if (code != ERROR_BUFFER_OVERFLOW || size == 0 || size > 1048576)
+    return false;
+  std::vector<BYTE> buffer(size);
+  auto* adapters = reinterpret_cast<IP_ADAPTER_ADDRESSES*>(buffer.data());
+  code = GetAdaptersAddresses(AF_INET, flags, nullptr, adapters, &size);
+  if (code != NO_ERROR) return false;
+
   DWORD route = 0;
-  // The default route is only a tie-breaker; it is not required for split VPN.
   GetBestInterface(0x01010101u, &route);
-  for (ULONG i = 0; i < table->NumEntries; ++i) {
-    const auto& row = table->Table[i];
-    if (row.OperStatus != IfOperStatusUp ||
-        (!CiscoAdapterName(row.Alias) && !CiscoAdapterName(row.Description)))
-      continue;
-    if (candidate != 0 && route != row.InterfaceIndex &&
-        route != candidate) {
-      candidate = 0;  // Multiple tunnel-like NICs: fail closed.
-      break;
-    }
-    if (candidate == 0 || route == row.InterfaceIndex) {
-      candidate = row.InterfaceIndex;
-      received = static_cast<uint64_t>(row.InOctets);
-      sent = static_cast<uint64_t>(row.OutOctets);
+  DWORD chosen = 0;
+  bool ambiguous = false;
+  for (auto* a = adapters; a != nullptr; a = a->Next) {
+    if (a->OperStatus != IfOperStatusUp || a->IfIndex == 0 ||
+        (!CiscoAdapterName(a->FriendlyName) &&
+         !CiscoAdapterDescription(a->Description))) continue;
+    if (!chosen || route == a->IfIndex) {
+      ambiguous = chosen != 0 && chosen != a->IfIndex &&
+                  route != a->IfIndex;
+      chosen = a->IfIndex;
+    } else if (route != chosen) {
+      ambiguous = true;
     }
   }
-  FreeMibTable(table);
-  if (!candidate) return false;
-  totals->received = received;
-  totals->sent = sent;
+  if (!chosen || ambiguous) return false;
+  MIB_IF_ROW2 row = {};
+  row.InterfaceIndex = chosen;
+  if (GetIfEntry2(&row) != NO_ERROR || row.OperStatus != IfOperStatusUp)
+    return false;
+  totals->received = static_cast<uint64_t>(row.InOctets);
+  totals->sent = static_cast<uint64_t>(row.OutOctets);
   return true;
 }
 inline HANDLE& Child() { static HANDLE process = nullptr; return process; }
