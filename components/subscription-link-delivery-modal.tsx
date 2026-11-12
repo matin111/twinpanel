@@ -13,7 +13,7 @@ type SubscriptionLinkDeliveryModalProps={
   loading?:boolean;
   error?:string;
   onClose:()=>void;
-  appOwner?:"admin"|"reseller";
+  appOwner?:"admin"|"reseller"|"customer";
   subscriptionId?:number;
 };
 
@@ -29,16 +29,18 @@ export function SubscriptionLinkDeliveryModal({open,link,reference,loading=false
   const [mounted,setMounted]=useState(false);
   const [copied,setCopied]=useState(false);
   const [appDelivery,setAppDelivery]=useState<AppAccessDelivery|null>(null);
+  const [appDeliveryError,setAppDeliveryError]=useState("");
   const publicLink=useMemo(()=>absoluteLink(String(link||"")),[link]);
 
   useEffect(()=>{setMounted(true);},[]);
   useEffect(()=>{
     let live=true;
     setAppDelivery(null);
+    setAppDeliveryError("");
     if(open&&appOwner&&subscriptionId&&subscriptionId>0){
       void getAppAccess(appOwner,subscriptionId).then(value=>{
         if(live)setAppDelivery(value);
-      }).catch(()=>{if(live)setAppDelivery(null);});
+      }).catch((reason)=>{if(live){setAppDelivery(null);setAppDeliveryError(reason instanceof Error?reason.message:String(reason));}});
     }
     return()=>{live=false};
   },[open,appOwner,subscriptionId]);
@@ -99,6 +101,7 @@ export function SubscriptionLinkDeliveryModal({open,link,reference,loading=false
             <div className="subscription-link-hint"><span aria-hidden="true">✦</span>{pick("همین لینک برای کاربر، نماینده و ادمین یکسان است و همیشه آخرین تنظیمات اشتراک را نمایش می‌دهد.","The same link is used by customer, reseller and admin and always reflects the latest subscription settings.")}</div>
           </div>
         </div>:<div className="subscription-link-unified-empty"><span aria-hidden="true">⌁</span><b>{pick("سابلینک هنوز آماده نیست","Subscription link is not ready yet")}</b><small>{pick("پس از آماده‌شدن سرویس دوباره تلاش کنید.","Try again after the service is ready.")}</small></div>}
+        {appDeliveryError&&appOwner==="customer"&&<div className="subscription-link-unified-alert" role="alert">{appDeliveryError==="CENTRAL_APP_NOT_INCLUDED"?pick("ورود اپ در لایسنس پنل فعال نیست.","App login is not included in this panel license."):appDeliveryError==="SUBSCRIPTION_NOT_FOUND"?pick("به اطلاعات این اشتراک دسترسی ندارید.","Subscription access denied."):pick("دریافت اطلاعات ورود اپ ممکن نشد.","Unable to load app login credentials.")}</div>}
         {appDelivery&&<div className="subscription-link-url-card" style={{marginTop:10}}>
           <div className="subscription-link-card-title"><b>{pick("اطلاعات ورود به اپ هوشمند","Smart app login")}</b></div>
           <div dir="ltr" style={{overflowWrap:"anywhere",display:"grid",gap:5}}>
