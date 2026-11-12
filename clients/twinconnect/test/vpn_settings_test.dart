@@ -20,6 +20,10 @@ void main() {
     });
     await tester.pumpWidget(const TwinConnectApp());
     await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('referenceNav3')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('referenceLoginAction')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('vpnSettingsButton')));
     await tester.pumpAndSettle();
 
