@@ -2924,6 +2924,27 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
               'SUDOKU_REMOTE_EGRESS_UNVERIFIED' => tr(
                 'ارتباط واقعی سودوکو با سرور تأیید نشد؛ اینترنت از آن عبور نکرد.',
                 'Sudoku remote handshake/HTTPS egress could not be verified.'),
+              'MIERU_SERVER_ADDRESS_INVALID' => tr(
+                'آدرس IP یا دامنه سرور Mieru در کانفیگ نامعتبر است.',
+                'The Mieru profile contains an invalid server IP/domain.'),
+              'MIERU_SERVER_DOMAIN_INVALID' => tr(
+                'نام دامنه Mieru در کانفیگ معتبر نیست.',
+                'Mieru profile has an invalid domain name.'),
+              'MIERU_SERVER_DNS_UNAVAILABLE' => tr(
+                'دامنه Mieru پیش از اتصال به IP عمومی معتبر تبدیل نشد.',
+                'Mieru domain could not resolve to a safe public IPv4 before VPN.'),
+              'MIERU_SERVER_BINDINGS_INVALID' => tr(
+                'فهرست پورت‌های سرور Mieru معتبر نیست.',
+                'The Mieru server port bindings are invalid.'),
+              'MIERU_BINDING_INVALID' => tr(
+                'یکی از پورت‌های TCP/UDP کانفیگ Mieru نامعتبر است.',
+                'A Mieru TCP/UDP port or port range is invalid.'),
+              'MIERU_SERVER_PROFILE_MISSING' => tr(
+                'کانفیگ Mieru برای سرور انتخابی در اشتراک پیدا نشد.',
+                'No Mieru account profile was delivered for this server.'),
+              'MIERU_OR_TUN_ENGINE_UNAVAILABLE' => tr(
+                'موتور Mieru یا موتور تونل ویندوز همراه برنامه نصب نشده است.',
+                'Mieru engine or the Windows tunnel engine is not bundled.'),
               'NATIVE_PROTOCOL_ENGINE_NOT_READY' => tr(
                 'موتور مستقل این پروتکل هنوز آماده نیست.',
                 'This protocol requires a native engine that is not ready yet.'),
