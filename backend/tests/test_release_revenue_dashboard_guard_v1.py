@@ -28,7 +28,8 @@ class ReleaseRevenueGuardTests(unittest.TestCase):
                 '<PremiumRevenueChart series={sales} pick={pick}/>\n'
                 'OverviewKpiCard OperationalHealthVisual tunnelsLoaded nodesLoaded '
                 'SubscriptionAnalytics RecentPaymentActivity ServerFleetVisual '
-                'subscriptionsPageV3 subscriptionBreakdown',
+                'subscriptionsPageV3 subscriptionBreakdown '
+                'TunnelMonitor ProtocolMonitor tunnelsLoaded protocols={protocols}',
                 encoding="utf-8",
             )
             (directory / "components/premium-revenue-chart.tsx").write_text(
@@ -71,13 +72,27 @@ class ReleaseRevenueGuardTests(unittest.TestCase):
                 'export function RecentPaymentActivity(){} '
                 'export function ServerFleetVisual(){} '
                 'function paymentStatus(){} '
-                'const a = "dashboardPaymentAmount aria-valuenow";',
+                'const a = "dashboardPaymentAmount aria-valuenow fleetSummary nodeRole";',
                 encoding="utf-8",
             )
             (directory / "components/admin-dashboard-lower-panels.module.css").write_text(
                 ':global(html[data-theme="light"]) .donutInner{background:white} '
                 '.nodeGrid{display:grid} '
                 '@media(prefers-reduced-motion:reduce){.nodeGrid{transition:none}}',
+                encoding="utf-8",
+            )
+            (directory / "components/admin-dashboard-network-panels.tsx").write_text(
+                'const CLASSIC=new Set(); '
+                'export function TunnelMonitor(){} '
+                'export function ProtocolMonitor(){} '
+                'const f=()=>setGroup(option.id); '
+                'const note="reported online nodes reported tunnel state aria-pressed";',
+                encoding="utf-8",
+            )
+            (directory / "components/admin-dashboard-network-panels.module.css").write_text(
+                ':global(html[data-theme="light"]) .protocolGrid{display:grid} '
+                '.tunnelRoute{display:flex}.protocolState{color:green} '
+                '@media(prefers-reduced-motion:reduce){.protocolGrid{animation:none}}',
                 encoding="utf-8",
             )
 
@@ -147,10 +162,22 @@ class ReleaseRevenueGuardTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "stale"):
             guard.verify_ui_release(self.source, self.current)
 
+    def test_missing_tunnel_protocol_monitor_is_blocked(self):
+        (self.source / "components/admin-dashboard-network-panels.tsx").unlink()
+        with self.assertRaisesRegex(ValueError, "Missing"):
+            guard.verify_ui_release(self.source, self.current)
+
+    def test_old_network_dashboard_stylesheet_is_blocked(self):
+        (self.source / "components/admin-dashboard-network-panels.module.css").write_text(
+            ".legacy-tunnel{display:block}",encoding="utf-8"
+        )
+        with self.assertRaisesRegex(ValueError, "stale"):
+            guard.verify_ui_release(self.source, self.current)
+
     def test_compiled_premium_chart_passes(self):
         folder = self.source / ".next/standalone/.next/static/chunks"
         folder.mkdir(parents=True)
-        (folder / "chunk.js").write_text("Sales pulse Server pulse Service health SUBSCRIPTION MIX LATEST TRANSACTIONS", encoding="utf-8")
+        (folder / "chunk.js").write_text("Sales pulse Server pulse Service health SUBSCRIPTION MIX LATEST TRANSACTIONS NETWORK TRANSPORTS PROTOCOL COVERAGE", encoding="utf-8")
         guard.verify_ui_release(self.source, self.current, check_bundle=True)
 
 
