@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:twinconnect/sudoku_client_profile.dart';
+import 'package:twinconnect/server_inventory.dart';
 import 'package:twinconnect/singbox_windows_config.dart';
 
 void main() {
@@ -78,6 +79,47 @@ void main() {
     config['aead'] = 'none';
     item['config'] = jsonEncode(config);
     expect(SudokuClientProfile.fromItem(item, '42'), isNull);
+  });
+
+  test('missing legacy Sudoku node selects only authorized online same-country profile', () {
+    const inventory = AppServerInventory(namespace: 'TEST', servers: [
+      AppServer(id: '6', name: 'Old Turkey', countryCode: 'TR',
+          nodeOnline: true, latencyMs: 50),
+      AppServer(id: '25', name: 'Central Turkey', countryCode: 'TR',
+          nodeOnline: true, latencyMs: 95),
+      AppServer(id: '26', name: 'Offline Turkey', countryCode: 'TR',
+          nodeOnline: false, latencyMs: 10),
+      AppServer(id: '9', name: 'Germany', countryCode: 'DE',
+          nodeOnline: true, latencyMs: 20),
+    ]);
+    Map<String, dynamic> forNode(int id) =>
+        {...profile(), 'node_id': id};
+
+    // The old Turkish Exit is still listed, but its retired identity is not
+    // present in the secured panel response. A central Turkish Exit is.
+    final picked = SudokuClientProfile.resolveDeliveredProfile(
+      requestedNodeId: '6',
+      items: [forNode(9), forNode(26), forNode(25)],
+      inventory: inventory,
+    );
+    expect(picked?.nodeId, '25');
+    expect(SudokuClientProfile.resolveDeliveredProfile(
+      requestedNodeId: '25',
+      items: [forNode(25), forNode(9)],
+      inventory: inventory,
+    )?.nodeId, '25');
+    expect(SudokuClientProfile.resolveDeliveredProfile(
+      requestedNodeId: '6',
+      items: [forNode(9), forNode(26)],
+      inventory: inventory,
+    ), isNull);
+    // A malformed profile for the requested node must never trigger
+    // re-routing; the user must see the real validation failure.
+    expect(SudokuClientProfile.resolveDeliveredProfile(
+      requestedNodeId: '6',
+      items: [forNode(25), {...forNode(6), 'config': '{}'}],
+      inventory: inventory,
+    ), isNull);
   });
 
   test('verified Sudoku SOCKS bridge preserves strict Windows TUN', () {
