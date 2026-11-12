@@ -31,6 +31,15 @@ void main() {
     expect(proxy, contains('guardSudokuProcess'));
     expect(proxy, contains('finishSudokuConfig'));
     expect(proxy, contains('await _verifyRemoteExit(localPort)'));
+    // Diagnose abrupt core exits without leaking keys, config, or raw stderr.
+    expect(proxy, contains('lastUnexpectedExitReason'));
+    expect(proxy, contains('_classifyNativeFailure(line)'));
+    expect(proxy, contains('owned.exitCode.then((code)'));
+    expect(proxy, isNot(contains('print(line)')));
+    expect(proxy, isNot(contains('stderr.listen((chunk) => print')));
+    expect(ui, contains('_sudokuProxy.lastUnexpectedExitReason'));
+    expect(ui, contains('SUDOKU_CONFIG_LOAD_FAILED'));
+    expect(ui, contains('SUDOKU_LOCAL_PORT_CONFLICT'));
     expect(proxy, contains("['-c', path]"));
     expect(native, contains('twinconnect_sudoku_guard.h'));
     expect(native, contains('stageSudokuConfig'));
