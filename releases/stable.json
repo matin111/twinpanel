@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.781",
+  "version": "1.1.0-rc.782",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-11T01:52:26Z",
+  "released_at": "2026-11-12T01:27:24Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "911334c11fa6d76b7ac182491f77567c22b2a7f0",
+  "source_sha": "030f30d91f415c264e98e601f916def34d698f63",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.781/twinpanel-1.1.0-rc.781-linux-x86_64.tar.gz",
-    "sha256": "e6123a41399341460ba47386a6b34bdd19c926c219ddd988bf1d75e191fc95dc",
-    "size_bytes": 30454880
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.782/twinpanel-1.1.0-rc.782-linux-x86_64.tar.gz",
+    "sha256": "052fcbc4fce4d759227c15636da5f448b4a7567be7198cbd54a7f003518ab5c1",
+    "size_bytes": 30494183
   },
   "notes": {
-    "fa": "نسخه یکپارچه طراحی کارتی کاربران و نمایندگان، نمایش تعداد اکانت هر کاربر، ریست حجم مصرفی با تأیید بله/خیر و پنجره جمع‌وجور مدیریت نماینده؛ بدون حذف امکانات و با کنترل جلوگیری از بازگشت تغییرات در انتشارهای بعدی.",
-    "en": "Consolidated admin UI: responsive user and reseller cards, per-user account count, confirmed usage reset, compact reseller management dialog, and release regression guard."
+    "fa": "مدیریت برند و ظاهر اپ هوشمند در پنل اصلی و نماینده، ثبت آدرس اپ در لایسنس، تحویل اطلاعات ورود اپ همراه ساب‌لینک و QR در ربات‌ها، محدودیت پروتکل‌های اپ بر اساس اشتراک، همراه اصلاحات جدید وضعیت آنلاین اشتراک‌ها، تمدید پلن، پیام همگانی عکس‌دار و دکمه خرید؛ با حفظ کانفیگ‌ها و سرویس‌های فعلی.",
+    "en": "Smart app branding management for admin and resellers, license-directory origin management, app-only credentials in subscription and bot delivery, subscription-scoped protocols, plus the latest subscription status, renewal and Telegram broadcast improvements."
   }
 }
