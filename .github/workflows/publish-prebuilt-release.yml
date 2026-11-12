@@ -60,6 +60,13 @@ jobs:
           test "$(tr -d '\r\n' < source/VERSION)" = "${{ steps.candidate.outputs.version }}"
           test "$(git -C source rev-parse HEAD)" = "${{ steps.candidate.outputs.source_sha }}"
 
+      - name: Prevent stale premium sales chart in pinned release source
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python3 publisher/scripts/verify_release_ui_parity.py \
+            --source source --main publisher
+
       - name: Prevent stale Connection UI in published releases
         shell: bash
         run: |
@@ -404,6 +411,17 @@ jobs:
           SIZE="$(stat -c '%s' "$ASSET")"
           echo "sha256=$SHA256" >> "$GITHUB_OUTPUT"
           echo "size_bytes=$SIZE" >> "$GITHUB_OUTPUT"
+
+      - name: Verify current main chart matches candidate before publishing asset
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          # Guard again after the long build: main might have advanced while
+          # the pinned candidate was being compiled.
+          git -C publisher fetch -q origin main
+          git -C publisher reset --hard origin/main
+          python3 publisher/scripts/verify_release_ui_parity.py \
+            --source source --main publisher --check-bundle
 
       - name: Publish GitHub Release asset
         env:
