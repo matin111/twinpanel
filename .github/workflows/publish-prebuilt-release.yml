@@ -172,6 +172,25 @@ jobs:
           grep -Fq '.runtime-modal.tp-unified-create-light form section' source/app/admin-manual-subscription-light.css
           echo "Light-mode and tunnel UI release guard passed"
 
+      - name: Protect Telegram account link recovery in pinned releases
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          # The bot must recover URLs of suspended/expired accounts too.
+          # Do not ship a pinned build reverting this to ACTIVE-only lookup.
+          for path in \
+            "backend/app/routers/telegram_account_link_lookup.py" \
+            "backend/tests/test_telegram_account_link_inactive_recovery.py"; do
+            test -s "source/$path"
+            test -s "publisher/$path"
+            if ! cmp -s "source/$path" "publisher/$path"; then
+              echo "::error file=$path::Telegram link recovery differs from main. Re-pin the candidate."
+              exit 1
+            fi
+          done
+          grep -Fq '_lookup_single_recoverable_subscription(' source/backend/app/routers/telegram_account_link_lookup.py
+          grep -Fq 'Subscription.status.in_(_LINK_RECOVERY_STATES)' source/backend/app/routers/telegram_account_link_lookup.py
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -490,6 +509,19 @@ jobs:
           grep -Fq 'import "./subscription-light-actions.css";' source/app/layout.tsx
           grep -Fq 'import "./subscription-light-actions.css";' publisher/app/layout.tsx
           grep -Fq 'import "./admin-manual-subscription-light.css";' publisher/app/layout.tsx
+
+      - name: Recheck Telegram account link recovery before release
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          for path in \
+            "backend/app/routers/telegram_account_link_lookup.py" \
+            "backend/tests/test_telegram_account_link_inactive_recovery.py"; do
+            if ! cmp -s "source/$path" "publisher/$path"; then
+              echo "::error file=$path::Bot account link recovery changed during build. Re-pin the release."
+              exit 1
+            fi
+          done
 
       - name: Publish GitHub Release asset
         env:

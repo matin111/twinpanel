@@ -7,7 +7,7 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
-from sqlalchemy import func, or_
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..database import get_db
@@ -90,8 +90,8 @@ def _credential_error(telegram_id: int) -> HTTPException:
 
 def _owned_lookup_error(telegram_id: int) -> HTTPException:
     _record_failure(telegram_id)
-    # Keep one generic response for missing Telegram ownership, missing or
-    # duplicate usernames, inactive subscriptions and expired subscriptions.
+    # Keep one generic response for missing ownership, ambiguous usernames,
+    # canceled or pending accounts. Do not disclose which account exists.
     return HTTPException(
         status_code=404,
         detail="اکانتی با این نام کاربری در حساب شما پیدا نشد",
@@ -112,6 +112,42 @@ def _public_share_link(db: Session, sub: Subscription) -> str:
     return link
 
 
+# Recovering a subscription URL does not activate or extend the account.
+# Keep canceled and never-provisioned (pending) accounts unavailable.
+_LINK_RECOVERY_STATES = (
+    SubscriptionStatus.SUSPENDED,
+    SubscriptionStatus.EXPIRED,
+)
+
+
+def _lookup_single_recoverable_subscription(db: Session, *conditions):
+    """Prefer the one active row (current behavior), then a unique inactive row.
+
+    Reused usernames may exist in legacy accounts. Never guess between two
+    equally eligible rows, and do not let a historical duplicate hide an
+    otherwise uniquely active account.
+    """
+    base = db.query(Subscription).filter(*conditions)
+    active = (
+        base.filter(Subscription.status == SubscriptionStatus.ACTIVE)
+        .order_by(Subscription.id.asc())
+        .limit(2)
+        .all()
+    )
+    if len(active) > 1:
+        return None
+    if active:
+        return active[0]
+
+    historical = (
+        base.filter(Subscription.status.in_(_LINK_RECOVERY_STATES))
+        .order_by(Subscription.id.asc())
+        .limit(2)
+        .all()
+    )
+    return historical[0] if len(historical) == 1 else None
+
+
 def _resolve_owned_subscription(
     payload: TelegramOwnedAccountLinkLookupIn,
     db: Session,
@@ -127,27 +163,13 @@ def _resolve_owned_subscription(
     if telegram_link is None:
         raise _owned_lookup_error(telegram_id)
 
-    now = datetime.utcnow()
-    matches = (
-        db.query(Subscription)
-        .filter(
-            Subscription.user_id == int(telegram_link.user_id),
-            func.lower(Subscription.account_username) == username.casefold(),
-            Subscription.status == SubscriptionStatus.ACTIVE,
-            or_(
-                Subscription.expires_at.is_(None),
-                Subscription.expires_at > now,
-            ),
-        )
-        .order_by(Subscription.id.asc())
-        .limit(2)
-        .all()
+    sub = _lookup_single_recoverable_subscription(
+        db,
+        Subscription.user_id == int(telegram_link.user_id),
+        func.lower(Subscription.account_username) == username.casefold(),
     )
-
-    if len(matches) != 1:
+    if sub is None:
         raise _owned_lookup_error(telegram_id)
-
-    sub = matches[0]
     link = _public_share_link(db, sub)
     _clear_failures(telegram_id)
 
@@ -192,7 +214,7 @@ def resolve_username_account_link(
     payload: TelegramOwnedAccountLinkLookupIn,
     db: Session = Depends(get_db),
 ):
-    """Resolve an active unique VPN username across admin-created accounts.
+    """Resolve a uniquely eligible VPN username across admin-created accounts.
 
     The bot enforces Telegram chat identity; the private bot secret is required
     by this endpoint. We never select an arbitrary row if usernames collide.
@@ -202,24 +224,12 @@ def resolve_username_account_link(
     _guard_username_lookup(telegram_id, username)
     if not username:
         raise _owned_lookup_error(telegram_id)
-    now = datetime.utcnow()
-    matches = (
-        db.query(Subscription)
-        .filter(
-            func.lower(Subscription.account_username) == username,
-            Subscription.status == SubscriptionStatus.ACTIVE,
-            or_(
-                Subscription.expires_at.is_(None),
-                Subscription.expires_at > now,
-            ),
-        )
-        .order_by(Subscription.id.asc())
-        .limit(2)
-        .all()
+    sub = _lookup_single_recoverable_subscription(
+        db,
+        func.lower(Subscription.account_username) == username,
     )
-    if len(matches) != 1:
+    if sub is None:
         raise _owned_lookup_error(telegram_id)
-    sub = matches[0]
     link = _public_share_link(db, sub)
     _clear_failures(telegram_id)
     _username_successes[telegram_id].append((time.monotonic(), username))
@@ -238,7 +248,7 @@ def resolve_owned_account_link(
     payload: TelegramOwnedAccountLinkLookupIn,
     db: Session = Depends(get_db),
 ):
-    """Resolve an active account owned by the linked TwinPanel user.
+    """Resolve a recoverable account owned by the linked TwinPanel user.
 
     Protocol and import source are intentionally irrelevant. The username is
     matched only inside subscriptions belonging to the user linked to this
