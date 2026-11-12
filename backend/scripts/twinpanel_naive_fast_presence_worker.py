@@ -23,7 +23,9 @@ if str(ROOT) not in sys.path:
 from app.database import SessionLocal
 from app.models import Node, NodeType
 from app.node_runtime_connection import connect_protocol_runtime
-from app.services.accounting_device_map_batch_v1 import install_accounting_device_batch_cache
+from app.services.accounting_device_map_batch_v1 import (
+    install_accounting_device_batch_cache, build_presence_devices_for_protocols,
+)
 from app.services import singbox_native_accounting_v265 as native
 
 INTERVAL_SECONDS = 20.0
@@ -48,10 +50,11 @@ async def reconcile_once() -> dict:
             .all()
         )
         # Identity mapping is loaded in one batch and is never inferred by IP.
-        by_node = {
-            int(node.id): native._devices_by_protocol(db, int(node.id)).get("naive", [])
-            for node in nodes
-        }
+        # One SQL/decryption pass for Naive alone, not every active protocol.
+        # The canonical auth/identity mapping and quota device IDs are retained.
+        by_node = build_presence_devices_for_protocols(
+            db, source_protocols={"naive", "naiveproxy"},
+        )
         db.commit()
         # Bias toward currently connected Naive users; avoid starving the
         # known live node behind lengthy remote probes for idle nodes.
