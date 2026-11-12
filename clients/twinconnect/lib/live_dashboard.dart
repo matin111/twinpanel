@@ -1,7 +1,7 @@
 import 'dart:ui' show ImageFilter, FontFeature;
-import 'dart:io' show Platform, HttpClient, InternetAddress, Process;
+import 'dart:io' show Platform, HttpClient, InternetAddress, Process, ProcessException, FileSystemException, SocketException, HttpException;
 import 'dart:convert' show utf8;
-import 'dart:async' show Timer;
+import 'dart:async' show Timer, TimeoutException;
 
 import 'package:flutter/services.dart' show PlatformException;
 import 'package:shared_preferences/shared_preferences.dart';
