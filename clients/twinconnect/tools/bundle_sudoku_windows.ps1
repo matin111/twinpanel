@@ -18,6 +18,12 @@ $matches = @(Get-ChildItem -LiteralPath $unpack -Recurse -File |
 if ($matches.Count -ne 1) { throw 'Expected exactly one sudoku.exe' }
 New-Item -ItemType Directory -Force -Path $root | Out-Null
 Copy-Item -LiteralPath $matches[0].FullName -Destination (Join-Path $root 'sudoku.exe') -Force
+# Ship the upstream GPL-3.0 license with this independent CLI executable.
+$licenseUrl = 'https://raw.githubusercontent.com/SUDOKU-ASCII/sudoku/v0.5.2-1/LICENSE'
+Invoke-WebRequest -Uri $licenseUrl -OutFile (Join-Path $root 'LICENSE.txt')
+if ((Get-Item (Join-Path $root 'LICENSE.txt')).Length -lt 1000) {
+  throw 'Sudoku upstream GPL license is missing'
+}
 $exe = Join-Path $root 'sudoku.exe'
 & $exe -h 2>&1 | Out-Null
 # Golang flag -h normally exits with 0. Do not assume a version flag exists.
