@@ -12,6 +12,7 @@ import 'protocol_strings.dart';
 import 'native_vpn_bridge.dart';
 import 'android_connection_card.dart';
 import 'windows_preview_fixture.dart';
+import 'reference_desktop_shell.dart';
 import 'vpn_settings.dart';
 import 'vpn_strings.dart';
 
@@ -139,6 +140,7 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
       const NativeProtocolReadiness(supportedCodes: {});
   bool _protocolCatalogUnavailable = false;
   bool _offlineDemo = false;
+  bool _showLogin = false;
   int _lookupSerial = 0;
 
   @override
@@ -183,6 +185,7 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
       if (!mounted || serial != _lookupSerial) return;
       setState(() {
         _brand = brand;
+        _showLogin = false;
         _confirmedPanel = panel;
         _confirmedUsername = username;
         _confirmedToken = token;
@@ -228,6 +231,7 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
       _confirmedPanel = null;
       _confirmedUsername = null;
       _confirmedToken = null;
+      _showLogin = false;
       _brand = WindowsPreviewFixture.brand();
       _catalog = WindowsPreviewFixture.protocolCatalog();
       _nativeProtocols =
@@ -240,6 +244,76 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
   Widget build(BuildContext context) {
     final strings = AppStrings.of(context);
     final brand = _brand;
+
+    // The reference dashboard is the actual initial Windows surface.
+    // Preview state is explicitly signed out; account identification is
+    // accessible from Account -> Sign in and never fakes tunnel connectivity.
+    if (brand == null && !_showLogin) {
+      return ReferenceDesktopShell(
+        brand: WindowsPreviewFixture.brand(),
+        username: 'Guest preview',
+        onLogin: () => setState(() => _showLogin = true),
+        onLogout: () => setState(() => _showLogin = true),
+        onSettings: () => setState(() => _showLogin = true),
+        locations: const Center(child: Text(
+          'Sign in to retrieve your available servers and protocols.',
+          style: TextStyle(color: Colors.white),
+        )),
+      );
+    }
+
+    if (brand != null) {
+      return ReferenceDesktopShell(
+        brand: brand,
+        username: _offlineDemo ? 'Offline preview' : (_confirmedUsername ?? _username.text.trim()),
+        onLogout: () => setState(() {
+          _brand = null;
+          _catalog = null;
+          _confirmedPanel = null;
+          _confirmedUsername = null;
+          _confirmedToken = null;
+          _offlineDemo = false;
+          _showLogin = false;
+        }),
+        onSettings: () => Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => VpnSettingsScreen(
+              tenant: brand.namespace,
+              account: _offlineDemo ? 'offline-demo-only' : _username.text.trim(),
+            ),
+          ),
+        ),
+        locations: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            BrandDetails(brand: brand),
+            if (_offlineDemo) const Padding(
+              padding: EdgeInsets.all(12),
+              child: Text('Offline preview: VPN functions and telemetry are disabled.'),
+            ),
+            if (_protocolCatalogUnavailable)
+              Text(strings.protocolCatalogUnavailable),
+            if (_catalog != null) ...[
+              ProtocolCatalogCard(
+                catalog: _catalog!,
+                native: _nativeProtocols,
+              ),
+              if (_confirmedPanel != null &&
+                  _confirmedUsername != null &&
+                  _confirmedToken != null)
+                AndroidConnectionCard(
+                  key: ValueKey(_confirmedUsername),
+                  panel: _confirmedPanel!,
+                  username: _confirmedUsername!,
+                  shareToken: _confirmedToken!,
+                  catalog: _catalog!,
+                  native: _nativeProtocols,
+                ),
+            ],
+          ],
+        ),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(

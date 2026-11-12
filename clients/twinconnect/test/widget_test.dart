@@ -32,6 +32,10 @@ void main() {
 
     await tester.pumpWidget(const TwinConnectApp());
     await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('referenceNav3')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('referenceLoginAction')));
+    await tester.pumpAndSettle();
 
     expect(find.text('شناسایی حساب'), findsOneWidget);
     expect(
@@ -56,6 +60,10 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pumpWidget(const TwinConnectApp());
     await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('referenceNav3')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('referenceLoginAction')));
+    await tester.pumpAndSettle();
     expect(find.text('Identify your account'), findsOneWidget);
   });
 
@@ -65,11 +73,19 @@ void main() {
     });
     await tester.pumpWidget(const TwinConnectApp());
     await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('referenceNav3')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('referenceLoginAction')));
+    await tester.pumpAndSettle();
     expect(find.text('Identify your account'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('languagePicker')));
     await tester.pumpAndSettle();
     await tester.tap(find.text('فارسی').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('referenceNav3')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('referenceLoginAction')));
     await tester.pumpAndSettle();
 
     expect(find.text('شناسایی حساب'), findsOneWidget);

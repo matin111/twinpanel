@@ -28,30 +28,33 @@ void main() {
         .toSet(), {'wireguard', 'cisco', 'v2ray'});
   });
 
-  testWidgets('offline Windows demo opens without user credentials',
+  testWidgets('offline desktop preview has honest empty telemetry and tabs',
       (tester) async {
+    await tester.binding.setSurfaceSize(const Size(1536, 1024));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(const TwinConnectApp());
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const Key('windowsDemoButton')), findsOneWidget);
-    await tester.drag(find.byType(ListView).first, const Offset(0, -260));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('windowsDemoButton')));
-    await tester.pumpAndSettle();
 
-    await tester.scrollUntilVisible(
-      find.byKey(const Key('offlineDemoBanner')), 280,
-      scrollable: find.byType(Scrollable).first,
-    );
-    expect(find.byKey(const Key('offlineDemoBanner')), findsOneWidget);
-    expect(
-      find.textContaining('Sample data only'),
-      findsOneWidget,
-    );
+    expect(find.byKey(const Key('referenceDesktopShell')), findsOneWidget);
+    expect(find.text('Network status'), findsOneWidget);
+    expect(find.textContaining('Tunnel inactive'), findsOneWidget);
+    expect(find.textContaining('Not connected'), findsOneWidget);
+    expect(find.text('204.10.192.96'), findsNothing);
+    expect(find.text('133 ms'), findsNothing);
+
+    await tester.tap(find.byKey(const Key('referenceNav1')));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Sign in to retrieve'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('referenceNav0')));
+    await tester.pumpAndSettle();
+    expect(find.text('Quick Connect'), findsOneWidget);
   });
 
-  testWidgets('offline demo can inspect settings without live VPN engines',
+  testWidgets('desktop settings still opens existing real settings page',
       (tester) async {
+    await tester.binding.setSurfaceSize(const Size(1536, 1024));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(const TwinConnectApp());
     await tester.pumpAndSettle();
     await tester.drag(find.byType(ListView).first, const Offset(0, -260));
@@ -59,6 +62,10 @@ void main() {
     await tester.tap(find.byKey(const Key('windowsDemoButton')));
     await tester.pumpAndSettle();
 
+    await tester.tap(find.byKey(const Key('referenceNav3')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('referenceLoginAction')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('vpnSettingsButton')));
     await tester.pumpAndSettle();
 

@@ -69,6 +69,12 @@ jobs:
           Write-Host ("Windows ZIP bytes: " + (Get-Item $zip).Length)
       - uses: actions/upload-artifact@v4
         with:
+          name: TwinConnect-Reference-Screenshot
+          path: clients/twinconnect/build/reference/desktop-1536x1024.png
+          if-no-files-found: warn
+          retention-days: 30
+      - uses: actions/upload-artifact@v4
+        with:
           name: TwinConnect-Windows-x64-Portable
           path: clients/twinconnect/TwinConnect-Windows-Preview.zip
           if-no-files-found: error
