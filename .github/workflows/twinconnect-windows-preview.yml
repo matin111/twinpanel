@@ -73,6 +73,12 @@ jobs:
       - name: Check Xray-core synthetic stdin config without routes
         shell: pwsh
         run: ./tools/check_xray_windows.ps1
+      - name: Bundle checksum-pinned official Sudoku Windows core
+        shell: pwsh
+        run: ./tools/bundle_sudoku_windows.ps1
+      - name: Verify official Sudoku core accepts synthetic client config
+        shell: pwsh
+        run: ./tools/check_sudoku_windows.ps1
       - name: Bundle pinned and verified sing-box engine (not yet enabled)
         shell: pwsh
         run: ./tools/bundle_singbox_windows.ps1
