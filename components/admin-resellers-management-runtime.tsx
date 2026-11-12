@@ -410,6 +410,36 @@ export function AdminResellersManagementRuntime(){
         .reseller-admin-card-actions .reseller-card-manage{background:rgba(44,93,185,.33);border-color:rgba(100,160,255,.48);color:#d4e5ff}
         .reseller-admin-card-actions .reseller-card-delete{border-color:rgba(244,93,115,.35);color:#ff9aa9}
         .reseller-admin-card-actions button:hover:not(:disabled){background:rgba(91,74,167,.32);border-color:rgba(165,146,255,.7)}.reseller-admin-card-actions button:disabled{opacity:.42;cursor:not-allowed}
+        /* Reseller card light mode: avoid dark fixed gradients and unreadable labels. */
+        html[data-theme="light"] .reseller-admin-card{
+          background:linear-gradient(155deg,#ffffff 0%,#f8faff 64%,#f3f6fc 100%);
+          border-color:#d8dfec;
+          color:#202b40;
+          box-shadow:0 9px 25px rgba(28,49,87,.08),inset 0 1px 0 #fff;
+        }
+        html[data-theme="light"] .reseller-admin-card:hover{border-color:#a4b6dc}
+        html[data-theme="light"] .reseller-admin-card-title small,
+        html[data-theme="light"] .reseller-admin-card-code small,
+        html[data-theme="light"] .reseller-admin-card-owner small,
+        html[data-theme="light"] .reseller-admin-card-stats small,
+        html[data-theme="light"] .reseller-admin-card-owner span{color:#5d6e85}
+        html[data-theme="light"] .reseller-admin-card-code{background:#f2f5fb;border-color:#dce3ee}
+        html[data-theme="light"] .reseller-admin-card-stats>span{
+          background:#f6f8fc;border-color:#dce3ee;color:#233450;
+        }
+        html[data-theme="light"] .reseller-admin-card-stats span:last-child b{color:#2055a6}
+        html[data-theme="light"] .reseller-admin-card-actions button{
+          background:#fff;border-color:#d4deed;color:#2d3f5b;
+        }
+        html[data-theme="light"] .reseller-admin-card-actions .reseller-card-manage{
+          background:#e8f0ff;border-color:#b7cdf4;color:#2353a4;
+        }
+        html[data-theme="light"] .reseller-admin-card-actions .reseller-card-delete{
+          background:#fff4f5;border-color:#f1c7ce;color:#ae3750;
+        }
+        html[data-theme="light"] .reseller-admin-card-actions button:hover:not(:disabled){
+          background:#edf2fb;border-color:#b5c8e7;
+        }
         @media(max-width:1200px){.reseller-admin-cards{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:720px){.reseller-admin-cards{grid-template-columns:minmax(0,1fr);gap:10px}.reseller-admin-card{padding:13px}}
 
         /* Compact reseller management: keep all controls, reduce wasted vertical space. */
