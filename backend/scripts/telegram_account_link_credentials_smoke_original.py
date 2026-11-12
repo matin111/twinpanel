@@ -24,8 +24,16 @@ checks = {
     "telegram owner mapping": "TelegramUserLink" in lookup and "db.get(TelegramUserLink, telegram_id)" in lookup,
     "subscription ownership restriction": "Subscription.user_id == int(telegram_link.user_id)" in lookup,
     "username lookup": "func.lower(Subscription.account_username)" in lookup,
-    "active subscription guard": "Subscription.status == SubscriptionStatus.ACTIVE" in lookup,
-    "expired subscription guard": "Subscription.expires_at > now" in lookup,
+    "active subscription preference": "base.filter(Subscription.status == SubscriptionStatus.ACTIVE)" in lookup,
+    "suspended and expired recovery": (
+        "SubscriptionStatus.SUSPENDED" in lookup
+        and "SubscriptionStatus.EXPIRED" in lookup
+        and "Subscription.status.in_(_LINK_RECOVERY_STATES)" in lookup
+    ),
+    "no canceled or pending recovery": (
+        "SubscriptionStatus.CANCELED" not in lookup
+        and "SubscriptionStatus.PENDING" not in lookup
+    ),
     "duplicate fail closed": ".limit(2)" in lookup and "if len(matches) != 1" in lookup,
     "migration restriction removed": "MigrationImportRecord" not in lookup,
     "main bot username API": '"/v1/telegram/account-link/resolve-username"' in bot and "bot_auth=True" in bot,
@@ -34,10 +42,10 @@ checks = {
         '"/account-link/resolve-username"' in lookup
         and "dependencies=[Depends(bot_guard)]" in lookup
     ),
-    "username-only active guard": (
+    "username recovery handles inactive": (
         "def resolve_username_account_link(" in lookup
-        and "Subscription.status == SubscriptionStatus.ACTIVE" in lookup
-        and "Subscription.expires_at > now" in lookup
+        and "_lookup_single_recoverable_subscription(" in lookup
+        and "_LINK_RECOVERY_STATES" in lookup
     ),
     "username-only duplicate fail closed": "if len(matches) != 1:" in lookup,
     "username-only rate limit": "_USERNAME_SUCCESS_LIMIT = 10" in lookup,
