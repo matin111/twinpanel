@@ -25,6 +25,9 @@ class ConnectionBootstrap {
     required VpnPolicy policy,
     required NativeVpnCapabilities capabilities,
     required NativeProtocolReadiness nativeProtocols,
+    // A new authenticated catalog read issued DURING this same connect
+    // attempt may overlap local native checks. Never pass UI-cached data.
+    Future<PanelProtocolCatalog>? currentAttemptCatalog,
   }) async {
     if (sessionToken.trim().length < 40 || sessionToken != sessionToken.trim()) {
       throw const ConnectionBootstrapException('INVALID_APP_SESSION');
@@ -46,8 +49,12 @@ class ConnectionBootstrap {
     // Refresh the entitlement gate before asking for any node metadata.
     // Revoked plans must NOT cause a speculative server lookup, even when
     // such a request would not include connection secrets.
-    final catalog = await api.loadSessionProtocolCatalog(
-      panel: panel, sessionToken: sessionToken);
+    final catalog = await (currentAttemptCatalog ??
+        api.loadSessionProtocolCatalog(
+          panel: panel, sessionToken: sessionToken));
+    if (catalog.namespace != panel.namespace) {
+      throw const ConnectionBootstrapException('PROTOCOL_CATALOG_SCOPE_MISMATCH');
+    }
     final allowed = catalog.entries.where((entry) =>
         entry.protocol.code == definition.code &&
         entry.selected && entry.configRecordPresent);
