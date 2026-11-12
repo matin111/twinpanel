@@ -39,7 +39,7 @@ from .migration_center_v2 import (
 )
 from .subscription_delivery_policy_v1 import DeliveryPolicyIn, put_delivery_policy
 from .subscriptions import subscription_out
-from .runtime_endpoints import _online_subscription_ids
+from .runtime_endpoints import _subscription_live_states, _live_item
 
 
 # Nested under the already-registered /v1 quota/control router. Keeping this
@@ -375,6 +375,19 @@ def transfer_subscription_to_user(
             "message": "مالکیت اکانت به کاربر منتقل شد؛ کانفیگ و حجم تغییر نکردند"}
 
 
+def _admin_page_item_with_presence(sub: Subscription, context: dict, states: dict[int, dict]) -> dict:
+    """Append live presence from the same cached snapshot as the KPI/filter.
+
+    Subscription.status is a commercial/entitlement state and must not be
+    conflated with whether there is a current network session.
+    """
+    item = _enriched_payload_from_context(sub, context)
+    live = _live_item(int(sub.id), states)
+    item["is_online"] = live["online"]
+    item["presence_state"] = live["presence_state"]
+    return item
+
+
 @router.get("/admin-page-v3")
 def admin_page_v3(
     limit: int = 40,
@@ -400,7 +413,10 @@ def admin_page_v3(
 
     # Online means a genuinely live session or recent accepted traffic, not
     # merely an ACTIVE subscription. Reuse the dashboard's live-state policy.
-    online_ids = _online_subscription_ids(db)
+    # One cached snapshot powers the counter, online filter, and each row.
+    # No extra per-subscription database queries are introduced.
+    live_states = _subscription_live_states(db)
+    online_ids = {sid for sid, item in live_states.items() if item["online"]}
     base = db.query(Subscription)
     # Apply reseller filtering BEFORE count, offset and limit. Never paginate
     # the global roster and filter only the current browser page.
@@ -445,7 +461,7 @@ def admin_page_v3(
         if label in stats:
             stats[label] += int(count)
     return {
-        "items": [_enriched_payload_from_context(sub, context) for sub in rows],
+        "items": [_admin_page_item_with_presence(sub, context, live_states) for sub in rows],
         "total": int(filtered_total),
         "limit": limit,
         "offset": offset,
