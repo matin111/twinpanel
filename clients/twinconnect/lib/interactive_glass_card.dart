@@ -59,7 +59,7 @@ class _TwinConnectGlassCardState extends State<TwinConnectGlassCard> {
               curve: Curves.easeOutCubic,
               padding: widget.padding,
               decoration: BoxDecoration(
-                color: surface.withValues(alpha: bright ? .82 : .90),
+                color: surface.withValues(alpha: bright ? .55 : .68),
                 borderRadius: radius,
                 border: Border.all(
                   color: active
@@ -73,10 +73,12 @@ class _TwinConnectGlassCardState extends State<TwinConnectGlassCard> {
                   end: Alignment.bottomRight,
                   stops: const [0, .42, 1],
                   colors: [
-                    Color.lerp(surface, accent, active ? .16 : .06)!,
-                    surface,
-                    Color.lerp(surface, Colors.black,
-                        bright ? .12 : .025)!,
+                    Color.lerp(surface, accent, active ? .18 : .075)!
+                        .withValues(alpha: bright ? .64 : .73),
+                    surface.withValues(alpha: bright ? .51 : .64),
+                    Color.lerp(surface, bright ? Colors.black : Colors.white,
+                        bright ? .12 : .045)!
+                        .withValues(alpha: bright ? .59 : .70),
                   ],
                 ),
                 boxShadow: [
