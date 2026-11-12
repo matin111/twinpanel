@@ -81,6 +81,93 @@
  .insight{gap:5px}
  .svg{min-height:190px}
 }
+
+/* Light theme is opt-in and only affects this CSS-module chart.
+   The old translucent navy graph made the light dashboard unreadable. */
+:global(html[data-theme="light"]) .root{
+  --rv:#6544c9;
+  --rg:#087f83;
+  color:#17243b;
+}
+:global(html[data-theme="light"]) .root .headline p,
+:global(html[data-theme="light"]) .root .insightLabel,
+:global(html[data-theme="light"]) .root .insight>span,
+:global(html[data-theme="light"]) .root .insight strong small,
+:global(html[data-theme="light"]) .root .graphFooter,
+:global(html[data-theme="light"]) .root .empty small{
+  color:#54657e;
+}
+:global(html[data-theme="light"]) .root .eyebrow{color:#6343bc}
+:global(html[data-theme="light"]) .root .insight{
+  background:linear-gradient(145deg,#ffffff,#f5f7ff);
+  border-color:#dce2f0;
+  box-shadow:0 8px 24px rgba(54,70,118,.055);
+}
+:global(html[data-theme="light"]) .root .insight:hover{border-color:#bcb0e8}
+:global(html[data-theme="light"]) .root .insight:before{
+  background:linear-gradient(270deg,rgba(117,88,220,.42),transparent);
+}
+:global(html[data-theme="light"]) .root .period{
+  border-color:#dce2ee;
+  background:#f2f5fb;
+}
+:global(html[data-theme="light"]) .root .period button{color:#465b77}
+:global(html[data-theme="light"]) .root .period button:hover{
+  color:#302065;
+  background:#e9e4fa;
+}
+:global(html[data-theme="light"]) .root .period button.activePeriod{
+  color:#463191;
+  background:linear-gradient(140deg,#e9e2ff,#f4f0ff);
+  box-shadow:inset 0 0 0 1px #c4b4f1,0 3px 9px rgba(97,69,179,.11);
+}
+:global(html[data-theme="light"]) .root .graphShell{
+  border-color:#d9dfec;
+  background:
+    radial-gradient(ellipse at 70% 5%,rgba(128,105,231,.10),transparent 54%),
+    radial-gradient(ellipse at 6% 88%,rgba(15,169,160,.065),transparent 50%),
+    linear-gradient(180deg,#ffffff 0%,#f5f8ff 100%);
+  box-shadow:0 10px 32px rgba(58,72,112,.06);
+}
+:global(html[data-theme="light"]) .root .graphShell:after{
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.9);
+}
+:global(html[data-theme="light"]) .root .legend button{
+  color:#33435d;
+  background:rgba(255,255,255,.85);
+  border-color:#d9dfec;
+}
+:global(html[data-theme="light"]) .root .legend button:hover{
+  background:#f0ecff;
+  border-color:#b8a7e7;
+}
+:global(html[data-theme="light"]) .root .livePill{color:#087e78}
+:global(html[data-theme="light"]) .root .gridline{stroke:rgba(109,126,161,.20)}
+:global(html[data-theme="light"]) .root .yLabel,
+:global(html[data-theme="light"]) .root .xLabel{fill:#536781}
+:global(html[data-theme="light"]) .root .svg path[stroke="#aa96ff"]{stroke:#6b4bd7}
+:global(html[data-theme="light"]) .root .svg path[stroke="#9178ff"]{stroke:#6b4bd7}
+:global(html[data-theme="light"]) .root .svg path[stroke="#23dac6"]{stroke:#079e96}
+:global(html[data-theme="light"]) .root .svg stop[stop-color="#9178ff"]{stop-color:#7962d9}
+:global(html[data-theme="light"]) .root .svg stop[stop-color="#23dac6"]{stop-color:#069e94}
+:global(html[data-theme="light"]) .root .tooltip{
+  color:#1d2b48;
+  background:linear-gradient(135deg,rgba(255,255,255,.99),rgba(246,248,255,.99));
+  border-color:#cbd3e5;
+  box-shadow:0 13px 38px rgba(42,54,94,.18),0 0 0 1px rgba(255,255,255,.5);
+}
+:global(html[data-theme="light"]) .root .tooltip small{color:#53647b}
+:global(html[data-theme="light"]) .root .tooltip>div span{color:#405573}
+:global(html[data-theme="light"]) .root .graphFooter{border-top-color:#dce2ee}
+:global(html[data-theme="light"]) .root .empty span{
+  color:#6541bc;
+  background:#ede7ff;
+}
+:global(html[data-theme="light"]) .root .peakIcon{
+  color:#6a4ab9;
+  background:#eee9ff;
+}
+
 @media(prefers-reduced-motion:reduce){
  .root *{animation-duration:.01ms!important;transition-duration:.01ms!important}
  .line{stroke-dashoffset:0}
