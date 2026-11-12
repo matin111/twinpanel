@@ -101,7 +101,7 @@ class WindowsSudokuProxy {
       // Never log the native core's output: it may contain private keys.
       unawaited(owned.stdout.drain<void>());
       unawaited(owned.stderr.drain<void>());
-      unawaited(process.exitCode.then((_) {
+      unawaited(owned.exitCode.then((_) {
         if (identical(_child, owned)) {
           _child = null;
           _port = null;
