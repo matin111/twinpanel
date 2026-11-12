@@ -85,6 +85,23 @@ class WindowsOpenConnectTunnel {
     }
   }
 
+  /// Returns real OS interface byte totals for the verified Cisco route.
+  /// No whole-system fallback; null means the VPN interface was not identified.
+  Future<({int received, int sent})?> readTrafficTotals() async {
+    if (!_nativeActive || _exitIp == null) return null;
+    try {
+      final raw = await _channel.invokeMapMethod<String, dynamic>(
+          'openConnectTraffic').timeout(const Duration(seconds: 5));
+      if (raw == null) return null;
+      final rx = raw['rxBytes'];
+      final tx = raw['txBytes'];
+      if (rx is! int || tx is! int || rx < 0 || tx < 0) return null;
+      return (received: rx, sent: tx);
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<bool> checkHealth() async {
     if (!_nativeActive || _exitIp == null) return false;
     try {
