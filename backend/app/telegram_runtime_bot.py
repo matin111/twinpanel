@@ -1632,12 +1632,27 @@ async def subscription_connection(
             await callback.message.answer("❌ دریافت لینک اتصال ناموفق بود: " + escape(str(exc)[:150]))
         return
 
+    # Customer-authenticated endpoint; never use the public share token to
+    # retrieve the separate app login.
+    app_access = {}
+    try:
+        app_access = await request(
+            "POST",
+            f"/v1/central-app/customer/subscriptions/{sub_id}/app-delivery",
+            token=token,
+        )
+    except Exception:
+        # An installation without the app entitlement still delivers VPN links.
+        app_access = {}
+
     from .telegram_subscription_qr_v1 import send_subscription_link_and_qr
 
     await send_subscription_link_and_qr(
         callback.message,
         link,
         username=str(info.get("account_username") or f"#{sub_id}"),
+        app_username=str(app_access.get("app_username") or ""),
+        app_password=str(app_access.get("app_password") or ""),
     )
 
 
