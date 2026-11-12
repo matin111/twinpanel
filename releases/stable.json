@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.810",
+  "version": "1.1.0-rc.811",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-12T19:04:48Z",
+  "released_at": "2026-11-12T20:19:10Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "b987427900e3a914b572b83563358e43b28accc7",
+  "source_sha": "aaed9d4d678cdaa0bb7fa3788ea4d61cec6e40b4",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.810/twinpanel-1.1.0-rc.810-linux-x86_64.tar.gz",
-    "sha256": "26341ce18cc020c15f6d1f45fbce82782d46c503715cf4b7c74e0aee46723003",
-    "size_bytes": 30656570
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.811/twinpanel-1.1.0-rc.811-linux-x86_64.tar.gz",
+    "sha256": "f58f8cf0df95e4185206328af6b08852230943576a405ecddb22fd52f6c305da",
+    "size_bytes": 30707283
   },
   "notes": {
-    "fa": "رفع مشکل دریافت لینک اشتراک در ربات تلگرام: بازیابی لینک اکانت‌های معلق و منقضی با نام کاربری، بدون فعال‌سازی یا تغییر تاریخ/حجم. اولویت با حساب فعال یکتا، جلوگیری از انتخاب اشتراک‌های تکراری و لغوشده، حفظ محدودیت درخواست و امنیت احراز ربات. همراه تمام اصلاحات عملکردی نسخه rc.809.",
-    "en": "Fix Telegram bot account-link recovery for suspended and expired subscriptions without enabling them or changing expiry/quota. Retain unique active-account priority, fail-closed duplicates, canceled/pending exclusions, owner scoping, rate limits, and all rc.809 performance fixes."
+    "fa": "رفع تعلیق اشتباه اشتراک‌های تازه در زمان آماده‌سازی: اعتبارسنجی سهمیه تنها برای اکانت تازه با نگاشت رسمی نود انجام می‌شود، نه بازسازی همه کاربران. کنترل سخت‌گیرانه سهمیه و مسیر اصلی برای موارد ناقص حفظ می‌شوند؛ اطلاعات و وضعیت اشتراک‌های قدیمی تغییر نمی‌کند.",
+    "en": "Fix false suspensions of newly created accounts caused by the 20-second full-fleet quota sync deadline. Validate the new account's own canonical quota-agent mappings; retain fail-closed full synchronization fallback and existing account/traffic enforcement unchanged."
   }
 }
