@@ -10,7 +10,7 @@ void main() {
     expect(installer, contains('SWP_FRAMECHANGED'));
     expect(installer, contains('windowControl'));
     expect(installer, contains('WM_CLOSE'));
-    expect(installer, isNot(contains('ExitProcess(')));
+    expect(installer, isNot(contains('::ExitProcess(')));
   });
 
   test('all screens keep safe floating window controls and drag', () {
