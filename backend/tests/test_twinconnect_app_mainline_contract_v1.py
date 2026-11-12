@@ -14,6 +14,7 @@ ADMIN = ROOT / "components/legacy-subscriptions-exact.tsx"
 RESELLER = ROOT / "components/reseller-subscriptions-parity.tsx"
 DELIVERY = ROOT / "components/central-app-brand-manager.tsx"
 LINK_MODAL = ROOT / "components/subscription-link-delivery-modal.tsx"
+CUSTOMER = ROOT / "components/customer-subscriptions-runtime.tsx"
 FRONT_API = ROOT / "lib/central-app-credential-api.ts"
 LICENSE = ROOT / "components/license-center.tsx"
 ROUTER_UI = ROOT / "components/routed-page-client-v2.tsx"
@@ -72,6 +73,20 @@ class TwinConnectMainlineContract(unittest.TestCase):
         self.assertIn("<AppCredentialDeliveryCard", admin)
         self.assertIn('appOwner="admin"', admin)
         self.assertIn('appOwner="reseller"', reseller)
+        self.assertIn('data-testid="reseller-app-delivery-action"', reseller)
+        self.assertIn('<AppCredentialDeliveryCard', reseller)
+        self.assertIn('owner="reseller"', reseller)
+        customer = CUSTOMER.read_text(encoding="utf-8")
+        self.assertIn('appOwner="customer"', customer)
+        self.assertIn('subscriptionId={linkModalId??undefined}', customer)
+        self.assertIn('owner:"admin"|"reseller"|"customer"', api)
+        self.assertIn('if(owner==="customer"&&reset)', api)
+        self.assertIn('appOwner?:"admin"|"reseller"|"customer"', link)
+        self.assertIn('appDelivery.app_username', link)
+        self.assertIn('appDelivery.app_password', link)
+        self.assertIn('if(open&&appOwner&&subscriptionId&&subscriptionId>0)', link)
+        self.assertNotIn('<QRCodeSVG value={appDelivery', link)
+        self.assertIn('/customer/subscriptions/{subscription_id}/app-delivery', routes)
         self.assertIn("getAppAccess(appOwner,subscriptionId)", link)
         self.assertIn("appearanceApi.save(role,appearance,resellerId)", delivery)
         self.assertIn("registerAppDirectory(appOrigin.trim())", LICENSE.read_text(encoding="utf-8"))
