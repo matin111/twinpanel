@@ -104,6 +104,18 @@ def install() -> None:
                 flutter::EncodableValue(static_cast<int64_t>(totals.sent));
             result->Success(flutter::EncodableValue(values));
           }
+        } else if (call.method_name() == "openVpnTraffic") {
+          twinconnect_openconnect::TrafficTotals totals = {};
+          if (!twinconnect_openconnect::ReadTunnelAdapterTraffic(&totals)) {
+            result->Success(flutter::EncodableValue());
+          } else {
+            flutter::EncodableMap values;
+            values[flutter::EncodableValue("rxBytes")] =
+                flutter::EncodableValue(static_cast<int64_t>(totals.received));
+            values[flutter::EncodableValue("txBytes")] =
+                flutter::EncodableValue(static_cast<int64_t>(totals.sent));
+            result->Success(flutter::EncodableValue(values));
+          }
         } else if (call.method_name() == "openConnectStatus") {
           result->Success(flutter::EncodableValue(
               twinconnect_openconnect::Running()));
