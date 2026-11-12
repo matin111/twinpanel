@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.786",
+  "version": "1.1.0-rc.788",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-12T02:36:57Z",
+  "released_at": "2026-11-12T03:04:31Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "be2f21252cee28ed631d58d2ef116c52032c48b4",
+  "source_sha": "2598672c827822ce1f83b7ee29927bdccdd153e8",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.786/twinpanel-1.1.0-rc.786-linux-x86_64.tar.gz",
-    "sha256": "619691b609f5c1d5480f2270b11c7a6f2613d0f4482166f1906f29ce7e64909e",
-    "size_bytes": 30544485
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.788/twinpanel-1.1.0-rc.788-linux-x86_64.tar.gz",
+    "sha256": "df00cd979a753995880fc705dfddfea7ffac3d7a29ae4aa51dc33a248caf972b",
+    "size_bytes": 30567119
   },
   "notes": {
-    "fa": "نمایش تبلتی ۴:۳ استودیوی برند TwinConnect، اصلاح پیش‌نمایش و جداسازی داده‌های نمونه از وضعیت واقعی اپ. به‌همراه اصلاحات موجود در سورس اصلی پنل. اتصال زنده رنگ و لوگو در کلاینت ویندوز روی شاخه مستقل ویندوز توسعه و تست می‌شود.",
-    "en": "4:3 landscape tablet Brand Studio preview, improved preview labeling and removal of misleading simulated live connection values, plus existing mainline panel fixes. Windows live-brand refresh is built separately from the integration branch."
+    "fa": "نسخه یکپارچه rc.788 شامل پیش‌نمایش تبلتی ۴:۳ تمام‌عرض و رفع برش آن در استودیوی برند TwinConnect، همراه اصلاحات جدید داشبورد منابع سرورها و تغییرات جاری پنل. بدون تغییر عمدی در کانفیگ‌های VPN.",
+    "en": "Integrated rc.788 release: full-width 4:3 tablet brand studio preview clipping fix, new server resource dashboard changes and current mainline fixes, without intentional changes to existing VPN configurations."
   }
 }
