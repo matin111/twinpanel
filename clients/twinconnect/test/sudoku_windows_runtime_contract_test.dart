@@ -1,0 +1,52 @@
+import 'dart:io';
+import 'package:flutter_test/flutter_test.dart';
+
+void main() {
+  test('Sudoku native core is included and guarded, not called via sing-box', () {
+    final ui = File('lib/live_dashboard.dart').readAsStringSync();
+    final native = File('tools/install_windows_native.py').readAsStringSync();
+    final proxy = File('lib/windows_sudoku_proxy.dart').readAsStringSync();
+    final config = File('lib/singbox_windows_config.dart').readAsStringSync();
+
+    expect(ui, contains('_startSudokuTunnel('));
+    expect(ui, contains('WindowsSudokuProxy.enginePresent()'));
+    expect(ui, contains('SudokuClientProfile.fromItem('));
+    expect(ui, contains("protocol: 'sudoku'"));
+    expect(ui, contains('sudokuSocksPort: socksPort'));
+    expect(ui, contains('sudokuVerifiedExitIp: verifiedExit'));
+    expect(ui, contains('sudokuEndpointIPv4: endpoint'));
+    expect(ui, contains('_sudokuProxy.stop()'));
+    expect(proxy, contains('stageSudokuConfig'));
+    expect(proxy, contains('guardSudokuProcess'));
+    expect(proxy, contains('finishSudokuConfig'));
+    expect(proxy, contains('await _verifyRemoteExit(localPort)'));
+    expect(proxy, contains("['-c', path]"));
+    expect(native, contains('twinconnect_sudoku_guard.h'));
+    expect(native, contains('stageSudokuConfig'));
+    expect(native, contains('guardSudokuProcess'));
+    expect(config, contains("'route_exclude_address': ['\$endpointRoute/32']"));
+  });
+
+  test('native ownership uses delete-on-close private files and limited child', () {
+    final native = File('native/windows/twinconnect_sudoku_guard.h')
+        .readAsStringSync();
+    expect(native, contains('JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE'));
+    expect(native, contains('IsBundledEngine(child)'));
+    expect(native, contains('FILE_FLAG_DELETE_ON_CLOSE'));
+    expect(native, contains('ConvertSidToStringSidW'));
+    expect(native, contains('FILE_SHARE_READ | FILE_SHARE_DELETE'));
+    expect(native, contains('ReleaseConfig()'));
+  });
+
+  test('official release is pinned and smoke tested in Windows CI', () {
+    final script = File('tools/bundle_sudoku_windows.ps1')
+        .readAsStringSync();
+    final flow = File('../../.github/workflows/twinconnect-windows-preview.yml')
+        .readAsStringSync();
+    expect(script, contains('sudoku-windows-amd64.zip'));
+    expect(script, contains('52051b7b30d6af66ee151d6a978fa20434edeb5eaaecc4c9bb27063bed33efe1'));
+    expect(script, contains('LICENSE.txt'));
+    expect(flow, contains('bundle_sudoku_windows.ps1'));
+    expect(flow, contains('check_sudoku_windows.ps1'));
+  });
+}
