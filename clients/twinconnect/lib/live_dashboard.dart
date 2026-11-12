@@ -15,6 +15,7 @@ import 'server_inventory.dart';
 import 'server_latency.dart';
 import 'windows_singbox_preflight.dart';
 import 'singbox_profile_validator.dart';
+import 'shadowtls_chain.dart';
 import 'singbox_windows_config.dart';
 import 'windows_singbox_tunnel.dart';
 import 'windows_xray_proxy.dart';
@@ -1259,8 +1260,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       }
       final definition = VpnProtocols.byCode(protocol);
       if (definition == null ||
-          !SingBoxProfileValidator.supportsFamily(protocol) ||
-          protocol == 'shadowtls') {
+          !SingBoxProfileValidator.supportsFamily(protocol)) {
         throw const FormatException('SINGBOX_PROTOCOL_NOT_SUPPORTED');
       }
       if (!await WindowsSingBoxPreflight.enginePresent()) {
@@ -1276,6 +1276,12 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           item['node_id']?.toString() == serverId).toList(growable: false);
       if (matches.length != 1) {
         throw const FormatException('MODERN_SERVER_PROFILE_MISSING');
+      }
+      // ShadowTLS cannot be flattened into one outbound: validate the
+      // subscription's two-stage Shadowsocks -> ShadowTLS chain before
+      // stopping any existing connection. Other protocols are unchanged.
+      if (protocol == 'shadowtls') {
+        ShadowTlsChain.fromItem(matches.single);
       }
       // When switching away from a working VPN, validate before stopping
       // it. For a fresh connect the tunnel controller performs the exact
