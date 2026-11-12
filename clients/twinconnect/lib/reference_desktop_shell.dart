@@ -161,7 +161,7 @@ class _ReferenceDesktopShellState extends State<ReferenceDesktopShell> {
         child: widget.brand.logoUrl == null
           ? const Icon(Icons.change_history_rounded, size: 68, color: violet)
           : Image.network(widget.brand.logoUrl!, fit: BoxFit.contain,
-              errorBuilder: (_, _, _) => const Icon(Icons.change_history_rounded,
+              errorBuilder: (context, error, stackTrace) => const Icon(Icons.change_history_rounded,
                 size: 68, color: violet))),
       const SizedBox(height: 8),
       title(widget.brand.brandName, size: 25),
