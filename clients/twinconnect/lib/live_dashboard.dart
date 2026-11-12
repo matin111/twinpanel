@@ -7,6 +7,7 @@ import 'package:flutter/services.dart' show PlatformException;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'protocols.dart';
@@ -1505,6 +1506,45 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
 
 
 
+  // Each account uses links from its own authenticated tenant brand, never
+  // a hard-coded vendor/other reseller destination.
+  Future<void> _openTenantLink(String? raw, String label) async {
+    final url = raw == null ? null : Uri.tryParse(raw.trim());
+    final valid = url != null &&
+        url.scheme == 'https' &&
+        url.host.contains('.') &&
+        url.userInfo.isEmpty &&
+        !url.hasFragment &&
+        !url.host.endsWith('.local') &&
+        !url.host.endsWith('.internal') &&
+        !url.host.endsWith('.localhost');
+    if (!valid) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(tr('لینک $label توسط مدیریت پنل تنظیم نشده است.',
+              'The $label link is not configured by your provider.')),
+        ));
+      }
+      return;
+    }
+    try {
+      final launched = await launchUrl(url, mode: LaunchMode.externalApplication);
+      if (!launched && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(tr('بازکردن لینک $label ممکن نشد.',
+              'Unable to open the $label link.')),
+        ));
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(tr('بازکردن لینک $label ممکن نشد.',
+              'Unable to open the $label link.')),
+        ));
+      }
+    }
+  }
+
   String tr(String fa, String en) => _persian ? fa : en;
 
   @override
@@ -1657,6 +1697,73 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         sideNav('locations', Icons.place_outlined, tr('مکان‌ها', 'Locations')),
         sideNav('settings', Icons.tune_rounded, tr('تنظیمات', 'Settings')),
         sideNav('account', Icons.person_outline_rounded, tr('حساب', 'Account')),
+        const SizedBox(height: 9),
+        if (wide)
+          Container(
+            key: const Key('tenantQuickLinks'),
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 7),
+            decoration: BoxDecoration(
+              color: (_dark ? Colors.white : const Color(0xFF482F8B))
+                  .withValues(alpha: .055),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: line.withValues(alpha: .45)),
+            ),
+            child: Row(children: [
+              for (final item in <({String id, IconData icon, String fa,
+                  String en, String? url})>[
+                (id: 'support', icon: Icons.support_agent_outlined,
+                    fa: 'پشتیبانی', en: 'Support', url: widget.brand.telegramUrl),
+                (id: 'renewal', icon: Icons.autorenew_rounded,
+                    fa: 'تمدید', en: 'Renew', url: widget.brand.renewalUrl),
+                (id: 'website', icon: Icons.language_rounded,
+                    fa: 'سایت', en: 'Website', url: widget.brand.websiteUrl),
+              ])
+                Expanded(child: Tooltip(
+                  message: tr(item.fa, item.en),
+                  child: InkWell(
+                    key: Key('tenantLink_${item.id}'),
+                    borderRadius: BorderRadius.circular(10),
+                    onTap: () => _openTenantLink(
+                        item.url, tr(item.fa, item.en)),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      child: Column(mainAxisSize: MainAxisSize.min, children: [
+                        Icon(item.icon, color: purple, size: 20),
+                        const SizedBox(height: 5),
+                        txt(tr(item.fa, item.en), size: 9, bold: true),
+                      ]),
+                    ),
+                  ),
+                )),
+            ]),
+          )
+        else
+          PopupMenuButton<String>(
+            key: const Key('tenantQuickLinksCompact'),
+            tooltip: tr('پشتیبانی و پیوندها', 'Support and links'),
+            icon: Icon(Icons.open_in_new_rounded, color: purple),
+            onSelected: (value) {
+              switch (value) {
+                case 'support':
+                  _openTenantLink(widget.brand.telegramUrl,
+                      tr('پشتیبانی', 'Support'));
+                case 'renewal':
+                  _openTenantLink(widget.brand.renewalUrl,
+                      tr('تمدید', 'Renew'));
+                case 'website':
+                  _openTenantLink(widget.brand.websiteUrl,
+                      tr('سایت', 'Website'));
+              }
+            },
+            itemBuilder: (_) => [
+              PopupMenuItem(value: 'support',
+                  child: Text(tr('پشتیبانی', 'Support'))),
+              PopupMenuItem(value: 'renewal',
+                  child: Text(tr('تمدید', 'Renew'))),
+              PopupMenuItem(value: 'website',
+                  child: Text(tr('سایت', 'Website'))),
+            ],
+          ),
         const Spacer(),
         if (wide) glassCard(
           padding: const EdgeInsets.all(12),
