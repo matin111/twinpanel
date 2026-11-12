@@ -11,16 +11,53 @@ class WindowsXrayPreflight {
     return '${File(appExecutable).parent.path}\\engines\\xray\\xray.exe';
   }
 
+  // Version verification is a subprocess: reuse it for one minute ONLY if
+  // the bundled executable path, size and modification time are unchanged.
+  // Failed checks are cached briefly too, preventing repeated slow launches.
+  static Future<bool>? _versionCheck;
+  static DateTime? _checkedAt;
+  static DateTime? _modified;
+  static int? _size;
+  static String? _binaryPath;
+
   static Future<bool> enginePresent() async {
     if (!Platform.isWindows) return false;
     final path = enginePath(Platform.resolvedExecutable);
-    if (!await File(path).exists()) return false;
+    try {
+      final info = await File(path).stat();
+      if (info.type != FileSystemEntityType.file) {
+        _versionCheck = null;
+        return false;
+      }
+      final now = DateTime.now();
+      if (_versionCheck != null &&
+          _binaryPath == path &&
+          _modified == info.modified &&
+          _size == info.size &&
+          _checkedAt != null &&
+          now.difference(_checkedAt!) < const Duration(seconds: 60)) {
+        return await _versionCheck!;
+      }
+      _binaryPath = path;
+      _modified = info.modified;
+      _size = info.size;
+      _checkedAt = now;
+      _versionCheck = _verifyVersion(path);
+      return await _versionCheck!;
+    } catch (_) {
+      _versionCheck = null;
+      return false;
+    }
+  }
+
+  static Future<bool> _verifyVersion(String path) async {
     try {
       final result = await Process.run(
         path, ['version'], runInShell: false,
       ).timeout(const Duration(seconds: 6));
       final output = result.stdout.toString();
-      return result.exitCode == 0 && output.startsWith('Xray ');
+      return result.exitCode == 0 && output.startsWith('Xray ') &&
+          RegExp(r'\\b26\\.11\\.9\\b').hasMatch(output);
     } catch (_) {
       return false;
     }
