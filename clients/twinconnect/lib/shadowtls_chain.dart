@@ -71,7 +71,6 @@ class ShadowTlsChain {
         server.contains('?') || server.contains('#') ||
         port is! int || port < 1 || port > 65535 ||
         tlsOptions is! Map || tlsOptions['enabled'] != true ||
-        tlsOptions['insecure'] == true ||
         tlsOptions['server_name'] is! String ||
         (tlsOptions['server_name'] as String).isEmpty ||
         tls.containsKey('detour')) {
