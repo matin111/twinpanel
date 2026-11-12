@@ -184,9 +184,7 @@ export function AdminDashboardRuntime(){
   return <Shell active="/admin"><div className="page dash27">
     <section className="dash27-hero">
       <div className="dash27-title">
-        <span className="dash27-eyebrow"><i/>{pick("مرکز فرمان زنده","LIVE COMMAND CENTER")}</span>
         <h1>{pick("داشبورد مدیریت","Admin Dashboard")}</h1>
-        <p>{pick("نمای یکپارچه فروش، کاربران، نودها، تانل‌ها و سلامت پروتکل‌های TwinPanel","Unified view of sales, users, nodes, tunnels and TwinPanel protocol health")}</p>
       </div>
       <div className="dash27-actions">
         <div className="dash27-live"><span/><div><b>{pick("سیستم آنلاین","System online")}</b><small>{generatedAt?generatedAt.toLocaleTimeString("fa-IR",{hour:"2-digit",minute:"2-digit"}):pick("در انتظار داده","Waiting for data")}</small></div></div>
