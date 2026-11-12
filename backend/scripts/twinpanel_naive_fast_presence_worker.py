@@ -127,6 +127,7 @@ async def main() -> None:
         print("TWINPANEL_NAIVE_FAST_AUTHENTICATED_PRESENCE_STARTED", flush=True)
         while True:
             started = time.monotonic()
+            report = None
             try:
                 report = await reconcile_once()
                 print(json.dumps({"event": "naive_fast_presence", **report},
@@ -137,7 +138,12 @@ async def main() -> None:
                 print(json.dumps({"event": "naive_fast_presence_crash",
                                   "error": f"{type(exc).__name__}:{str(exc)[:180]}"}),
                       flush=True)
-            await asyncio.sleep(max(INTERVAL_SECONDS - (time.monotonic() - started), 0.5))
+            # A sweep that exceeds its cadence must not immediately begin
+            # another full fleet scan. Retain 20s freshness on fast sweeps;
+            # give failing collectors 15s of backoff, successful slow
+            # collectors 5s of CPU/DB headroom before the next pass.
+            min_rest = 15.0 if report is None or not report.get("ok", False) else 5.0
+            await asyncio.sleep(max(INTERVAL_SECONDS - (time.monotonic() - started), min_rest))
 
 
 if __name__ == "__main__":
