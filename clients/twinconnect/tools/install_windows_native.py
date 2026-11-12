@@ -14,6 +14,8 @@ NATIVE = ROOT / "native" / "windows" / "twinconnect_wireguard.h"
 INSTALLED = ROOT / "windows" / "runner" / "twinconnect_wireguard.h"
 SINGBOX_GUARD = ROOT / "native" / "windows" / "twinconnect_singbox_guard.h"
 SINGBOX_INSTALLED = ROOT / "windows" / "runner" / "twinconnect_singbox_guard.h"
+XRAY_GUARD = ROOT / "native" / "windows" / "twinconnect_xray_guard.h"
+XRAY_INSTALLED = ROOT / "windows" / "runner" / "twinconnect_xray_guard.h"
 OPENCONNECT_NATIVE = ROOT / "native" / "windows" / "twinconnect_openconnect.h"
 OPENCONNECT_INSTALLED = ROOT / "windows" / "runner" / "twinconnect_openconnect.h"
 L2TP_NATIVE = ROOT / "native" / "windows" / "twinconnect_l2tp.h"
@@ -37,6 +39,9 @@ def install() -> None:
     if not SINGBOX_GUARD.is_file():
         raise RuntimeError("Missing sing-box process guard header")
     shutil.copyfile(SINGBOX_GUARD, SINGBOX_INSTALLED)
+    if not XRAY_GUARD.is_file():
+        raise RuntimeError("Missing Xray process guard header")
+    shutil.copyfile(XRAY_GUARD, XRAY_INSTALLED)
     if not OPENCONNECT_NATIVE.is_file():
         raise RuntimeError("Missing OpenConnect native runtime header")
     shutil.copyfile(OPENCONNECT_NATIVE, OPENCONNECT_INSTALLED)
@@ -68,6 +73,7 @@ def install() -> None:
             '#include <flutter/standard_method_codec.h>\n'
             '#include "twinconnect_wireguard.h"\n'
             '#include "twinconnect_singbox_guard.h"\n'
+            '#include "twinconnect_xray_guard.h"\n'
             '#include "twinconnect_openconnect.h"\n'
             '#include "twinconnect_l2tp.h"',
         )
@@ -234,6 +240,26 @@ def install() -> None:
           if (!twinconnect_singbox_guard::Guard(pid)) {
             result->Error("SINGBOX_PROCESS_GUARD_FAILED");
             return;
+          }
+          result->Success(flutter::EncodableValue(true));
+        } else if (call.method_name() == "guardXrayProcess") {
+          const auto* args = std::get_if<flutter::EncodableMap>(
+              call.arguments());
+          if (!args) { result->Error("INVALID_XRAY_PROCESS_REQUEST"); return; }
+          const auto it = args->find(flutter::EncodableValue("pid"));
+          if (it == args->end()) {
+            result->Error("INVALID_XRAY_PROCESS_ID"); return;
+          }
+          int64_t pid = 0;
+          if (const auto* v = std::get_if<int32_t>(&it->second)) {
+            pid = *v;
+          } else if (const auto* v = std::get_if<int64_t>(&it->second)) {
+            pid = *v;
+          } else {
+            result->Error("INVALID_XRAY_PROCESS_ID"); return;
+          }
+          if (!twinconnect_xray_guard::Guard(pid)) {
+            result->Error("XRAY_PROCESS_GUARD_FAILED"); return;
           }
           result->Success(flutter::EncodableValue(true));
         } else if (call.method_name() == "getCapabilities") {
