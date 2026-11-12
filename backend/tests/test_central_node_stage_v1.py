@@ -25,6 +25,21 @@ class CentralNodeStageTests(unittest.TestCase):
         scoped.start()
         self.addCleanup(scoped.stop)
 
+    def test_apply_uses_fleet_wide_lock_without_changing_per_node_logic(self):
+        from tempfile import TemporaryDirectory
+        from pathlib import Path
+        with TemporaryDirectory() as temp:
+            with (patch.object(stage, "_GLOBAL_STAGE_LOCK", Path(temp) / "fleet.lock"),
+                  patch.object(stage, "_run_serialized", return_value=0) as execute):
+                self.assertEqual(stage.run(19, 3000, True, delta_only=True), 0)
+                self.assertTrue((Path(temp) / "fleet.lock").is_file())
+                execute.assert_called_once_with(19, 3000, True, delta_only=True)
+
+    def test_readonly_stage_does_not_wait_for_fleet_write_lock(self):
+        with patch.object(stage, "_run_serialized", return_value=0) as execute:
+            self.assertEqual(stage.run(19, 3000, False), 0)
+            execute.assert_called_once_with(19, 3000, False, delta_only=False)
+
     def test_bulk_adapters_include_xray_and_no_individual_worker(self):
         self.assertEqual(len(stage.ADAPTERS), 10)
         self.assertFalse(any("backfill" in name for name in stage.ADAPTERS))
