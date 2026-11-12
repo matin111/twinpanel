@@ -89,7 +89,7 @@ class _TwinConnectAppState extends State<TwinConnectApp> {
     };
 
     return MaterialApp(
-      title: 'TwinConnect',
+      title: _activeBrand?.brandName ?? 'TwinConnect',
       debugShowCheckedModeBanner: false,
       locale: selectedLocale,
       supportedLocales: const [Locale('en'), Locale('fa')],
@@ -191,12 +191,12 @@ class _TwinConnectHomeState extends State<TwinConnectHome> with WidgetsBindingOb
   /// Refresh the brand from the account owner's panel, not a vendor/global
   /// default or the last saved snapshot. Transient failures retain the
   /// last verified brand and never log or expose the app session token.
-  Future<void> _refreshBrand() async {
-    if (_brandRefreshBusy) return;
+  Future<bool> _refreshBrand() async {
+    if (_brandRefreshBusy) return false;
     final panel = _confirmedPanel;
     final username = _confirmedUsername;
     final token = _confirmedSessionToken;
-    if (panel == null || username == null || token == null) return;
+    if (panel == null || username == null || token == null) return false;
     final serial = _lookupSerial;
     _brandRefreshBusy = true;
     try {
@@ -211,16 +211,16 @@ class _TwinConnectHomeState extends State<TwinConnectHome> with WidgetsBindingOb
             _sessionRefreshToken == null) rethrow;
         await _renewSession();
         final renewed = _confirmedSessionToken;
-        if (renewed == null || renewed == token) return;
+        if (renewed == null || renewed == token) return false;
         latest = await api.loadSessionBrand(
           panel: panel, sessionToken: renewed,
         );
       }
       if (!mounted || serial != _lookupSerial ||
-          username != _confirmedUsername || panel != _confirmedPanel) return;
+          username != _confirmedUsername || panel != _confirmedPanel) return false;
       if (latest.ownerType == 'reseller' &&
           !username.startsWith(latest.appUsernamePrefix)) {
-        return;
+        return false;
       }
       setState(() => _brand = latest);
       widget.onBrandChanged(latest);
@@ -236,8 +236,10 @@ class _TwinConnectHomeState extends State<TwinConnectHome> with WidgetsBindingOb
           );
         } catch (_) {/* A storage failure must not undo the live brand. */}
       }
+      return true;
     } catch (_) {
       // Offline mode keeps the last authenticated brand.
+      return false;
     } finally {
       _brandRefreshBusy = false;
     }
@@ -925,6 +927,7 @@ class _TwinConnectHomeState extends State<TwinConnectHome> with WidgetsBindingOb
       return TwinConnectLiveDashboard(
         key: ValueKey(_confirmedUsername),
         brand: brand,
+        onBrandRefresh: _refreshBrand,
         panel: _confirmedPanel!,
         username: _confirmedUsername!,
         sessionToken: _confirmedSessionToken!,
