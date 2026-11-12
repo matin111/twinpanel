@@ -20,6 +20,40 @@ BACKEND = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND))
 
 
+def _cheap_paid_order_priority() -> bool:
+    """Cheap read-only priority check before importing the large ORM graph.
+
+    The existing full safety check still runs before any backfill write.
+    Database failures defer this legacy batch rather than steal resources
+    from paid orders or API recovery.
+    """
+    raw_dsn = os.environ.get("DATABASE_URL", "").strip()
+    if not raw_dsn:
+        return False
+    try:
+        import psycopg2
+        dsn = raw_dsn.replace("postgresql+psycopg2://", "postgresql://", 1)
+        from datetime import datetime, timedelta
+        cutoff = datetime.utcnow() - timedelta(minutes=45)
+        with psycopg2.connect(
+            dsn, connect_timeout=2,
+            options="-c statement_timeout=1700 -c default_transaction_read_only=on",
+        ) as connection:
+            with connection.cursor() as cursor:
+                cursor.execute("""
+                    SELECT
+                        EXISTS (SELECT 1 FROM store_orders
+                                WHERE status='provisioning' AND created_at >= %s)
+                     OR EXISTS (SELECT 1 FROM reseller_bot_orders
+                                WHERE status='provisioning' AND created_at >= %s)
+                     OR EXISTS (SELECT 1 FROM fast_provision_jobs_v1
+                                WHERE state IN ('queued','running','retry'))
+                """, (cutoff, cutoff))
+                return bool(cursor.fetchone()[0])
+    except Exception:
+        return True
+
+
 def _cheap_priority_guard() -> bool:
     """Defer legacy backfill before its expensive application imports.
 
@@ -42,7 +76,7 @@ def _cheap_priority_guard() -> bool:
             return True
     except (OSError, subprocess.TimeoutExpired):
         pass  # The full existing guard remains authoritative.
-    return False
+    return _cheap_paid_order_priority()
 
 
 if __name__ == "__main__" and _cheap_priority_guard():
