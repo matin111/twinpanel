@@ -150,10 +150,10 @@ export function CentralAppBrandManager({role}:{role:"admin"|"reseller"}){
     <p className="tbs-connection-label">{pick("آماده اتصال","Ready to connect")}</p>
     <small className="tbs-connection-sub">{pick("برای اتصال ضربه بزنید","Tap to connect")}</small>
     <div className="tbs-server tbs-server-one" style={{background:appearance?.surface_color}}>
-      <div><b>🇩🇪 Germany</b><small>WireGuard · 46 ms</small></div><span style={{color:appearance?.primary_color}}>✓</span>
+      <div><b>{pick('سرور نمونه ۱','Sample server 1')}</b><small>{pick('بدون داده اتصال زنده','No live connection data')}</small></div><span style={{color:appearance?.primary_color}}>✓</span>
     </div>
     <div className="tbs-server tbs-server-two" style={{background:appearance?.surface_color}}>
-      <div><b>🇹🇷 Turkey</b><small>OpenConnect · 58 ms</small></div><span>›</span>
+      <div><b>{pick('سرور نمونه ۲','Sample server 2')}</b><small>{pick('طرح نمایشی','Design placeholder')}</small></div><span>›</span>
     </div>
     <div className="tbs-device-bottom"><span>⌂</span><span>◈</span><span>⚙</span></div>
   </div>;
@@ -254,9 +254,9 @@ export function CentralAppBrandManager({role}:{role:"admin"|"reseller"}){
         <aside className="tbs-preview">
           <div className="tbs-preview-head"><div><strong>{pick("پیش‌نمایش زنده","Live preview")}</strong>
             <small>{pick("نمای تقریبی اپ پس از دریافت برند","Approximate app appearance")}</small></div>
-            <span>● LIVE</span></div>
+            <span>{pick("پیش‌نمایش طراحی","DESIGN PREVIEW")}</span></div>
           {preview}
-          <div className="tbs-preview-note">{pick("پیش‌نمایش نمایشی است؛ تنظیمات واقعی از API برند توسط اپ دریافت می‌شوند.","Visual preview; actual settings are delivered to the app through its brand API.")}</div>
+          <div className="tbs-preview-note">{pick("این بخش فقط پیش‌نمایش ظاهر است؛ سرورها و اتصال واقعی را داخل نسخه ویندوز پس از ورود بررسی کنید.","This is an appearance preview; check actual servers and connections in the signed-in Windows app.")}</div>
         </aside>
       </div>}
   </div>;
