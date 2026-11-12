@@ -106,6 +106,11 @@ void main() {
     SharedPreferences.setMockInitialValues({'twinconnect_ui_language_v1': 'en'});
     await tester.pumpWidget(const TwinConnectApp());
     await tester.pumpAndSettle();
+    expect(find.byKey(const Key('referenceDesktopShell')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('referenceNav3')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('referenceLoginAction')));
+    await tester.pumpAndSettle();
     expect(find.text('TwinConnect'), findsOneWidget);
     expect(find.byKey(const Key('accountUsername')), findsOneWidget);
     expect(find.byKey(const Key('subscriptionLink')), findsOneWidget);
