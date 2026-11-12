@@ -46,7 +46,10 @@ void main() {
     expect(tunnel, contains('xraySocksPort'));
     expect(tunnel, contains('ip != before && ip == verifiedProxyIp'));
     expect(dashboard, contains('_startXrayTunnel'));
-    expect(dashboard, contains('showDialog<XrayInboundProfile>'));
+    // Inbounds are direct-selectable server rows: no extra modal.
+    expect(dashboard, isNot(contains('showDialog<XrayInboundProfile>')));
+    expect(dashboard, contains('xrayInboundRow(i, inbound)'));
+    expect(dashboard, contains('_startXrayTunnel(nodeId, inboundId: inbound.id)'));
     expect(dashboard, contains('if (_xrayProxy.isRunning) await _xrayProxy.stop();'));
   });
 }
