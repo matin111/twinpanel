@@ -77,6 +77,10 @@ def launch(db, node_id: int, *, initial_full: bool = False) -> dict:
         "--property=EnvironmentFile=/etc/twinpanel/backend.env",
         "--property=EnvironmentFile=-/etc/twinpanel/install.env",
         "--property=Nice=10", "--property=Type=exec",
+        # All subprocess adapters inherit the stage cgroup budget. A busy
+        # controller must not be starved by bulk provisioning.
+        "--property=CPUQuota=200%", "--property=CPUWeight=20",
+        "--property=IOWeight=30",
         sys.executable, str(STAGE),
         "--node-id", str(node_id),
         "--limit", str(MAX_USERS),
