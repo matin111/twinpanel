@@ -385,6 +385,24 @@ def _baseline_or_apply_cumulative(
         else uplink + downlink
     )
 
+    if proven_bytes == 0:
+        # An authoritative epoch rotation with zero counters is a baseline,
+        # NOT a billable usage event. Persist the new cursor once so repeated
+        # daemon restarts cannot create hundreds of thousands of zero-byte
+        # events or force needless subscription locks. A subsequent nonzero
+        # cumulative reading is accounted as a delta from this new epoch.
+        cursor.counter_epoch = epoch
+        cursor.last_sequence = sequence
+        cursor.last_uplink_value = uplink
+        cursor.last_downlink_value = downlink
+        cursor.updated_at = _naive(reported_at)
+        return {
+            "baselined": True,
+            "event": False,
+            "accepted_bytes": 0,
+            "epoch_changed": not same_epoch,
+        }
+
     if proven_bytes > 0:
         _activate_from_real_usage_if_needed(
             db,
