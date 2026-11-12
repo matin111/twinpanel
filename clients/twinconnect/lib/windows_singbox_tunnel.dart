@@ -6,6 +6,7 @@ import 'dart:math';
 import 'package:flutter/services.dart';
 
 import 'singbox_windows_config.dart';
+import 'xray_endpoint_route.dart';
 import 'singbox_profile_validator.dart';
 import 'modern_transport_probe.dart';
 import 'windows_singbox_preflight.dart';
@@ -139,6 +140,7 @@ class WindowsSingBoxTunnel {
     required Map<String, dynamic> profile,
     int? xraySocksPort,
     String? xrayVerifiedExitIp,
+    String? xrayEndpointIPv4,
     String? baselinePublicIp,
   }) async {
     if (_changing || _child != null) {
@@ -153,9 +155,13 @@ class WindowsSingBoxTunnel {
       if (!await WindowsSingBoxPreflight.enginePresent()) {
         throw const FormatException('SINGBOX_ENGINE_NOT_INSTALLED');
       }
-      // Bootstrap the selected endpoint on the physical network BEFORE
-      // strict-route TUN changes system DNS or routes. Use the same pinned IP
-      // for the real tunnel, retaining the original TLS server_name.
+      // Xray has already dialled the pinned upstream via the physical NIC.
+      // Only that IP can be exempted from TUN routes, preventing loopback.
+      if ((xraySocksPort == null) != (xrayEndpointIPv4 == null) ||
+          (xrayEndpointIPv4 != null &&
+           XrayEndpointRoute.requirePublicIPv4(xrayEndpointIPv4).isEmpty)) {
+        throw const FormatException('XRAY_ENDPOINT_ROUTE_MISSING');
+      }
       if ((xraySocksPort == null) != (xrayVerifiedExitIp == null) ||
           (xraySocksPort != null &&
            (protocol != 'v2ray' || xraySocksPort < 1024 ||
@@ -209,7 +215,8 @@ class WindowsSingBoxTunnel {
       final config = SingBoxWindowsConfig.compose(
         protocol: protocol, item: profile, resolvedServer: resolvedServer,
         telemetryPort: telemetryPort, telemetrySecret: telemetrySecret,
-        xraySocksPort: xraySocksPort);
+        xraySocksPort: xraySocksPort,
+        xrayEndpointIPv4: xrayEndpointIPv4);
       // Independently verify that the selected Hysteria2/TUIC/etc outbound
       // can reach the internet before changing any Windows routes.
       // A failure here points to profile/transport rather than TUN routing.
