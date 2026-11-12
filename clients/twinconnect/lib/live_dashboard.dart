@@ -45,6 +45,7 @@ class TwinConnectLiveDashboard extends StatefulWidget {
     required this.panel,
     required this.username,
     required this.brand,
+    this.onBrandRefresh,
     required this.sessionToken,
     required this.catalog,
     required this.servers,
@@ -62,6 +63,7 @@ class TwinConnectLiveDashboard extends StatefulWidget {
   final PanelDirectoryEntry panel;
   final String username;
   final BrandPreview brand;
+  final Future<bool> Function()? onBrandRefresh;
   final String sessionToken;
   final PanelProtocolCatalog? catalog;
   final AppServerInventory? servers;
@@ -1405,7 +1407,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final language = prefs.getString(_languagePreference);
-      final dark = prefs.getBool(_appearancePreference);
+      final dark = prefs.getBool(_appearancePreference + '_' + widget.username);
       if (!mounted) return;
       setState(() {
         if (language == 'fa' || language == 'en') {
@@ -1430,7 +1432,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     setState(() => _dark = next);
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool(_appearancePreference, next);
+      await prefs.setBool(_appearancePreference + '_' + widget.username, next);
     } catch (_) {}
   }
 
@@ -1493,7 +1495,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'TwinConnect',
+      title: widget.brand.brandName,
       debugShowCheckedModeBanner: false,
       locale: Locale(_persian ? 'fa' : 'en'),
       supportedLocales: const [Locale('fa'), Locale('en')],
@@ -2801,6 +2803,21 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
               settingLine(Icons.palette_outlined, tr('ظاهر', 'Appearance'),
                   disabled: false,
                   onTap: _changeAppearance),
+              settingLine(Icons.sync_rounded,
+                  tr('دریافت برند از پنل: ${widget.brand.brandName}',
+                     'Sync panel brand: ${widget.brand.brandName}'),
+                  disabled: widget.onBrandRefresh == null,
+                  onTap: () async {
+                    final success = await widget.onBrandRefresh?.call() ?? false;
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content: Text(success
+                        ? tr('برند از پنل دریافت شد.',
+                             'Brand synchronized from the panel.')
+                        : tr('دریافت برند ناموفق بود؛ آخرین تنظیمات معتبر حفظ شد.',
+                             'Could not sync brand; last verified brand kept.')),
+                    ));
+                  }),
             ],
           ),
         ),
