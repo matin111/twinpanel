@@ -1488,7 +1488,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     return tr('نامحدود', 'Unlimited');
   }
 
-  Color get purple => BrandTheme.parse(widget.brand.primaryColor, '#A46AFF');
+  Color get purple => BrandTheme.accent(widget.brand,
+      _dark ? Brightness.dark : Brightness.light);
   List<_DemoServer> get demoServers => [
     for (final server in widget.servers?.servers ?? const <AppServer>[])
       _DemoServer(
@@ -1533,8 +1534,10 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     // Both colors are tenant-managed in the main panel and reseller studio.
     // Keep explicit overrides for dark/light while the owner's palette remains
     // authoritative across the dashboard, cards and side navigation.
-    final panel = BrandTheme.parse(widget.brand.surfaceColor, '#20202A');
-    final sidebar = BrandTheme.parse(widget.brand.backgroundColor, '#101018');
+    final panel = BrandTheme.surface(widget.brand,
+        _dark ? Brightness.dark : Brightness.light);
+    final sidebar = BrandTheme.backgroundColor(widget.brand,
+        _dark ? Brightness.dark : Brightness.light);
 
     Text txt(String s, {double size = 13, bool bold = false, Color? color,
         TextAlign? align}) => Text(
@@ -1578,8 +1581,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     }) => TwinConnectGlassCard(
       key: key,
       dark: _dark,
-      surfaceColor: BrandTheme.parse(widget.brand.surfaceColor, '#20202A'),
-      accentColor: BrandTheme.parse(widget.brand.primaryColor, '#7C3AED'),
+      surfaceColor: panel,
+      accentColor: purple,
       selected: selected,
       radius: radius,
       padding: padding,
@@ -3084,7 +3087,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       body: Row(children: [
         Expanded(child: TwinConnectAmbientBackground(
           dark: _dark,
-          backgroundColor: BrandTheme.parse(widget.brand.backgroundColor, '#101018'),
+          backgroundColor: sidebar,
           child: SafeArea(child: ListView(
             padding: EdgeInsets.symmetric(
                 horizontal: wide ? 30 : 17, vertical: 25),
