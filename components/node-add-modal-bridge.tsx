@@ -357,7 +357,52 @@ export function NodeAddModalBridge(){
       html[data-theme="light"] .tp-node-section-title{color:#243b59}
       html[data-theme="light"] .tp-add-node-card .tp-node-form-grid>.field>input,
       html[data-theme="light"] .tp-add-node-card .tp-node-form-grid>.field>select{background:#f8faff!important;color:#1f3456!important}
-      html[data-theme="light"] .tp-add-node-card form>.action-row{background:#fff!important}
+
+      /* Light-only overrides for dark, low-contrast sections in Add server. */
+      html[data-theme="light"] .tp-add-node-modal .tp-add-node-card form .runtime-choice-section{
+        background:linear-gradient(165deg,#f5f9ff 0%,#edf3fc 100%)!important;
+        border:1px solid #d5e0ee!important;color:#273a56!important;
+        box-shadow:inset 0 1px 0 #fff,0 3px 12px rgba(52,74,111,.045)!important;
+      }
+      html[data-theme="light"] .tp-add-node-modal .tp-add-node-card form .runtime-choice-section .field>span,
+      html[data-theme="light"] .tp-add-node-modal .tp-add-node-card form .runtime-choice-section .toggle span{
+        color:#314764!important;opacity:1!important;font-weight:700;
+      }
+      html[data-theme="light"] .tp-add-node-modal .tp-add-node-card form .runtime-choice-section>small{
+        display:block;color:#526680!important;opacity:1!important;
+        font-size:11px;line-height:1.8;
+      }
+      html[data-theme="light"] .tp-add-node-modal .tp-add-node-card form .runtime-choice-section input:not([type="checkbox"]),
+      html[data-theme="light"] .tp-add-node-modal .tp-add-node-card form .runtime-choice-section select{
+        background:#fff!important;border:1px solid #cad8e9!important;
+        color:#243852!important;box-shadow:0 1px 2px rgba(43,68,105,.035)!important;
+      }
+      html[data-theme="light"] .tp-add-node-modal .tp-add-node-card form .runtime-choice-section input::placeholder{
+        color:#8899af!important;opacity:1;
+      }
+      html[data-theme="light"] .tp-add-node-modal .tp-add-node-card form .runtime-choice-section input:focus-visible{
+        outline:2px solid #7daaf2!important;outline-offset:1px;
+      }
+      html[data-theme="light"] .tp-add-node-modal .tp-add-node-card form .runtime-warning{
+        background:#fff8ec!important;border:1px solid #efd8b0!important;
+        color:#76501e!important;box-shadow:none!important;
+      }
+      html[data-theme="light"] .tp-add-node-modal .tp-add-node-card .tp-node-form-grid>.field>span,
+      html[data-theme="light"] .tp-add-node-modal .tp-add-node-card .tp-node-section-note,
+      html[data-theme="light"] .tp-add-node-modal .tp-add-node-card>.card-head small{
+        color:#526985!important;opacity:1!important;
+      }
+      html[data-theme="light"] .tp-add-node-modal .tp-add-node-card>.card-head>.icon-button{
+        background:#e9f0fa!important;color:#29415f!important;
+        border:1px solid #d4e0ed!important;
+      }
+      html[data-theme="light"] .tp-add-node-modal .tp-add-node-card .tp-node-section-number{
+        background:#e6f0ff!important;color:#2e5eae!important;
+      }
+      html[data-theme="light"] .tp-add-node-modal .tp-add-node-card .tp-node-separator{
+        border-top-color:#dee7f2!important;
+      }
+      html[data-theme="light"] .tp-add-node-modal .tp-add-node-card form>.action-row{background:#fff!important}
       @media(max-width:640px){
         .tp-add-node-card form{padding:13px!important}
         .tp-add-node-card>.card-head{padding:15px!important}
