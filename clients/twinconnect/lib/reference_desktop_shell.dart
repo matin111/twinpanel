@@ -154,7 +154,9 @@ class _ReferenceDesktopShellState extends State<ReferenceDesktopShell> {
           end: Alignment.bottomCenter, colors: [Color(0xFF080C29), Color(0xFF21145A)]),
       border: Border(left: BorderSide(color: Color(0x664A3B9D))),
     ),
-    child: Column(children: [
+    child: LayoutBuilder(builder: (context, bounds) => SingleChildScrollView(
+      child: SizedBox(height: math.max(850, bounds.maxHeight),
+        child: Column(children: [
       SizedBox(height: 68, width: 85,
         child: widget.brand.logoUrl == null
           ? const Icon(Icons.change_history_rounded, size: 68, color: violet)
@@ -188,7 +190,7 @@ class _ReferenceDesktopShellState extends State<ReferenceDesktopShell> {
       const SizedBox(height: 14),
       IconButton(key: const Key('referenceSettingsButton'), onPressed: widget.onSettings,
           icon: const Icon(Icons.settings_outlined, color: Colors.white, size: 29)),
-    ]),
+    ])))),
   );
 
   Widget linkIcon(IconData icon, String text, String? url) => InkWell(
@@ -385,11 +387,23 @@ class _ReferenceDesktopShellState extends State<ReferenceDesktopShell> {
                 ]))),
                 _ => quickConnect(),
               };
-              return limits.maxWidth < 770 || limits.maxHeight < 700
-                  ? SingleChildScrollView(child: SizedBox(
-                      width: math.max(770, limits.maxWidth),
-                      height: math.max(700, limits.maxHeight), child: page))
-                  : page;
+              if (limits.maxWidth >= 900 && limits.maxHeight >= 850) {
+                return page;
+              }
+              // Preserve the desktop composition without Flex overflow on
+              // narrow/short windows: allow both axes to scroll explicitly.
+              return SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: SizedBox(
+                  width: math.max(900, limits.maxWidth),
+                  child: SingleChildScrollView(
+                    child: SizedBox(
+                      height: math.max(850, limits.maxHeight),
+                      child: page,
+                    ),
+                  ),
+                ),
+              );
             }),
           )),
           sidebar(),
