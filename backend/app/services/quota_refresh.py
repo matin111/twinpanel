@@ -177,6 +177,137 @@ def _sync_subscription_quota_nodes_blocking(
     }
 
 
+
+def _verify_new_subscription_quota_mapping(
+    db: Session,
+    subscription_id: int,
+) -> dict:
+    """Validate the account's canonical per-node quota identities in O(account).
+
+    New subscriptions previously regenerated EVERY customer's quota inventory
+    on each selected Exit (and queued behind an executor shared with other
+    calls). That regularly hit the 20-second deadline although provisioning
+    and quota devices had succeeded. Agents obtain the complete inventory on
+    their authenticated /nodes/{node_id}/quota/config request; writing a local
+    /tmp snapshot is not required to validate a new subscriber.
+
+    Use precisely the same canonical build_node_devices() filtering, active
+    QuotaDevice checks and identity mapping as the agent pull. If a credential
+    is not covered, fall back to the original full sync, never fake success.
+    """
+    from ..models import NodeType, ProtocolCredential
+    from .quota_node_sync import (
+        _PROTOCOL_TO_QUOTA,
+        _credential_node_ids,
+        build_node_devices,
+    )
+
+    credentials = (
+        db.query(ProtocolCredential)
+        .filter(
+            ProtocolCredential.subscription_id == int(subscription_id),
+            ProtocolCredential.is_active.is_(True),
+        )
+        .all()
+    )
+    selected = [
+        item for item in credentials
+        if str(item.protocol or "").strip().lower() in _PROTOCOL_TO_QUOTA
+        and str(item.config_text_encrypted or "").strip()
+    ]
+    if not selected:
+        return {"ok": False, "reason": "no_provisioned_quota_credentials"}
+
+    expected_protocols = {
+        _PROTOCOL_TO_QUOTA[str(item.protocol).strip().lower()]
+        for item in selected
+    }
+
+    # The current delivery path stores the exact Exit IDs in each credential.
+    # Legacy subscriptions can instead keep their membership in the bridge.
+    node_ids = {
+        int(row[0])
+        for row in db.query(SubscriptionNode.node_id).filter(
+            SubscriptionNode.subscription_id == int(subscription_id)
+        ).all()
+    }
+    for credential in selected:
+        node_ids.update(_credential_node_ids(credential))
+    if not node_ids:
+        return {"ok": False, "reason": "no_quota_delivery_node"}
+
+    exits = {
+        int(row[0])
+        for row in db.query(Node.id).filter(
+            Node.id.in_(node_ids),
+            Node.node_type == NodeType.EXIT,
+            Node.retired_at.is_(None),
+        ).all()
+    }
+    if not exits:
+        return {"ok": False, "reason": "no_active_exit_for_quota"}
+
+    mapped_protocols: set[str] = set()
+    results = []
+    for node_id in sorted(exits):
+        # This filters the canonical quota query by exactly one subscription.
+        # The authoritative agent endpoint uses the same builder with no
+        # observed filter and still enforces telemetry fail-closed.
+        devices = build_node_devices(
+            db, node_id,
+            observed_subscription_ids={int(subscription_id)},
+        )
+        present = {
+            str(row.get("protocol") or "").strip().lower()
+            for row in devices
+            if int(row.get("subscription_id") or 0) == int(subscription_id)
+            and int(row.get("device_id") or 0) > 0
+            and str(row.get("identity") or "").strip()
+        }
+        mapped_protocols.update(present)
+        results.append({
+            "node_id": int(node_id),
+            "ok": bool(present),
+            "devices": len(devices),
+            "mode": "agent-pull-canonical",
+        })
+
+    missing = sorted(expected_protocols - mapped_protocols)
+    return {
+        "ok": bool(mapped_protocols) and not missing,
+        "subscription_id": int(subscription_id),
+        "nodes": results,
+        "mode": "agent-pull-canonical",
+        "missing_protocols": missing,
+    }
+
+
+def _sync_new_subscription_quota_nodes_blocking(
+    db: Session,
+    subscription_id: int,
+    extra_node_ids=None,
+) -> dict:
+    """Fast canonical validation, with original full sync as safe fallback."""
+    if extra_node_ids:
+        return _sync_subscription_quota_nodes_blocking(
+            db, subscription_id, extra_node_ids,
+        )
+    try:
+        result = _verify_new_subscription_quota_mapping(db, subscription_id)
+        if result.get("ok"):
+            # The canonical builder may backfill missing quota devices. Commit
+            # them before an authenticated agent independently pulls config.
+            db.commit()
+            return result
+    except Exception:
+        # A failed validation cannot be treated as an active quota identity.
+        db.rollback()
+
+    return _sync_subscription_quota_nodes_blocking(
+        db, subscription_id, extra_node_ids,
+    )
+
+
 # Quota device scans may decode every active credential while rebuilding an
 # Exit-node snapshot. Never run that synchronous CPU/DB workload on uvicorn's
 # event-loop thread, where it can stall *all* requests including /health.
@@ -193,6 +324,8 @@ async def sync_subscription_quota_nodes(
     db: Session,
     subscription_id: int,
     extra_node_ids=None,
+    *,
+    fast_validate: bool = False,
 ):
     """Preserve canonical quota logic, DB transaction and return contract.
 
@@ -204,7 +337,10 @@ async def sync_subscription_quota_nodes(
     """
     future = asyncio.get_running_loop().run_in_executor(
         _QUOTA_SYNC_EXECUTOR,
-        _sync_subscription_quota_nodes_blocking,
+        (
+            _sync_new_subscription_quota_nodes_blocking
+            if fast_validate else _sync_subscription_quota_nodes_blocking
+        ),
         db,
         int(subscription_id),
         extra_node_ids,
