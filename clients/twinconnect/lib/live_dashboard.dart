@@ -18,6 +18,8 @@ import 'singbox_profile_validator.dart';
 import 'singbox_windows_config.dart';
 import 'windows_singbox_tunnel.dart';
 import 'windows_xray_proxy.dart';
+import 'windows_sudoku_proxy.dart';
+import 'sudoku_client_profile.dart';
 import 'windows_xray_preflight.dart';
 import 'xray_inbound_profiles.dart';
 import 'xray_inbound_latency.dart';
@@ -105,6 +107,9 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       if (_xrayProxy.isRunning) {
         _xrayProxy.stop().catchError((Object _) {});
       }
+      if (_sudokuProxy.isRunning) {
+        _sudokuProxy.stop().catchError((Object _) {});
+      }
       if (!mounted) return;
       setState(() {
         _modernUp = false;
@@ -123,6 +128,20 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       setState(() {
         _modernUp = false;
         _vpnError = 'XRAY_PROCESS_EXITED';
+        _publicIp = null;
+      });
+    },
+  );
+  late final WindowsSudokuProxy _sudokuProxy = WindowsSudokuProxy(
+    onUnexpectedExit: () {
+      _modernHealthTimer?.cancel();
+      _stopModernTrafficMonitoring();
+      // The full-tunnel adapter must stop when its Sudoku upstream dies.
+      _modernTunnel.stop().catchError((Object _) {});
+      if (!mounted) return;
+      setState(() {
+        _modernUp = false;
+        _vpnError = 'SUDOKU_CORE_EXITED';
         _publicIp = null;
       });
     },
@@ -406,7 +425,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     }
     setState(() { _vpnBusy = true; _vpnError = null; });
     try {
-      if (_modernTunnel.isRunning || _xrayProxy.isRunning ||
+      if (_modernTunnel.isRunning || _xrayProxy.isRunning || _sudokuProxy.isRunning ||
           _ciscoTunnel.isRunning ||
           _openVpnTunnel.hasChild || _l2tpTunnel.hasChild || _modernUp) {
         _modernHealthTimer?.cancel();
@@ -421,6 +440,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           await _modernTunnel.stop();
         }
         if (_xrayProxy.isRunning) await _xrayProxy.stop();
+      if (_sudokuProxy.isRunning) await _sudokuProxy.stop();
         if (!mounted) return;
         setState(() { _modernUp = false; _modernProtocol = null; _modernNodeId = null; });
       }
@@ -527,7 +547,9 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       if (!mounted || !_modernUp || _vpnBusy || _modernHealthBusy) return;
       _modernHealthBusy = true;
       try {
-        final healthy = _modernProtocol == 'v2ray' && !_xrayProxy.isRunning
+        final healthy = ((_modernProtocol == 'v2ray' &&
+              !_xrayProxy.isRunning) ||
+              (_modernProtocol == 'sudoku' && !_sudokuProxy.isRunning))
             ? false
             : _modernProtocol == 'cisco'
             ? await _ciscoTunnel.checkHealth()
@@ -602,7 +624,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   // protocol switch the baseline MUST be sampled after old routes are gone.
   bool get _canPrefetchDirectBaseline =>
       !_vpnUp && !_vpnCleanup && !_vpnUnmanaged && !_modernUp &&
-      !_modernTunnel.isRunning && !_xrayProxy.isRunning &&
+      !_modernTunnel.isRunning && !_xrayProxy.isRunning && !_sudokuProxy.isRunning &&
       !_ciscoTunnel.isRunning && !_openVpnTunnel.hasChild &&
       !_l2tpTunnel.hasChild;
 
@@ -682,7 +704,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           _resetNetworkStats();
         });
       }
-      if (_modernTunnel.isRunning || _xrayProxy.isRunning ||
+      if (_modernTunnel.isRunning || _xrayProxy.isRunning || _sudokuProxy.isRunning ||
           _ciscoTunnel.isRunning ||
           _openVpnTunnel.hasChild || _l2tpTunnel.hasChild) {
         _modernHealthTimer?.cancel();
@@ -697,6 +719,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           await _modernTunnel.stop();
         }
         if (_xrayProxy.isRunning) await _xrayProxy.stop();
+      if (_sudokuProxy.isRunning) await _sudokuProxy.stop();
         if (!mounted) return;
         setState(() {
           _modernUp = false;
@@ -783,7 +806,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           _resetNetworkStats();
         });
       }
-      if (_modernTunnel.isRunning || _xrayProxy.isRunning ||
+      if (_modernTunnel.isRunning || _xrayProxy.isRunning || _sudokuProxy.isRunning ||
           _ciscoTunnel.isRunning ||
           _openVpnTunnel.hasChild || _l2tpTunnel.hasChild) {
         _modernHealthTimer?.cancel();
@@ -798,6 +821,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           await _modernTunnel.stop();
         }
         if (_xrayProxy.isRunning) await _xrayProxy.stop();
+      if (_sudokuProxy.isRunning) await _sudokuProxy.stop();
         if (!mounted) return;
         setState(() {
           _modernUp = false;
@@ -881,7 +905,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           _resetNetworkStats();
         });
       }
-      if (_modernTunnel.isRunning || _xrayProxy.isRunning ||
+      if (_modernTunnel.isRunning || _xrayProxy.isRunning || _sudokuProxy.isRunning ||
           _ciscoTunnel.isRunning ||
           _openVpnTunnel.hasChild || _l2tpTunnel.hasChild) {
         _modernHealthTimer?.cancel();
@@ -896,6 +920,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           await _modernTunnel.stop();
         }
         if (_xrayProxy.isRunning) await _xrayProxy.stop();
+      if (_sudokuProxy.isRunning) await _sudokuProxy.stop();
         if (!mounted) return;
         setState(() {
           _modernUp = false;
@@ -995,6 +1020,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       // selected; no stale profile or node address is reused.
       if (_modernTunnel.isRunning) await _modernTunnel.stop();
       if (_xrayProxy.isRunning) await _xrayProxy.stop();
+      if (_sudokuProxy.isRunning) await _sudokuProxy.stop();
       if (_ciscoTunnel.isRunning) await _ciscoTunnel.stop();
       if (_openVpnTunnel.hasChild) await _openVpnTunnel.stop();
       if (_l2tpTunnel.hasChild) await _l2tpTunnel.stop();
@@ -1147,7 +1173,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           _resetNetworkStats();
         });
       }
-      if (_modernTunnel.isRunning || _xrayProxy.isRunning ||
+      if (_modernTunnel.isRunning || _xrayProxy.isRunning || _sudokuProxy.isRunning ||
           _ciscoTunnel.isRunning ||
           _openVpnTunnel.hasChild || _l2tpTunnel.hasChild) {
         _modernHealthTimer?.cancel();
@@ -1162,6 +1188,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           await _modernTunnel.stop();
         }
         if (_xrayProxy.isRunning) await _xrayProxy.stop();
+      if (_sudokuProxy.isRunning) await _sudokuProxy.stop();
         if (!mounted) return;
         setState(() {
           _modernUp = false;
@@ -1215,6 +1242,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         await _modernTunnel.stop();
       }
       if (_xrayProxy.isRunning) await _xrayProxy.stop();
+      if (_sudokuProxy.isRunning) await _sudokuProxy.stop();
       if (!mounted) return;
       setState(() {
         _modernUp = false;
@@ -1337,7 +1365,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           candidate.profiles, targetId);
       if (!mounted) return;
 
-      if (_modernTunnel.isRunning || _xrayProxy.isRunning ||
+      if (_modernTunnel.isRunning || _xrayProxy.isRunning || _sudokuProxy.isRunning ||
           _ciscoTunnel.isRunning ||
           _openVpnTunnel.hasChild || _l2tpTunnel.hasChild || _modernUp) {
         _stopModernTrafficMonitoring();
@@ -1351,6 +1379,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           await _modernTunnel.stop();
         }
         if (_xrayProxy.isRunning) await _xrayProxy.stop();
+      if (_sudokuProxy.isRunning) await _sudokuProxy.stop();
         if (!mounted) return;
         setState(() {
           _modernUp = false;
@@ -1413,6 +1442,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     _stopModernTrafficMonitoring();
     _modernTunnel.dispose();
     _xrayProxy.dispose();
+    _sudokuProxy.dispose();
     _resetNetworkStats();
     super.dispose();
   }
@@ -1536,7 +1566,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
 
   Future<void> _toggleVpn() async {
     if (_vpnBusy || !Platform.isWindows) return;
-    if (_modernUp || _modernTunnel.isRunning || _xrayProxy.isRunning ||
+    if (_modernUp || _modernTunnel.isRunning || _xrayProxy.isRunning || _sudokuProxy.isRunning ||
         _ciscoTunnel.isRunning || _openVpnTunnel.hasChild ||
         _l2tpTunnel.hasChild) {
       await _stopModernTunnel();
