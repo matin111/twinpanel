@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.809",
-  "source_sha": "91bbf00b3ad1aadfd0916a97f2ec6b5bc632e82f",
+  "version": "1.1.0-rc.810",
+  "source_sha": "b987427900e3a914b572b83563358e43b28accc7",
   "notes": {
-    "fa": "رفع ریشه‌ای فشار CPU در TwinPanel: قفل سراسری ثبت گروهی نودها قبل از بارگذاری پایتون و دیتابیس برای جلوگیری از جهش CPU هنگام شروع چند نود، صف‌بندی امن با قفل مشترک، سهمیه CPU دو هسته برای کل پردازش نود و زیرپردازش‌ها؛ تثبیت سقف ۲٫۵ هسته برای حسابداری با جلوگیری از بازنشانی خودکار به چهار هسته. بدون تغییر داده کاربران، سهمیه‌ها یا کانفیگ پروتکل‌ها.",
-    "en": "Fix fleet CPU overload at the root by locking global staging before Python imports, serializing node bulk provisioning safely while keeping per-node isolation and a 200% stage CPU quota. Persist 250% accounting CPU cap and prevent updater budget re-escalation to 400%. No VPN data or configuration changes."
+    "fa": "رفع مشکل دریافت لینک اشتراک در ربات تلگرام: بازیابی لینک اکانت‌های معلق و منقضی با نام کاربری، بدون فعال‌سازی یا تغییر تاریخ/حجم. اولویت با حساب فعال یکتا، جلوگیری از انتخاب اشتراک‌های تکراری و لغوشده، حفظ محدودیت درخواست و امنیت احراز ربات. همراه تمام اصلاحات عملکردی نسخه rc.809.",
+    "en": "Fix Telegram bot account-link recovery for suspended and expired subscriptions without enabling them or changing expiry/quota. Retain unique active-account priority, fail-closed duplicates, canceled/pending exclusions, owner scoping, rate limits, and all rc.809 performance fixes."
   }
 }
