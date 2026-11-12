@@ -748,7 +748,9 @@ async def _provision_account_v1_locked(
 
         try:
             quota_sync = await await_hard_timeout(
-                sync_subscription_quota_nodes(db, sub.id),
+                sync_subscription_quota_nodes(
+                    db, sub.id, fast_validate=prefer_new_singbox_batch,
+                ),
                 timeout_seconds=QUOTA_SYNC_TIMEOUT_SECONDS,
                 wait_for_cancel=True,
             )
