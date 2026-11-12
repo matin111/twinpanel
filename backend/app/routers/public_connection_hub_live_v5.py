@@ -277,6 +277,117 @@ _LIVE_SCRIPT = r"""
 """
 
 
+
+# TWINPANEL_CONNECTION_APP_LOGIN_AUTHENTICATED_V1
+def _add_authenticated_app_login_panel(source: str, subscription_id: int) -> str:
+    """Add an app-login card to the actual /v1/connect page, not to the admin modal.
+
+    The public share token never returns app passwords. An existing authenticated
+    panel session must authorize a customer/reseller/admin delivery API call.
+    """
+    card = """
+<style>
+#tp-app-access{margin:16px 0;padding:18px;border:1px solid var(--line,#31394b);
+border-radius:18px;background:color-mix(in srgb,var(--surface,#111722) 82%,transparent);
+color:var(--text,#f4f7fb);box-shadow:0 8px 32px #0002}
+#tp-app-access .tp-app-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+#tp-app-access .tp-app-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;margin-top:10px}
+#tp-app-access code{overflow-wrap:anywhere;direction:ltr;text-align:left;display:block;padding:10px;border-radius:9px;background:#080b1455}
+#tp-app-access button{cursor:pointer;border:1px solid var(--line,#444);border-radius:10px;padding:9px 14px;background:var(--p,#7455cf);color:white}
+#tp-app-access .tp-app-note{font-size:12px;opacity:.8;margin-top:9px}
+#tp-app-access [hidden]{display:none!important}
+</style>
+<section id="tp-app-access" aria-label="ورود به اپ TwinConnect">
+ <div class="tp-app-head"><strong>ورود به اپ TwinConnect</strong>
+ <button id="tp-app-access-load" type="button">نمایش اطلاعات ورود اپ</button></div>
+ <p class="tp-app-note" id="tp-app-access-status">نام کاربری و رمز اپ با اطلاعات VPN متفاوت است.</p>
+ <div id="tp-app-access-values" hidden>
+  <div class="tp-app-row"><code id="tp-app-access-username"></code><button type="button" data-app-copy="username">کپی نام کاربری</button></div>
+  <div class="tp-app-row"><code id="tp-app-access-password"></code><button type="button" data-app-copy="password">کپی رمز</button></div>
+  <button id="tp-app-access-copy-all" type="button">کپی هر دو</button>
+ </div>
+ <a id="tp-app-access-signin" href="/panel/subscription" hidden>ورود به پنل برای دریافت اطلاعات اپ</a>
+</section>
+<script>
+(() => {
+  const sid = __SUBSCRIPTION_ID__;
+  const root = document.getElementById("tp-app-access");
+  if (!root) return;
+  const load = document.getElementById("tp-app-access-load");
+  const info = document.getElementById("tp-app-access-status");
+  const values = document.getElementById("tp-app-access-values");
+  const signin = document.getElementById("tp-app-access-signin");
+  const username = document.getElementById("tp-app-access-username");
+  const password = document.getElementById("tp-app-access-password");
+  let credentials = null;
+  const getToken = () => {
+    try { return sessionStorage.getItem("twinpanel_customer_token") ||
+       localStorage.getItem("twinpanel_customer_remember_token"); }
+    catch (_) { return null; }
+  };
+  const showStatus = (message) => { info.textContent = message; };
+  async function fetchOwnerDelivery(token) {
+    for (const role of ["customer","reseller","admin"]) {
+      const response = await fetch("/v1/central-app/" + role + "/subscriptions/" +
+        sid + "/app-delivery", {
+        method:"POST",headers:{"Authorization":"Bearer " + token},
+        cache:"no-store",credentials:"same-origin"
+      });
+      if (response.ok) return response.json();
+      if (response.status === 401) return null;
+      if (response.status === 403) {
+        const body = await response.json().catch(() => ({}));
+        if (body.detail === "CENTRAL_APP_NOT_INCLUDED") throw new Error("APP_DISABLED");
+      }
+      if (![403,404].includes(response.status)) throw new Error("DELIVERY_FAILED");
+    }
+    throw new Error("ACCESS_DENIED");
+  }
+  load.addEventListener("click", async () => {
+    const token = getToken();
+    if (!token) {
+      signin.hidden = false;
+      showStatus("برای نمایش رمز اپ، ابتدا وارد حساب پنل خود شوید.");
+      return;
+    }
+    load.disabled = true;
+    showStatus("در حال دریافت امن اطلاعات ورود...");
+    try {
+      const result = await fetchOwnerDelivery(token);
+      if (!result) {
+        signin.hidden = false;
+        showStatus("نشست ورود معتبر نیست؛ دوباره وارد پنل شوید.");
+        return;
+      }
+      credentials = {username:result.app_username,password:result.app_password};
+      username.textContent = credentials.username;
+      password.textContent = credentials.password;
+      values.hidden = false;
+      signin.hidden = true;
+      showStatus("اطلاعات ورود مخصوص همین اشتراک");
+    } catch (error) {
+      showStatus(error.message === "APP_DISABLED" ? "ورود اپ در لایسنس این پنل فعال نیست." :
+        error.message === "ACCESS_DENIED" ? "دسترسی به اطلاعات این اشتراک مجاز نیست." :
+        "دریافت اطلاعات اپ ممکن نشد. دوباره تلاش کنید.");
+    } finally { load.disabled = false; }
+  });
+  root.querySelectorAll("[data-app-copy]").forEach((button) =>
+    button.addEventListener("click", () => {
+      if (credentials) navigator.clipboard.writeText(credentials[button.dataset.appCopy]).catch(() => {});
+    })
+  );
+  document.getElementById("tp-app-access-copy-all").addEventListener("click", () => {
+    if (credentials) navigator.clipboard.writeText("نام کاربری اپ: " +
+      credentials.username + "\nرمز اپ: " + credentials.password).catch(() => {});
+  });
+})();
+</script>
+""".replace("__SUBSCRIPTION_ID__", str(int(subscription_id)))
+    anchor = '<section id="trafficCard"'
+    if anchor in source:
+        return source.replace(anchor, card + anchor, 1)
+    return source.replace("</body>", card + "</body>", 1)
+
 @router.get("/{token}", response_class=HTMLResponse)
 def public_connection_hub_live_v5(
     token: str,
@@ -467,6 +578,12 @@ def public_connection_hub_live_v5(
     except Exception:
         # Presentation hydration must never block config delivery.
         pass
+
+    # Resolve the subscription using the existing private share-token authority;
+    # no app password is rendered or returned to unauthenticated visitors.
+    from .account_delivery import _subscription_from_share_token
+    sub = _subscription_from_share_token(token, db)
+    source = _add_authenticated_app_login_panel(source, int(sub.id))
 
     return HTMLResponse(
         content=source,
