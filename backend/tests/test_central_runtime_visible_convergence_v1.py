@@ -39,6 +39,27 @@ class OwnershipTests(unittest.TestCase):
             owner.mark_central_applied(MagicMock(),14,"not-a-sha256")
 
 
+class CompletedNodeProtocolScopeTests(unittest.TestCase):
+    def test_completed_install_uses_online_rows_over_stale_progress_count(self):
+        from app.services import central_partial_protocol_scope_v1 as scope
+        db=MagicMock()
+        db.query.return_value.filter.return_value.order_by.return_value.first.return_value=SimpleNamespace(
+            node_id=29,stage="completed",expected_protocols=16,installed_protocols=15)
+        rows=[SimpleNamespace(protocol=key,status="online") for key in scope.ALL_PROTOCOL_SET]
+        db.query.return_value.filter.return_value.all.return_value=rows
+        self.assertEqual(scope.node_supported_protocols(db,29),scope.ALL_PROTOCOL_SET)
+
+    def test_incomplete_install_keeps_strict_protocol_counter_check(self):
+        from app.services import central_partial_protocol_scope_v1 as scope
+        db=MagicMock()
+        db.query.return_value.filter.return_value.order_by.return_value.first.return_value=SimpleNamespace(
+            node_id=29,stage="verified_ready",expected_protocols=16,installed_protocols=15)
+        rows=[SimpleNamespace(protocol=key,status="online") for key in scope.ALL_PROTOCOL_SET]
+        db.query.return_value.filter.return_value.all.return_value=rows
+        with self.assertRaisesRegex(RuntimeError,"CENTRAL_PARTIAL_NODE_PROTOCOL_COUNT_DRIFT"):
+            scope.node_supported_protocols(db,29)
+
+
 class VisibleConvergenceTests(unittest.TestCase):
     def _run(self,last):
         db=MagicMock()
