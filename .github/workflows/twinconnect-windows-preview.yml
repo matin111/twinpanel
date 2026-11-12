@@ -67,6 +67,12 @@ jobs:
       - name: Build Windows x64 standalone directory
         shell: pwsh
         run: flutter build windows --release "--dart-define=TWINCONNECT_DIRECTORY_URL=$env:TWINCONNECT_DIRECTORY_URL"
+      - name: Bundle pinned SHA256-verified official Xray-core
+        shell: pwsh
+        run: ./tools/bundle_xray_windows.ps1
+      - name: Check Xray-core synthetic stdin config without routes
+        shell: pwsh
+        run: ./tools/check_xray_windows.ps1
       - name: Bundle pinned and verified sing-box engine (not yet enabled)
         shell: pwsh
         run: ./tools/bundle_singbox_windows.ps1
