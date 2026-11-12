@@ -163,7 +163,9 @@ class WindowsL2tpTunnel {
         if (status.state == -1) {
           throw FormatException(_failure(status.code));
         }
-        await Future<void>.delayed(const Duration(milliseconds: 700));
+        // Poll RAS promptly; its negotiation is asynchronous and remains the
+        // authoritative connection gate, so shorter polls cannot fake success.
+        await Future<void>.delayed(const Duration(milliseconds: 250));
       }
       throw const FormatException('L2TP_CONNECT_TIMEOUT');
     } catch (_) {
