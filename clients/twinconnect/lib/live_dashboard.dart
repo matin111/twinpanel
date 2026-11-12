@@ -141,7 +141,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       if (!mounted) return;
       setState(() {
         _modernUp = false;
-        _vpnError = 'SUDOKU_CORE_EXITED';
+        _vpnError = _sudokuProxy.lastUnexpectedExitReason ?? 'SUDOKU_CORE_EXITED';
         _publicIp = null;
       });
     },
@@ -2643,6 +2643,22 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
               'SUDOKU_CORE_EXITED' => tr(
                 'موتور سودوکو متوقف شد؛ تونل نیز برای جلوگیری از نشتی قطع شد.',
                 'The Sudoku core stopped; the VPN tunnel was closed safely.'),
+              'SUDOKU_LOCAL_PORT_CONFLICT' => tr(
+                'پورت محلی سودوکو اشغال است؛ برنامه دیگری از آن استفاده می‌کند.',
+                'Sudoku local listener port is already in use.'),
+              'SUDOKU_CORE_ACCESS_DENIED' => tr(
+                'ویندوز دسترسی لازم برای اجرای موتور سودوکو را نداد.',
+                'Windows denied access to the Sudoku process or configuration.'),
+              'SUDOKU_CONFIG_LOAD_FAILED' => tr(
+                'موتور سودوکو نتوانست کانفیگ حفاظت‌شده را بخواند.',
+                'Sudoku could not load its protected configuration.'),
+              'SUDOKU_KEY_REJECTED' => tr(
+                'موتور سودوکو کلید کانفیگ دریافت‌شده را نپذیرفت.',
+                'Sudoku rejected the delivered profile key.'),
+              'SUDOKU_CORE_EXITED_CLEANLY' => tr(
+                'موتور سودوکو بدون درخواست کاربر به‌صورت عادی بسته شد؛ تونل قطع شد.',
+                'Sudoku exited cleanly without a user request; VPN was disconnected.'),
+
               'SUDOKU_LOOPBACK_PROXY_UNAVAILABLE' => tr(
                 'پروکسی محلی سودوکو بعد از اجرای موتور آماده نشد.',
                 'Sudoku local SOCKS5 proxy did not become ready.'),
