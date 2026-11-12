@@ -137,7 +137,9 @@ jobs:
           # would reintroduce dark Add server panels or dark subscription actions.
           for path in \
             "components/node-add-modal-bridge.tsx" \
-            "app/subscription-light-actions.css"; do
+            "app/subscription-light-actions.css" \
+            "components/tunnel-protocol-runtime-v307.tsx" \
+            "components/tunnel-protocol-runtime-v307.module.css"; do
             test -s "source/$path"
             test -s "publisher/$path"
             if ! cmp -s "source/$path" "publisher/$path"; then
@@ -152,7 +154,11 @@ jobs:
           grep -Fq 'Light-only overrides for dark, low-contrast sections' source/components/node-add-modal-bridge.tsx
           grep -Fq 'html[data-theme="light"] .tp-add-node-modal .tp-add-node-card form .runtime-choice-section' source/components/node-add-modal-bridge.tsx
           grep -Fq 'html[data-theme="light"] .legacy-subscriptions-page .mobile-subscription-more-actions button' source/app/subscription-light-actions.css
-          echo "Light-mode Add server and subscription UI release guard passed"
+          grep -Fq 'className={styles.createForm}' source/components/tunnel-protocol-runtime-v307.tsx
+          grep -Fq 'className={styles.createPairGrid}' source/components/tunnel-protocol-runtime-v307.tsx
+          grep -Fq '.createModalCard{' source/components/tunnel-protocol-runtime-v307.module.css
+          grep -Fq ':global(html[data-theme="light"]) .createModalCard' source/components/tunnel-protocol-runtime-v307.module.css
+          echo "Light-mode and tunnel UI release guard passed"
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -456,7 +462,9 @@ jobs:
           # again so an intervening UI change cannot be replaced by stale code.
           for path in \
             "components/node-add-modal-bridge.tsx" \
-            "app/subscription-light-actions.css"; do
+            "app/subscription-light-actions.css" \
+            "components/tunnel-protocol-runtime-v307.tsx" \
+            "components/tunnel-protocol-runtime-v307.module.css"; do
             if ! cmp -s "source/$path" "publisher/$path"; then
               echo "::error file=$path::Light-mode UI changed since the pinned build. Publish a fresh candidate."
               exit 1
