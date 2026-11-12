@@ -2209,35 +2209,65 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     );
 
     Widget sideNav(String page, IconData icon, String title) => Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Material(
-        borderRadius: BorderRadius.circular(13),
-        color: _page == page ? purple.withValues(alpha: 0.21)
-            : (_dark ? Colors.white.withValues(alpha: 0.045)
-                : const Color(0xFF7662A8).withValues(alpha: 0.055)),
-        child: InkWell(
-          key: Key('devNav_$page'),
-          borderRadius: BorderRadius.circular(13),
-          onTap: () => setState(() => _page = page),
-          child: Padding(
-            padding: EdgeInsets.symmetric(
-              horizontal: wide ? 19 : 8, vertical: wide ? 16 : 13),
-            child: Row(
-              mainAxisAlignment: wide ? MainAxisAlignment.start
-                  : MainAxisAlignment.center,
-              children: [
-                Icon(icon, color: _page == page ? purple
-                    : (_dark ? const Color(0xFFD2CCEA)
-                        : const Color(0xFF53496D)), size: wide ? 24 : 21),
-                if (wide) ...[
-                  const SizedBox(width: 15),
-                  Expanded(child: txt(title,
-                    color: _page == page ? ink
-                        : (_dark ? const Color(0xFFE7E2F8)
-                            : const Color(0xFF42395A)),
-                    bold: true)),
-                ],
-              ],
+      padding: const EdgeInsets.only(bottom: 10),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(17),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 13, sigmaY: 13),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              key: Key('devNav_$page'),
+              borderRadius: BorderRadius.circular(17),
+              onTap: () => setState(() => _page = page),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 230),
+                padding: EdgeInsets.symmetric(
+                  horizontal: wide ? 17 : 9,
+                  vertical: wide ? 16 : 13),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(17),
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft, end: Alignment.bottomRight,
+                    colors: _page == page
+                        ? [purple.withValues(alpha: .38),
+                           purple.withValues(alpha: .16)]
+                        : [
+                            (_dark ? Colors.white : purple)
+                                .withValues(alpha: .095),
+                            (_dark ? Colors.white : purple)
+                                .withValues(alpha: .035),
+                          ]),
+                  border: Border.all(
+                    color: _page == page
+                        ? purple.withValues(alpha: .72)
+                        : (_dark ? Colors.white : purple)
+                            .withValues(alpha: .19)),
+                  boxShadow: _page == page ? [
+                    BoxShadow(color: purple.withValues(alpha: .16),
+                      blurRadius: 18, spreadRadius: -4),
+                  ] : const [],
+                ),
+                child: Row(
+                  mainAxisAlignment: wide
+                      ? MainAxisAlignment.start : MainAxisAlignment.center,
+                  children: [
+                    Icon(icon, color: _page == page
+                        ? (_dark ? Colors.white : purple)
+                        : (_dark ? const Color(0xFFE1D9FA)
+                            : const Color(0xFF53496D)),
+                      size: wide ? 24 : 21),
+                    if (wide) ...[
+                      const SizedBox(width: 14),
+                      Expanded(child: txt(title,
+                        color: _page == page ? ink
+                            : (_dark ? const Color(0xFFE7E2F8)
+                                : const Color(0xFF42395A)),
+                        bold: true)),
+                    ],
+                  ],
+                ),
+              ),
             ),
           ),
         ),
