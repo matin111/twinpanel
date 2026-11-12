@@ -94,8 +94,10 @@ class WindowsOpenVpnTunnel {
       throw const FormatException('OPENVPN_ENGINE_NOT_INSTALLED');
     }
     _busy = true;
+    var phase = 'EGRESS_BASELINE';
     try {
       final before = await publicIp();
+      phase = 'PRIVATE_FILES';
       final local = Platform.environment['LOCALAPPDATA'];
       if (local == null || local.isEmpty) {
         throw const FormatException('OPENVPN_STORAGE_UNAVAILABLE');
@@ -113,6 +115,7 @@ class WindowsOpenVpnTunnel {
       _managementPort = reservation.port;
       await reservation.close();
       final ready = Completer<void>();
+      phase = 'PROCESS_LAUNCH';
       final child = await Process.start(binary, [
         '--config', _config!.path,
         '--management', '127.0.0.1', _managementPort.toString(),
@@ -149,8 +152,10 @@ class WindowsOpenVpnTunnel {
         // Remove secrets when OpenVPN exits on its own, not just on Disconnect.
         unawaited(_cleanupIfExited());
       });
+      phase = 'TUNNEL_INITIALIZATION';
       await ready.future.timeout(const Duration(seconds: 55),
           onTimeout: () => throw const FormatException('OPENVPN_START_TIMEOUT'));
+      phase = 'EGRESS_VERIFICATION';
       final ip = await publicIp();
       if (ip == before) {
         throw const FormatException('OPENVPN_EGRESS_NOT_VERIFIED');
@@ -158,10 +163,25 @@ class WindowsOpenVpnTunnel {
       _exitIp = ip;
       _ready = true;
       return ip;
-    } catch (_) {
+    } catch (error) {
       try { await _signalStop(); } catch (_) {}
       await _cleanupIfExited();
-      rethrow;
+      // Do not collapse OS errors to VPN_CONNECTION_FAILED; also do not
+      // expose ProcessException.command, config paths or private material.
+      if (error is FormatException) rethrow;
+      if (error is ProcessException) {
+        throw const FormatException('OPENVPN_PROCESS_LAUNCH_FAILED');
+      }
+      if (error is FileSystemException) {
+        throw const FormatException('OPENVPN_RUNTIME_FILES_FAILED');
+      }
+      if (error is SocketException || error is HttpException) {
+        throw FormatException('OPENVPN_${phase}_NETWORK_UNAVAILABLE');
+      }
+      if (error is TimeoutException) {
+        throw FormatException('OPENVPN_${phase}_TIMEOUT');
+      }
+      throw FormatException('OPENVPN_${phase}_RUNTIME_ERROR');
     } finally { _busy = false; }
   }
 
