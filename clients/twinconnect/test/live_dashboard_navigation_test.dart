@@ -76,6 +76,21 @@ void main() {
     expect(find.textContaining('20.00 GB'), findsWidgets);
     expect(find.text('Expiry date'), findsOneWidget);
     expect(find.textContaining('days'), findsWidgets);
+    expect(find.byKey(const Key('liveHomeUsageCompact')), findsOneWidget);
+    expect(find.byKey(const Key('liveAutoFastestServer')), findsOneWidget);
+    expect(find.byKey(const Key('autoFastestServerToggle')), findsOneWidget);
+    // The subscription summary is now a compact strip, not a giant panel.
+    final summary = find.byKey(const Key('liveHomeSubscriptionSummary'));
+    await tester.ensureVisible(summary);
+    await tester.pump();
+    expect(tester.getSize(summary).height, lessThan(210));
+    // Fastest server belongs in the connection header before the stats cards.
+    final fastest = find.byKey(const Key('liveAutoFastestServer'));
+    final power = find.byKey(const Key('liveConnectionStatus'));
+    await tester.ensureVisible(fastest);
+    await tester.pump();
+    expect(tester.getTopLeft(fastest).dy,
+      lessThan(tester.getTopLeft(power).dy));
     await tester.ensureVisible(find.byKey(const Key('liveHomeRefreshAccount')));
     await tester.tap(find.byKey(const Key('liveHomeRefreshAccount')));
     expect(refreshes, 1);
