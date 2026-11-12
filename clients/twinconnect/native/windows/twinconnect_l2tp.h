@@ -74,23 +74,16 @@ inline void Wipe(std::wstring& value) {
 
 inline DWORD FindL2tpDevice(std::wstring* name) {
   if (!name) return ERROR_INVALID_PARAMETER;
-  RASDEVINFOW initial = {};
-  initial.dwSize = sizeof(initial);
-  DWORD bytes = sizeof(initial), count = 0;
-  DWORD rc = RasEnumDevicesW(&initial, &bytes, &count);
-  if (rc == ERROR_SUCCESS && count == 1) {
-    std::wstring label(initial.szDeviceName);
-    std::transform(label.begin(), label.end(), label.begin(),
-        [](wchar_t c) { return static_cast<wchar_t>(towlower(c)); });
-    if (wcscmp(initial.szDeviceType, RASDT_Vpn) == 0 &&
-        label.find(L"l2tp") != std::wstring::npos) {
-      *name = initial.szDeviceName; return ERROR_SUCCESS;
-    }
-  }
-  if (rc != ERROR_BUFFER_TOO_SMALL || bytes == 0 || bytes > 65536)
+  // Use the documented two-call enumeration. A single RASDEVINFO buffer
+  // cannot enumerate computers that have multiple VPN miniports.
+  DWORD bytes = 0, count = 0;
+  DWORD rc = RasEnumDevicesW(nullptr, &bytes, &count);
+  if (rc != ERROR_BUFFER_TOO_SMALL || bytes < sizeof(RASDEVINFOW) ||
+      bytes > 65536) {
     return rc == ERROR_SUCCESS ? ERROR_NOT_FOUND : rc;
-  std::vector<BYTE> buf(bytes);
-  auto* devices = reinterpret_cast<RASDEVINFOW*>(buf.data());
+  }
+  std::vector<BYTE> buffer(bytes, 0);
+  auto* devices = reinterpret_cast<RASDEVINFOW*>(buffer.data());
   devices[0].dwSize = sizeof(RASDEVINFOW);
   rc = RasEnumDevicesW(devices, &bytes, &count);
   if (rc != ERROR_SUCCESS) return rc;
@@ -100,7 +93,8 @@ inline DWORD FindL2tpDevice(std::wstring* name) {
     std::transform(label.begin(), label.end(), label.begin(),
         [](wchar_t c) { return static_cast<wchar_t>(towlower(c)); });
     if (label.find(L"l2tp") != std::wstring::npos) {
-      *name = devices[i].szDeviceName; return ERROR_SUCCESS;
+      *name = devices[i].szDeviceName;
+      return ERROR_SUCCESS;
     }
   }
   return ERROR_NOT_FOUND;
@@ -151,6 +145,7 @@ inline void DialWorker(std::wstring entry, std::wstring host,
     rc = ERROR_INVALID_PARAMETER;
   if (rc == ERROR_SUCCESS) {
     rc = RasValidateEntryNameW(nullptr, entry.c_str());
+    // ERROR_ALREADY_EXISTS signals a collision; never modify other entries.
   }
   if (rc == ERROR_SUCCESS) {
     rc = RasSetEntryPropertiesW(nullptr, entry.c_str(),
