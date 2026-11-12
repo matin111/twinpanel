@@ -16,6 +16,8 @@ SINGBOX_GUARD = ROOT / "native" / "windows" / "twinconnect_singbox_guard.h"
 SINGBOX_INSTALLED = ROOT / "windows" / "runner" / "twinconnect_singbox_guard.h"
 XRAY_GUARD = ROOT / "native" / "windows" / "twinconnect_xray_guard.h"
 XRAY_INSTALLED = ROOT / "windows" / "runner" / "twinconnect_xray_guard.h"
+SUDOKU_GUARD = ROOT / "native" / "windows" / "twinconnect_sudoku_guard.h"
+SUDOKU_INSTALLED = ROOT / "windows" / "runner" / "twinconnect_sudoku_guard.h"
 OPENCONNECT_NATIVE = ROOT / "native" / "windows" / "twinconnect_openconnect.h"
 OPENCONNECT_INSTALLED = ROOT / "windows" / "runner" / "twinconnect_openconnect.h"
 L2TP_NATIVE = ROOT / "native" / "windows" / "twinconnect_l2tp.h"
@@ -42,6 +44,9 @@ def install() -> None:
     if not XRAY_GUARD.is_file():
         raise RuntimeError("Missing Xray process guard header")
     shutil.copyfile(XRAY_GUARD, XRAY_INSTALLED)
+    if not SUDOKU_GUARD.is_file():
+        raise RuntimeError("Missing Sudoku process/config guard header")
+    shutil.copyfile(SUDOKU_GUARD, SUDOKU_INSTALLED)
     if not OPENCONNECT_NATIVE.is_file():
         raise RuntimeError("Missing OpenConnect native runtime header")
     shutil.copyfile(OPENCONNECT_NATIVE, OPENCONNECT_INSTALLED)
@@ -74,6 +79,7 @@ def install() -> None:
             '#include "twinconnect_wireguard.h"\n'
             '#include "twinconnect_singbox_guard.h"\n'
             '#include "twinconnect_xray_guard.h"\n'
+            '#include "twinconnect_sudoku_guard.h"\n'
             '#include "twinconnect_openconnect.h"\n'
             '#include "twinconnect_l2tp.h"',
         )
@@ -260,6 +266,44 @@ def install() -> None:
           }
           if (!twinconnect_xray_guard::Guard(pid)) {
             result->Error("XRAY_PROCESS_GUARD_FAILED"); return;
+          }
+          result->Success(flutter::EncodableValue(true));
+        } else if (call.method_name() == "stageSudokuConfig") {
+          const auto* args = std::get_if<flutter::EncodableMap>(
+              call.arguments());
+          if (!args) { result->Error("SUDOKU_CONFIG_REQUEST_INVALID"); return; }
+          const auto it = args->find(flutter::EncodableValue("config"));
+          const auto* config = it == args->end() ? nullptr :
+              std::get_if<std::string>(&it->second);
+          if (!config) {
+            result->Error("SUDOKU_CONFIG_REQUEST_INVALID"); return;
+          }
+          std::string path;
+          if (!twinconnect_sudoku_guard::StageConfig(*config, &path)) {
+            result->Error("SUDOKU_PRIVATE_CONFIG_STAGE_FAILED"); return;
+          }
+          result->Success(flutter::EncodableValue(path));
+        } else if (call.method_name() == "finishSudokuConfig") {
+          twinconnect_sudoku_guard::ReleaseConfig();
+          result->Success(flutter::EncodableValue(true));
+        } else if (call.method_name() == "guardSudokuProcess") {
+          const auto* args = std::get_if<flutter::EncodableMap>(
+              call.arguments());
+          if (!args) { result->Error("SUDOKU_PROCESS_REQUEST_INVALID"); return; }
+          const auto it = args->find(flutter::EncodableValue("pid"));
+          if (it == args->end()) {
+            result->Error("SUDOKU_PROCESS_REQUEST_INVALID"); return;
+          }
+          int64_t sudoku_pid = 0;
+          if (const auto* sudoku_pid32 = std::get_if<int32_t>(&it->second)) {
+            sudoku_pid = *sudoku_pid32;
+          } else if (const auto* sudoku_pid64 = std::get_if<int64_t>(&it->second)) {
+            sudoku_pid = *sudoku_pid64;
+          } else {
+            result->Error("SUDOKU_PROCESS_REQUEST_INVALID"); return;
+          }
+          if (!twinconnect_sudoku_guard::Guard(sudoku_pid)) {
+            result->Error("SUDOKU_PROCESS_GUARD_FAILED"); return;
           }
           result->Success(flutter::EncodableValue(true));
         } else if (call.method_name() == "getCapabilities") {
