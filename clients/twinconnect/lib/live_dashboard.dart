@@ -535,8 +535,9 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
             setState(() {
               _modernUp = false;
               _publicIp = null;
-              _vpnError = _l2tpTunnel.hasChild
-                  ? 'L2TP_HEALTH_DEGRADED' : 'L2TP_CONNECTION_FAILED';
+              _vpnError = _l2tpTunnel.lastHealthError ??
+                  (_l2tpTunnel.hasChild
+                    ? 'L2TP_HEALTH_DEGRADED' : 'L2TP_CONNECTION_FAILED');
             });
           }
           return;
@@ -2261,6 +2262,18 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
               'L2TP_HEALTH_DEGRADED' => tr(
                 'اتصال L2TP پایدار نیست.',
                 'L2TP tunnel health has degraded.'),
+              'L2TP_HEALTH_PROBE_UNAVAILABLE' => tr(
+                'وضعیت اتصال L2TP در ویندوز برقرار است، ولی بررسی IP اینترنت از دو سرویس ناموفق بود.',
+                'Windows L2TP remains present, but both internet IP checks failed.'),
+              'L2TP_ROUTE_BYPASS_DETECTED' => tr(
+                'IP خروجی به IP قبل از اتصال برگشته؛ مسیر L2TP احتمالاً دور زده شده است.',
+                'Public IP returned to the pre-VPN address; L2TP routing may have been bypassed.'),
+              'L2TP_RAS_STATUS_UNAVAILABLE' => tr(
+                'بررسی وضعیت L2TP در ویندوز پاسخ نداد.',
+                'Windows RAS did not return an L2TP status.'),
+              'L2TP_RAS_DISCONNECTED' => tr(
+                'ویندوز اتصال L2TP را قطع‌شده گزارش می‌کند.',
+                'Windows reports that the L2TP connection was disconnected.'),
               'L2TP_DISCONNECT_PENDING' => tr(
                 'قطع اتصال L2TP هنوز کامل نشده است.',
                 'Windows L2TP disconnect is pending.'),
