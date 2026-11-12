@@ -68,7 +68,6 @@ class WindowsSudokuProxy {
       throw const FormatException('SUDOKU_PROXY_BUSY');
     }
     _changing = true;
-    Process? process;
     try {
       if (!await enginePresent()) {
         throw const FormatException('SUDOKU_ENGINE_NOT_BUNDLED');
@@ -91,7 +90,6 @@ class WindowsSudokuProxy {
       final owned = await Process.start(
         binaryPath(), ['-c', path], runInShell: false,
       ).timeout(const Duration(seconds: 7));
-      process = owned;
       _child = owned;
       final guarded = await _native.invokeMethod<bool>(
         'guardSudokuProcess', {'pid': owned.pid},
