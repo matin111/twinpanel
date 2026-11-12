@@ -140,11 +140,15 @@ class WindowsXrayProxy {
       ..connectionTimeout = const Duration(seconds: 3)
       ..findProxy = (_) => 'PROXY 127.0.0.1:$port';
     try {
-      for (var attempt = 0; attempt < 4; attempt++) {
+      final probeDeadline = Stopwatch()..start();
+      for (var attempt = 0;
+          attempt < 4 &&
+          probeDeadline.elapsed < const Duration(seconds: 10);
+          attempt++) {
         try {
           final request = await client.getUrl(
             Uri.https('api.ipify.org', '/', {'format': 'json'}),
-          ).timeout(const Duration(seconds: 4));
+          ).timeout(const Duration(seconds: 3));
           request.followRedirects = false;
           final response = await request.close()
               .timeout(const Duration(seconds: 5));
@@ -168,7 +172,13 @@ class WindowsXrayProxy {
           }
           return ip;
         } catch (_) {
-          await Future<void>.delayed(const Duration(milliseconds: 400));
+          // A failed attempt does not prove a working remote VLESS route.
+          // Back off briefly only when another attempt remains in budget.
+          if (attempt < 3 &&
+              probeDeadline.elapsed < const Duration(seconds: 10)) {
+            await Future<void>.delayed(
+                const Duration(milliseconds: 200));
+          }
         }
       }
       throw const FormatException('XRAY_REMOTE_EGRESS_NOT_VERIFIED');
