@@ -82,13 +82,16 @@ class TwinConnectFramelessControls extends StatelessWidget {
   }) {
     return IconButton(
       key: key,
-      tooltip: tooltip,
+      // This widget is drawn above Navigator by MaterialApp.builder.
+      // Flutter's Tooltip requires an Overlay below it and would throw
+      // on login and the authenticated screen. Expose semantics instead.
+      tooltip: null,
       iconSize: 16,
       visualDensity: VisualDensity.compact,
       constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
       padding: const EdgeInsets.all(4),
       color: foreground,
-      icon: Icon(icon),
+      icon: Semantics(label: tooltip, button: true, child: Icon(icon)),
       onPressed: onPressed,
     );
   }
