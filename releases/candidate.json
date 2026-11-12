@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.791",
-  "source_sha": "1f2e41b18d9b99d22c387a34bb6eeb36b4ca6f8c",
+  "version": "1.1.0-rc.792",
+  "source_sha": "73ef8e11092bc66bef18384c29be4296a96d4a18",
   "notes": {
-    "fa": "بازطراحی مدرن و حرفه‌ای بخش فعالیت‌های اخیر، وضعیت اشتراک‌ها و سرورها در داشبورد مدیریت؛ نمایش دقیق وضعیت و مبلغ پرداخت‌ها، تفکیک تعداد و درصد اشتراک‌های فعال، منقضی و معلق از API تجمیعی، کارت‌های سرور با پرچم کشور و نمودار ظرفیت و مصرف واقعی CPU/RAM/Disk. طراحی سازگار با دارک‌مود، لایت‌مود و موبایل، افزایش سرعت دریافت آمار اشتراک‌ها و حفاظت در آپدیت‌های آینده.",
-    "en": "Modern, responsive dark/light admin dashboard activity, subscription breakdown and server fleet cards; accurate aggregate counts without full roster fetch, payment status and amount, country flag and real resource metrics, with source and artifact release guards."
+    "fa": "بازطراحی حرفه‌ای بخش تانل‌ها و پروتکل‌های داشبورد؛ نمایش مسیر واقعی ایران به خروجی، نوع انتقال و تأخیر گزارش‌شده، کارت‌های پروتکل با فیلتر همه/کلاسیک/مدرن و شمارش صحیح ۱۶ پروتکل، تفکیک وضعیت آنلاین/آفلاین/نامشخص، تعداد آنلاین نودها و نشان ورودی ایران/سرور خروجی. دارک‌مود و لایت‌مود، موبایل و محافظت از ظاهر در آپدیت‌های بعدی. بدون تغییر کانفیگ سرورها یا اطلاعات مشتریان.",
+    "en": "Professional dark/light admin dashboard tunnel-route monitor and accurate 16-protocol status matrix with All/Classic/Modern filters, real reported latency and states, node online summary and Iran/Exit role badges. Responsive and release-parity protected; existing VPN/user/payment configurations unchanged."
   }
 }
