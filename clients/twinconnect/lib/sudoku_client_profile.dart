@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'server_inventory.dart';
+
 /// Official SUDOKU-ASCII standalone client format; NOT sing-box / Xray.
 /// Only the panel's active centrally shared, per-subscription credentials
 /// are accepted. The public endpoint may use a per-node tunnel-forwarded
@@ -64,6 +66,58 @@ class SudokuClientProfile {
     } catch (_) {
       return null;
     }
+  }
+
+  /// Keep an explicitly chosen node when it has a valid delivered profile.
+  /// If the panel still lists a legacy Sudoku node without a deliverable
+  /// identity, use only another ONLINE node from the SAME country whose
+  /// profile was actually issued to this subscription. Never invent keys or
+  /// silently cross country boundaries.
+  static SudokuClientProfile? resolveDeliveredProfile({
+    required String requestedNodeId,
+    required List<Map<String, dynamic>> items,
+    required AppServerInventory? inventory,
+  }) {
+    final direct = items.where(
+      (item) => item['node_id']?.toString() == requestedNodeId,
+    ).toList(growable: false);
+    if (direct.isNotEmpty) {
+      // Duplicate or malformed records are not a reason to change servers.
+      return direct.length == 1
+          ? fromItem(direct.single, requestedNodeId)
+          : null;
+    }
+    final servers = inventory?.servers;
+    if (servers == null) return null;
+    AppServer? requested;
+    for (final server in servers) {
+      if (server.id == requestedNodeId) {
+        requested = server;
+        break;
+      }
+    }
+    if (requested == null) return null;
+    final alternatives = servers.where(
+      (server) => server.id != requestedNodeId &&
+          server.nodeOnline &&
+          server.countryCode.toUpperCase() ==
+              requested!.countryCode.toUpperCase(),
+    ).toList(growable: false)
+      ..sort((a, b) {
+        final ap = a.latencyMs ?? 1000000;
+        final bp = b.latencyMs ?? 1000000;
+        final latency = ap.compareTo(bp);
+        return latency != 0 ? latency : a.id.compareTo(b.id);
+      });
+    for (final candidate in alternatives) {
+      final matches = items.where(
+        (item) => item['node_id']?.toString() == candidate.id,
+      ).toList(growable: false);
+      if (matches.length != 1) continue;
+      final valid = fromItem(matches.single, candidate.id);
+      if (valid != null) return valid;
+    }
+    return null;
   }
 
   /// Set a new loopback port, preserve the original per-user Sudoku split key
