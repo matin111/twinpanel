@@ -145,6 +145,8 @@ class WindowsOpenVpnTunnel {
         if (!ready.isCompleted) {
           ready.completeError(const FormatException('OPENVPN_PROCESS_EXITED'));
         }
+        // Remove secrets when OpenVPN exits on its own, not just on Disconnect.
+        unawaited(_cleanupIfExited());
       });
       await ready.future.timeout(const Duration(seconds: 55),
           onTimeout: () => throw const FormatException('OPENVPN_START_TIMEOUT'));
@@ -170,10 +172,12 @@ class WindowsOpenVpnTunnel {
         timeout: const Duration(seconds: 4));
     final sent = Completer<void>();
     var authenticated = false;
+    var passwordSubmitted = false;
     socket.transform(utf8.decoder).listen((response) {
       if (response.contains('ENTER PASSWORD:')) {
+        passwordSubmitted = true;
         socket.write(password + '\n');
-      } else if (!authenticated &&
+      } else if (passwordSubmitted && !authenticated &&
           (response.contains('SUCCESS:') || response.contains('>INFO:'))) {
         authenticated = true;
         socket.write('signal SIGTERM\n');
