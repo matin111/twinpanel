@@ -25,7 +25,8 @@ class ReleaseRevenueGuardTests(unittest.TestCase):
             (directory / "components").mkdir(parents=True)
             (directory / "components/admin-dashboard-runtime.tsx").write_text(
                 'import {PremiumRevenueChart} from "./premium-revenue-chart";\n'
-                '<PremiumRevenueChart series={sales} pick={pick}/>\n',
+                '<PremiumRevenueChart series={sales} pick={pick}/>\n'
+                'OverviewKpiCard OperationalHealthVisual tunnelsLoaded nodesLoaded',
                 encoding="utf-8",
             )
             (directory / "components/premium-revenue-chart.tsx").write_text(
@@ -48,6 +49,19 @@ class ReleaseRevenueGuardTests(unittest.TestCase):
             (directory / "components/admin-dashboard-server-card.module.css").write_text(
                 ':global(html[data-theme="light"]) .panel{background:white;} '
                 '@media(prefers-reduced-motion:reduce){.panel{animation:none;}}',
+                encoding="utf-8",
+            )
+            (directory / "components/admin-overview-visuals.tsx").write_text(
+                'function HealthRow(){return null}; '
+                'export function OverviewKpiCard(){} '
+                'export function OperationalHealthVisual(){} '
+                'function safeFraction(){} const a = "aria-valuetext";',
+                encoding="utf-8",
+            )
+            (directory / "components/admin-overview-visuals.module.css").write_text(
+                ':global(html[data-theme="light"]) .kpiValue{color:#234;} '
+                '.healthTrack{height:4px} '
+                '@media(prefers-reduced-motion:reduce){.healthTrack{animation:none}}',
                 encoding="utf-8",
             )
 
@@ -93,10 +107,22 @@ class ReleaseRevenueGuardTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "stale"):
             guard.verify_ui_release(self.source, self.current)
 
+    def test_missing_dashboard_overview_is_blocked(self):
+        (self.source / "components/admin-overview-visuals.tsx").unlink()
+        with self.assertRaisesRegex(ValueError, "Missing"):
+            guard.verify_ui_release(self.source, self.current)
+
+    def test_old_kpi_stylesheet_is_blocked(self):
+        (self.source / "components/admin-overview-visuals.module.css").write_text(
+            ".old-kpis{display:grid}", encoding="utf-8"
+        )
+        with self.assertRaisesRegex(ValueError, "stale"):
+            guard.verify_ui_release(self.source, self.current)
+
     def test_compiled_premium_chart_passes(self):
         folder = self.source / ".next/standalone/.next/static/chunks"
         folder.mkdir(parents=True)
-        (folder / "chunk.js").write_text("Sales pulse Server pulse", encoding="utf-8")
+        (folder / "chunk.js").write_text("Sales pulse Server pulse Service health", encoding="utf-8")
         guard.verify_ui_release(self.source, self.current, check_bundle=True)
 
 
