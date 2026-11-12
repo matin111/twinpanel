@@ -2,11 +2,12 @@
 from __future__ import annotations
 
 import ast
+import os
 import subprocess
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 SCRIPT=Path(__file__).resolve().parents[1]/"scripts/twinpanel_node_auto_backfill_v1.py"
 
@@ -21,7 +22,7 @@ class NodeAutoBackfillPreflightTests(unittest.TestCase):
             node for node in module.body
             if isinstance(node,ast.FunctionDef) and node.name=="_cheap_priority_guard"
         )
-        namespace={"os":Mock(),"subprocess":subprocess}
+        namespace={"os":os,"subprocess":subprocess}
         exec(compile(ast.Module(body=[function],type_ignores=[]),str(SCRIPT),"exec"),namespace)
         cls.guard=staticmethod(namespace["_cheap_priority_guard"])
 
