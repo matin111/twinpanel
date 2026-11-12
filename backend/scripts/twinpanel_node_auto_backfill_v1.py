@@ -19,6 +19,37 @@ from datetime import datetime, timedelta
 BACKEND = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND))
 
+
+def _cheap_priority_guard() -> bool:
+    """Defer legacy backfill before its expensive application imports.
+
+    The existing safe_to_start() still performs its complete API and paid
+    order checks when this non-mutating fast preflight allows a batch.
+    A central node stage has priority over retired per-account backfill.
+    """
+    if os.getloadavg()[0] >= float(os.getenv("NODE_AUTO_BACKFILL_MAX_LOAD", "7")):
+        return True
+    try:
+        stages = subprocess.run(
+            ["systemctl", "list-units", "--type=service", "--state=running",
+             "--no-legend", "twinpanel-central-node-stage-*.service"],
+            capture_output=True, text=True, check=False, timeout=3,
+        )
+        if stages.returncode == 0 and any(
+            line.strip().startswith("twinpanel-central-node-stage-")
+            for line in stages.stdout.splitlines()
+        ):
+            return True
+    except (OSError, subprocess.TimeoutExpired):
+        pass  # The full existing guard remains authoritative.
+    return False
+
+
+if __name__ == "__main__" and _cheap_priority_guard():
+    print("NODE_AUTO_BACKFILL_FAST_PRIORITY_PAUSED", flush=True)
+    raise SystemExit(0)
+
+
 from app.database import SessionLocal
 from app.services.node_auto_backfill_v1 import claim_next, finish_claim, repair_missing_v2ray_jobs
 from app.services.central_backfill_priority_v1 import new_account_work_has_priority
