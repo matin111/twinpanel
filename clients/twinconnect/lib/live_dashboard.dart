@@ -977,7 +977,16 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         _publicIp = null;
       });
 
-      final socksPort = await _xrayProxy.start(chosen);
+      // Remote Xray verification and the DIRECT pre-TUN public-IP
+      // baseline do not depend on each other. Run both at once rather than
+      // adding two separate internet round trips to every connection.
+      // Neither result claims VPN connectivity until the TUN is verified.
+      final preTunnel = await Future.wait<Object>([
+        _xrayProxy.start(chosen),
+        WindowsSingBoxTunnel.measureBaselineIp(),
+      ]);
+      final socksPort = preTunnel[0] as int;
+      final baselineIp = preTunnel[1] as String;
       final verifiedExit = _xrayProxy.verifiedExitIp;
       if (verifiedExit == null) {
         throw const FormatException('XRAY_REMOTE_EGRESS_NOT_VERIFIED');
@@ -990,6 +999,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         profile: const <String, dynamic>{},
         xraySocksPort: socksPort,
         xrayVerifiedExitIp: verifiedExit,
+        baselinePublicIp: baselineIp,
       );
       if (!mounted) return;
       setState(() {
