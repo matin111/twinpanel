@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.795",
+  "version": "1.1.0-rc.796",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-12T06:06:41Z",
+  "released_at": "2026-11-12T06:34:42Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "e829ffdd6eaa83d21c78b1babbb23e4597be28ac",
+  "source_sha": "d203bebd0404798d6b3862275375d84be19462c6",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.795/twinpanel-1.1.0-rc.795-linux-x86_64.tar.gz",
-    "sha256": "ea81ec620723e8c206eb87b151d2e251d7422b886f67ed74b998c89fa80e36ae",
-    "size_bytes": 30645385
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.796/twinpanel-1.1.0-rc.796-linux-x86_64.tar.gz",
+    "sha256": "0c78dacb96e73c2a6290636ff8860a5b26bc5b85449bbf29e64d92e1201cae69",
+    "size_bytes": 30636483
   },
   "notes": {
-    "fa": "افزودن کارت ورود امن TwinConnect داخل خود صفحه Connection اشتراک؛ پشتیبانی از احراز هویت مستقیم و دومرحله‌ای روی دامنه اشتراک، نمایش و کپی نام کاربری و رمز اپ برای صاحب مجاز، حفظ QR و کانفیگ و حساب VPN. تکمیل دسترسی ورود اپ برای نمایندگان و مشتریان.",
-    "en": "Add authenticated TwinConnect app login card directly to subscription Connection page, with same-origin login and 2FA, scoped credential display and copy, without changing public QR, VPN secrets or subscription configs. Complete reseller and customer app delivery entry points."
+    "fa": "رفع خطای اسکریپت دکمه نمایش اطلاعات ورود TwinConnect در صفحه واقعی Connection و تأیید صحت JavaScript تولیدشده؛ حذف کادر تکراری و دریافت خودکار اطلاعات اپ از پنجره ساب‌لینک ادمین و نماینده و کاربر. حفظ دکمه مستقل ورود اپ و QR و تنظیمات VPN.",
+    "en": "Fix generated JavaScript syntax so TwinConnect app login opens on the actual Connection page. Remove redundant app credentials from the panel's QR/link modal. Preserve standalone reseller/admin app access, public QR and VPN configurations."
   }
 }
