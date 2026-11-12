@@ -36,7 +36,7 @@ def verify_ui_release(source: Path, reference: Path, *, check_bundle: bool = Fal
     css = (source / PROTECTED_FILES[2]).read_text(encoding="utf-8")
     if 'import {PremiumRevenueChart}' not in dashboard or "<PremiumRevenueChart" not in dashboard:
         raise ValueError("PremiumRevenueChart is missing from the actual admin dashboard")
-    if not all(marker in component for marker in ("Sales pulse", "salesAnalytics", "seriesVisible", "selectPointer")):
+    if not all(marker in component for marker in ("Sales pulse", "seriesVisible", "selectPointer", "subscription_revenue_toman")):
         # Deliberately specific: fail rather than publish a look-alike or a stub.
         raise ValueError("Premium chart interactive feature markers are missing")
     if "@media(prefers-reduced-motion:reduce)" not in css:
