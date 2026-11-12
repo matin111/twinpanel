@@ -10,6 +10,9 @@ from aiogram.types import LinkPreviewOptions
 from sqlalchemy.orm import Session
 
 from ..models_reseller import ResellerBotSettings
+from ..reseller_bot_order_models import ResellerBotOrder
+from ..models import Subscription
+from ..central_app_credentials import app_delivery_payload
 from ..reseller_bot_crypto import decrypt_bot_token
 from . import reseller_bot_orders as legacy
 
@@ -71,6 +74,19 @@ async def send_order_delivery_to_telegram_v2(
         (info.get("subscription_link") if isinstance(info, dict) else None) or ""
     ).strip()
 
+    app_access = None
+    order = db.get(ResellerBotOrder, int(order_id))
+    if order is not None and int(order.reseller_id) == int(reseller_id) and order.subscription_id:
+        sub = db.get(Subscription, int(order.subscription_id))
+        if sub is not None:
+            try:
+                app_access = app_delivery_payload(db, sub)
+                if app_access:
+                    db.commit()
+            except Exception:
+                db.rollback()
+                log.exception("app login delivery unavailable for order=%s", order_id)
+
     lines = [
         "✅ <b>پرداخت شما تأیید شد.</b>",
         "",
@@ -86,6 +102,13 @@ async def send_order_delivery_to_telegram_v2(
             "",
             "🔗 لینک اتصال و دریافت کانفیگ:",
             f"<code>{escape(subscription_link)}</code>",
+        ])
+    if app_access:
+        lines.extend([
+            "",
+            "📱 <b>ورود به اپ هوشمند</b>",
+            f"👤 نام کاربری اپ: <code>{escape(app_access['username'])}</code>",
+            f"🔑 رمز اپ: <code>{escape(app_access['password'])}</code>",
         ])
     lines.extend([
         "",
