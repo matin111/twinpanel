@@ -34,14 +34,10 @@ export function OverviewKpiCard({kind,label,value,meta,ratio,pick}:{
   return <article className={styles.kpi} style={theme}>
     <div className={styles.kpiHeader}>
       <div className={styles.kpiIcon}><Icon kind={kind}/></div>
-      <span className={styles.kpiCategory}>{kind==="online"?pick("در لحظه","LIVE"):kind==="sales"?pick("امروز","TODAY"):kind==="nodes"?pick("زیرساخت","NODES"):pick("آمار کلیدی","OVERVIEW")}</span>
     </div>
     <span className={styles.kpiLabel}>{label}</span>
     <strong className={styles.kpiValue} dir="auto">{value}</strong>
-    <div className={styles.kpiFooter}>
-      <span title={meta}>{meta}</span>
-      {pct!=null?<b>{num(Math.round(pct))}%</b>:<i aria-hidden="true"/>}
-    </div>
+    {pct!=null?<div className={styles.kpiFooter}><b>{num(Math.round(pct))}%</b></div>:null}
     {pct!=null?<div className={styles.kpiProgress} aria-label={pick("درصد پوشش","Coverage")+" "+num(Math.round(pct))+"%"}><i style={{width:String(pct)+"%"}}/></div>:<div className={styles.kpiSeparator}/>}
   </article>;
 }
@@ -65,7 +61,6 @@ function HealthRow({line,pick}:{line:HealthLine;pick:Pick}){
        aria-valuetext={pct==null?pick("بدون گزارش","No reported data"):num(Math.round(pct))+"%"}>
       <i style={{width:(pct??0)+"%"}}/>
     </div>
-    <span className={styles.healthRowSub}>{pct==null?pick("در انتظار گزارش","Awaiting telemetry"):pct===100?pick("همه موارد گزارش‌شده فعال‌اند","All reported items online"):pct>=75?pick("بخشی نیاز به بررسی دارد","Some items need attention"):pick("بررسی ضروری است","Review required")}</span>
   </div>;
 }
 
@@ -82,10 +77,10 @@ export function OperationalHealthVisual({pick,nodeOnline,nodeTotal,tunnelOnline,
   const minimum=Math.min(...[nodePct,tunnelPct,protocolPct].filter((v):v is number=>v!=null));
   const allHealthy=allKnown&&minimum>=99.5;
   const needsReview=[nodePct,tunnelPct,protocolPct].some(v=>v!=null&&v<75);
-  const headTitle=allHealthy?pick("تمام سرویس‌های گزارش‌شده فعال‌اند","All reported services are active"):
-    needsReview?pick("بخشی از سرویس‌ها نیاز به بررسی دارد","Some services need attention"):
-    allKnown?pick("وضعیت سرویس‌ها قابل پایش است","Service status is being monitored"):
-    pick("در حال تکمیل گزارش سلامت","Gathering health reports");
+  const headTitle=allHealthy?pick("سالم","Healthy"):
+    needsReview?pick("نیاز به بررسی","Needs review"):
+    allKnown?pick("در حال پایش","Monitoring"):
+    pick("نامشخص","Unknown");
   const status=allHealthy?"good":needsReview?"warning":"neutral";
   const ringStyle={"--ring":nodePct==null?"0%":String(nodePct)+"%"} as CSSProperties;
   const lines:HealthLine[]=[
@@ -95,8 +90,8 @@ export function OperationalHealthVisual({pick,nodeOnline,nodeTotal,tunnelOnline,
   ];
   return <div className={styles.healthPanel} dir="rtl">
     <div className={styles.healthTitle}>
-      <div><span className={styles.healthEyebrow}><i/>{pick("پایش زیرساخت","INFRASTRUCTURE STATUS")}</span><h2>{pick("وضعیت سرویس‌ها","Service health")}</h2></div>
-      <div className={styles.healthTag} data-state={status}><i/>{allKnown?pick("گزارش دریافتی","Reported data"):pick("در حال بررسی","Checking")}</div>
+      <div><h2>{pick("وضعیت سرویس‌ها","Service health")}</h2></div>
+      <div className={styles.healthTag} data-state={status}><i/>{headTitle}</div>
     </div>
     <div className={styles.healthHero}>
       <div className={styles.healthRing} style={ringStyle}>
@@ -104,11 +99,6 @@ export function OperationalHealthVisual({pick,nodeOnline,nodeTotal,tunnelOnline,
           <strong>{nodePct==null?"—":num(Math.round(nodePct))+"%"}</strong>
           <span>{pick("دسترسی نودها","Node availability")}</span>
         </div>
-      </div>
-      <div className={styles.healthHeroText}>
-        <span className={styles.healthKicker}>{pick("نمای کلی وضعیت","STATUS OVERVIEW")}</span>
-        <b>{headTitle}</b>
-        <p>{pick("وضعیت بر اساس آخرین گزارش نودها، تانل‌ها و پروتکل‌هاست؛ به‌معنای تست واقعی اتصال کاربران نیست.","Based on reported node, tunnel and protocol states; not a live client-connection test.")}</p>
       </div>
     </div>
     <div className={styles.healthList}>

@@ -29,8 +29,8 @@ class DashboardOverviewTests(unittest.TestCase):
         self.assertIn("safeFraction",COMP)
         self.assertIn("total<1?null",COMP)
         self.assertIn("allKnown",COMP)
-        self.assertIn("Awaiting telemetry",COMP)
-        self.assertIn("not a live client-connection test",COMP)
+        self.assertIn("No reported data",COMP)
+        self.assertNotIn("not a live client-connection test",COMP)
         self.assertIn("aria-valuetext=",COMP)
 
     def test_responsive_theme_and_motion_sensitivity(self):

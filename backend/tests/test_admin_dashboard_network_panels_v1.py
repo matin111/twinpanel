@@ -15,14 +15,14 @@ class AdminDashboardNetworkPanelsTests(unittest.TestCase):
                      't.iran_node_id', 't.exit_node_id', 'tunnels.slice(0,6)',
                      'loaded?display(tunnels.length):"—"', 't.status'):
             self.assertIn(text,NETWORK)
-        self.assertIn('not a verified user traffic',NETWORK)
+        self.assertNotIn('not a verified user traffic',NETWORK)
         self.assertNotIn("Math.random(",NETWORK)
 
     def test_protocols_derive_count_and_categories(self):
         for text in ('const CLASSIC=new Set(', 'hysteria2', 'socks5',
                      'classicCount=protocols.filter', 'modernCount=protocols.length-classicCount',
                      'setGroup(option.id)', 'aria-pressed=', 'p.reported&&p.online',
-                     'p.reported?display(p.onlineNodes)', 'not a verified live client'):
+                     'p.reported?display(p.onlineNodes)', 'classify(t.status)'):
             self.assertIn(text,NETWORK)
         self.assertNotIn('15 service protocols',DASH)
         self.assertIn('<ProtocolMonitor protocols={protocols} pick={pick}/>',DASH)
@@ -42,7 +42,7 @@ class AdminDashboardNetworkPanelsTests(unittest.TestCase):
 
     def test_stale_release_is_blocked(self):
         for text in ('admin-dashboard-network-panels.tsx','admin-dashboard-network-panels.module.css',
-                     'NETWORK TRANSPORTS','PROTOCOL COVERAGE','fleetSummary'):
+                     'Tunnel monitor','Service protocols','fleetSummary'):
             self.assertIn(text,GUARD)
         self.assertIn('<TunnelMonitor tunnels={tunnels} nodes={nodes} loaded={tunnelsLoaded} pick={pick}/>',DASH)
         self.assertIn('const classify=(status:unknown)',NETWORK)

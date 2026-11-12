@@ -38,7 +38,7 @@ class AdminDashboardLowerPanelsTests(unittest.TestCase):
 
     def test_released_ui_is_protected_in_artifact_source(self):
         for marker in ('admin-dashboard-lower-panels.tsx','admin-dashboard-lower-panels.module.css',
-                       'SUBSCRIPTION MIX','LATEST TRANSACTIONS'):
+                       'Subscription overview','Recent activity'):
             self.assertIn(marker,GUARD)
         for component in ('<SubscriptionAnalytics','<RecentPaymentActivity','<ServerFleetVisual'):
             self.assertIn(component,DASH)
