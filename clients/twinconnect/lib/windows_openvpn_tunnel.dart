@@ -63,6 +63,26 @@ class WindowsOpenVpnTunnel {
     }
   }
 
+  // A new Windows VPN route and resolver often need several seconds to settle.
+  // Do not announce online unless a genuine public IPv4 differs from baseline.
+  static Future<String> verifiedEgressAfterConnect(String baseline) async {
+    Object? last;
+    for (var attempt = 0; attempt < 5; attempt++) {
+      if (attempt > 0) {
+        await Future<void>.delayed(const Duration(seconds: 2));
+      }
+      try {
+        final ip = await publicIp().timeout(const Duration(seconds: 7));
+        if (ip != baseline) return ip;
+        last = const FormatException('OPENVPN_EGRESS_NOT_VERIFIED');
+      } catch (e) {
+        last = e;
+      }
+    }
+    if (last is FormatException) throw last;
+    throw const FormatException('OPENVPN_EGRESS_NETWORK_UNAVAILABLE');
+  }
+
   Future<({int received, int sent})?> readTrafficTotals() async {
     if (!isRunning) return null;
     try {
@@ -88,7 +108,14 @@ class WindowsOpenVpnTunnel {
     if (_busy || _process != null) {
       throw const FormatException('OPENVPN_ALREADY_RUNNING');
     }
-    final config = OpenVpnProfileValidator.validate(item);
+    final validated = OpenVpnProfileValidator.validate(item);
+    // Old panel-issued inline profiles don't include Windows DNS. Force a
+    // resolver through the VPN instead of retaining an unreachable LAN DNS.
+    // This modifies only the ephemeral local OpenVPN profile for this session.
+    final hasDns = RegExp(r'(?mi)^dhcp-option\\s+DNS\\s+').hasMatch(validated);
+    final config = hasDns
+        ? validated
+        : '$validated\\ndhcp-option DNS 1.1.1.1\\ndhcp-option DNS 8.8.8.8\\n';
     final binary = enginePath;
     if (binary == null || !await File(binary).exists()) {
       throw const FormatException('OPENVPN_ENGINE_NOT_INSTALLED');
@@ -156,10 +183,7 @@ class WindowsOpenVpnTunnel {
       await ready.future.timeout(const Duration(seconds: 55),
           onTimeout: () => throw const FormatException('OPENVPN_START_TIMEOUT'));
       phase = 'EGRESS_VERIFICATION';
-      final ip = await publicIp();
-      if (ip == before) {
-        throw const FormatException('OPENVPN_EGRESS_NOT_VERIFIED');
-      }
+      final ip = await verifiedEgressAfterConnect(before);
       _exitIp = ip;
       _ready = true;
       return ip;
