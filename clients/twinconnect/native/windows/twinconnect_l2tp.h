@@ -11,6 +11,7 @@
 #include <thread>
 #include <algorithm>
 #include <cwctype>
+#include <cstdint>
 #pragma comment(lib, "Rasapi32.lib")
 
 namespace twinconnect_l2tp {
@@ -78,12 +79,16 @@ inline DWORD FindL2tpDevice(std::wstring* name) {
   DWORD bytes = sizeof(initial), count = 0;
   DWORD rc = RasEnumDevicesW(&initial, &bytes, &count);
   if (rc == ERROR_SUCCESS && count == 1) {
-    if (wcscmp(initial.szDeviceType, RASDT_Vpn) == 0) {
+    std::wstring label(initial.szDeviceName);
+    std::transform(label.begin(), label.end(), label.begin(),
+        [](wchar_t c) { return static_cast<wchar_t>(towlower(c)); });
+    if (wcscmp(initial.szDeviceType, RASDT_Vpn) == 0 &&
+        label.find(L"l2tp") != std::wstring::npos) {
       *name = initial.szDeviceName; return ERROR_SUCCESS;
     }
   }
   if (rc != ERROR_BUFFER_TOO_SMALL || bytes == 0 || bytes > 65536)
-    return rc == ERROR_SUCCESS ? ERROR_DEVICE_NOT_AVAILABLE : rc;
+    return rc == ERROR_SUCCESS ? ERROR_NOT_FOUND : rc;
   std::vector<BYTE> buf(bytes);
   auto* devices = reinterpret_cast<RASDEVINFOW*>(buf.data());
   devices[0].dwSize = sizeof(RASDEVINFOW);
@@ -98,7 +103,7 @@ inline DWORD FindL2tpDevice(std::wstring* name) {
       *name = devices[i].szDeviceName; return ERROR_SUCCESS;
     }
   }
-  return ERROR_DEVICE_NOT_AVAILABLE;
+  return ERROR_NOT_FOUND;
 }
 
 inline void RemoveOwnedEntry(const std::wstring& name) {
