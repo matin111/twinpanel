@@ -324,6 +324,17 @@ def install() -> None:
     runner_cmake.write_text(cmake, encoding="utf-8")
 
     HEADER.write_text(header, encoding="utf-8")
+    # On normal app exit, disconnect only this process's temporary L2TP RAS
+    # connection so its Windows phone-book PSK is not left behind.
+    if "twinconnect_l2tp::Stop();" not in cpp:
+        import re
+        cpp, patched = re.subn(
+            r"FlutterWindow::~FlutterWindow\(\)\s*\{\s*\}",
+            "FlutterWindow::~FlutterWindow() {\n  twinconnect_l2tp::Stop();\n}",
+            cpp, count=1,
+        )
+        if patched != 1:
+            raise RuntimeError("Unexpected Flutter Windows runner destructor; cannot guarantee L2TP cleanup")
     SOURCE.write_text(cpp, encoding="utf-8")
 
 
