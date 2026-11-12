@@ -15,9 +15,24 @@ class SingBoxWindowsConfig {
     String? resolvedServer,
     int? telemetryPort,
     String? telemetrySecret,
+    int? xraySocksPort,
   }) {
-    final outbound = SingBoxProfileValidator.validateOutbound(
-      protocolCode: protocol, item: item);
+    // An app-owned, loopback-only Xray-core SOCKS bridge is the sole
+    // supported external outbound. Never accept an arbitrary proxy host.
+    if (xraySocksPort != null &&
+        (protocol != 'v2ray' || xraySocksPort < 1024 ||
+         xraySocksPort > 65535 || resolvedServer != null)) {
+      throw const FormatException('XRAY_SOCKS_BRIDGE_INVALID');
+    }
+    final outbound = xraySocksPort == null
+        ? SingBoxProfileValidator.validateOutbound(
+            protocolCode: protocol, item: item)
+        : <String, dynamic>{
+            'type': 'socks',
+            'server': '127.0.0.1',
+            'server_port': xraySocksPort,
+            'version': '5',
+          };
     final serverOutbound = {...outbound, 'tag': 'proxy'};
     // Resolve the endpoint before installing TUN routes to avoid a DNS
     // bootstrap loop. Preserve the original TLS identity when dialing an IP.
