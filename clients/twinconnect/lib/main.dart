@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -245,10 +246,12 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
     final strings = AppStrings.of(context);
     final brand = _brand;
 
+    final desktop = Platform.isWindows || Platform.isLinux || Platform.isMacOS;
+
     // The reference dashboard is the actual initial Windows surface.
     // Preview state is explicitly signed out; account identification is
     // accessible from Account -> Sign in and never fakes tunnel connectivity.
-    if (brand == null && !_showLogin) {
+    if (desktop && brand == null && !_showLogin) {
       return ReferenceDesktopShell(
         brand: WindowsPreviewFixture.brand(),
         username: 'Guest preview',
@@ -262,7 +265,7 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
       );
     }
 
-    if (brand != null) {
+    if (desktop && brand != null) {
       return ReferenceDesktopShell(
         brand: brand,
         username: _offlineDemo ? 'Offline preview' : (_confirmedUsername ?? _username.text.trim()),
