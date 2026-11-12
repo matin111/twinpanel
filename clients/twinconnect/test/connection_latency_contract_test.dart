@@ -3,17 +3,16 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('native connection authorizations run concurrently before secrets', () {
+  test('native connection checks entitlement before node lookup and secrets', () {
     final source = File('lib/connection_bootstrap.dart').readAsStringSync();
-    final overlap = source.indexOf('Future.wait<Object>([');
-    final catalog = source.indexOf('api.loadSessionProtocolCatalog(', overlap);
-    final inventory = source.indexOf('api.refreshSessionServers(', overlap);
-    final privateProfiles = source.indexOf('api.loadSessionNativeProfiles(', overlap);
-    expect(overlap, greaterThan(-1));
-    expect(catalog, greaterThan(overlap));
-    expect(inventory, greaterThan(catalog));
+    final catalog = source.indexOf('api.loadSessionProtocolCatalog(');
+    final inventory = source.indexOf('api.refreshSessionServers(', catalog);
+    final privateProfiles = source.indexOf('api.loadSessionNativeProfiles(', inventory);
+    final authGate = source.indexOf("throw const ConnectionBootstrapException('PROTOCOL_NOT_ALLOWED')");
+    expect(catalog, greaterThan(-1));
+    expect(authGate, greaterThan(catalog));
+    expect(inventory, greaterThan(authGate));
     expect(privateProfiles, greaterThan(inventory));
-    expect(source, contains("PROTOCOL_NOT_ALLOWED"));
     expect(source, contains("SERVER_NOT_AVAILABLE"));
   });
 
