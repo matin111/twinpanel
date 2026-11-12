@@ -49,6 +49,84 @@
 .legacy-control-page .node-list-filter-summary{
   color:var(--muted);font-size:11px;font-weight:700;white-space:nowrap
 }
+
+/* Light-mode only: the selected KPI previously mixed a dark fixed gradient
+   with global light-theme typography. Keep all node filters readable. */
+html[data-theme="light"] .legacy-control-page .node-list-quick-filters .node-list-filter-card{
+  background:linear-gradient(155deg,#fff 0%,#f7f9ff 100%);
+  color:#1e2d46;
+  border-color:#d8e1ee;
+  box-shadow:0 7px 20px rgba(47,64,106,.055);
+}
+html[data-theme="light"] .legacy-control-page .node-list-quick-filters .node-list-filter-card.active{
+  background:linear-gradient(135deg,#f3edff 0%,#edf3ff 100%);
+  color:#302754;
+  border-color:#9679e8;
+  box-shadow:0 0 0 1px rgba(128,95,220,.18),0 9px 24px rgba(72,59,127,.095);
+}
+html[data-theme="light"] .legacy-control-page .node-list-quick-filters .node-list-filter-card:hover,
+html[data-theme="light"] .legacy-control-page .node-list-quick-filters .node-list-filter-card:focus-visible{
+  border-color:#8f72df;
+  box-shadow:0 0 0 3px rgba(116,90,202,.12),0 9px 20px rgba(50,62,110,.08);
+}
+html[data-theme="light"] .legacy-control-page .node-list-quick-filters .node-list-stat-text b{
+  color:#1b2942;
+}
+html[data-theme="light"] .legacy-control-page .node-list-quick-filters .node-list-stat-text small{
+  color:#566680;
+}
+html[data-theme="light"] .legacy-control-page .node-list-quick-filters .node-list-filter-card.active .node-list-stat-text small{
+  color:#64508c;
+}
+html[data-theme="light"] .legacy-control-page .node-list-quick-filters .stat-icon{
+  color:#6846c4;
+  background:#eeeaff;
+  border-color:#dacdfa;
+}
+html[data-theme="light"] .legacy-control-page .node-list-quick-filters .node-list-filter-card.active .stat-icon{
+  color:#5836b4;
+  background:#e4d9ff;
+  border-color:#c6b2f8;
+}
+html[data-theme="light"] .legacy-control-page .node-list-filter-summary{
+  color:#51617c;
+}
+/* Keep row actions and selection legible, without changing admin global buttons. */
+html[data-theme="light"] .legacy-control-page .runtime-toolbar{
+  color:#34435b;
+}
+html[data-theme="light"] .legacy-control-page .runtime-toolbar input,
+html[data-theme="light"] .legacy-control-page .runtime-toolbar select{
+  color:#263752;
+  background:#f8faff;
+  border-color:#ccd8ea;
+}
+html[data-theme="light"] .legacy-control-page .table table td,
+html[data-theme="light"] .legacy-control-page .table table td b.node-metric-value{
+  color:#253750;
+}
+html[data-theme="light"] .legacy-control-page .table table tbody tr.is-selected{
+  background:#f3eeff;
+}
+html[data-theme="light"] .legacy-control-page .table table tbody tr:hover{
+  background:#f6f8ff;
+}
+html[data-theme="light"] .legacy-control-page .table .primary-soft{
+  color:#5639ac;
+  background:#f1ecff;
+  border:1px solid #cbbaf5;
+  border-radius:9px;
+}
+html[data-theme="light"] .legacy-control-page .table .primary-soft:hover{
+  color:#452795;
+  background:#e8dfff;
+  border-color:#ab92ec;
+}
+html[data-theme="light"] .legacy-control-page .table .primary-soft:focus-visible{
+  outline:2px solid #7053c6;
+  outline-offset:2px;
+}
+
 @media(max-width:700px){
   .legacy-control-page .node-list-quick-filters{grid-template-columns:repeat(2,minmax(0,1fr))}
   .legacy-control-page .node-list-filter-card{padding:10px;min-height:86px}

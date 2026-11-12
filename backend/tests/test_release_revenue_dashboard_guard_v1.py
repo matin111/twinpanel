@@ -119,6 +119,20 @@ class ReleaseRevenueGuardTests(unittest.TestCase):
                 'html[data-theme="light"] .tbs-page .tbs-save:disabled{color:#506080}',
                 encoding="utf-8",
             )
+            (directory / "app").mkdir(parents=True, exist_ok=True)
+            (directory / "app/node-observability-v1.css").write_text(
+                'html[data-theme="light"] .legacy-control-page .node-list-quick-filters .node-list-filter-card.active{background:#f3edff} '
+                'html[data-theme="light"] .legacy-control-page .node-list-quick-filters .node-list-stat-text b{color:#1b2942} '
+                'html[data-theme="light"] .legacy-control-page .node-list-quick-filters .stat-icon{color:purple} '
+                'html[data-theme="light"] .legacy-control-page .table .primary-soft{color:purple} '
+                'html[data-theme="light"] .legacy-control-page .runtime-toolbar input{color:black}',
+                encoding="utf-8",
+            )
+            (directory / "components/legacy-nodes-runtime-v2.tsx").write_text(
+                'node-list-quick-filters node-list-filter-card aria-pressed={filter===item.id} '
+                'node-list-filter-summary selectFilter(item.id)',
+                encoding="utf-8",
+            )
 
     def test_up_to_date_pinned_chart_passes(self):
         guard.verify_ui_release(self.source, self.current)
@@ -226,6 +240,20 @@ class ReleaseRevenueGuardTests(unittest.TestCase):
         )
         with self.assertRaisesRegex(ValueError, "Compiled"):
             guard.verify_ui_release(self.source, self.current, check_bundle=True)
+
+    def test_old_light_node_kpi_styles_are_blocked(self):
+        path = self.source / "app/node-observability-v1.css"
+        path.write_text(
+            ".node-list-filter-card.active{background:#161b2b}",
+            encoding="utf-8",
+        )
+        with self.assertRaisesRegex(ValueError, "stale"):
+            guard.verify_ui_release(self.source, self.current)
+
+    def test_node_filter_controls_are_required(self):
+        (self.source / "components/legacy-nodes-runtime-v2.tsx").unlink()
+        with self.assertRaisesRegex(ValueError, "Missing"):
+            guard.verify_ui_release(self.source, self.current)
 
     def test_compiled_premium_chart_passes(self):
         folder = self.source / ".next/standalone/.next/static/chunks"
