@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.792",
-  "source_sha": "73ef8e11092bc66bef18384c29be4296a96d4a18",
+  "version": "1.1.0-rc.793",
+  "source_sha": "e31a3571da0f312baeb347bd5872383b5645e4f3",
   "notes": {
-    "fa": "بازطراحی حرفه‌ای بخش تانل‌ها و پروتکل‌های داشبورد؛ نمایش مسیر واقعی ایران به خروجی، نوع انتقال و تأخیر گزارش‌شده، کارت‌های پروتکل با فیلتر همه/کلاسیک/مدرن و شمارش صحیح ۱۶ پروتکل، تفکیک وضعیت آنلاین/آفلاین/نامشخص، تعداد آنلاین نودها و نشان ورودی ایران/سرور خروجی. دارک‌مود و لایت‌مود، موبایل و محافظت از ظاهر در آپدیت‌های بعدی. بدون تغییر کانفیگ سرورها یا اطلاعات مشتریان.",
-    "en": "Professional dark/light admin dashboard tunnel-route monitor and accurate 16-protocol status matrix with All/Classic/Modern filters, real reported latency and states, node online summary and Iran/Exit role badges. Responsive and release-parity protected; existing VPN/user/payment configurations unchanged."
+    "fa": "حذف کامل توضیحات اضافی و تکراری در داشبورد مدیریت، نمودار فروش، مانیتور منابع سرور، وضعیت سرویس‌ها، فعالیت‌های اخیر، اشتراک‌ها، نودها، تانل‌ها و پروتکل‌ها. حفظ اطلاعات ضروری شامل عنوان، اعداد، وضعیت، نمودار و دکمه‌های مدیریتی با چیدمان خلاصه‌تر و پشتیبانی از دارک‌مود و لایت‌مود. بدون تغییر در تنظیمات VPN، کیف پول و اطلاعات کاربران.",
+    "en": "Remove decorative and explanatory copy throughout the admin dashboard, sales and control-server charts, service health, payments, subscriptions, nodes, tunnels and protocols. Retain essential labels, numerical telemetry, filters, statuses and actions; compact responsive light/dark layout and release parity tests. No VPN, wallet or customer data changes."
   }
 }
