@@ -22,7 +22,8 @@ class NodeAutoBackfillPreflightTests(unittest.TestCase):
             node for node in module.body
             if isinstance(node,ast.FunctionDef) and node.name=="_cheap_priority_guard"
         )
-        namespace={"os":os,"subprocess":subprocess}
+        namespace={"os":os,"subprocess":subprocess,
+                   "_cheap_paid_order_priority":lambda:False}
         exec(compile(ast.Module(body=[function],type_ignores=[]),str(SCRIPT),"exec"),namespace)
         cls.guard=staticmethod(namespace["_cheap_priority_guard"])
 
@@ -44,6 +45,14 @@ class NodeAutoBackfillPreflightTests(unittest.TestCase):
         )
         with patch("os.getloadavg",return_value=(3,3,3)), \
              patch("subprocess.run",return_value=result):
+            self.assertTrue(self.guard())
+
+    def test_paid_job_priority_skips_app_imports_even_without_central_stage(self):
+        result=SimpleNamespace(returncode=0,stdout="")
+        with patch("os.getloadavg",return_value=(2,2,2)), \
+             patch("subprocess.run",return_value=result), \
+             patch.dict(self.guard.__globals__,
+                        {"_cheap_paid_order_priority":lambda:True}):
             self.assertTrue(self.guard())
 
     def test_idle_node_fleet_keeps_original_full_guard(self):
