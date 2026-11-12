@@ -370,7 +370,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     }
     setState(() { _vpnBusy = true; _vpnError = null; });
     try {
-      if (_modernTunnel.isRunning || _ciscoTunnel.isRunning || _modernUp) {
+      if (_modernTunnel.isRunning || _ciscoTunnel.isRunning ||
+          _openVpnTunnel.hasChild || _l2tpTunnel.hasChild || _modernUp) {
         _modernHealthTimer?.cancel();
         _stopModernTrafficMonitoring();
         if (_ciscoTunnel.isRunning) {
@@ -599,13 +600,15 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         });
       }
       if (_modernTunnel.isRunning || _ciscoTunnel.isRunning ||
-          _openVpnTunnel.isRunning) {
+          _openVpnTunnel.hasChild || _l2tpTunnel.hasChild) {
         _modernHealthTimer?.cancel();
         _stopModernTrafficMonitoring();
         if (_ciscoTunnel.isRunning) {
           await _ciscoTunnel.stop();
         } else if (_openVpnTunnel.hasChild) {
           await _openVpnTunnel.stop();
+        } else if (_l2tpTunnel.hasChild) {
+          await _l2tpTunnel.stop();
         } else {
           await _modernTunnel.stop();
         }
@@ -695,13 +698,15 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         });
       }
       if (_modernTunnel.isRunning || _ciscoTunnel.isRunning ||
-          _openVpnTunnel.isRunning) {
+          _openVpnTunnel.hasChild || _l2tpTunnel.hasChild) {
         _modernHealthTimer?.cancel();
         _stopModernTrafficMonitoring();
         if (_ciscoTunnel.isRunning) {
           await _ciscoTunnel.stop();
         } else if (_openVpnTunnel.hasChild) {
           await _openVpnTunnel.stop();
+        } else if (_l2tpTunnel.hasChild) {
+          await _l2tpTunnel.stop();
         } else {
           await _modernTunnel.stop();
         }
@@ -788,13 +793,15 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         });
       }
       if (_modernTunnel.isRunning || _ciscoTunnel.isRunning ||
-          _openVpnTunnel.isRunning) {
+          _openVpnTunnel.hasChild || _l2tpTunnel.hasChild) {
         _modernHealthTimer?.cancel();
         _stopModernTrafficMonitoring();
         if (_ciscoTunnel.isRunning) {
           await _ciscoTunnel.stop();
         } else if (_openVpnTunnel.hasChild) {
           await _openVpnTunnel.stop();
+        } else if (_l2tpTunnel.hasChild) {
+          await _l2tpTunnel.stop();
         } else {
           await _modernTunnel.stop();
         }
@@ -900,13 +907,15 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         });
       }
       if (_modernTunnel.isRunning || _ciscoTunnel.isRunning ||
-          _openVpnTunnel.isRunning) {
+          _openVpnTunnel.hasChild || _l2tpTunnel.hasChild) {
         _modernHealthTimer?.cancel();
         _stopModernTrafficMonitoring();
         if (_ciscoTunnel.isRunning) {
           await _ciscoTunnel.stop();
         } else if (_openVpnTunnel.hasChild) {
           await _openVpnTunnel.stop();
+        } else if (_l2tpTunnel.hasChild) {
+          await _l2tpTunnel.stop();
         } else {
           await _modernTunnel.stop();
         }
@@ -954,6 +963,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         await _ciscoTunnel.stop();
       } else if (_openVpnTunnel.hasChild) {
         await _openVpnTunnel.stop();
+      } else if (_l2tpTunnel.hasChild) {
+        await _l2tpTunnel.stop();
       } else if (_modernTunnel.isRunning) {
         await _modernTunnel.stop();
       }
@@ -1066,7 +1077,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           candidate.profiles, targetId);
       if (!mounted) return;
 
-      if (_modernTunnel.isRunning || _ciscoTunnel.isRunning || _modernUp) {
+      if (_modernTunnel.isRunning || _ciscoTunnel.isRunning ||
+          _openVpnTunnel.hasChild || _l2tpTunnel.hasChild || _modernUp) {
         _stopModernTrafficMonitoring();
         if (_ciscoTunnel.isRunning) {
           await _ciscoTunnel.stop();
@@ -1248,7 +1260,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   Future<void> _toggleVpn() async {
     if (_vpnBusy || !Platform.isWindows) return;
     if (_modernUp || _modernTunnel.isRunning ||
-        _ciscoTunnel.isRunning || _openVpnTunnel.hasChild) {
+        _ciscoTunnel.isRunning || _openVpnTunnel.hasChild ||
+        _l2tpTunnel.hasChild) {
       await _stopModernTunnel();
       return;
     }
