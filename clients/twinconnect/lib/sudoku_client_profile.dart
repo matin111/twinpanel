@@ -2,7 +2,8 @@ import 'dart:convert';
 
 /// Official SUDOKU-ASCII standalone client format; NOT sing-box / Xray.
 /// Only the panel's active centrally shared, per-subscription credentials
-/// are accepted. This parser never changes account keys or node settings.
+/// are accepted. The public endpoint may use a per-node tunnel-forwarded
+/// port; never replace its delivered port with the internal shared 18553. This parser never changes account keys or node settings.
 class SudokuClientProfile {
   const SudokuClientProfile({
     required this.nodeId,
@@ -35,7 +36,8 @@ class SudokuClientProfile {
       final parsed = Uri.tryParse('tcp://$endpoint');
       if (parsed == null || parsed.userInfo.isNotEmpty ||
           parsed.host.isEmpty || !parsed.hasPort ||
-          parsed.port != 18553 || parsed.path.isNotEmpty ||
+          parsed.port < 1 || parsed.port > 65535 ||
+          parsed.path.isNotEmpty ||
           parsed.query.isNotEmpty || parsed.fragment.isNotEmpty) return null;
       // Fail closed on unsupported or intentionally weakened crypto.
       if (raw['aead'] != 'chacha20-poly1305' &&
