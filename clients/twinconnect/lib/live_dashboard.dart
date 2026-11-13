@@ -2992,7 +2992,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           clipBehavior: Clip.antiAlias,
           decoration: BoxDecoration(
             gradient: LinearGradient(colors: [
-              purple, BrandTheme.parse(widget.brand.secondaryColor, '#7051D4')]),
+              purple, BrandTheme.secondaryAccent(widget.brand)]),
             borderRadius: BorderRadius.circular(13),
           ),
           child: widget.brand.logoUrl != null &&
@@ -3139,21 +3139,19 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           begin: Alignment.topLeft, end: Alignment.bottomRight,
           colors: _dark
               ? [
-                  Color.lerp(panel, purple, .46)!.withValues(alpha: .23),
-                  panel.withValues(alpha: .12),
-                  Color.lerp(panel,
-                    BrandTheme.secondaryAccent(widget.brand),
-                    .36)!.withValues(alpha: .22),
+                  const Color(0xFF203847).withValues(alpha: .48),
+                  const Color(0xFF142B37).withValues(alpha: .34),
+                  const Color(0xFF234B4B).withValues(alpha: .31),
                 ]
               : [
-                  const Color(0xFFEAF3F5).withValues(alpha: 0.76),
-                  Colors.white.withValues(alpha: 0.64),
-                  const Color(0xFFDCEBF0).withValues(alpha: 0.72),
+                  const Color(0xFFFCFEFF).withValues(alpha: .90),
+                  const Color(0xFFF0F7F9).withValues(alpha: .83),
+                  const Color(0xFFE6F3F4).withValues(alpha: .84),
                 ],
         ),
-        border: Border.all(color: purple.withValues(alpha: 0.54)),
+        border: Border.all(color: purple.withValues(alpha: 0.26)),
         boxShadow: [BoxShadow(
-          color: purple.withValues(alpha: _dark ? 0.25 : 0.11),
+          color: purple.withValues(alpha: _dark ? 0.14 : 0.06),
           blurRadius: 38, spreadRadius: 2, offset: const Offset(0, 14)),
         ],
       ),
@@ -3220,6 +3218,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           connected: _verifiedConnectionActive,
           connecting: _vpnBusy,
           dark: _dark,
+          rxSamples: _rxHistory,
+          txSamples: _txHistory,
         ),
         const SizedBox(height: 14),
         ClipRRect(
@@ -3237,11 +3237,11 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                     ? [const Color(0xFF277D69).withValues(alpha: .82),
                        const Color(0xFF69B69C).withValues(alpha: .68)]
                     : [
-                      purple.withValues(alpha: .85),
                       BrandTheme.connectionButton(widget.brand)
-                        .withValues(alpha: .71),
+                        .withValues(alpha: .94),
                       BrandTheme.secondaryAccent(widget.brand)
-                        .withValues(alpha: .42),
+                        .withValues(alpha: .74),
+                      const Color(0xFF386579).withValues(alpha: .66),
                     ]),
                 border: Border.all(
                   color: Colors.white.withValues(alpha: .49), width: 1.2),
