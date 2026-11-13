@@ -197,7 +197,6 @@ class NativeVpnCapabilities {
     this.includeApps = false,
     this.excludeApps = false,
     this.killSwitchEnforced = false,
-    this.wireGuardSessionKillSwitch = false,
     this.dnsGuard = false,
     this.ipv6Guard = false,
     this.localNetworkBypass = false,
@@ -213,9 +212,6 @@ class NativeVpnCapabilities {
   final bool excludeApps;
   /// True only after native OS lockdown/filter enforcement is confirmed.
   final bool killSwitchEnforced;
-  /// WireGuard official Windows WFP filtering available only while its /0 service runs.
-  /// Not an always-on system-wide firewall or proof of currently enforced blocking.
-  final bool wireGuardSessionKillSwitch;
   final bool dnsGuard;
   final bool ipv6Guard;
   final bool localNetworkBypass;
@@ -250,8 +246,6 @@ class NativeVpnCapabilities {
               platform == VpnPlatform.windows ||
               managed),
       killSwitchEnforced: flag('killSwitchEnforced'),
-      wireGuardSessionKillSwitch: platform == VpnPlatform.windows &&
-          flag('engineReady') && flag('wireGuardSessionKillSwitch'),
       dnsGuard: flag('dnsGuard'),
       ipv6Guard: flag('ipv6Guard'),
       localNetworkBypass: flag('localNetworkBypass'),
