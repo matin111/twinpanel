@@ -43,6 +43,7 @@ jobs:
       - name: Install fail-closed Windows VPN native bridge
         run: python tools/install_windows_native.py
       - name: Compile isolated Windows global guard prototype (never execute or ship)
+        continue-on-error: true # Experimental guard must not break existing VPN release builds.
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
