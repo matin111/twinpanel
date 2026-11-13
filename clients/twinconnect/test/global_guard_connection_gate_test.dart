@@ -67,10 +67,12 @@ void main() {
     // The connect/disconnect button is a separate WireGuard entry point.
     // Its disconnect branch must remain usable, while its connect branch
     // must fail closed before bootstrap and native service start.
-    final alternate = dashboard.indexOf("if (_autoFastest) {",
-        dashboard.indexOf('Future<void> _toggleVpn('));
-    expect(alternate, greaterThanOrEqualTo(0));
-    expect(dashboard.substring(alternate - 260, alternate),
+    final toggleStart = dashboard.indexOf('Future<void> _toggleVpn(');
+    expect(toggleStart, greaterThanOrEqualTo(0));
+    final connectBranch = dashboard.indexOf(
+        '// Allow disconnect at any time', toggleStart);
+    expect(connectBranch, greaterThan(toggleStart));
+    expect(dashboard.substring(connectBranch, connectBranch + 320),
         contains('await _requireVerifiedGuardIfRequested();'));
 
   });
