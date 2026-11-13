@@ -100,6 +100,21 @@ jobs:
           done
           python3 source/backend/tests/test_sudoku_shared_accounting_release_v1.py -v
 
+      - name: Guard Telegram start-only command menu on every installation
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          for path in \
+            "backend/app/bot_text_middleware.py" \
+            "backend/tests/test_main_bot_start_only_commands_v1.py"; do
+            test -s "source/$path" && test -s "publisher/$path"
+            cmp -s "source/$path" "publisher/$path" || {
+              echo "::error file=$path::Release lacks start-only command menu policy"
+              exit 1
+            }
+          done
+          python3 source/backend/tests/test_main_bot_start_only_commands_v1.py -v
+
       - name: Guard reseller subscription edit and renewal dialog visibility
         shell: bash
         run: |
