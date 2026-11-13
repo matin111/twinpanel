@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.827",
+  "version": "1.1.0-rc.828",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-13T08:07:53Z",
+  "released_at": "2026-11-13T08:21:20Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "6add61bf3762081cdc406a5a4e6deae77efd2807",
+  "source_sha": "322a4a1dcfc1b3152bd7309e5d1aaa6d8b686dda",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.827/twinpanel-1.1.0-rc.827-linux-x86_64.tar.gz",
-    "sha256": "90b32b71acce43cbff86681fb778737a5d951002cbd99729adf720556295dda2",
-    "size_bytes": 30772258
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.828/twinpanel-1.1.0-rc.828-linux-x86_64.tar.gz",
+    "sha256": "bae52932ff6886644dae24e0878c9d90664d7f981e9e8439a3a23f9ffa2ab67e",
+    "size_bytes": 30728761
   },
   "notes": {
-    "fa": "حسابداری دقیق Sudoku با سربار کمتر: اندازه‌گیری واقعی هر کاربر، مبدأ غیرقابل‌صورتحساب، جلوگیری از پردازش و ساخت رکورد صفر برای کاربران بدون مصرف. اصلاحات rc.826 حفظ شده؛ هیچ کانفیگ اتصال، کلید یا سرویس Sudoku روی نودها تغییر نمی‌کند.",
-    "en": "Accurate shared Sudoku accounting with low overhead: verified real per-user counters, nonbillable baselines, and sparse capture to avoid allocating zero-byte cursors for idle users. Preserves rc.826 accounting fixes without changing node VPN configs or credentials."
+    "fa": "رفع خطای ردشدن کل گزارش مصرف Sudoku هنگام تغییر همزمان شمارنده‌ها: خواندن مقادیر معتبر و مستقل upTotal/downTotal، عدم وابستگی به برابری لحظه‌ای used، حفظ مبدأ شمارش ایمن و ثبت سبک فقط برای کاربران دارای مصرف.",
+    "en": "Fix transient Sudoku telemetry rejection when the controller's used field differs during concurrent updates: bill solely from validated per-user cumulative upTotal/downTotal; preserve per-process baseline and sparse idle-user filtering."
   }
 }
