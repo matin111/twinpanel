@@ -152,7 +152,7 @@ class _LiveTrafficFlowPainter extends CustomPainter {
         double baseline, double direction) {
       final safe = samples.map((v) => v.isFinite && v > 0 ? v : 0.0)
           .toList(growable: false);
-      final maxRate = safe.fold<double>(0, math.max);
+      final maxRate = safe.fold<double>(0, (maximum, value) => math.max(maximum, value));
       final path = Path();
       const left = 14.0;
       final width = size.width - 28;
