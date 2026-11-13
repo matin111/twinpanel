@@ -42,12 +42,14 @@ class VpnSettingsScreen extends StatefulWidget {
     required this.tenant,
     required this.account,
     this.brand,
+    this.embedded = false,
     super.key,
   });
 
   final String tenant;
   final String account;
   final BrandPreview? brand;
+  final bool embedded;
 
   @override
   State<VpnSettingsScreen> createState() => _VpnSettingsScreenState();
@@ -219,11 +221,7 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
       VpnPlatform.other => s.vpnPlatformOther,
     };
 
-    return Scaffold(
-      appBar: AppBar(title: Text(s.vpnSettingsTitle)),
-      body: BrandBackground(
-        brand: widget.brand,
-        child: _loading
+    final settingsBody = _loading
           ? Center(
               child: Text(AppStrings.of(context).pick(
                 'در حال بررسی تنظیمات', 'Checking settings')),
@@ -233,7 +231,13 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 760),
                   child: ListView(
-                    padding: const EdgeInsets.all(20),
+                    shrinkWrap: widget.embedded,
+                    physics: widget.embedded
+                        ? const NeverScrollableScrollPhysics() : null,
+                    padding: EdgeInsets.symmetric(
+                      horizontal: widget.embedded ? 0 : 20,
+                      vertical: widget.embedded ? 4 : 20,
+                    ),
                     children: [
                       TwinConnectGlassCard(
                         dark: Theme.of(context).brightness == Brightness.dark,
@@ -495,8 +499,11 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
                   ),
                 ),
               ),
-            ),
-      ),
+            );
+    if (widget.embedded) return settingsBody;
+    return Scaffold(
+      appBar: AppBar(title: Text(s.vpnSettingsTitle)),
+      body: BrandBackground(brand: widget.brand, child: settingsBody),
     );
   }
 }
