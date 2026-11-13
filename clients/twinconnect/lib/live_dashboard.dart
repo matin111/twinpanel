@@ -40,6 +40,7 @@ import 'tenant_api.dart';
 import 'vpn_policy_store.dart';
 import 'vpn_policy.dart';
 import 'windows_wireguard.dart';
+import 'windows_amneziawg.dart';
 import 'tenant_models.dart';
 import 'brand_theme.dart';
 import 'plan_classification.dart';
@@ -104,6 +105,7 @@ class _DemoServer {
 
 class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   final WindowsWireGuardController _vpn = const WindowsWireGuardController();
+  final WindowsAmneziaWgController _awg = const WindowsAmneziaWgController();
   late final WindowsSingBoxTunnel _modernTunnel = WindowsSingBoxTunnel(
     onUnexpectedExit: () {
       _modernHealthTimer?.cancel();
@@ -204,6 +206,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   bool _vpnUp = false;
   bool _vpnVerified = false;
   bool _vpnReady = false;
+  bool _awgServiceUp = false;
+  bool _awgUnmanaged = false;
   bool _vpnUnmanaged = false;
   bool _vpnCleanup = false;
   int _vpnRx = 0;
@@ -481,6 +485,10 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       if (_sudokuProxy.isRunning) await _sudokuProxy.stop();
       if (_mieruProxy.isRunning) await _mieruProxy.stop();
       if (_trusttunnelProxy.isRunning) await _trusttunnelProxy.stop();
+      if (_awgServiceUp) {
+        await _awg.stop();
+        _awgServiceUp = false;
+      }
         if (!mounted) return;
         setState(() { _modernUp = false; _modernProtocol = null; _modernNodeId = null; });
       }
@@ -762,6 +770,10 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       if (_sudokuProxy.isRunning) await _sudokuProxy.stop();
       if (_mieruProxy.isRunning) await _mieruProxy.stop();
       if (_trusttunnelProxy.isRunning) await _trusttunnelProxy.stop();
+      if (_awgServiceUp) {
+        await _awg.stop();
+        _awgServiceUp = false;
+      }
         if (!mounted) return;
         setState(() {
           _modernUp = false;
@@ -866,6 +878,10 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       if (_sudokuProxy.isRunning) await _sudokuProxy.stop();
       if (_mieruProxy.isRunning) await _mieruProxy.stop();
       if (_trusttunnelProxy.isRunning) await _trusttunnelProxy.stop();
+      if (_awgServiceUp) {
+        await _awg.stop();
+        _awgServiceUp = false;
+      }
         if (!mounted) return;
         setState(() {
           _modernUp = false;
@@ -967,6 +983,10 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       if (_sudokuProxy.isRunning) await _sudokuProxy.stop();
       if (_mieruProxy.isRunning) await _mieruProxy.stop();
       if (_trusttunnelProxy.isRunning) await _trusttunnelProxy.stop();
+      if (_awgServiceUp) {
+        await _awg.stop();
+        _awgServiceUp = false;
+      }
         if (!mounted) return;
         setState(() {
           _modernUp = false;
@@ -1069,6 +1089,10 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       if (_sudokuProxy.isRunning) await _sudokuProxy.stop();
       if (_mieruProxy.isRunning) await _mieruProxy.stop();
       if (_trusttunnelProxy.isRunning) await _trusttunnelProxy.stop();
+      if (_awgServiceUp) {
+        await _awg.stop();
+        _awgServiceUp = false;
+      }
       if (_ciscoTunnel.isRunning) await _ciscoTunnel.stop();
       if (_openVpnTunnel.hasChild) await _openVpnTunnel.stop();
       if (_l2tpTunnel.hasChild) await _l2tpTunnel.stop();
@@ -1205,6 +1229,10 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       if (_sudokuProxy.isRunning) await _sudokuProxy.stop();
       if (_mieruProxy.isRunning) await _mieruProxy.stop();
       if (_trusttunnelProxy.isRunning) await _trusttunnelProxy.stop();
+      if (_awgServiceUp) {
+        await _awg.stop();
+        _awgServiceUp = false;
+      }
       if (_ciscoTunnel.isRunning) await _ciscoTunnel.stop();
       if (_openVpnTunnel.hasChild) await _openVpnTunnel.stop();
       if (_l2tpTunnel.hasChild) await _l2tpTunnel.stop();
@@ -1293,6 +1321,95 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     }
   }
 
+  /// Dedicated official AmneziaWG native service. Do not pass its
+  /// obfuscation settings to plain WireGuard or the sing-box engine.
+  Future<void> _startAmneziaWgTunnel(String serverId) async {
+    if (_vpnBusy || !Platform.isWindows) return;
+    setState(() { _vpnBusy = true; _vpnError = null; });
+    try {
+      if (_vpnUnmanaged || _vpnCleanup || _awgUnmanaged) {
+        throw const FormatException('PREVIOUS_TUNNEL_NOT_STOPPED');
+      }
+      final selected = widget.catalog?.entries.any((entry) =>
+          entry.protocol.code == 'amneziawg' && entry.selected &&
+          entry.configRecordPresent) ?? false;
+      if (!selected) {
+        throw const FormatException('PROTOCOL_NOT_INCLUDED_IN_SUBSCRIPTION');
+      }
+      final api = TenantApi.fromBuildConfig();
+      final checked = await Future.wait<Object>([
+        api.loadSessionNativeProfiles(
+          panel: widget.panel,
+          sessionToken: widget.sessionToken,
+          protocol: VpnProtocols.byCode('amneziawg')!,
+          native: const NativeProtocolReadiness(
+              supportedCodes: {'amneziawg'}),
+        ),
+        _vpnPolicy.load(widget.panel.namespace, widget.username),
+      ]);
+      final profiles = checked[0] as ClientProtocolProfiles;
+      final policy = checked[1] as VpnPolicy;
+      // Validate before removing a currently working connection.
+      final node = WindowsAmneziaWgController.configForSingleNode(
+          profiles, serverId);
+      final capability = await _awg.capabilities();
+      NativeVpnBridge.requireSafeToConnect(policy, capability);
+
+      if (_modernTunnel.isRunning) await _modernTunnel.stop();
+      if (_xrayProxy.isRunning) await _xrayProxy.stop();
+      if (_sudokuProxy.isRunning) await _sudokuProxy.stop();
+      if (_mieruProxy.isRunning) await _mieruProxy.stop();
+      if (_trusttunnelProxy.isRunning) await _trusttunnelProxy.stop();
+      if (_awgServiceUp) {
+        await _awg.stop();
+        _awgServiceUp = false;
+      }
+      if (_ciscoTunnel.isRunning) await _ciscoTunnel.stop();
+      if (_openVpnTunnel.hasChild) await _openVpnTunnel.stop();
+      if (_l2tpTunnel.hasChild) await _l2tpTunnel.stop();
+      if (_vpnUp || _vpnCleanup) {
+        await _vpn.stop().timeout(const Duration(seconds: 20));
+        final stopped = await _vpn.status();
+        if (stopped['state'] != 'down') {
+          throw const FormatException('PREVIOUS_TUNNEL_NOT_STOPPED');
+        }
+        _vpnUp = false;
+        _vpnVerified = false;
+        _vpnCleanup = false;
+      }
+      if (_awgServiceUp) {
+        await _awg.stop();
+        _awgServiceUp = false;
+      }
+      _modernHealthTimer?.cancel();
+      _stopModernTrafficMonitoring();
+      final started = await _awg.start(profile: node, policy: policy);
+      final up = started['state'] == 'interface_up' ||
+          started['state'] == 'peer_verified';
+      final verified = started['peerHandshakeVerified'] == true;
+      if (!up) throw const FormatException('AWG_NATIVE_TUNNEL_UNAVAILABLE');
+      if (!mounted) return;
+      setState(() {
+        _awgServiceUp = true;
+        _modernUp = verified;
+        _modernProtocol = 'amneziawg';
+        _modernNodeId = serverId;
+        _vpnRx = started['rxBytes'] is int ? started['rxBytes'] as int : 0;
+        _vpnTx = started['txBytes'] is int ? started['txBytes'] as int : 0;
+        _publicIp = null;
+        _vpnError = null;
+      });
+      // Interface-up is not a handshake; poll Windows for a confirmed peer.
+      _startNetworkStats();
+    } catch (error) {
+      if (mounted) setState(() {
+        _vpnError = _errorText(error);
+      });
+    } finally {
+      if (mounted) setState(() => _vpnBusy = false);
+    }
+  }
+
   Future<void> _startMieruTunnel(String serverId) async {
     if (_vpnBusy || !Platform.isWindows) return;
     setState(() { _vpnBusy = true; _vpnError = null; });
@@ -1335,6 +1452,10 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       if (_sudokuProxy.isRunning) await _sudokuProxy.stop();
       if (_mieruProxy.isRunning) await _mieruProxy.stop();
       if (_trusttunnelProxy.isRunning) await _trusttunnelProxy.stop();
+      if (_awgServiceUp) {
+        await _awg.stop();
+        _awgServiceUp = false;
+      }
       if (_ciscoTunnel.isRunning) await _ciscoTunnel.stop();
       if (_openVpnTunnel.hasChild) await _openVpnTunnel.stop();
       if (_l2tpTunnel.hasChild) await _l2tpTunnel.stop();
@@ -1464,6 +1585,10 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       if (_sudokuProxy.isRunning) await _sudokuProxy.stop();
       if (_mieruProxy.isRunning) await _mieruProxy.stop();
       if (_trusttunnelProxy.isRunning) await _trusttunnelProxy.stop();
+      if (_awgServiceUp) {
+        await _awg.stop();
+        _awgServiceUp = false;
+      }
       if (_ciscoTunnel.isRunning) await _ciscoTunnel.stop();
       if (_openVpnTunnel.hasChild) await _openVpnTunnel.stop();
       if (_l2tpTunnel.hasChild) await _l2tpTunnel.stop();
@@ -1637,6 +1762,10 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       if (_sudokuProxy.isRunning) await _sudokuProxy.stop();
       if (_mieruProxy.isRunning) await _mieruProxy.stop();
       if (_trusttunnelProxy.isRunning) await _trusttunnelProxy.stop();
+      if (_awgServiceUp) {
+        await _awg.stop();
+        _awgServiceUp = false;
+      }
         if (!mounted) return;
         setState(() {
           _modernUp = false;
@@ -1693,6 +1822,10 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       if (_sudokuProxy.isRunning) await _sudokuProxy.stop();
       if (_mieruProxy.isRunning) await _mieruProxy.stop();
       if (_trusttunnelProxy.isRunning) await _trusttunnelProxy.stop();
+      if (_awgServiceUp) {
+        await _awg.stop();
+        _awgServiceUp = false;
+      }
       if (!mounted) return;
       setState(() {
         _modernUp = false;
@@ -1762,6 +1895,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           await _startMieruTunnel(nodes[index].id);
         } else if (_filter == 'trusttunnel') {
           await _startTrustTunnel(nodes[index].id);
+        } else if (_filter == 'amneziawg') {
+          await _startAmneziaWgTunnel(nodes[index].id);
         } else if (SingBoxProfileValidator.supportsFamily(_filter)) {
           await _startModernTunnel(_filter, nodes[index].id);
         }
@@ -1838,6 +1973,10 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       if (_sudokuProxy.isRunning) await _sudokuProxy.stop();
       if (_mieruProxy.isRunning) await _mieruProxy.stop();
       if (_trusttunnelProxy.isRunning) await _trusttunnelProxy.stop();
+      if (_awgServiceUp) {
+        await _awg.stop();
+        _awgServiceUp = false;
+      }
         if (!mounted) return;
         setState(() {
           _modernUp = false;
@@ -2029,6 +2168,32 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           if (!nextUp && !_modernUp) _resetNetworkStats();
         });
       }
+      // Query the independent AmneziaWG service without confusing it
+      // with the ordinary WireGuard tunnel and its transfer counters.
+      if (_awgServiceUp || _modernProtocol == 'amneziawg') {
+        try {
+          final awg = await _awg.status();
+          if (!mounted) return;
+          final serviceUp = awg['state'] == 'interface_up' ||
+              awg['state'] == 'peer_verified';
+          final verified = awg['state'] == 'peer_verified' &&
+              awg['peerHandshakeVerified'] == true;
+          setState(() {
+            _awgServiceUp = serviceUp;
+            _awgUnmanaged = awg['state'] == 'unmanaged_service';
+            _modernUp = verified;
+            _vpnRx = awg['rxBytes'] is int ? awg['rxBytes'] as int : 0;
+            _vpnTx = awg['txBytes'] is int ? awg['txBytes'] as int : 0;
+            if (!serviceUp) {
+              _modernProtocol = null;
+              _modernNodeId = null;
+              _publicIp = null;
+            }
+          });
+        } catch (_) {
+          // A status-query timeout is not proof the service stopped.
+        }
+      }
       if (nextUp && (!wasUp || _networkTimer == null)) _startNetworkStats();
       if (nextUp && nextVerified && _publicIp == null) _readNetworkStats();
       // Native feature probe is expensive; do not repeat it every 12 seconds.
@@ -2047,7 +2212,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
 
   Future<void> _toggleVpn() async {
     if (_vpnBusy || !Platform.isWindows) return;
-    if (_modernUp || _modernTunnel.isRunning || _xrayProxy.isRunning || _sudokuProxy.isRunning ||
+    if (_modernUp || _awgServiceUp || _modernTunnel.isRunning || _xrayProxy.isRunning || _sudokuProxy.isRunning ||
         _ciscoTunnel.isRunning || _openVpnTunnel.hasChild ||
         _l2tpTunnel.hasChild) {
       await _stopModernTunnel();
@@ -2081,6 +2246,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         await _startMieruTunnel(_selectedServerId!);
       } else if (_filter == 'trusttunnel') {
         await _startTrustTunnel(_selectedServerId!);
+      } else if (_filter == 'amneziawg') {
+        await _startAmneziaWgTunnel(_selectedServerId!);
       } else if (SingBoxProfileValidator.supportsFamily(_filter)) {
         await _startModernTunnel(_filter, _selectedServerId!);
       } else {
@@ -3122,6 +3289,24 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
               'TRUSTTUNNEL_ENGINE_NOT_BUNDLED' => tr(
                 'موتور رسمی TrustTunnel در این نسخه وجود ندارد.',
                 'The official TrustTunnel Windows engine is not bundled.'),
+              'AWG_NODE_PROFILE_MISSING' => tr(
+                'کانفیگ AmneziaWG برای سرور انتخابی وجود ندارد.',
+                'No AmneziaWG profile was delivered for this server.'),
+              'AWG_CONFIG_MISSING' => tr(
+                'کانفیگ AmneziaWG ناقص یا نامعتبر است.',
+                'The AmneziaWG configuration is missing or invalid.'),
+              'AWG_OBFUSCATION_MISSING' => tr(
+                'پارامترهای اختصاصی AmneziaWG در کانفیگ موجود نیستند.',
+                'AmneziaWG obfuscation parameters are missing.'),
+              'AWG_OBFUSCATION_INVALID' => tr(
+                'مقادیر اختصاصی AmneziaWG معتبر نیستند.',
+                'AmneziaWG obfuscation values are invalid.'),
+              'AWG_ADMIN_OR_TUNNEL_CONFLICT' => tr(
+                'برای AmneziaWG دسترسی مدیر لازم است یا تونل دیگری فعال است.',
+                'AmneziaWG needs Administrator access or another tunnel is running.'),
+              'AWG_START_FAILED' => tr(
+                'سرویس رسمی AmneziaWG در ویندوز راه‌اندازی نشد.',
+                'The official AmneziaWG service could not start.'),
               'NATIVE_PROTOCOL_ENGINE_NOT_READY' => tr(
                 'موتور مستقل این پروتکل هنوز آماده نیست.',
                 'This protocol requires a native engine that is not ready yet.'),
