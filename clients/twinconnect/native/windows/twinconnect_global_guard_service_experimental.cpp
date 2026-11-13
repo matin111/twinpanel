@@ -135,11 +135,7 @@ bool RecoveryTaskReady() {
     if (FAILED(definition->get_Actions(&actions)) || !actions) break;
     long count = 0;
     if (FAILED(actions->get_Count(&count)) || count != 1) break;
-    VARIANT item = {};
-    VariantInit(&item);
-    item.vt = VT_I4;
-    item.lVal = 1;
-    if (FAILED(actions->get_Item(item, &action)) || !action ||
+    if (FAILED(actions->get_Item(1, &action)) || !action ||
         FAILED(action->QueryInterface(IID_IExecAction,
             reinterpret_cast<void**>(&executable))) || !executable ||
         FAILED(executable->get_Path(&path)) || !path ||
