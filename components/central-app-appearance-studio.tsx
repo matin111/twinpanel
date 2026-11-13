@@ -7,14 +7,14 @@ import styles from "./central-app-appearance.module.css";
 
 type Role="admin"|"reseller";
 const DEFAULT:AppAppearance={
-  primary_color:"#548BA4",secondary_color:"#65B7B2",button_color:"#3F879B",
-  background_color:"#121F2B",surface_color:"#203544",background_style:"gradient",
+  primary_color:"#6FA7B8",secondary_color:"#62C1B4",button_color:"#4E8FA2",
+  background_color:"#0F1720",surface_color:"#1B2B36",background_style:"gradient",
   background_image_url:null,theme_mode:"dark",
 };
 const PRESETS=[
   {name:["مه‌آلود اقیانوسی","Misty ocean"],colors:["#548BA4","#65B7B2","#3F879B","#121F2B","#203544"]},
   {name:["آبی دودی","Slate blue"],colors:["#7189A8","#6AA5B4","#4B7897","#172431","#283949"]},
-  {name:["بنفش شب","Midnight violet"],colors:["#7C3AED","#4F46E5","#7C3AED","#101018","#20202A"]},
+  {name:["فیروزه‌ای مه‌آلود","Soft aqua mist"],colors:["#6FA7B8","#62C1B4","#4E8FA2","#0F1720","#1B2B36"]},
   {name:["آبی اقیانوسی","Ocean blue"],colors:["#2563EB","#0891B2","#2563EB","#0B1729","#16263B"]},
   {name:["سبز زمردی","Emerald"],colors:["#059669","#0D9488","#059669","#091E1B","#15312D"]},
   {name:["صورتی مدرن","Modern rose"],colors:["#DB2777","#7C3AED","#DB2777","#1B1020","#302137"]},
