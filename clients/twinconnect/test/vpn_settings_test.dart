@@ -27,6 +27,31 @@ void main() {
     expect(find.byKey(const Key('appPassword')), findsOneWidget);
   });
 
+  testWidgets('advanced network settings expose honest feature availability',
+      (tester) async {
+    await tester.pumpWidget(const MaterialApp(
+      home: VpnSettingsScreen(tenant: '', account: ''),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('vpnCapabilityRefresh')), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('vpnProxyModeUnavailable')), 180,
+    );
+    final proxy = tester.widget<ListTile>(
+      find.byKey(const Key('vpnProxyModeUnavailable')),
+    );
+    expect(proxy.enabled, isFalse);
+    expect(find.byKey(const Key('vpnTunMode')), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('vpnShareGuideButton')), 180,
+    );
+    await tester.tap(find.byKey(const Key('vpnShareGuideButton')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('devShareVpnCard')), findsOneWidget);
+  });
+
   testWidgets('draft does not save without an identified account',
       (tester) async {
     await tester.pumpWidget(const MaterialApp(
