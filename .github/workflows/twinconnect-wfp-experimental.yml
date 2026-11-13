@@ -79,6 +79,16 @@ jobs:
             Start-Service -Name TwinConnectGlobalGuard -ErrorAction Stop
             & $exe status
             if ($LASTEXITCODE -ne 0) { throw "Admin IPC status failed" }
+            # Fail-closed negative tests: refuse to arm on physical adapters or
+            # malformed endpoints. No WFP filters may be added in either case.
+            & $exe arm "Ethernet" "1.1.1.1" "$exe" $ack
+            if ($LASTEXITCODE -eq 0) { throw "SECURITY: physical-adapter arm was accepted" }
+            & $exe arm "TwinConnectSB" "not-an-ip" "$exe" $ack
+            if ($LASTEXITCODE -eq 0) { throw "SECURITY: invalid endpoint arm was accepted" }
+            & $exe status
+            if ($LASTEXITCODE -ne 0 -or ($LASTEXITCODE -eq 0 -and -not ($LASTEXITCODE -eq 0))) {
+              throw "Guard status failed after rejected commands"
+            }
             & $exe recover $ack
             if ($LASTEXITCODE -ne 0) { throw "Independent recovery failed" }
             & $exe uninstall-vm $ack
