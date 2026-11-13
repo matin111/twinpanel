@@ -11,6 +11,8 @@ on:
       - "backend/app/routers/migration_center_v2.py"
       - "backend/app/routers/subscription_admin_v2.py"
       - "backend/tests/migration_center_v2_smoke.py"
+      - "backend/tests/migration_center_v3_smoke.py"
+      - "backend/tests/migration_center_session_ui_smoke.py"
       - ".github/workflows/migration-center-v2-smoke.yml"
   workflow_dispatch:
 
@@ -38,7 +40,26 @@ jobs:
             backend/app/services/migration_eylan_transfer.py \
             backend/app/routers/migration_center_v2.py \
             backend/app/routers/subscription_admin_v2.py \
-            backend/tests/migration_center_v2_smoke.py
+            backend/tests/migration_center_v2_smoke.py \
+            backend/tests/migration_center_v3_smoke.py \
+            backend/tests/migration_center_session_ui_smoke.py
 
       - name: Run Migration Center Phase 2 smoke
-        run: python backend/tests/migration_center_v2_smoke.py
+        run: |
+          python backend/tests/migration_center_v2_smoke.py
+          python backend/tests/migration_center_v3_smoke.py
+          python backend/tests/migration_center_session_ui_smoke.py
+
+  migration-center-ui-types:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies without lifecycle scripts
+        run: npm install --ignore-scripts --no-audit --no-fund --package-lock=false
+      - name: TypeScript check migration center and app
+        run: npx tsc --noEmit --pretty false
