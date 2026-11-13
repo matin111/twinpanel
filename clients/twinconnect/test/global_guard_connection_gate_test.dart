@@ -64,5 +64,14 @@ void main() {
     expect(wireguard, greaterThanOrEqualTo(0));
     expect(dashboard.substring(wireguard, wireguard + 400),
         contains('await _requireVerifiedGuardIfRequested();'));
+    // The connect/disconnect button is a separate WireGuard entry point.
+    // Its disconnect branch must remain usable, while its connect branch
+    // must fail closed before bootstrap and native service start.
+    final alternate = dashboard.indexOf("if (_autoFastest) {",
+        dashboard.indexOf('Future<void> _toggleVpn('));
+    expect(alternate, greaterThanOrEqualTo(0));
+    expect(dashboard.substring(alternate - 260, alternate),
+        contains('await _requireVerifiedGuardIfRequested();'));
+
   });
 }
