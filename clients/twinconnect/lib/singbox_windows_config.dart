@@ -85,6 +85,16 @@ class SingBoxWindowsConfig {
             'server_port': activeSocksPort,
             'version': '5',
           };
+    // The remote SOCKS5 TCP connection must not loop through its own
+    // Windows TUN. Exempt only the exact verified public upstream /32.
+    // Domain-based profiles get this address at native start after DNS.
+    final socksHost = protocol == 'socks5'
+        ? (resolvedServer ?? outbound['server']) : null;
+    final socksRoute = socksHost is String &&
+            InternetAddress.tryParse(socksHost)?.type ==
+                InternetAddressType.IPv4
+        ? XrayEndpointRoute.requirePublicIPv4(socksHost) : null;
+    final routeException = endpointRoute ?? socksRoute;
     final serverOutbound = {...outbound, 'tag': 'proxy'};
     // Resolve the endpoint before installing TUN routes to avoid a DNS
     // bootstrap loop. Preserve the original TLS identity when dialing an IP.
@@ -152,8 +162,8 @@ class SingBoxWindowsConfig {
           'mtu': 1400,
           'auto_route': true,
           'strict_route': true,
-          if (endpointRoute != null)
-            'route_exclude_address': ['$endpointRoute/32'],
+          if (routeException != null)
+            'route_exclude_address': ['$routeException/32'],
           'dns_mode': 'hijack',
         },
       ],
