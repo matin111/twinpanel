@@ -59,6 +59,7 @@ jobs:
           $target = Join-Path $env:ProgramFiles "TwinConnectGuardVMSmoke"
           New-Item -Path $target -ItemType Directory -Force | Out-Null
           Copy-Item -LiteralPath $exe -Destination (Join-Path $target "twinconnect-guard-service-test.exe")
+          Copy-Item -LiteralPath $exe -Destination (Join-Path $env:RUNNER_TEMP "twinconnect-guard-qa-unsigned.exe")
           Remove-Item -LiteralPath $exe -Force
       - name: Test admin service IPC and empty-rule recovery on disposable runner
         shell: pwsh
@@ -103,6 +104,49 @@ jobs:
               Start-Sleep -Seconds 2
             }
             Remove-Item -LiteralPath $dir -Recurse -Force -ErrorAction SilentlyContinue
+          }
+      - name: Validate signed automatic guard install and offline recovery without arming filters
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $guardDir = Join-Path $env:ProgramFiles 'TwinConnectGuardQASmoke'
+          $exe = Join-Path $guardDir 'TwinConnectGlobalGuard.exe'
+          $fixture = Join-Path $env:RUNNER_TEMP 'twinconnect-guard-qa-unsigned.exe'
+          New-Item -Path $guardDir -ItemType Directory -Force | Out-Null
+          Copy-Item -LiteralPath $fixture -Destination $exe -Force
+          $cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject 'CN=TwinConnect Ephemeral GitHub Runner Test Only' -CertStoreLocation 'Cert:\CurrentUser\My' -KeyExportPolicy Exportable
+          $public = Join-Path $env:RUNNER_TEMP 'twinconnect-guard-qa-public.cer'
+          Export-Certificate -Cert $cert -FilePath $public -Force | Out-Null
+          Import-Certificate -FilePath $public -CertStoreLocation 'Cert:\CurrentUser\Root' | Out-Null
+          Import-Certificate -FilePath $public -CertStoreLocation 'Cert:\CurrentUser\TrustedPublisher' | Out-Null
+          try {
+            $signed = Set-AuthenticodeSignature -FilePath $exe -Certificate $cert -HashAlgorithm SHA256
+            if ($signed.Status -ne 'Valid') { throw "QA signing failed: $($signed.Status)" }
+            & ./tools/install_guard_service.ps1 -Action Install -BinaryPath $exe -ExpectedSignerThumbprint $cert.Thumbprint
+            if ($LASTEXITCODE -ne 0) { throw 'Guard installer failed' }
+            $svc = Get-CimInstance Win32_Service -Filter "Name='TwinConnectGlobalGuard'"
+            if (!$svc -or $svc.State -ne 'Running' -or $svc.StartMode -ne 'Auto') {
+              throw 'Guard is not installed and automatically running'
+            }
+            # Simulate a crashed or stopped service: offline recovery must work
+            # without a functioning administrative named pipe.
+            Stop-Service -Name TwinConnectGlobalGuard -Force -ErrorAction Stop
+            & ./tools/install_guard_service.ps1 -Action Uninstall -BinaryPath $exe -ExpectedSignerThumbprint $cert.Thumbprint
+            if ($LASTEXITCODE -ne 0) { throw 'Offline guard uninstall failed' }
+            & $exe offline-status
+            if ($LASTEXITCODE -ne 0) { throw 'Owned filters remained after uninstall' }
+          } finally {
+            & $exe recover I_ACCEPT_OFFLINE_RECOVERY
+            $svc = Get-Service TwinConnectGlobalGuard -ErrorAction SilentlyContinue
+            if ($svc) {
+              sc.exe stop TwinConnectGlobalGuard | Out-Null
+              sc.exe delete TwinConnectGlobalGuard | Out-Null
+            }
+            Start-Sleep -Seconds 2
+            Remove-Item -LiteralPath $guardDir -Recurse -Force -ErrorAction SilentlyContinue
+            foreach ($store in @('My','Root','TrustedPublisher')) {
+              Remove-Item -LiteralPath ("Cert:\CurrentUser\$store\" + $cert.Thumbprint) -Force -ErrorAction SilentlyContinue
+            }
           }
       - name: Validate gated VM dual-stack leak test script syntax
         shell: pwsh
