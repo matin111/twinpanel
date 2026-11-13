@@ -1,3 +1,4 @@
+import 'twinconnect_wave_indicator.dart';
 import 'dart:ui' show ImageFilter, FontFeature;
 import 'dart:io' show Platform, HttpClient, InternetAddress, Process, ProcessException, FileSystemException, SocketException, HttpException;
 import 'dart:convert' show utf8;
@@ -3145,9 +3146,9 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                     .36)!.withValues(alpha: .22),
                 ]
               : [
-                  const Color(0xFFEDE4FF).withValues(alpha: 0.76),
+                  const Color(0xFFEAF3F5).withValues(alpha: 0.76),
                   Colors.white.withValues(alpha: 0.64),
-                  const Color(0xFFE6F1FF).withValues(alpha: 0.72),
+                  const Color(0xFFDCEBF0).withValues(alpha: 0.72),
                 ],
         ),
         border: Border.all(color: purple.withValues(alpha: 0.54)),
@@ -3213,64 +3214,12 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           ),
         ),
         const SizedBox(height: 18),
-        // Hero lens sits ABOVE the real VPN action; it is visual only.
-        // No synthetic traffic, route checks or permanently looping tickers.
-        TweenAnimationBuilder<double>(
-          key: const Key('devPowerEntranceAnimation'),
-          duration: const Duration(milliseconds: 520),
-          curve: Curves.easeOutBack,
-          tween: Tween(begin: .91, end: 1.0),
-          builder: (context, scale, child) =>
-              Transform.scale(scale: scale, child: child),
-          child: Container(
-            key: const Key('liveConnectionGlassOrb'),
-            height: 138, width: 138,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: purple.withValues(alpha: .29)),
-              boxShadow: [
-                BoxShadow(
-                  color: (_vpnVerified || _modernUp)
-                    ? const Color(0xFF29EAC0).withValues(alpha: .19)
-                    : purple.withValues(alpha: .20),
-                  blurRadius: 32, spreadRadius: 2),
-              ]),
-            child: Center(child: Container(
-              width: 112, height: 112,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: (_vpnVerified || _modernUp)
-                    ? const Color(0xFF52FFCE).withValues(alpha: .53)
-                    : purple.withValues(alpha: .52)),
-                gradient: RadialGradient(
-                  colors: (_vpnVerified || _modernUp)
-                    ? [const Color(0xFF21E4BA).withValues(alpha: .34),
-                       const Color(0xFF1B938B).withValues(alpha: .09)]
-                    : [purple.withValues(alpha: .37),
-                       BrandTheme.secondaryAccent(widget.brand)
-                          .withValues(alpha: .08)],
-                ),
-              ),
-              child: Center(child: Container(
-                width: 76, height: 76,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(26),
-                  color: (_dark ? Colors.white : purple)
-                    .withValues(alpha: _dark ? .10 : .09),
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: .29)),
-                ),
-                child: Icon(
-                  (_vpnUp || _modernUp)
-                      ? Icons.lock_rounded
-                      : Icons.lock_open_rounded,
-                  size: 38,
-                  color: (_vpnUp || _modernUp)
-                    ? const Color(0xFF48F7D0) : ink),
-              )),
-            )),
-          ),
+        // Real connection status drives the waves. Offline has no animation.
+        TwinConnectWaveIndicator(
+          key: const Key('liveConnectionGlassOrb'),
+          connected: _verifiedConnectionActive,
+          connecting: _vpnBusy,
+          dark: _dark,
         ),
         const SizedBox(height: 14),
         ClipRRect(
@@ -3285,11 +3234,11 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: (_modernUp || _vpnVerified)
-                    ? [const Color(0xFF09AE9B).withValues(alpha: .82),
-                       const Color(0xFF25E4BE).withValues(alpha: .57)]
+                    ? [const Color(0xFF277D69).withValues(alpha: .82),
+                       const Color(0xFF69B69C).withValues(alpha: .68)]
                     : [
                       purple.withValues(alpha: .85),
-                      BrandTheme.parse(widget.brand.buttonColor, '#9544F8')
+                      BrandTheme.connectionButton(widget.brand)
                         .withValues(alpha: .71),
                       BrandTheme.secondaryAccent(widget.brand)
                         .withValues(alpha: .42),
@@ -3348,35 +3297,6 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                     color: Colors.white, size: 22),
                 ]),
               ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 10),
-        ValueListenableBuilder<int>(
-          valueListenable: _connectedSeconds,
-          builder: (context, elapsed, child) => AnimatedOpacity(
-            duration: const Duration(milliseconds: 260),
-            opacity: _verifiedConnectionActive ? 1 : .68,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.timer_outlined, size: 17,
-                    color: _verifiedConnectionActive
-                        ? const Color(0xFF36E5BB) : sub),
-                const SizedBox(width: 7),
-                txt(tr('مدت اتصال', 'Connected for'),
-                    size: 12, color: sub),
-                const SizedBox(width: 8),
-                Text(_formatConnectedSeconds(elapsed),
-                    key: const Key('liveConnectionDuration'),
-                    textDirection: TextDirection.ltr,
-                    style: TextStyle(
-                      fontSize: 15, fontWeight: FontWeight.w700,
-                      fontFeatures: const [FontFeature.tabularFigures()],
-                      color: _verifiedConnectionActive
-                          ? const Color(0xFF36E5BB) : sub,
-                    )),
-              ],
             ),
           ),
         ),
@@ -3698,11 +3618,6 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
             style: const TextStyle(color: Colors.orangeAccent, fontSize: 11),
           ),
         ],
-        TextButton.icon(
-          onPressed: _vpnBusy ? null : _refreshVpnStatus,
-          icon: const Icon(Icons.refresh_rounded, size: 16),
-          label: Text(tr('بررسی وضعیت اتصال', 'Refresh tunnel status')),
-        ),
         const SizedBox(height: 12),
         ConnectionSignalArt(dark: _dark),
         const SizedBox(height: 12),
@@ -4348,6 +4263,44 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                 _vpnVerified ? tr('دست‌دهی تأیید شد', 'Handshake verified') :
                 _vpnUp ? tr('رابط فعال', 'Interface active') :
                 tr('قطع', 'Disconnected')),
+          ]),
+          const SizedBox(height: 11),
+          Row(children: [
+            ValueListenableBuilder<int>(
+          valueListenable: _connectedSeconds,
+          builder: (context, elapsed, child) => AnimatedOpacity(
+            duration: const Duration(milliseconds: 260),
+            opacity: _verifiedConnectionActive ? 1 : .68,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.timer_outlined, size: 17,
+                    color: _verifiedConnectionActive
+                        ? const Color(0xFF36E5BB) : sub),
+                const SizedBox(width: 7),
+                txt(tr('مدت اتصال', 'Connected for'),
+                    size: 12, color: sub),
+                const SizedBox(width: 8),
+                Text(_formatConnectedSeconds(elapsed),
+                    key: const Key('liveConnectionDuration'),
+                    textDirection: TextDirection.ltr,
+                    style: TextStyle(
+                      fontSize: 15, fontWeight: FontWeight.w700,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                      color: _verifiedConnectionActive
+                          ? const Color(0xFF36E5BB) : sub,
+                    )),
+              ],
+            ),
+          ),
+        ),
+            const Spacer(),
+            IconButton(
+              key: const Key('liveRefreshTunnelStatus'),
+              tooltip: tr('به‌روزرسانی اتصال', 'Refresh connection status'),
+              onPressed: _vpnBusy ? null : _refreshVpnStatus,
+              icon: Icon(Icons.refresh_rounded, color: purple, size: 19),
+            ),
           ]),
           const SizedBox(height: 23),
           Row(children: [
