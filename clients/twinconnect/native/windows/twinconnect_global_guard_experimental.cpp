@@ -1,0 +1,225 @@
+// TwinConnect experimental system-wide Windows outbound lock.
+// NOT connected to production UI. Requires isolated-VM validation before use.
+// Persistent WFP filters survive an app crash. Administrator can recover with
+// the "disarm" command from a separate console/physical access.
+// IMPORTANT: This prototype is not boot-time protection and must not be
+// advertised as a production always-on kill switch.
+
+#ifndef WINVER
+#define WINVER 0x0A00
+#endif
+#ifndef _WIN32_WINNT
+#define _WIN32_WINNT 0x0A00
+#endif
+
+#include <winsock2.h>
+#include <windows.h>
+#include <fwpmu.h>
+#include <netioapi.h>
+#include <ws2tcpip.h>
+#include <cstdio>
+#include <cwchar>
+#include <string>
+
+#pragma comment(lib, "Fwpuclnt.lib")
+#pragma comment(lib, "Iphlpapi.lib")
+#pragma comment(lib, "Ws2_32.lib")
+#pragma comment(lib, "Rpcrt4.lib")
+
+namespace {
+
+// Keys are fixed and uniquely owned by this tool; never enumerate or delete
+// another vendor's firewall filters.
+const GUID kSubLayer = {0xb3f412ac,0x2511,0x40d3,{0x99,0x62,0x72,0x11,0x4a,0x31,0xa9,0x41}};
+const GUID kBlockV4 = {0xb3f412ad,0x2511,0x40d3,{0x99,0x62,0x72,0x11,0x4a,0x31,0xa9,0x41}};
+const GUID kBlockV6 = {0xb3f412ae,0x2511,0x40d3,{0x99,0x62,0x72,0x11,0x4a,0x31,0xa9,0x41}};
+
+struct Engine {
+  HANDLE handle = nullptr;
+  ~Engine() {
+    if (handle != nullptr) FwpmEngineClose0(handle);
+  }
+};
+
+DWORD Open(Engine& engine) {
+  return FwpmEngineOpen0(nullptr, RPC_C_AUTHN_WINNT, nullptr,
+                         nullptr, &engine.handle);
+}
+
+bool Exists(HANDLE handle, const GUID& key) {
+  FWPM_FILTER0* filter = nullptr;
+  const DWORD result = FwpmFilterGetByKey0(handle, &key, &filter);
+  if (result == ERROR_SUCCESS) {
+    FwpmFreeMemory0(reinterpret_cast<void**>(&filter));
+    return true;
+  }
+  return false;
+}
+
+DWORD RemoveOwned(HANDLE handle, const GUID& key) {
+  const DWORD status = FwpmFilterDeleteByKey0(handle, &key);
+  return status == FWP_E_FILTER_NOT_FOUND ? ERROR_SUCCESS : status;
+}
+
+DWORD AddRule(HANDLE engine, const GUID& key, const GUID& layer,
+              const UINT64 localInterfaceLuid,
+              const UINT32* endpointV4) {
+  FWPM_FILTER_CONDITION0 conditions[2] = {};
+  // Conditions in one WFP filter are ANDed: block *only* when the
+  // outbound interface is NOT the protected tunnel AND destination is NOT
+  // the one exact VPN transport server address (for IPv4).
+  //
+  // Other apps targeting the same endpoint remain an intentionally narrow
+  // exception. Stronger endpoint process/port authentication is mandatory
+  // before deploying outside an isolated VM.
+  conditions[0].fieldKey = FWPM_CONDITION_IP_LOCAL_INTERFACE;
+  conditions[0].matchType = FWP_MATCH_NOT_EQUAL;
+  conditions[0].conditionValue.type = FWP_UINT64;
+  UINT64 luid = localInterfaceLuid;
+  conditions[0].conditionValue.uint64 = &luid;
+
+  UINT32 endpoint = endpointV4 == nullptr ? 0 : *endpointV4;
+  UINT32 count = 1;
+  if (endpointV4 != nullptr) {
+    conditions[1].fieldKey = FWPM_CONDITION_IP_REMOTE_ADDRESS;
+    conditions[1].matchType = FWP_MATCH_NOT_EQUAL;
+    conditions[1].conditionValue.type = FWP_UINT32;
+    conditions[1].conditionValue.uint32 = endpoint;
+    count = 2;
+  }
+
+  FWPM_FILTER0 filter = {};
+  filter.filterKey = key;
+  filter.displayData.name =
+      const_cast<wchar_t*>(L"TwinConnect experimental outbound lock");
+  filter.layerKey = layer;
+  filter.subLayerKey = kSubLayer;
+  filter.flags = FWPM_FILTER_FLAG_PERSISTENT;
+  filter.action.type = FWP_ACTION_BLOCK;
+  filter.weight.type = FWP_UINT8;
+  filter.weight.uint8 = 250;
+  filter.numFilterConditions = count;
+  filter.filterCondition = conditions;
+  return FwpmFilterAdd0(engine, &filter, nullptr, nullptr);
+}
+
+DWORD EnsureSubLayer(HANDLE engine) {
+  FWPM_SUBLAYER0 layer = {};
+  layer.subLayerKey = kSubLayer;
+  layer.displayData.name =
+      const_cast<wchar_t*>(L"TwinConnect experimental system guard");
+  layer.flags = FWPM_SUBLAYER_FLAG_PERSISTENT;
+  layer.weight = 0xD000;
+  const DWORD status = FwpmSubLayerAdd0(engine, &layer, nullptr);
+  return status == FWP_E_ALREADY_EXISTS ? ERROR_SUCCESS : status;
+}
+
+DWORD TransactionalArm(HANDLE engine, UINT64 tunnelLuid, UINT32 endpoint) {
+  DWORD result = FwpmTransactionBegin0(engine, 0);
+  if (result != ERROR_SUCCESS) return result;
+  result = EnsureSubLayer(engine);
+  if (result == ERROR_SUCCESS) result = RemoveOwned(engine, kBlockV4);
+  if (result == ERROR_SUCCESS) result = RemoveOwned(engine, kBlockV6);
+  if (result == ERROR_SUCCESS) {
+    result = AddRule(engine, kBlockV4, FWPM_LAYER_ALE_AUTH_CONNECT_V4,
+                     tunnelLuid, &endpoint);
+  }
+  if (result == ERROR_SUCCESS) {
+    result = AddRule(engine, kBlockV6, FWPM_LAYER_ALE_AUTH_CONNECT_V6,
+                     tunnelLuid, nullptr);
+  }
+  if (result != ERROR_SUCCESS) {
+    FwpmTransactionAbort0(engine);
+    return result;
+  }
+  result = FwpmTransactionCommit0(engine);
+  if (result != ERROR_SUCCESS) return result;
+  return Exists(engine, kBlockV4) && Exists(engine, kBlockV6)
+      ? ERROR_SUCCESS : ERROR_INVALID_STATE;
+}
+
+DWORD TransactionalDisarm(HANDLE engine) {
+  DWORD result = FwpmTransactionBegin0(engine, 0);
+  if (result != ERROR_SUCCESS) return result;
+  result = RemoveOwned(engine, kBlockV4);
+  if (result == ERROR_SUCCESS) result = RemoveOwned(engine, kBlockV6);
+  // Leave only our sublayer removed; do not touch Windows firewall profiles.
+  if (result == ERROR_SUCCESS) {
+    result = FwpmSubLayerDeleteByKey0(engine, &kSubLayer);
+    if (result == FWP_E_SUBLAYER_NOT_FOUND) result = ERROR_SUCCESS;
+  }
+  if (result != ERROR_SUCCESS) {
+    FwpmTransactionAbort0(engine);
+    return result;
+  }
+  return FwpmTransactionCommit0(engine);
+}
+
+void PrintStatus(HANDLE engine) {
+  const bool v4 = Exists(engine, kBlockV4);
+  const bool v6 = Exists(engine, kBlockV6);
+  wprintf(L"TwinConnect test WFP: IPv4=%ls IPv6=%ls\n",
+          v4 ? L"armed" : L"off", v6 ? L"armed" : L"off");
+  if (v4 != v6) {
+    wprintf(L"INCOMPLETE: run disarm with offline recovery access.\n");
+  }
+}
+
+void Usage() {
+  wprintf(L"Experimental WFP guard (NOT production Kill Switch)\n"
+          L" status\n"
+          L" arm <verified-tunnel-interface-alias> <VPN-endpoint-IPv4> "
+          L"I_ACCEPT_OFFLINE_RECOVERY\n"
+          L" disarm I_ACCEPT_OFFLINE_RECOVERY\n"
+          L"Run only on disposable Windows VM with administrator rights.\n");
+}
+
+} // namespace
+
+int wmain(int argc, wchar_t** argv) {
+  if (argc < 2) { Usage(); return 2; }
+  Engine engine;
+  DWORD result = Open(engine);
+  if (result != ERROR_SUCCESS) {
+    fwprintf(stderr, L"Cannot open WFP engine: 0x%08lx\n", result);
+    return 1;
+  }
+  if (_wcsicmp(argv[1], L"status") == 0 && argc == 2) {
+    PrintStatus(engine.handle);
+    return 0;
+  }
+  if (_wcsicmp(argv[1], L"disarm") == 0 && argc == 3 &&
+      wcscmp(argv[2], L"I_ACCEPT_OFFLINE_RECOVERY") == 0) {
+    result = TransactionalDisarm(engine.handle);
+  } else if (_wcsicmp(argv[1], L"arm") == 0 && argc == 5 &&
+             wcscmp(argv[4], L"I_ACCEPT_OFFLINE_RECOVERY") == 0) {
+    NET_LUID interfaceLuid = {};
+    if (ConvertInterfaceAliasToLuid(argv[2], &interfaceLuid)
+        != NO_ERROR || interfaceLuid.Value == 0) {
+      fwprintf(stderr, L"Verified VPN interface not found.\n");
+      return 2;
+    }
+    IN_ADDR address = {};
+    if (InetPtonW(AF_INET, argv[3], &address) != 1) {
+      fwprintf(stderr, L"Endpoint must be a numeric IPv4 address.\n");
+      return 2;
+    }
+    const UINT32 endpoint = ntohl(address.S_un.S_addr);
+    if (endpoint == 0 || endpoint == 0xFFFFFFFF ||
+        (endpoint >> 24) == 127 || (endpoint >> 24) >= 224) {
+      fwprintf(stderr, L"Unsupported VPN endpoint address.\n");
+      return 2;
+    }
+    result = TransactionalArm(engine.handle, interfaceLuid.Value, endpoint);
+  } else {
+    Usage();
+    return 2;
+  }
+
+  if (result != ERROR_SUCCESS) {
+    fwprintf(stderr, L"WFP transaction failed: 0x%08lx\n", result);
+    return 1;
+  }
+  PrintStatus(engine.handle);
+  return 0;
+}
