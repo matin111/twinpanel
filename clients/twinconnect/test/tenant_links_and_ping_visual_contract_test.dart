@@ -40,12 +40,16 @@ void main() {
     expect(dashboard, isNot(contains("tr('دست‌دهی با سرور تأیید شد', 'Server handshake verified')")));
   });
 
-  test('connection indicator waves only while connecting or verified', () {
+  test('connection fabric animates only on verified traffic', () {
     final wave = File('lib/twinconnect_wave_indicator.dart').readAsStringSync();
     final dashboard = File('lib/live_dashboard.dart').readAsStringSync();
-    expect(wave, contains('if (_active)'));
-    expect(wave, contains('if (!_active && _motion.isAnimating)'));
+    expect(wave, contains('if (_animate)'));
+    expect(wave, contains('if (!_animate && _motion.isAnimating)'));
     expect(dashboard, contains('connected: _verifiedConnectionActive'));
+    expect(dashboard, contains("Key('liveConnectionDataFabric')"));
+    expect(wave, contains('widget.connected && _trafficPresent'));
+    expect(wave, contains('maxRx > 0 || maxTx > 0'));
+    expect(wave, isNot(contains('Icons.lock_rounded')));
     expect(dashboard, contains("Key('liveRefreshTunnelStatus')"));
   });
 
