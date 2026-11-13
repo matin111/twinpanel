@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 
 /// Lightweight, finite ambient entrance animation for the Windows dashboard.
@@ -60,8 +58,8 @@ class _TwinConnectAmbientBackgroundState
     final brandBackground = widget.backgroundColor;
     final gradientColors = brandBackground == null
         ? (dark
-            ? const [Color(0xFF101D28), Color(0xFF1B3443), Color(0xFF112A35)]
-            : const [Color(0xFFF2F7F8), Color(0xFFE5F0F2), Color(0xFFF5F8F9)])
+            ? const [Color(0xFF0F1720), Color(0xFF132532), Color(0xFF17323B)]
+            : const [Color(0xFFF3F7F8), Color(0xFFEAF1F3), Color(0xFFF5FAFA)])
         : [
             brandBackground,
             Color.lerp(brandBackground, widget.primaryColor, dark ? .29 : .22)!,
@@ -172,80 +170,68 @@ class _AmbientLines extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final color = Color.lerp(primary, secondary, .38)!
-        .withValues(alpha: dark ? .12 : .16);
-    final paint = Paint()
-      ..color = color
-      ..strokeWidth = .7
-      ..style = PaintingStyle.stroke;
-    const gap = 58.0;
-
-    for (double x = 0; x <= size.width; x += gap) {
-      canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
-    }
-    for (double y = 0; y <= size.height; y += gap) {
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
-    }
-
-    final arc = Paint()
-      ..color = color.withValues(alpha: dark ? .75 : .82)
-      ..strokeWidth = 1
-      ..style = PaintingStyle.stroke;
-    for (var i = 0; i < 3; i++) {
-      canvas.drawArc(
-        Rect.fromCircle(
-          center: Offset(size.width * .83, size.height * .14),
-          radius: 180 + i * 70,
-        ),
-        math.pi * .08,
-        math.pi * 1.35,
-        false,
-        arc,
-      );
-    }
-    // Multiple fine orbital paths create depth in light mode without
-    // covering controls or relying on expensive endless animations.
-    final sweep = Paint()
-      ..color = secondary.withValues(alpha: dark ? .18 : .27)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.35;
-    for (var i = 0; i < 4; i++) {
-      canvas.drawArc(
-        Rect.fromCircle(
-          center: Offset(size.width * .10, size.height * .88),
-          radius: 165 + i * 56,
-        ),
-        math.pi * 1.08, math.pi * 1.25, false, sweep,
-      );
-    }
-
-    final streak = Paint()
-      ..shader = LinearGradient(
+    // Native vector wallpaper: fluid fiber-optic streams and low-saturation
+    // soft lights. This replaces the former grid and concentric violet arcs.
+    final bounds = Offset.zero & size;
+    canvas.drawRect(bounds, Paint()
+      ..shader = RadialGradient(
+        center: const Alignment(.67, -.44),
+        radius: 1.10,
         colors: [
+          primary.withValues(alpha: dark ? .30 : .13),
+          secondary.withValues(alpha: dark ? .10 : .06),
           primary.withValues(alpha: 0),
-          primary.withValues(alpha: dark ? .25 : .34),
-          secondary.withValues(alpha: dark ? .17 : .26),
+        ],
+      ).createShader(bounds));
+
+    canvas.drawRect(bounds, Paint()
+      ..shader = RadialGradient(
+        center: const Alignment(-.80, .92),
+        radius: 1.15,
+        colors: [
+          secondary.withValues(alpha: dark ? .24 : .12),
           secondary.withValues(alpha: 0),
         ],
-      ).createShader(Offset.zero & size)
-      ..strokeWidth = 1.2
-      ..style = PaintingStyle.stroke;
-    for (var i = 0; i < 5; i++) {
-      final y = size.height * (.13 + i * .19);
-      final path = Path()
-        ..moveTo(-40, y + 75)
-        ..cubicTo(size.width * .25, y - 92,
-            size.width * .70, y + 138, size.width + 40, y - 55);
-      canvas.drawPath(path, streak);
+      ).createShader(bounds));
+
+    // Curved data-stream ribbons, with differentiated depth and low contrast.
+    for (var i = 0; i < 13; i++) {
+      final band = i / 12.0;
+      final curve = Path()
+        ..moveTo(-size.width * .12, size.height * (.22 + band * .60))
+        ..cubicTo(
+          size.width * .18, size.height * (-.08 + band * .75),
+          size.width * .48, size.height * (.83 + band * .16),
+          size.width * 1.12, size.height * (.19 + band * .66),
+        );
+      final hue = Color.lerp(primary, secondary, band)!;
+      canvas.drawPath(curve, Paint()
+        ..color = hue.withValues(alpha: (dark ? .11 : .15) * (1 - band * .42))
+        ..strokeWidth = i % 4 == 0 ? 1.7 : .8
+        ..style = PaintingStyle.stroke);
     }
 
-    final sparks = Paint()..style = PaintingStyle.fill;
-    for (var i = 0; i < 28; i++) {
-      final dx = (size.width * ((i * 37 % 101) / 101));
-      final dy = (size.height * ((i * 53 % 97) / 97));
-      sparks.color = (i.isEven ? primary : secondary)
-          .withValues(alpha: dark ? .37 : .49);
-      canvas.drawCircle(Offset(dx, dy), i % 4 == 0 ? 1.9 : 1.1, sparks);
+    // Distant particles reinforce the flow without endless animations.
+    for (var i = 0; i < 39; i++) {
+      final fx = ((i * 47 + 11) % 101) / 101.0;
+      final fy = ((i * 29 + 17) % 97) / 97.0;
+      final p = Offset(size.width * fx, size.height * fy);
+      canvas.drawCircle(p, i % 6 == 0 ? 1.65 : .75, Paint()
+        ..color = (i.isEven ? primary : secondary)
+            .withValues(alpha: dark ? .24 : .32));
+    }
+
+    // Minimal understated diagonal light streaks.
+    for (var i = 0; i < 4; i++) {
+      final y = size.height * (.12 + i * .23);
+      final path = Path()
+        ..moveTo(size.width * .61, y - 80)
+        ..quadraticBezierTo(size.width * .88, y + 20,
+            size.width * 1.1, y - 30);
+      canvas.drawPath(path, Paint()
+        ..color = secondary.withValues(alpha: dark ? .14 : .11)
+        ..strokeWidth = 1.3
+        ..style = PaintingStyle.stroke);
     }
   }
 
