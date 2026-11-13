@@ -417,7 +417,9 @@ inline bool ValidConfig(const std::string& text) {
   // A single peer + both /0 routes activates official Windows AmneziaWG's
   // restrictive firewall rules, including DNS to the configured resolver.
   return private_key && address && dns && public_key && endpoint &&
-         peer_count == 1 && full_v4 && full_v6;
+         peer_count == 1 && full_v4 && full_v6 &&
+         std::all_of(obfs.begin(), obfs.end(),
+             [](bool present) { return present; });
 }
 
 inline flutter::EncodableValue Info(const char* state) {
