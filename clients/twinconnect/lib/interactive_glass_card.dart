@@ -12,6 +12,7 @@ class TwinConnectGlassCard extends StatefulWidget {
     required this.dark,
     this.surfaceColor,
     this.accentColor,
+    this.secondaryColor,
     this.radius = 20,
     this.padding = EdgeInsets.zero,
     this.selected = false,
@@ -22,6 +23,7 @@ class TwinConnectGlassCard extends StatefulWidget {
   final bool dark;
   final Color? surfaceColor;
   final Color? accentColor;
+  final Color? secondaryColor;
   final double radius;
   final EdgeInsetsGeometry padding;
   final bool selected;
@@ -37,6 +39,11 @@ class _TwinConnectGlassCardState extends State<TwinConnectGlassCard> {
   Widget build(BuildContext context) {
     final bright = widget.dark;
     final accent = widget.accentColor ?? const Color(0xFFA46AFF);
+    // Respect the reseller palette, with a subtle electric cyan reflection
+    // for depth. The secondary stays tenant-derived, never replaces branding.
+    final secondary = widget.secondaryColor ?? const Color(0xFF00DCEB);
+    final reflection = Color.lerp(secondary, const Color(0xFF00F0FF),
+        widget.dark ? .24 : .10)!;
     final surface = widget.surfaceColor ??
         (bright ? const Color(0xFF273753) : Colors.white);
     final active = widget.selected || _hovered;
@@ -53,39 +60,38 @@ class _TwinConnectGlassCardState extends State<TwinConnectGlassCard> {
         child: ClipRRect(
           borderRadius: radius,
           child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+            filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 240),
               curve: Curves.easeOutCubic,
               padding: widget.padding,
               decoration: BoxDecoration(
-                color: surface.withValues(alpha: bright ? .55 : .68),
+                color: surface.withValues(alpha: bright ? .28 : .48),
                 borderRadius: radius,
                 border: Border.all(
                   color: active
-                      ? accent.withValues(alpha: .68)
-                      : (bright ? Colors.white : const Color(0xFF6575AB))
-                          .withValues(alpha: bright ? .20 : .16),
-                  width: active ? 1.15 : .9,
+                      ? accent.withValues(alpha: .88)
+                      : (bright ? Colors.white : accent)
+                          .withValues(alpha: bright ? .32 : .25),
+                  width: active ? 1.3 : 1,
                 ),
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
-                  stops: const [0, .42, 1],
+                  stops: const [0, .46, 1],
                   colors: [
-                    Color.lerp(surface, accent, active ? .18 : .075)!
-                        .withValues(alpha: bright ? .64 : .73),
-                    surface.withValues(alpha: bright ? .51 : .64),
-                    Color.lerp(surface, bright ? Colors.black : Colors.white,
-                        bright ? .12 : .045)!
-                        .withValues(alpha: bright ? .59 : .70),
+                    Color.lerp(surface, accent, active ? .42 : .27)!
+                        .withValues(alpha: bright ? .38 : .55),
+                    surface.withValues(alpha: bright ? .22 : .48),
+                    Color.lerp(surface, reflection, active ? .32 : .21)!
+                        .withValues(alpha: bright ? .38 : .53),
                   ],
                 ),
                 boxShadow: [
                   BoxShadow(
                     color: (active ? accent : Colors.black).withValues(
-                      alpha: active ? .11 : (bright ? .06 : .03)),
-                    blurRadius: active ? 28 : 15,
+                      alpha: active ? .28 : (bright ? .13 : .06)),
+                    blurRadius: active ? 30 : 17,
                     offset: const Offset(0, 8),
                   ),
                 ],
@@ -104,7 +110,7 @@ class _TwinConnectGlassCardState extends State<TwinConnectGlassCard> {
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             gradient: RadialGradient(colors: [
-                              accent.withValues(alpha: bright ? .16 : .11),
+                              reflection.withValues(alpha: bright ? .24 : .13),
                               accent.withValues(alpha: 0),
                             ]),
                           ),
