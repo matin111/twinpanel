@@ -1,6 +1,6 @@
 "use client";
 
-import {useMemo,useState} from "react";
+import {useEffect,useMemo,useState} from "react";
 import {API_BASE} from "../lib/api";
 import {getCustomerToken} from "../lib/customer-api";
 import {useI18n} from "../lib/i18n";
@@ -64,6 +64,21 @@ type MigrationProtocolStatus={
   protocols:Array<{protocol:string;declared:number;configured:number}>;
 };
 
+type MigrationOverview={
+  source:Source;
+  total_imported:number;
+  history:Array<{
+    id:number; source_id:string; subscription_id:number;
+    target_user_id:number|null; account_username:string|null;
+    status:string; subscription_status:string; created_at:string|null;
+  }>;
+};
+
+type DestinationCheck={
+  exists:boolean;active:boolean;target_user_id:number;
+  display_name:string|null;existing_imports:number;
+};
+
 type EylanFinalizeResult={
   ok:boolean;
   subscriptions:number;
@@ -79,6 +94,8 @@ const ALL_MIGRATION_PROTOCOLS=[
 const ALL_PROTOCOLS_CSV=ALL_MIGRATION_PROTOCOLS.join(",");
 
 const EYLAN_STAGE_CHUNK=50;
+const MAX_JSON_BYTES=6*1024*1024;
+const PREVIEW_PAGE_SIZE=20;
 
 async function api<T>(path:string,init:RequestInit={}):Promise<T>{
   const token=getCustomerToken();
@@ -104,6 +121,7 @@ async function api<T>(path:string,init:RequestInit={}):Promise<T>{
 function parseRecords(raw:string):AnyRow[]{
   const parsed=JSON.parse(raw) as unknown;
   if(Array.isArray(parsed)){
+    if(parsed.length>10000)throw new Error("JSON exceeds the 10,000-record preview limit");
     if(!parsed.every(item=>item&&typeof item==="object"&&!Array.isArray(item)))throw new Error("JSON array must contain objects only");
     return parsed as AnyRow[];
   }
@@ -136,9 +154,78 @@ export function MigrationCenterAdmin(){
   const [ok,setOk]=useState("");
   const [migrationStatus,setMigrationStatus]=useState<MigrationProtocolStatus|null>(null);
   const [statusLoading,setStatusLoading]=useState(false);
+  const [overview,setOverview]=useState<MigrationOverview|null>(null);
+  const [overviewLoading,setOverviewLoading]=useState(false);
+  const [targetCheck,setTargetCheck]=useState<DestinationCheck|null>(null);
+  const [targetLoading,setTargetLoading]=useState(false);
+  const [previewPage,setPreviewPage]=useState(0);
+  const [jsonFileName,setJsonFileName]=useState("");
+  const [showJsonInput,setShowJsonInput]=useState(false);
+  const [showProtocols,setShowProtocols]=useState(false);
+  const [showProvisioning,setShowProvisioning]=useState(false);
+  const [importSummary,setImportSummary]=useState<{imported:number;existing:number;total:number;provisioned:number}|null>(null);
 
   const readyRecords=useMemo(()=>dryRun?.records.filter(item=>item.ready_for_future_import)??[],[dryRun]);
   const isEylan=source==="eylan";
+  const displayedRecords=useMemo(()=>dryRun?.records.slice(
+    previewPage*PREVIEW_PAGE_SIZE,(previewPage+1)*PREVIEW_PAGE_SIZE)??[],
+    [dryRun,previewPage]);
+  const configuredCount=migrationStatus?.source===source
+    ?migrationStatus.protocols.filter(p=>p.configured>0).length:0;
+  const configuredTotal=migrationStatus?.source===source
+    ?migrationStatus.protocols.reduce((total,p)=>total+p.configured,0):0;
+
+  const fetchOverview=async(current:Source)=>{
+    const result=await api<MigrationOverview>(
+      `/v1/admin/migration-center/overview?source=${current}&limit=12`);
+    if(result.source!==current)throw new Error("Unexpected migration overview source");
+    setOverview(result);
+  };
+
+  useEffect(()=>{
+    let cancelled=false;
+    setOverview(null);
+    setOverviewLoading(true);
+    api<MigrationOverview>(`/v1/admin/migration-center/overview?source=${source}&limit=12`)
+      .then(result=>{if(!cancelled&&result.source===source)setOverview(result);})
+      .catch(()=>{if(!cancelled)setOverview(null);})
+      .finally(()=>{if(!cancelled)setOverviewLoading(false);});
+    return ()=>{cancelled=true;};
+  },[source]);
+
+  const checkTarget=async()=>{
+    const id=Number(targetUserId);
+    setTargetCheck(null);
+    if(!Number.isSafeInteger(id)||id<=0){
+      setError(pick("شناسه کاربر مقصد معتبر نیست.","Enter a valid destination user ID."));
+      return null;
+    }
+    setTargetLoading(true);
+    try{
+      const result=await api<DestinationCheck>(
+        `/v1/admin/migration-center/target-check?source=${source}&target_user_id=${id}`);
+      if(result.target_user_id!==id)throw new Error("Destination check mismatch");
+      setTargetCheck(result);
+      return result;
+    }catch(reason){
+      setError(reason instanceof Error?reason.message:String(reason));
+      return null;
+    }finally{setTargetLoading(false);}
+  };
+
+  const chooseJsonFile=async(file:File|null)=>{
+    setDryRun(null);setPreviewPage(0);setImportSummary(null);setError("");setOk("");
+    if(!file){setJsonFileName("");return;}
+    if(file.size>MAX_JSON_BYTES){
+      setError(pick("حجم فایل JSON حداکثر ۶ مگابایت است.","JSON file must be at most 6 MB."));
+      return;
+    }
+    try{
+      setRaw(await file.text());
+      setJsonFileName(file.name);
+      setShowJsonInput(false);
+    }catch{setError(pick("خواندن فایل JSON ناموفق بود.","Could not read the JSON file."));}
+  };
 
   const refreshMigrationStatus=async()=>{
     setStatusLoading(true);
@@ -166,14 +253,20 @@ export function MigrationCenterAdmin(){
         form.append("file",eylanFile);
         result=await api<DryRunResult>("/v1/admin/migration-center/eylan/preview",{method:"POST",body:form});
       }else{
+        if(new TextEncoder().encode(raw).length>MAX_JSON_BYTES)throw new Error(pick("JSON بیش از ۶ مگابایت است.","JSON exceeds 6 MB."));
         const records=parseRecords(raw);
         result=await api<DryRunResult>("/v1/admin/migration-center/dry-run",{
           method:"POST",
           body:JSON.stringify({source,records}),
         });
       }
+      if(!result.dry_run||result.writes_performed!==false||result.source!==source){
+        throw new Error(pick("پاسخ پیش‌نمایش معتبر نیست؛ انتقال متوقف شد.","Unsafe preview response; import blocked."));
+      }
+      setPreviewPage(0);
       setDryRun(result);
-      setOk(pick("بررسی انجام شد؛ هنوز هیچ تغییری در دیتابیس ثبت نشده است.","Dry-run completed; no database writes were performed."));
+      setImportSummary(null);
+      setOk(pick("بررسی ایمن انجام شد؛ هیچ تغییری ثبت نشده است.","Safe preview completed without writing any data."));
     }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
     finally{setBusy(false);setBusyProgress(null);}
   };
@@ -182,9 +275,15 @@ export function MigrationCenterAdmin(){
     setError("");setOk("");
     const userId=Number(targetUserId);
     if(!Number.isInteger(userId)||userId<=0){setError(pick("شناسه کاربر TwinPanel معتبر وارد کنید.","Enter a valid TwinPanel user ID."));return;}
-    if(!dryRun||readyRecords.length===0){setError(pick("ابتدا Dry-run بگیرید و رکورد آماده داشته باشید.","Run a dry-run first and make sure at least one record is ready."));return;}
+    if(!dryRun||dryRun.source!==source||dryRun.writes_performed!==false||readyRecords.length===0){setError(pick("ابتدا پیش‌نمایش معتبر بگیرید.","Run a valid preview before importing."));return;}
+    const target=await checkTarget();
+    if(!target||!target.exists||!target.active){
+      setError(pick("کاربر مقصد وجود ندارد یا غیرفعال است؛ هیچ انتقالی انجام نشد.","Destination user is missing/inactive; no import was started."));
+      return;
+    }
     const protocolList=protocols.split(",").map(item=>item.trim().toLowerCase()).filter(Boolean);
     const effectiveProtocols=protocolList.length?protocolList:[...ALL_MIGRATION_PROTOCOLS];
+    setImportSummary(null);
     setBusyPhase(isEylan?"stage":"import");
     setBusyProgress({done:0,total:readyRecords.length});
     setBusy(true);
@@ -225,6 +324,8 @@ export function MigrationCenterAdmin(){
           method:"POST",
           body:JSON.stringify({source_ids:sourceIds,target_user_id:userId,protocols:effectiveProtocols}),
         });
+        setImportSummary({imported,existing,total:records.length,provisioned:Number(finalized.provision.subscriptions||0)});
+        await fetchOverview(source).catch(()=>{});
         if(!finalized.ok||!finalized.provision.ok){
           const failedNodes=finalized.provision.errors.map(item=>`${item.node}: ${item.error}`).join(" | ");
           setError(pick(`اطلاعات ایلان Stage شد اما Provision همه نودها کامل نشد. ${failedNodes}`,`Eylan records were staged, but provisioning did not complete on every node. ${failedNodes}`));
@@ -269,6 +370,8 @@ export function MigrationCenterAdmin(){
           setBusyProgress({done:finished,total:readyRecords.length});
         }
       }
+      setImportSummary({imported,existing,total:imported+existing,provisioned:v2rayProvisioned});
+      await fetchOverview(source).catch(()=>{});
       setOk(pick(
         `برای ${imported+existing} اشتراک هر ۱۵ پروتکل ثبت شد؛ V2Ray با UUID حفظ‌شده برای ${v2rayProvisioned} اکانت به‌صورت دسته‌ای اجرا شد. ساخت پروتکل‌های دیگر در نودهای آماده هنوز باید تکمیل شود.`,
         `All 15 protocol snapshots registered for ${imported+existing} subscriptions; V2Ray batched with preserved UUID for ${v2rayProvisioned} accounts. Remaining protocols await eligible-node provisioning.`
