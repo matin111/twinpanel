@@ -8,7 +8,7 @@ void main() {
     expect(glass, contains('BackdropFilter('));
     expect(glass, contains('ImageFilter.blur('));
     expect(glass, contains('surface.withValues(alpha:'));
-    expect(glass, contains('surface.withValues(alpha: bright ? .22 : .48)'));
+    expect(glass, contains('surface.withValues(alpha: bright ? .19 : .37)'));
   });
 
   test('connection dashboard, locations, account and settings use glass', () {
