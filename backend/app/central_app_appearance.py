@@ -16,11 +16,11 @@ from .central_app_models import CentralAppContact
 COLOR = re.compile(r"^#[0-9A-Fa-f]{6}$")
 LABEL = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$")
 DEFAULTS = {
-    "primary_color": "#6FA7B8",
-    "secondary_color": "#62C1B4",
-    "button_color": "#4E8FA2",
-    "background_color": "#0F1720",
-    "surface_color": "#1B2B36",
+    "primary_color": "#5CC8B7",
+    "secondary_color": "#81BDD4",
+    "button_color": "#479E9B",
+    "background_color": "#0E1E2B",
+    "surface_color": "#193641",
     "background_style": "gradient",
     "background_image_url": None,
     "theme_mode": "dark",
@@ -31,6 +31,7 @@ DEFAULTS = {
 _LEGACY_DEFAULTS = (
     ("#7C3AED", "#4F46E5", "#7C3AED", "#101018", "#20202A"),
     ("#548BA4", "#65B7B2", "#3F879B", "#121F2B", "#203544"),
+    ("#6FA7B8", "#62C1B4", "#4E8FA2", "#0F1720", "#1B2B36"),
 )
 _PALETTE_KEYS = ("primary_color", "secondary_color", "button_color",
                  "background_color", "surface_color")
