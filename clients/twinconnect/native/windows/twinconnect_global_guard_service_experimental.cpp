@@ -168,9 +168,93 @@ int Client(const std::wstring& text) {
   return result.rfind(L"OK", 0) == 0 ? 0 : 1;
 }
 
+
+bool RunningAsAdministrator() {
+  BOOL admin = FALSE;
+  PSID group = nullptr;
+  SID_IDENTIFIER_AUTHORITY authority = SECURITY_NT_AUTHORITY;
+  if (!AllocateAndInitializeSid(&authority, 2, SECURITY_BUILTIN_DOMAIN_RID,
+          DOMAIN_ALIAS_RID_ADMINS, 0, 0, 0, 0, 0, 0, &group)) return false;
+  BOOL valid = CheckTokenMembership(nullptr, group, &admin);
+  FreeSid(group);
+  return valid && admin;
+}
+
+bool ProtectedBinaryPath(std::wstring* executablePath) {
+  wchar_t filename[32768] = {};
+  DWORD len = GetModuleFileNameW(nullptr, filename, 32768);
+  if (!len || len >= 32768) return false;
+  *executablePath = filename;
+  const std::wstring trusted = L"C:\\Program Files\\";
+  const std::wstring trusted86 = L"C:\\Program Files (x86)\\";
+  return (executablePath->size() > trusted.size() &&
+          _wcsnicmp(executablePath->c_str(), trusted.c_str(),
+                    trusted.size()) == 0) ||
+         (executablePath->size() > trusted86.size() &&
+          _wcsnicmp(executablePath->c_str(), trusted86.c_str(),
+                    trusted86.size()) == 0);
+}
+
+int InstallVmOnlyService() {
+  if (!RunningAsAdministrator()) return 1;
+  std::wstring path;
+  if (!ProtectedBinaryPath(&path)) {
+    fwprintf(stderr, L"Install under protected Program Files first.\n");
+    return 1;
+  }
+  // Service stays demand-start and never arms filters automatically.
+  SC_HANDLE scm = OpenSCManagerW(nullptr, nullptr, SC_MANAGER_CREATE_SERVICE);
+  if (!scm) return 1;
+  std::wstring command = L"\"" + path + L"\" service";
+  SC_HANDLE service = CreateServiceW(
+      scm, kName, L"TwinConnect WFP Guard (EXPERIMENTAL VM ONLY)",
+      SERVICE_CHANGE_CONFIG | SERVICE_START | SERVICE_QUERY_STATUS,
+      SERVICE_WIN32_OWN_PROCESS, SERVICE_DEMAND_START,
+      SERVICE_ERROR_NORMAL, command.c_str(), nullptr, nullptr, nullptr,
+      L"LocalSystem", nullptr);
+  DWORD error = service ? ERROR_SUCCESS : GetLastError();
+  if (service) CloseServiceHandle(service);
+  CloseServiceHandle(scm);
+  if (error != ERROR_SUCCESS) {
+    fwprintf(stderr, L"CreateService failed: %lu\n", error);
+    return 1;
+  }
+  wprintf(L"Service registered but NOT started or armed.\n");
+  return 0;
+}
+
+int UninstallVmOnlyService() {
+  if (!RunningAsAdministrator()) return 1;
+  Engine engine;
+  if (Open(engine) != ERROR_SUCCESS) return 1;
+  // Restore connectivity BEFORE stopping or deleting anything.
+  if (TransactionalDisarm(engine.handle) != ERROR_SUCCESS) {
+    fwprintf(stderr, L"Recovery failed; refusing to uninstall service.\n");
+    return 1;
+  }
+  SC_HANDLE scm = OpenSCManagerW(nullptr, nullptr, SC_MANAGER_CONNECT);
+  if (!scm) return 1;
+  SC_HANDLE service = OpenServiceW(
+      scm, kName, SERVICE_STOP | SERVICE_QUERY_STATUS | DELETE);
+  if (!service) { CloseServiceHandle(scm); return 1; }
+  SERVICE_STATUS status = {};
+  ControlService(service, SERVICE_CONTROL_STOP, &status);
+  BOOL deleted = DeleteService(service);
+  CloseServiceHandle(service);
+  CloseServiceHandle(scm);
+  return deleted ? 0 : 1;
+}
+
 }  // namespace
 
 int wmain(int argc, wchar_t** argv) {
+  // VM-only install/uninstall require admin and a protected executable path.
+  if (argc == 3 && _wcsicmp(argv[1], L"install-vm") == 0 &&
+      wcscmp(argv[2], kAccept) == 0)
+    return InstallVmOnlyService();
+  if (argc == 3 && _wcsicmp(argv[1], L"uninstall-vm") == 0 &&
+      wcscmp(argv[2], kAccept) == 0)
+    return UninstallVmOnlyService();
   if (argc == 2 && _wcsicmp(argv[1], L"service") == 0) {
     SERVICE_TABLE_ENTRYW entries[] = {
       {const_cast<LPWSTR>(kName), ServiceMain},
