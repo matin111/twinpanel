@@ -31,23 +31,28 @@ class NodeProtocolOperatorSwitch(Base):
     )
 
 
+_SESSION_CACHE_KEY = "_tp_node_protocol_operator_switches_v1"
+
+
 def disabled_pairs(db: Session, node_ids: list[int] | None = None) -> set[tuple[int, str]]:
-    query = db.query(
-        NodeProtocolOperatorSwitch.node_id, NodeProtocolOperatorSwitch.protocol
-    ).filter(NodeProtocolOperatorSwitch.disabled.is_(True))
-    if node_ids is not None:
-        if not node_ids:
-            return set()
-        query = query.filter(NodeProtocolOperatorSwitch.node_id.in_(node_ids))
-    return {(int(node_id), str(protocol)) for node_id, protocol in query.all()}
+    # One SELECT per request/session, not one query for every node/protocol
+    # rendered on the public connection page.
+    cached = db.info.get(_SESSION_CACHE_KEY)
+    if cached is None:
+        rows = db.query(
+            NodeProtocolOperatorSwitch.node_id, NodeProtocolOperatorSwitch.protocol
+        ).filter(NodeProtocolOperatorSwitch.disabled.is_(True)).all()
+        cached = frozenset((int(n), str(p)) for n, p in rows)
+        db.info[_SESSION_CACHE_KEY] = cached
+    if node_ids is None:
+        return set(cached)
+    selected = {int(n) for n in node_ids}
+    return {pair for pair in cached if pair[0] in selected}
 
 
 def is_disabled(db: Session, node_id: int, protocol: str) -> bool:
     key = canonical_protocol(protocol)
-    return db.query(NodeProtocolOperatorSwitch.disabled).filter(
-        NodeProtocolOperatorSwitch.node_id == int(node_id),
-        NodeProtocolOperatorSwitch.protocol == key,
-    ).scalar() is True
+    return (int(node_id), key) in disabled_pairs(db)
 
 
 def set_disabled(db: Session, node_id: int, protocol: str, disabled: bool) -> bool:
@@ -59,6 +64,7 @@ def set_disabled(db: Session, node_id: int, protocol: str, disabled: bool) -> bo
     row.disabled = bool(disabled)
     row.changed_at = datetime.utcnow()
     db.flush()
+    db.info.pop(_SESSION_CACHE_KEY, None)
     return row.disabled
 
 
