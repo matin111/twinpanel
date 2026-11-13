@@ -63,7 +63,8 @@ bool Exists(HANDLE handle, const GUID& key) {
       InlineIsEqualGUID(filter->layerKey, blockV6
           ? FWPM_LAYER_ALE_AUTH_CONNECT_V6
           : FWPM_LAYER_ALE_AUTH_CONNECT_V4) &&
-      filter->action.type == (permitV4 ? FWP_ACTION_PERMIT : FWP_ACTION_BLOCK) &&
+      static_cast<unsigned int>(filter->action.type) ==
+          static_cast<unsigned int>(permitV4 ? FWP_ACTION_PERMIT : FWP_ACTION_BLOCK) &&
       filter->filterCondition != nullptr &&
       filter->numFilterConditions == (permitV4 ? 2u : 1u);
   if (valid && !permitV4) {
