@@ -205,3 +205,12 @@ def test_missing_authenticated_counters_cannot_charge_usage():
             snapshot=snapshot(["tp-sub-11"],{"tp-sub-11":1}))
     assert row["usage_supported"] is False
     assert seen==[]
+
+def test_sparse_verified_counters_do_not_baseline_idle_whitelist_users():
+    payload={"marker":"TP_SUDOKU_SHARED_NATIVE_PRESENCE_V1",
+        "names":["tp-sub-11","tp-sub-22"],"online":{},
+        "total":2,"connections":0,"epoch":"c"*32,
+        "counters":{"tp-sub-11":{"up":30,"down":70}}}
+    value=subject.validate_snapshot(payload)
+    assert len(value["known"])==2
+    assert value["counters"]=={"tp-sub-11":{"up":30,"down":70}}
