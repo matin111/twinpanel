@@ -13,39 +13,62 @@ class BrandTheme {
     return Color(int.parse('FF${value.substring(1)}', radix: 16));
   }
 
+  // Replace previously saved purple templates as well as the original
+  // default. Custom non-violet tenant branding is not overridden.
+  static bool legacyViolet(BrandPreview? brand) {
+    final primary = parse(brand?.primaryColor ?? '', '#7C3AED');
+    final hsv = HSVColor.fromColor(primary);
+    return hsv.hue >= 225 && hsv.hue <= 330 && hsv.saturation > .27;
+  }
+
+  static Color secondaryAccent(BrandPreview? brand) =>
+      legacyViolet(brand)
+          ? const Color(0xFF65B7B2)
+          : parse(brand?.secondaryColor ?? '', '#81BDD4');
+
+  static Color connectionButton(BrandPreview? brand) =>
+      legacyViolet(brand)
+          ? const Color(0xFF3F879B)
+          : parse(brand?.buttonColor ?? '', '#479E9B');
+
   // The panel stores one tenant palette, generally authored for dark mode.
   // Derive *separate* readable light surfaces while keeping the owner hue.
   static Color surface(BrandPreview? brand, Brightness brightness) {
-    final base = parse(brand?.surfaceColor ?? '', '#20202A');
+    final base = legacyViolet(brand)
+        ? const Color(0xFF1B2B36)
+        : parse(brand?.surfaceColor ?? '', '#193641');
     return brightness == Brightness.dark
         ? base
         : Color.lerp(base, Colors.white, 0.95)!;
   }
 
   static Color backgroundColor(BrandPreview? brand, Brightness brightness) {
-    final base = parse(brand?.backgroundColor ?? '', '#101018');
+    final base = legacyViolet(brand)
+        ? const Color(0xFF0F1720)
+        : parse(brand?.backgroundColor ?? '', '#0E1E2B');
     return brightness == Brightness.dark
         ? base
-        : Color.lerp(base, Colors.white, 0.97)!;
+        : // Avoid an almost pure-white field that washes away the light-mode art.
+        Color.lerp(base, const Color(0xFFF3F7F8), 0.97)!;
   }
 
   static Color accent(BrandPreview? brand, Brightness brightness) {
-    final base = parse(brand?.primaryColor ?? '', '#7C3AED');
+    final base = legacyViolet(brand)
+        ? const Color(0xFF548BA4)
+        : parse(brand?.primaryColor ?? '', '#5CC8B7');
     return brightness == Brightness.dark || base.computeLuminance() < .18
         ? base
-        : Color.lerp(base, const Color(0xFF352166), .45)!;
+        : Color.lerp(base, const Color(0xFF23485A), .24)!;
   }
 
-  static ThemeMode mode(BrandPreview? brand) => switch (brand?.themeMode) {
-        'light' => ThemeMode.light,
-        'system' => ThemeMode.system,
-        _ => ThemeMode.dark,
-      };
+  // All clients now use the same premium dark appearance.
+  // Legacy light/system values from older panel accounts are ignored.
+  static ThemeMode mode(BrandPreview? brand) => ThemeMode.dark;
 
   static ThemeData make(BrandPreview? brand, Brightness brightness) {
     final primary = accent(brand, brightness);
-    final secondary = parse(brand?.secondaryColor ?? '', '#4F46E5');
-    final button = parse(brand?.buttonColor ?? '', '#7C3AED');
+    final secondary = secondaryAccent(brand);
+    final button = connectionButton(brand);
     final bg = backgroundColor(brand, brightness);
     final surface = BrandTheme.surface(brand, brightness);
     final onSurface = ThemeData.estimateBrightnessForColor(surface) ==
@@ -87,7 +110,7 @@ class BrandTheme {
   static BoxDecoration background(BrandPreview? brand,
       {Brightness brightness = Brightness.dark}) {
     final base = backgroundColor(brand, brightness);
-    final secondary = parse(brand?.secondaryColor ?? '', '#4F46E5');
+    final secondary = parse(brand?.secondaryColor ?? '', '#81BDD4');
     final style = brand?.backgroundStyle ?? 'gradient';
     if (style == 'image' && brand?.backgroundImageUrl != null) {
       return BoxDecoration(

@@ -72,6 +72,42 @@ class AppearanceContractTests(unittest.TestCase):
         with self.assertRaises(FakeHTTPException):
             env["validate_appearance"](Payload(**{**values, "button_color": "not-a-color"}))
 
+    def test_new_default_palette_and_legacy_preset_detection(self):
+        tree = ast.parse(APPEARANCE.read_text())
+        constants = next(node.value for node in tree.body
+                         if isinstance(node, ast.Assign)
+                         and any(isinstance(target, ast.Name)
+                                 and target.id == "DEFAULTS"
+                                 for target in node.targets))
+        defaults = ast.literal_eval(constants)
+        self.assertEqual(defaults["primary_color"], "#6FA7B8")
+        self.assertEqual(defaults["secondary_color"], "#62C1B4")
+        self.assertEqual(defaults["button_color"], "#4E8FA2")
+        self.assertEqual(defaults["background_color"], "#0F1720")
+        self.assertEqual(defaults["surface_color"], "#1B2B36")
+
+        nodes = [node for node in tree.body
+                 if isinstance(node, (ast.Assign, ast.FunctionDef))
+                 and (isinstance(node, ast.FunctionDef)
+                      and node.name in ("_legacy_default", "_legacy_brand_pair")
+                      or isinstance(node, ast.Assign)
+                      and any(isinstance(target, ast.Name)
+                              and target.id in ("_LEGACY_DEFAULTS", "_PALETTE_KEYS")
+                              for target in node.targets))]
+        env = {}
+        exec(compile(ast.Module(body=nodes, type_ignores=[]),
+                     str(APPEARANCE), "exec"), env)
+        self.assertTrue(env["_legacy_default"]({
+            "primary_color": "#7C3AED", "secondary_color": "#4F46E5",
+            "button_color": "#7C3AED", "background_color": "#101018",
+            "surface_color": "#20202A",
+        }))
+        self.assertFalse(env["_legacy_default"]({
+            **defaults, "primary_color": "#112233",
+        }))
+        self.assertTrue(env["_legacy_brand_pair"]("#7C3AED", "#4F46E5"))
+        self.assertFalse(env["_legacy_brand_pair"]("#123456", "#654321"))
+
     def test_admin_and_reseller_ownership_scopes_are_distinct(self):
         code = API.read_text()
         self.assertIn("save_appearance(db, 0, payload)", code)

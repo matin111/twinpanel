@@ -24,7 +24,7 @@ void main() {
     expect(dashboard, contains('widget.brand.renewalUrl'));
     expect(dashboard, contains('widget.brand.websiteUrl'));
     expect(dashboard, contains('LaunchMode.externalApplication'));
-    expect(dashboard, contains("url.scheme == 'https'"));
+    expect(dashboard, contains("uri.scheme != 'https'"));
     expect(dashboard, contains("tenantLink_"));
   });
 }

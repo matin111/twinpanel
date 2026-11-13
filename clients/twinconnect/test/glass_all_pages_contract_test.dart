@@ -8,12 +8,12 @@ void main() {
     expect(glass, contains('BackdropFilter('));
     expect(glass, contains('ImageFilter.blur('));
     expect(glass, contains('surface.withValues(alpha:'));
-    expect(glass, contains('surface.withValues(alpha: bright ? .22 : .48)'));
+    expect(glass, contains('surface.withValues(alpha: bright ? .67 : .93)'));
   });
 
   test('connection dashboard, locations, account and settings use glass', () {
     final dashboard = File('lib/live_dashboard.dart').readAsStringSync();
-    expect(dashboard, contains('Widget powerCard() => ClipRRect('));
+    expect(dashboard, contains('Widget powerCard({required Widget subscriptionContent}) => ClipRRect('));
     expect(dashboard, contains('Widget connectionStats() => glassCard('));
     expect(dashboard, contains('Widget settings() => Column('));
     expect(dashboard, contains("key: const Key('settingsSecurityStatus')"));

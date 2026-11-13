@@ -1,18 +1,20 @@
 "use client";
 
 import {useEffect,useState,type CSSProperties} from "react";
-import {appearanceApi,type AppAppearance,type AppearanceReseller} from "../lib/central-app-appearance-api";
+import {appearanceApi,type AppAppearance,type AppContact,type AppearanceReseller} from "../lib/central-app-appearance-api";
 import {useI18n} from "../lib/i18n";
 import styles from "./central-app-appearance.module.css";
 
 type Role="admin"|"reseller";
 const DEFAULT:AppAppearance={
-  primary_color:"#7C3AED",secondary_color:"#4F46E5",button_color:"#7C3AED",
-  background_color:"#101018",surface_color:"#20202A",background_style:"gradient",
+  primary_color:"#6FA7B8",secondary_color:"#62C1B4",button_color:"#4E8FA2",
+  background_color:"#0F1720",surface_color:"#1B2B36",background_style:"gradient",
   background_image_url:null,theme_mode:"dark",
 };
 const PRESETS=[
-  {name:["بنفش شب","Midnight violet"],colors:["#7C3AED","#4F46E5","#7C3AED","#101018","#20202A"]},
+  {name:["مه‌آلود اقیانوسی","Misty ocean"],colors:["#548BA4","#65B7B2","#3F879B","#121F2B","#203544"]},
+  {name:["آبی دودی","Slate blue"],colors:["#7189A8","#6AA5B4","#4B7897","#172431","#283949"]},
+  {name:["فیروزه‌ای مه‌آلود","Soft aqua mist"],colors:["#6FA7B8","#62C1B4","#4E8FA2","#0F1720","#1B2B36"]},
   {name:["آبی اقیانوسی","Ocean blue"],colors:["#2563EB","#0891B2","#2563EB","#0B1729","#16263B"]},
   {name:["سبز زمردی","Emerald"],colors:["#059669","#0D9488","#059669","#091E1B","#15312D"]},
   {name:["صورتی مدرن","Modern rose"],colors:["#DB2777","#7C3AED","#DB2777","#1B1020","#302137"]},
@@ -34,6 +36,10 @@ export function CentralAppAppearanceStudio({role}:{role:Role}){
   const [selected,setSelected]=useState(0);
   const [resellers,setResellers]=useState<AppearanceReseller[]>([]);
   const [draft,setDraft]=useState<AppAppearance>(DEFAULT);
+  const [contact,setContact]=useState<AppContact|null>(null);
+  const [contactBusy,setContactBusy]=useState(false);
+  const [contactError,setContactError]=useState("");
+  const [contactSaved,setContactSaved]=useState("");
   const [loaded,setLoaded]=useState(false);
   const [busy,setBusy]=useState(false);
   const [message,setMessage]=useState("");
@@ -48,6 +54,12 @@ export function CentralAppAppearanceStudio({role}:{role:Role}){
   useEffect(()=>{
     let active=true;
     setLoaded(false);
+    setContact(null);
+    setContactError("");
+    setContactSaved("");
+    appearanceApi.loadContact(role,selected).then(value=>{
+      if(active)setContact(value);
+    }).catch(reason=>{if(active)setContactError(String(reason));});
     setMessage("");
     setError("");
     appearanceApi.load(role,selected).then(value=>{
@@ -86,6 +98,23 @@ export function CentralAppAppearanceStudio({role}:{role:Role}){
     catch(reason){setError(String(reason));}finally{setBusy(false);}
   };
 
+  const editContact=(key:"telegram_url"|"renewal_url"|"website_url",value:string)=>
+    setContact(old=>old?{...old,[key]:value}:old);
+  const saveContact=async()=>{
+    if(contactBusy||!contact)return;
+    const urls=[contact.telegram_url,contact.renewal_url,contact.website_url];
+    if(urls.some(url=>url?.trim()&&!/^https:\/\/[^\s/]+(?:\/[^\s]*)?$/.test(url.trim()))){
+      setContactError(pick("برای هر لینک یک آدرس HTTPS کامل وارد کنید.","Each link needs a full HTTPS URL."));
+      return;
+    }
+    setContactBusy(true);setContactError("");setContactSaved("");
+    try{
+      const saved=await appearanceApi.saveContact(role,contact,selected);
+      setContact(saved);
+      setContactSaved(pick("لینک‌های اپ ذخیره شدند.","App links saved."));
+    }catch(reason){setContactError(String(reason));}finally{setContactBusy(false);}
+  };
+
   const light= draft.theme_mode==="light" ||
     (draft.theme_mode==="system"&&brightness(draft.background_color)>160);
   const text=light?"#111827":"#F8FAFC";
@@ -122,6 +151,28 @@ export function CentralAppAppearanceStudio({role}:{role:Role}){
     {!loaded?<p className={styles.loading}>{pick("در حال دریافت تنظیمات اپ...","Loading app appearance...")}</p>:
     <div className={styles.layout}>
       <div className={styles.editor}>
+        <div className={styles.sectionTitle}>{pick("لینک‌های واقعی دکمه‌های اپ","Live app action links")}</div>
+        <p>{pick("لینک‌های مخصوص همین مدیر یا نماینده را وارد کنید. دکمه‌های اپ فقط همین مقصدها را باز می‌کنند.","Enter links for this admin or reseller only. App actions use these destinations.")}</p>
+        {contactError&&<p className={styles.error} role="alert">{contactError}</p>}
+        {contactSaved&&<p className={styles.success} role="status">{contactSaved}</p>}
+        {contact?<div className={styles.colors}>
+          {([
+            ["telegram_url","لینک پشتیبانی","Support URL","https://t.me/your_support"],
+            ["renewal_url","لینک تمدید","Renewal URL","https://example.com/renew"],
+            ["website_url","لینک سایت","Website URL","https://example.com"],
+          ] as const).map(([key,fa,en,placeholder])=><label className={styles.field} key={key}>
+            <span>{pick(fa,en)}</span>
+            <input type="url" dir="ltr" value={contact[key]||""}
+              placeholder={placeholder} disabled={contactBusy}
+              onChange={e=>editContact(key,e.target.value)}/>
+          </label>)}
+        </div>:<p className={styles.loading}>{pick("بارگذاری لینک‌های مالک...","Loading owner links...")}</p>}
+        <div className={styles.actions}>
+          <button className="primary" type="button" onClick={()=>void saveContact()}
+            disabled={contactBusy||!contact}>
+            {contactBusy?pick("در حال ذخیره...","Saving..."):pick("ذخیره لینک‌های اپ","Save app links")}
+          </button>
+        </div>
         <div className={styles.sectionTitle}>{pick("پالت رنگ‌ها","Color palette")}</div>
         <div className={styles.presets}>
           {PRESETS.map((entry,index)=><button key={index} type="button" disabled={busy}

@@ -95,16 +95,15 @@ void main() {
     expect(find.textContaining('Germany'), findsNothing);
   });
 
-  testWidgets('light mode and account and settings remain navigable',
+  testWidgets('dark-only mode retains account and settings navigation',
       (tester) async {
     await tester.binding.setSurfaceSize(const Size(1280, 900));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(const TwinConnectDevApp());
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('devThemeToggle')));
-    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('devThemeToggle')), findsNothing);
     expect(Theme.of(tester.element(find.byKey(const Key('devNav_home'))))
-        .brightness, Brightness.light);
+        .brightness, Brightness.dark);
     await tester.tap(find.byKey(const Key('devNav_settings')));
     await tester.pumpAndSettle();
     expect(find.text('Kill Switch'), findsOneWidget);

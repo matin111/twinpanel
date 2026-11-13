@@ -12,7 +12,24 @@ $release = Join-Path (Get-Location) 'build/windows/x64/runner/Release'
 $destination = Join-Path $release 'prerequisites'
 New-Item -ItemType Directory -Path $destination -Force | Out-Null
 $installer = Join-Path $destination 'openconnect-gui-1.6.2-win64.exe'
-Invoke-WebRequest -Uri $source -OutFile $installer -MaximumRedirection 3 -TimeoutSec 90
+# Upstream sometimes closes TLS mid-transfer on GitHub Windows runners.
+# Retry transient EOF only; never relax hash or Authenticode validation.
+$downloaded = $false
+for ($attempt = 1; $attempt -le 4; $attempt++) {
+  try {
+    if (Test-Path -LiteralPath $installer) {
+      Remove-Item -LiteralPath $installer -Force
+    }
+    Invoke-WebRequest -Uri $source -OutFile $installer -MaximumRedirection 3 -TimeoutSec 180
+    $downloaded = $true
+    break
+  } catch {
+    Write-Warning "OpenConnect upstream attempt $attempt failed: $($_.Exception.Message)"
+    if ($attempt -eq 4) { throw }
+    Start-Sleep -Seconds (5 * $attempt)
+  }
+}
+if (!$downloaded) { throw 'OpenConnect upstream download failed' }
 $size = (Get-Item -LiteralPath $installer).Length
 if ($size -lt 5MB -or $size -gt 100MB) { throw 'Unexpected upstream OpenConnect installer size' }
 $actualSha512 = (Get-FileHash -LiteralPath $installer -Algorithm SHA512).Hash.ToLowerInvariant()

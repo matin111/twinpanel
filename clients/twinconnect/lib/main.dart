@@ -30,7 +30,7 @@ import 'plan_classification.dart';
 
 void main() => runApp(const TwinConnectApp());
 
-enum AppLanguage { automatic, persian, english }
+enum AppLanguage { automatic, persian, english, turkish, arabic, german, french }
 
 class TwinConnectApp extends StatefulWidget {
   const TwinConnectApp({super.key});
@@ -59,6 +59,10 @@ class _TwinConnectAppState extends State<TwinConnectApp> {
         _language = switch (saved) {
           'fa' => AppLanguage.persian,
           'en' => AppLanguage.english,
+          'tr' => AppLanguage.turkish,
+          'ar' => AppLanguage.arabic,
+          'de' => AppLanguage.german,
+          'fr' => AppLanguage.french,
           _ => AppLanguage.automatic,
         };
       });
@@ -75,6 +79,10 @@ class _TwinConnectAppState extends State<TwinConnectApp> {
         AppLanguage.automatic => 'system',
         AppLanguage.persian => 'fa',
         AppLanguage.english => 'en',
+        AppLanguage.turkish => 'tr',
+        AppLanguage.arabic => 'ar',
+        AppLanguage.german => 'de',
+        AppLanguage.french => 'fr',
       };
       await preferences.setString(_languageKey, code);
     } catch (_) {
@@ -88,13 +96,17 @@ class _TwinConnectAppState extends State<TwinConnectApp> {
       AppLanguage.automatic => null,
       AppLanguage.persian => const Locale('fa'),
       AppLanguage.english => const Locale('en'),
+      AppLanguage.turkish => const Locale('tr'),
+      AppLanguage.arabic => const Locale('ar'),
+      AppLanguage.german => const Locale('de'),
+      AppLanguage.french => const Locale('fr'),
     };
 
     return MaterialApp(
       title: _activeBrand?.brandName ?? 'TwinConnect',
       debugShowCheckedModeBanner: false,
       locale: selectedLocale,
-      supportedLocales: const [Locale('en'), Locale('fa')],
+      supportedLocales: const [Locale('en'), Locale('fa'), Locale('tr'), Locale('ar'), Locale('de'), Locale('fr')],
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
@@ -102,7 +114,7 @@ class _TwinConnectAppState extends State<TwinConnectApp> {
       ],
       theme: BrandTheme.make(_activeBrand, Brightness.light),
       darkTheme: BrandTheme.make(_activeBrand, Brightness.dark),
-      themeMode: BrandTheme.mode(_activeBrand),
+      themeMode: ThemeMode.dark,
       builder: (context, child) => Stack(children: [
         Positioned.fill(child: child ?? const SizedBox.shrink()),
         const Positioned.fill(child: TwinConnectFramelessControls()),
@@ -811,6 +823,14 @@ class _TwinConnectHomeState extends State<TwinConnectHome> with WidgetsBindingOb
                       child: Text(strings.persianLanguage)),
                     DropdownMenuItem(value: AppLanguage.english,
                       child: Text(strings.englishLanguage)),
+                    const DropdownMenuItem(value: AppLanguage.turkish,
+                      child: Text('Türkçe')),
+                    const DropdownMenuItem(value: AppLanguage.arabic,
+                      child: Text('العربية')),
+                    const DropdownMenuItem(value: AppLanguage.german,
+                      child: Text('Deutsch')),
+                    const DropdownMenuItem(value: AppLanguage.french,
+                      child: Text('Français')),
                   ],
                 ),
               ],
@@ -1027,6 +1047,14 @@ class _TwinConnectHomeState extends State<TwinConnectHome> with WidgetsBindingOb
                     value: AppLanguage.english,
                     child: Text(strings.englishLanguage),
                   ),
+                  const DropdownMenuItem(value: AppLanguage.turkish,
+                    child: Text('Türkçe')),
+                  const DropdownMenuItem(value: AppLanguage.arabic,
+                    child: Text('العربية')),
+                  const DropdownMenuItem(value: AppLanguage.german,
+                    child: Text('Deutsch')),
+                  const DropdownMenuItem(value: AppLanguage.french,
+                    child: Text('Français')),
                 ],
               ),
             ),

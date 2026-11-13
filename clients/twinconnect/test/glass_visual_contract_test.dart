@@ -7,8 +7,8 @@ void main() {
     final dashboard = File('lib/live_dashboard.dart').readAsStringSync();
     expect(source, contains('ImageFilter.blur(sigmaX: 15, sigmaY: 15)'));
     expect(source, contains('secondaryColor'));
-    expect(source, contains('surface.withValues(alpha: bright ? .22 : .48)'));
-    expect(dashboard, contains('secondaryColor: BrandTheme.parse(widget.brand.secondaryColor'));
+    expect(source, contains('surface.withValues(alpha: bright ? .67 : .93)'));
+    expect(dashboard, contains('secondaryColor: BrandTheme.secondaryAccent(widget.brand)'));
     expect(dashboard, contains('filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16)'));
     expect(dashboard, contains('Key(\'liveConnectionControlsButton\')'));
     expect(dashboard, contains('onPressed: _vpnBusy ? null : _toggleVpn'));
