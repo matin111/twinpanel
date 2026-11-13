@@ -420,6 +420,41 @@ def _subscription_content(token: str, db: Session) -> tuple[str, int, int]:
     return base64.b64encode("\n".join(uris).encode("utf-8")).decode("ascii"), len(groups), len(uris)
 
 
+
+def _subscription_usage_headers(sub: Any) -> dict[str, str]:
+    """Client-compatible, read-only live subscription usage metadata.
+
+    Traffic is cumulative across ALL protocols, never counted per feed.
+    Do not invent an expiry for accounts whose clock starts at first use.
+    """
+    from datetime import datetime, timezone
+
+    limit = max(0, int(getattr(sub, "traffic_limit_bytes", 0) or 0))
+    used = max(0, int(getattr(sub, "traffic_used_bytes", 0) or 0))
+    expire_at = getattr(sub, "expires_at", None)
+
+    headers = {
+        "X-TwinPanel-Traffic-Used": str(used),
+        "X-TwinPanel-Traffic-Total": str(limit),
+        "X-TwinPanel-Traffic-Remaining": str(max(0, limit - used)) if limit else "unlimited",
+        "X-TwinPanel-Expiry-Status": "scheduled" if expire_at else "not-started" if getattr(sub, "activation_duration_days", None) and not getattr(sub, "starts_at", None) else "unlimited",
+    }
+    # Per established subscription conventions: download + upload = usage.
+    # 0 total is used for unlimited accounts; clients supporting this format
+    # interpret it differently, so keep explicit custom headers above.
+    parts = ["upload=0", f"download={used}", f"total={limit}"]
+    if expire_at is not None:
+        # Database timestamps are UTC-naive. Never treat them as local time.
+        if isinstance(expire_at, datetime):
+            expire_utc = expire_at.replace(tzinfo=timezone.utc) if expire_at.tzinfo is None else expire_at.astimezone(timezone.utc)
+            epoch = max(0, int(expire_utc.timestamp()))
+            parts.append(f"expire={epoch}")
+            headers["X-TwinPanel-Expires-At"] = expire_utc.isoformat().replace("+00:00", "Z")
+            headers["X-TwinPanel-Expiry-Status"] = "dated"
+    headers["subscription-userinfo"] = "; ".join(parts)
+    return headers
+
+
 def _subscription_response(token: str, db: Session) -> Response:
     content, server_count, profile_count = _subscription_content(token, db)
     from .public_connection_modern_names_v14 import _account_name
@@ -432,6 +467,7 @@ def _subscription_response(token: str, db: Session) -> Response:
             "Cache-Control": "no-store",
             "Profile-Title": profile_title,
             "Profile-Update-Interval": "12",
+            **_subscription_usage_headers(sub),
             "X-TwinPanel-Server-Count": str(server_count),
             "X-TwinPanel-Profile-Count": str(profile_count),
         },
