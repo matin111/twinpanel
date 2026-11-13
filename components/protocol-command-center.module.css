@@ -633,3 +633,9 @@
   .presetGrid{grid-template-columns:repeat(2,minmax(0,1fr))}
   .drawerFooter{margin:0 -12px -12px;padding:9px 12px 12px}
 }
+
+/* Per-node protocol actions: equal-width, responsive, light/dark compatible. */
+.nodeActions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:7px}
+.nodeActions>button{min-width:0;min-height:34px;font-size:10px;white-space:normal;padding:6px 8px;line-height:1.5}
+.operatorHint{display:block;margin-top:9px;color:var(--muted,#64748b);font-size:10px;line-height:1.8}
+@media(max-width:480px){.nodeActions>button{font-size:9px}}
