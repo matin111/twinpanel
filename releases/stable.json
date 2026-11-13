@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.823",
+  "version": "1.1.0-rc.824",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-13T05:56:41Z",
+  "released_at": "2026-11-13T06:58:21Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "3dbea688592a60a3b844954a30146af3f27dfb3a",
+  "source_sha": "fa0b3a0c068fd68fdea979e566df2aacd70a7b45",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.823/twinpanel-1.1.0-rc.823-linux-x86_64.tar.gz",
-    "sha256": "44735bc402ccd51405565daba89bdac23b38e86ece88725e6f7e15adf281b60b",
-    "size_bytes": 30716714
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.824/twinpanel-1.1.0-rc.824-linux-x86_64.tar.gz",
+    "sha256": "5bb5c40d1005a5f7ae1d4965d48d0e751b8cd82f8ac30efde5c723256e4600d9",
+    "size_bytes": 30720911
   },
   "notes": {
-    "fa": "طراحی تیره حرفه‌ای برای تنظیمات برند TwinConnect: پالت سرمه‌ای و سبز دریایی با کنتراست بیشتر، حذف لایت‌مود اپ از پنل، بهبود پیش‌نمایش شیشه‌ای و حفظ تصویر و رنگ‌های سفارشی ادمین و نماینده. بدون تغییر در نود، کیف‌پول، اشتراک و پروتکل‌ها.",
-    "en": "Premium dark-only TwinConnect Brand Studio with deep navy, sea-glass green and icy-blue accents. Remove app light-mode selection, improve frosted preview, and preserve custom owner colors and background images. No changes to nodes, wallet, subscriptions or VPN protocols."
+    "fa": "رفع گیرکردن دکمه ساخت اشتراک: انتقال عملیات دیتابیس از event loop به worker thread، محدودیت انتظار ۴۵ثانیه‌ای فرم با هشدار جلوگیری از ساخت تکراری، و تست‌های CI و انتشار برای حفظ اصلاحات در نسخه‌های بعدی.",
+    "en": "Fix hanging manual subscription creation: execute synchronous database persistence in FastAPI threadpool, bound frontend fetch to 45 seconds with no-blind-retry warning, and add release regression guards."
   }
 }
