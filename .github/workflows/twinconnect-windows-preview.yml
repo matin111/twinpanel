@@ -322,13 +322,19 @@ jobs:
           if ($env:SIGNING_CONFIGURED -eq 'true' -and $setup.Status -ne 'Valid') {
             throw 'Signed build did not retain a valid installer signature'
           }
+      # Draft Kill Switch PRs may run compilation checks but must not
+      # emit installable application artifacts until network safety is proven.
       - uses: actions/upload-artifact@v4
+        if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}
         with:
           name: TwinConnect-Windows-SHA256SUMS
           path: clients/twinconnect/TwinConnect-Windows-SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 30
+      # Draft Kill Switch PRs may run compilation checks but must not
+      # emit installable application artifacts until network safety is proven.
       - uses: actions/upload-artifact@v4
+        if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}
         with:
           name: TwinConnect-Windows-x64-Setup
           path: clients/twinconnect/TwinConnect-Windows-x64-Setup.exe
@@ -397,13 +403,19 @@ jobs:
           $zip = Join-Path (Get-Location) "TwinConnect-Windows-Dev.zip"
           if (Test-Path $zip) { Remove-Item $zip -Force }
           Compress-Archive -Path (Join-Path $release "*") -DestinationPath $zip -CompressionLevel Optimal
+      # Draft Kill Switch PRs may run compilation checks but must not
+      # emit installable application artifacts until network safety is proven.
       - uses: actions/upload-artifact@v4
+        if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}
         with:
           name: TwinConnect-Windows-x64-Dev-Dashboard
           path: clients/twinconnect/TwinConnect-Windows-Dev.zip
           if-no-files-found: error
           retention-days: 14
+      # Draft Kill Switch PRs may run compilation checks but must not
+      # emit installable application artifacts until network safety is proven.
       - uses: actions/upload-artifact@v4
+        if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}
         with:
           name: TwinConnect-Windows-x64-Portable
           path: clients/twinconnect/TwinConnect-Windows-Preview.zip
