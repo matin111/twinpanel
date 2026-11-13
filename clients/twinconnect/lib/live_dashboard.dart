@@ -2728,8 +2728,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
 
 
 
-  // Each account uses links from its own authenticated tenant brand, never
-  // a hard-coded vendor/other reseller destination.
+  // Links always belong to the signed-in tenant. Never substitute a vendor
+  // or unrelated reseller link when the owner hasn't configured an action.
   bool _openingTenantLink = false;
 
   String? _tenantLinkFromBrand(BrandPreview brand, String kind) =>
@@ -2740,40 +2740,69 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         _ => null,
       };
 
-  // Always resolve the action against the authenticated owner panel.
-  // Cached branding may be outdated if the admin/reseller edited links.
-  // No default merchant, vendor, or another reseller's URL is substituted.
+  // Accept ordinary https URLs and Telegram usernames/links. Never launch
+  // arbitrary URI schemes or localhost/private origins from panel settings.
+  Uri? _safeTenantLink(String? raw, String kind) {
+    if (raw == null || raw.trim().isEmpty) return null;
+    var candidate = raw.trim();
+    if (kind == 'support') {
+      if (RegExp(r'^@[A-Za-z0-9_]{5,32}$').hasMatch(candidate)) {
+        candidate = 'https://t.me/${candidate.substring(1)}';
+      } else if (RegExp(r'^[A-Za-z0-9_]{5,32}$').hasMatch(candidate) &&
+          !candidate.contains('.')) {
+        candidate = 'https://t.me/$candidate';
+      } else if (candidate.startsWith('t.me/') ||
+          candidate.startsWith('telegram.me/')) {
+        candidate = 'https://$candidate';
+      }
+    }
+    final uri = Uri.tryParse(candidate);
+    if (uri == null || uri.scheme != 'https' ||
+        uri.host.isEmpty || !uri.host.contains('.') ||
+        uri.userInfo.isNotEmpty || uri.hasFragment ||
+        uri.host.endsWith('.local') ||
+        uri.host.endsWith('.internal') ||
+        uri.host.endsWith('.localhost') ||
+        RegExp(r'^[0-9.]+$').hasMatch(uri.host)) {
+      return null;
+    }
+    return uri;
+  }
+
   Future<void> _openTenantLink(String kind, String label) async {
     if (_openingTenantLink) return;
     _openingTenantLink = true;
     try {
-      final brand = await TenantApi(vendorOrigin: widget.panel.apiOrigin)
-          .loadSessionBrand(
-        panel: widget.panel,
-        sessionToken: widget.sessionToken,
-      );
-      if (brand.namespace != widget.brand.namespace ||
-          brand.ownerType != widget.brand.ownerType ||
-          (brand.ownerType == 'reseller' &&
-              (brand.appUsernamePrefix != widget.brand.appUsernamePrefix ||
-                  !widget.username.startsWith(brand.appUsernamePrefix)))) {
-        throw const FormatException('TENANT_BRAND_MISMATCH');
+      // Login returned an authenticated brand; refresh for edits. If the
+      // refresh fails, an already-authenticated URL can still be opened.
+      var brand = widget.brand;
+      try {
+        final fresh = await TenantApi(vendorOrigin: widget.panel.apiOrigin)
+            .loadSessionBrand(
+          panel: widget.panel,
+          sessionToken: widget.sessionToken,
+        );
+        if (fresh.namespace != widget.brand.namespace ||
+            fresh.ownerType != widget.brand.ownerType ||
+            (fresh.ownerType == 'reseller' &&
+                (fresh.appUsernamePrefix != widget.brand.appUsernamePrefix ||
+                    !widget.username.startsWith(fresh.appUsernamePrefix)))) {
+          throw const FormatException('TENANT_BRAND_MISMATCH');
+        }
+        brand = fresh;
+      } on FormatException {
+        rethrow;
+      } catch (_) {
+        // Only use the original authenticated login brand, never a global URL.
       }
-      final raw = _tenantLinkFromBrand(brand, kind);
-      final url = raw == null ? null : Uri.tryParse(raw.trim());
-      final valid = url != null &&
-          url.scheme == 'https' &&
-          url.host.contains('.') &&
-          url.userInfo.isEmpty &&
-          !url.hasFragment &&
-          !url.host.endsWith('.local') &&
-          !url.host.endsWith('.internal') &&
-          !url.host.endsWith('.localhost');
-      if (!valid) {
+      final url = _safeTenantLink(_tenantLinkFromBrand(brand, kind), kind);
+      if (url == null) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text(tr('آدرس $label در تنظیمات اپ این پنل ثبت نشده است.',
-                'Configure the $label address in this panel\'s App Brand Studio.')),
+            content: Text(tr(
+              'لینک $label برای این اشتراک در تنظیمات برند اپ ثبت نشده است.',
+              '$label is not configured in this account\'s App Brand Studio.',
+            )),
           ));
         }
         return;
@@ -2783,15 +2812,14 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       if (!launched && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(tr('بازکردن $label ممکن نشد.',
-              'Unable to open $label.')),
+              'Unable to open $label in the browser.')),
         ));
       }
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(tr(
-            'دریافت لینک $label از پنل ناموفق بود. اتصال پنل را بررسی کنید.',
-            'Could not retrieve $label from the owning panel.')),
+          content: Text(tr('دریافت لینک $label از پنل ناموفق بود.',
+              'Could not validate the $label link for this account.')),
         ));
       }
     } finally {
@@ -3313,13 +3341,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                             : tr('اتصال سریع', 'Connect now'),
                         style: const TextStyle(color: Colors.white,
                           fontSize: 15, fontWeight: FontWeight.w800)),
-                      const SizedBox(height: 3),
-                      Text((_modernUp || _vpnVerified)
-                          ? tr('تونل ایمن فعال', 'Secure tunnel active')
-                          : tr('سرور انتخاب‌شده', 'Selected server'),
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: .82),
-                          fontSize: 10)),
+
                     ],
                   )),
                   const Icon(Icons.chevron_right_rounded,
@@ -3329,20 +3351,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
             ),
           ),
         ),
-        const SizedBox(height: 12),
-        AnimatedSwitcher(
-          duration: const Duration(milliseconds: 280),
-          child: txt(
-            _vpnBusy
-                ? tr('در حال برقراری اتصال', 'Establishing connection')
-                : (_modernUp || _vpnVerified)
-                    ? tr('اتصال امن برقرار است', 'Secure connection active')
-                    : (_vpnUp || _vpnCleanup)
-                        ? tr('در حال تأیید اتصال', 'Verifying connection')
-                        : tr('برای اتصال لمس کنید', 'Tap to connect'),
-            size: 16, bold: true),
-        ),
-        const SizedBox(height: 7),
+        const SizedBox(height: 10),
         ValueListenableBuilder<int>(
           valueListenable: _connectedSeconds,
           builder: (context, elapsed, child) => AnimatedOpacity(
@@ -3371,16 +3380,6 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
             ),
           ),
         ),
-        if (_vpnUp || _modernUp) ...[
-          const SizedBox(height: 6),
-          txt(_modernUp
-              ? tr('IP خروجی تونل تأیید شد', 'Tunnel exit IP verified')
-              : _vpnVerified
-                  ? tr('دست‌دهی با سرور تأیید شد', 'Server handshake verified')
-                  : tr('رابط روشن است؛ دست‌دهی هنوز تأیید نشده',
-                      'Interface is on; handshake is not yet verified'),
-              size: 12, color: sub),
-        ],
         if (_vpnError != null) ...[
           const SizedBox(height: 8),
           Text(
