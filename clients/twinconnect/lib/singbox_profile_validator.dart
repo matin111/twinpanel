@@ -68,6 +68,26 @@ class SingBoxProfileValidator {
         port is! int || port < 1 || port > 65535) {
       throw const FormatException('SINGBOX_ENDPOINT_INVALID');
     }
+    if (protocolCode == 'socks5') {
+      // Do not quietly downgrade the entitled SOCKS5 account to SOCKS4
+      // or attempt an unauthenticated session with incomplete credentials.
+      if (object['version'] != '5') {
+        throw const FormatException('SOCKS5_VERSION_INVALID');
+      }
+      final user = object['username'];
+      final password = object['password'];
+      if (user is! String || password is! String ||
+          user.isEmpty || password.isEmpty ||
+          user.length > 255 || password.length > 255) {
+        throw const FormatException('SOCKS5_ACCOUNT_AUTH_INVALID');
+      }
+      final transport = object['network'];
+      if (transport != null && transport != 'tcp') {
+        // This VPN uses TCP CONNECT and HTTPS-over-TCP for protected DNS.
+        // A UDP-only SOCKS5 account cannot carry that traffic.
+        throw const FormatException('SOCKS5_TCP_TRANSPORT_REQUIRED');
+      }
+    }
     if ((protocolCode == 'hysteria2' || protocolCode == 'tuic' ||
          protocolCode == 'anytls' || protocolCode == 'naive') &&
         object['tls'] is! Map) {
