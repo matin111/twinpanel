@@ -3851,7 +3851,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                 tooltip: tr('تست پینگ', 'Ping server'),
                 onPressed: _pingingNodes.contains(widget.servers!.servers[index].id)
                     ? null : () => _probeNode(index),
-                icon: Icon(Icons.network_ping_rounded, size: 18, color: purple),
+                icon: Icon(Icons.bolt_rounded, size: 18, color: purple),
               ),
               const SizedBox(width: 8),
               Icon(((_vpnUp && _activeNodeId == widget.servers?.servers[index].id) || (_modernUp && _modernNodeId == widget.servers?.servers[index].id))
@@ -3946,7 +3946,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                     onPressed: _xrayInboundsProbing.contains(
                             XrayInboundLatency.key(inbound))
                         ? null : () => _probeXrayInbound(inbound),
-                    icon: Icon(Icons.network_ping_rounded,
+                    icon: Icon(Icons.bolt_rounded,
                         color: purple, size: 18),
                   ),
                   const SizedBox(width: 4),
@@ -4206,7 +4206,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
               _probeAllNodes();
               if (_filter == 'v2ray') _probeAllXrayInbounds();
             },
-            icon: const Icon(Icons.network_ping_rounded),
+            icon: const Icon(Icons.bolt_rounded),
             label: Text(tr('تست پینگ همه سرورها', 'Ping all servers')),
           ),
           const SizedBox(height: 13),
