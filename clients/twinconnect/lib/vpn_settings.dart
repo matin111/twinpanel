@@ -65,6 +65,7 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
   bool _loading = false;
   bool _saving = false;
   bool _probing = false;
+  bool _wfpAvailable = false;
 
   bool get _identified =>
       widget.tenant.trim().isNotEmpty && widget.account.trim().isNotEmpty;
@@ -85,12 +86,14 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
 
   Future<void> _read() async {
     final capabilities = await NativeVpnBridge.probe();
+    final guard = await NativeVpnBridge.globalKillSwitchStatus();
     final policy = _identified
         ? await _store.load(widget.tenant, widget.account)
         : const VpnPolicy();
     if (!mounted) return;
     setState(() {
       _capabilities = capabilities;
+      _wfpAvailable = guard['wfpAvailable'] == true;
       _policy = policy;
       _loading = false;
     });
@@ -108,9 +111,11 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
     if (_probing) return;
     setState(() => _probing = true);
     final capabilities = await NativeVpnBridge.probe();
+    final guard = await NativeVpnBridge.globalKillSwitchStatus();
     if (!mounted) return;
     setState(() {
       _capabilities = capabilities;
+      _wfpAvailable = guard['wfpAvailable'] == true;
       _probing = false;
     });
   }
@@ -388,7 +393,9 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
                       GlassVpnSwitch.adaptive(
                         key: const Key('vpnKillSwitch'),
                         title: Text(s.vpnKillSwitch),
-                        subtitle: Text(s.vpnKillSwitchSubtitle),
+                        subtitle: Text(_wfpAvailable
+                            ? s.vpnGlobalGuardServiceRequired
+                            : s.vpnGlobalGuardUnavailable),
                         value: _capabilities.engineReady && _capabilities.killSwitchEnforced && _policy.killSwitchRequested,
                         onChanged: _capabilities.engineReady &&
                                 _capabilities.killSwitchEnforced
