@@ -45,11 +45,12 @@ void main() {
     expect(find.byKey(const Key('vpnTunMode')), findsOneWidget);
 
     await tester.scrollUntilVisible(
-      find.byKey(const Key('vpnShareGuideButton')), 180,
+      find.byKey(const Key('vpnSharingUnavailable')), 180,
     );
-    await tester.tap(find.byKey(const Key('vpnShareGuideButton')));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('devShareVpnCard')), findsOneWidget);
+    final share = tester.widget<ListTile>(
+      find.byKey(const Key('vpnSharingUnavailable')),
+    );
+    expect(share.enabled, isFalse);
   });
 
   testWidgets('draft does not save without an identified account',
