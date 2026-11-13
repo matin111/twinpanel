@@ -333,7 +333,7 @@ jobs:
             $absolute = $file.FullName
             $root = (Resolve-Path -LiteralPath $release).Path
             $relative = if ($absolute.StartsWith($root, [StringComparison]::OrdinalIgnoreCase)) {
-              'Release/' + $absolute.Substring($root.Length).TrimStart('\\','/').Replace('\\','/')
+              'Release/' + $absolute.Substring($root.Length).TrimStart([char]92,[char]47).Replace([char]92,[char]47)
             } else { $file.Name }
             $signature = Get-AuthenticodeSignature -LiteralPath $absolute
             [pscustomobject]@{
