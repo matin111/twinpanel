@@ -4607,74 +4607,55 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     );
 
     Widget settingLine(IconData icon, String title,
-        {bool disabled = true, VoidCallback? onTap}) => Padding(
-      padding: const EdgeInsets.only(bottom: 10),
+        {bool disabled = false, VoidCallback? onTap}) => Padding(
+      padding: const EdgeInsets.only(bottom: 7),
       child: glassCard(
-        radius: 17,
-        padding: const EdgeInsets.symmetric(vertical: 3),
+        radius: 16,
+        padding: EdgeInsets.zero,
         child: Material(
           color: Colors.transparent,
           child: ListTile(
+            dense: true,
+            visualDensity: const VisualDensity(vertical: -2),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 13),
             leading: Container(
-              width: 37,
-              height: 37,
+              width: 34,
+              height: 34,
               decoration: BoxDecoration(
-                color: purple.withValues(alpha: _dark ? .17 : .10),
-                borderRadius: BorderRadius.circular(12),
+                color: purple.withValues(alpha: .16),
+                borderRadius: BorderRadius.circular(11),
               ),
-              child: Icon(icon, color: purple, size: 20),
+              child: Icon(icon, color: purple, size: 19),
             ),
-            title: txt(title, bold: true),
-            subtitle: disabled
-                ? txt(tr('در این نسخه غیرفعال', 'Unavailable in preview'),
-                    color: sub, size: 10)
-                : null,
+            title: txt(title, bold: true, size: 12),
             trailing: disabled
-                ? const Switch(value: false, onChanged: null)
-                : Icon(Icons.chevron_right_rounded, color: sub),
-            onTap: onTap,
+                ? Icon(Icons.lock_outline_rounded, color: sub, size: 17)
+                : Icon(Icons.arrow_forward_ios_rounded, color: sub, size: 15),
+            onTap: disabled ? null : onTap,
           ),
         ),
       ),
+    );
+
+    Widget settingsSectionTitle(String title, IconData icon) => Padding(
+      padding: const EdgeInsets.fromLTRB(4, 9, 4, 10),
+      child: Row(children: [
+        Icon(icon, color: purple, size: 18),
+        const SizedBox(width: 9),
+        Expanded(child: txt(title, bold: true, size: 14)),
+      ]),
     );
 
     Widget settings() => Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         heading(tr('تنظیمات', 'Settings')),
-        const SizedBox(height: 15),
-        glassCard(
-          key: const Key('devSettingsGlassHeader'),
-          radius: 22,
-          padding: const EdgeInsets.symmetric(horizontal: 19, vertical: 19),
-          child: Row(children: [
-            Container(
-              height: 48, width: 48,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
-                color: purple.withValues(alpha: .17),
-              ),
-              child: Icon(Icons.tune_rounded, color: purple, size: 24),
-            ),
-            const SizedBox(width: 13),
-            Expanded(child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                txt(tr('تنظیمات اتصال', 'Connection preferences'),
-                    size: 16, bold: true),
-                const SizedBox(height: 5),
-                txt(tr('قابلیت‌های امنیتی فقط پس از تأیید موتور ویندوز فعال می‌شوند',
-                       'Security controls require verified Windows engine support'),
-                    size: 11, color: sub),
-              ],
-            )),
-          ]),
-        ),
-        const SizedBox(height: 17),
+        const SizedBox(height: 8),
+        settingsSectionTitle(tr('اتصال و امنیت', 'Connection & security'),
+            Icons.shield_outlined),
         settingLine(
           Icons.shield_outlined,
           tr('تنظیمات امنیت و VPN', 'VPN and security settings'),
-          disabled: false,
           onTap: () => Navigator.of(context).push(
             MaterialPageRoute<void>(
               builder: (_) => VpnSettingsScreen(
@@ -4686,33 +4667,29 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         ),
         glassCard(
           key: const Key('settingsSecurityStatus'),
-          radius: 18,
-          padding: const EdgeInsets.all(15),
+          radius: 16,
+          padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 10),
           child: Row(children: [
             const Icon(Icons.gpp_maybe_outlined,
-                color: Color(0xFFFFB66A), size: 23),
-            const SizedBox(width: 12),
-            Expanded(child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                txt(tr('Kill Switch هنوز تأیید نشده',
-                    'Kill Switch not yet enforced'),
-                    size: 13, bold: true),
-                const SizedBox(height: 4),
-                txt(tr('تا زمانی که محافظت شبکه در ویندوز اجرا و تأیید نشود،'
-                       ' این کلید فعال نخواهد شد.',
-                       'The switch stays unavailable until OS-level traffic'
-                       ' blocking is implemented and verified.'),
-                       color: sub, size: 11),
-              ],
-            )),
+                color: Color(0xFFFFB66A), size: 20),
+            const SizedBox(width: 10),
+            Expanded(child: txt(tr('Kill Switch هنوز فعال نیست',
+                'Kill Switch is not enforced'), size: 12, bold: true)),
+            Tooltip(
+              message: tr(
+                'تا زمانی که محافظت شبکه در ویندوز پیاده‌سازی و تأیید نشود، این قابلیت فعال نیست.',
+                'Requires verified OS-level traffic blocking in Windows.'),
+              child: Icon(Icons.info_outline_rounded,
+                  color: sub, size: 17),
+            ),
           ]),
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 10),
+        settingsSectionTitle(tr('سرورها و عیب‌یابی', 'Servers & diagnostics'),
+            Icons.hub_outlined),
         settingLine(
           Icons.hub_outlined,
-          tr('بررسی نصب موتور پروتکل‌های مدرن', 'Check modern engine installation'),
-          disabled: false,
+          tr('بررسی موتور پروتکل‌های مدرن', 'Check modern engine'),
           onTap: () async {
             final installed = await WindowsSingBoxPreflight.enginePresent();
             if (!context.mounted) return;
@@ -4727,8 +4704,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         ),
         settingLine(
           Icons.speed_rounded,
-          tr('بررسی وضعیت واقعی اتصال', 'Check live VPN status'),
-          disabled: false,
+          tr('بررسی وضعیت اتصال', 'Check live VPN status'),
           onTap: () {
             _refreshVpnStatus();
             setState(() => _page = 'home');
@@ -4737,7 +4713,6 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         settingLine(
           Icons.auto_awesome_rounded,
           tr('انتخاب سریع‌ترین سرور', 'Fastest server selection'),
-          disabled: false,
           onTap: () {
             setState(() => _page = 'home');
             if (_fastestKnownIndex == null) {
@@ -4749,9 +4724,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         ),
         settingLine(
           Icons.refresh_rounded,
-          tr('به‌روزرسانی اطلاعات حساب و سرورها',
-             'Refresh account and servers'),
-          disabled: false,
+          tr('به‌روزرسانی حساب و سرورها', 'Refresh account and servers'),
           onTap: () {
             widget.onRefreshAccount();
             widget.onRefresh();
@@ -4762,13 +4735,53 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
             ));
           },
         ),
-        const SizedBox(height: 16),
-        ShareVpnPreview(
-          key: const Key('devShareVpnSection'),
-          dark: _dark,
-          persian: _persian,
+        const SizedBox(height: 10),
+        settingsSectionTitle(tr('شخصی‌سازی', 'Personalization'),
+            Icons.tune_rounded),
+        settingLine(Icons.language_rounded, tr('زبان', 'Language'),
+            onTap: _changeLanguage),
+        settingLine(Icons.sync_rounded,
+            tr('دریافت تنظیمات برند', 'Sync brand settings'),
+            disabled: widget.onBrandRefresh == null,
+            onTap: () async {
+              final success = await widget.onBrandRefresh?.call() ?? false;
+              if (!context.mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                content: Text(success
+                  ? tr('برند از پنل دریافت شد.',
+                       'Brand synchronized from the panel.')
+                  : tr('دریافت برند ناموفق بود؛ آخرین تنظیمات معتبر حفظ شد.',
+                       'Could not sync brand; last verified brand kept.')),
+              ));
+            }),
+        const SizedBox(height: 9),
+        glassCard(
+          radius: 17,
+          padding: EdgeInsets.zero,
+          child: Theme(
+            data: Theme.of(context).copyWith(
+                dividerColor: Colors.transparent),
+            child: ExpansionTile(
+              key: const Key('devShareVpnDisclosure'),
+              leading: const Icon(Icons.wifi_tethering_rounded,
+                  color: Color(0xFF81BDD4)),
+              title: txt(tr('اشتراک‌گذاری VPN', 'Share VPN'),
+                  bold: true, size: 13),
+              subtitle: txt(tr('هنوز قابل استفاده نیست',
+                  'Not yet available'), color: sub, size: 11),
+              trailing: Icon(Icons.keyboard_arrow_down_rounded, color: sub),
+              childrenPadding: const EdgeInsets.fromLTRB(8, 0, 8, 12),
+              children: [
+                ShareVpnPreview(
+                  key: const Key('devShareVpnSection'),
+                  dark: _dark,
+                  persian: _persian,
+                ),
+              ],
+            ),
+          ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 13),
         OutlinedButton.icon(
           key: const Key('settingsSignOut'),
           onPressed: _vpnBusy ? null : _disconnectAndSignOut,
@@ -4782,36 +4795,6 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                 'Signing out will disconnect the VPN first.'),
                 style: TextStyle(color: sub, fontSize: 11)),
           ),
-        const SizedBox(height: 16),
-        glassCard(
-          key: const Key('devSettingsAppearanceCard'),
-          radius: 20,
-          padding: const EdgeInsets.fromLTRB(15, 12, 15, 12),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              txt(tr('شخصی‌سازی', 'Personalization'), size: 15, bold: true),
-              const SizedBox(height: 10),
-              settingLine(Icons.language_rounded, tr('زبان', 'Language'),
-                  disabled: false,
-                  onTap: _changeLanguage),
-              settingLine(Icons.sync_rounded,
-                  tr('دریافت برند از پنل: ${widget.brand.brandName}',
-                     'Sync panel brand: ${widget.brand.brandName}'),
-                  disabled: widget.onBrandRefresh == null,
-                  onTap: () async {
-                    final success = await widget.onBrandRefresh?.call() ?? false;
-                    if (!context.mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                      content: Text(success
-                        ? tr('برند از پنل دریافت شد.',
-                             'Brand synchronized from the panel.')
-                        : tr('دریافت برند ناموفق بود؛ آخرین تنظیمات معتبر حفظ شد.',
-                             'Could not sync brand; last verified brand kept.')),
-                    ));
-                  }),
-            ],
-          ),
-        ),
       ],
     );
 
