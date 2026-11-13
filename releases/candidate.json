@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.824",
-  "source_sha": "fa0b3a0c068fd68fdea979e566df2aacd70a7b45",
+  "version": "1.1.0-rc.825",
+  "source_sha": "4ddc019f7df54c479159c9baf5d55b48bfa37883",
   "notes": {
-    "fa": "رفع گیرکردن دکمه ساخت اشتراک: انتقال عملیات دیتابیس از event loop به worker thread، محدودیت انتظار ۴۵ثانیه‌ای فرم با هشدار جلوگیری از ساخت تکراری، و تست‌های CI و انتشار برای حفظ اصلاحات در نسخه‌های بعدی.",
-    "en": "Fix hanging manual subscription creation: execute synchronous database persistence in FastAPI threadpool, bound frontend fetch to 45 seconds with no-blind-retry warning, and add release regression guards."
+    "fa": "بازگردانی نمایش پروتکل‌های آنلاین در کارت‌های اشتراک پنل و صفحه Connection؛ اتصال نشانگرها به داده واقعی نشست و مصرف، بدون تغییر کانفیگ‌ها، نشست‌ها یا شمارش حجم و دستگاه؛ همراه تست انتشار برای جلوگیری از حذف مجدد.",
+    "en": "Restore confirmed active protocol badges in admin subscription cards and public Connection hub using authoritative live session/usage telemetry, with release regression protection. No VPN configuration or accounting changes."
   }
 }
