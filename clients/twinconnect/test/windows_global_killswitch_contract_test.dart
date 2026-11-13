@@ -67,6 +67,22 @@ void main() {
     expect(workflow, contains(r'uninstall-vm $ack'));
   });
 
+  test('VM-only control is wired from Flutter through native Windows to admin IPC', () {
+    final bridge = File('lib/native_vpn_bridge.dart').readAsStringSync();
+    final settings = File('lib/vpn_settings.dart').readAsStringSync();
+    final installer = File('tools/install_windows_native.py').readAsStringSync();
+    final header = File('native/windows/twinconnect_guard_control.h').readAsStringSync();
+    expect(bridge, contains('experimentalVmGlobalGuard'));
+    expect(settings, contains("Key('vpnVmArm')"));
+    expect(settings, contains("Key('vpnVmDisarm')"));
+    expect(settings, contains("TWINCONNECT_DISPOSABLE_VM"));
+    expect(installer, contains('experimentalVmGlobalGuard'));
+    expect(installer, contains('twinconnect_guard_control::SendVmOnly'));
+    expect(header, contains('PIPE_READMODE_MESSAGE'));
+    expect(header, contains('SERVICE_UNAVAILABLE'));
+    expect(header, contains('VM_ONLY'));
+  });
+
   test('native bridge installs only a read-only guard status method', () {
     final install = File('tools/install_windows_native.py')
         .readAsStringSync();
