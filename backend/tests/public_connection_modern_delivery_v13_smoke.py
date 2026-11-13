@@ -17,6 +17,7 @@ live = live_path.read_text(encoding="utf-8")
 standalone = standalone_path.read_text(encoding="utf-8")
 singbox = singbox_path.read_text(encoding="utf-8")
 shared = shared_path.read_text(encoding="utf-8")
+catalog = (ROUTERS / "public_connection_client_catalog_v821.py").read_text(encoding="utf-8")
 
 compile(v13, str(v13_path), "exec")
 compile(live, str(live_path), "exec")
@@ -101,10 +102,12 @@ assert "modern_protocol=" not in classic_window
 # on native sing-box because Karing Snell support is not treated as guaranteed.
 assert "karing://install-config?url=" in v13
 assert 'config_format == "sing-box" and protocol != "snell"' in v13
-for protocol in ("hysteria2", "tuic", "anytls", "naive", "shadowtls"):
-    assert f'"{protocol}": _KARING' in v13
-assert '"snell": {' in v13
-assert "sing-box Desktop" in v13
+assert "CLIENTS: dict[str, dict[str, tuple[str, str]]] = protocol_client_rows()" in v13
+for protocol in ("hysteria2", "tuic", "anytls"):
+    assert f'"{protocol}": {{p: "karing" for p in PLATFORMS}}' in catalog
+for protocol in ("naive", "shadowtls", "snell"):
+    assert f'"{protocol}": {{p: "singbox" for p in PLATFORMS}}' in catalog
+assert '"singbox": {' in catalog
 
 # Mieru receives a generated Karing-compatible profile while TrustTunnel keeps
 # its real tt:// URI from provisioning. Sudoku gets both an upstream-compatible
@@ -149,9 +152,9 @@ for marker in (
 
 # Official AmneziaWG destinations are platform-specific rather than reusing the
 # Windows binary link on mobile/Apple platforms.
-assert "org.amnezia.awg" in v13
-assert "id6478942365" in v13
-assert "amneziawg-windows-client/releases/latest" in v13
+assert '"amneziawg": {p: "amneziawg" for p in PLATFORMS}' in catalog
+assert "id6478942365" in catalog
+assert "amneziawg-amd64-3.1.0.msi" in catalog
 
 # V13 must be part of the actual live public route and run last after legacy
 # refiners so it can normalize the final customer-facing UI.
