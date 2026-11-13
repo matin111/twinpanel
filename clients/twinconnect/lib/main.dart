@@ -114,7 +114,7 @@ class _TwinConnectAppState extends State<TwinConnectApp> {
       ],
       theme: BrandTheme.make(_activeBrand, Brightness.light),
       darkTheme: BrandTheme.make(_activeBrand, Brightness.dark),
-      themeMode: BrandTheme.mode(_activeBrand),
+      themeMode: ThemeMode.dark,
       builder: (context, child) => Stack(children: [
         Positioned.fill(child: child ?? const SizedBox.shrink()),
         const Positioned.fill(child: TwinConnectFramelessControls()),
