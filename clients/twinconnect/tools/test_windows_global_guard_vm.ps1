@@ -68,11 +68,65 @@ function Test-Physical-Egress {
   }
 }
 
+# Send a real uncached DNS query directly through the physical source,
+# bypassing the Windows resolver/cache. UDP "send succeeded" is never counted
+# as egress: a matching DNS response is required.
+function Test-Physical-Dns {
+  param([string]$SourceAddress, [string]$RemoteAddress,
+        [int]$TimeoutMs=3500)
+  $source = [System.Net.IPAddress]::Parse($SourceAddress)
+  $remote = [System.Net.IPAddress]::Parse($RemoteAddress)
+  if ($source.AddressFamily -ne $remote.AddressFamily) {
+    throw "DNS source/destination IP family mismatch."
+  }
+  $udp = [System.Net.Sockets.UdpClient]::new(
+    [System.Net.IPEndPoint]::new($source, 0))
+  try {
+    $udp.Client.ReceiveTimeout = $TimeoutMs
+    $id = [byte[]]::new(2)
+    [System.Security.Cryptography.RandomNumberGenerator]::Fill($id)
+    # DNS header: id, recursion desired, one question.
+    $packet = [System.Collections.Generic.List[byte]]::new()
+    $packet.AddRange($id)
+    $packet.AddRange([byte[]]@(0x01,0x00,0x00,0x01,0x00,0x00,0x00,0x00,0x00,0x00))
+    # Random query name avoids cached local resolver replies.
+    $label = 'tc' + [Guid]::NewGuid().ToString('N').Substring(0,12)
+    foreach ($part in @($label,'example','com')) {
+      $packet.Add([byte]$part.Length)
+      $packet.AddRange([System.Text.Encoding]::ASCII.GetBytes($part))
+    }
+    $packet.AddRange([byte[]]@(0x00,0x00,0x01,0x00,0x01))
+    $query = $packet.ToArray()
+    $remoteEndpoint = [System.Net.IPEndPoint]::new($remote,53)
+    [void]$udp.Send($query, $query.Length, $remoteEndpoint)
+    $sender = [System.Net.IPEndPoint]::new(
+      [System.Net.IPAddress]::Any, 0)
+    if ($source.AddressFamily -eq [System.Net.Sockets.AddressFamily]::InterNetworkV6) {
+      $sender = [System.Net.IPEndPoint]::new([System.Net.IPAddress]::IPv6Any,0)
+    }
+    $reply = $udp.Receive([ref]$sender)
+    return $reply.Length -ge 12 -and
+      $sender.Address.Equals($remote) -and
+      $reply[0] -eq $id[0] -and $reply[1] -eq $id[1] -and
+      ($reply[2] -band 0x80) -ne 0
+  } catch [System.Net.Sockets.SocketException] {
+    return $false
+  } finally {
+    $udp.Dispose()
+  }
+}
+
 if (!(Test-Physical-Egress -SourceAddress $PhysicalIpv4)) {
   throw "Physical IPv4 baseline already blocked; test would be inconclusive."
 }
 if (!(Test-Physical-Egress -SourceAddress $PhysicalIpv6 -RemoteAddress "2606:4700:4700::1111")) {
   throw "Physical IPv6 baseline already blocked; test would be inconclusive."
+}
+if (!(Test-Physical-Dns -SourceAddress $PhysicalIpv4 -RemoteAddress "1.1.1.1")) {
+  throw "Direct IPv4 DNS baseline unavailable; cannot prove DNS protection."
+}
+if (!(Test-Physical-Dns -SourceAddress $PhysicalIpv6 -RemoteAddress "2606:4700:4700::1111")) {
+  throw "Direct IPv6 DNS baseline unavailable; cannot prove DNS protection."
 }
 $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(2)
 $action = New-ScheduledTaskAction -Execute $GuardExe -Argument ("recover " + $ack)
@@ -93,7 +147,13 @@ try {
   if (Test-Physical-Egress -SourceAddress $PhysicalIpv6 -RemoteAddress "2606:4700:4700::1111") {
     throw "PRIVACY FAILURE: direct physical IPv6 TCP egress still works."
   }
-  Write-Host "PASS: direct physical IPv4 and IPv6 TCP blocked inside VM."
+  if (Test-Physical-Dns -SourceAddress $PhysicalIpv4 -RemoteAddress "1.1.1.1") {
+    throw "PRIVACY FAILURE: IPv4 DNS UDP leaked outside tunnel."
+  }
+  if (Test-Physical-Dns -SourceAddress $PhysicalIpv6 -RemoteAddress "2606:4700:4700::1111") {
+    throw "PRIVACY FAILURE: IPv6 DNS UDP leaked outside tunnel."
+  }
+  Write-Host "PASS: direct IPv4/IPv6 TCP and DNS UDP blocked inside VM."
 } finally {
   & $GuardExe recover $ack
   $recovered = $LASTEXITCODE -eq 0
@@ -107,7 +167,10 @@ try {
       for ($attempt = 0; $attempt -lt 4 -and !$restored; $attempt++) {
         $v4Restored = Test-Physical-Egress -SourceAddress $PhysicalIpv4
         $v6Restored = Test-Physical-Egress -SourceAddress $PhysicalIpv6 -RemoteAddress "2606:4700:4700::1111"
-        $restored = $v4Restored -and $v6Restored
+        $dns4Restored = Test-Physical-Dns -SourceAddress $PhysicalIpv4 -RemoteAddress "1.1.1.1"
+        $dns6Restored = Test-Physical-Dns -SourceAddress $PhysicalIpv6 -RemoteAddress "2606:4700:4700::1111"
+        $restored = $v4Restored -and $v6Restored -and
+            $dns4Restored -and $dns6Restored
         if (!$restored) { Start-Sleep -Seconds 2 }
       }
     }
