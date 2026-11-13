@@ -103,7 +103,7 @@ void main() {
     expect(script, contains('ExpectedSignerThumbprint'));
     expect(script, contains('Verify-ServiceIdentity'));
     expect(script, contains('offline-status'));
-    expect(script, contains("if ($service.Status -ne 'Running')"));
+    expect(script, contains(r"if ($service.Status -ne 'Running')"));
     expect(script, contains("start= auto"));
     expect(script, contains("Start-Service -Name"));
     expect(script, contains("Invoke-Guard -Arguments @('recover', "));
