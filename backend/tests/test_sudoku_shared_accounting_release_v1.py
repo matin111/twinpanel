@@ -15,7 +15,8 @@ class SudokuSharedAccountingReleaseTests(unittest.TestCase):
         self.assertIn('upTotal',source)
         self.assertIn('downTotal',source)
         self.assertIn('"InvocationID"',source)
-        self.assertIn('used!=up+down',source)
+        self.assertIn('type(used) is not int',source)
+        self.assertNotIn('used!=up+down',source)
         self.assertIn('validated_counters',source)
 
     def test_accounting_uses_epoch_baseline_and_exact_user_identity(self):
