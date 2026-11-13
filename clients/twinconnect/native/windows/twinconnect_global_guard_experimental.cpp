@@ -193,6 +193,13 @@ int wmain(int argc, wchar_t** argv) {
     result = TransactionalDisarm(engine.handle);
   } else if (_wcsicmp(argv[1], L"arm") == 0 && argc == 5 &&
              wcscmp(argv[4], L"I_ACCEPT_OFFLINE_RECOVERY") == 0) {
+    // Never permit choosing a physical Ethernet/Wi-Fi adapter: doing so
+    // would make the block condition a no-op for direct user traffic.
+    if (_wcsicmp(argv[2], L"TwinConnectSB") != 0 &&
+        _wcsicmp(argv[2], L"TwinConnect") != 0) {
+      fwprintf(stderr, L"Only TwinConnect-owned tunnel aliases are allowed.\n");
+      return 2;
+    }
     NET_LUID interfaceLuid = {};
     if (ConvertInterfaceAliasToLuid(argv[2], &interfaceLuid)
         != NO_ERROR || interfaceLuid.Value == 0) {
