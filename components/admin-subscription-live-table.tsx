@@ -292,6 +292,40 @@ export function AdminSubscriptionLiveTable(){
       }
     };
 
+    // The current subscriptions UI uses cards, not the hidden legacy table.
+    // Bind live protocol names to the same canonical quota-ledger snapshot.
+    // Never infer a protocol from enabled configs or server selections.
+    const decorateCards=()=>{
+      const cards=document.querySelectorAll<HTMLElement>(
+        ".legacy-subscriptions-page .mobile-subscription-card[data-subscription-id]"
+      );
+      for(const card of cards){
+        const id=Number(card.dataset.subscriptionId||0);
+        if(!id)continue;
+        const state=states.get(id);
+        const online=Boolean(state?.online);
+        const uncertain=state?.presence_state==="unknown"||
+          (loaded&&(!lastSuccessAt||Date.now()-lastSuccessAt>STALE_AFTER_MS));
+        const protocols=online&&!uncertain?(state?.protocols||[]).map(protocolLabel).filter(Boolean):[];
+        const signature=protocols.join("|");
+        let target=card.querySelector<HTMLElement>("[data-live-protocols]");
+        if(!target){
+          target=document.createElement("span");
+          target.dataset.liveProtocols="1";
+          target.dir="ltr";
+          target.style.cssText="display:inline-flex;align-items:center;gap:4px;flex-wrap:wrap;font-size:10px;font-weight:700;color:#49dba1;direction:ltr;max-width:100%";
+          card.querySelector(".mobile-subscription-card-head .subscription-live-statuses")?.appendChild(target);
+        }
+        if(!target)continue;
+        if(target.dataset.signature===signature)continue;
+        target.dataset.signature=signature;
+        target.textContent=protocols.join(" · ");
+        target.title=protocols.length?tr("پروتکل‌های دارای فعالیت اتصال تأییدشده","Protocols with confirmed recent activity"):"";
+        target.hidden=protocols.length===0;
+        target.style.display=protocols.length?"inline-flex":"none";
+      }
+    };
+
     const bindObserver=()=>{
       if(disposed)return;
       const body=document.querySelector<HTMLTableSectionElement>(".legacy-subscriptions-page .table table tbody");
@@ -308,6 +342,7 @@ export function AdminSubscriptionLiveTable(){
         frame=undefined;
         decorateNow();
         bindObserver();
+        decorateCards();
       });
     };
 
