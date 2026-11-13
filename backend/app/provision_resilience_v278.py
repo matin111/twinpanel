@@ -135,7 +135,7 @@ async def _ensure_agent_python_v278(conn) -> tuple[str, str]:
             # the node's apt mirrors are unreachable. Both dependencies
             # have already passed an actual import test with python3.
             # The generated systemd service always uses the returned path.
-            return "python3", "system_packages_direct"
+            return "/usr/bin/python3", "system_packages_direct"
 
         await provision.cmd(
             conn,
@@ -204,7 +204,7 @@ async def _install_iran_agent_v278(
     )
 
     service = dedent(
-        """
+        f"""
         [Unit]
         Description=TwinPanel VPN Node Agent
         After=network-online.target
@@ -214,7 +214,7 @@ async def _install_iran_agent_v278(
         Type=simple
         User=root
         WorkingDirectory=/opt/twinpanel-agent
-        ExecStart=/opt/twinpanel-agent/venv/bin/python /opt/twinpanel-agent/agent.py
+        ExecStart={python_path} /opt/twinpanel-agent/agent.py
         Restart=always
         RestartSec=5
 
