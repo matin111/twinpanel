@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.815",
-  "source_sha": "f6ab12e57363d3d2c12750ae4507cbdf4250ec8b",
+  "version": "1.1.0-rc.816",
+  "source_sha": "639dec2edb13e209ed2044290e4642dbab31dcf6",
   "notes": {
-    "fa": "بازطراحی صفحه ساخت و ویرایش پلن طبق طرح تاییدشده: مودال فشرده و مدرن راست‌چین با دو ستون اطلاعات پایه، چهار ستون حجم و قیمت، کارت‌های کوچک پروتکل، بخش جمع‌شونده نودهای Exit، دکمه ذخیره و انصراف همیشه در پایین، واکنش‌گرا برای موبایل، سازگاری لایت/دارک؛ حفظ تمام ارتباطات API، فیلدهای موجود و Snapshot پروتکل و نود.",
-    "en": "Redesign admin plan create/edit modal to the approved compact responsive three-section UX with light/dark compatibility, inline protocol chips, collapsible exit node picker and pinned footer. Preserve plan CRUD, device limit, node/protocol snapshots, API payload and existing permissions."
+    "fa": "افزودن دو کنترل مدیریتی در صفحه پروتکل‌ها برای هر نود: ری‌استارت سرویس با تایید و بررسی سلامت؛ غیرفعال/فعال‌کردن همان پروتکل در همان نود برای کانفیگ‌های دریافتی، بدون حذف کاربران، تغییر تنظیمات یا قطع اتصال‌های فعلی. هشدار برای ری‌استارت sing-box مشترک، وضعیت پایدار مدیریتی، انتشار لینک‌ها و فهرست موبایل با احترام به غیرفعال‌سازی و سازگاری لایت/دارک؛ همراه همه امکانات rc.815.",
+    "en": "Add per-node protocol restart with confirmation/health-check and durable per-node operator disable/enable for newly fetched customer configurations only. Preserve existing runtime sessions, other nodes, keys, quota and previous rc.815 UI features. Include shared-sing-box interruption warnings, mobile inventory integration and release guards."
   }
 }
