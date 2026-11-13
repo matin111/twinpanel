@@ -14,9 +14,18 @@ export type AppAppearance={
   theme_mode:"light"|"dark"|"system";
 };
 export type AppearanceReseller={id:number;name:string};
+export type AppContact={
+  logo_url:string|null;
+  primary_color:string|null;
+  secondary_color:string|null;
+  telegram_url:string|null;
+  renewal_url:string|null;
+  support_phone:string|null;
+  website_url:string|null;
+};
 
 const root="/v1/central-app";
-async function request<T>(path:string,method="GET",body?:AppAppearance):Promise<T>{
+async function request<T>(path:string,method="GET",body?:AppAppearance|AppContact):Promise<T>{
   const token=getCustomerToken();
   if(!token)throw new Error("AUTH_REQUIRED");
   const response=await fetch(`${API_BASE}${path}`,{
@@ -34,6 +43,16 @@ async function request<T>(path:string,method="GET",body?:AppAppearance):Promise<
 }
 
 export const appearanceApi={
+  loadContact:(role:"admin"|"reseller",resellerId=0)=>{
+    const path=role==="reseller"?"reseller/profile":resellerId>0
+      ?`admin/resellers/${resellerId}/profile`:"admin/profile";
+    return request<AppContact>(`${root}/${path}`);
+  },
+  saveContact:(role:"admin"|"reseller",value:AppContact,resellerId=0)=>{
+    const path=role==="reseller"?"reseller/profile":resellerId>0
+      ?`admin/resellers/${resellerId}/profile`:"admin/profile";
+    return request<AppContact>(`${root}/${path}`,"PUT",value);
+  },
   listResellers:()=>request<AppearanceReseller[]>(root+"/admin/appearance-resellers"),
   load:(role:"admin"|"reseller",resellerId=0)=>{
     const path=role==="reseller"?"reseller/appearance":resellerId>0?`admin/resellers/${resellerId}/appearance`:"admin/appearance";
