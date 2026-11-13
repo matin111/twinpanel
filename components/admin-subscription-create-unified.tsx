@@ -10,7 +10,7 @@ import {useTheme} from "../lib/theme";
 
 const num=(value:unknown)=>{const n=Number(value??0);return Number.isFinite(n)?n:0;};
 const clean=(value:string)=>{const raw=value.trim();if(!raw)return null;const n=Number(raw);return Number.isFinite(n)?n:null;};
-const tinyButton={height:32,padding:"0 11px",borderRadius:10,fontSize:12};
+const tinyButton={height:27,minHeight:27,padding:"0 10px",borderRadius:9,fontSize:11};
 
 export function AdminSubscriptionCreateUnified(){
   const {pick}=useI18n();
@@ -116,7 +116,7 @@ export function AdminSubscriptionCreateUnified(){
 
   if(!mounted||!open)return null;
 
-  const choice=(checked:boolean,label:string,sub:string,onToggle:()=>void)=><button type="button" className="tp-create-choice" aria-pressed={checked} onClick={onToggle} style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,minHeight:42,padding:"9px 11px",borderRadius:12,border:light?(checked?"1px solid #9c84ee":"1px solid #d6e1ee"):(checked?"1px solid rgba(124,92,255,.62)":"1px solid rgba(148,163,184,.14)"),background:light?(checked?"#f0ebff":"#fff"):(checked?"rgba(109,74,255,.13)":"rgba(15,23,42,.26)"),color:light?"#253854":"inherit",cursor:"pointer",textAlign:"right"}}><span style={{display:"grid",gap:2,minWidth:0}}><b style={{fontSize:12,fontWeight:700,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{label}</b>{sub&&<small dir="ltr" style={{fontSize:10,opacity:light?1:.58,color:light?"#5c6c86":undefined,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{sub}</small>}</span><span aria-hidden="true" style={{width:20,height:20,borderRadius:999,border:checked?"6px solid #7c5cff":"2px solid rgba(148,163,184,.42)",background:checked?"white":"transparent",flex:"0 0 auto"}}/></button>;
+  const choice=(checked:boolean,label:string,sub:string,onToggle:()=>void)=><button type="button" className="tp-create-choice" aria-pressed={checked} title={label} onClick={onToggle} style={{display:"flex",alignItems:"center",justifyContent:"space-between",width:"100%",minWidth:0,boxSizing:"border-box",gap:7,minHeight:39,padding:"6px 9px",borderRadius:10,border:light?(checked?"1px solid #9c84ee":"1px solid #d6e1ee"):(checked?"1px solid rgba(124,92,255,.62)":"1px solid rgba(148,163,184,.14)"),background:light?(checked?"#f0ebff":"#fff"):(checked?"rgba(109,74,255,.13)":"rgba(15,23,42,.26)"),color:light?"#253854":"inherit",cursor:"pointer",textAlign:"right"}}><span style={{display:"grid",gap:2,minWidth:0}}><b style={{fontSize:11,fontWeight:700,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{label}</b>{sub&&<small dir="ltr" style={{fontSize:9,opacity:light?1:.58,color:light?"#5c6c86":undefined,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{sub}</small>}</span><span aria-hidden="true" style={{width:16,height:16,borderRadius:999,border:checked?"5px solid #7c5cff":"2px solid rgba(148,163,184,.42)",background:checked?"white":"transparent",flex:"0 0 auto"}}/></button>;
 
   return createPortal(<div className={`runtime-modal manual-subscription-modal tp-unified-create${light?" tp-unified-create-light":""}`} role="dialog" aria-modal="true" aria-label={pick("ساخت اشتراک","Create subscription")}>
     <button type="button" className="runtime-modal-bg" onClick={()=>!busy&&setOpen(false)}/>
@@ -137,14 +137,14 @@ export function AdminSubscriptionCreateUnified(){
             </div>
           </section>
 
-          <section style={{...box,padding:12}}>
-            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,marginBottom:10}}><div><b>{pick("پروتکل‌ها","Protocols")}</b><small style={{marginInlineStart:8,opacity:.55}}>{protocols.length}/15</small></div><div style={{display:"flex",gap:6}}><button type="button" className="ghost" style={tinyButton} onClick={()=>setProtocols(catalog.map(item=>item.key))}>{pick("همه","All")}</button><button type="button" className="ghost" style={tinyButton} onClick={()=>setProtocols([])}>{pick("هیچکدام","None")}</button></div></div>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(3,minmax(0,1fr))",gap:7}}>{catalog.map(item=><div key={item.key}>{choice(protocols.includes(item.key),item.title,item.family==="classic"?pick("کلاسیک","Classic"):pick("مدرن","Modern"),()=>toggleProtocol(item.key))}</div>)}</div>
+          <section className="tp-create-choice-section" style={{...box,padding:10}}>
+            <div className="tp-create-choice-head"><div><b>{pick("پروتکل‌ها","Protocols")}</b><small className="tp-create-choice-count" dir="ltr">{protocols.length}/{catalog.length}</small></div><div className="tp-create-choice-actions"><button type="button" className="ghost" style={tinyButton} disabled={loading} onClick={()=>setProtocols(catalog.map(item=>item.key))}>{pick("همه","All")}</button><button type="button" className="ghost" style={tinyButton} disabled={loading} onClick={()=>setProtocols([])}>{pick("هیچکدام","None")}</button></div></div>
+            <div className="tp-create-choice-grid tp-create-protocol-grid" role="group" aria-label={pick("انتخاب پروتکل‌ها","Select protocols")}>{catalog.map(item=><div className="tp-create-choice-cell" key={item.key}>{choice(protocols.includes(item.key),item.title,item.family==="classic"?pick("کلاسیک","Classic"):pick("مدرن","Modern"),()=>toggleProtocol(item.key))}</div>)}</div>
           </section>
 
-          <section style={{...box,padding:12}}>
-            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,marginBottom:10}}><div><b>{pick("سرورها","Servers")}</b><small style={{marginInlineStart:8,opacity:.55}}>{nodeIds.length}/{exitNodes.length}</small></div><div style={{display:"flex",gap:6}}><button type="button" className="ghost" style={tinyButton} onClick={()=>setNodeIds(exitNodes.map(node=>node.id))}>{pick("همه","All")}</button><button type="button" className="ghost" style={tinyButton} onClick={()=>setNodeIds([])}>{pick("هیچکدام","None")}</button></div></div>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:7}}>{exitNodes.map(node=><div key={node.id}>{choice(nodeIds.includes(node.id),node.name,node.public_ip||node.country_code||"",()=>toggleNode(node.id))}</div>)}</div>
+          <section className="tp-create-choice-section" style={{...box,padding:10}}>
+            <div className="tp-create-choice-head"><div><b>{pick("سرورها","Servers")}</b><small className="tp-create-choice-count" dir="ltr">{nodeIds.length}/{exitNodes.length}</small></div><div className="tp-create-choice-actions"><button type="button" className="ghost" style={tinyButton} disabled={loading} onClick={()=>setNodeIds(exitNodes.map(node=>node.id))}>{pick("همه","All")}</button><button type="button" className="ghost" style={tinyButton} disabled={loading} onClick={()=>setNodeIds([])}>{pick("هیچکدام","None")}</button></div></div>
+            <div className="tp-create-choice-grid tp-create-node-grid" role="group" aria-label={pick("انتخاب سرورها","Select servers")}>{exitNodes.map(node=><div className="tp-create-choice-cell" key={node.id}>{choice(nodeIds.includes(node.id),node.name,node.public_ip||node.country_code||"",()=>toggleNode(node.id))}</div>)}</div>
           </section>
 
           <section style={{...box,padding:12}}>
