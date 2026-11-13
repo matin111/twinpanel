@@ -47,6 +47,16 @@ void main() {
     expect(dashboard, contains('ServerLatency.color(_connectedServerRtt)'));
   });
 
+  test('light mode has visible branded luminous geometry', () {
+    final ambient = File('lib/ambient_background.dart').readAsStringSync();
+    final theme = File('lib/brand_theme.dart').readAsStringSync();
+    expect(ambient, contains('final streak = Paint()'));
+    expect(ambient, contains('final sparks = Paint()'));
+    expect(ambient, contains('final sweep = Paint()'));
+    expect(ambient, contains('dark ? .12 : .16'));
+    expect(theme, contains('Color(0xFFF4F0FF), 0.90'));
+  });
+
   test('shared background takes real per-tenant primary and secondary colors', () {
     final dashboard = File('lib/live_dashboard.dart').readAsStringSync();
     final ambient = File('lib/ambient_background.dart').readAsStringSync();
