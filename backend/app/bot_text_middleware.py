@@ -10,7 +10,10 @@ import qrcode
 from aiogram.client.session.middlewares.base import BaseRequestMiddleware
 from aiogram.types import BufferedInputFile, CopyTextButton, InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.methods import GetMyCommands, SetMyCommands
-from aiogram.types import BotCommand
+from aiogram.types import (
+    BotCommand, BotCommandScopeDefault, BotCommandScopeAllPrivateChats,
+    BotCommandScopeAllGroupChats, BotCommandScopeAllChatAdministrators,
+)
 
 from .bot_texts import custom_bot_texts
 from .database import SessionLocal
@@ -52,36 +55,55 @@ class BotTextRequestMiddleware(BaseRequestMiddleware):
             return
 
         self._commands_sync_attempted = True
-        try:
-            current = list(
-                await make_request(bot, GetMyCommands())
-                or []
+        commands = [BotCommand(command="start", description="شروع ربات")]
+        if self.scope == "admin":
+            # Telegram stores independent lists by chat scope and language.
+            # A default-only update leaves old menu commands in private chats,
+            # groups or Persian/English language overrides.
+            scopes = (
+                BotCommandScopeDefault(),
+                BotCommandScopeAllPrivateChats(),
+                BotCommandScopeAllGroupChats(),
+                BotCommandScopeAllChatAdministrators(),
             )
+            languages = (None, "fa", "en")
+            failed = False
+            for scope in scopes:
+                for language in languages:
+                    try:
+                        current = await make_request(
+                            bot, GetMyCommands(
+                                scope=scope, language_code=language,
+                            ),
+                        )
+                        if list(current or []) != commands:
+                            await make_request(
+                                bot, SetMyCommands(
+                                    commands=commands,
+                                    scope=scope,
+                                    language_code=language,
+                                ),
+                            )
+                    except Exception:
+                        failed = True
+            # Allow subsequent requests to retry if Telegram was unavailable.
+            self._commands_sync_attempted = not failed
+            return
 
-            commands = [
-                BotCommand(
-                    command="start",
-                    description="شروع ربات",
-                )
-            ]
-            # Admin sales bot: replace (never append to) legacy BotFather
-            # commands. Reseller bots keep their independently configured
-            # command menus, so this policy cannot erase reseller features.
-            if self.scope != "admin":
-                commands.extend(
-                    item for item in current
-                    if str(getattr(item, "command", "")).lower() != "start"
-                )
-
-            if current == commands:
+        # Independent reseller bots retain their existing commands.
+        try:
+            current = list(await make_request(bot, GetMyCommands()) or [])
+            if any(
+                str(getattr(item, "command", "")).lower() == "start"
+                for item in current
+            ):
                 return
-
             await make_request(
                 bot,
-                SetMyCommands(commands=commands),
+                SetMyCommands(commands=[*commands, *current]),
             )
         except Exception:
-            return
+            self._commands_sync_attempted = False
 
     def _load(self) -> dict[str, str]:
         now = time.monotonic()
