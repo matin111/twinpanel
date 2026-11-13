@@ -57,6 +57,7 @@ type ModernProtocolRow={
   adapter:string;
   runtime_status:string;
   installable:boolean;
+  operator_disabled?:boolean;
   port:number;
   transport:string;
   service:string;
@@ -127,6 +128,7 @@ type UnifiedProtocol={
   status:string;
   installed:boolean;
   installable:boolean;
+  operatorDisabled:boolean;
   portText:string;
   service?:string;
   recommended:boolean;
@@ -315,12 +317,12 @@ export function ProtocolCommandCenter(){
         protocol:def.key,enabled:false,port:def.defaultPort,port_text:def.key==="l2tp"?"500/4500/1701":String(def.defaultPort||""),transport:def.key==="openvpn"?"udp":def.transport,status:"not_installed",
       } satisfies ClassicProtocolInventoryRow);
       rows.push({
-        id:`classic:${def.key}`,kind:"classic",protocol:def.key,name:def.label,core:def.core,transport:row.transport||def.transport,category:"classic",status:row.enabled?(row.status||"enabled"):"not_installed",installed:Boolean(row.enabled),installable:true,portText:row.port_text||"—",service:row.service||undefined,recommended:["cisco","wireguard","v2ray"].includes(def.key),error:row.last_error,classicRow:row,
+        id:`classic:${def.key}`,kind:"classic",protocol:def.key,name:def.label,core:def.core,transport:row.transport||def.transport,category:"classic",status:row.enabled?(row.status||"enabled"):"not_installed",installed:Boolean(row.enabled),installable:true,operatorDisabled:Boolean(row.operator_disabled),portText:row.port_text||"—",service:row.service||undefined,recommended:["cisco","wireguard","v2ray"].includes(def.key),error:row.last_error,classicRow:row,
       });
     }
     for(const row of selectedNode.modern?.protocols||[]){
       rows.push({
-        id:`modern:${row.protocol}`,kind:"modern",protocol:row.protocol,name:row.name,core:row.core,transport:row.transport,category:row.category,status:row.status,installed:row.status!=="not_installed",installable:row.installable,portText:String(row.port||"—"),service:row.service,recommended:row.category==="recommended",error:row.last_error,modernRow:row,
+        id:`modern:${row.protocol}`,kind:"modern",protocol:row.protocol,name:row.name,core:row.core,transport:row.transport,category:row.category,status:row.status,installed:row.status!=="not_installed",installable:row.installable,operatorDisabled:Boolean(row.operator_disabled),portText:String(row.port||"—"),service:row.service,recommended:row.category==="recommended",error:row.last_error,modernRow:row,
       });
     }
     return rows;
@@ -345,8 +347,9 @@ export function ProtocolCommandCenter(){
 
   const metrics=useMemo(()=>({
     total:unifiedProtocols.length,
-    active:unifiedProtocols.filter(row=>row.installed).length,
+    active:unifiedProtocols.filter(row=>row.installed&&!row.operatorDisabled).length,
     healthy:unifiedProtocols.filter(row=>{
+      if(row.operatorDisabled)return false;
       if(row.kind==="modern")return row.status==="online";
       const run=classicRuntime[classicKey(selectedNodeId,row.protocol as ClassicProtocolKey)];
       return Boolean(run?.ok);
@@ -451,7 +454,7 @@ export function ProtocolCommandCenter(){
   const modernSyncAll=async()=>{
     const node=selectedNode?.modern;
     if(!node||busy)return;
-    const rows=node.protocols.filter(row=>row.installable&&Boolean(catalogMap.get(row.protocol)?.installable));
+    const rows=node.protocols.filter(row=>row.installable&&!row.operator_disabled&&Boolean(catalogMap.get(row.protocol)?.installable));
     if(!rows.length){
       setError("");
       setNotice(pick("هیچ پروتکل مدرن قابل همگام‌سازی روی این نود وجود ندارد.","There are no installable modern protocols to sync on this node."));
@@ -590,11 +593,11 @@ export function ProtocolCommandCenter(){
           <div className={styles.protocolGrid}>
             {filteredProtocols.map(row=>{
               const classicRun=row.kind==="classic"?classicRuntime[classicKey(selectedNodeId,row.protocol as ClassicProtocolKey)]:undefined;
-              const visibleStatus=row.kind==="classic"&&classicChecked[classicKey(selectedNodeId,row.protocol as ClassicProtocolKey)]?(classicRun?.ok?"online":"check"):row.status;
+              const visibleStatus=row.operatorDisabled?"admin_disabled":row.kind==="classic"&&classicChecked[classicKey(selectedNodeId,row.protocol as ClassicProtocolKey)]?(classicRun?.ok?"online":"check"):row.status;
               return <article key={row.id} className={`${styles.protocolCard} ${row.installed?styles.protocolCardActive:""}`}>
                 <div className={styles.cardTop}>
                   <div className={styles.protocolIdentity}><span className={styles.protocolIcon}>{iconFor(row.protocol)}</span><div><strong>{row.name}</strong><small>{row.core} · {row.transport}</small></div></div>
-                  <Badge tone={tone(visibleStatus)}>{visibleStatus==="not_installed"?pick("نصب نشده","Not installed"):visibleStatus}</Badge>
+                  <Badge tone={row.operatorDisabled?"warn":tone(visibleStatus)}>{row.operatorDisabled?pick("غیرفعال روی این نود","Disabled on this node"):visibleStatus==="not_installed"?pick("نصب نشده","Not installed"):visibleStatus}</Badge>
                 </div>
                 <div className={styles.metaLine}>
                   <span>{row.kind==="classic"?pick("Classic","Classic"):pick("Modern","Modern")}</span>
@@ -628,7 +631,7 @@ export function ProtocolCommandCenter(){
         {error?<div className={styles.errorBox}>{error}</div>:null}
         {notice?<div className={styles.successBox}>{notice}</div>:null}
 
-        <div className={styles.drawerStatus}><div><span>{pick("وضعیت","Status")}</span><Badge tone={tone(selectedRow.status)}>{selectedRow.status}</Badge></div><div><span>{pick("نود","Node")}</span><b>{selectedNode.name}</b></div><div><span>{pick("Runtime","Runtime")}</span><b>{selectedRow.kind==="classic"?pick("Production","Production"):selectedRow.installable?pick("آماده","Ready"):pick("در حال توسعه","Planned")}</b></div></div>
+        <div className={styles.drawerStatus}><div><span>{pick("وضعیت","Status")}</span><Badge tone={selectedRow.operatorDisabled?"warn":tone(selectedRow.status)}>{selectedRow.operatorDisabled?pick("غیرفعال روی این نود","Disabled on this node"):selectedRow.status}</Badge></div><div><span>{pick("نود","Node")}</span><b>{selectedNode.name}</b></div><div><span>{pick("Runtime","Runtime")}</span><b>{selectedRow.kind==="classic"?pick("Production","Production"):selectedRow.installable?pick("آماده","Ready"):pick("در حال توسعه","Planned")}</b></div></div>
 
         {selectedRow.kind==="classic"&&selectedRow.classicRow?(()=>{
           const protocol=selectedRow.protocol as ClassicProtocolKey;
