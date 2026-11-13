@@ -3170,14 +3170,17 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                   const Color(0xFF234B4B).withValues(alpha: .31),
                 ]
               : [
-                  const Color(0xFFFCFEFF).withValues(alpha: .90),
-                  const Color(0xFFF0F7F9).withValues(alpha: .83),
-                  const Color(0xFFE6F3F4).withValues(alpha: .84),
+                  const Color(0xFFFFFFFF).withValues(alpha: .97),
+                  const Color(0xFFF8FBFC).withValues(alpha: .96),
+                  const Color(0xFFF0F7F8).withValues(alpha: .96),
                 ],
         ),
-        border: Border.all(color: purple.withValues(alpha: 0.26)),
+        border: Border.all(color: _dark
+          ? const Color(0xFF7DA5B0).withValues(alpha: .31)
+          : const Color(0xFFAFCDD3).withValues(alpha: .78)),
         boxShadow: [BoxShadow(
-          color: purple.withValues(alpha: _dark ? 0.14 : 0.06),
+          color: _dark ? const Color(0xFF07151F).withValues(alpha: .24)
+              : const Color(0xFF213F4B).withValues(alpha: .10),
           blurRadius: 38, spreadRadius: 2, offset: const Offset(0, 14)),
         ],
       ),
@@ -3237,17 +3240,17 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
             ]),
           ),
         ),
-        const SizedBox(height: 18),
+        const SizedBox(height: 9),
         // Real connection status drives the waves. Offline has no animation.
         TwinConnectWaveIndicator(
-          key: const Key('liveConnectionGlassOrb'),
+          key: const Key('liveConnectionDataFabric'),
           connected: _verifiedConnectionActive,
           connecting: _vpnBusy,
           dark: _dark,
           rxSamples: _rxHistory,
           txSamples: _txHistory,
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 10),
         ClipRRect(
           borderRadius: BorderRadius.circular(18),
           child: BackdropFilter(
