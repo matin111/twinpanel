@@ -56,16 +56,19 @@ class _TwinConnectAmbientBackgroundState
   Widget build(BuildContext context) {
     final dark = widget.dark;
     final brandBackground = widget.backgroundColor;
-    final gradientColors = brandBackground == null
-        ? (dark
-            ? const [Color(0xFF0F1720), Color(0xFF132532), Color(0xFF17323B)]
-            : const [Color(0xFFF3F7F8), Color(0xFFEAF1F3), Color(0xFFF5FAFA)])
-        : [
-            brandBackground,
-            Color.lerp(brandBackground, widget.primaryColor, dark ? .29 : .22)!,
-            Color.lerp(brandBackground, widget.secondaryColor,
-                dark ? .23 : .17)!,
-          ];
+    final gradientColors = !dark
+        ? const [
+            Color(0xFFF7FAFC), Color(0xFFF0F6F8), Color(0xFFE6F0F3),
+          ]
+        : brandBackground == null
+            ? const [
+                Color(0xFF0B1620), Color(0xFF132C39), Color(0xFF142F37),
+              ]
+            : [
+                Color.lerp(brandBackground, const Color(0xFF091925), .16)!,
+                Color.lerp(brandBackground, widget.primaryColor, .24)!,
+                Color.lerp(brandBackground, widget.secondaryColor, .18)!,
+              ];
     return AnimatedContainer(
       key: const Key('devAnimatedBackground'),
       duration: const Duration(milliseconds: 550),
@@ -104,7 +107,7 @@ class _TwinConnectAmbientBackgroundState
                       child: _glow(
                         diameter: 515,
                         color: widget.primaryColor,
-                        strength: dark ? .43 : .33,
+                        strength: dark ? .29 : .09,
                       ),
                     ),
                     Positioned(
@@ -113,7 +116,7 @@ class _TwinConnectAmbientBackgroundState
                       child: _glow(
                         diameter: 485,
                         color: widget.secondaryColor,
-                        strength: dark ? .34 : .28,
+                        strength: dark ? .22 : .07,
                       ),
                     ),
                     Positioned(
@@ -123,7 +126,7 @@ class _TwinConnectAmbientBackgroundState
                         diameter: 320,
                         color: Color.lerp(widget.primaryColor,
                             widget.secondaryColor, .25)!,
-                        strength: dark ? .21 : .19,
+                        strength: dark ? .14 : .055,
                       ),
                     ),
                   ],
@@ -178,8 +181,8 @@ class _AmbientLines extends CustomPainter {
         center: const Alignment(.67, -.44),
         radius: 1.10,
         colors: [
-          primary.withValues(alpha: dark ? .30 : .13),
-          secondary.withValues(alpha: dark ? .10 : .06),
+          primary.withValues(alpha: dark ? .22 : .055),
+          secondary.withValues(alpha: dark ? .07 : .027),
           primary.withValues(alpha: 0),
         ],
       ).createShader(bounds));
@@ -189,7 +192,7 @@ class _AmbientLines extends CustomPainter {
         center: const Alignment(-.80, .92),
         radius: 1.15,
         colors: [
-          secondary.withValues(alpha: dark ? .24 : .12),
+          secondary.withValues(alpha: dark ? .16 : .052),
           secondary.withValues(alpha: 0),
         ],
       ).createShader(bounds));
@@ -206,7 +209,7 @@ class _AmbientLines extends CustomPainter {
         );
       final hue = Color.lerp(primary, secondary, band)!;
       canvas.drawPath(curve, Paint()
-        ..color = hue.withValues(alpha: (dark ? .11 : .15) * (1 - band * .42))
+        ..color = hue.withValues(alpha: (dark ? .10 : .075) * (1 - band * .42))
         ..strokeWidth = i % 4 == 0 ? 1.7 : .8
         ..style = PaintingStyle.stroke);
     }
@@ -218,7 +221,7 @@ class _AmbientLines extends CustomPainter {
       final p = Offset(size.width * fx, size.height * fy);
       canvas.drawCircle(p, i % 6 == 0 ? 1.65 : .75, Paint()
         ..color = (i.isEven ? primary : secondary)
-            .withValues(alpha: dark ? .24 : .32));
+            .withValues(alpha: dark ? .20 : .15));
     }
 
     // Minimal understated diagonal light streaks.
@@ -229,7 +232,7 @@ class _AmbientLines extends CustomPainter {
         ..quadraticBezierTo(size.width * .88, y + 20,
             size.width * 1.1, y - 30);
       canvas.drawPath(path, Paint()
-        ..color = secondary.withValues(alpha: dark ? .14 : .11)
+        ..color = secondary.withValues(alpha: dark ? .10 : .045)
         ..strokeWidth = 1.3
         ..style = PaintingStyle.stroke);
     }
