@@ -174,7 +174,7 @@ class WindowsL2tpTunnel {
           } catch (_) {
             // A temporary IP-check failure never confirms connectivity.
           }
-          if (DateTime.now().isAfter(routeDeadline!)) {
+          if (DateTime.now().isAfter(routeDeadline)) {
             throw const FormatException('L2TP_EGRESS_NOT_VERIFIED');
           }
         }

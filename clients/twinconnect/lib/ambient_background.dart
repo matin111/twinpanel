@@ -9,12 +9,16 @@ class TwinConnectAmbientBackground extends StatefulWidget {
   const TwinConnectAmbientBackground({
     required this.dark,
     this.backgroundColor,
+    this.primaryColor = const Color(0xFF9652FF),
+    this.secondaryColor = const Color(0xFF00DCEB),
     required this.child,
     super.key,
   });
 
   final bool dark;
   final Color? backgroundColor;
+  final Color primaryColor;
+  final Color secondaryColor;
   final Widget child;
 
   @override
@@ -37,7 +41,9 @@ class _TwinConnectAmbientBackgroundState
   @override
   void didUpdateWidget(covariant TwinConnectAmbientBackground oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.dark != widget.dark || oldWidget.backgroundColor != widget.backgroundColor) {
+    if (oldWidget.dark != widget.dark || oldWidget.backgroundColor != widget.backgroundColor ||
+        oldWidget.primaryColor != widget.primaryColor ||
+        oldWidget.secondaryColor != widget.secondaryColor) {
       _intro.forward(from: 0.0);
     }
   }
@@ -58,8 +64,9 @@ class _TwinConnectAmbientBackgroundState
             : const [Color(0xFFF6F1FF), Color(0xFFEFF2FF), Color(0xFFFBFAFF)])
         : [
             brandBackground,
-            Color.lerp(brandBackground, dark ? Colors.white : Colors.black, .045)!,
-            brandBackground,
+            Color.lerp(brandBackground, widget.primaryColor, dark ? .19 : .08)!,
+            Color.lerp(brandBackground, widget.secondaryColor,
+                dark ? .14 : .055)!,
           ];
     return AnimatedContainer(
       key: const Key('devAnimatedBackground'),
@@ -87,7 +94,10 @@ class _TwinConnectAmbientBackgroundState
                     RepaintBoundary(
                       child: CustomPaint(
                         key: const Key('devAmbientGrid'),
-                        painter: _AmbientLines(dark: dark),
+                        painter: _AmbientLines(
+                          dark: dark,
+                          primary: widget.primaryColor,
+                          secondary: widget.secondaryColor),
                       ),
                     ),
                     Positioned(
@@ -95,8 +105,8 @@ class _TwinConnectAmbientBackgroundState
                       right: -160 + t * 44,
                       child: _glow(
                         diameter: 515,
-                        color: const Color(0xFF8851FB),
-                        strength: dark ? .28 : .19,
+                        color: widget.primaryColor,
+                        strength: dark ? .37 : .21,
                       ),
                     ),
                     Positioned(
@@ -104,8 +114,8 @@ class _TwinConnectAmbientBackgroundState
                       left: -180 + t * 72,
                       child: _glow(
                         diameter: 485,
-                        color: const Color(0xFF26C8D5),
-                        strength: dark ? .17 : .13,
+                        color: widget.secondaryColor,
+                        strength: dark ? .27 : .15,
                       ),
                     ),
                     Positioned(
@@ -113,8 +123,9 @@ class _TwinConnectAmbientBackgroundState
                       left: 135 + t * 55,
                       child: _glow(
                         diameter: 320,
-                        color: const Color(0xFFC268FF),
-                        strength: dark ? .10 : .09,
+                        color: Color.lerp(widget.primaryColor,
+                            widget.secondaryColor, .25)!,
+                        strength: dark ? .17 : .10,
                       ),
                     ),
                   ],
@@ -153,13 +164,16 @@ class _TwinConnectAmbientBackgroundState
 }
 
 class _AmbientLines extends CustomPainter {
-  const _AmbientLines({required this.dark});
+  const _AmbientLines({required this.dark,
+      required this.primary, required this.secondary});
   final bool dark;
+  final Color primary;
+  final Color secondary;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final color = (dark ? const Color(0xFFAAA2FF) : const Color(0xFF7463C6))
-        .withValues(alpha: dark ? .065 : .068);
+    final color = Color.lerp(primary, secondary, .38)!
+        .withValues(alpha: dark ? .085 : .072);
     final paint = Paint()
       ..color = color
       ..strokeWidth = .7
@@ -193,5 +207,6 @@ class _AmbientLines extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _AmbientLines oldDelegate) =>
-      dark != oldDelegate.dark;
+      dark != oldDelegate.dark ||
+      primary != oldDelegate.primary || secondary != oldDelegate.secondary;
 }

@@ -51,6 +51,7 @@ import 'ambient_background.dart';
 import 'interactive_glass_card.dart';
 import 'share_vpn_preview.dart';
 import 'connection_signal_art.dart';
+import 'tunnel_traffic_chart.dart';
 import 'vpn_settings.dart';
 
 /// Authenticated application uses the original visual dashboard layout with live data.
@@ -212,6 +213,57 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   bool _vpnCleanup = false;
   int _vpnRx = 0;
   int _vpnTx = 0;
+  final List<double> _rxHistory = [];
+  final List<double> _txHistory = [];
+  DateTime? _lastSampleAt;
+  int? _lastSampleRx;
+  int? _lastSampleTx;
+  String? _lastSampleSource;
+  double? _rxBytesPerSecond;
+  double? _txBytesPerSecond;
+
+  void _clearTrafficSamples() {
+    _rxHistory.clear();
+    _txHistory.clear();
+    _lastSampleAt = null;
+    _lastSampleRx = null;
+    _lastSampleTx = null;
+    _lastSampleSource = null;
+    _rxBytesPerSecond = null;
+    _txBytesPerSecond = null;
+  }
+
+  // Only measured native byte deltas are plotted; a new connection,
+  // counter reset or protocol change starts a fresh baseline.
+  void _recordTraffic(String source, int rx, int tx) {
+    final now = DateTime.now();
+    if (_lastSampleSource != source || _lastSampleAt == null ||
+        _lastSampleRx == null || _lastSampleTx == null ||
+        rx < _lastSampleRx! || tx < _lastSampleTx!) {
+      _clearTrafficSamples();
+      _lastSampleSource = source;
+      _lastSampleAt = now;
+      _lastSampleRx = rx;
+      _lastSampleTx = tx;
+      return;
+    }
+    final elapsed = now.difference(_lastSampleAt!).inMilliseconds / 1000;
+    if (elapsed < .3) return;
+    final rxRate = (rx - _lastSampleRx!) / elapsed;
+    final txRate = (tx - _lastSampleTx!) / elapsed;
+    _lastSampleAt = now;
+    _lastSampleRx = rx;
+    _lastSampleTx = tx;
+    if (!rxRate.isFinite || !txRate.isFinite ||
+        rxRate < 0 || txRate < 0) return;
+    _rxBytesPerSecond = rxRate;
+    _txBytesPerSecond = txRate;
+    _rxHistory.add(rxRate);
+    _txHistory.add(txRate);
+    if (_rxHistory.length > 24) _rxHistory.removeAt(0);
+    if (_txHistory.length > 24) _txHistory.removeAt(0);
+  }
+
   String? _vpnError;
   String? _publicIp;
   int? _httpsLatencyMs;
@@ -540,6 +592,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     _modernTx = null;
     _tunnelOriginRx = null;
     _tunnelOriginTx = null;
+    _clearTrafficSamples();
   }
 
   Future<void> _refreshModernTraffic() async {
@@ -568,12 +621,14 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         rx = rx >= _tunnelOriginRx! ? rx - _tunnelOriginRx! : 0;
         tx = tx >= _tunnelOriginTx! ? tx - _tunnelOriginTx! : 0;
       }
-      if (_modernRx != rx || _modernTx != tx) {
-        setState(() {
-          _modernRx = rx;
-          _modernTx = tx;
-        });
-      }
+      // A zero-traffic interval must report 0 B/s, not leave the last
+      // nonzero speed on screen. Reuse the existing 2-second counter poll:
+      // no downloads, speed tests, or per-server background probes.
+      setState(() {
+        _modernRx = rx;
+        _modernTx = tx;
+        _recordTraffic('modern:$activeProtocol', rx, tx);
+      });
     } finally {
       _modernTrafficBusy = false;
     }
@@ -2163,6 +2218,11 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           _vpnUnmanaged = nextUnmanaged;
           _vpnRx = nextRx;
           _vpnTx = nextTx;
+          if (nextUp) {
+            _recordTraffic('wireguard', nextRx, nextTx);
+          } else if (!_modernUp) {
+            _clearTrafficSamples();
+          }
           if (!nextUp && !_modernUp) _resetNetworkStats();
         });
       }
@@ -2227,6 +2287,10 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         return;
       }
       if (_autoFastest) {
+        if (_filter == 'all') {
+          setState(() => _vpnError = 'SELECT_PROTOCOL_FOR_FASTEST');
+          return;
+        }
         final best = _fastestKnownIndex;
         if (best == null) {
           setState(() => _vpnError = 'NO_MEASURED_SERVER');
@@ -2285,6 +2349,9 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         });
       } else {
         if (_autoFastest) {
+          if (_filter != 'wireguard') {
+            throw const FormatException('SELECT_PROTOCOL_FOR_FASTEST');
+          }
           final best = _fastestKnownIndex;
           if (best == null) throw const FormatException('NO_MEASURED_SERVER');
           _selected = best;
@@ -2663,40 +2730,72 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
 
   // Each account uses links from its own authenticated tenant brand, never
   // a hard-coded vendor/other reseller destination.
-  Future<void> _openTenantLink(String? raw, String label) async {
-    final url = raw == null ? null : Uri.tryParse(raw.trim());
-    final valid = url != null &&
-        url.scheme == 'https' &&
-        url.host.contains('.') &&
-        url.userInfo.isEmpty &&
-        !url.hasFragment &&
-        !url.host.endsWith('.local') &&
-        !url.host.endsWith('.internal') &&
-        !url.host.endsWith('.localhost');
-    if (!valid) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(tr('لینک $label توسط مدیریت پنل تنظیم نشده است.',
-              'The $label link is not configured by your provider.')),
-        ));
-      }
-      return;
-    }
+  bool _openingTenantLink = false;
+
+  String? _tenantLinkFromBrand(BrandPreview brand, String kind) =>
+      switch (kind) {
+        'support' => brand.telegramUrl,
+        'renewal' => brand.renewalUrl,
+        'website' => brand.websiteUrl,
+        _ => null,
+      };
+
+  // Always resolve the action against the authenticated owner panel.
+  // Cached branding may be outdated if the admin/reseller edited links.
+  // No default merchant, vendor, or another reseller's URL is substituted.
+  Future<void> _openTenantLink(String kind, String label) async {
+    if (_openingTenantLink) return;
+    _openingTenantLink = true;
     try {
-      final launched = await launchUrl(url!, mode: LaunchMode.externalApplication);
+      final brand = await TenantApi(vendorOrigin: widget.panel.apiOrigin)
+          .loadSessionBrand(
+        panel: widget.panel,
+        sessionToken: widget.sessionToken,
+      );
+      if (brand.namespace != widget.brand.namespace ||
+          brand.ownerType != widget.brand.ownerType ||
+          (brand.ownerType == 'reseller' &&
+              (brand.appUsernamePrefix != widget.brand.appUsernamePrefix ||
+                  !widget.username.startsWith(brand.appUsernamePrefix)))) {
+        throw const FormatException('TENANT_BRAND_MISMATCH');
+      }
+      final raw = _tenantLinkFromBrand(brand, kind);
+      final url = raw == null ? null : Uri.tryParse(raw.trim());
+      final valid = url != null &&
+          url.scheme == 'https' &&
+          url.host.contains('.') &&
+          url.userInfo.isEmpty &&
+          !url.hasFragment &&
+          !url.host.endsWith('.local') &&
+          !url.host.endsWith('.internal') &&
+          !url.host.endsWith('.localhost');
+      if (!valid) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(tr('آدرس $label در تنظیمات اپ این پنل ثبت نشده است.',
+                'Configure the $label address in this panel\'s App Brand Studio.')),
+          ));
+        }
+        return;
+      }
+      final launched = await launchUrl(url,
+          mode: LaunchMode.externalApplication);
       if (!launched && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(tr('بازکردن لینک $label ممکن نشد.',
-              'Unable to open the $label link.')),
+          content: Text(tr('بازکردن $label ممکن نشد.',
+              'Unable to open $label.')),
         ));
       }
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(tr('بازکردن لینک $label ممکن نشد.',
-              'Unable to open the $label link.')),
+          content: Text(tr(
+            'دریافت لینک $label از پنل ناموفق بود. اتصال پنل را بررسی کنید.',
+            'Could not retrieve $label from the owning panel.')),
         ));
       }
+    } finally {
+      _openingTenantLink = false;
     }
   }
 
@@ -2722,7 +2821,9 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   }
 
   Widget _shell(BuildContext context) {
-    final wide = MediaQuery.sizeOf(context).width >= 870;
+    // Keep the authenticated desktop sidebar spacious; compact mode is only
+    // for narrow windows where a full sidebar would crowd live connection cards.
+    final wide = MediaQuery.sizeOf(context).width >= 980;
     final ink = _dark ? const Color(0xFFF7F4FF) : const Color(0xFF21233F);
     final sub = _dark ? const Color(0xFFABB4C9) : const Color(0xFF565D75);
     final line = _dark ? const Color(0xFF3C4564) : const Color(0xFFDADCEA);
@@ -2756,6 +2857,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       dark: _dark,
       surfaceColor: panel,
       accentColor: purple,
+      secondaryColor: BrandTheme.parse(widget.brand.secondaryColor, '#00DCEB'),
       selected: selected,
       radius: radius,
       padding: padding,
@@ -2763,35 +2865,81 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     );
 
     Widget sideNav(String page, IconData icon, String title) => Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Material(
-        borderRadius: BorderRadius.circular(13),
-        color: _page == page ? purple.withValues(alpha: 0.21)
-            : (_dark ? Colors.white.withValues(alpha: 0.045)
-                : const Color(0xFF7662A8).withValues(alpha: 0.055)),
-        child: InkWell(
-          key: Key('devNav_$page'),
-          borderRadius: BorderRadius.circular(13),
-          onTap: () => setState(() => _page = page),
-          child: Padding(
-            padding: EdgeInsets.symmetric(
-              horizontal: wide ? 15 : 8, vertical: 13),
-            child: Row(
-              mainAxisAlignment: wide ? MainAxisAlignment.start
-                  : MainAxisAlignment.center,
-              children: [
-                Icon(icon, color: _page == page ? purple
-                    : (_dark ? const Color(0xFFD2CCEA)
-                        : const Color(0xFF53496D)), size: 21),
-                if (wide) ...[
-                  const SizedBox(width: 12),
-                  Expanded(child: txt(title,
-                    color: _page == page ? ink
-                        : (_dark ? const Color(0xFFE7E2F8)
-                            : const Color(0xFF42395A)),
-                    bold: true)),
-                ],
-              ],
+      padding: const EdgeInsets.only(bottom: 10),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(17),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              key: Key('devNav_$page'),
+              borderRadius: BorderRadius.circular(17),
+              onTap: () => setState(() => _page = page),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 230),
+                padding: EdgeInsets.symmetric(
+                  horizontal: wide ? 17 : 9,
+                  vertical: wide ? 16 : 13),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(17),
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft, end: Alignment.bottomRight,
+                    colors: _page == page
+                        ? [purple.withValues(alpha: .52),
+                           BrandTheme.parse(widget.brand.secondaryColor, '#00DCEB')
+                               .withValues(alpha: .22)]
+                        : [
+                            (_dark ? Colors.white : purple)
+                                .withValues(alpha: .16),
+                            BrandTheme.parse(widget.brand.secondaryColor, '#00DCEB')
+                                .withValues(alpha: .085),
+                          ]),
+                  border: Border.all(
+                    color: _page == page
+                        ? purple.withValues(alpha: .72)
+                        : (_dark ? Colors.white : purple)
+                            .withValues(alpha: .30)),
+                  boxShadow: _page == page ? [
+                    BoxShadow(color: purple.withValues(alpha: .30),
+                      blurRadius: 22, spreadRadius: -4),
+                  ] : const [],
+                ),
+                child: Row(
+                  mainAxisAlignment: wide
+                      ? MainAxisAlignment.start : MainAxisAlignment.center,
+                  children: [
+                    if (page == 'locations' && selectedServer != null)
+                      Container(
+                        key: const Key('selectedLocationFlag'),
+                        width: wide ? 29 : 26,
+                        height: wide ? 27 : 24,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(8),
+                          color: Colors.white.withValues(alpha: .10),
+                          border: Border.all(
+                            color: purple.withValues(alpha: .34))),
+                        child: CountryFlag(selectedServer!.flag,
+                          width: wide ? 23 : 21),
+                      )
+                    else
+                      Icon(icon, color: _page == page
+                          ? (_dark ? Colors.white : purple)
+                          : (_dark ? const Color(0xFFE1D9FA)
+                              : const Color(0xFF53496D)),
+                        size: wide ? 24 : 21),
+                    if (wide) ...[
+                      const SizedBox(width: 14),
+                      Expanded(child: txt(title,
+                        color: _page == page ? ink
+                            : (_dark ? const Color(0xFFE7E2F8)
+                                : const Color(0xFF42395A)),
+                        bold: true)),
+                    ],
+                  ],
+                ),
+              ),
             ),
           ),
         ),
@@ -2799,11 +2947,16 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     );
 
     Widget sideBar() => Container(
-      width: wide ? 195 : 74,
+      width: wide ? 258 : 74,
       padding: EdgeInsets.symmetric(
-        horizontal: wide ? 13 : 7, vertical: 22),
-      decoration: BoxDecoration(color: sidebar,
-        border: Border(left: BorderSide(color: line))),
+        horizontal: wide ? 17 : 7, vertical: 22),
+      // Share the exact ambient gradient with the main connection view.
+      // A solid sidebar fill previously made the menu look like another app.
+      decoration: BoxDecoration(
+        color: Colors.transparent,
+        border: Border(left: BorderSide(
+          color: line.withValues(alpha: .25))),
+      ),
       child: Column(children: [
         Container(
           width: 42, height: 42,
@@ -2825,7 +2978,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           const SizedBox(height: 9),
           txt(widget.brand.brandName, size: 17, bold: true),
         ],
-        const SizedBox(height: 34),
+        const SizedBox(height: 38),
         sideNav('home', Icons.bolt_rounded, tr('اتصال سریع', 'Quick connect')),
         sideNav('locations', Icons.place_outlined, tr('مکان‌ها', 'Locations')),
         sideNav('settings', Icons.tune_rounded, tr('تنظیمات', 'Settings')),
@@ -2836,10 +2989,10 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
             key: const Key('tenantQuickLinks'),
             padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 7),
             decoration: BoxDecoration(
-              color: (_dark ? Colors.white : const Color(0xFF482F8B))
-                  .withValues(alpha: .055),
+              color: (_dark ? Colors.white : purple)
+                  .withValues(alpha: _dark ? .13 : .09),
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: line.withValues(alpha: .45)),
+              border: Border.all(color: purple.withValues(alpha: .35)),
             ),
             child: Row(children: [
               for (final item in <({String id, IconData icon, String fa,
@@ -2857,7 +3010,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                     key: Key('tenantLink_${item.id}'),
                     borderRadius: BorderRadius.circular(10),
                     onTap: () => _openTenantLink(
-                        item.url, tr(item.fa, item.en)),
+                        item.id, tr(item.fa, item.en)),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(vertical: 6),
                       child: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -2877,13 +3030,13 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
             icon: Icon(Icons.open_in_new_rounded, color: purple),
             onSelected: (value) {
               if (value == 'support') {
-                _openTenantLink(widget.brand.telegramUrl,
+                _openTenantLink('support',
                     tr('پشتیبانی', 'Support'));
               } else if (value == 'renewal') {
-                _openTenantLink(widget.brand.renewalUrl,
+                _openTenantLink('renewal',
                     tr('تمدید', 'Renew'));
               } else if (value == 'website') {
-                _openTenantLink(widget.brand.websiteUrl,
+                _openTenantLink('website',
                     tr('سایت', 'Website'));
               }
             },
@@ -2946,20 +3099,22 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     Widget powerCard() => ClipRRect(
       borderRadius: BorderRadius.circular(28),
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 11, sigmaY: 11),
+        filter: ImageFilter.blur(sigmaX: 21, sigmaY: 21),
         child: Container(
       key: const Key('liveConnectionStatus'),
-      constraints: const BoxConstraints(minHeight: 415),
-      padding: const EdgeInsets.fromLTRB(18, 26, 18, 25),
+      constraints: const BoxConstraints(minHeight: 413),
+      padding: const EdgeInsets.fromLTRB(17, 18, 17, 16),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(29),
         gradient: LinearGradient(
           begin: Alignment.topLeft, end: Alignment.bottomRight,
           colors: _dark
               ? [
-                  const Color(0xFF362A5E).withValues(alpha: 0.44),
-                  const Color(0xFF253754).withValues(alpha: 0.40),
-                  const Color(0xFF23364B).withValues(alpha: 0.42),
+                  Color.lerp(panel, purple, .46)!.withValues(alpha: .23),
+                  panel.withValues(alpha: .12),
+                  Color.lerp(panel,
+                    BrandTheme.parse(widget.brand.secondaryColor, '#00DCEB'),
+                    .36)!.withValues(alpha: .22),
                 ]
               : [
                   const Color(0xFFEDE4FF).withValues(alpha: 0.76),
@@ -2967,9 +3122,9 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                   const Color(0xFFE6F1FF).withValues(alpha: 0.72),
                 ],
         ),
-        border: Border.all(color: purple.withValues(alpha: 0.56)),
+        border: Border.all(color: purple.withValues(alpha: 0.54)),
         boxShadow: [BoxShadow(
-          color: purple.withValues(alpha: _dark ? 0.19 : 0.11),
+          color: purple.withValues(alpha: _dark ? 0.25 : 0.11),
           blurRadius: 38, spreadRadius: 2, offset: const Offset(0, 14)),
         ],
       ),
@@ -3030,114 +3185,148 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           ),
         ),
         const SizedBox(height: 18),
+        // Hero lens sits ABOVE the real VPN action; it is visual only.
+        // No synthetic traffic, route checks or permanently looping tickers.
         TweenAnimationBuilder<double>(
           key: const Key('devPowerEntranceAnimation'),
-          tween: Tween(begin: .86, end: 1),
-          duration: const Duration(milliseconds: 650),
+          duration: const Duration(milliseconds: 520),
           curve: Curves.easeOutBack,
-          builder: (context, value, child) => Transform.scale(
-            scale: value, child: child),
-          child: SizedBox(
-            height: 150, width: 150,
-            child: Stack(alignment: Alignment.center, children: [
-              // Outer double halo provides a premium depth cue without
-              // running an endless animation at idle.
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 480),
-                curve: Curves.easeOutCubic,
-                height: _vpnBusy ? 147 : 143,
-                width: _vpnBusy ? 147 : 143,
+          tween: Tween(begin: .91, end: 1.0),
+          builder: (context, scale, child) =>
+              Transform.scale(scale: scale, child: child),
+          child: Container(
+            key: const Key('liveConnectionGlassOrb'),
+            height: 138, width: 138,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: purple.withValues(alpha: .29)),
+              boxShadow: [
+                BoxShadow(
+                  color: (_vpnVerified || _modernUp)
+                    ? const Color(0xFF29EAC0).withValues(alpha: .19)
+                    : purple.withValues(alpha: .20),
+                  blurRadius: 32, spreadRadius: 2),
+              ]),
+            child: Center(child: Container(
+              width: 112, height: 112,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: (_vpnVerified || _modernUp)
+                    ? const Color(0xFF52FFCE).withValues(alpha: .53)
+                    : purple.withValues(alpha: .52)),
+                gradient: RadialGradient(
+                  colors: (_vpnVerified || _modernUp)
+                    ? [const Color(0xFF21E4BA).withValues(alpha: .34),
+                       const Color(0xFF1B938B).withValues(alpha: .09)]
+                    : [purple.withValues(alpha: .37),
+                       BrandTheme.parse(widget.brand.secondaryColor, '#00DCEB')
+                          .withValues(alpha: .08)],
+                ),
+              ),
+              child: Center(child: Container(
+                width: 76, height: 76,
                 decoration: BoxDecoration(
-                  shape: BoxShape.circle,
+                  borderRadius: BorderRadius.circular(26),
+                  color: (_dark ? Colors.white : purple)
+                    .withValues(alpha: _dark ? .10 : .09),
                   border: Border.all(
-                    color: ((_modernUp || _vpnVerified)
-                        ? const Color(0xFF39E2BA) : purple)
-                        .withValues(alpha: _vpnBusy ? .75 : .35),
-                    width: _vpnBusy ? 3 : 1.5),
-                  boxShadow: [
-                    BoxShadow(
-                      color: ((_modernUp || _vpnVerified)
-                          ? const Color(0xFF1BE4B3) : purple)
-                          .withValues(alpha: .16),
-                      blurRadius: 27, spreadRadius: 6),
-                  ],
+                    color: Colors.white.withValues(alpha: .29)),
                 ),
+                child: Icon(
+                  (_vpnUp || _modernUp)
+                      ? Icons.lock_rounded
+                      : Icons.lock_open_rounded,
+                  size: 38,
+                  color: (_vpnUp || _modernUp)
+                    ? const Color(0xFF48F7D0) : ink),
+              )),
+            )),
+          ),
+        ),
+        const SizedBox(height: 14),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(18),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+            child: Container(
+              width: 266,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(18),
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: (_modernUp || _vpnVerified)
+                    ? [const Color(0xFF09AE9B).withValues(alpha: .82),
+                       const Color(0xFF25E4BE).withValues(alpha: .57)]
+                    : [
+                      purple.withValues(alpha: .85),
+                      BrandTheme.parse(widget.brand.buttonColor, '#9544F8')
+                        .withValues(alpha: .71),
+                      BrandTheme.parse(widget.brand.secondaryColor, '#00DCEB')
+                        .withValues(alpha: .42),
+                    ]),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: .49), width: 1.2),
+                boxShadow: [BoxShadow(
+                  color: purple.withValues(alpha: .22), blurRadius: 21)],
               ),
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 450),
-                height: (_modernUp || _vpnVerified) ? 125 : 119,
-                width: (_modernUp || _vpnVerified) ? 125 : 119,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white.withValues(
-                      alpha: _dark ? .20 : .50), width: 1),
-                ),
-              ),
-              FilledButton(
+              child: FilledButton(
                 key: const Key('liveConnectionControlsButton'),
                 onPressed: _vpnBusy ? null : _toggleVpn,
                 style: FilledButton.styleFrom(
+                  minimumSize: const Size(250, 59),
                   backgroundColor: Colors.transparent,
+                  disabledBackgroundColor: Colors.white.withValues(alpha: .09),
                   foregroundColor: Colors.white,
-                  disabledBackgroundColor: Colors.transparent,
-                  padding: EdgeInsets.zero,
-                  shape: const CircleBorder(),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14, vertical: 8),
                   elevation: 0,
-                ),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 440),
-                  curve: Curves.easeInOutCubic,
-                  width: _vpnBusy ? 105 : 110,
-                  height: _vpnBusy ? 105 : 110,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: (_modernUp || _vpnVerified)
-                          ? const [Color(0xFF4AEDD1), Color(0xFF058F9F)]
-                          : const [Color(0xFFBE92FF), Color(0xFF6037CE)],
-                    ),
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: .55), width: 2),
-                    boxShadow: [
-                      BoxShadow(
-                        color: ((_modernUp || _vpnVerified)
-                            ? const Color(0xFF1CE4BD) : purple)
-                            .withValues(alpha: .40),
-                        blurRadius: _vpnBusy ? 35 : 23,
-                        spreadRadius: _vpnBusy ? 6 : 2),
-                      BoxShadow(color: Colors.black.withValues(alpha: .15),
-                        blurRadius: 13, offset: const Offset(0, 6)),
-                    ],
-                  ),
-                  child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 300),
-                    transitionBuilder: (child, animation) =>
-                        ScaleTransition(scale: animation, child: child),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(18))),
+                child: Row(children: [
+                  Container(
+                    width: 39, height: 39,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: .16),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: .30))),
                     child: _vpnBusy
-                        ? const SizedBox(
-                            key: ValueKey('connectingSpinner'),
-                            height: 39, width: 39,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 3, color: Colors.white))
-                        : Icon(
-                            key: ValueKey((_vpnUp || _modernUp)
-                                ? 'turnOff' : 'turnOn'),
-                            (_vpnUp || _modernUp)
-                                ? Icons.stop_rounded
-                                : Icons.power_settings_new_rounded,
-                            color: Colors.white, size: 47),
+                      ? const Padding(
+                          padding: EdgeInsets.all(11),
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white))
+                      : Icon((_vpnUp || _modernUp)
+                          ? Icons.stop_rounded : Icons.bolt_rounded,
+                          color: Colors.white, size: 23),
                   ),
-                ),
+                  const SizedBox(width: 13),
+                  Expanded(child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(_vpnBusy
+                          ? tr('در حال اتصال', 'Connecting')
+                          : (_vpnUp || _modernUp)
+                            ? tr('قطع اتصال', 'Disconnect')
+                            : tr('اتصال سریع', 'Connect now'),
+                        style: const TextStyle(color: Colors.white,
+                          fontSize: 15, fontWeight: FontWeight.w800)),
+                      const SizedBox(height: 3),
+                      Text((_modernUp || _vpnVerified)
+                          ? tr('تونل ایمن فعال', 'Secure tunnel active')
+                          : tr('سرور انتخاب‌شده', 'Selected server'),
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: .82),
+                          fontSize: 10)),
+                    ],
+                  )),
+                  const Icon(Icons.chevron_right_rounded,
+                    color: Colors.white, size: 22),
+                ]),
               ),
-              if (_vpnBusy)
-                const Positioned(
-                  top: 0,
-                  child: Icon(Icons.auto_awesome_rounded,
-                      color: Color(0xFFD6BDFF), size: 17),
-                ),
-            ]),
+            ),
           ),
         ),
         const SizedBox(height: 12),
@@ -3151,9 +3340,9 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                     : (_vpnUp || _vpnCleanup)
                         ? tr('در حال تأیید اتصال', 'Verifying connection')
                         : tr('برای اتصال لمس کنید', 'Tap to connect'),
-            size: 19, bold: true),
+            size: 16, bold: true),
         ),
-        const SizedBox(height: 9),
+        const SizedBox(height: 7),
         ValueListenableBuilder<int>(
           valueListenable: _connectedSeconds,
           builder: (context, elapsed, child) => AnimatedOpacity(
@@ -3564,6 +3753,13 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
 
     Widget serverRow(int index) {
       final server = demoServers[index];
+      final nodeId = widget.servers!.servers[index].id;
+      // Speed belongs to the currently connected tunnel only. Other nodes
+      // cannot have truthful download/upload numbers without an active test.
+      final activeHere = (_vpnUp && _activeNodeId == nodeId &&
+              (_filter == 'wireguard' || _filter == 'all')) ||
+          (_modernUp && _modernNodeId == nodeId &&
+              _modernProtocol == _filter);
       return Padding(
         padding: const EdgeInsets.only(bottom: 9),
         child: glassCard(
@@ -3599,6 +3795,26 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                   ]),
                   const SizedBox(height: 3),
                   txt(server.city, size: 10, color: sub),
+                  if (activeHere) ...[
+                    const SizedBox(height: 6),
+                    Row(children: [
+                      Icon(Icons.arrow_downward_rounded,
+                        size: 12, color: const Color(0xFF00DFF5)),
+                      const SizedBox(width: 3),
+                      Text(_rxBytesPerSecond == null
+                          ? '—' : '${_formatTransferBytes(_rxBytesPerSecond!.round())}/s',
+                        key: Key('activeServerDownload_$nodeId'),
+                        style: TextStyle(fontSize: 10, color: sub)),
+                      const SizedBox(width: 12),
+                      Icon(Icons.arrow_upward_rounded,
+                        size: 12, color: const Color(0xFFC765FF)),
+                      const SizedBox(width: 3),
+                      Text(_txBytesPerSecond == null
+                          ? '—' : '${_formatTransferBytes(_txBytesPerSecond!.round())}/s',
+                        key: Key('activeServerUpload_$nodeId'),
+                        style: TextStyle(fontSize: 10, color: sub)),
+                    ]),
+                  ],
                 ],
               )),
               Tooltip(
@@ -3749,6 +3965,68 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
 
     // All 16 chips remain visible. Admin-selected protocols will replace
     // the preview's complete catalog after an authenticated panel session.
+    Widget fastestServerControl() => Container(
+      key: const Key('liveAutoFastestServer'),
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        color: purple.withValues(alpha: _dark ? .12 : .06),
+        border: Border.all(color: purple.withValues(alpha: .32)),
+      ),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(Icons.auto_awesome_rounded, color: purple, size: 17),
+        const SizedBox(width: 6),
+        Text(tr('سریع‌ترین سرور', 'Fastest server'),
+          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700,
+            color: ink)),
+        const SizedBox(width: 4),
+        Tooltip(
+          message: _filter == 'all'
+            ? tr('ابتدا یک پروتکل انتخاب کنید', 'Choose a protocol first')
+            : _fastestKnownIndex == null
+            ? tr('پینگ معتبر موجود نیست', 'No measured server latency')
+            : tr('انتخاب بر اساس پینگ اندازه‌گیری‌شده',
+                 'Select by measured server latency'),
+          child: Switch(
+            key: const Key('autoFastestServerToggle'),
+            value: _autoFastest,
+            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            onChanged: _vpnBusy || _vpnUp || _modernUp
+                ? null : (enabled) {
+              if (enabled && _filter == 'all') {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  content: Text(tr('ابتدا یک پروتکل انتخاب کنید.',
+                    'Choose a protocol before enabling fastest server.'))));
+                return;
+              }
+              final allowed = widget.catalog?.entries.any((entry) =>
+                entry.protocol.code == _filter && entry.selected &&
+                entry.configRecordPresent) ?? false;
+              if (enabled && !allowed) {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  content: Text(tr('کانفیگ مجاز این پروتکل موجود نیست.',
+                    'No authorized configuration for this protocol.'))));
+                return;
+              }
+              final best = _fastestKnownIndex;
+              if (enabled && best == null) {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  content: Text(tr('برای انتخاب خودکار، پینگ معتبر لازم است.',
+                    'Measured server latency is required.'))));
+                return;
+              }
+              setState(() {
+                _autoFastest = enabled;
+                if (enabled) {
+                  _selected = best!;
+                }
+              });
+            },
+          ),
+        ),
+      ]),
+    );
+
     Widget filters() => Container(
       key: const Key('devProtocolFilters'),
       width: double.infinity,
@@ -3775,7 +4053,11 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12)),
               onSelected: (_) {
-                setState(() => _filter = entry.$1);
+                setState(() {
+                  // An automatic choice is valid only for its selected protocol.
+                  _filter = entry.$1;
+                  _autoFastest = false;
+                });
                 if (entry.$1 == 'v2ray') _loadXrayGroups();
                 if (entry.$1 == 'socks5') {
                   unawaited(_refreshSocks5AvailableNodes());
@@ -3930,6 +4212,11 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           ),
           const SizedBox(height: 13),
           filters(),
+          const SizedBox(height: 10),
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: fastestServerControl(),
+          ),
           const SizedBox(height: 12),
           if (_filter == 'socks5' && _socks5NodesLoading)
             const Padding(
@@ -4012,6 +4299,42 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       ),
     );
 
+    Widget trafficCard(IconData icon, String label,
+        double? bytesPerSecond, List<double> history, String total,
+        Color color) => glassCard(
+      radius: 19,
+      padding: const EdgeInsets.fromLTRB(12, 13, 12, 12),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(9),
+                color: color.withValues(alpha: .13)),
+              child: Icon(icon, color: color, size: 19)),
+            const SizedBox(width: 7),
+            Expanded(child: Text(label, overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: ink, fontSize: 12,
+                fontWeight: FontWeight.w700))),
+          ]),
+          const SizedBox(height: 10),
+          Text(bytesPerSecond == null ? '—'
+              : _formatTransferBytes(bytesPerSecond.round()) + '/s',
+            maxLines: 1, overflow: TextOverflow.ellipsis,
+            style: TextStyle(color: ink, fontSize: 19,
+              fontWeight: FontWeight.w800)),
+          const SizedBox(height: 9),
+          TunnelTrafficChart(samples: history,
+            color: color, dark: _dark, height: 49),
+          const SizedBox(height: 7),
+          Text(tr('کل این اتصال: ', 'Session total: ') + total,
+            maxLines: 1, overflow: TextOverflow.ellipsis,
+            style: TextStyle(color: sub, fontSize: 10)),
+        ],
+      ),
+    );
+
     Widget connectionStats() => glassCard(
       key: const Key('devConnectionStats'),
       radius: 23,
@@ -4035,7 +4358,24 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
               child: Column(crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(children: [
-                    Icon(Icons.speed_rounded, color: purple, size: 18),
+                    Container(
+                      key: const Key('livePingLightningIcon'),
+                      height: 29, width: 29,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(colors: [
+                          ServerLatency.color(_connectedServerRtt)
+                            .withValues(alpha: .20),
+                          purple.withValues(alpha: .12),
+                        ]),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: ServerLatency.color(_connectedServerRtt)
+                            .withValues(alpha: .36)),
+                      ),
+                      child: Icon(Icons.bolt_rounded,
+                        color: ServerLatency.color(_connectedServerRtt),
+                        size: 20),
+                    ),
                     const SizedBox(width: 8),
                     Expanded(child: txt(tr('پینگ سرور', 'Server ping'),
                         size: 11, color: sub)),
@@ -4063,13 +4403,25 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           ]),
           const SizedBox(height: 18),
           Row(children: [
-            Expanded(child: metric(Icons.arrow_downward_rounded,
-              tr('دریافت', 'Received'), _modernUp ? (_modernRx == null ? '—' : _formatTransferBytes(_modernRx!)) : _vpnUp ? _formatTransferBytes(_vpnRx) : '—',
-              detail: tr('مجموع رابط', 'Interface total'))),
+            Expanded(child: trafficCard(
+              Icons.arrow_downward_rounded,
+              tr('دانلود', 'Download'),
+              _rxBytesPerSecond, _rxHistory,
+              _modernUp
+                  ? (_modernRx == null ? '—'
+                      : _formatTransferBytes(_modernRx!))
+                  : _vpnUp ? _formatTransferBytes(_vpnRx) : '—',
+              const Color(0xFF00DFF5))),
             const SizedBox(width: 10),
-            Expanded(child: metric(Icons.arrow_upward_rounded,
-              tr('ارسال', 'Sent'), _modernUp ? (_modernTx == null ? '—' : _formatTransferBytes(_modernTx!)) : _vpnUp ? _formatTransferBytes(_vpnTx) : '—',
-              detail: tr('مجموع رابط', 'Interface total'))),
+            Expanded(child: trafficCard(
+              Icons.arrow_upward_rounded,
+              tr('آپلود', 'Upload'),
+              _txBytesPerSecond, _txHistory,
+              _modernUp
+                  ? (_modernTx == null ? '—'
+                      : _formatTransferBytes(_modernTx!))
+                  : _vpnUp ? _formatTransferBytes(_vpnTx) : '—',
+              const Color(0xFFC765FF))),
           ]),
           const SizedBox(height: 25),
           glassCard(
@@ -4085,6 +4437,170 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         ],
       ),
     );
+
+    // Main connection page: compact, real subscription lifecycle details.
+    // The account page still owns the full breakdown and edit/refresh actions.
+    // A missing snapshot displays dashes, never fictitious quota/dates.
+    Widget homeSubscriptionSummary() {
+      final account = widget.account;
+      final used = account?.trafficUsedBytes ?? 0;
+      final limit = account?.trafficLimitBytes ?? 0;
+      final unlimited = account != null && limit <= 0;
+      final fraction = account == null || limit <= 0
+          ? 0.0 : (used / limit).clamp(0.0, 1.0);
+      final expires = account?.expiresAt;
+      final days = expires?.difference(DateTime.now()).inDays;
+      final total = account == null ? '—'
+          : unlimited ? tr('نامحدود', 'Unlimited') : _formatBytes(limit);
+      final remaining = account == null ? '—'
+          : unlimited ? tr('نامحدود', 'Unlimited')
+          : _formatBytes((limit - used).clamp(0, limit).toInt());
+      final daysLabel = account == null ? '—'
+          : expires == null
+              ? (account.activationDurationDays != null &&
+                  account.activationDurationDays! > 0
+                    ? tr('پس از اولین اتصال', 'After first connection')
+                    : tr('نامحدود', 'Unlimited'))
+              : days == null ? '—' : days < 0
+                  ? tr('منقضی', 'Expired')
+                  : tr('${days + 1} روز', '${days + 1} days');
+      const cyan = Color(0xFF00DCF5);
+      const violet = Color(0xFFC965FF);
+
+      Widget miniMetric(Key key, IconData icon, String label, String value,
+          Color accent) => Container(
+        key: key,
+        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 10),
+        decoration: BoxDecoration(
+          color: accent.withValues(alpha: _dark ? .09 : .055),
+          borderRadius: BorderRadius.circular(13),
+          border: Border.all(color: accent.withValues(alpha: .25)),
+        ),
+        child: Row(children: [
+          Icon(icon, color: accent, size: 19),
+          const SizedBox(width: 8),
+          Expanded(child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(label, maxLines: 1, overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 10, color: sub)),
+              const SizedBox(height: 4),
+              Text(value, maxLines: 1, overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 13, color: ink,
+                    fontWeight: FontWeight.w800)),
+            ],
+          )),
+        ]),
+      );
+
+      Widget usageMini() => Container(
+        key: const Key('liveHomeUsageCompact'),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(13),
+          gradient: LinearGradient(colors: [
+            purple.withValues(alpha: _dark ? .19 : .08),
+            cyan.withValues(alpha: _dark ? .075 : .03),
+          ]),
+          border: Border.all(color: purple.withValues(alpha: .28)),
+        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(children: [
+              Icon(Icons.data_usage_rounded, size: 17, color: purple),
+              const SizedBox(width: 7),
+              Expanded(child: Text(tr('حجم مصرفی', 'Data usage'),
+                style: TextStyle(fontSize: 10, color: sub))),
+              Text(account == null ? '—' : _formatBytes(used),
+                style: TextStyle(color: ink, fontSize: 14,
+                  fontWeight: FontWeight.w800)),
+              Text(' / $total',
+                style: TextStyle(fontSize: 10, color: sub)),
+            ]),
+            const SizedBox(height: 9),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: LinearProgressIndicator(
+                key: const Key('liveHomeDataProgress'),
+                minHeight: 5, value: fraction,
+                backgroundColor: purple.withValues(alpha: .17),
+                color: fraction >= .9
+                    ? const Color(0xFFFFB26B) : purple),
+            ),
+            const SizedBox(height: 5),
+            Text(tr('باقی‌مانده: ', 'Remaining: ') + remaining,
+              style: const TextStyle(color: cyan, fontSize: 10),
+              maxLines: 1, overflow: TextOverflow.ellipsis),
+          ]),
+      );
+
+      return glassCard(
+        key: const Key('liveHomeSubscriptionSummary'),
+        radius: 20,
+        padding: const EdgeInsets.fromLTRB(12, 9, 12, 11),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(children: [
+              Icon(Icons.verified_user_outlined, color: purple, size: 17),
+              const SizedBox(width: 7),
+              Expanded(child: txt(tr('اعتبار اشتراک', 'Subscription details'),
+                size: 12, bold: true)),
+              if (account != null)
+                Text(unlimited ? tr('نامحدود', 'Unlimited')
+                    : tr('حجمی', 'Metered'),
+                  style: const TextStyle(color: cyan, fontSize: 10)),
+              IconButton(
+                key: const Key('liveHomeRefreshAccount'),
+                tooltip: tr('به‌روزرسانی اشتراک', 'Refresh subscription'),
+                onPressed: widget.onRefreshAccount,
+                visualDensity: VisualDensity.compact,
+                constraints: const BoxConstraints(
+                    minWidth: 31, minHeight: 29),
+                icon: Icon(Icons.refresh_rounded, color: purple, size: 17)),
+            ]),
+            const SizedBox(height: 5),
+            LayoutBuilder(builder: (context, constraints) {
+              final usage = usageMini();
+              final expiry = miniMetric(const Key('liveHomeExpiryChip'),
+                  Icons.calendar_month_outlined,
+                  tr('تاریخ انقضا', 'Expiry date'),
+                  _expiryLabel(), violet);
+              final remaining = miniMetric(const Key('liveHomeTimeChip'),
+                  Icons.hourglass_bottom_rounded,
+                  tr('زمان باقی‌مانده', 'Time remaining'),
+                  daysLabel, cyan);
+              if (constraints.maxWidth < 610) {
+                return Column(children: [
+                  usage, const SizedBox(height: 7),
+                  Row(children: [
+                    Expanded(child: expiry),
+                    const SizedBox(width: 7),
+                    Expanded(child: remaining),
+                  ]),
+                ]);
+              }
+              return Row(children: [
+                Expanded(flex: 5, child: usage),
+                const SizedBox(width: 8),
+                Expanded(flex: 3, child: expiry),
+                const SizedBox(width: 8),
+                Expanded(flex: 3, child: remaining),
+              ]);
+            }),
+            if (widget.accountError != null) ...[
+              const SizedBox(height: 6),
+              Text(tr('اطلاعات حساب در دسترس نیست؛ تازه‌سازی کنید.',
+                  'Account info unavailable; please refresh.'),
+                style: const TextStyle(
+                  fontSize: 10, color: Color(0xFFFFB878))),
+            ],
+          ],
+        ),
+      );
+    }
 
     Widget home() => Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -4119,51 +4635,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           );
         }),
         const SizedBox(height: 15),
-        glassCard(
-          key: const Key('liveAutoFastestServer'),
-          radius: 19,
-          padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 10),
-          child: Row(children: [
-            Icon(Icons.auto_awesome_rounded, size: 22, color: purple),
-            const SizedBox(width: 12),
-            Expanded(child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                txt(tr('انتخاب سریع‌ترین سرور', 'Select fastest server'),
-                    size: 13, bold: true),
-                const SizedBox(height: 4),
-                txt(_fastestKnownIndex == null
-                    ? tr('تاخیر قابل‌اندازه‌گیری موجود نیست',
-                        'No measured server latency available')
-                    : tr('بر اساس تاخیر گزارش‌شده پنل',
-                        'Based on measured server ICMP latency'),
-                    size: 11, color: sub),
-              ],
-            )),
-            Switch(
-              key: const Key('autoFastestServerToggle'),
-              value: _autoFastest,
-              onChanged: _vpnBusy || _vpnUp || _modernUp
-                  ? null : (enabled) {
-                final best = _fastestKnownIndex;
-                if (enabled && best == null) {
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                    content: Text(tr('برای انتخاب خودکار، پینگ معتبر لازم است.',
-                        'Measured server latency is required.'))));
-                  return;
-                }
-                setState(() {
-                  _autoFastest = enabled;
-                  if (enabled) {
-                    _selected = best!;
-                    // Never switch to WireGuard when the user selected
-                    // Hysteria2, TUIC or another protocol.
-                  }
-                });
-              },
-            ),
-          ]),
-        ),
+        homeSubscriptionSummary(),
+
       ],
     );
 
@@ -4616,11 +5089,14 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     };
 
     return Scaffold(
-      body: Row(children: [
-        Expanded(child: TwinConnectAmbientBackground(
-          dark: _dark,
-          backgroundColor: sidebar,
-          child: SafeArea(child: ListView(
+      body: TwinConnectAmbientBackground(
+        dark: _dark,
+        backgroundColor: sidebar,
+        primaryColor: purple,
+        secondaryColor: BrandTheme.parse(
+          widget.brand.secondaryColor, '#00DCEB'),
+        child: Row(children: [
+          Expanded(child: SafeArea(child: ListView(
             padding: EdgeInsets.symmetric(
                 horizontal: wide ? 30 : 17, vertical: 25),
             children: [
@@ -4649,10 +5125,10 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                 ),
               )),
             ],
-          )),
-        )),
-        sideBar(),
-      ]),
+          ))),
+          sideBar(),
+        ]),
+      ),
     );
   }
 }
