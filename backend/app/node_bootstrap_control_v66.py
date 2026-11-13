@@ -434,8 +434,6 @@ async def _install_or_upgrade_agent_v70(
             control["iran_dependency"] = True
             control["fallback_only"] = True
     return result
-finally:
-    db.close()
 
 
 def apply_node_bootstrap_control_v66() -> None:
