@@ -54,7 +54,7 @@ void main() {
     expect(ambient, contains('final sparks = Paint()'));
     expect(ambient, contains('final sweep = Paint()'));
     expect(ambient, contains('dark ? .12 : .16'));
-    expect(theme, contains('Color(0xFFF4F0FF), 0.90'));
+    expect(theme, contains('Color(0xFFF9F6FF), 0.97'));
   });
 
   test('all server ping actions use lightning instead of the old network icon', () {
