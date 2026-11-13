@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.817",
-  "source_sha": "971938488e3bccb0dba40910c3f352a303491eff",
+  "version": "1.1.0-rc.818",
+  "source_sha": "30caf37d4af8c0e2eefbb6bd377cb8d16304a098",
   "notes": {
-    "fa": "اصلاح صفحه پلن‌ها: بازگرداندن انتخاب واضح و همیشه قابل‌مشاهده ۲۷ نود Exit در کنار پروتکل‌ها، با شبکه فشرده، شمارنده نودهای انتخاب‌شده و انتخاب همه. حفظ لیست انتخاب‌شده هنگام ویرایش و ثبت نودها و پروتکل‌ها در API و اشتراک. موبایل و لایت/دارک سازگار.",
-    "en": "Restore always-visible allowed Exit node selection alongside protocol selection within compact plan create/edit modal; keep checked state, snapshots, all-node button, and mobile/light/dark UX. Preserve plan API and quotas."
+    "fa": "رفع ریشه‌ای خطای HTTP 500 در نصب/ارتقای Agent نودهای ایران: تشخیص نبودن ensurepip و نصب خودکار python3-venv قبل از ساخت محیط Python؛ جایگزین امن استفاده از Python سیستمی هنگام قطع بودن مخزن بسته‌ها با تنظیم صحیح ExecStart سرویس. نود iran6 جداگانه تعمیر و وضعیت ONLINE تأیید شد؛ پروتکل‌ها، اشتراک‌ها و تنظیمات VPN تغییر نکردند.",
+    "en": "Fix Iran node Agent HTTP 500 on minimal Debian/Ubuntu images missing ensurepip: preflight and install python3-venv, and safely use tested system Python when apt unavailable, including a matching systemd ExecStart. Existing iran6 repaired online; no VPN configs or subscriptions changed."
   }
 }
