@@ -103,6 +103,8 @@ jobs:
         run: ./tools/check_mieru_windows.ps1
       - name: Bundle official pinned TrustTunnel Windows CLI and verify release SHA256
         shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: ./tools/bundle_trusttunnel_windows.ps1
       - name: Bundle official SHA256-verified AmneziaWG Windows prerequisite
         shell: pwsh
