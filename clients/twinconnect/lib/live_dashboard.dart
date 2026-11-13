@@ -4698,47 +4698,37 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         const SizedBox(height: 17),
         glassCard(
           key: const Key('settingsSecurityStatus'),
-          radius: 23,
-          padding: const EdgeInsets.all(18),
-          child: Material(
-            type: MaterialType.transparency,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(19),
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => VpnSettingsScreen(
-                    tenant: widget.panel.namespace,
-                    account: widget.username,
-                  ),
-                ),
+          radius: 22,
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+          child: Row(children: [
+            Container(
+              width: 43,
+              height: 43,
+              decoration: BoxDecoration(
+                color: purple.withValues(alpha: .17),
+                borderRadius: BorderRadius.circular(14),
               ),
-              child: Row(children: [
-                Container(
-                  width: 54,
-                  height: 54,
-                  decoration: BoxDecoration(
-                    color: purple.withValues(alpha: .19),
-                    borderRadius: BorderRadius.circular(17),
-                  ),
-                  child: Icon(Icons.shield_outlined,
-                      color: purple, size: 27),
-                ),
-                const SizedBox(width: 16),
-                Expanded(child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    txt(tr('امنیت و اتصال', 'Security & connection'),
-                        bold: true, size: 16),
-                    const SizedBox(height: 5),
-                    txt(tr('تنظیمات شبکه و حفاظت VPN',
-                        'Network and VPN protection settings'),
-                        size: 12, color: sub),
-                  ],
-                )),
-                Icon(Icons.chevron_right_rounded, color: sub, size: 25),
-              ]),
+              child: Icon(Icons.shield_outlined, color: purple, size: 23),
             ),
-          ),
+            const SizedBox(width: 13),
+            Expanded(child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                txt(tr('امنیت و شبکه', 'Security & network'),
+                    bold: true, size: 16),
+                const SizedBox(height: 4),
+                txt(tr('کنترل اتصال و مسیر ترافیک',
+                    'Connection and traffic controls'), size: 11, color: sub),
+              ],
+            )),
+          ]),
+        ),
+        const SizedBox(height: 10),
+        VpnSettingsScreen(
+          key: const Key('inlineVpnSettings'),
+          tenant: widget.panel.namespace,
+          account: widget.username,
+          embedded: true,
         ),
         const SizedBox(height: 16),
         settingsSectionTitle(tr('برنامه', 'Application'),
