@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -33,6 +35,7 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
       NativeVpnCapabilities.unavailable(NativeVpnBridge.platform);
   Map<String, dynamic> _guard = const {};
   bool _checking = false;
+  bool _vmGuardBusy = false;
 
   @override
   void initState() {
@@ -85,6 +88,73 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(AppStrings.of(context).pick(
           'گزارش عیب‌یابی کپی شد', 'Diagnostic report copied')),
+    ));
+  }
+
+  Future<void> _vmGuardAction(bool enable) async {
+    if (_vmGuardBusy ||
+        !Platform.isWindows ||
+        Platform.environment['TWINCONNECT_DISPOSABLE_VM'] != '1') return;
+    String alias = '';
+    String endpoint = '';
+    String executable = '';
+    if (enable) {
+      final aliasController = TextEditingController(text: 'TwinConnectSB');
+      final endpointController = TextEditingController();
+      final executableController = TextEditingController();
+      try {
+        final accepted = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Experimental Windows VM guard'),
+            content: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 430),
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                const Text('Disposable VM only. Verify external recovery '
+                    'and never use on your everyday Windows installation.'),
+                TextField(controller: aliasController,
+                    decoration: const InputDecoration(labelText: 'Tunnel alias')),
+                TextField(controller: endpointController,
+                    decoration: const InputDecoration(labelText: 'Endpoint IPv4')),
+                TextField(controller: executableController,
+                    decoration: const InputDecoration(labelText: 'Transport executable path')),
+              ]),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text('Cancel')),
+              FilledButton(onPressed: () => Navigator.pop(ctx, true),
+                  child: const Text('Test only in disposable VM')),
+            ],
+          ),
+        );
+        if (accepted != true || !mounted) return;
+        alias = aliasController.text;
+        endpoint = endpointController.text;
+        executable = executableController.text;
+      } finally {
+        // Defer controller disposal until the dialog transition has closed.
+        await Future<void>.delayed(const Duration(milliseconds: 250));
+        aliasController.dispose();
+        endpointController.dispose();
+        executableController.dispose();
+      }
+    }
+    if (!mounted) return;
+    setState(() => _vmGuardBusy = true);
+    final result = await NativeVpnBridge.experimentalVmGlobalGuard(
+      action: enable ? 'arm' : 'disarm',
+      alias: alias,
+      endpoint: endpoint,
+      executable: executable,
+    );
+    await _check();
+    if (!mounted) return;
+    setState(() => _vmGuardBusy = false);
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(result['success'] == true
+          ? 'VM command acknowledged; leak tests still required'
+          : 'VM guard rejected: ${result['reason']}'),
     ));
   }
 
@@ -278,6 +348,23 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
             ),
           ]),
         ),
+        if (Platform.isWindows &&
+            Platform.environment['TWINCONNECT_DISPOSABLE_VM'] == '1')
+          _glass(Row(children: [
+            const Icon(Icons.science_outlined),
+            const SizedBox(width: 8),
+            const Expanded(child: Text('Experimental VM guard — not production')),
+            TextButton(
+              key: const Key('vpnVmArm'),
+              onPressed: _vmGuardBusy ? null : () => _vmGuardAction(true),
+              child: const Text('Arm test'),
+            ),
+            TextButton(
+              key: const Key('vpnVmDisarm'),
+              onPressed: _vmGuardBusy ? null : () => _vmGuardAction(false),
+              child: const Text('Disarm'),
+            ),
+          ]), key: const Key('vpnVmGuardControl')),
         _section(tr('حالت اتصال', 'Connection mode')),
         _glass(Row(children: [
           const Icon(Icons.route_rounded, size: 22),
