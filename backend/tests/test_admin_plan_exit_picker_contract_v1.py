@@ -10,7 +10,7 @@ STYLES = ROOT / "components" / "compact-plan-modal.module.css"
 class CompactPlanExitSelectorContract(unittest.TestCase):
     def test_exit_node_selection_remains_visible_in_create_and_edit(self):
         source = MODAL.read_text(encoding="utf-8")
-        self.assertIn('Select Exit nodes', source)
+        self.assertIn('Allowed exit servers', source)
         self.assertIn("exitNodes.map(row=>", source)
         self.assertIn("draft.node_ids.includes(nodeId)", source)
         self.assertIn("onChange={event=>toggleNode(nodeId,event.target.checked)}", source)
