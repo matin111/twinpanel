@@ -44,7 +44,7 @@ void main() {
     final wave = File('lib/twinconnect_wave_indicator.dart').readAsStringSync();
     final dashboard = File('lib/live_dashboard.dart').readAsStringSync();
     expect(wave, contains('if (_active)'));
-    expect(wave, contains('if (!_active && _pulse.isAnimating)'));
+    expect(wave, contains('if (!_active && _motion.isAnimating)'));
     expect(dashboard, contains('connected: _verifiedConnectionActive'));
     expect(dashboard, contains("Key('liveRefreshTunnelStatus')"));
   });
@@ -59,11 +59,11 @@ void main() {
   test('light mode has visible branded luminous geometry', () {
     final ambient = File('lib/ambient_background.dart').readAsStringSync();
     final theme = File('lib/brand_theme.dart').readAsStringSync();
-    expect(ambient, contains('final streak = Paint()'));
-    expect(ambient, contains('final sparks = Paint()'));
-    expect(ambient, contains('final sweep = Paint()'));
-    expect(ambient, contains('dark ? .12 : .16'));
-    expect(theme, contains('Color(0xFFF9F6FF), 0.97'));
+    expect(ambient, contains('final haze = Paint()'));
+    expect(ambient, contains('for (var i = 0; i < 39; i++)'));
+    expect(ambient, contains('for (var i = 0; i < 13; i++)'));
+    expect(ambient, contains('dark ? .11 : .15'));
+    expect(theme, contains('Color(0xFFF3F7F8), 0.97'));
   });
 
   test('all server ping actions use lightning instead of the old network icon', () {
