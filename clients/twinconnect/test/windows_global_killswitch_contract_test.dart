@@ -56,6 +56,8 @@ void main() {
     final workflow = File('../../.github/workflows/twinconnect-wfp-vm-leak-test.yml')
         .readAsStringSync();
     expect(script, contains('TwinConnectWfpEmergencyRestore'));
+    expect(script, contains('New-ScheduledTaskSettingsSet -StartWhenAvailable'));
+    expect(script, contains(r'!$check.Settings.StartWhenAvailable'));
     expect(script, contains('function Test-Physical-Dns'));
     expect(script, contains('function Set-Physical-Interface'));
     expect(script, contains('HostToNetworkOrder'));
@@ -95,6 +97,8 @@ void main() {
     expect(code, contains('CLSID_TaskScheduler'));
     expect(code, contains('TwinConnectWfpEmergencyRestore'));
     expect(code, contains('get_NextRunTime'));
+    expect(code, contains('get_StartWhenAvailable'));
+    expect(code, contains('startWhenAvailable != VARIANT_TRUE'));
     expect(code, contains('GetLocalTime(&now)'));
     expect(code, isNot(contains('GetSystemTime(&now)')));
     expect(code, contains('recover I_ACCEPT_OFFLINE_RECOVERY'));
