@@ -2321,11 +2321,26 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                   mainAxisAlignment: wide
                       ? MainAxisAlignment.start : MainAxisAlignment.center,
                   children: [
-                    Icon(icon, color: _page == page
-                        ? (_dark ? Colors.white : purple)
-                        : (_dark ? const Color(0xFFE1D9FA)
-                            : const Color(0xFF53496D)),
-                      size: wide ? 24 : 21),
+                    if (page == 'locations' && selectedServer != null)
+                      Container(
+                        key: const Key('selectedLocationFlag'),
+                        width: wide ? 29 : 26,
+                        height: wide ? 27 : 24,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(8),
+                          color: Colors.white.withValues(alpha: .10),
+                          border: Border.all(
+                            color: purple.withValues(alpha: .34))),
+                        child: CountryFlag(selectedServer!.flag,
+                          width: wide ? 23 : 21),
+                      )
+                    else
+                      Icon(icon, color: _page == page
+                          ? (_dark ? Colors.white : purple)
+                          : (_dark ? const Color(0xFFE1D9FA)
+                              : const Color(0xFF53496D)),
+                        size: wide ? 24 : 21),
                     if (wide) ...[
                       const SizedBox(width: 14),
                       Expanded(child: txt(title,
