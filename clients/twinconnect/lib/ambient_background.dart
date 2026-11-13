@@ -57,9 +57,15 @@ class _TwinConnectAmbientBackgroundState
     final dark = widget.dark;
     final brandBackground = widget.backgroundColor;
     final gradientColors = !dark
-        ? const [
-            Color(0xFFF7FAFC), Color(0xFFF0F6F8), Color(0xFFE6F0F3),
-          ]
+        ? (brandBackground == null
+            ? const [
+                Color(0xFFF7FAFC), Color(0xFFF0F6F8), Color(0xFFE6F0F3),
+              ]
+            : [
+                Color.lerp(brandBackground, Colors.white, .72)!,
+                Color.lerp(brandBackground, const Color(0xFFEFF6F8), .68)!,
+                Color.lerp(brandBackground, const Color(0xFFE6F0F3), .66)!,
+              ])
         : brandBackground == null
             ? const [
                 Color(0xFF0B1620), Color(0xFF132C39), Color(0xFF142F37),
