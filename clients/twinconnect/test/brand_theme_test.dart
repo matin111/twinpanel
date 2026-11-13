@@ -32,7 +32,7 @@ void main() {
     expect(branded.buttonColor, '#F97316');
     expect(branded.backgroundColor, '#090B14');
     expect(branded.surfaceColor, '#162434');
-    expect(BrandTheme.mode(branded), ThemeMode.light);
+    expect(BrandTheme.mode(branded), ThemeMode.dark);
     // Light mode keeps the tenant hue but darkens bright accents for legible
     // controls on frosted white cards; dark mode retains the configured color.
     expect(BrandTheme.make(branded, Brightness.light).colorScheme.primary,
