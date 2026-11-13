@@ -29,6 +29,9 @@ void main() {
         'server': 'vpn.example.org',
         'server_port': 443,
         'password': 'confidential',
+        if (entry.key == 'socks5') ...{
+          'version': '5', 'username': 'synthetic', 'network': 'tcp',
+        },
         if (entry.key != 'snell' && entry.key != 'socks5')
           'tls': <String, dynamic>{'enabled': true, 'server_name': 'example.org'},
       };
