@@ -129,7 +129,7 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
                 constraints: const BoxConstraints(maxWidth: 760),
                 child: ShareVpnPreview(
                   dark: Theme.of(context).brightness == Brightness.dark,
-                  persian: AppStrings.of(context).pick(true, false),
+                  persian: AppStrings.of(context).isFa,
                 ),
               ),
             ],
