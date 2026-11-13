@@ -53,6 +53,24 @@ void main() {
     expect(dashboard, contains("Key('liveRefreshTunnelStatus')"));
   });
 
+  test('language selector uses professional glass cards with six saved locales', () {
+    final picker = File('lib/twin_language_picker.dart').readAsStringSync();
+    final dashboard = File('lib/live_dashboard.dart').readAsStringSync();
+    expect(dashboard, contains('showTwinLanguagePicker('));
+    expect(dashboard, contains('await prefs.setString(_languagePreference, selected)'));
+    expect(picker, contains("Key('devLanguageDialog')"));
+    expect(picker, contains('GridView.builder('));
+    expect(picker, contains('Icons.translate_rounded'));
+    expect(picker, contains('Icons.check_circle_rounded'));
+    expect(picker, contains('rtl ? TextDirection.rtl : TextDirection.ltr'));
+    expect(picker, contains('item.code == \'ar\''));
+    expect(picker, contains('Color(0xFFF9FCFD)'));
+    expect(picker, contains('Color(0xFF13232F)'));
+    for (final code in ['fa', 'en', 'tr', 'ar', 'de', 'fr']) {
+      expect(picker, contains("code: '$code'"));
+    }
+  });
+
   test('Persian dashboard is RTL and English dashboard is LTR', () {
     final dashboard = File('lib/live_dashboard.dart').readAsStringSync();
     expect(dashboard, contains("textDirection: _rtl ? TextDirection.rtl : TextDirection.ltr"));
