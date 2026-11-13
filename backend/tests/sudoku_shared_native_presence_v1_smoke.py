@@ -185,8 +185,10 @@ def test_first_authoritative_snapshot_is_nonbillable_baseline():
         return {"baselined":True,"event":False,"accepted_bytes":0}
     with patch.object(subject.canonical,"_active_sessions",return_value=[]),patch.object(
         subject.canonical,"_baseline_or_apply_cumulative",side_effect=fake_usage):
+        from app.models import SubscriptionStatus
+        database=SimpleNamespace(get=lambda _model,_sid:SimpleNamespace(status=SubscriptionStatus.ACTIVE))
         row=subject.apply_shared_native_counters(
-            object(),node=SimpleNamespace(id=29),
+            database,node=SimpleNamespace(id=29),
             devices=[{"subscription_id":11,"device_id":101}],snapshot=snapshot)
     assert row["usage_supported"] is True
     assert row["baselined"]==1 and row["accepted_bytes"]==0
