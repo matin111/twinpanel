@@ -55,3 +55,19 @@
 :global(html[data-theme="light"]) .nodePanel{border-color:#dce3ee}
 :global(html[data-theme="light"]) .nodeContents{border-color:#e4e8f1}
 :global(html[data-theme="light"]) .cancel,:global(html[data-theme="light"]) .smallBtn,:global(html[data-theme="light"]) .close{color:#26354e;border-color:#d6dfea}
+
+/* Plans: show Exit server selection next to protocols, never below a hidden accordion. */
+.selectionLayout{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;align-items:stretch}
+.selectionColumn{min-width:0;padding:10px;border:1px solid var(--line,rgba(130,150,186,.22));border-radius:12px;background:var(--surface,rgba(0,0,0,.06))}
+.selectionColumn .sectionTop{margin-bottom:9px;gap:5px}
+.selectionColumn .sectionTitle{font-size:12px}
+.selectionActions{display:flex;align-items:center;gap:6px;flex-shrink:0}
+.selectionColumn .pills{grid-template-columns:repeat(2,minmax(0,1fr));max-height:176px;overflow-y:auto;scrollbar-width:thin}
+.nodeHint{display:block;color:var(--muted,#93a1bb);font-size:10px;margin-top:8px}
+.emptyNodes{min-height:82px;display:flex;align-items:center;justify-content:center;text-align:center;padding:10px;color:var(--muted,#93a1bb);font-size:12px}
+:global(html[data-theme="light"]) .selectionColumn{background:#fafbff;border-color:#dde4ef}
+@media(max-width:720px){
+ .selectionLayout{grid-template-columns:minmax(0,1fr)}
+ .selectionColumn .pills{max-height:130px}
+ .selectionColumn .sectionTop{flex-wrap:wrap}
+}
