@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:twinconnect/main.dart';
@@ -8,7 +9,33 @@ import 'package:twinconnect/vpn_settings.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  setUp(() => SharedPreferences.setMockInitialValues({}));
+  const channel = MethodChannel('com.twinpanel.twinconnect/vpn');
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, (call) async {
+      // Deterministic native availability in UI tests: no plugin timeout
+      // and no fabricated enforcement. Real OS behavior is tested separately.
+      if (call.method == 'getCapabilities') return null;
+      if (call.method == 'getGlobalKillSwitchStatus') {
+        return <String, Object>{
+          'contractVersion': 1,
+          'wfpAvailable': false,
+          'serviceInstalled': false,
+          'armed': false,
+          'enforcedV4': false,
+          'enforcedV6': false,
+          'recoveryVerified': false,
+          'reason': 'TEST_UNAVAILABLE',
+        };
+      }
+      return null;
+    });
+  });
+  tearDown(() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, null);
+  });
 
   testWidgets('login stays simple and has no settings shortcut', (tester) async {
     SharedPreferences.setMockInitialValues({'twinconnect_ui_language_v1': 'en'});
@@ -24,8 +51,7 @@ void main() {
     await tester.pumpWidget(const MaterialApp(
       home: VpnSettingsScreen(tenant: '', account: ''),
     ));
-    await tester.pump(const Duration(milliseconds: 200));
-    await tester.pump();
+    await tester.pumpAndSettle();
     expect(find.byKey(const Key('vpnCapabilityRefresh')), findsOneWidget);
     expect(find.byKey(const Key('vpnNativeEngineStatus')), findsOneWidget);
     expect(find.byKey(const Key('vpnWfpStatus')), findsOneWidget);
@@ -40,8 +66,7 @@ void main() {
     await tester.pumpWidget(const MaterialApp(
       home: VpnSettingsScreen(tenant: tenant, account: account),
     ));
-    await tester.pump(const Duration(milliseconds: 200));
-    await tester.pump();
+    await tester.pumpAndSettle();
     final kill = tester.widget<Switch>(find.byKey(const Key('vpnKillSwitch')));
     expect(kill.onChanged, isNull);
     expect(kill.value, isFalse);
@@ -54,13 +79,11 @@ void main() {
     await tester.pumpWidget(const MaterialApp(
       home: VpnSettingsScreen(tenant: '', account: ''),
     ));
-    await tester.pump(const Duration(milliseconds: 200));
-    await tester.pump();
+    await tester.pumpAndSettle();
     final details = find.byTooltip('Details');
     expect(details, findsWidgets);
     await tester.tap(details.first);
-    await tester.pump(const Duration(milliseconds: 200));
-    await tester.pump();
+    await tester.pumpAndSettle();
     expect(find.byType(AlertDialog), findsOneWidget);
     expect(find.byType(VpnSettingsScreen), findsOneWidget);
   });
