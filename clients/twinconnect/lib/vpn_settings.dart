@@ -388,16 +388,10 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
                       GlassVpnSwitch.adaptive(
                         key: const Key('vpnKillSwitch'),
                         title: Text(s.vpnKillSwitch),
-                        subtitle: Text(_capabilities.wireGuardSessionKillSwitch
-                            ? s.vpnWireGuardKillSwitchHint
-                            : s.vpnKillSwitchSubtitle),
-                        value: _capabilities.engineReady &&
-                            (_capabilities.killSwitchEnforced ||
-                             _capabilities.wireGuardSessionKillSwitch) &&
-                            _policy.killSwitchRequested,
+                        subtitle: Text(s.vpnKillSwitchSubtitle),
+                        value: _capabilities.engineReady && _capabilities.killSwitchEnforced && _policy.killSwitchRequested,
                         onChanged: _capabilities.engineReady &&
-                                (_capabilities.killSwitchEnforced ||
-                                 _capabilities.wireGuardSessionKillSwitch)
+                                _capabilities.killSwitchEnforced
                             ? (value) => _update(
                                 _policy.copyWith(killSwitchRequested: value))
                             : null,
