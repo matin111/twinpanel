@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import 'app_strings.dart';
 import 'brand_theme.dart';
 import 'interactive_glass_card.dart';
 import 'native_vpn_bridge.dart';
 import 'tenant_models.dart';
-import 'vpn_policy.dart';
 
 /// One-page, fail-closed network settings. A saved preference is not proof of
 /// enforcement; no unsupported switch is shown as working.
