@@ -29,7 +29,6 @@ class SudokuSharedAccountingReleaseTests(unittest.TestCase):
         source=(ROOT/"scripts/twinpanel_sudoku_fast_presence_worker.py").read_text()
         ast.parse(source)
         self.assertIn('usage=apply_shared_native_counters(',source)
-        self.assertIn('usage=apply_legacy_unit_counters',source) if False else None
         self.assertIn('apply_legacy_unit_counters(',source)
         self.assertIn('apply_shared_native_presence(',source)
 
