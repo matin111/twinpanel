@@ -62,7 +62,9 @@ void main() {
     final workflow = File('../../.github/workflows/twinconnect-wfp-experimental.yml')
         .readAsStringSync();
     expect(workflow, contains('Compile standalone privileged guard service'));
-    expect(workflow, contains('DO NOT start the service'));
+    expect(workflow, contains("Never invoke 'arm'"));
+    expect(workflow, contains('recover $ack'));
+    expect(workflow, contains('uninstall-vm $ack'));
   });
 
   test('native bridge installs only a read-only guard status method', () {
