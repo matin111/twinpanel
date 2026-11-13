@@ -25,7 +25,7 @@ void main() {
   test('dedicated VPN preferences and sharing cards use same glass', () {
     final settings = File('lib/vpn_settings.dart').readAsStringSync();
     final sharing = File('lib/share_vpn_preview.dart').readAsStringSync();
-    expect(settings, contains('class GlassVpnSwitch'));
+    expect(settings, contains('class VpnSettingsScreen'));
     expect(settings, contains('TwinConnectGlassCard('));
     expect(sharing, contains('TwinConnectGlassCard('));
   });
