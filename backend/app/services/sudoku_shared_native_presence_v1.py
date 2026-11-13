@@ -66,23 +66,46 @@ if (not isinstance(rows,list) or len(rows)>3000
         or type(doc.get("count")) is not int
         or doc["count"]!=len(rows)):
     raise RuntimeError("SUDOKU_SHARED_CONTROLLER_COUNT_INVALID")
-names=set();online={};connected=0
+# The upstream authenticated controller has authoritative per-user
+# cumulative wire counters. Validate them ON THE EXIT before SSH transport.
+# Bind each reading to the daemon invocation so restarts get a fresh baseline.
+import subprocess
+service=subprocess.run(
+    ["systemctl","show","twinpanel-sudoku-shared.service",
+     "-p","ActiveState","-p","MainPID","-p","InvocationID"],
+    capture_output=True,text=True,check=False,timeout=5)
+properties=dict(line.split("=",1) for line in service.stdout.splitlines() if "=" in line)
+epoch=properties.get("InvocationID","")
+if (service.returncode or properties.get("ActiveState")!="active"
+        or not properties.get("MainPID","").isdigit()
+        or int(properties["MainPID"])<=0
+        or not re.fullmatch("[0-9a-f]{32}",epoch)):
+    raise RuntimeError("SUDOKU_SHARED_EPOCH_UNAVAILABLE")
+names=set();online={};connected=0;counters={}
 for row in rows:
     name=row.get("name") if isinstance(row,dict) else None
     conns=row.get("conns") if isinstance(row,dict) else None
+    up=row.get("upTotal") if isinstance(row,dict) else None
+    down=row.get("downTotal") if isinstance(row,dict) else None
+    used=row.get("used") if isinstance(row,dict) else None
     if (not isinstance(name,str) or not re.fullmatch("tp-sub-[1-9][0-9]*",name)
-            or name in names or type(conns) is not int or conns<0 or conns>65535):
+            or name in names or type(conns) is not int or not 0<=conns<=65535
+            or type(up) is not int or not 0<=up<=2**63-1
+            or type(down) is not int or not 0<=down<=2**63-1
+            or type(used) is not int or used!=up+down or used>2**63-1):
         raise RuntimeError("SUDOKU_SHARED_CONTROLLER_USER_INVALID")
     names.add(name)
+    counters[name]={"up":up,"down":down}
     if conns>0:
         online[name]=conns
         connected+=conns
 if names!=expected_names:
     raise RuntimeError("SUDOKU_SHARED_CONTROLLER_CONFIG_MISMATCH")
-# Report only IDs and connection counts; no controller secret, keys or bytes.
+# Never expose keys/secret or arbitrary controller metadata.
 print(json.dumps({"marker":"TP_SUDOKU_SHARED_NATIVE_PRESENCE_V1",
                   "names":sorted(names),"online":online,
-                  "total":len(names),"connections":connected},
+                  "total":len(names),"connections":connected,
+                  "epoch":epoch,"counters":counters},
                  separators=(",",":"),ensure_ascii=True))
 '''
     return "python3 -c " + shlex.quote(script)
@@ -115,8 +138,32 @@ def validate_snapshot(payload: Any) -> dict[str, Any]:
         summed += conns
     if summed != connections:
         raise ValueError("sudoku_shared_native_connection_count_mismatch")
+    epoch = payload.get("epoch")
+    counters = payload.get("counters")
+    if (epoch is None and counters is None):
+        # Backward-compatible presence-only snapshots used by existing tests.
+        # Never charge bytes when the runtime provides no counter evidence.
+        validated_counters = {}
+        validated_epoch = None
+    else:
+        if (not isinstance(epoch,str)
+                or re.fullmatch(r"[0-9a-f]{32}",epoch) is None
+                or not isinstance(counters,dict)
+                or set(counters)!=known):
+            raise ValueError("sudoku_shared_native_counters_invalid")
+        validated_counters = {}
+        for name, reading in counters.items():
+            if not isinstance(reading,dict) or set(reading)!={"up","down"}:
+                raise ValueError("sudoku_shared_native_counter_fields_invalid")
+            up,down = reading["up"],reading["down"]
+            if (type(up) is not int or type(down) is not int
+                    or min(up,down)<0 or up+down>2**63-1):
+                raise ValueError("sudoku_shared_native_counter_values_invalid")
+            validated_counters[name]={"up":up,"down":down}
+        validated_epoch=epoch
     return {"known": known, "online": dict(online),
-            "total":total, "connections":connections}
+            "total":total, "connections":connections,
+            "epoch":validated_epoch,"counters":validated_counters}
 
 
 async def collect_shared_native_users(conn) -> tuple[bool, dict[str, Any], str | None]:
@@ -194,3 +241,62 @@ def apply_shared_native_presence(
         "usage_events": 0,
         "usage_supported": False,
     }
+
+def apply_shared_native_counters(
+    db,
+    *,
+    node: Any,
+    devices: list[dict[str, Any]],
+    snapshot: dict[str, Any],
+) -> dict[str, Any]:
+    """Bill only per-user authenticated cumulative wire deltas.
+
+    A new daemon invocation has a new source key, so its first reading is
+    non-billable even if the daemon ran before the accounting worker started.
+    Counter resets within an invocation fail closed; no usage is fabricated
+    from presence, speed, or connection counts.
+    """
+    epoch=snapshot.get("epoch")
+    counters=snapshot.get("counters")
+    if not epoch or not isinstance(counters,dict) or not counters:
+        return {"usage_supported":False,"usage_events":0,
+                "accepted_bytes":0,"baselined":0,"rejected_counters":0}
+    now=canonical._utcnow()
+    baselined=events=accepted=rejected=0
+    seen=set()
+    for device in devices:
+        sid=int(device["subscription_id"])
+        if sid in seen:
+            continue
+        seen.add(sid)
+        name=f"tp-sub-{sid}"
+        counter=counters.get(name)
+        if counter is None:
+            continue
+        active=canonical._active_sessions(
+            db,node_id=int(node.id),device_id=int(device["device_id"]),
+            protocol="sudoku",
+        )
+        try:
+            reading=canonical._baseline_or_apply_cumulative(
+                db,node_id=int(node.id),device=device,protocol="sudoku",
+                source_key=f"sudoku:shared:{sid}:{epoch}",
+                counter_epoch=epoch,
+                uplink=counter["up"],downlink=counter["down"],
+                session_key=active[0].session_key if active else None,
+                client_ip=None,reported_at=now,
+            )
+        except RuntimeError as exc:
+            if str(exc) not in (
+                "counter_decreased_without_authoritative_new_epoch",
+                "runtime_counter_source_identity_conflict",
+            ):
+                raise
+            rejected+=1
+            continue
+        baselined+=int(bool(reading["baselined"]))
+        events+=int(bool(reading["event"]))
+        accepted+=int(reading["accepted_bytes"])
+    return {"usage_supported":True,"usage_events":events,
+            "accepted_bytes":accepted,"baselined":baselined,
+            "rejected_counters":rejected}
