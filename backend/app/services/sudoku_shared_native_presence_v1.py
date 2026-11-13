@@ -95,7 +95,10 @@ for row in rows:
             or type(used) is not int or used!=up+down or used>2**63-1):
         raise RuntimeError("SUDOKU_SHARED_CONTROLLER_USER_INVALID")
     names.add(name)
-    counters[name]={"up":up,"down":down}
+    # Zero-traffic subscribers need no quota cursor: shared Exit whitelists
+    # may contain thousands of users with no activity.
+    if used>0:
+        counters[name]={"up":up,"down":down}
     if conns>0:
         online[name]=conns
         connected+=conns
@@ -149,7 +152,7 @@ def validate_snapshot(payload: Any) -> dict[str, Any]:
         if (not isinstance(epoch,str)
                 or re.fullmatch(r"[0-9a-f]{32}",epoch) is None
                 or not isinstance(counters,dict)
-                or set(counters)!=known):
+                or not set(counters).issubset(known)):
             raise ValueError("sudoku_shared_native_counters_invalid")
         validated_counters = {}
         for name, reading in counters.items():
