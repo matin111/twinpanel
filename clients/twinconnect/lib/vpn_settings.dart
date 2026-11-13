@@ -42,14 +42,26 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
   Future<void> _check() async {
     if (_checking) return;
     setState(() => _checking = true);
-    final results = await Future.wait<Object>([
-      NativeVpnBridge.probe(),
-      NativeVpnBridge.globalKillSwitchStatus(),
-    ]);
+    NativeVpnCapabilities capabilities =
+        NativeVpnCapabilities.unavailable(NativeVpnBridge.platform);
+    Map<String, dynamic> guard = const {};
+    try {
+      // Native status probes can stall on unhealthy Windows services.
+      // The page must recover rather than remain in a loading state.
+      final results = await Future.wait<Object>([
+        NativeVpnBridge.probe().timeout(const Duration(seconds: 5)),
+        NativeVpnBridge.globalKillSwitchStatus()
+            .timeout(const Duration(seconds: 5)),
+      ]);
+      capabilities = results[0] as NativeVpnCapabilities;
+      guard = results[1] as Map<String, dynamic>;
+    } catch (_) {
+      // Never turn a timed-out or failed check into a 'protected' state.
+    }
     if (!mounted) return;
     setState(() {
-      _capabilities = results[0] as NativeVpnCapabilities;
-      _guard = results[1] as Map<String, dynamic>;
+      _capabilities = capabilities;
+      _guard = guard;
       _checking = false;
     });
   }
