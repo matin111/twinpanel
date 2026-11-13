@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.814",
-  "source_sha": "597d3db02d007bba111f86368cf60ed78041a7b7",
+  "version": "1.1.0-rc.815",
+  "source_sha": "f6ab12e57363d3d2c12750ae4507cbdf4250ec8b",
   "notes": {
-    "fa": "رفع نهایی سربار بک‌فیل: اجرای کنترل سبک دیتابیس و اولویت سفارش‌های خرید جدید قبل از بارگذاری سنگین ORM، قفل نود مرکزی، و نادیده گرفتن امن بک‌فیل قدیمی هنگام نیاز به منابع پنل. تکمیل بهینه‌سازی‌های rc.813 برای پایش آنلاین Naive/Sudoku و ممیزی حجم ۱۶ پروتکل. بدون تغییر سهمیه، کانفیگ یا منطق محاسبات ترافیک.",
-    "en": "Avoid legacy backfill heavy app imports by cheaply checking paid provisioning priority and central node stages before initialization. Preserve full safety checks for admitted work. Retain rc.813 scoped presence collectors and 16-protocol read-only integrity audit; do not change quota counters or VPN configs."
+    "fa": "بازطراحی صفحه ساخت و ویرایش پلن طبق طرح تاییدشده: مودال فشرده و مدرن راست‌چین با دو ستون اطلاعات پایه، چهار ستون حجم و قیمت، کارت‌های کوچک پروتکل، بخش جمع‌شونده نودهای Exit، دکمه ذخیره و انصراف همیشه در پایین، واکنش‌گرا برای موبایل، سازگاری لایت/دارک؛ حفظ تمام ارتباطات API، فیلدهای موجود و Snapshot پروتکل و نود.",
+    "en": "Redesign admin plan create/edit modal to the approved compact responsive three-section UX with light/dark compatibility, inline protocol chips, collapsible exit node picker and pinned footer. Preserve plan CRUD, device limit, node/protocol snapshots, API payload and existing permissions."
   }
 }
