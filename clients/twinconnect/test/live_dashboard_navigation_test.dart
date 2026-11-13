@@ -99,8 +99,8 @@ void main() {
     await tester.tap(find.byKey(const Key('devNav_home')));
     await tester.pump();
     expect(find.byKey(const Key('liveAutoFastestServer')), findsNothing);
-    await tester.ensureVisible(find.byKey(const Key('liveHomeRefreshAccount')));
-    await tester.tap(find.byKey(const Key('liveHomeRefreshAccount')));
+    await tester.ensureVisible(find.byKey(const Key('liveHomeRefreshAccount')).first);
+    await tester.tap(find.byKey(const Key('liveHomeRefreshAccount')).first);
     expect(refreshes, 1);
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(seconds: 30));
