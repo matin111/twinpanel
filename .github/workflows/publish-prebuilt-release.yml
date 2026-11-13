@@ -233,6 +233,22 @@ jobs:
           grep -Fq 'install_public_delivery_switches()' source/backend/app/main.py
           grep -Fq 'nodeActions' source/components/protocol-command-center.tsx
 
+      - name: Protect compact subscription create choices in pinned releases
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          for path in \
+            "components/admin-subscription-create-unified.tsx" \
+            "app/admin-manual-subscription-light.css"; do
+            test -s "source/$path" && test -s "publisher/$path"
+            cmp -s "source/$path" "publisher/$path" || {
+              echo "::error file=$path::Pinned release would lose compact subscription choices; re-pin candidate."
+              exit 1
+            }
+          done
+          grep -Fq 'tp-create-protocol-grid' source/components/admin-subscription-create-unified.tsx
+          grep -Fq 'tp-create-node-grid' source/components/admin-subscription-create-unified.tsx
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -600,6 +616,19 @@ jobs:
             "components/protocol-command-center.tsx"; do
             cmp -s "source/$path" "publisher/$path" || {
               echo "::error file=$path::Operator controls changed after candidate was pinned."
+              exit 1
+            }
+          done
+
+      - name: Recheck compact subscription choices before asset publication
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          for path in \
+            "components/admin-subscription-create-unified.tsx" \
+            "app/admin-manual-subscription-light.css"; do
+            cmp -s "source/$path" "publisher/$path" || {
+              echo "::error file=$path::Subscription choice UI changed after source was pinned."
               exit 1
             }
           done
