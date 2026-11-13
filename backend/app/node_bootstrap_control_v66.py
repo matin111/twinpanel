@@ -387,48 +387,55 @@ async def _install_or_upgrade_agent_v70(
     the Controller API directly. This makes the Iran hop bootstrap-only on the
     normal production path.
     """
+    # Keep the node lookup transaction shorter than remote SSH/apt work.
+    # A long bootstrap may take minutes; holding an idle checked-out PG
+    # connection across those awaits can fail on network/DB connection resets.
     db = SessionLocal()
     try:
         node = db.get(Node, int(node_id))
-        if node is None or node.node_type != NodeType.EXIT:
-            return await _BASE_AGENT_INSTALL(conn, node_id, api_base)
-
-        # Probe the same IP transport the Agent will actually use. The
-        # previous bootstrap checked a potentially poisoned DNS hostname,
-        # incorrectly forcing new Exits through an Iran relay even when the
-        # pinned-IP endpoint was reachable.
-        agent_api, pinned_ca = resolve_agent_controller_connection(api_base)
-        direct_ok = await v63._api_reachable_from_exit(conn, agent_api)
-        if direct_ok:
-            result = await _BASE_AGENT_INSTALL(conn, node_id, agent_api)
-            if isinstance(result, dict):
-                result["control_plane"] = {
-                    "mode": "direct_outbound",
-                    "agent_api_base": agent_api,
-                    "iran_dependency": False,
-                }
-            return result
-
-        # An explicitly configured IP controller must not silently downgrade
-        # to a domain/HTTP relay that could expose credentials or fail later.
-        if pinned_ca:
-            raise RuntimeError("pinned_controller_ip_unreachable_from_exit")
-
-        # Direct outbound API is genuinely unavailable. Keep the proven V64
-        # relay as a bounded fallback so provisioning still succeeds.
-        result = await v64._install_or_upgrade_agent_v64(
-            conn,
-            node_id,
-            api_base,
-        )
-        if isinstance(result, dict):
-            control = result.get("control_plane")
-            if isinstance(control, dict):
-                control["iran_dependency"] = True
-                control["fallback_only"] = True
-        return result
+        is_exit = bool(node is not None and node.node_type == NodeType.EXIT)
     finally:
         db.close()
+
+    if not is_exit:
+        return await _BASE_AGENT_INSTALL(conn, node_id, api_base)
+
+    # Probe the same IP transport the Agent will actually use. The
+    # previous bootstrap checked a potentially poisoned DNS hostname,
+    # incorrectly forcing new Exits through an Iran relay even when the
+    # pinned-IP endpoint was reachable.
+    agent_api, pinned_ca = resolve_agent_controller_connection(api_base)
+    direct_ok = await v63._api_reachable_from_exit(conn, agent_api)
+    if direct_ok:
+        result = await _BASE_AGENT_INSTALL(conn, node_id, agent_api)
+        if isinstance(result, dict):
+            result["control_plane"] = {
+                "mode": "direct_outbound",
+                "agent_api_base": agent_api,
+                "iran_dependency": False,
+            }
+        return result
+
+    # An explicitly configured IP controller must not silently downgrade
+    # to a domain/HTTP relay that could expose credentials or fail later.
+    if pinned_ca:
+        raise RuntimeError("pinned_controller_ip_unreachable_from_exit")
+
+    # Direct outbound API is genuinely unavailable. Keep the proven V64
+    # relay as a bounded fallback so provisioning still succeeds.
+    result = await v64._install_or_upgrade_agent_v64(
+        conn,
+        node_id,
+        api_base,
+    )
+    if isinstance(result, dict):
+        control = result.get("control_plane")
+        if isinstance(control, dict):
+            control["iran_dependency"] = True
+            control["fallback_only"] = True
+    return result
+finally:
+    db.close()
 
 
 def apply_node_bootstrap_control_v66() -> None:
