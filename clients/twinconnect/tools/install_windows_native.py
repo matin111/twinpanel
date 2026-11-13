@@ -452,14 +452,6 @@ def install() -> None:
             const auto* value = std::get_if<std::string>(&it->second);
             return value ? *value : "";
           };
-          // Kill switch request is an explicit typed choice. WireGuard's
-          // official single-peer /0 profile activates its session-scoped WFP
-          // filter. This is never a persistent app-independent lockdown.
-          const auto policyBoolean = [&](const char* key) -> bool {
-            const auto it = policy->find(flutter::EncodableValue(key));
-            return it != policy->end() &&
-                   std::get_if<bool>(&it->second) != nullptr;
-          };
           const auto policyFalse = [&](const char* key) -> bool {
             const auto it = policy->find(flutter::EncodableValue(key));
             if (it == policy->end()) return false;
@@ -469,7 +461,7 @@ def install() -> None:
           if (policyString("routingMode") != "fullTunnel" ||
               policyString("dnsMode") != "protected" ||
               policyString("ipv6Mode") != "tunnelOrBlock" ||
-              !policyBoolean("killSwitchRequested") ||
+              !policyFalse("killSwitchRequested") ||
               !policyFalse("allowLan") ||
               !policyFalse("autoReconnect") ||
               !policyFalse("autoConnect")) {
