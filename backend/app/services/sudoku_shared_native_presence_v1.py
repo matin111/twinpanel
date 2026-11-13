@@ -261,6 +261,7 @@ def apply_shared_native_counters(
     if not epoch or not isinstance(counters,dict) or not counters:
         return {"usage_supported":False,"usage_events":0,
                 "accepted_bytes":0,"baselined":0,"rejected_counters":0}
+    from ..models import Subscription, SubscriptionStatus
     now=canonical._utcnow()
     baselined=events=accepted=rejected=0
     seen=set()
@@ -272,6 +273,9 @@ def apply_shared_native_counters(
         name=f"tp-sub-{sid}"
         counter=counters.get(name)
         if counter is None:
+            continue
+        sub=db.get(Subscription,sid)
+        if sub is None or sub.status!=SubscriptionStatus.ACTIVE:
             continue
         active=canonical._active_sessions(
             db,node_id=int(node.id),device_id=int(device["device_id"]),
