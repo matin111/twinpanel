@@ -1,6 +1,6 @@
 "use client";
 
-import {useEffect,useRef,useState} from "react";
+import {useEffect,useRef,useState,type CSSProperties} from "react";
 import {API_BASE} from "../lib/api";
 import {getCustomerToken} from "../lib/customer-api";
 import {useI18n} from "../lib/i18n";
@@ -134,28 +134,43 @@ export function CentralAppBrandManager({role}:{role:"admin"|"reseller"}){
     :resellerId>0?resellers.find(r=>r.id===resellerId)?.name||""
     :contact.brand_name||pick("پنل اصلی","Main panel");
   const previewLogo=imageUrl(contact.logo_url);
-  const preview=<div className="tbs-device" style={{
-    background:appearance?.background_color,
-    color:appearance?.theme_mode==="light"?"#172033":"#f3f6ff",
-  }}>
-    <div className="tbs-device-top"><span>9:41</span><span>●●● ▰</span></div>
+  const previewPalette={
+    "--tc-primary":appearance?.primary_color||"#9F43FF",
+    "--tc-secondary":appearance?.secondary_color||"#00DFF2",
+    "--tc-button":appearance?.button_color||"#9053FF",
+    "--tc-card":appearance?.surface_color||"#22234D",
+  } as CSSProperties;
+  const preview=<div className={`tbs-device tbs-device-modern ${appearance?.theme_mode==="light"?"tbs-device-light":""}`}
+    style={{
+      ...previewPalette,
+      background:appearance?.background_style==="solid"
+        ?appearance?.background_color
+        :`linear-gradient(145deg,${appearance?.background_color} 12%,${appearance?.secondary_color}36 58%,${appearance?.background_color} 100%)`,
+      color:appearance?.theme_mode==="light"?"#172033":"#f3f6ff",
+    }}>
+    <div className="tbs-device-top"><span>WIN · TWINCONNECT</span><span>✦</span></div>
     <div className="tbs-device-brand">
       <span className="tbs-device-logo">{previewLogo?<img alt="" src={previewLogo}/>:<span>✦</span>}</span>
-      <div><strong>{brand}</strong><small>TwinConnect</small></div>
+      <div><strong>{brand}</strong><small>{pick("پیش‌نمایش تم اختصاصی","Custom theme preview")}</small></div>
     </div>
     <div className="tbs-device-glow" style={{background:appearance?.primary_color}}/>
-    <div className="tbs-connect-orb" style={{borderColor:appearance?.secondary_color,boxShadow:`0 0 36px ${appearance?.primary_color}55`}}>
-      <span style={{background:appearance?.button_color}}>⏻</span>
+    <div className="tbs-modern-status"><span className="tbs-status-dot"/> {pick("آماده اتصال","Ready to connect")}</div>
+    <div className="tbs-modern-connect" style={{
+      background:`linear-gradient(125deg,${appearance?.primary_color},${appearance?.button_color} 52%,${appearance?.secondary_color})`,
+    }}><span className="tbs-modern-power">⏻</span><span><strong>{pick("اتصال سریع","Quick connect")}</strong><small>{pick("انتخاب سرور","Selected server")}</small></span><span>›</span></div>
+    <div className="tbs-modern-details">
+      <span>{pick("سرور","Server")}<strong>—</strong></span>
+      <span>{pick("پینگ","Ping")}<strong>—</strong></span>
     </div>
-    <p className="tbs-connection-label">{pick("آماده اتصال","Ready to connect")}</p>
-    <small className="tbs-connection-sub">{pick("برای اتصال ضربه بزنید","Tap to connect")}</small>
-    <div className="tbs-server tbs-server-one" style={{background:appearance?.surface_color}}>
-      <div><b>{pick('سرور نمونه ۱','Sample server 1')}</b><small>{pick('بدون داده اتصال زنده','No live connection data')}</small></div><span style={{color:appearance?.primary_color}}>✓</span>
+    <div className="tbs-modern-speeds">
+      <div className="tbs-modern-traffic"><span>↓ {pick("دانلود","Download")}</span><strong>— MB/s</strong><div className="tbs-modern-graph"/></div>
+      <div className="tbs-modern-traffic"><span>↑ {pick("آپلود","Upload")}</span><strong>— MB/s</strong><div className="tbs-modern-graph"/></div>
     </div>
-    <div className="tbs-server tbs-server-two" style={{background:appearance?.surface_color}}>
-      <div><b>{pick('سرور نمونه ۲','Sample server 2')}</b><small>{pick('طرح نمایشی','Design placeholder')}</small></div><span>›</span>
+    <div className="tbs-modern-subscription"><b>{pick("اطلاعات اشتراک","Subscription")}</b>
+      <div><span>{pick("حجم مصرفی","Usage")}<strong>— / —</strong></span>
+      <span>{pick("انقضا","Expiry")}<strong>—</strong></span></div>
     </div>
-    <div className="tbs-device-bottom"><span>⌂</span><span>◈</span><span>⚙</span></div>
+    <div className="tbs-modern-menu"><span>⌁ {pick("اتصال","Connect")}</span><span>◈ {pick("سرورها","Locations")}</span><span>⚙ {pick("تنظیمات","Settings")}</span></div>
   </div>;
   const page=<div className="tbs-page" dir="rtl">
     <div className="tbs-hero">
@@ -208,9 +223,22 @@ export function CentralAppBrandManager({role}:{role:"admin"|"reseller"}){
           {tab==="colors"&&<div className="tbs-panel">
             <div className="tbs-section-head"><div><h2>{pick("رنگ‌ها و ظاهر","Colors & appearance")}</h2><p>{pick("رنگ‌ها را تنظیم کنید و نتیجه را در پیش‌نمایش ببینید.","Customize colors and preview changes instantly.")}</p></div></div>
             <div className="tbs-presets">
-              {[["#7C3AED","#4F46E5"],["#0087DB","#00C2BB"],["#F97316","#DB2777"],["#15A66A","#0E7490"]].map(([a,b])=>
-                <button key={a} type="button" title={pick("اعمال پالت","Apply preset")} style={{background:`linear-gradient(125deg,${a} 50%,${b} 50%)`}}
-                  onClick={()=>{changeColor("primary_color",a);changeColor("secondary_color",b);changeColor("button_color",a)}}/>)}
+              {([
+                ["#9F43FF","#00DFF2","#9053FF","#0A1028","#252350"],
+                ["#7C3AED","#4F46E5","#7C3AED","#101018","#20202A"],
+                ["#0087DB","#00C2BB","#0087DB","#071B30","#15304A"],
+                ["#F97316","#DB2777","#F97316","#231320","#39203B"],
+                ["#15A66A","#0E7490","#15A66A","#081B1B","#173336"],
+              ] as const).map(([a,b,button,background,surface],i)=>
+                <button key={a} type="button"
+                  aria-label={i===0?pick("تم شیشه‌ای نئونی TwinConnect","TwinConnect neon glass theme"):pick("اعمال پالت","Apply preset")}
+                  title={i===0?pick("تم شیشه‌ای نئونی TwinConnect","TwinConnect neon glass theme"):pick("اعمال پالت","Apply preset")}
+                  style={{background:`linear-gradient(125deg,${a} 45%,${b} 55%)`}}
+                  onClick={()=>{setAppearance(current=>current?{
+                    ...current,primary_color:a,secondary_color:b,
+                    button_color:button,background_color:background,
+                    surface_color:surface,background_style:"gradient",
+                  }:current);setDirty(true)}}/>)}
             </div>
             <div className="tbs-colors">
               {([
