@@ -267,6 +267,30 @@ jobs:
           grep -Fq 'tp-create-protocol-grid' source/components/admin-subscription-create-unified.tsx
           grep -Fq 'tp-create-node-grid' source/components/admin-subscription-create-unified.tsx
 
+      - name: Protect audited protocol client downloads in pinned source
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          # Prevent the old missing-APK/HTML-200 links from returning on update.
+          for path in \
+            "backend/app/routers/public_connection_client_catalog_v821.py" \
+            "backend/app/routers/public_connection_app_download_v34.py" \
+            "backend/app/routers/public_connection_modern_delivery_v13.py" \
+            "backend/app/routers/public_connection_canonical_presentation_v24.py" \
+            "backend/app/routers/public_connection_v2ray_actions_v41.py" \
+            "backend/app/routers/public_connection_protocol_subscriptions_v30.py" \
+            "backend/app/routers/public_connection_unified_surface_dates_v80.py" \
+            "backend/app/routers/account_delivery.py" \
+            "backend/tests/test_public_connection_audited_app_downloads_v821.py"; do
+            test -s "source/$path" && test -s "publisher/$path"
+            cmp -s "source/$path" "publisher/$path" || {
+              echo "::error file=$path::Pinned download catalog is stale; re-pin source."
+              exit 1
+            }
+          done
+          grep -Fq 'global_downloads()' source/backend/app/routers/account_delivery.py
+          grep -Fq 'protocol_client_rows()' source/backend/app/routers/public_connection_modern_delivery_v13.py
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -647,6 +671,26 @@ jobs:
             "app/admin-manual-subscription-light.css"; do
             cmp -s "source/$path" "publisher/$path" || {
               echo "::error file=$path::Subscription choice UI changed after source was pinned."
+              exit 1
+            }
+          done
+
+      - name: Recheck audited client assets before release publication
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          for path in \
+            "backend/app/routers/public_connection_client_catalog_v821.py" \
+            "backend/app/routers/public_connection_app_download_v34.py" \
+            "backend/app/routers/public_connection_modern_delivery_v13.py" \
+            "backend/app/routers/public_connection_canonical_presentation_v24.py" \
+            "backend/app/routers/public_connection_v2ray_actions_v41.py" \
+            "backend/app/routers/public_connection_protocol_subscriptions_v30.py" \
+            "backend/app/routers/public_connection_unified_surface_dates_v80.py" \
+            "backend/app/routers/account_delivery.py" \
+            "backend/tests/test_public_connection_audited_app_downloads_v821.py"; do
+            cmp -s "source/$path" "publisher/$path" || {
+              echo "::error file=$path::Download link source changed during build."
               exit 1
             }
           done
