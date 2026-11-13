@@ -202,6 +202,7 @@ void Usage() {
 
 } // namespace
 
+#ifndef TWINCONNECT_GUARD_NO_MAIN
 int wmain(int argc, wchar_t** argv) {
   if (argc < 2) { Usage(); return 2; }
   Engine engine;
@@ -271,3 +272,4 @@ int wmain(int argc, wchar_t** argv) {
   PrintStatus(engine.handle);
   return 0;
 }
+#endif  // TWINCONNECT_GUARD_NO_MAIN
