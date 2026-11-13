@@ -12,6 +12,8 @@ HEADER = ROOT / "windows" / "runner" / "flutter_window.h"
 SOURCE = ROOT / "windows" / "runner" / "flutter_window.cpp"
 NATIVE = ROOT / "native" / "windows" / "twinconnect_wireguard.h"
 INSTALLED = ROOT / "windows" / "runner" / "twinconnect_wireguard.h"
+AMNEZIAWG_NATIVE = ROOT / "native" / "windows" / "twinconnect_amneziawg.h"
+AMNEZIAWG_INSTALLED = ROOT / "windows" / "runner" / "twinconnect_amneziawg.h"
 SINGBOX_GUARD = ROOT / "native" / "windows" / "twinconnect_singbox_guard.h"
 SINGBOX_INSTALLED = ROOT / "windows" / "runner" / "twinconnect_singbox_guard.h"
 XRAY_GUARD = ROOT / "native" / "windows" / "twinconnect_xray_guard.h"
@@ -42,6 +44,9 @@ def install() -> None:
         raise RuntimeError("Generate the Windows Flutter runner before installing native bridge.")
 
     shutil.copyfile(NATIVE, INSTALLED)
+    if not AMNEZIAWG_NATIVE.is_file():
+        raise RuntimeError("Missing isolated AmneziaWG Windows bridge")
+    shutil.copyfile(AMNEZIAWG_NATIVE, AMNEZIAWG_INSTALLED)
     if not SINGBOX_GUARD.is_file():
         raise RuntimeError("Missing sing-box process guard header")
     shutil.copyfile(SINGBOX_GUARD, SINGBOX_INSTALLED)
@@ -87,6 +92,7 @@ def install() -> None:
             '#include "flutter_window.h"\n'
             '#include <flutter/standard_method_codec.h>\n'
             '#include "twinconnect_wireguard.h"\n'
+            '#include "twinconnect_amneziawg.h"\n'
             '#include "twinconnect_singbox_guard.h"\n'
             '#include "twinconnect_xray_guard.h"\n'
             '#include "twinconnect_sudoku_guard.h"\n'
@@ -378,6 +384,35 @@ def install() -> None:
             result->Error("TRUSTTUNNEL_PROCESS_GUARD_FAILED"); return;
           }
           result->Success(flutter::EncodableValue(true));
+        } else if (call.method_name() == "getAmneziaWgStatus") {
+          result->Success(twinconnect_amneziawg::Status());
+        } else if (call.method_name() == "getAmneziaWgCapabilities") {
+          result->Success(twinconnect_amneziawg::Capabilities());
+        } else if (call.method_name() == "startAmneziaWg") {
+          const auto* args = std::get_if<flutter::EncodableMap>(call.arguments());
+          if (!args) { result->Error("AWG_REQUEST_INVALID"); return; }
+          const auto it = args->find(flutter::EncodableValue("config"));
+          const auto* config = it == args->end() ? nullptr :
+              std::get_if<std::string>(&it->second);
+          if (!config || !twinconnect_amneziawg::IsAdmin() ||
+              twinconnect_wireguard::ServiceExists() ||
+              twinconnect_amneziawg::ServiceExists()) {
+            result->Error("AWG_ADMIN_OR_TUNNEL_CONFLICT"); return;
+          }
+          const std::string safe =
+              twinconnect_amneziawg::ProtectedFullTunnelConfig(*config);
+          if (!twinconnect_amneziawg::ValidConfig(safe)) {
+            result->Error("AWG_CONFIG_UNSAFE"); return;
+          }
+          if (!twinconnect_amneziawg::Start(*config)) {
+            result->Error("AWG_START_FAILED"); return;
+          }
+          result->Success(twinconnect_amneziawg::Status());
+        } else if (call.method_name() == "stopAmneziaWg") {
+          if (!twinconnect_amneziawg::Stop()) {
+            result->Error("AWG_STOP_FAILED"); return;
+          }
+          result->Success(twinconnect_amneziawg::Status());
         } else if (call.method_name() == "getCapabilities") {
           result->Success(twinconnect_wireguard::Capabilities());
         } else if (call.method_name() == "getProtocolCapabilities") {
