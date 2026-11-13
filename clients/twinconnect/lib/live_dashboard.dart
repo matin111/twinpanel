@@ -2417,6 +2417,9 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           _resetNetworkStats();
         });
       } else {
+        // Allow disconnect at any time, but never start a new WireGuard
+        // session while requested OS-wide protection is unverified.
+        await _requireVerifiedGuardIfRequested();
         if (_autoFastest) {
           if (_filter != 'wireguard') {
             throw const FormatException('SELECT_PROTOCOL_FOR_FASTEST');
