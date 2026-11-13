@@ -24,6 +24,14 @@ void main() {
     expect(fa.error('APP_NOT_AUTHORIZED'), isNot(en.error('APP_NOT_AUTHORIZED')));
   });
 
+  test('additional language labels translate common login and dashboard text', () {
+    expect(const AppStrings(Locale('tr')).appLoginTitle, 'Giriş yap');
+    expect(const AppStrings(Locale('ar')).appLoginTitle, 'تسجيل الدخول');
+    expect(const AppStrings(Locale('de')).appLoginTitle, 'Anmelden');
+    expect(const AppStrings(Locale('fr')).appLoginTitle, 'Se connecter');
+    expect(const AppStrings(Locale('ar')).pick('اتصال سریع', 'Quick connect'), 'اتصال سريع');
+  });
+
   testWidgets('restores Persian preference and switches to English with LTR',
       (tester) async {
     SharedPreferences.setMockInitialValues({
