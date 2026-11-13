@@ -81,7 +81,14 @@ export async function createSubscriptionFastV1(payload:FastSubscriptionCreatePay
   const token=getCustomerToken();
   if(!token)throw new Error("AUTH_REQUIRED");
 
-  const response=await fetch(`${API_BASE}/v1/subscriptions/admin-create-fast-v1`,{
+  // Bound the UI wait; an aborted request can still commit on the server.
+  // Never retry automatically after a timeout: check the username/account list first.
+  const controller=new AbortController();
+  const timeout=setTimeout(()=>controller.abort(),45000);
+  let response:Response;
+  try{
+    response=await fetch(`${API_BASE}/v1/subscriptions/admin-create-fast-v1`,{
+      signal:controller.signal,
     method:"POST",
     cache:"no-store",
     headers:{
@@ -89,7 +96,15 @@ export async function createSubscriptionFastV1(payload:FastSubscriptionCreatePay
       "Content-Type":"application/json",
     },
     body:JSON.stringify(payload),
-  });
+    });
+  }catch(reason){
+    if(reason instanceof Error&&reason.name==="AbortError"){
+      throw new Error("پاسخ ثبت اکانت بیش از ۴۵ ثانیه طول کشید. ممکن است درخواست روی سرور تکمیل شده باشد؛ قبل از تلاش دوباره، لیست اشتراک‌ها و نام کاربری را بررسی کنید.");
+    }
+    throw reason;
+  }finally{
+    clearTimeout(timeout);
+  }
 
   const raw=await response.text();
   let body:unknown=null;
