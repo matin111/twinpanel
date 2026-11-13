@@ -61,11 +61,9 @@ class BrandTheme {
         : Color.lerp(base, const Color(0xFF23485A), .24)!;
   }
 
-  static ThemeMode mode(BrandPreview? brand) => switch (brand?.themeMode) {
-        'light' => ThemeMode.light,
-        'system' => ThemeMode.system,
-        _ => ThemeMode.dark,
-      };
+  // All clients now use the same premium dark appearance.
+  // Legacy light/system values from older panel accounts are ignored.
+  static ThemeMode mode(BrandPreview? brand) => ThemeMode.dark;
 
   static ThemeData make(BrandPreview? brand, Brightness brightness) {
     final primary = accent(brand, brightness);
