@@ -78,7 +78,7 @@ void main() {
   test('light mode has visible branded luminous geometry', () {
     final ambient = File('lib/ambient_background.dart').readAsStringSync();
     final theme = File('lib/brand_theme.dart').readAsStringSync();
-    expect(ambient, contains('final background = Paint()'));
+    expect(ambient, contains('final bounds = Offset.zero & size;'));
     expect(ambient, contains('for (var i = 0; i < 39; i++)'));
     expect(ambient, contains('for (var i = 0; i < 13; i++)'));
     expect(ambient, contains('dark ? .11 : .15'));
