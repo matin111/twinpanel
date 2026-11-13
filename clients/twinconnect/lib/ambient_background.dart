@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 /// Lightweight, finite ambient entrance animation for the Windows dashboard.
@@ -68,7 +69,7 @@ class _TwinConnectAmbientBackgroundState
               ])
         : brandBackground == null
             ? const [
-                Color(0xFF0B1620), Color(0xFF132C39), Color(0xFF142F37),
+                Color(0xFF0A1B27), Color(0xFF163641), Color(0xFF102839),
               ]
             : [
                 Color.lerp(brandBackground, const Color(0xFF091925), .16)!,
@@ -228,6 +229,22 @@ class _AmbientLines extends CustomPainter {
       canvas.drawCircle(p, i % 6 == 0 ? 1.65 : .75, Paint()
         ..color = (i.isEven ? primary : secondary)
             .withValues(alpha: dark ? .20 : .15));
+    }
+
+    // Tonal dot-matrix depth: softened around the edge so it remains a
+    // background and never competes with real connection information.
+    for (var row = 0; row < 13; row++) {
+      for (var column = 0; column < 21; column++) {
+        final x = size.width * (.10 + column * .042);
+        final y = size.height * (.08 + row * .071);
+        final dx = (x / size.width - .52).abs();
+        final dy = (y / size.height - .48).abs();
+        final falloff = (1.0 - dx * .83 - dy * .87).clamp(0.0, 1.0);
+        final point = Offset(x + math.sin(row * .65) * 5, y);
+        canvas.drawCircle(point, 1.05,
+          Paint()..color = (column.isEven ? primary : secondary)
+            .withValues(alpha: (dark ? .13 : .03) * falloff));
+      }
     }
 
     // Minimal understated diagonal light streaks.
