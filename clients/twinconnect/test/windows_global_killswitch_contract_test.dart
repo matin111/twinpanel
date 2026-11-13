@@ -57,10 +57,10 @@ void main() {
         .readAsStringSync();
     expect(script, contains('TwinConnectWfpEmergencyRestore'));
     expect(script, contains('OWNED_RULES_PRESENT 0 0 0'));
-    expect(script, contains('if ($recovered -and $restored)'));
-    expect(script, contains('if (!$recovered -or !$restored)'));
-    expect(script, contains('Test-Physical-Egress -SourceAddress $PhysicalIpv4'));
-    expect(script, contains('Test-Physical-Egress -SourceAddress $PhysicalIpv6'));
+    expect(script, contains(r'if ($recovered -and $restored)'));
+    expect(script, contains(r'if (!$recovered -or !$restored)'));
+    expect(script, contains(r'Test-Physical-Egress -SourceAddress $PhysicalIpv4'));
+    expect(script, contains(r'Test-Physical-Egress -SourceAddress $PhysicalIpv6'));
     expect(workflow, contains('self-hosted, windows, x64, twinconnect-disposable-vm'));
     expect(workflow, isNot(contains('runs-on: windows-latest')));
   });
