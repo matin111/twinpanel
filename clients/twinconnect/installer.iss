@@ -47,6 +47,8 @@ var
   OpenConnectManifest: String;
   OpenVpnInstaller: String;
   OpenVpnBinary: String;
+  AmneziaWgInstaller: String;
+  AmneziaWgBinary: String;
 begin
   if CurStep = ssPostInstall then
   begin
@@ -97,6 +99,28 @@ begin
       else
         MsgBox('OpenVPN signed vendor prerequisite is missing from Setup.',
                mbError, MB_OK);
+    end;
+    { AmneziaWG has its own Windows driver and service. Do not substitute
+      ordinary WireGuard for the native v1 obfuscated AWG profile.
+      The official upstream MSI is bundled and SHA256-verified by CI.
+      Install only when its official executable is absent. }
+    AmneziaWgBinary := ExpandConstant('{pf}\\AmneziaWG\\amneziawg.exe');
+    AmneziaWgInstaller := ExpandConstant(
+      '{app}\\prerequisites\\amneziawg-amd64-3.1.0.msi');
+    if not FileExists(AmneziaWgBinary) then
+    begin
+      if FileExists(AmneziaWgInstaller) then
+      begin
+        Ok := Exec(ExpandConstant('{sys}\\msiexec.exe'),
+                   '/i "' + AmneziaWgInstaller + '" /qn /norestart',
+                   '', SW_HIDE, ewWaitUntilTerminated, ExitCode);
+        if (not Ok) or ((ExitCode <> 0) and (ExitCode <> 3010)) then
+          MsgBox('Official AmneziaWG driver prerequisite could not be installed.' + #13#10 +
+                 'All other VPN protocols remain available.', mbError, MB_OK);
+      end
+      else
+        MsgBox('AmneziaWG Windows prerequisite is missing from Setup.' + #13#10 +
+               'Other VPN protocols are unaffected.', mbError, MB_OK);
     end;
     { Vendor GUI setup may still supply adapter/driver prerequisites.
       Its success is NOT proof that Cisco tunnel routing is functional. }
