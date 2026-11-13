@@ -85,6 +85,13 @@ void main() {
     expect(code, contains('PIPE_REJECT_REMOTE_CLIENTS'));
     expect(code, contains('D:P(A;;GA;;;SY)(A;;GA;;;BA)'));
     expect(code, contains('TransactionalArm('));
+    expect(code, contains('RecoveryTaskReady()'));
+    expect(code, contains('ERR RECOVERY_TASK_NOT_VERIFIED'));
+    expect(code, contains('CLSID_TaskScheduler'));
+    expect(code, contains('TwinConnectWfpEmergencyRestore'));
+    expect(code, contains('get_NextRunTime'));
+    expect(code, contains('recover I_ACCEPT_OFFLINE_RECOVERY'));
+
     expect(code, contains('TransactionalDisarm('));
     expect(code, contains('offline-status'));
     expect(code, contains('OwnedFilterPresent(engine.handle, kBlockV4)'));
