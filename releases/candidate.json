@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.821",
-  "source_sha": "44755c4e15db441864a4cb11936d26060ffdf661",
+  "version": "1.1.0-rc.822",
+  "source_sha": "fc7c17dc8b32c3da0e1475f573e35656eb18320a",
   "notes": {
-    "fa": "اصلاح کامل لینک‌های دانلود برنامه‌ها برای ۱۶ پروتکل در اندروید، آیفون، ویندوز و مک. حذف آدرس‌های فایل جعلی که HTML تحویل می‌دادند و صفحات عمومی GitHub به‌جای فایل نصب؛ جایگزینی با دانلود مستقیم واقعی، App Store یا صفحه رسمی Homebrew. هر پروتکل کلاینت سازگار با دستگاه خود را دریافت می‌کند؛ لینک‌های نسخه Intel مک نیز در فهرست برنامه‌ها افزوده شده است. اتصال‌ها، کانفیگ‌ها، اعتبار اشتراک و سایر امکانات نسخه rc.820 بدون تغییر می‌مانند.",
-    "en": "Replace fake /downloads/apps installers and stale releases pages with tested direct binaries or precise platform app-store entries for all 16 protocols on Android, iOS, Windows, macOS. One canonical client catalog powers per-protocol buttons and global app downloads, with V2Ray-specific v2rayNG/V2Box/v2rayN, no fake L2TP installers, Win TrustTunnel CLI correctly labeled, and Mac Intel alternatives. Preserve all rc.820 network, config and account functionality."
+    "fa": "به‌روزرسانی ظاهر پیش‌فرض اپ TwinConnect در پنل از سورس اصلی GitHub: رنگ‌های سرمه‌ای، آبی دودی و فیروزه‌ای ملایم، حذف پالت بنفش قدیمی از انتخاب‌های پیش‌فرض، پیش‌نمایش جریان دیتا به جای دکمه دایره‌ای، بهبود لایت‌مود و حفظ رنگ‌های سفارشی ادمین و نماینده‌ها. هیچ تغییری در پروتکل‌ها، کاربران، کیف‌پول‌ها و تنظیمات VPN اعمال نشده است.",
+    "en": "Refresh the TwinConnect Brand Studio defaults from current GitHub main: muted slate/navy/teal palettes, replace legacy violet presets with owner-editable full themes, live-flow-style preview instead of circular power orb, improved light mode, while preserving existing customized tenant branding. No changes to VPN protocols, accounts, wallets, or node settings."
   }
 }
