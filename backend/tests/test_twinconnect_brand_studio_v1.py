@@ -49,6 +49,10 @@ class TwinConnectBrandStudioContract(unittest.TestCase):
         self.assertIn("tbs-data-flow",ui)
         self.assertNotIn('className="tbs-connect-orb"',ui)
         self.assertIn("tbs-dark-only",css)
+        self.assertNotIn('<option value="light">',ui)
+        self.assertNotIn('<option value="system">',ui)
+        self.assertIn('theme_mode:"dark"',ui)
+        self.assertIn('background:appearance?.background_color',ui)
 
     def test_brand_studio_has_real_logo_upload_and_reseller_scope(self):
         ui=UI.read_text(encoding="utf-8")
