@@ -2191,7 +2191,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     if (_openingTenantLink) return;
     _openingTenantLink = true;
     try {
-      final brand = await TenantApi.fromBuildConfig().loadSessionBrand(
+      final brand = await TenantApi(vendorOrigin: widget.panel.apiOrigin)
+          .loadSessionBrand(
         panel: widget.panel,
         sessionToken: widget.sessionToken,
       );
