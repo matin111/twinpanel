@@ -33,21 +33,46 @@ if ($service.Status -ne "Running") { throw "Guard service is not running." }
 if (!(Get-NetAdapter -InterfaceAlias $TunnelAlias -ErrorAction SilentlyContinue)) {
   throw "TwinConnect tunnel adapter not present."
 }
+$physicalBindings = @{}
 foreach ($source in @($PhysicalIpv4, $PhysicalIpv6)) {
-  $binding = Get-NetIPAddress -IPAddress $source -ErrorAction SilentlyContinue
-  if (!$binding -or $binding.InterfaceAlias -eq $TunnelAlias) {
-    throw "Physical source missing or belongs to tunnel: $source"
+  $binding = @(Get-NetIPAddress -IPAddress $source -ErrorAction SilentlyContinue)
+  if ($binding.Count -ne 1 -or $binding[0].InterfaceAlias -eq $TunnelAlias -or
+      $binding[0].InterfaceIndex -le 0) {
+    throw "Physical source missing, ambiguous or belongs to tunnel: $source"
   }
+  $physicalBindings[$source] = [int]$binding[0].InterfaceIndex
 }
+$physicalV4Index = $physicalBindings[$PhysicalIpv4]
+$physicalV6Index = $physicalBindings[$PhysicalIpv6]
 $endpoint = [System.Net.IPAddress]::None
 if (![System.Net.IPAddress]::TryParse($VpnEndpointIpv4, [ref]$endpoint) -or
     $endpoint.AddressFamily -ne [System.Net.Sockets.AddressFamily]::InterNetwork) {
   throw "Numeric IPv4 endpoint required."
 }
 
+# Binding an IP address alone does NOT prove that packets went out of the
+# physical interface. Select the outgoing NIC explicitly using the Windows
+# IP_UNICAST_IF / IPV6_UNICAST_IF option. If unsupported, fail the test.
+function Set-Physical-Interface {
+  param([System.Net.Sockets.Socket]$Socket, [int]$InterfaceIndex)
+  if ($InterfaceIndex -le 0) { throw "Invalid physical interface index." }
+  $option = [System.Net.Sockets.SocketOptionName]31
+  if ($Socket.AddressFamily -eq [System.Net.Sockets.AddressFamily]::InterNetwork) {
+    $index = [System.Net.IPAddress]::HostToNetworkOrder($InterfaceIndex)
+    $Socket.SetSocketOption([System.Net.Sockets.SocketOptionLevel]::IP,
+        $option, $index)
+  } elseif ($Socket.AddressFamily -eq [System.Net.Sockets.AddressFamily]::InterNetworkV6) {
+    $Socket.SetSocketOption([System.Net.Sockets.SocketOptionLevel]::IPv6,
+        $option, $InterfaceIndex)
+  } else {
+    throw "Unsupported physical interface address family."
+  }
+}
+
 function Test-Physical-Egress {
   param([string]$SourceAddress,[string]$RemoteAddress="1.1.1.1",
-        [int]$Port=443,[int]$TimeoutMs=3500)
+        [int]$Port=443,[int]$TimeoutMs=3500,
+        [int]$InterfaceIndex)
   $sourceIp = [System.Net.IPAddress]::Parse($SourceAddress)
   $remoteIp = [System.Net.IPAddress]::Parse($RemoteAddress)
   if ($sourceIp.AddressFamily -ne $remoteIp.AddressFamily) {
@@ -58,6 +83,7 @@ function Test-Physical-Egress {
     [System.Net.Sockets.SocketType]::Stream,
     [System.Net.Sockets.ProtocolType]::Tcp)
   try {
+    Set-Physical-Interface -Socket $socket -InterfaceIndex $InterfaceIndex
     $socket.Bind([System.Net.IPEndPoint]::new($sourceIp, 0))
     $async = $socket.BeginConnect($RemoteAddress, $Port, $null, $null)
     if (!$async.AsyncWaitHandle.WaitOne($TimeoutMs)) { return $false }
@@ -73,7 +99,7 @@ function Test-Physical-Egress {
 # as egress: a matching DNS response is required.
 function Test-Physical-Dns {
   param([string]$SourceAddress, [string]$RemoteAddress,
-        [int]$TimeoutMs=3500)
+        [int]$TimeoutMs=3500, [int]$InterfaceIndex)
   $source = [System.Net.IPAddress]::Parse($SourceAddress)
   $remote = [System.Net.IPAddress]::Parse($RemoteAddress)
   if ($source.AddressFamily -ne $remote.AddressFamily) {
@@ -82,6 +108,7 @@ function Test-Physical-Dns {
   $udp = [System.Net.Sockets.UdpClient]::new(
     [System.Net.IPEndPoint]::new($source, 0))
   try {
+    Set-Physical-Interface -Socket $udp.Client -InterfaceIndex $InterfaceIndex
     $udp.Client.ReceiveTimeout = $TimeoutMs
     $id = [byte[]]::new(2)
     [System.Security.Cryptography.RandomNumberGenerator]::Fill($id)
@@ -116,16 +143,16 @@ function Test-Physical-Dns {
   }
 }
 
-if (!(Test-Physical-Egress -SourceAddress $PhysicalIpv4)) {
+if (!(Test-Physical-Egress -SourceAddress $PhysicalIpv4 -InterfaceIndex $physicalV4Index)) {
   throw "Physical IPv4 baseline already blocked; test would be inconclusive."
 }
-if (!(Test-Physical-Egress -SourceAddress $PhysicalIpv6 -RemoteAddress "2606:4700:4700::1111")) {
+if (!(Test-Physical-Egress -SourceAddress $PhysicalIpv6 -InterfaceIndex $physicalV6Index -RemoteAddress "2606:4700:4700::1111")) {
   throw "Physical IPv6 baseline already blocked; test would be inconclusive."
 }
-if (!(Test-Physical-Dns -SourceAddress $PhysicalIpv4 -RemoteAddress "1.1.1.1")) {
+if (!(Test-Physical-Dns -SourceAddress $PhysicalIpv4 -InterfaceIndex $physicalV4Index -RemoteAddress "1.1.1.1")) {
   throw "Direct IPv4 DNS baseline unavailable; cannot prove DNS protection."
 }
-if (!(Test-Physical-Dns -SourceAddress $PhysicalIpv6 -RemoteAddress "2606:4700:4700::1111")) {
+if (!(Test-Physical-Dns -SourceAddress $PhysicalIpv6 -InterfaceIndex $physicalV6Index -RemoteAddress "2606:4700:4700::1111")) {
   throw "Direct IPv6 DNS baseline unavailable; cannot prove DNS protection."
 }
 $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(2)
@@ -141,16 +168,16 @@ try {
   if ($LASTEXITCODE -ne 0 -or $status -notmatch "OK 1 1 1") {
     throw "Dual-stack WFP filters were not reported installed."
   }
-  if (Test-Physical-Egress -SourceAddress $PhysicalIpv4) {
+  if (Test-Physical-Egress -SourceAddress $PhysicalIpv4 -InterfaceIndex $physicalV4Index) {
     throw "PRIVACY FAILURE: direct physical IPv4 TCP egress still works."
   }
-  if (Test-Physical-Egress -SourceAddress $PhysicalIpv6 -RemoteAddress "2606:4700:4700::1111") {
+  if (Test-Physical-Egress -SourceAddress $PhysicalIpv6 -InterfaceIndex $physicalV6Index -RemoteAddress "2606:4700:4700::1111") {
     throw "PRIVACY FAILURE: direct physical IPv6 TCP egress still works."
   }
-  if (Test-Physical-Dns -SourceAddress $PhysicalIpv4 -RemoteAddress "1.1.1.1") {
+  if (Test-Physical-Dns -SourceAddress $PhysicalIpv4 -InterfaceIndex $physicalV4Index -RemoteAddress "1.1.1.1") {
     throw "PRIVACY FAILURE: IPv4 DNS UDP leaked outside tunnel."
   }
-  if (Test-Physical-Dns -SourceAddress $PhysicalIpv6 -RemoteAddress "2606:4700:4700::1111") {
+  if (Test-Physical-Dns -SourceAddress $PhysicalIpv6 -InterfaceIndex $physicalV6Index -RemoteAddress "2606:4700:4700::1111") {
     throw "PRIVACY FAILURE: IPv6 DNS UDP leaked outside tunnel."
   }
   Write-Host "PASS: direct IPv4/IPv6 TCP and DNS UDP blocked inside VM."
@@ -165,10 +192,10 @@ try {
         ($rawStatus -match 'OWNED_RULES_PRESENT 0 0 0')
     if ($recovered) {
       for ($attempt = 0; $attempt -lt 4 -and !$restored; $attempt++) {
-        $v4Restored = Test-Physical-Egress -SourceAddress $PhysicalIpv4
-        $v6Restored = Test-Physical-Egress -SourceAddress $PhysicalIpv6 -RemoteAddress "2606:4700:4700::1111"
-        $dns4Restored = Test-Physical-Dns -SourceAddress $PhysicalIpv4 -RemoteAddress "1.1.1.1"
-        $dns6Restored = Test-Physical-Dns -SourceAddress $PhysicalIpv6 -RemoteAddress "2606:4700:4700::1111"
+        $v4Restored = Test-Physical-Egress -SourceAddress $PhysicalIpv4 -InterfaceIndex $physicalV4Index
+        $v6Restored = Test-Physical-Egress -SourceAddress $PhysicalIpv6 -InterfaceIndex $physicalV6Index -RemoteAddress "2606:4700:4700::1111"
+        $dns4Restored = Test-Physical-Dns -SourceAddress $PhysicalIpv4 -InterfaceIndex $physicalV4Index -RemoteAddress "1.1.1.1"
+        $dns6Restored = Test-Physical-Dns -SourceAddress $PhysicalIpv6 -InterfaceIndex $physicalV6Index -RemoteAddress "2606:4700:4700::1111"
         $restored = $v4Restored -and $v6Restored -and
             $dns4Restored -and $dns6Restored
         if (!$restored) { Start-Sleep -Seconds 2 }
