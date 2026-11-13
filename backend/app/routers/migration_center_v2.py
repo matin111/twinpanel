@@ -126,14 +126,14 @@ def migration_all_protocols_status(
         .scalar() or 0
     )
     snapshots = dict(
-        db.query(SubscriptionProtocol.protocol, func.count(SubscriptionProtocol.id))
+        db.query(SubscriptionProtocol.protocol, func.count(func.distinct(SubscriptionProtocol.subscription_id)))
         .join(MigrationImportRecord, MigrationImportRecord.subscription_id == SubscriptionProtocol.subscription_id)
         .filter(MigrationImportRecord.source == source)
         .group_by(SubscriptionProtocol.protocol)
         .all()
     )
     ready = dict(
-        db.query(ProtocolCredential.protocol, func.count(ProtocolCredential.id))
+        db.query(ProtocolCredential.protocol, func.count(func.distinct(ProtocolCredential.subscription_id)))
         .join(MigrationImportRecord, MigrationImportRecord.subscription_id == ProtocolCredential.subscription_id)
         .filter(
             MigrationImportRecord.source == source,
