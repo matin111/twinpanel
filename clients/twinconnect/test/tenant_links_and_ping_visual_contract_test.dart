@@ -71,6 +71,17 @@ void main() {
     }
   });
 
+  test('desktop connection cards share height and network location opens servers', () {
+    final dashboard = File('lib/live_dashboard.dart').readAsStringSync();
+    expect(dashboard, contains("Key('liveBalancedConnectionPanels')"));
+    expect(dashboard, contains('crossAxisAlignment: CrossAxisAlignment.stretch'));
+    expect(dashboard, contains('powerCard(\n                      subscriptionContent: homeSubscriptionSummary())'));
+    expect(dashboard, contains("Key('liveOpenLocationsFromNetwork')"));
+    expect(dashboard, contains("onTap: () => setState(() => _page = 'locations')"));
+    expect(dashboard, contains("tr('مکان‌ها', 'Locations')"));
+    expect(dashboard, isNot(contains("tr('از پنل', 'Panel')")));
+  });
+
   test('settings remain compact without hiding actual diagnostics', () {
     final dashboard = File('lib/live_dashboard.dart').readAsStringSync();
     expect(dashboard, contains('settingsSectionTitle('));
