@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.824",
+  "version": "1.1.0-rc.825",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-13T06:58:21Z",
+  "released_at": "2026-11-13T07:12:43Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "fa0b3a0c068fd68fdea979e566df2aacd70a7b45",
+  "source_sha": "4ddc019f7df54c479159c9baf5d55b48bfa37883",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.824/twinpanel-1.1.0-rc.824-linux-x86_64.tar.gz",
-    "sha256": "5bb5c40d1005a5f7ae1d4965d48d0e751b8cd82f8ac30efde5c723256e4600d9",
-    "size_bytes": 30720911
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.825/twinpanel-1.1.0-rc.825-linux-x86_64.tar.gz",
+    "sha256": "977571e7f7c33911e1ed980f7dd3b8090676696d209dee7669d3093caa5f9ef6",
+    "size_bytes": 30765946
   },
   "notes": {
-    "fa": "رفع گیرکردن دکمه ساخت اشتراک: انتقال عملیات دیتابیس از event loop به worker thread، محدودیت انتظار ۴۵ثانیه‌ای فرم با هشدار جلوگیری از ساخت تکراری، و تست‌های CI و انتشار برای حفظ اصلاحات در نسخه‌های بعدی.",
-    "en": "Fix hanging manual subscription creation: execute synchronous database persistence in FastAPI threadpool, bound frontend fetch to 45 seconds with no-blind-retry warning, and add release regression guards."
+    "fa": "بازگردانی نمایش پروتکل‌های آنلاین در کارت‌های اشتراک پنل و صفحه Connection؛ اتصال نشانگرها به داده واقعی نشست و مصرف، بدون تغییر کانفیگ‌ها، نشست‌ها یا شمارش حجم و دستگاه؛ همراه تست انتشار برای جلوگیری از حذف مجدد.",
+    "en": "Restore confirmed active protocol badges in admin subscription cards and public Connection hub using authoritative live session/usage telemetry, with release regression protection. No VPN configuration or accounting changes."
   }
 }
