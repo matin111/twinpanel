@@ -105,7 +105,11 @@ def test_node_collector_is_local_authenticated_read_only():
     assert "write_text" not in script
     assert "conn.run" not in script
     assert "client_key" not in script
-    assert "upTotal" not in script and "downTotal" not in script
+    # Verified per-user cumulative wire counters are now part of this
+    # authenticated read-only snapshot; passwords and client keys never are.
+    assert "upTotal" in script and "downTotal" in script
+    assert "InvocationID" in script
+    assert "client_key" not in script
 
 
 def test_async_ssh_success_and_error_never_expose_native_credentials():
@@ -145,3 +149,55 @@ if __name__=="__main__":
         if name.startswith("test_") and callable(test):
             test()
     print("SUDOKU_SHARED_NATIVE_PRESENCE_V1_OK")
+
+def test_validated_counters_are_exact_and_bounded():
+    payload={"marker":"TP_SUDOKU_SHARED_NATIVE_PRESENCE_V1",
+        "names":["tp-sub-11"],"online":{"tp-sub-11":1},
+        "total":1,"connections":1,
+        "epoch":"a"*32,
+        "counters":{"tp-sub-11":{"up":300,"down":700}}}
+    valid=subject.validate_snapshot(payload)
+    assert valid["counters"]["tp-sub-11"]=={"up":300,"down":700}
+    bad=[
+        {**payload,"epoch":"bad"},
+        {**payload,"counters":{"tp-sub-22":{"up":1,"down":2}}},
+        {**payload,"counters":{"tp-sub-11":{"up":True,"down":2}}},
+        {**payload,"counters":{"tp-sub-11":{"up":-1,"down":2}}},
+        {**payload,"counters":{"tp-sub-11":{"up":3,"down":2**63}}},
+    ]
+    for row in bad:
+        try: subject.validate_snapshot(row)
+        except ValueError: pass
+        else: raise AssertionError("unsafe Sudoku counter snapshot accepted")
+
+
+def test_first_authoritative_snapshot_is_nonbillable_baseline():
+    payload={"marker":"TP_SUDOKU_SHARED_NATIVE_PRESENCE_V1",
+        "names":["tp-sub-11"],"online":{"tp-sub-11":1},
+        "total":1,"connections":1,"epoch":"b"*32,
+        "counters":{"tp-sub-11":{"up":300,"down":700}}}
+    snapshot=subject.validate_snapshot(payload)
+    calls=[]
+    def fake_usage(db,**kwargs):
+        calls.append(kwargs)
+        return {"baselined":True,"event":False,"accepted_bytes":0}
+    with patch.object(subject.canonical,"_active_sessions",return_value=[]),patch.object(
+        subject.canonical,"_baseline_or_apply_cumulative",side_effect=fake_usage):
+        row=subject.apply_shared_native_counters(
+            object(),node=SimpleNamespace(id=29),
+            devices=[{"subscription_id":11,"device_id":101}],snapshot=snapshot)
+    assert row["usage_supported"] is True
+    assert row["baselined"]==1 and row["accepted_bytes"]==0
+    assert calls[0]["source_key"]=="sudoku:shared:11:"+"b"*32
+    assert calls[0]["uplink"]==300 and calls[0]["downlink"]==700
+
+
+def test_missing_authenticated_counters_cannot_charge_usage():
+    seen=[]
+    with patch.object(subject.canonical,"_baseline_or_apply_cumulative",side_effect=lambda *a,**k:seen.append(k)):
+        row=subject.apply_shared_native_counters(
+            object(),node=SimpleNamespace(id=29),
+            devices=[{"subscription_id":11,"device_id":101}],
+            snapshot=snapshot(["tp-sub-11"],{"tp-sub-11":1}))
+    assert row["usage_supported"] is False
+    assert seen==[]
