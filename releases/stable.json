@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.826",
+  "version": "1.1.0-rc.827",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-13T07:57:22Z",
+  "released_at": "2026-11-13T08:07:53Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "3fb21abcf4943c4a7f0b53975c798ede9630f1cd",
+  "source_sha": "6add61bf3762081cdc406a5a4e6deae77efd2807",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.826/twinpanel-1.1.0-rc.826-linux-x86_64.tar.gz",
-    "sha256": "d6d8bbd79e30a3c493982f341c8886c12acb4a4f7442ebfffa0289607c1cd11a",
-    "size_bytes": 30788168
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.827/twinpanel-1.1.0-rc.827-linux-x86_64.tar.gz",
+    "sha256": "90b32b71acce43cbff86681fb778737a5d951002cbd99729adf720556295dda2",
+    "size_bytes": 30772258
   },
   "notes": {
-    "fa": "رفع ثبت‌نشدن مصرف Sudoku مشترک: دریافت شمارنده واقعی و احرازشده آپلود/دانلود هر اشتراک، ثبت تفاضل مصرف در موتور سهمیه با مبدأ غیرقابل‌صورتحساب در اولین نمونه، مدیریت ایمن ریست سرویس و جلوگیری از ثبت تکراری؛ بدون تغییر کانفیگ VPN یا کلید کاربران.",
-    "en": "Restore measured per-user Sudoku shared traffic accounting from authenticated cumulative uplink/downlink counters. First observation is nonbillable; process epochs prevent duplicate charging, and inactive users are not charged. No VPN client config or key changes."
+    "fa": "حسابداری دقیق Sudoku با سربار کمتر: اندازه‌گیری واقعی هر کاربر، مبدأ غیرقابل‌صورتحساب، جلوگیری از پردازش و ساخت رکورد صفر برای کاربران بدون مصرف. اصلاحات rc.826 حفظ شده؛ هیچ کانفیگ اتصال، کلید یا سرویس Sudoku روی نودها تغییر نمی‌کند.",
+    "en": "Accurate shared Sudoku accounting with low overhead: verified real per-user counters, nonbillable baselines, and sparse capture to avoid allocating zero-byte cursors for idle users. Preserves rc.826 accounting fixes without changing node VPN configs or credentials."
   }
 }
