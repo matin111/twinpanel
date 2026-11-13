@@ -3708,7 +3708,24 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
               child: Column(crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(children: [
-                    Icon(Icons.speed_rounded, color: purple, size: 18),
+                    Container(
+                      key: const Key('livePingLightningIcon'),
+                      height: 29, width: 29,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(colors: [
+                          ServerLatency.color(_connectedServerRtt)
+                            .withValues(alpha: .20),
+                          purple.withValues(alpha: .12),
+                        ]),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: ServerLatency.color(_connectedServerRtt)
+                            .withValues(alpha: .36)),
+                      ),
+                      child: Icon(Icons.bolt_rounded,
+                        color: ServerLatency.color(_connectedServerRtt),
+                        size: 20),
+                    ),
                     const SizedBox(width: 8),
                     Expanded(child: txt(tr('پینگ سرور', 'Server ping'),
                         size: 11, color: sub)),
