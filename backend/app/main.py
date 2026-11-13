@@ -26,6 +26,7 @@ from . import storefront_settings_models  # TWINPANEL_STOREFRONT_CMS_V74
 from . import two_factor_models
 from . import runtime_settings_model
 from . import node_connection_settings_models_v1  # additive per-node modern endpoint table
+from . import node_protocol_operator_switches_v1  # durable per-node protocol availability before create_all
 from . import fast_provision_job_models_v1  # additive durable new-account queue table
 from . import download_asset_models
 from . import subscription_delivery_policy_v1
@@ -50,6 +51,7 @@ from .routers.modern_transports import router as modern_transports_router
 from .routers.tunnel_selected_v358 import router as tunnel_selected_v358_router
 from .routers.tunnel_selected_jobs_v1 import router as tunnel_selected_jobs_v1_router  # TWINPANEL_SELECTED_INITIAL_TRANSPORT_V358
 from .routers.modern_protocol_admin_v3 import router as modern_protocol_admin_v3_router
+from .routers.node_protocol_operator_controls_v1 import router as node_protocol_operator_controls_v1_router
 from .routers.download_assets import admin_router as download_assets_admin_router, public_router as download_assets_public_router
 from .routers.public_connection_hub_live_v5 import router as public_connection_hub_live_v5_router
 from .routers.public_connection_live_v4 import router as public_connection_live_v4_router
@@ -158,6 +160,8 @@ ensure_wallet_crypto_schema()
 # Delivery engine. Subscriptions without a policy-state row remain on the exact
 # legacy behavior.
 install_account_delivery_hooks()
+# Wrap all customer/legacy/explicit/Multi-Link projections after their hooks.
+node_protocol_operator_switches_v1.install_public_delivery_switches()
 
 
 # TWINPANEL_TUNNEL_WATCHDOG_LIFESPAN_V1
@@ -411,6 +415,7 @@ app.include_router(account_delivery.customer_router)
 # router so /modern-protocols uses Local Core + Exit dispatch while L2TP and
 # compatibility-only routes continue to be served by the legacy router.
 app.include_router(modern_protocol_admin_v3_router)
+app.include_router(node_protocol_operator_controls_v1_router)
 
 # TWINPANEL_VPN_SETTINGS_V1
 from .routers.vpn_settings import router as vpn_settings_router

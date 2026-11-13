@@ -211,6 +211,28 @@ jobs:
           grep -Fq '_verify_new_subscription_quota_mapping(' source/backend/app/services/quota_refresh.py
           grep -Fq 'fast_validate=prefer_new_singbox_batch' source/backend/app/routers/modern_account_delivery_v1.py
 
+      - name: Protect per-node protocol actions in pinned releases
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          # Operator disabled states and controls must survive prebuilt updates.
+          for path in \
+            "backend/app/node_protocol_operator_switches_v1.py" \
+            "backend/app/routers/node_protocol_operator_controls_v1.py" \
+            "backend/app/routers/modern_protocol_admin_v3.py" \
+            "backend/app/services/central_partial_protocol_scope_v1.py" \
+            "backend/app/main.py" \
+            "backend/tests/test_node_protocol_operator_controls_v1.py" \
+            "components/protocol-command-center.tsx"; do
+            test -s "source/$path" && test -s "publisher/$path"
+            if ! cmp -s "source/$path" "publisher/$path"; then
+              echo "::error file=$path::Pinned source lacks the latest per-node protocol controls. Re-pin release."
+              exit 1
+            fi
+          done
+          grep -Fq 'install_public_delivery_switches()' source/backend/app/main.py
+          grep -Fq 'nodeActions' source/components/protocol-command-center.tsx
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -561,6 +583,23 @@ jobs:
             "backend/tests/test_new_subscription_quota_targeted_validation.py"; do
             cmp -s "source/$path" "publisher/$path" || {
               echo "::error file=$path::Quota fix changed during build; create a new candidate."
+              exit 1
+            }
+          done
+
+      - name: Recheck per-node protocol controls before publishing
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          for path in \
+            "backend/app/node_protocol_operator_switches_v1.py" \
+            "backend/app/routers/node_protocol_operator_controls_v1.py" \
+            "backend/app/routers/modern_protocol_admin_v3.py" \
+            "backend/app/main.py" \
+            "backend/tests/test_node_protocol_operator_controls_v1.py" \
+            "components/protocol-command-center.tsx"; do
+            cmp -s "source/$path" "publisher/$path" || {
+              echo "::error file=$path::Operator controls changed after candidate was pinned."
               exit 1
             }
           done

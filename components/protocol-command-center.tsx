@@ -57,6 +57,7 @@ type ModernProtocolRow={
   adapter:string;
   runtime_status:string;
   installable:boolean;
+  operator_disabled?:boolean;
   port:number;
   transport:string;
   service:string;
@@ -127,6 +128,7 @@ type UnifiedProtocol={
   status:string;
   installed:boolean;
   installable:boolean;
+  operatorDisabled:boolean;
   portText:string;
   service?:string;
   recommended:boolean;
@@ -315,12 +317,12 @@ export function ProtocolCommandCenter(){
         protocol:def.key,enabled:false,port:def.defaultPort,port_text:def.key==="l2tp"?"500/4500/1701":String(def.defaultPort||""),transport:def.key==="openvpn"?"udp":def.transport,status:"not_installed",
       } satisfies ClassicProtocolInventoryRow);
       rows.push({
-        id:`classic:${def.key}`,kind:"classic",protocol:def.key,name:def.label,core:def.core,transport:row.transport||def.transport,category:"classic",status:row.enabled?(row.status||"enabled"):"not_installed",installed:Boolean(row.enabled),installable:true,portText:row.port_text||"—",service:row.service||undefined,recommended:["cisco","wireguard","v2ray"].includes(def.key),error:row.last_error,classicRow:row,
+        id:`classic:${def.key}`,kind:"classic",protocol:def.key,name:def.label,core:def.core,transport:row.transport||def.transport,category:"classic",status:row.enabled?(row.status||"enabled"):"not_installed",installed:Boolean(row.enabled),installable:true,operatorDisabled:Boolean(row.operator_disabled),portText:row.port_text||"—",service:row.service||undefined,recommended:["cisco","wireguard","v2ray"].includes(def.key),error:row.last_error,classicRow:row,
       });
     }
     for(const row of selectedNode.modern?.protocols||[]){
       rows.push({
-        id:`modern:${row.protocol}`,kind:"modern",protocol:row.protocol,name:row.name,core:row.core,transport:row.transport,category:row.category,status:row.status,installed:row.status!=="not_installed",installable:row.installable,portText:String(row.port||"—"),service:row.service,recommended:row.category==="recommended",error:row.last_error,modernRow:row,
+        id:`modern:${row.protocol}`,kind:"modern",protocol:row.protocol,name:row.name,core:row.core,transport:row.transport,category:row.category,status:row.status,installed:row.status!=="not_installed",installable:row.installable,operatorDisabled:Boolean(row.operator_disabled),portText:String(row.port||"—"),service:row.service,recommended:row.category==="recommended",error:row.last_error,modernRow:row,
       });
     }
     return rows;
@@ -345,8 +347,9 @@ export function ProtocolCommandCenter(){
 
   const metrics=useMemo(()=>({
     total:unifiedProtocols.length,
-    active:unifiedProtocols.filter(row=>row.installed).length,
+    active:unifiedProtocols.filter(row=>row.installed&&!row.operatorDisabled).length,
     healthy:unifiedProtocols.filter(row=>{
+      if(row.operatorDisabled)return false;
       if(row.kind==="modern")return row.status==="online";
       const run=classicRuntime[classicKey(selectedNodeId,row.protocol as ClassicProtocolKey)];
       return Boolean(run?.ok);
@@ -429,11 +432,52 @@ export function ProtocolCommandCenter(){
   const restartClassic=async(row:UnifiedProtocol)=>{
     if(!selectedNode||row.kind!=="classic"||busy)return;
     const key=classicKey(selectedNode.id,row.protocol as ClassicProtocolKey);
-    setBusy(`classic-restart:${key}`);setError("");
+    if(!row.installed||!window.confirm(pick("ری‌استارت "+row.name+" روی "+selectedNode.name+" اتصال‌های فعلی همین پروتکل را موقتاً قطع می‌کند. ادامه می‌دهید؟","Restarting "+row.name+" on "+selectedNode.name+" briefly interrupts connections using this protocol. Continue?")))return;
+    setBusy("classic-restart:"+key);setError("");setNotice("");
     try{
       const result=await legacyAdminApi.restartProtocol(selectedNode.id,row.protocol);
       const runtimeRow=result&&typeof result.protocol==="object"&&result.protocol?result.protocol as ClassicRuntime:{};
-      setClassicRuntime(current=>({...current,[key]:runtimeRow}));setClassicChecked(current=>({...current,[key]:true}));setNotice(pick("سرویس ریستارت شد.","Service restarted."));
+      setClassicRuntime(current=>({...current,[key]:runtimeRow}));setClassicChecked(current=>({...current,[key]:true}));
+      if(runtimeRow.ok===false)throw new Error(pick("سرویس ری‌استارت شد ولی Health Check موفق نبود.","Restart completed but health check failed."));
+      setNotice(pick(row.name+" روی "+selectedNode.name+" ری‌استارت و بررسی شد.",row.name+" on "+selectedNode.name+" restarted and checked."));
+      await load(true);
+    }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
+    finally{setBusy("");}
+  };
+
+
+  const restartOnNode=async(row:UnifiedProtocol)=>{
+    if(!selectedNode||!row.installed||busy)return;
+    if(row.kind==="classic"){await restartClassic(row);return;}
+    const shared=!["mieru","trusttunnel","amneziawg","sudoku"].includes(row.protocol);
+    const warning=shared
+      ?pick("این پروتکل روی Core مشترک sing-box است؛ ری‌استارت آن سایر پروتکل‌های مدرن همین نود را هم برای چند لحظه قطع می‌کند.","This protocol uses the shared sing-box core; restarting briefly interrupts all sing-box protocols on this node.")
+      :pick("اتصال کاربران همین پروتکل برای چند لحظه قطع می‌شود.","Connections using this protocol will be briefly interrupted.");
+    if(!window.confirm(pick("ری‌استارت "+row.name+" روی "+selectedNode.name+"؟\\n"+warning,"Restart "+row.name+" on "+selectedNode.name+"?\\n"+warning)))return;
+    setBusy("modern-restart:"+selectedNode.id+":"+row.protocol);setError("");setNotice("");
+    try{
+      const result=await modernRequest<{ok:boolean;message?:string}>("/v1/settings/vpn/modern-protocols/"+selectedNode.id+"/"+row.protocol+"/restart",{method:"POST"});
+      await load(true);
+      if(!result.ok)throw new Error(result.message||pick("پس از ری‌استارت Health Check موفق نبود.","Health check failed after restart."));
+      setNotice(pick(row.name+" روی "+selectedNode.name+" با موفقیت ری‌استارت شد.",row.name+" was restarted on "+selectedNode.name+"."));
+    }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
+    finally{setBusy("");}
+  };
+
+  const toggleOnNode=async(row:UnifiedProtocol)=>{
+    if(!selectedNode||!row.installed||busy)return;
+    const disabled=!row.operatorDisabled;
+    const message=disabled
+      ?pick("فقط "+row.name+" روی نود "+selectedNode.name+" از فهرست سرورها و کانفیگ‌های جدید کاربران مخفی شود؟\\n\\nسرویس متوقف نمی‌شود و اتصال‌های فعلی قطع نخواهند شد.","Hide only "+row.name+" on node "+selectedNode.name+" from newly fetched configs?\\n\\nThe runtime and existing connections remain untouched.")
+      :pick(row.name+" روی نود "+selectedNode.name+" دوباره برای دریافت کانفیگ فعال شود؟","Make "+row.name+" on "+selectedNode.name+" available in fetched configs again?");
+    if(!window.confirm(message))return;
+    setBusy("node-toggle:"+selectedNode.id+":"+row.protocol);setError("");setNotice("");
+    try{
+      await modernRequest("/v1/admin/node-protocol-controls/"+selectedNode.id+"/"+row.protocol,{method:"PUT",body:JSON.stringify({disabled})});
+      await load(true);
+      setNotice(disabled
+        ?pick(row.name+" فقط روی نود "+selectedNode.name+" برای کانفیگ‌های جدید غیرفعال شد.",row.name+" was hidden for new configs on "+selectedNode.name+".")
+        :pick(row.name+" روی نود "+selectedNode.name+" دوباره فعال شد.",row.name+" on "+selectedNode.name+" was enabled again."));
     }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
     finally{setBusy("");}
   };
@@ -451,7 +495,7 @@ export function ProtocolCommandCenter(){
   const modernSyncAll=async()=>{
     const node=selectedNode?.modern;
     if(!node||busy)return;
-    const rows=node.protocols.filter(row=>row.installable&&Boolean(catalogMap.get(row.protocol)?.installable));
+    const rows=node.protocols.filter(row=>row.installable&&!row.operator_disabled&&Boolean(catalogMap.get(row.protocol)?.installable));
     if(!rows.length){
       setError("");
       setNotice(pick("هیچ پروتکل مدرن قابل همگام‌سازی روی این نود وجود ندارد.","There are no installable modern protocols to sync on this node."));
@@ -590,11 +634,11 @@ export function ProtocolCommandCenter(){
           <div className={styles.protocolGrid}>
             {filteredProtocols.map(row=>{
               const classicRun=row.kind==="classic"?classicRuntime[classicKey(selectedNodeId,row.protocol as ClassicProtocolKey)]:undefined;
-              const visibleStatus=row.kind==="classic"&&classicChecked[classicKey(selectedNodeId,row.protocol as ClassicProtocolKey)]?(classicRun?.ok?"online":"check"):row.status;
+              const visibleStatus=row.operatorDisabled?"admin_disabled":row.kind==="classic"&&classicChecked[classicKey(selectedNodeId,row.protocol as ClassicProtocolKey)]?(classicRun?.ok?"online":"check"):row.status;
               return <article key={row.id} className={`${styles.protocolCard} ${row.installed?styles.protocolCardActive:""}`}>
                 <div className={styles.cardTop}>
                   <div className={styles.protocolIdentity}><span className={styles.protocolIcon}>{iconFor(row.protocol)}</span><div><strong>{row.name}</strong><small>{row.core} · {row.transport}</small></div></div>
-                  <Badge tone={tone(visibleStatus)}>{visibleStatus==="not_installed"?pick("نصب نشده","Not installed"):visibleStatus}</Badge>
+                  <Badge tone={row.operatorDisabled?"warn":tone(visibleStatus)}>{row.operatorDisabled?pick("غیرفعال روی این نود","Disabled on this node"):visibleStatus==="not_installed"?pick("نصب نشده","Not installed"):visibleStatus}</Badge>
                 </div>
                 <div className={styles.metaLine}>
                   <span>{row.kind==="classic"?pick("Classic","Classic"):pick("Modern","Modern")}</span>
@@ -609,6 +653,10 @@ export function ProtocolCommandCenter(){
                     {busy.includes(`${selectedNodeId}:${row.protocol}`)?"…":row.installed?"Health":row.installable?pick("نصب","Install"):pick("به‌زودی","Soon")}
                   </button>
                 </div>
+                {row.installed?<div className={styles.nodeActions}>
+                  <button type="button" className={styles.secondaryButton} disabled={!!busy} onClick={()=>void restartOnNode(row)}>{pick("↻ ری‌استارت پروتکل","↻ Restart protocol")}</button>
+                  <button type="button" className={row.operatorDisabled?styles.secondaryButton:styles.dangerButton} disabled={!!busy} onClick={()=>void toggleOnNode(row)}>{row.operatorDisabled?pick("فعال‌سازی روی نود","Enable on node"):pick("غیرفعال روی نود","Disable on node")}</button>
+                </div>:null}
               </article>;
             })}
           </div>
@@ -628,7 +676,16 @@ export function ProtocolCommandCenter(){
         {error?<div className={styles.errorBox}>{error}</div>:null}
         {notice?<div className={styles.successBox}>{notice}</div>:null}
 
-        <div className={styles.drawerStatus}><div><span>{pick("وضعیت","Status")}</span><Badge tone={tone(selectedRow.status)}>{selectedRow.status}</Badge></div><div><span>{pick("نود","Node")}</span><b>{selectedNode.name}</b></div><div><span>{pick("Runtime","Runtime")}</span><b>{selectedRow.kind==="classic"?pick("Production","Production"):selectedRow.installable?pick("آماده","Ready"):pick("در حال توسعه","Planned")}</b></div></div>
+        <div className={styles.drawerStatus}><div><span>{pick("وضعیت","Status")}</span><Badge tone={selectedRow.operatorDisabled?"warn":tone(selectedRow.status)}>{selectedRow.operatorDisabled?pick("غیرفعال روی این نود","Disabled on this node"):selectedRow.status}</Badge></div><div><span>{pick("نود","Node")}</span><b>{selectedNode.name}</b></div><div><span>{pick("Runtime","Runtime")}</span><b>{selectedRow.kind==="classic"?pick("Production","Production"):selectedRow.installable?pick("آماده","Ready"):pick("در حال توسعه","Planned")}</b></div></div>
+
+        {selectedRow.installed?<section className={styles.drawerSection}>
+          <div className={styles.sectionHead}><div><strong>{pick("کنترل همین نود","Controls for this node")}</strong><small>{pick("هر عمل فقط روی نود انتخاب‌شده اعمال می‌شود؛ تنظیمات سایر نودها تغییر نمی‌کند.","Actions target only this node; other nodes remain unchanged.")}</small></div></div>
+          <div className={styles.actionRow}>
+            <button type="button" className={styles.secondaryButton} disabled={!!busy} onClick={()=>void restartOnNode(selectedRow)}>{pick("↻ ری‌استارت پروتکل","↻ Restart protocol")}</button>
+            <button type="button" className={selectedRow.operatorDisabled?styles.secondaryButton:styles.dangerButton} disabled={!!busy} onClick={()=>void toggleOnNode(selectedRow)}>{selectedRow.operatorDisabled?pick("فعال‌سازی پروتکل روی نود","Enable protocol on node"):pick("غیرفعال‌کردن پروتکل روی نود","Disable protocol on node")}</button>
+          </div>
+          <small className={styles.operatorHint}>{pick("غیرفعال‌کردن فقط نمایش کانفیگ‌های جدید را متوقف می‌کند؛ سرویس و اتصال‌های فعلی بدون تغییر می‌مانند.","Disabling hides new configs only; it does not stop the service or existing connections.")}</small>
+        </section>:null}
 
         {selectedRow.kind==="classic"&&selectedRow.classicRow?(()=>{
           const protocol=selectedRow.protocol as ClassicProtocolKey;
@@ -645,7 +702,7 @@ export function ProtocolCommandCenter(){
               {portWarnings[key]?<div className={styles.warningBox}>{portWarnings[key]}</div>:null}
               {protocol!=="l2tp"?<button className={styles.secondaryButton} disabled={!!busy||!Number.isInteger(draft.port)||draft.port<1||draft.port>65535} onClick={()=>void checkClassicPort(selectedRow)}>{busy===`port-check:${key}`?"…":pick("بررسی تداخل پورت","Check port conflict")}</button>:null}
               {run?.error||selectedRow.error?<div className={styles.errorBox}>{run?.error||selectedRow.error}</div>:null}
-              <div className={styles.actionRow}><button className={styles.primaryButton} disabled={!!busy} onClick={()=>void ensureClassic(selectedRow)}>{busy===`classic-ensure:${key}`?"…":selectedRow.installed?pick("اعمال / Repair","Apply / repair"):pick("نصب / فعال‌سازی","Install / enable")}</button>{selectedRow.installed?<button className={styles.secondaryButton} disabled={!!busy} onClick={()=>void classicHealth(selectedRow)}>{busy===`classic-health:${key}`?"…":"Health"}</button>:null}{selectedRow.installed&&checked&&!run?.ok?<button className={styles.secondaryButton} disabled={!!busy} onClick={()=>void restartClassic(selectedRow)}>{busy===`classic-restart:${key}`?"…":pick("ریستارت","Restart")}</button>:null}</div>
+              <div className={styles.actionRow}><button className={styles.primaryButton} disabled={!!busy} onClick={()=>void ensureClassic(selectedRow)}>{busy===`classic-ensure:${key}`?"…":selectedRow.installed?pick("اعمال / Repair","Apply / repair"):pick("نصب / فعال‌سازی","Install / enable")}</button>{selectedRow.installed?<button className={styles.secondaryButton} disabled={!!busy} onClick={()=>void classicHealth(selectedRow)}>{busy===`classic-health:${key}`?"…":"Health"}</button>:null}</div>
             </section>
 
             {protocol==="v2ray"&&selectedRow.installed?<section className={styles.drawerSection}>
