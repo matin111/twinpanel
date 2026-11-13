@@ -20,6 +20,8 @@ SUDOKU_GUARD = ROOT / "native" / "windows" / "twinconnect_sudoku_guard.h"
 SUDOKU_INSTALLED = ROOT / "windows" / "runner" / "twinconnect_sudoku_guard.h"
 MIERU_GUARD = ROOT / "native" / "windows" / "twinconnect_mieru_guard.h"
 MIERU_INSTALLED = ROOT / "windows" / "runner" / "twinconnect_mieru_guard.h"
+TRUSTTUNNEL_GUARD = ROOT / "native" / "windows" / "twinconnect_trusttunnel_guard.h"
+TRUSTTUNNEL_INSTALLED = ROOT / "windows" / "runner" / "twinconnect_trusttunnel_guard.h"
 OPENCONNECT_NATIVE = ROOT / "native" / "windows" / "twinconnect_openconnect.h"
 OPENCONNECT_INSTALLED = ROOT / "windows" / "runner" / "twinconnect_openconnect.h"
 L2TP_NATIVE = ROOT / "native" / "windows" / "twinconnect_l2tp.h"
@@ -52,6 +54,9 @@ def install() -> None:
     if not MIERU_GUARD.is_file():
         raise RuntimeError("Missing Mieru process/config guard header")
     shutil.copyfile(MIERU_GUARD, MIERU_INSTALLED)
+    if not TRUSTTUNNEL_GUARD.is_file():
+        raise RuntimeError("Missing TrustTunnel private config/process guard")
+    shutil.copyfile(TRUSTTUNNEL_GUARD, TRUSTTUNNEL_INSTALLED)
     if not OPENCONNECT_NATIVE.is_file():
         raise RuntimeError("Missing OpenConnect native runtime header")
     shutil.copyfile(OPENCONNECT_NATIVE, OPENCONNECT_INSTALLED)
@@ -86,6 +91,7 @@ def install() -> None:
             '#include "twinconnect_xray_guard.h"\n'
             '#include "twinconnect_sudoku_guard.h"\n'
             '#include "twinconnect_mieru_guard.h"\n'
+            '#include "twinconnect_trusttunnel_guard.h"\n'
             '#include "twinconnect_openconnect.h"\n'
             '#include "twinconnect_l2tp.h"',
         )
@@ -342,6 +348,36 @@ def install() -> None:
             result->Error("MIERU_PROCESS_GUARD_FAILED"); return;
           }
           result->Success(flutter::EncodableValue(true));
+        } else if (call.method_name() == "stageTrustTunnelConfig") {
+          const auto* args = std::get_if<flutter::EncodableMap>(call.arguments());
+          if (!args) { result->Error("TRUSTTUNNEL_CONFIG_REQUEST_INVALID"); return; }
+          const auto it = args->find(flutter::EncodableValue("config"));
+          const auto* config = it == args->end() ? nullptr :
+              std::get_if<std::string>(&it->second);
+          if (!config) { result->Error("TRUSTTUNNEL_CONFIG_REQUEST_INVALID"); return; }
+          std::string path;
+          if (!twinconnect_trusttunnel_guard::StageConfig(*config, &path)) {
+            result->Error("TRUSTTUNNEL_CONFIG_STAGE_FAILED"); return;
+          }
+          result->Success(flutter::EncodableValue(path));
+        } else if (call.method_name() == "finishTrustTunnelConfig") {
+          twinconnect_trusttunnel_guard::ReleaseConfig();
+          result->Success(flutter::EncodableValue(true));
+        } else if (call.method_name() == "guardTrustTunnelProcess") {
+          const auto* args = std::get_if<flutter::EncodableMap>(call.arguments());
+          if (!args) { result->Error("TRUSTTUNNEL_PROCESS_REQUEST_INVALID"); return; }
+          const auto it = args->find(flutter::EncodableValue("pid"));
+          if (it == args->end()) { result->Error("TRUSTTUNNEL_PROCESS_REQUEST_INVALID"); return; }
+          int64_t pid = 0;
+          if (const auto* i32 = std::get_if<int32_t>(&it->second)) {
+            pid = *i32;
+          } else if (const auto* i64 = std::get_if<int64_t>(&it->second)) {
+            pid = *i64;
+          } else { result->Error("TRUSTTUNNEL_PROCESS_REQUEST_INVALID"); return; }
+          if (!twinconnect_trusttunnel_guard::Guard(pid)) {
+            result->Error("TRUSTTUNNEL_PROCESS_GUARD_FAILED"); return;
+          }
+          result->Success(flutter::EncodableValue(true));
         } else if (call.method_name() == "getCapabilities") {
           result->Success(twinconnect_wireguard::Capabilities());
         } else if (call.method_name() == "getProtocolCapabilities") {
@@ -490,7 +526,7 @@ def install() -> None:
         import re
         cpp, patched = re.subn(
             r"FlutterWindow::~FlutterWindow\(\)\s*\{\s*\}",
-            "FlutterWindow::~FlutterWindow() {\n  twinconnect_l2tp::Stop();\n  twinconnect_sudoku_guard::ReleaseConfig();\n  twinconnect_mieru_guard::ReleaseConfig();\n}",
+            "FlutterWindow::~FlutterWindow() {\n  twinconnect_l2tp::Stop();\n  twinconnect_sudoku_guard::ReleaseConfig();\n  twinconnect_mieru_guard::ReleaseConfig();\n  twinconnect_trusttunnel_guard::ReleaseConfig();\n}",
             cpp, count=1,
         )
         if patched != 1:
