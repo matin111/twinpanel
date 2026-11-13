@@ -248,6 +248,19 @@ int UninstallVmOnlyService() {
 }  // namespace
 
 int wmain(int argc, wchar_t** argv) {
+  // Works even if the service is crashed or absent. Return 0 ONLY when
+  // no TwinConnect-owned persistent WFP rules remain, including malformed
+  // ones that fail structural verification.
+  if (argc == 2 && _wcsicmp(argv[1], L"offline-status") == 0) {
+    Engine engine;
+    if (Open(engine) != ERROR_SUCCESS) return 2;
+    const bool v4 = OwnedFilterPresent(engine.handle, kBlockV4);
+    const bool v6 = OwnedFilterPresent(engine.handle, kBlockV6);
+    const bool permit = OwnedFilterPresent(engine.handle, kPermitV4);
+    wprintf(L"OWNED_RULES_PRESENT %d %d %d\n",
+            v4 ? 1 : 0, v6 ? 1 : 0, permit ? 1 : 0);
+    return v4 || v6 || permit ? 1 : 0;
+  }
   // VM-only install/uninstall require admin and a protected executable path.
   if (argc == 3 && _wcsicmp(argv[1], L"install-vm") == 0 &&
       wcscmp(argv[2], kAccept) == 0)
