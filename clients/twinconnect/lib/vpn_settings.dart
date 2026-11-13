@@ -133,6 +133,26 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
     child: Material(type: MaterialType.transparency, child: child),
   );
 
+  Widget _routingOption({
+    required String label,
+    required String help,
+    required bool selected,
+    required bool enabled,
+    required Key key,
+  }) => Row(key: key, children: [
+    Icon(selected ? Icons.radio_button_checked_rounded
+                  : Icons.radio_button_unchecked_rounded,
+      color: selected ? Theme.of(context).colorScheme.primary
+          : Theme.of(context).disabledColor, size: 20),
+    const SizedBox(width: 12),
+    Expanded(child: Text(label, style: TextStyle(
+      fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+      color: enabled ? null : Theme.of(context).disabledColor,
+    ))),
+    _help(label, help),
+    if (!enabled) const Icon(Icons.lock_outline_rounded, size: 17),
+  ]);
+
   Widget _statusItem({
     required String title,
     required String help,
@@ -236,6 +256,82 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
             ),
           ]),
         ),
+        _section(tr('حالت اتصال', 'Connection mode')),
+        _glass(Row(children: [
+          const Icon(Icons.route_rounded, size: 22),
+          const SizedBox(width: 12),
+          Expanded(child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(tr('VPN / TUN', 'VPN / TUN'),
+                  style: const TextStyle(fontWeight: FontWeight.w700)),
+              Text(_capabilities.engineReady && _capabilities.fullTunnel
+                  ? tr('تونل دستگاه پشتیبانی می‌شود', 'Device tunnel supported')
+                  : tr('در این دستگاه تأیید نشده', 'Not verified on this device'),
+                  style: Theme.of(context).textTheme.bodySmall),
+            ],
+          )),
+          _help('VPN / TUN', tr(
+            'حالت تمام‌تونل که ترافیک دستگاه را از مسیر VPN هدایت می‌کند. فعال بودن موتور به‌تنهایی تضمین نمی‌کند که همه ترافیک بدون نشت منتقل می‌شود.',
+            'Full-device tunneling. Engine support alone is not proof against leaks.',
+          )),
+          Icon(_capabilities.engineReady && _capabilities.fullTunnel
+              ? Icons.check_circle_rounded : Icons.lock_outline_rounded,
+              color: _capabilities.engineReady && _capabilities.fullTunnel
+                  ? const Color(0xFF47CBA8) : null),
+        ]), key: const Key('vpnTunMode')),
+        const SizedBox(height: 8),
+        _glass(Row(children: [
+          const Icon(Icons.swap_horiz_rounded, size: 22),
+          const SizedBox(width: 12),
+          Expanded(child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(tr('Proxy / System Proxy', 'Proxy / System Proxy'),
+                  style: const TextStyle(fontWeight: FontWeight.w700)),
+              Text(tr('موتور تغییر مسیر پروکسی هنوز متصل نیست',
+                      'Proxy switching engine not integrated'),
+                  style: Theme.of(context).textTheme.bodySmall),
+            ],
+          )),
+          _help('Proxy', tr(
+            'حالت پروکسی فقط برنامه‌هایی را پوشش می‌دهد که از SOCKS یا پروکسی سیستم پیروی می‌کنند. با VPN کل سیستم تفاوت دارد؛ هنوز امکان تغییر امن حالت از این بخش فراهم نشده است.',
+            'A local SOCKS/system proxy only covers proxy-aware apps. Safe mode switching is not yet integrated.',
+          )),
+          const Icon(Icons.lock_outline_rounded),
+        ]), key: const Key('vpnProxyModeUnavailable')),
+        _section(tr('تفکیک برنامه‌ها', 'Split tunneling')),
+        _glass(Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _routingOption(
+              label: tr('تمام دستگاه', 'Entire device'),
+              selected: true,
+              enabled: true,
+              help: tr('در وضعیت فعلی تمام ترافیک دستگاه از VPN عبور می‌کند؛ البته با توجه به محدودیت پروتکل و تنظیمات شبکه.',
+                  'Currently routes device traffic via VPN, subject to the protocol and OS routing capabilities.'),
+              key: const Key('vpnRoutingFullTunnel'),
+            ),
+            Divider(height: 12, color: Theme.of(context).dividerColor),
+            _routingOption(
+              label: tr('فقط برنامه‌های انتخابی', 'Only selected apps'),
+              selected: false,
+              enabled: false,
+              help: tr('این حالت تنها پس از اضافه‌شدن فیلتر واقعی بسته‌های برنامه‌ها و انتخاب برنامه‌های نصب‌شده فعال می‌شود.',
+                  'Requires a verified per-app packet routing implementation and an installed-app picker.'),
+              key: const Key('vpnRoutingIncludeApps'),
+            ),
+            Divider(height: 12, color: Theme.of(context).dividerColor),
+            _routingOption(
+              label: tr('همه به‌جز برنامه‌های انتخابی', 'Exclude selected apps'),
+              selected: false,
+              enabled: false,
+              help: tr('برای عبور مستقیم برنامه‌های مشخص باید قوانین واقعی سیستم‌عامل ساخته و تست شوند.',
+                  'Requires verified OS routing rules for applications excluded from the VPN.'),
+              key: const Key('vpnRoutingExcludeApps'),
+            ),
+          ],
+        ), key: const Key('vpnSplitTunnelCard')),
         _section(tr('وضعیت شبکه', 'Network status')),
         LayoutBuilder(builder: (context, constraints) {
           final compact = constraints.maxWidth < 550;
