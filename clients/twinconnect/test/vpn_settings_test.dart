@@ -24,7 +24,8 @@ void main() {
     await tester.pumpWidget(const MaterialApp(
       home: VpnSettingsScreen(tenant: '', account: ''),
     ));
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pump();
     expect(find.byKey(const Key('vpnCapabilityRefresh')), findsOneWidget);
     expect(find.byKey(const Key('vpnNativeEngineStatus')), findsOneWidget);
     expect(find.byKey(const Key('vpnWfpStatus')), findsOneWidget);
@@ -39,7 +40,8 @@ void main() {
     await tester.pumpWidget(const MaterialApp(
       home: VpnSettingsScreen(tenant: tenant, account: account),
     ));
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pump();
     final kill = tester.widget<Switch>(find.byKey(const Key('vpnKillSwitch')));
     expect(kill.onChanged, isNull);
     expect(kill.value, isFalse);
@@ -52,11 +54,13 @@ void main() {
     await tester.pumpWidget(const MaterialApp(
       home: VpnSettingsScreen(tenant: '', account: ''),
     ));
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pump();
     final details = find.byTooltip('Details');
     expect(details, findsWidgets);
     await tester.tap(details.first);
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pump();
     expect(find.byType(AlertDialog), findsOneWidget);
     expect(find.byType(VpnSettingsScreen), findsOneWidget);
   });
