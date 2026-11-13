@@ -106,6 +106,37 @@ async def _ensure_agent_python_v278(conn) -> tuple[str, str]:
         )
 
     if system_ready.strip() == "yes":
+        # Minimal Ubuntu/Debian images can have python3-httpx and psutil but
+        # *lack ensurepip*. In that case python3 -m venv fails with HTTP 500
+        # on every Iran node Agent upgrade. Provision python3-venv first.
+        ensurepip = await provision.cmd(
+            conn,
+            "if python3 -m ensurepip --version >/dev/null 2>&1; "
+            "then echo yes; else echo no; fi",
+            check=False,
+        )
+        if ensurepip.strip() != "yes":
+            await provision.cmd(
+                conn,
+                "export DEBIAN_FRONTEND=noninteractive; "
+                "apt-get -o DPkg::Lock::Timeout=120 install -y "
+                "python3-venv >/dev/null 2>&1",
+                timeout=240,
+                check=False,
+            )
+            ensurepip = await provision.cmd(
+                conn,
+                "if python3 -m ensurepip --version >/dev/null 2>&1; "
+                "then echo yes; else echo no; fi",
+                check=False,
+            )
+        if ensurepip.strip() != "yes":
+            # Avoid dropping an otherwise usable system-package Agent if
+            # the node's apt mirrors are unreachable. Both dependencies
+            # have already passed an actual import test with python3.
+            # The generated systemd service always uses the returned path.
+            return "python3", "system_packages_direct"
+
         await provision.cmd(
             conn,
             "rm -rf /opt/twinpanel-agent/venv.new; "
