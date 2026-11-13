@@ -1,6 +1,6 @@
 {
   "version": "1.1.0-rc.830",
-  "source_sha": "473a665b99e53f033a00b68d8f68ff6495fc8e47",
+  "source_sha": "1f1ab837c5e86a5696a07f811db9be3dac449f3c",
   "notes": {
     "fa": "افزودن نمایش حجم کل، حجم مصرفی، حجم باقی‌مانده و تاریخ انقضا به مولتی‌لینک‌های پروتکل‌ها از طریق هدر استاندارد subscription-userinfo و هدرهای مستقل. پشتیبانی از اشتراک نامحدود و شروع اعتبار از اولین اتصال، بدون تغییر کانفیگ‌ها، لینک‌ها و شمارش حجم؛ همراه تست رگرسیون. شامل اصلاحات نسخه‌های قبلی.",
     "en": "Expose live total/used/remaining traffic and expiration via subscription-userinfo plus explicit metadata headers on protocol Multi-Links and V2Ray feeds. Preserve first-use and unlimited subscriptions, VPN payloads, URLs, and accounting semantics. Includes regression tests and preceding fixes."
