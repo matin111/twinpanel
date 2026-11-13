@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.822",
-  "source_sha": "fc7c17dc8b32c3da0e1475f573e35656eb18320a",
+  "version": "1.1.0-rc.823",
+  "source_sha": "3dbea688592a60a3b844954a30146af3f27dfb3a",
   "notes": {
-    "fa": "به‌روزرسانی ظاهر پیش‌فرض اپ TwinConnect در پنل از سورس اصلی GitHub: رنگ‌های سرمه‌ای، آبی دودی و فیروزه‌ای ملایم، حذف پالت بنفش قدیمی از انتخاب‌های پیش‌فرض، پیش‌نمایش جریان دیتا به جای دکمه دایره‌ای، بهبود لایت‌مود و حفظ رنگ‌های سفارشی ادمین و نماینده‌ها. هیچ تغییری در پروتکل‌ها، کاربران، کیف‌پول‌ها و تنظیمات VPN اعمال نشده است.",
-    "en": "Refresh the TwinConnect Brand Studio defaults from current GitHub main: muted slate/navy/teal palettes, replace legacy violet presets with owner-editable full themes, live-flow-style preview instead of circular power orb, improved light mode, while preserving existing customized tenant branding. No changes to VPN protocols, accounts, wallets, or node settings."
+    "fa": "طراحی تیره حرفه‌ای برای تنظیمات برند TwinConnect: پالت سرمه‌ای و سبز دریایی با کنتراست بیشتر، حذف لایت‌مود اپ از پنل، بهبود پیش‌نمایش شیشه‌ای و حفظ تصویر و رنگ‌های سفارشی ادمین و نماینده. بدون تغییر در نود، کیف‌پول، اشتراک و پروتکل‌ها.",
+    "en": "Premium dark-only TwinConnect Brand Studio with deep navy, sea-glass green and icy-blue accents. Remove app light-mode selection, improve frosted preview, and preserve custom owner colors and background images. No changes to nodes, wallet, subscriptions or VPN protocols."
   }
 }
