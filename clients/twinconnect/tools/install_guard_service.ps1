@@ -60,12 +60,17 @@ if ($Action -eq 'Install') {
 } else {
   # The independent recovery command must work before service removal.
   Invoke-Guard -Arguments @('recover', $ack)
-  $status = & $binary status
-  if ($LASTEXITCODE -ne 0 -or $status -notmatch 'OK 0 0 0') {
+  # Offline audit checks raw owned GUID presence without depending on the
+  # service pipe. A crashed service must not prevent a safe recovery.
+  $status = & $binary offline-status
+  if ($LASTEXITCODE -ne 0 -or $status -notmatch 'OWNED_RULES_PRESENT 0 0 0') {
     throw 'Owned WFP filters still present. Refusing to uninstall.'
   }
   if (Service-Exists) {
-    Stop-Service -Name $name -Force -ErrorAction Stop
+    $running = (Get-Service -Name $name -ErrorAction Stop).Status
+    if ($running -ne 'Stopped') {
+      Stop-Service -Name $name -Force -ErrorAction Stop
+    }
     & sc.exe delete $name
     if ($LASTEXITCODE -ne 0) { throw 'SCM service deletion failed.' }
   }
