@@ -16,7 +16,7 @@ void main() {
     expect(dashboard, contains('Widget powerCard({required Widget subscriptionContent}) => ClipRRect('));
     expect(dashboard, contains('Widget connectionStats() => glassCard('));
     expect(dashboard, contains('Widget settings() => Column('));
-    expect(dashboard, contains("key: const Key('settingsSecurityStatus')"));
+    expect(dashboard, contains("key: const Key('inlineVpnSettings')"));
     expect(dashboard, contains("key: const Key('accountIdentityCard')"));
     expect(dashboard, contains("key: const Key('devLocationListingCard')"));
     expect(dashboard, isNot(contains('decoration: tile(radius:')));
