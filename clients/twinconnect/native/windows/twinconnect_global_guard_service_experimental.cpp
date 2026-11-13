@@ -127,7 +127,10 @@ bool RecoveryTaskReady() {
     FILETIME dueFt = {}, nowFt = {};
     if (!VariantTimeToSystemTime(next, &due) ||
         !SystemTimeToFileTime(&due, &dueFt)) break;
-    GetSystemTime(&now);
+    // Task Scheduler next-run DATE uses local wall-clock time. Compare it
+    // against local time, not UTC; otherwise the safety gate fails in most
+    // time zones or accepts a task at the wrong real-world deadline.
+    GetLocalTime(&now);
     if (!SystemTimeToFileTime(&now, &nowFt)) break;
     ULARGE_INTEGER when = {}, current = {};
     when.LowPart = dueFt.dwLowDateTime;
