@@ -3644,9 +3644,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
             style: const TextStyle(color: Colors.orangeAccent, fontSize: 11),
           ),
         ],
-        const SizedBox(height: 12),
-        ConnectionSignalArt(dark: _dark),
-        const SizedBox(height: 12),
+        const SizedBox(height: 16),
         glassCard(
           radius: 15,
           padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 12),
