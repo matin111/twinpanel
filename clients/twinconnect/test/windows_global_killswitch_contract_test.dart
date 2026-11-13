@@ -57,6 +57,12 @@ void main() {
         .readAsStringSync();
     expect(script, contains('TwinConnectWfpEmergencyRestore'));
     expect(script, contains('function Test-Physical-Dns'));
+    expect(script, contains('function Set-Physical-Interface'));
+    expect(script, contains('HostToNetworkOrder'));
+    expect(script, contains('SetSocketOption('));
+    expect(script, contains(r'-InterfaceIndex $physicalV4Index'));
+    expect(script, contains(r'-InterfaceIndex $physicalV6Index'));
+
     expect(script, contains('IPv4 DNS UDP leaked outside tunnel'));
     expect(script, contains('IPv6 DNS UDP leaked outside tunnel'));
     expect(script, contains('dns4Restored'));
