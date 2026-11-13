@@ -103,7 +103,7 @@ PROTOCOL_CLIENT: dict[str, dict[str, str]] = {
 }
 
 ALIASES = {
-    "openconnect": "openconnect", "anyconnect": "openconnect",
+    "openconnect": "cisco", "anyconnect": "cisco",
     "cisco": "cisco", "xray": "v2ray", "naiveproxy": "naive",
     "sing-box": "singbox", "singbox": "singbox",
     "v2rayng": "v2rayng", "v2rayn": "v2rayn", "v2box": "v2box",
@@ -132,7 +132,10 @@ def app_for_protocol(protocol: str, platform: str) -> str | None:
 
 def client_for(protocol: str, platform: str) -> tuple[str, str] | None:
     app = app_for_protocol(protocol, platform)
-    return APPS.get(app or "", {}).get(normalize(platform))
+    plat = normalize(platform)
+    if plat in ("iphone", "ipad"):
+        plat = "ios"
+    return APPS.get(app or "", {}).get(plat)
 
 
 def client_redirect_path(app: str, platform: str) -> str:
