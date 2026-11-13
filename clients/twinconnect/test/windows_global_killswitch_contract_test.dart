@@ -35,10 +35,10 @@ void main() {
     expect(source, contains('FwpmTransactionAbort0('));
     expect(source, contains('TransactionalDisarm('));
     expect(source, contains('I_ACCEPT_OFFLINE_RECOVERY'));
-    final workflow = File('../../.github/workflows/twinconnect-windows-preview.yml')
+    final workflow = File('../../.github/workflows/twinconnect-wfp-experimental.yml')
         .readAsStringSync();
-    expect(workflow, contains('Compile isolated Windows global guard prototype'));
-    expect(workflow, contains('never arm or ship'));
+    expect(workflow, contains('Build experimental WFP tool without installing'));
+    expect(workflow, contains("NEVER invoke 'arm' or 'disarm'"));
   });
 
   test('native bridge installs only a read-only guard status method', () {
