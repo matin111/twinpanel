@@ -8,6 +8,11 @@
 #ifndef IncludeVerifiedGlobalGuard
   #define IncludeVerifiedGlobalGuard 0
 #endif
+#if IncludeVerifiedGlobalGuard
+  #ifndef GuardSigningThumbprint
+    #error "Verified Kill Switch setup requires a pinned service signing thumbprint."
+  #endif
+#endif
 
 [Setup]
 AppId={{D662C7C4-9DB8-4F2B-9320-8CF0AF73D613}
@@ -142,7 +147,7 @@ begin
       Do not allow a missing/invalid guard binary to silently pass. }
     GuardInstallerArgs := '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' +
       ExpandConstant('{app}\tools\install_guard_service.ps1') + '" -Action Install -BinaryPath "' +
-      ExpandConstant('{app}\services\TwinConnectGlobalGuard.exe') + '"';
+      ExpandConstant('{app}\services\TwinConnectGlobalGuard.exe') + '" -ExpectedSignerThumbprint "{#GuardSigningThumbprint}"';
     Ok := Exec(PowershellPath, GuardInstallerArgs, '', SW_HIDE, ewWaitUntilTerminated, ExitCode);
     if (not Ok) or (ExitCode <> 0) then
     begin
@@ -176,7 +181,7 @@ begin
     Args := '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' +
       ExpandConstant('{app}\tools\install_guard_service.ps1') +
       '" -Action Uninstall -BinaryPath "' +
-      ExpandConstant('{app}\services\TwinConnectGlobalGuard.exe') + '"';
+      ExpandConstant('{app}\services\TwinConnectGlobalGuard.exe') + '" -ExpectedSignerThumbprint "{#GuardSigningThumbprint}"';
     Ok := Exec(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'),
       Args, '', SW_HIDE, ewWaitUntilTerminated, ExitCode);
     if (not Ok) or (ExitCode <> 0) then
