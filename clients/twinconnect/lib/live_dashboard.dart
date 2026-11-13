@@ -4403,13 +4403,33 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           const SizedBox(height: 25),
           glassCard(
             radius: 14,
-            padding: const EdgeInsets.all(12),
-            child: Row(children: [
-              if (selectedServer != null) CountryFlag(selectedServer!.flag, width: 30),
-              const SizedBox(width: 9),
-              Expanded(child: txt(selectedServer?.country ?? '—', bold: true)),
-              txt(tr('از پنل', 'Panel'), color: sub, size: 10),
-            ]),
+            padding: EdgeInsets.zero,
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                key: const Key('liveOpenLocationsFromNetwork'),
+                borderRadius: BorderRadius.circular(14),
+                onTap: () => setState(() => _page = 'locations'),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12, vertical: 11),
+                  child: Row(children: [
+                    if (selectedServer != null)
+                      CountryFlag(selectedServer!.flag, width: 30),
+                    const SizedBox(width: 9),
+                    Expanded(child: txt(
+                      selectedServer?.country ?? '—', bold: true)),
+                    Text(tr('مکان‌ها', 'Locations'),
+                      style: TextStyle(
+                        color: purple, fontSize: 12,
+                        fontWeight: FontWeight.w700)),
+                    const SizedBox(width: 5),
+                    Icon(Icons.chevron_right_rounded,
+                      color: purple, size: 19),
+                  ]),
+                ),
+              ),
+            ),
           ),
         ],
       ),
@@ -4540,8 +4560,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
             ]),
             const SizedBox(height: 5),
             // Compact in-panel account details immediately beneath Connect.
-            // Avoid an inner LayoutBuilder so IntrinsicHeight can balance the
-            // connection panel and network status panel on desktop.
+            // Compact account summary sits within the connection panel.
             usageMini(),
             const SizedBox(height: 7),
             Row(children: [
@@ -4585,20 +4604,23 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           }
           return Directionality(
             textDirection: _rtl ? TextDirection.rtl : TextDirection.ltr,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(flex: 5, child: Directionality(
-                  textDirection: _rtl ? TextDirection.rtl : TextDirection.ltr,
-                  child: powerCard(
-                    subscriptionContent: homeSubscriptionSummary()),
-                )),
-                const SizedBox(width: 14),
-                Expanded(flex: 5, child: Directionality(
-                  textDirection: _rtl ? TextDirection.rtl : TextDirection.ltr,
-                  child: connectionStats(),
-                )),
-              ],
+            child: IntrinsicHeight(
+              key: const Key('liveBalancedConnectionPanels'),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(flex: 5, child: Directionality(
+                    textDirection: _rtl ? TextDirection.rtl : TextDirection.ltr,
+                    child: powerCard(
+                      subscriptionContent: homeSubscriptionSummary()),
+                  )),
+                  const SizedBox(width: 14),
+                  Expanded(flex: 5, child: Directionality(
+                    textDirection: _rtl ? TextDirection.rtl : TextDirection.ltr,
+                    child: connectionStats(),
+                  )),
+                ],
+              ),
             ),
           );
         }),
