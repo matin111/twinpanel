@@ -56,6 +56,11 @@ void main() {
     final workflow = File('../../.github/workflows/twinconnect-wfp-vm-leak-test.yml')
         .readAsStringSync();
     expect(script, contains('TwinConnectWfpEmergencyRestore'));
+    expect(script, contains('function Test-Physical-Dns'));
+    expect(script, contains('IPv4 DNS UDP leaked outside tunnel'));
+    expect(script, contains('IPv6 DNS UDP leaked outside tunnel'));
+    expect(script, contains('dns4Restored'));
+    expect(script, contains('dns6Restored'));
     expect(script, contains('OWNED_RULES_PRESENT 0 0 0'));
     expect(script, contains(r'if ($recovered -and $restored)'));
     expect(script, contains(r'if (!$recovered -or !$restored)'));
