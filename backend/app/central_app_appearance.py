@@ -16,11 +16,11 @@ from .central_app_models import CentralAppContact
 COLOR = re.compile(r"^#[0-9A-Fa-f]{6}$")
 LABEL = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$")
 DEFAULTS = {
-    "primary_color": "#7C3AED",
-    "secondary_color": "#4F46E5",
-    "button_color": "#7C3AED",
-    "background_color": "#101018",
-    "surface_color": "#20202A",
+    "primary_color": "#548BA4",
+    "secondary_color": "#65B7B2",
+    "button_color": "#3F879B",
+    "background_color": "#121F2B",
+    "surface_color": "#203544",
     "background_style": "gradient",
     "background_image_url": None,
     "theme_mode": "dark",
