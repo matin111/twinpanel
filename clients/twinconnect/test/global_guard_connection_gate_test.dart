@@ -1,6 +1,8 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:twinconnect/vpn_policy_store.dart';
 import 'package:twinconnect/global_guard_connection_gate.dart';
 import 'package:twinconnect/vpn_policy.dart';
 
@@ -15,6 +17,17 @@ void main() {
     'enforcedV6': true,
     'recoveryVerified': true,
   };
+
+  test('corrupted guard policy fails closed instead of clearing protection', () async {
+    const store = VpnPolicyStore();
+    final key = VpnPolicyStore.storageKey('TP', 'alice');
+    SharedPreferences.setMockInitialValues({key: '{invalid-json'});
+    await expectLater(store.loadFailClosed('TP', 'alice'), throwsFormatException);
+
+    SharedPreferences.setMockInitialValues({key: requiredPolicy.encode()});
+    final saved = await store.loadFailClosed('TP', 'alice');
+    expect(saved.killSwitchRequested, isTrue);
+  });
 
   test('Kill Switch disabled does not change existing connections', () {
     expect(() => GlobalGuardConnectionGate.ensureCanConnect(
