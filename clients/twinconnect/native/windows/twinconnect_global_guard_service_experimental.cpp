@@ -48,6 +48,17 @@ bool ValidateRequest(const std::wstring& alias, const std::wstring& host,
   NET_LUID tunnel = {};
   if (ConvertInterfaceAliasToLuid(alias.c_str(), &tunnel) != NO_ERROR ||
       tunnel.Value == 0) return false;
+  // Never trust an alias alone. A local administrator or a network driver
+  // might rename a physical Ethernet/Wi-Fi NIC to "TwinConnect". Binding
+  // system-wide WFP blocks to such a NIC could bypass the intended protection.
+  MIB_IF_ROW2 adapter = {};
+  adapter.InterfaceLuid = tunnel;
+  if (GetIfEntry2(&adapter) != NO_ERROR ||
+      adapter.OperStatus != IfOperStatusUp ||
+      adapter.InterfaceAndOperStatusFlags.HardwareInterface ||
+      adapter.Type == IF_TYPE_SOFTWARE_LOOPBACK ||
+      adapter.Type == IF_TYPE_PPP ||
+      adapter.Type == IF_TYPE_IEEE80211) return false;
   IN_ADDR ip = {};
   if (InetPtonW(AF_INET, host.c_str(), &ip) != 1) return false;
   UINT32 addr = ntohl(ip.S_un.S_addr);
