@@ -48,6 +48,7 @@ export type EnsureClassicProtocolPayload={
 export type ClassicProtocolInventoryRow={
   protocol:ClassicProtocolKey;
   enabled:boolean;
+  operator_disabled?:boolean;
   port:number|null;
   port_text:string;
   transport:string;
