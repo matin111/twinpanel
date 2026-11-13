@@ -66,11 +66,4 @@ jobs:
           PHYSICAL_IPV6: ${{ inputs.physical_ipv6 }}
           TRANSPORT_EXE: ${{ inputs.transport_executable }}
         run: |
-          ./tools/test_windows_global_guard_vm.ps1 \
-            -GuardExe 'C:\Program Files\TwinConnectGuardVMSmoke\twinconnect-guard-service-test.exe' \
-            -TunnelAlias $env:TUNNEL_ALIAS \
-            -VpnEndpointIpv4 $env:ENDPOINT_IPV4 \
-            -TransportExe $env:TRANSPORT_EXE \
-            -PhysicalIpv4 $env:PHYSICAL_IPV4 \
-            -PhysicalIpv6 $env:PHYSICAL_IPV6 \
-            -DisposableVmOnly -IHaveOfflineConsoleRecovery
+          & ./tools/test_windows_global_guard_vm.ps1 -GuardExe 'C:\Program Files\TwinConnectGuardVMSmoke\twinconnect-guard-service-test.exe' -TunnelAlias $env:TUNNEL_ALIAS -VpnEndpointIpv4 $env:ENDPOINT_IPV4 -TransportExe $env:TRANSPORT_EXE -PhysicalIpv4 $env:PHYSICAL_IPV4 -PhysicalIpv6 $env:PHYSICAL_IPV6 -DisposableVmOnly -IHaveOfflineConsoleRecovery
