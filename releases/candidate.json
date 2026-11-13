@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.827",
-  "source_sha": "6add61bf3762081cdc406a5a4e6deae77efd2807",
+  "version": "1.1.0-rc.828",
+  "source_sha": "322a4a1dcfc1b3152bd7309e5d1aaa6d8b686dda",
   "notes": {
-    "fa": "حسابداری دقیق Sudoku با سربار کمتر: اندازه‌گیری واقعی هر کاربر، مبدأ غیرقابل‌صورتحساب، جلوگیری از پردازش و ساخت رکورد صفر برای کاربران بدون مصرف. اصلاحات rc.826 حفظ شده؛ هیچ کانفیگ اتصال، کلید یا سرویس Sudoku روی نودها تغییر نمی‌کند.",
-    "en": "Accurate shared Sudoku accounting with low overhead: verified real per-user counters, nonbillable baselines, and sparse capture to avoid allocating zero-byte cursors for idle users. Preserves rc.826 accounting fixes without changing node VPN configs or credentials."
+    "fa": "رفع خطای ردشدن کل گزارش مصرف Sudoku هنگام تغییر همزمان شمارنده‌ها: خواندن مقادیر معتبر و مستقل upTotal/downTotal، عدم وابستگی به برابری لحظه‌ای used، حفظ مبدأ شمارش ایمن و ثبت سبک فقط برای کاربران دارای مصرف.",
+    "en": "Fix transient Sudoku telemetry rejection when the controller's used field differs during concurrent updates: bill solely from validated per-user cumulative upTotal/downTotal; preserve per-process baseline and sparse idle-user filtering."
   }
 }
