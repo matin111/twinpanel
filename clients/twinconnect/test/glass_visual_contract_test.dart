@@ -12,6 +12,6 @@ void main() {
     expect(dashboard, contains('filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16)'));
     expect(dashboard, contains('Key(\'liveConnectionControlsButton\')'));
     expect(dashboard, contains('onPressed: _vpnBusy ? null : _toggleVpn'));
-    expect(dashboard, contains('Colors.transparent;'));
+    expect(dashboard, contains('backgroundColor: Colors.transparent'));
   });
 }
