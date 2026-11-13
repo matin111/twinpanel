@@ -33,6 +33,7 @@ namespace {
 const GUID kSubLayer = {0xb3f412ac,0x2511,0x40d3,{0x99,0x62,0x72,0x11,0x4a,0x31,0xa9,0x41}};
 const GUID kBlockV4 = {0xb3f412ad,0x2511,0x40d3,{0x99,0x62,0x72,0x11,0x4a,0x31,0xa9,0x41}};
 const GUID kBlockV6 = {0xb3f412ae,0x2511,0x40d3,{0x99,0x62,0x72,0x11,0x4a,0x31,0xa9,0x41}};
+const GUID kPermitV4 = {0xb3f412af,0x2511,0x40d3,{0x99,0x62,0x72,0x11,0x4a,0x31,0xa9,0x41}};
 
 struct Engine {
   HANDLE handle = nullptr;
@@ -61,46 +62,65 @@ DWORD RemoveOwned(HANDLE handle, const GUID& key) {
   return status == FWP_E_FILTER_NOT_FOUND ? ERROR_SUCCESS : status;
 }
 
-DWORD AddRule(HANDLE engine, const GUID& key, const GUID& layer,
-              const UINT64 localInterfaceLuid,
-              const UINT32* endpointV4) {
-  FWPM_FILTER_CONDITION0 conditions[2] = {};
-  // Conditions in one WFP filter are ANDed: block *only* when the
-  // outbound interface is NOT the protected tunnel AND destination is NOT
-  // the one exact VPN transport server address (for IPv4).
-  //
-  // Other apps targeting the same endpoint remain an intentionally narrow
-  // exception. Stronger endpoint process/port authentication is mandatory
-  // before deploying outside an isolated VM.
-  conditions[0].fieldKey = FWPM_CONDITION_IP_LOCAL_INTERFACE;
-  conditions[0].matchType = FWP_MATCH_NOT_EQUAL;
-  conditions[0].conditionValue.type = FWP_UINT64;
+DWORD AddBlockRule(HANDLE engine, const GUID& key, const GUID& layer,
+                   const UINT64 localInterfaceLuid) {
+  FWPM_FILTER_CONDITION0 condition = {};
+  condition.fieldKey = FWPM_CONDITION_IP_LOCAL_INTERFACE;
+  condition.matchType = FWP_MATCH_NOT_EQUAL;
+  condition.conditionValue.type = FWP_UINT64;
   UINT64 luid = localInterfaceLuid;
-  conditions[0].conditionValue.uint64 = &luid;
-
-  UINT32 endpoint = endpointV4 == nullptr ? 0 : *endpointV4;
-  UINT32 count = 1;
-  if (endpointV4 != nullptr) {
-    conditions[1].fieldKey = FWPM_CONDITION_IP_REMOTE_ADDRESS;
-    conditions[1].matchType = FWP_MATCH_NOT_EQUAL;
-    conditions[1].conditionValue.type = FWP_UINT32;
-    conditions[1].conditionValue.uint32 = endpoint;
-    count = 2;
-  }
+  condition.conditionValue.uint64 = &luid;
 
   FWPM_FILTER0 filter = {};
   filter.filterKey = key;
   filter.displayData.name =
-      const_cast<wchar_t*>(L"TwinConnect experimental outbound lock");
+      const_cast<wchar_t*>(L"TwinConnect experimental outbound block");
   filter.layerKey = layer;
   filter.subLayerKey = kSubLayer;
   filter.flags = FWPM_FILTER_FLAG_PERSISTENT;
   filter.action.type = FWP_ACTION_BLOCK;
   filter.weight.type = FWP_UINT8;
-  filter.weight.uint8 = 250;
-  filter.numFilterConditions = count;
-  filter.filterCondition = conditions;
+  filter.weight.uint8 = 200;
+  filter.numFilterConditions = 1;
+  filter.filterCondition = &condition;
   return FwpmFilterAdd0(engine, &filter, nullptr, nullptr);
+}
+
+// An IP-only exception is a privacy leak: unrelated applications could
+// connect directly to the same server. Require BOTH exact executable AppId
+// and exact destination IP. Production still requires signature/ACL review.
+DWORD AddTransportPermit(HANDLE engine, UINT32 endpoint,
+                         const std::wstring& executablePath) {
+  FWP_BYTE_BLOB* appId = nullptr;
+  DWORD result = FwpmGetAppIdFromFileName0(executablePath.c_str(), &appId);
+  if (result != ERROR_SUCCESS) return result;
+  if (appId == nullptr) return ERROR_INVALID_DATA;
+
+  FWPM_FILTER_CONDITION0 conditions[2] = {};
+  conditions[0].fieldKey = FWPM_CONDITION_ALE_APP_ID;
+  conditions[0].matchType = FWP_MATCH_EQUAL;
+  conditions[0].conditionValue.type = FWP_BYTE_BLOB_TYPE;
+  conditions[0].conditionValue.byteBlob = appId;
+  conditions[1].fieldKey = FWPM_CONDITION_IP_REMOTE_ADDRESS;
+  conditions[1].matchType = FWP_MATCH_EQUAL;
+  conditions[1].conditionValue.type = FWP_UINT32;
+  conditions[1].conditionValue.uint32 = endpoint;
+
+  FWPM_FILTER0 filter = {};
+  filter.filterKey = kPermitV4;
+  filter.displayData.name =
+      const_cast<wchar_t*>(L"TwinConnect experimental transport permit");
+  filter.layerKey = FWPM_LAYER_ALE_AUTH_CONNECT_V4;
+  filter.subLayerKey = kSubLayer;
+  filter.flags = FWPM_FILTER_FLAG_PERSISTENT;
+  filter.action.type = FWP_ACTION_PERMIT;
+  filter.weight.type = FWP_UINT8;
+  filter.weight.uint8 = 250;
+  filter.numFilterConditions = 2;
+  filter.filterCondition = conditions;
+  result = FwpmFilterAdd0(engine, &filter, nullptr, nullptr);
+  FwpmFreeMemory0(reinterpret_cast<void**>(&appId));
+  return result;
 }
 
 DWORD EnsureSubLayer(HANDLE engine) {
@@ -114,20 +134,22 @@ DWORD EnsureSubLayer(HANDLE engine) {
   return status == FWP_E_ALREADY_EXISTS ? ERROR_SUCCESS : status;
 }
 
-DWORD TransactionalArm(HANDLE engine, UINT64 tunnelLuid, UINT32 endpoint) {
+DWORD TransactionalArm(HANDLE engine, UINT64 tunnelLuid, UINT32 endpoint,
+                       const std::wstring& executablePath) {
   DWORD result = FwpmTransactionBegin0(engine, 0);
   if (result != ERROR_SUCCESS) return result;
   result = EnsureSubLayer(engine);
   if (result == ERROR_SUCCESS) result = RemoveOwned(engine, kBlockV4);
   if (result == ERROR_SUCCESS) result = RemoveOwned(engine, kBlockV6);
-  if (result == ERROR_SUCCESS) {
-    result = AddRule(engine, kBlockV4, FWPM_LAYER_ALE_AUTH_CONNECT_V4,
-                     tunnelLuid, &endpoint);
-  }
-  if (result == ERROR_SUCCESS) {
-    result = AddRule(engine, kBlockV6, FWPM_LAYER_ALE_AUTH_CONNECT_V6,
-                     tunnelLuid, nullptr);
-  }
+  if (result == ERROR_SUCCESS) result = RemoveOwned(engine, kPermitV4);
+  if (result == ERROR_SUCCESS)
+    result = AddTransportPermit(engine, endpoint, executablePath);
+  if (result == ERROR_SUCCESS)
+    result = AddBlockRule(engine, kBlockV4, FWPM_LAYER_ALE_AUTH_CONNECT_V4,
+                          tunnelLuid);
+  if (result == ERROR_SUCCESS)
+    result = AddBlockRule(engine, kBlockV6, FWPM_LAYER_ALE_AUTH_CONNECT_V6,
+                          tunnelLuid);
   if (result != ERROR_SUCCESS) {
     FwpmTransactionAbort0(engine);
     return result;
@@ -135,6 +157,7 @@ DWORD TransactionalArm(HANDLE engine, UINT64 tunnelLuid, UINT32 endpoint) {
   result = FwpmTransactionCommit0(engine);
   if (result != ERROR_SUCCESS) return result;
   return Exists(engine, kBlockV4) && Exists(engine, kBlockV6)
+      && Exists(engine, kPermitV4)
       ? ERROR_SUCCESS : ERROR_INVALID_STATE;
 }
 
@@ -143,6 +166,7 @@ DWORD TransactionalDisarm(HANDLE engine) {
   if (result != ERROR_SUCCESS) return result;
   result = RemoveOwned(engine, kBlockV4);
   if (result == ERROR_SUCCESS) result = RemoveOwned(engine, kBlockV6);
+  if (result == ERROR_SUCCESS) result = RemoveOwned(engine, kPermitV4);
   // Leave only our sublayer removed; do not touch Windows firewall profiles.
   if (result == ERROR_SUCCESS) {
     result = FwpmSubLayerDeleteByKey0(engine, &kSubLayer);
@@ -158,9 +182,11 @@ DWORD TransactionalDisarm(HANDLE engine) {
 void PrintStatus(HANDLE engine) {
   const bool v4 = Exists(engine, kBlockV4);
   const bool v6 = Exists(engine, kBlockV6);
-  wprintf(L"TwinConnect test WFP: IPv4=%ls IPv6=%ls\n",
-          v4 ? L"armed" : L"off", v6 ? L"armed" : L"off");
-  if (v4 != v6) {
+  const bool permit = Exists(engine, kPermitV4);
+  wprintf(L"TwinConnect test WFP: IPv4=%ls IPv6=%ls appPermit=%ls\n",
+          v4 ? L"armed" : L"off", v6 ? L"armed" : L"off",
+          permit ? L"present" : L"absent");
+  if (v4 != v6 || v4 != permit) {
     wprintf(L"INCOMPLETE: run disarm with offline recovery access.\n");
   }
 }
@@ -169,7 +195,7 @@ void Usage() {
   wprintf(L"Experimental WFP guard (NOT production Kill Switch)\n"
           L" status\n"
           L" arm <verified-tunnel-interface-alias> <VPN-endpoint-IPv4> "
-          L"I_ACCEPT_OFFLINE_RECOVERY\n"
+          L"<trusted-transport-executable> I_ACCEPT_OFFLINE_RECOVERY\n"
           L" disarm I_ACCEPT_OFFLINE_RECOVERY\n"
           L"Run only on disposable Windows VM with administrator rights.\n");
 }
@@ -191,8 +217,8 @@ int wmain(int argc, wchar_t** argv) {
   if (_wcsicmp(argv[1], L"disarm") == 0 && argc == 3 &&
       wcscmp(argv[2], L"I_ACCEPT_OFFLINE_RECOVERY") == 0) {
     result = TransactionalDisarm(engine.handle);
-  } else if (_wcsicmp(argv[1], L"arm") == 0 && argc == 5 &&
-             wcscmp(argv[4], L"I_ACCEPT_OFFLINE_RECOVERY") == 0) {
+  } else if (_wcsicmp(argv[1], L"arm") == 0 && argc == 6 &&
+             wcscmp(argv[5], L"I_ACCEPT_OFFLINE_RECOVERY") == 0) {
     // Never permit choosing a physical Ethernet/Wi-Fi adapter: doing so
     // would make the block condition a no-op for direct user traffic.
     if (_wcsicmp(argv[2], L"TwinConnectSB") != 0 &&
@@ -217,7 +243,22 @@ int wmain(int argc, wchar_t** argv) {
       fwprintf(stderr, L"Unsupported VPN endpoint address.\n");
       return 2;
     }
-    result = TransactionalArm(engine.handle, interfaceLuid.Value, endpoint);
+    const std::wstring programPath(argv[4]);
+    const DWORD flags = GetFileAttributesW(programPath.c_str());
+    const std::wstring trusted = L"C:\\Program Files\\";
+    const std::wstring trusted86 = L"C:\\Program Files (x86)\\";
+    const bool managedPath =
+        (programPath.size() > trusted.size() &&
+         _wcsnicmp(programPath.c_str(), trusted.c_str(), trusted.size()) == 0) ||
+        (programPath.size() > trusted86.size() &&
+         _wcsnicmp(programPath.c_str(), trusted86.c_str(), trusted86.size()) == 0);
+    if (!managedPath || flags == INVALID_FILE_ATTRIBUTES ||
+        (flags & FILE_ATTRIBUTE_DIRECTORY)) {
+      fwprintf(stderr, L"Transport executable must be installed in Program Files.\n");
+      return 2;
+    }
+    result = TransactionalArm(engine.handle, interfaceLuid.Value,
+                              endpoint, programPath);
   } else {
     Usage();
     return 2;
