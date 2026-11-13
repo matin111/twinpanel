@@ -54,8 +54,46 @@ jobs:
           if ($LASTEXITCODE -ne 0 -or !(Test-Path $exe)) {
             throw "Guard service C++ compilation failed"
           }
-          # Compile-only. DO NOT start the service, install it, or manipulate WFP.
+          # Compile-only phase; ephemeral runner service smoke below uses
+          # no arm command and verifies recovery while no filters are installed.
+          $target = Join-Path $env:ProgramFiles "TwinConnectGuardVMSmoke"
+          New-Item -Path $target -ItemType Directory -Force | Out-Null
+          Copy-Item -LiteralPath $exe -Destination (Join-Path $target "twinconnect-guard-service-test.exe")
           Remove-Item -LiteralPath $exe -Force
+      - name: Test admin service IPC and empty-rule recovery on disposable runner
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+          $principal = [Security.Principal.WindowsPrincipal]::new($identity)
+          if (!$principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+            throw "Runner is not elevated; cannot exercise Windows SCM"
+          }
+          $dir = Join-Path $env:ProgramFiles "TwinConnectGuardVMSmoke"
+          $exe = Join-Path $dir "twinconnect-guard-service-test.exe"
+          $ack = "I_ACCEPT_OFFLINE_RECOVERY"
+          try {
+            # Never invoke 'arm'. Recovery removes only owned rules (none here).
+            & $exe install-vm $ack
+            if ($LASTEXITCODE -ne 0) { throw "SCM installation failed" }
+            Start-Service -Name TwinConnectGlobalGuard -ErrorAction Stop
+            & $exe status
+            if ($LASTEXITCODE -ne 0) { throw "Admin IPC status failed" }
+            & $exe recover $ack
+            if ($LASTEXITCODE -ne 0) { throw "Independent recovery failed" }
+            & $exe uninstall-vm $ack
+            if ($LASTEXITCODE -ne 0) { throw "Service uninstall failed" }
+          } finally {
+            # Best effort cleanup even when a test assertion fails.
+            & $exe recover $ack
+            $svc = Get-Service TwinConnectGlobalGuard -ErrorAction SilentlyContinue
+            if ($svc) {
+              sc.exe stop TwinConnectGlobalGuard | Out-Null
+              sc.exe delete TwinConnectGlobalGuard | Out-Null
+              Start-Sleep -Seconds 2
+            }
+            Remove-Item -LiteralPath $dir -Recurse -Force -ErrorAction SilentlyContinue
+          }
       - name: Validate no executable entered the repository
         shell: pwsh
         run: |
