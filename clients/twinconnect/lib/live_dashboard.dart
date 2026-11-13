@@ -4416,8 +4416,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
               : days == null ? '—' : days < 0
                   ? tr('منقضی', 'Expired')
                   : tr('${days + 1} روز', '${days + 1} days');
-      const cyan = Color(0xFF00DCF5);
-      const violet = Color(0xFFC965FF);
+      const cyan = Color(0xFF6BB9BB);
+      const violet = Color(0xFF81AAB4);
 
       Widget miniMetric(Key key, IconData icon, String label, String value,
           Color accent) => Container(
@@ -4839,7 +4839,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(19),
                   gradient: const LinearGradient(
-                    colors: [Color(0xFFAA7AFF), Color(0xFF6953D7)],
+                    colors: [Color(0xFF789EB2), Color(0xFF49778C)],
                   ),
                 ),
                 child: const Icon(Icons.shield_outlined,
@@ -4947,7 +4947,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                     valueColor: AlwaysStoppedAnimation<Color>(
                       hasLimit && fraction >= .9
                           ? const Color(0xFFFFB26B)
-                          : const Color(0xFF9B6CF1)),
+                          : const Color(0xFF6F9FB1)),
                   ),
                 ),
                 const SizedBox(height: 10),
@@ -5046,7 +5046,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         backgroundColor: sidebar,
         primaryColor: purple,
         secondaryColor: BrandTheme.parse(
-          widget.brand.secondaryColor, '#00DCEB'),
+          widget.brand.secondaryColor, '#62C1B4'),
         child: Row(children: [
           Expanded(child: SafeArea(child: ListView(
             padding: EdgeInsets.symmetric(
