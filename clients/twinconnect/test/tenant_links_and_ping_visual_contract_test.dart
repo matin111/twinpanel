@@ -82,7 +82,7 @@ void main() {
     expect(ambient, contains('final bounds = Offset.zero & size;'));
     expect(ambient, contains('for (var i = 0; i < 39; i++)'));
     expect(ambient, contains('for (var i = 0; i < 13; i++)'));
-    expect(ambient, contains('dark ? .11 : .15'));
+    expect(ambient, contains('dark ? .10 : .075'));
     expect(theme, contains('Color(0xFFF3F7F8), 0.97'));
   });
 
