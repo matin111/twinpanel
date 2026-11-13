@@ -150,6 +150,8 @@ void main() {
       )),
     ));
     await tester.pump(const Duration(milliseconds: 800));
+    // Selected server is TR initially: Locations shows its country flag.
+    expect(find.byKey(const Key('selectedLocationFlag')), findsOneWidget);
     await tester.tap(find.byKey(const Key('devNav_locations')));
     await tester.pump(const Duration(milliseconds: 800));
     expect(find.byKey(const Key('devLocationListingCard')), findsOneWidget);
