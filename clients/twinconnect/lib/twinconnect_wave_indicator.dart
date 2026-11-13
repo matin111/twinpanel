@@ -173,9 +173,9 @@ class _NetworkFabricPainter extends CustomPainter {
     final right = size.width * .935;
     final reach = right - left;
     final maxRx = rx.fold<double>(0, (m, v) =>
-        math.max(m, v.isFinite && v > 0 ? v : 0));
+        math.max(m, v.isFinite && v > 0 ? v : 0.0));
     final maxTx = tx.fold<double>(0, (m, v) =>
-        math.max(m, v.isFinite && v > 0 ? v : 0));
+        math.max(m, v.isFinite && v > 0 ? v : 0.0));
     final realActivity = maxRx > 0 || maxTx > 0;
     final active = connected && realActivity;
     final luminous = connected || connecting;
