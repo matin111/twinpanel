@@ -20,6 +20,26 @@ void main() {
     expect(dashboard, contains('LaunchMode.externalApplication'));
   });
 
+  test('tenant links accept Telegram handles and show missing-link feedback', () {
+    final dashboard = File('lib/live_dashboard.dart').readAsStringSync();
+    expect(dashboard, contains("_safeTenantLink(String? raw, String kind)"));
+    expect(dashboard, contains("candidate = 'https://t.me/"));
+    expect(dashboard, contains('brand = fresh;'));
+    expect(dashboard, contains("_tenantLinkFromBrand(brand, kind)"));
+    expect(dashboard, contains('App Brand Studio'));
+    expect(dashboard, contains('uri.scheme != \'https\''));
+    expect(dashboard, contains('uri.userInfo.isNotEmpty'));
+  });
+
+  test('connecting screen keeps status, connection control and clock without redundant captions', () {
+    final dashboard = File('lib/live_dashboard.dart').readAsStringSync();
+    expect(dashboard, contains("Key('liveConnectionStatus')"));
+    expect(dashboard, contains("Key('liveConnectionControlsButton')"));
+    expect(dashboard, contains("Key('liveConnectionDuration')"));
+    expect(dashboard, isNot(contains("tr('اتصال امن برقرار است', 'Secure connection active')")));
+    expect(dashboard, isNot(contains("tr('دست‌دهی با سرور تأیید شد', 'Server handshake verified')")));
+  });
+
   test('network ping uses latency-colored neon lightning, not gauge', () {
     final dashboard = File('lib/live_dashboard.dart').readAsStringSync();
     expect(dashboard, contains("Key('livePingLightningIcon')"));
