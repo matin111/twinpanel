@@ -83,6 +83,23 @@ jobs:
           done
           python3 source/backend/tests/test_admin_fast_create_threadpool_v1.py -v
 
+      - name: Protect live online-protocol badges in Connection and admin cards
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          for path in \
+            "components/legacy-subscriptions-exact.tsx" \
+            "components/admin-subscription-live-table.tsx" \
+            "backend/app/routers/public_connection_hub_live_v5.py" \
+            "backend/tests/test_online_protocol_presentation_v1.py"; do
+            test -s "source/$path" && test -s "publisher/$path"
+            cmp -s "source/$path" "publisher/$path" || {
+              echo "::error file=$path::Pinned release lacks live protocol display restoration"
+              exit 1
+            }
+          done
+          python3 source/backend/tests/test_online_protocol_presentation_v1.py -v
+
       - name: Protect selected Tunnel and Iran Agent fixes in pinned release
         shell: bash
         run: |
