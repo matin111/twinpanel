@@ -240,36 +240,9 @@ _SCRIPT = r"""
   let legacyObserver=null;
   let resizeTimer=null;
 
-  const DIRECT_APPS={
-    android:{
-      'OpenVPN Connect':['OpenVPN Connect','https://play.google.com/store/apps/details?id=net.openvpn.openvpn'],
-      'WireGuard':['WireGuard','https://download.wireguard.com/android-client/com.wireguard.android-1.0.20260315.apk'],
-      'Hiddify':['Hiddify','https://github.com/hiddify/hiddify-app/releases/latest/download/Hiddify-Android-universal.apk'],
-      'Karing':['Karing','https://github.com/KaringX/karing/releases/download/v1.2.26.2919/karing_1.2.26.2919_android_arm.apk'],
-      'OpenConnect':['Cisco Secure Client','https://play.google.com/store/apps/details?id=com.cisco.anyconnect.vpn.android.avf'],
-      'Cisco Secure Client':['Cisco Secure Client','https://play.google.com/store/apps/details?id=com.cisco.anyconnect.vpn.android.avf'],
-      'sing-box':['sing-box','https://github.com/SagerNet/sing-box/releases/download/v1.14.4/SFA-1.14.4-arm64-v8a.apk'],
-      'sing-box Desktop':['sing-box','https://github.com/SagerNet/sing-box/releases/download/v1.14.4/SFA-1.14.4-arm64-v8a.apk'],
-      'AmneziaWG':['AmneziaWG','https://github.com/amnezia-vpn/amneziawg-android/releases/download/v3.1.20260814/AmneziaWG-3.1.202060814.apk'],
-      'TrustTunnel':['TrustTunnel','https://play.google.com/store/apps/details?id=com.adguard.trusttunnel'],
-      'TrustTunnel GUI':['TrustTunnel','https://play.google.com/store/apps/details?id=com.adguard.trusttunnel'],
-      'Sudodroid':['Sudodroid','https://github.com/SUDOKU-ASCII/sudoku-android/releases/download/v0.3.3/sudodroid-v0.3.3-universal.apk']
-    },
-    ios:{
-      'OpenVPN Connect':['OpenVPN Connect','https://apps.apple.com/us/app/openvpn-connect/id590379981'],
-      'WireGuard':['WireGuard','https://apps.apple.com/us/app/wireguard/id1451685025'],
-      'Hiddify':['Hiddify','https://github.com/hiddify/hiddify-app/releases/latest/download/Hiddify-iOS.ipa'],
-      'Karing':['Karing','https://apps.apple.com/us/app/karing/id6472431552'],
-      'OpenConnect':['Cisco Secure Client','https://apps.apple.com/us/app/cisco-secure-client/id1135064690'],
-      'Cisco Secure Client':['Cisco Secure Client','https://apps.apple.com/us/app/cisco-secure-client/id1135064690'],
-      'sing-box':['sing-box MT','https://apps.apple.com/us/app/sing-box-mt/id6785326793'],
-      'sing-box Desktop':['sing-box MT','https://apps.apple.com/us/app/sing-box-mt/id6785326793'],
-      'AmneziaWG':['AmneziaWG','https://apps.apple.com/app/amneziawg/id6478942365'],
-      'TrustTunnel':['TrustTunnel','https://apps.apple.com/us/app/trusttunnel/id6755807890'],
-      'TrustTunnel GUI':['TrustTunnel','https://apps.apple.com/us/app/trusttunnel/id6755807890'],
-      'Anywhere Proxy':['Anywhere Proxy','https://apps.apple.com/us/app/anywhere-proxy/id6758235178']
-    }
-  };
+  // Direct links are resolved by the audited V13/V34 client catalog.
+  // Never overwrite those links with old platform-specific binaries.
+
 
   function text(el){return String(el?.textContent||'').trim()}
 
@@ -299,28 +272,14 @@ _SCRIPT = r"""
     syncLive();
   }
 
-  function normalizeAppName(value){
-    return String(value||'').replace(/^دانلود\s+/,'').trim();
-  }
 
-  function applyDirectApp(link,platform){
-    const rows=DIRECT_APPS[platform]||{};
-    const current=normalizeAppName(link.textContent);
-    const target=rows[current];
-    if(!target)return;
-    link.textContent=target[0];
-    link.href=target[1];
-    link.target='_blank';
-    link.rel='noopener noreferrer';
-    link.dataset.v24DirectInstall='1';
-  }
 
   function syncApps(){
     const platform=String(document.body.dataset.tpPlatform||'unknown').toLowerCase();
     document.querySelectorAll('.v13-app[data-v13-platform]').forEach(link=>{
       const target=String(link.dataset.v13Platform||'').toLowerCase();
       link.style.display=(platform==='unknown'||target===platform)?'inline-flex':'none';
-      if(platform!=='unknown'&&target===platform)applyDirectApp(link,platform);
+      // The original href is already a validated per-protocol redirect.
     });
 
     document.querySelectorAll('.platform-group[data-platform]').forEach(group=>{
