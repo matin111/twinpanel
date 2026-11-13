@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'app_strings.dart';
 import 'brand_theme.dart';
@@ -64,6 +65,27 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
       _guard = guard;
       _checking = false;
     });
+  }
+
+  Future<void> _copyDiagnostics() async {
+    final diagnosticText = <String>[
+      'TwinConnect network diagnostics',
+      'platform: ${NativeVpnBridge.platform.name}',
+      'vpn_engine_ready: ${_capabilities.engineReady}',
+      'full_tunnel_supported: ${_capabilities.fullTunnel}',
+      'wfp_available: ${_guard['wfpAvailable'] == true}',
+      'guard_service_installed: ${_guard['serviceInstalled'] == true}',
+      'guard_armed_verified: $_guardActive',
+      'dns_engine_support: ${_capabilities.dnsGuard}',
+      'ipv6_engine_support: ${_capabilities.ipv6Guard}',
+      'guard_reason: ${_guard['reason'] ?? 'UNKNOWN'}',
+    ].join('\\n');
+    await Clipboard.setData(ClipboardData(text: diagnosticText));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(AppStrings.of(context).pick(
+          'گزارش عیب‌یابی کپی شد', 'Diagnostic report copied')),
+    ));
   }
 
   bool get _guardActive =>
@@ -342,6 +364,15 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
               style: const TextStyle(fontWeight: FontWeight.w700)),
           leading: const Icon(Icons.monitor_heart_outlined),
           children: [
+            Align(
+              alignment: AlignmentDirectional.centerEnd,
+              child: TextButton.icon(
+                key: const Key('vpnCopyDiagnostics'),
+                onPressed: _copyDiagnostics,
+                icon: const Icon(Icons.copy_all_rounded, size: 17),
+                label: Text(tr('کپی گزارش', 'Copy diagnostics')),
+              ),
+            ),
             _statusItem(
               key: const Key('vpnNativeEngineStatus'),
               title: tr('موتور VPN', 'VPN engine'),
