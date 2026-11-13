@@ -2106,6 +2106,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     if (oldWidget.username != widget.username ||
         oldWidget.panel.namespace != widget.panel.namespace ||
         oldWidget.panel.apiOrigin != widget.panel.apiOrigin) {
+      _socks5AssignedNodeIds = null;
+      _socks5NodesError = null;
       // No in-memory Xray credentials may cross tenants or accounts.
       _xrayGroups = const [];
       _xrayGroupsLoaded = false;
@@ -2402,6 +2404,71 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   }
 
   String _page = 'home';
+  // Only cache entitled SOCKS5 node IDs; never cache proxy credentials.
+  Set<String>? _socks5AssignedNodeIds;
+  bool _socks5NodesLoading = false;
+  String? _socks5NodesError;
+
+  Future<void> _refreshSocks5AvailableNodes() async {
+    if (_socks5NodesLoading) return;
+    final authorized = widget.catalog?.entries.any((entry) =>
+        entry.protocol.code == 'socks5' && entry.selected &&
+        entry.configRecordPresent) ?? false;
+    if (!authorized) {
+      if (mounted) setState(() {
+        _socks5AssignedNodeIds = <String>{};
+        _socks5NodesError = 'SOCKS5_NOT_INCLUDED_IN_SUBSCRIPTION';
+      });
+      return;
+    }
+    final username = widget.username;
+    final namespace = widget.panel.namespace;
+    setState(() {
+      _socks5NodesLoading = true;
+      _socks5NodesError = null;
+    });
+    try {
+      final profiles = await TenantApi.fromBuildConfig()
+          .loadSessionNativeProfiles(
+        panel: widget.panel,
+        sessionToken: widget.sessionToken,
+        protocol: VpnProtocols.byCode('socks5')!,
+        native: const NativeProtocolReadiness(supportedCodes: {'socks5'}),
+      );
+      final assigned = profiles.items
+          .map((item) => item['node_id']?.toString())
+          .whereType<String>().toSet();
+      if (!mounted || widget.username != username ||
+          widget.panel.namespace != namespace) return;
+      final nodes = widget.servers?.servers ?? const <AppServer>[];
+      final alreadyValid = _selected >= 0 && _selected < nodes.length &&
+          assigned.contains(nodes[_selected].id);
+      final firstValid = nodes.indexWhere((n) => assigned.contains(n.id));
+      setState(() {
+        _socks5AssignedNodeIds = assigned;
+        _socks5NodesError = assigned.isEmpty
+            ? 'SOCKS5_SERVER_PROFILE_MISSING' : null;
+        if (_filter == 'socks5' && !alreadyValid && firstValid >= 0) {
+          _selected = firstValid;
+          _autoFastest = false;
+        }
+      });
+    } catch (_) {
+      if (mounted && widget.username == username &&
+          widget.panel.namespace == namespace) {
+        setState(() {
+          _socks5AssignedNodeIds = null;
+          _socks5NodesError = 'SOCKS5_SERVER_PROFILES_UNAVAILABLE';
+        });
+      }
+    } finally {
+      if (mounted && widget.username == username &&
+          widget.panel.namespace == namespace) {
+        setState(() => _socks5NodesLoading = false);
+      }
+    }
+  }
+
   String _filter = 'all';
   String _search = '';
   int _selected = 0;
@@ -3316,6 +3383,24 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
               'UNMANAGED_WIREGUARD_SERVICE' => tr(
                 'سرویس WireGuard متعلق به برنامه نیست؛ تغییری ایجاد نشد.',
                 'WireGuard service is not managed by this app.'),
+              'SOCKS5_NOT_INCLUDED_IN_SUBSCRIPTION' => tr(
+                'SOCKS5 برای این اشتراک فعال نیست.',
+                'SOCKS5 is not enabled for this subscription.'),
+              'SOCKS5_SERVER_PROFILE_MISSING' => tr(
+                'برای این اشتراک سرور SOCKS5 تحویل نشده است.',
+                'No SOCKS5 server was delivered for this account.'),
+              'SOCKS5_SERVER_PROFILES_UNAVAILABLE' => tr(
+                'دریافت فهرست سرورهای SOCKS5 ناموفق بود.',
+                'Could not load authorized SOCKS5 nodes.'),
+              'SOCKS5_ACCOUNT_AUTH_INVALID' => tr(
+                'نام کاربری یا رمز SOCKS5 نامعتبر است.',
+                'SOCKS5 credentials are missing or invalid.'),
+              'SOCKS5_VERSION_INVALID' => tr(
+                'نسخه تحویلی SOCKS5 معتبر نیست.',
+                'Delivered SOCKS5 version is invalid.'),
+              'SOCKS5_TCP_TRANSPORT_REQUIRED' => tr(
+                'این پروفایل SOCKS5 اتصال TCP لازم را ندارد.',
+                'This SOCKS5 profile does not support TCP CONNECT.'),
               'SINGBOX_SERVER_TRANSPORT_UNREACHABLE' => tr(
                 'آزمایش اولیه ارتباط پروتکل با سرور موفق نبود؛ اتصال جدید برقرار نشد.',
                 'Selected protocol failed the transport preflight; no new connection was established.'),
@@ -3692,6 +3777,9 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
               onSelected: (_) {
                 setState(() => _filter = entry.$1);
                 if (entry.$1 == 'v2ray') _loadXrayGroups();
+                if (entry.$1 == 'socks5') {
+                  unawaited(_refreshSocks5AvailableNodes());
+                }
               },
             ),
         ],
@@ -3702,10 +3790,13 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       final query = _search.trim().toLowerCase();
       final matching = <int>[
         for (int i = 0; i < demoServers.length; i++)
-          if (query.isEmpty ||
+          if ((_filter != 'socks5' ||
+              _socks5AssignedNodeIds == null ||
+              _socks5AssignedNodeIds!.contains(widget.servers!.servers[i].id)) &&
+              (query.isEmpty ||
               ('${demoServers[i].country} ${demoServers[i].city} '
                '${_countryLabel(demoServers[i].flag)}')
-                .toLowerCase().contains(query))
+                .toLowerCase().contains(query)))
             i,
       ];
       final grouped = <String, List<int>>{};
@@ -3840,6 +3931,21 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           const SizedBox(height: 13),
           filters(),
           const SizedBox(height: 12),
+          if (_filter == 'socks5' && _socks5NodesLoading)
+            const Padding(
+              padding: EdgeInsets.all(12),
+              child: Center(child: CircularProgressIndicator()),
+            ),
+          if (_filter == 'socks5' && _socks5NodesError != null)
+            Padding(
+              padding: const EdgeInsets.all(9),
+              child: TextButton.icon(
+                onPressed: _refreshSocks5AvailableNodes,
+                icon: const Icon(Icons.refresh_rounded),
+                label: Text(tr('دریافت سرورهای مجاز SOCKS5',
+                               'Retry authorized SOCKS5 nodes')),
+              ),
+            ),
           if (_filter == 'v2ray' && _xrayGroupsLoading)
             const Padding(
               padding: EdgeInsets.all(12),
