@@ -100,7 +100,9 @@ def test_node_collector_is_local_authenticated_read_only():
     assert "http://127.0.0.1:19095/users" in script
     assert "secret" in script
     assert "SUDOKU_SHARED_CONTROLLER_CONFIG_MISMATCH" in script
-    assert "systemctl" not in script
+    assert '["systemctl","show"' in script
+    assert "systemctl restart" not in script
+    assert "systemctl set-property" not in script
     assert "iptables" not in script
     assert "write_text" not in script
     assert "conn.run" not in script
