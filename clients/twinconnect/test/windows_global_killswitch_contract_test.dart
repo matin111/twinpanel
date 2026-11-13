@@ -60,6 +60,8 @@ void main() {
     expect(code, contains('D:P(A;;GA;;;SY)(A;;GA;;;BA)'));
     expect(code, contains('TransactionalArm('));
     expect(code, contains('TransactionalDisarm('));
+    expect(code, contains('offline-status'));
+    expect(code, contains('OwnedFilterPresent(engine.handle, kBlockV4)'));
     expect(code, contains('recover'));
     expect(code, contains('InstallVmOnlyService('));
     expect(code, contains('UninstallVmOnlyService('));
@@ -102,6 +104,9 @@ void main() {
     expect(script, contains("Start-Service -Name"));
     expect(script, contains("Invoke-Guard -Arguments @('recover', "));
     expect(script, contains("Owned WFP filters still present"));
+    expect(script, contains("offline-status"));
+    expect(script, contains("Stop-Service -Name"));
+
     expect(script, isNot(contains("arm I_ACCEPT_OFFLINE_RECOVERY")));
   });
 
