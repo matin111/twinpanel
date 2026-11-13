@@ -90,6 +90,49 @@ class NativeVpnBridge {
     }
   }
 
+  /// Experimental VM-only command bridge, NOT a production protection toggle.
+  /// The Windows native layer independently requires TWINCONNECT_DISPOSABLE_VM=1
+  /// and Windows Administrators access to the privileged guard pipe.
+  /// A positive acknowledgement alone is not proof of leak-free filtering.
+  static Future<Map<String, dynamic>> experimentalVmGlobalGuard({
+    required String action,
+    String alias = '',
+    String endpoint = '',
+    String executable = '',
+  }) async {
+    if (platform != VpnPlatform.windows ||
+        Platform.environment['TWINCONNECT_DISPOSABLE_VM'] != '1') {
+      return const {'contractVersion': 1, 'success': false,
+        'reason': 'VM_ONLY'};
+    }
+    if (!const {'status', 'arm', 'disarm'}.contains(action)) {
+      return const {'contractVersion': 1, 'success': false,
+        'reason': 'INVALID_ACTION'};
+    }
+    try {
+      final raw = await _channel.invokeMethod<Map<dynamic, dynamic>>(
+        'experimentalVmGlobalGuard', {
+          'action': action,
+          'alias': alias,
+          'endpoint': endpoint,
+          'executable': executable,
+        },
+      ).timeout(const Duration(seconds: 5));
+      if (raw == null || raw['contractVersion'] != 1) {
+        return const {'contractVersion': 1, 'success': false,
+          'reason': 'INVALID_NATIVE_RESPONSE'};
+      }
+      return {
+        'contractVersion': 1,
+        'success': raw['success'] == true,
+        'reason': raw['reason'] is String ? raw['reason'] : 'UNKNOWN',
+      };
+    } catch (_) {
+      return const {'contractVersion': 1, 'success': false,
+        'reason': 'GUARD_CONTROL_UNAVAILABLE'};
+    }
+  }
+
   static Future<NativeProtocolReadiness> protocolReadiness({
     NativeVpnCapabilities? validatedCapabilities,
   }) async {
