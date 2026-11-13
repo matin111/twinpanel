@@ -135,8 +135,10 @@ export function CentralAppBrandManager({role}:{role:"admin"|"reseller"}){
     :contact.brand_name||pick("پنل اصلی","Main panel");
   const previewLogo=imageUrl(contact.logo_url);
   const preview=<div className="tbs-device" style={{
-    background:appearance?.background_color,
-    color:appearance?.theme_mode==="light"?"#172033":"#f3f6ff",
+    background:appearance?.theme_mode==="light"?"#F3F7F8":appearance?.background_color,
+    color:appearance?.theme_mode==="light"?"#21343E":"#EAF3F5",
+    ...(appearance?.background_style==="image"&&appearance.background_image_url?
+      {backgroundImage:`url(${appearance.background_image_url})`,backgroundSize:"cover",backgroundPosition:"center"}:{}) ,
   }}>
     <div className="tbs-device-top"><span>9:41</span><span>●●● ▰</span></div>
     <div className="tbs-device-brand">
@@ -144,8 +146,20 @@ export function CentralAppBrandManager({role}:{role:"admin"|"reseller"}){
       <div><strong>{brand}</strong><small>TwinConnect</small></div>
     </div>
     <div className="tbs-device-glow" style={{background:appearance?.primary_color}}/>
-    <div className="tbs-connect-orb" style={{borderColor:appearance?.secondary_color,boxShadow:`0 0 36px ${appearance?.primary_color}55`}}>
-      <span style={{background:appearance?.button_color}}>⏻</span>
+    <div className="tbs-data-flow" aria-hidden="true" style={{
+      borderColor:`${appearance?.secondary_color}55`,
+      background:`linear-gradient(135deg,${appearance?.surface_color}d9,${appearance?.background_color}bd)`,
+    }}>
+      <svg viewBox="0 0 284 115" preserveAspectRatio="none" role="img">
+        <defs><linearGradient id="tbs-flow" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stopColor={appearance?.primary_color}/><stop offset="100%" stopColor={appearance?.secondary_color}/>
+        </linearGradient></defs>
+        <path d="M0 74 L24 68 L49 77 L72 36 L96 56 L117 53 L139 20 L163 62 L189 42 L213 55 L240 32 L261 40 L284 18"
+          fill="none" stroke="url(#tbs-flow)" strokeWidth="3" strokeLinecap="round"/>
+        <path d="M0 74 L24 68 L49 77 L72 36 L96 56 L117 53 L139 20 L163 62 L189 42 L213 55 L240 32 L261 40 L284 18 L284 115 L0 115 Z"
+          fill="url(#tbs-flow)" opacity=".10"/>
+      </svg>
+      <div className="tbs-flow-caption">DATA FLOW <span>↓ ↑</span></div>
     </div>
     <p className="tbs-connection-label">{pick("آماده اتصال","Ready to connect")}</p>
     <small className="tbs-connection-sub">{pick("برای اتصال ضربه بزنید","Tap to connect")}</small>
@@ -208,9 +222,18 @@ export function CentralAppBrandManager({role}:{role:"admin"|"reseller"}){
           {tab==="colors"&&<div className="tbs-panel">
             <div className="tbs-section-head"><div><h2>{pick("رنگ‌ها و ظاهر","Colors & appearance")}</h2><p>{pick("رنگ‌ها را تنظیم کنید و نتیجه را در پیش‌نمایش ببینید.","Customize colors and preview changes instantly.")}</p></div></div>
             <div className="tbs-presets">
-              {[["#7C3AED","#4F46E5"],["#0087DB","#00C2BB"],["#F97316","#DB2777"],["#15A66A","#0E7490"]].map(([a,b])=>
-                <button key={a} type="button" title={pick("اعمال پالت","Apply preset")} style={{background:`linear-gradient(125deg,${a} 50%,${b} 50%)`}}
-                  onClick={()=>{changeColor("primary_color",a);changeColor("secondary_color",b);changeColor("button_color",a)}}/>)}
+              {([
+                {name:"Ocean slate",primary:"#6FA7B8",secondary:"#62C1B4",button:"#4E8FA2",background:"#0F1720",surface:"#1B2B36"},
+                {name:"Misty blue",primary:"#789EAD",secondary:"#80BDB8",button:"#588D9E",background:"#14222B",surface:"#20333E"},
+                {name:"Soft glacier",primary:"#729CB4",secondary:"#9BCDC6",button:"#50849E",background:"#172532",surface:"#283E48"},
+                {name:"Quiet evergreen",primary:"#649E92",secondary:"#93C6B5",button:"#508C80",background:"#142723",surface:"#23413B"},
+              ] as const).map(preset=>
+                <button key={preset.name} type="button" title={preset.name} aria-label={preset.name}
+                  style={{background:`linear-gradient(125deg,${preset.primary} 50%,${preset.secondary} 50%)`}}
+                  onClick={()=>{setAppearance(current=>current?{...current,
+                    primary_color:preset.primary,secondary_color:preset.secondary,
+                    button_color:preset.button,background_color:preset.background,
+                    surface_color:preset.surface,background_style:"gradient"}:current);setDirty(true)}}/>)}
             </div>
             <div className="tbs-colors">
               {([

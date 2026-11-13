@@ -38,6 +38,18 @@ class TwinConnectBrandStudioContract(unittest.TestCase):
         self.assertIn("subscription_app_brand_preview(",credentials)
         self.assertIn('"Cache-Control": "private, no-store',credentials)
 
+    def test_brand_studio_uses_new_owner_editable_defaults_and_live_flow_preview(self):
+        ui=UI.read_text(encoding="utf-8")
+        css=(ROOT/"components/central-app-brand-studio.css").read_text(encoding="utf-8")
+        for color in ("#6FA7B8", "#62C1B4", "#4E8FA2", "#0F1720", "#1B2B36"):
+            self.assertIn(color,ui)
+        self.assertIn("setAppearance(current=>current?{...current,",ui)
+        self.assertIn("background_color:preset.background",ui)
+        self.assertNotIn('["#7C3AED","#4F46E5"]',ui)
+        self.assertIn("tbs-data-flow",ui)
+        self.assertNotIn('className="tbs-connect-orb"',ui)
+        self.assertIn("html[data-theme=\"light\"] .tbs-page",css)
+
     def test_brand_studio_has_real_logo_upload_and_reseller_scope(self):
         ui=UI.read_text(encoding="utf-8")
         self.assertIn('body.append("file",file)',ui)
