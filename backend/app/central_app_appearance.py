@@ -16,15 +16,34 @@ from .central_app_models import CentralAppContact
 COLOR = re.compile(r"^#[0-9A-Fa-f]{6}$")
 LABEL = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$")
 DEFAULTS = {
-    "primary_color": "#7C3AED",
-    "secondary_color": "#4F46E5",
-    "button_color": "#7C3AED",
-    "background_color": "#101018",
-    "surface_color": "#20202A",
+    "primary_color": "#6FA7B8",
+    "secondary_color": "#62C1B4",
+    "button_color": "#4E8FA2",
+    "background_color": "#0F1720",
+    "surface_color": "#1B2B36",
     "background_style": "gradient",
     "background_image_url": None,
     "theme_mode": "dark",
 }
+
+# Only previously shipped unmodified defaults migrate automatically.
+# Explicit custom reseller/admin palettes are never overwritten.
+_LEGACY_DEFAULTS = (
+    ("#7C3AED", "#4F46E5", "#7C3AED", "#101018", "#20202A"),
+    ("#548BA4", "#65B7B2", "#3F879B", "#121F2B", "#203544"),
+)
+_PALETTE_KEYS = ("primary_color", "secondary_color", "button_color",
+                 "background_color", "surface_color")
+
+
+def _legacy_default(values: dict) -> bool:
+    palette = tuple(str(values.get(key) or "").upper() for key in _PALETTE_KEYS)
+    return palette in _LEGACY_DEFAULTS
+
+
+def _legacy_brand_pair(primary: str | None, secondary: str | None) -> bool:
+    pair = ((primary or "").upper(), (secondary or "").upper())
+    return pair in {(old[0], old[1]) for old in _LEGACY_DEFAULTS}
 
 
 class AppearanceIn(BaseModel):
@@ -82,22 +101,29 @@ def resolve_appearance(db: Session, reseller_id: int) -> dict:
     """No other reseller's row is ever inherited or returned."""
     row = db.get(CentralAppAppearance, int(reseller_id))
     if row:
-        return {key: getattr(row, key) for key in DEFAULTS}
+        saved = {key: getattr(row, key) for key in DEFAULTS}
+        return dict(DEFAULTS) if _legacy_default(saved) else saved
     values = dict(DEFAULTS)
     contact = db.get(CentralAppContact, int(reseller_id))
-    if contact:
+    contact_primary = getattr(contact, "primary_color", None) if contact else None
+    contact_secondary = getattr(contact, "secondary_color", None) if contact else None
+    if contact and not _legacy_brand_pair(contact_primary, contact_secondary):
         for key in ("primary_color", "secondary_color"):
             color = getattr(contact, key)
             if color and COLOR.fullmatch(color):
                 values[key] = color.upper()
     if not reseller_id:
         branding = db.query(BrandingSettings).first()
-        if branding:
-            for key in ("primary_color", "secondary_color"):
-                color = getattr(branding, key, None)
-                if color and COLOR.fullmatch(color) and not (contact and getattr(contact, key, None)):
-                    values[key] = color.upper()
-    values["button_color"] = values["primary_color"]
+        if branding and not contact_primary and not contact_secondary:
+            b_primary = getattr(branding, "primary_color", None)
+            b_secondary = getattr(branding, "secondary_color", None)
+            if not _legacy_brand_pair(b_primary, b_secondary):
+                for key, color in (("primary_color", b_primary),
+                                   ("secondary_color", b_secondary)):
+                    if color and COLOR.fullmatch(color):
+                        values[key] = color.upper()
+    if values["primary_color"] != DEFAULTS["primary_color"]:
+        values["button_color"] = values["primary_color"]
     return values
 
 
