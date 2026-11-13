@@ -169,7 +169,7 @@ class BotTextRequestMiddleware(BaseRequestMiddleware):
             if not failed:
                 try:
                     stamp.parent.mkdir(parents=True, exist_ok=True)
-                    stamp.write_text(fingerprint + "\\n", encoding="ascii")
+                    stamp.write_text(fingerprint + "\n", encoding="ascii")
                 except OSError:
                     pass
         except Exception:
