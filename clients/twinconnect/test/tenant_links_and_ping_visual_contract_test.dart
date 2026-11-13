@@ -76,7 +76,7 @@ void main() {
     expect(dashboard, contains("Key('liveBalancedConnectionPanels')"));
     expect(dashboard, contains('crossAxisAlignment: CrossAxisAlignment.stretch'));
     expect(
-      RegExp(r'powerCard\\s*\\(\\s*subscriptionContent:\\s*homeSubscriptionSummary\\(\\)\\s*\\)')
+      RegExp(r'powerCard\s*\(\s*subscriptionContent:\s*homeSubscriptionSummary\(\)\s*\)')
           .hasMatch(dashboard),
       isTrue,
     );
