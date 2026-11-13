@@ -57,6 +57,15 @@ void main() {
     expect(theme, contains('Color(0xFFF4F0FF), 0.90'));
   });
 
+  test('all server ping actions use lightning instead of the old network icon', () {
+    final dashboard = File('lib/live_dashboard.dart').readAsStringSync();
+    expect(dashboard, isNot(contains('Icons.network_ping_rounded')));
+    expect(dashboard, contains('Icons.bolt_rounded'));
+    expect(dashboard, contains("tooltip: tr('تست پینگ', 'Ping server')"));
+    expect(dashboard, contains("tr('تست پینگ همه سرورها', 'Ping all servers')"));
+    expect(dashboard, contains("Key('livePingLightningIcon')"));
+  });
+
   test('shared background takes real per-tenant primary and secondary colors', () {
     final dashboard = File('lib/live_dashboard.dart').readAsStringSync();
     final ambient = File('lib/ambient_background.dart').readAsStringSync();
