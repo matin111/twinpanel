@@ -17,6 +17,23 @@ void main() {
     expect(header, isNot(contains('FWPM_FILTER_FLAG_PERSISTENT')));
   });
 
+  test('system-wide WFP experiment includes atomic restore and dual-stack filters', () {
+    final source = File('native/windows/twinconnect_global_guard_experimental.cpp')
+        .readAsStringSync();
+    expect(source, contains('FWPM_FILTER_FLAG_PERSISTENT'));
+    expect(source, contains('FWPM_LAYER_ALE_AUTH_CONNECT_V4'));
+    expect(source, contains('FWPM_LAYER_ALE_AUTH_CONNECT_V6'));
+    expect(source, contains('FwpmTransactionBegin0('));
+    expect(source, contains('FwpmTransactionCommit0('));
+    expect(source, contains('FwpmTransactionAbort0('));
+    expect(source, contains('TransactionalDisarm('));
+    expect(source, contains('I_ACCEPT_OFFLINE_RECOVERY'));
+    final workflow = File('../../.github/workflows/twinconnect-windows-preview.yml')
+        .readAsStringSync();
+    expect(workflow, contains('Compile isolated Windows global guard prototype'));
+    expect(workflow, contains('never execute or ship'));
+  });
+
   test('native bridge installs only a read-only guard status method', () {
     final install = File('tools/install_windows_native.py')
         .readAsStringSync();
