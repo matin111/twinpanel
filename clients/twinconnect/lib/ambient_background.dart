@@ -64,9 +64,9 @@ class _TwinConnectAmbientBackgroundState
             : const [Color(0xFFF6F1FF), Color(0xFFEFF2FF), Color(0xFFFBFAFF)])
         : [
             brandBackground,
-            Color.lerp(brandBackground, widget.primaryColor, dark ? .19 : .08)!,
+            Color.lerp(brandBackground, widget.primaryColor, dark ? .29 : .22)!,
             Color.lerp(brandBackground, widget.secondaryColor,
-                dark ? .14 : .055)!,
+                dark ? .23 : .17)!,
           ];
     return AnimatedContainer(
       key: const Key('devAnimatedBackground'),
@@ -106,7 +106,7 @@ class _TwinConnectAmbientBackgroundState
                       child: _glow(
                         diameter: 515,
                         color: widget.primaryColor,
-                        strength: dark ? .37 : .21,
+                        strength: dark ? .43 : .33,
                       ),
                     ),
                     Positioned(
@@ -115,7 +115,7 @@ class _TwinConnectAmbientBackgroundState
                       child: _glow(
                         diameter: 485,
                         color: widget.secondaryColor,
-                        strength: dark ? .27 : .15,
+                        strength: dark ? .34 : .28,
                       ),
                     ),
                     Positioned(
@@ -125,7 +125,7 @@ class _TwinConnectAmbientBackgroundState
                         diameter: 320,
                         color: Color.lerp(widget.primaryColor,
                             widget.secondaryColor, .25)!,
-                        strength: dark ? .17 : .10,
+                        strength: dark ? .21 : .19,
                       ),
                     ),
                   ],
@@ -173,7 +173,7 @@ class _AmbientLines extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final color = Color.lerp(primary, secondary, .38)!
-        .withValues(alpha: dark ? .085 : .072);
+        .withValues(alpha: dark ? .12 : .16);
     final paint = Paint()
       ..color = color
       ..strokeWidth = .7
@@ -188,7 +188,7 @@ class _AmbientLines extends CustomPainter {
     }
 
     final arc = Paint()
-      ..color = color.withValues(alpha: dark ? .45 : .55)
+      ..color = color.withValues(alpha: dark ? .75 : .82)
       ..strokeWidth = 1
       ..style = PaintingStyle.stroke;
     for (var i = 0; i < 3; i++) {
@@ -202,6 +202,50 @@ class _AmbientLines extends CustomPainter {
         false,
         arc,
       );
+    }
+    // Multiple fine orbital paths create depth in light mode without
+    // covering controls or relying on expensive endless animations.
+    final sweep = Paint()
+      ..color = secondary.withValues(alpha: dark ? .18 : .27)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.35;
+    for (var i = 0; i < 4; i++) {
+      canvas.drawArc(
+        Rect.fromCircle(
+          center: Offset(size.width * .10, size.height * .88),
+          radius: 165 + i * 56,
+        ),
+        math.pi * 1.08, math.pi * 1.25, false, sweep,
+      );
+    }
+
+    final streak = Paint()
+      ..shader = LinearGradient(
+        colors: [
+          primary.withValues(alpha: 0),
+          primary.withValues(alpha: dark ? .25 : .34),
+          secondary.withValues(alpha: dark ? .17 : .26),
+          secondary.withValues(alpha: 0),
+        ],
+      ).createShader(Offset.zero & size)
+      ..strokeWidth = 1.2
+      ..style = PaintingStyle.stroke;
+    for (var i = 0; i < 5; i++) {
+      final y = size.height * (.13 + i * .19);
+      final path = Path()
+        ..moveTo(-40, y + 75)
+        ..cubicTo(size.width * .25, y - 92,
+            size.width * .70, y + 138, size.width + 40, y - 55);
+      canvas.drawPath(path, streak);
+    }
+
+    final sparks = Paint()..style = PaintingStyle.fill;
+    for (var i = 0; i < 28; i++) {
+      final dx = (size.width * ((i * 37 % 101) / 101));
+      final dy = (size.height * ((i * 53 % 97) / 97));
+      sparks.color = (i.isEven ? primary : secondary)
+          .withValues(alpha: dark ? .37 : .49);
+      canvas.drawCircle(Offset(dx, dy), i % 4 == 0 ? 1.9 : 1.1, sparks);
     }
   }
 
