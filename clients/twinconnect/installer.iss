@@ -35,6 +35,7 @@ DisableProgramGroupPage=yes
 [Files]
 Source: "build\windows\x64\runner\Release\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "tools\install_prerequisites.ps1"; DestDir: "{app}\tools"; Flags: ignoreversion
+Source: "tools\check_windows_real_device_readonly.ps1"; DestDir: "{app}\tools"; Flags: ignoreversion
 #if IncludeVerifiedGlobalGuard
 Source: "build\windows\x64\runner\Release\services\TwinConnectGlobalGuard.exe"; DestDir: "{app}\services"; Flags: ignoreversion
 Source: "tools\install_guard_service.ps1"; DestDir: "{app}\tools"; Flags: ignoreversion
