@@ -262,7 +262,9 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
                         surfaceColor: Theme.of(context).colorScheme.surface,
                         accentColor: Theme.of(context).colorScheme.primary,
                         radius: 17,
-                        child: ListTile(
+                        child: Material(
+                          type: MaterialType.transparency,
+                          child: ListTile(
                           key: const Key('vpnCapabilityRefresh'),
                           leading: _probing
                               ? const SizedBox(
@@ -275,6 +277,7 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
                           trailing: const Icon(Icons.refresh_rounded),
                           onTap: _probing ? null : _refreshNativeCapabilities,
                         ),
+                          ),
                       ),
                       _section(context, s.vpnConnectionModeTitle),
                       TwinConnectGlassCard(
@@ -282,7 +285,9 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
                         surfaceColor: Theme.of(context).colorScheme.surface,
                         accentColor: Theme.of(context).colorScheme.primary,
                         radius: 17,
-                        child: Column(
+                        child: Material(
+                          type: MaterialType.transparency,
+                          child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             ListTile(
@@ -307,6 +312,7 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
                             ),
                           ],
                         ),
+                          ),
                       ),
                       _section(context, s.vpnRoutingTitle),
                       Wrap(
@@ -388,7 +394,9 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
                         surfaceColor: Theme.of(context).colorScheme.surface,
                         accentColor: Theme.of(context).colorScheme.primary,
                         radius: 17,
-                        child: ListTile(
+                        child: Material(
+                          type: MaterialType.transparency,
+                          child: ListTile(
                           key: const Key('vpnShareGuideButton'),
                           leading: const Icon(Icons.wifi_tethering_outlined),
                           title: Text(s.vpnSharingTitle),
@@ -396,6 +404,7 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
                           trailing: const Icon(Icons.chevron_right_rounded),
                           onTap: _openShareVpnGuide,
                         ),
+                          ),
                       ),
                       _section(context, s.vpnSecurityTitle),
                       GlassVpnSwitch.adaptive(
