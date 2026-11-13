@@ -101,12 +101,12 @@ void main() {
     expect(setup, contains('-Action Uninstall'));
     expect(script, contains("Get-AuthenticodeSignature"));
     expect(script, contains('ExpectedSignerThumbprint'));
-    expect(script, contains('Verify-ServiceIdentity'));
+    expect(script, contains('Assert-ServiceIdentity'));
     expect(script, contains('offline-status'));
     expect(script, contains(r"if ($service.Status -ne 'Running')"));
     expect(script, contains("start= auto"));
     expect(script, contains("Start-Service -Name"));
-    expect(script, contains("Invoke-Guard -Arguments @('recover', "));
+    expect(script, contains(r'& $binary recover $ack'));
     expect(script, contains("Owned WFP filters still present"));
     expect(script, contains("offline-status"));
     expect(script, contains("Stop-Service -Name"));
