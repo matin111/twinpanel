@@ -118,7 +118,7 @@ class WindowsTrustTunnelProxy {
       await listener.close();
       final config = profile.privateSocksToml(hostIp, localPort);
       // The official TrustTunnel CLI requires --config <filename>. The native
-      // runner stages the config in a user-SID-only, delete-on-close
+      // runner stages the config in a user-SID-only, explicitly cleaned
       // temporary Windows file, never as a CLI argument or public JSON.
       final path = await _native.invokeMethod<String>(
         'stageTrustTunnelConfig', {'config': config},
@@ -141,7 +141,7 @@ class WindowsTrustTunnelProxy {
       }
       // The config handle remains open until the core has opened SOCKS.
       // Never log the native core's output: it may contain private keys.
-      // Official TrustTunnel Fatalf -> logx.Errorf -> stdout, so both streams
+      // TrustTunnel errors may appear on stdout, so both streams
       // must be consumed. Never persist or print either stream.
       _consumeNativeDiagnostic(owned, owned.stdout);
       _consumeNativeDiagnostic(owned, owned.stderr);
@@ -211,45 +211,28 @@ class WindowsTrustTunnelProxy {
   }
 
   static Future<String> _verifyRemoteExit(int port) async {
-    final client = HttpClient()
-      ..connectionTimeout = const Duration(seconds: 3)
-      ..findProxy = (_) => 'PROXY 127.0.0.1:$port';
-    try {
-      final deadline = Stopwatch()..start();
-      for (var attempt = 0; attempt < 3 &&
-          deadline.elapsed < const Duration(seconds: 10); attempt++) {
-        try {
-          final req = await client.getUrl(
-            Uri.https('api.ipify.org', '/', {'format': 'json'}),
-          ).timeout(const Duration(seconds: 4));
-          req.followRedirects = false;
-          final res = await req.close()
-              .timeout(const Duration(seconds: 5));
-          if (res.statusCode != HttpStatus.ok) {
-            throw const FormatException('TRUSTTUNNEL_REMOTE_EGRESS_UNVERIFIED');
-          }
-          final body = await utf8.decoder.bind(res).join()
-              .timeout(const Duration(seconds: 5));
-          if (body.length > 512) {
-            throw const FormatException('TRUSTTUNNEL_REMOTE_EGRESS_UNVERIFIED');
-          }
-          final parsed = jsonDecode(body);
-          final raw = parsed is Map ? parsed['ip'] : null;
-          if (raw is! String) {
-            throw const FormatException('TRUSTTUNNEL_REMOTE_EGRESS_UNVERIFIED');
-          }
-          return XrayEndpointRoute.requirePublicIPv4(raw);
-        } catch (_) {
-          if (attempt < 2) {
-            await Future<void>.delayed(
-                const Duration(milliseconds: 200));
-          }
-        }
+    // Windows includes curl.exe. Invoke SOCKS5h explicitly: a normal Dart
+    // HttpClient.findProxy uses HTTP CONNECT, not SOCKS, and would be wrong.
+    // No username, profile or secret is ever placed in argv or logged.
+    for (var attempt = 0; attempt < 3; attempt++) {
+      try {
+        final result = await Process.run('curl.exe', [
+          '--silent', '--show-error', '--fail', '--max-time', '8',
+          '--noproxy', '',
+          '--socks5-hostname', '127.0.0.1:' + port.toString(),
+          'https://api.ipify.org?format=json',
+        ], runInShell: false).timeout(const Duration(seconds: 10));
+        final stdout = result.stdout;
+        if (result.exitCode != 0 || stdout is! String ||
+            stdout.isEmpty || stdout.length > 512) continue;
+        final decoded = jsonDecode(stdout);
+        if (decoded is! Map || decoded['ip'] is! String) continue;
+        return XrayEndpointRoute.requirePublicIPv4(decoded['ip'] as String);
+      } catch (_) {
+        // Do not include native output or customer data in any error.
       }
-      throw const FormatException('TRUSTTUNNEL_REMOTE_EGRESS_UNVERIFIED');
-    } finally {
-      client.close(force: true);
     }
+    throw const FormatException('TRUSTTUNNEL_REMOTE_EGRESS_UNVERIFIED');
   }
 
   Future<void> _finishConfigStage() async {
