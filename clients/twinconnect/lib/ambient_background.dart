@@ -96,7 +96,7 @@ class _TwinConnectAmbientBackgroundState
                       child: _glow(
                         diameter: 515,
                         color: const Color(0xFF8851FB),
-                        strength: dark ? .28 : .19,
+                        strength: dark ? .37 : .21,
                       ),
                     ),
                     Positioned(
@@ -105,7 +105,7 @@ class _TwinConnectAmbientBackgroundState
                       child: _glow(
                         diameter: 485,
                         color: const Color(0xFF26C8D5),
-                        strength: dark ? .17 : .13,
+                        strength: dark ? .27 : .15,
                       ),
                     ),
                     Positioned(
@@ -114,7 +114,7 @@ class _TwinConnectAmbientBackgroundState
                       child: _glow(
                         diameter: 320,
                         color: const Color(0xFFC268FF),
-                        strength: dark ? .10 : .09,
+                        strength: dark ? .17 : .10,
                       ),
                     ),
                   ],
