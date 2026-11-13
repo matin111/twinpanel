@@ -44,48 +44,17 @@ _GITHUB: dict[tuple[str, str], GitHubAsset] = {
 }
 
 
+# Single audited source, shared with public connection cards and Apps tab.
+from .public_connection_client_catalog_v821 import APPS, normalize as _normalize_catalog
+
 _STATIC: dict[tuple[str, str], str] = {
-    # Verified Karing 1.2.26.2919 assets supplied for each platform.
-    ("karing", "windows"): "https://github.com/KaringX/karing/releases/download/v1.2.26.2919/karing_1.2.26.2919_windows_x64.zip",
-    ("karing", "android"): "https://github.com/KaringX/karing/releases/download/v1.2.26.2919/karing_1.2.26.2919_android_arm.apk",
-    ("karing", "macos"): "https://github.com/KaringX/karing/releases/download/v1.2.26.2919/karing_1.2.26.2919_macos_universal.dmg",
-    ("karing", "linux"): "https://github.com/KaringX/karing/releases/download/v1.2.26.2919/karing_1.2.26.2919_linux_amd64.deb",
-    # Apple stores are direct install destinations, not project landing pages.
-    ("hiddify", "ios"): "https://apps.apple.com/us/app/hiddify-proxy-vpn/id6596777532?platform=iphone",
-    ("karing", "ios"): "https://apps.apple.com/us/app/karing/id6472431552",
-    ("karing", "macos-store"): "https://apps.apple.com/us/app/karing/id6472431552",
-    ("amneziawg", "ios"): "https://apps.apple.com/app/amneziawg/id6478942365",
-    ("amneziawg", "macos"): "https://apps.apple.com/app/amneziawg/id6478942365",
-    ("sudoku", "ios"): "https://apps.apple.com/us/app/anywhere-proxy/id6758235178",
-
-    # Native WireGuard installers/store destinations.
-    ("wireguard", "windows"): "https://download.wireguard.com/windows-client/wireguard-installer.exe",
-    ("wireguard", "android"): "market://details?id=com.wireguard.android",
-    ("wireguard", "ios"): "https://apps.apple.com/us/app/wireguard/id1441195209",
-    ("wireguard", "macos"): "https://apps.apple.com/us/app/wireguard/id1451685025",
-
-    # Direct OpenVPN install destinations.
-    ("openvpn", "windows"): "https://build.openvpn.net/downloads/releases/OpenVPN-2.7.8-I002-amd64.msi",
-    ("openvpn", "android"): "market://details?id=net.openvpn.openvpn",
-    ("openvpn", "ios"): "https://apps.apple.com/us/app/openvpn-connect-openvpn-app/id590379981",
-
-    # Cisco/OpenConnect is manual credential delivery. Keep a direct installer
-    # instead of sending Windows users to a documentation/landing page.
-    ("openconnect", "windows"): "https://github.com/openconnect/openconnect-gui/releases/download/v1.5.3/openconnect-gui-1.5.3-win32.exe",
-    ("openconnect", "android"): "market://details?id=com.cisco.anyconnect.vpn.android.avf",
-    ("openconnect", "ios"): "https://apps.apple.com/us/app/cisco-secure-client/id1135064690",
-
-    # Official TrustTunnel Flutter client destinations for mobile/macOS. The
-    # Windows GUI is the same community GUI already selected by TwinPanel.
-    ("trusttunnel", "windows"): "https://raw.githubusercontent.com/blazuryk/TrustTunnel-GUI-Client/main/gui_client.exe",
-    ("trusttunnel", "android"): "https://agrd.io/android_trusttunnel",
-    ("trusttunnel", "ios"): "https://agrd.io/ios_trusttunnel",
-    ("trusttunnel", "macos"): "https://agrd.io/macos_trusttunnel",
+    (app, platform): data[1]
+    for app, rows in APPS.items() for platform, data in rows.items()
 }
 
 
 def _normalize(value: str) -> str:
-    return re.sub(r"[^a-z0-9]+", "", str(value or "").strip().lower())
+    return _normalize_catalog(value)
 
 
 def _github_asset(spec: GitHubAsset) -> str:
