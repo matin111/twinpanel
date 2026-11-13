@@ -47,6 +47,15 @@ DWORD Open(Engine& engine) {
                          nullptr, &engine.handle);
 }
 
+// Recovery audit intentionally checks GUID presence without validating shape.
+// A malformed owned rule is still present and MUST block an uninstall.
+bool OwnedFilterPresent(HANDLE handle, const GUID& key) {
+  FWPM_FILTER0* filter = nullptr;
+  const DWORD status = FwpmFilterGetByKey0(handle, &key, &filter);
+  if (filter != nullptr) FwpmFreeMemory0(reinterpret_cast<void**>(&filter));
+  return status == ERROR_SUCCESS;
+}
+
 // Read and verify the exact TwinConnect-owned filter contract. A filter
 // merely existing by GUID must never be treated as proof of protection.
 bool Exists(HANDLE handle, const GUID& key) {
