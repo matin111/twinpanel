@@ -89,6 +89,7 @@ bool RecoveryTaskReady() {
   ITaskFolder* folder = nullptr;
   IRegisteredTask* task = nullptr;
   ITaskDefinition* definition = nullptr;
+  ITaskSettings* settings = nullptr;
   IPrincipal* principal = nullptr;
   IActionCollection* actions = nullptr;
   IAction* action = nullptr;
@@ -140,7 +141,13 @@ bool RecoveryTaskReady() {
     // The recovery deadline must be imminent, not tomorrow or next month.
     if (when.QuadPart <= current.QuadPart ||
         when.QuadPart - current.QuadPart > 10ULL * 60ULL * 10000000ULL) break;
+    // Task Scheduler's StartWhenAvailable means the offline restore will
+    // still run after reboot if the machine missed its original deadline.
+    VARIANT_BOOL startWhenAvailable = VARIANT_FALSE;
     if (FAILED(task->get_Definition(&definition)) || !definition ||
+        FAILED(definition->get_Settings(&settings)) || !settings ||
+        FAILED(settings->get_StartWhenAvailable(&startWhenAvailable)) ||
+        startWhenAvailable != VARIANT_TRUE ||
         FAILED(definition->get_Principal(&principal)) || !principal ||
         FAILED(principal->get_UserId(&user)) || !user) break;
     if (_wcsicmp(user, L"SYSTEM") != 0 &&
@@ -168,6 +175,7 @@ bool RecoveryTaskReady() {
   if (action) action->Release();
   if (actions) actions->Release();
   if (principal) principal->Release();
+  if (settings) settings->Release();
   if (definition) definition->Release();
   if (task) task->Release();
   if (folder) folder->Release();
