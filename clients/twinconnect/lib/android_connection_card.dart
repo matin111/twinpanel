@@ -23,6 +23,7 @@ class AndroidConnectionCard extends StatefulWidget {
     required this.sessionToken,
     required this.catalog,
     required this.native,
+    this.selectedNodeId,
     super.key,
   });
 
@@ -31,6 +32,8 @@ class AndroidConnectionCard extends StatefulWidget {
   final String sessionToken;
   final PanelProtocolCatalog catalog;
   final NativeProtocolReadiness native;
+  // Exact panel node ID selected on the shared Servers screen.
+  final String? selectedNodeId;
 
   @override
   State<AndroidConnectionCard> createState() => _AndroidConnectionCardState();
@@ -136,9 +139,20 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
         protocol: VpnProtocols.byCode('wireguard')!,
         native: widget.native,
       );
-      final nodes = AndroidTunnelController.wireGuardNodes(profiles);
+      final selectedNodeId = widget.selectedNodeId;
+      final selectedProfiles = selectedNodeId == null
+          ? profiles
+          : ClientProtocolProfiles(
+              namespace: profiles.namespace,
+              protocol: profiles.protocol,
+              items: profiles.items.where((item) =>
+                  item['node_id']?.toString() == selectedNodeId).toList(),
+            );
+      // Never silently connect to a different country/node than selected.
+      final nodes = AndroidTunnelController.wireGuardNodes(selectedProfiles);
       if (nodes.isEmpty) {
-        if (mounted) setState(() => _errorCode = 'NO_WIREGUARD_CONFIG');
+        if (mounted) setState(() => _errorCode = selectedNodeId == null
+            ? 'NO_WIREGUARD_CONFIG' : 'SELECTED_WIREGUARD_NODE_UNAVAILABLE');
         return;
       }
       if (!mounted) return;
@@ -229,7 +243,8 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
             if (_errorCode != null) ...[
               const SizedBox(height: 10),
               Text(
-                _errorCode == 'NO_WIREGUARD_CONFIG'
+                _errorCode == 'NO_WIREGUARD_CONFIG' ||
+                    _errorCode == 'SELECTED_WIREGUARD_NODE_UNAVAILABLE'
                     ? s.wireGuardNoConfigs
                     : s.nativeError(_errorCode!),
                 style: TextStyle(color: Theme.of(context).colorScheme.error),
