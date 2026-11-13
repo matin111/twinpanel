@@ -21,6 +21,13 @@ void main() {
     final source = File('native/windows/twinconnect_global_guard_experimental.cpp')
         .readAsStringSync();
     expect(source, contains('FWPM_FILTER_FLAG_PERSISTENT'));
+    expect(source, contains('FWPM_CONDITION_ALE_APP_ID'));
+    expect(source, contains('FwpmGetAppIdFromFileName0'));
+    expect(source, contains('FWPM_CONDITION_IP_REMOTE_ADDRESS'));
+    expect(source, contains('FWP_ACTION_PERMIT'));
+    expect(source, contains('AddBlockRule('));
+    expect(source, contains('AddTransportPermit('));
+    expect(source, contains('RemoveOwned(engine, kPermitV4)'));
     expect(source, contains('FWPM_LAYER_ALE_AUTH_CONNECT_V4'));
     expect(source, contains('FWPM_LAYER_ALE_AUTH_CONNECT_V6'));
     expect(source, contains('FwpmTransactionBegin0('));
