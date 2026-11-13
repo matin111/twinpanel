@@ -4,6 +4,7 @@ import 'app_strings.dart';
 import 'brand_theme.dart';
 import 'interactive_glass_card.dart';
 import 'native_vpn_bridge.dart';
+import 'vpn_policy.dart';
 import 'tenant_models.dart';
 
 /// One-page, fail-closed network settings. A saved preference is not proof of
