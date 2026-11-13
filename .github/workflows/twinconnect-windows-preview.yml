@@ -42,26 +42,6 @@ jobs:
         run: flutter create --platforms=windows --org com.twinpanel --project-name twinconnect .
       - name: Install fail-closed Windows VPN native bridge
         run: python tools/install_windows_native.py
-      - name: Compile isolated Windows global guard prototype (read-only status; never arm or ship)
-        continue-on-error: true # Experimental guard must not break existing VPN release builds.
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = "Stop"
-          $vswhere = Join-Path "${env:ProgramFiles(x86)}" "Microsoft Visual Studio/Installer/vswhere.exe"
-          $vs = (& $vswhere -latest -property installationPath).Trim()
-          if (!$vs) { throw "Visual Studio C++ tools not installed" }
-          $dev = Join-Path $vs "Common7/Tools/VsDevCmd.bat"
-          $exe = Join-Path $env:RUNNER_TEMP "twinconnect-guard-check.exe"
-          $source = Join-Path (Get-Location) "native/windows/twinconnect_global_guard_experimental.cpp"
-          $compile = 'call "' + $dev + '" -arch=amd64 && cl /nologo /std:c++17 /EHsc /W4 /Fe:"' + $exe + '" "' + $source + '" /link Fwpuclnt.lib Iphlpapi.lib Ws2_32.lib Rpcrt4.lib'
-          & cmd.exe /d /s /c $compile
-          if ($LASTEXITCODE -ne 0 -or !(Test-Path $exe)) {
-            throw "Experimental WFP guard did not compile"
-          }
-          # The status command only reads owned WFP filter IDs. Never arm.
-          & $exe status
-          if ($LASTEXITCODE -ne 0) { throw "Read-only WFP status probe failed" }
-          Remove-Item -LiteralPath $exe -Force
       - name: Fetch Flutter dependencies
         run: flutter pub get
       - name: Verify Dart compilation and tests
