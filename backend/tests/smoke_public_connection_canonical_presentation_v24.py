@@ -74,33 +74,23 @@ assert "dataset.tpPlatform" in v24
 assert "link.style.display" in v24
 
 
-# Mobile app links must be exact install/download destinations, never generic
-# project or documentation landing pages.
-for direct in (
-    "https://play.google.com/store/apps/details?id=net.openvpn.openvpn",
-    "https://download.wireguard.com/android-client/com.wireguard.android-1.0.20260315.apk",
-    "https://github.com/hiddify/hiddify-app/releases/latest/download/Hiddify-Android-universal.apk",
-    "https://github.com/hiddify/hiddify-app/releases/latest/download/Hiddify-iOS.ipa",
-    "https://github.com/KaringX/karing/releases/download/v1.2.26.2919/karing_1.2.26.2919_android_arm.apk",
-    "https://apps.apple.com/us/app/karing/id6472431552",
-    "https://github.com/SagerNet/sing-box/releases/download/v1.14.4/SFA-1.14.4-arm64-v8a.apk",
-    "https://apps.apple.com/us/app/sing-box-mt/id6785326793",
-    "https://github.com/amnezia-vpn/amneziawg-android/releases/download/v3.1.20260814/AmneziaWG-3.1.202060814.apk",
-    "https://play.google.com/store/apps/details?id=com.adguard.trusttunnel",
-    "https://apps.apple.com/us/app/trusttunnel/id6755807890",
-    "https://github.com/SUDOKU-ASCII/sudoku-android/releases/download/v0.3.3/sudodroid-v0.3.3-universal.apk",
+# V24 must never replace audited client URLs with old hardcoded APK/IPA
+# strings. Every renderer uses one canonical client download catalog.
+catalog = (ROUTERS / "public_connection_client_catalog_v821.py").read_text(encoding="utf-8")
+assert "const DIRECT_APPS" not in v24
+assert "applyDirectApp" not in v24
+assert "Hiddify-iOS.ipa" not in v24
+for target in (
+    "com.wireguard.android-1.0.20260315.apk",
+    "v2rayNG_2.3.15_arm64-v8a.apk",
+    "Hiddify-Android-arm64.apk",
+    "karing_1.2.26.2929_android_arm64-v8a.apk",
+    "SFA-1.14.4-arm64-v8a.apk",
+    "AmneziaWG-3.1.202060814.apk",
+    "sudodroid-v0.3.4-universal.apk",
+    "id6755807890",
 ):
-    assert direct in v24, direct
-
-for landing in (
-    "https://karing.app/en/quickstart",
-    "https://openvpn.net/client/",
-    "https://www.wireguard.com/install/",
-    "https://github.com/hiddify/hiddify-app/releases\"",
-    "https://github.com/SagerNet/sing-box/releases/latest\"",
-):
-    assert landing not in v24, landing
-
+    assert target in catalog, target
 
 # Mobile helper/tutorial prose is visually retired; protocol names, app names,
 # canonical connection facts and functional action labels remain.
