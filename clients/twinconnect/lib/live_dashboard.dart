@@ -5119,7 +5119,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                 backgroundColor: panel.withValues(alpha: .82),
                 indicatorColor: purple.withValues(alpha: .23),
                 selectedIndex: const ['home', 'locations', 'settings', 'account']
-                    .indexOf(_page).clamp(0, 3),
+                    .indexOf(_page).clamp(0, 3).toInt(),
                 onDestinationSelected: (index) => setState(() => _page =
                     const ['home', 'locations', 'settings', 'account'][index]),
                 destinations: [
