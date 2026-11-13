@@ -86,6 +86,11 @@ void main() {
     expect(code, contains('D:P(A;;GA;;;SY)(A;;GA;;;BA)'));
     expect(code, contains('TransactionalArm('));
     expect(code, contains('RecoveryTaskReady()'));
+    expect(code, contains('GetIfEntry2(&adapter)'));
+    expect(code, contains('adapter.OperStatus != IfOperStatusUp'));
+    expect(code, contains('adapter.InterfaceAndOperStatusFlags.HardwareInterface'));
+    expect(code, contains('IF_TYPE_SOFTWARE_LOOPBACK'));
+
     expect(code, contains('ERR RECOVERY_TASK_NOT_VERIFIED'));
     expect(code, contains('CLSID_TaskScheduler'));
     expect(code, contains('TwinConnectWfpEmergencyRestore'));
