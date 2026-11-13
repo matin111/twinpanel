@@ -463,7 +463,7 @@ export function LegacySubscriptionsRuntimePage(){
         {filtered.map(item=>{
           const user=userMap.get(n(item.user_id));
           const plan=planMap.get(n(item.plan_id));
-          return <article className="mobile-subscription-card" key={n(item.id)}>
+          return <article className="mobile-subscription-card" data-subscription-id={n(item.id)} key={n(item.id)}>
             <div className="mobile-subscription-card-head">
               <div className="mobile-subscription-user">
                 <span className="mobile-subscription-avatar" aria-hidden="true">◉</span>
