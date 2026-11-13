@@ -134,6 +134,17 @@ void main() {
     expect(dashboard, contains('textDirection: TextDirection.ltr,'));
   });
 
+  test('Android location selection feeds exact native WireGuard node ID', () {
+    final dashboard = File('lib/live_dashboard.dart').readAsStringSync();
+    final androidCard = File('lib/android_connection_card.dart').readAsStringSync();
+    expect(dashboard, contains('if (Platform.isAndroid) _androidExplicitNodeSelected = true;'));
+    expect(dashboard, contains('selectedNodeId: _androidExplicitNodeSelected'));
+    expect(dashboard, contains('if (Platform.isAndroid) {'));
+    expect(androidCard, contains("item['node_id']?.toString() == selectedNodeId"));
+    expect(androidCard, contains('SELECTED_WIREGUARD_NODE_UNAVAILABLE'));
+    expect(androidCard, contains('AndroidTunnelController.wireGuardNodes(selectedProfiles)'));
+  });
+
   test('six dashboard locales and Arabic right-to-left are supported', () {
     final dashboard = File('lib/live_dashboard.dart').readAsStringSync();
     final localizer = File('lib/app_strings.dart').readAsStringSync();
