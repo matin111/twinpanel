@@ -96,8 +96,8 @@ void main() {
     ));
     final theme = Theme.of(tester.element(find.text('Shared brand')));
     expect(theme.colorScheme.primary,
-        BrandTheme.parse(brand.primaryColor, '#7C3AED'));
+        BrandTheme.accent(brand, Brightness.dark));
     expect(theme.scaffoldBackgroundColor,
-        BrandTheme.parse(brand.backgroundColor, '#101018'));
+        BrandTheme.backgroundColor(brand, Brightness.dark));
   });
 }
