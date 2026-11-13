@@ -55,7 +55,10 @@ void main() {
     expect(find.byKey(const Key('vpnCapabilityRefresh')), findsOneWidget);
     expect(find.byKey(const Key('vpnNativeEngineStatus')), findsOneWidget);
     expect(find.byKey(const Key('vpnWfpStatus')), findsOneWidget);
-    expect(find.byKey(const Key('vpnProxyModeUnavailable')), findsNothing);
+    expect(find.byKey(const Key('vpnProxyModeUnavailable')), findsOneWidget);
+    expect(find.byKey(const Key('vpnTunMode')), findsOneWidget);
+    expect(find.byKey(const Key('vpnRoutingIncludeApps')), findsOneWidget);
+    expect(find.byKey(const Key('vpnRoutingExcludeApps')), findsOneWidget);
     expect(find.byKey(const Key('vpnSharingUnavailable')), findsNothing);
     expect(find.byKey(const Key('vpnSaveButton')), findsNothing);
   });
