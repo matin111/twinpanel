@@ -209,7 +209,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   /// tunnel. The guard remains active when a VPN disconnects; we must never
   /// disarm it just because a transport process is stopped.
   Future<void> _requireVerifiedGuardIfRequested() async {
-    final policy = await _vpnPolicy.load(widget.panel.namespace, widget.username);
+    final policy = await _vpnPolicy.loadFailClosed(widget.panel.namespace, widget.username);
     if (!policy.killSwitchRequested) return;
     if (!Platform.isWindows) {
       throw const FormatException('GLOBAL_KILL_SWITCH_UNSUPPORTED_PLATFORM');
