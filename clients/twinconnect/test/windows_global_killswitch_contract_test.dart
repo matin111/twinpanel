@@ -50,6 +50,21 @@ void main() {
     expect(workflow, contains("NEVER invoke 'arm' or 'disarm'"));
   });
 
+  test('VM leak test must verify network recovery and retain emergency restore until confirmed', () {
+    final script = File('tools/test_windows_global_guard_vm.ps1')
+        .readAsStringSync();
+    final workflow = File('../../.github/workflows/twinconnect-wfp-vm-leak-test.yml')
+        .readAsStringSync();
+    expect(script, contains('TwinConnectWfpEmergencyRestore'));
+    expect(script, contains('OWNED_RULES_PRESENT 0 0 0'));
+    expect(script, contains('if ($recovered -and $restored)'));
+    expect(script, contains('if (!$recovered -or !$restored)'));
+    expect(script, contains('Test-Physical-Egress -SourceAddress $PhysicalIpv4'));
+    expect(script, contains('Test-Physical-Egress -SourceAddress $PhysicalIpv6'));
+    expect(workflow, contains('self-hosted, windows, x64, twinconnect-disposable-vm'));
+    expect(workflow, isNot(contains('runs-on: windows-latest')));
+  });
+
   test('privileged Windows service owns lockdown and independent recovery', () {
     final code = File('native/windows/twinconnect_global_guard_service_experimental.cpp')
         .readAsStringSync();
