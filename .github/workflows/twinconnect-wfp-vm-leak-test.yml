@@ -1,0 +1,76 @@
+name: TwinConnect Manual WFP Leak Test (Disposable VM Only)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: 'Type I_HAVE_VM_SNAPSHOT_AND_OFFLINE_RECOVERY'
+        type: string
+        required: true
+      tunnel_alias:
+        type: choice
+        options: ["TwinConnectSB", "TwinConnect"]
+        required: true
+      endpoint_ipv4:
+        description: "Verified VPN server IPv4"
+        type: string
+        required: true
+      physical_ipv4:
+        description: "Physical adapter source IPv4 with baseline internet access"
+        type: string
+        required: true
+      physical_ipv6:
+        description: "Physical adapter source IPv6 with baseline internet access"
+        type: string
+        required: true
+      transport_executable:
+        description: "Signed, administrator-managed VPN transport executable absolute path"
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  packet-leak-validation:
+    # Deliberately never use github-hosted runners: packet-loss and persistent
+    # firewall tests require owner-controlled disposable VM + offline console.
+    runs-on: [self-hosted, windows, x64, twinconnect-disposable-vm]
+    environment: twinconnect-vm-network-tests
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: clients/twinconnect
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assert explicit VM safety prerequisites
+        shell: pwsh
+        env:
+          CONFIRMATION: ${{ inputs.confirmation }}
+        run: |
+          if ($env:CONFIRMATION -cne 'I_HAVE_VM_SNAPSHOT_AND_OFFLINE_RECOVERY') {
+            throw "VM snapshot/offline recovery confirmation missing"
+          }
+          if ($env:TWINCONNECT_DISPOSABLE_VM -ne '1') {
+            throw "VM must be externally marked as disposable"
+          }
+          if (!(Test-Path 'C:\Program Files\TwinConnectGuardVMSmoke\twinconnect-guard-service-test.exe')) {
+            throw "Guard executable must be separately installed on the VM"
+          }
+      - name: Test real physical IPv4/IPv6 blocking with independent recovery
+        shell: pwsh
+        env:
+          TUNNEL_ALIAS: ${{ inputs.tunnel_alias }}
+          ENDPOINT_IPV4: ${{ inputs.endpoint_ipv4 }}
+          PHYSICAL_IPV4: ${{ inputs.physical_ipv4 }}
+          PHYSICAL_IPV6: ${{ inputs.physical_ipv6 }}
+          TRANSPORT_EXE: ${{ inputs.transport_executable }}
+        run: |
+          ./tools/test_windows_global_guard_vm.ps1 \
+            -GuardExe 'C:\Program Files\TwinConnectGuardVMSmoke\twinconnect-guard-service-test.exe' \
+            -TunnelAlias $env:TUNNEL_ALIAS \
+            -VpnEndpointIpv4 $env:ENDPOINT_IPV4 \
+            -TransportExe $env:TRANSPORT_EXE \
+            -PhysicalIpv4 $env:PHYSICAL_IPV4 \
+            -PhysicalIpv6 $env:PHYSICAL_IPV6 \
+            -DisposableVmOnly -IHaveOfflineConsoleRecovery
