@@ -255,8 +255,11 @@ async def _provision_subscription_background(
         db.close()
 
 
+# All persistence and preflight calls below are synchronous SQLAlchemy work.
+# FastAPI must execute this route in its worker threadpool, not the event loop.
+# Otherwise slow DB queries stall node heartbeats and unrelated API requests.
 @router.post("/admin-create-fast-v1", status_code=202)
-async def admin_create_fast_v1(
+def admin_create_fast_v1(
     payload: dict[str, Any],
     background_tasks: BackgroundTasks,
 ):
