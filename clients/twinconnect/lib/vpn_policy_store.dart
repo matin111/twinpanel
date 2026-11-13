@@ -30,6 +30,16 @@ class VpnPolicyStore {
     }
   }
 
+  /// Security-sensitive load. A corrupted or unreadable preference must not
+  /// silently become a default policy with Kill Switch switched off.
+  /// This is used only at the actual connection entry points.
+  Future<VpnPolicy> loadFailClosed(String tenant, String account) async {
+    final preferences = await SharedPreferences.getInstance();
+    final raw = preferences.getString(storageKey(tenant, account));
+    if (raw == null) return const VpnPolicy();
+    return VpnPolicy.decode(raw);
+  }
+
   Future<bool> save(
     String tenant,
     String account,
