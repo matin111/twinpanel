@@ -117,6 +117,37 @@ class PerNodeProtocolSwitchTests(unittest.TestCase):
         self.assertEqual(available, ALL_PROTOCOL_SET - {"cisco"})
         self.assertEqual(node_supported_protocols(self.db, 2), ALL_PROTOCOL_SET)
 
+    def test_admin_api_changes_one_pair_only(self):
+        from app.routers.node_protocol_operator_controls_v1 import (
+            NodeProtocolToggleIn, read_switch, write_switch,
+        )
+        change = write_switch(
+            1, "cisco", NodeProtocolToggleIn(disabled=True), db=self.db
+        )
+        self.assertTrue(change["ok"])
+        self.assertTrue(change["disabled"])
+        self.assertEqual(change["effect"], "public_delivery_only")
+        self.assertFalse(change["runtime_stopped"])
+        self.assertTrue(read_switch(1, "cisco", db=self.db)["disabled"])
+        self.assertFalse(read_switch(2, "cisco", db=self.db)["disabled"])
+        node = self.db.get(Node, 1)
+        self.assertTrue(node.show_to_users)
+        self.assertTrue(write_switch(
+            1, "cisco", NodeProtocolToggleIn(disabled=False), db=self.db
+        )["ok"])
+        self.assertFalse(read_switch(1, "cisco", db=self.db)["disabled"])
+
+    def test_repeated_reads_use_session_cache(self):
+        set_disabled(self.db, 2, "wireguard", True)
+        self.db.commit()
+        first = disabled_pairs(self.db)
+        second = disabled_pairs(self.db, [2])
+        self.assertEqual(first, second)
+        self.assertIn("_tp_node_protocol_operator_switches_v1", self.db.info)
+        set_disabled(self.db, 2, "wireguard", False)
+        self.assertNotIn("_tp_node_protocol_operator_switches_v1", self.db.info)
+        self.assertEqual(disabled_pairs(self.db), set())
+
     def test_api_auth_and_source_contracts(self):
         from app.routers.node_protocol_operator_controls_v1 import (
             read_switch, write_switch, router,
