@@ -65,12 +65,39 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(title),
-        content: Text(description),
+        backgroundColor: Theme.of(ctx).colorScheme.surface.withValues(alpha: .97),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(22),
+          side: BorderSide(
+            color: Theme.of(ctx).colorScheme.primary.withValues(alpha: .27),
+          ),
+        ),
+        title: Row(children: [
+          Container(
+            padding: const EdgeInsets.all(9),
+            decoration: BoxDecoration(
+              color: Theme.of(ctx).colorScheme.primary.withValues(alpha: .13),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(Icons.help_outline_rounded,
+                color: Theme.of(ctx).colorScheme.primary, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(child: Text(title, style: const TextStyle(
+            fontSize: 17, fontWeight: FontWeight.w700,
+          ))),
+        ]),
+        content: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 400),
+          child: Text(description, style: const TextStyle(
+            fontSize: 14, height: 1.55,
+          )),
+        ),
+        actionsPadding: const EdgeInsets.fromLTRB(18, 0, 18, 14),
         actions: [
-          TextButton(
+          FilledButton.tonal(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: Text(AppStrings.of(ctx).pick('بستن', 'Close')),
+            child: Text(AppStrings.of(ctx).pick('متوجه شدم', 'Got it')),
           ),
         ],
       ),
