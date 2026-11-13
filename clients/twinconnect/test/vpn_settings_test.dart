@@ -53,6 +53,10 @@ void main() {
     ));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('vpnCapabilityRefresh')), findsOneWidget);
+    expect(find.byKey(const Key('vpnDiagnosticsDisclosure')), findsOneWidget);
+    await tester.ensureVisible(find.byKey(const Key('vpnDiagnosticsDisclosure')));
+    await tester.tap(find.byKey(const Key('vpnDiagnosticsDisclosure')));
+    await tester.pumpAndSettle();
     expect(find.byKey(const Key('vpnNativeEngineStatus')), findsOneWidget);
     expect(find.byKey(const Key('vpnWfpStatus')), findsOneWidget);
     expect(find.byKey(const Key('vpnProxyModeUnavailable')), findsOneWidget);
