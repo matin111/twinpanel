@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import asyncio
+import hashlib
 import io
 import re
 import time
+from pathlib import Path
 from html import escape, unescape
 from typing import Any, Awaitable, Callable
 
@@ -11,12 +14,13 @@ from aiogram.client.session.middlewares.base import BaseRequestMiddleware
 from aiogram.types import BufferedInputFile, CopyTextButton, InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.methods import GetMyCommands, SetMyCommands
 from aiogram.types import (
-    BotCommand, BotCommandScopeDefault, BotCommandScopeAllPrivateChats,
+    BotCommand, BotCommandScopeChat, BotCommandScopeDefault, BotCommandScopeAllPrivateChats,
     BotCommandScopeAllGroupChats, BotCommandScopeAllChatAdministrators,
 )
 
 from .bot_texts import custom_bot_texts
 from .database import SessionLocal
+from .telegram_models import TelegramUserLink
 
 
 class BotTextRequestMiddleware(BaseRequestMiddleware):
@@ -45,6 +49,7 @@ class BotTextRequestMiddleware(BaseRequestMiddleware):
         self._values: dict[str, str] = {}
         self._qr_sent_at: dict[tuple[str, str], float] = {}
         self._commands_sync_attempted = False
+        self._chat_migration_task: asyncio.Task[None] | None = None
 
     async def _sync_start_command(
         self,
@@ -88,6 +93,11 @@ class BotTextRequestMiddleware(BaseRequestMiddleware):
                         failed = True
             # Allow subsequent requests to retry if Telegram was unavailable.
             self._commands_sync_attempted = not failed
+            if self._chat_migration_task is None:
+                # Do not block customer requests while pushing the new menu.
+                self._chat_migration_task = asyncio.create_task(
+                    self._migrate_linked_chat_commands(make_request, bot, commands)
+                )
             return
 
         # Independent reseller bots retain their existing commands.
@@ -104,6 +114,67 @@ class BotTextRequestMiddleware(BaseRequestMiddleware):
             )
         except Exception:
             self._commands_sync_attempted = False
+
+
+    async def _migrate_linked_chat_commands(
+        self,
+        make_request: Callable[..., Awaitable[Any]],
+        bot: Any,
+        commands: list[BotCommand],
+    ) -> None:
+        """Update old per-chat menus without messaging or interrupting users.
+
+        Telegram does not provide a bot API to enumerate arbitrary chats.
+        Only linked users already known by this panel can be migrated here;
+        new users inherit the default /start menu. A persistent fingerprint
+        avoids hundreds of redundant Bot API writes on every restart.
+        """
+        def linked_ids() -> list[int]:
+            db = SessionLocal()
+            try:
+                return sorted({
+                    int(row[0])
+                    for row in db.query(TelegramUserLink.telegram_id).all()
+                    if row[0] and int(row[0]) > 0
+                })
+            finally:
+                db.close()
+
+        try:
+            chat_ids = await asyncio.to_thread(linked_ids)
+            fingerprint = hashlib.sha256(
+                (str(bot.id) + ":" + ",".join(map(str, chat_ids))).encode()
+            ).hexdigest()
+            stamp = Path("/var/lib/twinpanel-license/telegram-start-only-menu-v1.sha256")
+            try:
+                if stamp.read_text(encoding="ascii").strip() == fingerprint:
+                    return
+            except OSError:
+                pass
+
+            failed = False
+            for chat_id in chat_ids:
+                try:
+                    await make_request(
+                        bot, SetMyCommands(
+                            commands=commands,
+                            scope=BotCommandScopeChat(chat_id=chat_id),
+                        ),
+                    )
+                except Exception:
+                    failed = True
+                # Keep the migration below Telegram's practical rate limits.
+                await asyncio.sleep(0.15)
+
+            if not failed:
+                try:
+                    stamp.parent.mkdir(parents=True, exist_ok=True)
+                    stamp.write_text(fingerprint + "\\n", encoding="ascii")
+                except OSError:
+                    pass
+        except Exception:
+            # Never interrupt bot polling, purchases or customer messaging.
+            return
 
     def _load(self) -> dict[str, str]:
         now = time.monotonic()
