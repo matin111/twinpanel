@@ -122,7 +122,7 @@ class TwinConnectMainlineContract(unittest.TestCase):
         self.assertIn("<QRCodeSVG value={publicLink}", link)
         self.assertIn('/customer/subscriptions/{subscription_id}/app-delivery', ROUTES.read_text(encoding="utf-8"))
         self.assertIn("getAppAccess(", api)
-        self.assertIn("appearanceApi.save(role,appearance,resellerId)", delivery)
+        self.assertIn('appearanceApi.save(role,{...appearance,theme_mode:"dark"},resellerId)', delivery)
         self.assertIn("registerAppDirectory(appOrigin.trim())", LICENSE.read_text(encoding="utf-8"))
         self.assertIn('routeKey==="admin/smart-app"', ROUTER_UI.read_text(encoding="utf-8"))
         self.assertIn('routeKey==="reseller/smart-app"', ROUTER_UI.read_text(encoding="utf-8"))
