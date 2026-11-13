@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.823",
-  "source_sha": "3dbea688592a60a3b844954a30146af3f27dfb3a",
+  "version": "1.1.0-rc.824",
+  "source_sha": "fa0b3a0c068fd68fdea979e566df2aacd70a7b45",
   "notes": {
-    "fa": "طراحی تیره حرفه‌ای برای تنظیمات برند TwinConnect: پالت سرمه‌ای و سبز دریایی با کنتراست بیشتر، حذف لایت‌مود اپ از پنل، بهبود پیش‌نمایش شیشه‌ای و حفظ تصویر و رنگ‌های سفارشی ادمین و نماینده. بدون تغییر در نود، کیف‌پول، اشتراک و پروتکل‌ها.",
-    "en": "Premium dark-only TwinConnect Brand Studio with deep navy, sea-glass green and icy-blue accents. Remove app light-mode selection, improve frosted preview, and preserve custom owner colors and background images. No changes to nodes, wallet, subscriptions or VPN protocols."
+    "fa": "رفع گیرکردن دکمه ساخت اشتراک: انتقال عملیات دیتابیس از event loop به worker thread، محدودیت انتظار ۴۵ثانیه‌ای فرم با هشدار جلوگیری از ساخت تکراری، و تست‌های CI و انتشار برای حفظ اصلاحات در نسخه‌های بعدی.",
+    "en": "Fix hanging manual subscription creation: execute synchronous database persistence in FastAPI threadpool, bound frontend fetch to 45 seconds with no-blind-retry warning, and add release regression guards."
   }
 }
