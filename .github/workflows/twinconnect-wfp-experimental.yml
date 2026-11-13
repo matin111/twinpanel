@@ -119,7 +119,7 @@ jobs:
           if (!$source.Contains('Get-AuthenticodeSignature') -or
               !$source.Contains('ExpectedSignerThumbprint') -or
               !$source.Contains('offline-status') -or
-              !$source.Contains('Verify-ServiceIdentity')) {
+              !$source.Contains('Assert-ServiceIdentity')) {
             throw 'Guard signer pinning or offline recovery is missing'
           }
           # Certificate issuance stalled on hosted Windows runners. Executable
