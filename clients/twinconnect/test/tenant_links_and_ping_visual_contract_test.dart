@@ -49,6 +49,15 @@ void main() {
     expect(dashboard, contains("Key('liveRefreshTunnelStatus')"));
   });
 
+  test('Persian dashboard is RTL and English dashboard is LTR', () {
+    final dashboard = File('lib/live_dashboard.dart').readAsStringSync();
+    expect(dashboard, contains("textDirection: _persian ? TextDirection.rtl : TextDirection.ltr"));
+    expect(dashboard, contains("key: ValueKey<String>(_persian ? 'dashboard-rtl' : 'dashboard-ltr')"));
+    expect(dashboard, contains('child: Row(children: [\n          sideBar(),'));
+    expect(dashboard, isNot(contains('textDirection: TextDirection.ltr,\n            child: Row(')));
+    expect(dashboard, contains('textDirection: TextDirection.ltr,'));
+  });
+
   test('network ping uses latency-colored neon lightning, not gauge', () {
     final dashboard = File('lib/live_dashboard.dart').readAsStringSync();
     expect(dashboard, contains("Key('livePingLightningIcon')"));
