@@ -60,7 +60,9 @@ void main() {
     expect(native, contains('twinconnect_sudoku_guard.h'));
     expect(native, contains('stageSudokuConfig'));
     expect(native, contains('guardSudokuProcess'));
-    expect(config, contains("'route_exclude_address': ['\$endpointRoute/32']"));
+    // One narrow public /32 exception is used by Sudoku, Mieru, Xray,
+    // TrustTunnel and now SOCKS5. The variable is shared for all.
+    expect(config, contains("'route_exclude_address': ['\$routeException/32']"));
   });
 
   test('Windows Go-readable Sudoku staging retains user-only ACL and cleanup', () {
