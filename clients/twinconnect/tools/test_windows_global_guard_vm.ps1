@@ -8,6 +8,7 @@ param(
   [Parameter(Mandatory)][string]$VpnEndpointIpv4,
   [Parameter(Mandatory)][string]$TransportExe,
   [Parameter(Mandatory)][string]$PhysicalIpv4,
+  [Parameter(Mandatory)][string]$PhysicalIpv6,
   [switch]$DisposableVmOnly,
   [switch]$IHaveOfflineConsoleRecovery
 )
@@ -30,6 +31,12 @@ if ($service.Status -ne "Running") { throw "Guard service is not running." }
 if (!(Get-NetAdapter -InterfaceAlias $TunnelAlias -ErrorAction SilentlyContinue)) {
   throw "TwinConnect tunnel adapter not present."
 }
+foreach ($source in @($PhysicalIpv4, $PhysicalIpv6)) {
+  $binding = Get-NetIPAddress -IPAddress $source -ErrorAction SilentlyContinue
+  if (!$binding -or $binding.InterfaceAlias -eq $TunnelAlias) {
+    throw "Physical source missing or belongs to tunnel: $source"
+  }
+}
 $endpoint = [System.Net.IPAddress]::None
 if (![System.Net.IPAddress]::TryParse($VpnEndpointIpv4, [ref]$endpoint) -or
     $endpoint.AddressFamily -ne [System.Net.Sockets.AddressFamily]::InterNetwork) {
@@ -39,13 +46,17 @@ if (![System.Net.IPAddress]::TryParse($VpnEndpointIpv4, [ref]$endpoint) -or
 function Test-Physical-Egress {
   param([string]$SourceAddress,[string]$RemoteAddress="1.1.1.1",
         [int]$Port=443,[int]$TimeoutMs=3500)
+  $sourceIp = [System.Net.IPAddress]::Parse($SourceAddress)
+  $remoteIp = [System.Net.IPAddress]::Parse($RemoteAddress)
+  if ($sourceIp.AddressFamily -ne $remoteIp.AddressFamily) {
+    throw "Source and destination have different IP families."
+  }
   $socket = [System.Net.Sockets.Socket]::new(
-    [System.Net.Sockets.AddressFamily]::InterNetwork,
+    $sourceIp.AddressFamily,
     [System.Net.Sockets.SocketType]::Stream,
     [System.Net.Sockets.ProtocolType]::Tcp)
   try {
-    $socket.Bind([System.Net.IPEndPoint]::new(
-      [System.Net.IPAddress]::Parse($SourceAddress), 0))
+    $socket.Bind([System.Net.IPEndPoint]::new($sourceIp, 0))
     $async = $socket.BeginConnect($RemoteAddress, $Port, $null, $null)
     if (!$async.AsyncWaitHandle.WaitOne($TimeoutMs)) { return $false }
     try { $socket.EndConnect($async); return $true }
@@ -57,6 +68,9 @@ function Test-Physical-Egress {
 
 if (!(Test-Physical-Egress -SourceAddress $PhysicalIpv4)) {
   throw "Physical IPv4 baseline already blocked; test would be inconclusive."
+}
+if (!(Test-Physical-Egress -SourceAddress $PhysicalIpv6 -RemoteAddress "2606:4700:4700::1111")) {
+  throw "Physical IPv6 baseline already blocked; test would be inconclusive."
 }
 $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(2)
 $action = New-ScheduledTaskAction -Execute $GuardExe -Argument ("recover " + $ack)
@@ -73,7 +87,10 @@ try {
   if (Test-Physical-Egress -SourceAddress $PhysicalIpv4) {
     throw "PRIVACY FAILURE: direct physical IPv4 TCP egress still works."
   }
-  Write-Host "PASS: direct physical IPv4 TCP blocked inside VM."
+  if (Test-Physical-Egress -SourceAddress $PhysicalIpv6 -RemoteAddress "2606:4700:4700::1111") {
+    throw "PRIVACY FAILURE: direct physical IPv6 TCP egress still works."
+  }
+  Write-Host "PASS: direct physical IPv4 and IPv6 TCP blocked inside VM."
 } finally {
   & $GuardExe recover $ack
   $recovered = $LASTEXITCODE -eq 0
@@ -85,5 +102,5 @@ try {
 }
 if (!$recovered) { throw "Emergency recovery failed." }
 Write-Host "TwinConnect-owned WFP rules were removed."
-# Partial test only: DNS, IPv6, UDP, crash/reboot, route transitions and every
-# protocol must pass separate tests before release.
+# Partial test only: DNS, UDP/QUIC, crash/reboot, route transitions and
+# every protocol must pass separate tests before release.
