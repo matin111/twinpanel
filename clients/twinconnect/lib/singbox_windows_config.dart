@@ -23,8 +23,10 @@ class SingBoxWindowsConfig {
     String? sudokuEndpointIPv4,
     int? mieruSocksPort,
     String? mieruEndpointIPv4,
+    int? trusttunnelSocksPort,
+    String? trusttunnelEndpointIPv4,
   }) {
-    if ([xraySocksPort, sudokuSocksPort, mieruSocksPort]
+    if ([xraySocksPort, sudokuSocksPort, mieruSocksPort, trusttunnelSocksPort]
         .where((port) => port != null).length > 1) {
       throw const FormatException('MULTIPLE_LOCAL_PROXY_UPSTREAMS');
     }
@@ -44,7 +46,16 @@ class SingBoxWindowsConfig {
     if ((mieruSocksPort == null) != (mieruEndpointIPv4 == null)) {
       throw const FormatException('MIERU_ENDPOINT_ROUTE_MISSING');
     }
-    final activeSocksPort = xraySocksPort ?? sudokuSocksPort ?? mieruSocksPort;
+    if (trusttunnelSocksPort != null &&
+        (protocol != 'trusttunnel' || trusttunnelSocksPort < 1025 ||
+         trusttunnelSocksPort > 65535 || resolvedServer != null)) {
+      throw const FormatException('TRUSTTUNNEL_SOCKS_BRIDGE_INVALID');
+    }
+    if ((trusttunnelSocksPort == null) != (trusttunnelEndpointIPv4 == null)) {
+      throw const FormatException('TRUSTTUNNEL_ENDPOINT_ROUTE_MISSING');
+    }
+    final activeSocksPort = xraySocksPort ?? sudokuSocksPort ??
+        mieruSocksPort ?? trusttunnelSocksPort;
     // An app-owned, loopback-only Xray-core SOCKS bridge is the sole
     // supported external outbound. Never accept an arbitrary proxy host.
     if (xraySocksPort != null &&
@@ -58,7 +69,7 @@ class SingBoxWindowsConfig {
     // A narrow /32 exception only for the exact preverified VLESS server.
     // Never make a general LAN/IPv4 exception or weaken strict_route.
     final pinnedEndpoint = xrayEndpointIPv4 ?? sudokuEndpointIPv4 ??
-        mieruEndpointIPv4;
+        mieruEndpointIPv4 ?? trusttunnelEndpointIPv4;
     final endpointRoute = pinnedEndpoint == null
         ? null : XrayEndpointRoute.requirePublicIPv4(pinnedEndpoint);
     final chain = activeSocksPort == null && protocol == 'shadowtls'
