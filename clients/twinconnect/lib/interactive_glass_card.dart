@@ -66,13 +66,13 @@ class _TwinConnectGlassCardState extends State<TwinConnectGlassCard> {
               curve: Curves.easeOutCubic,
               padding: widget.padding,
               decoration: BoxDecoration(
-                color: surface.withValues(alpha: bright ? .24 : .39),
+                color: surface.withValues(alpha: bright ? .66 : .94),
                 borderRadius: radius,
                 border: Border.all(
                   color: active
                       ? accent.withValues(alpha: .88)
                       : (bright ? Colors.white : accent)
-                          .withValues(alpha: bright ? .24 : .18),
+                          .withValues(alpha: bright ? .25 : .33),
                   width: active ? 1.3 : 1,
                 ),
                 gradient: LinearGradient(
@@ -81,16 +81,16 @@ class _TwinConnectGlassCardState extends State<TwinConnectGlassCard> {
                   stops: const [0, .46, 1],
                   colors: [
                     Color.lerp(surface, accent, active ? .29 : .16)!
-                        .withValues(alpha: bright ? .31 : .43),
-                    surface.withValues(alpha: bright ? .19 : .37),
+                        .withValues(alpha: bright ? .62 : .96),
+                    surface.withValues(alpha: bright ? .67 : .93),
                     Color.lerp(surface, reflection, active ? .25 : .13)!
-                        .withValues(alpha: bright ? .31 : .41),
+                        .withValues(alpha: bright ? .63 : .97),
                   ],
                 ),
                 boxShadow: [
                   BoxShadow(
                     color: (active ? accent : Colors.black).withValues(
-                      alpha: active ? .28 : (bright ? .13 : .06)),
+                      alpha: active ? (bright ? .17 : .12) : (bright ? .12 : .08)),
                     blurRadius: active ? 30 : 17,
                     offset: const Offset(0, 8),
                   ),
@@ -110,7 +110,7 @@ class _TwinConnectGlassCardState extends State<TwinConnectGlassCard> {
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             gradient: RadialGradient(colors: [
-                              reflection.withValues(alpha: bright ? .24 : .13),
+                              reflection.withValues(alpha: bright ? .17 : .11),
                               accent.withValues(alpha: 0),
                             ]),
                           ),
