@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.830",
-  "source_sha": "1f1ab837c5e86a5696a07f811db9be3dac449f3c",
+  "version": "1.1.0-rc.831",
+  "source_sha": "8b6e0c5260c60dd18f2d427cf96a0f14966cd268",
   "notes": {
-    "fa": "افزودن نمایش حجم کل، حجم مصرفی، حجم باقی‌مانده و تاریخ انقضا به مولتی‌لینک‌های پروتکل‌ها از طریق هدر استاندارد subscription-userinfo و هدرهای مستقل. پشتیبانی از اشتراک نامحدود و شروع اعتبار از اولین اتصال، بدون تغییر کانفیگ‌ها، لینک‌ها و شمارش حجم؛ همراه تست رگرسیون. شامل اصلاحات نسخه‌های قبلی.",
-    "en": "Expose live total/used/remaining traffic and expiration via subscription-userinfo plus explicit metadata headers on protocol Multi-Links and V2Ray feeds. Preserve first-use and unlimited subscriptions, VPN payloads, URLs, and accounting semantics. Includes regression tests and preceding fixes."
+    "fa": "فهرست کامندهای ربات فروش تلگرام بعد از نصب و آپدیت پنل فقط شامل /start خواهد بود؛ پاک‌سازی کامندهای قدیمی در چت خصوصی، گروه‌ها، مدیران گروه و زبان‌های فارسی و انگلیسی. امکانات داخلی و منوی مستقل ربات نمایندگان بدون تغییر باقی می‌ماند. دارای تست رگرسیون انتشار.",
+    "en": "Ensure the main sales Telegram bot shows only /start after any new installation or update, including default, private, group, administrator scopes and Persian/English overrides. Preserve internal bot features and independent reseller bot command menus. Release regression tested."
   }
 }
