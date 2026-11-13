@@ -79,7 +79,7 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
       'dns_engine_support: ${_capabilities.dnsGuard}',
       'ipv6_engine_support: ${_capabilities.ipv6Guard}',
       'guard_reason: ${_guard['reason'] ?? 'UNKNOWN'}',
-    ].join('\\n');
+    ].join('\n');
     await Clipboard.setData(ClipboardData(text: diagnosticText));
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
