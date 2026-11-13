@@ -4585,23 +4585,20 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           }
           return Directionality(
             textDirection: _rtl ? TextDirection.rtl : TextDirection.ltr,
-            child: IntrinsicHeight(
-              key: const Key('liveEqualHeightConnectionPanels'),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Expanded(flex: 5, child: Directionality(
-                    textDirection: _rtl ? TextDirection.rtl : TextDirection.ltr,
-                    child: powerCard(
-                      subscriptionContent: homeSubscriptionSummary()),
-                  )),
-                  const SizedBox(width: 14),
-                  Expanded(flex: 5, child: Directionality(
-                    textDirection: _rtl ? TextDirection.rtl : TextDirection.ltr,
-                    child: connectionStats(),
-                  )),
-                ],
-              ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(flex: 5, child: Directionality(
+                  textDirection: _rtl ? TextDirection.rtl : TextDirection.ltr,
+                  child: powerCard(
+                    subscriptionContent: homeSubscriptionSummary()),
+                )),
+                const SizedBox(width: 14),
+                Expanded(flex: 5, child: Directionality(
+                  textDirection: _rtl ? TextDirection.rtl : TextDirection.ltr,
+                  child: connectionStats(),
+                )),
+              ],
             ),
           );
         }),
