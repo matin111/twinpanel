@@ -99,8 +99,13 @@ void main() {
     await tester.tap(find.byKey(const Key('devNav_home')));
     await tester.pump();
     expect(find.byKey(const Key('liveAutoFastestServer')), findsNothing);
-    await tester.ensureVisible(find.byKey(const Key('liveHomeRefreshAccount')).first);
-    await tester.tap(find.byKey(const Key('liveHomeRefreshAccount')).first);
+    // Assert the actual refresh callback, not the tap target of a possibly
+    // off-screen duplicated shell during a navigation transition.
+    final refreshButtons = tester.widgetList<IconButton>(
+      find.byKey(const Key('liveHomeRefreshAccount'))).toList();
+    expect(refreshButtons, isNotEmpty);
+    refreshButtons.firstWhere((button) => button.onPressed != null)
+        .onPressed!();
     expect(refreshes, 1);
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(seconds: 30));
