@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "clients/twinconnect/native/windows/twinconnect_global_guard_experimental.cpp"
+      - "clients/twinconnect/native/windows/twinconnect_global_guard_service_experimental.cpp"
       - ".github/workflows/twinconnect-wfp-experimental.yml"
   workflow_dispatch:
 
@@ -37,6 +38,23 @@ jobs:
           # Only a read-only status query. NEVER invoke 'arm' or 'disarm'.
           & $exe status
           if ($LASTEXITCODE -ne 0) { throw "Read-only guard status failed" }
+          Remove-Item -LiteralPath $exe -Force
+      - name: Compile standalone privileged guard service and recovery client (never install)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $vswhere = Join-Path "${env:ProgramFiles(x86)}" "Microsoft Visual Studio/Installer/vswhere.exe"
+          $vs = (& $vswhere -latest -property installationPath).Trim()
+          if (!$vs) { throw "Visual Studio C++ compiler unavailable" }
+          $dev = Join-Path $vs "Common7/Tools/VsDevCmd.bat"
+          $source = Join-Path (Get-Location) "native/windows/twinconnect_global_guard_service_experimental.cpp"
+          $exe = Join-Path $env:RUNNER_TEMP "twinconnect-guard-service-test.exe"
+          $compile = 'call "' + $dev + '" -arch=amd64 && cl /nologo /std:c++17 /EHsc /W4 /WX /Fe:"' + $exe + '" "' + $source + '" /link Fwpuclnt.lib Iphlpapi.lib Ws2_32.lib Rpcrt4.lib Advapi32.lib'
+          & cmd.exe /d /s /c $compile
+          if ($LASTEXITCODE -ne 0 -or !(Test-Path $exe)) {
+            throw "Guard service C++ compilation failed"
+          }
+          # Compile-only. DO NOT start the service, install it, or manipulate WFP.
           Remove-Item -LiteralPath $exe -Force
       - name: Validate no executable entered the repository
         shell: pwsh
