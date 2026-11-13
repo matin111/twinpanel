@@ -2582,18 +2582,9 @@ _SCRIPT = r"""
      sudoku:['windows','android','ios','macos'],
      singbox:['windows','android','ios','macos'],
      v2rayng:['android'],v2box:['ios'],v2rayn:['windows','macos'],
-     karing:['windows','android','ios','macos']
-   };
-   const appName=appTypes[key];
-   const supportedPlatforms={
-     openconnect:['windows','android','ios'],
-     openvpn:['windows','android','ios'],
-     wireguard:['windows','android','ios','macos'],
-     amneziawg:['windows','android','ios','macos'],
-     trusttunnel:['windows','android','ios','macos'],
-     sudoku:['windows','android','ios','macos'],
      karing:['windows','android','ios','macos','linux']
    };
+   const appName=appTypes[key];
    const canonical=appName&&supportedPlatforms[appName]?.includes(platform)
      ?'/v1/connect/app-download/'+appName+'/'+platform:null;
    const existing=[...footer.querySelectorAll('[data-kind="app"]')];
