@@ -8,6 +8,7 @@ import 'native_vpn_bridge.dart';
 import 'vpn_policy.dart';
 import 'vpn_policy_store.dart';
 import 'vpn_strings.dart';
+import 'share_vpn_preview.dart';
 
 /// Controls are enabled only for verified native capabilities.
 /// Consistent frosted surface for every policy row across desktop and mobile.
@@ -62,6 +63,7 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
   // Show safe, disabled defaults immediately; the native probe runs in background.
   bool _loading = false;
   bool _saving = false;
+  bool _probing = false;
 
   bool get _identified =>
       widget.tenant.trim().isNotEmpty && widget.account.trim().isNotEmpty;
@@ -100,6 +102,42 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
   }
 
   void _update(VpnPolicy next) => setState(() => _policy = next);
+
+  Future<void> _refreshNativeCapabilities() async {
+    if (_probing) return;
+    setState(() => _probing = true);
+    final capabilities = await NativeVpnBridge.probe();
+    if (!mounted) return;
+    setState(() {
+      _capabilities = capabilities;
+      _probing = false;
+    });
+  }
+
+  void _openShareVpnGuide() {
+    Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (context) => Scaffold(
+        appBar: AppBar(title: Text(AppStrings.of(context).pick(
+          'اشتراک‌گذاری VPN', 'Share VPN',
+        ))),
+        body: BrandBackground(
+          brand: widget.brand,
+          child: ListView(
+            padding: const EdgeInsets.all(20),
+            children: [
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 760),
+                child: ShareVpnPreview(
+                  dark: Theme.of(context).brightness == Brightness.dark,
+                  persian: AppStrings.of(context).pick(true, false),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ));
+  }
 
   void _addApp() {
     if ((_policy.routingMode == VpnRoutingMode.onlySelectedApps &&
@@ -218,6 +256,58 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
                         ),
                         ),
                       ),
+                      const SizedBox(height: 12),
+                      TwinConnectGlassCard(
+                        dark: Theme.of(context).brightness == Brightness.dark,
+                        surfaceColor: Theme.of(context).colorScheme.surface,
+                        accentColor: Theme.of(context).colorScheme.primary,
+                        radius: 17,
+                        child: ListTile(
+                          key: const Key('vpnCapabilityRefresh'),
+                          leading: _probing
+                              ? const SizedBox(
+                                  width: 24, height: 24,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : const Icon(Icons.health_and_safety_outlined),
+                          title: Text(s.vpnCapabilityCheck),
+                          subtitle: Text(s.vpnCapabilityCheckHint),
+                          trailing: const Icon(Icons.refresh_rounded),
+                          onTap: _probing ? null : _refreshNativeCapabilities,
+                        ),
+                      ),
+                      _section(context, s.vpnConnectionModeTitle),
+                      TwinConnectGlassCard(
+                        dark: Theme.of(context).brightness == Brightness.dark,
+                        surfaceColor: Theme.of(context).colorScheme.surface,
+                        accentColor: Theme.of(context).colorScheme.primary,
+                        radius: 17,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            ListTile(
+                              key: const Key('vpnTunMode'),
+                              leading: const Icon(Icons.shield_outlined),
+                              title: Text(s.vpnTunMode),
+                              subtitle: Text(s.vpnTunModeHint),
+                              trailing: Icon(
+                                _capabilities.engineReady && _capabilities.fullTunnel
+                                    ? Icons.check_circle_outline
+                                    : Icons.lock_outline,
+                              ),
+                            ),
+                            const Divider(height: 1),
+                            ListTile(
+                              key: const Key('vpnProxyModeUnavailable'),
+                              leading: const Icon(Icons.swap_horiz_rounded),
+                              title: Text(s.vpnProxyMode),
+                              subtitle: Text(s.vpnProxyModeUnavailable),
+                              trailing: const Icon(Icons.lock_outline),
+                              enabled: false,
+                            ),
+                          ],
+                        ),
+                      ),
                       _section(context, s.vpnRoutingTitle),
                       Wrap(
                         spacing: 8,
@@ -292,6 +382,21 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
                           ],
                         ),
                       ],
+                      _section(context, s.vpnSharingTitle),
+                      TwinConnectGlassCard(
+                        dark: Theme.of(context).brightness == Brightness.dark,
+                        surfaceColor: Theme.of(context).colorScheme.surface,
+                        accentColor: Theme.of(context).colorScheme.primary,
+                        radius: 17,
+                        child: ListTile(
+                          key: const Key('vpnShareGuideButton'),
+                          leading: const Icon(Icons.wifi_tethering_outlined),
+                          title: Text(s.vpnSharingTitle),
+                          subtitle: Text(s.vpnSharingHint),
+                          trailing: const Icon(Icons.chevron_right_rounded),
+                          onTap: _openShareVpnGuide,
+                        ),
+                      ),
                       _section(context, s.vpnSecurityTitle),
                       GlassVpnSwitch.adaptive(
                         key: const Key('vpnKillSwitch'),
@@ -359,6 +464,11 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
                       ),
 
 
+                      const SizedBox(height: 14),
+                      Text(
+                        s.vpnSettingsNotApplied,
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
                       const SizedBox(height: 18),
                       FilledButton.icon(
                         key: const Key('vpnSaveButton'),
