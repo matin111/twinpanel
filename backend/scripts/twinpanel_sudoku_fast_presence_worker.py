@@ -29,6 +29,7 @@ from app.services.accounting_device_map_batch_v1 import (
 from app.services.central_runtime_ownership_v1 import is_central_node
 from app.services.sudoku_shared_native_presence_v1 import (
     collect_shared_native_users, apply_shared_native_presence,
+    apply_shared_native_counters,
 )
 from app.services.sudoku_legacy_systemd_accounting_v1 import (
     collect_legacy_unit_counters, apply_legacy_unit_counters,
@@ -110,8 +111,9 @@ async def reconcile_once() -> dict:
                     stats = apply_shared_native_presence(
                         db, node=node, devices=devices, snapshot=native,
                     )
-                    usage={"usage_events":0,"accepted_bytes":0,
-                           "usage_supported":False,"baselined":0}
+                    usage=apply_shared_native_counters(
+                        db,node=node,devices=devices,snapshot=native,
+                    )
                 else:
                     stats = canonical._apply_sudoku_presence(
                         db, node=node, devices=devices, established_ports=ports,
