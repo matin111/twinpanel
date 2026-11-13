@@ -324,24 +324,22 @@ jobs:
           if ($env:SIGNING_CONFIGURED -eq 'true' -and $setup.Status -ne 'Valid') {
             throw 'Signed build did not retain a valid installer signature'
           }
-      # Draft Kill Switch PRs may run compilation checks but must not
-      # emit installable application artifacts until network safety is proven.
+      # A draft PR may offer a private, clearly named installation-test
+      # artifact to its repository collaborators. This is NOT a public
+      # release or a certified Kill Switch. IncludeVerifiedGlobalGuard=0,
+      # so the experimental WFP service is never installed or armed.
       - uses: actions/upload-artifact@v4
-        if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}
         with:
-          name: TwinConnect-Windows-SHA256SUMS
+          name: TwinConnect-Windows-TEST-SHA256SUMS
           path: clients/twinconnect/TwinConnect-Windows-SHA256SUMS.txt
           if-no-files-found: error
-          retention-days: 30
-      # Draft Kill Switch PRs may run compilation checks but must not
-      # emit installable application artifacts until network safety is proven.
+          retention-days: 7
       - uses: actions/upload-artifact@v4
-        if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}
         with:
-          name: TwinConnect-Windows-x64-Setup
+          name: TwinConnect-Windows-TEST-Only-KillSwitch-OFF
           path: clients/twinconnect/TwinConnect-Windows-x64-Setup.exe
           if-no-files-found: error
-          retention-days: 30
+          retention-days: 7
       # Unsigned artifacts are for internal testing only. Never distribute
       # unsigned Windows executables as public GitHub Release assets.
       # A publisher code-signing certificate is mandatory for prereleases.
