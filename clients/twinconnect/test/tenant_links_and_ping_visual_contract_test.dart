@@ -86,6 +86,24 @@ void main() {
     expect(dashboard, isNot(contains("tr('از پنل', 'Panel')")));
   });
 
+  test('fastest server toggle immediately probes selects and connects', () {
+    final dashboard = File('lib/live_dashboard.dart').readAsStringSync();
+    final begin = dashboard.indexOf('Future<void> _enableFastestAndConnect()');
+    final end = dashboard.indexOf('void _resetNetworkStats()', begin);
+    expect(begin, greaterThan(0));
+    expect(end, greaterThan(begin));
+    final action = dashboard.substring(begin, end);
+    expect(action, contains('await _probeAllNodes()'));
+    expect(action, contains('final best = _fastestKnownIndex'));
+    expect(action, contains('entry.selected && entry.configRecordPresent'));
+    expect(action, contains('_selected = best'));
+    expect(action, contains('_autoFastest = true'));
+    expect(action, contains('await _toggleVpn()'));
+    expect(action, contains('NO_MEASURED_SERVER'));
+    expect(dashboard, contains('_enableFastestAndConnect();'));
+    expect(dashboard, contains("Key('autoFastestServerToggle')"));
+  });
+
   test('settings remain compact without hiding actual diagnostics', () {
     final dashboard = File('lib/live_dashboard.dart').readAsStringSync();
     expect(dashboard, contains('settingsSectionTitle('));
