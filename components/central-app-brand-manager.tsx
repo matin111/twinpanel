@@ -109,7 +109,7 @@ export function CentralAppBrandManager({role}:{role:"admin"|"reseller"}){
     if(!appearance||busy)return;
     setBusy(true);setError("");setNotice("");
     try{
-      const a=await appearanceApi.save(role,appearance,resellerId);
+      const a=await appearanceApi.save(role,{...appearance,theme_mode:"dark"},resellerId);
       const c=await apiRequest<AppContact>(target,"PUT",{
         logo_url:contact.logo_url,primary_color:a.primary_color,secondary_color:a.secondary_color,
         telegram_url:contact.telegram_url,renewal_url:contact.renewal_url,
@@ -135,8 +135,8 @@ export function CentralAppBrandManager({role}:{role:"admin"|"reseller"}){
     :contact.brand_name||pick("پنل اصلی","Main panel");
   const previewLogo=imageUrl(contact.logo_url);
   const preview=<div className="tbs-device" style={{
-    background:appearance?.theme_mode==="light"?"#F3F7F8":appearance?.background_color,
-    color:appearance?.theme_mode==="light"?"#21343E":"#EAF3F5",
+    background:appearance?.background_color,
+    color:"#EAF3F5",
     ...(appearance?.background_style==="image"&&appearance.background_image_url?
       {backgroundImage:`url(${appearance.background_image_url})`,backgroundSize:"cover",backgroundPosition:"center"}:{}) ,
   }}>
@@ -223,7 +223,7 @@ export function CentralAppBrandManager({role}:{role:"admin"|"reseller"}){
             <div className="tbs-section-head"><div><h2>{pick("رنگ‌ها و ظاهر","Colors & appearance")}</h2><p>{pick("رنگ‌ها را تنظیم کنید و نتیجه را در پیش‌نمایش ببینید.","Customize colors and preview changes instantly.")}</p></div></div>
             <div className="tbs-presets">
               {([
-                {name:"Ocean slate",primary:"#6FA7B8",secondary:"#62C1B4",button:"#4E8FA2",background:"#0F1720",surface:"#1B2B36"},
+                {name:"Deep sea glass",primary:"#5CC8B7",secondary:"#81BDD4",button:"#479E9B",background:"#0E1E2B",surface:"#193641"},
                 {name:"Misty blue",primary:"#789EAD",secondary:"#80BDB8",button:"#588D9E",background:"#14222B",surface:"#20333E"},
                 {name:"Soft glacier",primary:"#729CB4",secondary:"#9BCDC6",button:"#50849E",background:"#172532",surface:"#283E48"},
                 {name:"Quiet evergreen",primary:"#649E92",secondary:"#93C6B5",button:"#508C80",background:"#142723",surface:"#23413B"},
@@ -233,7 +233,7 @@ export function CentralAppBrandManager({role}:{role:"admin"|"reseller"}){
                   onClick={()=>{setAppearance(current=>current?{...current,
                     primary_color:preset.primary,secondary_color:preset.secondary,
                     button_color:preset.button,background_color:preset.background,
-                    surface_color:preset.surface,background_style:"gradient"}:current);setDirty(true)}}/>)}
+                    surface_color:preset.surface,background_style:"gradient",theme_mode:"dark"}:current);setDirty(true)}}/>)}
             </div>
             <div className="tbs-colors">
               {([
@@ -249,10 +249,11 @@ export function CentralAppBrandManager({role}:{role:"admin"|"reseller"}){
               </div>)}
             </div>
             <div className="tbs-selects">
-              <label>{pick("حالت نمایش","Theme")}
-                <select value={appearance.theme_mode} onChange={e=>changeAppearance("theme_mode",e.target.value as AppAppearance["theme_mode"])}>
-                  <option value="dark">{pick("تیره","Dark")}</option><option value="light">{pick("روشن","Light")}</option><option value="system">{pick("سیستم","System")}</option>
-                </select></label>
+              <div className="tbs-dark-only">
+                <span aria-hidden="true">◐</span>
+                <strong>{pick("حالت تیره حرفه‌ای","Premium dark theme")}</strong>
+                <small>{pick("ظاهر برنامه ثابت است؛ رنگ‌ها و پس‌زمینه قابل تغییرند.","App appearance stays dark; colors and wallpaper remain customizable.")}</small>
+              </div>
               <label>{pick("استایل پس‌زمینه","Background style")}
                 <select value={appearance.background_style} onChange={e=>changeAppearance("background_style",e.target.value as AppAppearance["background_style"])}>
                   <option value="gradient">{pick("گرادیان","Gradient")}</option><option value="solid">{pick("ساده","Solid")}</option><option value="image">{pick("تصویر","Image")}</option>
