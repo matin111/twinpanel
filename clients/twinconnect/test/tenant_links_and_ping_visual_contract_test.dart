@@ -64,7 +64,7 @@ void main() {
     expect(picker, contains('Icons.check_circle_rounded'));
     expect(picker, contains('rtl ? TextDirection.rtl : TextDirection.ltr'));
     expect(picker, contains('item.code == \'ar\''));
-    expect(picker, contains('Color(0xFFF9FCFD)'));
+    expect(picker, contains('Color(0xFFF4FAFB)'));
     expect(picker, contains('Color(0xFF13232F)'));
     for (final code in ['fa', 'en', 'tr', 'ar', 'de', 'fr']) {
       expect(picker, contains("code: '$code'"));
