@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.816",
+  "version": "1.1.0-rc.817",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-13T00:30:47Z",
+  "released_at": "2026-11-13T00:58:57Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "639dec2edb13e209ed2044290e4642dbab31dcf6",
+  "source_sha": "971938488e3bccb0dba40910c3f352a303491eff",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.816/twinpanel-1.1.0-rc.816-linux-x86_64.tar.gz",
-    "sha256": "894a31f793f395fe78d7ff635bf6811c642f294900ba04a17c2f4b0a85ad5e10",
-    "size_bytes": 30731205
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.817/twinpanel-1.1.0-rc.817-linux-x86_64.tar.gz",
+    "sha256": "3552d8ab92a5506ce247d3a4c7c0a3078565adcfd00a4a9afde5c328f294ac8e",
+    "size_bytes": 30702224
   },
   "notes": {
-    "fa": "افزودن دو کنترل مدیریتی در صفحه پروتکل‌ها برای هر نود: ری‌استارت سرویس با تایید و بررسی سلامت؛ غیرفعال/فعال‌کردن همان پروتکل در همان نود برای کانفیگ‌های دریافتی، بدون حذف کاربران، تغییر تنظیمات یا قطع اتصال‌های فعلی. هشدار برای ری‌استارت sing-box مشترک، وضعیت پایدار مدیریتی، انتشار لینک‌ها و فهرست موبایل با احترام به غیرفعال‌سازی و سازگاری لایت/دارک؛ همراه همه امکانات rc.815.",
-    "en": "Add per-node protocol restart with confirmation/health-check and durable per-node operator disable/enable for newly fetched customer configurations only. Preserve existing runtime sessions, other nodes, keys, quota and previous rc.815 UI features. Include shared-sing-box interruption warnings, mobile inventory integration and release guards."
+    "fa": "اصلاح صفحه پلن‌ها: بازگرداندن انتخاب واضح و همیشه قابل‌مشاهده ۲۷ نود Exit در کنار پروتکل‌ها، با شبکه فشرده، شمارنده نودهای انتخاب‌شده و انتخاب همه. حفظ لیست انتخاب‌شده هنگام ویرایش و ثبت نودها و پروتکل‌ها در API و اشتراک. موبایل و لایت/دارک سازگار.",
+    "en": "Restore always-visible allowed Exit node selection alongside protocol selection within compact plan create/edit modal; keep checked state, snapshots, all-node button, and mobile/light/dark UX. Preserve plan API and quotas."
   }
 }
