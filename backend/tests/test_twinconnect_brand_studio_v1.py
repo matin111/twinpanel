@@ -41,21 +41,25 @@ class TwinConnectBrandStudioContract(unittest.TestCase):
     def test_brand_studio_uses_new_owner_editable_defaults_and_live_flow_preview(self):
         ui=UI.read_text(encoding="utf-8")
         css=(ROOT/"components/central-app-brand-studio.css").read_text(encoding="utf-8")
-        for color in ("#6FA7B8", "#62C1B4", "#4E8FA2", "#0F1720", "#1B2B36"):
+        for color in ("#5CC8B7", "#81BDD4", "#479E9B", "#0E1E2B", "#193641"):
             self.assertIn(color,ui)
         self.assertIn("setAppearance(current=>current?{...current,",ui)
         self.assertIn("background_color:preset.background",ui)
         self.assertNotIn('["#7C3AED","#4F46E5"]',ui)
         self.assertIn("tbs-data-flow",ui)
         self.assertNotIn('className="tbs-connect-orb"',ui)
-        self.assertIn("html[data-theme=\"light\"] .tbs-page",css)
+        self.assertIn("tbs-dark-only",css)
+        self.assertNotIn('<option value="light">',ui)
+        self.assertNotIn('<option value="system">',ui)
+        self.assertIn('theme_mode:"dark"',ui)
+        self.assertIn('background:appearance?.background_color',ui)
 
     def test_brand_studio_has_real_logo_upload_and_reseller_scope(self):
         ui=UI.read_text(encoding="utf-8")
         self.assertIn('body.append("file",file)',ui)
         self.assertIn('role==="reseller"?"reseller/assets/logo"',ui)
         self.assertIn('role==="reseller"?"reseller/profile"',ui)
-        self.assertIn('appearanceApi.save(role,appearance,resellerId)',ui)
+        self.assertIn('appearanceApi.save(role,{...appearance,theme_mode:"dark"},resellerId)',ui)
         self.assertIn("tbs-device",ui)
 
 if __name__=="__main__":

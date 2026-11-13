@@ -353,3 +353,16 @@ html[data-theme="light"] .tbs-actions{background:#EAF1F389}
 html[data-theme="light"] .tbs-device{border-color:#CBDCE0;box-shadow:0 18px 35px #17333a22}
 html[data-theme="light"] .tbs-device-brand,html[data-theme="light"] .tbs-connection-label{color:inherit}
 @media (prefers-reduced-motion:reduce){.tbs-data-flow svg{filter:none}}
+
+/* TwinConnect 2027 ocean-glass studio: dark app preview only. */
+.tbs-dark-only{display:flex;flex-direction:column;gap:4px;border:1px solid #7bcbb63c;border-radius:16px;padding:10px 14px;background:linear-gradient(130deg,#173c435e,#1d455734);color:#d7f7f0;min-width:0}
+.tbs-dark-only>span{font-size:18px;color:#7bdac7}
+.tbs-dark-only>strong{font-size:12px;line-height:1.6}
+.tbs-dark-only>small{font-size:10px;color:#8faeb6;line-height:1.7}
+.tbs-device{border-color:#345767;box-shadow:0 28px 65px #05121a72,inset 0 1px 0 #afffef36}
+.tbs-device::before{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse at 15% 25%,#58c5ae25,transparent 52%),radial-gradient(ellipse at 80% 68%,#5ea5ce1a,transparent 55%)}
+.tbs-data-flow{box-shadow:0 20px 45px #061b2480,inset 0 1px 0 #b5fdfb22;border-color:#75cab744}
+.tbs-device-glow{opacity:.33;filter:blur(95px)}
+.tbs-preview{background:linear-gradient(160deg,#162d3ba6,#122632b6)}
+.tbs-presets button{box-shadow:0 4px 15px #07172233}
+.tbs-presets button:hover{box-shadow:0 6px 20px #52bba44d}

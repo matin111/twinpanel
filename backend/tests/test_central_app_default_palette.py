@@ -34,11 +34,11 @@ def test_default_app_colors_are_slate_ocean():
         "primary_color", "secondary_color", "button_color",
         "background_color", "surface_color",
     )} == {
-        "primary_color": "#6FA7B8",
-        "secondary_color": "#62C1B4",
-        "button_color": "#4E8FA2",
-        "background_color": "#0F1720",
-        "surface_color": "#1B2B36",
+        "primary_color": "#5CC8B7",
+        "secondary_color": "#81BDD4",
+        "button_color": "#479E9B",
+        "background_color": "#0E1E2B",
+        "surface_color": "#193641",
     }
 
 
