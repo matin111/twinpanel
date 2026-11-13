@@ -40,6 +40,15 @@ void main() {
     expect(dashboard, isNot(contains("tr('دست‌دهی با سرور تأیید شد', 'Server handshake verified')")));
   });
 
+  test('connection indicator waves only while connecting or verified', () {
+    final wave = File('lib/twinconnect_wave_indicator.dart').readAsStringSync();
+    final dashboard = File('lib/live_dashboard.dart').readAsStringSync();
+    expect(wave, contains('if (_active)'));
+    expect(wave, contains('if (!_active && _pulse.isAnimating)'));
+    expect(dashboard, contains('connected: _verifiedConnectionActive'));
+    expect(dashboard, contains("Key('liveRefreshTunnelStatus')"));
+  });
+
   test('network ping uses latency-colored neon lightning, not gauge', () {
     final dashboard = File('lib/live_dashboard.dart').readAsStringSync();
     expect(dashboard, contains("Key('livePingLightningIcon')"));
@@ -70,7 +79,7 @@ void main() {
     final dashboard = File('lib/live_dashboard.dart').readAsStringSync();
     final ambient = File('lib/ambient_background.dart').readAsStringSync();
     expect(dashboard, contains('primaryColor: purple'));
-    expect(dashboard, contains("widget.brand.secondaryColor, '#00DCEB'"));
+    expect(dashboard, contains('BrandTheme.secondaryAccent(widget.brand)'));
     expect(ambient, contains('final Color primaryColor'));
     expect(ambient, contains('final Color secondaryColor'));
     expect(ambient, contains('duration: const Duration(milliseconds: 1250)'));
