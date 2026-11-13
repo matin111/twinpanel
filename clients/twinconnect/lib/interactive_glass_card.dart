@@ -38,14 +38,14 @@ class _TwinConnectGlassCardState extends State<TwinConnectGlassCard> {
   @override
   Widget build(BuildContext context) {
     final bright = widget.dark;
-    final accent = widget.accentColor ?? const Color(0xFFA46AFF);
+    final accent = widget.accentColor ?? const Color(0xFF6FA7B8);
     // Respect the reseller palette, with a subtle electric cyan reflection
     // for depth. The secondary stays tenant-derived, never replaces branding.
-    final secondary = widget.secondaryColor ?? const Color(0xFF00DCEB);
-    final reflection = Color.lerp(secondary, const Color(0xFF00F0FF),
+    final secondary = widget.secondaryColor ?? const Color(0xFF62C1B4);
+    final reflection = Color.lerp(secondary, const Color(0xFF9CD9D0),
         widget.dark ? .24 : .10)!;
     final surface = widget.surfaceColor ??
-        (bright ? const Color(0xFF273753) : Colors.white);
+        (bright ? const Color(0xFF1B2B36) : Colors.white);
     final active = widget.selected || _hovered;
     final radius = BorderRadius.circular(widget.radius);
     return MouseRegion(
@@ -66,13 +66,13 @@ class _TwinConnectGlassCardState extends State<TwinConnectGlassCard> {
               curve: Curves.easeOutCubic,
               padding: widget.padding,
               decoration: BoxDecoration(
-                color: surface.withValues(alpha: bright ? .28 : .48),
+                color: surface.withValues(alpha: bright ? .24 : .39),
                 borderRadius: radius,
                 border: Border.all(
                   color: active
                       ? accent.withValues(alpha: .88)
                       : (bright ? Colors.white : accent)
-                          .withValues(alpha: bright ? .32 : .25),
+                          .withValues(alpha: bright ? .24 : .18),
                   width: active ? 1.3 : 1,
                 ),
                 gradient: LinearGradient(
@@ -80,11 +80,11 @@ class _TwinConnectGlassCardState extends State<TwinConnectGlassCard> {
                   end: Alignment.bottomRight,
                   stops: const [0, .46, 1],
                   colors: [
-                    Color.lerp(surface, accent, active ? .42 : .27)!
-                        .withValues(alpha: bright ? .38 : .55),
-                    surface.withValues(alpha: bright ? .22 : .48),
-                    Color.lerp(surface, reflection, active ? .32 : .21)!
-                        .withValues(alpha: bright ? .38 : .53),
+                    Color.lerp(surface, accent, active ? .29 : .16)!
+                        .withValues(alpha: bright ? .31 : .43),
+                    surface.withValues(alpha: bright ? .19 : .37),
+                    Color.lerp(surface, reflection, active ? .25 : .13)!
+                        .withValues(alpha: bright ? .31 : .41),
                   ],
                 ),
                 boxShadow: [
