@@ -2094,10 +2094,19 @@ async def _ensure_fabric_for_tunnel_node(
     No manual SSH command is required.
     """
 
+    # Resolve DB-backed controller URL before opening the remote SSH session.
+    # Release read-only transactions before multi-minute remote bootstrap:
+    # otherwise PostgreSQL may disconnect an idle transaction while apt runs.
+    agent_api_base = api_base_url(db, None)
     conn = await ssh_connect_saved(
         node,
         db,
     )
+    if db.new or db.dirty or db.deleted:
+        conn.close()
+        await conn.wait_closed()
+        raise RuntimeError("TUNNEL_BOOTSTRAP_UNEXPECTED_DB_WRITES")
+    db.commit()
 
     try:
         # -------------------------------------------------
@@ -2107,7 +2116,7 @@ async def _ensure_fabric_for_tunnel_node(
         agent = await _install_or_upgrade_agent(
             conn,
             node.id,
-            api_base=api_base_url(db, None),
+            api_base=agent_api_base,
         )
 
         if not isinstance(agent, dict):
