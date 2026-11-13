@@ -2594,16 +2594,33 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
             padding: const EdgeInsets.all(5),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(24),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: (_modernUp || _vpnVerified)
+                  ? [
+                      const Color(0xFF0EDFB3).withValues(alpha: .95),
+                      const Color(0xFF008D9C).withValues(alpha: .78),
+                    ]
+                  : [
+                      purple.withValues(alpha: .94),
+                      BrandTheme.parse(widget.brand.buttonColor, '#9544F8')
+                          .withValues(alpha: .86),
+                      BrandTheme.parse(widget.brand.secondaryColor, '#00DCEB')
+                          .withValues(alpha: .72),
+                    ],
+              ),
               border: Border.all(
                 color: (_modernUp || _vpnVerified)
-                    ? const Color(0xFF00E6B0).withValues(alpha: .72)
-                    : purple.withValues(alpha: .66)),
+                    ? const Color(0xFF5CFFE2).withValues(alpha: .86)
+                    : purple.withValues(alpha: .91),
+                width: 1.25),
               boxShadow: [
                 BoxShadow(
                   color: (_modernUp || _vpnVerified)
-                      ? const Color(0xFF00E6B0).withValues(alpha: .19)
-                      : purple.withValues(alpha: .23),
-                  blurRadius: 24, spreadRadius: 2),
+                      ? const Color(0xFF00E6B0).withValues(alpha: .30)
+                      : purple.withValues(alpha: .35),
+                  blurRadius: 29, spreadRadius: 1),
               ],
             ),
             child: FilledButton(
@@ -2624,9 +2641,9 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                   if (states.contains(WidgetState.disabled)) {
                     return purple.withValues(alpha: .35);
                   }
-                  return (_modernUp || _vpnVerified)
-                      ? const Color(0xFF0E997E)
-                      : const Color(0xFF7943DF);
+                  // Frosted gradient lives on the parent shell; the
+                  // button stays transparent so brand colors remain visible.
+                  return Colors.transparent;
                 }),
               ),
               child: Row(
