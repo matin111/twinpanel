@@ -27,7 +27,7 @@ class BrandTheme {
     return brightness == Brightness.dark
         ? base
         : // Avoid an almost pure-white field that washes away the light-mode art.
-        Color.lerp(base, const Color(0xFFF4F0FF), 0.90)!;
+        Color.lerp(base, const Color(0xFFF9F6FF), 0.97)!;
   }
 
   static Color accent(BrandPreview? brand, Brightness brightness) {
