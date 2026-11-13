@@ -17,6 +17,8 @@ $ErrorActionPreference = "Stop"
 $ack = "I_ACCEPT_OFFLINE_RECOVERY"
 $task = "TwinConnectWfpEmergencyRestore"
 $recovered = $false
+$restored = $false
+$taskRegistered = $false
 
 if (!$DisposableVmOnly -or !$IHaveOfflineConsoleRecovery -or
     $env:TWINCONNECT_DISPOSABLE_VM -ne "1") {
@@ -75,6 +77,7 @@ if (!(Test-Physical-Egress -SourceAddress $PhysicalIpv6 -RemoteAddress "2606:470
 $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(2)
 $action = New-ScheduledTaskAction -Execute $GuardExe -Argument ("recover " + $ack)
 Register-ScheduledTask -TaskName $task -Trigger $trigger -Action $action -User "SYSTEM" -RunLevel Highest -Force | Out-Null
+$taskRegistered = $true
 try {
   $check = Get-ScheduledTask -TaskName $task -ErrorAction Stop
   if ($check.State -eq "Disabled") { throw "Emergency task disabled." }
@@ -95,12 +98,30 @@ try {
   & $GuardExe recover $ack
   $recovered = $LASTEXITCODE -eq 0
   if ($recovered) {
+    # The recovery CLI returning success is not sufficient. Query raw filter
+    # ownership, then prove both original physical routes can connect again.
+    $rawStatus = & $GuardExe offline-status
+    $recovered = $LASTEXITCODE -eq 0 -and
+        ($rawStatus -match 'OWNED_RULES_PRESENT 0 0 0')
+    if ($recovered) {
+      for ($attempt = 0; $attempt -lt 4 -and !$restored; $attempt++) {
+        $v4Restored = Test-Physical-Egress -SourceAddress $PhysicalIpv4
+        $v6Restored = Test-Physical-Egress -SourceAddress $PhysicalIpv6 -RemoteAddress "2606:4700:4700::1111"
+        $restored = $v4Restored -and $v6Restored
+        if (!$restored) { Start-Sleep -Seconds 2 }
+      }
+    }
+  }
+  if ($recovered -and $restored) {
     Unregister-ScheduledTask -TaskName $task -Confirm:$false -ErrorAction SilentlyContinue
+    $taskRegistered = $false
   } else {
-    Write-Warning "Recovery failed. Independent scheduled restore remains registered."
+    Write-Warning "Connectivity was not fully restored. Independent SYSTEM emergency task remains registered."
   }
 }
-if (!$recovered) { throw "Emergency recovery failed." }
-Write-Host "TwinConnect-owned WFP rules were removed."
+if (!$recovered -or !$restored) {
+  throw "Recovery was not verified: both physical IPv4 and IPv6 must work again."
+}
+Write-Host "PASS: TwinConnect-owned WFP rules removed and both physical networks restored."
 # Partial test only: DNS, UDP/QUIC, crash/reboot, route transitions and
 # every protocol must pass separate tests before release.
