@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.816",
-  "source_sha": "639dec2edb13e209ed2044290e4642dbab31dcf6",
+  "version": "1.1.0-rc.817",
+  "source_sha": "971938488e3bccb0dba40910c3f352a303491eff",
   "notes": {
-    "fa": "افزودن دو کنترل مدیریتی در صفحه پروتکل‌ها برای هر نود: ری‌استارت سرویس با تایید و بررسی سلامت؛ غیرفعال/فعال‌کردن همان پروتکل در همان نود برای کانفیگ‌های دریافتی، بدون حذف کاربران، تغییر تنظیمات یا قطع اتصال‌های فعلی. هشدار برای ری‌استارت sing-box مشترک، وضعیت پایدار مدیریتی، انتشار لینک‌ها و فهرست موبایل با احترام به غیرفعال‌سازی و سازگاری لایت/دارک؛ همراه همه امکانات rc.815.",
-    "en": "Add per-node protocol restart with confirmation/health-check and durable per-node operator disable/enable for newly fetched customer configurations only. Preserve existing runtime sessions, other nodes, keys, quota and previous rc.815 UI features. Include shared-sing-box interruption warnings, mobile inventory integration and release guards."
+    "fa": "اصلاح صفحه پلن‌ها: بازگرداندن انتخاب واضح و همیشه قابل‌مشاهده ۲۷ نود Exit در کنار پروتکل‌ها، با شبکه فشرده، شمارنده نودهای انتخاب‌شده و انتخاب همه. حفظ لیست انتخاب‌شده هنگام ویرایش و ثبت نودها و پروتکل‌ها در API و اشتراک. موبایل و لایت/دارک سازگار.",
+    "en": "Restore always-visible allowed Exit node selection alongside protocol selection within compact plan create/edit modal; keep checked state, snapshots, all-node button, and mobile/light/dark UX. Preserve plan API and quotas."
   }
 }
