@@ -75,7 +75,11 @@ void main() {
     final dashboard = File('lib/live_dashboard.dart').readAsStringSync();
     expect(dashboard, contains("Key('liveBalancedConnectionPanels')"));
     expect(dashboard, contains('crossAxisAlignment: CrossAxisAlignment.stretch'));
-    expect(dashboard, contains('powerCard(\n                      subscriptionContent: homeSubscriptionSummary())'));
+    expect(
+      RegExp(r'powerCard\\s*\\(\\s*subscriptionContent:\\s*homeSubscriptionSummary\\(\\)\\s*\\)')
+          .hasMatch(dashboard),
+      isTrue,
+    );
     expect(dashboard, contains("Key('liveOpenLocationsFromNetwork')"));
     expect(dashboard, contains("onTap: () => setState(() => _page = 'locations')"));
     expect(dashboard, contains("tr('مکان‌ها', 'Locations')"));
