@@ -1377,10 +1377,6 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         _vpnVerified = false;
         _vpnCleanup = false;
       }
-      if (_awgServiceUp) {
-        await _awg.stop();
-        _awgServiceUp = false;
-      }
       _modernHealthTimer?.cancel();
       _stopModernTrafficMonitoring();
       final started = await _awg.start(profile: node, policy: policy);
@@ -2168,9 +2164,10 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           if (!nextUp && !_modernUp) _resetNetworkStats();
         });
       }
-      // Query the independent AmneziaWG service without confusing it
-      // with the ordinary WireGuard tunnel and its transfer counters.
-      if (_awgServiceUp || _modernProtocol == 'amneziawg') {
+      // Query the independent official service even after a Windows/app
+      // restart, so an owned service is never mistaken for a disconnected
+      // account or silently started a second time.
+      {
         try {
           final awg = await _awg.status();
           if (!mounted) return;
@@ -2181,19 +2178,22 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           setState(() {
             _awgServiceUp = serviceUp;
             _awgUnmanaged = awg['state'] == 'unmanaged_service';
-            _modernUp = verified;
-            _vpnRx = awg['rxBytes'] is int ? awg['rxBytes'] as int : 0;
-            _vpnTx = awg['txBytes'] is int ? awg['txBytes'] as int : 0;
-            if (!serviceUp) {
-              _modernProtocol = null;
-              _modernNodeId = null;
-              _publicIp = null;
+            if (_modernProtocol == 'amneziawg') {
+              _modernUp = verified;
+              _vpnRx = awg['rxBytes'] is int ? awg['rxBytes'] as int : 0;
+              _vpnTx = awg['txBytes'] is int ? awg['txBytes'] as int : 0;
+              if (!serviceUp) {
+                _modernProtocol = null;
+                _modernNodeId = null;
+                _publicIp = null;
+              }
             }
           });
         } catch (_) {
           // A status-query timeout is not proof the service stopped.
         }
       }
+      if (_awgServiceUp && _networkTimer == null) _startNetworkStats();
       if (nextUp && (!wasUp || _networkTimer == null)) _startNetworkStats();
       if (nextUp && nextVerified && _publicIp == null) _readNetworkStats();
       // Native feature probe is expensive; do not repeat it every 12 seconds.
