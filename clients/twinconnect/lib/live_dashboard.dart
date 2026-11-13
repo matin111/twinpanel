@@ -2511,22 +2511,22 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     Widget powerCard() => ClipRRect(
       borderRadius: BorderRadius.circular(28),
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+        filter: ImageFilter.blur(sigmaX: 21, sigmaY: 21),
         child: Container(
       key: const Key('liveConnectionStatus'),
-      constraints: const BoxConstraints(minHeight: 415),
-      padding: const EdgeInsets.fromLTRB(18, 26, 18, 25),
+      constraints: const BoxConstraints(minHeight: 413),
+      padding: const EdgeInsets.fromLTRB(17, 18, 17, 16),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(29),
         gradient: LinearGradient(
           begin: Alignment.topLeft, end: Alignment.bottomRight,
           colors: _dark
               ? [
-                  Color.lerp(panel, purple, .35)!.withValues(alpha: .36),
-                  panel.withValues(alpha: .24),
+                  Color.lerp(panel, purple, .46)!.withValues(alpha: .23),
+                  panel.withValues(alpha: .12),
                   Color.lerp(panel,
                     BrandTheme.parse(widget.brand.secondaryColor, '#00DCEB'),
-                    .28)!.withValues(alpha: .38),
+                    .36)!.withValues(alpha: .22),
                 ]
               : [
                   const Color(0xFFEDE4FF).withValues(alpha: 0.76),
@@ -2534,7 +2534,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                   const Color(0xFFE6F1FF).withValues(alpha: 0.72),
                 ],
         ),
-        border: Border.all(color: purple.withValues(alpha: 0.70)),
+        border: Border.all(color: purple.withValues(alpha: 0.54)),
         boxShadow: [BoxShadow(
           color: purple.withValues(alpha: _dark ? 0.25 : 0.11),
           blurRadius: 38, spreadRadius: 2, offset: const Offset(0, 14)),
@@ -2597,90 +2597,121 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           ),
         ),
         const SizedBox(height: 18),
+        // Hero lens sits ABOVE the real VPN action; it is visual only.
+        // No synthetic traffic, route checks or permanently looping tickers.
         TweenAnimationBuilder<double>(
           key: const Key('devPowerEntranceAnimation'),
-          tween: Tween(begin: .94, end: 1.0),
-          duration: const Duration(milliseconds: 480),
-          curve: Curves.easeOutCubic,
+          duration: const Duration(milliseconds: 520),
+          curve: Curves.easeOutBack,
+          tween: Tween(begin: .91, end: 1.0),
           builder: (context, scale, child) =>
               Transform.scale(scale: scale, child: child),
           child: Container(
-            width: 250,
-            padding: const EdgeInsets.all(5),
+            key: const Key('liveConnectionGlassOrb'),
+            height: 138, width: 138,
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(24),
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: (_modernUp || _vpnVerified)
-                  ? [
-                      const Color(0xFF0EDFB3).withValues(alpha: .95),
-                      const Color(0xFF008D9C).withValues(alpha: .78),
-                    ]
-                  : [
-                      purple.withValues(alpha: .94),
-                      BrandTheme.parse(widget.brand.buttonColor, '#9544F8')
-                          .withValues(alpha: .86),
-                      BrandTheme.parse(widget.brand.secondaryColor, '#00DCEB')
-                          .withValues(alpha: .72),
-                    ],
-              ),
-              border: Border.all(
-                color: (_modernUp || _vpnVerified)
-                    ? const Color(0xFF5CFFE2).withValues(alpha: .86)
-                    : purple.withValues(alpha: .91),
-                width: 1.25),
+              shape: BoxShape.circle,
+              border: Border.all(color: purple.withValues(alpha: .29)),
               boxShadow: [
                 BoxShadow(
-                  color: (_modernUp || _vpnVerified)
-                      ? const Color(0xFF00E6B0).withValues(alpha: .30)
-                      : purple.withValues(alpha: .35),
-                  blurRadius: 29, spreadRadius: 1),
-              ],
-            ),
-            child: FilledButton(
-              key: const Key('liveConnectionControlsButton'),
-              onPressed: _vpnBusy ? null : _toggleVpn,
-              style: FilledButton.styleFrom(
-                minimumSize: const Size(238, 80),
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 19, vertical: 10),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(19)),
-                backgroundColor: Colors.transparent,
-                foregroundColor: Colors.white,
-                disabledBackgroundColor: Colors.transparent,
-                elevation: 0,
-              ).copyWith(
-                backgroundColor: WidgetStateProperty.resolveWith((states) {
-                  if (states.contains(WidgetState.disabled)) {
-                    return purple.withValues(alpha: .35);
-                  }
-                  // Frosted gradient lives on the parent shell; the
-                  // button stays transparent so brand colors remain visible.
-                  return Colors.transparent;
-                }),
+                  color: (_vpnVerified || _modernUp)
+                    ? const Color(0xFF29EAC0).withValues(alpha: .19)
+                    : purple.withValues(alpha: .20),
+                  blurRadius: 32, spreadRadius: 2),
+              ]),
+            child: Center(child: Container(
+              width: 112, height: 112,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: (_vpnVerified || _modernUp)
+                    ? const Color(0xFF52FFCE).withValues(alpha: .53)
+                    : purple.withValues(alpha: .52)),
+                gradient: RadialGradient(
+                  colors: (_vpnVerified || _modernUp)
+                    ? [const Color(0xFF21E4BA).withValues(alpha: .34),
+                       const Color(0xFF1B938B).withValues(alpha: .09)]
+                    : [purple.withValues(alpha: .37),
+                       BrandTheme.parse(widget.brand.secondaryColor, '#00DCEB')
+                          .withValues(alpha: .08)],
+                ),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
+              child: Center(child: Container(
+                width: 76, height: 76,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(26),
+                  color: (_dark ? Colors.white : purple)
+                    .withValues(alpha: _dark ? .10 : .09),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: .29)),
+                ),
+                child: Icon(
+                  (_vpnUp || _modernUp)
+                      ? Icons.lock_rounded
+                      : Icons.lock_open_rounded,
+                  size: 38,
+                  color: (_vpnUp || _modernUp)
+                    ? const Color(0xFF48F7D0) : ink),
+              )),
+            )),
+          ),
+        ),
+        const SizedBox(height: 14),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(18),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+            child: Container(
+              width: 266,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(18),
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: (_modernUp || _vpnVerified)
+                    ? [const Color(0xFF09AE9B).withValues(alpha: .82),
+                       const Color(0xFF25E4BE).withValues(alpha: .57)]
+                    : [
+                      purple.withValues(alpha: .85),
+                      BrandTheme.parse(widget.brand.buttonColor, '#9544F8')
+                        .withValues(alpha: .71),
+                      BrandTheme.parse(widget.brand.secondaryColor, '#00DCEB')
+                        .withValues(alpha: .42),
+                    ]),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: .49), width: 1.2),
+                boxShadow: [BoxShadow(
+                  color: purple.withValues(alpha: .22), blurRadius: 21)],
+              ),
+              child: FilledButton(
+                key: const Key('liveConnectionControlsButton'),
+                onPressed: _vpnBusy ? null : _toggleVpn,
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size(250, 59),
+                  backgroundColor: Colors.transparent,
+                  disabledBackgroundColor: Colors.white.withValues(alpha: .09),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14, vertical: 8),
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(18))),
+                child: Row(children: [
                   Container(
-                    width: 47, height: 47,
+                    width: 39, height: 39,
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(14),
-                      color: Colors.white.withValues(alpha: .13),
+                      color: Colors.white.withValues(alpha: .16),
+                      borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                          color: Colors.white.withValues(alpha: .20))),
+                        color: Colors.white.withValues(alpha: .30))),
                     child: _vpnBusy
-                        ? const Padding(
-                            padding: EdgeInsets.all(12),
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2.5,
-                              color: Colors.white))
-                        : Icon((_vpnUp || _modernUp)
-                            ? Icons.stop_rounded
-                            : Icons.power_settings_new_rounded,
-                            size: 28, color: Colors.white),
+                      ? const Padding(
+                          padding: EdgeInsets.all(11),
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white))
+                      : Icon((_vpnUp || _modernUp)
+                          ? Icons.stop_rounded : Icons.bolt_rounded,
+                          color: Colors.white, size: 23),
                   ),
                   const SizedBox(width: 13),
                   Expanded(child: Column(
@@ -2690,28 +2721,22 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                       Text(_vpnBusy
                           ? tr('در حال اتصال', 'Connecting')
                           : (_vpnUp || _modernUp)
-                              ? tr('قطع اتصال', 'Disconnect')
-                              : tr('اتصال سریع', 'Connect now'),
-                          style: const TextStyle(color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800)),
+                            ? tr('قطع اتصال', 'Disconnect')
+                            : tr('اتصال سریع', 'Connect now'),
+                        style: const TextStyle(color: Colors.white,
+                          fontSize: 15, fontWeight: FontWeight.w800)),
                       const SizedBox(height: 3),
-                      Text(_vpnBusy
-                          ? tr('در حال بررسی مسیر', 'Checking route')
-                          : (_modernUp || _vpnVerified)
-                              ? tr('تونل فعال', 'Tunnel active')
-                              : (_vpnUp || _vpnCleanup)
-                                  ? tr('در انتظار تأیید', 'Awaiting verification')
-                                  : tr('با سرور انتخابی', 'Selected server'),
+                      Text((_modernUp || _vpnVerified)
+                          ? tr('تونل ایمن فعال', 'Secure tunnel active')
+                          : tr('سرور انتخاب‌شده', 'Selected server'),
                         style: TextStyle(
-                          color: Colors.white.withValues(alpha: .77),
-                          fontSize: 10.5)),
+                          color: Colors.white.withValues(alpha: .82),
+                          fontSize: 10)),
                     ],
                   )),
-                  Icon(Icons.arrow_forward_ios_rounded,
-                    size: 14,
-                    color: Colors.white.withValues(alpha: .70)),
-                ],
+                  const Icon(Icons.chevron_right_rounded,
+                    color: Colors.white, size: 22),
+                ]),
               ),
             ),
           ),
@@ -2727,9 +2752,9 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                     : (_vpnUp || _vpnCleanup)
                         ? tr('در حال تأیید اتصال', 'Verifying connection')
                         : tr('برای اتصال لمس کنید', 'Tap to connect'),
-            size: 19, bold: true),
+            size: 16, bold: true),
         ),
-        const SizedBox(height: 9),
+        const SizedBox(height: 7),
         ValueListenableBuilder<int>(
           valueListenable: _connectedSeconds,
           builder: (context, elapsed, child) => AnimatedOpacity(
