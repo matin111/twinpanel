@@ -253,6 +253,27 @@ jobs:
       - name: Install Inno Setup installer compiler
         shell: pwsh
         run: choco install innosetup --no-progress -y
+      - name: Validate global guard installer release gate and PowerShell syntax
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $script = Join-Path (Get-Location) 'tools/install_guard_service.ps1'
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            $script, [ref]$tokens, [ref]$errors) | Out-Null
+          if ($errors.Count -gt 0) {
+            $errors | ForEach-Object { Write-Error $_.Message }
+            throw 'Guard service installer PowerShell syntax invalid'
+          }
+          $setup = Get-Content 'installer.iss' -Raw
+          if (!$setup.Contains('#define IncludeVerifiedGlobalGuard 0')) {
+            throw 'Guard must remain release-gated until leak tests pass'
+          }
+          if (!$setup.Contains('install_guard_service.ps1') -or
+              !$setup.Contains('-Action Uninstall')) {
+            throw 'Automated service lifecycle missing'
+          }
       - name: Package TwinConnect Windows setup with automatic WireGuard prerequisite
         shell: pwsh
         run: |
