@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.826",
-  "source_sha": "3fb21abcf4943c4a7f0b53975c798ede9630f1cd",
+  "version": "1.1.0-rc.827",
+  "source_sha": "6add61bf3762081cdc406a5a4e6deae77efd2807",
   "notes": {
-    "fa": "رفع ثبت‌نشدن مصرف Sudoku مشترک: دریافت شمارنده واقعی و احرازشده آپلود/دانلود هر اشتراک، ثبت تفاضل مصرف در موتور سهمیه با مبدأ غیرقابل‌صورتحساب در اولین نمونه، مدیریت ایمن ریست سرویس و جلوگیری از ثبت تکراری؛ بدون تغییر کانفیگ VPN یا کلید کاربران.",
-    "en": "Restore measured per-user Sudoku shared traffic accounting from authenticated cumulative uplink/downlink counters. First observation is nonbillable; process epochs prevent duplicate charging, and inactive users are not charged. No VPN client config or key changes."
+    "fa": "حسابداری دقیق Sudoku با سربار کمتر: اندازه‌گیری واقعی هر کاربر، مبدأ غیرقابل‌صورتحساب، جلوگیری از پردازش و ساخت رکورد صفر برای کاربران بدون مصرف. اصلاحات rc.826 حفظ شده؛ هیچ کانفیگ اتصال، کلید یا سرویس Sudoku روی نودها تغییر نمی‌کند.",
+    "en": "Accurate shared Sudoku accounting with low overhead: verified real per-user counters, nonbillable baselines, and sparse capture to avoid allocating zero-byte cursors for idle users. Preserves rc.826 accounting fixes without changing node VPN configs or credentials."
   }
 }
