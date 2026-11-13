@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.830",
+  "version": "1.1.0-rc.831",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-13T21:50:41Z",
+  "released_at": "2026-11-13T23:22:36Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "1f1ab837c5e86a5696a07f811db9be3dac449f3c",
+  "source_sha": "8b6e0c5260c60dd18f2d427cf96a0f14966cd268",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.830/twinpanel-1.1.0-rc.830-linux-x86_64.tar.gz",
-    "sha256": "e7403851e8eabb27a48136621b9ef5b289d05d18ba34b1c45c8ffa144b5dfbe9",
-    "size_bytes": 30793125
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.831/twinpanel-1.1.0-rc.831-linux-x86_64.tar.gz",
+    "sha256": "8feee97291de4059f5467ef5d3182f20e4833a3612352c2b3f739b3b6ac50043",
+    "size_bytes": 30741329
   },
   "notes": {
-    "fa": "افزودن نمایش حجم کل، حجم مصرفی، حجم باقی‌مانده و تاریخ انقضا به مولتی‌لینک‌های پروتکل‌ها از طریق هدر استاندارد subscription-userinfo و هدرهای مستقل. پشتیبانی از اشتراک نامحدود و شروع اعتبار از اولین اتصال، بدون تغییر کانفیگ‌ها، لینک‌ها و شمارش حجم؛ همراه تست رگرسیون. شامل اصلاحات نسخه‌های قبلی.",
-    "en": "Expose live total/used/remaining traffic and expiration via subscription-userinfo plus explicit metadata headers on protocol Multi-Links and V2Ray feeds. Preserve first-use and unlimited subscriptions, VPN payloads, URLs, and accounting semantics. Includes regression tests and preceding fixes."
+    "fa": "فهرست کامندهای ربات فروش تلگرام بعد از نصب و آپدیت پنل فقط شامل /start خواهد بود؛ پاک‌سازی کامندهای قدیمی در چت خصوصی، گروه‌ها، مدیران گروه و زبان‌های فارسی و انگلیسی. امکانات داخلی و منوی مستقل ربات نمایندگان بدون تغییر باقی می‌ماند. دارای تست رگرسیون انتشار.",
+    "en": "Ensure the main sales Telegram bot shows only /start after any new installation or update, including default, private, group, administrator scopes and Persian/English overrides. Preserve internal bot features and independent reseller bot command menus. Release regression tested."
   }
 }
