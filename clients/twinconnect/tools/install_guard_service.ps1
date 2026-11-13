@@ -68,7 +68,10 @@ if ($Action -eq 'Install') {
   Verify-ServiceIdentity
   & sc.exe config $name start= auto
   if ($LASTEXITCODE -ne 0) { throw 'Could not configure automatic service startup.' }
-  Start-Service -Name $name -ErrorAction Stop
+  $service = Get-Service -Name $name -ErrorAction Stop
+  if ($service.Status -ne 'Running') {
+    Start-Service -Name $name -ErrorAction Stop
+  }
   $service = Get-Service -Name $name -ErrorAction Stop
   if ($service.Status -ne 'Running') { throw 'Global guard service did not start.' }
   Verify-ServiceIdentity
