@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.829",
+  "version": "1.1.0-rc.830",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-13T20:39:49Z",
+  "released_at": "2026-11-13T21:50:41Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "580ce59638e4245a84dd1fa5e0368c8dfc1a9168",
+  "source_sha": "1f1ab837c5e86a5696a07f811db9be3dac449f3c",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.829/twinpanel-1.1.0-rc.829-linux-x86_64.tar.gz",
-    "sha256": "06996db96fe34fb2cfb3188b171ac144e15361a53a33ea2cb00a5fe4c9936a64",
-    "size_bytes": 30734737
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.830/twinpanel-1.1.0-rc.830-linux-x86_64.tar.gz",
+    "sha256": "e7403851e8eabb27a48136621b9ef5b289d05d18ba34b1c45c8ffa144b5dfbe9",
+    "size_bytes": 30793125
   },
   "notes": {
-    "fa": "کاهش فشار CPU پنل هنگام همگام‌سازی اشتراک‌ها روی نودها: تنظیم خودکار هم‌زمانی خانواده‌های پروتکلی بر اساس بار سرور، اجرای ترتیبی در فشار بالا و حفظ مسیر سریع در بار پایین. بدون تغییر کانفیگ، اتصالات کاربران، محاسبه ترافیک و منطق ثبت اشتراک؛ همراه تست رگرسیون. همچنین مشکل بازنشدن پنجره‌های تمدید و ویرایش نماینده با انتقال مودال‌ها به لایه اصلی و تست رگرسیون اصلاح شد.",
-    "en": "Reduce controller CPU contention during central node subscription staging by adapting protocol-family parallelism to system load. Keep the existing fast path at low load and serialize busy-host family runs; no changes to VPN configurations, sessions, usage accounting, or subscription semantics. Includes regression tests. Also restores reseller subscription renewal/edit dialogs by rendering them at the document root with regression protection."
+    "fa": "افزودن نمایش حجم کل، حجم مصرفی، حجم باقی‌مانده و تاریخ انقضا به مولتی‌لینک‌های پروتکل‌ها از طریق هدر استاندارد subscription-userinfo و هدرهای مستقل. پشتیبانی از اشتراک نامحدود و شروع اعتبار از اولین اتصال، بدون تغییر کانفیگ‌ها، لینک‌ها و شمارش حجم؛ همراه تست رگرسیون. شامل اصلاحات نسخه‌های قبلی.",
+    "en": "Expose live total/used/remaining traffic and expiration via subscription-userinfo plus explicit metadata headers on protocol Multi-Links and V2Ray feeds. Preserve first-use and unlimited subscriptions, VPN payloads, URLs, and accounting semantics. Includes regression tests and preceding fixes."
   }
 }
