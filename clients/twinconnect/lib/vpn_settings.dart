@@ -332,59 +332,62 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
             ),
           ],
         ), key: const Key('vpnSplitTunnelCard')),
-        _section(tr('وضعیت شبکه', 'Network status')),
-        LayoutBuilder(builder: (context, constraints) {
-          final compact = constraints.maxWidth < 550;
-          final width = compact ? constraints.maxWidth : (constraints.maxWidth - 10) / 2;
-          return Wrap(spacing: 10, runSpacing: 10, children: [
-            SizedBox(width: width, child: _statusItem(
+        const SizedBox(height: 11),
+        _glass(ExpansionTile(
+          key: const Key('vpnDiagnosticsDisclosure'),
+          initiallyExpanded: false,
+          tilePadding: const EdgeInsets.symmetric(horizontal: 3),
+          childrenPadding: const EdgeInsets.symmetric(vertical: 6),
+          title: Text(tr('عیب‌یابی اتصال', 'Connection diagnostics'),
+              style: const TextStyle(fontWeight: FontWeight.w700)),
+          leading: const Icon(Icons.monitor_heart_outlined),
+          children: [
+            _statusItem(
               key: const Key('vpnNativeEngineStatus'),
               title: tr('موتور VPN', 'VPN engine'),
               value: _capabilities.engineReady
-                  ? tr('آماده', 'Ready') : tr('در دسترس نیست', 'Unavailable'),
+                  ? tr('آماده', 'Ready')
+                  : tr('در دسترس نیست', 'Unavailable'),
               ready: _capabilities.engineReady,
               icon: Icons.power_rounded,
-              help: tr('آمادگی موتور اتصال به معنی متصل‌بودن VPN نیست.',
-                'An available engine does not mean VPN is connected.'),
-            )),
-            SizedBox(width: width, child: _statusItem(
+              help: tr('این فقط وضعیت موتور اتصال است، نه تأیید اتصال به VPN.',
+                'Engine readiness does not prove an active VPN connection.'),
+            ),
+            const SizedBox(height: 6),
+            _statusItem(
               key: const Key('vpnWfpStatus'),
-              title: tr('فایروال ویندوز', 'Windows firewall engine'),
-              value: globalReady ? tr('شناسایی شد', 'Detected') :
-                  tr('در دسترس نیست', 'Unavailable'),
+              title: tr('Windows Filtering Platform', 'Windows Filtering Platform'),
+              value: globalReady ? tr('شناسایی شد', 'Detected')
+                  : tr('در دسترس نیست', 'Unavailable'),
               ready: globalReady,
               icon: Icons.security_rounded,
-              help: tr('شناسایی WFP فقط پیش‌نیاز Kill Switch است و به معنی مسدودسازی ترافیک نیست.',
-                  'WFP detection is only a prerequisite and does not mean traffic is blocked.'),
-            )),
-            SizedBox(width: width, child: _statusItem(
+              help: tr('فقط امکان دسترسی به فیلتر ویندوز را بررسی می‌کند؛ به معنای فعال بودن Kill Switch نیست.',
+                'WFP availability is not proof that system traffic is blocked.'),
+            ),
+            const SizedBox(height: 6),
+            _statusItem(
               key: const Key('vpnDnsGuard'),
-              title: tr('حفاظت DNS', 'DNS protection'),
-              value: _capabilities.dnsGuard
-                  ? tr('پشتیبانی موتور', 'Engine supports')
-                  : tr('تأیید نشده', 'Not verified'),
+              title: 'DNS',
+              value: _capabilities.dnsGuard ? tr('پشتیبانی موتور', 'Engine supported')
+                  : tr('تأیید نشده', 'Unverified'),
               ready: _capabilities.dnsGuard,
               icon: Icons.dns_rounded,
-              help: tr('وضعیت پشتیبانی موتور است؛ جلوگیری قطعی از نشت DNS فقط با تست اتصال مشخص می‌شود.',
-                  'This reports engine support; actual DNS leak protection needs a live connection test.'),
-            )),
-            SizedBox(width: width, child: _statusItem(
+              help: tr('وضعیت قابلیت موتور است، نه نتیجه تست نشت DNS.',
+                'Engine capability is not a DNS leak test.'),
+            ),
+            const SizedBox(height: 6),
+            _statusItem(
               key: const Key('vpnIpv6Guard'),
-              title: tr('حفاظت IPv6', 'IPv6 protection'),
-              value: _capabilities.ipv6Guard
-                  ? tr('پشتیبانی موتور', 'Engine supports')
-                  : tr('تأیید نشده', 'Not verified'),
+              title: 'IPv6',
+              value: _capabilities.ipv6Guard ? tr('پشتیبانی موتور', 'Engine supported')
+                  : tr('تأیید نشده', 'Unverified'),
               ready: _capabilities.ipv6Guard,
               icon: Icons.lan_rounded,
-              help: tr('این نشانگر پشتیبانی را نمایش می‌دهد، نه تأیید عدم نشت IPv6.',
-                  'Shows reported engine support, not a confirmed IPv6 leak test.'),
-            )),
-          ]);
-        }),
-        const SizedBox(height: 12),
-        Text(tr('فقط امکانات فعال و قابل بررسی نمایش داده می‌شوند. سایر قابلیت‌ها تا زمان پیاده‌سازی واقعی پنهان هستند.',
-            'Only observable features are shown. Unimplemented controls remain hidden.'),
-          style: Theme.of(context).textTheme.bodySmall),
+              help: tr('وضعیت قابلیت موتور است، نه نتیجه تست نشت IPv6.',
+                'Engine capability is not an IPv6 leak test.'),
+            ),
+          ],
+        ), key: const Key('vpnDiagnosticsCard')),
       ],
     );
 
