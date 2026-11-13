@@ -102,17 +102,6 @@ class _NetworkFabricPainter extends CustomPainter {
   static const _mint = Color(0xFF61D9B5);
   static const _ice = Color(0xFF86C8EA);
 
-  double _sample(List<double> history, double t) {
-    if (history.isEmpty) return 0;
-    final position = t.clamp(0.0, 1.0).toDouble() * (history.length - 1);
-    final i = position.floor().clamp(0, history.length - 1);
-    final next = math.min(i + 1, history.length - 1);
-    final fraction = position - i;
-    final a = history[i];
-    final b = history[next];
-    return math.max(0.0, (a.isFinite ? a : 0.0) * (1 - fraction) +
-        (b.isFinite ? b : 0.0) * fraction);
-  }
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -155,16 +144,6 @@ class _NetworkFabricPainter extends CustomPainter {
           _mint.withValues(alpha: 0),
         ]).createShader(rect),
     );
-
-    final left = size.width * .065;
-    final width = size.width * .87;
-    final centerY = size.height * .52;
-    final count = 45;
-    final maxRx = rx.fold<double>(0, (m, v) => math.max(m, v.isFinite ? v : 0.0));
-    final maxTx = tx.fold<double>(0, (m, v) => math.max(m, v.isFinite ? v : 0.0));
-    final realActivity = maxRx > 0 || maxTx > 0;
-    final active = connected && realActivity;
-    final transitioning = connecting && !connected;
 
     // Fiber-optic network field: the arcs and halo signify connection state,
     // not measured byte counts. Rate numbers elsewhere remain real telemetry.
