@@ -3116,10 +3116,40 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
               : Icons.dark_mode_outlined, color: sub),
           onPressed: _changeAppearance,
         ),
-        TextButton(
-          key: const Key('devLanguageToggle'),
-          onPressed: _changeLanguage,
-          child: Text(_languageCode.toUpperCase()),
+        Tooltip(
+          message: tr('انتخاب زبان', 'Choose language'),
+          child: OutlinedButton(
+            key: const Key('devLanguageToggle'),
+            onPressed: _changeLanguage,
+            style: OutlinedButton.styleFrom(
+              minimumSize: Size(wide ? 124 : 46, 43),
+              padding: EdgeInsets.symmetric(horizontal: wide ? 15 : 7),
+              backgroundColor: purple.withValues(alpha: _dark ? .18 : .10),
+              side: BorderSide(
+                color: BrandTheme.secondaryAccent(widget.brand)
+                  .withValues(alpha: .44)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(15)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.language_rounded, size: 19,
+                  color: _dark ? const Color(0xFF9EDAD5)
+                    : const Color(0xFF3B7C8E)),
+                if (wide) ...[
+                  const SizedBox(width: 9),
+                  Text(_languageCode.toUpperCase(),
+                    style: TextStyle(
+                      color: ink, fontWeight: FontWeight.w800,
+                      letterSpacing: .6)),
+                  const SizedBox(width: 3),
+                  Icon(Icons.keyboard_arrow_down_rounded,
+                    color: sub, size: 17),
+                ],
+              ],
+            ),
+          ),
         ),
         IconButton(
           key: const Key('devSettingsButton'),
