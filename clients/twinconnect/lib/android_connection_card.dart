@@ -188,10 +188,9 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
         wireguard?.selected == true &&
         wireguard?.configRecordPresent == true;
 
-    return Card(
+    return Padding(
       key: const Key('androidConnectionCard'),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(10),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -238,7 +237,6 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
             ],
           ],
         ),
-      ),
     );
   }
 }
