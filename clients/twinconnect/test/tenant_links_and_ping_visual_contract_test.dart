@@ -123,8 +123,13 @@ void main() {
     final dashboard = File('lib/live_dashboard.dart').readAsStringSync();
     expect(dashboard, contains("textDirection: _rtl ? TextDirection.rtl : TextDirection.ltr"));
     expect(dashboard, contains("key: ValueKey<String>(_rtl ? 'dashboard-rtl' : 'dashboard-ltr')"));
-    expect(dashboard.replaceAll('\r\n', '\n'),
-        contains('child: Row(children: [\n          sideBar(),'));
+    // Windows retains its desktop sidebar; Android owns a bottom navigation.
+    expect(dashboard, contains('child: Column(children: ['));
+    expect(dashboard, contains('Expanded(child: Row(children: ['));
+    expect(dashboard, contains('if (!Platform.isAndroid) sideBar(),'));
+    expect(dashboard, contains('if (Platform.isAndroid)'));
+    expect(dashboard, contains("Key('androidMainNavigation')"));
+    expect(dashboard, contains("const ['home', 'locations', 'settings', 'account']"));
     expect(dashboard, isNot(contains('textDirection: TextDirection.ltr,\n            child: Row(')));
     expect(dashboard, contains('textDirection: TextDirection.ltr,'));
   });
