@@ -2852,9 +2852,9 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     // Keep the authenticated desktop sidebar spacious; compact mode is only
     // for narrow windows where a full sidebar would crowd live connection cards.
     final wide = MediaQuery.sizeOf(context).width >= 980;
-    final ink = _dark ? const Color(0xFFF7F4FF) : const Color(0xFF21233F);
+    final ink = _dark ? const Color(0xFFE9F2F4) : const Color(0xFF223945);
     final sub = _dark ? const Color(0xFFABB4C9) : const Color(0xFF565D75);
-    final line = _dark ? const Color(0xFF3C4564) : const Color(0xFFDADCEA);
+    final line = _dark ? const Color(0xFF3A5461) : const Color(0xFFCCDDE2);
     // Both colors are tenant-managed in the main panel and reseller studio.
     // Keep explicit overrides for dark/light while the owner's palette remains
     // authoritative across the dashboard, cards and side navigation.
@@ -2885,7 +2885,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       dark: _dark,
       surfaceColor: panel,
       accentColor: purple,
-      secondaryColor: BrandTheme.parse(widget.brand.secondaryColor, '#00DCEB'),
+      secondaryColor: BrandTheme.secondaryAccent(widget.brand),
       selected: selected,
       radius: radius,
       padding: padding,
@@ -2915,12 +2915,12 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                     begin: Alignment.topLeft, end: Alignment.bottomRight,
                     colors: _page == page
                         ? [purple.withValues(alpha: .52),
-                           BrandTheme.parse(widget.brand.secondaryColor, '#00DCEB')
+                           BrandTheme.secondaryAccent(widget.brand)
                                .withValues(alpha: .22)]
                         : [
                             (_dark ? Colors.white : purple)
                                 .withValues(alpha: .16),
-                            BrandTheme.parse(widget.brand.secondaryColor, '#00DCEB')
+                            BrandTheme.secondaryAccent(widget.brand)
                                 .withValues(alpha: .085),
                           ]),
                   border: Border.all(
@@ -2954,15 +2954,15 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                     else
                       Icon(icon, color: _page == page
                           ? (_dark ? Colors.white : purple)
-                          : (_dark ? const Color(0xFFE1D9FA)
-                              : const Color(0xFF53496D)),
+                          : (_dark ? const Color(0xFFD4E8EC)
+                              : const Color(0xFF4B6472)),
                         size: wide ? 24 : 21),
                     if (wide) ...[
                       const SizedBox(width: 14),
                       Expanded(child: txt(title,
                         color: _page == page ? ink
-                            : (_dark ? const Color(0xFFE7E2F8)
-                                : const Color(0xFF42395A)),
+                            : (_dark ? const Color(0xFFE0EEF0)
+                                : const Color(0xFF334F5F)),
                         bold: true)),
                     ],
                   ],
@@ -3119,8 +3119,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       child: Row(mainAxisSize: MainAxisSize.min, children: [
         if (icon != null) ...[
           Icon(icon, color: purple, size: 15), const SizedBox(width: 6)],
-        txt(s, color: _dark ? const Color(0xFFE5CAFF)
-            : const Color(0xFF6336BA), size: 11),
+        txt(s, color: _dark ? const Color(0xFFB2CED5)
+            : const Color(0xFF376F86), size: 11),
       ]),
     );
 
@@ -3141,7 +3141,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                   Color.lerp(panel, purple, .46)!.withValues(alpha: .23),
                   panel.withValues(alpha: .12),
                   Color.lerp(panel,
-                    BrandTheme.parse(widget.brand.secondaryColor, '#00DCEB'),
+                    BrandTheme.secondaryAccent(widget.brand),
                     .36)!.withValues(alpha: .22),
                 ]
               : [
@@ -3248,7 +3248,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                     ? [const Color(0xFF21E4BA).withValues(alpha: .34),
                        const Color(0xFF1B938B).withValues(alpha: .09)]
                     : [purple.withValues(alpha: .37),
-                       BrandTheme.parse(widget.brand.secondaryColor, '#00DCEB')
+                       BrandTheme.secondaryAccent(widget.brand)
                           .withValues(alpha: .08)],
                 ),
               ),
@@ -3291,7 +3291,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                       purple.withValues(alpha: .85),
                       BrandTheme.parse(widget.brand.buttonColor, '#9544F8')
                         .withValues(alpha: .71),
-                      BrandTheme.parse(widget.brand.secondaryColor, '#00DCEB')
+                      BrandTheme.secondaryAccent(widget.brand)
                         .withValues(alpha: .42),
                     ]),
                 border: Border.all(
@@ -3798,7 +3798,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                     const SizedBox(height: 6),
                     Row(children: [
                       Icon(Icons.arrow_downward_rounded,
-                        size: 12, color: const Color(0xFF00DFF5)),
+                        size: 12, color: const Color(0xFF6BB9BB)),
                       const SizedBox(width: 3),
                       Text(_rxBytesPerSecond == null
                           ? '—' : '${_formatTransferBytes(_rxBytesPerSecond!.round())}/s',
@@ -3806,7 +3806,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                         style: TextStyle(fontSize: 10, color: sub)),
                       const SizedBox(width: 12),
                       Icon(Icons.arrow_upward_rounded,
-                        size: 12, color: const Color(0xFFC765FF)),
+                        size: 12, color: const Color(0xFF81AAB4)),
                       const SizedBox(width: 3),
                       Text(_txBytesPerSecond == null
                           ? '—' : '${_formatTransferBytes(_txBytesPerSecond!.round())}/s',
@@ -4046,7 +4046,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
               selected: _filter == entry.$1,
               showCheckmark: false,
               selectedColor: _dark
-                  ? const Color(0xFF7640C9) : const Color(0xFF7844C7),
+                  ? const Color(0xFF537E96) : const Color(0xFF648CA2),
               backgroundColor: panel,
               side: BorderSide(color: _filter == entry.$1 ? purple : line),
               shape: RoundedRectangleBorder(
@@ -4410,7 +4410,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                   ? (_modernRx == null ? '—'
                       : _formatTransferBytes(_modernRx!))
                   : _vpnUp ? _formatTransferBytes(_vpnRx) : '—',
-              const Color(0xFF00DFF5))),
+              const Color(0xFF6BB9BB))),
             const SizedBox(width: 10),
             Expanded(child: trafficCard(
               Icons.arrow_upward_rounded,
@@ -4420,7 +4420,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                   ? (_modernTx == null ? '—'
                       : _formatTransferBytes(_modernTx!))
                   : _vpnUp ? _formatTransferBytes(_vpnTx) : '—',
-              const Color(0xFFC765FF))),
+              const Color(0xFF81AAB4))),
           ]),
           const SizedBox(height: 25),
           glassCard(
