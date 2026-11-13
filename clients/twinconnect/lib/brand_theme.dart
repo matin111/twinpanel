@@ -26,7 +26,8 @@ class BrandTheme {
     final base = parse(brand?.backgroundColor ?? '', '#101018');
     return brightness == Brightness.dark
         ? base
-        : Color.lerp(base, Colors.white, 0.97)!;
+        : // Avoid an almost pure-white field that washes away the light-mode art.
+        Color.lerp(base, const Color(0xFFF4F0FF), 0.90)!;
   }
 
   static Color accent(BrandPreview? brand, Brightness brightness) {
