@@ -100,6 +100,21 @@ jobs:
           done
           python3 source/backend/tests/test_sudoku_shared_accounting_release_v1.py -v
 
+      - name: Guard reseller subscription edit and renewal dialog visibility
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          for path in \
+            "components/reseller-subscriptions-parity.tsx" \
+            "backend/tests/test_reseller_subscription_modal_visibility_v1.py"; do
+            test -s "source/$path" && test -s "publisher/$path"
+            cmp -s "source/$path" "publisher/$path" || {
+              echo "::error file=$path::Release missing visible reseller renewal/edit dialog fixes"
+              exit 1
+            }
+          done
+          python3 source/backend/tests/test_reseller_subscription_modal_visibility_v1.py -v
+
       - name: Protect live online-protocol badges in Connection and admin cards
         shell: bash
         run: |
