@@ -55,12 +55,9 @@ void main() {
     await openPicker(tester,
       dark: false, rtl: true, selected: 'fa',
       onSelect: (value) => result = value);
-    final direction = tester.widget<Directionality>(
-      find.ancestor(
-        of: find.byKey(const Key('devLanguageDialog')),
-        matching: find.byType(Directionality)).first,
-    );
-    expect(direction.textDirection, TextDirection.rtl);
+    final direction = Directionality.of(
+      tester.element(find.byKey(const Key('devLanguageDialog'))));
+    expect(direction, TextDirection.rtl);
     await tester.tap(find.byKey(const Key('languageChoice_de')));
     await tester.pumpAndSettle();
     expect(result, 'de');
