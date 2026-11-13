@@ -85,7 +85,21 @@ class NativeVpnBridge {
     VpnProtocolDefinition protocol,
     NativeProtocolReadiness nativeProtocols,
   ) {
-    requireSafeToConnect(policy, capabilities);
+    // WireGuard for Windows supplies a session-scoped WFP blocker for /0
+    // routes. This must not be confused with persistent always-on protection.
+    if (policy.killSwitchRequested &&
+        protocol.code == 'wireguard' &&
+        capabilities.platform == VpnPlatform.windows &&
+        capabilities.wireGuardSessionKillSwitch) {
+      final otherProblems = policy.connectionProblems(capabilities)
+          .where((reason) => reason != 'KILL_SWITCH_NOT_ENFORCED')
+          .toList();
+      if (otherProblems.isNotEmpty) {
+        throw StateError('NATIVE_VPN_POLICY_NOT_ENFORCED: ${otherProblems.join(',')}');
+      }
+    } else {
+      requireSafeToConnect(policy, capabilities);
+    }
     if (!capabilities.engineReady || !nativeProtocols.supports(protocol.code)) {
       throw StateError('PROTOCOL_ENGINE_NOT_READY: ${protocol.code}');
     }
