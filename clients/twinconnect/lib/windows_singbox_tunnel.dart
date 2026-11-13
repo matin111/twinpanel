@@ -148,6 +148,9 @@ class WindowsSingBoxTunnel {
     int? mieruSocksPort,
     String? mieruVerifiedExitIp,
     String? mieruEndpointIPv4,
+    int? trusttunnelSocksPort,
+    String? trusttunnelVerifiedExitIp,
+    String? trusttunnelEndpointIPv4,
     String? baselinePublicIp,
   }) async {
     if (_changing || _child != null) {
@@ -164,7 +167,7 @@ class WindowsSingBoxTunnel {
       }
       // An independently verified native core (Xray or Sudoku) must keep
       // its upstream TCP dial on the physical network after TUN auto_route.
-      if ([xraySocksPort, sudokuSocksPort, mieruSocksPort]
+      if ([xraySocksPort, sudokuSocksPort, mieruSocksPort, trusttunnelSocksPort]
           .where((port) => port != null).length > 1) {
         throw const FormatException('MULTIPLE_LOCAL_PROXY_UPSTREAMS');
       }
@@ -194,10 +197,23 @@ class WindowsSingBoxTunnel {
       if (mieruEndpointIPv4 != null) {
         XrayEndpointRoute.requirePublicIPv4(mieruEndpointIPv4);
       }
-      final activeSocksPort =
-          xraySocksPort ?? sudokuSocksPort ?? mieruSocksPort;
+      if ((trusttunnelSocksPort == null) != (trusttunnelEndpointIPv4 == null) ||
+          (trusttunnelSocksPort == null) != (trusttunnelVerifiedExitIp == null) ||
+          (trusttunnelSocksPort != null &&
+            (protocol != 'trusttunnel' || trusttunnelSocksPort < 1025 ||
+             trusttunnelSocksPort > 65535 ||
+             InternetAddress.tryParse(trusttunnelVerifiedExitIp!)?.type !=
+                 InternetAddressType.IPv4))) {
+        throw const FormatException('TRUSTTUNNEL_BRIDGE_NOT_VERIFIED');
+      }
+      if (trusttunnelEndpointIPv4 != null) {
+        XrayEndpointRoute.requirePublicIPv4(trusttunnelEndpointIPv4);
+      }
+      final activeSocksPort = xraySocksPort ?? sudokuSocksPort ??
+          mieruSocksPort ?? trusttunnelSocksPort;
       final activeVerifiedExit =
-          xrayVerifiedExitIp ?? sudokuVerifiedExitIp ?? mieruVerifiedExitIp;
+          xrayVerifiedExitIp ?? sudokuVerifiedExitIp ??
+          mieruVerifiedExitIp ?? trusttunnelVerifiedExitIp;
       // Only that server IP can be exempted from TUN routes, preventing loopback.
       if ((xraySocksPort == null) != (xrayEndpointIPv4 == null)) {
         throw const FormatException('XRAY_ENDPOINT_ROUTE_MISSING');
@@ -267,7 +283,9 @@ class WindowsSingBoxTunnel {
         sudokuSocksPort: sudokuSocksPort,
         sudokuEndpointIPv4: sudokuEndpointIPv4,
         mieruSocksPort: mieruSocksPort,
-        mieruEndpointIPv4: mieruEndpointIPv4);
+        mieruEndpointIPv4: mieruEndpointIPv4,
+        trusttunnelSocksPort: trusttunnelSocksPort,
+        trusttunnelEndpointIPv4: trusttunnelEndpointIPv4);
       // Independently verify that the selected Hysteria2/TUIC/etc outbound
       // can reach the internet before changing any Windows routes.
       // A failure here points to profile/transport rather than TUN routing.
