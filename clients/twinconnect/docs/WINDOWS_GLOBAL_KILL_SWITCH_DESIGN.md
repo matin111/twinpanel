@@ -39,6 +39,22 @@ Enabling this feature must protect *all outbound traffic*, regardless of whether
 - `lib/vpn_settings.dart`: shows prerequisite and keeps the toggle locked until verified native enforcement.
 - `test/windows_global_killswitch_contract_test.dart`: regression checks to prevent cosmetic or unsafe activation.
 
+## Experimental WFP implementation (NOT production-ready)
+
+`native/windows/twinconnect_global_guard_experimental.cpp` implements a
+**separate opt-in prototype** that can transactionally add persistent IPv4
+and IPv6 outbound-block filters and remove only its own rules. The requested
+VPN tunnel alias is restricted to TwinConnect-owned adapters, and one numeric
+IPv4 transport endpoint may be excluded. The emergency `disarm` operation is
+a distinct administrator command. CI compiles this experiment but never runs,
+packages, installs or arms it.
+
+**Critical remaining requirements:** It has not been packet-capture tested;
+IPv6 VPN transport endpoint exceptions, loopback proxy chains, DHCP/NDP,
+reconnection, protocol-specific adapters, firewall arbitration, endpoint
+rotation, Windows reboot boot-time coverage, and mandatory recovery testing
+are not yet implemented or proven. Do not enable it on real user machines.
+
 ## Minimum Windows isolated-VM acceptance plan
 
 1. Verify non-admin app cannot arm; no rules are written by the preflight.
