@@ -24,10 +24,8 @@ class BotTextRequestMiddleware(BaseRequestMiddleware):
     source of truth for those values; this middleware only replaces explicitly
     configurable text fragments immediately before the Telegram API request.
 
-    Both the main bot and every reseller bot install this middleware. On the
-    first Telegram API request we therefore also make sure ``/start`` exists in
-    the BotFather command menu while preserving every command that may already
-    have been configured for that bot.
+    The main bot's public command menu is intentionally /start-only; reseller
+    bots retain their existing command menus. Runtime handlers are unaffected.
     """
 
     def __init__(
@@ -66,12 +64,14 @@ class BotTextRequestMiddleware(BaseRequestMiddleware):
                     description="شروع ربات",
                 )
             ]
-            commands.extend(
-                item
-                for item in current
-                if str(getattr(item, "command", "")).lower()
-                != "start"
-            )
+            # Admin sales bot: replace (never append to) legacy BotFather
+            # commands. Reseller bots keep their independently configured
+            # command menus, so this policy cannot erase reseller features.
+            if self.scope != "admin":
+                commands.extend(
+                    item for item in current
+                    if str(getattr(item, "command", "")).lower() != "start"
+                )
 
             if current == commands:
                 return
