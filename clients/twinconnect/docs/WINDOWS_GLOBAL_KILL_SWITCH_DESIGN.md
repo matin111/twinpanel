@@ -45,7 +45,10 @@ Enabling this feature must protect *all outbound traffic*, regardless of whether
 **separate opt-in prototype** that can transactionally add persistent IPv4
 and IPv6 outbound-block filters and remove only its own rules. The requested
 VPN tunnel alias is restricted to TwinConnect-owned adapters, and one numeric
-IPv4 transport endpoint may be excluded. The emergency `disarm` operation is
+IPv4 transport endpoint can be permitted only for an exact executable
+application identifier sourced from a managed Program Files path. A raw
+destination-IP-only exception is prohibited. The executable signature and
+file ACL still require independent verification before production. The emergency `disarm` operation is
 a distinct administrator command. CI compiles this experiment but never runs,
 packages, installs or arms it.
 
