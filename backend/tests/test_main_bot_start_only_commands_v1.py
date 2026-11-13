@@ -16,6 +16,16 @@ class MainBotMenuTests(unittest.TestCase):
         self.assertIn('if self.scope == "admin":',code)
         self.assertIn('SetMyCommands(',code)
         self.assertIn('self._commands_sync_attempted = not failed',code)
+    def test_existing_linked_users_migrate_without_chat_messages(self):
+        code=SOURCE.read_text()
+        self.assertIn('BotCommandScopeChat(chat_id=chat_id)',code)
+        self.assertIn('TelegramUserLink.telegram_id',code)
+        self.assertIn('asyncio.create_task(',code)
+        self.assertIn('await asyncio.sleep(0.15)',code)
+        self.assertIn('telegram-start-only-menu-v1.sha256',code)
+        self.assertIn('stamp.write_text(fingerprint +',code)
+        self.assertNotIn('SendMessage(',code.split('async def _migrate_linked_chat_commands(')[1].split('def _load(')[0])
+
     def test_reseller_menus_remain_independent(self):
         code=SOURCE.read_text()
         self.assertIn('SetMyCommands(commands=[*commands, *current])',code)
