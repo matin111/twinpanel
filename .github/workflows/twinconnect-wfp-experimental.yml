@@ -104,6 +104,25 @@ jobs:
             }
             Remove-Item -LiteralPath $dir -Recurse -Force -ErrorAction SilentlyContinue
           }
+      - name: Validate gated VM dual-stack leak test script syntax
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $script = Join-Path (Get-Location) "tools/test_windows_global_guard_vm.ps1"
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            $script, [ref]$tokens, [ref]$errors) | Out-Null
+          if ($errors.Count -ne 0) {
+            $errors | ForEach-Object { Write-Error $_.Message }
+            throw "VM-only WFP leak test has PowerShell syntax errors"
+          }
+          if (!(Select-String -Path $script -SimpleMatch 'TWINCONNECT_DISPOSABLE_VM' -Quiet)) {
+            throw "VM-only safety gate missing"
+          }
+          if (!(Select-String -Path $script -SimpleMatch 'TwinConnectWfpEmergencyRestore' -Quiet)) {
+            throw "Emergency recovery registration missing"
+          }
       - name: Validate no executable entered the repository
         shell: pwsh
         run: |
