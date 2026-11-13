@@ -89,6 +89,22 @@ void main() {
     expect(header, contains('VM_ONLY'));
   });
 
+  test('Windows setup provisions only a certified signed guard with recovery-first uninstall', () {
+    final setup = File('installer.iss').readAsStringSync();
+    final script = File('tools/install_guard_service.ps1').readAsStringSync();
+    expect(setup, contains('#define IncludeVerifiedGlobalGuard 0'));
+    expect(setup, contains('#if IncludeVerifiedGlobalGuard'));
+    expect(setup, contains('install_guard_service.ps1'));
+    expect(setup, contains('-Action Install'));
+    expect(setup, contains('-Action Uninstall'));
+    expect(script, contains("Get-AuthenticodeSignature"));
+    expect(script, contains("start= auto"));
+    expect(script, contains("Start-Service -Name"));
+    expect(script, contains("Invoke-Guard -Arguments @('recover', "));
+    expect(script, contains("Owned WFP filters still present"));
+    expect(script, isNot(contains("arm I_ACCEPT_OFFLINE_RECOVERY")));
+  });
+
   test('native bridge installs only a read-only guard status method', () {
     final install = File('tools/install_windows_native.py')
         .readAsStringSync();
