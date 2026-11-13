@@ -2269,6 +2269,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       dark: _dark,
       surfaceColor: panel,
       accentColor: purple,
+      secondaryColor: BrandTheme.parse(widget.brand.secondaryColor, '#00DCEB'),
       selected: selected,
       radius: radius,
       padding: padding,
@@ -2280,7 +2281,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       child: ClipRRect(
         borderRadius: BorderRadius.circular(17),
         child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 13, sigmaY: 13),
+          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
           child: Material(
             color: Colors.transparent,
             child: InkWell(
@@ -2297,22 +2298,23 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                   gradient: LinearGradient(
                     begin: Alignment.topLeft, end: Alignment.bottomRight,
                     colors: _page == page
-                        ? [purple.withValues(alpha: .38),
-                           purple.withValues(alpha: .16)]
+                        ? [purple.withValues(alpha: .52),
+                           BrandTheme.parse(widget.brand.secondaryColor, '#00DCEB')
+                               .withValues(alpha: .22)]
                         : [
                             (_dark ? Colors.white : purple)
-                                .withValues(alpha: .095),
-                            (_dark ? Colors.white : purple)
-                                .withValues(alpha: .035),
+                                .withValues(alpha: .16),
+                            BrandTheme.parse(widget.brand.secondaryColor, '#00DCEB')
+                                .withValues(alpha: .085),
                           ]),
                   border: Border.all(
                     color: _page == page
                         ? purple.withValues(alpha: .72)
                         : (_dark ? Colors.white : purple)
-                            .withValues(alpha: .19)),
+                            .withValues(alpha: .30)),
                   boxShadow: _page == page ? [
-                    BoxShadow(color: purple.withValues(alpha: .16),
-                      blurRadius: 18, spreadRadius: -4),
+                    BoxShadow(color: purple.withValues(alpha: .30),
+                      blurRadius: 22, spreadRadius: -4),
                   ] : const [],
                 ),
                 child: Row(
@@ -2384,10 +2386,10 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
             key: const Key('tenantQuickLinks'),
             padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 7),
             decoration: BoxDecoration(
-              color: (_dark ? Colors.white : const Color(0xFF482F8B))
-                  .withValues(alpha: .055),
+              color: (_dark ? Colors.white : purple)
+                  .withValues(alpha: _dark ? .13 : .09),
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: line.withValues(alpha: .45)),
+              border: Border.all(color: purple.withValues(alpha: .35)),
             ),
             child: Row(children: [
               for (final item in <({String id, IconData icon, String fa,
@@ -2494,7 +2496,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     Widget powerCard() => ClipRRect(
       borderRadius: BorderRadius.circular(28),
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 11, sigmaY: 11),
+        filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
         child: Container(
       key: const Key('liveConnectionStatus'),
       constraints: const BoxConstraints(minHeight: 415),
@@ -2505,9 +2507,11 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           begin: Alignment.topLeft, end: Alignment.bottomRight,
           colors: _dark
               ? [
-                  const Color(0xFF362A5E).withValues(alpha: 0.44),
-                  const Color(0xFF253754).withValues(alpha: 0.40),
-                  const Color(0xFF23364B).withValues(alpha: 0.42),
+                  Color.lerp(panel, purple, .35)!.withValues(alpha: .36),
+                  panel.withValues(alpha: .24),
+                  Color.lerp(panel,
+                    BrandTheme.parse(widget.brand.secondaryColor, '#00DCEB'),
+                    .28)!.withValues(alpha: .38),
                 ]
               : [
                   const Color(0xFFEDE4FF).withValues(alpha: 0.76),
@@ -2515,9 +2519,9 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                   const Color(0xFFE6F1FF).withValues(alpha: 0.72),
                 ],
         ),
-        border: Border.all(color: purple.withValues(alpha: 0.56)),
+        border: Border.all(color: purple.withValues(alpha: 0.70)),
         boxShadow: [BoxShadow(
-          color: purple.withValues(alpha: _dark ? 0.19 : 0.11),
+          color: purple.withValues(alpha: _dark ? 0.25 : 0.11),
           blurRadius: 38, spreadRadius: 2, offset: const Offset(0, 14)),
         ],
       ),
