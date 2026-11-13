@@ -1,6 +1,6 @@
 "use client";
 
-import {useEffect,useMemo,useState} from "react";
+import {useEffect,useMemo,useRef,useState} from "react";
 import {API_BASE} from "../lib/api";
 import {getCustomerToken} from "../lib/customer-api";
 import {useI18n} from "../lib/i18n";
@@ -163,6 +163,7 @@ export function MigrationCenterAdmin(){
   const [showJsonInput,setShowJsonInput]=useState(false);
   const [showProtocols,setShowProtocols]=useState(false);
   const [showProvisioning,setShowProvisioning]=useState(false);
+  const importLock=useRef(false);
   const [importSummary,setImportSummary]=useState<{imported:number;existing:number;total:number;provisioned:number}|null>(null);
 
   const readyRecords=useMemo(()=>dryRun?.records.filter(item=>item.ready_for_future_import)??[],[dryRun]);
@@ -276,9 +277,12 @@ export function MigrationCenterAdmin(){
     const userId=Number(targetUserId);
     if(!Number.isInteger(userId)||userId<=0){setError(pick("شناسه کاربر TwinPanel معتبر وارد کنید.","Enter a valid TwinPanel user ID."));return;}
     if(!dryRun||dryRun.source!==source||dryRun.writes_performed!==false||readyRecords.length===0){setError(pick("ابتدا پیش‌نمایش معتبر بگیرید.","Run a valid preview before importing."));return;}
+    if(importLock.current)return;
+    importLock.current=true;
     const target=await checkTarget();
     if(!target||!target.exists||!target.active){
       setError(pick("کاربر مقصد وجود ندارد یا غیرفعال است؛ هیچ انتقالی انجام نشد.","Destination user is missing/inactive; no import was started."));
+      importLock.current=false;
       return;
     }
     const protocolList=protocols.split(",").map(item=>item.trim().toLowerCase()).filter(Boolean);
@@ -377,7 +381,7 @@ export function MigrationCenterAdmin(){
         `All 15 protocol snapshots registered for ${imported+existing} subscriptions; V2Ray batched with preserved UUID for ${v2rayProvisioned} accounts. Remaining protocols await eligible-node provisioning.`
       ));
     }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
-    finally{setBusy(false);setBusyProgress(null);}
+    finally{setBusy(false);setBusyProgress(null);importLock.current=false;}
   };
 
   const busyTitle=busyPhase==="preview"
@@ -581,7 +585,7 @@ export function MigrationCenterAdmin(){
       <div className="mig-form-grid" dir="rtl">
         <label className="mig-field">
           <span>{pick("پنل مبدا","Source panel")}</span>
-          <select value={source} disabled={busy} onChange={event=>{
+          <select value={source} disabled={busy||targetLoading} onChange={event=>{
             const next=event.target.value as Source;
             setSource(next);setDryRun(null);setPreviewPage(0);
             setMigrationStatus(null);setTargetCheck(null);
@@ -628,7 +632,7 @@ export function MigrationCenterAdmin(){
         <div className="mig-import-source">
           <label className="mig-field">
             <span>{pick("فایل بکاپ ایلان","Eylan backup file")}</span>
-            <input type="file" disabled={busy} accept=".tar,.tar.gz,.tgz,.zip,application/gzip,application/zip"
+            <input type="file" disabled={busy||targetLoading} accept=".tar,.tar.gz,.tgz,.zip,application/gzip,application/zip"
               onChange={event=>{setEylanFile(event.target.files?.[0]||null);setDryRun(null);setPreviewPage(0);setImportSummary(null);setOk("");setError("");}}/>
           </label>
           <small>{pick("حجم، مصرف، رمز و تاریخ انقضا منتقل می‌شوند. ساخت کانفیگ پروتکل‌ها پس از ثبت حساب جداگانه ارزیابی می‌شود.","Usage, limits, password and expiry are migrated. Actual protocol provisioning is verified separately.")}</small>
@@ -646,13 +650,13 @@ export function MigrationCenterAdmin(){
           </div>
           <label className="mig-field mig-file-field">
             <span>{pick("انتخاب فایل JSON","Choose JSON file")}</span>
-            <input type="file" accept=".json,application/json" disabled={busy}
+            <input type="file" accept=".json,application/json" disabled={busy||targetLoading}
               onChange={event=>void chooseJsonFile(event.target.files?.[0]||null)}/>
           </label>
           {jsonFileName&&<span className="mig-mini-pill">{jsonFileName} · {formatBytes(new TextEncoder().encode(raw).length)}</span>}
           {showJsonInput&&<label className="mig-field mig-editor">
             <span>{pick("JSON خروجی پنل مبدا","Source export JSON")}</span>
-            <textarea value={raw} disabled={busy} onChange={event=>{
+            <textarea value={raw} disabled={busy||targetLoading} onChange={event=>{
               setRaw(event.target.value);setJsonFileName("");
               setDryRun(null);setPreviewPage(0);setImportSummary(null);setOk("");setError("");
             }} rows={8} spellCheck={false}
@@ -665,7 +669,7 @@ export function MigrationCenterAdmin(){
       <div className="mig-footer-actions">
         <small>{pick("پیش‌نمایش فقط بررسی می‌کند و چیزی در دیتابیس تغییر نمی‌دهد.","Preview makes no database changes.")}</small>
         <div className="mig-actions-inline">
-          <button className="ghost" type="button" onClick={()=>void runDry()} disabled={busy||(isEylan?!eylanFile:!raw.trim())}>
+          <button className="ghost" type="button" onClick={()=>void runDry()} disabled={busy||targetLoading||(isEylan?!eylanFile:!raw.trim())}>
             {pick("۱. بررسی بدون انتقال","1. Safe preview")}
           </button>
           <button className="primary" type="button" onClick={()=>void importReady()}
