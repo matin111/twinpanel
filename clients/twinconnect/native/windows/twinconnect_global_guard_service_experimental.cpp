@@ -6,8 +6,13 @@
 #define TWINCONNECT_GUARD_NO_MAIN
 #include "twinconnect_global_guard_experimental.cpp"
 #include <sddl.h>
+#include <taskschd.h>
+#include <oleauto.h>
 #include <vector>
 #pragma comment(lib, "Advapi32.lib")
+#pragma comment(lib, "Ole32.lib")
+#pragma comment(lib, "Oleaut32.lib")
+#pragma comment(lib, "Taskschd.lib")
 
 namespace {
 const wchar_t* kName = L"TwinConnectGlobalGuard";
@@ -63,6 +68,104 @@ bool ValidateRequest(const std::wstring& alias, const std::wstring& host,
   return true;
 }
 
+// VM-only safety gate: the privileged service must refuse persistent WFP
+// rules until a real, independent SYSTEM recovery task is already scheduled.
+// An app-level timer cannot recover when Flutter or the guard service crashes.
+bool RecoveryTaskReady() {
+  const HRESULT initialized = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+  if (FAILED(initialized)) return false;
+  ITaskService* scheduler = nullptr;
+  ITaskFolder* folder = nullptr;
+  IRegisteredTask* task = nullptr;
+  ITaskDefinition* definition = nullptr;
+  IPrincipal* principal = nullptr;
+  IActionCollection* actions = nullptr;
+  IAction* action = nullptr;
+  IExecAction* executable = nullptr;
+  BSTR name = nullptr, user = nullptr, path = nullptr, arguments = nullptr;
+  bool valid = false;
+  do {
+    HRESULT hr = CoCreateInstance(CLSID_TaskScheduler, nullptr,
+        CLSCTX_INPROC_SERVER, IID_ITaskService,
+        reinterpret_cast<void**>(&scheduler));
+    if (FAILED(hr) || scheduler == nullptr) break;
+    VARIANT empty = {};
+    VariantInit(&empty);
+    hr = scheduler->Connect(empty, empty, empty, empty);
+    if (FAILED(hr)) break;
+    name = SysAllocString(L"\\");
+    if (!name) break;
+    hr = scheduler->GetFolder(name, &folder);
+    SysFreeString(name);
+    name = nullptr;
+    if (FAILED(hr) || !folder) break;
+    name = SysAllocString(L"TwinConnectWfpEmergencyRestore");
+    if (!name) break;
+    hr = folder->GetTask(name, &task);
+    SysFreeString(name);
+    name = nullptr;
+    if (FAILED(hr) || !task) break;
+    VARIANT_BOOL enabled = VARIANT_FALSE;
+    TASK_STATE state = TASK_STATE_UNKNOWN;
+    DATE next = 0;
+    if (FAILED(task->get_Enabled(&enabled)) || enabled != VARIANT_TRUE ||
+        FAILED(task->get_State(&state)) ||
+        (state != TASK_STATE_READY && state != TASK_STATE_RUNNING) ||
+        FAILED(task->get_NextRunTime(&next)) || next <= 0) break;
+    SYSTEMTIME due = {}, now = {};
+    FILETIME dueFt = {}, nowFt = {};
+    if (!VariantTimeToSystemTime(next, &due) ||
+        !SystemTimeToFileTime(&due, &dueFt)) break;
+    GetSystemTime(&now);
+    if (!SystemTimeToFileTime(&now, &nowFt)) break;
+    ULARGE_INTEGER when = {}, current = {};
+    when.LowPart = dueFt.dwLowDateTime;
+    when.HighPart = dueFt.dwHighDateTime;
+    current.LowPart = nowFt.dwLowDateTime;
+    current.HighPart = nowFt.dwHighDateTime;
+    // The recovery deadline must be imminent, not tomorrow or next month.
+    if (when.QuadPart <= current.QuadPart ||
+        when.QuadPart - current.QuadPart > 10ULL * 60ULL * 10000000ULL) break;
+    if (FAILED(task->get_Definition(&definition)) || !definition ||
+        FAILED(definition->get_Principal(&principal)) || !principal ||
+        FAILED(principal->get_UserId(&user)) || !user) break;
+    if (_wcsicmp(user, L"SYSTEM") != 0 &&
+        _wcsicmp(user, L"S-1-5-18") != 0 &&
+        _wcsicmp(user, L"NT AUTHORITY\\SYSTEM") != 0) break;
+    if (FAILED(definition->get_Actions(&actions)) || !actions) break;
+    long count = 0;
+    if (FAILED(actions->get_Count(&count)) || count != 1) break;
+    VARIANT item = {};
+    VariantInit(&item);
+    item.vt = VT_I4;
+    item.lVal = 1;
+    if (FAILED(actions->get_Item(item, &action)) || !action ||
+        FAILED(action->QueryInterface(IID_IExecAction,
+            reinterpret_cast<void**>(&executable))) || !executable ||
+        FAILED(executable->get_Path(&path)) || !path ||
+        FAILED(executable->get_Arguments(&arguments)) || !arguments) break;
+    wchar_t self[MAX_PATH] = {};
+    DWORD length = GetModuleFileNameW(nullptr, self, MAX_PATH);
+    valid = length > 0 && length < MAX_PATH &&
+        _wcsicmp(path, self) == 0 &&
+        wcscmp(arguments, L"recover I_ACCEPT_OFFLINE_RECOVERY") == 0;
+  } while (false);
+  if (arguments) SysFreeString(arguments);
+  if (path) SysFreeString(path);
+  if (user) SysFreeString(user);
+  if (name) SysFreeString(name);
+  if (executable) executable->Release();
+  if (action) action->Release();
+  if (actions) actions->Release();
+  if (principal) principal->Release();
+  if (definition) definition->Release();
+  if (task) task->Release();
+  if (folder) folder->Release();
+  if (scheduler) scheduler->Release();
+  CoUninitialize();
+  return valid;
+}
+
 std::wstring HandleRequest(const std::wstring& request) {
   Engine engine;
   if (Open(engine) != ERROR_SUCCESS) return L"ERR WFP_ENGINE_UNAVAILABLE";
@@ -94,6 +197,8 @@ std::wstring HandleRequest(const std::wstring& request) {
   UINT32 endpoint = 0;
   if (!ValidateRequest(alias, host, path, &luid, &endpoint))
     return L"ERR UNVERIFIED_TUNNEL_OR_TRANSPORT";
+  // No persistent WFP lock without an independent SYSTEM recovery task.
+  if (!RecoveryTaskReady()) return L"ERR RECOVERY_TASK_NOT_VERIFIED";
   DWORD code = TransactionalArm(engine.handle, luid, endpoint, path);
   return code == ERROR_SUCCESS ? L"OK ARMED_EXPERIMENTAL" :
                                  L"ERR WFP_ARM_FAILED";
