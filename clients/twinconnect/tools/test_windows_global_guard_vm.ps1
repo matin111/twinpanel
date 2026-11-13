@@ -157,11 +157,16 @@ if (!(Test-Physical-Dns -SourceAddress $PhysicalIpv6 -InterfaceIndex $physicalV6
 }
 $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(2)
 $action = New-ScheduledTaskAction -Execute $GuardExe -Argument ("recover " + $ack)
-Register-ScheduledTask -TaskName $task -Trigger $trigger -Action $action -User "SYSTEM" -RunLevel Highest -Force | Out-Null
+# Run missed emergency recovery as soon as Windows is booted again. A
+# snapshot/reboot must not leave persistent WFP filters stranded indefinitely.
+$settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -ExecutionTimeLimit (New-TimeSpan -Minutes 3)
+Register-ScheduledTask -TaskName $task -Trigger $trigger -Action $action -Settings $settings -User "SYSTEM" -RunLevel Highest -Force | Out-Null
 $taskRegistered = $true
 try {
   $check = Get-ScheduledTask -TaskName $task -ErrorAction Stop
-  if ($check.State -eq "Disabled") { throw "Emergency task disabled." }
+  if ($check.State -eq "Disabled" -or !$check.Settings.StartWhenAvailable) {
+    throw "Emergency task must be enabled and recover after reboot."
+  }
   & $GuardExe arm $TunnelAlias $VpnEndpointIpv4 $TransportExe $ack
   if ($LASTEXITCODE -ne 0) { throw "Guard arm failed." }
   $status = & $GuardExe status
