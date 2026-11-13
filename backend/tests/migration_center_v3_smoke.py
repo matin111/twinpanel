@@ -9,6 +9,13 @@ def read(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
+def test_readiness_counts_distinct_accounts_not_duplicate_node_rows() -> None:
+    source = read(ROUTER)
+    assert "func.count(func.distinct(SubscriptionProtocol.subscription_id))" in source
+    assert "func.count(func.distinct(ProtocolCredential.subscription_id))" in source
+    assert '"fully_provisioned": bool(total)' in source
+
+
 def test_target_preflight_is_admin_only_read_only_and_explicit() -> None:
     source = read(ROUTER)
     assert 'prefix="/admin/migration-center"' in source
