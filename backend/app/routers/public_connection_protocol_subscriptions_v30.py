@@ -204,9 +204,15 @@ _SCRIPT = r"""
   const token=__TOKEN__;
   const MOBILE='(max-width:720px)';
   const SUPPORTED=new Set(['v2ray','hysteria2','tuic','anytls']);
-  const KARING='/v1/connect/app-download/karing/'+( /android/i.test(navigator.userAgent)?'android':/mac/i.test(navigator.userAgent)?'macos':/linux/i.test(navigator.userAgent)?'linux':/iPhone|iPad|iPod/i.test(navigator.userAgent)?'ios':'windows');
-  const HIDDIFY='https://github.com/hiddify/hiddify-app/releases/latest';
-  const V2RAYN='https://github.com/2dust/v2rayN/releases/latest';
+  const OS=(()=>{
+    const p=String(document.body?.dataset?.tpPlatform||'').toLowerCase();
+    if(['android','ios','windows','macos','linux'].includes(p))return p;
+    const ua=String(navigator.userAgent||'');
+    return /android/i.test(ua)?'android':/iPhone|iPad|iPod/i.test(ua)?'ios':/mac/i.test(ua)?'macos':/linux/i.test(ua)?'linux':'windows';
+  })();
+  const KARING='/v1/connect/app-download/karing/'+OS;
+  const HIDDIFY=['android','ios'].includes(OS)?'/v1/connect/app-download/hiddify/'+OS:'';
+  const V2RAYN=['windows','macos'].includes(OS)?'/v1/connect/app-download/v2rayn/'+OS:'';
   const text=el=>String(el?.textContent||'').trim();
   const normalize=value=>{const p=String(value||'').trim().toLowerCase();return p==='xray'?'v2ray':p;};
   function panelProtocol(panel){const modern=normalize(panel?.dataset?.modernProtocol||'');if(modern)return modern;const choice=[...document.querySelectorAll('.protocol-choice')].find(item=>String(item.dataset.protocol||'')===String(panel?.id||''));return normalize(choice?.dataset?.protocolKey||choice?.dataset?.protocol||'');}
@@ -232,7 +238,12 @@ _SCRIPT = r"""
     const count=panel.querySelectorAll('.server-view').length;
     const url=subscriptionUrl(protocol);
     const card=document.createElement('section');card.className='v30-subscription-card';card.dataset.v30Protocol=protocol;
-    card.innerHTML='<div class="v30-subscription-head"><b>همه سرورها</b><span class="v30-subscription-count">'+count+' سرور</span></div><div class="v30-subscription-actions"><a class="v30-primary v30-karing-all" href="'+karingHref(url,protocol)+'">افزودن همه به Karing</a><button type="button" class="v30-copy-sub">کپی لینک اشتراک</button></div><div class="v30-client-downloads"><a href="'+KARING+'" target="_blank" rel="noopener noreferrer">دانلود Karing</a><a href="'+HIDDIFY+'" target="_blank" rel="noopener noreferrer">دانلود Hiddify</a><a class="v30-client-v2rayn" href="'+V2RAYN+'" target="_blank" rel="noopener noreferrer">دانلود v2rayN</a></div>';
+    card.innerHTML='<div class="v30-subscription-head"><b>همه سرورها</b><span class="v30-subscription-count">'+count+' سرور</span></div><div class="v30-subscription-actions"><a class="v30-primary v30-karing-all" href="'+karingHref(url,protocol)+'">افزودن همه به Karing</a><button type="button" class="v30-copy-sub">کپی لینک اشتراک</button></div><div class="v30-client-downloads"><a href="'+KARING+'" target="_blank" rel="noopener noreferrer">دانلود Karing</a><a class="v30-hiddify-download" href="'+HIDDIFY+'" target="_blank" rel="noopener noreferrer">دانلود Hiddify</a><a class="v30-client-v2rayn" href="'+V2RAYN+'" target="_blank" rel="noopener noreferrer">دانلود v2rayN</a></div>';
+    // Other modern protocols should not show unrelated V2Ray installers.
+    const hiddify=card.querySelector('.v30-hiddify-download');
+    if(!HIDDIFY||protocol!=='v2ray')hiddify?.remove();
+    const v2rayn=card.querySelector('.v30-client-v2rayn');
+    if(!V2RAYN||protocol!=='v2ray')v2rayn?.remove();
     const karing=card.querySelector('.v30-karing-all');
     karing?.addEventListener('click',async(event)=>{
       event.preventDefault();
