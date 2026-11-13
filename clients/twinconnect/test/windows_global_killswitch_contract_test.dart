@@ -36,6 +36,12 @@ void main() {
     expect(source, contains('FwpmTransactionBegin0('));
     expect(source, contains('FwpmTransactionCommit0('));
     expect(source, contains('FwpmTransactionAbort0('));
+    expect(source, contains('filter->action.type'));
+    expect(source, contains('FWPM_CONDITION_IP_LOCAL_INTERFACE'));
+    expect(source, contains('FWPM_CONDITION_ALE_APP_ID'));
+    expect(source, contains('filter->numFilterConditions'));
+    expect(source, contains('const DWORD recovery = TransactionalDisarm(engine)'));
+
     expect(source, contains('TransactionalDisarm('));
     expect(source, contains('I_ACCEPT_OFFLINE_RECOVERY'));
     final workflow = File('../../.github/workflows/twinconnect-wfp-experimental.yml')
