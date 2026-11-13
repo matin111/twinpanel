@@ -10,7 +10,10 @@ void main() {
     expect(header, contains('FwpmEngineOpen0('));
     expect(header, contains('FWPM_SESSION_FLAG_DYNAMIC'));
     expect(header, contains('FwpmEngineClose0(engine)'));
-    expect(header, contains('flutter::EncodableValue(false)'));
+    expect(header, contains('const bool recoveryVerified = false;'));
+    expect(header, contains('OpenServiceW('));
+    expect(header, contains('OwnedFilterExists('));
+    expect(header, contains('FWPM_SESSION_FLAG_DYNAMIC'));
     expect(header, isNot(contains('FwpmFilterAdd')));
     expect(header, isNot(contains('FwpmFilterDelete')));
     expect(header, isNot(contains('FwpmSubLayerAdd')));
