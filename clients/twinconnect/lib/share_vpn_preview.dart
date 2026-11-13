@@ -1,3 +1,5 @@
+import 'dart:io' show Platform, Process;
+
 import 'package:flutter/material.dart';
 
 import 'interactive_glass_card.dart';
@@ -21,88 +23,27 @@ class ShareVpnPreview extends StatefulWidget {
 
 class _ShareVpnPreviewState extends State<ShareVpnPreview> {
   static const accent = Color(0xFFA46AFF);
-  String? _draftName;
 
   String tr(String fa, String en) => widget.persian ? fa : en;
 
   Future<void> _editWifi() async {
-    final name = TextEditingController(text: _draftName ?? 'TwinConnect-Share');
-    final password = TextEditingController();
-    final form = GlobalKey<FormState>();
+    // Open the real Windows hotspot settings rather than storing a
+    // deceptive Wi-Fi/password preview that never configures an adapter.
+    if (!Platform.isWindows) {
+      _guide();
+      return;
+    }
     try {
-      final saved = await showDialog<String>(
-        context: context,
-        builder: (dialogContext) => AlertDialog(
-          key: const Key('devWifiEditDialog'),
-          title: Text(tr('تنظیمات Wi-Fi', 'Wi-Fi settings')),
-          content: Form(
-            key: form,
-            child: SizedBox(
-              width: 360,
-              child: Column(mainAxisSize: MainAxisSize.min, children: [
-                Text(tr(
-                  'این تنظیمات فقط پیش‌نمایش است و روی ویندوز اعمال نمی‌شود.',
-                  'Preview only. No Wi-Fi or hotspot setting is applied.',
-                )),
-                const SizedBox(height: 15),
-                TextFormField(
-                  key: const Key('devWifiName'),
-                  controller: name,
-                  maxLength: 32,
-                  decoration: InputDecoration(
-                    labelText: tr('نام شبکه', 'Network name'),
-                  ),
-                  validator: (value) {
-                    final text = value?.trim() ?? '';
-                    return text.isEmpty || text.length > 32
-                        ? tr('نام معتبر وارد کنید', 'Enter a valid name')
-                        : null;
-                  },
-                ),
-                TextFormField(
-                  key: const Key('devWifiPassword'),
-                  controller: password,
-                  obscureText: true,
-                  maxLength: 63,
-                  decoration: InputDecoration(
-                    labelText: tr('رمز Wi-Fi (آزمایشی)', 'Wi-Fi password (preview)'),
-                    helperText: tr('رمز ذخیره نمی‌شود', 'Password is not stored'),
-                  ),
-                  validator: (value) {
-                    final text = value ?? '';
-                    return text.isEmpty || (text.length >= 8 && text.length <= 63)
-                        ? null
-                        : tr('رمز حداقل ۸ کاراکتر', 'Use at least 8 characters');
-                  },
-                ),
-              ]),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: Text(tr('انصراف', 'Cancel')),
-            ),
-            FilledButton(
-              key: const Key('devWifiPreviewSave'),
-              onPressed: () {
-                if (form.currentState?.validate() == true) {
-                  Navigator.of(dialogContext).pop(name.text.trim());
-                }
-              },
-              child: Text(tr('ذخیره پیش‌نمایش', 'Save preview')),
-            ),
-          ],
-        ),
+      await Process.start(
+        'explorer.exe', ['ms-settings:network-mobilehotspot'],
+        runInShell: false,
       );
-      if (saved != null && mounted) {
-        setState(() => _draftName = saved);
-      }
-    } finally {
-      // No passwords are retained or written to preferences.
-      name.dispose();
-      password.clear();
-      password.dispose();
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(tr('تنظیمات هات‌اسپات ویندوز باز نشد.',
+          'Could not open Windows Mobile hotspot settings.')),
+      ));
     }
   }
 
@@ -113,12 +54,17 @@ class _ShareVpnPreviewState extends State<ShareVpnPreview> {
         key: const Key('devShareVpnGuide'),
         title: Text(tr('راهنمای اشتراک‌گذاری VPN', 'Share VPN guide')),
         content: Text(tr(
-          'ابتدا اتصال واقعی VPN و سپس اشتراک‌گذاری شبکه در ویندوز باید '
-          'توسط موتور بومی تأیید شوند. تا آن زمان هیچ دستگاهی به VPN '
-          'اشتراکی متصل نمی‌شود و گزینه روشن‌کردن غیرفعال می‌ماند.',
-          'A verified native VPN tunnel and Windows network-sharing adapter '
-          'are both required. Sharing remains disabled until those capabilities '
-          'are installed and verified.',
+          'این پیام خطای اتصال VPN نیست. اشتراک‌گذاری اینترنت از طریق '
+          'هات‌اسپات ویندوز با عبور دادن ترافیک دستگاه‌های دیگر از تونل VPN '
+          'متفاوت است. این نسخه هنوز مسیریابی، NAT و انتخاب آداپتور خروجی VPN '
+          'را پیاده‌سازی و آزمایش نکرده است. از بخش «بازکردن تنظیمات» می‌توانید '
+          'هات‌اسپات ویندوز را بررسی کنید؛ روشن شدن هات‌اسپات به تنهایی '
+          'به معنای اشتراک VPN نیست.',
+          'This is not a VPN connection error. Windows Mobile hotspot alone '
+          'does not route other devices through the VPN tunnel. This build '
+          'does not yet implement and verify VPN adapter selection, NAT and '
+          'sharing routing. Use Open settings to inspect Windows hotspot, '
+          'but an enabled hotspot is not proof of VPN sharing.',
         )),
         actions: [
           TextButton(
@@ -165,10 +111,21 @@ class _ShareVpnPreviewState extends State<ShareVpnPreview> {
                   style: TextStyle(color: color, fontSize: 18,
                       fontWeight: FontWeight.bold),
                 )),
-                const Switch(
-                  key: Key('devShareVpnSwitch'),
-                  value: false,
-                  onChanged: null,
+                Tooltip(
+                  message: tr('موتور اشتراک‌گذاری VPN نصب و تأیید نشده است.',
+                    'The native VPN sharing engine is not implemented or verified.'),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 11, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFB86B).withValues(alpha: .12),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(tr('غیرفعال', 'Unavailable'),
+                      style: const TextStyle(
+                        color: Color(0xFFFFB86B),
+                        fontSize: 11, fontWeight: FontWeight.w700)),
+                  ),
                 ),
               ]),
               const SizedBox(height: 15),
@@ -214,8 +171,8 @@ class _ShareVpnPreviewState extends State<ShareVpnPreview> {
               ),
               const SizedBox(height: 13),
               Text(
-                tr('اشتراک‌گذاری هنوز فعال نیست',
-                    'VPN sharing is not available yet'),
+                tr('اشتراک VPN در این نسخه تأیید نشده',
+                    'VPN sharing is not verified in this build'),
                 style: TextStyle(
                   color: color, fontWeight: FontWeight.w700, fontSize: 14),
               ),
@@ -242,23 +199,18 @@ class _ShareVpnPreviewState extends State<ShareVpnPreview> {
                 const Icon(Icons.router_outlined, color: accent),
                 const SizedBox(width: 10),
                 Expanded(child: Text(
-                  tr('نام و رمز شبکه Wi-Fi', 'Wi-Fi name & password'),
+                  tr('هات‌اسپات ویندوز', 'Windows Mobile hotspot'),
                   style: TextStyle(color: color, fontWeight: FontWeight.w700),
                 )),
                 TextButton(
                   key: const Key('devWifiEditButton'),
                   onPressed: _editWifi,
-                  child: Text(tr('ویرایش', 'Edit')),
+                  child: Text(tr('بازکردن تنظیمات', 'Open settings')),
                 ),
               ]),
-              if (_draftName != null)
-                Text(
-                  tr('نام آزمایشی: $_draftName', 'Preview name: $_draftName'),
-                  style: small,
-                ),
               Text(
-                tr('فقط پیش‌نمایش؛ تنظیمات شبکه ویندوز تغییر نمی‌کند.',
-                   'Preview only. Windows network settings are unchanged.'),
+                tr('تنظیم نام و رمز در ویندوز انجام می‌شود؛ فعال‌کردن هات‌اسپات به معنای اشتراک VPN نیست.',
+                   'Configure Wi-Fi in Windows. Hotspot availability does not prove that VPN traffic is being shared.'),
                 style: small,
               ),
             ],

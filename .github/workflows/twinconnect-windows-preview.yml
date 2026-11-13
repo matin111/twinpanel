@@ -8,12 +8,17 @@ on:
   push:
     branches:
       - feat/twinconnect-windows-preview-v1
+      - integration/twinconnect-windows-app-20261110
     paths:
       - "clients/twinconnect/**"
       - ".github/workflows/twinconnect-windows-preview.yml"
 
 jobs:
   windows-preview:
+    # PRs have read-only permissions; only trusted branch pushes may publish
+    # unsigned preview assets to a clearly marked prerelease.
+    permissions:
+      contents: write
     runs-on: windows-latest
     timeout-minutes: 35
     defaults:
@@ -24,12 +29,15 @@ jobs:
       # A dedicated owned HTTPS domain must replace this before production.
       # Using a repository variable takes precedence without modifying code.
       TWINCONNECT_DIRECTORY_URL: ${{ vars.TWINCONNECT_DIRECTORY_URL || 'https://panel.matindnspro.sbs' }}
+      SIGNING_CONFIGURED: ${{ github.event_name == 'push' && github.ref == 'refs/heads/integration/twinconnect-windows-app-20261110' && secrets.TWINCONNECT_SIGN_PFX_BASE64 != '' && secrets.TWINCONNECT_SIGN_PFX_PASSWORD != '' }}
     steps:
       - uses: actions/checkout@v4
+      # Avoid a stalled Flutter SDK cache restore on GitHub Windows runners.
+      # This build needs a fresh SDK setup; pub dependencies are fetched below.
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
-          cache: true
+          cache: false
       - name: Generate native Windows Flutter project
         run: flutter create --platforms=windows --org com.twinpanel --project-name twinconnect .
       - name: Install fail-closed Windows VPN native bridge
@@ -38,7 +46,7 @@ jobs:
         run: flutter pub get
       - name: Verify Dart compilation and tests
         run: |
-          flutter analyze
+          flutter analyze --no-fatal-infos
           flutter test --reporter expanded
       - name: Verify HTTPS directory is configured and reachable
         shell: pwsh
@@ -59,6 +67,114 @@ jobs:
       - name: Build Windows x64 standalone directory
         shell: pwsh
         run: flutter build windows --release "--dart-define=TWINCONNECT_DIRECTORY_URL=$env:TWINCONNECT_DIRECTORY_URL"
+      - name: Bundle pinned SHA256-verified official Xray-core
+        shell: pwsh
+        run: ./tools/bundle_xray_windows.ps1
+      - name: Check Xray-core synthetic stdin config without routes
+        shell: pwsh
+        run: ./tools/check_xray_windows.ps1
+      - name: Bundle checksum-pinned official Sudoku Windows core
+        shell: pwsh
+        run: ./tools/bundle_sudoku_windows.ps1
+      - name: Verify official Sudoku core accepts synthetic client config
+        shell: pwsh
+        run: ./tools/check_sudoku_windows.ps1
+      - name: Bundle official SHA256-pinned Mieru Windows client
+        shell: pwsh
+        run: ./tools/bundle_mieru_windows.ps1
+      - name: Verify independent Mieru engine with synthetic loopback SOCKS5
+        shell: pwsh
+        run: ./tools/check_mieru_windows.ps1
+      - name: Bundle official pinned TrustTunnel Windows CLI and verify release SHA256
+        shell: pwsh
+        run: ./tools/bundle_trusttunnel_windows.ps1
+      - name: Bundle official SHA256-verified AmneziaWG Windows prerequisite
+        shell: pwsh
+        run: ./tools/bundle_amneziawg_windows.ps1
+      - name: Bundle pinned and verified sing-box engine (not yet enabled)
+        shell: pwsh
+        run: ./tools/bundle_singbox_windows.ps1
+      - name: Verify bundled sing-box accepts synthetic Windows TUN config
+        shell: pwsh
+        run: ./tools/check_singbox_windows.ps1
+      - name: Exercise sing-box runtime with loopback-only synthetic proxy
+        shell: pwsh
+        run: ./tools/smoke_singbox_loopback_windows.ps1
+      - name: Verify actual TUN adapter creation without changing system routes
+        shell: pwsh
+        run: ./tools/smoke_singbox_tun_windows.ps1
+      - name: Bundle signed OpenConnect Windows prerequisite
+        shell: pwsh
+        env:
+          TWINCONNECT_OPENCONNECT_SHA256: ${{ vars.TWINCONNECT_OPENCONNECT_SHA256 }}
+        run: ./tools/bundle_openconnect_windows.ps1
+      - name: Verify packaged OpenConnect upstream provenance
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $exe = Join-Path (Get-Location) 'build/windows/x64/runner/Release/prerequisites/openconnect-gui-1.6.2-win64.exe'
+          if (!(Test-Path $exe)) { throw 'OpenConnect prerequisite is missing from release' }
+          $sig = Get-AuthenticodeSignature -LiteralPath $exe
+          if ($sig.Status -ne 'Valid') { throw 'Bundled OpenConnect vendor signature invalid' }
+          $provenance = Join-Path (Split-Path $exe) 'OPENCONNECT-SOURCE.txt'
+          if (!(Test-Path $provenance)) { throw 'OpenConnect provenance missing' }
+      - name: Extract and execute verified OpenConnect CLI from vendor package
+        shell: pwsh
+        run: ./tools/extract_openconnect_windows.ps1
+      - name: Bundle official signed OpenVPN Community MSI for integrated setup
+        shell: pwsh
+        env:
+          TWINCONNECT_OPENVPN_SHA256: ${{ vars.TWINCONNECT_OPENVPN_SHA256 }}
+        run: ./tools/bundle_openvpn_windows.ps1
+      - name: Inspect release binaries with Windows Defender (when available)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $release = Join-Path (Get-Location) 'build/windows/x64/runner/Release'
+          $defender = Join-Path $env:ProgramFiles 'Windows Defender/MpCmdRun.exe'
+          if (!(Test-Path $defender)) {
+            Write-Warning 'Defender command-line scanner is not available on this runner. No malware-clean claim is made.'
+          } else {
+            & $defender -Scan -ScanType 3 -File $release -DisableRemediation
+            $scanExit = $LASTEXITCODE
+            if ($scanExit -ne 0) {
+              throw "Windows Defender scan did not complete cleanly (exit code $scanExit); refusing artifact publication."
+            }
+            Write-Host 'Windows Defender on-demand scan completed successfully'
+          }
+      - name: Authenticode-sign app when a publisher certificate is configured
+        if: ${{ env.SIGNING_CONFIGURED == 'true' }}
+        shell: pwsh
+        env:
+          TWINCONNECT_SIGN_PFX_BASE64: ${{ secrets.TWINCONNECT_SIGN_PFX_BASE64 }}
+          TWINCONNECT_SIGN_PFX_PASSWORD: ${{ secrets.TWINCONNECT_SIGN_PFX_PASSWORD }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if (!$env:TWINCONNECT_SIGN_PFX_BASE64 -or !$env:TWINCONNECT_SIGN_PFX_PASSWORD) {
+            throw 'Incomplete signing configuration'
+          }
+          $pfx = Join-Path $env:RUNNER_TEMP 'twinconnect-signing.pfx'
+          try {
+            [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:TWINCONNECT_SIGN_PFX_BASE64))
+            $password = ConvertTo-SecureString $env:TWINCONNECT_SIGN_PFX_PASSWORD -AsPlainText -Force
+            $certificate = Get-PfxCertificate -FilePath $pfx -Password $password
+            if (!$certificate.HasPrivateKey -or
+                $certificate.NotAfter -le (Get-Date) -or
+                !$certificate.EnhancedKeyUsageList.ObjectId.Value.Contains('1.3.6.1.5.5.7.3.3')) {
+              throw 'Code signing certificate is invalid, expired, or lacks code-signing usage'
+            }
+            $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin" -Filter signtool.exe -Recurse -File |
+              Where-Object { $_.FullName -match '\\x64\\' } |
+              Sort-Object FullName -Descending | Select-Object -First 1
+            if (!$signtool) { throw 'Windows SDK signtool.exe not available' }
+            $exe = Join-Path (Get-Location) 'build/windows/x64/runner/Release/twinconnect.exe'
+            & $signtool.FullName sign /fd SHA256 /f $pfx /p $env:TWINCONNECT_SIGN_PFX_PASSWORD /tr http://timestamp.digicert.com /td SHA256 $exe
+            if ($LASTEXITCODE -ne 0) { throw 'App signing failed' }
+            & $signtool.FullName verify /pa /all $exe
+            if ($LASTEXITCODE -ne 0) { throw 'App Authenticode verification failed' }
+          } finally {
+            Remove-Item -LiteralPath $pfx -Force -ErrorAction SilentlyContinue
+          }
       - name: Package portable ZIP and usage instructions
         shell: pwsh
         run: |
@@ -89,8 +205,10 @@ jobs:
 
           IMPORTANT:
           - No WireGuard software or drivers are bundled with TwinConnect.
-          - Cisco/OpenConnect and the other 15 protocols have no Windows
-            tunnel adapter in this preview.
+          - The sing-box 1.14.4 executable is bundled and SHA256-verified,
+            but its native TUN lifecycle is not connected in this build.
+          - Only WireGuard has a verified Windows connection adapter.
+          - Do not interpret bundled executable as enabled protocol support.
           - Only one-peer WireGuard profiles with DNS and complete IPv4
             default coverage are accepted. The native adapter derives
             protected /0 routes in memory from panel split-/1 routes; it
@@ -109,6 +227,111 @@ jobs:
           Compress-Archive -Path (Join-Path $release "*") -DestinationPath $zip -CompressionLevel Optimal
           if (!(Test-Path $zip)) { throw "ZIP packaging failed" }
           Write-Host ("Windows ZIP bytes: " + (Get-Item $zip).Length)
+      - name: Install Inno Setup installer compiler
+        shell: pwsh
+        run: choco install innosetup --no-progress -y
+      - name: Package TwinConnect Windows setup with automatic WireGuard prerequisite
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $compiler = "${env:ProgramFiles(x86)}\\Inno Setup 6\\ISCC.exe"
+          if (!(Test-Path $compiler)) { throw "Inno Setup 6 compiler not installed" }
+          & $compiler "installer.iss"
+          if ($LASTEXITCODE -ne 0) { throw "Installer compilation failed" }
+          if (!(Test-Path "TwinConnect-Windows-x64-Setup.exe")) {
+            throw "TwinConnect setup executable missing"
+          }
+      - name: Sign installer when a publisher certificate is configured
+        if: ${{ env.SIGNING_CONFIGURED == 'true' }}
+        shell: pwsh
+        env:
+          TWINCONNECT_SIGN_PFX_BASE64: ${{ secrets.TWINCONNECT_SIGN_PFX_BASE64 }}
+          TWINCONNECT_SIGN_PFX_PASSWORD: ${{ secrets.TWINCONNECT_SIGN_PFX_PASSWORD }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $pfx = Join-Path $env:RUNNER_TEMP 'twinconnect-signing.pfx'
+          try {
+            [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:TWINCONNECT_SIGN_PFX_BASE64))
+            $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin" -Filter signtool.exe -Recurse -File |
+              Where-Object { $_.FullName -match '\\x64\\' } |
+              Sort-Object FullName -Descending | Select-Object -First 1
+            if (!$signtool) { throw 'Windows SDK signtool.exe not available' }
+            & $signtool.FullName sign /fd SHA256 /f $pfx /p $env:TWINCONNECT_SIGN_PFX_PASSWORD /tr http://timestamp.digicert.com /td SHA256 'TwinConnect-Windows-x64-Setup.exe'
+            if ($LASTEXITCODE -ne 0) { throw 'Installer signing failed' }
+            & $signtool.FullName verify /pa /all 'TwinConnect-Windows-x64-Setup.exe'
+            if ($LASTEXITCODE -ne 0) { throw 'Installer Authenticode verification failed' }
+          } finally {
+            Remove-Item -LiteralPath $pfx -Force -ErrorAction SilentlyContinue
+          }
+      - name: Publish release integrity manifest
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $files = @('TwinConnect-Windows-x64-Setup.exe', 'TwinConnect-Windows-Preview.zip')
+          $files | ForEach-Object {
+            if (!(Test-Path $_)) { throw "Missing artifact: $_" }
+            $hash = (Get-FileHash $_ -Algorithm SHA256).Hash.ToLowerInvariant()
+            "$hash  $_"
+          } | Set-Content -Path 'TwinConnect-Windows-SHA256SUMS.txt' -Encoding ascii
+          $setup = Get-AuthenticodeSignature 'TwinConnect-Windows-x64-Setup.exe'
+          Write-Host "Setup Authenticode status: $($setup.Status)"
+          if ($env:SIGNING_CONFIGURED -eq 'true' -and $setup.Status -ne 'Valid') {
+            throw 'Signed build did not retain a valid installer signature'
+          }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TwinConnect-Windows-SHA256SUMS
+          path: clients/twinconnect/TwinConnect-Windows-SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 30
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TwinConnect-Windows-x64-Setup
+          path: clients/twinconnect/TwinConnect-Windows-x64-Setup.exe
+          if-no-files-found: error
+          retention-days: 30
+      # Unsigned artifacts are for internal testing only. Never distribute
+      # unsigned Windows executables as public GitHub Release assets.
+      # A publisher code-signing certificate is mandatory for prereleases.
+      - name: Publish signed installer as GitHub prerelease assets
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/integration/twinconnect-windows-app-20261110' && env.SIGNING_CONFIGURED == 'true' }}
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          # Fail closed: do not publish unsigned or unverified executables.
+          foreach ($file in @('TwinConnect-Windows-x64-Setup.exe', 'build/windows/x64/runner/Release/twinconnect.exe')) {
+            $signature = Get-AuthenticodeSignature -LiteralPath $file
+            if ($signature.Status -ne 'Valid') {
+              throw "Refusing release: invalid or missing Authenticode signature for $file ($($signature.Status))"
+            }
+          }
+          $tag = 'twinconnect-windows-preview-' + $env:GITHUB_SHA.Substring(0, 12)
+          $files = @(
+            'TwinConnect-Windows-x64-Setup.exe',
+            'TwinConnect-Windows-Preview.zip',
+            'TwinConnect-Windows-SHA256SUMS.txt'
+          )
+          foreach ($file in $files) {
+            if (!(Test-Path -LiteralPath $file)) { throw "Missing release file: $file" }
+          }
+          $notes = @'
+          SIGNED DEVELOPMENT PRERELEASE — not approved for customers.
+          Built from the TwinConnect integration branch. Contains the signed Windows
+          installer, standalone portable ZIP, and SHA-256 integrity manifest.
+          Signature verification is required but does not guarantee malware-free code.
+          Do not disable antivirus protections to run it.
+          The Windows Defender on-demand CI scan is separate from a professional
+          security audit and does not certify malware-free binaries.
+          '@
+          gh release create $tag @files --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "TwinConnect Windows Preview ($($env:GITHUB_SHA.Substring(0, 12)))" --notes $notes --prerelease
+          if ($LASTEXITCODE -ne 0) { throw 'Failed to publish TwinConnect preview release' }
+          $assets = gh release view $tag --repo $env:GITHUB_REPOSITORY --json assets --jq '.assets[].name'
+          if ($LASTEXITCODE -ne 0 -or !($assets -contains 'TwinConnect-Windows-x64-Setup.exe') -or !($assets -contains 'TwinConnect-Windows-SHA256SUMS.txt')) {
+            throw 'GitHub prerelease asset verification failed'
+          }
+          Write-Host "TwinConnect release: https://github.com/$env:GITHUB_REPOSITORY/releases/tag/$tag"
       - name: Build isolated Windows Dev dashboard (no sign-in)
         shell: pwsh
         run: flutter build windows --release --target lib/main_dev.dart

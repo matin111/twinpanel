@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'app_strings.dart';
 import 'brand_theme.dart';
+import 'interactive_glass_card.dart';
 import 'tenant_models.dart';
 import 'native_vpn_bridge.dart';
 import 'vpn_policy.dart';
@@ -9,6 +10,32 @@ import 'vpn_policy_store.dart';
 import 'vpn_strings.dart';
 
 /// Controls are enabled only for verified native capabilities.
+/// Consistent frosted surface for every policy row across desktop and mobile.
+class GlassVpnSwitch {
+  static Widget adaptive({
+    required Key key,
+    required Widget title,
+    Widget? subtitle,
+    required bool value,
+    required ValueChanged<bool>? onChanged,
+  }) => Builder(builder: (context) => Padding(
+    padding: const EdgeInsets.only(bottom: 9),
+    child: TwinConnectGlassCard(
+      dark: Theme.of(context).brightness == Brightness.dark,
+      surfaceColor: Theme.of(context).colorScheme.surface,
+      accentColor: Theme.of(context).colorScheme.primary,
+      radius: 17,
+      child: SwitchListTile.adaptive(
+        key: key,
+        title: title,
+        subtitle: subtitle,
+        value: value,
+        onChanged: onChanged,
+      ),
+    ),
+  ));
+}
+
 class VpnSettingsScreen extends StatefulWidget {
   const VpnSettingsScreen({
     required this.tenant,
@@ -170,7 +197,12 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
                   child: ListView(
                     padding: const EdgeInsets.all(20),
                     children: [
-                      ListTile(
+                      TwinConnectGlassCard(
+                        dark: Theme.of(context).brightness == Brightness.dark,
+                        surfaceColor: Theme.of(context).colorScheme.surface,
+                        accentColor: Theme.of(context).colorScheme.primary,
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        child: ListTile(
                         key: const Key('vpnNotActiveNotice'),
                         contentPadding: EdgeInsets.zero,
                         leading: Icon(
@@ -183,6 +215,7 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
                           _capabilities.engineReady
                               ? s.vpnEngineAvailable
                               : s.vpnEngineUnavailable,
+                        ),
                         ),
                       ),
                       _section(context, s.vpnRoutingTitle),
@@ -260,7 +293,7 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
                         ),
                       ],
                       _section(context, s.vpnSecurityTitle),
-                      SwitchListTile.adaptive(
+                      GlassVpnSwitch.adaptive(
                         key: const Key('vpnKillSwitch'),
                         title: Text(s.vpnKillSwitch),
                         subtitle: Text(s.vpnKillSwitchSubtitle),
@@ -272,7 +305,7 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
                             : null,
                       ),
 
-                      SwitchListTile.adaptive(
+                      GlassVpnSwitch.adaptive(
                         key: const Key('vpnDnsGuard'),
                         title: Text(s.vpnDnsProtected),
                         subtitle: Text(s.vpnDnsHint),
@@ -282,7 +315,7 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
                                 dnsMode: value ? VpnDnsMode.protected : VpnDnsMode.system))
                             : null,
                       ),
-                      SwitchListTile.adaptive(
+                      GlassVpnSwitch.adaptive(
                         key: const Key('vpnIpv6Guard'),
                         title: Text(s.vpnIpv6Protected),
                         subtitle: Text(s.vpnIpv6Hint),
@@ -292,7 +325,7 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
                                 ipv6Mode: value ? VpnIpv6Mode.tunnelOrBlock : VpnIpv6Mode.unprotected))
                             : null,
                       ),
-                      SwitchListTile.adaptive(
+                      GlassVpnSwitch.adaptive(
                         key: const Key('vpnLanAccess'),
                         title: Text(s.vpnAllowLan),
                         subtitle: Text(s.vpnAllowLanHint),
@@ -302,7 +335,7 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
                             : null,
                       ),
                       _section(context, s.vpnAutomationTitle),
-                      SwitchListTile.adaptive(
+                      GlassVpnSwitch.adaptive(
                         key: const Key('vpnAutoReconnect'),
                         title: Text(s.vpnAutoReconnect),
                         value: _capabilities.engineReady && _capabilities.autoReconnect && _policy.autoReconnect,
@@ -310,7 +343,7 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
                             ? (value) => _update(_policy.copyWith(autoReconnect: value))
                             : null,
                       ),
-                      SwitchListTile.adaptive(
+                      GlassVpnSwitch.adaptive(
                         key: const Key('vpnAutoConnect'),
                         title: Text(s.vpnAutoConnect),
                         value: _capabilities.engineReady && _capabilities.autoConnect && _policy.autoConnect,
@@ -318,7 +351,7 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
                             ? (value) => _update(_policy.copyWith(autoConnect: value))
                             : null,
                       ),
-                      SwitchListTile.adaptive(
+                      GlassVpnSwitch.adaptive(
                         key: const Key('vpnAutoSelect'),
                         title: Text(s.vpnAutoSelectServer),
                         value: false,
