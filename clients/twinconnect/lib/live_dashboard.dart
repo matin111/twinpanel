@@ -1462,7 +1462,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       if (_modernTunnel.isRunning) await _modernTunnel.stop();
       if (_xrayProxy.isRunning) await _xrayProxy.stop();
       if (_sudokuProxy.isRunning) await _sudokuProxy.stop();
-      if (_trusttunnelProxy.isRunning) await _trusttunnelProxy.stop();
+      if (_mieruProxy.isRunning) await _mieruProxy.stop();
       if (_trusttunnelProxy.isRunning) await _trusttunnelProxy.stop();
       if (_ciscoTunnel.isRunning) await _ciscoTunnel.stop();
       if (_openVpnTunnel.hasChild) await _openVpnTunnel.stop();
