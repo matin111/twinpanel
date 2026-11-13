@@ -58,6 +58,25 @@ reconnection, protocol-specific adapters, firewall arbitration, endpoint
 rotation, Windows reboot boot-time coverage, and mandatory recovery testing
 are not yet implemented or proven. Do not enable it on real user machines.
 
+## Manual dual-stack packet-leak acceptance job
+
+The separately gated `.github/workflows/twinconnect-wfp-vm-leak-test.yml`
+requires an **owner-controlled self-hosted Windows runner** with the label
+`twinconnect-disposable-vm`, a VM snapshot, offline console recovery, both
+working physical IPv4/IPv6 internet baselines, a verified TwinConnect tunnel
+adapter, an installed experimental service, and explicit dispatch input.
+It cannot run on the normal hosted GitHub Actions Windows runner and is
+not automatically triggered from a pull request.
+
+The job invokes `tools/test_windows_global_guard_vm.ps1`, registers a
+separate SYSTEM-owned emergency recovery task **before** attempting to arm
+persistent filters, then verifies both IPv4 and IPv6 direct TCP connections
+are blocked. If a baseline fails, the result is **inconclusive**, not a pass.
+UDP, QUIC, DNS, process crash, reconnect, reboot and protocol-specific
+transport coverage remain release blockers even after a dual-stack TCP pass.
+
+**No actual packet-blocking acceptance run has yet been performed.**
+
 ## Minimum Windows isolated-VM acceptance plan
 
 1. Verify non-admin app cannot arm; no rules are written by the preflight.
