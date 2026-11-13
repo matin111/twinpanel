@@ -270,6 +270,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   String? _publicIp;
   int? _httpsLatencyMs;
   bool _autoFastest = false;
+  bool _fastestConnecting = false;
   bool _networkRefreshing = false;
   int _networkEpoch = 0;
   Timer? _networkTimer;
@@ -459,6 +460,62 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       }
     }
     return best;
+  }
+
+
+  // Select from an authenticated protocol catalog and measured, online nodes.
+  // Enabling Fastest is an immediate connect action, not a passive preference.
+  Future<void> _enableFastestAndConnect() async {
+    if (_vpnBusy || _fastestConnecting || _verifiedConnectionActive ||
+        _vpnUp || _modernUp || _vpnCleanup || !Platform.isWindows) return;
+    if (_pingAllBusy) {
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(
+        content: Text(tr('تست پینگ سرورها هنوز در حال اجراست.',
+            'Server latency measurement is still running.'))));
+      return;
+    }
+    final authorized = widget.catalog?.entries.where((entry) =>
+        entry.selected && entry.configRecordPresent).map((e) =>
+        e.protocol.code).toSet() ?? <String>{};
+    // Respect an explicitly selected protocol; otherwise choose an available
+    // authorized native family, never force WireGuard for every account.
+    final eligible = <String>[
+      'wireguard', 'openvpn', 'cisco', 'l2tp', 'hysteria2', 'tuic',
+      'anytls', 'naive', 'shadowtls', 'snell', 'mieru',
+      'trusttunnel', 'amneziawg', 'v2ray', 'sudoku',
+    ];
+    final protocol = _filter != 'all'
+        ? (authorized.contains(_filter) ? _filter : null)
+        : eligible.where(authorized.contains).firstOrNull;
+    if (protocol == null) {
+      setState(() => _vpnError = 'PROTOCOL_NOT_INCLUDED_IN_SUBSCRIPTION');
+      return;
+    }
+    setState(() { _fastestConnecting = true; _vpnError = null; });
+    try {
+      // Refresh live ICMP latency instead of relying on stale panel hints.
+      await _probeAllNodes();
+      if (!mounted) return;
+      final best = _fastestKnownIndex;
+      if (best == null) {
+        setState(() => _vpnError = 'NO_MEASURED_SERVER');
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(
+          content: Text(tr('سرور آنلاین با پینگ معتبر پیدا نشد.',
+              'No online server has a verified latency measurement.'))));
+        return;
+      }
+      setState(() {
+        _filter = protocol;
+        _selected = best;
+        _autoFastest = true;
+        _page = 'home';
+      });
+      await _toggleVpn();
+    } catch (error) {
+      if (mounted) setState(() => _vpnError = _errorText(error));
+    } finally {
+      if (mounted) setState(() => _fastestConnecting = false);
+    }
   }
 
   void _resetNetworkStats() {
@@ -3852,58 +3909,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                     children: [
                       txt('${server.country} · $label', bold: true),
                       const SizedBox(height: 3),
-                      txt('V2Ray / Xray', size: 10, color: sub),
-                    ],
-                  )),
-                  const SizedBox(width: 8),
-                  Tooltip(
-                    message: tr(
-                      'زمان برقراری TCP با پورت اینباند، نه پینگ ICMP',
-                      'TCP handshake to inbound port, not ICMP ping',
-                    ),
-                    child: Text(
-                      _xrayInboundsProbing.contains(
-                          XrayInboundLatency.key(inbound))
-                          ? '…'
-                          : _xrayInboundRtts.containsKey(
-                              XrayInboundLatency.key(inbound)) &&
-                              _xrayInboundRtts[XrayInboundLatency.key(inbound)] == null
-                              ? tr('بدون پاسخ', 'No reply')
-                              : ServerLatency.label(
-                                  _xrayInboundRtts[XrayInboundLatency.key(inbound)]),
-                      key: Key('xrayRtt_${nodeId}_${inbound.id}'),
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: ServerLatency.color(
-                            _xrayInboundRtts[XrayInboundLatency.key(inbound)]),
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    key: Key('probeXray_${nodeId}_${inbound.id}'),
-                    tooltip: tr('تست پورت اینباند', 'Probe inbound TCP port'),
-                    onPressed: _xrayInboundsProbing.contains(
-                            XrayInboundLatency.key(inbound))
-                        ? null : () => _probeXrayInbound(inbound),
-                    icon: Icon(Icons.bolt_rounded,
-                        color: purple, size: 18),
-                  ),
-                  const SizedBox(width: 4),
-                  Icon(connected ? Icons.verified_rounded :
-                    Icons.power_settings_new_rounded,
-                    size: 20,
-                    color: connected ? const Color(0xFF33D6A6) : purple),
-                ]),
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-
-    // All 16 chips remain visible. Admin-selected protocols will replace
-    // the preview's complete catalog after an authenticated panel session.
+   
     Widget fastestServerControl() => Container(
       key: const Key('liveAutoFastestServer'),
       padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
@@ -3911,6 +3917,33 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         borderRadius: BorderRadius.circular(16),
         color: purple.withValues(alpha: _dark ? .12 : .06),
         border: Border.all(color: purple.withValues(alpha: .32)),
+      ),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(Icons.auto_awesome_rounded, color: purple, size: 17),
+        const SizedBox(width: 6),
+        Text(tr('سریع‌ترین سرور', 'Fastest server'),
+          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700,
+            color: ink)),
+        const SizedBox(width: 4),
+        if (_fastestConnecting)
+          const SizedBox(width: 19, height: 19,
+            child: CircularProgressIndicator(strokeWidth: 2))
+        else Switch(
+          key: const Key('autoFastestServerToggle'),
+          value: _autoFastest && (_vpnUp || _modernUp || _vpnBusy),
+          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          onChanged: _vpnBusy || _modernUp || _vpnUp || _pingAllBusy
+              ? null : (enabled) {
+            if (enabled) {
+              _enableFastestAndConnect();
+            } else {
+              setState(() => _autoFastest = false);
+            }
+          },
+        ),
+      ]),
+    );
+alpha: .32)),
       ),
       child: Row(mainAxisSize: MainAxisSize.min, children: [
         Icon(Icons.auto_awesome_rounded, color: purple, size: 17),
