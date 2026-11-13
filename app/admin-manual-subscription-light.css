@@ -241,3 +241,100 @@ body > .runtime-modal.manual-subscription-modal.tp-light-create .icon-button{
   color:#344965!important;
   border:1px solid #d5e0ed!important;
 }
+
+
+/* Compact, plan-style choice grids in the live unified subscription create modal.
+   Full-width cells fix the old right-aligned narrow buttons and empty columns. */
+.runtime-modal.tp-unified-create .tp-create-choice-section {
+  min-width:0;
+}
+.runtime-modal.tp-unified-create .tp-create-choice-head {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:8px;
+}
+.runtime-modal.tp-unified-create .tp-create-choice-head > div:first-child {
+  display:flex;
+  align-items:center;
+  gap:9px;
+  min-width:0;
+}
+.runtime-modal.tp-unified-create .tp-create-choice-count {
+  padding:2px 8px;
+  border-radius:999px;
+  border:1px solid rgba(124,92,255,.25);
+  background:rgba(124,92,255,.10);
+  color:#c9b9ff;
+  font-size:10px;
+  font-weight:700;
+  white-space:nowrap;
+}
+.runtime-modal.tp-unified-create .tp-create-choice-actions {
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  gap:5px;
+}
+.runtime-modal.tp-unified-create .tp-create-choice-grid {
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:6px;
+  min-width:0;
+  overflow-x:hidden;
+  overflow-y:auto;
+  overscroll-behavior:contain;
+  scrollbar-width:thin;
+  scrollbar-color:rgba(139,115,237,.5) transparent;
+  padding:1px 3px 1px 1px;
+  align-content:start;
+}
+.runtime-modal.tp-unified-create .tp-create-protocol-grid {
+  max-height:172px;
+}
+.runtime-modal.tp-unified-create .tp-create-node-grid {
+  max-height:144px;
+}
+.runtime-modal.tp-unified-create .tp-create-choice-cell {
+  min-width:0;
+  display:flex;
+}
+.runtime-modal.tp-unified-create .tp-create-choice-cell > .tp-create-choice {
+  width:100%;
+  max-width:100%;
+  min-width:0;
+  min-height:39px;
+  text-align:start;
+}
+.runtime-modal.tp-unified-create .tp-create-choice-cell > .tp-create-choice:focus-visible {
+  outline:2px solid #9987ff;
+  outline-offset:1px;
+}
+.runtime-modal.tp-unified-create .tp-create-choice-cell > .tp-create-choice:hover:not(:disabled) {
+  border-color:rgba(158,129,255,.85)!important;
+  filter:brightness(1.06);
+}
+.runtime-modal.tp-unified-create-light .tp-create-choice-count {
+  color:#6843ad;
+  background:#f1ebff;
+  border-color:#d8caff;
+}
+@media (max-width:800px) {
+  .runtime-modal.tp-unified-create .tp-create-choice-grid {
+    grid-template-columns:repeat(3,minmax(0,1fr));
+  }
+}
+@media (max-width:560px) {
+  .runtime-modal.tp-unified-create .tp-create-choice-grid {
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:5px;
+  }
+  .runtime-modal.tp-unified-create .tp-create-choice-head {
+    flex-wrap:wrap;
+    gap:7px;
+  }
+  .runtime-modal.tp-unified-create .tp-create-choice-cell > .tp-create-choice {
+    min-height:38px;
+  }
+}
