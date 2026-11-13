@@ -71,6 +71,22 @@ void main() {
     }
   });
 
+  test('settings remain compact without hiding actual diagnostics', () {
+    final dashboard = File('lib/live_dashboard.dart').readAsStringSync();
+    expect(dashboard, contains('settingsSectionTitle('));
+    expect(dashboard, contains("Key('settingsSecurityStatus')"));
+    expect(dashboard, contains("Key('devShareVpnDisclosure')"));
+    expect(dashboard, contains("Key('devShareVpnSection')"));
+    expect(dashboard, contains('ExpansionTile('));
+    expect(dashboard, contains('await WindowsSingBoxPreflight.enginePresent()'));
+    expect(dashboard, contains('widget.onRefreshAccount()'));
+    expect(dashboard, contains('widget.onRefresh()'));
+    expect(dashboard, contains('_probeAllNodes()'));
+    expect(dashboard, contains('_disconnectAndSignOut'));
+    expect(dashboard, isNot(contains("Key('devSettingsGlassHeader')")));
+    expect(dashboard, isNot(contains("Key('devSettingsAppearanceCard')")));
+  });
+
   test('Persian dashboard is RTL and English dashboard is LTR', () {
     final dashboard = File('lib/live_dashboard.dart').readAsStringSync();
     expect(dashboard, contains("textDirection: _rtl ? TextDirection.rtl : TextDirection.ltr"));
