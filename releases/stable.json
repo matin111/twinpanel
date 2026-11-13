@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.820",
+  "version": "1.1.0-rc.821",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-13T02:33:34Z",
+  "released_at": "2026-11-13T03:26:53Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "6a1aae7b5a96be7460651022d3e7375ab9d4dc55",
+  "source_sha": "44755c4e15db441864a4cb11936d26060ffdf661",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.820/twinpanel-1.1.0-rc.820-linux-x86_64.tar.gz",
-    "sha256": "0f835b7fc1ab0aafcaa8eef50fd206297f4c658404b3c933b7df37290698ca35",
-    "size_bytes": 30706971
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.821/twinpanel-1.1.0-rc.821-linux-x86_64.tar.gz",
+    "sha256": "2a47366689ea4a23e0a39210eed6f81399abc2b10b67e0031096a57cc44e8739",
+    "size_bytes": 30742583
   },
   "notes": {
-    "fa": "رفع پایدار خطای ساخت تونل TP27 Fast: آزادسازی تراکنش پایگاه داده قبل از نصب طولانی Agent، تشخیص خطای قطع اتصال PostgreSQL در Job، حفظ مسیر نصب Agent ایران و افزودن تست‌های جلوگیری از بازگشت باگ در آپدیت‌های بعدی.",
-    "en": "Durable selected-tunnel bootstrap database transaction fix, safer PostgreSQL disconnect job diagnostics, Iran Agent fallback preservation, and automated release regression guards."
+    "fa": "اصلاح کامل لینک‌های دانلود برنامه‌ها برای ۱۶ پروتکل در اندروید، آیفون، ویندوز و مک. حذف آدرس‌های فایل جعلی که HTML تحویل می‌دادند و صفحات عمومی GitHub به‌جای فایل نصب؛ جایگزینی با دانلود مستقیم واقعی، App Store یا صفحه رسمی Homebrew. هر پروتکل کلاینت سازگار با دستگاه خود را دریافت می‌کند؛ لینک‌های نسخه Intel مک نیز در فهرست برنامه‌ها افزوده شده است. اتصال‌ها، کانفیگ‌ها، اعتبار اشتراک و سایر امکانات نسخه rc.820 بدون تغییر می‌مانند.",
+    "en": "Replace fake /downloads/apps installers and stale releases pages with tested direct binaries or precise platform app-store entries for all 16 protocols on Android, iOS, Windows, macOS. One canonical client catalog powers per-protocol buttons and global app downloads, with V2Ray-specific v2rayNG/V2Box/v2rayN, no fake L2TP installers, Win TrustTunnel CLI correctly labeled, and Mac Intel alternatives. Preserve all rc.820 network, config and account functionality."
   }
 }
