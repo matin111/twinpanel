@@ -12,7 +12,89 @@ param(
   [ValidateSet('Install','Uninstall')]
   [string]$Action,
   [Parameter(Mandatory)]
-  [string]$BinaryPath
+  [string]$BinaryPath,
+  [Parameter(Mandatory)]
+  [ValidatePattern('^[A-Fa-f0-9]{40}
+$ErrorActionPreference = 'Stop'
+Set-StrictMode -Version Latest
+$name = 'TwinConnectGlobalGuard'
+$ack = 'I_ACCEPT_OFFLINE_RECOVERY'
+$logDir = Join-Path $env:ProgramData 'TwinConnect'
+New-Item -Path $logDir -ItemType Directory -Force | Out-Null
+
+function Invoke-Guard {
+  param([string[]]$Arguments)
+  & $BinaryPath @Arguments
+  if ($LASTEXITCODE -ne 0) {
+    throw "Guard rejected command: $($Arguments[0])"
+  }
+}
+
+function Service-Exists {
+  return [bool](Get-Service -Name $name -ErrorAction SilentlyContinue)
+}
+
+$binary = [System.IO.Path]::GetFullPath($BinaryPath)
+$programFiles = [System.IO.Path]::GetFullPath($env:ProgramFiles).TrimEnd('\') + '\'
+if (!$binary.StartsWith($programFiles, [StringComparison]::OrdinalIgnoreCase)) {
+  throw 'Guard must be installed under protected Program Files.'
+}
+if (!(Test-Path -LiteralPath $binary -PathType Leaf)) {
+  throw 'Bundled global guard binary is missing.'
+}
+$signature = Get-AuthenticodeSignature -LiteralPath $binary
+if ($signature.Status -ne 'Valid' -or !$signature.SignerCertificate) {
+  throw 'Unsigned or untrusted guard service refused.'
+}
+if ($signature.SignerCertificate.Thumbprint -ne $ExpectedSignerThumbprint) {
+  throw 'Guard signer does not match the approved publisher certificate.'
+}
+$expectedCommand = '"' + $binary + '" service'
+function Verify-ServiceIdentity {
+  if (!(Service-Exists)) { throw 'Guard Windows service missing.' }
+  $svc = Get-CimInstance Win32_Service -Filter "Name='TwinConnectGlobalGuard'"
+  if (!$svc -or
+      $svc.PathName -ine $expectedCommand -or
+      $svc.StartName -notin @('LocalSystem', 'NT AUTHORITY\\SYSTEM')) {
+    throw 'Guard service executable path or account does not match installer.'
+  }
+}
+if ($Action -eq 'Install') {
+  if (!(Service-Exists)) {
+    # Service API stays OFF during installation; never silently enforce filters.
+    & sc.exe create $name binPath= ('"' + $binary + '" service') start= auto obj= LocalSystem
+    if ($LASTEXITCODE -ne 0) { throw 'Could not register guard Windows service.' }
+  }
+  Verify-ServiceIdentity
+  & sc.exe config $name start= auto
+  if ($LASTEXITCODE -ne 0) { throw 'Could not configure automatic service startup.' }
+  Start-Service -Name $name -ErrorAction Stop
+  $service = Get-Service -Name $name -ErrorAction Stop
+  if ($service.Status -ne 'Running') { throw 'Global guard service did not start.' }
+  Verify-ServiceIdentity
+  Write-Output 'Verified service installed and running; blocking remains disabled.'
+} else {
+  # The independent recovery command must work before service removal.
+  Invoke-Guard -Arguments @('recover', $ack)
+  # Offline audit checks raw owned GUID presence without depending on the
+  # service pipe. A crashed service must not prevent a safe recovery.
+  $status = & $binary offline-status
+  if ($LASTEXITCODE -ne 0 -or $status -notmatch 'OWNED_RULES_PRESENT 0 0 0') {
+    throw 'Owned WFP filters still present. Refusing to uninstall.'
+  }
+  if (Service-Exists) {
+    Verify-ServiceIdentity
+    $running = (Get-Service -Name $name -ErrorAction Stop).Status
+    if ($running -ne 'Stopped') {
+      Stop-Service -Name $name -Force -ErrorAction Stop
+    }
+    & sc.exe delete $name
+    if ($LASTEXITCODE -ne 0) { throw 'SCM service deletion failed.' }
+  }
+  Write-Output 'Owned filters recovered and service removed.'
+}
+)]
+  [string]$ExpectedSignerThumbprint
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
