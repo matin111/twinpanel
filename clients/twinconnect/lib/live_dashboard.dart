@@ -41,6 +41,7 @@ import 'cisco_openconnect_profile.dart';
 import 'connection_bootstrap.dart';
 import 'tenant_api.dart';
 import 'vpn_policy_store.dart';
+import 'global_guard_connection_gate.dart';
 import 'vpn_policy.dart';
 import 'windows_wireguard.dart';
 import 'windows_amneziawg.dart';
@@ -52,7 +53,6 @@ import 'native_vpn_bridge.dart';
 import 'country_flag.dart';
 import 'ambient_background.dart';
 import 'interactive_glass_card.dart';
-import 'share_vpn_preview.dart';
 import 'tunnel_traffic_chart.dart';
 import 'vpn_settings.dart';
 
@@ -205,6 +205,20 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   String? _modernProtocol;
   String? _modernNodeId;
   final VpnPolicyStore _vpnPolicy = const VpnPolicyStore();
+  /// Every protocol switch passes this gate BEFORE interrupting an existing
+  /// tunnel. The guard remains active when a VPN disconnects; we must never
+  /// disarm it just because a transport process is stopped.
+  Future<void> _requireVerifiedGuardIfRequested() async {
+    final policy = await _vpnPolicy.loadFailClosed(widget.panel.namespace, widget.username);
+    if (!policy.killSwitchRequested) return;
+    if (!Platform.isWindows) {
+      throw const FormatException('GLOBAL_KILL_SWITCH_UNSUPPORTED_PLATFORM');
+    }
+    final status = await NativeVpnBridge.globalKillSwitchStatus()
+        .timeout(const Duration(seconds: 5));
+    GlobalGuardConnectionGate.ensureCanConnect(policy, status);
+  }
+
   bool _vpnBusy = false;
   bool _vpnUp = false;
   bool _vpnVerified = false;
@@ -817,6 +831,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     if (_vpnBusy) return;
     setState(() { _vpnBusy = true; _vpnError = null; });
     try {
+      await _requireVerifiedGuardIfRequested();
       if (_vpnUnmanaged) {
         throw const FormatException('UNMANAGED_WIREGUARD_SERVICE');
       }
@@ -924,6 +939,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     if (_vpnBusy) return;
     setState(() { _vpnBusy = true; _vpnError = null; });
     try {
+      await _requireVerifiedGuardIfRequested();
       if (_vpnUnmanaged) {
         throw const FormatException('UNMANAGED_WIREGUARD_SERVICE');
       }
@@ -1033,6 +1049,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     if (_vpnBusy) return;
     setState(() { _vpnBusy = true; _vpnError = null; });
     try {
+      await _requireVerifiedGuardIfRequested();
       if (_vpnUnmanaged) {
         throw const FormatException('UNMANAGED_WIREGUARD_SERVICE');
       }
@@ -1139,6 +1156,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     if (_vpnBusy || !Platform.isWindows) return;
     setState(() { _vpnBusy = true; _vpnError = null; });
     try {
+      await _requireVerifiedGuardIfRequested();
       if (_vpnUnmanaged || _vpnCleanup) {
         throw const FormatException('PREVIOUS_TUNNEL_NOT_STOPPED');
       }
@@ -1294,6 +1312,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     if (_vpnBusy || !Platform.isWindows) return;
     setState(() { _vpnBusy = true; _vpnError = null; });
     try {
+      await _requireVerifiedGuardIfRequested();
       if (_vpnUnmanaged || _vpnCleanup) {
         throw const FormatException('PREVIOUS_TUNNEL_NOT_STOPPED');
       }
@@ -1435,6 +1454,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     if (_vpnBusy || !Platform.isWindows) return;
     setState(() { _vpnBusy = true; _vpnError = null; });
     try {
+      await _requireVerifiedGuardIfRequested();
       if (_vpnUnmanaged || _vpnCleanup || _awgUnmanaged) {
         throw const FormatException('PREVIOUS_TUNNEL_NOT_STOPPED');
       }
@@ -1518,6 +1538,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     if (_vpnBusy || !Platform.isWindows) return;
     setState(() { _vpnBusy = true; _vpnError = null; });
     try {
+      await _requireVerifiedGuardIfRequested();
       if (_vpnUnmanaged || _vpnCleanup) {
         throw const FormatException('PREVIOUS_TUNNEL_NOT_STOPPED');
       }
@@ -1651,6 +1672,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     if (_vpnBusy || !Platform.isWindows) return;
     setState(() { _vpnBusy = true; _vpnError = null; });
     try {
+      await _requireVerifiedGuardIfRequested();
       if (_vpnUnmanaged || _vpnCleanup) {
         throw const FormatException('PREVIOUS_TUNNEL_NOT_STOPPED');
       }
@@ -1784,6 +1806,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     if (_vpnBusy) return;
     setState(() { _vpnBusy = true; _vpnError = null; });
     try {
+      await _requireVerifiedGuardIfRequested();
       if (_vpnUnmanaged) {
         throw const FormatException('UNMANAGED_WIREGUARD_SERVICE');
       }
@@ -2031,6 +2054,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     // removing the working tunnel. A failed preflight keeps it running.
     setState(() { _vpnBusy = true; _vpnError = null; });
     try {
+      await _requireVerifiedGuardIfRequested();
       final api = TenantApi.fromBuildConfig();
       final checks = await Future.wait<Object>([
         _vpnPolicy.load(widget.panel.namespace, widget.username),
@@ -2393,6 +2417,9 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           _resetNetworkStats();
         });
       } else {
+        // Allow disconnect at any time, but never start a new WireGuard
+        // session while requested OS-wide protection is unverified.
+        await _requireVerifiedGuardIfRequested();
         if (_autoFastest) {
           if (_filter != 'wireguard') {
             throw const FormatException('SELECT_PROTOCOL_FOR_FASTEST');
@@ -4695,138 +4722,50 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         heading(tr('تنظیمات', 'Settings')),
-        const SizedBox(height: 8),
-        settingsSectionTitle(tr('اتصال و امنیت', 'Connection & security'),
-            Icons.shield_outlined),
-        settingLine(
-          Icons.shield_outlined,
-          tr('تنظیمات امنیت و VPN', 'VPN and security settings'),
-          onTap: () => Navigator.of(context).push(
-            MaterialPageRoute<void>(
-              builder: (_) => VpnSettingsScreen(
-                tenant: widget.panel.namespace,
-                account: widget.username,
-              ),
-            ),
-          ),
+        const SizedBox(height: 17),
+        VpnSettingsScreen(
+          key: const Key('inlineVpnSettings'),
+          tenant: widget.panel.namespace,
+          account: widget.username,
+          embedded: true,
         ),
-        glassCard(
-          key: const Key('settingsSecurityStatus'),
-          radius: 16,
-          padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 10),
-          child: Row(children: [
-            const Icon(Icons.gpp_maybe_outlined,
-                color: Color(0xFFFFB66A), size: 20),
-            const SizedBox(width: 10),
-            Expanded(child: txt(tr('Kill Switch هنوز فعال نیست',
-                'Kill Switch is not enforced'), size: 12, bold: true)),
-            Tooltip(
-              message: tr(
-                'تا زمانی که محافظت شبکه در ویندوز پیاده‌سازی و تأیید نشود، این قابلیت فعال نیست.',
-                'Requires verified OS-level traffic blocking in Windows.'),
-              child: Icon(Icons.info_outline_rounded,
-                  color: sub, size: 17),
-            ),
-          ]),
-        ),
-        const SizedBox(height: 10),
-        settingsSectionTitle(tr('سرورها و عیب‌یابی', 'Servers & diagnostics'),
-            Icons.hub_outlined),
+        const SizedBox(height: 16),
+        settingsSectionTitle(tr('برنامه', 'Application'),
+            Icons.tune_rounded),
         settingLine(
-          Icons.hub_outlined,
-          tr('بررسی موتور پروتکل‌های مدرن', 'Check modern engine'),
-          onTap: () async {
-            final installed = await WindowsSingBoxPreflight.enginePresent();
-            if (!context.mounted) return;
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-              content: Text(installed
-                  ? tr('موتور sing-box نصب است؛ کنترل تونل هنوز فعال نشده است.',
-                       'sing-box is installed, but the native tunnel controller is not enabled.')
-                  : tr('موتور sing-box در نصب فعلی پیدا نشد.',
-                       'sing-box was not found in this installation.')),
-            ));
-          },
-        ),
-        settingLine(
-          Icons.speed_rounded,
-          tr('بررسی وضعیت اتصال', 'Check live VPN status'),
-          onTap: () {
-            _refreshVpnStatus();
-            setState(() => _page = 'home');
-          },
-        ),
-        settingLine(
-          Icons.auto_awesome_rounded,
-          tr('انتخاب سریع‌ترین سرور', 'Fastest server selection'),
-          onTap: () {
-            setState(() => _page = 'home');
-            if (_fastestKnownIndex == null) {
-              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                content: Text(tr('ابتدا از بخش مکان‌ها پینگ سرورها را تست کنید.',
-                    'Test server latencies in Locations first.'))));
-            }
-          },
+          Icons.language_rounded,
+          tr('زبان برنامه', 'App language'),
+          onTap: _changeLanguage,
         ),
         settingLine(
           Icons.refresh_rounded,
-          tr('به‌روزرسانی حساب و سرورها', 'Refresh account and servers'),
+          tr('به‌روزرسانی سرورها و حساب', 'Refresh servers & account'),
           onTap: () {
             widget.onRefreshAccount();
             widget.onRefresh();
             _probeAllNodes();
             ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-              content: Text(tr('درخواست به‌روزرسانی ارسال شد.',
-                'Refresh requested.')),
+              content: Text(tr('به‌روزرسانی شروع شد.',
+                  'Refreshing account and servers.')),
             ));
           },
         ),
-        const SizedBox(height: 10),
-        settingsSectionTitle(tr('شخصی‌سازی', 'Personalization'),
-            Icons.tune_rounded),
-        settingLine(Icons.language_rounded, tr('زبان', 'Language'),
-            onTap: _changeLanguage),
-        settingLine(Icons.sync_rounded,
-            tr('دریافت تنظیمات برند', 'Sync brand settings'),
-            disabled: widget.onBrandRefresh == null,
+        if (widget.onBrandRefresh != null)
+          settingLine(
+            Icons.palette_outlined,
+            tr('همگام‌سازی ظاهر', 'Sync appearance'),
             onTap: () async {
-              final success = await widget.onBrandRefresh?.call() ?? false;
+              final success = await widget.onBrandRefresh!.call();
               if (!context.mounted) return;
               ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                 content: Text(success
-                  ? tr('برند از پنل دریافت شد.',
-                       'Brand synchronized from the panel.')
-                  : tr('دریافت برند ناموفق بود؛ آخرین تنظیمات معتبر حفظ شد.',
-                       'Could not sync brand; last verified brand kept.')),
+                    ? tr('ظاهر از پنل دریافت شد.', 'Appearance synchronized.')
+                    : tr('همگام‌سازی ناموفق بود.',
+                        'Could not synchronize appearance.')),
               ));
-            }),
-        const SizedBox(height: 9),
-        glassCard(
-          radius: 17,
-          padding: EdgeInsets.zero,
-          child: Theme(
-            data: Theme.of(context).copyWith(
-                dividerColor: Colors.transparent),
-            child: ExpansionTile(
-              key: const Key('devShareVpnDisclosure'),
-              leading: const Icon(Icons.wifi_tethering_rounded,
-                  color: Color(0xFF81BDD4)),
-              title: txt(tr('اشتراک‌گذاری VPN', 'Share VPN'),
-                  bold: true, size: 13),
-              subtitle: txt(tr('هنوز قابل استفاده نیست',
-                  'Not yet available'), color: sub, size: 11),
-              trailing: Icon(Icons.keyboard_arrow_down_rounded, color: sub),
-              childrenPadding: const EdgeInsets.fromLTRB(8, 0, 8, 12),
-              children: [
-                ShareVpnPreview(
-                  key: const Key('devShareVpnSection'),
-                  dark: _dark,
-                  persian: _persian,
-                ),
-              ],
-            ),
+            },
           ),
-        ),
-        const SizedBox(height: 13),
+        const SizedBox(height: 12),
         OutlinedButton.icon(
           key: const Key('settingsSignOut'),
           onPressed: _vpnBusy ? null : _disconnectAndSignOut,

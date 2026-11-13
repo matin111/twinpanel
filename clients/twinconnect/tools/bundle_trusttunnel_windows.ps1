@@ -3,7 +3,17 @@ $ErrorActionPreference = 'Stop'
 # digest as well as the expected archive name before copying any executable.
 $version = 'v1.1.11'
 $assetName = "trusttunnel_client-$version-windows-x86_64.zip"
-$release = Invoke-RestMethod -Uri "https://api.github.com/repos/TrustTunnel/TrustTunnelClient/releases/tags/$version" -Headers @{'Accept'='application/vnd.github+json'; 'User-Agent'='TwinConnect-Windows-Build'} -TimeoutSec 90
+$headers = @{
+  'Accept' = 'application/vnd.github+json'
+  'User-Agent' = 'TwinConnect-Windows-Build'
+  'X-GitHub-Api-Version' = '2022-11-28'
+}
+# Authenticated GitHub Actions requests use a higher API quota. Fail closed
+# without weakening the release tag or SHA256 verification.
+if (![string]::IsNullOrWhiteSpace($env:GH_TOKEN)) {
+  $headers['Authorization'] = "Bearer $env:GH_TOKEN"
+}
+$release = Invoke-RestMethod -Uri "https://api.github.com/repos/TrustTunnel/TrustTunnelClient/releases/tags/$version" -Headers $headers -TimeoutSec 90
 if ($release.tag_name -ne $version -or $release.draft -eq $true) {
   throw 'Official TrustTunnel version verification failed'
 }

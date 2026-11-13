@@ -16,7 +16,7 @@ void main() {
     expect(dashboard, contains('Widget powerCard({required Widget subscriptionContent}) => ClipRRect('));
     expect(dashboard, contains('Widget connectionStats() => glassCard('));
     expect(dashboard, contains('Widget settings() => Column('));
-    expect(dashboard, contains("key: const Key('settingsSecurityStatus')"));
+    expect(dashboard, contains("key: const Key('inlineVpnSettings')"));
     expect(dashboard, contains("key: const Key('accountIdentityCard')"));
     expect(dashboard, contains("key: const Key('devLocationListingCard')"));
     expect(dashboard, isNot(contains('decoration: tile(radius:')));
@@ -25,7 +25,7 @@ void main() {
   test('dedicated VPN preferences and sharing cards use same glass', () {
     final settings = File('lib/vpn_settings.dart').readAsStringSync();
     final sharing = File('lib/share_vpn_preview.dart').readAsStringSync();
-    expect(settings, contains('class GlassVpnSwitch'));
+    expect(settings, contains('class VpnSettingsScreen'));
     expect(settings, contains('TwinConnectGlassCard('));
     expect(sharing, contains('TwinConnectGlassCard('));
   });

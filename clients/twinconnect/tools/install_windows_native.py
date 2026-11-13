@@ -26,6 +26,10 @@ TRUSTTUNNEL_GUARD = ROOT / "native" / "windows" / "twinconnect_trusttunnel_guard
 TRUSTTUNNEL_INSTALLED = ROOT / "windows" / "runner" / "twinconnect_trusttunnel_guard.h"
 OPENCONNECT_NATIVE = ROOT / "native" / "windows" / "twinconnect_openconnect.h"
 OPENCONNECT_INSTALLED = ROOT / "windows" / "runner" / "twinconnect_openconnect.h"
+GLOBAL_KILLSWITCH_NATIVE = ROOT / "native" / "windows" / "twinconnect_global_killswitch.h"
+GLOBAL_KILLSWITCH_INSTALLED = ROOT / "windows" / "runner" / "twinconnect_global_killswitch.h"
+GUARD_CONTROL_NATIVE = ROOT / "native" / "windows" / "twinconnect_guard_control.h"
+GUARD_CONTROL_INSTALLED = ROOT / "windows" / "runner" / "twinconnect_guard_control.h"
 L2TP_NATIVE = ROOT / "native" / "windows" / "twinconnect_l2tp.h"
 L2TP_INSTALLED = ROOT / "windows" / "runner" / "twinconnect_l2tp.h"
 
@@ -68,6 +72,12 @@ def install() -> None:
     if not L2TP_NATIVE.is_file():
         raise RuntimeError("Missing Windows L2TP native RAS implementation")
     shutil.copyfile(L2TP_NATIVE, L2TP_INSTALLED)
+    if not GLOBAL_KILLSWITCH_NATIVE.is_file():
+        raise RuntimeError("Missing read-only Windows WFP preflight")
+    shutil.copyfile(GLOBAL_KILLSWITCH_NATIVE, GLOBAL_KILLSWITCH_INSTALLED)
+    if not GUARD_CONTROL_NATIVE.is_file():
+        raise RuntimeError('Missing VM-only WFP IPC bridge')
+    shutil.copyfile(GUARD_CONTROL_NATIVE, GUARD_CONTROL_INSTALLED)
 
     header = HEADER.read_text(encoding="utf-8-sig")
     cpp = SOURCE.read_text(encoding="utf-8-sig")
@@ -99,7 +109,9 @@ def install() -> None:
             '#include "twinconnect_mieru_guard.h"\n'
             '#include "twinconnect_trusttunnel_guard.h"\n'
             '#include "twinconnect_openconnect.h"\n'
-            '#include "twinconnect_l2tp.h"',
+            '#include "twinconnect_l2tp.h"\n'
+            '#include "twinconnect_global_killswitch.h"\n'
+            '#include "twinconnect_guard_control.h"',
         )
         injection = """  // TwinConnect: fail-closed Windows native capability handshake.
   vpn_channel_ = std::make_unique<
@@ -413,6 +425,19 @@ def install() -> None:
             result->Error("AWG_STOP_FAILED"); return;
           }
           result->Success(twinconnect_amneziawg::Status());
+        } else if (call.method_name() == "experimentalVmGlobalGuard") {
+          const auto* args = std::get_if<flutter::EncodableMap>(call.arguments());
+          if (!args) { result->Error("INVALID_REQUEST"); return; }
+          const auto get = [&](const char* key) -> std::string {
+            const auto at = args->find(flutter::EncodableValue(key));
+            if (at == args->end()) return "";
+            const auto* value = std::get_if<std::string>(&at->second);
+            return value ? *value : "";
+          };
+          result->Success(twinconnect_guard_control::SendVmOnly(
+              get("action"), get("alias"), get("endpoint"), get("executable")));
+        } else if (call.method_name() == "getGlobalKillSwitchStatus") {
+          result->Success(twinconnect_global_killswitch::Preflight());
         } else if (call.method_name() == "getCapabilities") {
           result->Success(twinconnect_wireguard::Capabilities());
         } else if (call.method_name() == "getProtocolCapabilities") {

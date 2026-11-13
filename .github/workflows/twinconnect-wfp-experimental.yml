@@ -1,0 +1,151 @@
+name: TwinConnect Windows WFP Guard Experimental Check
+
+on:
+  pull_request:
+    paths:
+      - "clients/twinconnect/native/windows/twinconnect_global_guard_experimental.cpp"
+      - "clients/twinconnect/native/windows/twinconnect_global_guard_service_experimental.cpp"
+      - ".github/workflows/twinconnect-wfp-experimental.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  wfp-readonly-build:
+    runs-on: windows-latest
+    timeout-minutes: 12
+    defaults:
+      run:
+        working-directory: clients/twinconnect
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build experimental WFP tool without installing
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $vswhere = Join-Path "${env:ProgramFiles(x86)}" "Microsoft Visual Studio/Installer/vswhere.exe"
+          $vs = (& $vswhere -latest -property installationPath).Trim()
+          if (!$vs) { throw "Visual Studio C++ compiler unavailable" }
+          $dev = Join-Path $vs "Common7/Tools/VsDevCmd.bat"
+          $source = Join-Path (Get-Location) "native/windows/twinconnect_global_guard_experimental.cpp"
+          $exe = Join-Path $env:RUNNER_TEMP "twinconnect-wfp-test.exe"
+          $compile = 'call "' + $dev + '" -arch=amd64 && cl /nologo /std:c++17 /EHsc /W4 /WX /Fe:"' + $exe + '" "' + $source + '" /link Fwpuclnt.lib Iphlpapi.lib Ws2_32.lib Rpcrt4.lib'
+          & cmd.exe /d /s /c $compile
+          if ($LASTEXITCODE -ne 0 -or !(Test-Path $exe)) {
+            throw "Experimental WFP C++ compilation failed"
+          }
+          # Only a read-only status query. NEVER invoke 'arm' or 'disarm'.
+          & $exe status
+          if ($LASTEXITCODE -ne 0) { throw "Read-only guard status failed" }
+          Remove-Item -LiteralPath $exe -Force
+      - name: Compile standalone privileged guard service and recovery client (never install)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $vswhere = Join-Path "${env:ProgramFiles(x86)}" "Microsoft Visual Studio/Installer/vswhere.exe"
+          $vs = (& $vswhere -latest -property installationPath).Trim()
+          if (!$vs) { throw "Visual Studio C++ compiler unavailable" }
+          $dev = Join-Path $vs "Common7/Tools/VsDevCmd.bat"
+          $source = Join-Path (Get-Location) "native/windows/twinconnect_global_guard_service_experimental.cpp"
+          $exe = Join-Path $env:RUNNER_TEMP "twinconnect-guard-service-test.exe"
+          $compile = 'call "' + $dev + '" -arch=amd64 && cl /nologo /std:c++17 /EHsc /W4 /WX /Fe:"' + $exe + '" "' + $source + '" /link Fwpuclnt.lib Iphlpapi.lib Ws2_32.lib Rpcrt4.lib Advapi32.lib'
+          & cmd.exe /d /s /c $compile
+          if ($LASTEXITCODE -ne 0 -or !(Test-Path $exe)) {
+            throw "Guard service C++ compilation failed"
+          }
+          # Compile-only phase; ephemeral runner service smoke below uses
+          # no arm command and verifies recovery while no filters are installed.
+          $target = Join-Path $env:ProgramFiles "TwinConnectGuardVMSmoke"
+          New-Item -Path $target -ItemType Directory -Force | Out-Null
+          Copy-Item -LiteralPath $exe -Destination (Join-Path $target "twinconnect-guard-service-test.exe")
+          Copy-Item -LiteralPath $exe -Destination (Join-Path $env:RUNNER_TEMP "twinconnect-guard-qa-unsigned.exe")
+          Remove-Item -LiteralPath $exe -Force
+      - name: Test admin service IPC and empty-rule recovery on disposable runner
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+          $principal = [Security.Principal.WindowsPrincipal]::new($identity)
+          if (!$principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+            throw "Runner is not elevated; cannot exercise Windows SCM"
+          }
+          $dir = Join-Path $env:ProgramFiles "TwinConnectGuardVMSmoke"
+          $exe = Join-Path $dir "twinconnect-guard-service-test.exe"
+          $ack = "I_ACCEPT_OFFLINE_RECOVERY"
+          try {
+            # Never invoke 'arm'. Recovery removes only owned rules (none here).
+            & $exe install-vm $ack
+            if ($LASTEXITCODE -ne 0) { throw "SCM installation failed" }
+            Start-Service -Name TwinConnectGlobalGuard -ErrorAction Stop
+            & $exe status
+            if ($LASTEXITCODE -ne 0) { throw "Admin IPC status failed" }
+            # Fail-closed negative tests: refuse to arm on physical adapters or
+            # malformed endpoints. No WFP filters may be added in either case.
+            & $exe arm "Ethernet" "1.1.1.1" "$exe" $ack
+            if ($LASTEXITCODE -eq 0) { throw "SECURITY: physical-adapter arm was accepted" }
+            & $exe arm "TwinConnectSB" "not-an-ip" "$exe" $ack
+            if ($LASTEXITCODE -eq 0) { throw "SECURITY: invalid endpoint arm was accepted" }
+            $guardStatus = & $exe status
+            if ($LASTEXITCODE -ne 0 -or ($guardStatus -notmatch "OK 0 0 0")) {
+              throw "SECURITY: rejected commands left WFP rules installed"
+            }
+            & $exe recover $ack
+            if ($LASTEXITCODE -ne 0) { throw "Independent recovery failed" }
+            & $exe uninstall-vm $ack
+            if ($LASTEXITCODE -ne 0) { throw "Service uninstall failed" }
+          } finally {
+            # Best effort cleanup even when a test assertion fails.
+            & $exe recover $ack
+            $svc = Get-Service TwinConnectGlobalGuard -ErrorAction SilentlyContinue
+            if ($svc) {
+              sc.exe stop TwinConnectGlobalGuard | Out-Null
+              sc.exe delete TwinConnectGlobalGuard | Out-Null
+              Start-Sleep -Seconds 2
+            }
+            Remove-Item -LiteralPath $dir -Recurse -Force -ErrorAction SilentlyContinue
+          }
+      - name: Validate signed installer script syntax without issuing certificates on shared runners
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $script = Join-Path (Get-Location) 'tools/install_guard_service.ps1'
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            $script, [ref]$tokens, [ref]$errors) | Out-Null
+          if ($errors.Count -ne 0) { throw 'Guard installer has PowerShell parse errors' }
+          $source = Get-Content $script -Raw
+          if (!$source.Contains('Get-AuthenticodeSignature') -or
+              !$source.Contains('ExpectedSignerThumbprint') -or
+              !$source.Contains('offline-status') -or
+              !$source.Contains('Assert-ServiceIdentity')) {
+            throw 'Guard signer pinning or offline recovery is missing'
+          }
+          # Certificate issuance stalled on hosted Windows runners. Executable
+          # installation/signing acceptance belongs on a dedicated controlled VM.
+      - name: Validate gated VM dual-stack leak test script syntax
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $script = Join-Path (Get-Location) "tools/test_windows_global_guard_vm.ps1"
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            $script, [ref]$tokens, [ref]$errors) | Out-Null
+          if ($errors.Count -ne 0) {
+            $errors | ForEach-Object { Write-Error $_.Message }
+            throw "VM-only WFP leak test has PowerShell syntax errors"
+          }
+          if (!(Select-String -Path $script -SimpleMatch 'TWINCONNECT_DISPOSABLE_VM' -Quiet)) {
+            throw "VM-only safety gate missing"
+          }
+          if (!(Select-String -Path $script -SimpleMatch 'TwinConnectWfpEmergencyRestore' -Quiet)) {
+            throw "Emergency recovery registration missing"
+          }
+      - name: Validate no executable entered the repository
+        shell: pwsh
+        run: |
+          if (Test-Path "native/windows/twinconnect-wfp-test.exe") {
+            throw "Prototype binary must never be bundled"
+          }

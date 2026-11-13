@@ -2,6 +2,18 @@
 #define MyAppVersion "0.1.0-preview"
 #define MyAppExeName "twinconnect.exe"
 
+; Release gate: verified signed system guard is not ready.
+; Only certified builds may define IncludeVerifiedGlobalGuard from the
+; compiler command line AFTER service integration and leak/recovery tests.
+#ifndef IncludeVerifiedGlobalGuard
+  #define IncludeVerifiedGlobalGuard 0
+#endif
+#if IncludeVerifiedGlobalGuard
+  #ifndef GuardSigningThumbprint
+    #error "Verified Kill Switch setup requires a pinned service signing thumbprint."
+  #endif
+#endif
+
 [Setup]
 AppId={{D662C7C4-9DB8-4F2B-9320-8CF0AF73D613}
 AppName={#MyAppName}
@@ -23,6 +35,11 @@ DisableProgramGroupPage=yes
 [Files]
 Source: "build\windows\x64\runner\Release\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "tools\install_prerequisites.ps1"; DestDir: "{app}\tools"; Flags: ignoreversion
+Source: "tools\check_windows_real_device_readonly.ps1"; DestDir: "{app}\tools"; Flags: ignoreversion
+#if IncludeVerifiedGlobalGuard
+Source: "build\windows\x64\runner\Release\services\TwinConnectGlobalGuard.exe"; DestDir: "{app}\services"; Flags: ignoreversion
+Source: "tools\install_guard_service.ps1"; DestDir: "{app}\tools"; Flags: ignoreversion
+#endif
 
 [Icons]
 Name: "{autoprograms}\TwinConnect"; Filename: "{app}\{#MyAppExeName}"
@@ -49,6 +66,9 @@ var
   OpenVpnBinary: String;
   AmneziaWgInstaller: String;
   AmneziaWgBinary: String;
+#if IncludeVerifiedGlobalGuard
+  GuardInstallerArgs: String;
+#endif
 begin
   if CurStep = ssPostInstall then
   begin
@@ -122,6 +142,21 @@ begin
         MsgBox('AmneziaWG Windows prerequisite is missing from Setup.' + #13#10 +
                'Other VPN protocols are unaffected.', mbError, MB_OK);
     end;
+#if IncludeVerifiedGlobalGuard
+    { Install and start a VERIFIED, signed service automatically at setup
+      time, while leaving the blocking policy OFF until user opt-in.
+      Do not allow a missing/invalid guard binary to silently pass. }
+    GuardInstallerArgs := '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' +
+      ExpandConstant('{app}\tools\install_guard_service.ps1') + '" -Action Install -BinaryPath "' +
+      ExpandConstant('{app}\services\TwinConnectGlobalGuard.exe') + '" -ExpectedSignerThumbprint "{#GuardSigningThumbprint}"';
+    Ok := Exec(PowershellPath, GuardInstallerArgs, '', SW_HIDE, ewWaitUntilTerminated, ExitCode);
+    if (not Ok) or (ExitCode <> 0) then
+    begin
+      MsgBox('Kill Switch service could not be verified and installed. Setup cannot continue.',
+        mbCriticalError, MB_OK);
+      Abort;
+    end;
+#endif
     { Vendor GUI setup may still supply adapter/driver prerequisites.
       Its success is NOT proof that Cisco tunnel routing is functional. }
     if FileExists(OpenConnectInstaller) then
@@ -134,3 +169,28 @@ begin
     end;
   end;
 end;
+
+#if IncludeVerifiedGlobalGuard
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+var
+  ExitCode: Integer;
+  Ok: Boolean;
+  Args: String;
+begin
+  if CurUninstallStep = usUninstall then
+  begin
+    Args := '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' +
+      ExpandConstant('{app}\tools\install_guard_service.ps1') +
+      '" -Action Uninstall -BinaryPath "' +
+      ExpandConstant('{app}\services\TwinConnectGlobalGuard.exe') + '" -ExpectedSignerThumbprint "{#GuardSigningThumbprint}"';
+    Ok := Exec(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'),
+      Args, '', SW_HIDE, ewWaitUntilTerminated, ExitCode);
+    if (not Ok) or (ExitCode <> 0) then
+    begin
+      MsgBox('Kill Switch recovery failed. Uninstall has been stopped to prevent a network lockout.',
+        mbCriticalError, MB_OK);
+      Abort;
+    end;
+  end;
+end;
+#endif

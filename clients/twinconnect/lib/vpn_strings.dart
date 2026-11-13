@@ -30,6 +30,31 @@ extension VpnStrings on AppStrings {
     'برنامه‌های استثناشده از VPN خارج می‌شوند و ممکن است IP واقعی را ببینند.',
     'Excluded apps bypass the VPN and may reveal your regular IP.',
   );
+  String get vpnCapabilityCheck => pick('بررسی دوباره امکانات دستگاه', 'Recheck device capabilities');
+  String get vpnCapabilityCheckHint => pick(
+    'قابلیت‌های فعال موتور اتصال را دوباره بررسی می‌کند.',
+    'Refresh the verified native engine capabilities.',
+  );
+  String get vpnConnectionModeTitle => pick('نوع اتصال', 'Connection mode');
+  String get vpnTunMode => pick('VPN / TUN', 'VPN / TUN');
+  String get vpnTunModeHint => pick(
+    'فقط در صورت تأیید تونل واقعی در سیستم فعال است.',
+    'Available only with a verified native tunnel.',
+  );
+  String get vpnProxyMode => pick('Proxy / System Proxy', 'Proxy / System Proxy');
+  String get vpnProxyModeUnavailable => pick(
+    'تا پیاده‌سازی موتور پروکسی قابل تغییر نیست.',
+    'Requires a verified proxy routing engine.',
+  );
+  String get vpnSharingTitle => pick('اشتراک‌گذاری VPN', 'Share VPN');
+  String get vpnSharingHint => pick(
+    'راهنما و وضعیت اشتراک‌گذاری؛ هیچ هات‌اسپاتی خودکار روشن نمی‌شود.',
+    'Guide and status; does not automatically enable a hotspot.',
+  );
+  String get vpnSettingsNotApplied => pick(
+    'ذخیره تنظیمات به معنای فعال شدن حفاظت نیست؛ تنها قابلیت‌های تأییدشده در زمان اتصال اعمال می‌شوند.',
+    'Saving preferences does not enforce protection; only verified native features can apply during connection.',
+  );
   String get vpnRoutingTitle => pick('مسیر عبور ترافیک', 'Traffic routing');
   String get vpnAppSelectionUnavailable => pick(
     'فعلاً پشتیبانی نمی‌شود',
@@ -53,6 +78,14 @@ extension VpnStrings on AppStrings {
   String get vpnKillSwitchSubtitle => pick(
     'قطع اینترنت هنگام قطع VPN',
     'Blocks internet if VPN disconnects',
+  );
+  String get vpnGlobalGuardServiceRequired => pick(
+    'موتور فیلتر ویندوز آماده است؛ سرویس محافظت سراسری هنوز نصب نشده.',
+    'Windows filtering is available; the system-wide guard service is not installed.',
+  );
+  String get vpnGlobalGuardUnavailable => pick(
+    'محافظت سراسری ویندوز هنوز قابل فعال‌سازی نیست.',
+    'System-wide Windows kill switch is not ready.',
   );
   String get vpnKillSwitchOff => pick(
     'Kill Switch: غیرفعال',

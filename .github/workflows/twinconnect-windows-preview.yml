@@ -103,6 +103,8 @@ jobs:
         run: ./tools/check_mieru_windows.ps1
       - name: Bundle official pinned TrustTunnel Windows CLI and verify release SHA256
         shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: ./tools/bundle_trusttunnel_windows.ps1
       - name: Bundle official SHA256-verified AmneziaWG Windows prerequisite
         shell: pwsh
@@ -253,6 +255,27 @@ jobs:
       - name: Install Inno Setup installer compiler
         shell: pwsh
         run: choco install innosetup --no-progress -y
+      - name: Validate global guard installer release gate and PowerShell syntax
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $script = Join-Path (Get-Location) 'tools/install_guard_service.ps1'
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            $script, [ref]$tokens, [ref]$errors) | Out-Null
+          if ($errors.Count -gt 0) {
+            $errors | ForEach-Object { Write-Error $_.Message }
+            throw 'Guard service installer PowerShell syntax invalid'
+          }
+          $setup = Get-Content 'installer.iss' -Raw
+          if (!$setup.Contains('#define IncludeVerifiedGlobalGuard 0')) {
+            throw 'Guard must remain release-gated until leak tests pass'
+          }
+          if (!$setup.Contains('install_guard_service.ps1') -or
+              !$setup.Contains('-Action Uninstall')) {
+            throw 'Automated service lifecycle missing'
+          }
       - name: Package TwinConnect Windows setup with automatic WireGuard prerequisite
         shell: pwsh
         run: |
@@ -301,18 +324,22 @@ jobs:
           if ($env:SIGNING_CONFIGURED -eq 'true' -and $setup.Status -ne 'Valid') {
             throw 'Signed build did not retain a valid installer signature'
           }
+      # A draft PR may offer a private, clearly named installation-test
+      # artifact to its repository collaborators. This is NOT a public
+      # release or a certified Kill Switch. IncludeVerifiedGlobalGuard=0,
+      # so the experimental WFP service is never installed or armed.
       - uses: actions/upload-artifact@v4
         with:
-          name: TwinConnect-Windows-SHA256SUMS
+          name: TwinConnect-Windows-TEST-SHA256SUMS
           path: clients/twinconnect/TwinConnect-Windows-SHA256SUMS.txt
           if-no-files-found: error
-          retention-days: 30
+          retention-days: 7
       - uses: actions/upload-artifact@v4
         with:
-          name: TwinConnect-Windows-x64-Setup
+          name: TwinConnect-Windows-TEST-Only-KillSwitch-OFF
           path: clients/twinconnect/TwinConnect-Windows-x64-Setup.exe
           if-no-files-found: error
-          retention-days: 30
+          retention-days: 7
       # Unsigned artifacts are for internal testing only. Never distribute
       # unsigned Windows executables as public GitHub Release assets.
       # A publisher code-signing certificate is mandatory for prereleases.
@@ -376,13 +403,19 @@ jobs:
           $zip = Join-Path (Get-Location) "TwinConnect-Windows-Dev.zip"
           if (Test-Path $zip) { Remove-Item $zip -Force }
           Compress-Archive -Path (Join-Path $release "*") -DestinationPath $zip -CompressionLevel Optimal
+      # Draft Kill Switch PRs may run compilation checks but must not
+      # emit installable application artifacts until network safety is proven.
       - uses: actions/upload-artifact@v4
+        if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}
         with:
           name: TwinConnect-Windows-x64-Dev-Dashboard
           path: clients/twinconnect/TwinConnect-Windows-Dev.zip
           if-no-files-found: error
           retention-days: 14
+      # Draft Kill Switch PRs may run compilation checks but must not
+      # emit installable application artifacts until network safety is proven.
       - uses: actions/upload-artifact@v4
+        if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}
         with:
           name: TwinConnect-Windows-x64-Portable
           path: clients/twinconnect/TwinConnect-Windows-Preview.zip
