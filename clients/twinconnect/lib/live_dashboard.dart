@@ -2174,40 +2174,71 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
 
   // Each account uses links from its own authenticated tenant brand, never
   // a hard-coded vendor/other reseller destination.
-  Future<void> _openTenantLink(String? raw, String label) async {
-    final url = raw == null ? null : Uri.tryParse(raw.trim());
-    final valid = url != null &&
-        url.scheme == 'https' &&
-        url.host.contains('.') &&
-        url.userInfo.isEmpty &&
-        !url.hasFragment &&
-        !url.host.endsWith('.local') &&
-        !url.host.endsWith('.internal') &&
-        !url.host.endsWith('.localhost');
-    if (!valid) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(tr('لینک $label توسط مدیریت پنل تنظیم نشده است.',
-              'The $label link is not configured by your provider.')),
-        ));
-      }
-      return;
-    }
+  bool _openingTenantLink = false;
+
+  String? _tenantLinkFromBrand(BrandPreview brand, String kind) =>
+      switch (kind) {
+        'support' => brand.telegramUrl,
+        'renewal' => brand.renewalUrl,
+        'website' => brand.websiteUrl,
+        _ => null,
+      };
+
+  // Always resolve the action against the authenticated owner panel.
+  // Cached branding may be outdated if the admin/reseller edited links.
+  // No default merchant, vendor, or another reseller's URL is substituted.
+  Future<void> _openTenantLink(String kind, String label) async {
+    if (_openingTenantLink) return;
+    _openingTenantLink = true;
     try {
-      final launched = await launchUrl(url, mode: LaunchMode.externalApplication);
+      final brand = await TenantApi.fromBuildConfig().loadSessionBrand(
+        panel: widget.panel,
+        sessionToken: widget.sessionToken,
+      );
+      if (brand.namespace != widget.brand.namespace ||
+          brand.ownerType != widget.brand.ownerType ||
+          (brand.ownerType == 'reseller' &&
+              (brand.appUsernamePrefix != widget.brand.appUsernamePrefix ||
+                  !widget.username.startsWith(brand.appUsernamePrefix)))) {
+        throw const FormatException('TENANT_BRAND_MISMATCH');
+      }
+      final raw = _tenantLinkFromBrand(brand, kind);
+      final url = raw == null ? null : Uri.tryParse(raw.trim());
+      final valid = url != null &&
+          url.scheme == 'https' &&
+          url.host.contains('.') &&
+          url.userInfo.isEmpty &&
+          !url.hasFragment &&
+          !url.host.endsWith('.local') &&
+          !url.host.endsWith('.internal') &&
+          !url.host.endsWith('.localhost');
+      if (!valid) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(tr('آدرس $label در تنظیمات اپ این پنل ثبت نشده است.',
+                'Configure the $label address in this panel\'s App Brand Studio.')),
+          ));
+        }
+        return;
+      }
+      final launched = await launchUrl(url,
+          mode: LaunchMode.externalApplication);
       if (!launched && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(tr('بازکردن لینک $label ممکن نشد.',
-              'Unable to open the $label link.')),
+          content: Text(tr('بازکردن $label ممکن نشد.',
+              'Unable to open $label.')),
         ));
       }
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(tr('بازکردن لینک $label ممکن نشد.',
-              'Unable to open the $label link.')),
+          content: Text(tr(
+            'دریافت لینک $label از پنل ناموفق بود. اتصال پنل را بررسی کنید.',
+            'Could not retrieve $label from the owning panel.')),
         ));
       }
+    } finally {
+      _openingTenantLink = false;
     }
   }
 
@@ -2422,7 +2453,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                     key: Key('tenantLink_${item.id}'),
                     borderRadius: BorderRadius.circular(10),
                     onTap: () => _openTenantLink(
-                        item.url, tr(item.fa, item.en)),
+                        item.id, tr(item.fa, item.en)),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(vertical: 6),
                       child: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -2442,13 +2473,13 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
             icon: Icon(Icons.open_in_new_rounded, color: purple),
             onSelected: (value) {
               if (value == 'support') {
-                _openTenantLink(widget.brand.telegramUrl,
+                _openTenantLink('support',
                     tr('پشتیبانی', 'Support'));
               } else if (value == 'renewal') {
-                _openTenantLink(widget.brand.renewalUrl,
+                _openTenantLink('renewal',
                     tr('تمدید', 'Renew'));
               } else if (value == 'website') {
-                _openTenantLink(widget.brand.websiteUrl,
+                _openTenantLink('website',
                     tr('سایت', 'Website'));
               }
             },
