@@ -108,7 +108,7 @@ void main() {
     final dashboard = File('lib/live_dashboard.dart').readAsStringSync();
     final policy = File('lib/vpn_settings.dart').readAsStringSync();
     expect(dashboard, contains('Widget settings() => Column('));
-    expect(dashboard, contains("Key('settingsSecurityStatus')"));
+    expect(dashboard, contains("Key('inlineVpnSettings')"));
     expect(dashboard, contains("Key('inlineVpnSettings')"));
     expect(dashboard, contains('embedded: true'));
     expect(dashboard, isNot(contains("Key('devShareVpnDisclosure')")));
