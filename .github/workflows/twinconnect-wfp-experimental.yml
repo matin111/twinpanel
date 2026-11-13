@@ -106,6 +106,7 @@ jobs:
             Remove-Item -LiteralPath $dir -Recurse -Force -ErrorAction SilentlyContinue
           }
       - name: Validate signed automatic guard install and offline recovery without arming filters
+        timeout-minutes: 5
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -114,14 +115,17 @@ jobs:
           $fixture = Join-Path $env:RUNNER_TEMP 'twinconnect-guard-qa-unsigned.exe'
           New-Item -Path $guardDir -ItemType Directory -Force | Out-Null
           Copy-Item -LiteralPath $fixture -Destination $exe -Force
+          Write-Host 'Creating ephemeral CI-only signing identity'
           $cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject 'CN=TwinConnect Ephemeral GitHub Runner Test Only' -CertStoreLocation 'Cert:\CurrentUser\My' -KeyExportPolicy Exportable
           $public = Join-Path $env:RUNNER_TEMP 'twinconnect-guard-qa-public.cer'
           Export-Certificate -Cert $cert -FilePath $public -Force | Out-Null
           Import-Certificate -FilePath $public -CertStoreLocation 'Cert:\CurrentUser\Root' | Out-Null
           Import-Certificate -FilePath $public -CertStoreLocation 'Cert:\CurrentUser\TrustedPublisher' | Out-Null
           try {
+            Write-Host 'Signing experimental service fixture'
             $signed = Set-AuthenticodeSignature -FilePath $exe -Certificate $cert -HashAlgorithm SHA256
             if ($signed.Status -ne 'Valid') { throw "QA signing failed: $($signed.Status)" }
+            Write-Host 'Testing guarded automatic Windows service installation'
             & ./tools/install_guard_service.ps1 -Action Install -BinaryPath $exe -ExpectedSignerThumbprint $cert.Thumbprint
             if ($LASTEXITCODE -ne 0) { throw 'Guard installer failed' }
             $svc = Get-CimInstance Win32_Service -Filter "Name='TwinConnectGlobalGuard'"
@@ -130,7 +134,9 @@ jobs:
             }
             # Simulate a crashed or stopped service: offline recovery must work
             # without a functioning administrative named pipe.
+            Write-Host 'Simulating stopped guard service'
             Stop-Service -Name TwinConnectGlobalGuard -Force -ErrorAction Stop
+            Write-Host 'Testing offline recovery and uninstall'
             & ./tools/install_guard_service.ps1 -Action Uninstall -BinaryPath $exe -ExpectedSignerThumbprint $cert.Thumbprint
             if ($LASTEXITCODE -ne 0) { throw 'Offline guard uninstall failed' }
             & $exe offline-status
