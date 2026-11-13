@@ -24,6 +24,48 @@ function colorInputValue(value:string,fallback:string){
   return /^#[0-9a-fA-F]{6}$/.test(value)?value:fallback;
 }
 
+const BRAND_UPLOAD_TARGET_BYTES=700*1024;
+const BRAND_UPLOAD_MAX_BYTES=2*1024*1024;
+
+async function prepareBrandAsset(kind:BrandingAssetKind,file:File):Promise<File>{
+  // Optimize raster uploads in the browser, before reverse proxies with low body limits.
+  // ICO files cannot be safely decoded in every browser; preserve valid small ICO files.
+  if(kind==="favicon" && (file.type==="image/x-icon" || /\\.ico$/i.test(file.name))){
+    if(file.size>BRAND_UPLOAD_TARGET_BYTES)throw new Error("Favicon ICO is too large. Please upload a smaller PNG or WebP image.");
+    return file;
+  }
+  if(file.size<=BRAND_UPLOAD_TARGET_BYTES)return file;
+  if(!["image/png","image/jpeg","image/webp"].includes(file.type)){
+    throw new Error("Unsupported image type. Use PNG, JPG, or WebP.");
+  }
+  const url=URL.createObjectURL(file);
+  let image:HTMLImageElement;
+  try{
+    image=new Image();
+    image.src=url;
+    await image.decode();
+    const maxSide=kind==="favicon"?256:1024;
+    let scale=Math.min(1,maxSide/Math.max(image.naturalWidth,image.naturalHeight));
+    for(let attempt=0;attempt<7;attempt++){
+      const canvas=document.createElement("canvas");
+      canvas.width=Math.max(1,Math.round(image.naturalWidth*scale));
+      canvas.height=Math.max(1,Math.round(image.naturalHeight*scale));
+      const context=canvas.getContext("2d");
+      if(!context)throw new Error("Image optimization is not supported by this browser.");
+      context.drawImage(image,0,0,canvas.width,canvas.height);
+      const quality=Math.max(0.48,0.84-attempt*0.06);
+      const blob=await new Promise<Blob|null>(resolve=>canvas.toBlob(resolve,"image/webp",quality));
+      if(blob && blob.type==="image/webp" && blob.size<=BRAND_UPLOAD_TARGET_BYTES){
+        return new File([blob],kind+".webp",{type:"image/webp"});
+      }
+      scale*=0.8;
+    }
+    throw new Error("Image is too large to optimize. Please use a smaller PNG or WebP.");
+  }finally{
+    URL.revokeObjectURL(url);
+  }
+}
+
 export function BrandingSettingsPage(){
   const {pick}=useI18n();
   const {brand,ready,updateBrand,reloadBrand}=useBranding();
@@ -67,7 +109,9 @@ export function BrandingSettingsPage(){
     event.target.value="";
     if(!file||!begin(`upload-${kind}`))return;
     try{
-      applyRecord(await brandingApi.uploadAsset(kind,file));
+      const optimized=await prepareBrandAsset(kind,file);
+      if(optimized.size>BRAND_UPLOAD_MAX_BYTES)throw new Error(pick("حجم تصویر بیشتر از ۲ مگابایت است.","Image exceeds 2 MB."));
+      applyRecord(await brandingApi.uploadAsset(kind,optimized));
       success(kind==="logo"?pick("لوگو آپلود و فعال شد.","Logo uploaded and activated."):pick("Favicon آپلود و فعال شد.","Favicon uploaded and activated."));
     }catch(reason){fail(reason);}finally{finish();}
   };
