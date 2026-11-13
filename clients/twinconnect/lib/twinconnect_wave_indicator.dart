@@ -104,14 +104,14 @@ class _NetworkFabricPainter extends CustomPainter {
 
   double _sample(List<double> history, double t) {
     if (history.isEmpty) return 0;
-    final position = t.clamp(0.0, 1.0) * (history.length - 1);
+    final position = t.clamp(0.0, 1.0).toDouble() * (history.length - 1);
     final i = position.floor().clamp(0, history.length - 1);
     final next = math.min(i + 1, history.length - 1);
     final fraction = position - i;
     final a = history[i];
     final b = history[next];
-    return math.max(0, (a.isFinite ? a : 0) * (1 - fraction) +
-        (b.isFinite ? b : 0) * fraction);
+    return math.max(0.0, (a.isFinite ? a : 0.0) * (1 - fraction) +
+        (b.isFinite ? b : 0.0) * fraction);
   }
 
   @override
@@ -160,8 +160,8 @@ class _NetworkFabricPainter extends CustomPainter {
     final width = size.width * .87;
     final centerY = size.height * .52;
     final count = 45;
-    final maxRx = rx.fold<double>(0, (m, v) => math.max(m, v.isFinite ? v : 0));
-    final maxTx = tx.fold<double>(0, (m, v) => math.max(m, v.isFinite ? v : 0));
+    final maxRx = rx.fold<double>(0, (m, v) => math.max(m, v.isFinite ? v : 0.0));
+    final maxTx = tx.fold<double>(0, (m, v) => math.max(m, v.isFinite ? v : 0.0));
     final realActivity = maxRx > 0 || maxTx > 0;
     final active = connected && realActivity;
     final transitioning = connecting && !connected;
