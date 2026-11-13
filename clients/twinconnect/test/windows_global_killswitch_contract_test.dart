@@ -95,6 +95,8 @@ void main() {
     expect(code, contains('CLSID_TaskScheduler'));
     expect(code, contains('TwinConnectWfpEmergencyRestore'));
     expect(code, contains('get_NextRunTime'));
+    expect(code, contains('GetLocalTime(&now)'));
+    expect(code, isNot(contains('GetSystemTime(&now)')));
     expect(code, contains('recover I_ACCEPT_OFFLINE_RECOVERY'));
 
     expect(code, contains('TransactionalDisarm('));
