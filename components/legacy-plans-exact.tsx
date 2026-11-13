@@ -34,12 +34,12 @@ function Check({label,checked,onChange}:{label:string;checked:boolean;onChange:(
 
 export function LegacyPlansRuntimePage(){
   const {pick}=useI18n();
-  const [rows,setRows]=useState<RuntimeRow[]>([]);const [nodes,setNodes]=useState<RuntimeRow[]>([]);const [q,setQ]=useState("");const [busy,setBusy]=useState("");const [error,setError]=useState("");const [ok,setOk]=useState("");const [editing,setEditing]=useState<RuntimeRow|null>(null);const [open,setOpen]=useState(false);const [draft,setDraft]=useState<PlanDraft>({...EMPTY_DRAFT});const [showNodes,setShowNodes]=useState(false);const basicRef=useRef<HTMLElement>(null);const pricingRef=useRef<HTMLElement>(null);const protocolsRef=useRef<HTMLElement>(null);const [activeSection,setActiveSection]=useState<"basic"|"pricing"|"protocols">("basic");
+  const [rows,setRows]=useState<RuntimeRow[]>([]);const [nodes,setNodes]=useState<RuntimeRow[]>([]);const [q,setQ]=useState("");const [busy,setBusy]=useState("");const [error,setError]=useState("");const [ok,setOk]=useState("");const [editing,setEditing]=useState<RuntimeRow|null>(null);const [open,setOpen]=useState(false);const [draft,setDraft]=useState<PlanDraft>({...EMPTY_DRAFT});const basicRef=useRef<HTMLElement>(null);const pricingRef=useRef<HTMLElement>(null);const protocolsRef=useRef<HTMLElement>(null);const [activeSection,setActiveSection]=useState<"basic"|"pricing"|"protocols">("basic");
   const load=async()=>{setError("");try{const [planRows,nodeRows]=await Promise.all([adminApi.plans(),adminApi.nodes()]);setRows(planRows);setNodes(nodeRows as unknown as RuntimeRow[]);}catch(reason){setError(reason instanceof Error?reason.message:String(reason));}};
   useEffect(()=>{void load();},[]);
   const exitNodes=useMemo(()=>nodes.filter(row=>s(row.node_type).trim().toLowerCase()==="exit"),[nodes]);const allNodeIds=useMemo(()=>exitNodes.map(row=>n(row.id)).filter(Boolean),[exitNodes]);const nodeNameById=useMemo(()=>new Map(exitNodes.map(row=>[n(row.id),s(row.name)||`#${n(row.id)}`])),[exitNodes]);const categoryOptions=useMemo(()=>Array.from(new Set(rows.map(row=>s(row.category).trim()).filter(Boolean))),[rows]);
   const subscriptionTypeOptions=useMemo(()=>Array.from(new Set(rows.map(row=>s(row.subscription_type).trim()).filter(Boolean))),[rows]);const filtered=useMemo(()=>{const value=q.trim().toLowerCase();return value?rows.filter(row=>`${row.id??""} ${row.name??""} ${row.category??""} ${row.subscription_type??""} ${row.description??""}`.toLowerCase().includes(value)):rows;},[rows,q]);
-  const start=(row?:RuntimeRow)=>{if(row){setEditing(row);const protocols=stringList(row.protocols);const nodeIds=numberList(row.node_ids);const allowedNodeIds=nodeIds.filter(id=>allNodeIds.includes(id));setDraft({name:s(row.name),category:s(row.category),subscription_type:s(row.subscription_type)||"اشتراک عمومی",description:s(row.description),duration_days:n(row.duration_days)||30,traffic_gb:n(row.traffic_gb),device_limit:row.device_limit==null?1:n(row.device_limit),price_toman:n(row.price_toman),is_active:Boolean(row.is_active),protocols:protocols.length?protocols:[...ALL_PROTOCOLS],node_ids:allowedNodeIds.length?allowedNodeIds:[...allNodeIds]});}else{setEditing(null);setDraft({...EMPTY_DRAFT,protocols:[...ALL_PROTOCOLS],node_ids:[...allNodeIds]});}setShowNodes(false);setActiveSection("basic");setOpen(true);};
+  const start=(row?:RuntimeRow)=>{if(row){setEditing(row);const protocols=stringList(row.protocols);const nodeIds=numberList(row.node_ids);const allowedNodeIds=nodeIds.filter(id=>allNodeIds.includes(id));setDraft({name:s(row.name),category:s(row.category),subscription_type:s(row.subscription_type)||"اشتراک عمومی",description:s(row.description),duration_days:n(row.duration_days)||30,traffic_gb:n(row.traffic_gb),device_limit:row.device_limit==null?1:n(row.device_limit),price_toman:n(row.price_toman),is_active:Boolean(row.is_active),protocols:protocols.length?protocols:[...ALL_PROTOCOLS],node_ids:allowedNodeIds.length?allowedNodeIds:[...allNodeIds]});}else{setEditing(null);setDraft({...EMPTY_DRAFT,protocols:[...ALL_PROTOCOLS],node_ids:[...allNodeIds]});}setActiveSection("basic");setOpen(true);};
   const toggleProtocol=(protocol:string,checked:boolean)=>setDraft(current=>({...current,protocols:checked?Array.from(new Set([...current.protocols,protocol])):current.protocols.filter(value=>value!==protocol)}));
   const toggleNode=(nodeId:number,checked:boolean)=>setDraft(current=>({...current,node_ids:checked?Array.from(new Set([...current.node_ids,nodeId])):current.node_ids.filter(value=>value!==nodeId)}));
   const movePlan=async(id:number,direction:-1|1)=>{if(busy||q.trim())return;const ordered=rows.map(row=>n(row.id)).filter(Boolean);const from=ordered.indexOf(id);const to=from+direction;if(from<0||to<0||to>=ordered.length)return;const next=[...ordered];[next[from],next[to]]=[next[to],next[from]];setBusy(`order:${id}`);setError("");setOk("");try{await adminApi.reorderPlans(next);setOk(pick("ترتیب نمایش ذخیره شد","Display order saved"));await load();}catch(reason){setError(reason instanceof Error?reason.message:String(reason));}finally{setBusy("");}};
@@ -65,7 +65,7 @@ export function LegacyPlansRuntimePage(){
           {([
             ["basic",pick("ⓘ اطلاعات پایه","ⓘ Basic info"),basicRef],
             ["pricing",pick("▤ حجم و قیمت","▤ Volume & price"),pricingRef],
-            ["protocols",pick("♧ پروتکل‌ها","♧ Protocols"),protocolsRef],
+            ["protocols",pick("♧ پروتکل‌ها و نودها","♧ Protocols & nodes"),protocolsRef],
           ] as const).map(([key,title,ref])=><button key={key} type="button" className={`${styles.step} ${activeSection===key?styles.stepCurrent:""}`} onClick={()=>{setActiveSection(key);ref.current?.scrollIntoView({behavior:"smooth",block:"nearest"});}}>{title}</button>)}
         </nav>
         <div className={styles.body}>
@@ -87,29 +87,42 @@ export function LegacyPlansRuntimePage(){
               <label className={styles.field}><span>{pick("تعداد کاربر (۰ = نامحدود)","Users (0 = unlimited)")}</span><input type="number" min={0} required value={draft.device_limit} onChange={event=>setDraft(current=>({...current,device_limit:Number(event.target.value)}))}/></label>
             </div>
           </section>
-          <section ref={protocolsRef} className={styles.section} aria-label={pick("پروتکل‌های مجاز","Allowed protocols")}>
+          <section ref={protocolsRef} className={styles.section} aria-label={pick("پروتکل‌ها و نودهای مجاز","Allowed protocols and nodes")}>
             <div className={styles.sectionTop}>
-              <div><b className={styles.sectionTitle}>{pick("♧ پروتکل‌ها","♧ Protocols")}</b><div className={styles.sectionDescription}>{pick("پروتکل‌های مجاز هر پلن را انتخاب کنید.","Select protocols enabled for this plan.")}</div></div>
-              <div style={{display:"flex",alignItems:"center",gap:8}}>
-                <span className={styles.selectionCount}>{draft.protocols.length} {pick("پروتکل انتخاب شده","selected protocols")}</span>
-                <button type="button" className={styles.smallBtn} onClick={()=>setDraft(current=>({...current,protocols:[...ALL_PROTOCOLS]}))}>{pick("انتخاب همه","Select all")}</button>
-              </div>
+              <div><b className={styles.sectionTitle}>{pick("پروتکل‌ها و نودهای مجاز","Allowed protocols and exit nodes")}</b>
+              <div className={styles.sectionDescription}>{pick("پروتکل‌ها و سرورهای قابل استفاده در این پلن را جداگانه انتخاب کنید.","Choose enabled protocols and exit servers for this plan.")}</div></div>
             </div>
-            <div className={styles.pills}>
-              {PROTOCOLS.map(([key,label])=><label key={key} className={`${styles.pill} ${draft.protocols.includes(key)?styles.pillSelected:""}`}><span>{label}</span><input type="checkbox" checked={draft.protocols.includes(key)} onChange={event=>toggleProtocol(key,event.target.checked)}/></label>)}
+            <div className={styles.selectionLayout}>
+              <div className={styles.selectionColumn}>
+                <div className={styles.sectionTop}>
+                  <b className={styles.sectionTitle}>{pick("پروتکل‌ها","Protocols")}</b>
+                  <div className={styles.selectionActions}><span className={styles.selectionCount}>{draft.protocols.length}/{PROTOCOLS.length}</span>
+                    <button type="button" className={styles.smallBtn} onClick={()=>setDraft(current=>({...current,protocols:[...ALL_PROTOCOLS]}))}>{pick("انتخاب همه","Select all")}</button>
+                  </div>
+                </div>
+                <div className={styles.pills}>
+                  {PROTOCOLS.map(([key,label])=><label key={key} className={`${styles.pill} ${draft.protocols.includes(key)?styles.pillSelected:""}`}><span>{label}</span><input type="checkbox" checked={draft.protocols.includes(key)} onChange={event=>toggleProtocol(key,event.target.checked)}/></label>)}
+                </div>
+              </div>
+              <div className={styles.selectionColumn}>
+                <div className={styles.sectionTop}>
+                  <b className={styles.sectionTitle}>{pick("انتخاب نودهای خارج (Exit)","Select Exit nodes")}</b>
+                  <div className={styles.selectionActions}><span className={styles.selectionCount}>{draft.node_ids.length}/{exitNodes.length}</span>
+                    <button type="button" className={styles.smallBtn} onClick={()=>setDraft(current=>({...current,node_ids:[...allNodeIds]}))}>{pick("انتخاب همه","Select all")}</button>
+                  </div>
+                </div>
+                {exitNodes.length>0
+                  ?<div className={styles.pills} aria-label={pick("انتخاب نودها","Select nodes")}>
+                    {exitNodes.map(row=>{const nodeId=n(row.id);return <label key={nodeId} className={`${styles.pill} ${draft.node_ids.includes(nodeId)?styles.pillSelected:""}`} title={s(row.name)}>
+                      <span>{s(row.name)||`#${nodeId}`} · {s(row.country_code)}</span>
+                      <input type="checkbox" checked={draft.node_ids.includes(nodeId)} onChange={event=>toggleNode(nodeId,event.target.checked)}/>
+                    </label>;})}
+                   </div>
+                  :<div className={styles.emptyNodes}>{pick("نود خروجی موجود نیست؛ فهرست نودها را بررسی کنید.","No Exit nodes available. Check the node inventory.")}</div>}
+                <small className={styles.nodeHint}>{pick("تنها نودهای خروجی انتخاب‌شده به اشتراک اضافه می‌شوند.","Only selected Exit nodes are snapshotted onto subscriptions.")}</small>
+              </div>
             </div>
           </section>
-          <div className={styles.nodePanel}>
-            <button type="button" className={styles.nodeToggle} aria-expanded={showNodes} onClick={()=>setShowNodes(current=>!current)}>
-              <span>{pick("سرورهای خارج مجاز","Allowed exit servers")} · {draft.node_ids.length} {pick("انتخاب شده","selected")}</span><span>{showNodes?"⌃":"⌄"}</span>
-            </button>
-            {showNodes&&<div className={styles.nodeContents}>
-              <div className={styles.sectionTop}><span className={styles.sectionDescription}>{pick("فقط نودهای Exit انتخاب و روی اشتراک ذخیره می‌شوند.","Only Exit nodes are selectable and snapshotted on the subscription.")}</span>
-                <button type="button" className={styles.smallBtn} onClick={()=>setDraft(current=>({...current,node_ids:[...allNodeIds]}))}>{pick("انتخاب همه","Select all")}</button>
-              </div>
-              <div className={styles.pills}>{exitNodes.map(row=>{const nodeId=n(row.id);return <label key={nodeId} className={`${styles.pill} ${draft.node_ids.includes(nodeId)?styles.pillSelected:""}`}><span>{s(row.name)||`#${nodeId}`} · {s(row.country_code)}</span><input type="checkbox" checked={draft.node_ids.includes(nodeId)} onChange={event=>toggleNode(nodeId,event.target.checked)}/></label>;})}</div>
-            </div>}
-          </div>
           <label className={styles.activeCheck}><input type="checkbox" checked={draft.is_active} onChange={event=>setDraft(current=>({...current,is_active:event.target.checked}))}/>{pick("پلن فعال و منتشر شده باشد","Keep plan active and published")}</label>
         </div>
         <footer className={styles.footer}>
