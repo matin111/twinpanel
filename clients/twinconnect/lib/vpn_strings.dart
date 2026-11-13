@@ -79,6 +79,14 @@ extension VpnStrings on AppStrings {
     'قطع اینترنت هنگام قطع VPN',
     'Blocks internet if VPN disconnects',
   );
+  String get vpnGlobalGuardServiceRequired => pick(
+    'موتور فیلتر ویندوز آماده است؛ سرویس محافظت سراسری هنوز نصب نشده.',
+    'Windows filtering is available; the system-wide guard service is not installed.',
+  );
+  String get vpnGlobalGuardUnavailable => pick(
+    'محافظت سراسری ویندوز هنوز قابل فعال‌سازی نیست.',
+    'System-wide Windows kill switch is not ready.',
+  );
   String get vpnKillSwitchOff => pick(
     'Kill Switch: غیرفعال',
     'Kill switch: Off',
