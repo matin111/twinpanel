@@ -3147,7 +3147,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       ]),
     );
 
-    Widget powerCard() => ClipRRect(
+    Widget powerCard({required Widget subscriptionContent}) => ClipRRect(
       borderRadius: BorderRadius.circular(28),
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 21, sigmaY: 21),
@@ -3325,6 +3325,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
             ),
           ),
         ),
+        const SizedBox(height: 12),
+        subscriptionContent,
         if (_vpnError != null) ...[
           const SizedBox(height: 8),
           Text(
@@ -4537,34 +4539,24 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                 icon: Icon(Icons.refresh_rounded, color: purple, size: 17)),
             ]),
             const SizedBox(height: 5),
-            LayoutBuilder(builder: (context, constraints) {
-              final usage = usageMini();
-              final expiry = miniMetric(const Key('liveHomeExpiryChip'),
-                  Icons.calendar_month_outlined,
-                  tr('تاریخ انقضا', 'Expiry date'),
-                  _expiryLabel(), violet);
-              final remaining = miniMetric(const Key('liveHomeTimeChip'),
-                  Icons.hourglass_bottom_rounded,
-                  tr('زمان باقی‌مانده', 'Time remaining'),
-                  daysLabel, cyan);
-              if (constraints.maxWidth < 610) {
-                return Column(children: [
-                  usage, const SizedBox(height: 7),
-                  Row(children: [
-                    Expanded(child: expiry),
-                    const SizedBox(width: 7),
-                    Expanded(child: remaining),
-                  ]),
-                ]);
-              }
-              return Row(children: [
-                Expanded(flex: 5, child: usage),
-                const SizedBox(width: 8),
-                Expanded(flex: 3, child: expiry),
-                const SizedBox(width: 8),
-                Expanded(flex: 3, child: remaining),
-              ]);
-            }),
+            // Compact in-panel account details immediately beneath Connect.
+            // Avoid an inner LayoutBuilder so IntrinsicHeight can balance the
+            // connection panel and network status panel on desktop.
+            usageMini(),
+            const SizedBox(height: 7),
+            Row(children: [
+              Expanded(child: miniMetric(
+                const Key('liveHomeExpiryChip'),
+                Icons.calendar_month_outlined,
+                tr('تاریخ انقضا', 'Expiry date'),
+                _expiryLabel(), violet)),
+              const SizedBox(width: 7),
+              Expanded(child: miniMetric(
+                const Key('liveHomeTimeChip'),
+                Icons.hourglass_bottom_rounded,
+                tr('زمان باقی‌مانده', 'Time remaining'),
+                daysLabel, cyan)),
+            ]),
             if (widget.accountError != null) ...[
               const SizedBox(height: 6),
               Text(tr('اطلاعات حساب در دسترس نیست؛ تازه‌سازی کنید.',
@@ -4586,31 +4578,33 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           final split = constraints.maxWidth >= 740;
           if (!split) {
             return Column(children: [
-              powerCard(),
+              powerCard(subscriptionContent: homeSubscriptionSummary()),
               const SizedBox(height: 12),
               connectionStats(),
             ]);
           }
           return Directionality(
             textDirection: _rtl ? TextDirection.rtl : TextDirection.ltr,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(flex: 5, child: Directionality(
-                  textDirection: _rtl ? TextDirection.rtl : TextDirection.ltr,
-                  child: powerCard(),
-                )),
-                const SizedBox(width: 14),
-                Expanded(flex: 5, child: Directionality(
-                  textDirection: _rtl ? TextDirection.rtl : TextDirection.ltr,
-                  child: connectionStats(),
-                )),
-              ],
+            child: IntrinsicHeight(
+              key: const Key('liveEqualHeightConnectionPanels'),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(flex: 5, child: Directionality(
+                    textDirection: _rtl ? TextDirection.rtl : TextDirection.ltr,
+                    child: powerCard(
+                      subscriptionContent: homeSubscriptionSummary()),
+                  )),
+                  const SizedBox(width: 14),
+                  Expanded(flex: 5, child: Directionality(
+                    textDirection: _rtl ? TextDirection.rtl : TextDirection.ltr,
+                    child: connectionStats(),
+                  )),
+                ],
+              ),
             ),
           );
         }),
-        const SizedBox(height: 15),
-        homeSubscriptionSummary(),
 
       ],
     );
