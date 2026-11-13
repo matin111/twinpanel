@@ -46,6 +46,50 @@ class NativeVpnBridge {
   }
 
 
+  /// Read-only WFP preflight. In particular, WFP availability is never
+  /// proof that a privileged kill-switch service exists or is enforcing
+  /// a global network block. Missing/legacy channels fail closed.
+  static Future<Map<String, dynamic>> globalKillSwitchStatus() async {
+    const unavailable = <String, dynamic>{
+      'contractVersion': 1,
+      'wfpAvailable': false,
+      'serviceInstalled': false,
+      'armed': false,
+      'enforcedV4': false,
+      'enforcedV6': false,
+      'recoveryVerified': false,
+      'reason': 'NATIVE_GLOBAL_GUARD_UNAVAILABLE',
+    };
+    if (platform != VpnPlatform.windows) return unavailable;
+    try {
+      final raw = await _channel.invokeMethod<Map<dynamic, dynamic>>(
+        'getGlobalKillSwitchStatus',
+      );
+      if (raw == null || raw['contractVersion'] != 1) {
+        return unavailable;
+      }
+      // Do not trust one reported flag. All key conditions are mandatory.
+      final armed = raw['armed'] == true &&
+          raw['serviceInstalled'] == true &&
+          raw['enforcedV4'] == true &&
+          raw['enforcedV6'] == true &&
+          raw['recoveryVerified'] == true;
+      return <String, dynamic>{
+        ...unavailable,
+        'wfpAvailable': raw['wfpAvailable'] == true,
+        'serviceInstalled': raw['serviceInstalled'] == true,
+        'armed': armed,
+        'enforcedV4': raw['enforcedV4'] == true,
+        'enforcedV6': raw['enforcedV6'] == true,
+        'recoveryVerified': raw['recoveryVerified'] == true,
+        'reason': raw['reason'] is String
+            ? raw['reason'] : 'NATIVE_GLOBAL_GUARD_UNAVAILABLE',
+      };
+    } catch (_) {
+      return unavailable;
+    }
+  }
+
   static Future<NativeProtocolReadiness> protocolReadiness({
     NativeVpnCapabilities? validatedCapabilities,
   }) async {
