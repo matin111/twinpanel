@@ -4442,6 +4442,9 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       body: TwinConnectAmbientBackground(
         dark: _dark,
         backgroundColor: sidebar,
+        primaryColor: purple,
+        secondaryColor: BrandTheme.parse(
+          widget.brand.secondaryColor, '#00DCEB'),
         child: Row(children: [
           Expanded(child: SafeArea(child: ListView(
             padding: EdgeInsets.symmetric(
