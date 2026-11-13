@@ -67,6 +67,24 @@ jobs:
           python3 publisher/scripts/verify_release_ui_parity.py \
             --source source --main publisher
 
+      - name: Protect selected Tunnel and Iran Agent fixes in pinned release
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          for path in \
+            "backend/app/node_bootstrap_control_v66.py" \
+            "backend/app/routers/tunnels.py" \
+            "backend/app/routers/tunnel_selected_jobs_v1.py" \
+            "backend/app/provision_resilience_v278.py" \
+            "backend/tests/test_tunnel_release_persistence_v1.py"; do
+            test -s "source/$path" && test -s "publisher/$path"
+            cmp -s "source/$path" "publisher/$path" || {
+              echo "::error file=$path::Pinned release would lose tunnel bootstrap DB/Agent fixes."
+              exit 1
+            }
+          done
+          python3 source/backend/tests/test_tunnel_release_persistence_v1.py -v
+
       - name: Prevent stale Connection UI in published releases
         shell: bash
         run: |
