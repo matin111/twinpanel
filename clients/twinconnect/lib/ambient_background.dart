@@ -9,8 +9,8 @@ class TwinConnectAmbientBackground extends StatefulWidget {
   const TwinConnectAmbientBackground({
     required this.dark,
     this.backgroundColor,
-    this.primaryColor = const Color(0xFF9652FF),
-    this.secondaryColor = const Color(0xFF00DCEB),
+    this.primaryColor = const Color(0xFF548BA4),
+    this.secondaryColor = const Color(0xFF65B7B2),
     required this.child,
     super.key,
   });
@@ -60,8 +60,8 @@ class _TwinConnectAmbientBackgroundState
     final brandBackground = widget.backgroundColor;
     final gradientColors = brandBackground == null
         ? (dark
-            ? const [Color(0xFF0A1024), Color(0xFF181432), Color(0xFF0C1A2B)]
-            : const [Color(0xFFF6F1FF), Color(0xFFEFF2FF), Color(0xFFFBFAFF)])
+            ? const [Color(0xFF101D28), Color(0xFF1B3443), Color(0xFF112A35)]
+            : const [Color(0xFFF2F7F8), Color(0xFFE5F0F2), Color(0xFFF5F8F9)])
         : [
             brandBackground,
             Color.lerp(brandBackground, widget.primaryColor, dark ? .29 : .22)!,
