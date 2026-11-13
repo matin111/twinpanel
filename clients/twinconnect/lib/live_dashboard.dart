@@ -21,6 +21,10 @@ import 'windows_singbox_tunnel.dart';
 import 'windows_xray_proxy.dart';
 import 'windows_sudoku_proxy.dart';
 import 'sudoku_client_profile.dart';
+import 'mieru_client_profile.dart';
+import 'windows_mieru_proxy.dart';
+import 'trusttunnel_client_profile.dart';
+import 'windows_trusttunnel_proxy.dart';
 import 'windows_xray_preflight.dart';
 import 'xray_inbound_profiles.dart';
 import 'xray_inbound_secure_cache.dart';
@@ -36,6 +40,7 @@ import 'tenant_api.dart';
 import 'vpn_policy_store.dart';
 import 'vpn_policy.dart';
 import 'windows_wireguard.dart';
+import 'windows_amneziawg.dart';
 import 'tenant_models.dart';
 import 'brand_theme.dart';
 import 'plan_classification.dart';
@@ -101,6 +106,7 @@ class _DemoServer {
 
 class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   final WindowsWireGuardController _vpn = const WindowsWireGuardController();
+  final WindowsAmneziaWgController _awg = const WindowsAmneziaWgController();
   late final WindowsSingBoxTunnel _modernTunnel = WindowsSingBoxTunnel(
     onUnexpectedExit: () {
       _modernHealthTimer?.cancel();
@@ -112,6 +118,12 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       }
       if (_sudokuProxy.isRunning) {
         _sudokuProxy.stop().catchError((Object _) {});
+      }
+      if (_mieruProxy.isRunning) {
+        _mieruProxy.stop().catchError((Object _) {});
+      }
+      if (_trusttunnelProxy.isRunning) {
+        _trusttunnelProxy.stop().catchError((Object _) {});
       }
       if (!mounted) return;
       setState(() {
@@ -131,6 +143,32 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       setState(() {
         _modernUp = false;
         _vpnError = 'XRAY_PROCESS_EXITED';
+        _publicIp = null;
+      });
+    },
+  );
+  late final WindowsTrustTunnelProxy _trusttunnelProxy =
+      WindowsTrustTunnelProxy(onUnexpectedExit: () {
+    _modernHealthTimer?.cancel();
+    _stopModernTrafficMonitoring();
+    _modernTunnel.stop().catchError((Object _) {});
+    if (!mounted) return;
+    setState(() {
+      _modernUp = false;
+      _vpnError = _trusttunnelProxy.lastUnexpectedExitReason ??
+          'TRUSTTUNNEL_CORE_EXITED';
+      _publicIp = null;
+    });
+  });
+  late final WindowsMieruProxy _mieruProxy = WindowsMieruProxy(
+    onUnexpectedExit: () {
+      _modernHealthTimer?.cancel();
+      _stopModernTrafficMonitoring();
+      _modernTunnel.stop().catchError((Object _) {});
+      if (!mounted) return;
+      setState(() {
+        _modernUp = false;
+        _vpnError = _mieruProxy.exitReason;
         _publicIp = null;
       });
     },
@@ -169,6 +207,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   bool _vpnUp = false;
   bool _vpnVerified = false;
   bool _vpnReady = false;
+  bool _awgServiceUp = false;
+  bool _awgUnmanaged = false;
   bool _vpnUnmanaged = false;
   bool _vpnCleanup = false;
   int _vpnRx = 0;
@@ -479,7 +519,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     }
     setState(() { _vpnBusy = true; _vpnError = null; });
     try {
-      if (_modernTunnel.isRunning || _xrayProxy.isRunning || _sudokuProxy.isRunning ||
+      if (_modernTunnel.isRunning || _xrayProxy.isRunning || _sudokuProxy.isRunning || _mieruProxy.isRunning || _trusttunnelProxy.isRunning ||
           _ciscoTunnel.isRunning ||
           _openVpnTunnel.hasChild || _l2tpTunnel.hasChild || _modernUp) {
         _modernHealthTimer?.cancel();
@@ -495,6 +535,12 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         }
         if (_xrayProxy.isRunning) await _xrayProxy.stop();
       if (_sudokuProxy.isRunning) await _sudokuProxy.stop();
+      if (_mieruProxy.isRunning) await _mieruProxy.stop();
+      if (_trusttunnelProxy.isRunning) await _trusttunnelProxy.stop();
+      if (_awgServiceUp) {
+        await _awg.stop();
+        _awgServiceUp = false;
+      }
         if (!mounted) return;
         setState(() { _modernUp = false; _modernProtocol = null; _modernNodeId = null; });
       }
@@ -777,6 +823,12 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         }
         if (_xrayProxy.isRunning) await _xrayProxy.stop();
       if (_sudokuProxy.isRunning) await _sudokuProxy.stop();
+      if (_mieruProxy.isRunning) await _mieruProxy.stop();
+      if (_trusttunnelProxy.isRunning) await _trusttunnelProxy.stop();
+      if (_awgServiceUp) {
+        await _awg.stop();
+        _awgServiceUp = false;
+      }
         if (!mounted) return;
         setState(() {
           _modernUp = false;
@@ -879,6 +931,12 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         }
         if (_xrayProxy.isRunning) await _xrayProxy.stop();
       if (_sudokuProxy.isRunning) await _sudokuProxy.stop();
+      if (_mieruProxy.isRunning) await _mieruProxy.stop();
+      if (_trusttunnelProxy.isRunning) await _trusttunnelProxy.stop();
+      if (_awgServiceUp) {
+        await _awg.stop();
+        _awgServiceUp = false;
+      }
         if (!mounted) return;
         setState(() {
           _modernUp = false;
@@ -978,6 +1036,12 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         }
         if (_xrayProxy.isRunning) await _xrayProxy.stop();
       if (_sudokuProxy.isRunning) await _sudokuProxy.stop();
+      if (_mieruProxy.isRunning) await _mieruProxy.stop();
+      if (_trusttunnelProxy.isRunning) await _trusttunnelProxy.stop();
+      if (_awgServiceUp) {
+        await _awg.stop();
+        _awgServiceUp = false;
+      }
         if (!mounted) return;
         setState(() {
           _modernUp = false;
@@ -1078,6 +1142,12 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       if (_modernTunnel.isRunning) await _modernTunnel.stop();
       if (_xrayProxy.isRunning) await _xrayProxy.stop();
       if (_sudokuProxy.isRunning) await _sudokuProxy.stop();
+      if (_mieruProxy.isRunning) await _mieruProxy.stop();
+      if (_trusttunnelProxy.isRunning) await _trusttunnelProxy.stop();
+      if (_awgServiceUp) {
+        await _awg.stop();
+        _awgServiceUp = false;
+      }
       if (_ciscoTunnel.isRunning) await _ciscoTunnel.stop();
       if (_openVpnTunnel.hasChild) await _openVpnTunnel.stop();
       if (_l2tpTunnel.hasChild) await _l2tpTunnel.stop();
@@ -1212,6 +1282,12 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       if (_modernTunnel.isRunning) await _modernTunnel.stop();
       if (_xrayProxy.isRunning) await _xrayProxy.stop();
       if (_sudokuProxy.isRunning) await _sudokuProxy.stop();
+      if (_mieruProxy.isRunning) await _mieruProxy.stop();
+      if (_trusttunnelProxy.isRunning) await _trusttunnelProxy.stop();
+      if (_awgServiceUp) {
+        await _awg.stop();
+        _awgServiceUp = false;
+      }
       if (_ciscoTunnel.isRunning) await _ciscoTunnel.stop();
       if (_openVpnTunnel.hasChild) await _openVpnTunnel.stop();
       if (_l2tpTunnel.hasChild) await _l2tpTunnel.stop();
@@ -1282,6 +1358,357 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     } catch (error) {
       if (_sudokuProxy.isRunning && !_modernTunnel.isRunning) {
         try { await _sudokuProxy.stop(); } catch (_) {}
+      }
+      if (mounted) setState(() {
+        _modernUp = _modernTunnel.isRunning ||
+            _ciscoTunnel.isRunning ||
+            _openVpnTunnel.isRunning ||
+            _l2tpTunnel.isRunning;
+        if (!_modernUp) {
+          _modernProtocol = null;
+          _modernNodeId = null;
+          _publicIp = null;
+        }
+        _vpnError = _errorText(error);
+      });
+    } finally {
+      if (mounted) setState(() => _vpnBusy = false);
+    }
+  }
+
+  /// Dedicated official AmneziaWG native service. Do not pass its
+  /// obfuscation settings to plain WireGuard or the sing-box engine.
+  Future<void> _startAmneziaWgTunnel(String serverId) async {
+    if (_vpnBusy || !Platform.isWindows) return;
+    setState(() { _vpnBusy = true; _vpnError = null; });
+    try {
+      if (_vpnUnmanaged || _vpnCleanup || _awgUnmanaged) {
+        throw const FormatException('PREVIOUS_TUNNEL_NOT_STOPPED');
+      }
+      final selected = widget.catalog?.entries.any((entry) =>
+          entry.protocol.code == 'amneziawg' && entry.selected &&
+          entry.configRecordPresent) ?? false;
+      if (!selected) {
+        throw const FormatException('PROTOCOL_NOT_INCLUDED_IN_SUBSCRIPTION');
+      }
+      final api = TenantApi.fromBuildConfig();
+      final checked = await Future.wait<Object>([
+        api.loadSessionNativeProfiles(
+          panel: widget.panel,
+          sessionToken: widget.sessionToken,
+          protocol: VpnProtocols.byCode('amneziawg')!,
+          native: const NativeProtocolReadiness(
+              supportedCodes: {'amneziawg'}),
+        ),
+        _vpnPolicy.load(widget.panel.namespace, widget.username),
+      ]);
+      final profiles = checked[0] as ClientProtocolProfiles;
+      final policy = checked[1] as VpnPolicy;
+      // Validate before removing a currently working connection.
+      final node = WindowsAmneziaWgController.configForSingleNode(
+          profiles, serverId);
+      final capability = await _awg.capabilities();
+      NativeVpnBridge.requireSafeToConnect(policy, capability);
+
+      if (_modernTunnel.isRunning) await _modernTunnel.stop();
+      if (_xrayProxy.isRunning) await _xrayProxy.stop();
+      if (_sudokuProxy.isRunning) await _sudokuProxy.stop();
+      if (_mieruProxy.isRunning) await _mieruProxy.stop();
+      if (_trusttunnelProxy.isRunning) await _trusttunnelProxy.stop();
+      if (_awgServiceUp) {
+        await _awg.stop();
+        _awgServiceUp = false;
+      }
+      if (_ciscoTunnel.isRunning) await _ciscoTunnel.stop();
+      if (_openVpnTunnel.hasChild) await _openVpnTunnel.stop();
+      if (_l2tpTunnel.hasChild) await _l2tpTunnel.stop();
+      if (_vpnUp || _vpnCleanup) {
+        await _vpn.stop().timeout(const Duration(seconds: 20));
+        final stopped = await _vpn.status();
+        if (stopped['state'] != 'down') {
+          throw const FormatException('PREVIOUS_TUNNEL_NOT_STOPPED');
+        }
+        _vpnUp = false;
+        _vpnVerified = false;
+        _vpnCleanup = false;
+      }
+      _modernHealthTimer?.cancel();
+      _stopModernTrafficMonitoring();
+      final started = await _awg.start(profile: node, policy: policy);
+      final up = started['state'] == 'interface_up' ||
+          started['state'] == 'peer_verified';
+      final verified = started['peerHandshakeVerified'] == true;
+      if (!up) throw const FormatException('AWG_NATIVE_TUNNEL_UNAVAILABLE');
+      if (!mounted) return;
+      setState(() {
+        _awgServiceUp = true;
+        _modernUp = verified;
+        _modernProtocol = 'amneziawg';
+        _modernNodeId = serverId;
+        _vpnRx = started['rxBytes'] is int ? started['rxBytes'] as int : 0;
+        _vpnTx = started['txBytes'] is int ? started['txBytes'] as int : 0;
+        _publicIp = null;
+        _vpnError = null;
+      });
+      // Interface-up is not a handshake; poll Windows for a confirmed peer.
+      _startNetworkStats();
+    } catch (error) {
+      if (mounted) setState(() {
+        _vpnError = _errorText(error);
+      });
+    } finally {
+      if (mounted) setState(() => _vpnBusy = false);
+    }
+  }
+
+  Future<void> _startMieruTunnel(String serverId) async {
+    if (_vpnBusy || !Platform.isWindows) return;
+    setState(() { _vpnBusy = true; _vpnError = null; });
+    try {
+      if (_vpnUnmanaged || _vpnCleanup) {
+        throw const FormatException('PREVIOUS_TUNNEL_NOT_STOPPED');
+      }
+      final authorized = widget.catalog?.entries.any((entry) =>
+          entry.protocol.code == 'mieru' && entry.selected &&
+          entry.configRecordPresent) ?? false;
+      if (!authorized) {
+        throw const FormatException('PROTOCOL_NOT_INCLUDED_IN_SUBSCRIPTION');
+      }
+      final ready = await Future.wait<bool>([
+        WindowsMieruProxy.enginePresent(),
+        WindowsSingBoxPreflight.enginePresent(),
+      ]);
+      if (!ready[0] || !ready[1]) {
+        throw const FormatException('MIERU_OR_TUN_ENGINE_UNAVAILABLE');
+      }
+      final profiles = await TenantApi.fromBuildConfig()
+          .loadSessionNativeProfiles(
+        panel: widget.panel,
+        sessionToken: widget.sessionToken,
+        protocol: VpnProtocols.byCode('mieru')!,
+        native: const NativeProtocolReadiness(supportedCodes: {'mieru'}),
+      );
+      final matches = profiles.items.where(
+        (item) => item['node_id']?.toString() == serverId,
+      ).toList(growable: false);
+      if (matches.length != 1) {
+        throw const FormatException('MIERU_SERVER_PROFILE_MISSING');
+      }
+      final profile = MieruClientProfile.fromItem(matches.single);
+      final resolvedServerId = serverId;
+      // Delivery and native engine validation happen BEFORE touching a
+      // running VPN. Never leave two active TUN devices or core processes.
+      if (_modernTunnel.isRunning) await _modernTunnel.stop();
+      if (_xrayProxy.isRunning) await _xrayProxy.stop();
+      if (_sudokuProxy.isRunning) await _sudokuProxy.stop();
+      if (_mieruProxy.isRunning) await _mieruProxy.stop();
+      if (_trusttunnelProxy.isRunning) await _trusttunnelProxy.stop();
+      if (_awgServiceUp) {
+        await _awg.stop();
+        _awgServiceUp = false;
+      }
+      if (_ciscoTunnel.isRunning) await _ciscoTunnel.stop();
+      if (_openVpnTunnel.hasChild) await _openVpnTunnel.stop();
+      if (_l2tpTunnel.hasChild) await _l2tpTunnel.stop();
+      if (_vpnUp || _vpnCleanup) {
+        await _vpn.stop().timeout(const Duration(seconds: 20));
+        final status = await _vpn.status()
+            .timeout(const Duration(seconds: 10));
+        if (status['state'] != 'down') {
+          throw const FormatException('PREVIOUS_TUNNEL_NOT_STOPPED');
+        }
+        if (mounted) setState(() {
+          _vpnUp = false;
+          _vpnVerified = false;
+          _vpnCleanup = false;
+          _activeNodeId = null;
+          _vpnRx = 0;
+          _vpnTx = 0;
+          _resetNetworkStats();
+        });
+      }
+      _modernHealthTimer?.cancel();
+      _stopModernTrafficMonitoring();
+      if (mounted) setState(() {
+        _modernUp = false;
+        _modernProtocol = null;
+        _modernNodeId = null;
+        _publicIp = null;
+      });
+
+      // The Mieru core performs its own authenticated Mieru handshake.
+      // In parallel, get a DIRECT pre-TUN public-IP baseline. Both are
+      // required before sing-box is allowed to modify Windows routes.
+      final preTunnel = await Future.wait<Object>([
+        _mieruProxy.start(profile),
+        WindowsSingBoxTunnel.measureBaselineIp().timeout(
+          const Duration(seconds: 9),
+          onTimeout: () =>
+              throw const FormatException('MIERU_BASELINE_IP_TIMEOUT'),
+        ),
+      ]);
+      final socksPort = preTunnel[0] as int;
+      final baselineIp = preTunnel[1] as String;
+      final verifiedExit = _mieruProxy.verifiedExitIp;
+      final endpoint = _mieruProxy.endpointIpv4;
+      if (verifiedExit == null || endpoint == null) {
+        throw const FormatException('MIERU_REMOTE_EGRESS_UNVERIFIED');
+      }
+      final ip = await _modernTunnel.start(
+        protocol: 'mieru',
+        serverId: resolvedServerId,
+        profile: const <String, dynamic>{},
+        mieruSocksPort: socksPort,
+        mieruVerifiedExitIp: verifiedExit,
+        mieruEndpointIPv4: endpoint,
+        baselinePublicIp: baselineIp,
+      );
+      if (!mounted) return;
+      setState(() {
+        _modernUp = true;
+        _modernProtocol = 'mieru';
+        _modernNodeId = resolvedServerId;
+        _publicIp = ip;
+        _vpnError = null;
+      });
+      _startModernTrafficMonitoring();
+      _startModernHealthMonitoring();
+    } catch (error) {
+      if (_mieruProxy.isRunning && !_modernTunnel.isRunning) {
+        try { await _mieruProxy.stop(); } catch (_) {}
+      }
+      if (mounted) setState(() {
+        _modernUp = _modernTunnel.isRunning ||
+            _ciscoTunnel.isRunning ||
+            _openVpnTunnel.isRunning ||
+            _l2tpTunnel.isRunning;
+        if (!_modernUp) {
+          _modernProtocol = null;
+          _modernNodeId = null;
+          _publicIp = null;
+        }
+        _vpnError = _errorText(error);
+      });
+    } finally {
+      if (mounted) setState(() => _vpnBusy = false);
+    }
+  }
+
+  Future<void> _startTrustTunnel(String serverId) async {
+    if (_vpnBusy || !Platform.isWindows) return;
+    setState(() { _vpnBusy = true; _vpnError = null; });
+    try {
+      if (_vpnUnmanaged || _vpnCleanup) {
+        throw const FormatException('PREVIOUS_TUNNEL_NOT_STOPPED');
+      }
+      final authorized = widget.catalog?.entries.any((entry) =>
+          entry.protocol.code == 'trusttunnel' && entry.selected &&
+          entry.configRecordPresent) ?? false;
+      if (!authorized) {
+        throw const FormatException('PROTOCOL_NOT_INCLUDED_IN_SUBSCRIPTION');
+      }
+      final ready = await Future.wait<bool>([
+        WindowsTrustTunnelProxy.enginePresent(),
+        WindowsSingBoxPreflight.enginePresent(),
+      ]);
+      if (!ready[0] || !ready[1]) {
+        throw const FormatException('TRUSTTUNNEL_OR_TUN_ENGINE_UNAVAILABLE');
+      }
+      final profiles = await TenantApi.fromBuildConfig()
+          .loadSessionNativeProfiles(
+        panel: widget.panel,
+        sessionToken: widget.sessionToken,
+        protocol: VpnProtocols.byCode('trusttunnel')!,
+        native: const NativeProtocolReadiness(supportedCodes: {'trusttunnel'}),
+      );
+      final matches = profiles.items.where(
+        (item) => item['node_id']?.toString() == serverId,
+      ).toList(growable: false);
+      if (matches.length != 1) {
+        throw const FormatException('TRUSTTUNNEL_SERVER_PROFILE_MISSING');
+      }
+      final profile = TrustTunnelClientProfile.fromItem(matches.single);
+      final resolvedServerId = serverId;
+      // Delivery and native engine validation happen BEFORE touching a
+      // running VPN. Never leave two active TUN devices or core processes.
+      if (_modernTunnel.isRunning) await _modernTunnel.stop();
+      if (_xrayProxy.isRunning) await _xrayProxy.stop();
+      if (_sudokuProxy.isRunning) await _sudokuProxy.stop();
+      if (_mieruProxy.isRunning) await _mieruProxy.stop();
+      if (_trusttunnelProxy.isRunning) await _trusttunnelProxy.stop();
+      if (_awgServiceUp) {
+        await _awg.stop();
+        _awgServiceUp = false;
+      }
+      if (_ciscoTunnel.isRunning) await _ciscoTunnel.stop();
+      if (_openVpnTunnel.hasChild) await _openVpnTunnel.stop();
+      if (_l2tpTunnel.hasChild) await _l2tpTunnel.stop();
+      if (_vpnUp || _vpnCleanup) {
+        await _vpn.stop().timeout(const Duration(seconds: 20));
+        final status = await _vpn.status()
+            .timeout(const Duration(seconds: 10));
+        if (status['state'] != 'down') {
+          throw const FormatException('PREVIOUS_TUNNEL_NOT_STOPPED');
+        }
+        if (mounted) setState(() {
+          _vpnUp = false;
+          _vpnVerified = false;
+          _vpnCleanup = false;
+          _activeNodeId = null;
+          _vpnRx = 0;
+          _vpnTx = 0;
+          _resetNetworkStats();
+        });
+      }
+      _modernHealthTimer?.cancel();
+      _stopModernTrafficMonitoring();
+      if (mounted) setState(() {
+        _modernUp = false;
+        _modernProtocol = null;
+        _modernNodeId = null;
+        _publicIp = null;
+      });
+
+      // The TrustTunnel core performs its own authenticated TrustTunnel handshake.
+      // In parallel, get a DIRECT pre-TUN public-IP baseline. Both are
+      // required before sing-box is allowed to modify Windows routes.
+      final preTunnel = await Future.wait<Object>([
+        _trusttunnelProxy.start(profile),
+        WindowsSingBoxTunnel.measureBaselineIp().timeout(
+          const Duration(seconds: 9),
+          onTimeout: () =>
+              throw const FormatException('TRUSTTUNNEL_BASELINE_IP_TIMEOUT'),
+        ),
+      ]);
+      final socksPort = preTunnel[0] as int;
+      final baselineIp = preTunnel[1] as String;
+      final verifiedExit = _trusttunnelProxy.verifiedExitIp;
+      final endpoint = _trusttunnelProxy.endpointIpv4;
+      if (verifiedExit == null || endpoint == null) {
+        throw const FormatException('TRUSTTUNNEL_REMOTE_EGRESS_UNVERIFIED');
+      }
+      final ip = await _modernTunnel.start(
+        protocol: 'trusttunnel',
+        serverId: resolvedServerId,
+        profile: const <String, dynamic>{},
+        trusttunnelSocksPort: socksPort,
+        trusttunnelVerifiedExitIp: verifiedExit,
+        trusttunnelEndpointIPv4: endpoint,
+        baselinePublicIp: baselineIp,
+      );
+      if (!mounted) return;
+      setState(() {
+        _modernUp = true;
+        _modernProtocol = 'trusttunnel';
+        _modernNodeId = resolvedServerId;
+        _publicIp = ip;
+        _vpnError = null;
+      });
+      _startModernTrafficMonitoring();
+      _startModernHealthMonitoring();
+    } catch (error) {
+      if (_trusttunnelProxy.isRunning && !_modernTunnel.isRunning) {
+        try { await _trusttunnelProxy.stop(); } catch (_) {}
       }
       if (mounted) setState(() {
         _modernUp = _modernTunnel.isRunning ||
@@ -1384,6 +1811,12 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         }
         if (_xrayProxy.isRunning) await _xrayProxy.stop();
       if (_sudokuProxy.isRunning) await _sudokuProxy.stop();
+      if (_mieruProxy.isRunning) await _mieruProxy.stop();
+      if (_trusttunnelProxy.isRunning) await _trusttunnelProxy.stop();
+      if (_awgServiceUp) {
+        await _awg.stop();
+        _awgServiceUp = false;
+      }
         if (!mounted) return;
         setState(() {
           _modernUp = false;
@@ -1438,6 +1871,12 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       }
       if (_xrayProxy.isRunning) await _xrayProxy.stop();
       if (_sudokuProxy.isRunning) await _sudokuProxy.stop();
+      if (_mieruProxy.isRunning) await _mieruProxy.stop();
+      if (_trusttunnelProxy.isRunning) await _trusttunnelProxy.stop();
+      if (_awgServiceUp) {
+        await _awg.stop();
+        _awgServiceUp = false;
+      }
       if (!mounted) return;
       setState(() {
         _modernUp = false;
@@ -1503,6 +1942,12 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           await _startXrayTunnel(nodes[index].id);
         } else if (_filter == 'sudoku') {
           await _startSudokuTunnel(nodes[index].id);
+        } else if (_filter == 'mieru') {
+          await _startMieruTunnel(nodes[index].id);
+        } else if (_filter == 'trusttunnel') {
+          await _startTrustTunnel(nodes[index].id);
+        } else if (_filter == 'amneziawg') {
+          await _startAmneziaWgTunnel(nodes[index].id);
         } else if (SingBoxProfileValidator.supportsFamily(_filter)) {
           await _startModernTunnel(_filter, nodes[index].id);
         }
@@ -1577,6 +2022,12 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         }
         if (_xrayProxy.isRunning) await _xrayProxy.stop();
       if (_sudokuProxy.isRunning) await _sudokuProxy.stop();
+      if (_mieruProxy.isRunning) await _mieruProxy.stop();
+      if (_trusttunnelProxy.isRunning) await _trusttunnelProxy.stop();
+      if (_awgServiceUp) {
+        await _awg.stop();
+        _awgServiceUp = false;
+      }
         if (!mounted) return;
         setState(() {
           _modernUp = false;
@@ -1640,6 +2091,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     _modernTunnel.dispose();
     _xrayProxy.dispose();
     _sudokuProxy.dispose();
+    _mieruProxy.dispose();
+    _trusttunnelProxy.dispose();
     _resetNetworkStats();
     super.dispose();
   }
@@ -1708,6 +2161,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     if (oldWidget.username != widget.username ||
         oldWidget.panel.namespace != widget.panel.namespace ||
         oldWidget.panel.apiOrigin != widget.panel.apiOrigin) {
+      _socks5AssignedNodeIds = null;
+      _socks5NodesError = null;
       // No in-memory Xray credentials may cross tenants or accounts.
       _xrayGroups = const [];
       _xrayGroupsLoaded = false;
@@ -1771,6 +2226,36 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           if (!nextUp && !_modernUp) _resetNetworkStats();
         });
       }
+      // Query the independent official service even after a Windows/app
+      // restart, so an owned service is never mistaken for a disconnected
+      // account or silently started a second time.
+      {
+        try {
+          final awg = await _awg.status();
+          if (!mounted) return;
+          final serviceUp = awg['state'] == 'interface_up' ||
+              awg['state'] == 'peer_verified';
+          final verified = awg['state'] == 'peer_verified' &&
+              awg['peerHandshakeVerified'] == true;
+          setState(() {
+            _awgServiceUp = serviceUp;
+            _awgUnmanaged = awg['state'] == 'unmanaged_service';
+            if (_modernProtocol == 'amneziawg') {
+              _modernUp = verified;
+              _vpnRx = awg['rxBytes'] is int ? awg['rxBytes'] as int : 0;
+              _vpnTx = awg['txBytes'] is int ? awg['txBytes'] as int : 0;
+              if (!serviceUp) {
+                _modernProtocol = null;
+                _modernNodeId = null;
+                _publicIp = null;
+              }
+            }
+          });
+        } catch (_) {
+          // A status-query timeout is not proof the service stopped.
+        }
+      }
+      if (_awgServiceUp && _networkTimer == null) _startNetworkStats();
       if (nextUp && (!wasUp || _networkTimer == null)) _startNetworkStats();
       if (nextUp && nextVerified && _publicIp == null) _readNetworkStats();
       // Native feature probe is expensive; do not repeat it every 12 seconds.
@@ -1789,7 +2274,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
 
   Future<void> _toggleVpn() async {
     if (_vpnBusy || !Platform.isWindows) return;
-    if (_modernUp || _modernTunnel.isRunning || _xrayProxy.isRunning || _sudokuProxy.isRunning ||
+    if (_modernUp || _awgServiceUp || _modernTunnel.isRunning || _xrayProxy.isRunning || _sudokuProxy.isRunning ||
         _ciscoTunnel.isRunning || _openVpnTunnel.hasChild ||
         _l2tpTunnel.hasChild) {
       await _stopModernTunnel();
@@ -1823,6 +2308,12 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         await _startXrayTunnel(_selectedServerId!);
       } else if (_filter == 'sudoku') {
         await _startSudokuTunnel(_selectedServerId!);
+      } else if (_filter == 'mieru') {
+        await _startMieruTunnel(_selectedServerId!);
+      } else if (_filter == 'trusttunnel') {
+        await _startTrustTunnel(_selectedServerId!);
+      } else if (_filter == 'amneziawg') {
+        await _startAmneziaWgTunnel(_selectedServerId!);
       } else if (SingBoxProfileValidator.supportsFamily(_filter)) {
         await _startModernTunnel(_filter, _selectedServerId!);
       } else {
@@ -1980,6 +2471,71 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   }
 
   String _page = 'home';
+  // Only cache entitled SOCKS5 node IDs; never cache proxy credentials.
+  Set<String>? _socks5AssignedNodeIds;
+  bool _socks5NodesLoading = false;
+  String? _socks5NodesError;
+
+  Future<void> _refreshSocks5AvailableNodes() async {
+    if (_socks5NodesLoading) return;
+    final authorized = widget.catalog?.entries.any((entry) =>
+        entry.protocol.code == 'socks5' && entry.selected &&
+        entry.configRecordPresent) ?? false;
+    if (!authorized) {
+      if (mounted) setState(() {
+        _socks5AssignedNodeIds = <String>{};
+        _socks5NodesError = 'SOCKS5_NOT_INCLUDED_IN_SUBSCRIPTION';
+      });
+      return;
+    }
+    final username = widget.username;
+    final namespace = widget.panel.namespace;
+    setState(() {
+      _socks5NodesLoading = true;
+      _socks5NodesError = null;
+    });
+    try {
+      final profiles = await TenantApi.fromBuildConfig()
+          .loadSessionNativeProfiles(
+        panel: widget.panel,
+        sessionToken: widget.sessionToken,
+        protocol: VpnProtocols.byCode('socks5')!,
+        native: const NativeProtocolReadiness(supportedCodes: {'socks5'}),
+      );
+      final assigned = profiles.items
+          .map((item) => item['node_id']?.toString())
+          .whereType<String>().toSet();
+      if (!mounted || widget.username != username ||
+          widget.panel.namespace != namespace) return;
+      final nodes = widget.servers?.servers ?? const <AppServer>[];
+      final alreadyValid = _selected >= 0 && _selected < nodes.length &&
+          assigned.contains(nodes[_selected].id);
+      final firstValid = nodes.indexWhere((n) => assigned.contains(n.id));
+      setState(() {
+        _socks5AssignedNodeIds = assigned;
+        _socks5NodesError = assigned.isEmpty
+            ? 'SOCKS5_SERVER_PROFILE_MISSING' : null;
+        if (_filter == 'socks5' && !alreadyValid && firstValid >= 0) {
+          _selected = firstValid;
+          _autoFastest = false;
+        }
+      });
+    } catch (_) {
+      if (mounted && widget.username == username &&
+          widget.panel.namespace == namespace) {
+        setState(() {
+          _socks5AssignedNodeIds = null;
+          _socks5NodesError = 'SOCKS5_SERVER_PROFILES_UNAVAILABLE';
+        });
+      }
+    } finally {
+      if (mounted && widget.username == username &&
+          widget.panel.namespace == namespace) {
+        setState(() => _socks5NodesLoading = false);
+      }
+    }
+  }
+
   String _filter = 'all';
   String _search = '';
   int _selected = 0;
@@ -2953,6 +3509,60 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
               'SUDOKU_REMOTE_EGRESS_UNVERIFIED' => tr(
                 'ارتباط واقعی سودوکو با سرور تأیید نشد؛ اینترنت از آن عبور نکرد.',
                 'Sudoku remote handshake/HTTPS egress could not be verified.'),
+              'MIERU_SERVER_ADDRESS_INVALID' => tr(
+                'آدرس IP یا دامنه سرور Mieru در کانفیگ نامعتبر است.',
+                'The Mieru profile contains an invalid server IP/domain.'),
+              'MIERU_SERVER_DOMAIN_INVALID' => tr(
+                'نام دامنه Mieru در کانفیگ معتبر نیست.',
+                'Mieru profile has an invalid domain name.'),
+              'MIERU_SERVER_DNS_UNAVAILABLE' => tr(
+                'دامنه Mieru پیش از اتصال به IP عمومی معتبر تبدیل نشد.',
+                'Mieru domain could not resolve to a safe public IPv4 before VPN.'),
+              'MIERU_SERVER_BINDINGS_INVALID' => tr(
+                'فهرست پورت‌های سرور Mieru معتبر نیست.',
+                'The Mieru server port bindings are invalid.'),
+              'MIERU_BINDING_INVALID' => tr(
+                'یکی از پورت‌های TCP/UDP کانفیگ Mieru نامعتبر است.',
+                'A Mieru TCP/UDP port or port range is invalid.'),
+              'MIERU_SERVER_PROFILE_MISSING' => tr(
+                'کانفیگ Mieru برای سرور انتخابی در اشتراک پیدا نشد.',
+                'No Mieru account profile was delivered for this server.'),
+              'MIERU_OR_TUN_ENGINE_UNAVAILABLE' => tr(
+                'موتور Mieru یا موتور تونل ویندوز همراه برنامه نصب نشده است.',
+                'Mieru engine or the Windows tunnel engine is not bundled.'),
+              'TRUSTTUNNEL_DEEPLINK_INVALID' => tr(
+                'لینک TrustTunnel تحویل‌شده از پنل معتبر نیست.',
+                'TrustTunnel deep link from the panel is invalid.'),
+              'TRUSTTUNNEL_CERT_INVALID' => tr(
+                'گواهی TLS در کانفیگ TrustTunnel نامعتبر است.',
+                'TrustTunnel certificate payload is invalid.'),
+              'TRUSTTUNNEL_ENDPOINT_DNS_UNAVAILABLE' => tr(
+                'آدرس سرور TrustTunnel به IP عمومی معتبر تبدیل نشد.',
+                'TrustTunnel endpoint did not resolve to a safe public IP.'),
+              'TRUSTTUNNEL_REMOTE_EGRESS_UNVERIFIED' => tr(
+                'پراکسی TrustTunnel نتوانست عبور واقعی اینترنت را تأیید کند.',
+                'TrustTunnel SOCKS5 internet egress verification failed.'),
+              'TRUSTTUNNEL_ENGINE_NOT_BUNDLED' => tr(
+                'موتور رسمی TrustTunnel در این نسخه وجود ندارد.',
+                'The official TrustTunnel Windows engine is not bundled.'),
+              'AWG_NODE_PROFILE_MISSING' => tr(
+                'کانفیگ AmneziaWG برای سرور انتخابی وجود ندارد.',
+                'No AmneziaWG profile was delivered for this server.'),
+              'AWG_CONFIG_MISSING' => tr(
+                'کانفیگ AmneziaWG ناقص یا نامعتبر است.',
+                'The AmneziaWG configuration is missing or invalid.'),
+              'AWG_OBFUSCATION_MISSING' => tr(
+                'پارامترهای اختصاصی AmneziaWG در کانفیگ موجود نیستند.',
+                'AmneziaWG obfuscation parameters are missing.'),
+              'AWG_OBFUSCATION_INVALID' => tr(
+                'مقادیر اختصاصی AmneziaWG معتبر نیستند.',
+                'AmneziaWG obfuscation values are invalid.'),
+              'AWG_ADMIN_OR_TUNNEL_CONFLICT' => tr(
+                'برای AmneziaWG دسترسی مدیر لازم است یا تونل دیگری فعال است.',
+                'AmneziaWG needs Administrator access or another tunnel is running.'),
+              'AWG_START_FAILED' => tr(
+                'سرویس رسمی AmneziaWG در ویندوز راه‌اندازی نشد.',
+                'The official AmneziaWG service could not start.'),
               'NATIVE_PROTOCOL_ENGINE_NOT_READY' => tr(
                 'موتور مستقل این پروتکل هنوز آماده نیست.',
                 'This protocol requires a native engine that is not ready yet.'),
@@ -2962,6 +3572,24 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
               'UNMANAGED_WIREGUARD_SERVICE' => tr(
                 'سرویس WireGuard متعلق به برنامه نیست؛ تغییری ایجاد نشد.',
                 'WireGuard service is not managed by this app.'),
+              'SOCKS5_NOT_INCLUDED_IN_SUBSCRIPTION' => tr(
+                'SOCKS5 برای این اشتراک فعال نیست.',
+                'SOCKS5 is not enabled for this subscription.'),
+              'SOCKS5_SERVER_PROFILE_MISSING' => tr(
+                'برای این اشتراک سرور SOCKS5 تحویل نشده است.',
+                'No SOCKS5 server was delivered for this account.'),
+              'SOCKS5_SERVER_PROFILES_UNAVAILABLE' => tr(
+                'دریافت فهرست سرورهای SOCKS5 ناموفق بود.',
+                'Could not load authorized SOCKS5 nodes.'),
+              'SOCKS5_ACCOUNT_AUTH_INVALID' => tr(
+                'نام کاربری یا رمز SOCKS5 نامعتبر است.',
+                'SOCKS5 credentials are missing or invalid.'),
+              'SOCKS5_VERSION_INVALID' => tr(
+                'نسخه تحویلی SOCKS5 معتبر نیست.',
+                'Delivered SOCKS5 version is invalid.'),
+              'SOCKS5_TCP_TRANSPORT_REQUIRED' => tr(
+                'این پروفایل SOCKS5 اتصال TCP لازم را ندارد.',
+                'This SOCKS5 profile does not support TCP CONNECT.'),
               'SINGBOX_SERVER_TRANSPORT_UNREACHABLE' => tr(
                 'آزمایش اولیه ارتباط پروتکل با سرور موفق نبود؛ اتصال جدید برقرار نشد.',
                 'Selected protocol failed the transport preflight; no new connection was established.'),
@@ -3431,6 +4059,9 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                   _autoFastest = false;
                 });
                 if (entry.$1 == 'v2ray') _loadXrayGroups();
+                if (entry.$1 == 'socks5') {
+                  unawaited(_refreshSocks5AvailableNodes());
+                }
               },
             ),
         ],
@@ -3441,10 +4072,13 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       final query = _search.trim().toLowerCase();
       final matching = <int>[
         for (int i = 0; i < demoServers.length; i++)
-          if (query.isEmpty ||
+          if ((_filter != 'socks5' ||
+              _socks5AssignedNodeIds == null ||
+              _socks5AssignedNodeIds!.contains(widget.servers!.servers[i].id)) &&
+              (query.isEmpty ||
               ('${demoServers[i].country} ${demoServers[i].city} '
                '${_countryLabel(demoServers[i].flag)}')
-                .toLowerCase().contains(query))
+                .toLowerCase().contains(query)))
             i,
       ];
       final grouped = <String, List<int>>{};
@@ -3584,6 +4218,21 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
             child: fastestServerControl(),
           ),
           const SizedBox(height: 12),
+          if (_filter == 'socks5' && _socks5NodesLoading)
+            const Padding(
+              padding: EdgeInsets.all(12),
+              child: Center(child: CircularProgressIndicator()),
+            ),
+          if (_filter == 'socks5' && _socks5NodesError != null)
+            Padding(
+              padding: const EdgeInsets.all(9),
+              child: TextButton.icon(
+                onPressed: _refreshSocks5AvailableNodes,
+                icon: const Icon(Icons.refresh_rounded),
+                label: Text(tr('دریافت سرورهای مجاز SOCKS5',
+                               'Retry authorized SOCKS5 nodes')),
+              ),
+            ),
           if (_filter == 'v2ray' && _xrayGroupsLoading)
             const Padding(
               padding: EdgeInsets.all(12),

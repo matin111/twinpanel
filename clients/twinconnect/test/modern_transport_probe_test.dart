@@ -22,7 +22,7 @@ void main() {
           'uuid': '2DD61D93-75D8-4DA4-AC0E-6AECE7EAC365',
         if (entry.key == 'naive' || entry.key == 'socks5')
           'username': 'synthetic',
-        if (entry.key == 'socks5') 'version': '5',
+        if (entry.key == 'socks5') ...{'version': '5', 'network': 'tcp'},
         if (entry.key == 'snell') ...{'version': 4, 'psk': 'synthetic'},
         if (!{'snell', 'socks5'}.contains(entry.key))
           'tls': {'enabled': true},

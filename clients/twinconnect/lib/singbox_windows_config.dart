@@ -21,8 +21,13 @@ class SingBoxWindowsConfig {
     String? xrayEndpointIPv4,
     int? sudokuSocksPort,
     String? sudokuEndpointIPv4,
+    int? mieruSocksPort,
+    String? mieruEndpointIPv4,
+    int? trusttunnelSocksPort,
+    String? trusttunnelEndpointIPv4,
   }) {
-    if (xraySocksPort != null && sudokuSocksPort != null) {
+    if ([xraySocksPort, sudokuSocksPort, mieruSocksPort, trusttunnelSocksPort]
+        .where((port) => port != null).length > 1) {
       throw const FormatException('MULTIPLE_LOCAL_PROXY_UPSTREAMS');
     }
     if (sudokuSocksPort != null &&
@@ -33,7 +38,24 @@ class SingBoxWindowsConfig {
     if ((sudokuSocksPort == null) != (sudokuEndpointIPv4 == null)) {
       throw const FormatException('SUDOKU_ENDPOINT_ROUTE_MISSING');
     }
-    final activeSocksPort = xraySocksPort ?? sudokuSocksPort;
+    if (mieruSocksPort != null &&
+        (protocol != 'mieru' || mieruSocksPort < 1024 ||
+         mieruSocksPort > 65535 || resolvedServer != null)) {
+      throw const FormatException('MIERU_SOCKS_BRIDGE_INVALID');
+    }
+    if ((mieruSocksPort == null) != (mieruEndpointIPv4 == null)) {
+      throw const FormatException('MIERU_ENDPOINT_ROUTE_MISSING');
+    }
+    if (trusttunnelSocksPort != null &&
+        (protocol != 'trusttunnel' || trusttunnelSocksPort < 1025 ||
+         trusttunnelSocksPort > 65535 || resolvedServer != null)) {
+      throw const FormatException('TRUSTTUNNEL_SOCKS_BRIDGE_INVALID');
+    }
+    if ((trusttunnelSocksPort == null) != (trusttunnelEndpointIPv4 == null)) {
+      throw const FormatException('TRUSTTUNNEL_ENDPOINT_ROUTE_MISSING');
+    }
+    final activeSocksPort = xraySocksPort ?? sudokuSocksPort ??
+        mieruSocksPort ?? trusttunnelSocksPort;
     // An app-owned, loopback-only Xray-core SOCKS bridge is the sole
     // supported external outbound. Never accept an arbitrary proxy host.
     if (xraySocksPort != null &&
@@ -46,7 +68,8 @@ class SingBoxWindowsConfig {
     }
     // A narrow /32 exception only for the exact preverified VLESS server.
     // Never make a general LAN/IPv4 exception or weaken strict_route.
-    final pinnedEndpoint = xrayEndpointIPv4 ?? sudokuEndpointIPv4;
+    final pinnedEndpoint = xrayEndpointIPv4 ?? sudokuEndpointIPv4 ??
+        mieruEndpointIPv4 ?? trusttunnelEndpointIPv4;
     final endpointRoute = pinnedEndpoint == null
         ? null : XrayEndpointRoute.requirePublicIPv4(pinnedEndpoint);
     final chain = activeSocksPort == null && protocol == 'shadowtls'
@@ -62,6 +85,16 @@ class SingBoxWindowsConfig {
             'server_port': activeSocksPort,
             'version': '5',
           };
+    // The remote SOCKS5 TCP connection must not loop through its own
+    // Windows TUN. Exempt only the exact verified public upstream /32.
+    // Domain-based profiles get this address at native start after DNS.
+    final socksHost = protocol == 'socks5'
+        ? (resolvedServer ?? outbound['server']) : null;
+    final socksRoute = socksHost is String &&
+            InternetAddress.tryParse(socksHost)?.type ==
+                InternetAddressType.IPv4
+        ? XrayEndpointRoute.requirePublicIPv4(socksHost) : null;
+    final routeException = endpointRoute ?? socksRoute;
     final serverOutbound = {...outbound, 'tag': 'proxy'};
     // Resolve the endpoint before installing TUN routes to avoid a DNS
     // bootstrap loop. Preserve the original TLS identity when dialing an IP.
@@ -129,8 +162,8 @@ class SingBoxWindowsConfig {
           'mtu': 1400,
           'auto_route': true,
           'strict_route': true,
-          if (endpointRoute != null)
-            'route_exclude_address': ['$endpointRoute/32'],
+          if (routeException != null)
+            'route_exclude_address': ['$routeException/32'],
           'dns_mode': 'hijack',
         },
       ],
