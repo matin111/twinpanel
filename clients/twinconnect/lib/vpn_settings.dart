@@ -8,7 +8,6 @@ import 'native_vpn_bridge.dart';
 import 'vpn_policy.dart';
 import 'vpn_policy_store.dart';
 import 'vpn_strings.dart';
-import 'share_vpn_preview.dart';
 
 /// Controls are enabled only for verified native capabilities.
 /// Consistent frosted surface for every policy row across desktop and mobile.
@@ -114,31 +113,6 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
       _capabilities = capabilities;
       _probing = false;
     });
-  }
-
-  void _openShareVpnGuide() {
-    Navigator.of(context).push(MaterialPageRoute<void>(
-      builder: (context) => Scaffold(
-        appBar: AppBar(title: Text(AppStrings.of(context).pick(
-          'اشتراک‌گذاری VPN', 'Share VPN',
-        ))),
-        body: BrandBackground(
-          brand: widget.brand,
-          child: ListView(
-            padding: const EdgeInsets.all(20),
-            children: [
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 760),
-                child: ShareVpnPreview(
-                  dark: Theme.of(context).brightness == Brightness.dark,
-                  persian: AppStrings.of(context).isFa,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    ));
   }
 
   void _addApp() {
@@ -401,14 +375,14 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
                         child: Material(
                           type: MaterialType.transparency,
                           child: ListTile(
-                          key: const Key('vpnShareGuideButton'),
-                          leading: const Icon(Icons.wifi_tethering_outlined),
-                          title: Text(s.vpnSharingTitle),
-                          subtitle: Text(s.vpnSharingHint),
-                          trailing: const Icon(Icons.chevron_right_rounded),
-                          onTap: _openShareVpnGuide,
-                        ),
+                            key: const Key('vpnSharingUnavailable'),
+                            leading: const Icon(Icons.wifi_tethering_off_outlined),
+                            title: Text(s.vpnSharingTitle),
+                            subtitle: Text(s.vpnSharingHint),
+                            trailing: const Icon(Icons.lock_outline),
+                            enabled: false,
                           ),
+                        ),
                       ),
                       _section(context, s.vpnSecurityTitle),
                       GlassVpnSwitch.adaptive(
