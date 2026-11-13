@@ -41,6 +41,7 @@ import 'cisco_openconnect_profile.dart';
 import 'connection_bootstrap.dart';
 import 'tenant_api.dart';
 import 'vpn_policy_store.dart';
+import 'global_guard_connection_gate.dart';
 import 'vpn_policy.dart';
 import 'windows_wireguard.dart';
 import 'windows_amneziawg.dart';
@@ -204,6 +205,20 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   String? _modernProtocol;
   String? _modernNodeId;
   final VpnPolicyStore _vpnPolicy = const VpnPolicyStore();
+  /// Every protocol switch passes this gate BEFORE interrupting an existing
+  /// tunnel. The guard remains active when a VPN disconnects; we must never
+  /// disarm it just because a transport process is stopped.
+  Future<void> _requireVerifiedGuardIfRequested() async {
+    final policy = await _vpnPolicy.load(widget.panel.namespace, widget.username);
+    if (!policy.killSwitchRequested) return;
+    if (!Platform.isWindows) {
+      throw const FormatException('GLOBAL_KILL_SWITCH_UNSUPPORTED_PLATFORM');
+    }
+    final status = await NativeVpnBridge.globalKillSwitchStatus()
+        .timeout(const Duration(seconds: 5));
+    GlobalGuardConnectionGate.ensureCanConnect(policy, status);
+  }
+
   bool _vpnBusy = false;
   bool _vpnUp = false;
   bool _vpnVerified = false;
@@ -816,6 +831,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     if (_vpnBusy) return;
     setState(() { _vpnBusy = true; _vpnError = null; });
     try {
+      await _requireVerifiedGuardIfRequested();
       if (_vpnUnmanaged) {
         throw const FormatException('UNMANAGED_WIREGUARD_SERVICE');
       }
@@ -923,6 +939,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     if (_vpnBusy) return;
     setState(() { _vpnBusy = true; _vpnError = null; });
     try {
+      await _requireVerifiedGuardIfRequested();
       if (_vpnUnmanaged) {
         throw const FormatException('UNMANAGED_WIREGUARD_SERVICE');
       }
@@ -1032,6 +1049,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     if (_vpnBusy) return;
     setState(() { _vpnBusy = true; _vpnError = null; });
     try {
+      await _requireVerifiedGuardIfRequested();
       if (_vpnUnmanaged) {
         throw const FormatException('UNMANAGED_WIREGUARD_SERVICE');
       }
@@ -1138,6 +1156,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     if (_vpnBusy || !Platform.isWindows) return;
     setState(() { _vpnBusy = true; _vpnError = null; });
     try {
+      await _requireVerifiedGuardIfRequested();
       if (_vpnUnmanaged || _vpnCleanup) {
         throw const FormatException('PREVIOUS_TUNNEL_NOT_STOPPED');
       }
@@ -1293,6 +1312,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     if (_vpnBusy || !Platform.isWindows) return;
     setState(() { _vpnBusy = true; _vpnError = null; });
     try {
+      await _requireVerifiedGuardIfRequested();
       if (_vpnUnmanaged || _vpnCleanup) {
         throw const FormatException('PREVIOUS_TUNNEL_NOT_STOPPED');
       }
@@ -1434,6 +1454,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     if (_vpnBusy || !Platform.isWindows) return;
     setState(() { _vpnBusy = true; _vpnError = null; });
     try {
+      await _requireVerifiedGuardIfRequested();
       if (_vpnUnmanaged || _vpnCleanup || _awgUnmanaged) {
         throw const FormatException('PREVIOUS_TUNNEL_NOT_STOPPED');
       }
@@ -1517,6 +1538,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     if (_vpnBusy || !Platform.isWindows) return;
     setState(() { _vpnBusy = true; _vpnError = null; });
     try {
+      await _requireVerifiedGuardIfRequested();
       if (_vpnUnmanaged || _vpnCleanup) {
         throw const FormatException('PREVIOUS_TUNNEL_NOT_STOPPED');
       }
@@ -1650,6 +1672,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     if (_vpnBusy || !Platform.isWindows) return;
     setState(() { _vpnBusy = true; _vpnError = null; });
     try {
+      await _requireVerifiedGuardIfRequested();
       if (_vpnUnmanaged || _vpnCleanup) {
         throw const FormatException('PREVIOUS_TUNNEL_NOT_STOPPED');
       }
@@ -1783,6 +1806,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     if (_vpnBusy) return;
     setState(() { _vpnBusy = true; _vpnError = null; });
     try {
+      await _requireVerifiedGuardIfRequested();
       if (_vpnUnmanaged) {
         throw const FormatException('UNMANAGED_WIREGUARD_SERVICE');
       }
@@ -2030,6 +2054,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     // removing the working tunnel. A failed preflight keeps it running.
     setState(() { _vpnBusy = true; _vpnError = null; });
     try {
+      await _requireVerifiedGuardIfRequested();
       final api = TenantApi.fromBuildConfig();
       final checks = await Future.wait<Object>([
         _vpnPolicy.load(widget.panel.namespace, widget.username),
