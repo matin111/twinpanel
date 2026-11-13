@@ -440,6 +440,7 @@ inline flutter::EncodableValue Capabilities() {
       {flutter::EncodableValue("dnsGuard"), flutter::EncodableValue(ready)},
       {flutter::EncodableValue("ipv6Guard"), flutter::EncodableValue(ready)},
       {flutter::EncodableValue("killSwitchEnforced"), flutter::EncodableValue(false)},
+      {flutter::EncodableValue("wireGuardSessionKillSwitch"), flutter::EncodableValue(ready)},
       {flutter::EncodableValue("includeApps"), flutter::EncodableValue(false)},
       {flutter::EncodableValue("excludeApps"), flutter::EncodableValue(false)},
       {flutter::EncodableValue("localNetworkBypass"), flutter::EncodableValue(false)},
