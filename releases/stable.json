@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.831",
+  "version": "1.1.0-rc.832",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-13T23:22:36Z",
+  "released_at": "2026-11-13T23:28:23Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "8b6e0c5260c60dd18f2d427cf96a0f14966cd268",
+  "source_sha": "7a7ad3cc7be73a53b2224bfe7b0b291825ee2ad5",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.831/twinpanel-1.1.0-rc.831-linux-x86_64.tar.gz",
-    "sha256": "8feee97291de4059f5467ef5d3182f20e4833a3612352c2b3f739b3b6ac50043",
-    "size_bytes": 30741329
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.832/twinpanel-1.1.0-rc.832-linux-x86_64.tar.gz",
+    "sha256": "fd8ebb582b67ef7340ae29daf77b4dec4496e0f1d93b1a9ff98caccc454db26f",
+    "size_bytes": 30739369
   },
   "notes": {
-    "fa": "فهرست کامندهای ربات فروش تلگرام بعد از نصب و آپدیت پنل فقط شامل /start خواهد بود؛ پاک‌سازی کامندهای قدیمی در چت خصوصی، گروه‌ها، مدیران گروه و زبان‌های فارسی و انگلیسی. امکانات داخلی و منوی مستقل ربات نمایندگان بدون تغییر باقی می‌ماند. دارای تست رگرسیون انتشار.",
-    "en": "Ensure the main sales Telegram bot shows only /start after any new installation or update, including default, private, group, administrator scopes and Persian/English overrides. Preserve internal bot features and independent reseller bot command menus. Release regression tested."
+    "fa": "نمایش خودکار کامند /start برای کاربران ربات فروش بعد از نصب یا آپدیت پنل، بدون نیاز به بستن چت یا ارسال پیام. حذف دستورات قدیمی در دامنه‌های عمومی و فارسی/انگلیسی و به‌روزرسانی تدریجی کامند چت‌های کاربری ثبت‌شده در پس‌زمینه؛ همراه ذخیره نشانگر برای جلوگیری از تکرار غیرضروری. بدون تغییر امکانات داخلی یا ربات نمایندگان.",
+    "en": "Automatically migrate known linked Telegram users to the main sales bot's /start-only command menu on startup, without requiring users to close chats or receiving messages. Update scoped/language menus and known private chats with bounded API pacing and persistent migration fingerprint. Preserve independent reseller bots."
   }
 }
