@@ -207,7 +207,19 @@ async def execute_job(job_id: str) -> None:
         except BaseException as exc:
             db.rollback()
             # No raw exception, IP, configuration or SSH output in job status.
-            code="TUNNEL_CREATE_FAILED_"+type(exc).__name__.upper()
+            detail = getattr(exc, "detail", None)
+            detail_error = str(detail.get("error", "")) if isinstance(detail, dict) else ""
+            detail_message = str(detail.get("message", "")) if isinstance(detail, dict) else ""
+            diagnostic = (detail_error + " " + detail_message + " " + str(type(exc).__name__)).lower()
+            if any(marker in diagnostic for marker in (
+                "ssl connection has been closed", "connection already closed",
+                "server closed the connection unexpectedly", "operationalerror",
+            )):
+                code = "TUNNEL_CREATE_DB_CONNECTION_LOST"
+            elif "node_bootstrap_not_ready" in diagnostic:
+                code = "TUNNEL_CREATE_NODE_BOOTSTRAP_FAILED"
+            else:
+                code = "TUNNEL_CREATE_FAILED_" + type(exc).__name__.upper()
             db.execute(text("""
                 UPDATE twinpanel_selected_tunnel_jobs_v1
                 SET state='failed',stage='failed',error_code=:code,
