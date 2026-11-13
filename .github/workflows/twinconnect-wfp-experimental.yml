@@ -85,9 +85,9 @@ jobs:
             if ($LASTEXITCODE -eq 0) { throw "SECURITY: physical-adapter arm was accepted" }
             & $exe arm "TwinConnectSB" "not-an-ip" "$exe" $ack
             if ($LASTEXITCODE -eq 0) { throw "SECURITY: invalid endpoint arm was accepted" }
-            & $exe status
-            if ($LASTEXITCODE -ne 0) {
-              throw "Guard status failed after rejected commands"
+            $guardStatus = & $exe status
+            if ($LASTEXITCODE -ne 0 -or ($guardStatus -notmatch "OK 0 0 0")) {
+              throw "SECURITY: rejected commands left WFP rules installed"
             }
             & $exe recover $ack
             if ($LASTEXITCODE -ne 0) { throw "Independent recovery failed" }
