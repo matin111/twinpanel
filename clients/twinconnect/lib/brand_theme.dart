@@ -13,17 +13,40 @@ class BrandTheme {
     return Color(int.parse('FF${value.substring(1)}', radix: 16));
   }
 
+  // Legacy default violet is not a customized reseller palette. Translate
+  // that old default to the new low-saturation ocean/slate design. Explicit
+  // tenant color choices other than these defaults remain unchanged.
+  static bool legacyViolet(BrandPreview? brand) =>
+      (brand?.primaryColor.toUpperCase() ?? '#7C3AED') == '#7C3AED' &&
+      (brand?.secondaryColor.toUpperCase() ?? '#4F46E5') == '#4F46E5';
+
+  static Color secondaryAccent(BrandPreview? brand) =>
+      legacyViolet(brand)
+          ? const Color(0xFF65B7B2)
+          : parse(brand?.secondaryColor ?? '', '#65B7B2');
+
+  static Color connectionButton(BrandPreview? brand) =>
+      legacyViolet(brand)
+          ? const Color(0xFF3F879B)
+          : parse(brand?.buttonColor ?? '', '#3F879B');
+
   // The panel stores one tenant palette, generally authored for dark mode.
   // Derive *separate* readable light surfaces while keeping the owner hue.
   static Color surface(BrandPreview? brand, Brightness brightness) {
-    final base = parse(brand?.surfaceColor ?? '', '#20202A');
+    final base = legacyViolet(brand) &&
+            (brand?.surfaceColor.toUpperCase() ?? '#20202A') == '#20202A'
+        ? const Color(0xFF203544)
+        : parse(brand?.surfaceColor ?? '', '#203544');
     return brightness == Brightness.dark
         ? base
         : Color.lerp(base, Colors.white, 0.95)!;
   }
 
   static Color backgroundColor(BrandPreview? brand, Brightness brightness) {
-    final base = parse(brand?.backgroundColor ?? '', '#101018');
+    final base = legacyViolet(brand) &&
+            (brand?.backgroundColor.toUpperCase() ?? '#101018') == '#101018'
+        ? const Color(0xFF121F2B)
+        : parse(brand?.backgroundColor ?? '', '#121F2B');
     return brightness == Brightness.dark
         ? base
         : // Avoid an almost pure-white field that washes away the light-mode art.
@@ -31,10 +54,12 @@ class BrandTheme {
   }
 
   static Color accent(BrandPreview? brand, Brightness brightness) {
-    final base = parse(brand?.primaryColor ?? '', '#7C3AED');
+    final base = legacyViolet(brand)
+        ? const Color(0xFF548BA4)
+        : parse(brand?.primaryColor ?? '', '#548BA4');
     return brightness == Brightness.dark || base.computeLuminance() < .18
         ? base
-        : Color.lerp(base, const Color(0xFF352166), .45)!;
+        : Color.lerp(base, const Color(0xFF23485A), .24)!;
   }
 
   static ThemeMode mode(BrandPreview? brand) => switch (brand?.themeMode) {
@@ -45,8 +70,8 @@ class BrandTheme {
 
   static ThemeData make(BrandPreview? brand, Brightness brightness) {
     final primary = accent(brand, brightness);
-    final secondary = parse(brand?.secondaryColor ?? '', '#4F46E5');
-    final button = parse(brand?.buttonColor ?? '', '#7C3AED');
+    final secondary = secondaryAccent(brand);
+    final button = connectionButton(brand);
     final bg = backgroundColor(brand, brightness);
     final surface = BrandTheme.surface(brand, brightness);
     final onSurface = ThemeData.estimateBrightnessForColor(surface) ==
