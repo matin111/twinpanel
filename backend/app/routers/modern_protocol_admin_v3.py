@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..deps import require_admin
 from ..models import Node, NodeProtocolConfig
+from ..node_protocol_operator_switches_v1 import disabled_pairs
 from ..modern_protocol_models import ModernProtocolSetting
 from ..modern_node_install_lock import NodeInstallBusy, exclusive_node_install
 from ..modern_protocol_runtime import certificate_pin
@@ -249,6 +250,7 @@ def inventory(db: Session = Depends(get_db)):
         .all()
     )
     payload: list[dict[str, Any]] = []
+    disabled = disabled_pairs(db, [int(n.id) for n in nodes])
     for node in nodes:
         statuses = _status_rows(db, node.id)
         settings = _setting_rows(db, node.id)
@@ -259,7 +261,10 @@ def inventory(db: Session = Depends(get_db)):
             "public_domain": node.public_domain,
             "status": getattr(node.status, "value", str(node.status)),
             "protocols": [
-                _row_payload(key, statuses.get(key), settings.get(key))
+                {
+                    **_row_payload(key, statuses.get(key), settings.get(key)),
+                    "operator_disabled": (int(node.id), key) in disabled,
+                }
                 for key in PROTOCOL_CATALOG
             ],
         })
@@ -495,6 +500,87 @@ async def health(
             "execution": execution,
             "certificate_public_key_sha256": pin,
             "protocols": results,
+        }
+    finally:
+        conn.close()
+        await conn.wait_closed()
+
+
+
+# The sing-box daemon hosts multiple modern protocols, so a restart of one
+# sing-box-backed protocol necessarily restarts the shared core on this node.
+# The UI explicitly warns the operator. Standalone units remain isolated.
+_MODERN_RESTART_UNITS = {
+    "mieru": "mita.service",
+    "trusttunnel": "twinpanel-trusttunnel.service",
+    "amneziawg": "twinpanel-amneziawg.service",
+    "sudoku": "twinpanel-sudoku.service",
+}
+
+
+@router.post("/modern-protocols/{node_id}/{protocol}/restart")
+async def restart_one_runtime(
+    node_id: int,
+    protocol: str,
+    db: Session = Depends(get_db),
+):
+    from ..routers.provision import cmd
+    from ..modern_protocol_dispatch import (
+        _wait_for_singbox_health,
+        _wait_for_standalone_health,
+    )
+    from ..standalone_protocol_runtime import STANDALONE_PROTOCOLS
+
+    node = _protocol_node(db, node_id)
+    key = str(protocol or "").strip().lower()
+    if key not in SINGBOX_PROTOCOLS or key not in PROTOCOL_CATALOG:
+        raise HTTPException(status_code=422, detail="پروتکل نصب‌شدنی معتبر نیست")
+    row = _status_rows(db, node_id).get(key)
+    if row is None or str(row.status or "").lower() == "not_installed":
+        raise HTTPException(status_code=409, detail="ابتدا پروتکل را روی این نود نصب کنید")
+    port = int(row.port or PROTOCOL_CATALOG[key]["default_port"])
+    unit = _MODERN_RESTART_UNITS.get(key, "twinpanel-sing-box.service")
+    shared = key not in STANDALONE_PROTOCOLS
+
+    conn = await asyncio.wait_for(connect_protocol_runtime(node, db), timeout=20)
+    db.expunge(node)
+    db.commit()
+    try:
+        try:
+            async with exclusive_node_install(node_id):
+                loaded = (await cmd(
+                    conn, f"systemctl show {unit} -p LoadState --value",
+                    check=False, timeout=12,
+                )).strip()
+                if loaded != "loaded":
+                    raise HTTPException(status_code=409, detail="سرویس نصب‌شده پیدا نشد")
+                await cmd(conn, f"systemctl restart {unit}", timeout=60)
+                if shared:
+                    result = await _wait_for_singbox_health(conn, key, port)
+                else:
+                    result = await _wait_for_standalone_health(conn, key, port)
+        except NodeInstallBusy as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        except HTTPException:
+            raise
+        except Exception as exc:
+            raise HTTPException(
+                status_code=502, detail=f"ری‌استارت ناموفق: {str(exc)[:500]}"
+            ) from exc
+        _save_status(db, node, key, result)
+        db.commit()
+        return {
+            "ok": bool(result.get("ok")),
+            "node_id": node_id,
+            "protocol": key,
+            "service": unit,
+            "shared_core": shared,
+            "health": result,
+            "message": (
+                "سرویس ری‌استارت شد و Health Check موفق بود"
+                if result.get("ok") else
+                "ری‌استارت انجام شد اما Health Check موفق نبود"
+            ),
         }
     finally:
         conn.close()
