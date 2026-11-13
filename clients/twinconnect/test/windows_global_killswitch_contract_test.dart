@@ -47,8 +47,8 @@ void main() {
   test('settings cannot activate global guard without enforcement', () {
     final screen = File('lib/vpn_settings.dart').readAsStringSync();
     expect(screen, contains('NativeVpnBridge.globalKillSwitchStatus()'));
-    expect(screen, contains('vpnGlobalGuardServiceRequired'));
-    expect(screen, contains('_capabilities.killSwitchEnforced'));
+    expect(screen, contains('Protection service not ready'));
+    expect(screen, contains('onChanged: null'));
     expect(screen, isNot(contains('setGlobalKillSwitchEnabled')));
   });
 }
