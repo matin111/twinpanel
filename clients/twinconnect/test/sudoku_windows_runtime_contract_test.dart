@@ -60,7 +60,8 @@ void main() {
     expect(native, contains('twinconnect_sudoku_guard.h'));
     expect(native, contains('stageSudokuConfig'));
     expect(native, contains('guardSudokuProcess'));
-    expect(config, contains("'route_exclude_address': ['\$endpointRoute/32']"));
+    expect(config, contains("'route_exclude_address': ['\$routeException/32']"));
+    expect(config, contains('final routeException = endpointRoute ?? socksRoute;'));
   });
 
   test('Windows Go-readable Sudoku staging retains user-only ACL and cleanup', () {
