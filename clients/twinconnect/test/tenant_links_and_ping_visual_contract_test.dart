@@ -113,7 +113,7 @@ void main() {
     expect(dashboard, contains('embedded: true'));
     expect(dashboard, isNot(contains("Key('devShareVpnDisclosure')")));
     expect(policy, contains('final bool embedded;'));
-    expect(policy, contains('if (widget.embedded) return settingsBody;'));
+    expect(policy, contains('if (widget.embedded) return content;'));
     expect(dashboard, contains('widget.onRefreshAccount()'));
     expect(dashboard, contains('widget.onRefresh()'));
     expect(dashboard, contains('_disconnectAndSignOut'));
