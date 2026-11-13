@@ -44,6 +44,27 @@ void main() {
     expect(workflow, contains("NEVER invoke 'arm' or 'disarm'"));
   });
 
+  test('privileged Windows service owns lockdown and independent recovery', () {
+    final code = File('native/windows/twinconnect_global_guard_service_experimental.cpp')
+        .readAsStringSync();
+    expect(code, contains('SERVICE_WIN32_OWN_PROCESS'));
+    expect(code, contains('StartServiceCtrlDispatcherW('));
+    expect(code, contains('CreateNamedPipeW('));
+    expect(code, contains('PIPE_REJECT_REMOTE_CLIENTS'));
+    expect(code, contains('D:P(A;;GA;;;SY)(A;;GA;;;BA)'));
+    expect(code, contains('TransactionalArm('));
+    expect(code, contains('TransactionalDisarm('));
+    expect(code, contains('recover'));
+    expect(code, contains('InstallVmOnlyService('));
+    expect(code, contains('UninstallVmOnlyService('));
+    expect(code, contains('SERVICE_DEMAND_START'));
+    expect(code, isNot(contains('SERVICE_AUTO_START')));
+    final workflow = File('../../.github/workflows/twinconnect-wfp-experimental.yml')
+        .readAsStringSync();
+    expect(workflow, contains('Compile standalone privileged guard service'));
+    expect(workflow, contains('DO NOT start the service'));
+  });
+
   test('native bridge installs only a read-only guard status method', () {
     final install = File('tools/install_windows_native.py')
         .readAsStringSync();
