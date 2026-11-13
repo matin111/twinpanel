@@ -25,7 +25,7 @@ from .public_connection_modern_names_v14 import (
     _profile_name,
 )
 from .public_connection_modern_delivery_v16 import _resolve_delivery_content
-from .public_connection_multilink_v7 import _subscription_and_payload, _v2ray_items, _subscription_content
+from .public_connection_multilink_v7 import _subscription_and_payload, _v2ray_items, _subscription_content, _subscription_usage_headers
 from .. import xray_public_delivery_runtime as xray_delivery
 
 
@@ -463,6 +463,7 @@ def _headers(sub: Any, protocol: str, kind: str, count: int) -> dict[str, str]:
         "Cache-Control": "no-store",
         "Profile-Title": _multilink_name(sub, protocol),
         "Profile-Update-Interval": "12",
+        **_subscription_usage_headers(sub),
         "X-TwinPanel-Protocol": protocol,
         "X-TwinPanel-Node-Count": str(count),
         "X-TwinPanel-Multi-Kind": kind,
