@@ -1,3 +1,4 @@
+import 'twin_language_picker.dart';
 import 'app_strings.dart';
 import 'twinconnect_wave_indicator.dart';
 import 'dart:ui' show ImageFilter, FontFeature;
@@ -2457,27 +2458,19 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   }
 
   Future<void> _changeLanguage() async {
-    const choices = <String, String>{
-      'fa': 'فارسی', 'en': 'English', 'tr': 'Türkçe',
-      'ar': 'العربية', 'de': 'Deutsch', 'fr': 'Français',
-    };
-    final selected = await showDialog<String>(
+    final selected = await showTwinLanguagePicker(
       context: context,
-      builder: (dialogContext) => SimpleDialog(
-        title: Text(tr('زبان اپلیکیشن', 'App language')),
-        children: [
-          for (final choice in choices.entries)
-            SimpleDialogOption(
-              onPressed: () => Navigator.of(dialogContext).pop(choice.key),
-              child: Row(children: [
-                if (_languageCode == choice.key)
-                  const Icon(Icons.check_rounded, size: 18),
-                const SizedBox(width: 8),
-                Text(choice.value),
-              ]),
-            ),
-        ],
-      ),
+      selectedCode: _languageCode,
+      dark: _dark,
+      rtl: _rtl,
+      primary: BrandTheme.accent(widget.brand,
+          _dark ? Brightness.dark : Brightness.light),
+      accent: BrandTheme.secondaryAccent(widget.brand),
+      title: tr('انتخاب زبان', 'Choose language'),
+      subtitle: tr('زبان نمایش برنامه را انتخاب کنید',
+          'Select your preferred display language'),
+      note: tr('انتخاب شما برای دفعات بعد ذخیره می‌شود',
+          'Your selection is saved for next time'),
     );
     if (selected == null || !mounted) return;
     setState(() => _languageCode = selected);
