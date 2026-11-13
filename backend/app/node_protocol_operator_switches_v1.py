@@ -136,3 +136,32 @@ def install_public_delivery_switches() -> None:
     account_delivery._stored_info = guarded(account_delivery._stored_info)
     # Multi-Link and Mother HA use this separately captured projection.
     mother._original_stored_info = guarded(mother._original_stored_info)
+
+    def guard_readiness(fn):
+        if getattr(fn, "_tp_operator_switch_v1", False):
+            return fn
+
+        def usable(db, protocol, item):
+            if isinstance(item, dict):
+                try:
+                    node_id = int(item.get("node_id") or 0)
+                    if node_id > 0 and is_disabled(db, node_id, protocol):
+                        return False
+                except (ValueError, TypeError):
+                    pass
+            return fn(db, protocol, item)
+        usable._tp_operator_switch_v1 = True
+        return usable
+
+    # Public mobile server inventory imports this function eagerly, so update
+    # its bound reference as well. No disabled pair may be advertised as ready.
+    account_delivery._delivery_item_is_usable = guard_readiness(
+        account_delivery._delivery_item_is_usable
+    )
+    try:
+        from .routers import public_connection_mobile_server_inventory_v18 as mobile
+        mobile._delivery_item_is_usable = guard_readiness(
+            mobile._delivery_item_is_usable
+        )
+    except ImportError:
+        pass
