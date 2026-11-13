@@ -65,6 +65,32 @@ def adapter_command(family: RuntimeFamily, node_id: int, limit: int,
     return command
 
 
+def runtime_family_concurrency(*, cores: int | None = None,
+                               load: float | None = None) -> int:
+    """Select safe controller-side parallelism without changing VPN state.
+
+    Explicitly configured deployments may override the adaptive default
+    (1..3); invalid values fall back to the safe, adaptive selection.
+    """
+    cores = int(cores if cores is not None else (os.cpu_count() or 1))
+    if cores < 8:
+        return 1
+    try:
+        configured = int(os.environ.get("TWINPANEL_CENTRAL_FAMILY_CONCURRENCY", "0"))
+    except ValueError:
+        configured = 0
+    if 1 <= configured <= 3:
+        return configured
+    if load is None:
+        try:
+            load = os.getloadavg()[0]
+        except (OSError, AttributeError):
+            return 1
+    # A busy host needs spare CPU for the API, purchase activation, and
+    # accounting; low load retains the existing 2-family fast path.
+    return 1 if load >= max(3.0, cores * 0.35) else 2
+
+
 async def reconcile_runtime_families(
     node_id: int, limit: int, backend: Path,
     *, families=FAMILIES, timeout_seconds=1200, max_concurrent_families=None,
@@ -81,11 +107,12 @@ async def reconcile_runtime_families(
             or any(family not in FAMILIES for family in families)):
         raise RuntimeError("CENTRAL_RUNTIME_UNKNOWN_DELTA_FAMILY")
     if max_concurrent_families is None:
-        # Eylan-like node-wide snapshots should not wait behind unrelated
-        # service families when the controller has adequate CPU headroom.
-        # Bound to TWO disjoint families (never per subscriber) and keep
-        # small controllers serial. Sudoku remains isolated at the end.
-        max_concurrent_families=2 if (os.cpu_count() or 1)>=8 else 1
+        # Prefer fast, two-family batches only while the controller has room.
+        # Under sustained load, parallel SSH/ORM adapters compete with API,
+        # quotas and accounting and can make the panel appear frozen.
+        # Decide once per batch: changing the semaphore halfway through an
+        # apply risks reordering existing adapter operations.
+        max_concurrent_families=runtime_family_concurrency()
     if (node_id <= 0 or limit <= 0 or max_concurrent_families < 1
             or max_concurrent_families > 3):
         raise ValueError("CENTRAL_RUNTIME_INVALID_TARGET")
