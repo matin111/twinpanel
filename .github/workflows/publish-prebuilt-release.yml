@@ -67,6 +67,22 @@ jobs:
           python3 publisher/scripts/verify_release_ui_parity.py \
             --source source --main publisher
 
+      - name: Protect nonblocking subscription creation in pinned release
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          for path in \
+            "backend/app/routers/subscription_create_fast_v1.py" \
+            "lib/subscription-create-fast-api.ts" \
+            "backend/tests/test_admin_fast_create_threadpool_v1.py"; do
+            test -s "source/$path" && test -s "publisher/$path"
+            cmp -s "source/$path" "publisher/$path" || {
+              echo "::error file=$path::Candidate lacks latest nonblocking subscription-create fix"
+              exit 1
+            }
+          done
+          python3 source/backend/tests/test_admin_fast_create_threadpool_v1.py -v
+
       - name: Protect selected Tunnel and Iran Agent fixes in pinned release
         shell: bash
         run: |
