@@ -1,3 +1,4 @@
+import 'app_strings.dart';
 import 'twinconnect_wave_indicator.dart';
 import 'dart:ui' show ImageFilter, FontFeature;
 import 'dart:io' show Platform, HttpClient, InternetAddress, Process, ProcessException, FileSystemException, SocketException, HttpException;
@@ -2433,7 +2434,9 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     }
   }
 
-  bool _persian = false;
+  String _languageCode = 'en';
+  bool get _persian => _languageCode == 'fa';
+  bool get _rtl => _languageCode == 'fa' || _languageCode == 'ar';
   bool _dark = true;
   static const _languagePreference = 'twinconnect_ui_language_v1';
   static const _appearancePreference = 'twinconnect_ui_dark_v1';
@@ -2445,8 +2448,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       final dark = prefs.getBool(_appearancePreference + '_' + widget.username);
       if (!mounted) return;
       setState(() {
-        if (language == 'fa' || language == 'en') {
-          _persian = language == 'fa';
+        if (const {'fa','en','tr','ar','de','fr'}.contains(language)) {
+          _languageCode = language!;
         }
         if (dark != null) _dark = dark;
       });
@@ -2454,11 +2457,33 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   }
 
   Future<void> _changeLanguage() async {
-    final next = !_persian;
-    setState(() => _persian = next);
+    const choices = <String, String>{
+      'fa': 'فارسی', 'en': 'English', 'tr': 'Türkçe',
+      'ar': 'العربية', 'de': 'Deutsch', 'fr': 'Français',
+    };
+    final selected = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => SimpleDialog(
+        title: Text(tr('زبان اپلیکیشن', 'App language')),
+        children: [
+          for (final choice in choices.entries)
+            SimpleDialogOption(
+              onPressed: () => Navigator.of(dialogContext).pop(choice.key),
+              child: Row(children: [
+                if (_languageCode == choice.key)
+                  const Icon(Icons.check_rounded, size: 18),
+                const SizedBox(width: 8),
+                Text(choice.value),
+              ]),
+            ),
+        ],
+      ),
+    );
+    if (selected == null || !mounted) return;
+    setState(() => _languageCode = selected);
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_languagePreference, next ? 'fa' : 'en');
+      await prefs.setString(_languagePreference, selected);
     } catch (_) {}
   }
 
@@ -2828,15 +2853,16 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     }
   }
 
-  String tr(String fa, String en) => _persian ? fa : en;
+  String tr(String fa, String en) =>
+      AppStrings(Locale(_languageCode)).pick(fa, en);
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: widget.brand.brandName,
       debugShowCheckedModeBanner: false,
-      locale: Locale(_persian ? 'fa' : 'en'),
-      supportedLocales: const [Locale('fa'), Locale('en')],
+      locale: Locale(_languageCode),
+      supportedLocales: const [Locale('fa'), Locale('en'), Locale('tr'), Locale('ar'), Locale('de'), Locale('fr')],
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
@@ -3100,7 +3126,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         TextButton(
           key: const Key('devLanguageToggle'),
           onPressed: _changeLanguage,
-          child: Text(_persian ? 'EN' : 'فا'),
+          child: Text(_languageCode.toUpperCase()),
         ),
         IconButton(
           key: const Key('devSettingsButton'),
@@ -4569,17 +4595,17 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
             ]);
           }
           return Directionality(
-            textDirection: _persian ? TextDirection.rtl : TextDirection.ltr,
+            textDirection: _rtl ? TextDirection.rtl : TextDirection.ltr,
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(flex: 5, child: Directionality(
-                  textDirection: _persian ? TextDirection.rtl : TextDirection.ltr,
+                  textDirection: _rtl ? TextDirection.rtl : TextDirection.ltr,
                   child: powerCard(),
                 )),
                 const SizedBox(width: 14),
                 Expanded(flex: 5, child: Directionality(
-                  textDirection: _persian ? TextDirection.rtl : TextDirection.ltr,
+                  textDirection: _rtl ? TextDirection.rtl : TextDirection.ltr,
                   child: connectionStats(),
                 )),
               ],
@@ -5041,8 +5067,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     };
 
     return Directionality(
-      key: ValueKey<String>(_persian ? 'dashboard-rtl' : 'dashboard-ltr'),
-      textDirection: _persian ? TextDirection.rtl : TextDirection.ltr,
+      key: ValueKey<String>(_rtl ? 'dashboard-rtl' : 'dashboard-ltr'),
+      textDirection: _rtl ? TextDirection.rtl : TextDirection.ltr,
       child: Scaffold(
       body: TwinConnectAmbientBackground(
         dark: _dark,
