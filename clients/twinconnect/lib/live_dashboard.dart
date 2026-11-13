@@ -2137,10 +2137,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     _durationTicker = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) _updateConnectionClock();
     });
-    _dark = widget.brand.themeMode == 'light' ? false
-        : widget.brand.themeMode == 'system'
-            ? WidgetsBinding.instance.platformDispatcher.platformBrightness == Brightness.dark
-            : true;
+    _dark = true; // Premium dark canvas is the only supported app appearance.
     _restoreAppearance();
     _refreshNativeReadiness();
     _refreshVpnStatus();
@@ -2155,12 +2152,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   @override
   void didUpdateWidget(covariant TwinConnectLiveDashboard oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.brand.themeMode != widget.brand.themeMode) {
-      _dark = widget.brand.themeMode == 'light' ? false
-          : widget.brand.themeMode == 'system'
-              ? WidgetsBinding.instance.platformDispatcher.platformBrightness == Brightness.dark
-              : true;
-    }
+    // All tenants use the same dark UI; branded colors remain customizable.
     if (oldWidget.username != widget.username ||
         oldWidget.panel.namespace != widget.panel.namespace ||
         oldWidget.panel.apiOrigin != widget.panel.apiOrigin) {
@@ -2440,19 +2432,16 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   bool get _rtl => _languageCode == 'fa' || _languageCode == 'ar';
   bool _dark = true;
   static const _languagePreference = 'twinconnect_ui_language_v1';
-  static const _appearancePreference = 'twinconnect_ui_dark_v1';
 
   Future<void> _restoreAppearance() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final language = prefs.getString(_languagePreference);
-      final dark = prefs.getBool(_appearancePreference + '_' + widget.username);
       if (!mounted) return;
       setState(() {
         if (const {'fa','en','tr','ar','de','fr'}.contains(language)) {
           _languageCode = language!;
         }
-        if (dark != null) _dark = dark;
       });
     } catch (_) {}
   }
@@ -2480,14 +2469,6 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     } catch (_) {}
   }
 
-  Future<void> _changeAppearance() async {
-    final next = !_dark;
-    setState(() => _dark = next);
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool(_appearancePreference + '_' + widget.username, next);
-    } catch (_) {}
-  }
 
   String _page = 'home';
   // Only cache entitled SOCKS5 node IDs; never cache proxy credentials.
@@ -2861,7 +2842,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      themeMode: _dark ? ThemeMode.dark : ThemeMode.light,
+      themeMode: ThemeMode.dark,
       theme: BrandTheme.make(widget.brand, Brightness.light),
       darkTheme: BrandTheme.make(widget.brand, Brightness.dark),
       home: Builder(builder: _shell),
@@ -3109,13 +3090,6 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           ]),
         ),
         const SizedBox(height: 12),
-        IconButton(
-          key: const Key('devThemeToggle'),
-          tooltip: tr('تغییر ظاهر', 'Theme'),
-          icon: Icon(_dark ? Icons.light_mode_outlined
-              : Icons.dark_mode_outlined, color: sub),
-          onPressed: _changeAppearance,
-        ),
         Tooltip(
           message: tr('انتخاب زبان', 'Choose language'),
           child: OutlinedButton(
@@ -4832,9 +4806,6 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
               settingLine(Icons.language_rounded, tr('زبان', 'Language'),
                   disabled: false,
                   onTap: _changeLanguage),
-              settingLine(Icons.palette_outlined, tr('ظاهر', 'Appearance'),
-                  disabled: false,
-                  onTap: _changeAppearance),
               settingLine(Icons.sync_rounded,
                   tr('دریافت برند از پنل: ${widget.brand.brandName}',
                      'Sync panel brand: ${widget.brand.brandName}'),
