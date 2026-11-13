@@ -8,6 +8,7 @@ from ..database import get_db
 from ..services.node_os_preflight_v1 import remote_supported_os_id
 from ..deps import require_admin
 from ..models import Node, NodeProtocolConfig
+from ..node_protocol_operator_switches_v1 import disabled_pairs
 from ..node_runtime_connection import (
     connect_protocol_runtime,
     is_local_core,
@@ -261,6 +262,7 @@ def classic_protocol_inventory(
         (row.node_id, row.protocol): row
         for row in configs
     }
+    operator_disabled = disabled_pairs(db, node_ids)
 
     payload_nodes = []
     for node in nodes:
@@ -288,6 +290,7 @@ def classic_protocol_inventory(
                 {
                     "protocol": protocol,
                     "enabled": enabled,
+                    "operator_disabled": (int(node.id), protocol) in operator_disabled,
                     "port": port,
                     "port_text": port_text,
                     "transport": transport,
