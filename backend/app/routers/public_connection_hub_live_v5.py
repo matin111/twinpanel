@@ -499,6 +499,25 @@ def public_connection_hub_live_v5(
     source = refine_public_connection_protocol_actions_v20(source)
     source = refine_public_connection_xray_profiles_v48(source)
     source = refine_public_connection_canonical_mobile_v26(source)
+    # Approved responsive V65 hides the per-protocol <em> status for every
+    # connection card. Restore it with a more specific final rule, retaining
+    # V5's canonical online/offline JS and its quota-ledger source of truth.
+    # Do not mark an enabled protocol online without recent real activity.
+    source = source.replace(
+        "</head>",
+        '<style id="tp-live-protocol-status-restored">'
+        'body.tp65-ready .protocol-choice em{display:inline-flex!important;'
+        'align-items:center;justify-content:center;'
+        'font-size:10px!important;line-height:1.3;'
+        'white-space:nowrap;padding:3px 7px;min-width:45px}'
+        'body.tp65-ready .protocol-choice.live-online{'
+        'border-color:#29d37d!important;box-shadow:0 0 0 1px rgba(41,211,125,.35)!important}'
+        'body.tp65-ready .protocol-choice.live-online em{'
+        'color:#7af0b5!important;background:#0a3322!important;'
+        'border:1px solid #1b8053!important}'
+        '</style></head>',
+        1,
+    )
     # Canonical desktop skin forces a five-column metrics strip. The older
     # template already has five cells; appending two produces wrapped/duplicate
     # rows. Keep exactly the five requested metrics without changing quota data.
