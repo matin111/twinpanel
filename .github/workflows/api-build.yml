@@ -145,6 +145,10 @@ jobs:
         working-directory: backend
         run: PYTHONPATH=. python tests/test_fast_presence_read_txn_before_ssh_v1.py -v
 
+      - name: Guard selected Tunnel release fixes against regression
+        working-directory: backend
+        run: python tests/test_tunnel_release_persistence_v1.py -v
+
       - name: Verify SSH credential read transaction closes before network await
         working-directory: backend
         run: PYTHONPATH=. python tests/test_ssh_access_transaction_release_v1.py -v
