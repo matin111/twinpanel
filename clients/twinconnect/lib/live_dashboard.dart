@@ -50,6 +50,8 @@ import 'brand_theme.dart';
 import 'plan_classification.dart';
 import 'account_snapshot.dart';
 import 'native_vpn_bridge.dart';
+import 'android_connection_card.dart';
+import 'android_tunnel.dart';
 import 'country_flag.dart';
 import 'ambient_background.dart';
 import 'interactive_glass_card.dart';
@@ -577,6 +579,30 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
 
   Future<void> _disconnectAndSignOut() async {
     if (_vpnBusy) return;
+    if (Platform.isAndroid) {
+      setState(() { _vpnBusy = true; _vpnError = null; });
+      try {
+        final controller = const AndroidTunnelController();
+        var status = await controller.status();
+        if (status['state'] != 'down') {
+          // Never clear credentials while an Android VPN may still be active.
+          if (status['state'] == 'unavailable') {
+            throw const FormatException('ANDROID_VPN_STATUS_UNAVAILABLE');
+          }
+          await controller.stop();
+          status = await controller.status();
+        }
+        if (status['state'] != 'down') {
+          throw const FormatException('ANDROID_VPN_DISCONNECT_UNVERIFIED');
+        }
+        if (mounted) widget.onLogout();
+      } catch (error) {
+        if (mounted) setState(() => _vpnError = _errorText(error));
+      } finally {
+        if (mounted) setState(() => _vpnBusy = false);
+      }
+      return;
+    }
     if (_vpnUnmanaged) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(tr('تونل فعلی توسط TwinConnect مدیریت نمی‌شود.',
@@ -4643,7 +4669,28 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       children: [
         heading(tr('اتصال سریع', 'Quick connect')),
         const SizedBox(height: 16),
-        LayoutBuilder(builder: (context, constraints) {
+        if (Platform.isAndroid) ...[
+          glassCard(
+            key: const Key('androidNativeConnectionGlass'),
+            radius: 26,
+            padding: const EdgeInsets.all(14),
+            child: widget.catalog == null
+                ? const Center(child: CircularProgressIndicator())
+                : AndroidConnectionCard(
+                    panel: widget.panel,
+                    username: widget.username,
+                    sessionToken: widget.sessionToken,
+                    catalog: widget.catalog!,
+                    native: widget.native,
+                  ),
+          ),
+          const SizedBox(height: 14),
+          glassCard(
+            radius: 24,
+            padding: const EdgeInsets.all(18),
+            child: homeSubscriptionSummary(),
+          ),
+        ] else LayoutBuilder(builder: (context, constraints) {
           final split = constraints.maxWidth >= 740;
           if (!split) {
             return Column(children: [
@@ -5030,8 +5077,9 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           widget.brand.secondaryColor, '#62C1B4'),
         // Sidebar belongs to the reading-direction start edge:
         // Persian -> right; English -> left.
-        child: Row(children: [
-          sideBar(),
+        child: Column(children: [
+          Expanded(child: Row(children: [
+          if (!Platform.isAndroid) sideBar(),
           Expanded(child: SafeArea(child: ListView(
             padding: EdgeInsets.symmetric(
                 horizontal: wide ? 30 : 17, vertical: 25),
@@ -5062,6 +5110,30 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
               )),
             ],
           ))),
+        ])),
+          if (Platform.isAndroid)
+            SafeArea(
+              top: false,
+              child: NavigationBar(
+                key: const Key('androidMainNavigation'),
+                backgroundColor: panel.withValues(alpha: .82),
+                indicatorColor: purple.withValues(alpha: .23),
+                selectedIndex: const ['home', 'locations', 'settings', 'account']
+                    .indexOf(_page).clamp(0, 3),
+                onDestinationSelected: (index) => setState(() => _page =
+                    const ['home', 'locations', 'settings', 'account'][index]),
+                destinations: [
+                  NavigationDestination(icon: const Icon(Icons.bolt_rounded),
+                      label: tr('اتصال', 'Connect')),
+                  NavigationDestination(icon: const Icon(Icons.place_outlined),
+                      label: tr('سرورها', 'Servers')),
+                  NavigationDestination(icon: const Icon(Icons.tune_rounded),
+                      label: tr('تنظیمات', 'Settings')),
+                  NavigationDestination(icon: const Icon(Icons.person_outline_rounded),
+                      label: tr('حساب', 'Account')),
+                ],
+              ),
+            ),
         ]),
       ),
       ),
