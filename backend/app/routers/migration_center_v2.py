@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime
 from typing import Any, Literal
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy import func
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..deps import require_admin
 from ..migration_import_models import MigrationImportRecord
-from ..models import ProtocolCredential, Subscription, SubscriptionProtocol, SubscriptionStatus
+from ..models import ProtocolCredential, Subscription, SubscriptionProtocol, SubscriptionStatus, User
 from ..services.migration_eylan import EYLAN_SOURCE, MAX_ARCHIVE_BYTES, duration_days_for_expiry, preview_eylan_backup
 from ..services.migration_eylan_transfer import EYLAN_STAGE_LIMIT, finalize_eylan_records, stage_eylan_records
 from ..services.migration_import_v2 import _enc_payload, import_record, legacy_payload
@@ -126,14 +126,14 @@ def migration_all_protocols_status(
         .scalar() or 0
     )
     snapshots = dict(
-        db.query(SubscriptionProtocol.protocol, func.count(SubscriptionProtocol.id))
+        db.query(SubscriptionProtocol.protocol, func.count(func.distinct(SubscriptionProtocol.subscription_id)))
         .join(MigrationImportRecord, MigrationImportRecord.subscription_id == SubscriptionProtocol.subscription_id)
         .filter(MigrationImportRecord.source == source)
         .group_by(SubscriptionProtocol.protocol)
         .all()
     )
     ready = dict(
-        db.query(ProtocolCredential.protocol, func.count(ProtocolCredential.id))
+        db.query(ProtocolCredential.protocol, func.count(func.distinct(ProtocolCredential.subscription_id)))
         .join(MigrationImportRecord, MigrationImportRecord.subscription_id == ProtocolCredential.subscription_id)
         .filter(
             MigrationImportRecord.source == source,
@@ -202,6 +202,91 @@ def migration_all_protocols_backfill(
         "next_after_id": next_cursor,
         "has_more": has_more,
         "remote_provisioning_completed": False,
+    }
+
+
+@admin_router.get("/target-check")
+def migration_target_check(
+    target_user_id: int = Query(gt=0),
+    source: Literal["sanaei", "marzban", "pasargad", "eylan"] = Query(),
+    db: Session = Depends(get_db),
+):
+    """Read-only destination check before submitting any migration batch.
+
+    The endpoint does not expose account credentials or legacy tokens.
+    A missing/inactive user is explicitly reported instead of allowing the
+    UI to discover it halfway through a long batch.
+    """
+    user = db.get(User, target_user_id)
+    if not user:
+        return {
+            "exists": False,
+            "active": False,
+            "target_user_id": target_user_id,
+            "display_name": None,
+            "existing_imports": 0,
+        }
+    existing_imports = int(
+        db.query(func.count(MigrationImportRecord.id))
+        .join(Subscription, Subscription.id == MigrationImportRecord.subscription_id)
+        .filter(
+            MigrationImportRecord.source == source,
+            Subscription.user_id == target_user_id,
+        )
+        .scalar() or 0
+    )
+    return {
+        "exists": True,
+        "active": bool(user.is_active),
+        "target_user_id": target_user_id,
+        "display_name": user.full_name or f"User #{target_user_id}",
+        "existing_imports": existing_imports,
+    }
+
+
+@admin_router.get("/overview")
+def migration_overview(
+    source: Literal["sanaei", "marzban", "pasargad", "eylan"] = Query(),
+    limit: int = Query(default=12, ge=1, le=30),
+    db: Session = Depends(get_db),
+):
+    """Bounded, read-only audit overview with no preserved secrets.
+
+    Do not return legacy_url, legacy_token, preserved_payload_encrypted,
+    password, or subscription keys. One joined query avoids the prior N+1
+    subscription fetches when displaying the latest migration attempts.
+    """
+    count = int(
+        db.query(func.count(MigrationImportRecord.id))
+        .filter(MigrationImportRecord.source == source)
+        .scalar() or 0
+    )
+    rows = (
+        db.query(MigrationImportRecord, Subscription)
+        .outerjoin(Subscription, Subscription.id == MigrationImportRecord.subscription_id)
+        .filter(MigrationImportRecord.source == source)
+        .order_by(MigrationImportRecord.created_at.desc(), MigrationImportRecord.id.desc())
+        .limit(limit)
+        .all()
+    )
+    return {
+        "source": source,
+        "total_imported": count,
+        "history": [
+            {
+                "id": marker.id,
+                "source_id": marker.source_id,
+                "subscription_id": marker.subscription_id,
+                "target_user_id": sub.user_id if sub else None,
+                "account_username": sub.account_username if sub else None,
+                "status": marker.status,
+                "subscription_status": (
+                    getattr(sub.status, "value", str(sub.status)) if sub else "missing"
+                ),
+                "created_at": marker.created_at.isoformat() if marker.created_at else None,
+            }
+            for marker, sub in rows
+        ],
     }
 
 
