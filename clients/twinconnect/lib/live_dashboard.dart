@@ -4695,34 +4695,6 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       children: [
         heading(tr('تنظیمات', 'Settings')),
         const SizedBox(height: 17),
-        glassCard(
-          key: const Key('settingsSecurityStatus'),
-          radius: 22,
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-          child: Row(children: [
-            Container(
-              width: 43,
-              height: 43,
-              decoration: BoxDecoration(
-                color: purple.withValues(alpha: .17),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Icon(Icons.shield_outlined, color: purple, size: 23),
-            ),
-            const SizedBox(width: 13),
-            Expanded(child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                txt(tr('امنیت و شبکه', 'Security & network'),
-                    bold: true, size: 16),
-                const SizedBox(height: 4),
-                txt(tr('کنترل اتصال و مسیر ترافیک',
-                    'Connection and traffic controls'), size: 11, color: sub),
-              ],
-            )),
-          ]),
-        ),
-        const SizedBox(height: 10),
         VpnSettingsScreen(
           key: const Key('inlineVpnSettings'),
           tenant: widget.panel.namespace,
