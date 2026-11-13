@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.819",
+  "version": "1.1.0-rc.820",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-13T01:49:44Z",
+  "released_at": "2026-11-13T02:33:34Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "3368bae2ef65d4e94f74ceccf4b6ba8b6e287a68",
+  "source_sha": "6a1aae7b5a96be7460651022d3e7375ab9d4dc55",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.819/twinpanel-1.1.0-rc.819-linux-x86_64.tar.gz",
-    "sha256": "2ff731d5d2dceb823b15f75c7436b396aaff4c56eb6b238521e376d08fd96527",
-    "size_bytes": 30704013
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.820/twinpanel-1.1.0-rc.820-linux-x86_64.tar.gz",
+    "sha256": "0f835b7fc1ab0aafcaa8eef50fd206297f4c658404b3c933b7df37290698ca35",
+    "size_bytes": 30706971
   },
   "notes": {
-    "fa": "بازطراحی فشرده و منظم بخش پروتکل‌ها و سرورها در فرم ساخت اشتراک: کارت‌های هم‌عرض و تمام‌عرض با گرید چهارتایی دسکتاپ، سه‌ستونی تبلت و دو‌ستونی موبایل؛ اسکرول داخلی مستقل، عنوان‌ها و شمارنده‌های مرتب و حفظ انتخاب همه/هیچکدام و فرآیند ساخت اکانت. هر دو حالت روشن و تاریک اصلاح شدند؛ تمام اصلاحات rc.818 نیز حفظ شده‌اند.",
-    "en": "Compact admin create-subscription protocol and exit-node choice grids: uniformly sized full-width cards, 4/3/2 responsive columns, section-scoped scrolling, compact headers and accurate selection counts. Preserve existing plan, selection and provisioning logic, light/dark themes and all rc.818 agent repairs."
+    "fa": "رفع پایدار خطای ساخت تونل TP27 Fast: آزادسازی تراکنش پایگاه داده قبل از نصب طولانی Agent، تشخیص خطای قطع اتصال PostgreSQL در Job، حفظ مسیر نصب Agent ایران و افزودن تست‌های جلوگیری از بازگشت باگ در آپدیت‌های بعدی.",
+    "en": "Durable selected-tunnel bootstrap database transaction fix, safer PostgreSQL disconnect job diagnostics, Iran Agent fallback preservation, and automated release regression guards."
   }
 }
