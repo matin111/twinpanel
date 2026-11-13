@@ -52,7 +52,6 @@ import 'native_vpn_bridge.dart';
 import 'country_flag.dart';
 import 'ambient_background.dart';
 import 'interactive_glass_card.dart';
-import 'share_vpn_preview.dart';
 import 'tunnel_traffic_chart.dart';
 import 'vpn_settings.dart';
 
