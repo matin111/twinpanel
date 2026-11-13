@@ -54,6 +54,14 @@ def main() -> None:
     assert "existing_venv" in source
     assert "python3-httpx python3-psutil" in source
     assert "--system-site-packages" in source
+    # Minimal Ubuntu nodes need python3-venv/ensurepip before --system-site-packages.
+    # If apt is unavailable but system dependencies are healthy, the generated
+    # service must use the same verified /usr/bin/python3 interpreter.
+    assert "python3 -m ensurepip --version" in source
+    assert "python3-venv >/dev/null 2>&1" in source
+    assert 'return "/usr/bin/python3", "system_packages_direct"' in source
+    assert 'ExecStart={python_path} /opt/twinpanel-agent/agent.py' in source
+    assert "service = dedent(\n        f\"\"\"" in source
     assert "--disable-pip-version-check install --retries 2 --timeout 15" in source
     assert "pip install --upgrade pip >/dev/null" not in source
     # The legacy Agent installer now has the same offline-safe behavior.
