@@ -47,14 +47,48 @@ DWORD Open(Engine& engine) {
                          nullptr, &engine.handle);
 }
 
+// Read and verify the exact TwinConnect-owned filter contract. A filter
+// merely existing by GUID must never be treated as proof of protection.
 bool Exists(HANDLE handle, const GUID& key) {
   FWPM_FILTER0* filter = nullptr;
   const DWORD result = FwpmFilterGetByKey0(handle, &key, &filter);
-  if (result == ERROR_SUCCESS) {
-    FwpmFreeMemory0(reinterpret_cast<void**>(&filter));
-    return true;
+  if (result != ERROR_SUCCESS || !filter) return false;
+
+  const bool blockV4 = InlineIsEqualGUID(key, kBlockV4);
+  const bool blockV6 = InlineIsEqualGUID(key, kBlockV6);
+  const bool permitV4 = InlineIsEqualGUID(key, kPermitV4);
+  bool valid = (blockV4 || blockV6 || permitV4) &&
+      InlineIsEqualGUID(filter->subLayerKey, kSubLayer) &&
+      (filter->flags & FWPM_FILTER_FLAG_PERSISTENT) != 0 &&
+      InlineIsEqualGUID(filter->layerKey, blockV6
+          ? FWPM_LAYER_ALE_AUTH_CONNECT_V6
+          : FWPM_LAYER_ALE_AUTH_CONNECT_V4) &&
+      filter->action.type == (permitV4 ? FWP_ACTION_PERMIT : FWP_ACTION_BLOCK) &&
+      filter->filterCondition != nullptr &&
+      filter->numFilterConditions == (permitV4 ? 2u : 1u);
+  if (valid && !permitV4) {
+    const auto& rule = filter->filterCondition[0];
+    valid = InlineIsEqualGUID(rule.fieldKey, FWPM_CONDITION_IP_LOCAL_INTERFACE) &&
+        rule.matchType == FWP_MATCH_NOT_EQUAL &&
+        rule.conditionValue.type == FWP_UINT64 &&
+        rule.conditionValue.uint64 != nullptr &&
+        *rule.conditionValue.uint64 != 0;
   }
-  return false;
+  if (valid && permitV4) {
+    const auto& app = filter->filterCondition[0];
+    const auto& address = filter->filterCondition[1];
+    valid = InlineIsEqualGUID(app.fieldKey, FWPM_CONDITION_ALE_APP_ID) &&
+        app.matchType == FWP_MATCH_EQUAL &&
+        app.conditionValue.type == FWP_BYTE_BLOB_TYPE &&
+        app.conditionValue.byteBlob != nullptr &&
+        app.conditionValue.byteBlob->size > 0 &&
+        InlineIsEqualGUID(address.fieldKey, FWPM_CONDITION_IP_REMOTE_ADDRESS) &&
+        address.matchType == FWP_MATCH_EQUAL &&
+        address.conditionValue.type == FWP_UINT32 &&
+        address.conditionValue.uint32 != 0;
+  }
+  FwpmFreeMemory0(reinterpret_cast<void**>(&filter));
+  return valid;
 }
 
 DWORD RemoveOwned(HANDLE handle, const GUID& key) {
@@ -134,6 +168,8 @@ DWORD EnsureSubLayer(HANDLE engine) {
   return status == FWP_E_ALREADY_EXISTS ? ERROR_SUCCESS : status;
 }
 
+DWORD TransactionalDisarm(HANDLE engine);
+
 DWORD TransactionalArm(HANDLE engine, UINT64 tunnelLuid, UINT32 endpoint,
                        const std::wstring& executablePath) {
   DWORD result = FwpmTransactionBegin0(engine, 0);
@@ -156,9 +192,12 @@ DWORD TransactionalArm(HANDLE engine, UINT64 tunnelLuid, UINT32 endpoint,
   }
   result = FwpmTransactionCommit0(engine);
   if (result != ERROR_SUCCESS) return result;
-  return Exists(engine, kBlockV4) && Exists(engine, kBlockV6)
-      && Exists(engine, kPermitV4)
-      ? ERROR_SUCCESS : ERROR_INVALID_STATE;
+  if (Exists(engine, kBlockV4) && Exists(engine, kBlockV6) &&
+      Exists(engine, kPermitV4)) return ERROR_SUCCESS;
+  // A committed but unverifiable policy must be rolled back immediately,
+  // rather than leaving hidden persistent firewall rules behind.
+  const DWORD recovery = TransactionalDisarm(engine);
+  return recovery == ERROR_SUCCESS ? ERROR_INVALID_STATE : recovery;
 }
 
 DWORD TransactionalDisarm(HANDLE engine) {
