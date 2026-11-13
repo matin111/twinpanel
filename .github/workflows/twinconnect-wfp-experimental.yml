@@ -1,0 +1,46 @@
+name: TwinConnect Windows WFP Guard Experimental Check
+
+on:
+  pull_request:
+    paths:
+      - "clients/twinconnect/native/windows/twinconnect_global_guard_experimental.cpp"
+      - ".github/workflows/twinconnect-wfp-experimental.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  wfp-readonly-build:
+    runs-on: windows-latest
+    timeout-minutes: 12
+    defaults:
+      run:
+        working-directory: clients/twinconnect
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build experimental WFP tool without installing
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $vswhere = Join-Path "${env:ProgramFiles(x86)}" "Microsoft Visual Studio/Installer/vswhere.exe"
+          $vs = (& $vswhere -latest -property installationPath).Trim()
+          if (!$vs) { throw "Visual Studio C++ compiler unavailable" }
+          $dev = Join-Path $vs "Common7/Tools/VsDevCmd.bat"
+          $source = Join-Path (Get-Location) "native/windows/twinconnect_global_guard_experimental.cpp"
+          $exe = Join-Path $env:RUNNER_TEMP "twinconnect-wfp-test.exe"
+          $compile = 'call "' + $dev + '" -arch=amd64 && cl /nologo /std:c++17 /EHsc /W4 /WX /Fe:"' + $exe + '" "' + $source + '" /link Fwpuclnt.lib Iphlpapi.lib Ws2_32.lib Rpcrt4.lib'
+          & cmd.exe /d /s /c $compile
+          if ($LASTEXITCODE -ne 0 -or !(Test-Path $exe)) {
+            throw "Experimental WFP C++ compilation failed"
+          }
+          # Only a read-only status query. NEVER invoke 'arm' or 'disarm'.
+          & $exe status
+          if ($LASTEXITCODE -ne 0) { throw "Read-only guard status failed" }
+          Remove-Item -LiteralPath $exe -Force
+      - name: Validate no executable entered the repository
+        shell: pwsh
+        run: |
+          if (Test-Path "native/windows/twinconnect-wfp-test.exe") {
+            throw "Prototype binary must never be bundled"
+          }
