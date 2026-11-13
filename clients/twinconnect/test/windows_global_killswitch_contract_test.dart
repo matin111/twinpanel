@@ -31,7 +31,7 @@ void main() {
     final workflow = File('../../.github/workflows/twinconnect-windows-preview.yml')
         .readAsStringSync();
     expect(workflow, contains('Compile isolated Windows global guard prototype'));
-    expect(workflow, contains('never execute or ship'));
+    expect(workflow, contains('never arm or ship'));
   });
 
   test('native bridge installs only a read-only guard status method', () {
