@@ -13,7 +13,7 @@ String syntheticLink({int version = 1, bool badSkip = false, bool cert = false})
     if (value.length < 64) {
       b.add(value.length);
     } else {
-      b.add(0x40 | (value.length >> 8), value.length & 0xff);
+      b.addAll([0x40 | (value.length >> 8), value.length & 0xff]);
     }
     b.addAll(value);
   }
