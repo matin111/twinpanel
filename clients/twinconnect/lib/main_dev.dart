@@ -67,7 +67,7 @@ class _TwinConnectDevAppState extends State<TwinConnectDevApp> {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      themeMode: _dark ? ThemeMode.dark : ThemeMode.light,
+      themeMode: ThemeMode.dark,
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(
@@ -223,13 +223,6 @@ class _TwinConnectDevAppState extends State<TwinConnectDevApp> {
           ]),
         ),
         const SizedBox(height: 12),
-        IconButton(
-          key: const Key('devThemeToggle'),
-          tooltip: tr('تغییر ظاهر', 'Theme'),
-          icon: Icon(_dark ? Icons.light_mode_outlined
-              : Icons.dark_mode_outlined, color: sub),
-          onPressed: () => setState(() => _dark = !_dark),
-        ),
         TextButton(
           key: const Key('devLanguageToggle'),
           onPressed: () => setState(() => _persian = !_persian),
@@ -735,9 +728,6 @@ class _TwinConnectDevAppState extends State<TwinConnectDevApp> {
               settingLine(Icons.language_rounded, tr('زبان', 'Language'),
                   disabled: false,
                   onTap: () => setState(() => _persian = !_persian)),
-              settingLine(Icons.palette_outlined, tr('ظاهر', 'Appearance'),
-                  disabled: false,
-                  onTap: () => setState(() => _dark = !_dark)),
             ],
           ),
         ),
