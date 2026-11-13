@@ -4569,7 +4569,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
             ]);
           }
           return Directionality(
-            textDirection: TextDirection.ltr,
+            textDirection: _persian ? TextDirection.rtl : TextDirection.ltr,
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -5040,14 +5040,20 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       _ => home(),
     };
 
-    return Scaffold(
+    return Directionality(
+      key: ValueKey<String>(_persian ? 'dashboard-rtl' : 'dashboard-ltr'),
+      textDirection: _persian ? TextDirection.rtl : TextDirection.ltr,
+      child: Scaffold(
       body: TwinConnectAmbientBackground(
         dark: _dark,
         backgroundColor: sidebar,
         primaryColor: purple,
         secondaryColor: BrandTheme.parse(
           widget.brand.secondaryColor, '#62C1B4'),
+        // Sidebar belongs to the reading-direction start edge:
+        // Persian -> right; English -> left.
         child: Row(children: [
+          sideBar(),
           Expanded(child: SafeArea(child: ListView(
             padding: EdgeInsets.symmetric(
                 horizontal: wide ? 30 : 17, vertical: 25),
@@ -5078,8 +5084,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
               )),
             ],
           ))),
-          sideBar(),
         ]),
+      ),
       ),
     );
   }
