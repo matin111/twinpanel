@@ -301,6 +301,56 @@ jobs:
           if ($env:SIGNING_CONFIGURED -eq 'true' -and $setup.Status -ne 'Valid') {
             throw 'Signed build did not retain a valid installer signature'
           }
+      # Inspect the actual distributable files, not only the unpacked Flutter directory.
+      # This is a CI malware scan; it cannot establish Chrome Safe Browsing reputation.
+      - name: Scan final installer and portable ZIP with Windows Defender
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $scanner = Join-Path $env:ProgramFiles 'Windows Defender/MpCmdRun.exe'
+          if (!(Test-Path -LiteralPath $scanner)) {
+            throw 'Windows Defender scanner unavailable; refusing unscanned diagnostic artifacts'
+          }
+          foreach ($path in @('TwinConnect-Windows-x64-Setup.exe', 'TwinConnect-Windows-Preview.zip')) {
+            if (!(Test-Path -LiteralPath $path)) { throw "Missing distributable: $path" }
+            & $scanner -Scan -ScanType 3 -File (Resolve-Path -LiteralPath $path).Path -DisableRemediation
+            if ($LASTEXITCODE -ne 0) { throw "Defender did not complete cleanly for $path (exit $LASTEXITCODE)" }
+          }
+          Write-Host 'Final installer and portable archive scanned without Defender findings'
+
+      # Inventory helps compare a Chrome-blocked build with an earlier downloadable one.
+      # Hashes, sizes, and Authenticode status only; no account secrets or configuration.
+      - name: Record distributable binary hashes and signature status
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $release = 'build/windows/x64/runner/Release'
+          $files = @(Get-ChildItem -LiteralPath $release -File -Recurse |
+            Where-Object { $_.Extension.ToLowerInvariant() -in @('.exe', '.dll', '.msi', '.sys') })
+          $files += @(Get-Item -LiteralPath 'TwinConnect-Windows-x64-Setup.exe')
+          $records = @($files | ForEach-Object {
+            $file = $_
+            $absolute = $file.FullName
+            $root = (Resolve-Path -LiteralPath $release).Path
+            $relative = if ($absolute.StartsWith($root, [StringComparison]::OrdinalIgnoreCase)) {
+              'Release/' + $absolute.Substring($root.Length).TrimStart('\\','/').Replace('\\','/')
+            } else { $file.Name }
+            $signature = Get-AuthenticodeSignature -LiteralPath $absolute
+            [pscustomobject]@{
+              path = $relative
+              bytes = $file.Length
+              sha256 = (Get-FileHash -LiteralPath $absolute -Algorithm SHA256).Hash.ToLowerInvariant()
+              authenticode = $signature.Status.ToString()
+            }
+          } | Sort-Object path)
+          $records | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath 'TwinConnect-Windows-Binary-Inventory.json' -Encoding utf8
+          Write-Host ("Binary inventory entries: " + $records.Count)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TwinConnect-Windows-Binary-Inventory
+          path: clients/twinconnect/TwinConnect-Windows-Binary-Inventory.json
+          if-no-files-found: error
+          retention-days: 30
       - uses: actions/upload-artifact@v4
         with:
           name: TwinConnect-Windows-SHA256SUMS
