@@ -2014,6 +2014,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     final busy = _vpnBusy;
     setState(() {
       _selected = index;
+      if (Platform.isAndroid) _androidExplicitNodeSelected = true;
       _page = 'home';
       _autoFastest = false;
       if (!busy) _vpnError = null;
@@ -2024,8 +2025,13 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
             'Server selected; previous connection operation is still running.'))));
       return;
     }
+    if (Platform.isAndroid) {
+      // Selection is passed to the native Android card by exact node ID.
+      // Never start the Windows engine or claim a connection here.
+      return;
+    }
     if (!Platform.isWindows) {
-      setState(() => _vpnError = 'WINDOWS_ENGINE_REQUIRED');
+      setState(() => _vpnError = 'PLATFORM_UNSUPPORTED');
       return;
     }
     if (_filter != 'all' && _filter != 'wireguard') {
@@ -2642,6 +2648,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   String _filter = 'all';
   String _search = '';
   int _selected = 0;
+  bool _androidExplicitNodeSelected = false;
   final Set<int> _favorites = <int>{};
   // User-facing Xray inbounds remain distinct choices. Last validated
   // entries are stored in OS-encrypted short-lived display cache only.
@@ -4682,6 +4689,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                     sessionToken: widget.sessionToken,
                     catalog: widget.catalog!,
                     native: widget.native,
+                    selectedNodeId: _androidExplicitNodeSelected
+                        ? _selectedServerId : null,
                   ),
           ),
           const SizedBox(height: 14),
