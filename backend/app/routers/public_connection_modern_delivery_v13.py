@@ -55,57 +55,12 @@ PROTOCOL_META: dict[str, tuple[str, str, str]] = {
     "sudoku": ("Sudoku", "SU", "#9333ea"),
 }
 
-_PLATFORMS = ("windows", "android", "ios", "macos")
-_KARING = {p: ("Karing", f"/v1/connect/app-download/karing/{p}") for p in _PLATFORMS}
-_HIDDIFY = {
-    p: ("Hiddify", "https://hiddify.com/app/How-to-install-Hiddify-app/")
-    for p in _PLATFORMS
-}
+# Canonical verified client identity and link per protocol and OS.
+# V34 and the public Apps tab consume this same catalog.
+from .public_connection_client_catalog_v821 import protocol_client_rows
 
-# Stable official/project pages are intentionally preferred to version-pinned
-# binary URLs so customer pages do not go stale when upstream clients release.
-CLIENTS: dict[str, dict[str, tuple[str, str]]] = {
-    "cisco": {
-        "windows": ("OpenConnect / Cisco Client", "https://www.infradead.org/openconnect/"),
-        "android": ("OpenConnect", "https://www.infradead.org/openconnect/"),
-        "ios": ("Cisco Secure Client", "https://www.cisco.com/site/us/en/products/security/secure-client/index.html"),
-        "macos": ("OpenConnect / Cisco Client", "https://www.infradead.org/openconnect/"),
-    },
-    "openvpn": {p: ("OpenVPN Connect", "https://openvpn.net/client/") for p in _PLATFORMS},
-    "wireguard": {p: ("WireGuard", "https://www.wireguard.com/install/") for p in _PLATFORMS},
-    "v2ray": _HIDDIFY,
-    "hysteria2": _KARING,
-    "tuic": _KARING,
-    "anytls": _KARING,
-    "naive": _KARING,
-    "shadowtls": _KARING,
-    "socks5": {p: ("SOCKS5-compatible client", "https://sing-box.sagernet.org/configuration/outbound/socks/") for p in _PLATFORMS},
-    "snell": {
-        "windows": ("sing-box Desktop", "https://github.com/SagerNet/sing-box-for-desktop/releases/latest"),
-        "android": ("sing-box", "https://github.com/SagerNet/sing-box/releases/latest"),
-        "ios": ("sing-box", "https://github.com/SagerNet/sing-box-for-apple"),
-        "macos": ("sing-box", "https://github.com/SagerNet/sing-box-for-apple"),
-    },
-    "mieru": _KARING,
-    "trusttunnel": {
-        "windows": ("TrustTunnel GUI", "https://github.com/blazuryk/TrustTunnel-GUI-Client/releases/latest"),
-        "android": ("TrustTunnel", "https://github.com/TrustTunnel/TrustTunnel"),
-        "ios": ("TrustTunnel", "https://github.com/TrustTunnel/TrustTunnel"),
-        "macos": ("TrustTunnel", "https://github.com/TrustTunnel/TrustTunnel"),
-    },
-    "amneziawg": {
-        "windows": ("AmneziaWG", "https://github.com/amnezia-vpn/amneziawg-windows-client/releases/latest"),
-        "android": ("AmneziaWG", "https://play.google.com/store/apps/details?id=org.amnezia.awg"),
-        "ios": ("AmneziaWG", "https://apps.apple.com/app/amneziawg/id6478942365"),
-        "macos": ("AmneziaWG", "https://apps.apple.com/app/amneziawg/id6478942365"),
-    },
-    "sudoku": {
-        "windows": ("Sudoku Desktop", "https://github.com/SUDOKU-ASCII/sudoku-desktop/releases/latest"),
-        "android": ("Sudodroid", "https://github.com/SUDOKU-ASCII/sudoku-android/releases/latest"),
-        "ios": ("Anywhere Proxy", "https://apps.apple.com/us/app/anywhere-proxy/id6758235178"),
-        "macos": ("Sudoku Desktop", "https://github.com/SUDOKU-ASCII/sudoku-desktop/releases/latest"),
-    },
-}
+_PLATFORMS = ("windows", "android", "ios", "macos")
+CLIENTS: dict[str, dict[str, tuple[str, str]]] = protocol_client_rows()
 
 
 def _h(value: Any) -> str:

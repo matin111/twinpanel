@@ -8,9 +8,9 @@ V41 = ROOT / "app" / "routers" / "public_connection_v2ray_actions_v41.py"
 def test_v2ray_uses_its_own_client_family_not_karing_or_hiddify() -> None:
     source = V41.read_text(encoding="utf-8")
     authority = source.split("_MARKER =", 1)[0]
-    assert '"windows": ("v2rayN"' in authority
-    assert '"android": ("v2rayNG"' in authority
-    assert '"ios": ("V2Box"' in authority
+    assert 'protocol_client_rows()["v2ray"]' in authority
+    catalog = (ROOT / "app/routers/public_connection_client_catalog_v821.py").read_text()
+    assert '"v2ray": {"android": "v2rayng", "ios": "v2box", "windows": "v2rayn", "macos": "v2rayn"}' in catalog
     assert 'modern_delivery.CLIENTS["v2ray"] = _V2RAY_CLIENTS' in authority
     assert 'multilink.PROTOCOL_CLIENT["v2ray"] = "v2ray"' in authority
     assert 'modern_delivery.CLIENTS["v2ray"] = modern_delivery._KARING' not in authority

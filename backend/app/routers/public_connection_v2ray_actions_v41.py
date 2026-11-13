@@ -17,12 +17,10 @@ apply_v2ray_multilink_v43()
 # customer card was rewritten to v2rayN/v2rayNG/V2Box while backend compatibility
 # metadata still advertised Karing, so Multi-Link labels could name a different
 # app than the visible download card.
-_V2RAY_CLIENTS = {
-    "windows": ("v2rayN", "https://github.com/2dust/v2rayN/releases/latest"),
-    "android": ("v2rayNG", "https://github.com/2dust/v2rayNG/releases/latest"),
-    "ios": ("V2Box", "https://apps.apple.com/us/app/v2box-v2ray-client/id6446814690"),
-    "macos": ("v2rayN", "https://github.com/2dust/v2rayN/releases/latest"),
-}
+from .public_connection_client_catalog_v821 import protocol_client_rows
+
+_V2RAY_CLIENTS = protocol_client_rows()["v2ray"]
+
 modern_delivery.CLIENTS["v2ray"] = _V2RAY_CLIENTS
 multilink.PROTOCOL_CLIENT["v2ray"] = "v2ray"
 
@@ -77,12 +75,12 @@ _SCRIPT = r"""
   let timer=null;
 
   const CLIENTS={
-    windows:{name:'v2rayN',url:'https://github.com/2dust/v2rayN/releases/latest'},
-    macos:{name:'v2rayN',url:'https://github.com/2dust/v2rayN/releases/latest'},
-    linux:{name:'v2rayN',url:'https://github.com/2dust/v2rayN/releases/latest'},
-    android:{name:'v2rayNG',url:'https://github.com/2dust/v2rayNG/releases/latest'},
-    ios:{name:'V2Box',url:'https://apps.apple.com/us/app/v2box-v2ray-client/id6446814690'},
-    unknown:{name:'v2rayN / v2rayNG / V2Box',url:'https://github.com/2dust/v2rayN/releases/latest'}
+    windows:{name:'v2rayN',url:'/v1/connect/app-download/v2rayn/windows'},
+    macos:{name:'v2rayN',url:'/v1/connect/app-download/v2rayn/macos'},
+    linux:{name:'v2rayN',url:'https://github.com/2dust/v2rayN/releases/download/7.25.6/v2rayN-linux-64.zip'},
+    android:{name:'v2rayNG',url:'/v1/connect/app-download/v2rayng/android'},
+    ios:{name:'V2Box',url:'/v1/connect/app-download/v2box/ios'},
+    unknown:{name:'v2rayN / v2rayNG / V2Box',url:'/v1/connect/app-download/v2rayn/windows'}
   };
 
   function normalize(value){

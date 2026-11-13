@@ -2562,24 +2562,29 @@ _SCRIPT = r"""
      const u=String(a.getAttribute('href')||'');
      return u.startsWith('https://')||u.startsWith('http://')||u.startsWith('/v1/connect/app-download/');
    });
+   // Per-protocol and OS client identity. Actual bytes/store links are
+   // served by the audited /v1/connect/app-download/ route, never a release page.
    const appTypes={
      cisco:'openconnect',openconnect:'openconnect',openvpn:'openvpn',
      wireguard:'wireguard',amneziawg:'amneziawg',trusttunnel:'trusttunnel',
-     sudoku:'sudoku',v2ray:'karing',hysteria2:'karing',
-     tuic:'karing',anytls:'karing',naive:'karing',
-     shadowtls:'karing',snell:'karing',mieru:'karing',
-     socks5:'karing'
+     sudoku:'sudoku',
+     v2ray:platform==='android'?'v2rayng':platform==='ios'?'v2box':platform==='macos'?'v2rayn':'karing',
+     hysteria2:'karing',tuic:'karing',anytls:'karing',
+     naive:'singbox',shadowtls:'singbox',snell:'singbox',
+     mieru:'karing',socks5:'karing'
    };
-   const appName=appTypes[key];
    const supportedPlatforms={
-     openconnect:['windows','android','ios'],
-     openvpn:['windows','android','ios'],
+     openconnect:['windows','android','ios','macos'],
+     openvpn:['windows','android','ios','macos'],
      wireguard:['windows','android','ios','macos'],
      amneziawg:['windows','android','ios','macos'],
      trusttunnel:['windows','android','ios','macos'],
      sudoku:['windows','android','ios','macos'],
+     singbox:['windows','android','ios','macos'],
+     v2rayng:['android'],v2box:['ios'],v2rayn:['windows','macos'],
      karing:['windows','android','ios','macos','linux']
    };
+   const appName=appTypes[key];
    const canonical=appName&&supportedPlatforms[appName]?.includes(platform)
      ?'/v1/connect/app-download/'+appName+'/'+platform:null;
    const existing=[...footer.querySelectorAll('[data-kind="app"]')];
@@ -2600,7 +2605,7 @@ _SCRIPT = r"""
      app.setAttribute('href',href);
      app.setAttribute('target','_blank');
      app.setAttribute('rel','noopener noreferrer');
-     const appLabels={openvpn:'OpenVPN',wireguard:'WireGuard',amneziawg:'AmneziaWG',openconnect:'OpenConnect',trusttunnel:'TrustTunnel',sudoku:'Sudoku',karing:'Karing'};
+     const appLabels={openvpn:'OpenVPN',wireguard:'WireGuard',amneziawg:'AmneziaWG',openconnect:'OpenConnect',trusttunnel:'TrustTunnel',sudoku:'Sudoku',karing:'Karing',singbox:'sing-box',v2rayng:'v2rayNG',v2box:'V2Box',v2rayn:'v2rayN'};
      app.textContent='دانلود '+(appLabels[appName]||appName);
      app.removeAttribute('hidden');
      app.removeAttribute('style');
@@ -2618,7 +2623,7 @@ _SCRIPT = r"""
    if(key==='v2ray'&&platform==='windows'){
      let extra=oldExtra;
      if(!extra){extra=el('a','tp92-v2rayn tp78-footer-action','دانلود v2rayN')}
-     extra.href='https://github.com/2dust/v2rayN/releases/latest';
+     extra.href='/v1/connect/app-download/v2rayn/windows';
      extra.target='_blank';extra.rel='noopener noreferrer';
      extra.dataset.tp92Client='v2rayn';
      extra.dataset.kind='client';
