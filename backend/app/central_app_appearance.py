@@ -102,7 +102,7 @@ def resolve_appearance(db: Session, reseller_id: int) -> dict:
     row = db.get(CentralAppAppearance, int(reseller_id))
     if row:
         saved = {key: getattr(row, key) for key in DEFAULTS}
-        return dict(DEFAULTS) if _legacy_default(saved) else saved
+        return {**saved, **{key: DEFAULTS[key] for key in _PALETTE_KEYS}} if _legacy_default(saved) else saved
     values = dict(DEFAULTS)
     contact = db.get(CentralAppContact, int(reseller_id))
     contact_primary = getattr(contact, "primary_color", None) if contact else None
