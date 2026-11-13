@@ -26,6 +26,8 @@ class PerNodeProtocolSwitchTests(unittest.TestCase):
         self.engine = create_engine("sqlite+pysqlite:///:memory:")
         Node.__table__.create(self.engine)
         NodeProtocolOperatorSwitch.__table__.create(self.engine)
+        from app.node_install_progress_models_v1 import NodeInstallProgressV1
+        NodeInstallProgressV1.__table__.create(self.engine)
         self.db = Session(self.engine)
         self.db.add_all([
             Node(id=1, name="Exit A", node_type=NodeType.EXIT,
