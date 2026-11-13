@@ -13,12 +13,13 @@ class BrandTheme {
     return Color(int.parse('FF${value.substring(1)}', radix: 16));
   }
 
-  // Legacy default violet is not a customized reseller palette. Translate
-  // that old default to the new low-saturation ocean/slate design. Explicit
-  // tenant color choices other than these defaults remain unchanged.
-  static bool legacyViolet(BrandPreview? brand) =>
-      (brand?.primaryColor.toUpperCase() ?? '#7C3AED') == '#7C3AED' &&
-      (brand?.secondaryColor.toUpperCase() ?? '#4F46E5') == '#4F46E5';
+  // Replace previously saved purple templates as well as the original
+  // default. Custom non-violet tenant branding is not overridden.
+  static bool legacyViolet(BrandPreview? brand) {
+    final primary = parse(brand?.primaryColor ?? '', '#7C3AED');
+    final hsv = HSVColor.fromColor(primary);
+    return hsv.hue >= 225 && hsv.hue <= 330 && hsv.saturation > .27;
+  }
 
   static Color secondaryAccent(BrandPreview? brand) =>
       legacyViolet(brand)
@@ -33,24 +34,22 @@ class BrandTheme {
   // The panel stores one tenant palette, generally authored for dark mode.
   // Derive *separate* readable light surfaces while keeping the owner hue.
   static Color surface(BrandPreview? brand, Brightness brightness) {
-    final base = legacyViolet(brand) &&
-            (brand?.surfaceColor.toUpperCase() ?? '#20202A') == '#20202A'
-        ? const Color(0xFF203544)
-        : parse(brand?.surfaceColor ?? '', '#203544');
+    final base = legacyViolet(brand)
+        ? const Color(0xFF1B2B36)
+        : parse(brand?.surfaceColor ?? '', '#1B2B36');
     return brightness == Brightness.dark
         ? base
         : Color.lerp(base, Colors.white, 0.95)!;
   }
 
   static Color backgroundColor(BrandPreview? brand, Brightness brightness) {
-    final base = legacyViolet(brand) &&
-            (brand?.backgroundColor.toUpperCase() ?? '#101018') == '#101018'
-        ? const Color(0xFF121F2B)
-        : parse(brand?.backgroundColor ?? '', '#121F2B');
+    final base = legacyViolet(brand)
+        ? const Color(0xFF0F1720)
+        : parse(brand?.backgroundColor ?? '', '#0F1720');
     return brightness == Brightness.dark
         ? base
         : // Avoid an almost pure-white field that washes away the light-mode art.
-        Color.lerp(base, const Color(0xFFF9F6FF), 0.97)!;
+        Color.lerp(base, const Color(0xFFF3F7F8), 0.97)!;
   }
 
   static Color accent(BrandPreview? brand, Brightness brightness) {
