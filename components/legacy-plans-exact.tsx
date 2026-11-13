@@ -106,7 +106,7 @@ export function LegacyPlansRuntimePage(){
               </div>
               <div className={styles.selectionColumn}>
                 <div className={styles.sectionTop}>
-                  <b className={styles.sectionTitle}>{pick("انتخاب نودهای خارج (Exit)","Select Exit nodes")}</b>
+                  <b className={styles.sectionTitle}>{pick("انتخاب نودهای خارج (Exit)","Allowed exit servers")}</b>
                   <div className={styles.selectionActions}><span className={styles.selectionCount}>{draft.node_ids.length}/{exitNodes.length}</span>
                     <button type="button" className={styles.smallBtn} onClick={()=>setDraft(current=>({...current,node_ids:[...allNodeIds]}))}>{pick("انتخاب همه","Select all")}</button>
                   </div>
