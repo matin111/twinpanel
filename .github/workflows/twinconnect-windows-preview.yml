@@ -353,6 +353,32 @@ jobs:
           }
           & $exe offline-status
           if ($LASTEXITCODE -ne 0) { throw 'Guard WFP preflight failed' }
+      - name: Verify bundled Windows Kill Switch test controller
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $source = Join-Path (Get-Location) 'tools/windows_guard_control.ps1'
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            $source, [ref]$tokens, [ref]$errors) | Out-Null
+          if ($errors.Count -gt 0) { throw 'Guard control PowerShell parse error' }
+          $script = Get-Content $source -Raw
+          foreach ($marker in @('SIGNED_GUARD_REQUIRED','Register-ScheduledTask',
+              'New-ScheduledTaskTrigger','GUARD_ARMED_TWO_MINUTE_TEST',
+              'offline-status','recover $ack')) {
+            if (!$script.Contains($marker)) {
+              throw "Guard control missing safety requirement: $marker"
+            }
+          }
+          $installer = Get-Content 'installer.iss' -Raw
+          if (!$installer.Contains('windows_guard_control.ps1')) {
+            throw 'Main Setup does not bundle guard test controller'
+          }
+          $settings = Get-Content 'lib/vpn_settings.dart' -Raw
+          if (!$settings.Contains('vpnSignedGuardTimedTest')) {
+            throw 'Settings guard test control is missing'
+          }
       - name: Package TwinConnect Windows setup with automatic WireGuard prerequisite
         shell: pwsh
         env:
