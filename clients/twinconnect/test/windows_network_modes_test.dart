@@ -93,8 +93,8 @@ void main() {
     final settings = File('lib/vpn_settings.dart').readAsStringSync();
     expect(engine, contains('LOCAL_SOCKS5_NOT_VERIFIED'));
     // The TCP stream may split a valid 2-byte SOCKS5 reply across reads.
-    expect(engine, contains('while ($received -lt $reply.Length)'));
-    expect(engine, contains('$received += $count'));
+    expect(engine, contains(r'while ($received -lt $reply.Length)'));
+    expect(engine, contains(r'$received += $count'));
     expect(engine, contains('Restore-Values'));
     expect(engine, contains('PROXY_SETTINGS_CHANGED_EXTERNALLY_DO_NOT_OVERWRITE'));
     expect(engine, contains('InternetSetOptionW'));
