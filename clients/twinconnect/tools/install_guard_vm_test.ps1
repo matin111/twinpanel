@@ -15,18 +15,18 @@ if (!$exe.StartsWith($root, [StringComparison]::OrdinalIgnoreCase) -or
     [IO.Path]::GetFileName($exe) -ine 'TwinConnectGlobalGuard.exe') {
   throw 'VM guard executable must be installed under Program Files.'
 }
-# Never install this unsigned acceptance build on real hardware.
-$computer = Get-CimInstance Win32_ComputerSystem
-$identity = ($computer.Manufacturer + ' ' + $computer.Model)
-if ($env:TWINCONNECT_DISPOSABLE_VM -ne '1' -or
-    $identity -notmatch '(virtual|vmware|virtualbox|kvm|qemu|hyper-v|xen|parallels)') {
-  throw 'VM_ONLY: set TWINCONNECT_DISPOSABLE_VM=1 inside a disposable Windows VM.'
-}
 if (!(Test-Path -LiteralPath $exe -PathType Leaf)) { throw 'Guard executable missing.' }
 function GuardService { Get-CimInstance Win32_Service -Filter "Name='TwinConnectGlobalGuard'" }
 $svc = GuardService
 $expected = '"' + $exe + '" service'
 if ($Action -eq 'Install') {
+  # Installation is VM-only, but uninstall/recovery must work unconditionally.
+  $computer = Get-CimInstance Win32_ComputerSystem
+  $identity = ($computer.Manufacturer + ' ' + $computer.Model)
+  if ($env:TWINCONNECT_DISPOSABLE_VM -ne '1' -or
+      $identity -notmatch '(virtual|vmware|virtualbox|kvm|qemu|hyper-v|xen|parallels)') {
+    throw 'VM_ONLY: set TWINCONNECT_DISPOSABLE_VM=1 inside a disposable Windows VM.'
+  }
   if ($svc) {
     if ($svc.PathName -ine $expected -or
         $svc.StartName -notin @('LocalSystem', 'NT AUTHORITY\SYSTEM')) {
