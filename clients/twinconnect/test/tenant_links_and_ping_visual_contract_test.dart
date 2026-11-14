@@ -151,7 +151,8 @@ void main() {
     expect(dashboard, contains('if (index == 0) {'));
     expect(dashboard, contains("_filter = 'all';"));
     expect(dashboard, contains('_androidExplicitNodeSelected = false;'));
-    expect(dashboard, contains('selectedProtocolCode: _filter == \'all\' ? null : _filter'));
+    expect(dashboard, contains("widget.native.supports(_filter)"));
+    expect(dashboard, contains("selectedProtocolCode: _filter != 'all' &&"));
   });
 
   test('Android offers all entitled protocols without claiming missing engines', () {
