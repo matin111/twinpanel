@@ -44,7 +44,10 @@ class AdminMutationAuditMiddleware(BaseHTTPMiddleware):
         header = request.headers.get("authorization", "")
         if not header.lower().startswith("bearer "):
             return response
-        subject = decode_access_token(header[7:].strip())
+        try:
+            subject = decode_access_token(header[7:].strip())
+        except Exception:
+            return response
         if not subject:
             return response
         # No request bodies, passwords, query strings or tokens are retained.
