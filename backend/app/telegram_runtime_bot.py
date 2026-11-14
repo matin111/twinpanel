@@ -2058,7 +2058,7 @@ async def renewal_receipt_submit(message: Message, state: FSMContext):
 
     try:
         token = await _telegram_session_token(message.from_user.id)
-        await request(
+        receipt_result = await request(
             "POST",
             f"/v1/payments/intents/{int(data['intent_id'])}/receipt",
             token=token,
@@ -2074,6 +2074,18 @@ async def renewal_receipt_submit(message: Message, state: FSMContext):
         return
 
     await state.clear()
+    if receipt_result.get("already_verified"):
+        await message.answer(
+            "✅ <b>پرداخت شما قبلاً به‌صورت خودکار تأیید شده است.</b>\n\n"
+            + (
+                "📦 ارسال اطلاعات اشتراک در صف تحویل قرار گرفت.\n"
+                if receipt_result.get("delivery_queued")
+                else "📦 وضعیت اشتراک را از «اشتراک‌های من» بررسی کنید.\n"
+            )
+            + "رسید شما نیز ثبت شد؛ تأیید یا پرداخت مجدد لازم نیست.",
+            reply_markup=main_keyboard(),
+        )
+        return
     await message.answer(
         "✅ <b>رسید تمدید ثبت شد</b>\n\n"
         "وضعیت: <b>در انتظار بررسی</b>\n"
