@@ -284,41 +284,6 @@ jobs:
             Remove-Item -LiteralPath $exe -Force
             Write-Host "Guard release not approved. Service excluded from all installers."
           }
-      - name: Sign and verify guard service after isolated VM approval
-        if: ${{ env.GUARD_RELEASE_APPROVED == 'true' && env.SIGNING_CONFIGURED == 'true' }}
-        shell: pwsh
-        env:
-          TWINCONNECT_SIGN_PFX_BASE64: ${{ secrets.TWINCONNECT_SIGN_PFX_BASE64 }}
-          TWINCONNECT_SIGN_PFX_PASSWORD: ${{ secrets.TWINCONNECT_SIGN_PFX_PASSWORD }}
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $exe = Join-Path (Get-Location) "build/windows/x64/runner/Release/services/TwinConnectGlobalGuard.exe"
-          if (!(Test-Path $exe)) { throw "Guard executable is missing" }
-          $pfx = Join-Path $env:RUNNER_TEMP "guard-signing.pfx"
-          try {
-            [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:TWINCONNECT_SIGN_PFX_BASE64))
-            $password = ConvertTo-SecureString $env:TWINCONNECT_SIGN_PFX_PASSWORD -AsPlainText -Force
-            $certificate = Get-PfxCertificate -FilePath $pfx -Password $password
-            if (!$certificate.HasPrivateKey -or $certificate.NotAfter -le (Get-Date) -or
-                !$certificate.EnhancedKeyUsageList.ObjectId.Value.Contains('1.3.6.1.5.5.7.3.3')) {
-              throw "Guard release requires a valid code-signing certificate"
-            }
-            $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin" -Filter signtool.exe -Recurse -File |
-              Where-Object { $_.FullName.Contains('\x64\') } |
-              Sort-Object FullName -Descending | Select-Object -First 1
-            if (!$signtool) { throw "Windows SDK signtool unavailable" }
-            & $signtool.FullName sign /fd SHA256 /f $pfx /p $env:TWINCONNECT_SIGN_PFX_PASSWORD /tr http://timestamp.digicert.com /td SHA256 $exe
-            if ($LASTEXITCODE -ne 0) { throw "Guard Authenticode signing failed" }
-            & $signtool.FullName verify /pa /all $exe
-            if ($LASTEXITCODE -ne 0) { throw "Guard signature verification failed" }
-            $sig = Get-AuthenticodeSignature -LiteralPath $exe
-            if ($sig.Status -ne 'Valid' -or $sig.SignerCertificate.Thumbprint -ine $certificate.Thumbprint) {
-              throw "Guard signer does not match release signing certificate"
-            }
-            $certificate.Thumbprint | Set-Content 'guard-signing-thumbprint.txt' -NoNewline
-          } finally {
-            Remove-Item -LiteralPath $pfx -Force -ErrorAction SilentlyContinue
-          }
       - name: Validate global guard installer release gate and PowerShell syntax
         shell: pwsh
         run: |
