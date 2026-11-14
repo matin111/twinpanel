@@ -179,6 +179,25 @@ void main() {
     expect(restore, contains('Type RESET to confirm'));
   });
 
+  test('Windows Defender Firewall browser lock is independently reversible', () {
+    final script = File('tools/windows_app_network_lock.ps1').readAsStringSync();
+    final setup = File('installer.iss').readAsStringSync();
+    final settings = File('lib/vpn_settings.dart').readAsStringSync();
+    expect(script, contains('New-NetFirewallRule'));
+    expect(script, contains('Remove-NetFirewallRule'));
+    expect(script, contains('Get-NetFirewallApplicationFilter'));
+    expect(script, contains('RULE_OWNER_MISMATCH'));
+    expect(script, contains('TWINCONNECT_APP_LOCKED'));
+    expect(script, contains('TWINCONNECT_APP_UNLOCKED'));
+    expect(script, isNot(contains('Set-NetFirewallProfile')));
+    expect(script, isNot(contains('netsh advfirewall reset')));
+    expect(setup, contains('windows_app_network_lock.ps1'));
+    expect(settings, contains("Key('vpnBrowserNetworkLockOn')"));
+    expect(settings, contains("Key('vpnBrowserNetworkLockOff')"));
+    expect(settings, contains("_manageBrowserNetworkLock('Lock')"));
+    expect(settings, contains("_manageBrowserNetworkLock('Unlock')"));
+  });
+
   test('native bridge installs only a read-only guard status method', () {
     final install = File('tools/install_windows_native.py')
         .readAsStringSync();
