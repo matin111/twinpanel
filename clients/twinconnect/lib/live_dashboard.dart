@@ -5134,8 +5134,17 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                 indicatorColor: purple.withValues(alpha: .23),
                 selectedIndex: const ['home', 'locations', 'settings', 'account']
                     .indexOf(_page).clamp(0, 3).toInt(),
-                onDestinationSelected: (index) => setState(() => _page =
-                    const ['home', 'locations', 'settings', 'account'][index]),
+                onDestinationSelected: (index) => setState(() {
+                  _page = const ['home', 'locations', 'settings', 'account'][index];
+                  if (index == 0) {
+                    // Tapping Connect explicitly requests automatic connection.
+                    // Do not reuse an unsupported protocol previously filtered
+                    // on Servers (e.g. Cisco with no native Android engine).
+                    _filter = 'all';
+                    _androidExplicitNodeSelected = false;
+                    _autoFastest = false;
+                  }
+                }),
                 destinations: [
                   NavigationDestination(icon: const Icon(Icons.bolt_rounded),
                       label: tr('اتصال', 'Connect')),
