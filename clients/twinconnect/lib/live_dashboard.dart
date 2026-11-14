@@ -4693,6 +4693,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                     sessionToken: widget.sessionToken,
                     catalog: widget.catalog!,
                     native: widget.native,
+                    servers: widget.servers,
                     selectedProtocolCode: _filter == 'all' ? null : _filter,
                     selectedNodeId: _androidExplicitNodeSelected
                         ? _selectedServerId : null,
