@@ -502,12 +502,61 @@ class _TwinConnectHomeState extends State<TwinConnectHome> with WidgetsBindingOb
       final namespace = TenantIdentity.parseNamespace(username, '');
       final password = _password.text;
       final api = TenantApi.fromBuildConfig();
-      final panel = await api.resolve(namespace);
-      final loggedIn = await api.login(
-        panel: panel,
-        username: username,
-        password: password,
-      );
+      PanelDirectoryEntry panel;
+      try {
+        panel = await api.resolve(namespace);
+      } on TenantApiException catch (error) {
+        if (error.message == 'NETWORK_UNAVAILABLE') {
+          throw const TenantApiException('DIRECTORY_NETWORK_UNAVAILABLE');
+        }
+        rethrow;
+      } on TimeoutException {
+        throw const TenantApiException('DIRECTORY_NETWORK_UNAVAILABLE');
+      }
+      AppLoginSession loggedIn;
+      try {
+        loggedIn = await api.login(
+          panel: panel,
+          username: username,
+          password: password,
+        );
+      } on TenantApiException catch (error) {
+        if (error.message != 'NETWORK_UNAVAILABLE') rethrow;
+        // A license owner can rotate their panel domain without requiring
+        // customers to update their installed app. Refresh the directory
+        // once, but never send credentials to the license center itself.
+        PanelDirectoryEntry refreshed;
+        try {
+          refreshed = await api.resolve(namespace);
+        } on TenantApiException catch (directoryError) {
+          if (directoryError.message == 'NETWORK_UNAVAILABLE') {
+            throw const TenantApiException('DIRECTORY_NETWORK_UNAVAILABLE');
+          }
+          rethrow;
+        } on TimeoutException {
+          throw const TenantApiException('DIRECTORY_NETWORK_UNAVAILABLE');
+        }
+        if (refreshed.apiOrigin == panel.apiOrigin) {
+          throw const TenantApiException('PANEL_NETWORK_UNAVAILABLE');
+        }
+        panel = refreshed;
+        try {
+          loggedIn = await api.login(
+            panel: panel,
+            username: username,
+            password: password,
+          );
+        } on TenantApiException catch (retryError) {
+          if (retryError.message == 'NETWORK_UNAVAILABLE') {
+            throw const TenantApiException('PANEL_NETWORK_UNAVAILABLE');
+          }
+          rethrow;
+        } on TimeoutException {
+          throw const TenantApiException('PANEL_NETWORK_UNAVAILABLE');
+        }
+      } on TimeoutException {
+        throw const TenantApiException('PANEL_NETWORK_UNAVAILABLE');
+      }
       final brand = loggedIn.brand;
       if (!mounted || serial != _lookupSerial) return;
       setState(() {
