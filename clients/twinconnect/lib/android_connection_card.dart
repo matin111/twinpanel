@@ -191,34 +191,50 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
     }
   }
 
+  /// Probe two independent HTTPS IP services. A failed ipify request alone
+  /// must not be mistaken for an offline VPN. Responses are treated as a
+  /// network reachability signal ONLY when the native peer handshake is fresh.
+  /// Never disable TLS verification or send credentials to probe providers.
   Future<void> _checkInternet() async {
     if (_checkingInternet) return;
     _checkingInternet = true;
     _lastInternetCheck = DateTime.now();
-    final client = HttpClient()..connectionTimeout = const Duration(seconds: 5);
-    try {
-      final watch = Stopwatch()..start();
-      final request = await client.getUrl(Uri.https('api.ipify.org', '/'));
-      final response = await request.close().timeout(const Duration(seconds: 7));
-      final result = (await utf8.decoder.bind(response).join()).trim();
-      watch.stop();
-      if (response.statusCode != 200 ||
-          InternetAddress.tryParse(result) == null) {
-        throw const FormatException('PUBLIC_IP_INVALID');
+    String? verifiedIp;
+    int? latencyMs;
+    for (final provider in const ['api.ipify.org', 'icanhazip.com']) {
+      final client = HttpClient()
+        ..connectionTimeout = const Duration(seconds: 4);
+      try {
+        final watch = Stopwatch()..start();
+        final request = await client
+            .getUrl(Uri.https(provider, '/'))
+            .timeout(const Duration(seconds: 5));
+        final response = await request.close()
+            .timeout(const Duration(seconds: 6));
+        if (response.statusCode != HttpStatus.ok) continue;
+        final result = (await utf8.decoder.bind(response)
+            .join().timeout(const Duration(seconds: 6))).trim();
+        watch.stop();
+        if (result.length <= 64 && InternetAddress.tryParse(result) != null) {
+          verifiedIp = result;
+          latencyMs = watch.elapsedMilliseconds;
+          break;
+        }
+      } catch (_) {
+        // Try the other provider; no trust or connectivity inference here.
+      } finally {
+        client.close(force: true);
       }
-      if (mounted && _up && _handshake) setState(() {
-        _publicIp = result;
-        _httpsLatencyMs = watch.elapsedMilliseconds;
-      });
-    } catch (_) {
-      if (mounted) setState(() {
-        _publicIp = null;
-        _httpsLatencyMs = null;
-      });
-    } finally {
-      client.close(force: true);
-      _checkingInternet = false;
     }
+    if (mounted) {
+      // The peer handshake is mandatory. An IP response alone does not
+      // establish that the intended VPN transport is carrying user traffic.
+      setState(() {
+        _publicIp = _up && _handshake ? verifiedIp : null;
+        _httpsLatencyMs = _up && _handshake ? latencyMs : null;
+      });
+    }
+    _checkingInternet = false;
   }
 
   String _nativeError(Object error) {
