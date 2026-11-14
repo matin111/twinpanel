@@ -169,8 +169,8 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
         title: Text(s.pick('ریست تنظیمات اینترنت ویندوز',
             'Reset Windows network settings')),
         content: Text(s.pick(
-          'اتصال VPN و اینترنت ممکن است قطع شود. کش DNS، Winsock و TCP/IP ریست می‌شوند و بعد از آن باید ویندوز را ریستارت کنی. تنظیمات اختصاصی فایروال دیگر برنامه‌ها دست‌نخورده می‌ماند. ادامه می‌دهی؟',
-          'Internet and VPN may disconnect. This resets DNS cache, Winsock and TCP/IP. Restart Windows afterward. Other apps\' firewall rules are not removed. Continue?',
+          'اتصال VPN و اینترنت ممکن است قطع شود. کش DNS، Winsock و TCP/IP ریست می‌شوند و بعد از آن باید ویندوز را ریستارت کنی. اگر سرویس محافظت امضاشده نصب باشد، قوانین متعلق به TwinConnect هم بازیابی می‌شوند. قوانین فایروال دیگر برنامه‌ها دست‌نخورده می‌مانند. ادامه می‌دهی؟',
+          'Internet and VPN may disconnect. This resets DNS cache, Winsock and TCP/IP. Restart Windows afterward. If the signed TwinConnect guard is installed, its own WFP rules are recovered first. Other apps\' firewall rules are not removed. Continue?',
         )),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false),
@@ -416,8 +416,8 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
               style: const TextStyle(fontWeight: FontWeight.w600),
             )),
             _help('Windows network reset', tr(
-              'با تأیید کاربر، DNS و Winsock و TCP/IP ریست می‌شود. برای تکمیل به راه‌اندازی مجدد ویندوز نیاز است. این گزینه جایگزین بازیابی قوانین Kill Switch نیست.',
-              'With confirmation, clears DNS cache and resets Winsock/TCP-IP. Requires a Windows restart. This does not recover persistent Kill Switch firewall rules.',
+              'با تأیید کاربر، DNS و Winsock و TCP/IP ریست می‌شود. برای تکمیل به راه‌اندازی مجدد ویندوز نیاز است. در صورت وجود سرویس امضاشده TwinConnect، قوانین محافظتی متعلق به آن نیز بازیابی و بررسی می‌شوند.',
+              'With confirmation, clears DNS cache and resets Winsock/TCP-IP. Requires a Windows restart. A trusted installed TwinConnect guard is recovered and its owned WFP rules verified first.',
             )),
             TextButton(
               key: const Key('vpnWindowsNetworkReset'),
