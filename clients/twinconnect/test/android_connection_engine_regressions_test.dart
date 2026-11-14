@@ -2,6 +2,30 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('Android tab navigation preserves mounted VPN session state', () {
+    final dashboard = File('lib/live_dashboard.dart').readAsStringSync();
+    expect(dashboard, contains('child: Platform.isAndroid'));
+    expect(dashboard, contains("offstage: _page != 'home'"));
+    expect(dashboard, contains('child: home(),'));
+    expect(dashboard, contains("if (_page != 'home')"));
+  });
+
+  test('Cisco native error category survives service shutdown', () {
+    final service = File(
+      'native/android/java/com/axevpn/flutter/openconnect/'
+      'AxeOpenConnectVpnService.java',
+    ).readAsStringSync();
+    final plugin = File(
+      'native/android/java/com/axevpn/flutter/openconnect/'
+      'OpenConnectFlutterPlugin.java',
+    ).readAsStringSync();
+    final tunnel = File('lib/android_cisco_tunnel.dart').readAsStringSync();
+    expect(service, contains('lastFailureCode = failureStage'));
+    expect(plugin, contains('json.put("failure_code"'));
+    expect(tunnel, contains("nativeStatus['failure_code']"));
+    expect(tunnel, contains('CISCO_CSTP_CONFIG_MISSING'));
+  });
+
   test('Cisco asynchronous startup does not fail on initial disconnected', () {
     final source = File('lib/android_cisco_tunnel.dart').readAsStringSync();
     expect(source, contains('var observedStarting = false;'));
