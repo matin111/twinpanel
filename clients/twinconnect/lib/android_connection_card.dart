@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 import 'android_connection_strings.dart';
 import 'android_tunnel.dart';
 import 'android_modern_tunnel.dart';
+import 'android_openvpn_tunnel.dart';
 import 'cisco_openconnect_profile.dart';
 import 'app_strings.dart';
 import 'native_vpn_bridge.dart';
@@ -61,6 +62,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
   bool _up = false;
   bool _ciscoUp = false;
   bool _modernUp = false;
+  bool _openVpnUp = false;
   String? _errorCode;
   AppServer? _activeServer;
   String? _activeServerName;
@@ -124,6 +126,14 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
     if (!Platform.isAndroid || _polling) return;
     _polling = true;
     try {
+      if (AndroidOpenVpnTunnel.instance.connected) {
+        if (!mounted) return;
+        if (!_openVpnUp) setState(() => _openVpnUp = true);
+        return;
+      }
+      if (_openVpnUp && mounted) {
+        setState(() { _openVpnUp = false; _clearTelemetry(); });
+      }
       if (AndroidModernTunnel.instance.connected) {
         if (!mounted) return;
         if (!_modernUp) setState(() => _modernUp = true);
@@ -337,6 +347,74 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
       });
     } on FormatException catch (error) {
       if (mounted) setState(() => _errorCode = error.message);
+    } catch (error) {
+      if (mounted) setState(() => _errorCode = _nativeError(error));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _connectOpenVpn() async {
+    if (_busy || _up || _ciscoUp || _modernUp || _openVpnUp ||
+        !Platform.isAndroid || !widget.native.supports('openvpn')) return;
+    setState(() { _busy = true; _errorCode = null; });
+    try {
+      final policy = await _store.loadFailClosed(
+        widget.panel.namespace, widget.username,
+      );
+      AndroidOpenVpnTunnel.requireSafePolicy(policy);
+      final profiles = await TenantApi.fromBuildConfig().loadSessionNativeProfiles(
+        panel: widget.panel,
+        sessionToken: widget.sessionToken,
+        protocol: VpnProtocols.byCode('openvpn')!,
+        native: widget.native,
+      );
+      final inventory = widget.servers?.servers ?? const <AppServer>[];
+      final selectedId = widget.selectedNodeId;
+      final choices = profiles.items.where((item) {
+        final id = item['node_id']?.toString();
+        if (id == null || (selectedId != null && id != selectedId)) return false;
+        final server = inventory.where((s) => s.id == id).firstOrNull;
+        return inventory.isEmpty || server?.nodeOnline == true;
+      }).toList(growable: false);
+      if (choices.isEmpty) {
+        throw const FormatException('ANDROID_OPENVPN_NO_AUTHORIZED_NODE');
+      }
+      final item = choices.first;
+      AndroidOpenVpnTunnel.requireProfile(item);
+      final id = item['node_id']?.toString();
+      final active = inventory.where((s) => s.id == id).firstOrNull;
+      await AndroidOpenVpnTunnel.instance.connect(
+        item: item,
+        serverName: active?.name ??
+            (item['node'] is String ? item['node'] as String : 'OpenVPN'),
+        policy: policy,
+      );
+      if (!mounted) return;
+      setState(() {
+        _openVpnUp = AndroidOpenVpnTunnel.instance.connected;
+        _activeServer = active;
+        _activeServerName = active?.name ??
+            (item['node'] is String ? item['node'] as String : null);
+      });
+    } on FormatException catch (error) {
+      if (mounted) setState(() => _errorCode = error.message);
+    } catch (error) {
+      if (mounted) setState(() => _errorCode = _nativeError(error));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _disconnectOpenVpn() async {
+    if (_busy || !_openVpnUp) return;
+    setState(() { _busy = true; _errorCode = null; });
+    try {
+      await AndroidOpenVpnTunnel.instance.disconnect();
+      if (mounted) setState(() {
+        _openVpnUp = false;
+        _clearTelemetry();
+      });
     } catch (error) {
       if (mounted) setState(() => _errorCode = _nativeError(error));
     } finally {
@@ -564,8 +642,13 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
         chosen?.configRecordPresent == true;
     final protocolName = chosen?.protocol.name ??
         (requested ?? s.pick('پروتکل آماده‌ای وجود ندارد', 'No ready protocol'));
-    final connected = _up || _ciscoUp || _modernUp;
+    final connected = _up || _ciscoUp || _modernUp || _openVpnUp;
     final ciscoSelected = chosen?.protocol.code == 'cisco';
+    final openVpnSelected = chosen?.protocol.code == 'openvpn';
+    final openVpnReady = openVpnSelected &&
+        AndroidOpenVpnTunnel.instance.available &&
+        widget.native.supports('openvpn') &&
+        chosen?.configRecordPresent == true;
     final modernSelected = chosen != null &&
         AndroidModernTunnel.protocolCodes.contains(chosen.protocol.code);
     final modernReady = modernSelected &&
@@ -576,7 +659,8 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
         widget.native.supports('cisco') &&
         chosen?.configRecordPresent == true;
     final canStartSelected =
-        ciscoSelected ? ciscoReady : modernSelected ? modernReady : nativeReady;
+        ciscoSelected ? ciscoReady : openVpnSelected ? openVpnReady :
+        modernSelected ? modernReady : nativeReady;
     final accent = connected ? const Color(0xFF35D9AE)
         : const Color(0xFF72C1D6);
 
@@ -694,10 +778,12 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
                 borderRadius: BorderRadius.circular(18)),
             ),
             onPressed: _busy ? null : _ciscoUp ? _disconnectCisco
+                : _openVpnUp ? _disconnectOpenVpn
                 : _modernUp ? _disconnectModern
                 : _up ? _disconnect
                 : canStartSelected
                     ? (ciscoSelected ? _connectCisco
+                        : openVpnSelected ? _connectOpenVpn
                         : modernSelected
                             ? () => _connectModern(chosen.protocol.code)
                             : _connect)
