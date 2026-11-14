@@ -80,19 +80,15 @@ jobs:
           xcrun simctl io "$device" screenshot TwinConnect-iOS-03-Settings.png
           sleep 12
           xcrun simctl io "$device" screenshot TwinConnect-iOS-04-Account.png
-      - name: Archive iOS simulator app
-        shell: bash
-        run: |
-          ditto -c -k --sequesterRsrc --keepParent \
-            build/ios/iphonesimulator/Runner.app \
-            TwinConnect-iOS-Simulator-v0.1.0.zip
-          shasum -a 256 TwinConnect-iOS-Simulator-v0.1.0.zip > TwinConnect-iOS-Simulator-SHA256.txt
-      - uses: actions/upload-artifact@v4
+      # Only screenshots are distributed for visual review. Bundling an
+      # executable Runner.app inside the artifact made Chrome flag the
+      # entire archive as a dangerous download, although the reviewer needs
+      # only images, not an executable for Windows.
+      - name: Upload four iPhone screen screenshots (no executable)
+        uses: actions/upload-artifact@v4
         with:
-          name: TwinConnect-iOS-UI-Preview-v0.1.0
+          name: TwinConnect-iPhone-Screenshots-v0.1.0
           path: |
-            clients/twinconnect/TwinConnect-iOS-Simulator-v0.1.0.zip
-            clients/twinconnect/TwinConnect-iOS-Simulator-SHA256.txt
             clients/twinconnect/TwinConnect-iOS-01-Connect.png
             clients/twinconnect/TwinConnect-iOS-02-Locations.png
             clients/twinconnect/TwinConnect-iOS-03-Settings.png
