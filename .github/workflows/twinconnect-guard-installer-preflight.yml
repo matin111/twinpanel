@@ -1,0 +1,144 @@
+name: TwinConnect Guard Installer Preflight
+
+on:
+  pull_request:
+    paths:
+      - "clients/twinconnect/installer.iss"
+      - "clients/twinconnect/tools/install_guard_service.ps1"
+      - "clients/twinconnect/native/windows/twinconnect_global_guard_service_experimental.cpp"
+      - ".github/workflows/twinconnect-guard-installer-preflight.yml"
+  push:
+    branches:
+      - feat/twinconnect-guard-installer-integration-20261114
+    paths:
+      - ".github/workflows/twinconnect-guard-installer-preflight.yml"
+      - "clients/twinconnect/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  guard-installer-preflight:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: clients/twinconnect
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile standalone guard service without installing or arming
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $vswhere = Join-Path "${env:ProgramFiles(x86)}" "Microsoft Visual Studio/Installer/vswhere.exe"
+          $vs = (& $vswhere -latest -property installationPath).Trim()
+          if (!$vs) { throw 'Visual Studio not available' }
+          $dev = Join-Path $vs 'Common7/Tools/VsDevCmd.bat'
+          $src = Join-Path (Get-Location) 'native/windows/twinconnect_global_guard_service_experimental.cpp'
+          $exe = Join-Path $env:RUNNER_TEMP 'TwinConnectGlobalGuard-preflight.exe'
+          $compile = 'call "' + $dev + '" -arch=amd64 && cl /nologo /std:c++17 /EHsc /W4 /WX /Fe:"' + $exe + '" "' + $src + '" /link Fwpuclnt.lib Iphlpapi.lib Ws2_32.lib Rpcrt4.lib Advapi32.lib Ole32.lib Oleaut32.lib Taskschd.lib'
+          & cmd.exe /d /s /c $compile
+          if ($LASTEXITCODE -ne 0 -or !(Test-Path $exe)) { throw 'Guard compilation failed' }
+          & $exe offline-status
+          if ($LASTEXITCODE -ne 0) { throw 'Read-only guard preflight failed' }
+          Remove-Item -LiteralPath $exe -Force
+      - name: Compile firewall-disabled diagnostic service
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $vswhere = Join-Path "${env:ProgramFiles(x86)}" "Microsoft Visual Studio/Installer/vswhere.exe"
+          $vs = (& $vswhere -latest -property installationPath).Trim()
+          $dev = Join-Path $vs 'Common7/Tools/VsDevCmd.bat'
+          $src = Join-Path (Get-Location) 'native/windows/twinconnect_global_guard_service_experimental.cpp'
+          $folder = Join-Path (Get-Location) 'build/guard-diagnostic'
+          New-Item -ItemType Directory -Force -Path $folder | Out-Null
+          $exe = Join-Path $folder 'TwinConnectGuardDiagnostic.exe'
+          $compile = 'call "' + $dev + '" -arch=amd64 && cl /nologo /std:c++17 /EHsc /W4 /WX /DTWINCONNECT_GUARD_DIAGNOSTIC_ONLY=1 /Fe:"' + $exe + '" "' + $src + '" /link Fwpuclnt.lib Iphlpapi.lib Ws2_32.lib Rpcrt4.lib Advapi32.lib Ole32.lib Oleaut32.lib Taskschd.lib'
+          & cmd.exe /d /s /c $compile
+          if ($LASTEXITCODE -ne 0 -or !(Test-Path $exe)) { throw 'Diagnostic service compilation failed' }
+          & $exe offline-status
+          if ($LASTEXITCODE -ne 0) { throw 'Read-only WFP inspection failed' }
+          $source = Get-Content $src -Raw
+          if (!$source.Contains('TWINCONNECT_GUARD_DIAGNOSTIC_ONLY') -or
+              !$source.Contains('DIAGNOSTIC_NO_FIREWALL_CHANGES')) {
+            throw 'Diagnostic binary must refuse firewall mutation'
+          }
+      - name: Build standalone Windows service installation test Setup
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $tokens = $null
+          $errors = $null
+          [Management.Automation.Language.Parser]::ParseFile(
+            (Join-Path (Get-Location) 'tools/install_guard_diagnostic.ps1'),
+            [ref]$tokens, [ref]$errors) | Out-Null
+          if ($errors.Count -gt 0) { throw 'Diagnostic installer PowerShell syntax invalid' }
+          choco install innosetup --no-progress -y
+          if ($LASTEXITCODE -ne 0) { throw 'Inno Setup installation failed' }
+          $compiler = Join-Path "${env:ProgramFiles(x86)}" 'Inno Setup 6/ISCC.exe'
+          if (!(Test-Path $compiler)) { throw 'Inno Setup compiler missing' }
+          & $compiler 'installer-guard-diagnostic.iss'
+          if ($LASTEXITCODE -ne 0 -or !(Test-Path 'TwinConnect-Guard-Diagnostic-Setup.exe')) {
+            throw 'Diagnostic installer build failed'
+          }
+          (Get-FileHash 'TwinConnect-Guard-Diagnostic-Setup.exe' -Algorithm SHA256).Hash |
+            Set-Content -Path 'TwinConnect-Guard-Diagnostic-SHA256.txt' -Encoding ascii
+      - name: Exercise diagnostic Setup install, IPC rejection, and uninstall on Windows runner
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $setup = Join-Path (Get-Location) 'TwinConnect-Guard-Diagnostic-Setup.exe'
+          $installDir = Join-Path $env:ProgramFiles 'TwinConnectGuardDiagnostic'
+          $exe = Join-Path $installDir 'TwinConnectGuardDiagnostic.exe'
+          try {
+            $p = Start-Process -FilePath $setup -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -PassThru -Wait
+            if ($p.ExitCode -ne 0) { throw "Diagnostic Setup returned $($p.ExitCode)" }
+            $service = Get-Service 'TwinConnectGuardDiagnostic' -ErrorAction Stop
+            if ($service.Status -ne 'Running') { throw 'Service not running after installation' }
+            & $exe status
+            if ($LASTEXITCODE -ne 0) { throw 'Service IPC status command failed' }
+            & $exe arm 'TwinConnect' '1.1.1.1' "$exe" 'I_ACCEPT_OFFLINE_RECOVERY'
+            if ($LASTEXITCODE -eq 0) { throw 'SECURITY: diagnostic build accepted WFP arm' }
+            $audit = & $exe offline-status
+            if ($LASTEXITCODE -ne 0 -or $audit -notmatch 'OWNED_RULES_PRESENT 0 0 0') {
+              throw 'SECURITY: firewall rules present after diagnostic install'
+            }
+          } finally {
+            $uninstaller = Join-Path $installDir 'unins000.exe'
+            if (Test-Path $uninstaller) {
+              $p = Start-Process -FilePath $uninstaller -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -PassThru -Wait
+              if ($p.ExitCode -ne 0) { throw "Diagnostic uninstaller returned $($p.ExitCode)" }
+            }
+          }
+          if (Get-Service 'TwinConnectGuardDiagnostic' -ErrorAction SilentlyContinue) {
+            throw 'Diagnostic service still registered after uninstall'
+          }
+      - name: Publish clearly labeled internal installation test
+        uses: actions/upload-artifact@v4
+        with:
+          name: TwinConnect-Guard-Diagnostic-Install-Test-NO-KILLSWITCH
+          path: |
+            clients/twinconnect/TwinConnect-Guard-Diagnostic-Setup.exe
+            clients/twinconnect/TwinConnect-Guard-Diagnostic-SHA256.txt
+          if-no-files-found: error
+          retention-days: 7
+      - name: Verify signed-service installer gate and recovery contract
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $iss = Get-Content 'installer.iss' -Raw
+          $ps = Get-Content 'tools/install_guard_service.ps1' -Raw
+          foreach ($mark in @('PrivilegesRequired=admin', '#define IncludeVerifiedGlobalGuard 0', 'GuardSigningThumbprint', 'install_guard_service.ps1', '-Action Uninstall')) {
+            if (!$iss.Contains($mark)) { throw "Missing installer safety requirement: $mark" }
+          }
+          foreach ($mark in @('Get-AuthenticodeSignature', 'ExpectedSignerThumbprint', 'offline-status', 'Assert-ServiceIdentity')) {
+            if (!$ps.Contains($mark)) { throw "Missing service safety requirement: $mark" }
+          }
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Join-Path (Get-Location) 'tools/install_guard_service.ps1'),
+            [ref]$tokens, [ref]$errors) | Out-Null
+          if ($errors.Count -ne 0) { throw 'Guard installer PowerShell syntax invalid' }
+          Write-Host 'Guard compiles; unsigned and unverified firewall enforcement remains disabled.'
