@@ -2,6 +2,10 @@ name: TwinConnect Android Slim Libbox Experiment
 
 on:
   workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/twinconnect-android-slim-libbox.yml'
+      - 'clients/twinconnect/lib/android_singbox_tunnel.dart'
 
 jobs:
   slim-native:
