@@ -366,15 +366,6 @@ async def install_protocols(
 
     merge = _bootstrap_script(protocols, ports)
     merge_b64 = base64.b64encode(merge.encode()).decode()
-    await cmd(
-        conn,
-        f"printf '%s' {shlex.quote(merge_b64)} | base64 -d | python3 && "
-        f"/usr/local/bin/twinpanel-sing-box check -c {shlex.quote(CONFIG_PATH + '.new')} && "
-        f"if [ -s {shlex.quote(CONFIG_PATH)} ]; then cp -a {shlex.quote(CONFIG_PATH)} {shlex.quote(CONFIG_PATH)}.bak-$(date +%Y%m%d-%H%M%S); fi && "
-        f"mv {shlex.quote(CONFIG_PATH + '.new')} {shlex.quote(CONFIG_PATH)} && chmod 600 {shlex.quote(CONFIG_PATH)}",
-        timeout=120,
-    )
-
     service = '''[Unit]
 Description=TwinPanel Modern VPN Core (sing-box)
 After=network-online.target
@@ -392,12 +383,41 @@ LimitNOFILE=1048576
 WantedBy=multi-user.target
 '''
     service_b64 = base64.b64encode(service.encode()).decode()
+    # Serialize provisioning of this shared core and do not drop active
+    # connections when a repeated provisioning pass produces identical bytes.
+    # The previous implementation restarted sing-box for EVERY install call,
+    # including identical configurations and identical systemd unit files.
     await cmd(
         conn,
-        f"printf '%s' {shlex.quote(service_b64)} | base64 -d > /etc/systemd/system/{SERVICE_NAME}.service.new && "
-        f"mv /etc/systemd/system/{SERVICE_NAME}.service.new /etc/systemd/system/{SERVICE_NAME}.service && "
-        "systemctl daemon-reload && "
-        f"systemctl enable {SERVICE_NAME}.service >/dev/null && systemctl restart {SERVICE_NAME}.service",
+        "set -eu; "
+        "exec 9>/run/lock/twinpanel-singbox-install.lock; "
+        "flock -x -w 90 9; "
+        f"printf '%s' {shlex.quote(merge_b64)} | base64 -d | python3; "
+        f"if [ -s {shlex.quote(CONFIG_PATH)} ] && "
+        f"cmp -s {shlex.quote(CONFIG_PATH + '.new')} {shlex.quote(CONFIG_PATH)}; then "
+        f"rm -f {shlex.quote(CONFIG_PATH + '.new')}; config_changed=0; "
+        "else "
+        f"/usr/local/bin/twinpanel-sing-box check -c {shlex.quote(CONFIG_PATH + '.new')}; "
+        f"if [ -s {shlex.quote(CONFIG_PATH)} ]; then "
+        f"cp -a {shlex.quote(CONFIG_PATH)} {shlex.quote(CONFIG_PATH)}.bak-$(date +%Y%m%d-%H%M%S); fi; "
+        f"mv {shlex.quote(CONFIG_PATH + '.new')} {shlex.quote(CONFIG_PATH)}; "
+        f"chmod 600 {shlex.quote(CONFIG_PATH)}; config_changed=1; fi; "
+        f"printf '%s' {shlex.quote(service_b64)} | base64 -d > "
+        f"/etc/systemd/system/{SERVICE_NAME}.service.new; "
+        f"if [ -s /etc/systemd/system/{SERVICE_NAME}.service ] && "
+        f"cmp -s /etc/systemd/system/{SERVICE_NAME}.service.new "
+        f"/etc/systemd/system/{SERVICE_NAME}.service; then "
+        f"rm -f /etc/systemd/system/{SERVICE_NAME}.service.new; unit_changed=0; "
+        "else "
+        f"mv /etc/systemd/system/{SERVICE_NAME}.service.new "
+        f"/etc/systemd/system/{SERVICE_NAME}.service; "
+        "systemctl daemon-reload; unit_changed=1; fi; "
+        f"systemctl enable {SERVICE_NAME}.service >/dev/null; "
+        f"if [ \"$config_changed\" -eq 1 ] || [ \"$unit_changed\" -eq 1 ] || "
+        f"! systemctl is-active --quiet {SERVICE_NAME}.service; then "
+        f"systemctl restart {SERVICE_NAME}.service; "
+        "echo TWINPANEL_SINGBOX_RESTART_CONFIG_OR_UNIT_CHANGED; "
+        "else echo TWINPANEL_SINGBOX_UNCHANGED_NO_RESTART; fi",
         timeout=120,
     )
 
