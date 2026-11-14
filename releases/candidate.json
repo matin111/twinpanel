@@ -1,6 +1,6 @@
 {
   "version": "1.1.0-rc.840",
-  "source_sha": "ec8b57ecdaaf483e3f22ae016e1915709aa9d2fb",
+  "source_sha": "72f760c0bb55c4b1f3653bad48fd64b93cca65e6",
   "notes": {
     "fa": "افزودن دکمه ریست سرویس پروتکل روی تمام ۱۶ کارت پروتکل‌های داشبورد با انتخاب نود دارای پروتکل، پنجره تأیید، اخطار موتور مشترک sing-box و بروزرسانی وضعیت بعد از ریست. حجم، اشتراک و کانفیگ‌ها تغییر نمی‌کنند.",
     "en": "Add per-protocol restart action on all 16 dashboard protocol cards with installed-node selection, confirmation, warning for shared sing-box runtime, and refreshed health telemetry. No user quota or configuration reset."
