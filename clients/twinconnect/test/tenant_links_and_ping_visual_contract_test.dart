@@ -157,7 +157,10 @@ void main() {
     expect(dashboard, contains("Key('androidChooseLocation')"));
     expect(dashboard, contains("Key('androidNativeConnectionGlass')"));
     expect(android, contains("Key('androidPrimaryConnect')"));
-    expect(android, contains("Key('androidPowerIndicator')"));
+    expect(android, contains("Key('androidSharedConnectionDataFabric')"));
+    expect(android, contains('TwinConnectWaveIndicator('));
+    expect(android, contains("Key('androidSharedPowerCard')"));
+    expect(android, contains("Key('androidNetworkOverview')"));
     expect(android, contains("Key('androidVerifiedStatus')"));
     expect(android, contains('selectedProtocolCode'));
     expect(android, contains('This protocol engine is not ready on Android yet.'));
