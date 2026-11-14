@@ -61,6 +61,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
   bool _up = false;
   bool _ciscoUp = false;
   String? _singBoxProtocol;
+  bool _singBoxVerified = false;
   String? _errorCode;
   AppServer? _activeServer;
   String? _activeServerName;
@@ -113,6 +114,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
     _rxSamples.clear();
     _txSamples.clear();
     _handshake = false;
+    _singBoxVerified = false;
     _publicIp = null;
     _httpsLatencyMs = null;
     _lastInternetCheck = null;
@@ -426,6 +428,8 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
       final id = item['node_id']?.toString();
       setState(() {
         _singBoxProtocol = code;
+        _singBoxVerified = true;
+        _httpsLatencyMs = AndroidSingBoxTunnel.instance.verifiedLatencyMs;
         _activeServer = inventory.where((n) => n.id == id).firstOrNull;
         _activeServerName = _activeServer?.name ??
             (item['node'] is String ? item['node'] as String : null);
@@ -636,7 +640,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
         (_ciscoUp ? 'cisco' : _up ? 'wireguard' : null);
     final selectedIsActive = activeProtocolCode != null &&
         chosen?.protocol.code == activeProtocolCode;
-    final internetVerified = _ciscoUp ||
+    final internetVerified = _ciscoUp || _singBoxVerified ||
         (_up && _handshake && _publicIp != null);
     // A sing-box start acknowledgement is not proof of internet access.
     final ciscoSelected = chosen?.protocol.code == 'cisco';
