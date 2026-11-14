@@ -27,6 +27,7 @@ import java.security.SecureRandom;
 import java.security.cert.X509Certificate;
 import java.util.Arrays;
 import java.util.Locale;
+import java.util.concurrent.atomic.AtomicLong;
 
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLSocket;
@@ -68,6 +69,8 @@ public class AxeOpenConnectVpnService extends VpnService {
 
     /** True while the VPN tunnel is active. Read by OpenConnectFlutterPlugin on re-init. */
     public static volatile boolean isRunning = false;
+    public static final AtomicLong bytesReceived = new AtomicLong();
+    public static final AtomicLong bytesSent = new AtomicLong();
 
     public static final String EXTRA_SERVER_URL    = "server_url";
     public static final String EXTRA_TUNNEL_NAME   = "tunnel_name";
@@ -282,6 +285,8 @@ public class AxeOpenConnectVpnService extends VpnService {
             // ── Phase 4: Forward packets ──
             this.tunnelSocket = tunSock;
             running = true;
+            bytesReceived.set(0);
+            bytesSent.set(0);
             isRunning = true;
             // startForeground() was already called in onStartCommand().
             broadcastStage("connected");
@@ -493,6 +498,7 @@ public class AxeOpenConnectVpnService extends VpnService {
                     synchronized (sockOut) {
                         sockOut.write(frm, 0, CSTP_HDR + n);
                         sockOut.flush();
+                        bytesSent.addAndGet(n);
                     }
                 }
             } catch (Exception e) {
@@ -539,6 +545,7 @@ public class AxeOpenConnectVpnService extends VpnService {
                     switch (type) {
                         case CSTP_DATA:
                             fos.write(data);
+                            bytesReceived.addAndGet(data.length);
                             break;
                         case CSTP_DPD_REQ:
                             synchronized (sockOut) {
