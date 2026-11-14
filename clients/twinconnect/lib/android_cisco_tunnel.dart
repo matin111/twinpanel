@@ -94,7 +94,7 @@ class AndroidCiscoTunnel {
           observedStarting = true;
         }
         if (stage == 'disconnected' && observedStarting &&
-            !await _serviceRunning()) {
+            !(await _serviceRunning())) {
           throw const FormatException('CISCO_ENGINE_DISCONNECTED');
         }
         if (stage == 'connected' && await _serviceRunning()) {
