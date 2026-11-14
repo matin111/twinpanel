@@ -16,6 +16,23 @@ void main() {
     expect(engine, contains('ip != before && ip == verifiedProxyIp'));
   });
 
+  test('Fast Server respects ready protocols and never defaults to WireGuard', () {
+    final ui = File('lib/live_dashboard.dart').readAsStringSync();
+    final begin = ui.indexOf('Future<void> _enableFastestAndConnect()');
+    final end = ui.indexOf('void _resetNetworkStats()', begin);
+    final fast = ui.substring(begin, end);
+    expect(fast, contains('NativeVpnBridge.protocolReadiness()'));
+    expect(fast, contains('authorized.where(ready.supports)'));
+    expect(fast, contains("prefs.getString('twinconnect_last_verified_protocol')"));
+    expect(fast, contains('_filter != \'all\''));
+    expect(fast, contains('_fastestKnownIndex'));
+    expect(fast, contains('await _toggleVpn()'));
+    expect(fast, contains('_filter = previousFilter'));
+    expect(fast, isNot(contains("'wireguard', 'openvpn', 'cisco'")));
+    expect(fast, isNot(contains('eligible.where(authorized.contains).firstOrNull')));
+    expect(ui, contains('value: _autoFastest,'));
+  });
+
   test('Xray runtime needs verified SOCKS and remote HTTPS before TUN', () {
     final xray = File('lib/windows_xray_proxy.dart').readAsStringSync();
     final ui = File('lib/live_dashboard.dart').readAsStringSync();

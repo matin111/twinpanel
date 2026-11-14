@@ -302,9 +302,28 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       if (_connectedSeconds.value != 0) _connectedSeconds.value = 0;
       return;
     }
+    if (_connectedSince == null) {
+      // Remember the actual verified protocol, including manual connections.
+      // Fast Server must not guess WireGuard just because it is listed first.
+      final verifiedProtocol = _modernUp
+          ? _modernProtocol
+          : _vpnVerified ? 'wireguard' : null;
+      if (verifiedProtocol != null) {
+        unawaited(_rememberVerifiedProtocol(verifiedProtocol));
+      }
+    }
     _connectedSince ??= DateTime.now();
     final seconds = DateTime.now().difference(_connectedSince!).inSeconds;
     if (_connectedSeconds.value != seconds) _connectedSeconds.value = seconds;
+  }
+
+  Future<void> _rememberVerifiedProtocol(String protocol) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('twinconnect_last_verified_protocol', protocol);
+    } catch (_) {
+      // Preference failure must not interrupt a working VPN session.
+    }
   }
 
   static String _formatConnectedSeconds(int seconds) {
@@ -488,22 +507,45 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     final authorized = widget.catalog?.entries.where((entry) =>
         entry.selected && entry.configRecordPresent).map((e) =>
         e.protocol.code).toSet() ?? <String>{};
-    final eligible = <String>[
-      'wireguard', 'openvpn', 'cisco', 'l2tp', 'hysteria2', 'tuic',
-      'anytls', 'naive', 'shadowtls', 'snell', 'mieru',
-      'trusttunnel', 'amneziawg', 'v2ray', 'sudoku',
-    ];
-    final protocol = _filter != 'all'
-        ? (authorized.contains(_filter) ? _filter : null)
-        : eligible.where(authorized.contains).firstOrNull;
-    if (protocol == null) {
+    if (authorized.isEmpty) {
       setState(() => _vpnError = 'PROTOCOL_NOT_INCLUDED_IN_SUBSCRIPTION');
       return;
     }
+    final previousFilter = _filter;
+    final previousSelected = _selected;
     setState(() { _fastestConnecting = true; _vpnError = null; });
     try {
-      await _probeAllNodes();
+      // Fast Server chooses the lowest measured server RTT; it does not
+      // silently equate WireGuard with the fastest protocol.
+      final checks = await Future.wait<Object>([
+        NativeVpnBridge.protocolReadiness().timeout(
+            const Duration(seconds: 8)),
+        SharedPreferences.getInstance(),
+        _probeAllNodes().then((_) => true),
+      ]);
       if (!mounted) return;
+      final ready = checks[0] as NativeProtocolReadiness;
+      final prefs = checks[1] as SharedPreferences;
+      final available = authorized.where(ready.supports).toSet();
+      // Explicit protocol choice wins. With "All", reuse the last verified
+      // successful protocol before falling back to another ready engine.
+      final preferred = _filter != 'all'
+          ? _filter
+          : prefs.getString('twinconnect_last_verified_protocol');
+      final eligible = <String>[
+        'hysteria2', 'tuic', 'anytls', 'v2ray', 'openvpn', 'cisco',
+        'shadowtls', 'naive', 'snell', 'mieru', 'trusttunnel',
+        'amneziawg', 'wireguard', 'l2tp', 'sudoku',
+      ];
+      final protocol = preferred != null && available.contains(preferred)
+          ? preferred
+          : _filter != 'all'
+              ? null
+              : eligible.where(available.contains).firstOrNull;
+      if (protocol == null) {
+        setState(() => _vpnError = 'NATIVE_PROTOCOL_ENGINE_NOT_READY');
+        return;
+      }
       final best = _fastestKnownIndex;
       if (best == null) {
         setState(() => _vpnError = 'NO_MEASURED_SERVER');
@@ -519,8 +561,23 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         _page = 'home';
       });
       await _toggleVpn();
+      if (!mounted) return;
+      if (_verifiedConnectionActive && _vpnError == null) {
+        await prefs.setString('twinconnect_last_verified_protocol', protocol);
+      } else {
+        setState(() {
+          _autoFastest = false;
+          _filter = previousFilter;
+          _selected = previousSelected;
+        });
+      }
     } catch (error) {
-      if (mounted) setState(() => _vpnError = _errorText(error));
+      if (mounted) setState(() {
+        _vpnError = _errorText(error);
+        _autoFastest = false;
+        _filter = previousFilter;
+        _selected = previousSelected;
+      });
     } finally {
       if (mounted) setState(() => _fastestConnecting = false);
     }
@@ -3762,10 +3819,6 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
 
     Widget heading(String name) => Row(children: [
       Expanded(child: txt(name, size: 24, bold: true)),
-      Container(
-        key: const Key('devSampleNotice'),
-        child: smallPill(tr('حساب واقعی', 'Live account')),
-      ),
     ]);
 
     Widget serverRow(int index) {
@@ -4002,9 +4055,12 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
             child: CircularProgressIndicator(strokeWidth: 2))
         else Switch(
           key: const Key('autoFastestServerToggle'),
-          value: _autoFastest && (_vpnUp || _modernUp || _vpnBusy),
+          value: _autoFastest,
           materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          onChanged: _vpnBusy || _modernUp || _vpnUp
+          // Allow turning automatic selection OFF while connected; never
+          // start a replacement tunnel in the middle of an active session.
+          onChanged: _vpnBusy || _fastestConnecting ||
+                  ((_modernUp || _vpnUp) && !_autoFastest)
               ? null : (enabled) {
             if (enabled) {
               _enableFastestAndConnect();

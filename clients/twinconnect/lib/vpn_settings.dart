@@ -1,12 +1,15 @@
 import 'dart:io';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app_strings.dart';
 import 'brand_theme.dart';
 import 'interactive_glass_card.dart';
 import 'native_vpn_bridge.dart';
+import 'windows_app_route_engine.dart';
 import 'vpn_policy.dart';
 import 'tenant_models.dart';
 
@@ -36,11 +39,51 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
   Map<String, dynamic> _guard = const {};
   bool _checking = false;
   bool _vmGuardBusy = false;
+  bool _networkResetBusy = false;
+  bool _guardRecoveryBusy = false;
+  bool _guardTrialBusy = false;
+  String _selectedKillSwitchApp = '';
+  bool? _selectedKillSwitchEnabled;
+  bool _appLockBusy = false;
+  String _appKillSwitchDiagnostic = 'not_tested';
+  Timer? _guardStatusTimer;
+  WindowsAppRoutingMode _routingMode = WindowsAppRoutingMode.fullTunnel;
+  List<String> _routingApps = <String>[];
+  bool _routingBusy = false;
+  bool _systemProxyBusy = false;
+  bool? _systemProxyEnabled;
+  int? _systemProxyPort;
+
 
   @override
   void initState() {
     super.initState();
     _check();
+    if (Platform.isWindows) {
+      _loadSelectedKillSwitchApp();
+      _loadRoutingSettings();
+      _loadSystemProxyStatus();
+      // Keep the native Windows WFP service as the source of truth,
+      // including when SYSTEM's timed emergency recovery removes filters.
+      _guardStatusTimer = Timer.periodic(
+        const Duration(seconds: 15), (_) {
+          if (mounted && !_checking && !_guardTrialBusy &&
+              !_guardRecoveryBusy && !_networkResetBusy) {
+            _check();
+            if (!_appLockBusy && _selectedKillSwitchApp.isNotEmpty) {
+              _loadSelectedKillSwitchApp();
+            }
+            if (!_systemProxyBusy) _loadSystemProxyStatus();
+          }
+        },
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _guardStatusTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _check() async {
@@ -49,18 +92,19 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
     NativeVpnCapabilities capabilities =
         NativeVpnCapabilities.unavailable(NativeVpnBridge.platform);
     Map<String, dynamic> guard = const {};
+    // Independent probes: a failed legacy WFP service must never mask the
+    // actual VPN engine status shown in Settings.
     try {
-      // Native status probes can stall on unhealthy Windows services.
-      // The page must recover rather than remain in a loading state.
-      final results = await Future.wait<Object>([
-        NativeVpnBridge.probe().timeout(const Duration(seconds: 5)),
-        NativeVpnBridge.globalKillSwitchStatus()
-            .timeout(const Duration(seconds: 5)),
-      ]);
-      capabilities = results[0] as NativeVpnCapabilities;
-      guard = results[1] as Map<String, dynamic>;
+      capabilities = await NativeVpnBridge.probe()
+          .timeout(const Duration(seconds: 5));
     } catch (_) {
-      // Never turn a timed-out or failed check into a 'protected' state.
+      capabilities = NativeVpnCapabilities.unavailable(NativeVpnBridge.platform);
+    }
+    try {
+      guard = await NativeVpnBridge.globalKillSwitchStatus()
+          .timeout(const Duration(seconds: 5));
+    } catch (_) {
+      guard = const {};
     }
     if (!mounted) return;
     setState(() {
@@ -82,6 +126,14 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
       'dns_engine_support: ${_capabilities.dnsGuard}',
       'ipv6_engine_support: ${_capabilities.ipv6Guard}',
       'guard_reason: ${_guard['reason'] ?? 'UNKNOWN'}',
+      'selected_app_kill_switch_status: ${_selectedKillSwitchEnabled == true ? 'active' : 'inactive'}',
+      'selected_app_kill_switch_last_error: $_appKillSwitchDiagnostic',
+      'split_tunnel_mode: ${_routingMode.name}',
+      'split_tunnel_selected_app_count: ${_routingApps.length}',
+      'split_tunnel_requires_reconnect: true',
+      'split_tunnel_engine_scope: windows_singbox_tun_only',
+      'system_proxy_status: ${_systemProxyEnabled == null ? 'unverified' : (_systemProxyEnabled! ? 'enabled' : 'disabled')}',
+      'system_proxy_port: ${_systemProxyPort ?? 'none'}',
     ].join('\n');
     await Clipboard.setData(ClipboardData(text: diagnosticText));
     if (!mounted) return;
@@ -158,6 +210,561 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
     ));
   }
 
+
+
+
+
+  Future<String> _appLockCommand(String action, [String? app]) async {
+    final script = File(
+        File(Platform.resolvedExecutable).parent.path +
+        r'\tools\windows_app_network_lock.ps1');
+    if (!await script.exists()) {
+      throw const FileSystemException('APP_KILL_SWITCH_SCRIPT_MISSING');
+    }
+    final result = await Process.run('powershell.exe', [
+      '-NoProfile', '-STA', '-ExecutionPolicy', 'Bypass',
+      '-File', script.path, '-Action', action,
+      if (app != null) ...['-Executable', app],
+    ]).timeout(const Duration(seconds: 50));
+    if (result.exitCode != 0) {
+      throw StateError('APP_FIREWALL_ACTION_FAILED: ${result.stderr}');
+    }
+    return result.stdout.toString().trim();
+  }
+
+
+  Future<void> _loadSelectedKillSwitchApp() async {
+    final preferences = await SharedPreferences.getInstance();
+    final path = preferences.getString('twinconnect_selected_app_killswitch') ?? '';
+    if (path.isEmpty || _appLockBusy) return;
+    bool? enabled;
+    try {
+      final status = await _appLockCommand('Status', path);
+      if (status == 'TWINCONNECT_APP_LOCKED') enabled = true;
+      if (status == 'TWINCONNECT_APP_UNLOCKED') enabled = false;
+    } catch (_) {
+      // Offline WFP status must not delete the user's saved app selection.
+    }
+    if (mounted && !_appLockBusy) {
+      setState(() {
+        _selectedKillSwitchApp = path;
+        _selectedKillSwitchEnabled = enabled;
+      });
+    }
+  }
+
+
+
+  Future<String> _systemProxyCommand(String action, [int? port]) async {
+    final script = File(
+      File(Platform.resolvedExecutable).parent.path +
+      r'\tools\windows_system_proxy.ps1');
+    if (!await script.exists()) {
+      throw const FileSystemException('SYSTEM_PROXY_ENGINE_MISSING');
+    }
+    final result = await Process.run('powershell.exe', [
+      '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
+      '-File', script.path, '-Action', action,
+      if (port != null) ...['-SocksPort', port.toString()],
+    ]).timeout(const Duration(seconds: 15));
+    if (result.exitCode != 0) {
+      throw StateError('SYSTEM_PROXY_COMMAND_FAILED: ${result.stderr}');
+    }
+    return result.stdout.toString().trim();
+  }
+
+  Future<void> _loadSystemProxyStatus() async {
+    try {
+      final output = await _systemProxyCommand('Status');
+      if (!mounted) return;
+      if (output.startsWith('TWINCONNECT_SYSTEM_PROXY_ON ')) {
+        final port = int.tryParse(output.split(' ').last);
+        if (port == null) throw const FormatException('PROXY_PORT_INVALID');
+        setState(() {
+          _systemProxyEnabled = true;
+          _systemProxyPort = port;
+        });
+      } else if (output == 'TWINCONNECT_SYSTEM_PROXY_OFF') {
+        setState(() {
+          _systemProxyEnabled = false;
+          _systemProxyPort = null;
+        });
+      } else {
+        throw const FormatException('PROXY_STATUS_UNKNOWN');
+      }
+    } catch (_) {
+      if (mounted) setState(() => _systemProxyEnabled = null);
+    }
+  }
+
+  Future<void> _changeSystemProxy(bool enable) async {
+    if (!Platform.isWindows || _systemProxyBusy) return;
+    int? port;
+    if (enable) {
+      final controller = TextEditingController(
+          text: _systemProxyPort?.toString() ?? '1080');
+      try {
+        final accepted = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: Text(AppStrings.of(ctx).pick(
+              'فعال‌سازی پروکسی ویندوز', 'Enable Windows system proxy')),
+            content: Column(mainAxisSize: MainAxisSize.min, children: [
+              Text(AppStrings.of(ctx).pick(
+                'پورت SOCKS5 محلی را وارد کن؛ اتصال آن قبل از تغییر ویندوز بررسی می‌شود.',
+                'Enter a local SOCKS5 port; its listener is verified before Windows settings change.',
+              )),
+              TextField(
+                key: const Key('vpnSystemProxyPort'),
+                controller: controller,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'SOCKS5 port'),
+              ),
+            ]),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx, false),
+                  child: Text(AppStrings.of(ctx).pick('انصراف', 'Cancel'))),
+              FilledButton(onPressed: () => Navigator.pop(ctx, true),
+                  child: Text(AppStrings.of(ctx).pick('فعال', 'Enable'))),
+            ],
+          ),
+        );
+        if (accepted != true || !mounted) return;
+        port = int.tryParse(controller.text.trim());
+        if (port == null || port < 1025 || port > 65535) {
+          throw const FormatException('SYSTEM_PROXY_PORT_INVALID');
+        }
+      } finally {
+        controller.dispose();
+      }
+    }
+    if (!mounted) return;
+    setState(() => _systemProxyBusy = true);
+    try {
+      final output = await _systemProxyCommand(
+          enable ? 'Enable' : 'Disable', port);
+      if (enable
+          ? output != 'TWINCONNECT_SYSTEM_PROXY_ON $port'
+          : output != 'TWINCONNECT_SYSTEM_PROXY_OFF') {
+        throw const FormatException('SYSTEM_PROXY_RESULT_NOT_VERIFIED');
+      }
+      await _loadSystemProxyStatus();
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(
+          AppStrings.of(context).pick(
+            'تغییر پروکسی انجام نشد: $error',
+            'System proxy change failed: $error'))));
+      }
+      await _loadSystemProxyStatus();
+    } finally {
+      if (mounted) setState(() => _systemProxyBusy = false);
+    }
+  }
+
+  Future<void> _loadRoutingSettings() async {
+    try {
+      final policy = await WindowsAppRoutePolicy.load();
+      policy.validate();
+      if (mounted) setState(() {
+        _routingMode = policy.mode;
+        _routingApps = policy.applicationPaths.toList();
+      });
+    } catch (_) {
+      if (mounted) setState(() {
+        _routingMode = WindowsAppRoutingMode.fullTunnel;
+        _routingApps = <String>[];
+      });
+    }
+  }
+
+  Future<void> _chooseRoutingApp() async {
+    if (!Platform.isWindows || _routingBusy) return;
+    setState(() => _routingBusy = true);
+    try {
+      final result = await _appLockCommand('Pick');
+      if (result == 'TWINCONNECT_PICK_CANCELLED') return;
+      const prefix = 'TWINCONNECT_PICKED ';
+      if (!result.startsWith(prefix)) throw const FormatException('ROUTING_APP_PICK_FAILED');
+      final selected = result.substring(prefix.length).trim();
+      if (selected.isEmpty) throw const FormatException('ROUTING_APP_PATH_EMPTY');
+      final updated = <String>[..._routingApps];
+      if (!updated.contains(selected)) updated.add(selected);
+      final policy = WindowsAppRoutePolicy(
+        mode: _routingMode, applicationPaths: updated);
+      await policy.persist();
+      if (mounted) setState(() => _routingApps = updated);
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(
+          AppStrings.of(context).pick(
+            'انتخاب برنامه برای مسیریابی انجام نشد: $error',
+            'Application routing selection failed: $error'))));
+      }
+    } finally {
+      if (mounted) setState(() => _routingBusy = false);
+    }
+  }
+
+  Future<void> _removeRoutingApp(String selected) async {
+    if (_routingBusy) return;
+    setState(() => _routingBusy = true);
+    try {
+      final remaining = _routingApps.where((p) => p != selected).toList();
+      final mode = remaining.isEmpty
+          ? WindowsAppRoutingMode.fullTunnel : _routingMode;
+      await WindowsAppRoutePolicy(
+        mode: mode, applicationPaths: remaining).persist();
+      if (mounted) setState(() {
+        _routingMode = mode;
+        _routingApps = remaining;
+      });
+    } catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.toString())));
+    } finally {
+      if (mounted) setState(() => _routingBusy = false);
+    }
+  }
+
+  Future<void> _setRoutingMode(WindowsAppRoutingMode mode) async {
+    if (!Platform.isWindows || _routingBusy) return;
+    if (mode != WindowsAppRoutingMode.fullTunnel && _routingApps.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(
+        AppStrings.of(context).pick(
+          'اول یک برنامه را برای مسیریابی انتخاب کن.',
+          'Select an application for routing first.'))));
+      return;
+    }
+    setState(() => _routingBusy = true);
+    try {
+      await WindowsAppRoutePolicy(
+        mode: mode, applicationPaths: _routingApps).persist();
+      if (mounted) {
+        setState(() => _routingMode = mode);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(
+          AppStrings.of(context).pick(
+            'مسیریابی ذخیره شد؛ برای اعمال در موتور sing-box اتصال VPN را دوباره برقرار کن.',
+            'Routing saved. Reconnect a sing-box VPN tunnel to apply it.'))));
+      }
+    } catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.toString())));
+    } finally {
+      if (mounted) setState(() => _routingBusy = false);
+    }
+  }
+
+  Future<void> _pickKillSwitchApp() async {
+    if (!Platform.isWindows || _appLockBusy) return;
+    setState(() => _appLockBusy = true);
+    try {
+      final picked = await _appLockCommand('Pick');
+      if (picked == 'TWINCONNECT_PICK_CANCELLED') return;
+      const prefix = 'TWINCONNECT_PICKED ';
+      if (!picked.startsWith(prefix)) {
+        throw const FormatException('APP_PICK_RESULT_INVALID');
+      }
+      final path = picked.substring(prefix.length).trim();
+      if (path.isEmpty) throw const FormatException('APP_PICK_PATH_EMPTY');
+      // File selection must succeed independently of WFP initialization.
+      // An unavailable guard may disable the toggle, but must not discard
+      // the user's selected application.
+      bool? enabled;
+      try {
+        final status = await _appLockCommand('Status', path);
+        if (status == 'TWINCONNECT_APP_LOCKED') {
+          enabled = true;
+        } else if (status == 'TWINCONNECT_APP_UNLOCKED') {
+          enabled = false;
+        }
+      } catch (_) {
+        enabled = null;
+      }
+      if (mounted) {
+        setState(() {
+          _selectedKillSwitchApp = path;
+          _selectedKillSwitchEnabled = enabled;
+        });
+      }
+      final preferences = await SharedPreferences.getInstance();
+      await preferences.setString('twinconnect_selected_app_killswitch', path);
+      if (enabled == null && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(AppStrings.of(context).pick(
+            'برنامه انتخاب شد؛ سرویس محافظت WFP در دسترس نیست.',
+            'App selected; WFP protection engine is unavailable.',
+          )),
+        ));
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(AppStrings.of(context).pick(
+            'انتخاب فایل برنامه انجام نشد. مسیر فایل exe و دسترسی ویندوز را بررسی کن.',
+            'Could not select the program executable. Check the EXE location and Windows access.',
+          )),
+        ));
+      }
+    } finally {
+      if (mounted) setState(() => _appLockBusy = false);
+    }
+  }
+
+  Future<void> _toggleSelectedAppKillSwitch(bool enable) async {
+    if (!Platform.isWindows || _appLockBusy ||
+        _selectedKillSwitchApp.isEmpty) return;
+    setState(() => _appLockBusy = true);
+    try {
+      final output = await _appLockCommand(
+        enable ? 'Lock' : 'Unlock', _selectedKillSwitchApp);
+      final expected = enable
+          ? 'TWINCONNECT_APP_LOCKED'
+          : 'TWINCONNECT_APP_UNLOCKED';
+      if (output != expected) {
+        throw const FormatException('APP_FIREWALL_STATUS_UNVERIFIED');
+      }
+      if (mounted) setState(() {
+        _selectedKillSwitchEnabled = enable;
+        _appKillSwitchDiagnostic = 'none';
+      });
+    } catch (error) {
+      if (mounted) {
+        // Never expose raw PowerShell exceptions or multiline stack traces in
+        // the app; keep low-level details available only for diagnostics.
+        final raw = error.toString().toUpperCase();
+        // Retain only a bounded diagnostic token, not a noisy PowerShell stack
+        // trace or private Windows filesystem paths.
+        final matched = RegExp(
+          r'(APP_WFP_[A-Z_0-9]+|WFP_[A-Z_0-9]+|VERIFIED_TWINCONNECT_TUNNEL_REQUIRED)')
+            .firstMatch(raw);
+        _appKillSwitchDiagnostic = matched?.group(0) ?? 'UNKNOWN_WFP_FAILURE';
+        final message = raw.contains('NO_VERIFIED_TUN_ADAPTER') ||
+                raw.contains('NO_TUN_INTERFACE') ||
+                raw.contains('VERIFIED_TWINCONNECT_TUNNEL_REQUIRED') ||
+                raw.contains('CONNECT_TO_TWINCONNECT_VPN')
+            ? AppStrings.of(context).pick(
+                'آداپتور مجازی TwinConnect پیدا نشد. یک‌بار با VPN وصل شو تا نصب شود.',
+                'TwinConnect virtual adapter was not found. Connect once to install it.')
+            : raw.contains('ADMINISTRATOR_REQUIRED') ||
+                    raw.contains('ACCESS_DENIED') ||
+                    raw.contains('ELEVATED_COMMAND_FAILED')
+                ? AppStrings.of(context).pick(
+                    'دسترسی مدیر تأیید نشد. درخواست مجوز ویندوز را قبول کن.',
+                    'Administrator permission was not granted. Approve the Windows UAC prompt.')
+                : raw.contains('APP_WFP_ENGINE_NOT_INSTALLED')
+                    ? AppStrings.of(context).pick(
+                        'موتور Kill Switch نصب نیست. نسخه کامل TwinConnect را نصب کن.',
+                        'Kill Switch engine is missing. Install the complete TwinConnect app.')
+                    : raw.contains('APP_WFP_NATIVE_ARM_ERROR_')
+                        ? AppStrings.of(context).pick(
+                            'خطای موتور WFP: $_appKillSwitchDiagnostic',
+                            'WFP engine error: $_appKillSwitchDiagnostic')
+                        : AppStrings.of(context).pick(
+                            'Kill Switch فعال نشد؛ جزئیات را از بخش عیب‌یابی کپی کن.',
+                            'Kill Switch failed. Copy diagnostics for the error details.');
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(SnackBar(
+            duration: const Duration(seconds: 4),
+            behavior: SnackBarBehavior.floating,
+            content: Text(message, maxLines: 2, overflow: TextOverflow.ellipsis),
+          ));
+      }
+    } finally {
+      if (mounted) setState(() => _appLockBusy = false);
+    }
+  }
+
+  Future<void> _testSignedWindowsGuard() async {
+    if (!Platform.isWindows || _guardTrialBusy ||
+        _guard['serviceInstalled'] != true) return;
+    final s = AppStrings.of(context);
+    final tunnel = TextEditingController(text: 'TwinConnect');
+    final endpoint = TextEditingController();
+    final transport = TextEditingController();
+    bool? accepted;
+    try {
+      accepted = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(s.pick('تست دو دقیقه‌ای Kill Switch', 'Two-minute Kill Switch test')),
+          content: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 460),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Text(s.pick(
+                'فقط برای سرویس امضاشده و VPN متصل. قوانین محافظت پس از دو دقیقه خودکار پاک می‌شوند. قبل از اجرا مسیر بازیابی را آماده داشته باش.',
+                'Signed guard and connected VPN only. WFP rules are automatically removed after two minutes. Keep offline recovery available.',
+              )),
+              TextField(controller: tunnel,
+                decoration: const InputDecoration(labelText: 'Tunnel alias')),
+              TextField(controller: endpoint,
+                decoration: const InputDecoration(labelText: 'VPN endpoint IPv4')),
+              TextField(controller: transport,
+                decoration: const InputDecoration(labelText: 'VPN transport executable')),
+            ]),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false),
+              child: Text(s.pick('انصراف', 'Cancel'))),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true),
+              child: Text(s.pick('شروع تست', 'Start test'))),
+          ],
+        ),
+      );
+      if (accepted != true || !mounted) return;
+      setState(() => _guardTrialBusy = true);
+      final script = File(File(Platform.resolvedExecutable).parent.path +
+          r'\tools\windows_guard_control.ps1');
+      if (!await script.exists()) {
+        throw const FileSystemException('GUARD_CONTROL_SCRIPT_MISSING');
+      }
+      final result = await Process.run('powershell.exe', [
+        '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
+        '-File', script.path, '-Action', 'Arm',
+        '-TunnelAlias', tunnel.text.trim(),
+        '-EndpointIpv4', endpoint.text.trim(),
+        '-TransportExe', transport.text.trim(),
+      ]).timeout(const Duration(seconds: 40));
+      if (result.exitCode != 0 ||
+          !result.stdout.toString().contains('GUARD_ARMED_TWO_MINUTE_TEST')) {
+        throw StateError('GUARD_ARM_FAILED: ' + result.stderr.toString());
+      }
+      await _check();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(s.pick(
+          'تست محدود فعال شد؛ قوانین تا دو دقیقه دیگر خودکار بازیابی می‌شوند.',
+          'Time-limited test started. Owned WFP rules will be recovered automatically in two minutes.',
+        )),
+      ));
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(s.pick(
+            'فعال‌سازی تأیید نشد؛ سرویس امضاشده، VPN متصل و دسترسی Administrator را بررسی کن.',
+            'Guard activation was not verified. Check signed service, active VPN and Administrator access.',
+          )),
+        ));
+      }
+    } finally {
+      if (mounted) setState(() => _guardTrialBusy = false);
+      await Future<void>.delayed(const Duration(milliseconds: 250));
+      tunnel.dispose();
+      endpoint.dispose();
+      transport.dispose();
+    }
+  }
+
+  Future<void> _resetWindowsNetwork() async {
+    if (!Platform.isWindows || _networkResetBusy) return;
+    final s = AppStrings.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(s.pick('ریست تنظیمات اینترنت ویندوز',
+            'Reset Windows network settings')),
+        content: Text(s.pick(
+          'اتصال VPN و اینترنت ممکن است قطع شود. کش DNS، Winsock و TCP/IP ریست می‌شوند و بعد از آن باید ویندوز را ریستارت کنی. اگر سرویس محافظت امضاشده نصب باشد، قوانین متعلق به TwinConnect هم بازیابی می‌شوند. قوانین فایروال دیگر برنامه‌ها دست‌نخورده می‌مانند. ادامه می‌دهی؟',
+          'Internet and VPN may disconnect. This resets DNS cache, Winsock and TCP/IP. Restart Windows afterward. If the signed TwinConnect guard is installed, its own WFP rules are recovered first. Other apps\' firewall rules are not removed. Continue?',
+        )),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false),
+              child: Text(s.pick('انصراف', 'Cancel'))),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true),
+              child: Text(s.pick('ریست شبکه', 'Reset network'))),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _networkResetBusy = true);
+    String message;
+    try {
+      final script = File('${File(Platform.resolvedExecutable).parent.path}'
+          '\\tools\\reset_windows_network.ps1');
+      if (!await script.exists()) {
+        throw const FileSystemException('NETWORK_RESET_TOOL_MISSING');
+      }
+      final result = await Process.run(
+        'powershell.exe',
+        ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
+          '-File', script.path],
+      ).timeout(const Duration(seconds: 90));
+      if (result.exitCode != 0 ||
+          !result.stdout.toString().contains('NETWORK_RESET_OK_RESTART_REQUIRED')) {
+        throw StateError('NETWORK_RESET_FAILED: ${result.stderr}');
+      }
+      message = s.pick(
+        'تنظیمات شبکه ریست شد؛ برای تکمیل، ویندوز را ریستارت کن.',
+        'Network reset completed. Restart Windows to finish.',
+      );
+    } catch (error) {
+      message = s.pick(
+        'ریست شبکه انجام نشد. برنامه را با دسترسی Administrator اجرا کن. گزارش: C:\\ProgramData\\TwinConnect\\network-reset.log',
+        'Network reset failed. Run the app as Administrator. Log: C:\\ProgramData\\TwinConnect\\network-reset.log',
+      );
+    }
+    if (!mounted) return;
+    setState(() => _networkResetBusy = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), duration: const Duration(seconds: 8)),
+    );
+  }
+
+
+  Future<void> _recoverWindowsGuard() async {
+    if (!Platform.isWindows || _guardRecoveryBusy) return;
+    final s = AppStrings.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(s.pick('بازیابی اضطراری Kill Switch',
+            'Emergency Kill Switch recovery')),
+        content: Text(s.pick(
+          'فقط قوانین محافظتی متعلق به TwinConnect حذف می‌شوند و ممکن است اینترنت مستقیم دوباره برقرار شود. این کار تنظیمات شبکه ویندوز را ریست نمی‌کند. ادامه می‌دهی؟',
+          'This removes TwinConnect-owned protection rules only and may restore direct internet access. It does not reset Windows networking. Continue?',
+        )),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false),
+              child: Text(s.pick('انصراف', 'Cancel'))),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true),
+              child: Text(s.pick('بازیابی', 'Recover'))),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _guardRecoveryBusy = true);
+    String message;
+    try {
+      final script = File('${File(Platform.resolvedExecutable).parent.path}'
+          '\\tools\\reset_windows_network.ps1');
+      if (!await script.exists()) {
+        throw const FileSystemException('GUARD_RECOVERY_TOOL_MISSING');
+      }
+      final result = await Process.run('powershell.exe',
+        ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
+          '-File', script.path, '-GuardOnly'],
+      ).timeout(const Duration(seconds: 60));
+      if (result.exitCode != 0 ||
+          !result.stdout.toString().contains('TWINCONNECT_GUARD_RECOVERY_OK')) {
+        throw StateError('GUARD_RECOVERY_FAILED: ${result.stderr}');
+      }
+      message = s.pick('بازیابی محافظ TwinConnect انجام شد.',
+          'TwinConnect guard recovery completed.');
+    } catch (_) {
+      message = s.pick(
+        'بازیابی تأیید نشد. با Administrator اجرا کن؛ گزارش: C:\\ProgramData\\TwinConnect\\network-reset.log',
+        'Recovery was not verified. Run as Administrator; log: C:\\ProgramData\\TwinConnect\\network-reset.log',
+      );
+    }
+    await _check();
+    if (!mounted) return;
+    setState(() => _guardRecoveryBusy = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), duration: const Duration(seconds: 8)),
+    );
+  }
+
   bool get _guardActive =>
       _guard['serviceInstalled'] == true &&
       _guard['armed'] == true &&
@@ -231,16 +838,26 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
     required bool selected,
     required bool enabled,
     required Key key,
+    VoidCallback? onTap,
   }) => Row(key: key, children: [
-    Icon(selected ? Icons.radio_button_checked_rounded
-                  : Icons.radio_button_unchecked_rounded,
-      color: selected ? Theme.of(context).colorScheme.primary
-          : Theme.of(context).disabledColor, size: 20),
-    const SizedBox(width: 12),
-    Expanded(child: Text(label, style: TextStyle(
-      fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-      color: enabled ? null : Theme.of(context).disabledColor,
-    ))),
+    Expanded(child: InkWell(
+      onTap: enabled ? onTap : null,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Row(children: [
+          Icon(selected ? Icons.radio_button_checked_rounded
+              : Icons.radio_button_unchecked_rounded,
+            color: selected ? Theme.of(context).colorScheme.primary
+                : Theme.of(context).disabledColor, size: 20),
+          const SizedBox(width: 12),
+          Expanded(child: Text(label, style: TextStyle(
+            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+            color: enabled ? null : Theme.of(context).disabledColor,
+          ))),
+        ]),
+      ),
+    )),
     _help(label, help),
     if (!enabled) const Icon(Icons.lock_outline_rounded, size: 17),
   ]);
@@ -295,35 +912,51 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _section(tr('امنیت سیستم', 'System security')),
-        _glass(
-          Row(children: [
-            const Icon(Icons.shield_rounded, size: 25),
-            const SizedBox(width: 13),
-            Expanded(child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Kill Switch', style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.bold)),
-                Text(_guardActive
-                    ? tr('محافظت سیستم تأیید شده', 'System protection verified')
-                    : globalReady
-                        ? tr('سرویس محافظت هنوز آماده نیست', 'Protection service not ready')
-                        : tr('محافظت سراسری در دسترس نیست', 'System protection unavailable'),
-                    style: Theme.of(context).textTheme.bodySmall),
-              ],
-            )),
-            _help('Kill Switch', tr(
-              'این قابلیت باید هنگام قطع VPN، ترافیک مستقیم IPv4 و IPv6 کل سیستم را مسدود کند. صرف آماده‌بودن WFP به معنی فعال‌بودن محافظت نیست. تا نصب و آزمایش سرویس مستقل ویندوز نمی‌توان آن را روشن کرد.',
-              'Blocks direct system-wide IPv4/IPv6 traffic when the VPN drops. WFP availability alone does not mean protection is active. It cannot be enabled until the independent Windows service is installed and tested.',
-            )),
-            Switch.adaptive(
-              key: const Key('vpnKillSwitch'),
-              value: _guardActive,
-              onChanged: null, // Never allow cosmetic activation.
-            ),
-          ]),
-          key: const Key('vpnKillSwitchCard'),
-        ),
+        if (Platform.isWindows) ...[
+          const SizedBox(height: 8),
+          _glass(Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(children: [
+                const Icon(Icons.shield_rounded, size: 22),
+                const SizedBox(width: 9),
+                Expanded(child: Text(
+                  tr('Kill Switch برنامه انتخابی', 'Selected app Kill Switch'),
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                )),
+                Switch.adaptive(
+                  key: const Key('vpnSelectedAppKillSwitch'),
+                  value: _selectedKillSwitchEnabled == true,
+                  onChanged: _appLockBusy || _selectedKillSwitchApp.isEmpty
+                      ? null : _toggleSelectedAppKillSwitch,
+                ),
+              ]),
+
+              const SizedBox(height: 8),
+              Row(children: [
+                Expanded(child: Text(
+                  _selectedKillSwitchApp.isEmpty
+                      ? tr('هنوز برنامه‌ای انتخاب نشده', 'No application selected')
+                      : _selectedKillSwitchApp.split(Platform.pathSeparator).last,
+                  key: const Key('vpnSelectedAppName'),
+                  overflow: TextOverflow.ellipsis,
+                )),
+                const SizedBox(width: 8),
+                TextButton.icon(
+                  key: const Key('vpnSelectKillSwitchApp'),
+                  // Do not hide persistent protection on another app.
+                  // Turn the current app's Kill Switch off before changing it.
+                  onPressed: _appLockBusy || _selectedKillSwitchEnabled == true
+                      ? null : _pickKillSwitchApp,
+                  icon: const Icon(Icons.folder_open_rounded, size: 18),
+                  label: Text(tr('انتخاب برنامه', 'Select app')),
+                ),
+              ]),
+              if (_appLockBusy)
+                const LinearProgressIndicator(minHeight: 2),
+            ],
+          ), key: const Key('vpnSelectedAppKillSwitchCard')),
+        ],
         const SizedBox(height: 8),
         _glass(
           Row(children: [
@@ -348,6 +981,71 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
             ),
           ]),
         ),
+
+        if (Platform.isWindows && _guard['serviceInstalled'] == true) ...[
+          const SizedBox(height: 8),
+          _glass(Row(children: [
+            const Icon(Icons.science_outlined, size: 22),
+            const SizedBox(width: 12),
+            Expanded(child: Text(tr(
+              'تست کنترل‌شده Kill Switch (۲ دقیقه)',
+              'Kill Switch controlled test (2 min)',
+            ))),
+            TextButton(
+              key: const Key('vpnSignedGuardTimedTest'),
+              onPressed: _guardTrialBusy ? null : _testSignedWindowsGuard,
+              child: _guardTrialBusy
+                  ? const SizedBox(width: 18, height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2))
+                  : Text(tr('تست', 'Test')),
+            ),
+          ]), key: const Key('vpnSignedGuardTimedTestCard')),
+        ],
+        // Recovery must remain accessible even if the guard service crashes,
+        // is unregistered, or a native status probe fails closed.
+        if (Platform.isWindows) ...[
+          const SizedBox(height: 8),
+          _glass(Row(children: [
+            const Icon(Icons.shield_outlined, size: 22),
+            const SizedBox(width: 12),
+            Expanded(child: Text(
+              tr('بازیابی اضطراری Kill Switch',
+                 'Emergency Kill Switch recovery'),
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            )),
+            TextButton(
+              key: const Key('vpnGuardEmergencyRecovery'),
+              onPressed: _guardRecoveryBusy ? null : _recoverWindowsGuard,
+              child: _guardRecoveryBusy
+                  ? const SizedBox(width: 18, height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2))
+                  : Text(tr('بازیابی', 'Recover')),
+            ),
+          ]), key: const Key('vpnGuardEmergencyRecoveryCard')),
+        ],
+        if (Platform.isWindows) ...[
+          const SizedBox(height: 8),
+          _glass(Row(children: [
+            const Icon(Icons.settings_backup_restore_rounded, size: 22),
+            const SizedBox(width: 12),
+            Expanded(child: Text(
+              tr('ریست تنظیمات اینترنت ویندوز', 'Reset Windows network settings'),
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            )),
+            _help('Windows network reset', tr(
+              'با تأیید کاربر، DNS و Winsock و TCP/IP ریست می‌شود. برای تکمیل به راه‌اندازی مجدد ویندوز نیاز است. در صورت وجود سرویس امضاشده TwinConnect، قوانین محافظتی متعلق به آن نیز بازیابی و بررسی می‌شوند.',
+              'With confirmation, clears DNS cache and resets Winsock/TCP-IP. Requires a Windows restart. A trusted installed TwinConnect guard is recovered and its owned WFP rules verified first.',
+            )),
+            TextButton(
+              key: const Key('vpnWindowsNetworkReset'),
+              onPressed: _networkResetBusy ? null : _resetWindowsNetwork,
+              child: _networkResetBusy
+                  ? const SizedBox(width: 18, height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2))
+                  : Text(tr('ریست', 'Reset')),
+            ),
+          ]), key: const Key('vpnWindowsNetworkResetCard')),
+        ],
         if (Platform.isWindows &&
             Platform.environment['TWINCONNECT_DISPOSABLE_VM'] == '1')
           _glass(Row(children: [
@@ -398,47 +1096,86 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
             children: [
               Text(tr('Proxy / System Proxy', 'Proxy / System Proxy'),
                   style: const TextStyle(fontWeight: FontWeight.w700)),
-              Text(tr('موتور تغییر مسیر پروکسی هنوز متصل نیست',
-                      'Proxy switching engine not integrated'),
+              Text(_systemProxyEnabled == true
+                  ? tr('SOCKS5 فعال: 127.0.0.1:${_systemProxyPort ?? 0}',
+                      'SOCKS5 active: 127.0.0.1:${_systemProxyPort ?? 0}')
+                  : _systemProxyEnabled == false
+                      ? tr('خاموش', 'Off')
+                      : tr('وضعیت موتور تأیید نشد', 'Engine status unverified'),
                   style: Theme.of(context).textTheme.bodySmall),
             ],
           )),
           _help('Proxy', tr(
-            'حالت پروکسی فقط برنامه‌هایی را پوشش می‌دهد که از SOCKS یا پروکسی سیستم پیروی می‌کنند. با VPN کل سیستم تفاوت دارد؛ هنوز امکان تغییر امن حالت از این بخش فراهم نشده است.',
-            'A local SOCKS/system proxy only covers proxy-aware apps. Safe mode switching is not yet integrated.',
+            'این موتور فقط برنامه‌هایی را تغییر می‌دهد که از پروکسی سیستم پیروی می‌کنند. ابتدا SOCKS5 محلی باید فعال باشد. خاموش‌کردن تنظیمات قبلی ویندوز را برمی‌گرداند.',
+            'Only proxy-aware applications are affected. A verified local SOCKS5 listener is required. Disabling restores your previous Windows settings.',
           )),
-          const Icon(Icons.lock_outline_rounded),
-        ]), key: const Key('vpnProxyModeUnavailable')),
+          Switch.adaptive(
+            key: const Key('vpnSystemProxyToggle'),
+            value: _systemProxyEnabled == true,
+            onChanged: !Platform.isWindows || _systemProxyBusy ||
+                _systemProxyEnabled == null
+                ? null : _changeSystemProxy,
+          ),
+        ]), key: const Key('vpnSystemProxyCard')),
         _section(tr('تفکیک برنامه‌ها', 'Split tunneling')),
         _glass(Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             _routingOption(
               label: tr('تمام دستگاه', 'Entire device'),
-              selected: true,
-              enabled: true,
-              help: tr('در وضعیت فعلی تمام ترافیک دستگاه از VPN عبور می‌کند؛ البته با توجه به محدودیت پروتکل و تنظیمات شبکه.',
-                  'Currently routes device traffic via VPN, subject to the protocol and OS routing capabilities.'),
+              selected: _routingMode == WindowsAppRoutingMode.fullTunnel,
+              enabled: Platform.isWindows && !_routingBusy,
+              onTap: () => _setRoutingMode(WindowsAppRoutingMode.fullTunnel),
+              help: tr('موتور TUN همه ترافیک را از پروکسی انتخابی عبور می‌دهد.',
+                  'The TUN routes all traffic through the selected proxy.'),
               key: const Key('vpnRoutingFullTunnel'),
             ),
             Divider(height: 12, color: Theme.of(context).dividerColor),
             _routingOption(
               label: tr('فقط برنامه‌های انتخابی', 'Only selected apps'),
-              selected: false,
-              enabled: false,
-              help: tr('این حالت تنها پس از اضافه‌شدن فیلتر واقعی بسته‌های برنامه‌ها و انتخاب برنامه‌های نصب‌شده فعال می‌شود.',
-                  'Requires a verified per-app packet routing implementation and an installed-app picker.'),
+              selected: _routingMode == WindowsAppRoutingMode.includeSelected,
+              enabled: Platform.isWindows && !_routingBusy,
+              onTap: () => _setRoutingMode(WindowsAppRoutingMode.includeSelected),
+              help: tr('برای sing-box روی ویندوز: فقط برنامه‌های این فهرست از VPN می‌گذرند. پس از تغییر باید VPN را دوباره وصل کنی.',
+                  'Windows sing-box: only listed apps use VPN. Reconnect VPN to apply.'),
               key: const Key('vpnRoutingIncludeApps'),
             ),
             Divider(height: 12, color: Theme.of(context).dividerColor),
             _routingOption(
               label: tr('همه به‌جز برنامه‌های انتخابی', 'Exclude selected apps'),
-              selected: false,
-              enabled: false,
-              help: tr('برای عبور مستقیم برنامه‌های مشخص باید قوانین واقعی سیستم‌عامل ساخته و تست شوند.',
-                  'Requires verified OS routing rules for applications excluded from the VPN.'),
+              selected: _routingMode == WindowsAppRoutingMode.excludeSelected,
+              enabled: Platform.isWindows && !_routingBusy,
+              onTap: () => _setRoutingMode(WindowsAppRoutingMode.excludeSelected),
+              help: tr('برای sing-box روی ویندوز: برنامه‌های انتخاب‌شده مستقیم وصل می‌شوند، بقیه از VPN. پس از تغییر باید VPN را دوباره وصل کنی.',
+                  'Windows sing-box: listed apps connect directly; the rest use VPN. Reconnect to apply.'),
               key: const Key('vpnRoutingExcludeApps'),
             ),
+            if (Platform.isWindows) ...[
+              const Divider(height: 14),
+              Row(children: [
+                Expanded(child: Text(tr('برنامه‌های مسیریابی', 'Routed applications'),
+                    style: const TextStyle(fontWeight: FontWeight.w600))),
+                TextButton.icon(
+                  key: const Key('vpnPickRoutingApp'),
+                  onPressed: _routingBusy ? null : _chooseRoutingApp,
+                  icon: const Icon(Icons.add_circle_outline_rounded, size: 17),
+                  label: Text(tr('افزودن', 'Add app')),
+                ),
+              ]),
+              for (final path in _routingApps)
+                Row(children: [
+                  Expanded(child: Text(
+                    path.split(Platform.pathSeparator).last,
+                    overflow: TextOverflow.ellipsis)),
+                  IconButton(
+                    key: ValueKey('vpnRemoveRoutingApp_$path'),
+                    tooltip: tr('حذف', 'Remove'),
+                    onPressed: _routingBusy ? null : () => _removeRoutingApp(path),
+                    icon: const Icon(Icons.close_rounded, size: 18),
+                  ),
+                ]),
+
+            ],
           ],
         ), key: const Key('vpnSplitTunnelCard')),
         const SizedBox(height: 11),

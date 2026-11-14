@@ -10,7 +10,11 @@ void main() {
     expect(header, contains('FwpmEngineOpen0('));
     expect(header, contains('FWPM_SESSION_FLAG_DYNAMIC'));
     expect(header, contains('FwpmEngineClose0(engine)'));
-    expect(header, contains('const bool recoveryVerified = false;'));
+    // A read-only native probe may show ON only after the privileged service
+    // confirms verified WFP rules and a SYSTEM emergency rollback task.
+    expect(header, contains('IndependentRollbackVerified()'));
+    expect(header, contains('CallNamedPipeW('));
+    expect(header, contains('OK 1 1 1 1'));
     expect(header, contains('OpenServiceW('));
     expect(header, contains('OwnedFilterExists('));
     expect(header, contains('FWPM_SESSION_FLAG_DYNAMIC'));
@@ -158,6 +162,101 @@ void main() {
     expect(script, isNot(contains("arm I_ACCEPT_OFFLINE_RECOVERY")));
   });
 
+  test('main Windows installer provides automatic signed guard and offline recovery', () {
+    final setup = File('installer.iss').readAsStringSync();
+    final control = File('tools/windows_guard_control.ps1').readAsStringSync();
+    final restore = File('tools/restore_windows_network_launcher.ps1').readAsStringSync();
+    expect(setup, contains('TwinConnect - Restore Internet'));
+    expect(setup, contains('restore_windows_network_launcher.ps1'));
+    expect(setup, contains('install_guard_service.ps1'));
+    expect(setup, contains('-Action Install'));
+    expect(setup, contains('GuardSigningThumbprint'));
+    expect(control, contains('Register-ScheduledTask'));
+    expect(control, contains('UNTRUSTED_RECOVERY_TASK_CONFLICT'));
+    expect(control, contains('OK 1 1 1 1'));
+    expect(restore, contains('reset_windows_network.ps1'));
+    expect(restore, contains(r'& $restore -GuardOnly'));
+    expect(restore, contains('Type RESET to confirm'));
+  });
+
+  test('selected-app WFP Kill Switch blocks direct traffic but preserves VPN', () {
+    final script = File('tools/windows_app_network_lock.ps1').readAsStringSync();
+    final native = File('native/windows/twinconnect_app_killswitch.cpp').readAsStringSync();
+    final setup = File('installer.iss').readAsStringSync();
+    final settings = File('lib/vpn_settings.dart').readAsStringSync();
+    final workflow = File('../../.github/workflows/twinconnect-windows-preview.yml').readAsStringSync();
+    expect(native, contains('FWPM_CONDITION_ALE_APP_ID'));
+    expect(native, contains('FWPM_CONDITION_IP_LOCAL_INTERFACE'));
+    expect(native, contains('FWP_MATCH_NOT_EQUAL'));
+    expect(native, contains('FWPM_LAYER_ALE_AUTH_CONNECT_V4'));
+    expect(native, contains('FWPM_LAYER_ALE_AUTH_CONNECT_V6'));
+    expect(native, contains('FWPM_FILTER_FLAG_PERSISTENT'));
+    expect(native, contains('FwpmTransactionBegin0'));
+    expect(native, contains('RemoveOwned('));
+    expect(native, contains('TWINCONNECT_APP_UNLOCKED'));
+    expect(native, isNot(contains('FWP_ACTION_PERMIT')));
+    expect(script, contains('TwinConnectAppKillSwitch.exe'));
+    expect(script, contains('Get-NetAdapter'));
+    expect(script, contains('APP_WFP_STATUS_UNVERIFIED'));
+    expect(script, contains('OpenFileDialog'));
+    expect(script, contains('LOCALAPPDATA'));
+    expect(native, contains('const bool statusOnly'));
+    expect(native, contains('!audit && !statusOnly && !IsAdmin()'));
+    expect(script, isNot(contains('New-NetFirewallRule')));
+    expect(setup, contains('windows_app_network_lock.ps1'));
+    expect(settings, contains("Key('vpnSelectKillSwitchApp')"));
+    expect(settings, contains("Key('vpnSelectedAppKillSwitch')"));
+    expect(settings, contains('_toggleSelectedAppKillSwitch'));
+    expect(workflow, contains('Build app-scoped WFP bypass guard'));
+  });
+
+  test('app WFP lock prompts UAC and checks actual filters after elevation', () {
+    final script = File('tools/windows_app_network_lock.ps1').readAsStringSync();
+    final native = File('native/windows/twinconnect_app_killswitch.cpp').readAsStringSync();
+    final settings = File('lib/vpn_settings.dart').readAsStringSync();
+    expect(script, contains('-Verb RunAs'));
+    expect(script, contains('-ElevationReceipt'));
+    expect(script, contains('APP_WFP_ELEVATED_STATUS_UNVERIFIED'));
+    expect(script, contains(r'& $binary status $path'));
+    expect(script, contains('TWINCONNECT_APP_LOCKED'));
+    expect(script, contains('TWINCONNECT_APP_UNLOCKED'));
+    expect(script, contains(r'Remove-Item -LiteralPath $receipt'));
+    expect(native, contains('APP_WFP_NATIVE_ARM_ERROR_'));
+    // Persistent Kill Switch must be switchable on with the VPN disconnected,
+    // provided its trusted virtual adapter was already provisioned.
+    expect(native, isNot(contains('row.OperStatus != IfOperStatusUp')));
+    expect(native, contains('row.InterfaceAndOperStatusFlags.HardwareInterface'));
+    expect(script, contains('APP_WFP_NO_VERIFIED_TUN_ADAPTER'));
+    expect(script, contains('TwinConnectAWG'));
+    expect(native, contains('TwinConnectAWG'));
+    expect(script, contains('ElevationReceipt'));
+    expect(script, contains('APP_WFP_NATIVE_ARM_ERROR_'));
+
+    expect(script, isNot(contains("Status -eq 'Up'")));
+    expect(native, contains('const bool sameApp'));
+    expect(native, contains('if (sameApp) {'));
+    expect(native, contains('FwpmTransactionAbort0(h)'));
+    expect(native, contains('appCondition = &condition'));
+    expect(native, contains('interfaceCondition = &condition'));
+    expect(native, isNot(contains('f->filterCondition[0]')));
+    expect(native, isNot(contains('f->filterCondition[1]')));
+    expect(settings, isNot(contains(r"'تغییر Kill Switch انجام نشد: ${error.toString()}'")));
+  });
+
+  test('Windows application picker never depends on installed WFP engine', () {
+    final script = File('tools/windows_app_network_lock.ps1').readAsStringSync();
+    final settings = File('lib/vpn_settings.dart').readAsStringSync();
+    final pick = script.indexOf('TWINCONNECT_PICKED ');
+    final engine = script.indexOf('APP_WFP_ENGINE_NOT_INSTALLED');
+    expect(pick, greaterThan(0));
+    expect(engine, greaterThan(pick));
+    expect(script, isNot(contains('#Requires -RunAsAdministrator')));
+    expect(script, contains('-Verb RunAs'));
+    expect(script, contains('APP_WFP_ELEVATED_STATUS_UNVERIFIED'));
+    expect(settings, contains('File selection must succeed independently'));
+    expect(settings, contains('_selectedKillSwitchEnabled = enabled'));
+  });
+
   test('native bridge installs only a read-only guard status method', () {
     final install = File('tools/install_windows_native.py')
         .readAsStringSync();
@@ -185,11 +284,14 @@ void main() {
     );
   });
 
-  test('settings cannot activate global guard without enforcement', () {
+  test('legacy system-wide Kill Switch toggle is removed, per-app remains', () {
     final screen = File('lib/vpn_settings.dart').readAsStringSync();
-    expect(screen, contains('NativeVpnBridge.globalKillSwitchStatus()'));
-    expect(screen, contains('Protection service not ready'));
-    expect(screen, contains('onChanged: null'));
+    expect(screen, contains("key: const Key('vpnSelectedAppKillSwitch')"));
+    expect(screen, contains("key: const Key('vpnSelectKillSwitchApp')"));
+    expect(screen, isNot(contains("key: const Key('vpnKillSwitch')")));
+    expect(screen, isNot(contains("key: const Key('vpnKillSwitchCard')")));
+    expect(screen, contains('_toggleSelectedAppKillSwitch'));
+    expect(screen, contains('_recoverWindowsGuard()'));
     expect(screen, isNot(contains('setGlobalKillSwitchEnabled')));
   });
 }
