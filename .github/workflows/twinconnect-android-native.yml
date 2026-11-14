@@ -93,6 +93,7 @@ jobs:
                   raise SystemExit(f"APK exceeds 50 MiB: {name}")
           PY
       - name: Upload Android device-specific release test APKs
+        if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
           name: twinconnect-android-clean-v20-apks
