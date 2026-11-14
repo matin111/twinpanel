@@ -3397,6 +3397,16 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           ),
         ),
         const SizedBox(height: 9),
+        if (Platform.isIOS) ...[
+          Text(
+            tr('نسخه آزمایشی آیفون: اتصال VPN تا تکمیل Network Extension غیرفعال است.',
+               'iOS preview: VPN connection is unavailable until Network Extension is implemented.'),
+            key: const Key('iosVpnEngineUnavailableNotice'),
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 11, color: Color(0xFFFFCA81)),
+          ),
+          const SizedBox(height: 9),
+        ],
         // Real connection status drives the waves. Offline has no animation.
         TwinConnectWaveIndicator(
           key: const Key('liveConnectionDataFabric'),
@@ -3435,7 +3445,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
               ),
               child: FilledButton(
                 key: const Key('liveConnectionControlsButton'),
-                onPressed: _vpnBusy ? null : _toggleVpn,
+                onPressed: !Platform.isWindows || _vpnBusy ? null : _toggleVpn,
                 style: FilledButton.styleFrom(
                   minimumSize: const Size(250, 59),
                   backgroundColor: Colors.transparent,
@@ -3985,7 +3995,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
             child: InkWell(
               key: Key('connectXray_${nodeId}_${inbound.id}'),
               borderRadius: BorderRadius.circular(16),
-              onTap: _vpnBusy ? null : () {
+              onTap: !Platform.isWindows || _vpnBusy ? null : () {
                 setState(() {
                   _selected = index;
                   _selectedXrayNodeId = nodeId;
@@ -4084,7 +4094,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
           // Allow turning automatic selection OFF while connected; never
           // start a replacement tunnel in the middle of an active session.
-          onChanged: _vpnBusy || _fastestConnecting ||
+          onChanged: !Platform.isWindows || _vpnBusy || _fastestConnecting ||
                   ((_modernUp || _vpnUp) && !_autoFastest)
               ? null : (enabled) {
             if (enabled) {
