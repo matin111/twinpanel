@@ -925,7 +925,9 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
                 : connected
                     ? s.pick('ابتدا تونل قبلی را قطع کنید', 'Disconnect active tunnel first')
                     : !canStartSelected
-                        ? s.pick('موتور اتصال نصب نیست', 'Engine not installed')
+                        ? chosen?.configRecordPresent != true
+                            ? s.pick('کانفیگ این پروتکل آماده نیست', 'Protocol profile unavailable')
+                            : s.pick('موتور اتصال نصب نیست', 'Engine not installed')
                         : s.pick('اتصال سریع', 'Connect now')),
           ),
         ),
