@@ -277,7 +277,11 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
   /// reachability; an OS interface alone is not a connected VPN. No secrets
   /// are logged. Timeout leaves the current node untrusted.
   Future<bool> _awaitPeerHandshake() async {
-    for (var attempt = 0; attempt < 12; attempt++) {
+    // Generate an HTTPS request through the live VPN interface; an idle
+    // WireGuard peer may not initiate a handshake until traffic is sent.
+    // The result is never treated as verified until handshake + IP succeed.
+    unawaited(_checkInternet());
+    for (var attempt = 0; attempt < 18; attempt++) {
       if (!mounted) return false;
       final status = await _controller.status();
       if (status['state'] != 'interface_up') return false;
@@ -405,12 +409,19 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
       var peerVerified = false;
       for (final node in attempts) {
         if (!mounted) return;
-        final response = await _controller.connectWireGuard(
-          node: node,
-          policy: policy,
-          capabilities: capabilities,
-          nativeProtocols: widget.native,
-        );
+        Map<String, dynamic> response;
+        try {
+          response = await _controller.connectWireGuard(
+            node: node,
+            policy: policy,
+            capabilities: capabilities,
+            nativeProtocols: widget.native,
+          );
+        } catch (_) {
+          // A partially created interface must never survive failed start.
+          try { await _controller.stop(); } catch (_) {}
+          rethrow;
+        }
         if (response['state'] != 'interface_up') {
           throw const FormatException('NATIVE_TUNNEL_STATUS_INVALID');
         }
@@ -425,6 +436,9 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
                 .where((server) => server.id == node.nodeId)
                 .firstOrNull;
           });
+          // Previous pre-handshake probes do not qualify as an end-to-end
+          // check. Clear its timer and attempt a fresh verified HTTPS check.
+          _lastInternetCheck = null;
           unawaited(_checkInternet());
           break;
         }
