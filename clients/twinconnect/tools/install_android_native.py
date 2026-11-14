@@ -73,6 +73,17 @@ def patch_manifest() -> None:
         '            </intent-filter>\n'
         '        </service>\n'
     )
+    service += (
+        '\n        <!-- Reserved Cisco / OpenConnect VpnService. The engine is '
+        'not advertised until a real native transport is bundled. -->\n'
+        '        <service android:name=".OpenConnectVpnService"\n'
+        '            android:exported="false"\n'
+        '            android:permission="android.permission.BIND_VPN_SERVICE">\n'
+        '            <intent-filter>\n'
+        '                <action android:name="android.net.VpnService" />\n'
+        '            </intent-filter>\n'
+        '        </service>\n'
+    )
     current = current[:match.end()] + service + current[match.end():]
     filename.write_text(current, encoding="utf-8")
 
@@ -85,7 +96,7 @@ def install_native_sources() -> None:
             "'flutter create --platforms=android,ios,macos,windows "
             "--org com.twinpanel --project-name twinconnect .' first"
         )
-    for filename in ("MainActivity.kt", "WireGuardRuntime.kt"):
+    for filename in ("MainActivity.kt", "WireGuardRuntime.kt", "OpenConnectVpnService.kt"):
         src = NATIVE / "kotlin" / "com" / "twinpanel" / "twinconnect" / filename
         if not src.is_file():
             raise RuntimeError(f"Missing tracked native source: {src}")
