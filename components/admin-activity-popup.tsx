@@ -79,18 +79,26 @@ export function AdminActivityPopup(){
               <small>{label}</small><strong>{value==null?"—":Number(value).toLocaleString("fa-IR")}</strong>
             </div>)}
           </div>
-          <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",marginBottom:12}}>
+          <form role="search" onSubmit={event=>{event.preventDefault();setPage(0);setAppliedSearch(search.trim());setRevision(v=>v+1);}}
+            style={{display:"flex",flexDirection:"column",gap:7,margin:"14px 0 12px",padding:"12px",border:"1px solid #cbd5e1",borderRadius:12,background:"#f8fafc",color:"#0f172a"}}>
+            <label htmlFor="tp-admin-activity-search" style={{fontWeight:700,fontSize:13}}>{pick("جستجو در تاریخچه ادمین","Search admin history")}</label>
+            <div style={{display:"flex",gap:7,alignItems:"stretch",flexWrap:"wrap"}}>
+              <input id="tp-admin-activity-search" type="search" value={search} onChange={e=>setSearch(e.target.value)}
+                placeholder={pick("نام ادمین، شناسه اکانت یا نوع عملیات…","Admin name, account ID or action…")}
+                aria-label={pick("جستجو در تاریخچه","Search history")}
+                style={{display:"block",flex:"1 1 230px",width:"100%",minWidth:0,boxSizing:"border-box",border:"1px solid #94a3b8",borderRadius:9,padding:"10px 12px",background:"#fff",color:"#0f172a",fontSize:14,outlineOffset:2}}/>
+              <button type="submit" className="primary" disabled={loading} style={{padding:"9px 17px",whiteSpace:"nowrap"}}>⌕ {pick("جستجو","Search")}</button>
+              {(appliedSearch||search)&&<button type="button" className="ghost" onClick={()=>{setSearch("");setAppliedSearch("");setPage(0);}} style={{color:"#334155",border:"1px solid #94a3b8"}}>{pick("پاک‌کردن","Clear")}</button>}
+            </div>
+            {appliedSearch&&<small>{pick("نتایج جستجو برای","Results for")}: <b>{appliedSearch}</b></small>}
+          </form>
+          <div style={{display:"flex",gap:8,alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",marginBottom:12}}>
             <label>{pick("فیلتر","Filter")}: <select value={filter} onChange={e=>{setFilter(e.target.value);setPage(0);}}>
               <option value="all">{pick("همه","All")}</option>
               <option value="wallet">{pick("کیف پول","Wallet")}</option>
               <option value="subscription">{pick("اشتراک‌ها","Subscriptions")}</option>
               <option value="other">{pick("سایر","Other")}</option>
             </select></label>
-            <form onSubmit={event=>{event.preventDefault();setPage(0);setAppliedSearch(search.trim());setRevision(v=>v+1);}} style={{display:"flex",gap:6,alignItems:"center",flex:"1 1 250px",minWidth:0}}>
-              <input type="search" value={search} onChange={e=>setSearch(e.target.value)} placeholder={pick("جستجوی ادمین، شناسه اکانت، عملیات…","Search admin, account ID, action…")} aria-label={pick("جستجو در تاریخچه","Search history")} style={{minWidth:0,flex:1,padding:"8px 10px",borderRadius:9}}/>
-              <button type="submit" className="primary" disabled={loading}>{pick("جستجو","Search")}</button>
-              {appliedSearch&&<button type="button" className="ghost" onClick={()=>{setSearch("");setAppliedSearch("");setPage(0);}}>{pick("پاک‌کردن","Clear")}</button>}
-            </form>
             <button className="ghost" type="button" disabled={loading} onClick={()=>setRevision(v=>v+1)}>{pick("بروزرسانی","Refresh")}</button>
           </div>
           {error&&<div className="runtime-error">{error}</div>}
