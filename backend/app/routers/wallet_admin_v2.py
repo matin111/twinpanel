@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -10,6 +11,7 @@ from ..database import get_db
 from ..deps import require_admin
 from ..models import User
 from ..models_reseller import Reseller, ResellerCustomer
+from ..quota_models import QuotaAuditLog
 from ..telegram_notify_service import queue_telegram_notification
 from ..user_notification_models import UserNotification
 from ..services.wallet_payment_automation import credit_wallet_topup
@@ -164,12 +166,18 @@ def adjust_wallet_v2(
     user_id: int,
     payload: AdminAdjustIn,
     db: Session = Depends(get_db),
+    actor: User = Depends(require_admin),
 ):
     if _is_reseller_scoped_user(db, int(user_id)):
         # Same non-disclosure behavior as central user management: reseller
         # identities must not be discoverable or mutable by direct user ID.
         raise HTTPException(status_code=404, detail="کاربر پیدا نشد")
 
+    # The inner legacy handler commits the money transfer before returning.
+    # Preserve the committed transaction even if audit delivery is interrupted.
+    from ..customer_wallet_models import CustomerWallet
+    before_wallet = db.get(CustomerWallet, int(user_id))
+    before_balance = int(before_wallet.balance_toman or 0) if before_wallet else 0
     result = adjust_wallet(user_id, payload, db)
     amount = int(payload.amount_toman)
     tx = result.get("transaction") or {}
@@ -194,6 +202,22 @@ def adjust_wallet_v2(
         created_at=datetime.utcnow(),
     )
     db.add(notification)
+    db.add(QuotaAuditLog(
+        actor_type="admin",
+        actor_id=str(actor.id),
+        action="wallet_credit" if amount > 0 else "wallet_debit",
+        subject_type="user",
+        subject_id=str(user_id),
+        request_id=str(uuid.uuid4()),
+        details={
+            "amount_toman": amount,
+            "previous_balance_toman": before_balance,
+            "new_balance_toman": int(result.get("balance_toman") or 0),
+            "transaction_id": str(tx_id),
+            "note": payload.note.strip()[:200],
+        },
+        success=True,
+    ))
     db.flush()
 
     queue_telegram_notification(
