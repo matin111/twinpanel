@@ -64,6 +64,18 @@ def patch_manifest() -> None:
     match = re.search(r"<application\b[^>]*>", current, flags=re.DOTALL)
     if match is None:
         raise RuntimeError("Missing Android application manifest element")
+    # Prevent automatic restoration of old preferences/session/policy after
+    # the user explicitly uninstalls the previous app for a clean reinstall.
+    # Normal Android updates remain non-destructive.
+    application = match.group(0)
+    if "android:allowBackup" not in application:
+        secured = application[:-1] + (
+            ' android:allowBackup="false" android:fullBackupContent="false">'
+        )
+        current = current[:match.start()] + secured + current[match.end():]
+        match = re.search(r"<application\\b[^>]*>", current, flags=re.DOTALL)
+        if match is None:
+            raise RuntimeError("Unable to set Android backup policy")
     service = (
         '\n        <!-- The actual WireGuard GoBackend VpnService. '
         'No fake local TUN service. -->\n'
