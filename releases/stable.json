@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.836",
+  "version": "1.1.0-rc.837",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-14T12:29:21Z",
+  "released_at": "2026-11-14T13:02:41Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "cd49f0a3afe148d5f8aa9e40cb9fdb2f81b5497e",
+  "source_sha": "0d28d19affab90f049a7e34d553b34b94f95c5b5",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.836/twinpanel-1.1.0-rc.836-linux-x86_64.tar.gz",
-    "sha256": "30bb614def41525f15b9e095d364c92097908a7ca4a50aa7b7353684d7d6d6d4",
-    "size_bytes": 30852999
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.837/twinpanel-1.1.0-rc.837-linux-x86_64.tar.gz",
+    "sha256": "21dbbe629c83fe1c28afa9391f956a283edccadca53c6fd2fc585d8b3b044569",
+    "size_bytes": 30802851
   },
   "notes": {
-    "fa": "اصلاح خطای ۴۰۴ تاریخچه اتصال‌ها در صفحه Connection با حذف پیشوند تکراری API؛ افزودن جستجوی سروری نام ادمین، شناسه اکانت و عملیات داخل پاپ‌آپ تاریخچه، بدون تغییر طراحی اصلی پنل.",
-    "en": "Fix session-history API 404 caused by duplicated prefix under the Connection router; add server-side admin activity popup search by administrator, account ID and action, preserving page layout."
+    "fa": "نمایش تاریخچه ریز مصرف هر نشست Connection فقط در پاپ‌آپ بازشونده با دکمه مستقل، بدون کارت‌های بلند در صفحه؛ نمایش واضح کادر جستجوی تاریخچه ادمین در بالای پاپ‌آپ و جستجو بر اساس نام ادمین، شناسه اکانت و نوع عملیات.",
+    "en": "Move per-session Connection usage history into a lazy-loaded accessible modal instead of tall inline cards. Prominently surface server-side admin activity search inside the popup with filters and account/admin/action lookup."
   }
 }
