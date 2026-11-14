@@ -240,7 +240,8 @@ void main() {
     expect(pick, greaterThan(0));
     expect(engine, greaterThan(pick));
     expect(script, isNot(contains('#Requires -RunAsAdministrator')));
-    expect(script, contains('ADMINISTRATOR_REQUIRED_TO_CHANGE_WFP_RULES'));
+    expect(script, contains('-Verb RunAs'));
+    expect(script, contains('APP_WFP_ELEVATED_STATUS_UNVERIFIED'));
     expect(settings, contains('File selection must succeed independently'));
     expect(settings, contains('_selectedKillSwitchEnabled = enabled'));
   });
