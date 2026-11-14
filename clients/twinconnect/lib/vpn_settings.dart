@@ -45,6 +45,7 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
   String _selectedKillSwitchApp = '';
   bool? _selectedKillSwitchEnabled;
   bool _appLockBusy = false;
+  String _appKillSwitchDiagnostic = 'not_tested';
   Timer? _guardStatusTimer;
   WindowsAppRoutingMode _routingMode = WindowsAppRoutingMode.fullTunnel;
   List<String> _routingApps = <String>[];
@@ -125,6 +126,8 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
       'dns_engine_support: ${_capabilities.dnsGuard}',
       'ipv6_engine_support: ${_capabilities.ipv6Guard}',
       'guard_reason: ${_guard['reason'] ?? 'UNKNOWN'}',
+      'selected_app_kill_switch_status: ${_selectedKillSwitchEnabled == true ? 'active' : 'inactive'}',
+      'selected_app_kill_switch_last_error: $_appKillSwitchDiagnostic',
     ].join('\n');
     await Clipboard.setData(ClipboardData(text: diagnosticText));
     if (!mounted) return;
@@ -515,12 +518,21 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
       if (output != expected) {
         throw const FormatException('APP_FIREWALL_STATUS_UNVERIFIED');
       }
-      if (mounted) setState(() => _selectedKillSwitchEnabled = enable);
+      if (mounted) setState(() {
+        _selectedKillSwitchEnabled = enable;
+        _appKillSwitchDiagnostic = 'none';
+      });
     } catch (error) {
       if (mounted) {
         // Never expose raw PowerShell exceptions or multiline stack traces in
         // the app; keep low-level details available only for diagnostics.
         final raw = error.toString().toUpperCase();
+        // Retain only a bounded diagnostic token, not a noisy PowerShell stack
+        // trace or private Windows filesystem paths.
+        final matched = RegExp(
+          r'(APP_WFP_[A-Z_0-9]+|WFP_[A-Z_0-9]+|VERIFIED_TWINCONNECT_TUNNEL_REQUIRED)')
+            .firstMatch(raw);
+        _appKillSwitchDiagnostic = matched?.group(0) ?? 'UNKNOWN_WFP_FAILURE';
         final message = raw.contains('NO_TUN_INTERFACE') ||
                 raw.contains('VERIFIED_TWINCONNECT_TUNNEL_REQUIRED') ||
                 raw.contains('CONNECT_TO_TWINCONNECT_VPN')
