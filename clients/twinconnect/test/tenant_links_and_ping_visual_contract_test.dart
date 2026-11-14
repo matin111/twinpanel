@@ -308,9 +308,9 @@ void main() {
     expect(card, contains("loadSessionNativeProfiles("));
     expect(card, contains('AndroidCiscoTunnel.instance.connect(profile)'));
     expect(card, contains('AndroidCiscoTunnel.instance.status()'));
-    expect(cisco, contains('package:axevpn_flutter/openconnect_flutter.dart'));
-    expect(cisco, contains("servercert: pin"));
-    expect(cisco, contains('engine.isServiceRunning()'));
+    expect(cisco, contains('com.axevpn.flutter.openconnect/vpncontrol'));
+    expect(cisco, contains("'servercert': pin"));
+    expect(cisco, contains("'isRunning'"));
     expect(cisco, contains('CISCO_SHA256_PIN_REQUIRED'));
     expect(native, contains('OpenConnectFlutterPlugin()'));
     expect(native, contains('listOf("wireguard")'));
