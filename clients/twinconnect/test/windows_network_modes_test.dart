@@ -92,6 +92,9 @@ void main() {
     final installer = File('installer.iss').readAsStringSync();
     final settings = File('lib/vpn_settings.dart').readAsStringSync();
     expect(engine, contains('LOCAL_SOCKS5_NOT_VERIFIED'));
+    // The TCP stream may split a valid 2-byte SOCKS5 reply across reads.
+    expect(engine, contains('while ($received -lt $reply.Length)'));
+    expect(engine, contains('$received += $count'));
     expect(engine, contains('Restore-Values'));
     expect(engine, contains('PROXY_SETTINGS_CHANGED_EXTERNALLY_DO_NOT_OVERWRITE'));
     expect(engine, contains('InternetSetOptionW'));
@@ -101,5 +104,7 @@ void main() {
     expect(installer, contains('TwinConnect - Restore System Proxy'));
     expect(settings, contains("Key('vpnSystemProxyToggle')"));
     expect(settings, contains("Key('vpnPickRoutingApp')"));
+    expect(settings, contains('split_tunnel_mode:'));
+    expect(settings, contains('system_proxy_status:'));
   });
 }
