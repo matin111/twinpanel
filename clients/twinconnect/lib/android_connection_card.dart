@@ -840,9 +840,13 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
                       ? s.pick('اینترنت در زمان اتصال در دسترس است', 'Internet reachable while VPN active')
                       : _up && _handshake
                           ? s.pick('دست‌دهی سرور تأیید شد؛ اینترنت هنوز تأیید نشده', 'Peer handshake verified; internet not yet verified')
-                          : connected
-                              ? s.pick('تونل فعال است، اما اتصال به سرور تأیید نشده', 'Tunnel interface up; server connection unverified')
-                              : s.pick('آفلاین هستید', 'You are offline'),
+                          : _openVpnUp
+                              ? s.pick('تونل OpenVPN فعال است؛ اینترنت هنوز بررسی نشده', 'OpenVPN connected; internet not verified')
+                              : _singBoxProtocol != null
+                                  ? s.pick('تونل Sing-box فعال است؛ مسیر اینترنت هنوز تأیید نشده', 'Sing-box active; internet route unverified')
+                                  : connected
+                                      ? s.pick('تونل فعال است، اما اتصال به سرور تأیید نشده', 'Tunnel interface up; server connection unverified')
+                                      : s.pick('آفلاین هستید', 'You are offline'),
               textAlign: TextAlign.center,
               style: TextStyle(color: accent, fontWeight: FontWeight.w700),
             ),
