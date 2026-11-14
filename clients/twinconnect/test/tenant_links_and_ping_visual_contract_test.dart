@@ -93,7 +93,9 @@ void main() {
     expect(begin, greaterThan(0));
     expect(end, greaterThan(begin));
     final action = dashboard.substring(begin, end);
-    expect(action, contains('await _probeAllNodes()'));
+    // Latency and native protocol readiness are checked concurrently.
+    expect(action, contains('_probeAllNodes().then((_) => true)'));
+    expect(action, contains('NativeVpnBridge.protocolReadiness()'));
     expect(action, contains('final best = _fastestKnownIndex'));
     expect(action, contains('entry.selected && entry.configRecordPresent'));
     expect(action, contains('_selected = best'));
