@@ -48,6 +48,7 @@ from .public_connection_multilink_v7 import router as public_connection_multilin
 from . import public_connection_hub_v5 as _public_connection_hub_v5_module
 from .public_connection_hub_v5 import public_connection_hub_v5
 from .public_connection_live_v4 import public_connection_live
+from .public_connection_session_history_v1 import router as connection_session_history_router
 from .public_connection_payload_fast_v1 import public_connection_payload_fast_v1
 from .public_connection_qr_deferred_v1 import (
     defer_public_connection_qr,
@@ -67,6 +68,7 @@ router = APIRouter(
     tags=["public-connection-hub-live-v5"],
 )
 router.include_router(public_connection_qr_deferred_router)
+router.include_router(connection_session_history_router)
 router.include_router(public_connection_multilink_v7_router)
 router.include_router(public_connection_files_v9_router)
 router.include_router(public_connection_modern_delivery_v13_router)
@@ -624,6 +626,94 @@ def public_connection_hub_live_v5(
 
     # Inject last so legacy inline styles cannot obscure glass surfaces.
     source = source.replace("</body>", "<style>" + _CONNECTION_GLASS_CSS + "</style></body>", 1)
+
+
+    # Per-connection history is fetched only after the page loads. No
+    # historical usage totals are inferred from subscription aggregate counters.
+    history_html = r"""
+    <section id="tp-session-history" class="card tp-session-history" dir="rtl"
+      style="margin:18px auto;padding:16px;border-radius:16px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+        <h2 style="font-size:16px;margin:0">تاریخچه اتصال‌ها و ریز مصرف</h2>
+        <button id="tp-session-refresh" type="button" style="padding:8px 12px">بروزرسانی</button>
+      </div>
+      <p style="font-size:12px;opacity:.7;margin:8px 0">
+        فقط مصرف ثبت‌شده برای هر نشست نمایش داده می‌شود؛ داده‌های فاقد شناسه نشست به آن نسبت داده نمی‌شوند.
+      </p>
+      <div id="tp-session-items" aria-live="polite">در حال دریافت تاریخچه…</div>
+    </section>
+    """
+    history_script = r"""
+    <script>
+    (() => {
+      const token = __SESSION_TOKEN__;
+      const container = document.getElementById('tp-session-items');
+      const refresh = document.getElementById('tp-session-refresh');
+      if (!container) return;
+      const bytes = value => {
+        if (value == null) return 'ثبت‌نشده';
+        const n = Math.max(0, Number(value));
+        return n >= 1073741824 ? (n/1073741824).toFixed(2)+' GB'
+          : n >= 1048576 ? (n/1048576).toFixed(1)+' MB'
+          : n >= 1024 ? (n/1024).toFixed(1)+' KB' : n+' B';
+      };
+      const dt = value => {
+        if (!value) return '—';
+        const d = new Date(value);
+        return Number.isNaN(d.getTime()) ? '—'
+          : d.toLocaleString('fa-IR', {dateStyle:'short',timeStyle:'short'});
+      };
+      const duration = value => {
+        const sec = Math.max(0, Number(value)||0);
+        return Math.floor(sec/3600)+' ساعت و '+Math.floor(sec%3600/60)+' دقیقه';
+      };
+      const append = (parent, name, value) => {
+        const el = document.createElement('div');
+        const b = document.createElement('b');
+        b.textContent = name+': ';
+        el.append(b, document.createTextNode(String(value)));
+        parent.appendChild(el);
+      };
+      async function load() {
+        if (refresh) refresh.disabled = true;
+        try {
+          const url = '/v1/connect/'+encodeURIComponent(token)+'/sessions';
+          const res = await fetch(url, {cache:'no-store'});
+          if (!res.ok) throw Error('خطا در دریافت');
+          const data = await res.json();
+          container.replaceChildren();
+          if (!Array.isArray(data.items) || !data.items.length) {
+            container.textContent = 'هنوز نشست ثبت‌شده‌ای وجود ندارد.';
+            return;
+          }
+          for (const item of data.items) {
+            const card = document.createElement('article');
+            card.style.cssText='border:1px solid var(--line,#4d5774);border-radius:12px;padding:12px;margin:10px 0;display:grid;gap:5px';
+            const heading = document.createElement('strong');
+            heading.textContent = String(item.protocol||'—').toUpperCase()+
+              ' · سرور #'+String(item.node_id)+(item.country?' · '+item.country:'');
+            card.appendChild(heading);
+            append(card,'وضعیت',item.active?'متصل':'پایان‌یافته');
+            append(card,'شروع',dt(item.started_at));
+            append(card,'پایان',item.active?'در حال اتصال':dt(item.ended_at));
+            append(card,'مدت',duration(item.duration_seconds));
+            append(card,'دانلود',bytes(item.download_bytes));
+            append(card,'آپلود',bytes(item.upload_bytes));
+            append(card,'مجموع همین اتصال',bytes(item.total_bytes));
+            container.appendChild(card);
+          }
+        } catch (_) {
+          container.textContent = 'دریافت تاریخچه ممکن نشد. دوباره تلاش کنید.';
+        } finally {
+          if (refresh) refresh.disabled = false;
+        }
+      }
+      if (refresh) refresh.addEventListener('click', load);
+      load();
+    })();
+    </script>
+    """.replace("__SESSION_TOKEN__", json.dumps(str(token), ensure_ascii=True))
+    source = source.replace("</body>", history_html + history_script + "</body>", 1)
 
     return HTMLResponse(
         content=source,
