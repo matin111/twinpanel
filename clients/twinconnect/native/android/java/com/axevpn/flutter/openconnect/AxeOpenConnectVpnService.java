@@ -541,9 +541,6 @@ public class AxeOpenConnectVpnService extends VpnService {
                         break;
                     }
                     // Validate CSTP sync bytes and dump raw header for diagnostics
-                    Log.d(TAG, String.format("CSTP hdr: %02x %02x %02x %02x  %02x %02x %02x %02x",
-                            hdr[0]&0xFF, hdr[1]&0xFF, hdr[2]&0xFF, hdr[3]&0xFF,
-                            hdr[4]&0xFF, hdr[5]&0xFF, hdr[6]&0xFF, hdr[7]&0xFF));
                     if (hdr[0] != CSTP_SYNC[0] || hdr[1] != CSTP_SYNC[1]
                             || hdr[2] != CSTP_SYNC[2] || hdr[3] != CSTP_SYNC[3]) {
                         Log.e(TAG, String.format(
@@ -554,7 +551,6 @@ public class AxeOpenConnectVpnService extends VpnService {
                     // Real STF header: sync[0-3], lenH[4], lenL[5], type[6], reserved[7]
                     int dataLen = ((hdr[4] & 0xFF) << 8) | (hdr[5] & 0xFF);
                     int type    = hdr[6] & 0xFF;
-                    Log.d(TAG, "CSTP pkt type=" + type + " len=" + dataLen);
                     if (dataLen > 65535) {
                         Log.e(TAG, "Bogus CSTP length " + dataLen); break;
                     }
