@@ -162,6 +162,23 @@ void main() {
     expect(script, isNot(contains("arm I_ACCEPT_OFFLINE_RECOVERY")));
   });
 
+  test('main Windows installer provides automatic signed guard and offline recovery', () {
+    final setup = File('installer.iss').readAsStringSync();
+    final control = File('tools/windows_guard_control.ps1').readAsStringSync();
+    final restore = File('tools/restore_windows_network_launcher.ps1').readAsStringSync();
+    expect(setup, contains('TwinConnect - Restore Internet'));
+    expect(setup, contains('restore_windows_network_launcher.ps1'));
+    expect(setup, contains('install_guard_service.ps1'));
+    expect(setup, contains('-Action Install'));
+    expect(setup, contains('GuardSigningThumbprint'));
+    expect(control, contains('Register-ScheduledTask'));
+    expect(control, contains('UNTRUSTED_RECOVERY_TASK_CONFLICT'));
+    expect(control, contains('OK 1 1 1 1'));
+    expect(restore, contains('reset_windows_network.ps1'));
+    expect(restore, contains(r'& $restore -GuardOnly'));
+    expect(restore, contains('Type RESET to confirm'));
+  });
+
   test('native bridge installs only a read-only guard status method', () {
     final install = File('tools/install_windows_native.py')
         .readAsStringSync();
