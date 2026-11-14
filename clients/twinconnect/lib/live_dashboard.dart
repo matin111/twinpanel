@@ -485,10 +485,13 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     int? best;
     for (var i = 0; i < servers.length; i++) {
       final node = servers[i];
-      // Only a measured ICMP value qualifies; panel hints are not live ping.
-      final latency = _nodePings[node.id];
-      if (!node.nodeOnline || latency == null || latency < 0) continue;
-      if (best == null || latency < _nodePings[servers[best].id]!) {
+      // Prefer real measured RTT; use the panel's nonzero last-known
+      // latency only when ICMP is blocked or unavailable on Windows.
+      // Never treat an unmeasured server as zero-latency.
+      final latency = _latencyFor(node);
+      if (!node.nodeOnline || latency == null || latency <= 0) continue;
+      final bestLatency = best == null ? null : _latencyFor(servers[best]);
+      if (bestLatency == null || latency < bestLatency) {
         best = i;
       }
     }
