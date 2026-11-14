@@ -5,6 +5,7 @@ import {createPortal} from "react-dom";
 import {API_BASE} from "../lib/api";
 import {getCustomerToken} from "../lib/customer-api";
 import {useI18n} from "../lib/i18n";
+import {useTheme} from "../lib/theme";
 
 type AuditEvent={
   id:number;actor:string;actor_id:string;action:string;
@@ -28,6 +29,8 @@ const bytes=(value:unknown)=>value==null?"—":(Number(value)/1073741824).toLoca
 
 export function AdminActivityPopup(){
   const {pick}=useI18n();
+  const {resolved}=useTheme();
+  const isDark=resolved==="dark";
   const [open,setOpen]=useState(false);
   const [filter,setFilter]=useState("all");
   const [search,setSearch]=useState("");
@@ -82,20 +85,20 @@ export function AdminActivityPopup(){
             </div>)}
           </div>
           <form role="search" onSubmit={event=>{event.preventDefault();setPage(0);setAppliedSearch(search.trim());setRevision(v=>v+1);}}
-            style={{display:"flex",flexDirection:"column",gap:7,margin:"14px 0 12px",padding:"12px",border:"1px solid #cbd5e1",borderRadius:12,background:"#f8fafc",color:"#0f172a"}}>
+            style={{display:"flex",flexDirection:"column",gap:7,margin:"14px 0 12px",padding:"12px",border:isDark?"1px solid #354766":"1px solid #cbd5e1",borderRadius:12,background:isDark?"#18243b":"#f8fafc",color:isDark?"#edf3ff":"#0f172a"}}>
             <label htmlFor="tp-admin-activity-search" style={{fontWeight:700,fontSize:13}}>{pick("جستجو در تاریخچه ادمین","Search admin history")}</label>
             <div style={{display:"flex",gap:7,alignItems:"stretch",flexWrap:"wrap"}}>
               <input id="tp-admin-activity-search" type="search" value={search} onChange={e=>setSearch(e.target.value)}
                 placeholder={pick("نام ادمین، شناسه اکانت یا نوع عملیات…","Admin name, account ID or action…")}
                 aria-label={pick("جستجو در تاریخچه","Search history")}
-                style={{display:"block",flex:"1 1 230px",width:"100%",minWidth:0,boxSizing:"border-box",border:"1px solid #94a3b8",borderRadius:9,padding:"10px 12px",background:"#fff",color:"#0f172a",fontSize:14,outlineOffset:2}}/>
+                style={{display:"block",flex:"1 1 230px",width:"100%",minWidth:0,boxSizing:"border-box",border:isDark?"1px solid #4b5d7d":"1px solid #94a3b8",borderRadius:9,padding:"10px 12px",background:isDark?"#0e172a":"#fff",color:isDark?"#f1f5ff":"#0f172a",fontSize:14,outlineOffset:2}}/>
               <button type="submit" className="primary" disabled={loading} style={{padding:"9px 17px",whiteSpace:"nowrap"}}>⌕ {pick("جستجو","Search")}</button>
-              {(appliedSearch||search)&&<button type="button" className="ghost" onClick={()=>{setSearch("");setAppliedSearch("");setPage(0);}} style={{color:"#334155",border:"1px solid #94a3b8"}}>{pick("پاک‌کردن","Clear")}</button>}
+              {(appliedSearch||search)&&<button type="button" className="ghost" onClick={()=>{setSearch("");setAppliedSearch("");setPage(0);}} style={{color:isDark?"#e0ebff":"#334155",border:isDark?"1px solid #4b5d7d":"1px solid #94a3b8"}}>{pick("پاک‌کردن","Clear")}</button>}
             </div>
             {appliedSearch&&<small>{pick("نتایج جستجو برای","Results for")}: <b>{appliedSearch}</b></small>}
           </form>
           <div style={{display:"flex",gap:8,alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",marginBottom:12}}>
-            <label>{pick("فیلتر","Filter")}: <select value={filter} onChange={e=>{setFilter(e.target.value);setPage(0);}}>
+            <label>{pick("فیلتر","Filter")}: <select style={{background:isDark?"#14223a":"#fff",color:isDark?"#eaf0ff":"#14213b",border:isDark?"1px solid #4b5d7d":"1px solid #cbd5e1",borderRadius:8,padding:"6px 9px"}} value={filter} onChange={e=>{setFilter(e.target.value);setPage(0);}}>
               <option value="all">{pick("همه","All")}</option>
               <option value="wallet">{pick("کیف پول","Wallet")}</option>
               <option value="subscription">{pick("اشتراک‌ها","Subscriptions")}</option>
