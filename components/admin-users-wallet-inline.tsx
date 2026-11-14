@@ -70,14 +70,16 @@ export function AdminUsersWalletInline(){
 
   const scan=useCallback(()=>{
     const found:HostRow[]=[];
-    const rows=document.querySelectorAll<HTMLElement>(".admin-users-runtime tbody tr");
+    // User management now renders responsive cards instead of table rows.
+    // Look up each card's own ID so wallet actions never attach to another user.
+    const rows=document.querySelectorAll<HTMLElement>(".admin-users-runtime .admin-user-card");
 
     rows.forEach(row=>{
-      const first=row.querySelector<HTMLElement>("td:first-child");
-      const actions=row.querySelector<HTMLElement>(".row-actions");
+      const first=row.querySelector<HTMLElement>(".admin-user-names small");
+      const actions=row.querySelector<HTMLElement>(".admin-user-card-actions");
       if(!first||!actions)return;
 
-      const match=(first.textContent||"").match(/#\s*(\d+)/);
+      const match=(first.textContent||"").match(/^#\s*(\d+)$/);
       if(!match)return;
 
       const id=Number(match[1]);
@@ -87,6 +89,7 @@ export function AdminUsersWalletInline(){
       if(!host){
         host=document.createElement("span");
         host.className="admin-user-wallet-slot";
+        host.style.cssText="grid-column:1/-1;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;align-items:center";
         host.dataset.userId=String(id);
         actions.prepend(host);
       }
@@ -176,7 +179,7 @@ export function AdminUsersWalletInline(){
         <button type="button" className="ghost" onClick={()=>open(id,"debit")} title={pick("کاهش موجودی کیف پول","Deduct from wallet")}>
           {pick("➖ کاهش","➖ Deduct")}
         </button>
-        <small style={{whiteSpace:"nowrap"}}>{money(Number(balances[id]||0))}</small>
+        <small style={{gridColumn:"1/-1",textAlign:"center",whiteSpace:"nowrap"}}>{pick("موجودی کیف پول","Wallet balance")}: {money(Number(balances[id]||0))}</small>
       </>,
       host,
       `wallet-${id}`
