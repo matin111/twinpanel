@@ -199,6 +199,9 @@ void main() {
     expect(script, contains('Get-NetAdapter'));
     expect(script, contains('APP_WFP_STATUS_UNVERIFIED'));
     expect(script, contains('OpenFileDialog'));
+    expect(script, contains('LOCALAPPDATA'));
+    expect(native, contains('const bool statusOnly'));
+    expect(native, contains('!audit && !statusOnly && !IsAdmin()'));
     expect(script, isNot(contains('New-NetFirewallRule')));
     expect(setup, contains('windows_app_network_lock.ps1'));
     expect(settings, contains("Key('vpnSelectKillSwitchApp')"));
@@ -247,15 +250,14 @@ void main() {
     );
   });
 
-  test('settings cannot activate global guard without enforcement', () {
+  test('legacy system-wide Kill Switch toggle is removed, per-app remains', () {
     final screen = File('lib/vpn_settings.dart').readAsStringSync();
-    expect(screen, contains('NativeVpnBridge.globalKillSwitchStatus()'));
-    expect(screen, contains('Protection service not ready'));
-    expect(screen, contains("key: const Key('vpnKillSwitch')"));
-    expect(screen, contains("_guard['serviceInstalled'] != true"));
-    expect(screen, contains('_testSignedWindowsGuard()'));
+    expect(screen, contains("key: const Key('vpnSelectedAppKillSwitch')"));
+    expect(screen, contains("key: const Key('vpnSelectKillSwitchApp')"));
+    expect(screen, isNot(contains("key: const Key('vpnKillSwitch')")));
+    expect(screen, isNot(contains("key: const Key('vpnKillSwitchCard')")));
+    expect(screen, contains('_toggleSelectedAppKillSwitch'));
     expect(screen, contains('_recoverWindowsGuard()'));
-    expect(screen, contains('value: _guardActive'));
     expect(screen, isNot(contains('setGlobalKillSwitchEnabled')));
   });
 }
