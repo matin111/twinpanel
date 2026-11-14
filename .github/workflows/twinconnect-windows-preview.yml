@@ -31,9 +31,6 @@ jobs:
       # Using a repository variable takes precedence without modifying code.
       TWINCONNECT_DIRECTORY_URL: ${{ vars.TWINCONNECT_DIRECTORY_URL || 'https://panel.matindnspro.sbs' }}
       SIGNING_CONFIGURED: ${{ github.event_name == 'push' && github.ref == 'refs/heads/integration/twinconnect-windows-app-20261110' && secrets.TWINCONNECT_SIGN_PFX_BASE64 != '' && secrets.TWINCONNECT_SIGN_PFX_PASSWORD != '' }}
-      # Explicit release gate: an owner must attest isolated dual-stack leak and recovery testing.
-      # No GitHub-hosted smoke test can replace that evidence.
-      GUARD_RELEASE_APPROVED: ${{ vars.TWINCONNECT_GUARD_VM_LEAK_APPROVED == 'true' }}
     steps:
       - uses: actions/checkout@v4
       # Avoid a stalled Flutter SDK cache restore on GitHub Windows runners.
@@ -259,7 +256,7 @@ jobs:
       - name: Install Inno Setup installer compiler
         shell: pwsh
         run: choco install innosetup --no-progress -y
-      - name: Compile isolated Windows guard service (never install or arm during CI)
+      - name: Compile guard service without installing it
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -268,22 +265,13 @@ jobs:
           if (!$vs) { throw "Visual Studio C++ compiler unavailable" }
           $dev = Join-Path $vs "Common7/Tools/VsDevCmd.bat"
           $source = Join-Path (Get-Location) "native/windows/twinconnect_global_guard_service_experimental.cpp"
-          $folder = Join-Path (Get-Location) "build/windows/x64/runner/Release/services"
-          New-Item -ItemType Directory -Force -Path $folder | Out-Null
-          $exe = Join-Path $folder "TwinConnectGlobalGuard.exe"
+          $exe = Join-Path $env:RUNNER_TEMP "TwinConnectGlobalGuard-test.exe"
           $compile = 'call "' + $dev + '" -arch=amd64 && cl /nologo /std:c++17 /EHsc /W4 /WX /Fe:"' + $exe + '" "' + $source + '" /link Fwpuclnt.lib Iphlpapi.lib Ws2_32.lib Rpcrt4.lib Advapi32.lib Ole32.lib Oleaut32.lib Taskschd.lib'
           & cmd.exe /d /s /c $compile
-          if ($LASTEXITCODE -ne 0 -or !(Test-Path $exe)) {
-            throw "Guard service compilation failed"
-          }
-          # Static compile/preflight alone does NOT certify the Kill Switch.
+          if ($LASTEXITCODE -ne 0 -or !(Test-Path $exe)) { throw "Guard compile failed" }
           & $exe offline-status
-          if ($LASTEXITCODE -ne 0) { throw "Read-only guard inspection failed" }
-          if ($env:GUARD_RELEASE_APPROVED -ne 'true') {
-            # Prevent the experimental guard from accidentally entering the normal installer.
-            Remove-Item -LiteralPath $exe -Force
-            Write-Host "Guard release not approved. Service excluded from all installers."
-          }
+          if ($LASTEXITCODE -ne 0) { throw "Guard read-only self-test failed" }
+          Remove-Item -LiteralPath $exe -Force
       - name: Validate global guard installer release gate and PowerShell syntax
         shell: pwsh
         run: |
@@ -311,19 +299,7 @@ jobs:
           $ErrorActionPreference = "Stop"
           $compiler = "${env:ProgramFiles(x86)}\\Inno Setup 6\\ISCC.exe"
           if (!(Test-Path $compiler)) { throw "Inno Setup 6 compiler not installed" }
-          if ($env:GUARD_RELEASE_APPROVED -eq 'true') {
-            if ($env:SIGNING_CONFIGURED -ne 'true') {
-              throw "Certified guard builds require a signed trusted integration release"
-            }
-            if (!(Test-Path 'guard-signing-thumbprint.txt')) {
-              throw "Signed guard thumbprint missing. Refusing protected installer."
-            }
-            $thumbprint = (Get-Content 'guard-signing-thumbprint.txt' -Raw).Trim()
-            if ($thumbprint.Length -ne 40 -or $thumbprint -match '[^a-fA-F0-9]') { throw 'Invalid signer thumbprint' }
-            & $compiler 'installer.iss' '/DIncludeVerifiedGlobalGuard=1' ('/DGuardSigningThumbprint=' + $thumbprint)
-          } else {
-            & $compiler 'installer.iss'
-          }
+          & $compiler 'installer.iss'
           if ($LASTEXITCODE -ne 0) { throw 'Installer compilation failed' }
           if (!(Test-Path "TwinConnect-Windows-x64-Setup.exe")) {
             throw "TwinConnect setup executable missing"
