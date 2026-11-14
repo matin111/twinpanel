@@ -5105,7 +5105,24 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
             children: [
               Center(child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 1000),
-                child: AnimatedSwitcher(
+                // Keep Android connection state mounted across tab changes.
+                // Tabs must not implicitly disconnect or reset an active VPN.
+                child: Platform.isAndroid
+                    ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Offstage(
+                            offstage: _page != 'home',
+                            child: home(),
+                          ),
+                          if (_page != 'home')
+                            KeyedSubtree(
+                              key: ValueKey<String>(_page),
+                              child: content(),
+                            ),
+                        ],
+                      )
+                    : AnimatedSwitcher(
                   key: const Key('devPageTransition'),
                   duration: const Duration(milliseconds: 360),
                   reverseDuration: const Duration(milliseconds: 210),
