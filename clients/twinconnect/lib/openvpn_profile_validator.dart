@@ -40,15 +40,29 @@ class OpenVpnProfileValidator {
       const allowed = {
         'client', 'dev', 'proto', 'remote', 'redirect-gateway',
         'tun-mtu', 'mssfix', 'resolv-retry', 'nobind', 'persist-key',
+        'auth-user-pass',
         'persist-tun', 'remote-cert-tls', 'verb', 'data-ciphers', 'auth',
       };
       if (!allowed.contains(name)) {
         throw const FormatException('OPENVPN_UNSAFE_DIRECTIVE');
       }
+      if (name == 'auth-user-pass' && parts.length != 1) {
+        // Never allow a path to an external credentials file.
+        throw const FormatException('OPENVPN_EXTERNAL_MATERIAL_FORBIDDEN');
+      }
       directives.putIfAbsent(name, () => []).add(parts.skip(1).join(' '));
     }
-    if (block != null || blocks['ca'] != 1 || blocks['cert'] != 1 ||
-        blocks['key'] != 1 || directives['client']?.length != 1 ||
+    final hasCert = blocks['cert'] == 1 && blocks['key'] == 1;
+    final hasUsernamePassword = directives['auth-user-pass']?.length == 1 &&
+        (item['username'] ?? item['user']) is String &&
+        ((item['username'] ?? item['user']) as String).isNotEmpty &&
+        item['password'] is String && (item['password'] as String).isNotEmpty;
+    if (block != null || blocks['ca'] != 1 ||
+        (blocks['cert'] ?? 0) != (blocks['key'] ?? 0) ||
+        (blocks['cert'] ?? 0) > 1 || (blocks['key'] ?? 0) > 1 ||
+        (!hasCert && !hasUsernamePassword) ||
+        directives['auth-user-pass'] != null && !hasUsernamePassword ||
+        directives['client']?.length != 1 ||
         directives['dev']?.singleOrNull != 'tun' ||
         directives['remote-cert-tls']?.singleOrNull != 'server' ||
         directives['remote']?.length != 1) {
