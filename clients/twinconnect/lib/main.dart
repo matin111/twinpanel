@@ -1,9 +1,5 @@
 import 'dart:async';
 
-// Build provenance is public metadata, never a credential or installation ID.
-const String twinConnectBuildId =
-    String.fromEnvironment('TWINCONNECT_BUILD_ID', defaultValue: 'local');
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -31,6 +27,10 @@ import 'app_session_store.dart';
 import 'xray_inbound_secure_cache.dart';
 import 'account_snapshot.dart';
 import 'plan_classification.dart';
+
+// Build provenance is public metadata, never a credential or installation ID.
+const String twinConnectBuildId =
+    String.fromEnvironment('TWINCONNECT_BUILD_ID', defaultValue: 'local');
 
 void main() => runApp(const TwinConnectApp());
 
