@@ -228,6 +228,14 @@ void main() {
     expect(dashboard, contains('servers: widget.servers'));
   });
 
+  test('Android HTTPS probe has a TLS fallback and requires peer handshake', () {
+    final card = File('lib/android_connection_card.dart').readAsStringSync();
+    expect(card, contains("'api.ipify.org', 'icanhazip.com'"));
+    expect(card, contains('Uri.https(provider,'));
+    expect(card, contains('_up && _handshake ? verifiedIp : null'));
+    expect(card, isNot(contains('badCertificateCallback')));
+  });
+
   test('Android native engine understands panel split IPv4 routing', () {
     final native = File(
       'native/android/kotlin/com/twinpanel/twinconnect/WireGuardRuntime.kt',
