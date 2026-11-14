@@ -220,9 +220,9 @@ void main() {
     expect(script, contains(r'& $binary status $path'));
     expect(script, contains('TWINCONNECT_APP_LOCKED'));
     expect(script, contains('TWINCONNECT_APP_UNLOCKED'));
-    expect(script, contains('Remove-Item -LiteralPath $receipt'));
+    expect(script, contains(r'Remove-Item -LiteralPath $receipt'));
     expect(native, contains('APP_WFP_NATIVE_ARM_ERROR_'));
-    expect(settings, isNot(contains("'تغییر Kill Switch انجام نشد: ${error.toString()}'")));
+    expect(settings, isNot(contains(r"'تغییر Kill Switch انجام نشد: ${error.toString()}'")));
   });
 
   test('Windows application picker never depends on installed WFP engine', () {
