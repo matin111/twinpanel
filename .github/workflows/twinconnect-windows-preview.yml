@@ -408,9 +408,12 @@ jobs:
             $appLock, [ref]$tokens, [ref]$errors) | Out-Null
           if ($errors.Count -gt 0) { throw 'Selected-app Kill Switch PowerShell parse error' }
           $firewallCode = Get-Content $appLock -Raw
-          foreach ($marker in @('New-NetFirewallRule','Remove-NetFirewallRule',
-              'Get-NetFirewallApplicationFilter','RULE_OWNER_MISMATCH')) {
-            if (!$firewallCode.Contains($marker)) { throw "Missing browser lock safety check: $marker" }
+          foreach ($marker in @('TwinConnectAppKillSwitch.exe','APP_WFP_STATUS_UNVERIFIED',
+              'Get-NetAdapter','TWINCONNECT_APP_UNLOCKED')) {
+            if (!$firewallCode.Contains($marker)) { throw "Missing WFP app guard check: $marker" }
+          }
+          if ($firewallCode.Contains('New-NetFirewallRule')) {
+            throw 'Unsafe generic application deny must not replace VPN bypass Kill Switch'
           }
           if (!$installer.Contains('windows_app_network_lock.ps1') -or
               !$settings.Contains('vpnSelectKillSwitchApp') -or
