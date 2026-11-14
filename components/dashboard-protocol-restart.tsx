@@ -9,7 +9,7 @@ import {legacyAdminApi,type ClassicProtocolKey} from "../lib/legacy-admin-api";
 type Pick=(fa:string,en:string)=>string;
 type NodeChoice={id:number;name:string;status:string;kind:"classic"|"modern"};
 type ModernInventory={nodes:Array<{id:number;name:string;status:string;protocols:Array<{protocol:string;status:string;runtime_status?:string;port?:number}>}>};
-type RestartResult={ok?:boolean;message?:string;protocol?:{ok?:boolean;error?:string}};
+type RestartResult={ok?:boolean;message?:string;error?:string;protocol?:{ok?:boolean;error?:string}};
 const CLASSIC=new Set(["cisco","openvpn","wireguard","l2tp","v2ray"]);
 const STANDALONE=new Set(["mieru","trusttunnel","amneziawg","sudoku"]);
 
