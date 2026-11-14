@@ -32,6 +32,7 @@ try {
     }
     Log 'Verified no TwinConnect-owned WFP filters remain.'
   } else {
+    if ($GuardOnly) { throw 'GUARD_SERVICE_NOT_INSTALLED' }
     Log 'No installed TwinConnect guard; WFP recovery not applicable.'
   }
   if ($GuardOnly) {
