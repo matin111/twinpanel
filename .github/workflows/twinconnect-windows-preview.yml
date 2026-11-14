@@ -353,6 +353,28 @@ jobs:
           }
           & $exe offline-status
           if ($LASTEXITCODE -ne 0) { throw 'Guard WFP preflight failed' }
+      - name: Build app-scoped WFP bypass guard for normal TwinConnect installer
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $vswhere = Join-Path "${env:ProgramFiles(x86)}" 'Microsoft Visual Studio/Installer/vswhere.exe'
+          $vs = (& $vswhere -latest -property installationPath).Trim()
+          if (!$vs) { throw 'Visual Studio C++ compiler missing' }
+          $dev = Join-Path $vs 'Common7/Tools/VsDevCmd.bat'
+          $target = Join-Path (Get-Location) 'build/windows/x64/runner/Release/services'
+          New-Item -ItemType Directory -Path $target -Force | Out-Null
+          $exe = Join-Path $target 'TwinConnectAppKillSwitch.exe'
+          $source = Join-Path (Get-Location) 'native/windows/twinconnect_app_killswitch.cpp'
+          $cmd = 'call "' + $dev + '" -arch=amd64 && cl /nologo /std:c++17 /EHsc /W4 /WX /Fe:"' + $exe + '" "' + $source + '" /link Fwpuclnt.lib Iphlpapi.lib Rpcrt4.lib'
+          & cmd.exe /d /s /c $cmd
+          if ($LASTEXITCODE -ne 0 -or !(Test-Path $exe)) {
+            throw 'Selected-app WFP Kill Switch compilation failed'
+          }
+          # Never arm persistent firewall filters on GitHub-hosted runners.
+          $audit = & $exe audit
+          if ($LASTEXITCODE -ne 0 -or $audit -notmatch '^OWNED_APP_RULES_PRESENT 0 0') {
+            throw 'Read-only WFP policy audit did not pass'
+          }
       - name: Verify bundled Windows Kill Switch test controller
         shell: pwsh
         run: |
