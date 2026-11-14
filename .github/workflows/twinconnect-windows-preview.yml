@@ -9,6 +9,7 @@ on:
     branches:
       - feat/twinconnect-windows-preview-v1
       - integration/twinconnect-windows-app-20261110
+      - feat/twinconnect-guard-installer-integration-20261114
     paths:
       - "clients/twinconnect/**"
       - ".github/workflows/twinconnect-windows-preview.yml"
