@@ -499,7 +499,10 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
         widget.native.supports('cisco') &&
         chosen?.configRecordPresent == true;
     final canStartSelected = ciscoSelected ? ciscoReady : nativeReady;
-    final accent = connected ? const Color(0xFF35D9AE)
+    // An interface without a peer handshake is NOT a successful VPN.
+    // Reserve the connected green treatment for verified transport.
+    final accent = internetVerified ? const Color(0xFF35D9AE)
+        : connected ? const Color(0xFFE8B06B)
         : const Color(0xFF72C1D6);
 
     return Column(
