@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -10,32 +11,77 @@ import 'account_snapshot.dart';
 /// A fail-closed directory client. The vendor sees ONLY a tenant namespace.
 /// Username and bearer share token go directly to the licensed installation.
 class TenantApi {
-  TenantApi({required this.vendorOrigin});
+  TenantApi({required this.vendorOrigin, List<Uri>? vendorOrigins})
+      : vendorOrigins = List.unmodifiable(vendorOrigins ?? [vendorOrigin]);
 
+  /// All origins must be trusted HTTPS addresses of the *license directory*,
+  /// never customer panel addresses. Panel origins are resolved per account.
   final Uri vendorOrigin;
+  final List<Uri> vendorOrigins;
 
   static const String configuredVendor =
       String.fromEnvironment('TWINCONNECT_DIRECTORY_URL', defaultValue: '');
+  static const String configuredVendors =
+      String.fromEnvironment('TWINCONNECT_DIRECTORY_URLS', defaultValue: '');
+
+  /// License-center rotation / failover. A new deployment can supply multiple
+  /// independently hosted directory frontends; no tenant endpoint is compiled
+  /// into the app. Duplicate origins are discarded, order is deterministic.
+  static List<Uri> parseVendorOrigins(String values) {
+    final origins = <Uri>[];
+    for (final raw in values.split(',')) {
+      final value = raw.trim();
+      if (value.isEmpty) continue;
+      final uri = parseDirectoryOrigin(value);
+      if (!origins.contains(uri)) origins.add(uri);
+    }
+    if (origins.isEmpty) {
+      throw const FormatException('DIRECTORY_NOT_CONFIGURED');
+    }
+    if (origins.length > 8) {
+      throw const FormatException('TOO_MANY_DIRECTORY_ORIGINS');
+    }
+    return List.unmodifiable(origins);
+  }
 
   factory TenantApi.fromBuildConfig() {
-    if (configuredVendor.isEmpty) {
-      throw const FormatException(
-        'DIRECTORY_NOT_CONFIGURED',
-      );
-    }
-    return TenantApi(vendorOrigin: parseDirectoryOrigin(configuredVendor));
+    final configured = configuredVendors.trim().isNotEmpty
+        ? configuredVendors : configuredVendor;
+    final origins = parseVendorOrigins(configured);
+    return TenantApi(vendorOrigin: origins.first, vendorOrigins: origins);
   }
 
   Future<PanelDirectoryEntry> resolve(String namespace) async {
-    final url = vendorOrigin.resolve(
-      '/v1/app/resolve/${Uri.encodeComponent(namespace)}',
-    );
-    final map = await _requestJson(url);
-    final entry = PanelDirectoryEntry.fromJson(map);
-    if (entry.namespace != namespace) {
-      throw const FormatException('NAMESPACE_MISMATCH');
+    Object? unavailable;
+    for (final origin in vendorOrigins) {
+      try {
+        final url = origin.resolve(
+          '/v1/app/resolve/${Uri.encodeComponent(namespace)}',
+        );
+        final map = await _requestJson(url);
+        final entry = PanelDirectoryEntry.fromJson(map);
+        if (entry.namespace != namespace) {
+          throw const FormatException('NAMESPACE_MISMATCH');
+        }
+        return entry;
+      } on TenantApiException catch (error) {
+        // Only retry reachability/server failures. A 404/403 from the license
+        // authority is not permission to route an account elsewhere.
+        if (!const {'NETWORK_UNAVAILABLE', 'SERVER_ERROR', 'INVALID_TLS'}
+            .contains(error.message)) rethrow;
+        unavailable = error;
+      } on SocketException catch (error) {
+        unavailable = error;
+      } on HandshakeException catch (error) {
+        unavailable = error;
+      } on TimeoutException catch (error) {
+        unavailable = error;
+      }
     }
-    return entry;
+    if (unavailable != null) {
+      throw const TenantApiException('NETWORK_UNAVAILABLE');
+    }
+    throw const FormatException('DIRECTORY_NOT_CONFIGURED');
   }
 
   Future<AppRefreshTokens> refreshSession({
