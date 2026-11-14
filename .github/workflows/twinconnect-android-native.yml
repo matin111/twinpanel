@@ -36,6 +36,8 @@ jobs:
         shell: bash
         run: |
           grep -F 'GoBackend$VpnService' android/app/src/main/AndroidManifest.xml
+          grep -F '.OpenConnectVpnService' android/app/src/main/AndroidManifest.xml
+          test -f android/app/src/main/kotlin/com/twinpanel/twinconnect/OpenConnectVpnService.kt
           grep -F 'com.wireguard.android:tunnel:1.0.20260102' android/app/build.gradle.kts
           grep -F 'OPENCONNECT_CORE_NOT_INSTALLED' lib/android_tunnel.dart
       - name: Fetch packages
