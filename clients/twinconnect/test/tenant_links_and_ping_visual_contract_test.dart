@@ -156,7 +156,8 @@ void main() {
     expect(card, contains("final protocolName = chosen?.protocol.name"));
     expect(card, contains("Key('androidSeparateActiveProtocol')"));
     expect(card, contains("Key('androidDisconnectPreviousTunnel')"));
-    expect(card, contains("final internetVerified = _ciscoUp ||"));
+    expect(card, contains('final internetVerified = _activeVerifiedTransport && _publicIp != null;'));
+    expect(card, contains('Internet reachable while VPN active'));
     expect(card, contains("Key('androidNoHandshakeDiagnostic')"));
     expect(card, contains('WG_INTERFACE_UP_NO_HANDSHAKE'));
     expect(card, contains('Tunnel interface up; server connection unverified'));
@@ -250,11 +251,14 @@ void main() {
     expect(dashboard, contains('servers: widget.servers'));
   });
 
-  test('Android HTTPS probe has a TLS fallback and requires peer handshake', () {
+  test('Android HTTPS probe requires live transport and never disables TLS', () {
     final card = File('lib/android_connection_card.dart').readAsStringSync();
     expect(card, contains("'api.ipify.org', 'icanhazip.com'"));
     expect(card, contains('Uri.https(provider,'));
-    expect(card, contains('_up && _handshake ? verifiedIp : null'));
+    expect(card, contains('(_up && _handshake) || _openVpnUp || _ciscoUp ||'));
+    expect(card, contains('_activeVerifiedTransport ? verifiedIp : null'));
+    expect(card, contains('generation == _networkProbeGeneration'));
+    expect(card, contains('VPN routing not independently verified'));
     expect(card, isNot(contains('badCertificateCallback')));
   });
 
