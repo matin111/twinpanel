@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 
 import 'android_connection_strings.dart';
 import 'android_tunnel.dart';
+import 'cisco_openconnect_profile.dart';
 import 'app_strings.dart';
 import 'native_vpn_bridge.dart';
 import 'protocols.dart';
@@ -57,6 +58,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
 
   bool _busy = false;
   bool _up = false;
+  bool _ciscoUp = false;
   String? _errorCode;
   AppServer? _activeServer;
   String? _activeServerName;
@@ -260,6 +262,79 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
     return candidates.first.$2;
   }
 
+  /// Cisco uses its own engine and authenticated panel profile. Never hand
+  /// Cisco credentials to WireGuard or download secrets before readiness.
+  Future<void> _connectCisco() async {
+    if (_busy || _up || _ciscoUp || !Platform.isAndroid ||
+        !widget.native.supports('cisco')) return;
+    setState(() {
+      _busy = true;
+      _errorCode = null;
+    });
+    try {
+      final profiles = await TenantApi.fromBuildConfig()
+          .loadSessionNativeProfiles(
+            panel: widget.panel,
+            sessionToken: widget.sessionToken,
+            protocol: VpnProtocols.byCode('cisco')!,
+            native: widget.native,
+          );
+      final selectedId = widget.selectedNodeId;
+      final inventory = widget.servers?.servers ?? const <AppServer>[];
+      final choices = profiles.items.where((item) {
+        final id = item['node_id']?.toString();
+        if (id == null || (selectedId != null && selectedId != id)) {
+          return false;
+        }
+        final match = inventory.where((node) => node.id == id).firstOrNull;
+        return inventory.isEmpty || match?.nodeOnline == true;
+      }).toList(growable: false);
+      if (choices.isEmpty) {
+        throw const FormatException('CISCO_NO_AUTHORIZED_SERVER');
+      }
+      final item = choices.first;
+      final profile = CiscoOpenConnectProfile.fromItem(item);
+      final response = await _controller.connectCisco(
+        profile: profile,
+        nativeProtocols: widget.native,
+      );
+      if (!mounted) return;
+      if (response['state'] != 'interface_up' ||
+          response['trafficRoutingVerified'] != true) {
+        throw const FormatException('CISCO_NATIVE_TUNNEL_UNVERIFIED');
+      }
+      final id = item['node_id']?.toString();
+      setState(() {
+        _ciscoUp = true;
+        _activeServer = inventory.where((node) => node.id == id).firstOrNull;
+        _activeServerName = _activeServer?.name ??
+            (item['node'] is String ? item['node'] as String : null);
+      });
+    } on FormatException catch (error) {
+      if (mounted) setState(() => _errorCode = error.message);
+    } catch (error) {
+      if (mounted) setState(() => _errorCode = _nativeError(error));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _disconnectCisco() async {
+    if (_busy || !_ciscoUp) return;
+    setState(() => _busy = true);
+    try {
+      await _controller.stopCisco();
+      if (mounted) setState(() {
+        _ciscoUp = false;
+        _clearTelemetry();
+      });
+    } catch (error) {
+      if (mounted) setState(() => _errorCode = _nativeError(error));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _connect() async {
     if (widget.selectedProtocolCode != 'wireguard' &&
         widget.selectedProtocolCode != null) return;
@@ -392,7 +467,10 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
         chosen?.protocol.code == 'wireguard' &&
         chosen?.configRecordPresent == true;
     final protocolName = chosen?.protocol.name ?? (requested ?? '—');
-    final connected = _up;
+    final connected = _up || _ciscoUp;
+    final ciscoSelected = chosen?.protocol.code == 'cisco';
+    final ciscoReady = ciscoSelected && widget.native.supports('cisco');
+    final canStartSelected = ciscoSelected ? ciscoReady : nativeReady;
     final accent = connected ? const Color(0xFF35D9AE)
         : const Color(0xFF72C1D6);
 
@@ -488,7 +566,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
           ]),
         ),
         const SizedBox(height: 15),
-        if (!connected && !nativeReady)
+        if (!connected && !canStartSelected)
           Padding(
             padding: const EdgeInsets.only(bottom: 12),
             child: Text(
@@ -509,8 +587,10 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(18)),
             ),
-            onPressed: _busy ? null : connected ? _disconnect
-                : nativeReady ? _connect : null,
+            onPressed: _busy ? null : _ciscoUp ? _disconnectCisco
+                : _up ? _disconnect
+                : canStartSelected
+                    ? (ciscoSelected ? _connectCisco : _connect) : null,
             icon: Icon(connected ? Icons.stop_rounded :
                 Icons.bolt_rounded),
             label: Text(connected
