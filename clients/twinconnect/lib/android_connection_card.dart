@@ -14,6 +14,7 @@ import 'tenant_api.dart';
 import 'tenant_models.dart';
 import 'server_inventory.dart';
 import 'vpn_policy_store.dart';
+import 'twinconnect_wave_indicator.dart';
 
 /// A real WireGuard-native Android action, never a fake Cisco proxy.
 ///
@@ -56,6 +57,8 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
   String? _errorCode;
   AppServer? _activeServer;
   String? _activeServerName;
+  final List<double> _rxSamples = <double>[];
+  final List<double> _txSamples = <double>[];
   Timer? _telemetryTimer;
   bool _polling = false;
   bool _handshake = false;
@@ -100,6 +103,8 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
     _downloadBps = null;
     _uploadBps = null;
     _lastCountersAt = null;
+    _rxSamples.clear();
+    _txSamples.clear();
     _handshake = false;
     _publicIp = null;
     _httpsLatencyMs = null;
@@ -138,6 +143,10 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
           _rxBytes = rx;
           _txBytes = tx;
           _lastCountersAt = now;
+          _rxSamples.add(_downloadBps ?? 0.0);
+          _txSamples.add(_uploadBps ?? 0.0);
+          if (_rxSamples.length > 32) _rxSamples.removeAt(0);
+          if (_txSamples.length > 32) _txSamples.removeAt(0);
         } else {
           _downloadBps = null;
           _uploadBps = null;
@@ -405,31 +414,13 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
         ),
         const SizedBox(height: 25),
         Center(
-          child: TweenAnimationBuilder<double>(
-            tween: Tween(begin: .96, end: connected ? 1.08 : 1),
-            duration: const Duration(milliseconds: 480),
-            curve: Curves.easeOutCubic,
-            builder: (context, scale, child) =>
-                Transform.scale(scale: scale, child: child),
-            child: Container(
-              key: const Key('androidPowerIndicator'),
-              width: 156, height: 156,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: LinearGradient(colors: [
-                  accent.withValues(alpha: .22),
-                  accent.withValues(alpha: .06),
-                ]),
-                border: Border.all(
-                  color: accent.withValues(alpha: .55), width: 2),
-                boxShadow: [
-                  BoxShadow(color: accent.withValues(alpha: .14),
-                      blurRadius: 36, spreadRadius: 6),
-                ],
-              ),
-              child: Icon(Icons.power_settings_new_rounded,
-                  color: accent, size: 72),
-            ),
+          child: TwinConnectWaveIndicator(
+            key: const Key('androidSharedConnectionDataFabric'),
+            connected: connected && _handshake,
+            connecting: _busy,
+            dark: Theme.of(context).brightness == Brightness.dark,
+            rxSamples: List<double>.unmodifiable(_rxSamples),
+            txSamples: List<double>.unmodifiable(_txSamples),
           ),
         ),
         const SizedBox(height: 22),
@@ -475,15 +466,20 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
             ),
           ),
         SizedBox(
-          height: 55,
+          height: 59,
           child: FilledButton.icon(
             key: const Key('androidPrimaryConnect'),
+            style: FilledButton.styleFrom(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(18)),
+            ),
             onPressed: _busy ? null : connected ? _disconnect
                 : nativeReady ? _connect : null,
-            icon: Icon(connected ? Icons.stop_circle_outlined :
-                Icons.power_settings_new_rounded),
-            label: Text(connected ? s.wireGuardDisconnect
-                : s.pick('اتصال', 'Connect')),
+            icon: Icon(connected ? Icons.stop_rounded :
+                Icons.bolt_rounded),
+            label: Text(connected
+                ? s.pick('قطع اتصال', 'Disconnect')
+                : s.pick('اتصال سریع', 'Connect now')),
           ),
         ),
         const SizedBox(height: 18),
