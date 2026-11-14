@@ -87,8 +87,22 @@ class WindowsAppRoutePolicy {
       for (final value in existingRules)
         Map<String, dynamic>.from(value as Map),
     ];
+    // The desktop controller must verify the selected VPN exit using its
+    // own HTTPS request. In include-only mode the controller is otherwise
+    // routed DIRECT, so a healthy TUN is always reported as failed.
+    // Route only this app's exact executable through the VPN for verification;
+    // do not add any other processes or alter the user's selected list.
+    final processPaths = <String>[...applicationPaths];
+    if (mode == WindowsAppRoutingMode.includeSelected && Platform.isWindows) {
+      final controller = Platform.resolvedExecutable;
+      if (controller.toLowerCase().endsWith('\\\\twinconnect.exe') &&
+          !processPaths.any((path) =>
+              path.toLowerCase() == controller.toLowerCase())) {
+        processPaths.add(controller);
+      }
+    }
     final rule = <String, dynamic>{
-      'process_path': applicationPaths,
+      'process_path': processPaths,
       'action': 'route',
       'outbound': mode == WindowsAppRoutingMode.includeSelected
           ? 'proxy' : 'direct',
