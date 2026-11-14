@@ -68,6 +68,7 @@ from .routers.reseller_sale_v2 import router as reseller_sale_v2_router
 from .routers.reseller_profile_v2 import router as reseller_profile_v2_router
 from .routers.reseller_subscription_volume_v2 import router as reseller_subscription_volume_v2_router
 from .routers.admin_user_isolation import router as admin_user_isolation_router
+from .routers.admin_activity_v1 import router as admin_activity_v1_router
 from .routers.system_release import router as system_release_router
 from .routers.subscription_delivery_policy_v1 import router as subscription_delivery_policy_v1_router
 from .self_hosted_runtime import apply_self_hosted_runtime
@@ -373,6 +374,7 @@ app.include_router(tunnel_selected_jobs_v1_router)
 # Central admin user-management routes must win before the legacy admin router.
 # They hide reseller owners/customers while leaving reseller subscriptions visible.
 app.include_router(admin_user_isolation_router)
+app.include_router(admin_activity_v1_router)
 app.include_router(admin.router)
 # Simplified volume-only reseller admin routes override legacy create/list/stats
 # and traffic adjustment while keeping the older detail/plan endpoints available.
