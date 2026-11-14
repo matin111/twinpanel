@@ -3819,10 +3819,6 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
 
     Widget heading(String name) => Row(children: [
       Expanded(child: txt(name, size: 24, bold: true)),
-      Container(
-        key: const Key('devSampleNotice'),
-        child: smallPill(tr('حساب واقعی', 'Live account')),
-      ),
     ]);
 
     Widget serverRow(int index) {
