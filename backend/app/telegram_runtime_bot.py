@@ -24,6 +24,7 @@ from aiogram.types import (
 
 from .telegram_navigation_v1 import show_navigation_page, acknowledge_navigation
 from .routers.telegram_manager import load_bot_token
+from .telegram_legacy_contacts_v1 import acknowledge_legacy_start
 from .telegram_learning_center import register_learning_handlers
 from .telegram_renewal_catalog_main_v1 import (
     show_renewal_stage,
@@ -804,6 +805,12 @@ async def start(
         )
         return
 
+    # A legacy contact becomes an actual user of this bot only upon a
+    # genuine Telegram /start. Do not trust arbitrary deep-link payload IDs.
+    legacy_recognized = await asyncio.to_thread(
+        acknowledge_legacy_start, int(message.from_user.id)
+    )
+
     first_name = str(
         message.from_user.first_name
         or ""
@@ -819,8 +826,8 @@ async def start(
 
     text = (
         f"{greeting}\n\n"
-
-        "مدیریت و خرید اشتراک VPN "
+        + ("✅ شناسه شما از فهرست مخاطبان ربات قبلی شناسایی شد.\nاشتراک‌های قبلی فقط در صورت اتصال حساب معتبر نمایش داده می‌شوند.\n\n" if legacy_recognized else "")
+        + "مدیریت و خرید اشتراک VPN "
         "از داخل تلگرام.\n\n"
 
         "از طریق ربات می‌توانید:\n\n"
