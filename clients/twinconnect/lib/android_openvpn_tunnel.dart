@@ -56,7 +56,7 @@ class AndroidOpenVpnTunnel {
     final config = item['config'];
     if (config is! String || config.length < 70 ||
         config.length > 200000 ||
-        !RegExp(r'(?m)^client\s*$').hasMatch(config) ||
+        !RegExp(r'^client\s*$', multiLine: true).hasMatch(config) ||
         !RegExp(r'^remote\s+\S+\s+\d+', multiLine: true).hasMatch(config)) {
       throw const FormatException('ANDROID_OPENVPN_CONFIG_INVALID');
     }
