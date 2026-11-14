@@ -65,11 +65,32 @@ jobs:
                   raise SystemExit("License directory mirror failed identity validation")
           print("Verified %s HTTPS directory mirrors" % len(origins))
           PY
-      - name: Compile native Kotlin and Android debug APK with failover
-        run: flutter build apk --debug "--dart-define=TWINCONNECT_DIRECTORY_URLS=$TWINCONNECT_DIRECTORY_URLS" "--dart-define=TWINCONNECT_BUILD_ID=$GITHUB_SHA"
-      - name: Upload unsigned debugging APK
+      # A single debug APK bundles every CPU ABI and development runtime.
+      # Release/AOT + split-per-abi keeps the actual device installer small.
+      # This is a CI test build signed with the generated debug key, not a
+      # production release signed with the owner's private upload key.
+      - name: Build optimized Android APKs per CPU architecture
+        run: flutter build apk --release --split-per-abi "--dart-define=TWINCONNECT_DIRECTORY_URLS=$TWINCONNECT_DIRECTORY_URLS" "--dart-define=TWINCONNECT_BUILD_ID=$GITHUB_SHA"
+      - name: Enforce per-APK 50 MiB maximum and record sizes
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          root = Path("build/app/outputs/flutter-apk")
+          names = ("app-armeabi-v7a-release.apk", "app-arm64-v8a-release.apk", "app-x86_64-release.apk")
+          max_size = 50 * 1024 * 1024
+          for name in names:
+              apk = root / name
+              if not apk.is_file():
+                  raise SystemExit(f"Missing ABI-specific APK: {name}")
+              size = apk.stat().st_size
+              print(f"{name}: {size / (1024 * 1024):.2f} MiB ({size} bytes)")
+              if size >= max_size:
+                  raise SystemExit(f"APK exceeds 50 MiB: {name}")
+          PY
+      - name: Upload Android device-specific release test APKs
         uses: actions/upload-artifact@v4
         with:
-          name: twinconnect-android-wireguard-debug
-          path: clients/twinconnect/build/app/outputs/flutter-apk/app-debug.apk
+          name: twinconnect-android-optimized-apks
+          path: clients/twinconnect/build/app/outputs/flutter-apk/app-*-release.apk
           if-no-files-found: error
