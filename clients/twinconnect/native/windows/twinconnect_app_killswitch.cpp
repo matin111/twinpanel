@@ -56,7 +56,10 @@ bool IsTrustedApp(const wchar_t* path) {
       (attributes & FILE_ATTRIBUTE_DIRECTORY) == 0;
 }
 bool TunnelLuid(const wchar_t* alias, UINT64* result) {
+  // Exact tunnel names provided by our official WireGuard, AmneziaWG
+  // and sing-box backends; never treat an arbitrary adapter as a VPN.
   if (!alias || (_wcsicmp(alias,L"TwinConnect") != 0 &&
+      _wcsicmp(alias,L"TwinConnectAWG") != 0 &&
       _wcsicmp(alias,L"TwinConnectSB") != 0)) return false;
   NET_LUID luid = {};
   if (ConvertInterfaceAliasToLuid(alias, &luid) != NO_ERROR ||
