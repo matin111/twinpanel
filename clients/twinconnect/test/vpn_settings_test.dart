@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -57,7 +58,8 @@ void main() {
     // The passive diagnostic cards are lazily built by ExpansionTile;
     // verify the disclosure exists without depending on offscreen children.
     expect(find.byKey(const Key('vpnDiagnosticsCard')), findsOneWidget);
-    expect(find.byKey(const Key('vpnProxyModeUnavailable')), findsOneWidget);
+    expect(find.byKey(const Key('vpnSystemProxyCard')), findsOneWidget);
+    expect(find.byKey(const Key('vpnSystemProxyToggle')), findsOneWidget);
     expect(find.byKey(const Key('vpnTunMode')), findsOneWidget);
     expect(find.byKey(const Key('vpnRoutingIncludeApps')), findsOneWidget);
     expect(find.byKey(const Key('vpnRoutingExcludeApps')), findsOneWidget);
@@ -72,9 +74,15 @@ void main() {
       home: VpnSettingsScreen(tenant: tenant, account: account),
     ));
     await tester.pumpAndSettle();
-    final kill = tester.widget<Switch>(find.byKey(const Key('vpnKillSwitch')));
-    expect(kill.onChanged, isNull);
-    expect(kill.value, isFalse);
+    // Legacy system-wide toggle is removed; independent app-scoped guard
+    // is available on Windows only and never claims protection on Linux.
+    expect(find.byKey(const Key('vpnKillSwitch')), findsNothing);
+    if (Platform.isWindows) {
+      final kill = tester.widget<Switch>(
+        find.byKey(const Key('vpnSelectedAppKillSwitch')));
+      expect(kill.onChanged, isNull);
+      expect(kill.value, isFalse);
+    }
     final policy = await const VpnPolicyStore().load(tenant, account);
     expect(policy.killSwitchRequested, false);
     expect(policy.routingMode, VpnRoutingMode.fullTunnel);
