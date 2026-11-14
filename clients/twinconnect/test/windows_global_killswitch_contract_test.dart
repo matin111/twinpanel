@@ -210,6 +210,21 @@ void main() {
     expect(workflow, contains('Build app-scoped WFP bypass guard'));
   });
 
+  test('app WFP lock prompts UAC and checks actual filters after elevation', () {
+    final script = File('tools/windows_app_network_lock.ps1').readAsStringSync();
+    final native = File('native/windows/twinconnect_app_killswitch.cpp').readAsStringSync();
+    final settings = File('lib/vpn_settings.dart').readAsStringSync();
+    expect(script, contains('-Verb RunAs'));
+    expect(script, contains('-ElevationReceipt'));
+    expect(script, contains('APP_WFP_ELEVATED_STATUS_UNVERIFIED'));
+    expect(script, contains(r'& $binary status $path'));
+    expect(script, contains('TWINCONNECT_APP_LOCKED'));
+    expect(script, contains('TWINCONNECT_APP_UNLOCKED'));
+    expect(script, contains('Remove-Item -LiteralPath $receipt'));
+    expect(native, contains('APP_WFP_NATIVE_ARM_ERROR_'));
+    expect(settings, isNot(contains("'تغییر Kill Switch انجام نشد: ${error.toString()}'")));
+  });
+
   test('Windows application picker never depends on installed WFP engine', () {
     final script = File('tools/windows_app_network_lock.ps1').readAsStringSync();
     final settings = File('lib/vpn_settings.dart').readAsStringSync();
