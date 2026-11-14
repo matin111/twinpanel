@@ -379,6 +379,22 @@ jobs:
           if (!$settings.Contains('vpnSignedGuardTimedTest')) {
             throw 'Settings guard test control is missing'
           }
+          $appLock = Join-Path (Get-Location) 'tools/windows_app_network_lock.ps1'
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            $appLock, [ref]$tokens, [ref]$errors) | Out-Null
+          if ($errors.Count -gt 0) { throw 'Browser network lock PowerShell parse error' }
+          $firewallCode = Get-Content $appLock -Raw
+          foreach ($marker in @('New-NetFirewallRule','Remove-NetFirewallRule',
+              'Get-NetFirewallApplicationFilter','RULE_OWNER_MISMATCH')) {
+            if (!$firewallCode.Contains($marker)) { throw "Missing browser lock safety check: $marker" }
+          }
+          if (!$installer.Contains('windows_app_network_lock.ps1') -or
+              !$settings.Contains('vpnBrowserNetworkLockOn') -or
+              !$settings.Contains('vpnBrowserNetworkLockOff')) {
+            throw 'Browser lock is not bundled and accessible from TwinConnect settings'
+          }
       - name: Package TwinConnect Windows setup with automatic WireGuard prerequisite
         shell: pwsh
         env:
