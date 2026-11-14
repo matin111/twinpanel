@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.837",
-  "source_sha": "0d28d19affab90f049a7e34d553b34b94f95c5b5",
+  "version": "1.1.0-rc.838",
+  "source_sha": "8e704ee71fa44da1d57eb56109fa80b71782e399",
   "notes": {
-    "fa": "نمایش تاریخچه ریز مصرف هر نشست Connection فقط در پاپ‌آپ بازشونده با دکمه مستقل، بدون کارت‌های بلند در صفحه؛ نمایش واضح کادر جستجوی تاریخچه ادمین در بالای پاپ‌آپ و جستجو بر اساس نام ادمین، شناسه اکانت و نوع عملیات.",
-    "en": "Move per-session Connection usage history into a lazy-loaded accessible modal instead of tall inline cards. Prominently surface server-side admin activity search inside the popup with filters and account/admin/action lookup."
+    "fa": "اصلاح تاریخچه فعالیت ادمین: حذف درخواست‌های فنی بی‌معنا مانند بررسی انتشار و درخواست‌های HTTP از نمایش و آمار، حفظ رکوردهای قدیمی در دیتابیس، ثبت اقدامات واقعی ویرایش کاربر و اشتراک با عنوان قابل‌فهم، حفظ ثبت دقیق عملیات مالی، تمدید و ریست.",
+    "en": "Clean up administrator activity history: exclude legacy generic HTTP request noise from list and totals without deleting records; log only identified user/subscription business changes alongside precise wallet/renewal/reset events."
   }
 }
