@@ -36,6 +36,7 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
   Map<String, dynamic> _guard = const {};
   bool _checking = false;
   bool _vmGuardBusy = false;
+  bool _networkResetBusy = false;
 
   @override
   void initState() {
@@ -156,6 +157,62 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
           ? 'VM command acknowledged; leak tests still required'
           : 'VM guard rejected: ${result['reason']}'),
     ));
+  }
+
+
+  Future<void> _resetWindowsNetwork() async {
+    if (!Platform.isWindows || _networkResetBusy) return;
+    final s = AppStrings.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(s.pick('ریست تنظیمات اینترنت ویندوز',
+            'Reset Windows network settings')),
+        content: Text(s.pick(
+          'اتصال VPN و اینترنت ممکن است قطع شود. کش DNS، Winsock و TCP/IP ریست می‌شوند و بعد از آن باید ویندوز را ریستارت کنی. تنظیمات اختصاصی فایروال دیگر برنامه‌ها دست‌نخورده می‌ماند. ادامه می‌دهی؟',
+          'Internet and VPN may disconnect. This resets DNS cache, Winsock and TCP/IP. Restart Windows afterward. Other apps\' firewall rules are not removed. Continue?',
+        )),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false),
+              child: Text(s.pick('انصراف', 'Cancel'))),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true),
+              child: Text(s.pick('ریست شبکه', 'Reset network'))),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _networkResetBusy = true);
+    String message;
+    try {
+      final script = File('${File(Platform.resolvedExecutable).parent.path}'
+          '\\tools\\reset_windows_network.ps1');
+      if (!await script.exists()) {
+        throw const FileSystemException('NETWORK_RESET_TOOL_MISSING');
+      }
+      final result = await Process.run(
+        'powershell.exe',
+        ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
+          '-File', script.path],
+      ).timeout(const Duration(seconds: 90));
+      if (result.exitCode != 0 ||
+          !result.stdout.toString().contains('NETWORK_RESET_OK_RESTART_REQUIRED')) {
+        throw StateError('NETWORK_RESET_FAILED: ${result.stderr}');
+      }
+      message = s.pick(
+        'تنظیمات شبکه ریست شد؛ برای تکمیل، ویندوز را ریستارت کن.',
+        'Network reset completed. Restart Windows to finish.',
+      );
+    } catch (error) {
+      message = s.pick(
+        'ریست شبکه انجام نشد. برنامه را با دسترسی Administrator اجرا کن. گزارش: C:\\ProgramData\\TwinConnect\\network-reset.log',
+        'Network reset failed. Run the app as Administrator. Log: C:\\ProgramData\\TwinConnect\\network-reset.log',
+      );
+    }
+    if (!mounted) return;
+    setState(() => _networkResetBusy = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), duration: const Duration(seconds: 8)),
+    );
   }
 
   bool get _guardActive =>
@@ -348,6 +405,30 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
             ),
           ]),
         ),
+
+        if (Platform.isWindows) ...[
+          const SizedBox(height: 8),
+          _glass(Row(children: [
+            const Icon(Icons.settings_backup_restore_rounded, size: 22),
+            const SizedBox(width: 12),
+            Expanded(child: Text(
+              tr('ریست تنظیمات اینترنت ویندوز', 'Reset Windows network settings'),
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            )),
+            _help('Windows network reset', tr(
+              'با تأیید کاربر، DNS و Winsock و TCP/IP ریست می‌شود. برای تکمیل به راه‌اندازی مجدد ویندوز نیاز است. این گزینه جایگزین بازیابی قوانین Kill Switch نیست.',
+              'With confirmation, clears DNS cache and resets Winsock/TCP-IP. Requires a Windows restart. This does not recover persistent Kill Switch firewall rules.',
+            )),
+            TextButton(
+              key: const Key('vpnWindowsNetworkReset'),
+              onPressed: _networkResetBusy ? null : _resetWindowsNetwork,
+              child: _networkResetBusy
+                  ? const SizedBox(width: 18, height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2))
+                  : Text(tr('ریست', 'Reset')),
+            ),
+          ]), key: const Key('vpnWindowsNetworkResetCard')),
+        ],
         if (Platform.isWindows &&
             Platform.environment['TWINCONNECT_DISPOSABLE_VM'] == '1')
           _glass(Row(children: [
