@@ -261,7 +261,8 @@ void main() {
     expect(card, contains("status['rxBytes']"));
     expect(card, contains("status['txBytes']"));
     expect(card, contains("status['peerHandshakeVerified']"));
-    expect(card, contains("Uri.https('api.ipify.org', '/')"));
+    expect(card, contains("Uri.https(provider, '/')"));
+    expect(card, contains("'api.ipify.org', 'icanhazip.com'"));
     expect(card, contains("_speed(_downloadBps)"));
     expect(card, contains("_speed(_uploadBps)"));
     expect(card, contains("Icons.bolt, 'HTTPS'"));
