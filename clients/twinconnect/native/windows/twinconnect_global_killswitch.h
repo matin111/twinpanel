@@ -93,7 +93,8 @@ inline flutter::EncodableValue Preflight() {
       !installed ? "SERVICE_NOT_INSTALLED" :
       !running ? "SERVICE_NOT_RUNNING" :
       !v4 || !v6 || !transport ? "FILTERS_NOT_VERIFIED" :
-      "RECOVERY_NOT_VERIFIED";
+      !recoveryVerified ? "RECOVERY_NOT_VERIFIED" :
+      "GUARD_ARMED_VERIFIED";
 
   flutter::EncodableMap result = {
     {flutter::EncodableValue("contractVersion"), flutter::EncodableValue(1)},
