@@ -470,18 +470,27 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
     // Protocol selection happens on the Servers screen. Never silently
     // change the explicitly chosen protocol to WireGuard.
     final requested = widget.selectedProtocolCode;
+    // Quick Connect chooses ONLY an entitled protocol with an installed,
+    // native engine and an existing profile. Never default to Cisco merely
+    // because it appears first in the subscription's catalog.
+    final readyOptions = available.where((entry) =>
+        entry.configRecordPresent &&
+        widget.native.supports(entry.protocol.code)).toList(growable: false);
     final chosen = requested != null
         ? available.where((e) => e.protocol.code == requested).firstOrNull
-        : available.where((e) => e.protocol.code == 'wireguard').firstOrNull ??
-            available.first;
+        : readyOptions.where((e) => e.protocol.code == 'wireguard').firstOrNull ??
+            readyOptions.firstOrNull;
     final nativeReady = Platform.isAndroid &&
         widget.native.supports('wireguard') &&
         chosen?.protocol.code == 'wireguard' &&
         chosen?.configRecordPresent == true;
-    final protocolName = chosen?.protocol.name ?? (requested ?? '—');
+    final protocolName = chosen?.protocol.name ??
+        (requested ?? s.pick('پروتکل آماده‌ای وجود ندارد', 'No ready protocol'));
     final connected = _up || _ciscoUp;
     final ciscoSelected = chosen?.protocol.code == 'cisco';
-    final ciscoReady = ciscoSelected && widget.native.supports('cisco');
+    final ciscoReady = ciscoSelected &&
+        widget.native.supports('cisco') &&
+        chosen?.configRecordPresent == true;
     final canStartSelected = ciscoSelected ? ciscoReady : nativeReady;
     final accent = connected ? const Color(0xFF35D9AE)
         : const Color(0xFF72C1D6);
@@ -607,7 +616,9 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
                 Icons.bolt_rounded),
             label: Text(connected
                 ? s.pick('قطع اتصال', 'Disconnect')
-                : s.pick('اتصال سریع', 'Connect now')),
+                : !canStartSelected
+                    ? s.pick('اتصال در دسترس نیست', 'Connection unavailable')
+                    : s.pick('اتصال سریع', 'Connect now')),
           ),
         ),
         if (widget.subscriptionContent != null) ...[
