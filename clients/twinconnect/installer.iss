@@ -182,12 +182,29 @@ var
   ExitCode: Integer;
   Ok: Boolean;
   AppGuard: String;
+  SystemProxyScript: String;
 #if IncludeVerifiedGlobalGuard
   Args: String;
 #endif
 begin
   if CurUninstallStep = usUninstall then
   begin
+    { Attempt to recover the current user's WinINET settings before deleting
+      the independent SOCKS proxy engine. Do not clobber external changes. }
+    SystemProxyScript := ExpandConstant('{app}\tools\windows_system_proxy.ps1');
+    if FileExists(SystemProxyScript) then
+    begin
+      Ok := Exec(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'),
+        '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' +
+        SystemProxyScript + '" -Action Disable',
+        '', SW_HIDE, ewWaitUntilTerminated, ExitCode);
+      if (not Ok) or (ExitCode <> 0) then
+      begin
+        MsgBox('System proxy restoration failed. Disable TwinConnect System Proxy before uninstall.',
+          mbCriticalError, MB_OK);
+        Abort;
+      end;
+    end;
     { Persistent per-app WFP filters must never survive removal of their
       recovery executable. Recovery is limited to our own fixed filter GUIDs. }
     AppGuard := ExpandConstant('{app}\services\TwinConnectAppKillSwitch.exe');
