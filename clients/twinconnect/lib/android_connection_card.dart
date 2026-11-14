@@ -162,7 +162,20 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
           _singBoxProtocol = null;
           _clearTelemetry();
         });
-        if (online) _maybeCheckInternet();
+        if (online) {
+          final core = AndroidSingBoxTunnel.instance;
+          setState(() {
+            _downloadBps = core.downloadBps;
+            _uploadBps = core.uploadBps;
+            _rxBytes = core.receivedBytes;
+            _txBytes = core.sentBytes;
+            _rxSamples.add(_downloadBps ?? 0);
+            _txSamples.add(_uploadBps ?? 0);
+            if (_rxSamples.length > 32) _rxSamples.removeAt(0);
+            if (_txSamples.length > 32) _txSamples.removeAt(0);
+          });
+          _maybeCheckInternet();
+        }
         return;
       }
       if (_ciscoUp) {
