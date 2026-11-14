@@ -303,7 +303,7 @@ jobs:
               throw "Guard release requires a valid code-signing certificate"
             }
             $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin" -Filter signtool.exe -Recurse -File |
-              Where-Object { $_.FullName -match '\x64\' } |
+              Where-Object { $_.FullName.Contains('\x64\') } |
               Sort-Object FullName -Descending | Select-Object -First 1
             if (!$signtool) { throw "Windows SDK signtool unavailable" }
             & $signtool.FullName sign /fd SHA256 /f $pfx /p $env:TWINCONNECT_SIGN_PFX_PASSWORD /tr http://timestamp.digicert.com /td SHA256 $exe
@@ -353,7 +353,12 @@ jobs:
               throw "Signed guard thumbprint missing. Refusing protected installer."
             }
             $thumbprint = (Get-Content 'guard-signing-thumbprint.txt' -Raw).Trim()
-            if ($thumbprint -notmatch '^[a-fA-F0-9]{40}
+            if ($thumbprint.Length -ne 40 -or $thumbprint -match '[^a-fA-F0-9]') { throw 'Invalid signer thumbprint' }
+            & $compiler 'installer.iss' '/DIncludeVerifiedGlobalGuard=1' ('/DGuardSigningThumbprint=' + $thumbprint)
+          } else {
+            & $compiler 'installer.iss'
+          }
+          if ($LASTEXITCODE -ne 0) { throw 'Installer compilation failed' }
           if (!(Test-Path "TwinConnect-Windows-x64-Setup.exe")) {
             throw "TwinConnect setup executable missing"
           }
