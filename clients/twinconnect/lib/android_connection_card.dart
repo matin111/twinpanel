@@ -484,9 +484,16 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
         widget.native.supports('wireguard') &&
         chosen?.protocol.code == 'wireguard' &&
         chosen?.configRecordPresent == true;
-    final protocolName = chosen?.protocol.name ??
-        (requested ?? s.pick('پروتکل آماده‌ای وجود ندارد', 'No ready protocol'));
+    // The active protocol is sourced from the running native engine, not
+    // from the browsing filter. A WireGuard interface must NEVER be labeled
+    // OpenVPN, Hysteria2, or Cisco when the user switches tabs.
     final connected = _up || _ciscoUp;
+    final protocolName = _up ? 'WireGuard'
+        : _ciscoUp ? 'Cisco / OpenConnect'
+        : chosen?.protocol.name ??
+            (requested ?? s.pick('پروتکل آماده‌ای وجود ندارد', 'No ready protocol'));
+    final internetVerified = _ciscoUp ||
+        (_up && _handshake && _publicIp != null);
     final ciscoSelected = chosen?.protocol.code == 'cisco';
     final ciscoReady = ciscoSelected &&
         widget.native.supports('cisco') &&
@@ -536,12 +543,13 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
             child: Text(
               _busy
                   ? s.pick('در حال اتصال...', 'Connecting...')
-                  : connected && _handshake && _publicIp != null
+                  : internetVerified
                       ? s.pick('اینترنت VPN تأیید شد', 'VPN internet reachable')
-                      : connected && _handshake
-                          ? s.pick('دست‌دهی سرور تأیید شد', 'Peer handshake verified')
-                          : connected ? s.wireGuardActiveUnverified
-                          : s.pick('آفلاین هستید', 'You are offline'),
+                      : _up && _handshake
+                          ? s.pick('دست‌دهی سرور تأیید شد؛ اینترنت هنوز تأیید نشده', 'Peer handshake verified; internet not yet verified')
+                          : connected
+                              ? s.pick('تونل فعال است، اما اتصال به سرور تأیید نشده', 'Tunnel interface up; server connection unverified')
+                              : s.pick('آفلاین هستید', 'You are offline'),
               textAlign: TextAlign.center,
               style: TextStyle(color: accent, fontWeight: FontWeight.w700),
             ),
@@ -615,7 +623,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
             icon: Icon(connected ? Icons.stop_rounded :
                 Icons.bolt_rounded),
             label: Text(connected
-                ? s.pick('قطع اتصال', 'Disconnect')
+                ? s.pick('قطع تونل', 'Disconnect tunnel')
                 : !canStartSelected
                     ? s.pick('اتصال در دسترس نیست', 'Connection unavailable')
                     : s.pick('اتصال سریع', 'Connect now')),
@@ -645,10 +653,12 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
                 style: Theme.of(context).textTheme.titleMedium),
               const SizedBox(height: 10),
               Text(!connected ? s.pick('تونل غیرفعال است', 'Tunnel disconnected')
-                  : _publicIp != null && _handshake
+                  : internetVerified
                       ? s.pick('دسترسی اینترنت از VPN تأیید شد.', 'Internet reachable through VPN.')
-                      : _handshake ? s.pick('دست‌دهی سرور تأیید شد؛ بررسی اینترنت ادامه دارد.', 'Peer handshake received; checking internet.')
-                      : s.wireGuardActiveUnverified),
+                      : _up && _handshake
+                          ? s.pick('دست‌دهی انجام شده اما اینترنت هنوز تأیید نشده.', 'Peer handshake received; VPN internet not yet verified.')
+                          : s.pick('رابط VPN فعال است اما هنوز پاسخ سرور دریافت نشده است. ممکن است اینترنت کار نکند.',
+                              'VPN interface is up but no server handshake has been verified. Internet may not work.')),
               const SizedBox(height: 12),
               Row(children: [
                 Expanded(child: _metric(context, Icons.public, 'IP', _publicIp ?? '—')),
