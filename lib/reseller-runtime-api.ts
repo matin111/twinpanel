@@ -142,6 +142,7 @@ export const resellerApi={
   sellSubscription:(payload:{user_id?:number|null;plan_id?:number|null;traffic_gb:number;duration_days:number;node_ids:number[];protocols:string[];sell_price_toman:number;idempotency_key:string;username?:string|null;password?:string|null})=>request<ResellerRow>("/v1/reseller/subscriptions/sell",{method:"POST",body:JSON.stringify(payload)}),
   editSubscription:(id:number,payload:ResellerRow)=>request<ResellerRow>(`/v1/reseller/subscriptions/${id}/edit`,{method:"PATCH",body:JSON.stringify(payload)}),
   extendSubscription:(id:number,payload:{add_traffic_gb:number;add_days:number;charge_toman:number;idempotency_key:string;reset_usage?:boolean})=>request<ResellerRow>(`/v1/reseller/subscriptions/${id}/extend`,{method:"POST",body:JSON.stringify(payload)}),
+  resetSubscriptionUsage:(id:number)=>request<ResellerRow>(`/v1/reseller/subscriptions/${id}/reset-usage`,{method:"POST"}),
   toggleSubscription:(id:number)=>request<ResellerRow>(`/v1/reseller/subscriptions/${id}/toggle-active`,{method:"POST"}),
   deleteSubscription:(id:number)=>request<ResellerRow>(`/v1/reseller/subscriptions/${id}`,{method:"DELETE"}),
   connectionInfo:(id:number)=>request<ResellerRow>(`/v1/reseller/subscriptions/${id}/connection-info`),
