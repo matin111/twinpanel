@@ -14,6 +14,7 @@ import 'protocol_catalog_view.dart';
 import 'protocol_strings.dart';
 import 'native_vpn_bridge.dart';
 import 'android_connection_card.dart';
+import 'android_modern_tunnel.dart';
 import 'windows_connection_card.dart';
 import 'vpn_settings.dart';
 import 'vpn_strings.dart';
@@ -367,7 +368,14 @@ class _TwinConnectHomeState extends State<TwinConnectHome> with WidgetsBindingOb
       // Never fabricate account/server permissions from locally cached data.
       final catalog = await api.loadSessionProtocolCatalog(
         panel: activePanel, sessionToken: accessToken);
-      final native = await NativeVpnBridge.protocolReadiness();
+      final existing = await NativeVpnBridge.protocolReadiness();
+      final modernReady = await AndroidModernTunnel.instance.initialize();
+      final native = modernReady
+          ? NativeProtocolReadiness(supportedCodes: {
+              ...existing.supportedCodes,
+              ...AndroidModernTunnel.protocolCodes,
+            })
+          : existing;
       if (!mounted || serial != _lookupSerial) return;
       setState(() {
         _brand = saved.brand;
@@ -591,7 +599,14 @@ class _TwinConnectHomeState extends State<TwinConnectHome> with WidgetsBindingOb
           panel: panel,
           sessionToken: loggedIn.sessionToken,
         );
-        final native = await NativeVpnBridge.protocolReadiness();
+        final existing = await NativeVpnBridge.protocolReadiness();
+      final modernReady = await AndroidModernTunnel.instance.initialize();
+      final native = modernReady
+          ? NativeProtocolReadiness(supportedCodes: {
+              ...existing.supportedCodes,
+              ...AndroidModernTunnel.protocolCodes,
+            })
+          : existing;
         if (mounted && serial == _lookupSerial) {
           setState(() {
             _catalog = catalog;
