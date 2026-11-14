@@ -108,8 +108,10 @@ class WireGuardNode {
   const WireGuardNode({
     required this.name,
     required this.config,
+    this.nodeId,
   });
 
+  final String? nodeId;
   final String name;
   /// Sensitive: never print or persist.
   final String config;
