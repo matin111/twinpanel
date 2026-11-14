@@ -18,7 +18,7 @@ jobs:
     timeout-minutes: 35
     env:
       # Public license-center bootstrap; per-tenant panel domains resolve dynamically.
-      TWINCONNECT_DIRECTORY_URLS: ${{ vars.TWINCONNECT_DIRECTORY_URLS || 'https://167-104-219-168.sslip.io,https://panel.matindnspro.sbs' }}
+      TWINCONNECT_DIRECTORY_URLS: ${{ vars.TWINCONNECT_DIRECTORY_URLS || 'https://panel.matindnspro.sbs,https://167-104-219-168.sslip.io' }}
     defaults:
       run:
         working-directory: clients/twinconnect
