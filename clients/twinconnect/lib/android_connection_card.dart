@@ -699,7 +699,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
                 : canStartSelected
                     ? (ciscoSelected ? _connectCisco
                         : modernSelected
-                            ? () => _connectModern(chosen!.protocol.code)
+                            ? () => _connectModern(chosen.protocol.code)
                             : _connect)
                     : null,
             icon: Icon(connected ? Icons.stop_rounded :
