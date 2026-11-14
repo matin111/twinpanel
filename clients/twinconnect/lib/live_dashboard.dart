@@ -3012,6 +3012,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     // Keep the authenticated desktop sidebar spacious; compact mode is only
     // for narrow windows where a full sidebar would crowd live connection cards.
     final wide = MediaQuery.sizeOf(context).width >= 980;
+    final iosMobile = Platform.isIOS && MediaQuery.sizeOf(context).width < 700;
     final ink = _dark ? const Color(0xFFE9F2F4) : const Color(0xFF223945);
     final sub = _dark ? const Color(0xFFABB4C9) : const Color(0xFF565D75);
     final line = _dark ? const Color(0xFF3A5461) : const Color(0xFFCCDDE2);
@@ -5113,6 +5114,40 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       key: ValueKey<String>(_rtl ? 'dashboard-rtl' : 'dashboard-ltr'),
       textDirection: _rtl ? TextDirection.rtl : TextDirection.ltr,
       child: Scaffold(
+      bottomNavigationBar: iosMobile
+          ? SafeArea(
+              top: false,
+              child: NavigationBar(
+                key: const Key('iosBottomNavigation'),
+                height: 70,
+                backgroundColor: sidebar,
+                indicatorColor: purple.withValues(alpha: .26),
+                selectedIndex: switch (_page) {
+                  'locations' => 1,
+                  'settings' => 2,
+                  'account' => 3,
+                  _ => 0,
+                },
+                onDestinationSelected: (index) => setState(() {
+                  _page = const ['home', 'locations', 'settings', 'account'][index];
+                }),
+                destinations: [
+                  NavigationDestination(
+                    icon: const Icon(Icons.bolt_rounded),
+                    label: tr('اتصال', 'Connect')),
+                  NavigationDestination(
+                    icon: const Icon(Icons.place_outlined),
+                    label: tr('مکان‌ها', 'Locations')),
+                  NavigationDestination(
+                    icon: const Icon(Icons.tune_rounded),
+                    label: tr('تنظیمات', 'Settings')),
+                  NavigationDestination(
+                    icon: const Icon(Icons.person_outline_rounded),
+                    label: tr('حساب', 'Account')),
+                ],
+              ),
+            )
+          : null,
       body: TwinConnectAmbientBackground(
         dark: _dark,
         backgroundColor: sidebar,
@@ -5122,7 +5157,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         // Sidebar belongs to the reading-direction start edge:
         // Persian -> right; English -> left.
         child: Row(children: [
-          sideBar(),
+          if (!iosMobile) sideBar(),
           Expanded(child: SafeArea(child: ListView(
             padding: EdgeInsets.symmetric(
                 horizontal: wide ? 30 : 17, vertical: 25),
