@@ -12,6 +12,7 @@
 #include <fwpmu.h>
 #include <netioapi.h>
 #include <cwchar>
+#include <cstring>
 #include <string>
 #include <cstdio>
 #pragma comment(lib, "Fwpuclnt.lib")
@@ -198,7 +199,7 @@ int wmain(int argc, wchar_t** argv) {
     wprintf(L"TWINCONNECT_APP_RECOVERED\n");
     return 0;
   }
-  if (argc < 4) return 2;
+  if (argc < 3) return 2;
   const wchar_t* appPath = argv[2];
   if (!IsTrustedApp(appPath)) { fwprintf(stderr,L"INVALID_APP_PATH\n"); return 2; }
   FWP_BYTE_BLOB* app = nullptr;
