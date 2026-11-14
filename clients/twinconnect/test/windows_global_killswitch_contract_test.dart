@@ -179,27 +179,32 @@ void main() {
     expect(restore, contains('Type RESET to confirm'));
   });
 
-  test('Windows Defender Firewall selected-app Kill Switch is independently reversible', () {
+  test('selected-app WFP Kill Switch blocks direct traffic but preserves VPN', () {
     final script = File('tools/windows_app_network_lock.ps1').readAsStringSync();
+    final native = File('native/windows/twinconnect_app_killswitch.cpp').readAsStringSync();
     final setup = File('installer.iss').readAsStringSync();
     final settings = File('lib/vpn_settings.dart').readAsStringSync();
-    expect(script, contains('New-NetFirewallRule'));
-    expect(script, contains('Remove-NetFirewallRule'));
-    expect(script, contains('Get-NetFirewallApplicationFilter'));
-    expect(script, contains('RULE_OWNER_MISMATCH'));
-    expect(script, contains('TWINCONNECT_APP_LOCKED'));
-    expect(script, contains('TWINCONNECT_APP_UNLOCKED'));
-    expect(script, isNot(contains('Set-NetFirewallProfile')));
-    expect(script, isNot(contains('netsh advfirewall reset')));
-    expect(setup, contains('windows_app_network_lock.ps1'));
-    expect(script, contains('APP_MUST_BE_INSTALLED_IN_PROGRAM_FILES'));
+    final workflow = File('../../.github/workflows/twinconnect-windows-preview.yml').readAsStringSync();
+    expect(native, contains('FWPM_CONDITION_ALE_APP_ID'));
+    expect(native, contains('FWPM_CONDITION_IP_LOCAL_INTERFACE'));
+    expect(native, contains('FWP_MATCH_NOT_EQUAL'));
+    expect(native, contains('FWPM_LAYER_ALE_AUTH_CONNECT_V4'));
+    expect(native, contains('FWPM_LAYER_ALE_AUTH_CONNECT_V6'));
+    expect(native, contains('FWPM_FILTER_FLAG_PERSISTENT'));
+    expect(native, contains('FwpmTransactionBegin0'));
+    expect(native, contains('RemoveOwned('));
+    expect(native, contains('TWINCONNECT_APP_UNLOCKED'));
+    expect(native, isNot(contains('FWP_ACTION_PERMIT')));
+    expect(script, contains('TwinConnectAppKillSwitch.exe'));
+    expect(script, contains('Get-NetAdapter'));
+    expect(script, contains('APP_WFP_STATUS_UNVERIFIED'));
     expect(script, contains('OpenFileDialog'));
-    expect(script, contains('TwinConnect-AppKillSwitch-'));
+    expect(script, isNot(contains('New-NetFirewallRule')));
+    expect(setup, contains('windows_app_network_lock.ps1'));
     expect(settings, contains("Key('vpnSelectKillSwitchApp')"));
     expect(settings, contains("Key('vpnSelectedAppKillSwitch')"));
-    expect(settings, contains('_pickKillSwitchApp()'));
     expect(settings, contains('_toggleSelectedAppKillSwitch'));
-    expect(settings, contains("enable ? 'Lock' : 'Unlock'"));
+    expect(workflow, contains('Build app-scoped WFP bypass guard'));
   });
 
   test('native bridge installs only a read-only guard status method', () {
