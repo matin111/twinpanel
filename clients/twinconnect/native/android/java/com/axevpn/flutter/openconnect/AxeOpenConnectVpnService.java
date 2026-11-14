@@ -31,6 +31,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLSocket;
+import javax.net.ssl.SSLParameters;
 import javax.net.ssl.SSLSocketFactory;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
@@ -167,6 +168,7 @@ public class AxeOpenConnectVpnService extends VpnService {
             // Step 1a: POST username to /auth to get context cookie
             authSock = (SSLSocket) ssf.createSocket(host, port);
             protect(authSock);
+            requireVerifiedHost(authSock, servercert);
             authSock.startHandshake();
 
             String body1 = "username=" + URLEncoder.encode(username, "UTF-8");
@@ -200,6 +202,7 @@ public class AxeOpenConnectVpnService extends VpnService {
             // Step 1b: POST password with context cookie to /auth to get VPN session cookies
             authSock = (SSLSocket) ssf.createSocket(host, port);
             protect(authSock);
+            requireVerifiedHost(authSock, servercert);
             authSock.startHandshake();
 
             String body2 = "password=" + URLEncoder.encode(password, "UTF-8");
@@ -246,6 +249,7 @@ public class AxeOpenConnectVpnService extends VpnService {
             broadcastStage("connecting");
             tunSock = (SSLSocket) ssf.createSocket(host, port);
             protect(tunSock);
+            requireVerifiedHost(tunSock, servercert);
             tunSock.startHandshake();
 
             String connectReq = "CONNECT /CSCOSSLC/tunnel HTTP/1.1\r\n"
@@ -307,12 +311,20 @@ public class AxeOpenConnectVpnService extends VpnService {
 
     private SSLSocketFactory buildSslSocketFactory(final String servercert) {
         final byte[] pin = parseCertPin(servercert);
+        if (pin == null) {
+            if (servercert != null && !servercert.isEmpty()) {
+                throw new IllegalArgumentException("CISCO_CERT_PIN_INVALID");
+            }
+            // Default Android platform CA trust when no explicit pin is set.
+            // Socket hostname verification is enabled before TLS handshake.
+            return (SSLSocketFactory) SSLSocketFactory.getDefault();
+        }
         TrustManager[] tms = new TrustManager[]{new X509TrustManager() {
             @Override public void checkClientTrusted(X509Certificate[] c, String a) {}
             @Override
             public void checkServerTrusted(X509Certificate[] chain, String authType)
                     throws java.security.cert.CertificateException {
-                if (pin == null) throw new java.security.cert.CertificateException("CISCO_SHA256_PIN_REQUIRED");
+                if (pin == null) throw new java.security.cert.CertificateException("CISCO_CERT_PIN_INVALID");
                 for (X509Certificate cert : chain) {
                     try {
                         MessageDigest md = MessageDigest.getInstance("SHA-256");
@@ -338,6 +350,15 @@ public class AxeOpenConnectVpnService extends VpnService {
         } catch (Exception e) {
             Log.e(TAG, "Pinned TLS initialization failed", e);
             throw new IllegalStateException("CISCO_TLS_PIN_ENGINE_FAILED", e);
+        }
+    }
+
+    /** Enforce DNS/IP hostname verification for CA-trusted (unpinned) TLS. */
+    private void requireVerifiedHost(SSLSocket socket, String pin) {
+        if (pin == null || pin.isEmpty()) {
+            SSLParameters parameters = socket.getSSLParameters();
+            parameters.setEndpointIdentificationAlgorithm("HTTPS");
+            socket.setSSLParameters(parameters);
         }
     }
 
