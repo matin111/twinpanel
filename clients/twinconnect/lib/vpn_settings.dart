@@ -247,25 +247,42 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
       }
       final path = picked.substring(prefix.length).trim();
       if (path.isEmpty) throw const FormatException('APP_PICK_PATH_EMPTY');
-      final status = await _appLockCommand('Status', path);
-      if (status != 'TWINCONNECT_APP_LOCKED' &&
-          status != 'TWINCONNECT_APP_UNLOCKED') {
-        throw const FormatException('APP_LOCK_STATUS_INVALID');
+      // File selection must succeed independently of WFP initialization.
+      // An unavailable guard may disable the toggle, but must not discard
+      // the user's selected application.
+      bool? enabled;
+      try {
+        final status = await _appLockCommand('Status', path);
+        if (status == 'TWINCONNECT_APP_LOCKED') {
+          enabled = true;
+        } else if (status == 'TWINCONNECT_APP_UNLOCKED') {
+          enabled = false;
+        }
+      } catch (_) {
+        enabled = null;
       }
       if (mounted) {
         setState(() {
           _selectedKillSwitchApp = path;
-          _selectedKillSwitchEnabled = status == 'TWINCONNECT_APP_LOCKED';
+          _selectedKillSwitchEnabled = enabled;
         });
       }
       final preferences = await SharedPreferences.getInstance();
       await preferences.setString('twinconnect_selected_app_killswitch', path);
+      if (enabled == null && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(AppStrings.of(context).pick(
+            'برنامه انتخاب شد؛ سرویس محافظت WFP در دسترس نیست.',
+            'App selected; WFP protection engine is unavailable.',
+          )),
+        ));
+      }
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(AppStrings.of(context).pick(
-            'انتخاب برنامه یا خواندن وضعیت فایروال انجام نشد.',
-            'Could not select the app or read its firewall status.',
+            'انتخاب فایل برنامه انجام نشد. مسیر فایل exe و دسترسی ویندوز را بررسی کن.',
+            'Could not select the program executable. Check the EXE location and Windows access.',
           )),
         ));
       }
