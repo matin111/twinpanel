@@ -243,7 +243,11 @@ int wmain(int argc, wchar_t** argv) {
       result = ERROR_INVALID_PARAMETER;
     } else {
       result = Arm(engine.h, app, tunnel);
-      if (result == ERROR_SUCCESS) wprintf(L"TWINCONNECT_APP_LOCKED\n");
+      if (result == ERROR_SUCCESS) {
+        wprintf(L"TWINCONNECT_APP_LOCKED\n");
+      } else {
+        fwprintf(stderr, L"APP_WFP_NATIVE_ARM_ERROR_%lu\n", result);
+      }
     }
   }
   FwpmFreeMemory0(reinterpret_cast<void**>(&app));
