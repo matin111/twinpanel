@@ -104,7 +104,6 @@ void main() {
     expect(installer, contains('TwinConnect - Restore System Proxy'));
     expect(settings, contains("Key('vpnSystemProxyToggle')"));
     expect(settings, contains("Key('vpnPickRoutingApp')"));
-    expect(settings, contains('split_tunnel_mode:'));
-    expect(settings, contains('system_proxy_status:'));
+    expect(settings, isNot(contains("Key('vpnDiagnosticsCard')")));
   });
 }
