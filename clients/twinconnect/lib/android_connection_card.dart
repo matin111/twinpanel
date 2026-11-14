@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 
 import 'android_connection_strings.dart';
 import 'android_tunnel.dart';
+import 'android_modern_tunnel.dart';
 import 'cisco_openconnect_profile.dart';
 import 'app_strings.dart';
 import 'native_vpn_bridge.dart';
@@ -59,6 +60,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
   bool _busy = false;
   bool _up = false;
   bool _ciscoUp = false;
+  bool _modernUp = false;
   String? _errorCode;
   AppServer? _activeServer;
   String? _activeServerName;
@@ -122,6 +124,17 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
     if (!Platform.isAndroid || _polling) return;
     _polling = true;
     try {
+      if (AndroidModernTunnel.instance.connected) {
+        if (!mounted) return;
+        if (!_modernUp) setState(() => _modernUp = true);
+        return;
+      }
+      if (_modernUp && mounted) {
+        setState(() {
+          _modernUp = false;
+          _clearTelemetry();
+        });
+      }
       if (_ciscoUp) {
         final status = await _controller.ciscoStatus();
         if (!mounted) return;
@@ -331,6 +344,71 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
     }
   }
 
+  Future<void> _connectModern(String protocol) async {
+    if (_busy || _up || _ciscoUp || _modernUp || !Platform.isAndroid ||
+        !widget.native.supports(protocol)) return;
+    setState(() { _busy = true; _errorCode = null; });
+    try {
+      final policy = await _store.loadFailClosed(
+        widget.panel.namespace, widget.username,
+      );
+      AndroidModernTunnel.requireSafePolicy(policy);
+      final profiles = await TenantApi.fromBuildConfig().loadSessionNativeProfiles(
+        panel: widget.panel,
+        sessionToken: widget.sessionToken,
+        protocol: VpnProtocols.byCode(protocol)!,
+        native: widget.native,
+      );
+      final inventory = widget.servers?.servers ?? const <AppServer>[];
+      final chosenId = widget.selectedNodeId;
+      final candidates = profiles.items.where((item) {
+        final id = item['node_id']?.toString();
+        if (id == null || (chosenId != null && id != chosenId)) return false;
+        final server = inventory.where((s) => s.id == id).firstOrNull;
+        return inventory.isEmpty || server?.nodeOnline == true;
+      }).toList(growable: false);
+      if (candidates.isEmpty) {
+        throw const FormatException('ANDROID_MODERN_NO_AUTHORIZED_NODE');
+      }
+      // A panel profile is validated before the Android VPN permission request.
+      final item = candidates.first;
+      AndroidModernTunnel.validatedOutbound(protocol: protocol, item: item);
+      await AndroidModernTunnel.instance.connect(
+        protocol: protocol, item: item, policy: policy,
+      );
+      if (!mounted) return;
+      final id = item['node_id']?.toString();
+      setState(() {
+        _modernUp = AndroidModernTunnel.instance.connected;
+        _activeServer = inventory.where((s) => s.id == id).firstOrNull;
+        _activeServerName = _activeServer?.name ??
+            (item['node'] is String ? item['node'] as String : null);
+      });
+    } on FormatException catch (error) {
+      if (mounted) setState(() => _errorCode = error.message);
+    } catch (error) {
+      if (mounted) setState(() => _errorCode = _nativeError(error));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _disconnectModern() async {
+    if (_busy || !_modernUp) return;
+    setState(() { _busy = true; _errorCode = null; });
+    try {
+      await AndroidModernTunnel.instance.disconnect();
+      if (mounted) setState(() {
+        _modernUp = false;
+        _clearTelemetry();
+      });
+    } catch (error) {
+      if (mounted) setState(() => _errorCode = _nativeError(error));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _disconnectCisco() async {
     if (_busy || !_ciscoUp) return;
     setState(() => _busy = true);
@@ -486,12 +564,19 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
         chosen?.configRecordPresent == true;
     final protocolName = chosen?.protocol.name ??
         (requested ?? s.pick('پروتکل آماده‌ای وجود ندارد', 'No ready protocol'));
-    final connected = _up || _ciscoUp;
+    final connected = _up || _ciscoUp || _modernUp;
     final ciscoSelected = chosen?.protocol.code == 'cisco';
+    final modernSelected = chosen != null &&
+        AndroidModernTunnel.protocolCodes.contains(chosen.protocol.code);
+    final modernReady = modernSelected &&
+        AndroidModernTunnel.instance.available &&
+        widget.native.supports(chosen.protocol.code) &&
+        chosen.configRecordPresent;
     final ciscoReady = ciscoSelected &&
         widget.native.supports('cisco') &&
         chosen?.configRecordPresent == true;
-    final canStartSelected = ciscoSelected ? ciscoReady : nativeReady;
+    final canStartSelected =
+        ciscoSelected ? ciscoReady : modernSelected ? modernReady : nativeReady;
     final accent = connected ? const Color(0xFF35D9AE)
         : const Color(0xFF72C1D6);
 
@@ -609,9 +694,14 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
                 borderRadius: BorderRadius.circular(18)),
             ),
             onPressed: _busy ? null : _ciscoUp ? _disconnectCisco
+                : _modernUp ? _disconnectModern
                 : _up ? _disconnect
                 : canStartSelected
-                    ? (ciscoSelected ? _connectCisco : _connect) : null,
+                    ? (ciscoSelected ? _connectCisco
+                        : modernSelected
+                            ? () => _connectModern(chosen!.protocol.code)
+                            : _connect)
+                    : null,
             icon: Icon(connected ? Icons.stop_rounded :
                 Icons.bolt_rounded),
             label: Text(connected
