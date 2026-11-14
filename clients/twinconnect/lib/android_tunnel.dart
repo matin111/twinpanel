@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'native_vpn_bridge.dart';
 import 'protocols.dart';
 import 'vpn_policy.dart';
+import 'cisco_openconnect_profile.dart';
 
 /// Android-only bridge using the actual WireGuard JNI tunnel implementation.
 ///
@@ -94,13 +95,67 @@ class AndroidTunnelController {
     return Map.unmodifiable(raw);
   }
 
-  /// Cisco cannot be started by WireGuard; fail closed until a reviewed
-  /// libopenconnect engine forwards packets via Android VpnService.
-  Future<Never> connectCisco() async {
-    throw PlatformException(
-      code: 'OPENCONNECT_CORE_NOT_INSTALLED',
-      message: 'Cisco/OpenConnect native core is not installed in this build.',
+  /// Cisco/AnyConnect requires an independent Android VpnService and
+  /// libopenconnect engine. Do not forward any credentials until the native
+  /// bridge explicitly advertises a reviewed Cisco engine.
+  Future<Map<String, dynamic>> connectCisco({
+    required CiscoOpenConnectProfile profile,
+    required NativeProtocolReadiness nativeProtocols,
+  }) async {
+    if (!Platform.isAndroid) {
+      throw PlatformException(
+        code: 'PLATFORM_UNSUPPORTED',
+        message: 'Cisco native integration requires Android.',
+      );
+    }
+    if (!nativeProtocols.supports('cisco')) {
+      throw PlatformException(
+        code: 'OPENCONNECT_CORE_NOT_INSTALLED',
+        message: 'Cisco native engine is not installed.',
+      );
+    }
+    final raw = await _channel.invokeMapMethod<String, dynamic>(
+      'startOpenConnect',
+      {
+        'gateway': profile.gateway,
+        'username': profile.username,
+        'password': profile.password,
+        'servercert': profile.serverCertificate ?? '',
+      },
     );
+    if (raw == null || raw['protocol'] != 'cisco' ||
+        raw['state'] != 'interface_up' ||
+        raw['trafficRoutingVerified'] != true) {
+      throw const FormatException('CISCO_NATIVE_TUNNEL_UNVERIFIED');
+    }
+    return Map.unmodifiable(raw);
+  }
+
+  Future<Map<String, dynamic>> stopCisco() async {
+    if (!Platform.isAndroid) {
+      throw PlatformException(code: 'PLATFORM_UNSUPPORTED');
+    }
+    final raw = await _channel.invokeMapMethod<String, dynamic>(
+      'stopOpenConnect',
+    );
+    if (raw == null || raw['protocol'] != 'cisco' ||
+        raw['state'] != 'down') {
+      throw const FormatException('CISCO_NATIVE_STOP_UNVERIFIED');
+    }
+    return Map.unmodifiable(raw);
+  }
+
+  Future<Map<String, dynamic>> ciscoStatus() async {
+    if (!Platform.isAndroid) {
+      return const {'protocol': 'cisco', 'state': 'unavailable'};
+    }
+    final raw = await _channel.invokeMapMethod<String, dynamic>(
+      'getOpenConnectStatus',
+    );
+    if (raw == null || raw['protocol'] != 'cisco') {
+      return const {'protocol': 'cisco', 'state': 'unavailable'};
+    }
+    return Map.unmodifiable(raw);
   }
 }
 
