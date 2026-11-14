@@ -66,6 +66,29 @@ class MainActivity : FlutterActivity() {
                 "getTunnelStatus" -> onWorker(result) {
                     WireGuardRuntime.status()
                 }
+                // Dedicated Cisco API. Not backed by WireGuard. An Android
+                // OpenConnect VpnService + reviewed native core is required
+                // before enabling this protocol's native capability.
+                "getOpenConnectStatus" -> onWorker(result) {
+                    mapOf(
+                        "protocol" to "cisco",
+                        "state" to "unavailable",
+                        "engineReady" to false,
+                        "trafficRoutingVerified" to false
+                    )
+                }
+                "startOpenConnect" -> {
+                    // Fail BEFORE opening credentials or starting another
+                    // transport. Never report Cisco as a WireGuard tunnel.
+                    result.error(
+                        "OPENCONNECT_CORE_NOT_INSTALLED",
+                        "Dedicated OpenConnect Android core is not installed",
+                        null
+                    )
+                }
+                "stopOpenConnect" -> onWorker(result) {
+                    mapOf("protocol" to "cisco", "state" to "down")
+                }
                 "startTunnel" -> {
                     if (call.argument<String>("protocol") != "wireguard") {
                         result.error("PROTOCOL_ENGINE_NOT_READY", "Unsupported native protocol", null)
