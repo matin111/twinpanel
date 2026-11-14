@@ -55,7 +55,6 @@ import 'ambient_background.dart';
 import 'interactive_glass_card.dart';
 import 'tunnel_traffic_chart.dart';
 import 'vpn_settings.dart';
-import 'ios_home_shell.dart';
 
 /// Authenticated application uses the original visual dashboard layout with live data.
 
@@ -77,6 +76,8 @@ class TwinConnectLiveDashboard extends StatefulWidget {
     required this.onLogout,
     required this.onRefreshAccount,
     this.accountError,
+    this.simulatorPreview = false,
+    this.previewPage = 0,
     super.key,
   });
   final PanelDirectoryEntry panel;
@@ -95,6 +96,10 @@ class TwinConnectLiveDashboard extends StatefulWidget {
   final VoidCallback onLogout;
   final VoidCallback onRefreshAccount;
   final String? accountError;
+  /// Used ONLY by the alternate simulator-preview entry point.
+  /// Production sign-in never sets this, and no sample credentials are valid.
+  final bool simulatorPreview;
+  final int previewPage;
   @override
   State<TwinConnectLiveDashboard> createState() => _TwinConnectLiveDashboardState();
 }
@@ -2295,6 +2300,11 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       if (mounted) _updateConnectionClock();
     });
     _dark = true; // Premium dark canvas is the only supported app appearance.
+    if (widget.simulatorPreview) {
+      _page = const ['home', 'locations', 'settings', 'account'][
+          widget.previewPage.clamp(0, 3)];
+      return; // No network, VPN, or credential calls from an offline mock.
+    }
     _restoreAppearance();
     _refreshNativeReadiness();
     _refreshVpnStatus();
@@ -2310,6 +2320,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   void didUpdateWidget(covariant TwinConnectLiveDashboard oldWidget) {
     super.didUpdateWidget(oldWidget);
     // All tenants use the same dark UI; branded colors remain customizable.
+    if (widget.simulatorPreview) return;
     if (oldWidget.username != widget.username ||
         oldWidget.panel.namespace != widget.panel.namespace ||
         oldWidget.panel.apiOrigin != widget.panel.apiOrigin) {
@@ -2992,26 +3003,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
 
   @override
   Widget build(BuildContext context) {
-    // The authenticated iOS app uses the same reusable screen as the
-    // simulator tour, but receives only REAL panel data here. Preview
-    // fixtures are never loaded through this entry point.
-    if (Platform.isIOS) {
-      return MaterialApp(
-        title: widget.brand.brandName,
-        debugShowCheckedModeBanner: false,
-        theme: BrandTheme.make(widget.brand, Brightness.dark),
-        home: TwinConnectIphoneShell(
-          brand: widget.brand,
-          username: widget.username,
-          inventory: widget.servers,
-          catalog: widget.catalog,
-          account: widget.account,
-          plan: widget.plan,
-          onRefresh: widget.onRefresh,
-          onLogout: widget.onLogout,
-        ),
-      );
-    }
+    // Every platform renders the same authenticated dashboard and tenant
+    // theme. Only screen-size navigation and native engines differ.
     return MaterialApp(
       title: widget.brand.brandName,
       debugShowCheckedModeBanner: false,
@@ -4836,12 +4829,25 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       children: [
         heading(tr('تنظیمات', 'Settings')),
         const SizedBox(height: 17),
-        VpnSettingsScreen(
-          key: const Key('inlineVpnSettings'),
-          tenant: widget.panel.namespace,
-          account: widget.username,
-          embedded: true,
-        ),
+        if (Platform.isIOS)
+          glassCard(
+            padding: const EdgeInsets.all(18),
+            child: Row(children: [
+              Icon(Icons.shield_outlined, color: purple),
+              const SizedBox(width: 12),
+              Expanded(child: txt(tr(
+                'تنظیمات موتور VPN پس از تکمیل Network Extension فعال می‌شوند.',
+                'VPN engine settings will be available after Network Extension integration.'),
+                size: 12)),
+            ]),
+          )
+        else
+          VpnSettingsScreen(
+            key: const Key('inlineVpnSettings'),
+            tenant: widget.panel.namespace,
+            account: widget.username,
+            embedded: true,
+          ),
         const SizedBox(height: 16),
         settingsSectionTitle(tr('برنامه', 'Application'),
             Icons.tune_rounded),
