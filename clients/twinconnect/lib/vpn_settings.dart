@@ -37,6 +37,7 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
   bool _checking = false;
   bool _vmGuardBusy = false;
   bool _networkResetBusy = false;
+  bool _guardRecoveryBusy = false;
 
   @override
   void initState() {
@@ -210,6 +211,60 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
     }
     if (!mounted) return;
     setState(() => _networkResetBusy = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), duration: const Duration(seconds: 8)),
+    );
+  }
+
+
+  Future<void> _recoverWindowsGuard() async {
+    if (!Platform.isWindows || _guardRecoveryBusy) return;
+    final s = AppStrings.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(s.pick('بازیابی اضطراری Kill Switch',
+            'Emergency Kill Switch recovery')),
+        content: Text(s.pick(
+          'فقط قوانین محافظتی متعلق به TwinConnect حذف می‌شوند و ممکن است اینترنت مستقیم دوباره برقرار شود. این کار تنظیمات شبکه ویندوز را ریست نمی‌کند. ادامه می‌دهی؟',
+          'This removes TwinConnect-owned protection rules only and may restore direct internet access. It does not reset Windows networking. Continue?',
+        )),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false),
+              child: Text(s.pick('انصراف', 'Cancel'))),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true),
+              child: Text(s.pick('بازیابی', 'Recover'))),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _guardRecoveryBusy = true);
+    String message;
+    try {
+      final script = File('${File(Platform.resolvedExecutable).parent.path}'
+          '\\tools\\reset_windows_network.ps1');
+      if (!await script.exists()) {
+        throw const FileSystemException('GUARD_RECOVERY_TOOL_MISSING');
+      }
+      final result = await Process.run('powershell.exe',
+        ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
+          '-File', script.path, '-GuardOnly'],
+      ).timeout(const Duration(seconds: 60));
+      if (result.exitCode != 0 ||
+          !result.stdout.toString().contains('TWINCONNECT_GUARD_RECOVERY_OK')) {
+        throw StateError('GUARD_RECOVERY_FAILED: ${result.stderr}');
+      }
+      message = s.pick('بازیابی محافظ TwinConnect انجام شد.',
+          'TwinConnect guard recovery completed.');
+    } catch (_) {
+      message = s.pick(
+        'بازیابی تأیید نشد. با Administrator اجرا کن؛ گزارش: C:\\ProgramData\\TwinConnect\\network-reset.log',
+        'Recovery was not verified. Run as Administrator; log: C:\\ProgramData\\TwinConnect\\network-reset.log',
+      );
+    }
+    await _check();
+    if (!mounted) return;
+    setState(() => _guardRecoveryBusy = false);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message), duration: const Duration(seconds: 8)),
     );
@@ -406,6 +461,26 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
           ]),
         ),
 
+        if (Platform.isWindows && _guard['serviceInstalled'] == true) ...[
+          const SizedBox(height: 8),
+          _glass(Row(children: [
+            const Icon(Icons.shield_outlined, size: 22),
+            const SizedBox(width: 12),
+            Expanded(child: Text(
+              tr('بازیابی اضطراری Kill Switch',
+                 'Emergency Kill Switch recovery'),
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            )),
+            TextButton(
+              key: const Key('vpnGuardEmergencyRecovery'),
+              onPressed: _guardRecoveryBusy ? null : _recoverWindowsGuard,
+              child: _guardRecoveryBusy
+                  ? const SizedBox(width: 18, height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2))
+                  : Text(tr('بازیابی', 'Recover')),
+            ),
+          ]), key: const Key('vpnGuardEmergencyRecoveryCard')),
+        ],
         if (Platform.isWindows) ...[
           const SizedBox(height: 8),
           _glass(Row(children: [
