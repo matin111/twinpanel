@@ -585,18 +585,6 @@ def submit_payment_receipt(
             ),
         )
 
-    if row.status in {
-        "approved",
-        "auto_verified",
-    }:
-        raise HTTPException(
-            status_code=409,
-            detail=(
-                "این پرداخت قبلاً "
-                "تأیید شده است"
-            ),
-        )
-
     file_id = str(
         payload.telegram_file_id
         or ""
@@ -616,10 +604,58 @@ def submit_payment_receipt(
         datetime.utcnow()
     )
 
+    # An SMS may have verified the payment BEFORE the customer sent the
+    # receipt. Saving a late receipt must not undo approval or create
+    # another subscription, but it should heal a missing delivery event.
+    already_verified = row.status in {"approved", "auto_verified"}
+    delivery_queued = False
+    if already_verified:
+        order = db.get(StoreOrder, int(row.order_id))
+        if order and order.status == "fulfilled" and order.subscription_id:
+            from ..telegram_notify_models import TelegramNotification
+            existing = (
+                db.query(TelegramNotification)
+                .filter(
+                    TelegramNotification.user_id == row.user_id,
+                    TelegramNotification.kind == "payment_approved",
+                )
+                .order_by(TelegramNotification.id.desc())
+                .limit(500)
+                .all()
+            )
+            sent_or_pending = any(
+                str((notice.payload or {}).get("payment_id") or "") == str(row.id)
+                for notice in existing
+            )
+            if not sent_or_pending:
+                subscription = db.get(Subscription, int(order.subscription_id))
+                if subscription is not None:
+                    queue_telegram_notification(
+                        db,
+                        user_id=row.user_id,
+                        event_key=(
+                            f"payment-approved:order:{order.id}:"
+                            f"payment:{row.id}:subscription:{order.subscription_id}"
+                        ),
+                        kind="payment_approved",
+                        payload={
+                            "payment_id": row.id,
+                            "order_id": order.id,
+                            "subscription_id": order.subscription_id,
+                            "username": subscription.account_username,
+                            "amount_toman": int(
+                                row.payable_amount_toman or row.base_amount_toman or 0
+                            ),
+                        },
+                    )
+                    delivery_queued = True
     db.commit()
     db.refresh(row)
 
-    return intent_out(row)
+    result = intent_out(row)
+    result["already_verified"] = already_verified
+    result["delivery_queued"] = delivery_queued
+    return result
 
 
 # TWINPANEL_MAIN_RECEIPT_PROXY_V1
