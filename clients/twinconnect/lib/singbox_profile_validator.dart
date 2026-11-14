@@ -52,8 +52,22 @@ class SingBoxProfileValidator {
     if (candidate is! Map) {
       throw const FormatException('SINGBOX_JSON_PROFILE_REQUIRED');
     }
-    final object = Map<String, dynamic>.from(candidate);
-    if (object.containsKey('inbounds') || object.containsKey('route') ||
+    var object = Map<String, dynamic>.from(candidate);
+    // TwinPanel may deliver a full generated sing-box config rather than
+    // an isolated outbound. Never execute its routing, DNS, TUN, logging,
+    // or experimental sections: extract only one matching native outbound.
+    // Multiple matching outbounds are ambiguous and must fail closed.
+    if (object['outbounds'] is List) {
+      final matches = (object['outbounds'] as List<dynamic>)
+          .whereType<Map>()
+          .where((row) => row['type'] == expected).toList(growable: false);
+      if (matches.length != 1) {
+        throw const FormatException('SINGBOX_OUTBOUND_AMBIGUOUS');
+      }
+      object = Map<String, dynamic>.from(matches.single);
+    }
+    if (object.containsKey('outbounds') || object.containsKey('inbounds') ||
+        object.containsKey('dns') || object.containsKey('route') ||
         object.containsKey('experimental') || object.containsKey('log')) {
       // Never let a subscription profile override local routing/security.
       throw const FormatException('SINGBOX_UNTRUSTED_APP_CONFIG');

@@ -123,10 +123,191 @@ void main() {
     final dashboard = File('lib/live_dashboard.dart').readAsStringSync();
     expect(dashboard, contains("textDirection: _rtl ? TextDirection.rtl : TextDirection.ltr"));
     expect(dashboard, contains("key: ValueKey<String>(_rtl ? 'dashboard-rtl' : 'dashboard-ltr')"));
-    expect(dashboard.replaceAll('\r\n', '\n'),
-        contains('child: Row(children: [\n          sideBar(),'));
+    // Windows retains its desktop sidebar; Android owns a bottom navigation.
+    expect(dashboard, contains('child: Column(children: ['));
+    expect(dashboard, contains('Expanded(child: Row(children: ['));
+    expect(dashboard, contains('if (!Platform.isAndroid) sideBar(),'));
+    expect(dashboard, contains('if (Platform.isAndroid)'));
+    expect(dashboard, contains("Key('androidMainNavigation')"));
+    expect(dashboard, contains("const ['home', 'locations', 'settings', 'account']"));
     expect(dashboard, isNot(contains('textDirection: TextDirection.ltr,\n            child: Row(')));
     expect(dashboard, contains('textDirection: TextDirection.ltr,'));
+  });
+
+  test('Android location selection feeds exact native WireGuard node ID', () {
+    final dashboard = File('lib/live_dashboard.dart').readAsStringSync();
+    final androidCard = File('lib/android_connection_card.dart').readAsStringSync();
+    expect(dashboard, contains('if (Platform.isAndroid) _androidExplicitNodeSelected = true;'));
+    expect(dashboard, contains('selectedNodeId: _androidExplicitNodeSelected'));
+    expect(dashboard, contains('if (Platform.isAndroid) {'));
+    expect(androidCard, contains("item['node_id']?.toString()"));
+    expect(androidCard, contains('selectedNodeId != null && id != selectedNodeId'));
+    expect(androidCard, contains('SELECTED_WIREGUARD_NODE_UNAVAILABLE'));
+    expect(androidCard, contains('_candidateNodes(profiles, selectedNodeId)'));
+    expect(androidCard, contains('peerVerified = await _awaitPeerHandshake()'));
+    expect(androidCard, contains('await _controller.stop()'));
+    expect(androidCard, contains('WIREGUARD_PEER_HANDSHAKE_TIMEOUT'));
+    expect(androidCard, contains('candidates.take(3)'));
+    expect(androidCard, contains('candidates.take(1)'));
+  });
+
+  test('Android connection status follows active native tunnel not protocol filter', () {
+    final card = File('lib/android_connection_card.dart').readAsStringSync();
+    expect(card, contains("final protocolName = chosen?.protocol.name"));
+    expect(card, contains("Key('androidSeparateActiveProtocol')"));
+    expect(card, contains("Key('androidDisconnectPreviousTunnel')"));
+    expect(card, contains("final internetVerified = _ciscoUp ||"));
+    expect(card, contains("Key('androidNoHandshakeDiagnostic')"));
+    expect(card, contains('WG_INTERFACE_UP_NO_HANDSHAKE'));
+    expect(card, contains('Tunnel interface up; server connection unverified'));
+  });
+
+  test('Android Connect tab preserves selected protocol and node', () {
+    final dashboard = File('lib/live_dashboard.dart').readAsStringSync();
+    expect(dashboard, contains("selectedProtocolCode: _filter == 'all' ? null : _filter"));
+    expect(dashboard, contains('Navigation does not rewrite the chosen protocol or node'));
+    expect(dashboard, isNot(contains('widget.native.supports(_filter)')));
+  });
+
+  test('Android modern native engine does not reuse WireGuard or Cisco', () {
+    final modern = File('lib/android_singbox_tunnel.dart').readAsStringSync();
+    final card = File('lib/android_connection_card.dart').readAsStringSync();
+    expect(modern, contains('package:sing_box/sing_box.dart'));
+    for (final code in ['hysteria2', 'tuic', 'anytls', 'socks5']) {
+      expect(modern, contains("'$code'"));
+    }
+    expect(modern, contains('SingBoxProfileValidator.validateOutbound('));
+    expect(modern, contains('SingBox.instance.connect(jsonEncode(outbound))'));
+    expect(card, contains('Future<void> _connectModern('));
+    expect(card, contains('Future<void> _disconnectModern()'));
+    expect(card, contains('loadSessionNativeProfiles('));
+    expect(card, contains('AndroidSingBoxTunnel.instance.connect('));
+    final activity = File(
+      'native/android/kotlin/com/twinpanel/twinconnect/MainActivity.kt',
+    ).readAsStringSync();
+    expect(modern, contains("'forgetSingBoxEphemeralConfig'"));
+    expect(modern, contains('SINGBOX_OUTBOUND_UNREACHABLE'));
+    expect(activity, contains('"sing_box.last_input"'));
+    expect(activity, contains('"sing-box/last_config.json"'));
+  });
+
+  test('Android offers all entitled protocols without claiming missing engines', () {
+    final android = File('lib/android_connection_card.dart').readAsStringSync();
+    final native = File('native/android/kotlin/com/twinpanel/twinconnect/MainActivity.kt')
+        .readAsStringSync();
+    expect(android, contains("widget.catalog.entries"));
+    expect(android, contains(".where((entry) => entry.selected)"));
+    final dashboard = File('lib/live_dashboard.dart').readAsStringSync();
+    expect(dashboard, contains("Key('devProtocolFilters')"));
+    expect(dashboard, contains("Key('androidChooseLocation')"));
+    expect(dashboard, contains("Key('androidNativeConnectionGlass')"));
+    expect(android, contains("Key('androidPrimaryConnect')"));
+    expect(android, contains("Key('androidSharedConnectionDataFabric')"));
+    expect(android, contains('TwinConnectWaveIndicator('));
+    expect(android, contains("Key('androidSharedPowerCard')"));
+    expect(android, contains("Key('androidNetworkOverview')"));
+    expect(android, contains("Key('androidVerifiedStatus')"));
+    expect(android, contains('selectedProtocolCode'));
+    // Auto-connect must never silently default to a protocol with no native
+    // engine just because that protocol comes first in the catalog.
+    expect(android, contains('final readyOptions = available.where'));
+    expect(android, contains('widget.native.supports(entry.protocol.code)'));
+    expect(android, contains('readyOptions.firstOrNull'));
+    expect(android, contains('Engine not installed'));
+    expect(android, contains('Disconnect active tunnel first'));
+    expect(android, contains('This protocol engine is not ready on Android yet.'));
+    expect(android, isNot(contains("Key('androidProtocolChooser')")));
+    expect(native, contains('listOf("wireguard")'));
+    expect(android, isNot(contains("if ((wireguard?.selected != true) && (cisco?.selected != true))")));
+  });
+
+  test('Android quick connect shows real native diagnostics and no fake network figures', () {
+    final card = File('lib/android_connection_card.dart').readAsStringSync();
+    final native = File(
+      'native/android/kotlin/com/twinpanel/twinconnect/WireGuardRuntime.kt',
+    ).readAsStringSync();
+    final activity = File(
+      'native/android/kotlin/com/twinpanel/twinconnect/MainActivity.kt',
+    ).readAsStringSync();
+    expect(card, contains('loadFailClosed('));
+    expect(card, contains("Key('androidNetworkOverview')"));
+    expect(card, contains("'VPN error: "));
+    expect(native, contains('WIREGUARD_CONFIG_PARSE_FAILED'));
+    expect(native, contains('WIREGUARD_NATIVE_START_FAILED'));
+    expect(activity, contains('WIREGUARD_NATIVE_START_FAILED'));
+    expect(card, contains('wireGuardNoConfigs'));
+  });
+
+  test('Android quick connect never shows the raw node picker', () {
+    final card = File('lib/android_connection_card.dart').readAsStringSync();
+    final dashboard = File('lib/live_dashboard.dart').readAsStringSync();
+    expect(card, contains('List<WireGuardNode> _candidateNodes('));
+    expect(card, contains('widget.servers?.servers'));
+    expect(card, contains('matching.nodeOnline'));
+    expect(card, contains('selectedNodeId != null && id != selectedNodeId'));
+    expect(card, contains('candidates.sort('));
+    expect(card, isNot(contains('showDialog<WireGuardNode>')));
+    expect(dashboard, contains('servers: widget.servers'));
+  });
+
+  test('Android HTTPS probe has a TLS fallback and requires peer handshake', () {
+    final card = File('lib/android_connection_card.dart').readAsStringSync();
+    expect(card, contains("'api.ipify.org', 'icanhazip.com'"));
+    expect(card, contains('Uri.https(provider,'));
+    expect(card, contains('_up && _handshake ? verifiedIp : null'));
+    expect(card, isNot(contains('badCertificateCallback')));
+  });
+
+  test('Android native engine understands panel split IPv4 routing', () {
+    final native = File(
+      'native/android/kotlin/com/twinpanel/twinconnect/WireGuardRuntime.kt',
+    ).readAsStringSync();
+    expect(native, contains('hasFullIpv4Route(raw)'));
+    expect(native, contains('hasFullRoute(raw, "0.0.0.0/1")'));
+    expect(native, contains('hasFullRoute(raw, "128.0.0.0/1")'));
+    expect(native, contains('protectIpv6Route(configText)'));
+    expect(native, contains('match.groupValues[2].trimEnd() + ", ::/0"'));
+    expect(native, contains('validateStrictProfile(protectedProfile)'));
+    expect(native, contains('require(hasFullRoute(raw, "::/0"))'));
+  });
+
+  test('Android WireGuard network data comes from actual JNI and HTTPS probes', () {
+    final card = File('lib/android_connection_card.dart').readAsStringSync();
+    final native = File(
+      'native/android/kotlin/com/twinpanel/twinconnect/WireGuardRuntime.kt',
+    ).readAsStringSync();
+    expect(native, contains('getStatistics(tunnel)'));
+    expect(native, contains('statistics.totalRx()'));
+    expect(native, contains('statistics.totalTx()'));
+    expect(native, contains('latestHandshakeEpochMillis()'));
+    expect(card, contains("status['rxBytes']"));
+    expect(card, contains("status['txBytes']"));
+    expect(card, contains("status['peerHandshakeVerified']"));
+    expect(card, contains("Uri.https(provider, '/')"));
+    expect(card, contains("'api.ipify.org', 'icanhazip.com'"));
+    expect(card, contains("_speed(_downloadBps)"));
+    expect(card, contains("_speed(_uploadBps)"));
+    expect(card, contains("Icons.bolt, 'HTTPS'"));
+    expect(card, contains('_telemetryTimer?.cancel()'));
+  });
+
+  test('Cisco Android uses an isolated engine, not a WireGuard tunnel', () {
+    final controller = File('lib/android_tunnel.dart').readAsStringSync();
+    final card = File('lib/android_connection_card.dart').readAsStringSync();
+    final native = File(
+      'native/android/kotlin/com/twinpanel/twinconnect/MainActivity.kt',
+    ).readAsStringSync();
+    expect(controller, contains("nativeProtocols.supports('cisco')"));
+    expect(controller, contains("'startOpenConnect'"));
+    expect(controller, contains("'stopOpenConnect'"));
+    expect(controller, contains("'getOpenConnectStatus'"));
+    expect(controller, contains("'trafficRoutingVerified'"));
+    expect(card, contains('CiscoOpenConnectProfile.fromItem(item)'));
+    expect(card, contains("loadSessionNativeProfiles("));
+    expect(card, contains("_controller.connectCisco("));
+    expect(card, contains("_controller.ciscoStatus()"));
+    expect(native, contains('"OPENCONNECT_CORE_NOT_INSTALLED"'));
+    expect(native, contains('listOf("wireguard")'));
   });
 
   test('six dashboard locales and Arabic right-to-left are supported', () {

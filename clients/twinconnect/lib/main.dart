@@ -28,6 +28,10 @@ import 'xray_inbound_secure_cache.dart';
 import 'account_snapshot.dart';
 import 'plan_classification.dart';
 
+// Build provenance is public metadata, never a credential or installation ID.
+const String twinConnectBuildId =
+    String.fromEnvironment('TWINCONNECT_BUILD_ID', defaultValue: 'local');
+
 void main() => runApp(const TwinConnectApp());
 
 enum AppLanguage { automatic, persian, english, turkish, arabic, german, french }
@@ -502,12 +506,61 @@ class _TwinConnectHomeState extends State<TwinConnectHome> with WidgetsBindingOb
       final namespace = TenantIdentity.parseNamespace(username, '');
       final password = _password.text;
       final api = TenantApi.fromBuildConfig();
-      final panel = await api.resolve(namespace);
-      final loggedIn = await api.login(
-        panel: panel,
-        username: username,
-        password: password,
-      );
+      PanelDirectoryEntry panel;
+      try {
+        panel = await api.resolve(namespace);
+      } on TenantApiException catch (error) {
+        if (error.message == 'NETWORK_UNAVAILABLE') {
+          throw const TenantApiException('DIRECTORY_NETWORK_UNAVAILABLE');
+        }
+        rethrow;
+      } on TimeoutException {
+        throw const TenantApiException('DIRECTORY_NETWORK_UNAVAILABLE');
+      }
+      AppLoginSession loggedIn;
+      try {
+        loggedIn = await api.login(
+          panel: panel,
+          username: username,
+          password: password,
+        );
+      } on TenantApiException catch (error) {
+        if (error.message != 'NETWORK_UNAVAILABLE') rethrow;
+        // A license owner can rotate their panel domain without requiring
+        // customers to update their installed app. Refresh the directory
+        // once, but never send credentials to the license center itself.
+        PanelDirectoryEntry refreshed;
+        try {
+          refreshed = await api.resolve(namespace);
+        } on TenantApiException catch (directoryError) {
+          if (directoryError.message == 'NETWORK_UNAVAILABLE') {
+            throw const TenantApiException('DIRECTORY_NETWORK_UNAVAILABLE');
+          }
+          rethrow;
+        } on TimeoutException {
+          throw const TenantApiException('DIRECTORY_NETWORK_UNAVAILABLE');
+        }
+        if (refreshed.apiOrigin == panel.apiOrigin) {
+          throw const TenantApiException('PANEL_NETWORK_UNAVAILABLE');
+        }
+        panel = refreshed;
+        try {
+          loggedIn = await api.login(
+            panel: panel,
+            username: username,
+            password: password,
+          );
+        } on TenantApiException catch (retryError) {
+          if (retryError.message == 'NETWORK_UNAVAILABLE') {
+            throw const TenantApiException('PANEL_NETWORK_UNAVAILABLE');
+          }
+          rethrow;
+        } on TimeoutException {
+          throw const TenantApiException('PANEL_NETWORK_UNAVAILABLE');
+        }
+      } on TimeoutException {
+        throw const TenantApiException('PANEL_NETWORK_UNAVAILABLE');
+      }
       final brand = loggedIn.brand;
       if (!mounted || serial != _lookupSerial) return;
       setState(() {
@@ -1276,7 +1329,9 @@ class _TwinConnectHomeState extends State<TwinConnectHome> with WidgetsBindingOb
                         if (_errorCode != null) ...[
                           const SizedBox(height: 12),
                           SelectableText(
-                            strings.error(_errorCode!),
+                            '${strings.error(_errorCode!)}\n'
+                            'Error: $_errorCode | Build: '
+                            '${twinConnectBuildId.length > 12 ? twinConnectBuildId.substring(0, 12) : twinConnectBuildId}',
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               color: Theme.of(context).colorScheme.error,

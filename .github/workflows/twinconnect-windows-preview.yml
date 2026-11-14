@@ -25,10 +25,9 @@ jobs:
       run:
         working-directory: clients/twinconnect
     env:
-      # Temporary panel-hosted HTTPS mirror of the vendor directory for preview.
-      # A dedicated owned HTTPS domain must replace this before production.
-      # Using a repository variable takes precedence without modifying code.
-      TWINCONNECT_DIRECTORY_URL: ${{ vars.TWINCONNECT_DIRECTORY_URL || 'https://panel.matindnspro.sbs' }}
+      # Bootstrap through the independent license center, never a customer panel.
+      # Repository variable allows migration to the permanent vendor-owned domain.
+      TWINCONNECT_DIRECTORY_URL: ${{ vars.TWINCONNECT_DIRECTORY_URL || 'https://167-104-219-168.sslip.io' }}
       SIGNING_CONFIGURED: ${{ github.event_name == 'push' && github.ref == 'refs/heads/integration/twinconnect-windows-app-20261110' && secrets.TWINCONNECT_SIGN_PFX_BASE64 != '' && secrets.TWINCONNECT_SIGN_PFX_PASSWORD != '' }}
     steps:
       - uses: actions/checkout@v4
@@ -60,7 +59,8 @@ jobs:
           $probe = "$($origin.AbsoluteUri.TrimEnd('/'))/v1/app/resolve/TP934FE9"
           $result = Invoke-RestMethod -Uri $probe -Method Get -TimeoutSec 15
           if ($result.namespace -ne "TP934FE9" -or
-              $result.api_origin -ne "https://panel.matindnspro.sbs") {
+              $result.api_origin -notmatch "^https://" -or
+              $result.api_origin.TrimEnd("/") -eq $origin.AbsoluteUri.TrimEnd("/")) {
             throw "Tenant directory contract invalid or panel registration missing"
           }
           Write-Host "Verified HTTPS directory and registered panel namespace"

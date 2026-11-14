@@ -62,7 +62,7 @@ jobs:
       run:
         working-directory: clients/twinconnect
     env:
-      TWINCONNECT_DIRECTORY_URL: ${{ inputs.directory_url }}
+      TWINCONNECT_DIRECTORY_URL: ${{ inputs.directory_url || vars.TWINCONNECT_DIRECTORY_URL || 'https://167-104-219-168.sslip.io' }}
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
@@ -74,6 +74,25 @@ jobs:
       - name: Install Android native WireGuard
         if: matrix.platform == 'android'
         run: python tools/install_android_native.py
+      - name: Validate central license directory before building platform binaries
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json, os, urllib.request
+          from urllib.parse import urlsplit
+          origin = os.environ["TWINCONNECT_DIRECTORY_URL"].rstrip("/")
+          parsed = urlsplit(origin)
+          if (parsed.scheme != "https" or not parsed.hostname or parsed.username or
+              parsed.password or parsed.path or parsed.query or parsed.fragment):
+              raise SystemExit("Invalid central license directory origin")
+          with urllib.request.urlopen(origin + "/v1/app/resolve/TP934FE9", timeout=15) as response:
+              payload = json.load(response)
+          if payload.get("namespace") != "TP934FE9" or not str(payload.get("api_origin", "")).startswith("https://"):
+              raise SystemExit("Central license lookup failed")
+          if payload["api_origin"].rstrip("/") == origin:
+              raise SystemExit("Customer panel cannot be used as central bootstrap")
+          print("Central license lookup verified for platform preview")
+          PY
       - name: Build Android (unsigned preview)
         if: matrix.platform == 'android'
         run: flutter build apk --release --dart-define=TWINCONNECT_DIRECTORY_URL=$TWINCONNECT_DIRECTORY_URL

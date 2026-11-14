@@ -50,6 +50,8 @@ import 'brand_theme.dart';
 import 'plan_classification.dart';
 import 'account_snapshot.dart';
 import 'native_vpn_bridge.dart';
+import 'android_connection_card.dart';
+import 'android_tunnel.dart';
 import 'country_flag.dart';
 import 'ambient_background.dart';
 import 'interactive_glass_card.dart';
@@ -577,6 +579,30 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
 
   Future<void> _disconnectAndSignOut() async {
     if (_vpnBusy) return;
+    if (Platform.isAndroid) {
+      setState(() { _vpnBusy = true; _vpnError = null; });
+      try {
+        final controller = const AndroidTunnelController();
+        var status = await controller.status();
+        if (status['state'] != 'down') {
+          // Never clear credentials while an Android VPN may still be active.
+          if (status['state'] == 'unavailable') {
+            throw const FormatException('ANDROID_VPN_STATUS_UNAVAILABLE');
+          }
+          await controller.stop();
+          status = await controller.status();
+        }
+        if (status['state'] != 'down') {
+          throw const FormatException('ANDROID_VPN_DISCONNECT_UNVERIFIED');
+        }
+        if (mounted) widget.onLogout();
+      } catch (error) {
+        if (mounted) setState(() => _vpnError = _errorText(error));
+      } finally {
+        if (mounted) setState(() => _vpnBusy = false);
+      }
+      return;
+    }
     if (_vpnUnmanaged) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(tr('تونل فعلی توسط TwinConnect مدیریت نمی‌شود.',
@@ -1988,6 +2014,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     final busy = _vpnBusy;
     setState(() {
       _selected = index;
+      if (Platform.isAndroid) _androidExplicitNodeSelected = true;
       _page = 'home';
       _autoFastest = false;
       if (!busy) _vpnError = null;
@@ -1998,8 +2025,13 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
             'Server selected; previous connection operation is still running.'))));
       return;
     }
+    if (Platform.isAndroid) {
+      // Selection is passed to the native Android card by exact node ID.
+      // Never start the Windows engine or claim a connection here.
+      return;
+    }
     if (!Platform.isWindows) {
-      setState(() => _vpnError = 'WINDOWS_ENGINE_REQUIRED');
+      setState(() => _vpnError = 'PLATFORM_UNSUPPORTED');
       return;
     }
     if (_filter != 'all' && _filter != 'wireguard') {
@@ -2616,6 +2648,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   String _filter = 'all';
   String _search = '';
   int _selected = 0;
+  bool _androidExplicitNodeSelected = false;
   final Set<int> _favorites = <int>{};
   // User-facing Xray inbounds remain distinct choices. Last validated
   // entries are stored in OS-encrypted short-lived display cache only.
@@ -4643,7 +4676,40 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       children: [
         heading(tr('اتصال سریع', 'Quick connect')),
         const SizedBox(height: 16),
-        LayoutBuilder(builder: (context, constraints) {
+        if (Platform.isAndroid) ...[
+          Container(
+            key: const Key('androidNativeConnectionGlass'),
+            child: widget.catalog == null
+                ? const Center(child: CircularProgressIndicator())
+                : AndroidConnectionCard(
+                    panel: widget.panel,
+                    username: widget.username,
+                    sessionToken: widget.sessionToken,
+                    catalog: widget.catalog!,
+                    native: widget.native,
+                    servers: widget.servers,
+                    // The Connect home can only show protocols whose Android
+                    // native transport is actually initialized. An unsupported
+                    // Servers filter (Cisco, OpenVPN, etc.) cannot hijack it.
+                    // Preserve the actual choice, even when its Android
+                    // engine is unavailable; never substitute WireGuard.
+                    selectedProtocolCode: _filter == 'all' ? null : _filter,
+                    selectedNodeId: _androidExplicitNodeSelected
+                        ? _selectedServerId : null,
+                    subscriptionContent: Container(
+                      key: const Key('androidAccountSummary'),
+                      child: homeSubscriptionSummary(),
+                    ),
+                  ),
+          ),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            key: const Key('androidChooseLocation'),
+            onPressed: () => setState(() => _page = 'locations'),
+            icon: const Icon(Icons.place_outlined),
+            label: Text(tr('انتخاب سرور', 'Choose location')),
+          ),
+        ] else LayoutBuilder(builder: (context, constraints) {
           final split = constraints.maxWidth >= 740;
           if (!split) {
             return Column(children: [
@@ -5030,8 +5096,9 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           widget.brand.secondaryColor, '#62C1B4'),
         // Sidebar belongs to the reading-direction start edge:
         // Persian -> right; English -> left.
-        child: Row(children: [
-          sideBar(),
+        child: Column(children: [
+          Expanded(child: Row(children: [
+          if (!Platform.isAndroid) sideBar(),
           Expanded(child: SafeArea(child: ListView(
             padding: EdgeInsets.symmetric(
                 horizontal: wide ? 30 : 17, vertical: 25),
@@ -5062,6 +5129,33 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
               )),
             ],
           ))),
+        ])),
+          if (Platform.isAndroid)
+            SafeArea(
+              top: false,
+              child: NavigationBar(
+                key: const Key('androidMainNavigation'),
+                backgroundColor: panel.withValues(alpha: .82),
+                indicatorColor: purple.withValues(alpha: .23),
+                selectedIndex: const ['home', 'locations', 'settings', 'account']
+                    .indexOf(_page).clamp(0, 3).toInt(),
+                onDestinationSelected: (index) => setState(() {
+                  // Navigation does not rewrite the chosen protocol or node.
+                  // Automatic selection applies only when no filter is chosen.
+                  _page = const ['home', 'locations', 'settings', 'account'][index];
+                }),
+                destinations: [
+                  NavigationDestination(icon: const Icon(Icons.bolt_rounded),
+                      label: tr('اتصال', 'Connect')),
+                  NavigationDestination(icon: const Icon(Icons.place_outlined),
+                      label: tr('سرورها', 'Servers')),
+                  NavigationDestination(icon: const Icon(Icons.tune_rounded),
+                      label: tr('تنظیمات', 'Settings')),
+                  NavigationDestination(icon: const Icon(Icons.person_outline_rounded),
+                      label: tr('حساب', 'Account')),
+                ],
+              ),
+            ),
         ]),
       ),
       ),
