@@ -157,7 +157,8 @@ class _TwinConnectIphoneShellState extends State<TwinConnectIphoneShell> {
     final account = widget.account;
     final used = account?.trafficUsedBytes ?? 0;
     final limit = account?.trafficLimitBytes ?? 0;
-    final fraction = limit <= 0 ? 0.0 : (used / limit).clamp(0.0, 1.0);
+    final double fraction = limit <= 0
+        ? 0.0 : (used / limit).clamp(0.0, 1.0).toDouble();
     final expiry = account?.expiresAt;
     final days = expiry == null ? '—'
         : math.max(0, expiry.difference(DateTime.now()).inDays).toString();
