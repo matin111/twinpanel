@@ -57,6 +57,10 @@ extension AndroidConnectionStrings on AppStrings {
       case 'VPN_ADDRESS_MISSING':
         return pick('کانفیگ دریافتی WireGuard معتبر نیست. کد خطا را برای پشتیبانی ارسال کنید.',
                     'WireGuard profile is invalid. Share the error code with support.');
+      case 'WIREGUARD_PEER_HANDSHAKE_TIMEOUT':
+        return pick(
+          'سرور WireGuard پاسخی به دست‌دهی نداد؛ تونل ناموفق قطع شد. دسترسی UDP، پورت و کلیدهای نود را بررسی کنید.',
+          'WireGuard peer handshake timed out; the failed tunnel was stopped. Check the node UDP port and peer keys.');
       case 'WIREGUARD_NATIVE_START_FAILED':
       case 'TUNNEL_NOT_ESTABLISHED':
         return pick('موتور بومی WireGuard نتوانست تونل را فعال کند. کد خطا را بررسی کنید.',
