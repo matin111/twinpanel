@@ -397,9 +397,11 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
     if (_busy || _up || _ciscoUp || _singBoxProtocol != null ||
         !AndroidSingBoxTunnel.supported.contains(code)) return;
     setState(() { _busy = true; _errorCode = null; });
+    var stage = 'ENGINE_INIT';
     try {
       // Require real native initialization BEFORE asking for secrets.
       await AndroidSingBoxTunnel.instance.initialize();
+      stage = 'PROFILE_FETCH';
       final profiles = await TenantApi.fromBuildConfig()
           .loadSessionNativeProfiles(
             panel: widget.panel,
@@ -421,6 +423,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
         throw const FormatException('SINGBOX_NO_AUTHORIZED_SERVER');
       }
       final item = choices.first;
+      stage = 'NATIVE_CONNECT';
       await AndroidSingBoxTunnel.instance.connect(
         protocol: code, profile: item,
       );
@@ -436,8 +439,15 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
       });
     } on FormatException catch (error) {
       if (mounted) setState(() => _errorCode = error.message);
-    } catch (_) {
-      if (mounted) setState(() => _errorCode = 'SINGBOX_NATIVE_CONNECT_FAILED');
+    } catch (error) {
+      // Preserve safe platform/network error categories without exposing
+      // an upstream exception message which could contain VPN credentials.
+      final code = error is TenantApiException ? error.message :
+          error is PlatformException ? error.code :
+          stage == 'ENGINE_INIT' ? 'SINGBOX_ENGINE_INIT_FAILED' :
+          stage == 'PROFILE_FETCH' ? 'SINGBOX_PROFILE_FETCH_FAILED' :
+          'SINGBOX_NATIVE_CONNECT_FAILED';
+      if (mounted) setState(() => _errorCode = code);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
