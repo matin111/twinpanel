@@ -631,17 +631,27 @@ def public_connection_hub_live_v5(
     # Per-connection history is fetched only after the page loads. No
     # historical usage totals are inferred from subscription aggregate counters.
     history_html = r"""
-    <section id="tp-session-history" class="card tp-session-history" dir="rtl"
-      style="margin:18px auto;padding:16px;border-radius:16px">
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
-        <h2 style="font-size:16px;margin:0">تاریخچه اتصال‌ها و ریز مصرف</h2>
-        <button id="tp-session-refresh" type="button" style="padding:8px 12px">بروزرسانی</button>
-      </div>
-      <p style="font-size:12px;opacity:.7;margin:8px 0">
-        فقط مصرف ثبت‌شده برای هر نشست نمایش داده می‌شود؛ داده‌های فاقد شناسه نشست به آن نسبت داده نمی‌شوند.
-      </p>
-      <div id="tp-session-items" aria-live="polite">در حال دریافت تاریخچه…</div>
+    <section id="tp-session-history" dir="rtl" style="max-width:1176px;margin:12px auto;padding:0 14px;box-sizing:border-box">
+      <button id="tp-session-open" type="button" aria-haspopup="dialog" aria-controls="tp-session-dialog"
+        style="background:linear-gradient(120deg,#2365db,#138ab9);border:0;border-radius:12px;color:#fff;cursor:pointer;padding:12px 20px;font:inherit;font-weight:700;box-shadow:0 8px 28px #0003">
+        ◷ تاریخچه اتصال‌ها و ریز مصرف
+      </button>
     </section>
+    <div id="tp-session-dialog" role="dialog" aria-modal="true" aria-labelledby="tp-session-title" dir="rtl" hidden
+      style="position:fixed;inset:0;z-index:2147483000;align-items:center;justify-content:center;padding:16px;box-sizing:border-box">
+      <div id="tp-session-overlay" style="position:absolute;inset:0;background:rgba(4,9,24,.8);backdrop-filter:blur(5px)"></div>
+      <div style="position:relative;width:min(760px,100%);max-height:min(88vh,850px);overflow:auto;background:#121d31;color:#e8eefc;border:1px solid #435679;border-radius:18px;box-shadow:0 20px 80px #0009;padding:18px;box-sizing:border-box">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px">
+          <h2 id="tp-session-title" style="font-size:17px;margin:0;color:inherit">تاریخچه اتصال‌ها و ریز مصرف</h2>
+          <button id="tp-session-close" type="button" aria-label="بستن" style="border:1px solid #455572;background:#23344f;color:#fff;border-radius:10px;padding:7px 12px;cursor:pointer">✕</button>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px">
+          <small style="color:#b5c7e5">مصرف هر نشست جداگانه؛ ترافیک فاقد شناسه نشست به آن نسبت داده نمی‌شود.</small>
+          <button id="tp-session-refresh" type="button" style="border:1px solid #455572;background:#23344f;color:#fff;border-radius:10px;padding:8px 12px;cursor:pointer">بروزرسانی</button>
+        </div>
+        <div id="tp-session-items" aria-live="polite" style="display:grid;gap:10px"></div>
+      </div>
+    </div>
     """
     history_script = r"""
     <script>
@@ -649,7 +659,36 @@ def public_connection_hub_live_v5(
       const token = __SESSION_TOKEN__;
       const container = document.getElementById('tp-session-items');
       const refresh = document.getElementById('tp-session-refresh');
-      if (!container) return;
+      const dialog = document.getElementById('tp-session-dialog');
+      const opener = document.getElementById('tp-session-open');
+      const closeButton = document.getElementById('tp-session-close');
+      const overlay = document.getElementById('tp-session-overlay');
+      if (!container || !dialog || !opener || !closeButton) return;
+      let loaded = false;
+      let activeFetch = false;
+      let savedOverflow = '';
+      function closeDialog() {
+        if (dialog.hidden) return;
+        dialog.hidden = true;
+        dialog.style.display = 'none';
+        document.body.style.overflow = savedOverflow;
+        opener.focus();
+      }
+      function openDialog() {
+        if (!dialog.hidden) return;
+        savedOverflow = document.body.style.overflow;
+        dialog.hidden = false;
+        dialog.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+        closeButton.focus();
+        if (!loaded) void load();
+      }
+      opener.addEventListener('click', openDialog);
+      closeButton.addEventListener('click', closeDialog);
+      if (overlay) overlay.addEventListener('click', closeDialog);
+      document.addEventListener('keydown', event => {
+        if (event.key === 'Escape' && !dialog.hidden) closeDialog();
+      });
       const bytes = value => {
         if (value == null) return 'ثبت‌نشده';
         const n = Math.max(0, Number(value));
@@ -675,12 +714,16 @@ def public_connection_hub_live_v5(
         parent.appendChild(el);
       };
       async function load() {
+        if (activeFetch) return;
+        activeFetch = true;
+        container.textContent = 'در حال دریافت تاریخچه…';
         if (refresh) refresh.disabled = true;
         try {
           const url = '/v1/connect/'+encodeURIComponent(token)+'/sessions';
           const res = await fetch(url, {cache:'no-store'});
           if (!res.ok) throw Error('خطا در دریافت');
           const data = await res.json();
+          loaded = true;
           container.replaceChildren();
           if (!Array.isArray(data.items) || !data.items.length) {
             container.textContent = 'هنوز نشست ثبت‌شده‌ای وجود ندارد.';
@@ -688,7 +731,7 @@ def public_connection_hub_live_v5(
           }
           for (const item of data.items) {
             const card = document.createElement('article');
-            card.style.cssText='border:1px solid var(--line,#4d5774);border-radius:12px;padding:12px;margin:10px 0;display:grid;gap:5px';
+            card.style.cssText='border:1px solid #384965;background:#17243b;border-radius:12px;padding:12px;display:grid;gap:5px;line-height:1.65';
             const heading = document.createElement('strong');
             heading.textContent = String(item.protocol||'—').toUpperCase()+
               ' · سرور #'+String(item.node_id)+(item.country?' · '+item.country:'');
@@ -705,11 +748,11 @@ def public_connection_hub_live_v5(
         } catch (_) {
           container.textContent = 'دریافت تاریخچه ممکن نشد. دوباره تلاش کنید.';
         } finally {
+          activeFetch = false;
           if (refresh) refresh.disabled = false;
         }
       }
       if (refresh) refresh.addEventListener('click', load);
-      load();
     })();
     </script>
     """.replace("__SESSION_TOKEN__", json.dumps(str(token), ensure_ascii=True))
