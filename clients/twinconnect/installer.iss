@@ -38,6 +38,7 @@ Source: "tools\install_prerequisites.ps1"; DestDir: "{app}\tools"; Flags: ignore
 Source: "tools\reset_windows_network.ps1"; DestDir: "{app}\tools"; Flags: ignoreversion
 Source: "tools\restore_windows_network_launcher.ps1"; DestDir: "{app}\tools"; Flags: ignoreversion
 Source: "tools\windows_guard_control.ps1"; DestDir: "{app}\tools"; Flags: ignoreversion
+Source: "tools\windows_app_network_lock.ps1"; DestDir: "{app}\tools"; Flags: ignoreversion
 Source: "tools\check_windows_real_device_readonly.ps1"; DestDir: "{app}\tools"; Flags: ignoreversion
 #if IncludeVerifiedGlobalGuard
 Source: "build\windows\x64\runner\Release\services\TwinConnectGlobalGuard.exe"; DestDir: "{app}\services"; Flags: ignoreversion
