@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -52,21 +54,140 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
   bool _busy = false;
   bool _up = false;
   String? _errorCode;
+  Timer? _telemetryTimer;
+  bool _polling = false;
+  bool _handshake = false;
+  int? _rxBytes, _txBytes;
+  double? _downloadBps, _uploadBps;
+  DateTime? _lastCountersAt;
+  String? _publicIp;
+  int? _httpsLatencyMs;
+  bool _checkingInternet = false;
+  DateTime? _lastInternetCheck;
 
   @override
   void initState() {
     super.initState();
-    _refresh();
+    unawaited(_refresh());
+    _telemetryTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+      unawaited(_refresh());
+    });
+  }
+
+  @override
+  void dispose() {
+    _telemetryTimer?.cancel();
+    super.dispose();
+  }
+
+  static int? _counter(dynamic value) =>
+      value is int && value >= 0 ? value : null;
+
+  static String _speed(double? bytesPerSecond) {
+    if (bytesPerSecond == null) return '—';
+    if (bytesPerSecond < 1024) return '${bytesPerSecond.toStringAsFixed(0)} B/s';
+    if (bytesPerSecond < 1024 * 1024) {
+      return '${(bytesPerSecond / 1024).toStringAsFixed(1)} KB/s';
+    }
+    return '${(bytesPerSecond / (1024 * 1024)).toStringAsFixed(2)} MB/s';
+  }
+
+  void _clearTelemetry() {
+    _rxBytes = null;
+    _txBytes = null;
+    _downloadBps = null;
+    _uploadBps = null;
+    _lastCountersAt = null;
+    _handshake = false;
+    _publicIp = null;
+    _httpsLatencyMs = null;
+    _lastInternetCheck = null;
   }
 
   Future<void> _refresh() async {
-    if (!Platform.isAndroid) return;
+    if (!Platform.isAndroid || _polling) return;
+    _polling = true;
     try {
       final status = await _controller.status();
       if (!mounted) return;
-      setState(() => _up = status['state'] == 'interface_up');
+      final up = status['state'] == 'interface_up';
+      final rx = _counter(status['rxBytes']);
+      final tx = _counter(status['txBytes']);
+      final now = DateTime.now();
+      setState(() {
+        _up = up;
+        if (!up) {
+          _clearTelemetry();
+          return;
+        }
+        _handshake = status['peerHandshakeVerified'] == true;
+        if (rx != null && tx != null) {
+          final previous = _lastCountersAt;
+          final seconds = previous == null ? 0 :
+              now.difference(previous).inMilliseconds / 1000.0;
+          if (seconds > 0.1 && _rxBytes != null && _txBytes != null) {
+            _downloadBps = rx >= _rxBytes! ?
+                (rx - _rxBytes!) / seconds : null;
+            _uploadBps = tx >= _txBytes! ?
+                (tx - _txBytes!) / seconds : null;
+          }
+          _rxBytes = rx;
+          _txBytes = tx;
+          _lastCountersAt = now;
+        } else {
+          _downloadBps = null;
+          _uploadBps = null;
+          _lastCountersAt = null;
+          _rxBytes = null;
+          _txBytes = null;
+        }
+        if (!_handshake) {
+          _publicIp = null;
+          _httpsLatencyMs = null;
+        }
+      });
+      if (up && _handshake &&
+          !_checkingInternet && (_lastInternetCheck == null ||
+          now.difference(_lastInternetCheck!) > const Duration(seconds: 12))) {
+        unawaited(_checkInternet());
+      }
     } catch (_) {
-      if (mounted) setState(() => _up = false);
+      if (mounted) setState(() {
+        _up = false;
+        _clearTelemetry();
+      });
+    } finally {
+      _polling = false;
+    }
+  }
+
+  Future<void> _checkInternet() async {
+    if (_checkingInternet) return;
+    _checkingInternet = true;
+    _lastInternetCheck = DateTime.now();
+    final client = HttpClient()..connectionTimeout = const Duration(seconds: 5);
+    try {
+      final watch = Stopwatch()..start();
+      final request = await client.getUrl(Uri.https('api.ipify.org', '/'));
+      final response = await request.close().timeout(const Duration(seconds: 7));
+      final result = (await utf8.decoder.bind(response).join()).trim();
+      watch.stop();
+      if (response.statusCode != 200 ||
+          InternetAddress.tryParse(result) == null) {
+        throw const FormatException('PUBLIC_IP_INVALID');
+      }
+      if (mounted && _up && _handshake) setState(() {
+        _publicIp = result;
+        _httpsLatencyMs = watch.elapsedMilliseconds;
+      });
+    } catch (_) {
+      if (mounted) setState(() {
+        _publicIp = null;
+        _httpsLatencyMs = null;
+      });
+    } finally {
+      client.close(force: true);
+      _checkingInternet = false;
     }
   }
 
@@ -169,6 +290,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
       );
       if (!mounted) return;
       setState(() => _up = response['state'] == 'interface_up');
+      unawaited(_refresh());
     } on FormatException catch (error) {
       if (mounted) setState(() => _errorCode = error.message);
     } catch (error) {
@@ -186,7 +308,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
     });
     try {
       await _controller.stop();
-      if (mounted) setState(() => _up = false);
+      if (mounted) setState(() { _up = false; _clearTelemetry(); });
     } catch (error) {
       if (mounted) setState(() => _errorCode = _nativeError(error));
     } finally {
@@ -256,9 +378,12 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
             child: Text(
               _busy
                   ? s.pick('در حال اتصال...', 'Connecting...')
-                  : connected
-                      ? s.wireGuardActiveUnverified
-                      : s.pick('آفلاین هستید', 'You are offline'),
+                  : connected && _handshake && _publicIp != null
+                      ? s.pick('اینترنت VPN تأیید شد', 'VPN internet reachable')
+                      : connected && _handshake
+                          ? s.pick('دست‌دهی سرور تأیید شد', 'Peer handshake verified')
+                          : connected ? s.wireGuardActiveUnverified
+                          : s.pick('آفلاین هستید', 'You are offline'),
               textAlign: TextAlign.center,
               style: TextStyle(color: accent, fontWeight: FontWeight.w700),
             ),
@@ -345,21 +470,25 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
               Text(s.pick('وضعیت شبکه', 'Network status'),
                 style: Theme.of(context).textTheme.titleMedium),
               const SizedBox(height: 10),
-              Text(connected ? s.wireGuardActiveUnverified :
-                  s.pick('تونل غیرفعال است', 'Tunnel disconnected')),
+              Text(!connected ? s.pick('تونل غیرفعال است', 'Tunnel disconnected')
+                  : _publicIp != null && _handshake
+                      ? s.pick('دسترسی اینترنت از VPN تأیید شد.', 'Internet reachable through VPN.')
+                      : _handshake ? s.pick('دست‌دهی سرور تأیید شد؛ بررسی اینترنت ادامه دارد.', 'Peer handshake received; checking internet.')
+                      : s.wireGuardActiveUnverified),
               const SizedBox(height: 12),
               Row(children: [
-                Expanded(child: _metric(context, Icons.public, 'IP', '—')),
+                Expanded(child: _metric(context, Icons.public, 'IP', _publicIp ?? '—')),
                 const SizedBox(width: 8),
-                Expanded(child: _metric(context, Icons.bolt, 'Ping', '—')),
+                Expanded(child: _metric(context, Icons.bolt, 'HTTPS',
+                    _httpsLatencyMs == null ? '—' : '${_httpsLatencyMs} ms')),
               ]),
               const SizedBox(height: 8),
               Row(children: [
                 Expanded(child: _metric(context, Icons.arrow_downward,
-                    s.pick('دانلود', 'Download'), '—')),
+                    s.pick('دانلود', 'Download'), _speed(_downloadBps))),
                 const SizedBox(width: 8),
                 Expanded(child: _metric(context, Icons.arrow_upward,
-                    s.pick('آپلود', 'Upload'), '—')),
+                    s.pick('آپلود', 'Upload'), _speed(_uploadBps))),
               ]),
             ],
           ),
