@@ -230,6 +230,25 @@ void main() {
     expect(card, contains('_telemetryTimer?.cancel()'));
   });
 
+  test('Cisco Android uses an isolated engine, not a WireGuard tunnel', () {
+    final controller = File('lib/android_tunnel.dart').readAsStringSync();
+    final card = File('lib/android_connection_card.dart').readAsStringSync();
+    final native = File(
+      'native/android/kotlin/com/twinpanel/twinconnect/MainActivity.kt',
+    ).readAsStringSync();
+    expect(controller, contains("nativeProtocols.supports('cisco')"));
+    expect(controller, contains("'startOpenConnect'"));
+    expect(controller, contains("'stopOpenConnect'"));
+    expect(controller, contains("'getOpenConnectStatus'"));
+    expect(controller, contains("'trafficRoutingVerified'"));
+    expect(card, contains('CiscoOpenConnectProfile.fromItem(item)'));
+    expect(card, contains("loadSessionNativeProfiles("));
+    expect(card, contains("_controller.connectCisco("));
+    expect(card, contains("_controller.ciscoStatus()"));
+    expect(native, contains('"OPENCONNECT_CORE_NOT_INSTALLED"'));
+    expect(native, contains('listOf("wireguard")'));
+  });
+
   test('six dashboard locales and Arabic right-to-left are supported', () {
     final dashboard = File('lib/live_dashboard.dart').readAsStringSync();
     final localizer = File('lib/app_strings.dart').readAsStringSync();
