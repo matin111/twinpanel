@@ -145,6 +145,20 @@ void main() {
     expect(androidCard, contains('AndroidTunnelController.wireGuardNodes(selectedProfiles)'));
   });
 
+  test('Android offers all entitled protocols without claiming missing engines', () {
+    final android = File('lib/android_connection_card.dart').readAsStringSync();
+    final native = File('native/android/kotlin/com/twinpanel/twinconnect/MainActivity.kt')
+        .readAsStringSync();
+    expect(android, contains("widget.catalog.entries"));
+    expect(android, contains(".where((entry) => entry.selected)"));
+    expect(android, contains("Key('androidProtocolChooser')"));
+    expect(android, contains("Key('androidProtocol_"));
+    expect(android, contains("chosenCode == 'wireguard' && nativeReady"));
+    expect(android, contains('This protocol engine is not yet available on Android.'));
+    expect(native, contains('listOf("wireguard")'));
+    expect(android, isNot(contains("if ((wireguard?.selected != true) && (cisco?.selected != true))")));
+  });
+
   test('six dashboard locales and Arabic right-to-left are supported', () {
     final dashboard = File('lib/live_dashboard.dart').readAsStringSync();
     final localizer = File('lib/app_strings.dart').readAsStringSync();
