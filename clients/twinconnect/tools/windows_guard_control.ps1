@@ -40,12 +40,22 @@ if (!$trusted -or !(Test-Path -LiteralPath $transport -PathType Leaf)) { throw '
 $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(2)
 $recovery = New-ScheduledTaskAction -Execute $guard -Argument "recover $ack"
 $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -ExecutionTimeLimit (New-TimeSpan -Minutes 3)
+# Never modify an existing scheduled task unless it belongs to this guard.
+$existing = Get-ScheduledTask -TaskName $task -ErrorAction SilentlyContinue
+if ($existing) {
+  $execAction = @($existing.Actions)
+  if ($execAction.Count -ne 1 -or
+      [IO.Path]::GetFullPath($execAction[0].Execute) -ine [IO.Path]::GetFullPath($guard) -or
+      $execAction[0].Arguments -cne "recover $ack") {
+    throw 'UNTRUSTED_RECOVERY_TASK_CONFLICT'
+  }
+}
 Register-ScheduledTask -TaskName $task -Trigger $trigger -Action $recovery -Settings $settings -User 'SYSTEM' -RunLevel Highest -Force | Out-Null
 try {
   $status = & $guard arm $TunnelAlias $EndpointIpv4 $transport $ack
   if ($LASTEXITCODE -ne 0 -or $status -notmatch 'OK ARMED') { throw ('GUARD_ARM_REJECTED ' + $status) }
   $status = & $guard status
-  if ($LASTEXITCODE -ne 0 -or $status -notmatch 'OK 1 1 1') { throw 'GUARD_FILTER_STATUS_UNVERIFIED' }
+  if ($LASTEXITCODE -ne 0 -or $status.Trim() -cne 'OK 1 1 1 1') { throw 'GUARD_FILTER_STATUS_OR_RECOVERY_UNVERIFIED' }
   Write-Output 'GUARD_ARMED_TWO_MINUTE_TEST'
 } catch {
   & $guard recover $ack | Out-Null
