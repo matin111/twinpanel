@@ -63,7 +63,6 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
   bool _ciscoUp = false;
   bool _openVpnUp = false;
   String? _singBoxProtocol;
-  bool _singBoxVerified = false;
   String? _errorCode;
   AppServer? _activeServer;
   String? _activeServerName;
@@ -118,7 +117,6 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
     _rxSamples.clear();
     _txSamples.clear();
     _handshake = false;
-    _singBoxVerified = false;
     _publicIp = null;
     _httpsLatencyMs = null;
     _lastInternetCheck = null;
@@ -556,7 +554,6 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
       final id = item['node_id']?.toString();
       setState(() {
         _singBoxProtocol = code;
-        _singBoxVerified = true;
         // Outbound ping is not an independent Android VPN reachability test.
         _httpsLatencyMs = null;
         _activeServer = inventory.where((n) => n.id == id).firstOrNull;
