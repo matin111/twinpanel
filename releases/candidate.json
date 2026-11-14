@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.833",
-  "source_sha": "2d6e3e465e9c3b2be5a7c4337290fb6d575a7761",
+  "version": "1.1.0-rc.834",
+  "source_sha": "0c9bbdfb3ed593c817f031fac09c9efaeda0e522",
   "notes": {
-    "fa": "ثبت ایمن شناسه‌های مخاطبان ربات قبلی در جدول مستقل بدون ساخت حساب یا اشتراک، تشخیص مخاطب قدیمی هنگام /start واقعی، و حفظ کیف‌پول/اشتراک کاربران. جلوگیری از استارت اجباری، پیام ناخواسته و جعل هویت با لینک انتقال. دارای تست رگرسیون و ابزار ورود شناسه.",
-    "en": "Safely stage former Telegram bot contacts independently from website accounts, recognize returning legacy contacts only on authentic Telegram /start, preserve wallet/subscription data, and prevent fake starts or unsolicited messages. Includes safe idempotent importer and regression checks."
+    "fa": "نمایش تاریخچه واقعی هر نشست اتصال در لینک Connection با پروتکل، نود، زمان شروع و پایان، مدت، دانلود و آپلود نشست؛ عدم نسبت‌دادن ترافیک کلی یا فاقد شناسه نشست. بازگشت دکمه‌های افزایش/کاهش کیف پول در کارت کاربران.",
+    "en": "Display share-token-scoped measured per-session connection history with protocol, node, timestamps, duration, upload and download; never misattribute aggregate traffic. Restore wallet adjustment actions in user cards."
   }
 }
