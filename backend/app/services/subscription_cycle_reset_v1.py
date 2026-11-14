@@ -15,8 +15,8 @@ from ..subscription_enforcement import queue_subscription_enforcement
 from ..quota_models import QuotaAuditLog
 
 
-def reset_subscription_period_usage(db, subscription: Subscription, *, origin: str) -> int:
-    if origin not in {"admin_edit", "admin_renew"}:
+def reset_subscription_period_usage(db, subscription: Subscription, *, origin: str, actor_id: str = "admin-panel") -> int:
+    if origin not in {"admin_edit", "admin_renew", "reseller_direct"}:
         raise ValueError("invalid_subscription_usage_reset_origin")
     # Serialize with apply_usage_event(), which locks the same subscription
     # row before adding accepted usage. Never reset while a collector is
@@ -28,8 +28,8 @@ def reset_subscription_period_usage(db, subscription: Subscription, *, origin: s
     subscription.traffic_used_bytes = 0
     db.add(
         QuotaAuditLog(
-            actor_type="admin",
-            actor_id="admin-panel",
+            actor_type="reseller" if origin == "reseller_direct" else "admin",
+            actor_id=actor_id,
             action="subscription_usage_period_reset",
             subject_type="subscription",
             subject_id=str(subscription.id),
