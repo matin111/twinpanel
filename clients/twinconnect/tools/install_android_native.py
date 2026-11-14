@@ -40,7 +40,7 @@ def patch_gradle() -> None:
     current = only_once(
         current,
         "android {",
-        "android {\\n    packaging {\\n        jniLibs {\\n            useLegacyPackaging = true\\n        }\\n    }",
+        "android {\n    packaging {\n        jniLibs {\n            useLegacyPackaging = true\n        }\n    }",
         str(filename),
     )
     current += (
