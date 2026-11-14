@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.832",
-  "source_sha": "7a7ad3cc7be73a53b2224bfe7b0b291825ee2ad5",
+  "version": "1.1.0-rc.833",
+  "source_sha": "2d6e3e465e9c3b2be5a7c4337290fb6d575a7761",
   "notes": {
-    "fa": "نمایش خودکار کامند /start برای کاربران ربات فروش بعد از نصب یا آپدیت پنل، بدون نیاز به بستن چت یا ارسال پیام. حذف دستورات قدیمی در دامنه‌های عمومی و فارسی/انگلیسی و به‌روزرسانی تدریجی کامند چت‌های کاربری ثبت‌شده در پس‌زمینه؛ همراه ذخیره نشانگر برای جلوگیری از تکرار غیرضروری. بدون تغییر امکانات داخلی یا ربات نمایندگان.",
-    "en": "Automatically migrate known linked Telegram users to the main sales bot's /start-only command menu on startup, without requiring users to close chats or receiving messages. Update scoped/language menus and known private chats with bounded API pacing and persistent migration fingerprint. Preserve independent reseller bots."
+    "fa": "ثبت ایمن شناسه‌های مخاطبان ربات قبلی در جدول مستقل بدون ساخت حساب یا اشتراک، تشخیص مخاطب قدیمی هنگام /start واقعی، و حفظ کیف‌پول/اشتراک کاربران. جلوگیری از استارت اجباری، پیام ناخواسته و جعل هویت با لینک انتقال. دارای تست رگرسیون و ابزار ورود شناسه.",
+    "en": "Safely stage former Telegram bot contacts independently from website accounts, recognize returning legacy contacts only on authentic Telegram /start, preserve wallet/subscription data, and prevent fake starts or unsolicited messages. Includes safe idempotent importer and regression checks."
   }
 }
