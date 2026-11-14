@@ -199,14 +199,17 @@ internal object WireGuardRuntime {
         val freshHandshake = latestHandshake != null &&
             latestHandshake <= now + 10_000L &&
             now - latestHandshake < 180_000L
-        return mapOf(
+        val result = mutableMapOf<String, Any>(
             "protocol" to "wireguard",
             "state" to if (up) "interface_up" else "down",
             "peerHandshakeVerified" to freshHandshake,
-            "latestHandshakeEpochMillis" to latestHandshake,
-            "rxBytes" to rx,
-            "txBytes" to tx,
             "killSwitchEnforced" to isOsLockdownEnforced()
         )
+        if (rx != null) result["rxBytes"] = rx
+        if (tx != null) result["txBytes"] = tx
+        if (latestHandshake != null) {
+            result["latestHandshakeEpochMillis"] = latestHandshake
+        }
+        return result
     }
 }
