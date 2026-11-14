@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -18,6 +19,12 @@ class AndroidSingBoxTunnel {
       MethodChannel('com.twinpanel.twinconnect/vpn');
   int? _lastVerifiedLatencyMs;
   int? get verifiedLatencyMs => _lastVerifiedLatencyMs;
+  StreamSubscription<SingBoxConnectionStats>? _statsSubscription;
+  SingBoxConnectionStats? _latestStats;
+  double? get downloadBps => _latestStats?.downloadSpeed.toDouble();
+  double? get uploadBps => _latestStats?.uploadSpeed.toDouble();
+  int? get receivedBytes => _latestStats?.downloadTotal;
+  int? get sentBytes => _latestStats?.uploadTotal;
 
   static const supported = <String>{
     'hysteria2', 'tuic', 'anytls', 'socks5',
@@ -50,6 +57,9 @@ class AndroidSingBoxTunnel {
     // untrusted subscription-provided inbounds, routes or app settings.
     // Do not persist profiles in TwinConnect's own preferences.
     var verifiedLatency = 0;
+    await _statsSubscription?.cancel();
+    _statsSubscription = null;
+    _latestStats = null;
     try {
       await SingBox.instance.connect(jsonEncode(outbound));
       if (SingBox.instance.status != SingBoxConnectionStatus.connected) {
@@ -63,7 +73,14 @@ class AndroidSingBoxTunnel {
         throw const FormatException('SINGBOX_OUTBOUND_UNREACHABLE');
       }
       verifiedLatency = result.ping;
+      _statsSubscription = SingBox.instance.watchConnectionStats().listen(
+        (stats) => _latestStats = stats,
+        onError: (Object _) { _latestStats = null; },
+      );
     } catch (_) {
+      await _statsSubscription?.cancel();
+      _statsSubscription = null;
+      _latestStats = null;
       try { await SingBox.instance.disconnect(); } catch (_) {}
       rethrow;
     } finally {
@@ -89,6 +106,9 @@ class AndroidSingBoxTunnel {
 
   Future<void> disconnect() async {
     if (!_initialized) return;
+    await _statsSubscription?.cancel();
+    _statsSubscription = null;
+    _latestStats = null;
     await SingBox.instance.disconnect();
     _lastVerifiedLatencyMs = null;
   }
