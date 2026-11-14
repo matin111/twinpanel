@@ -46,6 +46,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
   bool _busy = false;
   bool _up = false;
   String? _errorCode;
+  String? _selectedProtocolCode;
 
   PanelProtocolStatus? _entry(String code) {
     for (final row in widget.catalog.entries) {
@@ -113,6 +114,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
   }
 
   Future<void> _connect() async {
+    if (_selectedProtocolCode != 'wireguard' && _selectedProtocolCode != null) return;
     if (_busy || _up || !Platform.isAndroid ||
         !widget.native.supports('wireguard')) {
       return;
@@ -192,15 +194,23 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
   @override
   Widget build(BuildContext context) {
     final s = AppStrings.of(context);
+    final available = widget.catalog.entries
+        .where((entry) => entry.selected).toList(growable: false);
+    if (available.isEmpty) return const SizedBox.shrink();
+    // All protocols allowed by this tenant's plan remain visible. Runtime
+    // readiness is separate from subscription entitlement.
+    final chosenCode = available.any((entry) =>
+            entry.protocol.code == _selectedProtocolCode)
+        ? _selectedProtocolCode!
+        : available.first.protocol.code;
+    final chosen = available.firstWhere(
+        (entry) => entry.protocol.code == chosenCode);
     final wireguard = _entry('wireguard');
-    final cisco = _entry('cisco');
-    if ((wireguard?.selected != true) && (cisco?.selected != true)) {
-      return const SizedBox.shrink();
-    }
     final nativeReady = Platform.isAndroid &&
         widget.native.supports('wireguard') &&
         wireguard?.selected == true &&
         wireguard?.configRecordPresent == true;
+    final canConnect = chosenCode == 'wireguard' && nativeReady;
 
     return Padding(
       key: const Key('androidConnectionCard'),
@@ -208,38 +218,54 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (wireguard?.selected == true) ...[
-              Text(
-                s.wireGuardNativeTitle,
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: 10),
-              Text(_up
-                  ? s.wireGuardActiveUnverified
-                  : (nativeReady ? s.wireGuardReady : s.wireGuardUnavailable)),
-              const SizedBox(height: 10),
+            Text(
+              s.pick('پروتکل‌های مجاز اشتراک', 'Subscription protocols'),
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              key: const Key('androidProtocolChooser'),
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final entry in available)
+                  ChoiceChip(
+                    key: Key('androidProtocol_${entry.protocol.code}'),
+                    label: Text(entry.protocol.name),
+                    selected: chosenCode == entry.protocol.code,
+                    onSelected: _busy ? null : (_) => setState(() {
+                      _selectedProtocolCode = entry.protocol.code;
+                      _errorCode = null;
+                    }),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              !chosen.configRecordPresent
+                  ? s.pick('کانفیگ این پروتکل در اشتراک موجود نیست.',
+                           'No profile for this protocol in your subscription.')
+                  : canConnect
+                      ? (_up ? s.wireGuardActiveUnverified : s.wireGuardReady)
+                      : s.pick('موتور اتصال این پروتکل در نسخه اندروید هنوز آماده نیست.',
+                               'This protocol engine is not yet available on Android.'),
+            ),
+            const SizedBox(height: 10),
+            if (chosenCode == 'wireguard')
               FilledButton.icon(
                 key: const Key('androidWireGuardAction'),
-                onPressed: _busy
-                    ? null
-                    : _up
-                        ? _disconnect
-                        : nativeReady
-                            ? _connect
-                            : null,
-                icon: Icon(_up ? Icons.stop_circle_outlined : Icons.power_settings_new),
+                onPressed: _busy ? null :
+                    _up ? _disconnect : canConnect ? _connect : null,
+                icon: Icon(_up
+                    ? Icons.stop_circle_outlined : Icons.power_settings_new),
                 label: Text(_up ? s.wireGuardDisconnect : s.wireGuardConnect),
+              )
+            else if (_up)
+              FilledButton.icon(
+                onPressed: _busy ? null : _disconnect,
+                icon: const Icon(Icons.stop_circle_outlined),
+                label: Text(s.wireGuardDisconnect),
               ),
-            ],
-            if (cisco?.selected == true) ...[
-              const Divider(height: 28),
-              Text(
-                s.ciscoNativeTitle,
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-              const SizedBox(height: 7),
-              Text(s.ciscoPending),
-            ],
             if (_errorCode != null) ...[
               const SizedBox(height: 10),
               Text(
