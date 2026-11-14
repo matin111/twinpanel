@@ -196,8 +196,16 @@ std::wstring HandleRequest(const std::wstring& request) {
     bool v4 = Exists(engine.handle, kBlockV4);
     bool v6 = Exists(engine.handle, kBlockV6);
     bool app = Exists(engine.handle, kPermitV4);
+#if defined(TWINCONNECT_GUARD_DIAGNOSTIC_ONLY)
+    const bool recoveryReady = false;
+#else
+    // The client may show ON only while an independently scheduled SYSTEM
+    // rollback is verified by the privileged service itself.
+    const bool recoveryReady = v4 && v6 && app && RecoveryTaskReady();
+#endif
     return std::wstring(L"OK ") + (v4 ? L"1" : L"0") + L" " +
-           (v6 ? L"1" : L"0") + L" " + (app ? L"1" : L"0");
+           (v6 ? L"1" : L"0") + L" " + (app ? L"1" : L"0") +
+           L" " + (recoveryReady ? L"1" : L"0");
   }
 #if defined(TWINCONNECT_GUARD_DIAGNOSTIC_ONLY)
   // Diagnostic build does not permit disarm or arm commands.
