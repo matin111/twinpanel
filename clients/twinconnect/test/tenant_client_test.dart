@@ -156,6 +156,14 @@ void main() {
       expect(after.apiOrigin.host, 'new-domain.example.com');
     });
 
+    test('Android build requires more than a single reachable directory', () {
+      final workflow = File('../../.github/workflows/twinconnect-android-native.yml')
+          .readAsStringSync();
+      expect(workflow, contains('TWINCONNECT_DIRECTORY_URLS'));
+      expect(workflow, contains('--dart-define=TWINCONNECT_DIRECTORY_URLS='));
+      expect(workflow, contains('At least two unique license-directory mirrors'));
+    });
+
     test('missing optional brand links stay hidden', () {
       final info = BrandPreview.fromJson({
         'namespace': 'TP0123456789ABCDEF',
