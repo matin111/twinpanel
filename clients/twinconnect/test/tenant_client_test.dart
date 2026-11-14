@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:twinconnect/main.dart';
 import 'package:twinconnect/tenant_models.dart';
+import 'package:twinconnect/tenant_api.dart';
 import 'package:twinconnect/interactive_glass_card.dart';
 
 void main() {
@@ -106,6 +107,18 @@ void main() {
         parseDirectoryOrigin('https://panel.example.com').toString(),
         'https://panel.example.com',
       );
+    });
+
+    test('license center supports ordered independent origins without tenant pinning', () {
+      final origins = TenantApi.parseVendorOrigins(
+          'https://license-a.example.com, https://license-b.example.com, '
+          'https://license-a.example.com');
+      expect(origins.map((uri) => uri.host).toList(),
+          ['license-a.example.com', 'license-b.example.com']);
+      expect(() => TenantApi.parseVendorOrigins(''), throwsFormatException);
+      expect(() => TenantApi.parseVendorOrigins(
+          'https://license-a.example.com,http://unsafe.example.com'),
+          throwsFormatException);
     });
 
     test('missing optional brand links stay hidden', () {
