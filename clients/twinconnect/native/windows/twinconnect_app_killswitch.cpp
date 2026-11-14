@@ -19,6 +19,7 @@
 #pragma comment(lib, "Fwpuclnt.lib")
 #pragma comment(lib, "Iphlpapi.lib")
 #pragma comment(lib, "Rpcrt4.lib")
+#pragma comment(lib, "Advapi32.lib")
 
 namespace {
 const GUID sublayer = {0x7c77bb10,0x62e4,0x410c,{0xa1,0xe4,0x7c,0x4b,0x3d,0x19,0x22,0xf2}};
