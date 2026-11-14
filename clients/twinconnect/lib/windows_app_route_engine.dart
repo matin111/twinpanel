@@ -95,7 +95,7 @@ class WindowsAppRoutePolicy {
     final processPaths = <String>[...applicationPaths];
     if (mode == WindowsAppRoutingMode.includeSelected && Platform.isWindows) {
       final controller = Platform.resolvedExecutable;
-      if (controller.toLowerCase().endsWith('\\\\twinconnect.exe') &&
+      if (controller.toLowerCase().endsWith('\\twinconnect.exe') &&
           !processPaths.any((path) =>
               path.toLowerCase() == controller.toLowerCase())) {
         processPaths.add(controller);
