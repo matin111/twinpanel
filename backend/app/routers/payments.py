@@ -612,6 +612,25 @@ def submit_payment_receipt(
     if already_verified:
         order = db.get(StoreOrder, int(row.order_id))
         if order and order.status == "fulfilled" and order.subscription_id:
+            conflicting = (
+                db.query(StoreOrder.id)
+                .filter(
+                    StoreOrder.subscription_id == int(order.subscription_id),
+                    StoreOrder.id != int(order.id),
+                    StoreOrder.status == "fulfilled",
+                    StoreOrder.plan_id != order.plan_id,
+                )
+                .first()
+            )
+            if conflicting:
+                # Distinct purchased plans mapped to one subscription:
+                # require manual reconciliation instead of duplicate delivery.
+                result = intent_out(row)
+                db.commit()
+                result["already_verified"] = True
+                result["delivery_queued"] = False
+                result["delivery_requires_review"] = True
+                return result
             from ..telegram_notify_models import TelegramNotification
             existing = (
                 db.query(TelegramNotification)
