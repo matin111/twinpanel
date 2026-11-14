@@ -519,7 +519,9 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   Future<void> _enableFastestAndConnect() async {
     if (_vpnBusy || _fastestConnecting || _verifiedConnectionActive ||
         _vpnUp || _modernUp || _vpnCleanup || !Platform.isWindows) return;
-    if (_pingAllBusy) {
+    // An existing fresh probe or panel RTT can be used immediately.
+    // Do not hold Quick Connect until every node completes ICMP probing.
+    if (_pingAllBusy && _fastestKnownIndex == null) {
       ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(
         content: Text(tr('تست پینگ سرورها هنوز در حال اجراست.',
             'Server latency measurement is still running.'))));
@@ -542,7 +544,9 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         NativeVpnBridge.protocolReadiness().timeout(
             const Duration(seconds: 8)),
         SharedPreferences.getInstance(),
-        _probeAllNodes().then((_) => true),
+        (_fastestKnownIndex != null || _pingAllBusy
+            ? Future<bool>.value(true)
+            : _probeAllNodes().then((_) => true)),
       ]);
       if (!mounted) return;
       final ready = checks[0] as NativeProtocolReadiness;
