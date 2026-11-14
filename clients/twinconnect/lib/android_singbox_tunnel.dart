@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:sing_box/sing_box.dart';
+import 'package:flutter/services.dart';
 
 import 'singbox_profile_validator.dart';
 
@@ -13,6 +14,8 @@ class AndroidSingBoxTunnel {
 
   static final AndroidSingBoxTunnel instance = AndroidSingBoxTunnel._();
   bool _initialized = false;
+  static const MethodChannel _native =
+      MethodChannel('com.twinpanel.twinconnect/vpn');
   int? _lastVerifiedLatencyMs;
   int? get verifiedLatencyMs => _lastVerifiedLatencyMs;
 
@@ -59,6 +62,16 @@ class AndroidSingBoxTunnel {
     if (!result.success) {
       await SingBox.instance.disconnect();
       throw const FormatException('SINGBOX_OUTBOUND_UNREACHABLE');
+    }
+    // The upstream plugin writes raw outbound credentials to disk for
+    // reconnect. Delete both persistent copies after startup and fail
+    // closed if that cannot be confirmed. Reconnect uses a fresh panel fetch.
+    final purged = await _native.invokeMapMethod<String, dynamic>(
+      'forgetSingBoxEphemeralConfig',
+    );
+    if (purged?['purged'] != true) {
+      await SingBox.instance.disconnect();
+      throw const FormatException('PROFILE_PURGE_FAILED');
     }
     _lastVerifiedLatencyMs = result.ping;
   }
