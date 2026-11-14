@@ -152,7 +152,8 @@ DWORD Add(HANDLE h, const GUID& key, const GUID& layer,
   f.flags = FWPM_FILTER_FLAG_PERSISTENT;
   f.action.type = FWP_ACTION_BLOCK;
   f.weight.type = FWP_UINT8;
-  f.weight.uint8 = 225;
+  // WFP_UINT8 weight must be in [0, 15]; 225 is rejected by BFE.
+  f.weight.uint8 = 0xF;
   f.filterCondition = c;
   f.numFilterConditions = 2;
   return FwpmFilterAdd0(h, &f, nullptr, nullptr);
