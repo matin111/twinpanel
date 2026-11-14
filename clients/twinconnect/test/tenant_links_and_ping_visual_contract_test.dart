@@ -146,6 +146,15 @@ void main() {
     expect(androidCard, contains('_autoNode(profiles, selectedNodeId)'));
   });
 
+  test('Android connection status follows active native tunnel not protocol filter', () {
+    final card = File('lib/android_connection_card.dart').readAsStringSync();
+    expect(card, contains("final protocolName = _up ? 'WireGuard'"));
+    expect(card, contains("final internetVerified = _ciscoUp ||"));
+    expect(card, contains("Key('androidNoHandshakeDiagnostic')"));
+    expect(card, contains('WG_INTERFACE_UP_NO_HANDSHAKE'));
+    expect(card, contains('Tunnel interface up; server connection unverified'));
+  });
+
   test('Android Connect tab clears unsupported Servers protocol selection', () {
     final dashboard = File('lib/live_dashboard.dart').readAsStringSync();
     expect(dashboard, contains('if (index == 0) {'));
