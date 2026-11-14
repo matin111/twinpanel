@@ -143,7 +143,12 @@ void main() {
     expect(androidCard, contains("item['node_id']?.toString()"));
     expect(androidCard, contains('selectedNodeId != null && id != selectedNodeId'));
     expect(androidCard, contains('SELECTED_WIREGUARD_NODE_UNAVAILABLE'));
-    expect(androidCard, contains('_autoNode(profiles, selectedNodeId)'));
+    expect(androidCard, contains('_candidateNodes(profiles, selectedNodeId)'));
+    expect(androidCard, contains('peerVerified = await _awaitPeerHandshake()'));
+    expect(androidCard, contains('await _controller.stop()'));
+    expect(androidCard, contains('WIREGUARD_PEER_HANDSHAKE_TIMEOUT'));
+    expect(androidCard, contains('candidates.take(3)'));
+    expect(androidCard, contains('candidates.take(1)'));
   });
 
   test('Android connection status follows active native tunnel not protocol filter', () {
