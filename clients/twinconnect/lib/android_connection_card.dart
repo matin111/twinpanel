@@ -79,6 +79,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
   int? _httpsLatencyMs;
   bool _checkingInternet = false;
   DateTime? _lastInternetCheck;
+  int _networkProbeGeneration = 0;
 
   @override
   void initState() {
@@ -108,6 +109,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
   }
 
   void _clearTelemetry() {
+    _networkProbeGeneration++;
     _rxBytes = null;
     _txBytes = null;
     _downloadBps = null;
@@ -134,6 +136,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
         if (!online) {
           setState(() { _openVpnUp = false; _clearTelemetry(); });
         } else {
+          _maybeCheckInternet();
           final counters = await AndroidOpenVpnTunnel.instance.counters();
           if (!mounted) return;
           final rx = counters.$1, tx = counters.$2;
@@ -159,6 +162,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
           _singBoxProtocol = null;
           _clearTelemetry();
         });
+        if (online) _maybeCheckInternet();
         return;
       }
       if (_ciscoUp) {
@@ -171,6 +175,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
             _clearTelemetry();
           });
         }
+        if (_ciscoUp) _maybeCheckInternet();
         return;
       }
       final status = await _controller.status();
@@ -215,11 +220,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
           _httpsLatencyMs = null;
         }
       });
-      if (up && _handshake &&
-          !_checkingInternet && (_lastInternetCheck == null ||
-          now.difference(_lastInternetCheck!) > const Duration(seconds: 12))) {
-        unawaited(_checkInternet());
-      }
+      if (up && _handshake) _maybeCheckInternet();
     } catch (_) {
       if (mounted) setState(() {
         _up = false;
@@ -234,9 +235,24 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
   /// must not be mistaken for an offline VPN. Responses are treated as a
   /// network reachability signal ONLY when the native peer handshake is fresh.
   /// Never disable TLS verification or send credentials to probe providers.
+  bool get _activeVerifiedTransport =>
+      (_up && _handshake) || _openVpnUp || _ciscoUp ||
+      (_singBoxProtocol != null && AndroidSingBoxTunnel.instance.isConnected);
+
+  void _maybeCheckInternet() {
+    final now = DateTime.now();
+    if (_checkingInternet || !_activeVerifiedTransport ||
+        (_lastInternetCheck != null &&
+          now.difference(_lastInternetCheck!) < const Duration(seconds: 12))) {
+      return;
+    }
+    unawaited(_checkInternet());
+  }
+
   Future<void> _checkInternet() async {
     if (_checkingInternet) return;
     _checkingInternet = true;
+    final generation = _networkProbeGeneration;
     _lastInternetCheck = DateTime.now();
     String? verifiedIp;
     int? latencyMs;
@@ -265,12 +281,12 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
         client.close(force: true);
       }
     }
-    if (mounted) {
-      // The peer handshake is mandatory. An IP response alone does not
-      // establish that the intended VPN transport is carrying user traffic.
+    if (mounted && generation == _networkProbeGeneration) {
+      // Probe confirms HTTPS reachability while a transport is active.
+      // It does not independently prove the traffic was routed through VPN.
       setState(() {
-        _publicIp = _up && _handshake ? verifiedIp : null;
-        _httpsLatencyMs = _up && _handshake ? latencyMs : null;
+        _publicIp = _activeVerifiedTransport ? verifiedIp : null;
+        _httpsLatencyMs = _activeVerifiedTransport ? latencyMs : null;
       });
     }
     _checkingInternet = false;
@@ -394,6 +410,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
         _activeServerName = _activeServer?.name ??
             (item['node'] is String ? item['node'] as String : null);
       });
+      _maybeCheckInternet();
     } on FormatException catch (error) {
       if (mounted) setState(() => _errorCode = error.message);
     } catch (error) {
@@ -527,11 +544,13 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
       setState(() {
         _singBoxProtocol = code;
         _singBoxVerified = true;
-        _httpsLatencyMs = AndroidSingBoxTunnel.instance.verifiedLatencyMs;
+        // Outbound ping is not an independent Android VPN reachability test.
+        _httpsLatencyMs = null;
         _activeServer = inventory.where((n) => n.id == id).firstOrNull;
         _activeServerName = _activeServer?.name ??
             (item['node'] is String ? item['node'] as String : null);
       });
+      _maybeCheckInternet();
     } on FormatException catch (error) {
       if (mounted) setState(() => _errorCode = error.message);
     } catch (error) {
@@ -747,8 +766,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
             _up ? 'wireguard' : null);
     final selectedIsActive = activeProtocolCode != null &&
         chosen?.protocol.code == activeProtocolCode;
-    final internetVerified = _ciscoUp || _singBoxVerified ||
-        (_up && _handshake && _publicIp != null);
+    final internetVerified = _activeVerifiedTransport && _publicIp != null;
     // A sing-box start acknowledgement is not proof of internet access.
     final ciscoSelected = chosen?.protocol.code == 'cisco';
     final ciscoReady = ciscoSelected &&
@@ -809,7 +827,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
               _busy
                   ? s.pick('در حال اتصال...', 'Connecting...')
                   : internetVerified
-                      ? s.pick('اینترنت VPN تأیید شد', 'VPN internet reachable')
+                      ? s.pick('اینترنت در زمان اتصال در دسترس است', 'Internet reachable while VPN active')
                       : _up && _handshake
                           ? s.pick('دست‌دهی سرور تأیید شد؛ اینترنت هنوز تأیید نشده', 'Peer handshake verified; internet not yet verified')
                           : connected
@@ -946,7 +964,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
               const SizedBox(height: 10),
               Text(!connected ? s.pick('تونل غیرفعال است', 'Tunnel disconnected')
                   : internetVerified
-                      ? s.pick('دسترسی اینترنت از VPN تأیید شد.', 'Internet reachable through VPN.')
+                      ? s.pick('دسترسی HTTPS برقرار است؛ مسیر VPN هنوز مستقل تأیید نشده.', 'HTTPS reachable; VPN routing not independently verified.')
                       : _up && _handshake
                           ? s.pick('دست‌دهی انجام شده اما اینترنت هنوز تأیید نشده.', 'Peer handshake received; VPN internet not yet verified.')
                           : s.pick('رابط VPN فعال است اما هنوز پاسخ سرور دریافت نشده است. ممکن است اینترنت کار نکند.',
