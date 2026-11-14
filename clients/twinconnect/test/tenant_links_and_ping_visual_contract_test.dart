@@ -182,6 +182,31 @@ void main() {
     expect(card, contains('wireGuardNoConfigs'));
   });
 
+  test('Android quick connect never shows the raw node picker', () {
+    final card = File('lib/android_connection_card.dart').readAsStringSync();
+    final dashboard = File('lib/live_dashboard.dart').readAsStringSync();
+    expect(card, contains('WireGuardNode? _autoNode('));
+    expect(card, contains('widget.servers?.servers'));
+    expect(card, contains('matching.nodeOnline'));
+    expect(card, contains('selectedNodeId != null && id != selectedNodeId'));
+    expect(card, contains('candidates.sort('));
+    expect(card, isNot(contains('showDialog<WireGuardNode>')));
+    expect(dashboard, contains('servers: widget.servers'));
+  });
+
+  test('Android native engine understands panel split IPv4 routing', () {
+    final native = File(
+      'native/android/kotlin/com/twinpanel/twinconnect/WireGuardRuntime.kt',
+    ).readAsStringSync();
+    expect(native, contains('hasFullIpv4Route(raw)'));
+    expect(native, contains('hasFullRoute(raw, "0.0.0.0/1")'));
+    expect(native, contains('hasFullRoute(raw, "128.0.0.0/1")'));
+    expect(native, contains('protectIpv6Route(configText)'));
+    expect(native, contains('match.groupValues[2].trimEnd() + ", ::/0"'));
+    expect(native, contains('validateStrictProfile(protectedProfile)'));
+    expect(native, contains('require(hasFullRoute(raw, "::/0"))'));
+  });
+
   test('six dashboard locales and Arabic right-to-left are supported', () {
     final dashboard = File('lib/live_dashboard.dart').readAsStringSync();
     final localizer = File('lib/app_strings.dart').readAsStringSync();
