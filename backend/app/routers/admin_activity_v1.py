@@ -7,7 +7,7 @@ from __future__ import annotations
 from datetime import timezone
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from ..database import get_db
@@ -26,6 +26,7 @@ def admin_activity_list(
     limit: int = Query(default=50, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     category: str = Query(default="all", pattern="^(all|wallet|subscription|other)$"),
+    search: str = Query(default="", max_length=100),
     db: Session = Depends(get_db),
 ):
     query = db.query(QuotaAuditLog).filter(QuotaAuditLog.actor_type == "admin")
@@ -38,6 +39,21 @@ def admin_activity_list(
             QuotaAuditLog.subject_type != "subscription",
             ~QuotaAuditLog.action.like("wallet_%"),
         )
+    term = search.strip()
+    if term:
+        pattern = "%" + term.replace("%", r"\%").replace("_", r"\_") + "%"
+        matched_admins = [
+            str(user.id) for user in db.query(User.id).filter(
+                or_(User.full_name.ilike(pattern), User.email.ilike(pattern))
+            ).limit(100).all()
+        ]
+        query = query.filter(or_(
+            QuotaAuditLog.actor_id.in_(matched_admins),
+            QuotaAuditLog.actor_id.ilike(pattern),
+            QuotaAuditLog.subject_id.ilike(pattern),
+            QuotaAuditLog.subject_type.ilike(pattern),
+            QuotaAuditLog.action.ilike(pattern),
+        ))
     total = query.with_entities(func.count(QuotaAuditLog.id)).scalar() or 0
     rows = (
         query.order_by(QuotaAuditLog.created_at.desc(), QuotaAuditLog.id.desc())
