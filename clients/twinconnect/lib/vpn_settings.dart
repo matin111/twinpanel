@@ -499,7 +499,8 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
                 Text('Kill Switch', style: Theme.of(context).textTheme.titleSmall?.copyWith(
                   fontWeight: FontWeight.bold)),
                 Text(_guardActive
-                    ? tr('محافظت سیستم تأیید شده', 'System protection verified')
+                    ? tr('محافظت فعال؛ بازیابی اضطراری زمان‌بندی شده',
+                         'Guard active; emergency recovery scheduled')
                     : globalReady
                         ? tr('سرویس محافظت هنوز آماده نیست', 'Protection service not ready')
                         : tr('محافظت سراسری در دسترس نیست', 'System protection unavailable'),
@@ -513,7 +514,21 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
             Switch.adaptive(
               key: const Key('vpnKillSwitch'),
               value: _guardActive,
-              onChanged: null, // Never allow cosmetic activation.
+              // Connect the actual UI switch to Windows guard commands.
+              // The native WFP status is authoritative, never the requested value.
+              // The controlled trial is time bounded and requires an
+              // independently verified SYSTEM emergency-recovery task.
+              onChanged: !Platform.isWindows ||
+                      _checking || _guardTrialBusy || _guardRecoveryBusy ||
+                      _guard['serviceInstalled'] != true
+                  ? null
+                  : (enable) {
+                      if (enable) {
+                        _testSignedWindowsGuard();
+                      } else {
+                        _recoverWindowsGuard();
+                      }
+                    },
             ),
           ]),
           key: const Key('vpnKillSwitchCard'),
