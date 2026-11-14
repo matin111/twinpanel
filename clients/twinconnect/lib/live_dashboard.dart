@@ -4691,9 +4691,9 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                     // The Connect home can only show protocols whose Android
                     // native transport is actually initialized. An unsupported
                     // Servers filter (Cisco, OpenVPN, etc.) cannot hijack it.
-                    selectedProtocolCode: _filter != 'all' &&
-                            widget.native.supports(_filter)
-                        ? _filter : null,
+                    // Preserve the actual choice, even when its Android
+                    // engine is unavailable; never substitute WireGuard.
+                    selectedProtocolCode: _filter == 'all' ? null : _filter,
                     selectedNodeId: _androidExplicitNodeSelected
                         ? _selectedServerId : null,
                     subscriptionContent: Container(
