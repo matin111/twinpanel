@@ -463,17 +463,23 @@ public class AxeOpenConnectVpnService extends VpnService {
 
     private ParcelFileDescriptor buildVpnInterface(VpnTunnelConfig cfg, String name) {
         try {
+            // The control socket was individually protected with VpnService.protect().
+            // Never bypass the TwinConnect app: HTTPS reachability probes MUST
+            // traverse the same VPN routing as user applications.
+            if (cfg.dns == null && cfg.dns2 == null) {
+                throw new IllegalStateException("CISCO_DNS_MISSING");
+            }
             Builder b = new Builder();
-            b.setSession(name != null ? name : "OpenConnect VPN")
+            b.setSession(name != null ? name : "TwinConnect Cisco")
              .setMtu(cfg.mtu)
              .addAddress(cfg.address, cfg.prefix)
-             .addRoute("0.0.0.0", 0);
-            if (cfg.dns  != null) try { b.addDnsServer(cfg.dns);  } catch (Exception ignored) {}
-            if (cfg.dns2 != null) try { b.addDnsServer(cfg.dns2); } catch (Exception ignored) {}
+             .addRoute("0.0.0.0", 0)
+             // CSTP backend currently provides IPv4 only. Capture and
+             // blackhole IPv6 rather than allowing a cleartext IPv6 bypass.
+             .addRoute("::", 0);
+            if (cfg.dns != null) b.addDnsServer(cfg.dns);
+            if (cfg.dns2 != null) b.addDnsServer(cfg.dns2);
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) b.setMetered(false);
-            // Exclude the VPN app itself so its own traffic (ads, API calls)
-            // bypasses the tunnel and reaches the internet directly.
-            try { b.addDisallowedApplication(getPackageName()); } catch (Exception ignored) {}
             return b.establish();
         } catch (Exception e) {
             Log.e(TAG, "TUN build failed", e); return null;
