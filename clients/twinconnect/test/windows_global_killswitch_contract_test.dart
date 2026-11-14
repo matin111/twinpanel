@@ -227,6 +227,11 @@ void main() {
     expect(native, isNot(contains('row.OperStatus != IfOperStatusUp')));
     expect(native, contains('row.InterfaceAndOperStatusFlags.HardwareInterface'));
     expect(script, contains('APP_WFP_NO_VERIFIED_TUN_ADAPTER'));
+    expect(script, contains('TwinConnectAWG'));
+    expect(native, contains('TwinConnectAWG'));
+    expect(script, contains('ElevationReceipt'));
+    expect(script, contains('APP_WFP_NATIVE_ARM_ERROR_'));
+
     expect(script, isNot(contains("Status -eq 'Up'")));
     expect(native, contains('const bool sameApp'));
     expect(native, contains('if (sameApp) {'));
