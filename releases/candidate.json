@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.835",
-  "source_sha": "6eecd3f3e50b27eebe2c60dd2aa68d0a0307be44",
+  "version": "1.1.0-rc.836",
+  "source_sha": "cd49f0a3afe148d5f8aa9e40cb9fdb2f81b5497e",
   "notes": {
-    "fa": "افزودن پاپ‌آپ آمار و تاریخچه فعالیت ادمین (تغییرات دستی کیف پول و تمدید اشتراک و لاگ عملیات مدیریتی)، ریست مستقل حجم نماینده با تأیید بله/خیر و ثبت حسابرسی، و نمایش ریز مصرف هر نشست اتصال در Connection بدون تغییر مجموع حجم.",
-    "en": "Admin activity and audit statistics popup for manual wallet adjustments and subscription renewals, general admin mutation events; independent reseller traffic reset with confirmation and audit; truthful per-session Connection usage details."
+    "fa": "اصلاح خطای ۴۰۴ تاریخچه اتصال‌ها در صفحه Connection با حذف پیشوند تکراری API؛ افزودن جستجوی سروری نام ادمین، شناسه اکانت و عملیات داخل پاپ‌آپ تاریخچه، بدون تغییر طراحی اصلی پنل.",
+    "en": "Fix session-history API 404 caused by duplicated prefix under the Connection router; add server-side admin activity popup search by administrator, account ID and action, preserving page layout."
   }
 }
