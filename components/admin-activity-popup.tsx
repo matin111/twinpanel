@@ -17,7 +17,9 @@ const titles:Record<string,string>={
   wallet_credit:"افزایش کیف پول",wallet_debit:"کاهش کیف پول",
   subscription_renew_or_reset:"تمدید / تغییر سهمیه اشتراک",
   subscription_usage_period_reset:"ریست حجم مصرفی",
-  manual_api_mutation:"تغییر دستی در پنل",
+  subscription_edit:"ویرایش اشتراک",
+  subscription_usage_reset:"ریست حجم اشتراک",
+  user_edit:"ویرایش کاربر",
 };
 const pretty=(value:unknown)=>value==null?"—":typeof value==="boolean"?(value?"بله":"خیر"):String(value);
 const fmt=(value:string|null)=>value?new Date(value).toLocaleString("fa-IR"):"—";
@@ -113,7 +115,7 @@ export function AdminActivityPopup(){
               {item.action.startsWith("wallet_")&&<small>
                 {pick("تغییر","Change")}: {money(item.details.amount_toman)} · {money(item.details.previous_balance_toman)} ← {money(item.details.new_balance_toman)}
               </small>}
-              {item.action.startsWith("subscription_")&&<small>
+              {item.action.startsWith("subscription_")&&(item.details.previous_usage_bytes!=null||item.details.new_traffic_limit_bytes!=null)&&<small>
                 {pick("مصرف قبلی","Previous usage")}: {bytes(item.details.previous_usage_bytes)}
                 {item.details.new_traffic_limit_bytes!=null?" · "+pick("حجم جدید","New quota")+": "+bytes(item.details.new_traffic_limit_bytes):""}
               </small>}
