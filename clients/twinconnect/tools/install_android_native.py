@@ -35,6 +35,14 @@ def patch_gradle() -> None:
         "        isCoreLibraryDesugaringEnabled = true",
         str(filename),
     )
+    # OpenVPN's embedded process must be extracted from the APK at install time.
+    # The 2.x Flutter plugin manages the OpenVPN VpnService independently.
+    current = only_once(
+        current,
+        "android {",
+        "android {\\n    packaging {\\n        jniLibs {\\n            useLegacyPackaging = true\\n        }\\n    }",
+        str(filename),
+    )
     current += (
         "\n// Pinned WireGuard native tunnel implementation; distinct from Cisco/OpenConnect.\n"
         "dependencies {\n"
