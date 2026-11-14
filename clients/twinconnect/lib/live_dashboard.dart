@@ -492,6 +492,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       setState(() => _vpnError = 'PROTOCOL_NOT_INCLUDED_IN_SUBSCRIPTION');
       return;
     }
+    final previousFilter = _filter;
+    final previousSelected = _selected;
     setState(() { _fastestConnecting = true; _vpnError = null; });
     try {
       // Fast Server chooses the lowest measured server RTT; it does not
@@ -544,12 +546,18 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       if (_verifiedConnectionActive && _vpnError == null) {
         await prefs.setString('twinconnect_last_verified_protocol', protocol);
       } else {
-        setState(() => _autoFastest = false);
+        setState(() {
+          _autoFastest = false;
+          _filter = previousFilter;
+          _selected = previousSelected;
+        });
       }
     } catch (error) {
       if (mounted) setState(() {
         _vpnError = _errorText(error);
         _autoFastest = false;
+        _filter = previousFilter;
+        _selected = previousSelected;
       });
     } finally {
       if (mounted) setState(() => _fastestConnecting = false);
