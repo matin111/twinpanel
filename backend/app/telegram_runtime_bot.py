@@ -2078,9 +2078,13 @@ async def renewal_receipt_submit(message: Message, state: FSMContext):
         await message.answer(
             "✅ <b>پرداخت شما قبلاً به‌صورت خودکار تأیید شده است.</b>\n\n"
             + (
-                "📦 ارسال اطلاعات اشتراک در صف تحویل قرار گرفت.\n"
-                if receipt_result.get("delivery_queued")
-                else "📦 وضعیت اشتراک را از «اشتراک‌های من» بررسی کنید.\n"
+                "⚠️ سفارش نیازمند بررسی تطبیق اشتراک است؛ پرداخت تکرار نشود.\n"
+                if receipt_result.get("delivery_requires_review")
+                else (
+                    "📦 ارسال اطلاعات اشتراک در صف تحویل قرار گرفت.\n"
+                    if receipt_result.get("delivery_queued")
+                    else "📦 وضعیت اشتراک را از «اشتراک‌های من» بررسی کنید.\n"
+                )
             )
             + "رسید شما نیز ثبت شد؛ تأیید یا پرداخت مجدد لازم نیست.",
             reply_markup=main_keyboard(),
