@@ -43,6 +43,56 @@ jobs:
           & $exe offline-status
           if ($LASTEXITCODE -ne 0) { throw 'Read-only guard preflight failed' }
           Remove-Item -LiteralPath $exe -Force
+      - name: Compile firewall-disabled diagnostic service
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $vswhere = Join-Path "${env:ProgramFiles(x86)}" "Microsoft Visual Studio/Installer/vswhere.exe"
+          $vs = (& $vswhere -latest -property installationPath).Trim()
+          $dev = Join-Path $vs 'Common7/Tools/VsDevCmd.bat'
+          $src = Join-Path (Get-Location) 'native/windows/twinconnect_global_guard_service_experimental.cpp'
+          $folder = Join-Path (Get-Location) 'build/guard-diagnostic'
+          New-Item -ItemType Directory -Force -Path $folder | Out-Null
+          $exe = Join-Path $folder 'TwinConnectGuardDiagnostic.exe'
+          $compile = 'call "' + $dev + '" -arch=amd64 && cl /nologo /std:c++17 /EHsc /W4 /WX /DTWINCONNECT_GUARD_DIAGNOSTIC_ONLY=1 /Fe:"' + $exe + '" "' + $src + '" /link Fwpuclnt.lib Iphlpapi.lib Ws2_32.lib Rpcrt4.lib Advapi32.lib Ole32.lib Oleaut32.lib Taskschd.lib'
+          & cmd.exe /d /s /c $compile
+          if ($LASTEXITCODE -ne 0 -or !(Test-Path $exe)) { throw 'Diagnostic service compilation failed' }
+          & $exe offline-status
+          if ($LASTEXITCODE -ne 0) { throw 'Read-only WFP inspection failed' }
+          $source = Get-Content $src -Raw
+          if (!$source.Contains('TWINCONNECT_GUARD_DIAGNOSTIC_ONLY') -or
+              !$source.Contains('DIAGNOSTIC_NO_FIREWALL_CHANGES')) {
+            throw 'Diagnostic binary must refuse firewall mutation'
+          }
+      - name: Build standalone Windows service installation test Setup
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $tokens = $null
+          $errors = $null
+          [Management.Automation.Language.Parser]::ParseFile(
+            (Join-Path (Get-Location) 'tools/install_guard_diagnostic.ps1'),
+            [ref]$tokens, [ref]$errors) | Out-Null
+          if ($errors.Count -gt 0) { throw 'Diagnostic installer PowerShell syntax invalid' }
+          choco install innosetup --no-progress -y
+          if ($LASTEXITCODE -ne 0) { throw 'Inno Setup installation failed' }
+          $compiler = Join-Path "${env:ProgramFiles(x86)}" 'Inno Setup 6/ISCC.exe'
+          if (!(Test-Path $compiler)) { throw 'Inno Setup compiler missing' }
+          & $compiler 'installer-guard-diagnostic.iss'
+          if ($LASTEXITCODE -ne 0 -or !(Test-Path 'TwinConnect-Guard-Diagnostic-Setup.exe')) {
+            throw 'Diagnostic installer build failed'
+          }
+          (Get-FileHash 'TwinConnect-Guard-Diagnostic-Setup.exe' -Algorithm SHA256).Hash |
+            Set-Content -Path 'TwinConnect-Guard-Diagnostic-SHA256.txt' -Encoding ascii
+      - name: Publish clearly labeled internal installation test
+        uses: actions/upload-artifact@v4
+        with:
+          name: TwinConnect-Guard-Diagnostic-Install-Test-NO-KILLSWITCH
+          path: |
+            clients/twinconnect/TwinConnect-Guard-Diagnostic-Setup.exe
+            clients/twinconnect/TwinConnect-Guard-Diagnostic-SHA256.txt
+          if-no-files-found: error
+          retention-days: 7
       - name: Verify signed-service installer gate and recovery contract
         shell: pwsh
         run: |
