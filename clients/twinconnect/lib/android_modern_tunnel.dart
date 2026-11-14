@@ -92,7 +92,17 @@ class AndroidModernTunnel {
     try {
       // The plugin applies its own validated Android TUN config. A successful
       // call indicates engine startup, not independently verified egress.
-      await SingBox.instance.connect(jsonEncode(outbound));
+      try {
+        await SingBox.instance.connect(jsonEncode(outbound));
+      } on SingBoxPermissionException {
+        throw const FormatException('VPN_PERMISSION_DENIED');
+      } on SingBoxConfigException {
+        throw const FormatException('ANDROID_MODERN_CONFIG_REJECTED');
+      } on SingBoxStartException {
+        throw const FormatException('ANDROID_MODERN_ENGINE_START_FAILED');
+      } on SingBoxTimeoutException {
+        throw const FormatException('ANDROID_MODERN_ENGINE_TIMEOUT');
+      }
       if (SingBox.instance.status != SingBoxConnectionStatus.connected) {
         throw const FormatException('ANDROID_MODERN_TUNNEL_NOT_CONNECTED');
       }
