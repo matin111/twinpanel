@@ -72,6 +72,7 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
             if (!_appLockBusy && _selectedKillSwitchApp.isNotEmpty) {
               _loadSelectedKillSwitchApp();
             }
+            if (!_systemProxyBusy) _loadSystemProxyStatus();
           }
         },
       );
@@ -90,18 +91,19 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
     NativeVpnCapabilities capabilities =
         NativeVpnCapabilities.unavailable(NativeVpnBridge.platform);
     Map<String, dynamic> guard = const {};
+    // Independent probes: a failed legacy WFP service must never mask the
+    // actual VPN engine status shown in Settings.
     try {
-      // Native status probes can stall on unhealthy Windows services.
-      // The page must recover rather than remain in a loading state.
-      final results = await Future.wait<Object>([
-        NativeVpnBridge.probe().timeout(const Duration(seconds: 5)),
-        NativeVpnBridge.globalKillSwitchStatus()
-            .timeout(const Duration(seconds: 5)),
-      ]);
-      capabilities = results[0] as NativeVpnCapabilities;
-      guard = results[1] as Map<String, dynamic>;
+      capabilities = await NativeVpnBridge.probe()
+          .timeout(const Duration(seconds: 5));
     } catch (_) {
-      // Never turn a timed-out or failed check into a 'protected' state.
+      capabilities = NativeVpnCapabilities.unavailable(NativeVpnBridge.platform);
+    }
+    try {
+      guard = await NativeVpnBridge.globalKillSwitchStatus()
+          .timeout(const Duration(seconds: 5));
+    } catch (_) {
+      guard = const {};
     }
     if (!mounted) return;
     setState(() {
