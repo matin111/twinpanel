@@ -189,6 +189,26 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
     }
   }
 
+  // Values remain unavailable until native handshake and byte counters
+  // have been verified. Never fabricate IP, ping or traffic measurements.
+  Widget _metric(BuildContext context, IconData icon, String label, String value) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 11),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(13),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.outline.withValues(alpha: .22)),
+      ),
+      child: Column(children: [
+        Icon(icon, size: 17),
+        const SizedBox(height: 4),
+        Text(label, style: Theme.of(context).textTheme.bodySmall),
+        const SizedBox(height: 3),
+        Text(value, style: Theme.of(context).textTheme.titleMedium),
+      ]),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final s = AppStrings.of(context);
@@ -303,6 +323,40 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
                 Icons.power_settings_new_rounded),
             label: Text(connected ? s.wireGuardDisconnect
                 : s.pick('اتصال', 'Connect')),
+          ),
+        ),
+        const SizedBox(height: 18),
+        Container(
+          key: const Key('androidNetworkOverview'),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface.withValues(alpha: .10),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: accent.withValues(alpha: .20)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(s.pick('وضعیت شبکه', 'Network status'),
+                style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 10),
+              Text(connected ? s.wireGuardActiveUnverified :
+                  s.pick('تونل غیرفعال است', 'Tunnel disconnected')),
+              const SizedBox(height: 12),
+              Row(children: [
+                Expanded(child: _metric(context, Icons.public, 'IP', '—')),
+                const SizedBox(width: 8),
+                Expanded(child: _metric(context, Icons.bolt, 'Ping', '—')),
+              ]),
+              const SizedBox(height: 8),
+              Row(children: [
+                Expanded(child: _metric(context, Icons.arrow_downward,
+                    s.pick('دانلود', 'Download'), '—')),
+                const SizedBox(width: 8),
+                Expanded(child: _metric(context, Icons.arrow_upward,
+                    s.pick('آپلود', 'Upload'), '—')),
+              ]),
+            ],
           ),
         ),
         if (_errorCode != null) ...[
