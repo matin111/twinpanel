@@ -20,6 +20,8 @@ dependencies:
   sing_box: 1.0.0
   # Embedded Android OpenVPN 2.x engine; GPLv3 distribution obligations apply.
   openvpn_flutter: 2.0.0
+  # Independent Android AnyConnect/CSTP engine. SHA-256 pin REQUIRED in app.
+  axevpn_flutter: 3.1.0
 
 dev_dependencies:
   flutter_test:
