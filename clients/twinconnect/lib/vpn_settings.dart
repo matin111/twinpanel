@@ -59,6 +59,9 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
           if (mounted && !_checking && !_guardTrialBusy &&
               !_guardRecoveryBusy && !_networkResetBusy) {
             _check();
+            if (!_appLockBusy && _selectedKillSwitchApp.isNotEmpty) {
+              _loadSelectedKillSwitchApp();
+            }
           }
         },
       );
@@ -289,8 +292,8 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(AppStrings.of(context).pick(
-            'تغییر Kill Switch تأیید نشد. دسترسی Administrator را بررسی کن.',
-            'Kill Switch change was not verified. Check Administrator access.',
+            'فعال‌سازی تأیید نشد. ابتدا VPN را وصل کن و دسترسی Administrator را بررسی کن.',
+            'Activation not verified. Connect VPN first and check Administrator access.',
           )),
         ));
       }
@@ -692,8 +695,8 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
               ]),
               const SizedBox(height: 6),
               Text(tr(
-                'وقتی فعال است، اینترنت برنامه انتخابی کاملاً مسدود می‌شود؛ حتی هنگام اتصال VPN. این گزینه مخصوص برنامه است، نه کل سیستم.',
-                'When enabled, all internet traffic for the selected app is blocked, even while VPN is connected. This is app-scoped, not system-wide.',
+                'وقتی فعال است، ترافیک برنامه انتخابی از تونل TwinConnect مجاز است؛ در صورت قطع VPN، اتصال مستقیم همان برنامه با WFP مسدود می‌شود. ابتدا به VPN وصل شو.',
+                'When enabled, the selected app is allowed through the TwinConnect VPN tunnel; if VPN disconnects, direct connections from that app are blocked by WFP. Connect VPN before enabling.',
               ), style: Theme.of(context).textTheme.bodySmall),
               const SizedBox(height: 8),
               Row(children: [
@@ -707,7 +710,10 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
                 const SizedBox(width: 8),
                 TextButton.icon(
                   key: const Key('vpnSelectKillSwitchApp'),
-                  onPressed: _appLockBusy ? null : _pickKillSwitchApp,
+                  // Do not hide persistent protection on another app.
+                  // Turn the current app's Kill Switch off before changing it.
+                  onPressed: _appLockBusy || _selectedKillSwitchEnabled == true
+                      ? null : _pickKillSwitchApp,
                   icon: const Icon(Icons.folder_open_rounded, size: 18),
                   label: Text(tr('انتخاب برنامه', 'Select app')),
                 ),
