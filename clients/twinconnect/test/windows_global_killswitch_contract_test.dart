@@ -179,7 +179,7 @@ void main() {
     expect(restore, contains('Type RESET to confirm'));
   });
 
-  test('Windows Defender Firewall browser lock is independently reversible', () {
+  test('Windows Defender Firewall selected-app Kill Switch is independently reversible', () {
     final script = File('tools/windows_app_network_lock.ps1').readAsStringSync();
     final setup = File('installer.iss').readAsStringSync();
     final settings = File('lib/vpn_settings.dart').readAsStringSync();
@@ -192,10 +192,14 @@ void main() {
     expect(script, isNot(contains('Set-NetFirewallProfile')));
     expect(script, isNot(contains('netsh advfirewall reset')));
     expect(setup, contains('windows_app_network_lock.ps1'));
-    expect(settings, contains("Key('vpnBrowserNetworkLockOn')"));
-    expect(settings, contains("Key('vpnBrowserNetworkLockOff')"));
-    expect(settings, contains("_manageBrowserNetworkLock('Lock')"));
-    expect(settings, contains("_manageBrowserNetworkLock('Unlock')"));
+    expect(script, contains('APP_MUST_BE_INSTALLED_IN_PROGRAM_FILES'));
+    expect(script, contains('OpenFileDialog'));
+    expect(script, contains('TwinConnect-AppKillSwitch-'));
+    expect(settings, contains("Key('vpnSelectKillSwitchApp')"));
+    expect(settings, contains("Key('vpnSelectedAppKillSwitch')"));
+    expect(settings, contains('_pickKillSwitchApp()'));
+    expect(settings, contains('_toggleSelectedAppKillSwitch'));
+    expect(settings, contains("enable ? 'Lock' : 'Unlock'"));
   });
 
   test('native bridge installs only a read-only guard status method', () {
