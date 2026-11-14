@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 import 'android_connection_strings.dart';
 import 'android_tunnel.dart';
 import 'android_singbox_tunnel.dart';
+import 'android_openvpn_tunnel.dart';
 import 'cisco_openconnect_profile.dart';
 import 'app_strings.dart';
 import 'native_vpn_bridge.dart';
@@ -60,6 +61,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
   bool _busy = false;
   bool _up = false;
   bool _ciscoUp = false;
+  bool _openVpnUp = false;
   String? _singBoxProtocol;
   bool _singBoxVerified = false;
   String? _errorCode;
@@ -126,6 +128,30 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
     if (!Platform.isAndroid || _polling) return;
     _polling = true;
     try {
+      if (_openVpnUp) {
+        final online = AndroidOpenVpnTunnel.instance.isConnected;
+        if (!mounted) return;
+        if (!online) {
+          setState(() { _openVpnUp = false; _clearTelemetry(); });
+        } else {
+          final counters = await AndroidOpenVpnTunnel.instance.counters();
+          if (!mounted) return;
+          final rx = counters.$1, tx = counters.$2;
+          final now = DateTime.now();
+          setState(() {
+            if (rx != null && tx != null) {
+              final seconds = _lastCountersAt == null ? 0.0 :
+                  now.difference(_lastCountersAt!).inMilliseconds / 1000.0;
+              if (seconds > 0.1 && _rxBytes != null && _txBytes != null) {
+                _downloadBps = rx >= _rxBytes! ? (rx - _rxBytes!) / seconds : null;
+                _uploadBps = tx >= _txBytes! ? (tx - _txBytes!) / seconds : null;
+              }
+              _rxBytes = rx; _txBytes = tx; _lastCountersAt = now;
+            }
+          });
+        }
+        return;
+      }
       if (_singBoxProtocol != null) {
         final online = AndroidSingBoxTunnel.instance.isConnected;
         if (!mounted) return;
@@ -393,8 +419,71 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
     }
   }
 
+  Future<void> _connectOpenVpn() async {
+    if (_busy || _up || _openVpnUp || _ciscoUp ||
+        _singBoxProtocol != null || !Platform.isAndroid) return;
+    setState(() { _busy = true; _errorCode = null; });
+    var stage = 'OPENVPN_ENGINE_INIT_FAILED';
+    try {
+      await AndroidOpenVpnTunnel.instance.initialize();
+      stage = 'OPENVPN_PROFILE_FETCH_FAILED';
+      final profiles = await TenantApi.fromBuildConfig()
+          .loadSessionNativeProfiles(
+            panel: widget.panel, sessionToken: widget.sessionToken,
+            protocol: VpnProtocols.byCode('openvpn')!,
+            native: const NativeProtocolReadiness(supportedCodes: {'openvpn'}),
+          );
+      final inventory = widget.servers?.servers ?? const <AppServer>[];
+      final selectedId = widget.selectedNodeId;
+      final choices = profiles.items.where((item) {
+        final id = item['node_id']?.toString();
+        if (id == null || (selectedId != null && id != selectedId)) return false;
+        final node = inventory.where((n) => n.id == id).firstOrNull;
+        return inventory.isEmpty || node?.nodeOnline == true;
+      }).toList(growable: false);
+      if (choices.isEmpty) throw const FormatException('OPENVPN_NO_AUTHORIZED_SERVER');
+      final item = choices.first;
+      final id = item['node_id']?.toString();
+      final server = inventory.where((n) => n.id == id).firstOrNull;
+      stage = 'OPENVPN_NATIVE_CONNECT_FAILED';
+      await AndroidOpenVpnTunnel.instance.connect(
+        profile: item, name: server?.name ?? 'TwinConnect',
+      );
+      if (!mounted) return;
+      setState(() {
+        _openVpnUp = true;
+        _activeServer = server;
+        _activeServerName = server?.name ??
+            (item['node'] is String ? item['node'] as String : null);
+      });
+    } on FormatException catch (error) {
+      if (mounted) setState(() => _errorCode = error.message);
+    } catch (error) {
+      if (mounted) setState(() => _errorCode =
+          error is PlatformException ? error.code :
+          error is TenantApiException ? error.message : stage);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _disconnectOpenVpn() async {
+    if (_busy || !_openVpnUp) return;
+    setState(() => _busy = true);
+    try {
+      await AndroidOpenVpnTunnel.instance.disconnect();
+      if (mounted) setState(() {
+        _openVpnUp = false; _clearTelemetry();
+      });
+    } catch (_) {
+      if (mounted) setState(() => _errorCode = 'OPENVPN_DISCONNECT_FAILED');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _connectModern(String code) async {
-    if (_busy || _up || _ciscoUp || _singBoxProtocol != null ||
+    if (_busy || _up || _openVpnUp || _ciscoUp || _singBoxProtocol != null ||
         !AndroidSingBoxTunnel.supported.contains(code)) return;
     setState(() { _busy = true; _errorCode = null; });
     var stage = 'ENGINE_INIT';
@@ -632,7 +721,8 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
     final readyOptions = available.where((entry) =>
         entry.configRecordPresent &&
         (widget.native.supports(entry.protocol.code) ||
-         AndroidSingBoxTunnel.supported.contains(entry.protocol.code))).toList(growable: false);
+         AndroidSingBoxTunnel.supported.contains(entry.protocol.code) ||
+         entry.protocol.code == 'openvpn')).toList(growable: false);
     final chosen = requested != null
         ? available.where((e) => e.protocol.code == requested).firstOrNull
         : readyOptions.where((e) => e.protocol.code == 'wireguard').firstOrNull ??
@@ -643,11 +733,12 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
         chosen?.configRecordPresent == true;
     // The selected protocol and active transport are distinct. Selecting
     // OpenVPN/Hysteria2 never starts or disguises a WireGuard tunnel.
-    final connected = _up || _ciscoUp || _singBoxProtocol != null;
+    final connected = _up || _openVpnUp || _ciscoUp || _singBoxProtocol != null;
     final protocolName = chosen?.protocol.name ??
         (requested ?? s.pick('پروتکل آماده‌ای وجود ندارد', 'No ready protocol'));
     final activeProtocolCode = _singBoxProtocol ??
-        (_ciscoUp ? 'cisco' : _up ? 'wireguard' : null);
+        (_openVpnUp ? 'openvpn' : _ciscoUp ? 'cisco' :
+            _up ? 'wireguard' : null);
     final selectedIsActive = activeProtocolCode != null &&
         chosen?.protocol.code == activeProtocolCode;
     final internetVerified = _ciscoUp || _singBoxVerified ||
@@ -657,11 +748,13 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
     final ciscoReady = ciscoSelected &&
         widget.native.supports('cisco') &&
         chosen?.configRecordPresent == true;
+    final openVpnSelected = chosen?.protocol.code == 'openvpn' &&
+        chosen?.configRecordPresent == true;
     final modernSelected = chosen != null &&
         AndroidSingBoxTunnel.supported.contains(chosen.protocol.code) &&
         chosen.configRecordPresent;
     final canStartSelected = ciscoSelected ? ciscoReady :
-        modernSelected || nativeReady;
+        openVpnSelected || modernSelected || nativeReady;
     // An interface without a peer handshake is NOT a successful VPN.
     // Reserve the connected green treatment for verified transport.
     final accent = internetVerified ? const Color(0xFF35D9AE)
@@ -725,7 +818,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
         Center(
           child: TwinConnectWaveIndicator(
             key: const Key('androidSharedConnectionDataFabric'),
-            connected: connected && _handshake,
+            connected: connected && (_handshake || _openVpnUp),
             connecting: _busy,
             dark: Theme.of(context).brightness == Brightness.dark,
             rxSamples: List<double>.unmodifiable(_rxSamples),
@@ -784,10 +877,12 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
             ),
             onPressed: _busy ? null
                 : selectedIsActive ? (_singBoxProtocol != null ? _disconnectModern :
+                    _openVpnUp ? _disconnectOpenVpn :
                     _ciscoUp ? _disconnectCisco : _disconnect)
                 : connected ? null
                 : canStartSelected
                     ? (modernSelected ? () => _connectModern(chosen.protocol.code) :
+                       openVpnSelected ? _connectOpenVpn :
                        ciscoSelected ? _connectCisco : _connect) : null,
             icon: Icon(selectedIsActive ? Icons.stop_rounded :
                 Icons.bolt_rounded),
@@ -804,7 +899,8 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
           const SizedBox(height: 10),
           Text(
             s.pick('تونل فعال جداگانه: ', 'Separate active tunnel: ') +
-                (_singBoxProtocol ?? (_ciscoUp ? 'Cisco / OpenConnect' : 'WireGuard')),
+                (_singBoxProtocol ?? (_openVpnUp ? 'OpenVPN' :
+                    _ciscoUp ? 'Cisco / OpenConnect' : 'WireGuard')),
             key: const Key('androidSeparateActiveProtocol'),
             textAlign: TextAlign.center,
             style: TextStyle(color: accent),
@@ -813,6 +909,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
           OutlinedButton.icon(
             key: const Key('androidDisconnectPreviousTunnel'),
             onPressed: _busy ? null : _singBoxProtocol != null ? _disconnectModern :
+                _openVpnUp ? _disconnectOpenVpn :
                 _ciscoUp ? _disconnectCisco : _disconnect,
             icon: const Icon(Icons.stop_circle_outlined),
             label: Text(s.pick('قطع تونل قبلی', 'Disconnect previous tunnel')),
