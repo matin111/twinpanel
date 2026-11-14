@@ -128,6 +128,12 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
       'guard_reason: ${_guard['reason'] ?? 'UNKNOWN'}',
       'selected_app_kill_switch_status: ${_selectedKillSwitchEnabled == true ? 'active' : 'inactive'}',
       'selected_app_kill_switch_last_error: $_appKillSwitchDiagnostic',
+      'split_tunnel_mode: ${_routingMode.name}',
+      'split_tunnel_selected_app_count: ${_routingApps.length}',
+      'split_tunnel_requires_reconnect: true',
+      'split_tunnel_engine_scope: windows_singbox_tun_only',
+      'system_proxy_status: ${_systemProxyEnabled == null ? 'unverified' : (_systemProxyEnabled! ? 'enabled' : 'disabled')}',
+      'system_proxy_port: ${_systemProxyPort ?? 'none'}',
     ].join('\n');
     await Clipboard.setData(ClipboardData(text: diagnosticText));
     if (!mounted) return;
