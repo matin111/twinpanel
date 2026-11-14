@@ -77,18 +77,25 @@ class WindowsAppRoutePolicy {
     if (existingRules is! List) {
       throw const FormatException('APP_ROUTING_RULES_MISSING');
     }
-    outbound.add(<String, dynamic>{'type': 'direct', 'tag': 'direct'});
-    // Must preserve DNS interception and IPv6 reject rules from the original
-    // TUN config. Exact path matching avoids broad process-name collisions.
+    final outbounds = <Map<String, dynamic>>[
+      for (final value in outbound) Map<String, dynamic>.from(value as Map),
+      <String, dynamic>{'type': 'direct', 'tag': 'direct'},
+    ];
+    config['outbounds'] = outbounds;
+    // Preserve DNS interception and IPv6 reject from the original TUN.
+    final rules = <Map<String, dynamic>>[
+      for (final value in existingRules)
+        Map<String, dynamic>.from(value as Map),
+    ];
     final rule = <String, dynamic>{
       'process_path': applicationPaths,
       'action': 'route',
       'outbound': mode == WindowsAppRoutingMode.includeSelected
           ? 'proxy' : 'direct',
     };
-    final index = existingRules.indexWhere((v) =>
-        v is Map && v['action'] == 'sniff');
-    existingRules.insert(index < 0 ? existingRules.length : index, rule);
+    final index = rules.indexWhere((v) => v['action'] == 'sniff');
+    rules.insert(index < 0 ? rules.length : index, rule);
+    route['rules'] = rules;
     route['final'] = mode == WindowsAppRoutingMode.includeSelected
         ? 'direct' : 'proxy';
   }
