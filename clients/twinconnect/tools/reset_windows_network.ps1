@@ -9,6 +9,31 @@ $log = Join-Path $logDirectory 'network-reset.log'
 function Log([string]$message) { Add-Content -LiteralPath $log -Value ("$(Get-Date -Format o) " + $message) }
 try {
   Log 'User confirmed Windows network reset.'
+  # Attempt recovery of ONLY TwinConnect-owned persistent WFP filters first.
+  # Resetting Winsock does not remove WFP filters. Never reset the whole
+  # Windows Firewall or delete rules belonging to unrelated applications.
+  $guard = Join-Path $env:ProgramFiles 'TwinConnect\services\TwinConnectGlobalGuard.exe'
+  $service = Get-Service -Name 'TwinConnectGlobalGuard' -ErrorAction SilentlyContinue
+  if ((Test-Path -LiteralPath $guard -PathType Leaf) -or $service) {
+    if (!(Test-Path -LiteralPath $guard -PathType Leaf)) {
+      throw 'GUARD_SERVICE_PRESENT_BUT_RECOVERY_BINARY_MISSING'
+    }
+    $signature = Get-AuthenticodeSignature -LiteralPath $guard
+    if ($signature.Status -ne 'Valid') {
+      throw 'GUARD_RECOVERY_BINARY_NOT_SIGNED_OR_TRUSTED'
+    }
+    # Independent CLI works even if the service/pipe is stopped.
+    & $guard recover 'I_ACCEPT_OFFLINE_RECOVERY' | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw 'GUARD_WFP_RECOVERY_FAILED' }
+    $audit = & $guard offline-status
+    if ($LASTEXITCODE -ne 0 -or
+        $audit -notmatch '^OWNED_RULES_PRESENT 0 0 0') {
+      throw 'GUARD_OWNED_FILTERS_STILL_PRESENT'
+    }
+    Log 'Verified no TwinConnect-owned WFP filters remain.'
+  } else {
+    Log 'No installed TwinConnect guard; WFP recovery not applicable.'
+  }
   # These are Windows OS supported recovery operations. They do not remove
   # non-TwinConnect firewall rules, VPN profiles or saved account credentials.
   & "$env:SystemRoot\System32\ipconfig.exe" /flushdns | Out-Null
