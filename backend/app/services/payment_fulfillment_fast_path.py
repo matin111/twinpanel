@@ -562,6 +562,25 @@ def reconcile_auto_payment_delivery_once(limit: int = 50) -> dict:
                 for notice in existing
             ):
                 continue
+            # A single subscription tied to DIFFERENT paid plans needs
+            # investigation, not a second misleading account-delivery message.
+            conflicting_orders = (
+                db.query(StoreOrder.id)
+                .filter(
+                    StoreOrder.subscription_id == int(subscription.id),
+                    StoreOrder.id != int(order.id),
+                    StoreOrder.plan_id != order.plan_id,
+                    StoreOrder.status == "fulfilled",
+                )
+                .first()
+            )
+            if conflicting_orders:
+                print(
+                    "AUTO_PAYMENT_SHARED_SUBSCRIPTION_REVIEW_REQUIRED",
+                    {"intent_id": int(intent.id), "order_id": int(order.id)},
+                    flush=True,
+                )
+                continue
             credential = (
                 db.query(ProtocolCredential)
                 .filter(
