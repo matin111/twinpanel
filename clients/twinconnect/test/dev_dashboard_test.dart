@@ -31,7 +31,7 @@ void main() {
     expect(find.byKey(const Key('devConnectionStats')), findsOneWidget);
     expect(find.text('— ms'), findsWidgets);
     expect(find.text('— B/s'), findsNWidgets(2));
-    expect(find.byKey(const Key('devSampleNotice')), findsOneWidget);
+    expect(find.byKey(const Key('devSampleNotice')), findsNothing);
     for (final page in ['home', 'locations', 'settings', 'account']) {
       expect(find.byKey(Key('devNav_$page')), findsOneWidget);
     }
