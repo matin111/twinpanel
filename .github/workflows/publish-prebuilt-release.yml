@@ -100,6 +100,22 @@ jobs:
           done
           python3 source/backend/tests/test_sudoku_shared_accounting_release_v1.py -v
 
+      - name: Guard legacy Telegram audience safe migration
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          for path in \
+            "backend/app/telegram_legacy_contacts_v1.py" \
+            "backend/app/telegram_runtime_bot.py" \
+            "backend/tests/test_telegram_legacy_contact_migration_v1.py"; do
+            test -s "source/$path" && test -s "publisher/$path"
+            cmp -s "source/$path" "publisher/$path" || {
+              echo "::error file=$path::Release lacks safe legacy audience onboarding"
+              exit 1
+            }
+          done
+          python3 source/backend/tests/test_telegram_legacy_contact_migration_v1.py -v
+
       - name: Guard Telegram start-only command menu on every installation
         shell: bash
         run: |
