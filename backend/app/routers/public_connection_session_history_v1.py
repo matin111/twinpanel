@@ -11,7 +11,8 @@ from ..models import Node
 from ..quota_models import QuotaSession, QuotaUsageEvent
 from .account_delivery import _subscription_from_share_token
 
-router = APIRouter(prefix="/v1/connect", tags=["connection-session-history"])
+# Included beneath parent /v1/connect; never prefix twice.
+router = APIRouter(tags=["connection-session-history"])
 
 def _iso(value: datetime | None) -> str | None:
     if value is None:
