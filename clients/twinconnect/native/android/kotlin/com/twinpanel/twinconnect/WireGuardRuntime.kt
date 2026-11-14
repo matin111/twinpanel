@@ -171,11 +171,42 @@ internal object WireGuardRuntime {
         return mapOf("state" to "down", "protocol" to "wireguard")
     }
 
+    /**
+     * WireGuard JNI counters are cumulative bytes for THIS tunnel, not global
+     * Android traffic or subscription accounting. Never expose peer keys.
+     * A recent handshake establishes peer contact, not internet reachability.
+     */
     @Synchronized
-    fun status(): Map<String, Any> = mapOf(
-        "protocol" to "wireguard",
-        "state" to if (isInterfaceUp()) "interface_up" else "down",
-        "peerHandshakeVerified" to false,
-        "killSwitchEnforced" to isOsLockdownEnforced()
-    )
+    fun status(): Map<String, Any> {
+        val up = isInterfaceUp()
+        var rx: Long? = null
+        var tx: Long? = null
+        var latestHandshake: Long? = null
+        if (up) {
+            try {
+                val statistics = backend!!.getStatistics(tunnel)
+                rx = statistics.totalRx()
+                tx = statistics.totalTx()
+                val timestamps = statistics.peers().mapNotNull {
+                    statistics.peer(it)?.latestHandshakeEpochMillis()
+                }.filter { it > 0L }
+                latestHandshake = timestamps.maxOrNull()
+            } catch (_: Exception) {
+                // Interface may be up while counters cannot be read.
+            }
+        }
+        val now = System.currentTimeMillis()
+        val freshHandshake = latestHandshake != null &&
+            latestHandshake <= now + 10_000L &&
+            now - latestHandshake < 180_000L
+        return mapOf(
+            "protocol" to "wireguard",
+            "state" to if (up) "interface_up" else "down",
+            "peerHandshakeVerified" to freshHandshake,
+            "latestHandshakeEpochMillis" to latestHandshake,
+            "rxBytes" to rx,
+            "txBytes" to tx,
+            "killSwitchEnforced" to isOsLockdownEnforced()
+        )
+    }
 }
