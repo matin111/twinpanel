@@ -5462,7 +5462,7 @@ def set_manual_limits(
 
 # TWINPANEL_SUB_COMPLETE_V17
 @router.patch("/{subscription_id}/extend")
-def extend_subscription_v17(subscription_id:int,payload:dict=Body(...),db:Session=Depends(get_db)):
+def extend_subscription_v17(subscription_id:int,payload:dict=Body(...),db:Session=Depends(get_db),actor:User=Depends(require_admin)):
     sub=db.get(Subscription,subscription_id)
     if not sub: raise HTTPException(status_code=404,detail="اشتراک پیدا نشد")
     from ..services.subscription_cycle_reset_v1 import (
@@ -5475,6 +5475,9 @@ def extend_subscription_v17(subscription_id:int,payload:dict=Body(...),db:Sessio
         add_days=int(payload.get("add_days",0) or 0)
     except (ValueError, TypeError):
         raise HTTPException(status_code=422,detail="حجم یا مدت تمدید نامعتبر است")
+    before_usage = int(sub.traffic_used_bytes or 0)
+    before_limit = int(sub.traffic_limit_bytes or 0)
+    before_expiry = sub.expires_at.isoformat() if sub.expires_at else None
     reset_usage=payload.get("reset_usage") is True
     reset_date=payload.get("reset_date") is True
     if add_traffic_gb<0 or add_days<0:
@@ -5507,6 +5510,27 @@ def extend_subscription_v17(subscription_id:int,payload:dict=Body(...),db:Sessio
         # Renewed accounts may have been EXPIRED; restore only if the
         # new expiry and current quota actually permit access.
         restore_after_period_change(db,sub,was_exhausted=was_exhausted)
+    from ..quota_models import QuotaAuditLog
+    db.add(QuotaAuditLog(
+        actor_type="admin",
+        actor_id=str(actor.id) if isinstance(actor, User) else "admin-panel",
+        action="subscription_renew_or_reset",
+        subject_type="subscription",
+        subject_id=str(sub.id),
+        request_id=str(uuid.uuid4()),
+        details={
+            "previous_usage_bytes": before_usage,
+            "previous_traffic_limit_bytes": before_limit,
+            "new_traffic_limit_bytes": int(sub.traffic_limit_bytes or 0),
+            "previous_expiry_at": before_expiry,
+            "new_expiry_at": sub.expires_at.isoformat() if sub.expires_at else None,
+            "add_days": add_days,
+            "add_traffic_gb": add_traffic_gb,
+            "reset_usage": reset_usage,
+            "reset_date": reset_date,
+        },
+        success=True,
+    ))
     db.commit();db.refresh(sub)
     return {"ok":True,"traffic_limit_bytes":int(sub.traffic_limit_bytes or 0),"traffic_used_bytes":int(sub.traffic_used_bytes or 0),"expires_at":sub.expires_at.isoformat() if sub.expires_at else None,"reset_usage":reset_usage,"reset_date":reset_date}
 
