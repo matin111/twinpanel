@@ -276,6 +276,30 @@ jobs:
               !$setup.Contains('-Action Uninstall')) {
             throw 'Automated service lifecycle missing'
           }
+      - name: Validate Windows network reset and guard-owned WFP recovery
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $path = Join-Path (Get-Location) 'tools/reset_windows_network.ps1'
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            $path, [ref]$tokens, [ref]$errors) | Out-Null
+          if ($errors.Count -ne 0) { throw 'Network recovery script has parse errors' }
+          $source = Get-Content $path -Raw
+          foreach ($marker in @('Get-AuthenticodeSignature', 'offline-status',
+              'OWNED_RULES_PRESENT 0 0 0', 'winsock reset', 'int ip reset')) {
+            if (!$source.Contains($marker)) {
+              throw "Missing Windows recovery check: $marker"
+            }
+          }
+          if ($source.Contains('advfirewall reset')) {
+            throw 'Network recovery must not reset unrelated firewall rules'
+          }
+          $iss = Get-Content 'installer.iss' -Raw
+          if (!$iss.Contains('reset_windows_network.ps1')) {
+            throw 'Windows Setup must bundle the network recovery script'
+          }
       - name: Package TwinConnect Windows setup with automatic WireGuard prerequisite
         shell: pwsh
         run: |
