@@ -175,15 +175,31 @@ begin
   end;
 end;
 
-#if IncludeVerifiedGlobalGuard
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 var
   ExitCode: Integer;
   Ok: Boolean;
+  AppGuard: String;
+#if IncludeVerifiedGlobalGuard
   Args: String;
+#endif
 begin
   if CurUninstallStep = usUninstall then
   begin
+    { Persistent per-app WFP filters must never survive removal of their
+      recovery executable. Recovery is limited to our own fixed filter GUIDs. }
+    AppGuard := ExpandConstant('{app}\services\TwinConnectAppKillSwitch.exe');
+    if FileExists(AppGuard) then
+    begin
+      Ok := Exec(AppGuard, 'recover', '', SW_HIDE, ewWaitUntilTerminated, ExitCode);
+      if (not Ok) or (ExitCode <> 0) then
+      begin
+        MsgBox('Selected-app Kill Switch recovery failed. Uninstall stopped to prevent an orphan firewall rule.',
+          mbCriticalError, MB_OK);
+        Abort;
+      end;
+    end;
+#if IncludeVerifiedGlobalGuard
     Args := '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' +
       ExpandConstant('{app}\tools\install_guard_service.ps1') +
       '" -Action Uninstall -BinaryPath "' +
@@ -196,6 +212,6 @@ begin
         mbCriticalError, MB_OK);
       Abort;
     end;
+#endif
   end;
 end;
-#endif
