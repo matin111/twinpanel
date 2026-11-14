@@ -3,6 +3,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app_strings.dart';
 import 'brand_theme.dart';
@@ -50,6 +51,7 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
     super.initState();
     _check();
     if (Platform.isWindows) {
+      _loadSelectedKillSwitchApp();
       // Keep the native Windows WFP service as the source of truth,
       // including when SYSTEM's timed emergency recovery removes filters.
       _guardStatusTimer = Timer.periodic(
@@ -206,6 +208,30 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
     return result.stdout.toString().trim();
   }
 
+
+  Future<void> _loadSelectedKillSwitchApp() async {
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      final path = preferences.getString('twinconnect_selected_app_killswitch') ?? '';
+      if (path.isEmpty) return;
+      final status = await _appLockCommand('Status', path);
+      if (!mounted) return;
+      if (status == 'TWINCONNECT_APP_LOCKED' ||
+          status == 'TWINCONNECT_APP_UNLOCKED') {
+        setState(() {
+          _selectedKillSwitchApp = path;
+          _selectedKillSwitchEnabled = status == 'TWINCONNECT_APP_LOCKED';
+        });
+      }
+    } catch (_) {
+      // A changed or removed app must never be shown as protected.
+      if (mounted) setState(() {
+        _selectedKillSwitchApp = '';
+        _selectedKillSwitchEnabled = null;
+      });
+    }
+  }
+
   Future<void> _pickKillSwitchApp() async {
     if (!Platform.isWindows || _appLockBusy) return;
     setState(() => _appLockBusy = true);
@@ -229,6 +255,8 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
           _selectedKillSwitchEnabled = status == 'TWINCONNECT_APP_LOCKED';
         });
       }
+      final preferences = await SharedPreferences.getInstance();
+      await preferences.setString('twinconnect_selected_app_killswitch', path);
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
