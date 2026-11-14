@@ -207,6 +207,19 @@ void main() {
     expect(workflow, contains('Build app-scoped WFP bypass guard'));
   });
 
+  test('Windows application picker never depends on installed WFP engine', () {
+    final script = File('tools/windows_app_network_lock.ps1').readAsStringSync();
+    final settings = File('lib/vpn_settings.dart').readAsStringSync();
+    final pick = script.indexOf("if (\$Action -eq 'Pick') {\n  Write-Output");
+    final engine = script.indexOf('APP_WFP_ENGINE_NOT_INSTALLED');
+    expect(pick, greaterThan(0));
+    expect(engine, greaterThan(pick));
+    expect(script, isNot(contains('#Requires -RunAsAdministrator')));
+    expect(script, contains('ADMINISTRATOR_REQUIRED_TO_CHANGE_WFP_RULES'));
+    expect(settings, contains('File selection must succeed independently'));
+    expect(settings, contains('_selectedKillSwitchEnabled = enabled'));
+  });
+
   test('native bridge installs only a read-only guard status method', () {
     final install = File('tools/install_windows_native.py')
         .readAsStringSync();
