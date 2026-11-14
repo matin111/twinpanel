@@ -48,17 +48,19 @@ def patch_gradle() -> None:
 def patch_manifest() -> None:
     filename = ANDROID / "app" / "src" / "main" / "AndroidManifest.xml"
     current = filename.read_text(encoding="utf-8")
-    if "com.wireguard.android.backend.GoBackend$VpnService" in current:
+    if ("com.wireguard.android.backend.GoBackend$VpnService" in current and
+            'android:name=".OpenConnectVpnService"' in current):
         return
     if '<manifest xmlns:android="http://schemas.android.com/apk/res/android">' not in current:
         raise RuntimeError("Unrecognized AndroidManifest.xml")
-    current = only_once(
-        current,
-        '<manifest xmlns:android="http://schemas.android.com/apk/res/android">',
-        '<manifest xmlns:android="http://schemas.android.com/apk/res/android">\n'
-        '    <uses-permission android:name="android.permission.INTERNET" />',
-        str(filename),
-    )
+    if 'android.permission.INTERNET' not in current:
+        current = only_once(
+            current,
+            '<manifest xmlns:android="http://schemas.android.com/apk/res/android">',
+            '<manifest xmlns:android="http://schemas.android.com/apk/res/android">\n'
+            '    <uses-permission android:name="android.permission.INTERNET" />',
+            str(filename),
+        )
     match = re.search(r"<application\b[^>]*>", current, flags=re.DOTALL)
     if match is None:
         raise RuntimeError("Missing Android application manifest element")
@@ -73,7 +75,10 @@ def patch_manifest() -> None:
         '            </intent-filter>\n'
         '        </service>\n'
     )
-    service += (
+    if "com.wireguard.android.backend.GoBackend$VpnService" in current:
+        service = ""
+    if 'android:name=".OpenConnectVpnService"' not in current:
+        service += (
         '\n        <!-- Reserved Cisco / OpenConnect VpnService. The engine is '
         'not advertised until a real native transport is bundled. -->\n'
         '        <service android:name=".OpenConnectVpnService"\n'
