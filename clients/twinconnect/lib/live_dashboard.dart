@@ -4680,21 +4680,36 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           glassCard(
             key: const Key('androidNativeConnectionGlass'),
             radius: 26,
-            padding: const EdgeInsets.all(14),
-            child: widget.catalog == null
-                ? const Center(child: CircularProgressIndicator())
-                : AndroidConnectionCard(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 23),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (widget.catalog == null)
+                  const Center(child: CircularProgressIndicator())
+                else
+                  AndroidConnectionCard(
                     panel: widget.panel,
                     username: widget.username,
                     sessionToken: widget.sessionToken,
                     catalog: widget.catalog!,
                     native: widget.native,
+                    selectedProtocolCode: _filter == 'all' ? null : _filter,
                     selectedNodeId: _androidExplicitNodeSelected
                         ? _selectedServerId : null,
                   ),
+                const SizedBox(height: 15),
+                OutlinedButton.icon(
+                  key: const Key('androidChooseLocation'),
+                  onPressed: () => setState(() => _page = 'locations'),
+                  icon: const Icon(Icons.place_outlined),
+                  label: Text(tr('انتخاب سرور', 'Choose location')),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 14),
           glassCard(
+            key: const Key('androidAccountSummary'),
             radius: 24,
             padding: const EdgeInsets.all(18),
             child: homeSubscriptionSummary(),
