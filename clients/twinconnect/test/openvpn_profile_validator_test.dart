@@ -52,9 +52,9 @@ void main() {
 
   test('accepts CA-verified username/password OpenVPN without client cert', () {
     final source = profile()
-        .replaceAll('<cert>\\nUSER-CERT\\n</cert>\\n', '')
-        .replaceAll('<key>\\nSECRET-PRIVATE-KEY\\n</key>\\n', '')
-        .replaceFirst('client\\n', 'client\\nauth-user-pass\\n');
+        .replaceAll('<cert>\nUSER-CERT\n</cert>\n', '')
+        .replaceAll('<key>\nSECRET-PRIVATE-KEY\n</key>\n', '')
+        .replaceFirst('client\n', 'client\nauth-user-pass\n');
     expect(OpenVpnProfileValidator.validate({
       'config': source, 'username': 'subscriber', 'password': 'secret',
     }), source);
