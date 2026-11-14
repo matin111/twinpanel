@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.838",
+  "version": "1.1.0-rc.839",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-14T20:59:42Z",
+  "released_at": "2026-11-14T21:14:11Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "8e704ee71fa44da1d57eb56109fa80b71782e399",
+  "source_sha": "2899c2bf13921e3adf2b02ee64386856e1c17605",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.838/twinpanel-1.1.0-rc.838-linux-x86_64.tar.gz",
-    "sha256": "9fa1e180e9dcd73e82349f2015d047008b90781dd117a22e7a7722e8b6fc7254",
-    "size_bytes": 30806957
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.839/twinpanel-1.1.0-rc.839-linux-x86_64.tar.gz",
+    "sha256": "d4b5707ec21b224d977e7e959d24176aad9b4d11ecaa8c97dcea45bb290cdeed",
+    "size_bytes": 30809302
   },
   "notes": {
-    "fa": "اصلاح تاریخچه فعالیت ادمین: حذف درخواست‌های فنی بی‌معنا مانند بررسی انتشار و درخواست‌های HTTP از نمایش و آمار، حفظ رکوردهای قدیمی در دیتابیس، ثبت اقدامات واقعی ویرایش کاربر و اشتراک با عنوان قابل‌فهم، حفظ ثبت دقیق عملیات مالی، تمدید و ریست.",
-    "en": "Clean up administrator activity history: exclude legacy generic HTTP request noise from list and totals without deleting records; log only identified user/subscription business changes alongside precise wallet/renewal/reset events."
+    "fa": "اصلاح دارک مود پاپ‌آپ تاریخچه ادمین: هماهنگ‌سازی رنگ زمینه بخش جستجو، ورودی جستجو، فیلتر و دکمه پاک‌کردن با تم انتخابی؛ حفظ رنگ‌بندی لایت مود و عملکرد جستجو و تاریخچه.",
+    "en": "Fix admin activity popup dark mode search panel, search input, filter and clear button colors using resolved dark/light theme while preserving existing behavior."
   }
 }
