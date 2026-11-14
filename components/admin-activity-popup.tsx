@@ -103,7 +103,7 @@ export function AdminActivityPopup(){
                 {item.details.new_traffic_limit_bytes!=null?" · "+pick("حجم جدید","New quota")+": "+bytes(item.details.new_traffic_limit_bytes):""}
               </small>}
               {item.action==="manual_api_mutation"&&<small dir="ltr">{pretty(item.details.method)} {pretty(item.details.route)} · HTTP {pretty(item.details.http_status)}</small>}
-              {item.details.note&&<small>{pick("توضیح","Note")}: {pretty(item.details.note)}</small>}
+              {item.details.note!=null&&String(item.details.note).trim()!==""&&<small>{pick("توضیح","Note")}: {pretty(item.details.note)}</small>}
             </article>)}
           </div>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,marginTop:12}}>
