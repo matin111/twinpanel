@@ -78,7 +78,7 @@ if (!(Test-Path -LiteralPath $binary -PathType Leaf)) { throw 'APP_WFP_ENGINE_NO
 # interface and cannot safely be guarded by interface-based filters.
 $tunnel = $null
 if ($Action -eq 'Lock') {
-  $tunnel = @('TwinConnectSB','TwinConnect') | Where-Object {
+  $tunnel = @('TwinConnectSB','TwinConnectAWG','TwinConnect') | Where-Object {
     $adapter = Get-NetAdapter -Name $_ -ErrorAction SilentlyContinue
     $adapter -and !$adapter.HardwareInterface
   } | Select-Object -First 1
