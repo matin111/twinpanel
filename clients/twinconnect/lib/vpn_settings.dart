@@ -40,6 +40,9 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
   bool _networkResetBusy = false;
   bool _guardRecoveryBusy = false;
   bool _guardTrialBusy = false;
+  String _appLockBrowser = 'Edge';
+  bool _appLockBusy = false;
+  String _appLockStatus = '';
   Timer? _guardStatusTimer;
 
   @override
@@ -182,6 +185,45 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
   }
 
 
+
+
+  Future<void> _manageBrowserNetworkLock(String action) async {
+    if (!Platform.isWindows || _appLockBusy) return;
+    setState(() => _appLockBusy = true);
+    final s = AppStrings.of(context);
+    try {
+      final script = File(
+          '${File(Platform.resolvedExecutable).parent.path}'
+          r'\tools\windows_app_network_lock.ps1');
+      if (!await script.exists()) {
+        throw const FileSystemException('APP_NETWORK_LOCK_SCRIPT_MISSING');
+      }
+      final result = await Process.run('powershell.exe', [
+        '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
+        '-File', script.path, '-Action', action, '-Browser', _appLockBrowser,
+      ]).timeout(const Duration(seconds: 20));
+      if (result.exitCode != 0) {
+        throw StateError('FIREWALL_RULE_FAILED: ${result.stderr}');
+      }
+      final output = result.stdout.toString().trim();
+      if (!output.contains(
+          'TWINCONNECT_APP_${action == 'Unlock' ? 'UNLOCKED' : 'LOCKED'} $_appLockBrowser')) {
+        throw StateError('FIREWALL_STATE_NOT_VERIFIED');
+      }
+      if (mounted) setState(() => _appLockStatus = action == 'Unlock' ? 'off' : 'on');
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(s.pick(
+            'قانون فایروال تأیید نشد؛ دسترسی Administrator و نصب مرورگر را بررسی کن.',
+            'Firewall rule not verified. Check Administrator permission and browser installation.',
+          )),
+        ));
+      }
+    } finally {
+      if (mounted) setState(() => _appLockBusy = false);
+    }
+  }
 
   Future<void> _testSignedWindowsGuard() async {
     if (!Platform.isWindows || _guardTrialBusy ||
@@ -553,6 +595,55 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
           ]),
           key: const Key('vpnKillSwitchCard'),
         ),
+        if (Platform.isWindows) ...[
+          const SizedBox(height: 8),
+          _glass(Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(tr('قفل اینترنت مرورگر', 'Browser network lock'),
+                style: const TextStyle(fontWeight: FontWeight.w600)),
+              const SizedBox(height: 5),
+              Text(tr(
+                'گزینه مستقل فایروال ویندوز: اینترنت مرورگر انتخابی را کاملاً می‌بندد، حتی وقتی VPN وصل باشد. محافظت کل سیستم نیست.',
+                'Independent Windows Firewall option: blocks the selected browser entirely, including while VPN is connected. Not a system-wide Kill Switch.',
+              ), style: Theme.of(context).textTheme.bodySmall),
+              const SizedBox(height: 7),
+              Row(children: [
+                Expanded(child: DropdownButton<String>(
+                  key: const Key('vpnBrowserNetworkLockTarget'),
+                  isExpanded: true,
+                  value: _appLockBrowser,
+                  items: const [
+                    DropdownMenuItem(value: 'Edge', child: Text('Microsoft Edge')),
+                    DropdownMenuItem(value: 'Chrome', child: Text('Google Chrome')),
+                    DropdownMenuItem(value: 'Firefox', child: Text('Mozilla Firefox')),
+                  ],
+                  onChanged: _appLockBusy ? null : (v) {
+                    if (v != null) setState(() {
+                      _appLockBrowser = v;
+                      _appLockStatus = '';
+                    });
+                  },
+                )),
+                const SizedBox(width: 6),
+                TextButton(
+                  key: const Key('vpnBrowserNetworkLockOn'),
+                  onPressed: _appLockBusy ? null : () => _manageBrowserNetworkLock('Lock'),
+                  child: Text(tr('مسدود', 'Block')),
+                ),
+                TextButton(
+                  key: const Key('vpnBrowserNetworkLockOff'),
+                  onPressed: _appLockBusy ? null : () => _manageBrowserNetworkLock('Unlock'),
+                  child: Text(tr('آزاد', 'Unblock')),
+                ),
+              ]),
+              if (_appLockStatus.isNotEmpty)
+                Text(_appLockStatus == 'on'
+                  ? tr('قانون مسدودسازی ثبت شد', 'Block rule verified')
+                  : tr('قانون مسدودسازی حذف شد', 'Block rule removed')),
+            ],
+          ), key: const Key('vpnBrowserNetworkLockCard')),
+        ],
         const SizedBox(height: 8),
         _glass(
           Row(children: [
