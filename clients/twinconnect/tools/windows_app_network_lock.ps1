@@ -68,14 +68,14 @@ if ($Action -in @('Lock','Unlock')) {
     try {
       # Windows file names cannot contain quotation marks. Pass quoted paths
       # as separate arguments to the signed-in Windows PowerShell process.
-      $args = @(
+      $elevationArguments = @(
         '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
         '-File', ('"' + $PSCommandPath + '"'),
         '-Action', $Action,
         '-Executable', ('"' + $path + '"'),
         '-ElevationReceipt', ('"' + $receipt + '"')
       )
-      $child = Start-Process -FilePath (Join-Path $PSHOME 'powershell.exe') -ArgumentList $args -Verb RunAs -Wait -PassThru -ErrorAction Stop
+      $child = Start-Process -FilePath (Join-Path $PSHOME 'powershell.exe') -ArgumentList $elevationArguments -Verb RunAs -Wait -PassThru -ErrorAction Stop
       if ($child.ExitCode -ne 0) { throw 'APP_WFP_ELEVATED_COMMAND_FAILED' }
       if (!(Test-Path -LiteralPath $receipt -PathType Leaf)) { throw 'APP_WFP_ELEVATED_RECEIPT_MISSING' }
       $answer = (Get-Content -LiteralPath $receipt -Raw -ErrorAction Stop).Trim()
