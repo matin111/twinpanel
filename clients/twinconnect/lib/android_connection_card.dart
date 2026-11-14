@@ -10,6 +10,7 @@ import 'native_vpn_bridge.dart';
 import 'protocols.dart';
 import 'tenant_api.dart';
 import 'tenant_models.dart';
+import 'server_inventory.dart';
 import 'vpn_policy_store.dart';
 
 /// A real WireGuard-native Android action, never a fake Cisco proxy.
@@ -25,6 +26,7 @@ class AndroidConnectionCard extends StatefulWidget {
     required this.native,
     this.selectedNodeId,
     this.selectedProtocolCode,
+    this.servers,
     super.key,
   });
 
@@ -37,6 +39,7 @@ class AndroidConnectionCard extends StatefulWidget {
   final String? selectedNodeId;
   /// The server screen owns protocol selection, not the connect screen.
   final String? selectedProtocolCode;
+  final AppServerInventory? servers;
 
   @override
   State<AndroidConnectionCard> createState() => _AndroidConnectionCardState();
@@ -90,22 +93,34 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
     return 'NATIVE_VPN_START_FAILED';
   }
 
-  Future<WireGuardNode?> _chooseNode(List<WireGuardNode> nodes) async {
-    if (nodes.isEmpty) return null;
-    if (nodes.length == 1) return nodes.single;
-    return showDialog<WireGuardNode>(
-      context: context,
-      builder: (dialogContext) => SimpleDialog(
-        title: Text(AppStrings.of(dialogContext).wireGuardChooseServer),
-        children: [
-          for (final node in nodes)
-            SimpleDialogOption(
-              onPressed: () => Navigator.pop(dialogContext, node),
-              child: Text(node.name),
-            ),
-        ],
-      ),
-    );
+  /// Automatic connection uses the panel's account-authorized node list.
+  /// An explicit Servers selection wins; never prompt for raw node codes.
+  WireGuardNode? _autoNode(
+    ClientProtocolProfiles profiles,
+    String? selectedNodeId,
+  ) {
+    final inventory = widget.servers?.servers ?? const <AppServer>[];
+    final candidates = <(String, WireGuardNode, AppServer?)>[];
+    for (final item in profiles.items) {
+      final id = item['node_id']?.toString();
+      final raw = item['config'];
+      if (id == null || raw is! String || raw.trim().isEmpty) continue;
+      if (selectedNodeId != null && id != selectedNodeId) continue;
+      final matching = inventory.where((server) => server.id == id).firstOrNull;
+      if (inventory.isNotEmpty &&
+          (matching == null || !matching.nodeOnline)) continue;
+      final name = matching?.name ??
+          (item['node'] is String ? item['node'] as String : id);
+      candidates.add((id, WireGuardNode(name: name, config: raw), matching));
+    }
+    if (candidates.isEmpty) return null;
+    candidates.sort((a, b) {
+      final aLatency = a.$3?.latencyMs ?? 60001;
+      final bLatency = b.$3?.latencyMs ?? 60001;
+      final delta = aLatency.compareTo(bLatency);
+      return delta != 0 ? delta : a.$1.compareTo(b.$1);
+    });
+    return candidates.first.$2;
   }
 
   Future<void> _connect() async {
@@ -138,24 +153,14 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
         native: widget.native,
       );
       final selectedNodeId = widget.selectedNodeId;
-      final selectedProfiles = selectedNodeId == null
-          ? profiles
-          : ClientProtocolProfiles(
-              namespace: profiles.namespace,
-              protocol: profiles.protocol,
-              items: profiles.items.where((item) =>
-                  item['node_id']?.toString() == selectedNodeId).toList(),
-            );
-      // Never silently connect to a different country/node than selected.
-      final nodes = AndroidTunnelController.wireGuardNodes(selectedProfiles);
-      if (nodes.isEmpty) {
+      final selected = _autoNode(profiles, selectedNodeId);
+      if (selected == null) {
         if (mounted) setState(() => _errorCode = selectedNodeId == null
-            ? 'NO_WIREGUARD_CONFIG' : 'SELECTED_WIREGUARD_NODE_UNAVAILABLE');
+            ? 'NO_ONLINE_WIREGUARD_NODE'
+            : 'SELECTED_WIREGUARD_NODE_UNAVAILABLE');
         return;
       }
       if (!mounted) return;
-      final selected = await _chooseNode(nodes);
-      if (selected == null) return;
       final response = await _controller.connectWireGuard(
         node: selected,
         policy: policy,
