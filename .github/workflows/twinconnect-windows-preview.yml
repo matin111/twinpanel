@@ -293,6 +293,17 @@ jobs:
               throw "Missing Windows recovery check: $marker"
             }
           }
+          foreach ($marker in @('GuardOnly', 'TWINCONNECT_GUARD_RECOVERY_OK')) {
+            if (!$source.Contains($marker)) {
+              throw "Missing guard-only emergency recovery: $marker"
+            }
+          }
+          $settings = Get-Content 'lib/vpn_settings.dart' -Raw
+          foreach ($marker in @('vpnGuardEmergencyRecovery', '_recoverWindowsGuard')) {
+            if (!$settings.Contains($marker)) {
+              throw "Missing visible Windows guard emergency control: $marker"
+            }
+          }
           if ($source.Contains('advfirewall reset')) {
             throw 'Network recovery must not reset unrelated firewall rules'
           }
