@@ -49,6 +49,14 @@ try {
   Write-Output 'GUARD_ARMED_TWO_MINUTE_TEST'
 } catch {
   & $guard recover $ack | Out-Null
-  Unregister-ScheduledTask -TaskName $task -Confirm:$false -ErrorAction SilentlyContinue
+  $recovered = ($LASTEXITCODE -eq 0)
+  if ($recovered) {
+    $audit = & $guard offline-status
+    $recovered = ($LASTEXITCODE -eq 0 -and $audit -match 'OWNED_RULES_PRESENT 0 0 0')
+  }
+  # If direct recovery failed, preserve the independent SYSTEM task.
+  if ($recovered) {
+    Unregister-ScheduledTask -TaskName $task -Confirm:$false -ErrorAction SilentlyContinue
+  }
   throw
 }
