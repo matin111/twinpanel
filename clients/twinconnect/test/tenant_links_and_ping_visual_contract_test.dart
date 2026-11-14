@@ -146,6 +146,14 @@ void main() {
     expect(androidCard, contains('_autoNode(profiles, selectedNodeId)'));
   });
 
+  test('Android Connect tab clears unsupported Servers protocol selection', () {
+    final dashboard = File('lib/live_dashboard.dart').readAsStringSync();
+    expect(dashboard, contains('if (index == 0) {'));
+    expect(dashboard, contains("_filter = 'all';"));
+    expect(dashboard, contains('_androidExplicitNodeSelected = false;'));
+    expect(dashboard, contains('selectedProtocolCode: _filter == \'all\' ? null : _filter'));
+  });
+
   test('Android offers all entitled protocols without claiming missing engines', () {
     final android = File('lib/android_connection_card.dart').readAsStringSync();
     final native = File('native/android/kotlin/com/twinpanel/twinconnect/MainActivity.kt')
