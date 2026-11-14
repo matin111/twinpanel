@@ -11,7 +11,7 @@ void main() {
     expect(dashboard, contains('secondaryColor: BrandTheme.secondaryAccent(widget.brand)'));
     expect(dashboard, contains('filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16)'));
     expect(dashboard, contains('Key(\'liveConnectionControlsButton\')'));
-    expect(dashboard, contains('onPressed: _vpnBusy ? null : _toggleVpn'));
+    expect(dashboard, contains('onPressed: !Platform.isWindows || _vpnBusy ? null : _toggleVpn'));
     expect(dashboard, contains('backgroundColor: Colors.transparent'));
   });
 }
