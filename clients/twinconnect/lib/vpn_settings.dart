@@ -552,8 +552,8 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
                         'Kill Switch engine is missing. Install the complete TwinConnect app.')
                     : raw.contains('APP_WFP_NATIVE_ARM_ERROR_')
                         ? AppStrings.of(context).pick(
-                            'خطای موتور WFP؛ جزئیات خطا در گزارش عیب‌یابی ثبت شد.',
-                            'WFP engine error; details are available in diagnostics.')
+                            'خطای موتور WFP: $_appKillSwitchDiagnostic',
+                            'WFP engine error: $_appKillSwitchDiagnostic')
                         : AppStrings.of(context).pick(
                             'Kill Switch فعال نشد؛ جزئیات را از بخش عیب‌یابی کپی کن.',
                             'Kill Switch failed. Copy diagnostics for the error details.');
