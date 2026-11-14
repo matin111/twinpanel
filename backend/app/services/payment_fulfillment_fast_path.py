@@ -154,7 +154,10 @@ def _try_queue_early_delivery_once(
     """Queue main-bot delivery once the first committed credential is usable."""
 
     order = db.get(StoreOrder, int(order_id))
-    if order is None or not order.subscription_id:
+    # Do not dispatch a "delivered" notification while provisioning is still
+    # running: Telegram may receive a payment confirmation with no account
+    # link, which the outbox then marks permanently delivered.
+    if order is None or order.status != "fulfilled" or not order.subscription_id:
         return None
 
     subscription_id = int(order.subscription_id)
