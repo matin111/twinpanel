@@ -84,6 +84,36 @@ jobs:
           }
           (Get-FileHash 'TwinConnect-Guard-Diagnostic-Setup.exe' -Algorithm SHA256).Hash |
             Set-Content -Path 'TwinConnect-Guard-Diagnostic-SHA256.txt' -Encoding ascii
+      - name: Exercise diagnostic Setup install, IPC rejection, and uninstall on Windows runner
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $setup = Join-Path (Get-Location) 'TwinConnect-Guard-Diagnostic-Setup.exe'
+          $installDir = Join-Path $env:ProgramFiles 'TwinConnectGuardDiagnostic'
+          $exe = Join-Path $installDir 'TwinConnectGuardDiagnostic.exe'
+          try {
+            $p = Start-Process -FilePath $setup -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -PassThru -Wait
+            if ($p.ExitCode -ne 0) { throw "Diagnostic Setup returned $($p.ExitCode)" }
+            $service = Get-Service 'TwinConnectGuardDiagnostic' -ErrorAction Stop
+            if ($service.Status -ne 'Running') { throw 'Service not running after installation' }
+            & $exe status
+            if ($LASTEXITCODE -ne 0) { throw 'Service IPC status command failed' }
+            & $exe arm 'TwinConnect' '1.1.1.1' "$exe" 'I_ACCEPT_OFFLINE_RECOVERY'
+            if ($LASTEXITCODE -eq 0) { throw 'SECURITY: diagnostic build accepted WFP arm' }
+            $audit = & $exe offline-status
+            if ($LASTEXITCODE -ne 0 -or $audit -notmatch 'OWNED_RULES_PRESENT 0 0 0') {
+              throw 'SECURITY: firewall rules present after diagnostic install'
+            }
+          } finally {
+            $uninstaller = Join-Path $installDir 'unins000.exe'
+            if (Test-Path $uninstaller) {
+              $p = Start-Process -FilePath $uninstaller -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -PassThru -Wait
+              if ($p.ExitCode -ne 0) { throw "Diagnostic uninstaller returned $($p.ExitCode)" }
+            }
+          }
+          if (Get-Service 'TwinConnectGuardDiagnostic' -ErrorAction SilentlyContinue) {
+            throw 'Diagnostic service still registered after uninstall'
+          }
       - name: Publish clearly labeled internal installation test
         uses: actions/upload-artifact@v4
         with:
