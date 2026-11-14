@@ -521,19 +521,29 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
         // Never expose raw PowerShell exceptions or multiline stack traces in
         // the app; keep low-level details available only for diagnostics.
         final raw = error.toString().toUpperCase();
-        final message = raw.contains('ADMINISTRATOR_REQUIRED') ||
-                raw.contains('ACCESS_DENIED')
+        final message = raw.contains('NO_TUN_INTERFACE') ||
+                raw.contains('VERIFIED_TWINCONNECT_TUNNEL_REQUIRED') ||
+                raw.contains('CONNECT_TO_TWINCONNECT_VPN')
             ? AppStrings.of(context).pick(
-                'برای تغییر Kill Switch دسترسی مدیر لازم است.',
-                'Administrator permission is required.')
-            : raw.contains('VERIFIED_TWINCONNECT_TUNNEL_REQUIRED') ||
-                    raw.contains('CONNECT_TO_TWINCONNECT_VPN')
+                'رابط VPN شناسایی نشد. ابتدا به VPN وصل شو؛ این محافظ فقط روی اتصال TUN پشتیبانی می‌شود.',
+                'No VPN tunnel found. Connect first; this guard requires a TUN interface.')
+            : raw.contains('ADMINISTRATOR_REQUIRED') ||
+                    raw.contains('ACCESS_DENIED') ||
+                    raw.contains('ELEVATED_COMMAND_FAILED')
                 ? AppStrings.of(context).pick(
-                    'ابتدا به یکی از سرورهای TwinConnect وصل شو.',
-                    'Connect to a TwinConnect server first.')
-                : AppStrings.of(context).pick(
-                    'Kill Switch فعال نشد. اتصال VPN و سرویس محافظت را بررسی کن.',
-                    'Kill Switch could not be activated. Check VPN and protection engine.');
+                    'دسترسی مدیر تأیید نشد. درخواست مجوز ویندوز را قبول کن.',
+                    'Administrator permission was not granted. Approve the Windows UAC prompt.')
+                : raw.contains('APP_WFP_ENGINE_NOT_INSTALLED')
+                    ? AppStrings.of(context).pick(
+                        'موتور Kill Switch نصب نیست. نسخه کامل TwinConnect را نصب کن.',
+                        'Kill Switch engine is missing. Install the complete TwinConnect app.')
+                    : raw.contains('APP_WFP_NATIVE_ARM_ERROR_')
+                        ? AppStrings.of(context).pick(
+                            'خطای موتور WFP؛ جزئیات خطا در گزارش عیب‌یابی ثبت شد.',
+                            'WFP engine error; details are available in diagnostics.')
+                        : AppStrings.of(context).pick(
+                            'Kill Switch فعال نشد؛ جزئیات را از بخش عیب‌یابی کپی کن.',
+                            'Kill Switch failed. Copy diagnostics for the error details.');
         ScaffoldMessenger.of(context)
           ..hideCurrentSnackBar()
           ..showSnackBar(SnackBar(
