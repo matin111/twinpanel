@@ -5,7 +5,7 @@ import 'package:openvpn_flutter/openvpn_flutter.dart';
 
 import 'vpn_policy.dart';
 
-/// Embedded Android OpenVPN 2.7 VpnService. Not Cisco/OpenConnect.
+/// Android OpenVPN 2.7 native VpnService, not Cisco/OpenConnect.
 class AndroidOpenVpnTunnel {
   AndroidOpenVpnTunnel._();
   static final AndroidOpenVpnTunnel instance = AndroidOpenVpnTunnel._();
@@ -51,13 +51,12 @@ class AndroidOpenVpnTunnel {
     }
   }
 
-  /// Treat profiles as opaque OpenVPN configs, never try to synthesize
-  /// endpoints or credentials. Do not log them.
+  /// Only existing .ovpn content received from the authorized tenant API.
   static String requireProfile(Map<String, dynamic> item) {
     final config = item['config'];
     if (config is! String || config.length < 70 ||
         config.length > 200000 ||
-        !RegExp(r'(?m)^client\s*).hasMatch(config) ||
+        !RegExp(r'(?m)^client\s*$').hasMatch(config) ||
         !RegExp(r'(?m)^remote\s+\S+\s+\d+').hasMatch(config)) {
       throw const FormatException('ANDROID_OPENVPN_CONFIG_INVALID');
     }
@@ -80,7 +79,6 @@ class AndroidOpenVpnTunnel {
     final engine = _engine!;
     _connecting = true;
     try {
-      // Subscribe before starting: avoid missing fast failure/connected stage.
       final finished = engine.stageStream
           .firstWhere((stage) => stage.isConnected || stage.isDisconnected);
       final result = await engine.connect(
@@ -88,60 +86,7 @@ class AndroidOpenVpnTunnel {
         username: item['username'] is String ? item['username'] as String : null,
         password: item['password'] is String ? item['password'] as String : null,
       );
-      if (!result) {
-        throw const FormatException('VPN_PERMISSION_DENIED');
-      }
-      final stage = await finished.timeout(const Duration(seconds: 35));
-      if (!stage.isConnected || !connected) {
-        throw const FormatException('ANDROID_OPENVPN_CONNECT_FAILED');
-      }
-    } on TimeoutException {
-      throw const FormatException('ANDROID_OPENVPN_CONNECT_TIMEOUT');
-    } finally {
-      _connecting = false;
-    }
-  }
-
-  Future<void> disconnect() async {
-    final engine = _engine;
-    if (!Platform.isAndroid || engine == null) return;
-    await engine.disconnect();
-  }
-}
-).hasMatch(config) ||
-        !RegExp(r'(?m)^remote\\s+\\S+\\s+\\d+').hasMatch(config)) {
-      throw const FormatException('ANDROID_OPENVPN_CONFIG_INVALID');
-    }
-    return config;
-  }
-
-  Future<void> connect({
-    required Map<String, dynamic> item,
-    required String serverName,
-    required VpnPolicy policy,
-  }) async {
-    requireSafePolicy(policy);
-    if (!await initialize()) {
-      throw const FormatException('ANDROID_OPENVPN_ENGINE_UNAVAILABLE');
-    }
-    if (_connecting || connected) {
-      throw const FormatException('VPN_TUNNEL_ALREADY_ACTIVE');
-    }
-    final config = requireProfile(item);
-    final engine = _engine!;
-    _connecting = true;
-    try {
-      // Subscribe before starting: avoid missing fast failure/connected stage.
-      final finished = engine.stageStream
-          .firstWhere((stage) => stage.isConnected || stage.isDisconnected);
-      final result = await engine.connect(
-        config, serverName,
-        username: item['username'] is String ? item['username'] as String : null,
-        password: item['password'] is String ? item['password'] as String : null,
-      );
-      if (!result) {
-        throw const FormatException('VPN_PERMISSION_DENIED');
-      }
+      if (!result) throw const FormatException('VPN_PERMISSION_DENIED');
       final stage = await finished.timeout(const Duration(seconds: 35));
       if (!stage.isConnected || !connected) {
         throw const FormatException('ANDROID_OPENVPN_CONNECT_FAILED');
