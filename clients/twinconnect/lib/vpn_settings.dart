@@ -736,13 +736,6 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
     );
   }
 
-  bool get _guardActive =>
-      _guard['serviceInstalled'] == true &&
-      _guard['armed'] == true &&
-      _guard['enforcedV4'] == true &&
-      _guard['enforcedV6'] == true &&
-      _guard['recoveryVerified'] == true;
-
   void _explain(String title, String description) {
     showDialog<void>(
       context: context,
