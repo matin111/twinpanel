@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -30,6 +31,7 @@ class AndroidConnectionCard extends StatefulWidget {
     this.selectedNodeId,
     this.selectedProtocolCode,
     this.servers,
+    this.subscriptionContent,
     super.key,
   });
 
@@ -43,6 +45,7 @@ class AndroidConnectionCard extends StatefulWidget {
   /// The server screen owns protocol selection, not the connect screen.
   final String? selectedProtocolCode;
   final AppServerInventory? servers;
+  final Widget? subscriptionContent;
 
   @override
   State<AndroidConnectionCard> createState() => _AndroidConnectionCardState();
@@ -397,6 +400,30 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
       key: const Key('androidConnectionCard'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(28),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 21, sigmaY: 21),
+            child: Container(
+              key: const Key('androidSharedPowerCard'),
+              padding: const EdgeInsets.fromLTRB(18, 22, 18, 18),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(28),
+                gradient: LinearGradient(
+                  colors: Theme.of(context).brightness == Brightness.dark
+                      ? [const Color(0xFF203847).withValues(alpha: .48),
+                         const Color(0xFF142B37).withValues(alpha: .34),
+                         const Color(0xFF234B4B).withValues(alpha: .31)]
+                      : [const Color(0xFFFFFFFF).withValues(alpha: .97),
+                         const Color(0xFFF8FBFC).withValues(alpha: .96),
+                         const Color(0xFFF0F7F8).withValues(alpha: .96)],
+                ),
+                border: Border.all(
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? const Color(0xFF7DA5B0).withValues(alpha: .31)
+                      : const Color(0xFFAFCDD3).withValues(alpha: .78)),
+              ),
+              child: Column(children: [
         Center(
           child: AnimatedContainer(
             key: const Key('androidVerifiedStatus'),
@@ -491,7 +518,15 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
                 : s.pick('اتصال سریع', 'Connect now')),
           ),
         ),
-        const SizedBox(height: 18),
+        if (widget.subscriptionContent != null) ...[
+          const SizedBox(height: 12),
+          widget.subscriptionContent!,
+        ],
+              ]),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
         Container(
           key: const Key('androidNetworkOverview'),
           padding: const EdgeInsets.all(16),
