@@ -140,9 +140,10 @@ void main() {
     expect(dashboard, contains('if (Platform.isAndroid) _androidExplicitNodeSelected = true;'));
     expect(dashboard, contains('selectedNodeId: _androidExplicitNodeSelected'));
     expect(dashboard, contains('if (Platform.isAndroid) {'));
-    expect(androidCard, contains("item['node_id']?.toString() == selectedNodeId"));
+    expect(androidCard, contains("item['node_id']?.toString()"));
+    expect(androidCard, contains('selectedNodeId != null && id != selectedNodeId'));
     expect(androidCard, contains('SELECTED_WIREGUARD_NODE_UNAVAILABLE'));
-    expect(androidCard, contains('AndroidTunnelController.wireGuardNodes(selectedProfiles)'));
+    expect(androidCard, contains('_autoNode(profiles, selectedNodeId)'));
   });
 
   test('Android offers all entitled protocols without claiming missing engines', () {
