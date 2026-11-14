@@ -355,13 +355,16 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Guard WFP preflight failed' }
       - name: Package TwinConnect Windows setup with automatic WireGuard prerequisite
         shell: pwsh
+        env:
+          GUARD_RELEASE_APPROVED: ${{ vars.TWINCONNECT_GUARD_RELEASE_APPROVED }}
+          GUARD_SIGNER: ${{ vars.TWINCONNECT_GUARD_SIGNER_THUMBPRINT }}
         run: |
           $ErrorActionPreference = "Stop"
           $compiler = "${env:ProgramFiles(x86)}\\Inno Setup 6\\ISCC.exe"
           if (!(Test-Path $compiler)) { throw "Inno Setup 6 compiler not installed" }
           if ($env:SIGNING_CONFIGURED -eq 'true' -and
-              "${{ vars.TWINCONNECT_GUARD_RELEASE_APPROVED }}" -eq 'true') {
-            $signer = "${{ vars.TWINCONNECT_GUARD_SIGNER_THUMBPRINT }}"
+              $env:GUARD_RELEASE_APPROVED -eq 'true') {
+            $signer = $env:GUARD_SIGNER
             $guard = 'build/windows/x64/runner/Release/services/TwinConnectGlobalGuard.exe'
             if (!$signer -or !(Test-Path $guard)) { throw 'Signed guard not present' }
             & $compiler '/DIncludeVerifiedGlobalGuard=1' ("/DGuardSigningThumbprint=" + $signer) 'installer.iss'
