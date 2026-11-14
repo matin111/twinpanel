@@ -222,6 +222,13 @@ void main() {
     expect(script, contains('TWINCONNECT_APP_UNLOCKED'));
     expect(script, contains(r'Remove-Item -LiteralPath $receipt'));
     expect(native, contains('APP_WFP_NATIVE_ARM_ERROR_'));
+    expect(native, contains('const bool sameApp'));
+    expect(native, contains('if (sameApp) {'));
+    expect(native, contains('FwpmTransactionAbort0(h)'));
+    expect(native, contains('appCondition = &condition'));
+    expect(native, contains('interfaceCondition = &condition'));
+    expect(native, isNot(contains('f->filterCondition[0]')));
+    expect(native, isNot(contains('f->filterCondition[1]')));
     expect(settings, isNot(contains(r"'تغییر Kill Switch انجام نشد: ${error.toString()}'")));
   });
 
