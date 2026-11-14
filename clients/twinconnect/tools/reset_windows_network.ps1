@@ -12,7 +12,7 @@ try {
   # Attempt recovery of ONLY TwinConnect-owned persistent WFP filters first.
   # Resetting Winsock does not remove WFP filters. Never reset the whole
   # Windows Firewall or delete rules belonging to unrelated applications.
-  $guard = Join-Path $env:ProgramFiles 'TwinConnect\services\TwinConnectGlobalGuard.exe'
+  $guard = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\services\TwinConnectGlobalGuard.exe'))
   $service = Get-Service -Name 'TwinConnectGlobalGuard' -ErrorAction SilentlyContinue
   if ((Test-Path -LiteralPath $guard -PathType Leaf) -or $service) {
     if (!(Test-Path -LiteralPath $guard -PathType Leaf)) {
@@ -37,7 +37,7 @@ try {
 
   # Recover the separately bundled selected-app WFP rule as well, even when
   # no system-wide guard service was ever installed.
-  $appGuard = Join-Path $env:ProgramFiles 'TwinConnect\services\TwinConnectAppKillSwitch.exe'
+  $appGuard = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\services\TwinConnectAppKillSwitch.exe'))
   if (Test-Path -LiteralPath $appGuard -PathType Leaf) {
     & $appGuard recover | Out-Null
     if ($LASTEXITCODE -ne 0) { throw 'APP_WFP_EMERGENCY_RECOVERY_FAILED' }
