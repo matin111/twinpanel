@@ -425,6 +425,12 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
     setState(() { _busy = true; _errorCode = null; });
     var stage = 'OPENVPN_ENGINE_INIT_FAILED';
     try {
+      // Do not bypass the policy gate used by the existing native transport.
+      final policy = await _store.loadFailClosed(
+        widget.panel.namespace, widget.username,
+      );
+      final capabilities = await NativeVpnBridge.probe();
+      NativeVpnBridge.requireSafeToConnect(policy, capabilities);
       await AndroidOpenVpnTunnel.instance.initialize();
       stage = 'OPENVPN_PROFILE_FETCH_FAILED';
       final profiles = await TenantApi.fromBuildConfig()
