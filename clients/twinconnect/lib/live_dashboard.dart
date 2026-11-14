@@ -4688,7 +4688,12 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                     catalog: widget.catalog!,
                     native: widget.native,
                     servers: widget.servers,
-                    selectedProtocolCode: _filter == 'all' ? null : _filter,
+                    // The Connect home can only show protocols whose Android
+                    // native transport is actually initialized. An unsupported
+                    // Servers filter (Cisco, OpenVPN, etc.) cannot hijack it.
+                    selectedProtocolCode: _filter != 'all' &&
+                            widget.native.supports(_filter)
+                        ? _filter : null,
                     selectedNodeId: _androidExplicitNodeSelected
                         ? _selectedServerId : null,
                     subscriptionContent: Container(
