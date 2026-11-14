@@ -6,18 +6,12 @@ param(
   [Parameter(Mandatory=$true)]
   [ValidateSet('Pick','Status','Lock','Unlock')]
   [string]$Action,
-  [string]$Executable = ''
+  [string]$Executable = '',
+  [string]$ElevationReceipt = ''
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
-if ($Action -in @('Lock','Unlock')) {
-  $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
-  $principal = [Security.Principal.WindowsPrincipal]::new($identity)
-  if (!$principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-    throw 'ADMINISTRATOR_REQUIRED_TO_CHANGE_WFP_RULES'
-  }
-}
 if ($Action -eq 'Pick') {
   Add-Type -AssemblyName System.Windows.Forms
   $dialog = New-Object System.Windows.Forms.OpenFileDialog
@@ -63,6 +57,44 @@ $binary = Join-Path $PSScriptRoot '..\services\TwinConnectAppKillSwitch.exe'
 $binary = [IO.Path]::GetFullPath($binary)
 if (!(Test-Path -LiteralPath $binary -PathType Leaf)) { throw 'APP_WFP_ENGINE_NOT_INSTALLED' }
 
+# Windows desktop app is not normally elevated. Ask Windows for consent
+# ONLY for the requested Lock/Unlock; never elevate file selection or status.
+if ($Action -in @('Lock','Unlock')) {
+  $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+  $principal = [Security.Principal.WindowsPrincipal]::new($identity)
+  if (!$principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+    if ($ElevationReceipt) { throw 'APP_WFP_ELEVATION_LOOP' }
+    $receipt = Join-Path ([IO.Path]::GetTempPath()) ('twinconnect-wfp-' + [guid]::NewGuid().ToString('N') + '.txt')
+    try {
+      # Windows file names cannot contain quotation marks. Pass quoted paths
+      # as separate arguments to the signed-in Windows PowerShell process.
+      $args = @(
+        '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
+        '-File', ('"' + $PSCommandPath + '"'),
+        '-Action', $Action,
+        '-Executable', ('"' + $path + '"'),
+        '-ElevationReceipt', ('"' + $receipt + '"')
+      )
+      $child = Start-Process -FilePath (Join-Path $PSHOME 'powershell.exe') -ArgumentList $args -Verb RunAs -Wait -PassThru -ErrorAction Stop
+      if ($child.ExitCode -ne 0) { throw 'APP_WFP_ELEVATED_COMMAND_FAILED' }
+      if (!(Test-Path -LiteralPath $receipt -PathType Leaf)) { throw 'APP_WFP_ELEVATED_RECEIPT_MISSING' }
+      $answer = (Get-Content -LiteralPath $receipt -Raw -ErrorAction Stop).Trim()
+      $expected = if ($Action -eq 'Lock') { 'TWINCONNECT_APP_LOCKED' } else { 'TWINCONNECT_APP_UNLOCKED' }
+      if ($answer -cne $expected) { throw 'APP_WFP_ELEVATED_RECEIPT_INVALID' }
+      # Independent read-only WFP recheck prevents a stale/spoofed receipt
+      # from being treated as success, including when UAC was cancelled.
+      $verified = (& $binary status $path 2>$null | Out-String).Trim()
+      if ($LASTEXITCODE -ne 0 -or $verified -cne $expected) {
+        throw 'APP_WFP_ELEVATED_STATUS_UNVERIFIED'
+      }
+      Write-Output $expected
+      exit 0
+    } finally {
+      Remove-Item -LiteralPath $receipt -Force -ErrorAction SilentlyContinue
+    }
+  }
+}
+
 if ($Action -eq 'Status') {
   $output = & $binary status $path 2>&1
 } elseif ($Action -eq 'Unlock') {
@@ -104,5 +136,9 @@ if ($Action -in @('Lock','Unlock')) {
       Remove-NetFirewallRule -Name $oldRule -PolicyStore PersistentStore -ErrorAction Stop
     }
   }
+}
+if ($ElevationReceipt) {
+  # The unelevated parent validates this receipt against native WFP status.
+  [IO.File]::WriteAllText($ElevationReceipt, $result, [Text.Encoding]::UTF8)
 }
 Write-Output $result
