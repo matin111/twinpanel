@@ -4,6 +4,7 @@ import asyncio
 import os
 from contextlib import suppress
 import time
+from datetime import datetime, timedelta
 
 from sqlalchemy.orm import Session
 
@@ -518,6 +519,90 @@ async def process_paid_store_orders_once(limit: int = 10) -> dict:
     }
 
 
+def reconcile_auto_payment_delivery_once(limit: int = 50) -> dict:
+    """Backfill missing notification rows for already-fulfilled auto payments.
+
+    Never reprovision a subscription or replay a delivered event. This only
+    creates a missing, idempotently keyed outbox row after customer credentials
+    are actually available.
+    """
+    from ..telegram_notify_models import TelegramNotification
+    db = SessionLocal()
+    repaired = []
+    try:
+        candidates = (
+            db.query(PaymentIntent, StoreOrder, Subscription)
+            .join(StoreOrder, StoreOrder.id == PaymentIntent.order_id)
+            .join(Subscription, Subscription.id == StoreOrder.subscription_id)
+            .filter(
+                PaymentIntent.status == "auto_verified",
+                PaymentIntent.verified_at >= datetime.utcnow() - timedelta(days=7),
+                StoreOrder.status == "fulfilled",
+                Subscription.account_username.isnot(None),
+                Subscription.account_username != "",
+                Subscription.share_code.isnot(None),
+                Subscription.share_code != "",
+            )
+            .order_by(PaymentIntent.id.desc())
+            .limit(max(1, int(limit)))
+            .all()
+        )
+        for intent, order, subscription in candidates:
+            # Read prior payment notices, including legacy event-key formats.
+            existing = (
+                db.query(TelegramNotification)
+                .filter(
+                    TelegramNotification.user_id == int(intent.user_id),
+                    TelegramNotification.kind == "payment_approved",
+                )
+                .all()
+            )
+            if any(
+                str((notice.payload or {}).get("payment_id") or "") == str(intent.id)
+                for notice in existing
+            ):
+                continue
+            credential = (
+                db.query(ProtocolCredential)
+                .filter(
+                    ProtocolCredential.subscription_id == int(subscription.id),
+                    ProtocolCredential.is_active.is_(True),
+                    ProtocolCredential.config_text_encrypted.isnot(None),
+                    ProtocolCredential.config_text_encrypted != "",
+                )
+                .first()
+            )
+            if not _credential_ready_for_early_delivery(credential):
+                continue
+            queue_telegram_notification(
+                db,
+                user_id=int(intent.user_id),
+                event_key=(
+                    f"payment-approved:order:{int(order.id)}:"
+                    f"payment:{int(intent.id)}:subscription:{int(subscription.id)}"
+                ),
+                kind="payment_approved",
+                payload={
+                    "payment_id": int(intent.id),
+                    "order_id": int(order.id),
+                    "subscription_id": int(subscription.id),
+                    "username": subscription.account_username,
+                    "amount_toman": int(
+                        intent.payable_amount_toman or intent.base_amount_toman or 0
+                    ),
+                },
+            )
+            repaired.append(int(intent.id))
+        if repaired:
+            db.commit()
+        return {"repaired": len(repaired), "intent_ids": repaired[:30]}
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+
 async def payment_fulfillment_recovery_loop() -> None:
     try:
         recovered = await asyncio.to_thread(
@@ -538,8 +623,16 @@ async def payment_fulfillment_recovery_loop() -> None:
             flush=True,
         )
 
+    next_reconcile_at = 0.0
     while True:
         try:
+            if time.monotonic() >= next_reconcile_at:
+                repaired = await asyncio.to_thread(
+                    reconcile_auto_payment_delivery_once
+                )
+                next_reconcile_at = time.monotonic() + 60.0
+                if repaired["repaired"]:
+                    print("AUTO_PAYMENT_MISSING_DELIVERY_QUEUED", repaired, flush=True)
             result = await process_paid_store_orders_once()
             wallet_result = await process_wallet_paid_orders_once()
             if result.get("seen") or wallet_result.get("seen"):
