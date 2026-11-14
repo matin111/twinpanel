@@ -28,6 +28,8 @@ export function AdminActivityPopup(){
   const {pick}=useI18n();
   const [open,setOpen]=useState(false);
   const [filter,setFilter]=useState("all");
+  const [search,setSearch]=useState("");
+  const [appliedSearch,setAppliedSearch]=useState("");
   const [page,setPage]=useState(0);
   const [revision,setRevision]=useState(0);
   const [data,setData]=useState<ActivityPage|null>(null);
@@ -42,7 +44,7 @@ export function AdminActivityPopup(){
     setLoading(true);setError("");
     const headers={Authorization:`Bearer ${token}`};
     Promise.all([
-      fetch(`${API_BASE}/v1/admin/activity?category=${filter}&limit=30&offset=${page*30}`,{headers,cache:"no-store"}),
+      fetch(`${API_BASE}/v1/admin/activity?category=${filter}&limit=30&offset=${page*30}&search=${encodeURIComponent(appliedSearch)}`,{headers,cache:"no-store"}),
       fetch(`${API_BASE}/v1/admin/activity/stats`,{headers,cache:"no-store"}),
     ]).then(async([a,b])=>{
       if(!a.ok||!b.ok)throw new Error("دریافت تاریخچه ممکن نشد");
@@ -51,7 +53,7 @@ export function AdminActivityPopup(){
     }).catch(e=>{if(!cancelled)setError(e instanceof Error?e.message:String(e));})
       .finally(()=>{if(!cancelled)setLoading(false);});
     return()=>{cancelled=true;};
-  },[open,filter,page,revision]);
+  },[open,filter,page,revision,appliedSearch]);
   const close=()=>setOpen(false);
   return <>
     <button type="button" className="ghost" onClick={()=>setOpen(true)}
@@ -84,6 +86,11 @@ export function AdminActivityPopup(){
               <option value="subscription">{pick("اشتراک‌ها","Subscriptions")}</option>
               <option value="other">{pick("سایر","Other")}</option>
             </select></label>
+            <form onSubmit={event=>{event.preventDefault();setPage(0);setAppliedSearch(search.trim());setRevision(v=>v+1);}} style={{display:"flex",gap:6,alignItems:"center",flex:"1 1 250px",minWidth:0}}>
+              <input type="search" value={search} onChange={e=>setSearch(e.target.value)} placeholder={pick("جستجوی ادمین، شناسه اکانت، عملیات…","Search admin, account ID, action…")} aria-label={pick("جستجو در تاریخچه","Search history")} style={{minWidth:0,flex:1,padding:"8px 10px",borderRadius:9}}/>
+              <button type="submit" className="primary" disabled={loading}>{pick("جستجو","Search")}</button>
+              {appliedSearch&&<button type="button" className="ghost" onClick={()=>{setSearch("");setAppliedSearch("");setPage(0);}}>{pick("پاک‌کردن","Clear")}</button>}
+            </form>
             <button className="ghost" type="button" disabled={loading} onClick={()=>setRevision(v=>v+1)}>{pick("بروزرسانی","Refresh")}</button>
           </div>
           {error&&<div className="runtime-error">{error}</div>}
