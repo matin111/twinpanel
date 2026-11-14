@@ -14,7 +14,7 @@ void main() {
   test('OpenVPN and Cisco render moving connection fabric without fake rates', () {
     final card = File('lib/android_connection_card.dart').readAsStringSync();
     final wave = File('lib/twinconnect_wave_indicator.dart').readAsStringSync();
-    expect(card, contains('connected: connected && (_handshake || _openVpnUp)'));
+    expect(card, contains('connected: _activeVerifiedTransport,'));
     expect(wave, contains('bool get _animate => widget.connected || widget.connecting;'));
     expect(wave, contains('final active = connected;'));
     expect(wave, contains('widget.rxSamples'));
