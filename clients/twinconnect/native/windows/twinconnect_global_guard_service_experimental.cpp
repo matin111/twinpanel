@@ -202,16 +202,11 @@ std::wstring HandleRequest(const std::wstring& request) {
 #if defined(TWINCONNECT_GUARD_DIAGNOSTIC_ONLY)
   // Diagnostic build does not permit disarm or arm commands.
   return L"ERR DIAGNOSTIC_NO_FIREWALL_CHANGES";
-#endif
+#else
   if (request == std::wstring(L"disarm ") + kAccept) {
     DWORD code = TransactionalDisarm(engine.handle);
     return code == ERROR_SUCCESS ? L"OK DISARMED" : L"ERR WFP_DISARM_FAILED";
   }
-#if defined(TWINCONNECT_GUARD_DIAGNOSTIC_ONLY)
-  // Internal installer test build: no request can add persistent WFP rules.
-  // The installed service verifies SCM/UAC/IPC lifecycle only.
-  return L"ERR DIAGNOSTIC_BUILD_BLOCKING_DISABLED";
-#endif
   const std::wstring prefix = L"arm ";
   if (request.rfind(prefix, 0) != 0) return L"ERR UNKNOWN_COMMAND";
   // Strict token count; paths may include spaces, so use tab as separator.
@@ -234,6 +229,7 @@ std::wstring HandleRequest(const std::wstring& request) {
   DWORD code = TransactionalArm(engine.handle, luid, endpoint, path);
   return code == ERROR_SUCCESS ? L"OK ARMED_EXPERIMENTAL" :
                                  L"ERR WFP_ARM_FAILED";
+#endif
 }
 
 void WINAPI ServiceMain(DWORD, LPWSTR*) {
