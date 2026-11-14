@@ -9,6 +9,7 @@
 
 #include <windows.h>
 #include <winsvc.h>
+#include <cwchar>
 #include <fwpmu.h>
 #include <flutter/encodable_value.h>
 #pragma comment(lib, "Fwpuclnt.lib")
@@ -50,6 +51,23 @@ inline bool ServicePresent(bool* running) {
   return found;
 }
 
+// Never infer active protection from filter presence alone.
+inline bool IndependentRollbackVerified() {
+  const wchar_t request[] = L"status";
+  wchar_t reply[128] = {};
+  DWORD received = 0;
+  const BOOL success = CallNamedPipeW(
+      L"\\\\.\\pipe\\TwinConnectGlobalGuardV1",
+      const_cast<wchar_t*>(request),
+      static_cast<DWORD>((sizeof(request) / sizeof(wchar_t) - 1) * sizeof(wchar_t)),
+      reply, static_cast<DWORD>(sizeof(reply)), &received, 1500);
+  if (!success || received % sizeof(wchar_t) != 0 || received < 8) return false;
+  const size_t characters = received / sizeof(wchar_t);
+  if (characters >= sizeof(reply) / sizeof(wchar_t)) return false;
+  reply[characters] = L'\0';
+  return wcscmp(reply, L"OK 1 1 1 1") == 0;
+}
+
 inline flutter::EncodableValue Preflight() {
   // Opening the WFP management engine is a capability check only.
   FWPM_SESSION0 session = {};
@@ -66,9 +84,9 @@ inline flutter::EncodableValue Preflight() {
   if (engine) FwpmEngineClose0(engine);
   bool running = false;
   const bool installed = ServicePresent(&running);
-  // Do NOT declare enforcement until recovery test results and a signed
-  // service attestation can be obtained. No service implements that yet.
-  const bool recoveryVerified = false;
+  // A running service and WFP rule presence alone do not prove protection.
+  const bool recoveryVerified = installed && running && v4 && v6 &&
+      transport && IndependentRollbackVerified();
   const bool armed = installed && running && v4 && v6 && transport &&
                      recoveryVerified;
   const char* reason = !ready ? "WFP_ENGINE_UNAVAILABLE" :
