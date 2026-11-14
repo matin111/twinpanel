@@ -166,10 +166,7 @@ public class AxeOpenConnectVpnService extends VpnService {
             broadcastStage("authenticating");
 
             // Step 1a: POST username to /auth to get context cookie
-            authSock = (SSLSocket) ssf.createSocket(host, port);
-            protect(authSock);
-            requireVerifiedHost(authSock, servercert);
-            authSock.startHandshake();
+            authSock = connectProtectedTls(ssf, host, port, servercert);
 
             String body1 = "username=" + URLEncoder.encode(username, "UTF-8");
             if (authGroup != null && !authGroup.isEmpty())
@@ -200,10 +197,7 @@ public class AxeOpenConnectVpnService extends VpnService {
             }
 
             // Step 1b: POST password with context cookie to /auth to get VPN session cookies
-            authSock = (SSLSocket) ssf.createSocket(host, port);
-            protect(authSock);
-            requireVerifiedHost(authSock, servercert);
-            authSock.startHandshake();
+            authSock = connectProtectedTls(ssf, host, port, servercert);
 
             String body2 = "password=" + URLEncoder.encode(password, "UTF-8");
             String authReq2 = "POST /auth HTTP/1.1\r\n"
@@ -247,10 +241,7 @@ public class AxeOpenConnectVpnService extends VpnService {
 
             // ── Phase 2: Open CSTP tunnel ──
             broadcastStage("connecting");
-            tunSock = (SSLSocket) ssf.createSocket(host, port);
-            protect(tunSock);
-            requireVerifiedHost(tunSock, servercert);
-            tunSock.startHandshake();
+            tunSock = connectProtectedTls(ssf, host, port, servercert);
 
             String connectReq = "CONNECT /CSCOSSLC/tunnel HTTP/1.1\r\n"
                     + "Host: " + host + "\r\n"
@@ -350,6 +341,29 @@ public class AxeOpenConnectVpnService extends VpnService {
         } catch (Exception e) {
             Log.e(TAG, "Pinned TLS initialization failed", e);
             throw new IllegalStateException("CISCO_TLS_PIN_ENGINE_FAILED", e);
+        }
+    }
+
+    /** Protect the underlying TCP socket BEFORE connecting to the gateway.
+     * Protecting an already-connected TLS socket is too late during reconnect,
+     * and can accidentally route the VPN control channel through its own TUN.
+     */
+    private SSLSocket connectProtectedTls(
+            SSLSocketFactory factory, String host, int port, String pin)
+            throws IOException {
+        java.net.Socket base = new java.net.Socket();
+        try {
+            if (!protect(base)) {
+                throw new IOException("CISCO_SOCKET_PROTECTION_FAILED");
+            }
+            base.connect(new java.net.InetSocketAddress(host, port), 10000);
+            SSLSocket tls = (SSLSocket) factory.createSocket(base, host, port, true);
+            requireVerifiedHost(tls, pin);
+            tls.startHandshake();
+            return tls;
+        } catch (IOException | RuntimeException error) {
+            try { base.close(); } catch (IOException ignored) {}
+            throw error;
         }
     }
 
