@@ -219,7 +219,7 @@ void main() {
   test('Android quick connect never shows the raw node picker', () {
     final card = File('lib/android_connection_card.dart').readAsStringSync();
     final dashboard = File('lib/live_dashboard.dart').readAsStringSync();
-    expect(card, contains('WireGuardNode? _autoNode('));
+    expect(card, contains('List<WireGuardNode> _candidateNodes('));
     expect(card, contains('widget.servers?.servers'));
     expect(card, contains('matching.nodeOnline'));
     expect(card, contains('selectedNodeId != null && id != selectedNodeId'));
