@@ -9,6 +9,7 @@ import 'app_strings.dart';
 import 'brand_theme.dart';
 import 'interactive_glass_card.dart';
 import 'native_vpn_bridge.dart';
+import 'windows_app_route_engine.dart';
 import 'vpn_policy.dart';
 import 'tenant_models.dart';
 
@@ -45,6 +46,10 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
   bool? _selectedKillSwitchEnabled;
   bool _appLockBusy = false;
   Timer? _guardStatusTimer;
+  WindowsAppRoutingMode _routingMode = WindowsAppRoutingMode.fullTunnel;
+  List<String> _routingApps = <String>[];
+  bool _routingBusy = false;
+
 
   @override
   void initState() {
@@ -52,6 +57,7 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
     _check();
     if (Platform.isWindows) {
       _loadSelectedKillSwitchApp();
+      _loadRoutingSettings();
       // Keep the native Windows WFP service as the source of truth,
       // including when SYSTEM's timed emergency recovery removes filters.
       _guardStatusTimer = Timer.periodic(
@@ -229,6 +235,100 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
         _selectedKillSwitchApp = path;
         _selectedKillSwitchEnabled = enabled;
       });
+    }
+  }
+
+
+  Future<void> _loadRoutingSettings() async {
+    try {
+      final policy = await WindowsAppRoutePolicy.load();
+      policy.validate();
+      if (mounted) setState(() {
+        _routingMode = policy.mode;
+        _routingApps = policy.applicationPaths.toList();
+      });
+    } catch (_) {
+      if (mounted) setState(() {
+        _routingMode = WindowsAppRoutingMode.fullTunnel;
+        _routingApps = <String>[];
+      });
+    }
+  }
+
+  Future<void> _chooseRoutingApp() async {
+    if (!Platform.isWindows || _routingBusy) return;
+    setState(() => _routingBusy = true);
+    try {
+      final result = await _appLockCommand('Pick');
+      if (result == 'TWINCONNECT_PICK_CANCELLED') return;
+      const prefix = 'TWINCONNECT_PICKED ';
+      if (!result.startsWith(prefix)) throw const FormatException('ROUTING_APP_PICK_FAILED');
+      final selected = result.substring(prefix.length).trim();
+      if (selected.isEmpty) throw const FormatException('ROUTING_APP_PATH_EMPTY');
+      final updated = <String>[..._routingApps];
+      if (!updated.contains(selected)) updated.add(selected);
+      final policy = WindowsAppRoutePolicy(
+        mode: _routingMode, applicationPaths: updated);
+      await policy.persist();
+      if (mounted) setState(() => _routingApps = updated);
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(
+          AppStrings.of(context).pick(
+            'انتخاب برنامه برای مسیریابی انجام نشد: $error',
+            'Application routing selection failed: $error'))));
+      }
+    } finally {
+      if (mounted) setState(() => _routingBusy = false);
+    }
+  }
+
+  Future<void> _removeRoutingApp(String selected) async {
+    if (_routingBusy) return;
+    setState(() => _routingBusy = true);
+    try {
+      final remaining = _routingApps.where((p) => p != selected).toList();
+      final mode = remaining.isEmpty
+          ? WindowsAppRoutingMode.fullTunnel : _routingMode;
+      await WindowsAppRoutePolicy(
+        mode: mode, applicationPaths: remaining).persist();
+      if (mounted) setState(() {
+        _routingMode = mode;
+        _routingApps = remaining;
+      });
+    } catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.toString())));
+    } finally {
+      if (mounted) setState(() => _routingBusy = false);
+    }
+  }
+
+  Future<void> _setRoutingMode(WindowsAppRoutingMode mode) async {
+    if (!Platform.isWindows || _routingBusy) return;
+    if (mode != WindowsAppRoutingMode.fullTunnel && _routingApps.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(
+        AppStrings.of(context).pick(
+          'اول یک برنامه را برای مسیریابی انتخاب کن.',
+          'Select an application for routing first.'))));
+      return;
+    }
+    setState(() => _routingBusy = true);
+    try {
+      await WindowsAppRoutePolicy(
+        mode: mode, applicationPaths: _routingApps).persist();
+      if (mounted) {
+        setState(() => _routingMode = mode);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(
+          AppStrings.of(context).pick(
+            'مسیریابی ذخیره شد؛ برای اعمال در موتور sing-box اتصال VPN را دوباره برقرار کن.',
+            'Routing saved. Reconnect a sing-box VPN tunnel to apply it.'))));
+      }
+    } catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.toString())));
+    } finally {
+      if (mounted) setState(() => _routingBusy = false);
     }
   }
 
@@ -578,16 +678,26 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
     required bool selected,
     required bool enabled,
     required Key key,
+    VoidCallback? onTap,
   }) => Row(key: key, children: [
-    Icon(selected ? Icons.radio_button_checked_rounded
-                  : Icons.radio_button_unchecked_rounded,
-      color: selected ? Theme.of(context).colorScheme.primary
-          : Theme.of(context).disabledColor, size: 20),
-    const SizedBox(width: 12),
-    Expanded(child: Text(label, style: TextStyle(
-      fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-      color: enabled ? null : Theme.of(context).disabledColor,
-    ))),
+    Expanded(child: InkWell(
+      onTap: enabled ? onTap : null,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Row(children: [
+          Icon(selected ? Icons.radio_button_checked_rounded
+              : Icons.radio_button_unchecked_rounded,
+            color: selected ? Theme.of(context).colorScheme.primary
+                : Theme.of(context).disabledColor, size: 20),
+          const SizedBox(width: 12),
+          Expanded(child: Text(label, style: TextStyle(
+            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+            color: enabled ? null : Theme.of(context).disabledColor,
+          ))),
+        ]),
+      ),
+    )),
     _help(label, help),
     if (!enabled) const Icon(Icons.lock_outline_rounded, size: 17),
   ]);
