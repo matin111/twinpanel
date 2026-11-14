@@ -4677,17 +4677,11 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         heading(tr('اتصال سریع', 'Quick connect')),
         const SizedBox(height: 16),
         if (Platform.isAndroid) ...[
-          glassCard(
+          Container(
             key: const Key('androidNativeConnectionGlass'),
-            radius: 26,
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 23),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                if (widget.catalog == null)
-                  const Center(child: CircularProgressIndicator())
-                else
-                  AndroidConnectionCard(
+            child: widget.catalog == null
+                ? const Center(child: CircularProgressIndicator())
+                : AndroidConnectionCard(
                     panel: widget.panel,
                     username: widget.username,
                     sessionToken: widget.sessionToken,
@@ -4697,23 +4691,18 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                     selectedProtocolCode: _filter == 'all' ? null : _filter,
                     selectedNodeId: _androidExplicitNodeSelected
                         ? _selectedServerId : null,
+                    subscriptionContent: Container(
+                      key: const Key('androidAccountSummary'),
+                      child: homeSubscriptionSummary(),
+                    ),
                   ),
-                const SizedBox(height: 15),
-                OutlinedButton.icon(
-                  key: const Key('androidChooseLocation'),
-                  onPressed: () => setState(() => _page = 'locations'),
-                  icon: const Icon(Icons.place_outlined),
-                  label: Text(tr('انتخاب سرور', 'Choose location')),
-                ),
-              ],
-            ),
           ),
-          const SizedBox(height: 14),
-          glassCard(
-            key: const Key('androidAccountSummary'),
-            radius: 24,
-            padding: const EdgeInsets.all(18),
-            child: homeSubscriptionSummary(),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            key: const Key('androidChooseLocation'),
+            onPressed: () => setState(() => _page = 'locations'),
+            icon: const Icon(Icons.place_outlined),
+            label: Text(tr('انتخاب سرور', 'Choose location')),
           ),
         ] else LayoutBuilder(builder: (context, constraints) {
           final split = constraints.maxWidth >= 740;
