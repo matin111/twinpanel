@@ -17,6 +17,7 @@ const titles:Record<string,string>={
   wallet_credit:"افزایش کیف پول",wallet_debit:"کاهش کیف پول",
   subscription_renew_or_reset:"تمدید / تغییر سهمیه اشتراک",
   subscription_usage_period_reset:"ریست حجم مصرفی",
+  manual_api_mutation:"تغییر دستی در پنل",
 };
 const pretty=(value:unknown)=>value==null?"—":typeof value==="boolean"?(value?"بله":"خیر"):String(value);
 const fmt=(value:string|null)=>value?new Date(value).toLocaleString("fa-IR"):"—";
@@ -28,6 +29,7 @@ export function AdminActivityPopup(){
   const [open,setOpen]=useState(false);
   const [filter,setFilter]=useState("all");
   const [page,setPage]=useState(0);
+  const [revision,setRevision]=useState(0);
   const [data,setData]=useState<ActivityPage|null>(null);
   const [stats,setStats]=useState<Stats|null>(null);
   const [loading,setLoading]=useState(false);
@@ -49,7 +51,7 @@ export function AdminActivityPopup(){
     }).catch(e=>{if(!cancelled)setError(e instanceof Error?e.message:String(e));})
       .finally(()=>{if(!cancelled)setLoading(false);});
     return()=>{cancelled=true;};
-  },[open,filter,page]);
+  },[open,filter,page,revision]);
   const close=()=>setOpen(false);
   return <>
     <button type="button" className="ghost" onClick={()=>setOpen(true)}
@@ -82,7 +84,7 @@ export function AdminActivityPopup(){
               <option value="subscription">{pick("اشتراک‌ها","Subscriptions")}</option>
               <option value="other">{pick("سایر","Other")}</option>
             </select></label>
-            <button className="ghost" type="button" disabled={loading} onClick={()=>{setOpen(false);setTimeout(()=>setOpen(true),0);}}>{pick("بروزرسانی","Refresh")}</button>
+            <button className="ghost" type="button" disabled={loading} onClick={()=>setRevision(v=>v+1)}>{pick("بروزرسانی","Refresh")}</button>
           </div>
           {error&&<div className="runtime-error">{error}</div>}
           {loading&&<small>{pick("در حال دریافت…","Loading…")}</small>}
@@ -100,6 +102,7 @@ export function AdminActivityPopup(){
                 {pick("مصرف قبلی","Previous usage")}: {bytes(item.details.previous_usage_bytes)}
                 {item.details.new_traffic_limit_bytes!=null?" · "+pick("حجم جدید","New quota")+": "+bytes(item.details.new_traffic_limit_bytes):""}
               </small>}
+              {item.action==="manual_api_mutation"&&<small dir="ltr">{pretty(item.details.method)} {pretty(item.details.route)} · HTTP {pretty(item.details.http_status)}</small>}
               {item.details.note&&<small>{pick("توضیح","Note")}: {pretty(item.details.note)}</small>}
             </article>)}
           </div>
