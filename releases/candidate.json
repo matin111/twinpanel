@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.836",
-  "source_sha": "cd49f0a3afe148d5f8aa9e40cb9fdb2f81b5497e",
+  "version": "1.1.0-rc.837",
+  "source_sha": "0d28d19affab90f049a7e34d553b34b94f95c5b5",
   "notes": {
-    "fa": "اصلاح خطای ۴۰۴ تاریخچه اتصال‌ها در صفحه Connection با حذف پیشوند تکراری API؛ افزودن جستجوی سروری نام ادمین، شناسه اکانت و عملیات داخل پاپ‌آپ تاریخچه، بدون تغییر طراحی اصلی پنل.",
-    "en": "Fix session-history API 404 caused by duplicated prefix under the Connection router; add server-side admin activity popup search by administrator, account ID and action, preserving page layout."
+    "fa": "نمایش تاریخچه ریز مصرف هر نشست Connection فقط در پاپ‌آپ بازشونده با دکمه مستقل، بدون کارت‌های بلند در صفحه؛ نمایش واضح کادر جستجوی تاریخچه ادمین در بالای پاپ‌آپ و جستجو بر اساس نام ادمین، شناسه اکانت و نوع عملیات.",
+    "en": "Move per-session Connection usage history into a lazy-loaded accessible modal instead of tall inline cards. Prominently surface server-side admin activity search inside the popup with filters and account/admin/action lookup."
   }
 }
