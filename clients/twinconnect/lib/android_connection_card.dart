@@ -24,6 +24,7 @@ class AndroidConnectionCard extends StatefulWidget {
     required this.catalog,
     required this.native,
     this.selectedNodeId,
+    this.selectedProtocolCode,
     super.key,
   });
 
@@ -34,6 +35,8 @@ class AndroidConnectionCard extends StatefulWidget {
   final NativeProtocolReadiness native;
   // Exact panel node ID selected on the shared Servers screen.
   final String? selectedNodeId;
+  /// The server screen owns protocol selection, not the connect screen.
+  final String? selectedProtocolCode;
 
   @override
   State<AndroidConnectionCard> createState() => _AndroidConnectionCardState();
@@ -46,7 +49,6 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
   bool _busy = false;
   bool _up = false;
   String? _errorCode;
-  String? _selectedProtocolCode;
 
   PanelProtocolStatus? _entry(String code) {
     for (final row in widget.catalog.entries) {
@@ -114,7 +116,8 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
   }
 
   Future<void> _connect() async {
-    if (_selectedProtocolCode != 'wireguard' && _selectedProtocolCode != null) return;
+    if (widget.selectedProtocolCode != 'wireguard' &&
+        widget.selectedProtocolCode != null) return;
     if (_busy || _up || !Platform.isAndroid ||
         !widget.native.supports('wireguard')) {
       return;
@@ -196,88 +199,129 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
     final s = AppStrings.of(context);
     final available = widget.catalog.entries
         .where((entry) => entry.selected).toList(growable: false);
-    if (available.isEmpty) return const SizedBox.shrink();
-    // All protocols allowed by this tenant's plan remain visible. Runtime
-    // readiness is separate from subscription entitlement.
-    final chosenCode = available.any((entry) =>
-            entry.protocol.code == _selectedProtocolCode)
-        ? _selectedProtocolCode!
-        : available.first.protocol.code;
-    final chosen = available.firstWhere(
-        (entry) => entry.protocol.code == chosenCode);
-    final wireguard = _entry('wireguard');
+    if (available.isEmpty) {
+      return Text(s.pick('پروتکل فعالی برای این اشتراک وجود ندارد.',
+          'No protocols enabled for this subscription.'));
+    }
+    // Protocol selection happens on the Servers screen. Never silently
+    // change the explicitly chosen protocol to WireGuard.
+    final requested = widget.selectedProtocolCode;
+    final chosen = requested != null
+        ? available.where((e) => e.protocol.code == requested).firstOrNull
+        : available.where((e) => e.protocol.code == 'wireguard').firstOrNull ??
+            available.first;
     final nativeReady = Platform.isAndroid &&
         widget.native.supports('wireguard') &&
-        wireguard?.selected == true &&
-        wireguard?.configRecordPresent == true;
-    final canConnect = chosenCode == 'wireguard' && nativeReady;
+        chosen != null && chosen.protocol.code == 'wireguard' &&
+        chosen.configRecordPresent;
+    final protocolName = chosen?.protocol.name ?? (requested ?? '—');
+    final connected = _up;
+    final accent = connected ? const Color(0xFF35D9AE)
+        : const Color(0xFF72C1D6);
 
-    return Padding(
+    return Column(
       key: const Key('androidConnectionCard'),
-      padding: const EdgeInsets.all(10),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              s.pick('پروتکل‌های مجاز اشتراک', 'Subscription protocols'),
-              style: Theme.of(context).textTheme.titleMedium,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Center(
+          child: AnimatedContainer(
+            key: const Key('androidVerifiedStatus'),
+            duration: const Duration(milliseconds: 350),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+            decoration: BoxDecoration(
+              color: accent.withValues(alpha: .12),
+              border: Border.all(color: accent.withValues(alpha: .45)),
+              borderRadius: BorderRadius.circular(25),
             ),
-            const SizedBox(height: 12),
-            Wrap(
-              key: const Key('androidProtocolChooser'),
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (final entry in available)
-                  ChoiceChip(
-                    key: Key('androidProtocol_${entry.protocol.code}'),
-                    label: Text(entry.protocol.name),
-                    selected: chosenCode == entry.protocol.code,
-                    onSelected: _busy ? null : (_) => setState(() {
-                      _selectedProtocolCode = entry.protocol.code;
-                      _errorCode = null;
-                    }),
-                  ),
-              ],
+            child: Text(
+              _busy
+                  ? s.pick('در حال اتصال...', 'Connecting...')
+                  : connected
+                      ? s.wireGuardActiveUnverified
+                      : s.pick('آفلاین هستید', 'You are offline'),
+              textAlign: TextAlign.center,
+              style: TextStyle(color: accent, fontWeight: FontWeight.w700),
             ),
-            const SizedBox(height: 12),
-            Text(
-              !chosen.configRecordPresent
-                  ? s.pick('کانفیگ این پروتکل در اشتراک موجود نیست.',
-                           'No profile for this protocol in your subscription.')
-                  : canConnect
-                      ? (_up ? s.wireGuardActiveUnverified : s.wireGuardReady)
-                      : s.pick('موتور اتصال این پروتکل در نسخه اندروید هنوز آماده نیست.',
-                               'This protocol engine is not yet available on Android.'),
-            ),
-            const SizedBox(height: 10),
-            if (chosenCode == 'wireguard')
-              FilledButton.icon(
-                key: const Key('androidWireGuardAction'),
-                onPressed: _busy ? null :
-                    _up ? _disconnect : canConnect ? _connect : null,
-                icon: Icon(_up
-                    ? Icons.stop_circle_outlined : Icons.power_settings_new),
-                label: Text(_up ? s.wireGuardDisconnect : s.wireGuardConnect),
-              )
-            else if (_up)
-              FilledButton.icon(
-                onPressed: _busy ? null : _disconnect,
-                icon: const Icon(Icons.stop_circle_outlined),
-                label: Text(s.wireGuardDisconnect),
-              ),
-            if (_errorCode != null) ...[
-              const SizedBox(height: 10),
-              Text(
-                _errorCode == 'NO_WIREGUARD_CONFIG' ||
-                    _errorCode == 'SELECTED_WIREGUARD_NODE_UNAVAILABLE'
-                    ? s.wireGuardNoConfigs
-                    : s.nativeError(_errorCode!),
-                style: TextStyle(color: Theme.of(context).colorScheme.error),
-              ),
-            ],
-          ],
+          ),
         ),
+        const SizedBox(height: 25),
+        Center(
+          child: TweenAnimationBuilder<double>(
+            tween: Tween(begin: .96, end: connected ? 1.08 : 1),
+            duration: const Duration(milliseconds: 480),
+            curve: Curves.easeOutCubic,
+            builder: (context, scale, child) =>
+                Transform.scale(scale: scale, child: child),
+            child: Container(
+              key: const Key('androidPowerIndicator'),
+              width: 156, height: 156,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(colors: [
+                  accent.withValues(alpha: .22),
+                  accent.withValues(alpha: .06),
+                ]),
+                border: Border.all(
+                  color: accent.withValues(alpha: .55), width: 2),
+                boxShadow: [
+                  BoxShadow(color: accent.withValues(alpha: .14),
+                      blurRadius: 36, spreadRadius: 6),
+                ],
+              ),
+              child: Icon(Icons.power_settings_new_rounded,
+                  color: accent, size: 72),
+            ),
+          ),
+        ),
+        const SizedBox(height: 22),
+        Text(protocolName, textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.w700)),
+        const SizedBox(height: 7),
+        Text(
+          widget.selectedNodeId == null
+              ? s.pick('انتخاب خودکار سرور', 'Automatic server selection')
+              : s.pick('سرور انتخاب‌شده', 'Selected server'),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 15),
+        if (!connected && (!nativeReady || chosen == null))
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Text(
+              chosen == null || !chosen.configRecordPresent
+                  ? s.pick('این پروتکل در اشتراک فعال نیست یا کانفیگ ندارد.',
+                      'This protocol is unavailable or has no profile.')
+                  : s.pick('موتور این پروتکل در اندروید هنوز آماده اتصال نیست.',
+                      'This protocol engine is not ready on Android yet.'),
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+          ),
+        SizedBox(
+          height: 55,
+          child: FilledButton.icon(
+            key: const Key('androidPrimaryConnect'),
+            onPressed: _busy ? null : connected ? _disconnect
+                : nativeReady ? _connect : null,
+            icon: Icon(connected ? Icons.stop_circle_outlined :
+                Icons.power_settings_new_rounded),
+            label: Text(connected ? s.wireGuardDisconnect
+                : s.pick('اتصال', 'Connect')),
+          ),
+        ),
+        if (_errorCode != null) ...[
+          const SizedBox(height: 12),
+          Text(
+            _errorCode == 'NO_WIREGUARD_CONFIG' ||
+                    _errorCode == 'SELECTED_WIREGUARD_NODE_UNAVAILABLE'
+                ? s.wireGuardNoConfigs
+                : s.nativeError(_errorCode!),
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Theme.of(context).colorScheme.error),
+          ),
+        ],
+      ],
     );
   }
 }
