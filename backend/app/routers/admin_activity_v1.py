@@ -4,7 +4,6 @@ Never expose credentials, raw request bodies, tokens, or client IPs.
 """
 from __future__ import annotations
 
-from collections import Counter
 from datetime import timezone
 
 from fastapi import APIRouter, Depends, Query
@@ -63,6 +62,7 @@ def admin_activity_list(
             "previous_expiry_at", "new_expiry_at",
             "add_days", "add_traffic_gb", "reset_usage", "reset_date",
             "note", "transaction_id", "reset_at",
+            "method", "route", "http_status",
         }
         safe = {key: details[key] for key in safe_keys if key in details}
         return {
