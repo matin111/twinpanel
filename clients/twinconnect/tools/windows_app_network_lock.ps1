@@ -64,10 +64,10 @@ $tunnel = $null
 if ($Action -eq 'Lock') {
   $tunnel = @('TwinConnectSB','TwinConnect') | Where-Object {
     $adapter = Get-NetAdapter -Name $_ -ErrorAction SilentlyContinue
-    $adapter -and $adapter.Status -eq 'Up' -and !$adapter.HardwareInterface
+    $adapter -and !$adapter.HardwareInterface
   } | Select-Object -First 1
   if (!$tunnel) {
-    throw 'APP_WFP_NO_TUN_INTERFACE_CONNECT_VPN_FIRST'
+    throw 'APP_WFP_NO_VERIFIED_TUN_ADAPTER'
   }
 }
 
