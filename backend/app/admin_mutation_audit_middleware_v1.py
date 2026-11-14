@@ -22,14 +22,14 @@ _MUTATIONS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 # customer-facing administrator history. Infrastructure checks, support replies,
 # and unclassified routes are intentionally excluded.
 _BUSINESS_ACTIONS = (
-    (re.compile(r"^/v1/subscriptions/(\\d+)/admin-edit$"), "subscription_edit", "subscription"),
-    (re.compile(r"^/v1/subscriptions/(\\d+)/reset-usage$"), "subscription_usage_reset", "subscription"),
-    (re.compile(r"^/v1/admin/users/(\\d+)$"), "user_edit", "user"),
-    (re.compile(r"^/v1/users/(\\d+)$"), "user_edit", "user"),
+    (re.compile(r"^/v1/subscriptions/(\d+)/admin-edit$"), "subscription_edit", "subscription"),
+    (re.compile(r"^/v1/subscriptions/(\d+)/reset-usage$"), "subscription_usage_reset", "subscription"),
+    (re.compile(r"^/v1/admin/users/(\d+)$"), "user_edit", "user"),
+    (re.compile(r"^/v1/users/(\d+)$"), "user_edit", "user"),
 )
 _DETAILED = (
-    re.compile(r"^/v1/admin/wallet/wallets/\\d+/adjust$"),
-    re.compile(r"^/v1/subscriptions/\\d+/extend$"),
+    re.compile(r"^/v1/admin/wallet/wallets/\d+/adjust$"),
+    re.compile(r"^/v1/subscriptions/\d+/extend$"),
 )
 
 
