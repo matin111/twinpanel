@@ -10,7 +10,11 @@ void main() {
     expect(header, contains('FwpmEngineOpen0('));
     expect(header, contains('FWPM_SESSION_FLAG_DYNAMIC'));
     expect(header, contains('FwpmEngineClose0(engine)'));
-    expect(header, contains('const bool recoveryVerified = false;'));
+    // A read-only native probe may show ON only after the privileged service
+    // confirms verified WFP rules and a SYSTEM emergency rollback task.
+    expect(header, contains('IndependentRollbackVerified()'));
+    expect(header, contains('CallNamedPipeW('));
+    expect(header, contains('OK 1 1 1 1'));
     expect(header, contains('OpenServiceW('));
     expect(header, contains('OwnedFilterExists('));
     expect(header, contains('FWPM_SESSION_FLAG_DYNAMIC'));
@@ -189,7 +193,11 @@ void main() {
     final screen = File('lib/vpn_settings.dart').readAsStringSync();
     expect(screen, contains('NativeVpnBridge.globalKillSwitchStatus()'));
     expect(screen, contains('Protection service not ready'));
-    expect(screen, contains('onChanged: null'));
+    expect(screen, contains("key: const Key('vpnKillSwitch')"));
+    expect(screen, contains("_guard['serviceInstalled'] != true"));
+    expect(screen, contains('_testSignedWindowsGuard()'));
+    expect(screen, contains('_recoverWindowsGuard()'));
+    expect(screen, contains('value: _guardActive'));
     expect(screen, isNot(contains('setGlobalKillSwitchEnabled')));
   });
 }
