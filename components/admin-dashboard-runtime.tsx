@@ -240,7 +240,7 @@ export function AdminDashboardRuntime(){
         <TunnelMonitor tunnels={tunnels} nodes={nodes} loaded={tunnelsLoaded} pick={pick}/>
       </Card>
       <Card className="dash27-protocol-card">
-        <ProtocolMonitor protocols={protocols} pick={pick}/>
+        <ProtocolMonitor protocols={protocols} pick={pick} onRestart={()=>void load(true)}/>
       </Card>
     </section>
 
