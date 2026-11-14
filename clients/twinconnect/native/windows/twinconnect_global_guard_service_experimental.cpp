@@ -15,8 +15,13 @@
 #pragma comment(lib, "Taskschd.lib")
 
 namespace {
+#if defined(TWINCONNECT_GUARD_DIAGNOSTIC_ONLY)
+const wchar_t* kName = L"TwinConnectGuardDiagnostic";
+const wchar_t* kPipe = L"\\\\.\\pipe\\TwinConnectGuardDiagnosticV1";
+#else
 const wchar_t* kName = L"TwinConnectGlobalGuard";
 const wchar_t* kPipe = L"\\\\.\\pipe\\TwinConnectGlobalGuardV1";
+#endif
 const wchar_t* kAccept = L"I_ACCEPT_OFFLINE_RECOVERY";
 SERVICE_STATUS_HANDLE gHandle = nullptr;
 SERVICE_STATUS gStatus = {};
@@ -194,6 +199,10 @@ std::wstring HandleRequest(const std::wstring& request) {
     return std::wstring(L"OK ") + (v4 ? L"1" : L"0") + L" " +
            (v6 ? L"1" : L"0") + L" " + (app ? L"1" : L"0");
   }
+#if defined(TWINCONNECT_GUARD_DIAGNOSTIC_ONLY)
+  // Diagnostic build does not permit disarm or arm commands.
+  return L"ERR DIAGNOSTIC_NO_FIREWALL_CHANGES";
+#endif
   if (request == std::wstring(L"disarm ") + kAccept) {
     DWORD code = TransactionalDisarm(engine.handle);
     return code == ERROR_SUCCESS ? L"OK DISARMED" : L"ERR WFP_DISARM_FAILED";
@@ -414,6 +423,7 @@ int wmain(int argc, wchar_t** argv) {
                   L"\t" + argv[4] + L"\t" + argv[5]);
 
   // Recovery even if the service is stopped or its pipe no longer works.
+#if !defined(TWINCONNECT_GUARD_DIAGNOSTIC_ONLY)
   if (argc == 3 && _wcsicmp(argv[1], L"recover") == 0 &&
       wcscmp(argv[2], kAccept) == 0) {
     Engine engine;
@@ -423,6 +433,7 @@ int wmain(int argc, wchar_t** argv) {
             L"RECOVERY_FAILED\n");
     return status == ERROR_SUCCESS ? 0 : 1;
   }
+#endif
   wprintf(L"VM-only Windows service prototype: service | status | "
           L"arm | disarm | recover.\n"
           L"Not a production release. Requires an independent recovery test.\n");
