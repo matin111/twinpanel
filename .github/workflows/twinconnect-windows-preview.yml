@@ -311,13 +311,63 @@ jobs:
           if (!$iss.Contains('reset_windows_network.ps1')) {
             throw 'Windows Setup must bundle the network recovery script'
           }
+      - name: Build signed WFP service for approved installer
+        if: ${{ env.SIGNING_CONFIGURED == 'true' && vars.TWINCONNECT_GUARD_RELEASE_APPROVED == 'true' }}
+        shell: pwsh
+        env:
+          TWINCONNECT_SIGN_PFX_BASE64: ${{ secrets.TWINCONNECT_SIGN_PFX_BASE64 }}
+          TWINCONNECT_SIGN_PFX_PASSWORD: ${{ secrets.TWINCONNECT_SIGN_PFX_PASSWORD }}
+          GUARD_SIGNER: ${{ vars.TWINCONNECT_GUARD_SIGNER_THUMBPRINT }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if (!$env:GUARD_SIGNER -or $env:GUARD_SIGNER.Length -ne 40 -or
+              $env:GUARD_SIGNER -notmatch '^[0-9a-fA-F]+') {
+            throw 'Verified guard signer thumbprint missing'
+          }
+          $vswhere = Join-Path "${env:ProgramFiles(x86)}" 'Microsoft Visual Studio/Installer/vswhere.exe'
+          $vs = (& $vswhere -latest -property installationPath).Trim()
+          $dev = Join-Path $vs 'Common7/Tools/VsDevCmd.bat'
+          $target = Join-Path (Get-Location) 'build/windows/x64/runner/Release/services'
+          New-Item -ItemType Directory -Force -Path $target | Out-Null
+          $exe = Join-Path $target 'TwinConnectGlobalGuard.exe'
+          $source = Join-Path (Get-Location) 'native/windows/twinconnect_global_guard_service_experimental.cpp'
+          $command = 'call "' + $dev + '" -arch=amd64 && cl /nologo /std:c++17 /EHsc /W4 /WX /Fe:"' + $exe + '" "' + $source + '" /link Fwpuclnt.lib Iphlpapi.lib Ws2_32.lib Rpcrt4.lib Advapi32.lib Ole32.lib Oleaut32.lib Taskschd.lib'
+          & cmd.exe /d /s /c $command
+          if ($LASTEXITCODE -ne 0 -or !(Test-Path $exe)) { throw 'Guard compile failed' }
+          $pfx = Join-Path $env:RUNNER_TEMP 'guard-sign.pfx'
+          try {
+            [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:TWINCONNECT_SIGN_PFX_BASE64))
+            $cert = Get-PfxCertificate -FilePath $pfx -Password (ConvertTo-SecureString $env:TWINCONNECT_SIGN_PFX_PASSWORD -AsPlainText -Force)
+            if ($cert.Thumbprint -ine $env:GUARD_SIGNER) { throw 'Guard certificate thumbprint mismatch' }
+            $sign = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin" -Filter signtool.exe -Recurse -File |
+              Where-Object { $_.FullName.Contains('\x64\') } | Select-Object -Last 1
+            if (!$sign) { throw 'SignTool not found' }
+            & $sign.FullName sign /fd SHA256 /f $pfx /p $env:TWINCONNECT_SIGN_PFX_PASSWORD /tr http://timestamp.digicert.com /td SHA256 $exe
+            if ($LASTEXITCODE -ne 0) { throw 'Guard signing failed' }
+            $verified = Get-AuthenticodeSignature -LiteralPath $exe
+            if ($verified.Status -ne 'Valid' -or $verified.SignerCertificate.Thumbprint -ine $env:GUARD_SIGNER) {
+              throw 'Guard Authenticode verification failed'
+            }
+          } finally {
+            Remove-Item -LiteralPath $pfx -Force -ErrorAction SilentlyContinue
+          }
+          & $exe offline-status
+          if ($LASTEXITCODE -ne 0) { throw 'Guard WFP preflight failed' }
       - name: Package TwinConnect Windows setup with automatic WireGuard prerequisite
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
           $compiler = "${env:ProgramFiles(x86)}\\Inno Setup 6\\ISCC.exe"
           if (!(Test-Path $compiler)) { throw "Inno Setup 6 compiler not installed" }
-          & $compiler "installer.iss"
+          if ($env:SIGNING_CONFIGURED -eq 'true' -and
+              "${{ vars.TWINCONNECT_GUARD_RELEASE_APPROVED }}" -eq 'true') {
+            $signer = "${{ vars.TWINCONNECT_GUARD_SIGNER_THUMBPRINT }}"
+            $guard = 'build/windows/x64/runner/Release/services/TwinConnectGlobalGuard.exe'
+            if (!$signer -or !(Test-Path $guard)) { throw 'Signed guard not present' }
+            & $compiler '/DIncludeVerifiedGlobalGuard=1' ("/DGuardSigningThumbprint=" + $signer) 'installer.iss'
+          } else {
+            & $compiler "installer.iss"
+          }
           if ($LASTEXITCODE -ne 0) { throw "Installer compilation failed" }
           if (!(Test-Path "TwinConnect-Windows-x64-Setup.exe")) {
             throw "TwinConnect setup executable missing"
