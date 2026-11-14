@@ -32,6 +32,9 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        // The upstream package auto-registers only its OpenVPN plugin.
+        // Register the independent CSTP/Cisco Android plugin explicitly.
+        flutterEngine.plugins.add(com.axevpn.flutter.openconnect.OpenConnectFlutterPlugin())
         val channel = MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
             "com.twinpanel.twinconnect/vpn"
