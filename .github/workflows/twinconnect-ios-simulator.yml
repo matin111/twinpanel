@@ -52,6 +52,7 @@ jobs:
           TWINCONNECT_DIRECTORY_URL: ${{ vars.TWINCONNECT_DIRECTORY_URL || 'https://panel.matindnspro.sbs' }}
         run: |
           flutter build ios --simulator --debug --no-codesign \
+            --target lib/ios_preview_main.dart \
             --dart-define=TWINCONNECT_DIRECTORY_URL="$TWINCONNECT_DIRECTORY_URL"
           test -d build/ios/iphonesimulator/Runner.app
       - name: Verify iPhone simulator boots and launches TwinConnect
@@ -68,10 +69,17 @@ jobs:
           xcrun simctl install "$device" build/ios/iphonesimulator/Runner.app
           xcrun simctl launch "$device" com.twinpanel.twinconnect
           xcrun simctl spawn "$device" launchctl print system >/dev/null
-          # Capture the visible launch screen so a developer without an
-          # iPhone or Mac can inspect the preview on Windows.
-          sleep 8
-          xcrun simctl io "$device" screenshot TwinConnect-iOS-Simulator-Launch.png
+          # The isolated preview automatically tours the four real iOS UI
+          # screens every 12 seconds. Capture all four on a cloud Mac so the
+          # developer can inspect them from a Windows PC, without an iPhone.
+          sleep 4
+          xcrun simctl io "$device" screenshot TwinConnect-iOS-01-Connect.png
+          sleep 12
+          xcrun simctl io "$device" screenshot TwinConnect-iOS-02-Locations.png
+          sleep 12
+          xcrun simctl io "$device" screenshot TwinConnect-iOS-03-Settings.png
+          sleep 12
+          xcrun simctl io "$device" screenshot TwinConnect-iOS-04-Account.png
       - name: Archive iOS simulator app
         shell: bash
         run: |
@@ -81,10 +89,13 @@ jobs:
           shasum -a 256 TwinConnect-iOS-Simulator-v0.1.0.zip > TwinConnect-iOS-Simulator-SHA256.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: TwinConnect-iOS-Simulator-v0.1.0
+          name: TwinConnect-iOS-UI-Preview-v0.1.0
           path: |
             clients/twinconnect/TwinConnect-iOS-Simulator-v0.1.0.zip
             clients/twinconnect/TwinConnect-iOS-Simulator-SHA256.txt
-            clients/twinconnect/TwinConnect-iOS-Simulator-Launch.png
+            clients/twinconnect/TwinConnect-iOS-01-Connect.png
+            clients/twinconnect/TwinConnect-iOS-02-Locations.png
+            clients/twinconnect/TwinConnect-iOS-03-Settings.png
+            clients/twinconnect/TwinConnect-iOS-04-Account.png
           if-no-files-found: error
           retention-days: 14
