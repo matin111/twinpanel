@@ -163,6 +163,12 @@ void main() {
     expect(android, contains("Key('androidNetworkOverview')"));
     expect(android, contains("Key('androidVerifiedStatus')"));
     expect(android, contains('selectedProtocolCode'));
+    // Auto-connect must never silently default to a protocol with no native
+    // engine just because that protocol comes first in the catalog.
+    expect(android, contains('final readyOptions = available.where'));
+    expect(android, contains('widget.native.supports(entry.protocol.code)'));
+    expect(android, contains('readyOptions.firstOrNull'));
+    expect(android, contains('Connection unavailable'));
     expect(android, contains('This protocol engine is not ready on Android yet.'));
     expect(android, isNot(contains("Key('androidProtocolChooser')")));
     expect(native, contains('listOf("wireguard")'));
