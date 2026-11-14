@@ -1,7 +1,7 @@
 #Requires -RunAsAdministrator
 # User-initiated Windows network recovery. Never called automatically by Setup.
 [CmdletBinding()]
-param()
+param([switch]$GuardOnly)
 $ErrorActionPreference = 'Stop'
 $logDirectory = Join-Path $env:ProgramData 'TwinConnect'
 New-Item -ItemType Directory -Path $logDirectory -Force | Out-Null
@@ -33,6 +33,11 @@ try {
     Log 'Verified no TwinConnect-owned WFP filters remain.'
   } else {
     Log 'No installed TwinConnect guard; WFP recovery not applicable.'
+  }
+  if ($GuardOnly) {
+    Log 'User requested Kill Switch emergency recovery only.'
+    Write-Output 'TWINCONNECT_GUARD_RECOVERY_OK'
+    exit 0
   }
   # These are Windows OS supported recovery operations. They do not remove
   # non-TwinConnect firewall rules, VPN profiles or saved account credentials.
