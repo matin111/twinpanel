@@ -57,6 +57,20 @@ $binary = Join-Path $PSScriptRoot '..\services\TwinConnectAppKillSwitch.exe'
 $binary = [IO.Path]::GetFullPath($binary)
 if (!(Test-Path -LiteralPath $binary -PathType Leaf)) { throw 'APP_WFP_ENGINE_NOT_INSTALLED' }
 
+# A selected-app WFP filter needs an active, recognizable TwinConnect TUN.
+# Check this BEFORE displaying UAC; proxy-only connections have no such
+# interface and cannot safely be guarded by interface-based filters.
+$tunnel = $null
+if ($Action -eq 'Lock') {
+  $tunnel = @('TwinConnectSB','TwinConnect') | Where-Object {
+    $adapter = Get-NetAdapter -Name $_ -ErrorAction SilentlyContinue
+    $adapter -and $adapter.Status -eq 'Up' -and !$adapter.HardwareInterface
+  } | Select-Object -First 1
+  if (!$tunnel) {
+    throw 'APP_WFP_NO_TUN_INTERFACE_CONNECT_VPN_FIRST'
+  }
+}
+
 # Windows desktop app is not normally elevated. Ask Windows for consent
 # ONLY for the requested Lock/Unlock; never elevate file selection or status.
 if ($Action -in @('Lock','Unlock')) {
@@ -100,11 +114,6 @@ if ($Action -eq 'Status') {
 } elseif ($Action -eq 'Unlock') {
   $output = & $binary disarm $path 2>&1
 } else {
-  $tunnel = @('TwinConnectSB','TwinConnect') | Where-Object {
-    $adapter = Get-NetAdapter -Name $_ -ErrorAction SilentlyContinue
-    $adapter -and $adapter.Status -eq 'Up' -and !$adapter.HardwareInterface
-  } | Select-Object -First 1
-  if (!$tunnel) { throw 'CONNECT_TO_TWINCONNECT_VPN_BEFORE_ENABLING_APP_KILL_SWITCH' }
   $output = & $binary arm $path $tunnel 2>&1
 }
 if ($LASTEXITCODE -ne 0) {
