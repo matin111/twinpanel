@@ -166,6 +166,17 @@ void main() {
       expect(workflow, contains('At least two unique license-directory mirrors'));
     });
 
+    test('login differentiates license-directory and tenant-panel outages', () {
+      final main = File('lib/main.dart').readAsStringSync();
+      final strings = File('lib/app_strings.dart').readAsStringSync();
+      expect(main, contains("DIRECTORY_NETWORK_UNAVAILABLE"));
+      expect(main, contains("PANEL_NETWORK_UNAVAILABLE"));
+      expect(main, contains("refreshed.apiOrigin == panel.apiOrigin"));
+      expect(main, contains("panel = refreshed;"));
+      expect(strings, contains("case 'DIRECTORY_NETWORK_UNAVAILABLE':"));
+      expect(strings, contains("case 'PANEL_NETWORK_UNAVAILABLE':"));
+    });
+
     test('missing optional brand links stay hidden', () {
       final info = BrandPreview.fromJson({
         'namespace': 'TP0123456789ABCDEF',
