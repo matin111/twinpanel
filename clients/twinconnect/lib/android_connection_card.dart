@@ -484,14 +484,14 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
         widget.native.supports('wireguard') &&
         chosen?.protocol.code == 'wireguard' &&
         chosen?.configRecordPresent == true;
-    // The active protocol is sourced from the running native engine, not
-    // from the browsing filter. A WireGuard interface must NEVER be labeled
-    // OpenVPN, Hysteria2, or Cisco when the user switches tabs.
+    // The selected protocol and active transport are distinct. Selecting
+    // OpenVPN/Hysteria2 never starts or disguises a WireGuard tunnel.
     final connected = _up || _ciscoUp;
-    final protocolName = _up ? 'WireGuard'
-        : _ciscoUp ? 'Cisco / OpenConnect'
-        : chosen?.protocol.name ??
-            (requested ?? s.pick('پروتکل آماده‌ای وجود ندارد', 'No ready protocol'));
+    final protocolName = chosen?.protocol.name ??
+        (requested ?? s.pick('پروتکل آماده‌ای وجود ندارد', 'No ready protocol'));
+    final activeProtocolCode = _ciscoUp ? 'cisco' : _up ? 'wireguard' : null;
+    final selectedIsActive = activeProtocolCode != null &&
+        chosen?.protocol.code == activeProtocolCode;
     final internetVerified = _ciscoUp ||
         (_up && _handshake && _publicIp != null);
     final ciscoSelected = chosen?.protocol.code == 'cisco';
@@ -598,7 +598,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
           ]),
         ),
         const SizedBox(height: 15),
-        if (!connected && !canStartSelected)
+        if (!selectedIsActive && !canStartSelected)
           Padding(
             padding: const EdgeInsets.only(bottom: 12),
             child: Text(
@@ -619,19 +619,39 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(18)),
             ),
-            onPressed: _busy ? null : _ciscoUp ? _disconnectCisco
-                : _up ? _disconnect
+            onPressed: _busy ? null
+                : selectedIsActive ? (_ciscoUp ? _disconnectCisco : _disconnect)
+                : connected ? null
                 : canStartSelected
                     ? (ciscoSelected ? _connectCisco : _connect) : null,
-            icon: Icon(connected ? Icons.stop_rounded :
+            icon: Icon(selectedIsActive ? Icons.stop_rounded :
                 Icons.bolt_rounded),
-            label: Text(connected
+            label: Text(selectedIsActive
                 ? s.pick('قطع تونل', 'Disconnect tunnel')
-                : !canStartSelected
-                    ? s.pick('اتصال در دسترس نیست', 'Connection unavailable')
-                    : s.pick('اتصال سریع', 'Connect now')),
+                : connected
+                    ? s.pick('ابتدا تونل قبلی را قطع کنید', 'Disconnect active tunnel first')
+                    : !canStartSelected
+                        ? s.pick('موتور اتصال نصب نیست', 'Engine not installed')
+                        : s.pick('اتصال سریع', 'Connect now')),
           ),
         ),
+        if (connected && !selectedIsActive) ...[
+          const SizedBox(height: 10),
+          Text(
+            s.pick('تونل فعال جداگانه: ', 'Separate active tunnel: ') +
+                (_ciscoUp ? 'Cisco / OpenConnect' : 'WireGuard'),
+            key: const Key('androidSeparateActiveProtocol'),
+            textAlign: TextAlign.center,
+            style: TextStyle(color: accent),
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            key: const Key('androidDisconnectPreviousTunnel'),
+            onPressed: _busy ? null : _ciscoUp ? _disconnectCisco : _disconnect,
+            icon: const Icon(Icons.stop_circle_outlined),
+            label: Text(s.pick('قطع تونل قبلی', 'Disconnect previous tunnel')),
+          ),
+        ],
         if (widget.subscriptionContent != null) ...[
           const SizedBox(height: 12),
           widget.subscriptionContent!,
