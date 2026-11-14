@@ -890,7 +890,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
         Center(
           child: TwinConnectWaveIndicator(
             key: const Key('androidSharedConnectionDataFabric'),
-            connected: connected && (_handshake || _openVpnUp),
+            connected: _activeVerifiedTransport,
             connecting: _busy,
             dark: Theme.of(context).brightness == Brightness.dark,
             rxSamples: List<double>.unmodifiable(_rxSamples),
