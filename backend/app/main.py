@@ -250,6 +250,8 @@ app = FastAPI(
     lifespan=lifespan,
 )
 app.add_middleware(LicenseMutationGuardMiddleware)
+from .admin_mutation_audit_middleware_v1 import AdminMutationAuditMiddleware
+app.add_middleware(AdminMutationAuditMiddleware)
 
 
 @app.get("/health")
