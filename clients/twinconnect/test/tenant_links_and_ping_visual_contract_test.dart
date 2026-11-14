@@ -126,7 +126,7 @@ void main() {
     expect(dashboard, contains("textDirection: _rtl ? TextDirection.rtl : TextDirection.ltr"));
     expect(dashboard, contains("key: ValueKey<String>(_rtl ? 'dashboard-rtl' : 'dashboard-ltr')"));
     expect(dashboard.replaceAll('\r\n', '\n'),
-        contains('child: Row(children: [\n          sideBar(),'));
+        contains('child: Row(children: [\n          if (!iosMobile) sideBar(),'));
     expect(dashboard, isNot(contains('textDirection: TextDirection.ltr,\n            child: Row(')));
     expect(dashboard, contains('textDirection: TextDirection.ltr,'));
   });
