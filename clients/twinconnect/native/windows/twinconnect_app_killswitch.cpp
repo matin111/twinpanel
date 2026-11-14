@@ -136,25 +136,31 @@ DWORD Add(HANDLE h, const GUID& key, const GUID& layer,
   return FwpmFilterAdd0(h, &f, nullptr, nullptr);
 }
 DWORD Arm(HANDLE h, FWP_BYTE_BLOB* app, UINT64 luid) {
-  // Never replace rules for another app or adapter without explicit recovery.
+  // Reuse a verified rule for the same app, or migrate both filters
+  // atomically when Windows re-creates its TUN adapter with a new LUID.
+  // Never replace filters for another app or a partially owned policy.
   FWPM_FILTER0* old4 = Get(h, v4);
   FWPM_FILTER0* old6 = Get(h, v6);
   UINT64 a = 0, b = 0;
-  bool already = OwnedValid(old4, FWPM_LAYER_ALE_AUTH_CONNECT_V4, app, &a) &&
+  const bool sameApp = OwnedValid(old4, FWPM_LAYER_ALE_AUTH_CONNECT_V4, app, &a) &&
       OwnedValid(old6, FWPM_LAYER_ALE_AUTH_CONNECT_V6, app, &b) &&
-      a == luid && b == luid;
+      a == b;
+  const bool occupied = old4 || old6;
   if (old4) FwpmFreeMemory0(reinterpret_cast<void**>(&old4));
   if (old6) FwpmFreeMemory0(reinterpret_cast<void**>(&old6));
-  if (already) return ERROR_SUCCESS;
-  // Fail closed on an existing conflicting or incomplete policy.
-  old4 = Get(h, v4);
-  old6 = Get(h, v6);
-  bool occupied = old4 || old6;
-  if (old4) FwpmFreeMemory0(reinterpret_cast<void**>(&old4));
-  if (old6) FwpmFreeMemory0(reinterpret_cast<void**>(&old6));
-  if (occupied) return ERROR_ALREADY_EXISTS;
+  if (sameApp && a == luid) return ERROR_SUCCESS;
+  if (occupied && !sameApp) return ERROR_ALREADY_EXISTS;
   DWORD code = FwpmTransactionBegin0(h, 0);
   if (code != ERROR_SUCCESS) return code;
+  if (sameApp) {
+    // Rollback restores the prior policy if either new filter fails.
+    code = Remove(h, v4);
+    if (code == ERROR_SUCCESS) code = Remove(h, v6);
+    if (code != ERROR_SUCCESS) {
+      FwpmTransactionAbort0(h);
+      return code;
+    }
+  }
   FWPM_SUBLAYER0 layer = {};
   layer.subLayerKey = sublayer;
   layer.displayData.name = const_cast<wchar_t*>(L"TwinConnect Selected App Guard");
