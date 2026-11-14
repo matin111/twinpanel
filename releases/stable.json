@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.834",
+  "version": "1.1.0-rc.835",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-14T11:04:16Z",
+  "released_at": "2026-11-14T12:10:26Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "0c9bbdfb3ed593c817f031fac09c9efaeda0e522",
+  "source_sha": "6eecd3f3e50b27eebe2c60dd2aa68d0a0307be44",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.834/twinpanel-1.1.0-rc.834-linux-x86_64.tar.gz",
-    "sha256": "1b65e7dc19b41c768844ee414f25fa96e45175c72fb9a0a2f02bd1431df5d1a3",
-    "size_bytes": 30829297
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.835/twinpanel-1.1.0-rc.835-linux-x86_64.tar.gz",
+    "sha256": "779b4e5f84f483752bf82c3b9f7a6d95019a21ebc7aa16745365bf4a165a0e02",
+    "size_bytes": 30796717
   },
   "notes": {
-    "fa": "نمایش تاریخچه واقعی هر نشست اتصال در لینک Connection با پروتکل، نود، زمان شروع و پایان، مدت، دانلود و آپلود نشست؛ عدم نسبت‌دادن ترافیک کلی یا فاقد شناسه نشست. بازگشت دکمه‌های افزایش/کاهش کیف پول در کارت کاربران.",
-    "en": "Display share-token-scoped measured per-session connection history with protocol, node, timestamps, duration, upload and download; never misattribute aggregate traffic. Restore wallet adjustment actions in user cards."
+    "fa": "افزودن پاپ‌آپ آمار و تاریخچه فعالیت ادمین (تغییرات دستی کیف پول و تمدید اشتراک و لاگ عملیات مدیریتی)، ریست مستقل حجم نماینده با تأیید بله/خیر و ثبت حسابرسی، و نمایش ریز مصرف هر نشست اتصال در Connection بدون تغییر مجموع حجم.",
+    "en": "Admin activity and audit statistics popup for manual wallet adjustments and subscription renewals, general admin mutation events; independent reseller traffic reset with confirmation and audit; truthful per-session Connection usage details."
   }
 }
