@@ -38,11 +38,11 @@ def patch_gradle() -> None:
     # The OpenVPN Android core is a native executable; AGP must extract it.
     current = only_once(
         current, "android {",
-        "android {\\n"
-        "    packaging {\\n"
-        "        jniLibs {\\n"
-        "            useLegacyPackaging = true\\n"
-        "        }\\n"
+        "android {\n"
+        "    packaging {\n"
+        "        jniLibs {\n"
+        "            useLegacyPackaging = true\n"
+        "        }\n"
         "    }",
         str(filename),
     )
