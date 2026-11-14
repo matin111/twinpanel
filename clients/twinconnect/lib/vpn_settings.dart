@@ -38,6 +38,7 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
   bool _vmGuardBusy = false;
   bool _networkResetBusy = false;
   bool _guardRecoveryBusy = false;
+  bool _guardTrialBusy = false;
 
   @override
   void initState() {
@@ -160,6 +161,87 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
     ));
   }
 
+
+
+  Future<void> _testSignedWindowsGuard() async {
+    if (!Platform.isWindows || _guardTrialBusy ||
+        _guard['serviceInstalled'] != true) return;
+    final s = AppStrings.of(context);
+    final tunnel = TextEditingController(text: 'TwinConnect');
+    final endpoint = TextEditingController();
+    final transport = TextEditingController();
+    bool? accepted;
+    try {
+      accepted = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(s.pick('تست دو دقیقه‌ای Kill Switch', 'Two-minute Kill Switch test')),
+          content: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 460),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Text(s.pick(
+                'فقط برای سرویس امضاشده و VPN متصل. قوانین محافظت پس از دو دقیقه خودکار پاک می‌شوند. قبل از اجرا مسیر بازیابی را آماده داشته باش.',
+                'Signed guard and connected VPN only. WFP rules are automatically removed after two minutes. Keep offline recovery available.',
+              )),
+              TextField(controller: tunnel,
+                decoration: const InputDecoration(labelText: 'Tunnel alias')),
+              TextField(controller: endpoint,
+                decoration: const InputDecoration(labelText: 'VPN endpoint IPv4')),
+              TextField(controller: transport,
+                decoration: const InputDecoration(labelText: 'VPN transport executable')),
+            ]),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false),
+              child: Text(s.pick('انصراف', 'Cancel'))),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true),
+              child: Text(s.pick('شروع تست', 'Start test'))),
+          ],
+        ),
+      );
+      if (accepted != true || !mounted) return;
+      setState(() => _guardTrialBusy = true);
+      final script = File(File(Platform.resolvedExecutable).parent.path +
+          r'\tools\windows_guard_control.ps1');
+      if (!await script.exists()) {
+        throw const FileSystemException('GUARD_CONTROL_SCRIPT_MISSING');
+      }
+      final result = await Process.run('powershell.exe', [
+        '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
+        '-File', script.path, '-Action', 'Arm',
+        '-TunnelAlias', tunnel.text.trim(),
+        '-EndpointIpv4', endpoint.text.trim(),
+        '-TransportExe', transport.text.trim(),
+      ]).timeout(const Duration(seconds: 40));
+      if (result.exitCode != 0 ||
+          !result.stdout.toString().contains('GUARD_ARMED_TWO_MINUTE_TEST')) {
+        throw StateError('GUARD_ARM_FAILED: ' + result.stderr.toString());
+      }
+      await _check();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(s.pick(
+          'تست محدود فعال شد؛ قوانین تا دو دقیقه دیگر خودکار بازیابی می‌شوند.',
+          'Time-limited test started. Owned WFP rules will be recovered automatically in two minutes.',
+        )),
+      ));
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(s.pick(
+            'فعال‌سازی تأیید نشد؛ سرویس امضاشده، VPN متصل و دسترسی Administrator را بررسی کن.',
+            'Guard activation was not verified. Check signed service, active VPN and Administrator access.',
+          )),
+        ));
+      }
+    } finally {
+      if (mounted) setState(() => _guardTrialBusy = false);
+      await Future<void>.delayed(const Duration(milliseconds: 250));
+      tunnel.dispose();
+      endpoint.dispose();
+      transport.dispose();
+    }
+  }
 
   Future<void> _resetWindowsNetwork() async {
     if (!Platform.isWindows || _networkResetBusy) return;
@@ -461,6 +543,25 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
           ]),
         ),
 
+        if (Platform.isWindows && _guard['serviceInstalled'] == true) ...[
+          const SizedBox(height: 8),
+          _glass(Row(children: [
+            const Icon(Icons.science_outlined, size: 22),
+            const SizedBox(width: 12),
+            Expanded(child: Text(tr(
+              'تست کنترل‌شده Kill Switch (۲ دقیقه)',
+              'Kill Switch controlled test (2 min)',
+            ))),
+            TextButton(
+              key: const Key('vpnSignedGuardTimedTest'),
+              onPressed: _guardTrialBusy ? null : _testSignedWindowsGuard,
+              child: _guardTrialBusy
+                  ? const SizedBox(width: 18, height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2))
+                  : Text(tr('تست', 'Test')),
+            ),
+          ]), key: const Key('vpnSignedGuardTimedTestCard')),
+        ],
         if (Platform.isWindows && _guard['serviceInstalled'] == true) ...[
           const SizedBox(height: 8),
           _glass(Row(children: [
