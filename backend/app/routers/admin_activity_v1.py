@@ -29,7 +29,12 @@ def admin_activity_list(
     search: str = Query(default="", max_length=100),
     db: Session = Depends(get_db),
 ):
-    query = db.query(QuotaAuditLog).filter(QuotaAuditLog.actor_type == "admin")
+    # Historical generic HTTP requests (release checks, support HTTP calls etc.)
+    # are retained in the database for audit but hidden from the human activity list.
+    query = db.query(QuotaAuditLog).filter(
+        QuotaAuditLog.actor_type == "admin",
+        QuotaAuditLog.action != "manual_api_mutation",
+    )
     if category == "wallet":
         query = query.filter(QuotaAuditLog.action.like("wallet_%"))
     elif category == "subscription":
@@ -98,7 +103,10 @@ def admin_activity_list(
 def admin_activity_stats(db: Session = Depends(get_db)):
     rows = db.query(
         QuotaAuditLog.action, func.count(QuotaAuditLog.id)
-    ).filter(QuotaAuditLog.actor_type == "admin").group_by(QuotaAuditLog.action).all()
+    ).filter(
+        QuotaAuditLog.actor_type == "admin",
+        QuotaAuditLog.action != "manual_api_mutation",
+    ).group_by(QuotaAuditLog.action).all()
     summary = {str(action): int(count) for action, count in rows}
     return {
         "recorded_total": sum(summary.values()),
