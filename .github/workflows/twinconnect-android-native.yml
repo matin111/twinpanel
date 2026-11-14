@@ -16,6 +16,9 @@ jobs:
   android-wireguard:
     runs-on: ubuntu-latest
     timeout-minutes: 35
+    env:
+      # Public license-center bootstrap; per-tenant panel domains resolve dynamically.
+      TWINCONNECT_DIRECTORY_URL: ${{ vars.TWINCONNECT_DIRECTORY_URL || 'https://167-104-219-168.sslip.io' }}
     defaults:
       run:
         working-directory: clients/twinconnect
@@ -41,8 +44,27 @@ jobs:
         run: flutter analyze --no-fatal-infos
       - name: Dart tests
         run: flutter test --reporter expanded
+      - name: Verify license-center HTTPS directory and tenant mapping
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json, os, urllib.request
+          from urllib.parse import urlsplit
+          origin = os.environ["TWINCONNECT_DIRECTORY_URL"].rstrip("/")
+          url = urlsplit(origin)
+          if (url.scheme != "https" or not url.hostname or url.username or
+              url.password or url.path or url.query or url.fragment):
+              raise SystemExit("Invalid central license directory origin")
+          with urllib.request.urlopen(origin + "/v1/app/resolve/TP934FE9", timeout=15) as response:
+              data = json.load(response)
+          if data.get("namespace") != "TP934FE9" or not str(data.get("api_origin", "")).startswith("https://"):
+              raise SystemExit("License directory tenant resolution failed")
+          if data["api_origin"].rstrip("/") == origin:
+              raise SystemExit("Directory bootstrap must be separate from the customer panel")
+          print("Verified independent central license directory")
+          PY
       - name: Compile native Kotlin and Android debug APK
-        run: flutter build apk --debug
+        run: flutter build apk --debug "--dart-define=TWINCONNECT_DIRECTORY_URL=$TWINCONNECT_DIRECTORY_URL"
       - name: Upload unsigned debugging APK
         uses: actions/upload-artifact@v4
         with:
