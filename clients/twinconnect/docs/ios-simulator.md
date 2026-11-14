@@ -8,8 +8,12 @@ licensed-panel API. It does not yet contain an iOS packet-tunnel engine.
 - Resolve Flutter packages and run analysis and unit/widget tests on macOS
 - Compile an **unsigned simulator-only** `Runner.app`
 - Boot an available iPhone Simulator, install the app and launch the bundle
-- Upload `TwinConnect-iOS-Simulator-v0.1.0.zip` and checksum as a temporary
-  GitHub Actions artifact
+- Upload `TwinConnect-iOS-Simulator-v0.1.0.zip`, checksum, and
+  **four screenshots** of Connect, Locations, Settings and Account as a
+  temporary GitHub Actions artifact. The simulator build uses the explicit
+  offline-only `lib/ios_preview_main.dart` entry point with fictitious
+  credentials and nodes; the signed-in production app still uses `main.dart`
+  and the real panel after authentication.
 
 The simulator ZIP **cannot** be installed on a physical iPhone and is **not**
 an IPA or an App Store/TestFlight release.
@@ -17,6 +21,9 @@ an IPA or an App Store/TestFlight release.
 ## Current safety boundary
 - Sign-in, language, panel/brand information and server inventory are Flutter
   features and can be tested without a real iPhone with test panel credentials.
+  The authenticated iPhone layout receives real brand, inventory, quota and
+  plan data through `TwinConnectIphoneShell`; the alternate simulator-only
+  UI preview receives hard-coded mock values instead.
 - iOS VPN controls do not attempt Windows-only subprocesses, PowerShell or WFP.
 - VPN connection is intentionally disabled on iOS until a signed iOS
   `NEPacketTunnelProvider` app extension and a suitable VPN engine exist.
