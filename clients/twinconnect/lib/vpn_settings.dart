@@ -518,12 +518,29 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
       if (mounted) setState(() => _selectedKillSwitchEnabled = enable);
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(AppStrings.of(context).pick(
-            'تغییر Kill Switch انجام نشد: ${error.toString()}',
-            'Kill Switch operation failed: ${error.toString()}',
-          )),
-        ));
+        // Never expose raw PowerShell exceptions or multiline stack traces in
+        // the app; keep low-level details available only for diagnostics.
+        final raw = error.toString().toUpperCase();
+        final message = raw.contains('ADMINISTRATOR_REQUIRED') ||
+                raw.contains('ACCESS_DENIED')
+            ? AppStrings.of(context).pick(
+                'برای تغییر Kill Switch دسترسی مدیر لازم است.',
+                'Administrator permission is required.')
+            : raw.contains('VERIFIED_TWINCONNECT_TUNNEL_REQUIRED') ||
+                    raw.contains('CONNECT_TO_TWINCONNECT_VPN')
+                ? AppStrings.of(context).pick(
+                    'ابتدا به یکی از سرورهای TwinConnect وصل شو.',
+                    'Connect to a TwinConnect server first.')
+                : AppStrings.of(context).pick(
+                    'Kill Switch فعال نشد. اتصال VPN و سرویس محافظت را بررسی کن.',
+                    'Kill Switch could not be activated. Check VPN and protection engine.');
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(SnackBar(
+            duration: const Duration(seconds: 4),
+            behavior: SnackBarBehavior.floating,
+            content: Text(message, maxLines: 2, overflow: TextOverflow.ellipsis),
+          ));
       }
     } finally {
       if (mounted) setState(() => _appLockBusy = false);
@@ -885,11 +902,7 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
                       ? null : _toggleSelectedAppKillSwitch,
                 ),
               ]),
-              const SizedBox(height: 6),
-              Text(tr(
-                'وقتی فعال است، ترافیک برنامه انتخابی از تونل TwinConnect مجاز است؛ در صورت قطع VPN، اتصال مستقیم همان برنامه با WFP مسدود می‌شود. ابتدا به VPN وصل شو.',
-                'When enabled, the selected app is allowed through the TwinConnect VPN tunnel; if VPN disconnects, direct connections from that app are blocked by WFP. Connect VPN before enabling.',
-              ), style: Theme.of(context).textTheme.bodySmall),
+
               const SizedBox(height: 8),
               Row(children: [
                 Expanded(child: Text(
@@ -1132,10 +1145,7 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
                     icon: const Icon(Icons.close_rounded, size: 18),
                   ),
                 ]),
-              Text(tr(
-                'تفکیک برنامه‌ها فقط در تونل sing-box فعال است؛ برای سایر پروتکل‌ها مسیریابی سراسری تغییر نمی‌کند.',
-                'Per-app routing applies to sing-box TUN connections only; other protocol engines remain unchanged.',
-              ), style: Theme.of(context).textTheme.bodySmall),
+
             ],
           ],
         ), key: const Key('vpnSplitTunnelCard')),
