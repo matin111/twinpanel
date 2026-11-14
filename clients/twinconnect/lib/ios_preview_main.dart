@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'account_snapshot.dart';
-import 'ios_home_shell.dart';
+import 'live_dashboard.dart';
 import 'plan_classification.dart';
 import 'protocols.dart';
 import 'server_inventory.dart';
@@ -73,22 +73,23 @@ class TwinConnectIphonePreview extends StatelessWidget {
   );
 
   @override
-  Widget build(BuildContext context) => MaterialApp(
-    title: 'TwinConnect iOS — UI Preview',
-    debugShowCheckedModeBanner: false,
-    theme: ThemeData.dark(useMaterial3: true).copyWith(
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: const Color(0xFF69D2DC),
-        brightness: Brightness.dark)),
-    home: TwinConnectIphoneShell(
-      brand: _brand,
-      username: 'demo_user',
-      inventory: _nodes,
-      catalog: _catalog,
-      account: _account,
-      plan: _plan,
-      previewMode: true,
-      autoTour: true,
+  Widget build(BuildContext context) => TwinConnectLiveDashboard(
+    brand: _brand,
+    panel: PanelDirectoryEntry(
+      namespace: _tenant,
+      apiOrigin: Uri.parse('https://example.com'),
     ),
+    username: 'demo_user',
+    sessionToken: '',
+    catalog: _catalog,
+    servers: _nodes,
+    native: const NativeProtocolReadiness(supportedCodes: {}),
+    plan: _plan,
+    accountStatus: 'demo',
+    account: _account,
+    simulatorPreview: true,
+    onRefresh: () {},
+    onRefreshAccount: () {},
+    onLogout: () {},
   );
 }
