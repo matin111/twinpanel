@@ -40,9 +40,9 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
   bool _networkResetBusy = false;
   bool _guardRecoveryBusy = false;
   bool _guardTrialBusy = false;
-  String _appLockBrowser = 'Edge';
+  String _selectedKillSwitchApp = '';
+  bool? _selectedKillSwitchEnabled;
   bool _appLockBusy = false;
-  String _appLockStatus = '';
   Timer? _guardStatusTimer;
 
   @override
@@ -187,36 +187,82 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
 
 
 
-  Future<void> _manageBrowserNetworkLock(String action) async {
+
+  Future<String> _appLockCommand(String action, [String? app]) async {
+    final script = File(
+        File(Platform.resolvedExecutable).parent.path +
+        r'\tools\windows_app_network_lock.ps1');
+    if (!await script.exists()) {
+      throw const FileSystemException('APP_KILL_SWITCH_SCRIPT_MISSING');
+    }
+    final result = await Process.run('powershell.exe', [
+      '-NoProfile', '-STA', '-ExecutionPolicy', 'Bypass',
+      '-File', script.path, '-Action', action,
+      if (app != null) ...['-Executable', app],
+    ]).timeout(const Duration(seconds: 50));
+    if (result.exitCode != 0) {
+      throw StateError('APP_FIREWALL_ACTION_FAILED: ${result.stderr}');
+    }
+    return result.stdout.toString().trim();
+  }
+
+  Future<void> _pickKillSwitchApp() async {
     if (!Platform.isWindows || _appLockBusy) return;
     setState(() => _appLockBusy = true);
-    final s = AppStrings.of(context);
     try {
-      final script = File(
-          '${File(Platform.resolvedExecutable).parent.path}'
-          r'\tools\windows_app_network_lock.ps1');
-      if (!await script.exists()) {
-        throw const FileSystemException('APP_NETWORK_LOCK_SCRIPT_MISSING');
+      final picked = await _appLockCommand('Pick');
+      if (picked == 'TWINCONNECT_PICK_CANCELLED') return;
+      const prefix = 'TWINCONNECT_PICKED ';
+      if (!picked.startsWith(prefix)) {
+        throw const FormatException('APP_PICK_RESULT_INVALID');
       }
-      final result = await Process.run('powershell.exe', [
-        '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
-        '-File', script.path, '-Action', action, '-Browser', _appLockBrowser,
-      ]).timeout(const Duration(seconds: 20));
-      if (result.exitCode != 0) {
-        throw StateError('FIREWALL_RULE_FAILED: ${result.stderr}');
+      final path = picked.substring(prefix.length).trim();
+      if (path.isEmpty) throw const FormatException('APP_PICK_PATH_EMPTY');
+      final status = await _appLockCommand('Status', path);
+      if (status != 'TWINCONNECT_APP_LOCKED' &&
+          status != 'TWINCONNECT_APP_UNLOCKED') {
+        throw const FormatException('APP_LOCK_STATUS_INVALID');
       }
-      final output = result.stdout.toString().trim();
-      if (!output.contains(
-          'TWINCONNECT_APP_${action == 'Unlock' ? 'UNLOCKED' : 'LOCKED'} $_appLockBrowser')) {
-        throw StateError('FIREWALL_STATE_NOT_VERIFIED');
+      if (mounted) {
+        setState(() {
+          _selectedKillSwitchApp = path;
+          _selectedKillSwitchEnabled = status == 'TWINCONNECT_APP_LOCKED';
+        });
       }
-      if (mounted) setState(() => _appLockStatus = action == 'Unlock' ? 'off' : 'on');
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(s.pick(
-            'قانون فایروال تأیید نشد؛ دسترسی Administrator و نصب مرورگر را بررسی کن.',
-            'Firewall rule not verified. Check Administrator permission and browser installation.',
+          content: Text(AppStrings.of(context).pick(
+            'انتخاب برنامه یا خواندن وضعیت فایروال انجام نشد.',
+            'Could not select the app or read its firewall status.',
+          )),
+        ));
+      }
+    } finally {
+      if (mounted) setState(() => _appLockBusy = false);
+    }
+  }
+
+  Future<void> _toggleSelectedAppKillSwitch(bool enable) async {
+    if (!Platform.isWindows || _appLockBusy ||
+        _selectedKillSwitchApp.isEmpty) return;
+    setState(() => _appLockBusy = true);
+    try {
+      final output = await _appLockCommand(
+        enable ? 'Lock' : 'Unlock', _selectedKillSwitchApp);
+      final expected = enable
+          ? 'TWINCONNECT_APP_LOCKED'
+          : 'TWINCONNECT_APP_UNLOCKED';
+      if (output != expected) {
+        throw const FormatException('APP_FIREWALL_STATUS_UNVERIFIED');
+      }
+      if (mounted) setState(() => _selectedKillSwitchEnabled = enable);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(AppStrings.of(context).pick(
+            'تغییر Kill Switch تأیید نشد. دسترسی Administrator را بررسی کن.',
+            'Kill Switch change was not verified. Check Administrator access.',
           )),
         ));
       }
@@ -600,49 +646,48 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
           _glass(Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(tr('قفل اینترنت مرورگر', 'Browser network lock'),
-                style: const TextStyle(fontWeight: FontWeight.w600)),
-              const SizedBox(height: 5),
-              Text(tr(
-                'گزینه مستقل فایروال ویندوز: اینترنت مرورگر انتخابی را کاملاً می‌بندد، حتی وقتی VPN وصل باشد. محافظت کل سیستم نیست.',
-                'Independent Windows Firewall option: blocks the selected browser entirely, including while VPN is connected. Not a system-wide Kill Switch.',
-              ), style: Theme.of(context).textTheme.bodySmall),
-              const SizedBox(height: 7),
               Row(children: [
-                Expanded(child: DropdownButton<String>(
-                  key: const Key('vpnBrowserNetworkLockTarget'),
-                  isExpanded: true,
-                  value: _appLockBrowser,
-                  items: const [
-                    DropdownMenuItem(value: 'Edge', child: Text('Microsoft Edge')),
-                    DropdownMenuItem(value: 'Chrome', child: Text('Google Chrome')),
-                    DropdownMenuItem(value: 'Firefox', child: Text('Mozilla Firefox')),
-                  ],
-                  onChanged: _appLockBusy ? null : (v) {
-                    if (v != null) setState(() {
-                      _appLockBrowser = v;
-                      _appLockStatus = '';
-                    });
-                  },
+                const Icon(Icons.shield_rounded, size: 22),
+                const SizedBox(width: 9),
+                Expanded(child: Text(
+                  tr('Kill Switch برنامه انتخابی', 'Selected app Kill Switch'),
+                  style: const TextStyle(fontWeight: FontWeight.w600),
                 )),
-                const SizedBox(width: 6),
-                TextButton(
-                  key: const Key('vpnBrowserNetworkLockOn'),
-                  onPressed: _appLockBusy ? null : () => _manageBrowserNetworkLock('Lock'),
-                  child: Text(tr('مسدود', 'Block')),
-                ),
-                TextButton(
-                  key: const Key('vpnBrowserNetworkLockOff'),
-                  onPressed: _appLockBusy ? null : () => _manageBrowserNetworkLock('Unlock'),
-                  child: Text(tr('آزاد', 'Unblock')),
+                Switch.adaptive(
+                  key: const Key('vpnSelectedAppKillSwitch'),
+                  value: _selectedKillSwitchEnabled == true,
+                  onChanged: _appLockBusy ||
+                          _selectedKillSwitchApp.isEmpty ||
+                          _selectedKillSwitchEnabled == null
+                      ? null : _toggleSelectedAppKillSwitch,
                 ),
               ]),
-              if (_appLockStatus.isNotEmpty)
-                Text(_appLockStatus == 'on'
-                  ? tr('قانون مسدودسازی ثبت شد', 'Block rule verified')
-                  : tr('قانون مسدودسازی حذف شد', 'Block rule removed')),
+              const SizedBox(height: 6),
+              Text(tr(
+                'وقتی فعال است، اینترنت برنامه انتخابی کاملاً مسدود می‌شود؛ حتی هنگام اتصال VPN. این گزینه مخصوص برنامه است، نه کل سیستم.',
+                'When enabled, all internet traffic for the selected app is blocked, even while VPN is connected. This is app-scoped, not system-wide.',
+              ), style: Theme.of(context).textTheme.bodySmall),
+              const SizedBox(height: 8),
+              Row(children: [
+                Expanded(child: Text(
+                  _selectedKillSwitchApp.isEmpty
+                      ? tr('هنوز برنامه‌ای انتخاب نشده', 'No application selected')
+                      : _selectedKillSwitchApp.split(r'\').last,
+                  key: const Key('vpnSelectedAppName'),
+                  overflow: TextOverflow.ellipsis,
+                )),
+                const SizedBox(width: 8),
+                TextButton.icon(
+                  key: const Key('vpnSelectKillSwitchApp'),
+                  onPressed: _appLockBusy ? null : _pickKillSwitchApp,
+                  icon: const Icon(Icons.folder_open_rounded, size: 18),
+                  label: Text(tr('انتخاب برنامه', 'Select app')),
+                ),
+              ]),
+              if (_appLockBusy)
+                const LinearProgressIndicator(minHeight: 2),
             ],
-          ), key: const Key('vpnBrowserNetworkLockCard')),
+          ), key: const Key('vpnSelectedAppKillSwitchCard')),
         ],
         const SizedBox(height: 8),
         _glass(
