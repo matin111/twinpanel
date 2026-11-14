@@ -66,6 +66,38 @@ internal object WireGuardRuntime {
             .any { it.trim().equals(route, ignoreCase = true) }
     }
 
+    // TwinPanel deliberately emits two /1 routes, which together provide
+    // the same IPv4 coverage as 0.0.0.0/0. Both forms must be accepted.
+    private fun hasFullIpv4Route(raw: String): Boolean =
+        hasFullRoute(raw, "0.0.0.0/0") ||
+        (hasFullRoute(raw, "0.0.0.0/1") &&
+         hasFullRoute(raw, "128.0.0.0/1"))
+
+    /**
+     * Route all IPv6 traffic into the Android VPN rather than allowing
+     * an IPv6-only device to bypass the tunnel. Existing TwinPanel clients
+     * may lack ::/0. This adds only a protective client-side route for
+     * an unambiguous, single-peer FULL-IPv4-tunnel profile.
+     *
+     * It does not invent IPv6 connectivity at the server: if that server
+     * cannot carry IPv6, IPv6 traffic will fail closed inside the VPN.
+     * The incoming profile is not persisted or logged.
+     */
+    private fun protectIpv6Route(raw: String): String {
+        if (hasFullRoute(raw, "::/0")) return raw
+        require(hasFullIpv4Route(raw)) { "IPV4_DEFAULT_ROUTE_MISSING" }
+        require(Regex("(?im)^\\s*\\[Peer\\]\\s*$").findAll(raw).count() == 1) {
+            "IPV6_DEFAULT_ROUTE_MISSING"
+        }
+        val allowed = Regex("(?im)^(\\s*AllowedIPs\\s*=\\s*)([^\\r\\n]+)$")
+            .findAll(raw).toList()
+        require(allowed.size == 1) { "IPV6_DEFAULT_ROUTE_MISSING" }
+        val match = allowed.single()
+        val replacement = match.groupValues[1] +
+            match.groupValues[2].trimEnd() + ", ::/0"
+        return raw.replaceRange(match.range, replacement)
+    }
+
     /**
      * Strict initial full-tunnel profile guard. GoBackend reads DNS and routes
      * from the actual profile, not Flutter UI. Never silently accept IPv4-only
@@ -79,7 +111,7 @@ internal object WireGuardRuntime {
         require(hasSetting(raw, "PrivateKey")) { "PRIVATE_KEY_MISSING" }
         require(hasSetting(raw, "DNS")) { "VPN_DNS_MISSING" }
         require(hasSetting(raw, "Address")) { "VPN_ADDRESS_MISSING" }
-        require(hasFullRoute(raw, "0.0.0.0/0")) { "IPV4_DEFAULT_ROUTE_MISSING" }
+        require(hasFullIpv4Route(raw)) { "IPV4_DEFAULT_ROUTE_MISSING" }
         require(hasFullRoute(raw, "::/0")) { "IPV6_DEFAULT_ROUTE_MISSING" }
         // A future native engine will additionally verify physical IPv6 egress,
         // DNS behavior and peer handshake on an instrumented Android device.
@@ -98,9 +130,10 @@ internal object WireGuardRuntime {
         if (policy["killSwitchRequested"] == true) {
             require(isOsLockdownEnforced()) { "OS_LOCKDOWN_NOT_ENABLED" }
         }
-        validateStrictProfile(configText)
+        val protectedProfile = protectIpv6Route(configText)
+        validateStrictProfile(protectedProfile)
         require(!isInterfaceUp()) { "TUNNEL_ALREADY_RUNNING" }
-        val bytes = configText.toByteArray(StandardCharsets.UTF_8)
+        val bytes = protectedProfile.toByteArray(StandardCharsets.UTF_8)
         val config: Config
         try {
             config = try {
