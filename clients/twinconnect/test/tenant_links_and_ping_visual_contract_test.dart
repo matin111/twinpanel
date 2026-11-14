@@ -208,6 +208,25 @@ void main() {
     expect(native, contains('require(hasFullRoute(raw, "::/0"))'));
   });
 
+  test('Android WireGuard network data comes from actual JNI and HTTPS probes', () {
+    final card = File('lib/android_connection_card.dart').readAsStringSync();
+    final native = File(
+      'native/android/kotlin/com/twinpanel/twinconnect/WireGuardRuntime.kt',
+    ).readAsStringSync();
+    expect(native, contains('getStatistics(tunnel)'));
+    expect(native, contains('statistics.totalRx()'));
+    expect(native, contains('statistics.totalTx()'));
+    expect(native, contains('latestHandshakeEpochMillis()'));
+    expect(card, contains("status['rxBytes']"));
+    expect(card, contains("status['txBytes']"));
+    expect(card, contains("status['peerHandshakeVerified']"));
+    expect(card, contains("Uri.https('api.ipify.org', '/')"));
+    expect(card, contains("_speed(_downloadBps)"));
+    expect(card, contains("_speed(_uploadBps)"));
+    expect(card, contains("Icons.bolt, 'HTTPS'"));
+    expect(card, contains('_telemetryTimer?.cancel()'));
+  });
+
   test('six dashboard locales and Arabic right-to-left are supported', () {
     final dashboard = File('lib/live_dashboard.dart').readAsStringSync();
     final localizer = File('lib/app_strings.dart').readAsStringSync();
