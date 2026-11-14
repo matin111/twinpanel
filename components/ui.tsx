@@ -8,6 +8,7 @@ import {AdminNotificationCenter} from "./admin-notification-center";
 import {useAdminNavAttention} from "./admin-nav-attention";
 import {AdminSubscriptionLiveTable} from "./admin-subscription-live-table";
 import {SystemReleaseFooter} from "./system-release-footer";
+import {AdminActivityPopup} from "./admin-activity-popup";
 
 const menuGroups=[
   {fa:"مدیریت",en:"Management",items:[
@@ -121,7 +122,7 @@ export function Shell({children,active="/admin"}:{children:React.ReactNode;activ
     <main onPointerDown={closeMenus}>
       <header className="admin-commandbar">
         <div className="search">⌕ <input placeholder={pick("جستجو در پنل...","Search panel...")}/></div>
-        <div className="head-actions"><LanguageSwitch compact/><ThemeSwitch compact/><AdminNotificationCenter/><span className="avatar">M</span></div>
+        <div className="head-actions"><AdminActivityPopup/><LanguageSwitch compact/><ThemeSwitch compact/><AdminNotificationCenter/><span className="avatar">M</span></div>
       </header>
       {active==="/admin/subscriptions"&&<AdminSubscriptionLiveTable/>}
       {children}
