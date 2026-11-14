@@ -22,16 +22,24 @@ if (!$principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
     exit 1
   }
 }
-Write-Host 'TwinConnect - Restore Windows network' -ForegroundColor Cyan
-Write-Host 'This can disconnect your VPN and resets DNS, Winsock and TCP/IP.'
-$yes = Read-Host 'Type RESET to proceed'
+Write-Host 'TwinConnect - Restore Internet' -ForegroundColor Cyan
+Write-Host '1 - Remove ONLY TwinConnect-owned WFP Kill Switch rules (no restart)'
+Write-Host '2 - Remove Kill Switch rules and reset DNS/Winsock/TCP-IP (restart required)'
+$choice = Read-Host 'Choose 1 or 2'
+if ($choice -notin @('1','2')) { Write-Host 'Cancelled.'; exit 0 }
+$yes = Read-Host 'Type RESET to confirm'
 if ($yes -cne 'RESET') { Write-Host 'Cancelled.'; exit 0 }
-& $restore
+if ($choice -eq '1') { & $restore -GuardOnly }
+else { & $restore }
 $code = $LASTEXITCODE
 if ($code -eq 0) {
-  Write-Host 'Network reset completed. Restart Windows to finish.' -ForegroundColor Green
+  if ($choice -eq '1') {
+    Write-Host 'TwinConnect-owned WFP rules removed and independently verified.' -ForegroundColor Green
+  } else {
+    Write-Host 'Network reset completed. Restart Windows to finish.' -ForegroundColor Green
+  }
 } else {
-  Write-Host 'Reset could not be verified. Review C:\ProgramData\TwinConnect\network-reset.log' -ForegroundColor Red
+  Write-Host 'Recovery could not be verified. Review C:\ProgramData\TwinConnect\network-reset.log' -ForegroundColor Red
 }
 Read-Host 'Press Enter to close'
 exit $code
