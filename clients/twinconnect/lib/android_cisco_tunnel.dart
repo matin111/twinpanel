@@ -1,25 +1,25 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
-import 'package:axevpn_flutter/openconnect_flutter.dart';
+import 'package:flutter/services.dart';
+
 import 'cisco_openconnect_profile.dart';
 
-/// An independent Android AnyConnect/CSTP TLS tunnel. Never WireGuard.
-/// This engine is permitted to authenticate only to an administrator-pinned
-/// TLS peer: the upstream Java plugin otherwise accepts untrusted certificates.
+/// Embedded Android Cisco AnyConnect / OpenConnect-compatible CSTP-over-TLS
+/// VpnService, separate from WireGuard, OpenVPN and sing-box.
+/// The vendored Java code requires an administrator-provided SHA-256 pin.
 class AndroidCiscoTunnel {
   AndroidCiscoTunnel._();
   static final AndroidCiscoTunnel instance = AndroidCiscoTunnel._();
 
-  OpenConnect? _engine;
+  static const _channel = MethodChannel(
+      'com.axevpn.flutter.openconnect/vpncontrol');
   bool _initialized = false;
   bool _connected = false;
 
   bool get isConnected => _connected;
 
-  /// Reject absent, SHA-1, or malformed pins before exposing any credentials.
-  /// The Java CSTP implementation accepts hex SHA-256 certificate pins without
-  /// a prefix or base64-encoded SPKI hashes with the pin-sha256: prefix.
   static String requiredSha256Pin(CiscoOpenConnectProfile profile) {
     final pin = profile.serverCertificate;
     if (pin == null || pin.isEmpty) {
@@ -39,41 +39,53 @@ class AndroidCiscoTunnel {
       throw const FormatException('CISCO_ANDROID_ONLY');
     }
     if (_initialized) return;
-    final engine = OpenConnect();
-    await engine.initialize(localizedDescription: 'TwinConnect');
-    final status = await engine.stage();
-    if (status == OCStage.unknown) {
+    await _channel.invokeMethod<void>('initialize', {
+      'localizedDescription': 'TwinConnect',
+    });
+    final stage = await _channel.invokeMethod<String>('stage');
+    if (stage == null || stage == 'unknown') {
       throw const FormatException('CISCO_NATIVE_ENGINE_UNAVAILABLE');
     }
-    _engine = engine;
     _initialized = true;
   }
 
+  Future<String> _stage() async =>
+      await _channel.invokeMethod<String>('stage') ?? 'unknown';
+
+  Future<bool> _serviceRunning() async =>
+      await _channel.invokeMethod<bool>('isRunning') ?? false;
+
+  Future<Map<String, dynamic>> _status() async {
+    final raw = await _channel.invokeMethod<String>('status');
+    if (raw == null || raw.isEmpty) return const {};
+    final data = jsonDecode(raw);
+    if (data is! Map) return const {};
+    return Map<String, dynamic>.from(data);
+  }
+
   Future<void> connect(CiscoOpenConnectProfile profile) async {
-    // Check pin BEFORE connecting or sending username/password to any peer.
-    final pin = requiredSha256Pin(profile);
+    final pin = requiredSha256Pin(profile); // Must precede credential transfer.
     await initialize();
-    final engine = _engine!;
     _connected = false;
     try {
-      await engine.connect(
-        serverUrl: 'https://${profile.gateway}',
-        name: 'TwinConnect Cisco',
-        username: profile.username,
-        password: profile.password,
-        servercert: pin,
-      );
-      // The native call only requests a VpnService; it is NOT a success ack.
-      // The independent service must report an established CSTP/TUN tunnel.
+      await _channel.invokeMethod<void>('connect', {
+        'server_url': 'https://${profile.gateway}',
+        'name': 'TwinConnect Cisco',
+        'username': profile.username,
+        'password': profile.password,
+        'servercert': pin,
+        'bypass_packages': <String>[],
+      });
+      // Native connect starts a foreground service, not an established tunnel.
       for (var attempt = 0; attempt < 35; attempt++) {
-        final stage = await engine.stage();
-        if (stage == OCStage.denied || stage == OCStage.error ||
-            stage == OCStage.disconnected) {
+        final stage = await _stage();
+        if (stage == 'denied' || stage == 'error' ||
+            stage == 'disconnected') {
           throw const FormatException('CISCO_NATIVE_CONNECTION_FAILED');
         }
-        if (stage == OCStage.connected && await engine.isServiceRunning()) {
-          final stats = await engine.status();
-          if (stats.state == 'connected') {
+        if (stage == 'connected' && await _serviceRunning()) {
+          final stats = await _status();
+          if (stats['state'] == 'connected') {
             _connected = true;
             return;
           }
@@ -83,7 +95,7 @@ class AndroidCiscoTunnel {
       throw const FormatException('CISCO_CONNECTION_TIMEOUT');
     } catch (_) {
       _connected = false;
-      try { await engine.disconnect(); } catch (_) {}
+      try { await _channel.invokeMethod<void>('disconnect'); } catch (_) {}
       rethrow;
     }
   }
@@ -92,20 +104,25 @@ class AndroidCiscoTunnel {
     if (!_initialized || !_connected) {
       return (connected: false, rx: null, tx: null);
     }
-    final engine = _engine!;
-    final stage = await engine.stage();
-    final running = await engine.isServiceRunning();
-    final stats = await engine.status();
-    final active = stage == OCStage.connected && running &&
-        stats.state == 'connected';
+    final stage = await _stage();
+    final running = await _serviceRunning();
+    final stats = await _status();
+    final active = stage == 'connected' && running &&
+        stats['state'] == 'connected';
     _connected = active;
-    return (connected: active,
-        rx: active ? stats.bytesIn : null,
-        tx: active ? stats.bytesOut : null);
+    int? count(dynamic v) {
+      final n = v is int ? v : int.tryParse(v?.toString() ?? '');
+      return n != null && n >= 0 ? n : null;
+    }
+    return (
+      connected: active,
+      rx: active ? count(stats['bytes_in']) : null,
+      tx: active ? count(stats['bytes_out']) : null,
+    );
   }
 
   Future<void> disconnect() async {
     _connected = false;
-    if (_initialized) await _engine!.disconnect();
+    if (_initialized) await _channel.invokeMethod<void>('disconnect');
   }
 }
