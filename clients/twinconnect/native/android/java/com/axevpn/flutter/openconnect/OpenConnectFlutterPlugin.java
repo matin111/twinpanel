@@ -296,8 +296,8 @@ public class OpenConnectFlutterPlugin implements FlutterPlugin, ActivityAware, M
         try {
             JSONObject json = new JSONObject();
             json.put("state", currentStage);
-            json.put("bytes_in", 0);
-            json.put("bytes_out", 0);
+            json.put("bytes_in", AxeOpenConnectVpnService.bytesReceived.get());
+            json.put("bytes_out", AxeOpenConnectVpnService.bytesSent.get());
             return json.toString();
         } catch (Exception e) {
             return "{\"state\":\"unknown\"}";
