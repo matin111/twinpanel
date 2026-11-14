@@ -32,8 +32,23 @@ try {
     }
     Log 'Verified no TwinConnect-owned WFP filters remain.'
   } else {
-    if ($GuardOnly) { throw 'GUARD_SERVICE_NOT_INSTALLED' }
-    Log 'No installed TwinConnect guard; WFP recovery not applicable.'
+    Log 'No signed system-wide guard service installed.'
+  }
+
+  # Recover the separately bundled selected-app WFP rule as well, even when
+  # no system-wide guard service was ever installed.
+  $appGuard = Join-Path $env:ProgramFiles 'TwinConnect\services\TwinConnectAppKillSwitch.exe'
+  if (Test-Path -LiteralPath $appGuard -PathType Leaf) {
+    & $appGuard recover | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw 'APP_WFP_EMERGENCY_RECOVERY_FAILED' }
+    $appAudit = & $appGuard audit
+    if ($LASTEXITCODE -ne 0 -or
+        $appAudit -notmatch '^OWNED_APP_RULES_PRESENT 0 0') {
+      throw 'APP_WFP_FILTERS_STILL_PRESENT'
+    }
+    Log 'Verified selected-app WFP rules removed.'
+  } else {
+    Log 'Selected-app WFP recovery executable not installed.'
   }
   if ($GuardOnly) {
     Log 'User requested Kill Switch emergency recovery only.'
