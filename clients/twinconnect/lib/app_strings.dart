@@ -349,6 +349,12 @@ class AppStrings {
         return pick('پاسخ سرور بیش از حد بزرگ است.', 'Server response is too large.');
       case 'INVALID_SERVER_RESPONSE':
         return pick('پاسخ سرویس معتبر نیست.', 'The server returned invalid data.');
+      case 'DIRECTORY_NETWORK_UNAVAILABLE':
+        return pick('مرکز لایسنس در دسترس نیست. اتصال اینترنت و مسیرهای جایگزین را بررسی کنید.',
+                    'License directory unreachable. Check network and directory routes.');
+      case 'PANEL_NETWORK_UNAVAILABLE':
+        return pick('پنل اشتراک شناسایی شد اما سرور ورود آن در دسترس نیست.',
+                    'Panel located, but its login server is unreachable.');
       case 'NETWORK_UNAVAILABLE':
         return pick('اتصال به سرور برقرار نشد.', 'Unable to connect to the server.');
       case 'INVALID_TLS':
