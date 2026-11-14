@@ -19,7 +19,7 @@ void main() {
       'nobind',
       'persist-tun',
       'persist-key',
-    ].join('\\n');
+    ].join('\n');
     // Test profile has no working server credentials or real endpoint.
     expect(AndroidOpenVpnTunnel.requireProfile({'config': sample}), sample);
   });
