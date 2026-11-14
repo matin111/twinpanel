@@ -91,8 +91,8 @@ export function TunnelMonitor({tunnels,nodes,loaded,pick}:{
   </div>;
 }
 
-export function ProtocolMonitor({protocols,pick}:{
-  protocols:DashboardProtocol[];pick:Pick;
+export function ProtocolMonitor({protocols,pick,onRestart}:{
+  protocols:DashboardProtocol[];pick:Pick;onRestart?:()=>void;
 }){
   const [group,setGroup]=useState<ProtocolGroup>("all");
   const shown=useMemo(()=>group==="all"?protocols:protocols.filter(p=>protocolKind(p.key)===group),[group,protocols]);
@@ -131,7 +131,7 @@ export function ProtocolMonitor({protocols,pick}:{
             <small>{p.reported?display(p.onlineNodes)+" "+pick("نود آنلاین گزارش‌شده","reported online nodes"):pick("بدون گزارش سلامت","No health report")}</small>
           </div>
           <span className={styles.protocolState}><i/>{state==="online"?pick("گزارش فعال","Reported online"):state==="offline"?pick("غیرفعال گزارش‌شده","Reported offline"):pick("نامشخص","Unknown")}</span>
-          <DashboardProtocolRestart protocol={p.key} label={p.label} pick={pick}/>
+          <DashboardProtocolRestart protocol={p.key} label={p.label} pick={pick} onComplete={onRestart}/>
         </article>;
       })}
     </div>
