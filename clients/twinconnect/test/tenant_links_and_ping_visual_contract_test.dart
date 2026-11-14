@@ -169,6 +169,21 @@ void main() {
     expect(dashboard, isNot(contains('widget.native.supports(_filter)')));
   });
 
+  test('Android modern native engine does not reuse WireGuard or Cisco', () {
+    final modern = File('lib/android_singbox_tunnel.dart').readAsStringSync();
+    final card = File('lib/android_connection_card.dart').readAsStringSync();
+    expect(modern, contains('package:sing_box/sing_box.dart'));
+    for (final code in ['hysteria2', 'tuic', 'anytls', 'socks5']) {
+      expect(modern, contains("'$code'"));
+    }
+    expect(modern, contains('SingBoxProfileValidator.validateOutbound('));
+    expect(modern, contains('SingBox.instance.connect(jsonEncode(outbound))'));
+    expect(card, contains('Future<void> _connectModern('));
+    expect(card, contains('Future<void> _disconnectModern()'));
+    expect(card, contains('loadSessionNativeProfiles('));
+    expect(card, contains('AndroidSingBoxTunnel.instance.connect('));
+  });
+
   test('Android offers all entitled protocols without claiming missing engines', () {
     final android = File('lib/android_connection_card.dart').readAsStringSync();
     final native = File('native/android/kotlin/com/twinpanel/twinconnect/MainActivity.kt')
