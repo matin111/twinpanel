@@ -1,0 +1,58 @@
+name: TwinConnect Guard Installer Preflight
+
+on:
+  pull_request:
+    paths:
+      - "clients/twinconnect/installer.iss"
+      - "clients/twinconnect/tools/install_guard_service.ps1"
+      - "clients/twinconnect/native/windows/twinconnect_global_guard_service_experimental.cpp"
+      - ".github/workflows/twinconnect-guard-installer-preflight.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  guard-installer-preflight:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: clients/twinconnect
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile standalone guard service without installing or arming
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $vswhere = Join-Path "${env:ProgramFiles(x86)}" "Microsoft Visual Studio/Installer/vswhere.exe"
+          $vs = (& $vswhere -latest -property installationPath).Trim()
+          if (!$vs) { throw 'Visual Studio not available' }
+          $dev = Join-Path $vs 'Common7/Tools/VsDevCmd.bat'
+          $src = Join-Path (Get-Location) 'native/windows/twinconnect_global_guard_service_experimental.cpp'
+          $exe = Join-Path $env:RUNNER_TEMP 'TwinConnectGlobalGuard-preflight.exe'
+          $compile = 'call "' + $dev + '" -arch=amd64 && cl /nologo /std:c++17 /EHsc /W4 /WX /Fe:"' + $exe + '" "' + $src + '" /link Fwpuclnt.lib Iphlpapi.lib Ws2_32.lib Rpcrt4.lib Advapi32.lib Ole32.lib Oleaut32.lib Taskschd.lib'
+          & cmd.exe /d /s /c $compile
+          if ($LASTEXITCODE -ne 0 -or !(Test-Path $exe)) { throw 'Guard compilation failed' }
+          & $exe offline-status
+          if ($LASTEXITCODE -ne 0) { throw 'Read-only guard preflight failed' }
+          Remove-Item -LiteralPath $exe -Force
+      - name: Verify signed-service installer gate and recovery contract
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $iss = Get-Content 'installer.iss' -Raw
+          $ps = Get-Content 'tools/install_guard_service.ps1' -Raw
+          foreach ($mark in @('PrivilegesRequired=admin', '#define IncludeVerifiedGlobalGuard 0', 'GuardSigningThumbprint', 'install_guard_service.ps1', '-Action Uninstall')) {
+            if (!$iss.Contains($mark)) { throw "Missing installer safety requirement: $mark" }
+          }
+          foreach ($mark in @('Get-AuthenticodeSignature', 'ExpectedSignerThumbprint', 'offline-status', 'Assert-ServiceIdentity')) {
+            if (!$ps.Contains($mark)) { throw "Missing service safety requirement: $mark" }
+          }
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Join-Path (Get-Location) 'tools/install_guard_service.ps1'),
+            [ref]$tokens, [ref]$errors) | Out-Null
+          if ($errors.Count -ne 0) { throw 'Guard installer PowerShell syntax invalid' }
+          Write-Host 'Guard compiles; unsigned and unverified firewall enforcement remains disabled.'
