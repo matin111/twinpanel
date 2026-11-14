@@ -182,6 +182,13 @@ void main() {
     expect(card, contains('Future<void> _disconnectModern()'));
     expect(card, contains('loadSessionNativeProfiles('));
     expect(card, contains('AndroidSingBoxTunnel.instance.connect('));
+    final activity = File(
+      'native/android/kotlin/com/twinpanel/twinconnect/MainActivity.kt',
+    ).readAsStringSync();
+    expect(modern, contains("'forgetSingBoxEphemeralConfig'"));
+    expect(modern, contains('SINGBOX_OUTBOUND_UNREACHABLE'));
+    expect(activity, contains('"sing_box.last_input"'));
+    expect(activity, contains('"sing-box/last_config.json"'));
   });
 
   test('Android offers all entitled protocols without claiming missing engines', () {
