@@ -77,12 +77,25 @@ class AndroidCiscoTunnel {
         'servercert': pin,
         'bypass_packages': <String>[],
       });
-      // Native connect starts a foreground service, not an established tunnel.
+      // Starting the Android foreground service is asynchronous. A snapshot
+      // of "disconnected" immediately after connect() is normal and MUST NOT
+      // be treated as a failed authentication or a stopped VPN.
+      var observedStarting = false;
       for (var attempt = 0; attempt < 35; attempt++) {
         final stage = await _stage();
-        if (stage == 'denied' || stage == 'error' ||
-            stage == 'disconnected') {
-          throw const FormatException('CISCO_NATIVE_CONNECTION_FAILED');
+        if (stage == 'denied') {
+          throw const FormatException('CISCO_AUTH_OR_VPN_PERMISSION_DENIED');
+        }
+        if (stage == 'error') {
+          throw const FormatException('CISCO_NATIVE_TUNNEL_FAILED');
+        }
+        if (stage == 'preparing' || stage == 'connecting' ||
+            stage == 'authenticating' || stage == 'connected') {
+          observedStarting = true;
+        }
+        if (stage == 'disconnected' && observedStarting &&
+            !await _serviceRunning()) {
+          throw const FormatException('CISCO_ENGINE_DISCONNECTED');
         }
         if (stage == 'connected' && await _serviceRunning()) {
           final stats = await _status();
