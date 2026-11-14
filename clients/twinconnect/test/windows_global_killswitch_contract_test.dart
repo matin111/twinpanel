@@ -210,7 +210,7 @@ void main() {
   test('Windows application picker never depends on installed WFP engine', () {
     final script = File('tools/windows_app_network_lock.ps1').readAsStringSync();
     final settings = File('lib/vpn_settings.dart').readAsStringSync();
-    final pick = script.indexOf("if (\$Action -eq 'Pick') {\n  Write-Output");
+    final pick = script.indexOf('TWINCONNECT_PICKED ');
     final engine = script.indexOf('APP_WFP_ENGINE_NOT_INSTALLED');
     expect(pick, greaterThan(0));
     expect(engine, greaterThan(pick));
