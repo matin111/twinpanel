@@ -8,7 +8,7 @@ import 'cisco_openconnect_profile.dart';
 
 /// Embedded Android Cisco AnyConnect / OpenConnect-compatible CSTP-over-TLS
 /// VpnService, separate from WireGuard, OpenVPN and sing-box.
-/// The vendored Java code requires an administrator-provided SHA-256 pin.
+/// The vendored Java code requires either Android CA+hostname validation or a SHA-256 pin.
 class AndroidCiscoTunnel {
   AndroidCiscoTunnel._();
   static final AndroidCiscoTunnel instance = AndroidCiscoTunnel._();
@@ -20,18 +20,19 @@ class AndroidCiscoTunnel {
 
   bool get isConnected => _connected;
 
-  static String requiredSha256Pin(CiscoOpenConnectProfile profile) {
+  /// Empty pin means the bundled Java service MUST validate the system
+  /// CA chain plus the HTTPS peer hostname. An explicitly provided pin must
+  /// always be a valid SHA-256 certificate or SPKI fingerprint.
+  static String validatedServerTrust(CiscoOpenConnectProfile profile) {
     final pin = profile.serverCertificate;
-    if (pin == null || pin.isEmpty) {
-      throw const FormatException('CISCO_SHA256_PIN_REQUIRED');
-    }
+    if (pin == null || pin.isEmpty) return '';
     if (RegExp(r'^sha256:[0-9a-fA-F]{64}$').hasMatch(pin)) {
       return pin.substring(7);
     }
     if (RegExp(r'^pin-sha256:[A-Za-z0-9+/]{43}=$').hasMatch(pin)) {
       return pin;
     }
-    throw const FormatException('CISCO_SHA256_PIN_REQUIRED');
+    throw const FormatException('CISCO_SHA256_PIN_INVALID');
   }
 
   Future<void> initialize() async {
@@ -64,7 +65,7 @@ class AndroidCiscoTunnel {
   }
 
   Future<void> connect(CiscoOpenConnectProfile profile) async {
-    final pin = requiredSha256Pin(profile); // Must precede credential transfer.
+    final pin = validatedServerTrust(profile); // Must precede credential transfer.
     await initialize();
     _connected = false;
     try {
