@@ -1052,17 +1052,27 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
             children: [
               Text(tr('Proxy / System Proxy', 'Proxy / System Proxy'),
                   style: const TextStyle(fontWeight: FontWeight.w700)),
-              Text(tr('موتور تغییر مسیر پروکسی هنوز متصل نیست',
-                      'Proxy switching engine not integrated'),
+              Text(_systemProxyEnabled == true
+                  ? tr('SOCKS5 فعال: 127.0.0.1:${_systemProxyPort ?? 0}',
+                      'SOCKS5 active: 127.0.0.1:${_systemProxyPort ?? 0}')
+                  : _systemProxyEnabled == false
+                      ? tr('خاموش', 'Off')
+                      : tr('وضعیت موتور تأیید نشد', 'Engine status unverified'),
                   style: Theme.of(context).textTheme.bodySmall),
             ],
           )),
           _help('Proxy', tr(
-            'حالت پروکسی فقط برنامه‌هایی را پوشش می‌دهد که از SOCKS یا پروکسی سیستم پیروی می‌کنند. با VPN کل سیستم تفاوت دارد؛ هنوز امکان تغییر امن حالت از این بخش فراهم نشده است.',
-            'A local SOCKS/system proxy only covers proxy-aware apps. Safe mode switching is not yet integrated.',
+            'این موتور فقط برنامه‌هایی را تغییر می‌دهد که از پروکسی سیستم پیروی می‌کنند. ابتدا SOCKS5 محلی باید فعال باشد. خاموش‌کردن تنظیمات قبلی ویندوز را برمی‌گرداند.',
+            'Only proxy-aware applications are affected. A verified local SOCKS5 listener is required. Disabling restores your previous Windows settings.',
           )),
-          const Icon(Icons.lock_outline_rounded),
-        ]), key: const Key('vpnProxyModeUnavailable')),
+          Switch.adaptive(
+            key: const Key('vpnSystemProxyToggle'),
+            value: _systemProxyEnabled == true,
+            onChanged: !Platform.isWindows || _systemProxyBusy ||
+                _systemProxyEnabled == null
+                ? null : _changeSystemProxy,
+          ),
+        ]), key: const Key('vpnSystemProxyCard')),
         _section(tr('تفکیک برنامه‌ها', 'Split tunneling')),
         _glass(Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
