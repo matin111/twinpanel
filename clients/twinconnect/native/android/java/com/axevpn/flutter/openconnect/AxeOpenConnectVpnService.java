@@ -70,6 +70,8 @@ public class AxeOpenConnectVpnService extends VpnService {
 
     /** True while the VPN tunnel is active. Read by OpenConnectFlutterPlugin on re-init. */
     public static volatile boolean isRunning = false;
+    // Non-sensitive diagnostic category. Never broadcast credentials or URLs.
+    public static volatile String lastFailureCode = "";
     public static final AtomicLong bytesReceived = new AtomicLong();
     public static final AtomicLong bytesSent = new AtomicLong();
 
@@ -139,7 +141,9 @@ public class AxeOpenConnectVpnService extends VpnService {
 
     private void connectToServer(String serverUrl, String name, String username,
                                   String password, String authGroup, String servercert) {
+        lastFailureCode = "";
         broadcastStage("preparing");
+        String failureStage = "CISCO_TLS_OR_SOCKET_FAILED";
         SSLSocket authSock = null;
         SSLSocket tunSock  = null;
         try {
@@ -164,6 +168,7 @@ public class AxeOpenConnectVpnService extends VpnService {
 
             // ── Phase 1: Authenticate (2-step: username → context cookie → password → session) ──
             broadcastStage("authenticating");
+            failureStage = "CISCO_AUTH_EXCHANGE_FAILED";
 
             // Step 1a: POST username to /auth to get context cookie
             authSock = connectProtectedTls(ssf, host, port, servercert);
@@ -191,6 +196,7 @@ public class AxeOpenConnectVpnService extends VpnService {
 
             if (contextCookie == null || contextCookie.isEmpty()) {
                 Log.e(TAG, "Authentication step 1 failed — no context cookie received");
+                lastFailureCode = "CISCO_AUTH_CONTEXT_REJECTED";
                 broadcastStage("denied");
                 stopSelf();
                 return;
@@ -234,6 +240,7 @@ public class AxeOpenConnectVpnService extends VpnService {
 
             if (sessionCookie == null || sessionCookie.isEmpty()) {
                 Log.e(TAG, "Authentication step 2 failed — no webvpn= session cookie (wrong password or server rejected login)");
+                lastFailureCode = "CISCO_AUTH_SESSION_REJECTED";
                 broadcastStage("denied");
                 stopSelf();
                 return;
@@ -241,6 +248,7 @@ public class AxeOpenConnectVpnService extends VpnService {
 
             // ── Phase 2: Open CSTP tunnel ──
             broadcastStage("connecting");
+            failureStage = "CISCO_CSTP_HANDSHAKE_FAILED";
             tunSock = connectProtectedTls(ssf, host, port, servercert);
 
             String connectReq = "CONNECT /CSCOSSLC/tunnel HTTP/1.1\r\n"
@@ -261,6 +269,7 @@ public class AxeOpenConnectVpnService extends VpnService {
             VpnTunnelConfig cfg = parseTunnelHeaders(tunSock.getInputStream());
             if (cfg == null) {
                 Log.e(TAG, "Tunnel setup failed — no VPN config in CONNECT response");
+                lastFailureCode = "CISCO_CSTP_CONFIG_MISSING";
                 broadcastStage("error");
                 safeClose(tunSock);
                 stopSelf();
@@ -268,9 +277,11 @@ public class AxeOpenConnectVpnService extends VpnService {
             }
 
             // ── Phase 3: TUN interface ──
+            failureStage = "CISCO_TUN_INTERFACE_FAILED";
             tunInterface = buildVpnInterface(cfg, name);
             if (tunInterface == null) {
                 Log.e(TAG, "TUN interface build failed");
+                lastFailureCode = "CISCO_TUN_INTERFACE_FAILED";
                 broadcastStage("error");
                 safeClose(tunSock);
                 stopSelf();
@@ -284,11 +295,13 @@ public class AxeOpenConnectVpnService extends VpnService {
             bytesSent.set(0);
             isRunning = true;
             // startForeground() was already called in onStartCommand().
+            lastFailureCode = "";
             broadcastStage("connected");
             forwardPackets(tunSock.getInputStream(), tos, cfg.mtu > 0 ? cfg.mtu : 1406);
 
         } catch (Exception e) {
             Log.e(TAG, "Connection error", e);
+            lastFailureCode = failureStage;
             broadcastStage("error");
         } finally {
             safeClose(authSock);
