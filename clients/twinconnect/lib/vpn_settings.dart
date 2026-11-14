@@ -562,7 +562,9 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
             ),
           ]), key: const Key('vpnSignedGuardTimedTestCard')),
         ],
-        if (Platform.isWindows && _guard['serviceInstalled'] == true) ...[
+        // Recovery must remain accessible even if the guard service crashes,
+        // is unregistered, or a native status probe fails closed.
+        if (Platform.isWindows) ...[
           const SizedBox(height: 8),
           _glass(Row(children: [
             const Icon(Icons.shield_outlined, size: 22),
