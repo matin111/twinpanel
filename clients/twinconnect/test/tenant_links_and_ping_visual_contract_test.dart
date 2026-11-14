@@ -148,20 +148,20 @@ void main() {
 
   test('Android connection status follows active native tunnel not protocol filter', () {
     final card = File('lib/android_connection_card.dart').readAsStringSync();
-    expect(card, contains("final protocolName = _up ? 'WireGuard'"));
+    expect(card, contains("final protocolName = chosen?.protocol.name"));
+    expect(card, contains("Key('androidSeparateActiveProtocol')"));
+    expect(card, contains("Key('androidDisconnectPreviousTunnel')"));
     expect(card, contains("final internetVerified = _ciscoUp ||"));
     expect(card, contains("Key('androidNoHandshakeDiagnostic')"));
     expect(card, contains('WG_INTERFACE_UP_NO_HANDSHAKE'));
     expect(card, contains('Tunnel interface up; server connection unverified'));
   });
 
-  test('Android Connect tab clears unsupported Servers protocol selection', () {
+  test('Android Connect tab preserves selected protocol and node', () {
     final dashboard = File('lib/live_dashboard.dart').readAsStringSync();
-    expect(dashboard, contains('if (index == 0) {'));
-    expect(dashboard, contains("_filter = 'all';"));
-    expect(dashboard, contains('_androidExplicitNodeSelected = false;'));
-    expect(dashboard, contains("widget.native.supports(_filter)"));
-    expect(dashboard, contains("selectedProtocolCode: _filter != 'all' &&"));
+    expect(dashboard, contains("selectedProtocolCode: _filter == 'all' ? null : _filter"));
+    expect(dashboard, contains('Navigation does not rewrite the chosen protocol or node'));
+    expect(dashboard, isNot(contains('widget.native.supports(_filter)')));
   });
 
   test('Android offers all entitled protocols without claiming missing engines', () {
