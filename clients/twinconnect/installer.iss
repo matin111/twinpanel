@@ -39,6 +39,7 @@ Source: "tools\reset_windows_network.ps1"; DestDir: "{app}\tools"; Flags: ignore
 Source: "tools\restore_windows_network_launcher.ps1"; DestDir: "{app}\tools"; Flags: ignoreversion
 Source: "tools\windows_guard_control.ps1"; DestDir: "{app}\tools"; Flags: ignoreversion
 Source: "tools\windows_app_network_lock.ps1"; DestDir: "{app}\tools"; Flags: ignoreversion
+Source: "tools\windows_system_proxy.ps1"; DestDir: "{app}\tools"; Flags: ignoreversion
 Source: "tools\check_windows_real_device_readonly.ps1"; DestDir: "{app}\tools"; Flags: ignoreversion
 #if IncludeVerifiedGlobalGuard
 Source: "build\windows\x64\runner\Release\services\TwinConnectGlobalGuard.exe"; DestDir: "{app}\services"; Flags: ignoreversion
@@ -48,6 +49,7 @@ Source: "tools\install_guard_service.ps1"; DestDir: "{app}\tools"; Flags: ignore
 [Icons]
 Name: "{autoprograms}\TwinConnect"; Filename: "{app}\{#MyAppExeName}"
 Name: "{autoprograms}\TwinConnect - Restore Internet"; Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\tools\restore_windows_network_launcher.ps1"""
+Name: "{autoprograms}\TwinConnect - Restore System Proxy"; Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\tools\windows_system_proxy.ps1"" -Action Disable"
 Name: "{autodesktop}\TwinConnect"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 
 [Tasks]
