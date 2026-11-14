@@ -206,7 +206,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
     final nativeReady = Platform.isAndroid &&
         widget.native.supports('wireguard') &&
         chosen?.protocol.code == 'wireguard' &&
-        chosen.configRecordPresent;
+        chosen?.configRecordPresent == true;
     final protocolName = chosen?.protocol.name ?? (requested ?? '—');
     final connected = _up;
     final accent = connected ? const Color(0xFF35D9AE)
@@ -278,11 +278,11 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 15),
-        if (!connected && (!nativeReady || chosen == null))
+        if (!connected && !nativeReady)
           Padding(
             padding: const EdgeInsets.only(bottom: 12),
             child: Text(
-              chosen == null || !chosen.configRecordPresent
+              chosen?.configRecordPresent != true
                   ? s.pick('این پروتکل در اشتراک فعال نیست یا کانفیگ ندارد.',
                       'This protocol is unavailable or has no profile.')
                   : s.pick('موتور این پروتکل در اندروید هنوز آماده اتصال نیست.',
