@@ -114,35 +114,6 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
     });
   }
 
-  Future<void> _copyDiagnostics() async {
-    final diagnosticText = <String>[
-      'TwinConnect network diagnostics',
-      'platform: ${NativeVpnBridge.platform.name}',
-      'vpn_engine_ready: ${_capabilities.engineReady}',
-      'full_tunnel_supported: ${_capabilities.fullTunnel}',
-      'wfp_available: ${_guard['wfpAvailable'] == true}',
-      'guard_service_installed: ${_guard['serviceInstalled'] == true}',
-      'guard_armed_verified: $_guardActive',
-      'dns_engine_support: ${_capabilities.dnsGuard}',
-      'ipv6_engine_support: ${_capabilities.ipv6Guard}',
-      'guard_reason: ${_guard['reason'] ?? 'UNKNOWN'}',
-      'selected_app_kill_switch_status: ${_selectedKillSwitchEnabled == true ? 'active' : 'inactive'}',
-      'selected_app_kill_switch_last_error: $_appKillSwitchDiagnostic',
-      'split_tunnel_mode: ${_routingMode.name}',
-      'split_tunnel_selected_app_count: ${_routingApps.length}',
-      'split_tunnel_requires_reconnect: true',
-      'split_tunnel_engine_scope: windows_singbox_tun_only',
-      'system_proxy_status: ${_systemProxyEnabled == null ? 'unverified' : (_systemProxyEnabled! ? 'enabled' : 'disabled')}',
-      'system_proxy_port: ${_systemProxyPort ?? 'none'}',
-    ].join('\n');
-    await Clipboard.setData(ClipboardData(text: diagnosticText));
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(AppStrings.of(context).pick(
-          'گزارش عیب‌یابی کپی شد', 'Diagnostic report copied')),
-    ));
-  }
-
   Future<void> _vmGuardAction(bool enable) async {
     if (_vmGuardBusy ||
         !Platform.isWindows ||
@@ -862,40 +833,6 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
     if (!enabled) const Icon(Icons.lock_outline_rounded, size: 17),
   ]);
 
-  Widget _statusItem({
-    required String title,
-    required String help,
-    required IconData icon,
-    required String value,
-    required bool ready,
-    Key? key,
-  }) => _glass(
-    Row(children: [
-      Container(
-        width: 36, height: 36,
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.primary.withValues(alpha: .13),
-          borderRadius: BorderRadius.circular(11),
-        ),
-        child: Icon(icon, size: 19),
-      ),
-      const SizedBox(width: 10),
-      Expanded(child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-          Text(value, style: TextStyle(
-            fontSize: 11,
-            color: ready ? const Color(0xFF47CBA8)
-                : Theme.of(context).colorScheme.onSurface.withValues(alpha: .60),
-          )),
-        ],
-      )),
-      _help(title, help),
-    ]),
-    key: key,
-  );
-
   Widget _section(String title) => Padding(
     padding: const EdgeInsets.only(top: 14, bottom: 9),
     child: Text(title, style: Theme.of(context).textTheme.titleMedium?.copyWith(
@@ -907,7 +844,6 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
   Widget build(BuildContext context) {
     final s = AppStrings.of(context);
     String tr(String fa, String en) => s.pick(fa, en);
-    final globalReady = _guard['wfpAvailable'] == true;
     final content = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
