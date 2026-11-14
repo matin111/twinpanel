@@ -276,7 +276,18 @@ void WINAPI ServiceMain(DWORD, LPWSTR*) {
   }
   LocalFree(descriptor);
   CloseHandle(gStop);
+#if !defined(TWINCONNECT_GUARD_DIAGNOSTIC_ONLY)
+  // A normal service shutdown must not strand persistent WFP rules.
+  // Never modify Windows Firewall rules owned by other applications.
+  Engine recoveryEngine;
+  DWORD recoveryResult = Open(recoveryEngine);
+  if (recoveryResult == ERROR_SUCCESS) {
+    recoveryResult = TransactionalDisarm(recoveryEngine.handle);
+  }
+  Update(SERVICE_STOPPED, recoveryResult);
+#else
   Update(SERVICE_STOPPED);
+#endif
 }
 
 int Client(const std::wstring& text) {
