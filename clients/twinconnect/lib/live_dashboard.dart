@@ -293,16 +293,34 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   final ValueNotifier<int> _connectedSeconds = ValueNotifier<int>(0);
   DateTime? _connectedSince;
   Timer? _durationTicker;
+  // Retain one session anchor across dashboard widget remounts. The anchor
+  // is never used as proof that a VPN is connected; OS/core status owns that.
+  static final Map<String, DateTime> _sessionAnchors = {};
+  String get _clockKey => '${widget.panel.namespace}:${widget.username}';
 
   bool get _verifiedConnectionActive => _modernUp || _vpnVerified;
+  bool get _transportStillPresent => _vpnUp || _awgServiceUp ||
+      _modernTunnel.isRunning || _ciscoTunnel.isRunning ||
+      _openVpnTunnel.isRunning || _l2tpTunnel.isRunning;
 
   void _updateConnectionClock() {
-    if (!_verifiedConnectionActive) {
-      _connectedSince = null;
+    if (!_verifiedConnectionActive && !_transportStillPresent) {
+      // An initial status probe on a remounted widget can briefly report
+      // offline. Only clear an anchor if this instance had seen the session.
+      if (_connectedSince != null) {
+        _connectedSince = null;
+        _sessionAnchors.remove(_clockKey);
+      }
       if (_connectedSeconds.value != 0) _connectedSeconds.value = 0;
       return;
     }
+    // A temporary native handshake/health probe failure is NOT a disconnect.
+    // Keep displaying the elapsed session duration while its tunnel exists.
+    if (_connectedSince == null && !_verifiedConnectionActive) return;
     if (_connectedSince == null) {
+      _connectedSince = _sessionAnchors.putIfAbsent(
+          _clockKey, () => DateTime.now());
+
       // Remember the actual verified protocol, including manual connections.
       // Fast Server must not guess WireGuard just because it is listed first.
       final verifiedProtocol = _modernUp
@@ -312,7 +330,6 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         unawaited(_rememberVerifiedProtocol(verifiedProtocol));
       }
     }
-    _connectedSince ??= DateTime.now();
     final seconds = DateTime.now().difference(_connectedSince!).inSeconds;
     if (_connectedSeconds.value != seconds) _connectedSeconds.value = seconds;
   }
@@ -488,9 +505,10 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       // Prefer real measured RTT; use the panel's nonzero last-known
       // latency only when ICMP is blocked or unavailable on Windows.
       // Never treat an unmeasured server as zero-latency.
-      final latency = _latencyFor(node);
+      final latency = _nodePings[node.id] ?? node.latencyMs;
       if (!node.nodeOnline || latency == null || latency <= 0) continue;
-      final bestLatency = best == null ? null : _latencyFor(servers[best]);
+      final bestLatency = best == null ? null :
+          (_nodePings[servers[best].id] ?? servers[best].latencyMs);
       if (bestLatency == null || latency < bestLatency) {
         best = i;
       }
