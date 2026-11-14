@@ -90,6 +90,12 @@ jobs:
             if ($LASTEXITCODE -ne 0 -or ($guardStatus -notmatch "OK 0 0 0")) {
               throw "SECURITY: rejected commands left WFP rules installed"
             }
+            # Normal stop must never strand TwinConnect-owned persistent WFP rules.
+            Stop-Service -Name TwinConnectGlobalGuard -ErrorAction Stop
+            $afterStop = & $exe offline-status
+            if ($LASTEXITCODE -ne 0 -or $afterStop -notmatch 'OWNED_RULES_PRESENT 0 0 0') {
+              throw "SECURITY: guard service stop left owned WFP rules"
+            }
             & $exe recover $ack
             if ($LASTEXITCODE -ne 0) { throw "Independent recovery failed" }
             & $exe uninstall-vm $ack
