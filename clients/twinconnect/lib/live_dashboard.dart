@@ -55,6 +55,7 @@ import 'ambient_background.dart';
 import 'interactive_glass_card.dart';
 import 'tunnel_traffic_chart.dart';
 import 'vpn_settings.dart';
+import 'ios_home_shell.dart';
 
 /// Authenticated application uses the original visual dashboard layout with live data.
 
@@ -2991,6 +2992,26 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
 
   @override
   Widget build(BuildContext context) {
+    // The authenticated iOS app uses the same reusable screen as the
+    // simulator tour, but receives only REAL panel data here. Preview
+    // fixtures are never loaded through this entry point.
+    if (Platform.isIOS) {
+      return MaterialApp(
+        title: widget.brand.brandName,
+        debugShowCheckedModeBanner: false,
+        theme: BrandTheme.make(widget.brand, Brightness.dark),
+        home: TwinConnectIphoneShell(
+          brand: widget.brand,
+          username: widget.username,
+          inventory: widget.servers,
+          catalog: widget.catalog,
+          account: widget.account,
+          plan: widget.plan,
+          onRefresh: widget.onRefresh,
+          onLogout: widget.onLogout,
+        ),
+      );
+    }
     return MaterialApp(
       title: widget.brand.brandName,
       debugShowCheckedModeBanner: false,
