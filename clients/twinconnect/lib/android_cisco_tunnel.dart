@@ -83,11 +83,25 @@ class AndroidCiscoTunnel {
       var observedStarting = false;
       for (var attempt = 0; attempt < 35; attempt++) {
         final stage = await _stage();
+        final nativeStatus = await _status();
+        final rawReason = nativeStatus['failure_code'];
+        // Accept only explicit known categories, never surface server strings.
+        const allowedFailures = <String>{
+          'CISCO_AUTH_CONTEXT_REJECTED',
+          'CISCO_AUTH_SESSION_REJECTED',
+          'CISCO_AUTH_EXCHANGE_FAILED',
+          'CISCO_TLS_OR_SOCKET_FAILED',
+          'CISCO_CSTP_HANDSHAKE_FAILED',
+          'CISCO_CSTP_CONFIG_MISSING',
+          'CISCO_TUN_INTERFACE_FAILED',
+        };
+        final reason = rawReason is String && allowedFailures.contains(rawReason)
+            ? rawReason : null;
         if (stage == 'denied') {
-          throw const FormatException('CISCO_AUTH_OR_VPN_PERMISSION_DENIED');
+          throw FormatException(reason ?? 'CISCO_AUTH_OR_VPN_PERMISSION_DENIED');
         }
         if (stage == 'error') {
-          throw const FormatException('CISCO_NATIVE_TUNNEL_FAILED');
+          throw FormatException(reason ?? 'CISCO_NATIVE_TUNNEL_FAILED');
         }
         if (stage == 'preparing' || stage == 'connecting' ||
             stage == 'authenticating' || stage == 'connected') {
@@ -95,7 +109,7 @@ class AndroidCiscoTunnel {
         }
         if (stage == 'disconnected' && observedStarting &&
             !(await _serviceRunning())) {
-          throw const FormatException('CISCO_ENGINE_DISCONNECTED');
+          throw FormatException(reason ?? 'CISCO_ENGINE_DISCONNECTED');
         }
         if (stage == 'connected' && await _serviceRunning()) {
           final stats = await _status();
