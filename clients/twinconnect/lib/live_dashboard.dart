@@ -500,7 +500,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         NativeVpnBridge.protocolReadiness().timeout(
             const Duration(seconds: 8)),
         SharedPreferences.getInstance(),
-        _probeAllNodes(),
+        _probeAllNodes().then((_) => true),
       ]);
       if (!mounted) return;
       final ready = checks[0] as NativeProtocolReadiness;
