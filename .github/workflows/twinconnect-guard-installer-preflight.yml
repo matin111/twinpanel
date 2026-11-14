@@ -7,6 +7,12 @@ on:
       - "clients/twinconnect/tools/install_guard_service.ps1"
       - "clients/twinconnect/native/windows/twinconnect_global_guard_service_experimental.cpp"
       - ".github/workflows/twinconnect-guard-installer-preflight.yml"
+  push:
+    branches:
+      - feat/twinconnect-guard-installer-integration-20261114
+    paths:
+      - ".github/workflows/twinconnect-guard-installer-preflight.yml"
+      - "clients/twinconnect/**"
   workflow_dispatch:
 
 permissions:
