@@ -47,6 +47,7 @@ def patch_gradle() -> None:
         "\n// Pinned WireGuard native tunnel implementation; distinct from Cisco/OpenConnect.\n"
         "dependencies {\n"
         '    implementation("com.wireguard.android:tunnel:1.0.20260102")\n'
+        '    implementation("androidx.core:core:1.15.0")\n'
         '    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")\n'
         "}\n"
     )
@@ -109,6 +110,30 @@ def patch_manifest() -> None:
         '            </intent-filter>\n'
         '        </service>\n'
     )
+    if 'android:name="com.axevpn.flutter.openconnect.AxeOpenConnectVpnService"' not in current:
+        service += (
+            '\\n        <!-- Independent pinned Cisco CSTP/TLS VpnService -->\\n'
+            '        <service android:name="com.axevpn.flutter.openconnect.AxeOpenConnectVpnService"\\n'
+            '            android:exported="false"\\n'
+            '            android:foregroundServiceType="specialUse"\\n'
+            '            android:permission="android.permission.BIND_VPN_SERVICE">\\n'
+            '            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"\\n'
+            '                android:value="vpn" />\\n'
+            '        </service>\\n'
+        )
+    for permission in (
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_SPECIAL_USE",
+    ):
+        if f'android:name="{permission}"' not in current:
+            current = current.replace(
+                '<manifest xmlns:android="http://schemas.android.com/apk/res/android">',
+                '<manifest xmlns:android="http://schemas.android.com/apk/res/android">\\n'
+                f'    <uses-permission android:name="{permission}" />', 1,
+            )
+            match = re.search(r"<application\\b[^>]*>", current, flags=re.DOTALL)
+            if match is None:
+                raise RuntimeError("Missing Android application")
     current = current[:match.end()] + service + current[match.end():]
     filename.write_text(current, encoding="utf-8")
 
@@ -126,13 +151,22 @@ def install_native_sources() -> None:
         if not src.is_file():
             raise RuntimeError(f"Missing tracked native source: {src}")
         shutil.copy2(src, package / filename)
+    java_package = (ANDROID / "app" / "src" / "main" / "java" /
+                    "com" / "axevpn" / "flutter" / "openconnect")
+    java_source = NATIVE / "java" / "com" / "axevpn" / "flutter" / "openconnect"
+    java_package.mkdir(parents=True, exist_ok=True)
+    for filename in ("AxeOpenConnectVpnService.java", "OpenConnectFlutterPlugin.java"):
+        src = java_source / filename
+        if not src.is_file():
+            raise RuntimeError(f"Missing Cisco native source: {src}")
+        shutil.copy2(src, java_package / filename)
 
 
 def main() -> None:
     install_native_sources()
     patch_gradle()
     patch_manifest()
-    print("Verified Android WireGuard JNI integration installed; Cisco not activated.")
+    print("Installed WireGuard JNI and independent pinned Cisco CSTP/TLS VpnService.")
 
 
 if __name__ == "__main__":
