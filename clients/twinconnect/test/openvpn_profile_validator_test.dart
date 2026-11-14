@@ -50,6 +50,25 @@ void main() {
     }), throwsFormatException);
   });
 
+  test('accepts CA-verified username/password OpenVPN without client cert', () {
+    final source = profile()
+        .replaceAll('<cert>\\nUSER-CERT\\n</cert>\\n', '')
+        .replaceAll('<key>\\nSECRET-PRIVATE-KEY\\n</key>\\n', '')
+        .replaceFirst('client\\n', 'client\\nauth-user-pass\\n');
+    expect(OpenVpnProfileValidator.validate({
+      'config': source, 'username': 'subscriber', 'password': 'secret',
+    }), source);
+    expect(() => OpenVpnProfileValidator.validate({'config': source}),
+        throwsFormatException);
+  });
+
+  test('rejects credential file path in auth-user-pass', () {
+    expect(() => OpenVpnProfileValidator.validate({
+      'config': profile(extra: 'auth-user-pass /tmp/secrets'),
+      'username': 'subscriber', 'password': 'secret',
+    }), throwsFormatException);
+  });
+
   test('rejects missing client inline private key without leaking data', () {
     final broken = profile().replaceAll('<key>', '<keyfile>');
     expect(() => OpenVpnProfileValidator.validate({'config': broken}),
