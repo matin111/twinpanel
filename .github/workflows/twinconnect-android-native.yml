@@ -16,6 +16,9 @@ jobs:
   android-wireguard:
     runs-on: ubuntu-latest
     timeout-minutes: 35
+    env:
+      # Public license-center bootstrap; per-tenant panel domains resolve dynamically.
+      TWINCONNECT_DIRECTORY_URLS: ${{ vars.TWINCONNECT_DIRECTORY_URLS || 'https://panel.matindnspro.sbs,https://167-104-219-168.sslip.io' }}
     defaults:
       run:
         working-directory: clients/twinconnect
@@ -33,6 +36,10 @@ jobs:
         shell: bash
         run: |
           grep -F 'GoBackend$VpnService' android/app/src/main/AndroidManifest.xml
+          grep -F 'android:allowBackup="false"' android/app/src/main/AndroidManifest.xml
+          grep -F 'android:fullBackupContent="false"' android/app/src/main/AndroidManifest.xml
+          grep -F '.OpenConnectVpnService' android/app/src/main/AndroidManifest.xml
+          test -f android/app/src/main/kotlin/com/twinpanel/twinconnect/OpenConnectVpnService.kt
           grep -F 'com.wireguard.android:tunnel:1.0.20260102' android/app/build.gradle.kts
           grep -F 'OPENCONNECT_CORE_NOT_INSTALLED' lib/android_tunnel.dart
       - name: Fetch packages
@@ -41,11 +48,51 @@ jobs:
         run: flutter analyze --no-fatal-infos
       - name: Dart tests
         run: flutter test --reporter expanded
-      - name: Compile native Kotlin and Android debug APK
-        run: flutter build apk --debug
-      - name: Upload unsigned debugging APK
+      - name: Verify redundant HTTPS directory mirrors before build
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json, os, urllib.request
+          from urllib.parse import urlsplit
+          origins = [origin.strip().rstrip("/") for origin in
+                     os.environ["TWINCONNECT_DIRECTORY_URLS"].split(",") if origin.strip()]
+          if len(origins) < 2 or len(origins) > 8 or len(set(origins)) != len(origins):
+              raise SystemExit("At least two unique license-directory mirrors are required")
+          for origin in origins:
+              url = urlsplit(origin)
+              if (url.scheme != "https" or not url.hostname or url.username or
+                  url.password or url.path or url.query or url.fragment):
+                  raise SystemExit("Invalid license directory origin")
+              with urllib.request.urlopen(origin + "/v1/app/resolve/TP934FE9", timeout=15) as response:
+                  data = json.load(response)
+              if data.get("namespace") != "TP934FE9" or not str(data.get("api_origin", "")).startswith("https://"):
+                  raise SystemExit("License directory mirror failed identity validation")
+          print("Verified %s HTTPS directory mirrors" % len(origins))
+          PY
+      # A single debug APK bundles every CPU ABI and development runtime.
+      # Release/AOT + split-per-abi keeps the actual device installer small.
+      # This is a CI test build signed with the generated debug key, not a
+      # production release signed with the owner's private upload key.
+      - name: Build optimized Android APKs per CPU architecture
+        run: flutter build apk --release --split-per-abi "--dart-define=TWINCONNECT_DIRECTORY_URLS=$TWINCONNECT_DIRECTORY_URLS" "--dart-define=TWINCONNECT_BUILD_ID=$GITHUB_SHA"
+      - name: Report APK sizes (native protocol engines retained)
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          root = Path("build/app/outputs/flutter-apk")
+          names = ("app-armeabi-v7a-release.apk", "app-arm64-v8a-release.apk", "app-x86_64-release.apk")
+          for name in names:
+              apk = root / name
+              if not apk.is_file():
+                  raise SystemExit(f"Missing ABI-specific APK: {name}")
+              size = apk.stat().st_size
+              print(f"{name}: {size / (1024 * 1024):.2f} MiB ({size} bytes)")
+          PY
+      - name: Upload Android device-specific release test APKs
+        if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
-          name: twinconnect-android-wireguard-debug
-          path: clients/twinconnect/build/app/outputs/flutter-apk/app-debug.apk
+          name: twinconnect-android-native-multiprotocol-release-apks
+          path: clients/twinconnect/build/app/outputs/flutter-apk/app-*-release.apk
           if-no-files-found: error

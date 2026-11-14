@@ -51,6 +51,23 @@ extension AndroidConnectionStrings on AppStrings {
       case 'VPN_PERMISSION_FAILED':
       case 'VPN_PERMISSION_REQUIRED':
         return wireGuardPermissionDenied;
+      case 'WIREGUARD_CONFIG_PARSE_FAILED':
+      case 'PROFILE_INVALID':
+      case 'PRIVATE_KEY_MISSING':
+      case 'VPN_ADDRESS_MISSING':
+        return pick('کانفیگ دریافتی WireGuard معتبر نیست. کد خطا را برای پشتیبانی ارسال کنید.',
+                    'WireGuard profile is invalid. Share the error code with support.');
+      case 'WIREGUARD_PEER_HANDSHAKE_TIMEOUT':
+        return pick(
+          'سرور WireGuard پاسخی به دست‌دهی نداد؛ تونل ناموفق قطع شد. دسترسی UDP، پورت و کلیدهای نود را بررسی کنید.',
+          'WireGuard peer handshake timed out; the failed tunnel was stopped. Check the node UDP port and peer keys.');
+      case 'WIREGUARD_NATIVE_START_FAILED':
+      case 'TUNNEL_NOT_ESTABLISHED':
+        return pick('موتور بومی WireGuard نتوانست تونل را فعال کند. کد خطا را بررسی کنید.',
+                    'WireGuard native backend could not activate the tunnel. Check the error code.');
+      case 'IPV4_DEFAULT_ROUTE_MISSING':
+        return pick('مسیر پیش‌فرض IPv4 در کانفیگ WireGuard وجود ندارد.',
+                    'WireGuard profile is missing the IPv4 default route.');
       case 'IPV6_DEFAULT_ROUTE_MISSING':
         return wireGuardIpv6Required;
       case 'VPN_DNS_MISSING':

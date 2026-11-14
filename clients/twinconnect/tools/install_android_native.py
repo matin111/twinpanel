@@ -48,24 +48,52 @@ def patch_gradle() -> None:
 def patch_manifest() -> None:
     filename = ANDROID / "app" / "src" / "main" / "AndroidManifest.xml"
     current = filename.read_text(encoding="utf-8")
-    if "com.wireguard.android.backend.GoBackend$VpnService" in current:
+    if ("com.wireguard.android.backend.GoBackend$VpnService" in current and
+            'android:name=".OpenConnectVpnService"' in current):
         return
     if '<manifest xmlns:android="http://schemas.android.com/apk/res/android">' not in current:
         raise RuntimeError("Unrecognized AndroidManifest.xml")
-    current = only_once(
-        current,
-        '<manifest xmlns:android="http://schemas.android.com/apk/res/android">',
-        '<manifest xmlns:android="http://schemas.android.com/apk/res/android">\n'
-        '    <uses-permission android:name="android.permission.INTERNET" />',
-        str(filename),
-    )
+    if 'android.permission.INTERNET' not in current:
+        current = only_once(
+            current,
+            '<manifest xmlns:android="http://schemas.android.com/apk/res/android">',
+            '<manifest xmlns:android="http://schemas.android.com/apk/res/android">\n'
+            '    <uses-permission android:name="android.permission.INTERNET" />',
+            str(filename),
+        )
     match = re.search(r"<application\b[^>]*>", current, flags=re.DOTALL)
     if match is None:
         raise RuntimeError("Missing Android application manifest element")
+    # Prevent automatic restoration of old preferences/session/policy after
+    # the user explicitly uninstalls the previous app for a clean reinstall.
+    # Normal Android updates remain non-destructive.
+    application = match.group(0)
+    if "android:allowBackup" not in application:
+        secured = application[:-1] + (
+            ' android:allowBackup="false" android:fullBackupContent="false">'
+        )
+        current = current[:match.start()] + secured + current[match.end():]
+        match = re.search(r"<application\b[^>]*>", current, flags=re.DOTALL)
+        if match is None:
+            raise RuntimeError("Unable to set Android backup policy")
     service = (
         '\n        <!-- The actual WireGuard GoBackend VpnService. '
         'No fake local TUN service. -->\n'
         '        <service android:name="com.wireguard.android.backend.GoBackend$VpnService"\n'
+        '            android:exported="false"\n'
+        '            android:permission="android.permission.BIND_VPN_SERVICE">\n'
+        '            <intent-filter>\n'
+        '                <action android:name="android.net.VpnService" />\n'
+        '            </intent-filter>\n'
+        '        </service>\n'
+    )
+    if "com.wireguard.android.backend.GoBackend$VpnService" in current:
+        service = ""
+    if 'android:name=".OpenConnectVpnService"' not in current:
+        service += (
+        '\n        <!-- Reserved Cisco / OpenConnect VpnService. The engine is '
+        'not advertised until a real native transport is bundled. -->\n'
+        '        <service android:name=".OpenConnectVpnService"\n'
         '            android:exported="false"\n'
         '            android:permission="android.permission.BIND_VPN_SERVICE">\n'
         '            <intent-filter>\n'
@@ -85,7 +113,7 @@ def install_native_sources() -> None:
             "'flutter create --platforms=android,ios,macos,windows "
             "--org com.twinpanel --project-name twinconnect .' first"
         )
-    for filename in ("MainActivity.kt", "WireGuardRuntime.kt"):
+    for filename in ("MainActivity.kt", "WireGuardRuntime.kt", "OpenConnectVpnService.kt"):
         src = NATIVE / "kotlin" / "com" / "twinpanel" / "twinconnect" / filename
         if not src.is_file():
             raise RuntimeError(f"Missing tracked native source: {src}")

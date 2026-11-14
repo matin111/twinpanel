@@ -1,8 +1,11 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:twinconnect/main.dart';
 import 'package:twinconnect/tenant_models.dart';
+import 'package:twinconnect/tenant_api.dart';
 import 'package:twinconnect/interactive_glass_card.dart';
 
 void main() {
@@ -106,6 +109,72 @@ void main() {
         parseDirectoryOrigin('https://panel.example.com').toString(),
         'https://panel.example.com',
       );
+    });
+
+    test('license center supports ordered independent origins without tenant pinning', () {
+      final origins = TenantApi.parseVendorOrigins(
+          'https://license-a.example.com, https://license-b.example.com, '
+          'https://license-a.example.com');
+      expect(origins.map((uri) => uri.host).toList(),
+          ['license-a.example.com', 'license-b.example.com']);
+      expect(() => TenantApi.parseVendorOrigins(''), throwsFormatException);
+      expect(() => TenantApi.parseVendorOrigins(
+          'https://license-a.example.com,http://unsafe.example.com'),
+          throwsFormatException);
+    });
+
+    test('thousands of licensed installations use isolated namespace routing', () {
+      // Each registration is resolved independently; there must never be
+      // one shared customer-panel origin baked into a universal app.
+      final resolved = <String, Uri>{};
+      for (var index = 0; index < 2000; index++) {
+        final namespace = 'TP${index.toRadixString(16).toUpperCase().padLeft(16, '0')}';
+        final origin = 'https://panel-$index.example.com';
+        final entry = PanelDirectoryEntry.fromJson({
+          'namespace': namespace,
+          'api_origin': origin,
+        });
+        expect(entry.namespace, namespace);
+        resolved[entry.namespace] = entry.apiOrigin;
+      }
+      expect(resolved.length, 2000);
+      expect(resolved.values.toSet().length, 2000);
+      expect(resolved['TP0000000000000000']?.host, 'panel-0.example.com');
+      expect(resolved['TP00000000000007CF']?.host, 'panel-1999.example.com');
+    });
+
+    test('license directory can rotate a tenant origin without a client update', () {
+      const namespace = 'TP0123456789ABCDEF';
+      final before = PanelDirectoryEntry.fromJson({
+        'namespace': namespace,
+        'api_origin': 'https://old-domain.example.com',
+      });
+      final after = PanelDirectoryEntry.fromJson({
+        'namespace': namespace,
+        'api_origin': 'https://new-domain.example.com',
+      });
+      expect(before.namespace, after.namespace);
+      expect(before.apiOrigin, isNot(after.apiOrigin));
+      expect(after.apiOrigin.host, 'new-domain.example.com');
+    });
+
+    test('Android build requires more than a single reachable directory', () {
+      final workflow = File('../../.github/workflows/twinconnect-android-native.yml')
+          .readAsStringSync();
+      expect(workflow, contains('TWINCONNECT_DIRECTORY_URLS'));
+      expect(workflow, contains('--dart-define=TWINCONNECT_DIRECTORY_URLS='));
+      expect(workflow, contains('At least two unique license-directory mirrors'));
+    });
+
+    test('login differentiates license-directory and tenant-panel outages', () {
+      final main = File('lib/main.dart').readAsStringSync();
+      final strings = File('lib/app_strings.dart').readAsStringSync();
+      expect(main, contains("DIRECTORY_NETWORK_UNAVAILABLE"));
+      expect(main, contains("PANEL_NETWORK_UNAVAILABLE"));
+      expect(main, contains("refreshed.apiOrigin == panel.apiOrigin"));
+      expect(main, contains("panel = refreshed;"));
+      expect(strings, contains("case 'DIRECTORY_NETWORK_UNAVAILABLE':"));
+      expect(strings, contains("case 'PANEL_NETWORK_UNAVAILABLE':"));
     });
 
     test('missing optional brand links stay hidden', () {

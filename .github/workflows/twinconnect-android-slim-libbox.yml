@@ -1,0 +1,75 @@
+name: TwinConnect Android Slim Libbox Experiment
+
+# Optional experiment only. The production preview keeps the full native core.
+on:
+  workflow_dispatch:
+
+jobs:
+  slim-native:
+    runs-on: ubuntu-latest
+    timeout-minutes: 65
+    defaults:
+      run:
+        working-directory: clients/twinconnect
+    env:
+      TWINCONNECT_DIRECTORY_URLS: ${{ vars.TWINCONNECT_DIRECTORY_URLS || 'https://panel.matindnspro.sbs,https://167-104-219-168.sslip.io' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Generate Android app and install existing native sources
+        run: |
+          flutter create --platforms=android --org com.twinpanel --project-name twinconnect .
+          python tools/install_android_native.py
+          flutter pub get
+          flutter analyze --no-fatal-infos
+          flutter test --reporter expanded
+      - name: Build reduced sing-box native lib for ARM64
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --depth 1 --branch v1.0.0 https://github.com/QUSAD-prod/sing_box.git /tmp/twinconnect-sing-box
+          # Build only the required QUIC/Hysteria2, TLS/utls and libbox bindings.
+          # Exclude gVisor, the duplicate WireGuard stack and the Clash API.
+          export GOTOOLCHAIN=auto
+          export ANDROID_HOME="${ANDROID_HOME:-${ANDROID_SDK_ROOT}}"
+          export ANDROID_TARGETS="android/arm64"
+          export LIBBOX_TAGS="with_quic,with_utls,badlinkname,tfogo_checklinkname0"
+          bash /tmp/twinconnect-sing-box/scripts/build_libbox.sh android
+          test -s /tmp/twinconnect-sing-box/build/libbox/libbox.aar
+          echo "SING_BOX_LIBBOX_AAR=/tmp/twinconnect-sing-box/build/libbox/libbox.aar" >> "$GITHUB_ENV"
+      - name: Build optimized Android ARM64 APK with reduced libbox
+        run: flutter build apk --release --target-platform android-arm64 "--dart-define=TWINCONNECT_DIRECTORY_URLS=$TWINCONNECT_DIRECTORY_URLS" "--dart-define=TWINCONNECT_BUILD_ID=$GITHUB_SHA"
+      - name: Audit largest native binaries and enforce 50 MiB
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import zipfile
+          apk=Path('build/app/outputs/flutter-apk/app-release.apk')
+          with zipfile.ZipFile(apk) as z:
+              entries=sorted((x for x in z.infolist() if not x.is_dir()),key=lambda x:x.compress_size,reverse=True)
+              for f in entries[:15]:
+                  print(f'{f.filename}: stored={f.file_size/1048576:.2f} MiB compressed={f.compress_size/1048576:.2f} MiB')
+          size=apk.stat().st_size
+          print(f'ARM64 total={size/1048576:.2f} MiB')
+          if size>=50*1024*1024:
+              raise SystemExit('SLIM_CORE_STILL_EXCEEDS_50_MIB')
+          PY
+      - name: Upload ARM64 build for engineering evaluation
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: twinconnect-android-slim-arm64-evaluation
+          path: clients/twinconnect/build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: warn
