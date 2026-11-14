@@ -5,6 +5,7 @@ import {useMemo,useState} from "react";
 import type {CSSProperties} from "react";
 import type {AdminNode,AdminTunnel} from "../lib/admin-api";
 import styles from "./admin-dashboard-network-panels.module.css";
+import {DashboardProtocolRestart} from "./dashboard-protocol-restart";
 
 type Pick=(fa:string,en:string)=>string;
 export type DashboardProtocol={key:string;label:string;online:boolean;onlineNodes:number;reported:boolean};
@@ -130,6 +131,7 @@ export function ProtocolMonitor({protocols,pick}:{
             <small>{p.reported?display(p.onlineNodes)+" "+pick("نود آنلاین گزارش‌شده","reported online nodes"):pick("بدون گزارش سلامت","No health report")}</small>
           </div>
           <span className={styles.protocolState}><i/>{state==="online"?pick("گزارش فعال","Reported online"):state==="offline"?pick("غیرفعال گزارش‌شده","Reported offline"):pick("نامشخص","Unknown")}</span>
+          <DashboardProtocolRestart protocol={p.key} label={p.label} pick={pick}/>
         </article>;
       })}
     </div>
