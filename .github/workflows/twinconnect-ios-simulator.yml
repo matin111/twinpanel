@@ -68,6 +68,10 @@ jobs:
           xcrun simctl install "$device" build/ios/iphonesimulator/Runner.app
           xcrun simctl launch "$device" com.twinpanel.twinconnect
           xcrun simctl spawn "$device" launchctl print system >/dev/null
+          # Capture the visible launch screen so a developer without an
+          # iPhone or Mac can inspect the preview on Windows.
+          sleep 8
+          xcrun simctl io "$device" screenshot TwinConnect-iOS-Simulator-Launch.png
       - name: Archive iOS simulator app
         shell: bash
         run: |
@@ -81,5 +85,6 @@ jobs:
           path: |
             clients/twinconnect/TwinConnect-iOS-Simulator-v0.1.0.zip
             clients/twinconnect/TwinConnect-iOS-Simulator-SHA256.txt
+            clients/twinconnect/TwinConnect-iOS-Simulator-Launch.png
           if-no-files-found: error
           retention-days: 14
