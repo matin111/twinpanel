@@ -49,31 +49,39 @@ class AndroidSingBoxTunnel {
     // The plugin builds the local TUN/DNS/routing config; never accept
     // untrusted subscription-provided inbounds, routes or app settings.
     // Do not persist profiles in TwinConnect's own preferences.
-    await SingBox.instance.connect(jsonEncode(outbound));
-    if (SingBox.instance.status != SingBoxConnectionStatus.connected) {
-      await SingBox.instance.disconnect();
-      throw const FormatException('SINGBOX_TUNNEL_NOT_VERIFIED');
+    var verifiedLatency = 0;
+    try {
+      await SingBox.instance.connect(jsonEncode(outbound));
+      if (SingBox.instance.status != SingBoxConnectionStatus.connected) {
+        throw const FormatException('SINGBOX_TUNNEL_NOT_VERIFIED');
+      }
+      // URL test is performed through the selected encrypted outbound.
+      final result = await SingBox.instance.pingCurrentServer(
+        timeout: const Duration(seconds: 12),
+      );
+      if (!result.success) {
+        throw const FormatException('SINGBOX_OUTBOUND_UNREACHABLE');
+      }
+      verifiedLatency = result.ping;
+    } catch (_) {
+      try { await SingBox.instance.disconnect(); } catch (_) {}
+      rethrow;
+    } finally {
+      // The plugin writes the last outbound in app-private plaintext files.
+      // Purge it even after a failure, not just after a successful handshake.
+      bool purged = false;
+      try {
+        final response = await _native.invokeMapMethod<String, dynamic>(
+          'forgetSingBoxEphemeralConfig',
+        );
+        purged = response?['purged'] == true;
+      } catch (_) {}
+      if (!purged) {
+        try { await SingBox.instance.disconnect(); } catch (_) {}
+        throw const FormatException('PROFILE_PURGE_FAILED');
+      }
     }
-    // Real URL test runs through sing-box's selected outbound. A started
-    // VpnService is NOT proof that encrypted user traffic reaches a server.
-    final result = await SingBox.instance.pingCurrentServer(
-      timeout: const Duration(seconds: 12),
-    );
-    if (!result.success) {
-      await SingBox.instance.disconnect();
-      throw const FormatException('SINGBOX_OUTBOUND_UNREACHABLE');
-    }
-    // The upstream plugin writes raw outbound credentials to disk for
-    // reconnect. Delete both persistent copies after startup and fail
-    // closed if that cannot be confirmed. Reconnect uses a fresh panel fetch.
-    final purged = await _native.invokeMapMethod<String, dynamic>(
-      'forgetSingBoxEphemeralConfig',
-    );
-    if (purged?['purged'] != true) {
-      await SingBox.instance.disconnect();
-      throw const FormatException('PROFILE_PURGE_FAILED');
-    }
-    _lastVerifiedLatencyMs = result.ping;
+    _lastVerifiedLatencyMs = verifiedLatency;
   }
 
   bool get isConnected => _initialized &&
