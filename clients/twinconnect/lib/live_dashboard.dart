@@ -302,9 +302,28 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       if (_connectedSeconds.value != 0) _connectedSeconds.value = 0;
       return;
     }
+    if (_connectedSince == null) {
+      // Remember the actual verified protocol, including manual connections.
+      // Fast Server must not guess WireGuard just because it is listed first.
+      final verifiedProtocol = _modernUp
+          ? _modernProtocol
+          : _vpnVerified ? 'wireguard' : null;
+      if (verifiedProtocol != null) {
+        unawaited(_rememberVerifiedProtocol(verifiedProtocol));
+      }
+    }
     _connectedSince ??= DateTime.now();
     final seconds = DateTime.now().difference(_connectedSince!).inSeconds;
     if (_connectedSeconds.value != seconds) _connectedSeconds.value = seconds;
+  }
+
+  Future<void> _rememberVerifiedProtocol(String protocol) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('twinconnect_last_verified_protocol', protocol);
+    } catch (_) {
+      // Preference failure must not interrupt a working VPN session.
+    }
   }
 
   static String _formatConnectedSeconds(int seconds) {
