@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.834",
-  "source_sha": "0c9bbdfb3ed593c817f031fac09c9efaeda0e522",
+  "version": "1.1.0-rc.835",
+  "source_sha": "472870742c40b791f9d527d817a01f7d4f9d4a3a",
   "notes": {
-    "fa": "نمایش تاریخچه واقعی هر نشست اتصال در لینک Connection با پروتکل، نود، زمان شروع و پایان، مدت، دانلود و آپلود نشست؛ عدم نسبت‌دادن ترافیک کلی یا فاقد شناسه نشست. بازگشت دکمه‌های افزایش/کاهش کیف پول در کارت کاربران.",
-    "en": "Display share-token-scoped measured per-session connection history with protocol, node, timestamps, duration, upload and download; never misattribute aggregate traffic. Restore wallet adjustment actions in user cards."
+    "fa": "افزودن پاپ‌آپ آمار و تاریخچه فعالیت ادمین (تغییرات دستی کیف پول و تمدید اشتراک و لاگ عملیات مدیریتی)، ریست مستقل حجم نماینده با تأیید بله/خیر و ثبت حسابرسی، و نمایش ریز مصرف هر نشست اتصال در Connection بدون تغییر مجموع حجم.",
+    "en": "Admin activity and audit statistics popup for manual wallet adjustments and subscription renewals, general admin mutation events; independent reseller traffic reset with confirmation and audit; truthful per-session Connection usage details."
   }
 }
