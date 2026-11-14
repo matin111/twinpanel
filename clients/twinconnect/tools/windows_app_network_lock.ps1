@@ -1,6 +1,6 @@
 # Picker and status run without UAC. Changing persistent WFP rules requires Administrator.
-# Application-scoped outbound internet block via Windows Defender Firewall.
-# Blocks both direct and VPN traffic while enabled; not a VPN-drop-only Kill Switch.
+# Application-scoped WFP VPN bypass guard. Blocks connections outside
+# TwinConnect's verified tunnel while retaining tunneled connectivity.
 [CmdletBinding()]
 param(
   [Parameter(Mandatory=$true)]
@@ -40,6 +40,11 @@ if ([string]::IsNullOrWhiteSpace($Executable)) { throw 'APP_EXECUTABLE_REQUIRED'
 $path = [IO.Path]::GetFullPath($Executable)
 $roots = @([IO.Path]::GetFullPath($env:ProgramFiles).TrimEnd('\') + '\')
 if (${env:ProgramFiles(x86)}) { $roots += [IO.Path]::GetFullPath(${env:ProgramFiles(x86)}).TrimEnd('\') + '\' }
+# Chromium and other per-user Windows applications frequently install
+# under LocalAppData. Permit these executable paths too.
+if ($env:LOCALAPPDATA) {
+  $roots += [IO.Path]::GetFullPath($env:LOCALAPPDATA).TrimEnd('\') + '\'
+}
 $trusted = $false
 foreach ($root in $roots) {
   if ($path.StartsWith($root,[StringComparison]::OrdinalIgnoreCase)) { $trusted = $true }
