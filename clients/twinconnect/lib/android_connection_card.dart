@@ -341,7 +341,16 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
   // have been verified. Never fabricate IP, ping or traffic measurements.
   static String _countryFlag(String code) {
     final country = code.trim().toUpperCase();
-    if (!RegExp(r'^[A-Z]{2}
+    if (country.length != 2 ||
+        !country.codeUnits.every((unit) => unit >= 65 && unit <= 90)) {
+      return '🌐';
+    }
+    return String.fromCharCodes(
+      country.codeUnits.map((unit) => 0x1F1E6 + unit - 65),
+    );
+  }
+
+  Widget _metric(BuildContext context, IconData icon, String label, String value) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 11),
       decoration: BoxDecoration(
