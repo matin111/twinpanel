@@ -420,6 +420,27 @@ jobs:
               !$settings.Contains('vpnSelectedAppKillSwitch')) {
             throw 'Selected-app Kill Switch is not bundled or accessible in TwinConnect settings'
           }
+          $proxyEngine = Join-Path (Get-Location) 'tools/windows_system_proxy.ps1'
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            $proxyEngine, [ref]$tokens, [ref]$errors) | Out-Null
+          if ($errors.Count -gt 0) {
+            throw "System proxy engine PowerShell parse error: $($errors -join '; ')"
+          }
+          $proxyCode = Get-Content $proxyEngine -Raw
+          foreach ($marker in @('LOCAL_SOCKS5_NOT_VERIFIED','Restore-Values',
+              'WININET_SETTINGS_CHANGED_FAILED')) {
+            if (!$proxyCode.Contains($marker)) {
+              throw "Missing Windows proxy safety guard: $marker"
+            }
+          }
+          if (!$installer.Contains('windows_system_proxy.ps1') -or
+              !$settings.Contains('vpnSystemProxyToggle') -or
+              !$settings.Contains('vpnRoutingIncludeApps') -or
+              !$settings.Contains('vpnRoutingExcludeApps')) {
+            throw 'Windows routing/proxy engines missing from setup or Settings'
+          }
       - name: Package TwinConnect Windows setup with automatic WireGuard prerequisite
         shell: pwsh
         env:
