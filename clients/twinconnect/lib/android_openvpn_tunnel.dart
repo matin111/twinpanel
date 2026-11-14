@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:flutter/services.dart';
 import 'package:openvpn_flutter/openvpn_flutter.dart';
 
 import 'openvpn_profile_validator.dart';
