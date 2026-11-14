@@ -31,7 +31,7 @@ if (![System.Net.IPAddress]::TryParse($EndpointIpv4, [ref]$parsed) -or
     $parsed.AddressFamily -ne [System.Net.Sockets.AddressFamily]::InterNetwork) { throw 'NUMERIC_IPV4_ENDPOINT_REQUIRED' }
 $transport = [IO.Path]::GetFullPath($TransportExe)
 $roots = @([IO.Path]::GetFullPath($env:ProgramFiles).TrimEnd('\') + '\')
-if (\${env:ProgramFiles(x86)}) { $roots += [IO.Path]::GetFullPath(\${env:ProgramFiles(x86)}).TrimEnd('\') + '\' }
+if (${env:ProgramFiles(x86)}) { $roots += [IO.Path]::GetFullPath(${env:ProgramFiles(x86)}).TrimEnd('\') + '\' }
 $trusted = $false
 foreach ($root in $roots) { if ($transport.StartsWith($root, [StringComparison]::OrdinalIgnoreCase)) { $trusted = $true } }
 if (!$trusted -or !(Test-Path -LiteralPath $transport -PathType Leaf)) { throw 'TRUSTED_TRANSPORT_PATH_REQUIRED' }
