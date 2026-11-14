@@ -112,14 +112,14 @@ def patch_manifest() -> None:
     )
     if 'android:name="com.axevpn.flutter.openconnect.AxeOpenConnectVpnService"' not in current:
         service += (
-            '\\n        <!-- Independent pinned Cisco CSTP/TLS VpnService -->\\n'
-            '        <service android:name="com.axevpn.flutter.openconnect.AxeOpenConnectVpnService"\\n'
-            '            android:exported="false"\\n'
-            '            android:foregroundServiceType="specialUse"\\n'
-            '            android:permission="android.permission.BIND_VPN_SERVICE">\\n'
-            '            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"\\n'
-            '                android:value="vpn" />\\n'
-            '        </service>\\n'
+            '\n        <!-- Independent pinned Cisco CSTP/TLS VpnService -->\n'
+            '        <service android:name="com.axevpn.flutter.openconnect.AxeOpenConnectVpnService"\n'
+            '            android:exported="false"\n'
+            '            android:foregroundServiceType="specialUse"\n'
+            '            android:permission="android.permission.BIND_VPN_SERVICE">\n'
+            '            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"\n'
+            '                android:value="vpn" />\n'
+            '        </service>\n'
         )
     for permission in (
         "android.permission.FOREGROUND_SERVICE",
@@ -128,10 +128,10 @@ def patch_manifest() -> None:
         if f'android:name="{permission}"' not in current:
             current = current.replace(
                 '<manifest xmlns:android="http://schemas.android.com/apk/res/android">',
-                '<manifest xmlns:android="http://schemas.android.com/apk/res/android">\\n'
+                '<manifest xmlns:android="http://schemas.android.com/apk/res/android">\n'
                 f'    <uses-permission android:name="{permission}" />', 1,
             )
-            match = re.search(r"<application\\b[^>]*>", current, flags=re.DOTALL)
+            match = re.search(r"<application\b[^>]*>", current, flags=re.DOTALL)
             if match is None:
                 raise RuntimeError("Missing Android application")
     current = current[:match.end()] + service + current[match.end():]
