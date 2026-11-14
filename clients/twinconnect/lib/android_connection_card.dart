@@ -659,6 +659,15 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
                           ? s.pick('دست‌دهی انجام شده اما اینترنت هنوز تأیید نشده.', 'Peer handshake received; VPN internet not yet verified.')
                           : s.pick('رابط VPN فعال است اما هنوز پاسخ سرور دریافت نشده است. ممکن است اینترنت کار نکند.',
                               'VPN interface is up but no server handshake has been verified. Internet may not work.')),
+              if (_up && !_handshake) ...[
+                const SizedBox(height: 8),
+                SelectableText(
+                  'Diagnostic: WG_INTERFACE_UP_NO_HANDSHAKE',
+                  key: const Key('androidNoHandshakeDiagnostic'),
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
               const SizedBox(height: 12),
               Row(children: [
                 Expanded(child: _metric(context, Icons.public, 'IP', _publicIp ?? '—')),
