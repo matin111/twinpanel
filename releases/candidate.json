@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.838",
-  "source_sha": "8e704ee71fa44da1d57eb56109fa80b71782e399",
+  "version": "1.1.0-rc.839",
+  "source_sha": "2899c2bf13921e3adf2b02ee64386856e1c17605",
   "notes": {
-    "fa": "اصلاح تاریخچه فعالیت ادمین: حذف درخواست‌های فنی بی‌معنا مانند بررسی انتشار و درخواست‌های HTTP از نمایش و آمار، حفظ رکوردهای قدیمی در دیتابیس، ثبت اقدامات واقعی ویرایش کاربر و اشتراک با عنوان قابل‌فهم، حفظ ثبت دقیق عملیات مالی، تمدید و ریست.",
-    "en": "Clean up administrator activity history: exclude legacy generic HTTP request noise from list and totals without deleting records; log only identified user/subscription business changes alongside precise wallet/renewal/reset events."
+    "fa": "اصلاح دارک مود پاپ‌آپ تاریخچه ادمین: هماهنگ‌سازی رنگ زمینه بخش جستجو، ورودی جستجو، فیلتر و دکمه پاک‌کردن با تم انتخابی؛ حفظ رنگ‌بندی لایت مود و عملکرد جستجو و تاریخچه.",
+    "en": "Fix admin activity popup dark mode search panel, search input, filter and clear button colors using resolved dark/light theme while preserving existing behavior."
   }
 }
