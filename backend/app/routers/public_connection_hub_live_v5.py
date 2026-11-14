@@ -706,6 +706,16 @@ def public_connection_hub_live_v5(
         const sec = Math.max(0, Number(value)||0);
         return Math.floor(sec/3600)+' ساعت و '+Math.floor(sec%3600/60)+' دقیقه';
       };
+      const regionNames = typeof Intl !== 'undefined' && Intl.DisplayNames
+        ? new Intl.DisplayNames(['fa'], {type:'region'}) : null;
+      const countryTitle = item => {
+        const code = String(item.country_code || '').trim().toUpperCase();
+        if (!/^[A-Z]{2}$/.test(code)) return 'کشور نامشخص';
+        const name = regionNames ? regionNames.of(code) : null;
+        const localized = name && name !== code ? name : code;
+        const flag = String.fromCodePoint(...[...code].map(ch => 127397 + ch.charCodeAt(0)));
+        return flag + ' ' + localized;
+      };
       const append = (parent, name, value) => {
         const el = document.createElement('div');
         const b = document.createElement('b');
@@ -733,8 +743,7 @@ def public_connection_hub_live_v5(
             const card = document.createElement('article');
             card.style.cssText='border:1px solid #384965;background:#17243b;border-radius:12px;padding:12px;display:grid;gap:5px;line-height:1.65';
             const heading = document.createElement('strong');
-            heading.textContent = String(item.protocol||'—').toUpperCase()+
-              ' · سرور #'+String(item.node_id)+(item.country?' · '+item.country:'');
+            heading.textContent = countryTitle(item) + ' · ' + String(item.protocol||'—').toUpperCase();
             card.appendChild(heading);
             append(card,'وضعیت',item.active?'متصل':'پایان‌یافته');
             append(card,'شروع',dt(item.started_at));
