@@ -132,7 +132,8 @@ class MainActivity : FlutterActivity() {
                     "DNS_POLICY_NOT_SUPPORTED", "IPV6_POLICY_NOT_SUPPORTED",
                     "LAN_BYPASS_NOT_IMPLEMENTED", "AUTOCONNECT_NOT_IMPLEMENTED",
                     "AUTO_RECONNECT_NOT_VERIFIED", "OS_LOCKDOWN_NOT_ENABLED",
-                    "TUNNEL_ALREADY_RUNNING", "TUNNEL_NOT_ESTABLISHED"
+                    "TUNNEL_ALREADY_RUNNING", "TUNNEL_NOT_ESTABLISHED",
+                    "WIREGUARD_CONFIG_PARSE_FAILED", "WIREGUARD_NATIVE_START_FAILED"
                 )
                 val safeCode = error.message?.takeIf { accepted.contains(it) }
                     ?: "NATIVE_VPN_START_FAILED"
