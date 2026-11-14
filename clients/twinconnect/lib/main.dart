@@ -1,5 +1,9 @@
 import 'dart:async';
 
+// Build provenance is public metadata, never a credential or installation ID.
+const String twinConnectBuildId =
+    String.fromEnvironment('TWINCONNECT_BUILD_ID', defaultValue: 'local');
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -1325,7 +1329,9 @@ class _TwinConnectHomeState extends State<TwinConnectHome> with WidgetsBindingOb
                         if (_errorCode != null) ...[
                           const SizedBox(height: 12),
                           SelectableText(
-                            strings.error(_errorCode!),
+                            '${strings.error(_errorCode!)}\n'
+                            'Error: $_errorCode | Build: '
+                            '${twinConnectBuildId.length > 12 ? twinConnectBuildId.substring(0, 12) : twinConnectBuildId}',
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               color: Theme.of(context).colorScheme.error,
