@@ -2247,8 +2247,11 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     }
   }
 
+  Timer? _previewTour;
+
   @override
   void dispose() {
+    _previewTour?.cancel();
     _durationTicker?.cancel();
     _connectedSeconds.dispose();
     _modernHealthTimer?.cancel();
@@ -2303,6 +2306,16 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     if (widget.simulatorPreview) {
       _page = const ['home', 'locations', 'settings', 'account'][
           widget.previewPage.clamp(0, 3)];
+      // This tour is confined to the simulator-only alternate entry point.
+      // The same dashboard layouts are used by authenticated clients.
+      _previewTour = Timer.periodic(const Duration(seconds: 12), (_) {
+        if (!mounted) return;
+        setState(() {
+          _page = const ['home', 'locations', 'settings', 'account'][
+              (const ['home', 'locations', 'settings', 'account']
+                  .indexOf(_page) + 1) % 4];
+        });
+      });
       return; // No network, VPN, or credential calls from an offline mock.
     }
     _restoreAppearance();
@@ -3412,6 +3425,12 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           ),
         ),
         const SizedBox(height: 9),
+        if (widget.simulatorPreview)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: txt(tr('پیش‌نمایش — داده‌ها ساختگی هستند',
+                'SIMULATOR PREVIEW — SAMPLE DATA'), size: 11),
+          ),
         if (Platform.isIOS) ...[
           Text(
             tr('نسخه آزمایشی آیفون: اتصال VPN تا تکمیل Network Extension غیرفعال است.',
