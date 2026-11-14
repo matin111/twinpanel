@@ -186,7 +186,8 @@ void main() {
     expect(android, contains('final readyOptions = available.where'));
     expect(android, contains('widget.native.supports(entry.protocol.code)'));
     expect(android, contains('readyOptions.firstOrNull'));
-    expect(android, contains('Connection unavailable'));
+    expect(android, contains('Engine not installed'));
+    expect(android, contains('Disconnect active tunnel first'));
     expect(android, contains('This protocol engine is not ready on Android yet.'));
     expect(android, isNot(contains("Key('androidProtocolChooser')")));
     expect(native, contains('listOf("wireguard")'));
