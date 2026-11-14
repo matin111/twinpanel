@@ -1,6 +1,7 @@
 package com.twinpanel.twinconnect
 
 import android.app.Activity
+import android.content.Context
 import android.content.Intent
 import android.net.VpnService
 import android.os.Bundle
@@ -65,6 +66,23 @@ class MainActivity : FlutterActivity() {
                 }
                 "getTunnelStatus" -> onWorker(result) {
                     WireGuardRuntime.status()
+                }
+                "forgetSingBoxEphemeralConfig" -> onWorker(result) {
+                    // sing_box currently persists a clear-text last_config.json
+                    // and the last outbound in SharedPreferences. TwinConnect
+                    // must never retain credentials across tenant sessions.
+                    val prefs = applicationContext.getSharedPreferences(
+                        "sing_box", Context.MODE_PRIVATE
+                    )
+                    val cleared = prefs.edit().remove("sing_box.last_input").commit()
+                    val config = java.io.File(
+                        applicationContext.filesDir, "sing-box/last_config.json"
+                    )
+                    val removed = !config.exists() || config.delete()
+                    if (!cleared || !removed) {
+                        throw IllegalArgumentException("PROFILE_PURGE_FAILED")
+                    }
+                    mapOf("purged" to true)
                 }
                 // Dedicated Cisco API. Not backed by WireGuard. An Android
                 // OpenConnect VpnService + reviewed native core is required
@@ -156,7 +174,8 @@ class MainActivity : FlutterActivity() {
                     "LAN_BYPASS_NOT_IMPLEMENTED", "AUTOCONNECT_NOT_IMPLEMENTED",
                     "AUTO_RECONNECT_NOT_VERIFIED", "OS_LOCKDOWN_NOT_ENABLED",
                     "TUNNEL_ALREADY_RUNNING", "TUNNEL_NOT_ESTABLISHED",
-                    "WIREGUARD_CONFIG_PARSE_FAILED", "WIREGUARD_NATIVE_START_FAILED"
+                    "WIREGUARD_CONFIG_PARSE_FAILED", "WIREGUARD_NATIVE_START_FAILED",
+                    "PROFILE_PURGE_FAILED"
                 )
                 val safeCode = error.message?.takeIf { accepted.contains(it) }
                     ?: "NATIVE_VPN_START_FAILED"
