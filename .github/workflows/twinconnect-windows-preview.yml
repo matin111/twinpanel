@@ -518,7 +518,7 @@ jobs:
           retention-days: 7
       - uses: actions/upload-artifact@v4
         with:
-          name: TwinConnect-Windows-TEST-Only-KillSwitch-OFF
+          name: TwinConnect-Windows-v0.1.0-preview
           path: clients/twinconnect/TwinConnect-Windows-x64-Setup.exe
           if-no-files-found: error
           retention-days: 7
