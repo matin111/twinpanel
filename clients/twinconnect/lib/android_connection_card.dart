@@ -120,7 +120,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
       _errorCode = null;
     });
     try {
-      final policy = await _store.load(
+      final policy = await _store.loadFailClosed(
         widget.panel.namespace, widget.username,
       );
       final capabilities = await NativeVpnBridge.probe();
@@ -164,6 +164,8 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
       );
       if (!mounted) return;
       setState(() => _up = response['state'] == 'interface_up');
+    } on FormatException catch (error) {
+      if (mounted) setState(() => _errorCode = error.message);
     } catch (error) {
       if (mounted) setState(() => _errorCode = _nativeError(error));
     } finally {
@@ -312,6 +314,12 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
                 : s.nativeError(_errorCode!),
             textAlign: TextAlign.center,
             style: TextStyle(color: Theme.of(context).colorScheme.error),
+          ),
+          const SizedBox(height: 5),
+          SelectableText(
+            'VPN error: ${_errorCode!}',
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodySmall,
           ),
         ],
       ],
