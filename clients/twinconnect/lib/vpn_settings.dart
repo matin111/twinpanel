@@ -1179,70 +1179,7 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
           ],
         ), key: const Key('vpnSplitTunnelCard')),
         const SizedBox(height: 11),
-        _glass(ExpansionTile(
-          key: const Key('vpnDiagnosticsDisclosure'),
-          initiallyExpanded: false,
-          tilePadding: const EdgeInsets.symmetric(horizontal: 3),
-          childrenPadding: const EdgeInsets.symmetric(vertical: 6),
-          title: Text(tr('عیب‌یابی اتصال', 'Connection diagnostics'),
-              style: const TextStyle(fontWeight: FontWeight.w700)),
-          leading: const Icon(Icons.monitor_heart_outlined),
-          children: [
-            Align(
-              alignment: AlignmentDirectional.centerEnd,
-              child: TextButton.icon(
-                key: const Key('vpnCopyDiagnostics'),
-                onPressed: _copyDiagnostics,
-                icon: const Icon(Icons.copy_all_rounded, size: 17),
-                label: Text(tr('کپی گزارش', 'Copy diagnostics')),
-              ),
-            ),
-            _statusItem(
-              key: const Key('vpnNativeEngineStatus'),
-              title: tr('موتور VPN', 'VPN engine'),
-              value: _capabilities.engineReady
-                  ? tr('آماده', 'Ready')
-                  : tr('در دسترس نیست', 'Unavailable'),
-              ready: _capabilities.engineReady,
-              icon: Icons.power_rounded,
-              help: tr('این فقط وضعیت موتور اتصال است، نه تأیید اتصال به VPN.',
-                'Engine readiness does not prove an active VPN connection.'),
-            ),
-            const SizedBox(height: 6),
-            _statusItem(
-              key: const Key('vpnWfpStatus'),
-              title: tr('Windows Filtering Platform', 'Windows Filtering Platform'),
-              value: globalReady ? tr('شناسایی شد', 'Detected')
-                  : tr('در دسترس نیست', 'Unavailable'),
-              ready: globalReady,
-              icon: Icons.security_rounded,
-              help: tr('فقط امکان دسترسی به فیلتر ویندوز را بررسی می‌کند؛ به معنای فعال بودن Kill Switch نیست.',
-                'WFP availability is not proof that system traffic is blocked.'),
-            ),
-            const SizedBox(height: 6),
-            _statusItem(
-              key: const Key('vpnDnsGuard'),
-              title: 'DNS',
-              value: _capabilities.dnsGuard ? tr('پشتیبانی موتور', 'Engine supported')
-                  : tr('تأیید نشده', 'Unverified'),
-              ready: _capabilities.dnsGuard,
-              icon: Icons.dns_rounded,
-              help: tr('وضعیت قابلیت موتور است، نه نتیجه تست نشت DNS.',
-                'Engine capability is not a DNS leak test.'),
-            ),
-            const SizedBox(height: 6),
-            _statusItem(
-              key: const Key('vpnIpv6Guard'),
-              title: 'IPv6',
-              value: _capabilities.ipv6Guard ? tr('پشتیبانی موتور', 'Engine supported')
-                  : tr('تأیید نشده', 'Unverified'),
-              ready: _capabilities.ipv6Guard,
-              icon: Icons.lan_rounded,
-              help: tr('وضعیت قابلیت موتور است، نه نتیجه تست نشت IPv6.',
-                'Engine capability is not an IPv6 leak test.'),
-            ),
-          ],
-        ), key: const Key('vpnDiagnosticsCard')),
+
       ],
     );
 
