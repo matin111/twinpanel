@@ -246,7 +246,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
 
   /// Automatic connection uses the panel's account-authorized node list.
   /// An explicit Servers selection wins; never prompt for raw node codes.
-  WireGuardNode? _autoNode(
+  List<WireGuardNode> _candidateNodes(
     ClientProtocolProfiles profiles,
     String? selectedNodeId,
   ) {
@@ -264,14 +264,27 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
           (item['node'] is String ? item['node'] as String : id);
       candidates.add((id, WireGuardNode(name: name, config: raw, nodeId: id), matching));
     }
-    if (candidates.isEmpty) return null;
     candidates.sort((a, b) {
       final aLatency = a.$3?.latencyMs ?? 60001;
       final bLatency = b.$3?.latencyMs ?? 60001;
       final delta = aLatency.compareTo(bLatency);
       return delta != 0 ? delta : a.$1.compareTo(b.$1);
     });
-    return candidates.first.$2;
+    return candidates.map((entry) => entry.$2).toList(growable: false);
+  }
+
+  /// A fresh authenticated WireGuard handshake is the minimal proof of peer
+  /// reachability; an OS interface alone is not a connected VPN. No secrets
+  /// are logged. Timeout leaves the current node untrusted.
+  Future<bool> _awaitPeerHandshake() async {
+    for (var attempt = 0; attempt < 12; attempt++) {
+      if (!mounted) return false;
+      final status = await _controller.status();
+      if (status['state'] != 'interface_up') return false;
+      if (status['peerHandshakeVerified'] == true) return true;
+      await Future<void>.delayed(const Duration(seconds: 1));
+    }
+    return false;
   }
 
   /// Cisco uses its own engine and authenticated panel profile. Never hand
@@ -377,31 +390,55 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
         native: widget.native,
       );
       final selectedNodeId = widget.selectedNodeId;
-      final selected = _autoNode(profiles, selectedNodeId);
-      if (selected == null) {
+      final candidates = _candidateNodes(profiles, selectedNodeId);
+      if (candidates.isEmpty) {
         if (mounted) setState(() => _errorCode = selectedNodeId == null
             ? 'NO_ONLINE_WIREGUARD_NODE'
             : 'SELECTED_WIREGUARD_NODE_UNAVAILABLE');
         return;
       }
-      if (!mounted) return;
-      final response = await _controller.connectWireGuard(
-        node: selected,
-        policy: policy,
-        capabilities: capabilities,
-        nativeProtocols: widget.native,
-      );
-      if (!mounted) return;
-      setState(() {
-        _up = response['state'] == 'interface_up';
-        if (_up) {
-          _activeServerName = selected.name;
-          _activeServer = widget.servers?.servers
-              .where((server) => server.id == selected.nodeId)
-              .firstOrNull;
+      // Only automatic mode retries other account-authorized, online nodes.
+      // A manual selection must never silently connect to another node.
+      final attempts = selectedNodeId == null
+          ? candidates.take(3).toList(growable: false)
+          : candidates.take(1).toList(growable: false);
+      var peerVerified = false;
+      for (final node in attempts) {
+        if (!mounted) return;
+        final response = await _controller.connectWireGuard(
+          node: node,
+          policy: policy,
+          capabilities: capabilities,
+          nativeProtocols: widget.native,
+        );
+        if (response['state'] != 'interface_up') {
+          throw const FormatException('NATIVE_TUNNEL_STATUS_INVALID');
         }
-      });
-      unawaited(_refresh());
+        peerVerified = await _awaitPeerHandshake();
+        if (peerVerified) {
+          if (!mounted) return;
+          setState(() {
+            _up = true;
+            _handshake = true;
+            _activeServerName = node.name;
+            _activeServer = widget.servers?.servers
+                .where((server) => server.id == node.nodeId)
+                .firstOrNull;
+          });
+          unawaited(_checkInternet());
+          break;
+        }
+        // Explicitly tear down failed attempts. They must never be reported
+        // as connected or remain blocking traffic while trying the next node.
+        await _controller.stop();
+      }
+      if (!peerVerified && mounted) {
+        setState(() {
+          _up = false;
+          _clearTelemetry();
+          _errorCode = 'WIREGUARD_PEER_HANDSHAKE_TIMEOUT';
+        });
+      }
     } on FormatException catch (error) {
       if (mounted) setState(() => _errorCode = error.message);
     } catch (error) {
