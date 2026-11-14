@@ -36,6 +36,7 @@ DisableProgramGroupPage=yes
 Source: "build\windows\x64\runner\Release\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "tools\install_prerequisites.ps1"; DestDir: "{app}\tools"; Flags: ignoreversion
 Source: "tools\reset_windows_network.ps1"; DestDir: "{app}\tools"; Flags: ignoreversion
+Source: "tools\restore_windows_network_launcher.ps1"; DestDir: "{app}\tools"; Flags: ignoreversion
 Source: "tools\windows_guard_control.ps1"; DestDir: "{app}\tools"; Flags: ignoreversion
 Source: "tools\check_windows_real_device_readonly.ps1"; DestDir: "{app}\tools"; Flags: ignoreversion
 #if IncludeVerifiedGlobalGuard
@@ -45,6 +46,7 @@ Source: "tools\install_guard_service.ps1"; DestDir: "{app}\tools"; Flags: ignore
 
 [Icons]
 Name: "{autoprograms}\TwinConnect"; Filename: "{app}\{#MyAppExeName}"
+Name: "{autoprograms}\TwinConnect - Restore Internet"; Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\tools\restore_windows_network_launcher.ps1"""
 Name: "{autodesktop}\TwinConnect"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 
 [Tasks]
