@@ -1,4 +1,4 @@
-#Requires -RunAsAdministrator
+# Picker and status run without UAC. Changing persistent WFP rules requires Administrator.
 # Application-scoped outbound internet block via Windows Defender Firewall.
 # Blocks both direct and VPN traffic while enabled; not a VPN-drop-only Kill Switch.
 [CmdletBinding()]
@@ -11,6 +11,13 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
+if ($Action -in @('Lock','Unlock')) {
+  $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+  $principal = [Security.Principal.WindowsPrincipal]::new($identity)
+  if (!$principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+    throw 'ADMINISTRATOR_REQUIRED_TO_CHANGE_WFP_RULES'
+  }
+}
 if ($Action -eq 'Pick') {
   Add-Type -AssemblyName System.Windows.Forms
   $dialog = New-Object System.Windows.Forms.OpenFileDialog
@@ -43,13 +50,13 @@ if (!$trusted -or [IO.Path]::GetExtension($path) -ine '.exe' -or
 # exact app identity AND interface != selected TwinConnect VPN interface.
 # Unlike a generic Windows Firewall application block, traffic on the VPN
 # interface remains allowed; direct traffic stays blocked on disconnect.
-$binary = Join-Path $env:ProgramFiles 'TwinConnect\services\TwinConnectAppKillSwitch.exe'
-if (!(Test-Path -LiteralPath $binary -PathType Leaf)) { throw 'APP_WFP_ENGINE_NOT_INSTALLED' }
-
 if ($Action -eq 'Pick') {
   Write-Output ('TWINCONNECT_PICKED ' + $path)
   exit 0
 }
+$binary = Join-Path $PSScriptRoot '..\services\TwinConnectAppKillSwitch.exe'
+$binary = [IO.Path]::GetFullPath($binary)
+if (!(Test-Path -LiteralPath $binary -PathType Leaf)) { throw 'APP_WFP_ENGINE_NOT_INSTALLED' }
 
 if ($Action -eq 'Status') {
   $output = & $binary status $path 2>&1
