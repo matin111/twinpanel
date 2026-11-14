@@ -122,6 +122,18 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
     if (!Platform.isAndroid || _polling) return;
     _polling = true;
     try {
+      if (_ciscoUp) {
+        final status = await _controller.ciscoStatus();
+        if (!mounted) return;
+        if (status['state'] != 'interface_up' ||
+            status['trafficRoutingVerified'] != true) {
+          setState(() {
+            _ciscoUp = false;
+            _clearTelemetry();
+          });
+        }
+        return;
+      }
       final status = await _controller.status();
       if (!mounted) return;
       final up = status['state'] == 'interface_up';
