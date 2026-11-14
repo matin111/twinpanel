@@ -213,24 +213,21 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
 
 
   Future<void> _loadSelectedKillSwitchApp() async {
+    final preferences = await SharedPreferences.getInstance();
+    final path = preferences.getString('twinconnect_selected_app_killswitch') ?? '';
+    if (path.isEmpty || _appLockBusy) return;
+    bool? enabled;
     try {
-      final preferences = await SharedPreferences.getInstance();
-      final path = preferences.getString('twinconnect_selected_app_killswitch') ?? '';
-      if (path.isEmpty) return;
       final status = await _appLockCommand('Status', path);
-      if (!mounted) return;
-      if (status == 'TWINCONNECT_APP_LOCKED' ||
-          status == 'TWINCONNECT_APP_UNLOCKED') {
-        setState(() {
-          _selectedKillSwitchApp = path;
-          _selectedKillSwitchEnabled = status == 'TWINCONNECT_APP_LOCKED';
-        });
-      }
+      if (status == 'TWINCONNECT_APP_LOCKED') enabled = true;
+      if (status == 'TWINCONNECT_APP_UNLOCKED') enabled = false;
     } catch (_) {
-      // A changed or removed app must never be shown as protected.
-      if (mounted) setState(() {
-        _selectedKillSwitchApp = '';
-        _selectedKillSwitchEnabled = null;
+      // Offline WFP status must not delete the user's saved app selection.
+    }
+    if (mounted && !_appLockBusy) {
+      setState(() {
+        _selectedKillSwitchApp = path;
+        _selectedKillSwitchEnabled = enabled;
       });
     }
   }
@@ -305,12 +302,12 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
         throw const FormatException('APP_FIREWALL_STATUS_UNVERIFIED');
       }
       if (mounted) setState(() => _selectedKillSwitchEnabled = enable);
-    } catch (_) {
+    } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(AppStrings.of(context).pick(
-            'فعال‌سازی تأیید نشد. ابتدا VPN را وصل کن و دسترسی Administrator را بررسی کن.',
-            'Activation not verified. Connect VPN first and check Administrator access.',
+            'تغییر Kill Switch انجام نشد: ${error.toString()}',
+            'Kill Switch operation failed: ${error.toString()}',
           )),
         ));
       }
@@ -645,50 +642,6 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _section(tr('امنیت سیستم', 'System security')),
-        _glass(
-          Row(children: [
-            const Icon(Icons.shield_rounded, size: 25),
-            const SizedBox(width: 13),
-            Expanded(child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Kill Switch', style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.bold)),
-                Text(_guardActive
-                    ? tr('محافظت فعال؛ بازیابی اضطراری زمان‌بندی شده',
-                         'Guard active; emergency recovery scheduled')
-                    : globalReady
-                        ? tr('سرویس محافظت هنوز آماده نیست', 'Protection service not ready')
-                        : tr('محافظت سراسری در دسترس نیست', 'System protection unavailable'),
-                    style: Theme.of(context).textTheme.bodySmall),
-              ],
-            )),
-            _help('Kill Switch', tr(
-              'این قابلیت باید هنگام قطع VPN، ترافیک مستقیم IPv4 و IPv6 کل سیستم را مسدود کند. صرف آماده‌بودن WFP به معنی فعال‌بودن محافظت نیست. تا نصب و آزمایش سرویس مستقل ویندوز نمی‌توان آن را روشن کرد.',
-              'Blocks direct system-wide IPv4/IPv6 traffic when the VPN drops. WFP availability alone does not mean protection is active. It cannot be enabled until the independent Windows service is installed and tested.',
-            )),
-            Switch.adaptive(
-              key: const Key('vpnKillSwitch'),
-              value: _guardActive,
-              // Connect the actual UI switch to Windows guard commands.
-              // The native WFP status is authoritative, never the requested value.
-              // The controlled trial is time bounded and requires an
-              // independently verified SYSTEM emergency-recovery task.
-              onChanged: !Platform.isWindows ||
-                      _checking || _guardTrialBusy || _guardRecoveryBusy ||
-                      _guard['serviceInstalled'] != true
-                  ? null
-                  : (enable) {
-                      if (enable) {
-                        _testSignedWindowsGuard();
-                      } else {
-                        _recoverWindowsGuard();
-                      }
-                    },
-            ),
-          ]),
-          key: const Key('vpnKillSwitchCard'),
-        ),
         if (Platform.isWindows) ...[
           const SizedBox(height: 8),
           _glass(Column(
@@ -704,9 +657,7 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
                 Switch.adaptive(
                   key: const Key('vpnSelectedAppKillSwitch'),
                   value: _selectedKillSwitchEnabled == true,
-                  onChanged: _appLockBusy ||
-                          _selectedKillSwitchApp.isEmpty ||
-                          _selectedKillSwitchEnabled == null
+                  onChanged: _appLockBusy || _selectedKillSwitchApp.isEmpty
                       ? null : _toggleSelectedAppKillSwitch,
                 ),
               ]),
