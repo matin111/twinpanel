@@ -183,7 +183,13 @@ int wmain(int argc, wchar_t** argv) {
   // Read-only 'audit' needs no user arguments and works without the app running.
   if (argc < 2) return 2;
   const bool audit = _wcsicmp(argv[1], L"audit") == 0;
-  if (!audit && !IsAdmin()) { fwprintf(stderr,L"ADMINISTRATOR_REQUIRED\n"); return 2; }
+  const bool statusOnly = _wcsicmp(argv[1], L"status") == 0;
+  // Reading filter status is safe for the unprivileged desktop process.
+  // Persistent WFP changes still require an elevated administrator token.
+  if (!audit && !statusOnly && !IsAdmin()) {
+    fwprintf(stderr,L"ADMINISTRATOR_REQUIRED\n");
+    return 2;
+  }
   Engine engine;
   if (Open(engine) != ERROR_SUCCESS) { fwprintf(stderr,L"WFP_UNAVAILABLE\n"); return 1; }
   FWPM_FILTER0* current4 = Get(engine.h, v4);
