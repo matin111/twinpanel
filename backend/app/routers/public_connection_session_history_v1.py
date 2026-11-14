@@ -77,13 +77,18 @@ def connection_session_history(token: str, db: Session = Depends(get_db)):
         up = sum(max(0, int(event.uplink_delta or 0)) for event in event_rows)
         down = sum(max(0, int(event.downlink_delta or 0)) for event in event_rows)
         node = nodes.get(s.node_id)
-        # The country of the node is available only if recorded on this node.
-        country = getattr(node, "country", None) if node else None
+        # Node.country_code is authoritative; Node has no "country" column.
+        # Preserve retired node metadata for historical sessions when available.
+        country_code = str(getattr(node, "country_code", "") or "").strip().upper() if node else ""
+        if len(country_code) != 2 or not country_code.isalpha():
+            country_code = ""
+        node_name = str(getattr(node, "name", "") or "").strip() if node else ""
         items.append({
             "id": s.id,
             "protocol": s.protocol,
             "node_id": s.node_id,
-            "country": str(country) if country else None,
+            "country_code": country_code or None,
+            "node_name": node_name or None,
             "started_at": _iso(s.started_at),
             "ended_at": _iso(ended),
             "last_seen_at": _iso(s.last_seen_at),
