@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -39,11 +40,30 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
   bool _networkResetBusy = false;
   bool _guardRecoveryBusy = false;
   bool _guardTrialBusy = false;
+  Timer? _guardStatusTimer;
 
   @override
   void initState() {
     super.initState();
     _check();
+    if (Platform.isWindows) {
+      // Keep the native Windows WFP service as the source of truth,
+      // including when SYSTEM's timed emergency recovery removes filters.
+      _guardStatusTimer = Timer.periodic(
+        const Duration(seconds: 15), (_) {
+          if (mounted && !_checking && !_guardTrialBusy &&
+              !_guardRecoveryBusy && !_networkResetBusy) {
+            _check();
+          }
+        },
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _guardStatusTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _check() async {
