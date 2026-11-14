@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 
 import 'android_connection_strings.dart';
 import 'android_tunnel.dart';
+import 'android_singbox_tunnel.dart';
 import 'cisco_openconnect_profile.dart';
 import 'app_strings.dart';
 import 'native_vpn_bridge.dart';
@@ -59,6 +60,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
   bool _busy = false;
   bool _up = false;
   bool _ciscoUp = false;
+  String? _singBoxProtocol;
   String? _errorCode;
   AppServer? _activeServer;
   String? _activeServerName;
@@ -122,6 +124,15 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
     if (!Platform.isAndroid || _polling) return;
     _polling = true;
     try {
+      if (_singBoxProtocol != null) {
+        final online = AndroidSingBoxTunnel.instance.isConnected;
+        if (!mounted) return;
+        if (!online) setState(() {
+          _singBoxProtocol = null;
+          _clearTelemetry();
+        });
+        return;
+      }
       if (_ciscoUp) {
         final status = await _controller.ciscoStatus();
         if (!mounted) return;
@@ -380,6 +391,70 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
     }
   }
 
+  Future<void> _connectModern(String code) async {
+    if (_busy || _up || _ciscoUp || _singBoxProtocol != null ||
+        !AndroidSingBoxTunnel.supported.contains(code)) return;
+    setState(() { _busy = true; _errorCode = null; });
+    try {
+      // Require real native initialization BEFORE asking for secrets.
+      await AndroidSingBoxTunnel.instance.initialize();
+      final profiles = await TenantApi.fromBuildConfig()
+          .loadSessionNativeProfiles(
+            panel: widget.panel,
+            sessionToken: widget.sessionToken,
+            protocol: VpnProtocols.byCode(code)!,
+            native: NativeProtocolReadiness(supportedCodes: {code}),
+          );
+      final inventory = widget.servers?.servers ?? const <AppServer>[];
+      final selectedId = widget.selectedNodeId;
+      final choices = profiles.items.where((item) {
+        final id = item['node_id']?.toString();
+        if (id == null || (selectedId != null && id != selectedId)) {
+          return false;
+        }
+        final node = inventory.where((n) => n.id == id).firstOrNull;
+        return inventory.isEmpty || node?.nodeOnline == true;
+      }).toList(growable: false);
+      if (choices.isEmpty) {
+        throw const FormatException('SINGBOX_NO_AUTHORIZED_SERVER');
+      }
+      final item = choices.first;
+      await AndroidSingBoxTunnel.instance.connect(
+        protocol: code, profile: item,
+      );
+      if (!mounted) return;
+      final id = item['node_id']?.toString();
+      setState(() {
+        _singBoxProtocol = code;
+        _activeServer = inventory.where((n) => n.id == id).firstOrNull;
+        _activeServerName = _activeServer?.name ??
+            (item['node'] is String ? item['node'] as String : null);
+      });
+    } on FormatException catch (error) {
+      if (mounted) setState(() => _errorCode = error.message);
+    } catch (_) {
+      if (mounted) setState(() => _errorCode = 'SINGBOX_NATIVE_CONNECT_FAILED');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _disconnectModern() async {
+    if (_busy || _singBoxProtocol == null) return;
+    setState(() => _busy = true);
+    try {
+      await AndroidSingBoxTunnel.instance.disconnect();
+      if (mounted) setState(() {
+        _singBoxProtocol = null;
+        _clearTelemetry();
+      });
+    } catch (_) {
+      if (mounted) setState(() => _errorCode = 'SINGBOX_DISCONNECT_FAILED');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _connect() async {
     if (widget.selectedProtocolCode != 'wireguard' &&
         widget.selectedProtocolCode != null) return;
@@ -542,7 +617,8 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
     // because it appears first in the subscription's catalog.
     final readyOptions = available.where((entry) =>
         entry.configRecordPresent &&
-        widget.native.supports(entry.protocol.code)).toList(growable: false);
+        (widget.native.supports(entry.protocol.code) ||
+         AndroidSingBoxTunnel.supported.contains(entry.protocol.code))).toList(growable: false);
     final chosen = requested != null
         ? available.where((e) => e.protocol.code == requested).firstOrNull
         : readyOptions.where((e) => e.protocol.code == 'wireguard').firstOrNull ??
@@ -553,19 +629,25 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
         chosen?.configRecordPresent == true;
     // The selected protocol and active transport are distinct. Selecting
     // OpenVPN/Hysteria2 never starts or disguises a WireGuard tunnel.
-    final connected = _up || _ciscoUp;
+    final connected = _up || _ciscoUp || _singBoxProtocol != null;
     final protocolName = chosen?.protocol.name ??
         (requested ?? s.pick('پروتکل آماده‌ای وجود ندارد', 'No ready protocol'));
-    final activeProtocolCode = _ciscoUp ? 'cisco' : _up ? 'wireguard' : null;
+    final activeProtocolCode = _singBoxProtocol ??
+        (_ciscoUp ? 'cisco' : _up ? 'wireguard' : null);
     final selectedIsActive = activeProtocolCode != null &&
         chosen?.protocol.code == activeProtocolCode;
     final internetVerified = _ciscoUp ||
         (_up && _handshake && _publicIp != null);
+    // A sing-box start acknowledgement is not proof of internet access.
     final ciscoSelected = chosen?.protocol.code == 'cisco';
     final ciscoReady = ciscoSelected &&
         widget.native.supports('cisco') &&
         chosen?.configRecordPresent == true;
-    final canStartSelected = ciscoSelected ? ciscoReady : nativeReady;
+    final modernSelected = chosen != null &&
+        AndroidSingBoxTunnel.supported.contains(chosen.protocol.code) &&
+        chosen.configRecordPresent;
+    final canStartSelected = ciscoSelected ? ciscoReady :
+        modernSelected || nativeReady;
     // An interface without a peer handshake is NOT a successful VPN.
     // Reserve the connected green treatment for verified transport.
     final accent = internetVerified ? const Color(0xFF35D9AE)
@@ -687,10 +769,12 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
                 borderRadius: BorderRadius.circular(18)),
             ),
             onPressed: _busy ? null
-                : selectedIsActive ? (_ciscoUp ? _disconnectCisco : _disconnect)
+                : selectedIsActive ? (_singBoxProtocol != null ? _disconnectModern :
+                    _ciscoUp ? _disconnectCisco : _disconnect)
                 : connected ? null
                 : canStartSelected
-                    ? (ciscoSelected ? _connectCisco : _connect) : null,
+                    ? (modernSelected ? () => _connectModern(chosen.protocol.code) :
+                       ciscoSelected ? _connectCisco : _connect) : null,
             icon: Icon(selectedIsActive ? Icons.stop_rounded :
                 Icons.bolt_rounded),
             label: Text(selectedIsActive
@@ -706,7 +790,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
           const SizedBox(height: 10),
           Text(
             s.pick('تونل فعال جداگانه: ', 'Separate active tunnel: ') +
-                (_ciscoUp ? 'Cisco / OpenConnect' : 'WireGuard'),
+                (_singBoxProtocol ?? (_ciscoUp ? 'Cisco / OpenConnect' : 'WireGuard')),
             key: const Key('androidSeparateActiveProtocol'),
             textAlign: TextAlign.center,
             style: TextStyle(color: accent),
@@ -714,7 +798,8 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
           const SizedBox(height: 8),
           OutlinedButton.icon(
             key: const Key('androidDisconnectPreviousTunnel'),
-            onPressed: _busy ? null : _ciscoUp ? _disconnectCisco : _disconnect,
+            onPressed: _busy ? null : _singBoxProtocol != null ? _disconnectModern :
+                _ciscoUp ? _disconnectCisco : _disconnect,
             icon: const Icon(Icons.stop_circle_outlined),
             label: Text(s.pick('قطع تونل قبلی', 'Disconnect previous tunnel')),
           ),
