@@ -114,6 +114,74 @@ jobs:
           if (Get-Service 'TwinConnectGuardDiagnostic' -ErrorAction SilentlyContinue) {
             throw 'Diagnostic service still registered after uninstall'
           }
+      - name: Build real WFP guard VM acceptance installer
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $source = Join-Path (Get-Location) 'native/windows/twinconnect_global_guard_service_experimental.cpp'
+          $target = Join-Path (Get-Location) 'build/guard-vm-test'
+          New-Item -ItemType Directory -Force -Path $target | Out-Null
+          $exe = Join-Path $target 'TwinConnectGlobalGuard.exe'
+          $vswhere = Join-Path "${env:ProgramFiles(x86)}" 'Microsoft Visual Studio/Installer/vswhere.exe'
+          $vs = (& $vswhere -latest -property installationPath).Trim()
+          $dev = Join-Path $vs 'Common7/Tools/VsDevCmd.bat'
+          $compile = 'call "' + $dev + '" -arch=amd64 && cl /nologo /std:c++17 /EHsc /W4 /WX /Fe:"' + $exe + '" "' + $source + '" /link Fwpuclnt.lib Iphlpapi.lib Ws2_32.lib Rpcrt4.lib Advapi32.lib Ole32.lib Oleaut32.lib Taskschd.lib'
+          & cmd.exe /d /s /c $compile
+          if ($LASTEXITCODE -ne 0 -or !(Test-Path $exe)) { throw 'Real guard VM service compilation failed' }
+          $tokens = $null
+          $errors = $null
+          [Management.Automation.Language.Parser]::ParseFile(
+            (Join-Path (Get-Location) 'tools/install_guard_vm_test.ps1'),
+            [ref]$tokens, [ref]$errors) | Out-Null
+          if ($errors.Count -gt 0) { throw 'VM test service installer has parse errors' }
+          $iscc = Join-Path "${env:ProgramFiles(x86)}" 'Inno Setup 6/ISCC.exe'
+          & $iscc 'installer-guard-vm-test.iss'
+          if ($LASTEXITCODE -ne 0 -or !(Test-Path 'TwinConnect-WFP-Guard-VM-TEST-Setup.exe')) {
+            throw 'WFP VM acceptance installer failed to build'
+          }
+          (Get-FileHash 'TwinConnect-WFP-Guard-VM-TEST-Setup.exe' -Algorithm SHA256).Hash |
+            Set-Content -Path 'TwinConnect-WFP-Guard-VM-TEST-SHA256.txt' -Encoding ascii
+      - name: Exercise real guard VM installer with firewall blocking OFF
+        shell: pwsh
+        env:
+          TWINCONNECT_DISPOSABLE_VM: '1'
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $setup = Join-Path (Get-Location) 'TwinConnect-WFP-Guard-VM-TEST-Setup.exe'
+          $installed = Join-Path $env:ProgramFiles 'TwinConnectGuardVMTest'
+          $exe = Join-Path $installed 'TwinConnectGlobalGuard.exe'
+          try {
+            $proc = Start-Process -FilePath $setup -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -PassThru -Wait
+            if ($proc.ExitCode -ne 0) { throw "VM test Setup exit code $($proc.ExitCode)" }
+            if ((Get-Service TwinConnectGlobalGuard -ErrorAction Stop).Status -ne 'Running') {
+              throw 'Real guard Windows service did not start'
+            }
+            $status = & $exe status
+            if ($LASTEXITCODE -ne 0 -or $status -notmatch 'OK 0 0 0') {
+              throw 'Guard startup unexpectedly altered WFP rules'
+            }
+            # No arm on shared CI runners. Real leak testing uses disposable VM workflow.
+            & $exe recover 'I_ACCEPT_OFFLINE_RECOVERY' | Out-Null
+            if ($LASTEXITCODE -ne 0) { throw 'Independent recovery command failed' }
+          } finally {
+            $uninstaller = Join-Path $installed 'unins000.exe'
+            if (Test-Path -LiteralPath $uninstaller) {
+              $proc = Start-Process -FilePath $uninstaller -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -PassThru -Wait
+              if ($proc.ExitCode -ne 0) { throw "VM test uninstall failed: $($proc.ExitCode)" }
+            }
+          }
+          if (Get-Service TwinConnectGlobalGuard -ErrorAction SilentlyContinue) {
+            throw 'Real guard VM test service survived uninstall'
+          }
+      - name: Publish functional WFP guard Windows VM test installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: TwinConnect-WFP-Guard-VM-TEST-Installer
+          path: |
+            clients/twinconnect/TwinConnect-WFP-Guard-VM-TEST-Setup.exe
+            clients/twinconnect/TwinConnect-WFP-Guard-VM-TEST-SHA256.txt
+          if-no-files-found: error
+          retention-days: 7
       - name: Publish clearly labeled internal installation test
         uses: actions/upload-artifact@v4
         with:
