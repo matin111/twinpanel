@@ -322,16 +322,31 @@ async def _apply(conn, *, action: str, tag: str, payload: dict[str, Any] | None 
     command = f'''set -eu
 CONFIG={shlex.quote(CONFIG_PATH)}
 SERVICE={shlex.quote(SERVICE_NAME)}
+# Shared with initial protocol provisioning: simultaneous writers must not
+# replace each other's .new file or restart a daemon with partial config.
+exec 9>/run/lock/twinpanel-singbox-install.lock
+flock -x -w 90 9
 BIN=/usr/local/bin/twinpanel-sing-box
 if [ ! -x "$BIN" ]; then BIN="$(command -v sing-box || true)"; fi
 [ -n "$BIN" ] || {{ echo singbox_binary_missing >&2; exit 41; }}
 [ -s "$CONFIG" ] || {{ echo singbox_config_missing >&2; exit 42; }}
-BACKUP="${{CONFIG}}.outbound-backup-$(date +%Y%m%d-%H%M%S)-$$"
-cp -a "$CONFIG" "$BACKUP"
+BACKUP="${{CONFIG}}.outbound-backup-$(date +%Y%m%d-%H%M%S)-$"
 cleanup() {{ rm -f "${{CONFIG}}.new"; }}
 trap cleanup EXIT
 printf '%s' {shlex.quote(script_b64)} | base64 -d | python3
+# A duplicate outbound update must not drop any existing user sessions.
+if cmp -s "${{CONFIG}}.new" "$CONFIG"; then
+  rm -f "${{CONFIG}}.new"
+  if systemctl is-active --quiet "${{SERVICE}}.service"; then
+    echo TWINPANEL_SINGBOX_OUTBOUND_UNCHANGED_NO_RESTART
+    exit 0
+  fi
+  systemctl start "${{SERVICE}}.service"
+  echo TWINPANEL_SINGBOX_OUTBOUND_UNCHANGED_SERVICE_RECOVERED
+  exit 0
+fi
 "$BIN" check -c "${{CONFIG}}.new"
+cp -a "$CONFIG" "$BACKUP"
 mv "${{CONFIG}}.new" "$CONFIG"
 chmod 600 "$CONFIG"
 if ! systemctl restart "${{SERVICE}}.service"; then
