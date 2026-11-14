@@ -46,6 +46,32 @@ void main() {
     });
   }
 
+  test('full panel JSON yields only one native outbound and drops app routing', () {
+    const original = '{"inbounds":[{"type":"tun","tag":"unsafe"}],'
+        '"dns":{"servers":[{"server":"8.8.8.8"}]},'
+        '"route":{"final":"direct"},'
+        '"outbounds":[{"type":"hysteria2","server":"vpn.example.org",'
+        '"server_port":443,"password":"secret",'
+        '"tls":{"enabled":true,"server_name":"vpn.example.org"}},'
+        '{"type":"direct","tag":"direct"}]}';
+    final outbound = SingBoxProfileValidator.validateOutbound(
+      protocolCode: 'hysteria2',
+      item: {'config': original},
+    );
+    expect(outbound['type'], 'hysteria2');
+    expect(outbound['password'], 'secret');
+    expect(outbound.containsKey('route'), isFalse);
+    expect(outbound.containsKey('dns'), isFalse);
+    expect(outbound.containsKey('inbounds'), isFalse);
+  });
+
+  test('ambiguous full panel sing-box profile is rejected', () {
+    expect(() => SingBoxProfileValidator.validateOutbound(
+      protocolCode: 'tuic',
+      item: {'config': '{"outbounds":[{"type":"tuic"},{"type":"tuic"}]}'},
+    ), throwsFormatException);
+  });
+
   test('opaque links and wrong protocol cannot silently be converted', () {
     expect(() => SingBoxProfileValidator.validateOutbound(
       protocolCode: 'hysteria2',
