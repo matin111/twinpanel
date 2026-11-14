@@ -198,6 +198,11 @@ std::wstring HandleRequest(const std::wstring& request) {
     DWORD code = TransactionalDisarm(engine.handle);
     return code == ERROR_SUCCESS ? L"OK DISARMED" : L"ERR WFP_DISARM_FAILED";
   }
+#if defined(TWINCONNECT_GUARD_DIAGNOSTIC_ONLY)
+  // Internal installer test build: no request can add persistent WFP rules.
+  // The installed service verifies SCM/UAC/IPC lifecycle only.
+  return L"ERR DIAGNOSTIC_BUILD_BLOCKING_DISABLED";
+#endif
   const std::wstring prefix = L"arm ";
   if (request.rfind(prefix, 0) != 0) return L"ERR UNKNOWN_COMMAND";
   // Strict token count; paths may include spaces, so use tab as separator.
