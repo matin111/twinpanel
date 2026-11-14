@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.840",
+  "version": "1.1.0-rc.841",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-14T22:09:38Z",
+  "released_at": "2026-11-14T22:38:43Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "72f760c0bb55c4b1f3653bad48fd64b93cca65e6",
+  "source_sha": "3cd9a7327e89cac6e0de503ad01a0cfeb29a0476",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.840/twinpanel-1.1.0-rc.840-linux-x86_64.tar.gz",
-    "sha256": "f147ab36f2cbbaf1fd3ef892e72ee3ef0f1d0507bfdd57821c38daf5331d7441",
-    "size_bytes": 30818738
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.841/twinpanel-1.1.0-rc.841-linux-x86_64.tar.gz",
+    "sha256": "8d92ec37174af91be96991e8f1a076d7c20aacd02ae6a29fd3ef64c989b2c0c5",
+    "size_bytes": 30823421
   },
   "notes": {
-    "fa": "افزودن دکمه ریست سرویس پروتکل روی تمام ۱۶ کارت پروتکل‌های داشبورد با انتخاب نود دارای پروتکل، پنجره تأیید، اخطار موتور مشترک sing-box و بروزرسانی وضعیت بعد از ریست. حجم، اشتراک و کانفیگ‌ها تغییر نمی‌کنند.",
-    "en": "Add per-protocol restart action on all 16 dashboard protocol cards with installed-node selection, confirmation, warning for shared sing-box runtime, and refreshed health telemetry. No user quota or configuration reset."
+    "fa": "تاریخچه نشست‌های Connection: نمایش نام فارسی کشور و پرچم از country_code واقعی نود به‌جای شماره سرور در تیتر هر اتصال؛ حفظ اطلاعات مصرف، زمان و پروتکل و نمایش کشور نامشخص در صورت نبود داده.",
+    "en": "Connection session history shows the Persian country name and flag from the actual node country_code instead of raw server ID. Preserves session protocol, timestamps, and traffic details."
   }
 }
