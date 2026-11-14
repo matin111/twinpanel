@@ -4,7 +4,6 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends
-from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..database import get_db
@@ -41,6 +40,7 @@ def connection_session_history(token: str, db: Session = Depends(get_db)):
     ).all()}
     # Query bounded by the latest 50 rows; no N+1 across hundreds of events.
     keys = {(s.node_id, s.session_key) for s in sessions}
+    oldest_start = min(s.started_at for s in sessions) - timedelta(seconds=10)
     rows = (
         db.query(
             QuotaUsageEvent.node_id,
@@ -52,6 +52,7 @@ def connection_session_history(token: str, db: Session = Depends(get_db)):
         )
         .filter(
             QuotaUsageEvent.subscription_id == subscription.id,
+            QuotaUsageEvent.reported_at >= oldest_start,
             QuotaUsageEvent.session_key.isnot(None),
             QuotaUsageEvent.node_id.in_({k[0] for k in keys}),
             QuotaUsageEvent.session_key.in_({k[1] for k in keys}),
