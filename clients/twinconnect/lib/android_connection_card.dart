@@ -236,7 +236,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
           (matching == null || !matching.nodeOnline)) continue;
       final name = matching?.name ??
           (item['node'] is String ? item['node'] as String : id);
-      candidates.add((id, WireGuardNode(name: name, config: raw), matching));
+      candidates.add((id, WireGuardNode(name: name, config: raw, nodeId: id), matching));
     }
     if (candidates.isEmpty) return null;
     candidates.sort((a, b) {
@@ -298,7 +298,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
         if (_up) {
           _activeServerName = selected.name;
           _activeServer = widget.servers?.servers
-              .where((server) => server.name == selected.name)
+              .where((server) => server.id == selected.nodeId)
               .firstOrNull;
         }
       });
