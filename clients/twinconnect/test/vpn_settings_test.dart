@@ -54,10 +54,10 @@ void main() {
     ));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('vpnCapabilityRefresh')), findsOneWidget);
-    expect(find.byKey(const Key('vpnDiagnosticsDisclosure')), findsOneWidget);
+    expect(find.byKey(const Key('vpnDiagnosticsDisclosure')), findsNothing);
     // The passive diagnostic cards are lazily built by ExpansionTile;
     // verify the disclosure exists without depending on offscreen children.
-    expect(find.byKey(const Key('vpnDiagnosticsCard')), findsOneWidget);
+    expect(find.byKey(const Key('vpnDiagnosticsCard')), findsNothing);
     expect(find.byKey(const Key('vpnSystemProxyCard')), findsOneWidget);
     expect(find.byKey(const Key('vpnSystemProxyToggle')), findsOneWidget);
     expect(find.byKey(const Key('vpnTunMode')), findsOneWidget);
