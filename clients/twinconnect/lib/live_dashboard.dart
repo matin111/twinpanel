@@ -2305,7 +2305,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     _dark = true; // Premium dark canvas is the only supported app appearance.
     if (widget.simulatorPreview) {
       _page = const ['home', 'locations', 'settings', 'account'][
-          widget.previewPage.clamp(0, 3)];
+          widget.previewPage.clamp(0, 3).toInt()];
       // This tour is confined to the simulator-only alternate entry point.
       // The same dashboard layouts are used by authenticated clients.
       _previewTour = Timer.periodic(const Duration(seconds: 12), (_) {
