@@ -301,16 +301,18 @@ void main() {
     final native = File(
       'native/android/kotlin/com/twinpanel/twinconnect/MainActivity.kt',
     ).readAsStringSync();
+    final cisco = File('lib/android_cisco_tunnel.dart').readAsStringSync();
     expect(controller, contains("nativeProtocols.supports('cisco')"));
-    expect(controller, contains("'startOpenConnect'"));
-    expect(controller, contains("'stopOpenConnect'"));
-    expect(controller, contains("'getOpenConnectStatus'"));
-    expect(controller, contains("'trafficRoutingVerified'"));
     expect(card, contains('CiscoOpenConnectProfile.fromItem(item)'));
+    expect(card, contains('AndroidCiscoTunnel.requiredSha256Pin(profile)'));
     expect(card, contains("loadSessionNativeProfiles("));
-    expect(card, contains("_controller.connectCisco("));
-    expect(card, contains("_controller.ciscoStatus()"));
-    expect(native, contains('"OPENCONNECT_CORE_NOT_INSTALLED"'));
+    expect(card, contains('AndroidCiscoTunnel.instance.connect(profile)'));
+    expect(card, contains('AndroidCiscoTunnel.instance.status()'));
+    expect(cisco, contains('package:axevpn_flutter/openconnect_flutter.dart'));
+    expect(cisco, contains("servercert: pin"));
+    expect(cisco, contains('engine.isServiceRunning()'));
+    expect(cisco, contains('CISCO_SHA256_PIN_REQUIRED'));
+    expect(native, contains('OpenConnectFlutterPlugin()'));
     expect(native, contains('listOf("wireguard")'));
   });
 
