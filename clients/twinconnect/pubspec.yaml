@@ -18,6 +18,7 @@ dependencies:
   country_flags: 4.1.2
   # Android sing-box native engine; GPLv3 obligations must be satisfied before release.
   sing_box: 1.0.0
+  openvpn_flutter: 2.0.0
 
 dev_dependencies:
   flutter_test:
