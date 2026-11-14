@@ -73,7 +73,7 @@ def patch_manifest() -> None:
             ' android:allowBackup="false" android:fullBackupContent="false">'
         )
         current = current[:match.start()] + secured + current[match.end():]
-        match = re.search(r"<application\\b[^>]*>", current, flags=re.DOTALL)
+        match = re.search(r"<application\b[^>]*>", current, flags=re.DOTALL)
         if match is None:
             raise RuntimeError("Unable to set Android backup policy")
     service = (
