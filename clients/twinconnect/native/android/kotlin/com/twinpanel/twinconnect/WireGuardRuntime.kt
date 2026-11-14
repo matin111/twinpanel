@@ -103,11 +103,20 @@ internal object WireGuardRuntime {
         val bytes = configText.toByteArray(StandardCharsets.UTF_8)
         val config: Config
         try {
-            config = Config.parse(ByteArrayInputStream(bytes))
+            config = try {
+                Config.parse(ByteArrayInputStream(bytes))
+            } catch (_: Exception) {
+                // Avoid surfacing parser details that may contain credentials.
+                throw IllegalArgumentException("WIREGUARD_CONFIG_PARSE_FAILED")
+            }
         } finally {
             bytes.fill(0)
         }
-        val actualState = backend!!.setState(tunnel, Tunnel.State.UP, config)
+        val actualState = try {
+            backend!!.setState(tunnel, Tunnel.State.UP, config)
+        } catch (_: Exception) {
+            throw IllegalArgumentException("WIREGUARD_NATIVE_START_FAILED")
+        }
         require(actualState == Tunnel.State.UP && isInterfaceUp()) {
             "TUNNEL_NOT_ESTABLISHED"
         }
