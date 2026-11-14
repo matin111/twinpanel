@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.840",
-  "source_sha": "72f760c0bb55c4b1f3653bad48fd64b93cca65e6",
+  "version": "1.1.0-rc.841",
+  "source_sha": "3cd9a7327e89cac6e0de503ad01a0cfeb29a0476",
   "notes": {
-    "fa": "افزودن دکمه ریست سرویس پروتکل روی تمام ۱۶ کارت پروتکل‌های داشبورد با انتخاب نود دارای پروتکل، پنجره تأیید، اخطار موتور مشترک sing-box و بروزرسانی وضعیت بعد از ریست. حجم، اشتراک و کانفیگ‌ها تغییر نمی‌کنند.",
-    "en": "Add per-protocol restart action on all 16 dashboard protocol cards with installed-node selection, confirmation, warning for shared sing-box runtime, and refreshed health telemetry. No user quota or configuration reset."
+    "fa": "تاریخچه نشست‌های Connection: نمایش نام فارسی کشور و پرچم از country_code واقعی نود به‌جای شماره سرور در تیتر هر اتصال؛ حفظ اطلاعات مصرف، زمان و پروتکل و نمایش کشور نامشخص در صورت نبود داده.",
+    "en": "Connection session history shows the Persian country name and flag from the actual node country_code instead of raw server ID. Preserves session protocol, timestamps, and traffic details."
   }
 }
