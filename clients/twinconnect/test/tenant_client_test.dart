@@ -121,6 +121,41 @@ void main() {
           throwsFormatException);
     });
 
+    test('thousands of licensed installations use isolated namespace routing', () {
+      // Each registration is resolved independently; there must never be
+      // one shared customer-panel origin baked into a universal app.
+      final resolved = <String, Uri>{};
+      for (var index = 0; index < 2000; index++) {
+        final namespace = 'TP${index.toRadixString(16).toUpperCase().padLeft(16, '0')}';
+        final origin = 'https://panel-$index.example.com';
+        final entry = PanelDirectoryEntry.fromJson({
+          'namespace': namespace,
+          'api_origin': origin,
+        });
+        expect(entry.namespace, namespace);
+        resolved[entry.namespace] = entry.apiOrigin;
+      }
+      expect(resolved.length, 2000);
+      expect(resolved.values.toSet().length, 2000);
+      expect(resolved['TP0000000000000000']?.host, 'panel-0.example.com');
+      expect(resolved['TP00000000000007CF']?.host, 'panel-1999.example.com');
+    });
+
+    test('license directory can rotate a tenant origin without a client update', () {
+      const namespace = 'TP0123456789ABCDEF';
+      final before = PanelDirectoryEntry.fromJson({
+        'namespace': namespace,
+        'api_origin': 'https://old-domain.example.com',
+      });
+      final after = PanelDirectoryEntry.fromJson({
+        'namespace': namespace,
+        'api_origin': 'https://new-domain.example.com',
+      });
+      expect(before.namespace, after.namespace);
+      expect(before.apiOrigin, isNot(after.apiOrigin));
+      expect(after.apiOrigin.host, 'new-domain.example.com');
+    });
+
     test('missing optional brand links stay hidden', () {
       final info = BrandPreview.fromJson({
         'namespace': 'TP0123456789ABCDEF',
