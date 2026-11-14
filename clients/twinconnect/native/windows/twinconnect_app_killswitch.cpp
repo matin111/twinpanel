@@ -81,14 +81,30 @@ bool OwnedValid(const FWPM_FILTER0* f, const GUID& layer,
       !InlineIsEqualGUID(f->subLayerKey, sublayer) ||
       (f->flags & FWPM_FILTER_FLAG_PERSISTENT) == 0 ||
       f->action.type != FWP_ACTION_BLOCK) return false;
-  const auto& a = f->filterCondition[0];
-  const auto& i = f->filterCondition[1];
-  if (!InlineIsEqualGUID(a.fieldKey, FWPM_CONDITION_ALE_APP_ID) ||
-      a.matchType != FWP_MATCH_EQUAL || a.conditionValue.type != FWP_BYTE_BLOB_TYPE ||
-      !a.conditionValue.byteBlob || !app ||
+  // BFE can return filter conditions in a different order than supplied.
+  // Never infer ownership from positional indices of filterCondition.
+  const FWPM_FILTER_CONDITION0* appCondition = nullptr;
+  const FWPM_FILTER_CONDITION0* interfaceCondition = nullptr;
+  for (UINT32 index = 0; index < f->numFilterConditions; ++index) {
+    const auto& condition = f->filterCondition[index];
+    if (InlineIsEqualGUID(condition.fieldKey, FWPM_CONDITION_ALE_APP_ID)) {
+      if (appCondition) return false;
+      appCondition = &condition;
+    } else if (InlineIsEqualGUID(condition.fieldKey, FWPM_CONDITION_IP_LOCAL_INTERFACE)) {
+      if (interfaceCondition) return false;
+      interfaceCondition = &condition;
+    } else {
+      return false;
+    }
+  }
+  if (!appCondition || !interfaceCondition || !app) return false;
+  const auto& a = *appCondition;
+  const auto& i = *interfaceCondition;
+  if (a.matchType != FWP_MATCH_EQUAL ||
+      a.conditionValue.type != FWP_BYTE_BLOB_TYPE ||
+      !a.conditionValue.byteBlob ||
       a.conditionValue.byteBlob->size != app->size ||
       memcmp(a.conditionValue.byteBlob->data, app->data, app->size) != 0 ||
-      !InlineIsEqualGUID(i.fieldKey, FWPM_CONDITION_IP_LOCAL_INTERFACE) ||
       i.matchType != FWP_MATCH_NOT_EQUAL ||
       i.conditionValue.type != FWP_UINT64 ||
       !i.conditionValue.uint64 || *i.conditionValue.uint64 == 0) return false;
