@@ -3,7 +3,6 @@ import 'dart:io';
 
 import 'package:sing_box/sing_box.dart';
 
-import 'protocols.dart';
 import 'singbox_profile_validator.dart';
 import 'vpn_policy.dart';
 
