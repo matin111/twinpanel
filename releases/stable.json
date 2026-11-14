@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.839",
+  "version": "1.1.0-rc.840",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-14T21:14:11Z",
+  "released_at": "2026-11-14T22:09:38Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "2899c2bf13921e3adf2b02ee64386856e1c17605",
+  "source_sha": "72f760c0bb55c4b1f3653bad48fd64b93cca65e6",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.839/twinpanel-1.1.0-rc.839-linux-x86_64.tar.gz",
-    "sha256": "d4b5707ec21b224d977e7e959d24176aad9b4d11ecaa8c97dcea45bb290cdeed",
-    "size_bytes": 30809302
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.840/twinpanel-1.1.0-rc.840-linux-x86_64.tar.gz",
+    "sha256": "f147ab36f2cbbaf1fd3ef892e72ee3ef0f1d0507bfdd57821c38daf5331d7441",
+    "size_bytes": 30818738
   },
   "notes": {
-    "fa": "اصلاح دارک مود پاپ‌آپ تاریخچه ادمین: هماهنگ‌سازی رنگ زمینه بخش جستجو، ورودی جستجو، فیلتر و دکمه پاک‌کردن با تم انتخابی؛ حفظ رنگ‌بندی لایت مود و عملکرد جستجو و تاریخچه.",
-    "en": "Fix admin activity popup dark mode search panel, search input, filter and clear button colors using resolved dark/light theme while preserving existing behavior."
+    "fa": "افزودن دکمه ریست سرویس پروتکل روی تمام ۱۶ کارت پروتکل‌های داشبورد با انتخاب نود دارای پروتکل، پنجره تأیید، اخطار موتور مشترک sing-box و بروزرسانی وضعیت بعد از ریست. حجم، اشتراک و کانفیگ‌ها تغییر نمی‌کنند.",
+    "en": "Add per-protocol restart action on all 16 dashboard protocol cards with installed-node selection, confirmation, warning for shared sing-box runtime, and refreshed health telemetry. No user quota or configuration reset."
   }
 }
