@@ -12,6 +12,21 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
+# The elevated helper returns a single, bounded diagnostic code to the parent
+# on failure. Never return raw PowerShell errors containing filesystem paths.
+trap {
+  if ($ElevationReceipt) {
+    $details = [string]$_.Exception.Message
+    $native = [regex]::Match($details, 'APP_WFP_NATIVE_ARM_ERROR_[0-9]+')
+    $code = if ($native.Success) { $native.Value } else {
+      $match = [regex]::Match($details, '(APP_WFP_[A-Z0-9_]+|VERIFIED_TWINCONNECT_TUNNEL_REQUIRED)')
+      if ($match.Success) { $match.Value } else { 'APP_WFP_HELPER_FAILED' }
+    }
+    [IO.File]::WriteAllText($ElevationReceipt, 'ERROR ' + $code, [Text.Encoding]::UTF8)
+  }
+  exit 1
+}
+
 if ($Action -eq 'Pick') {
   Add-Type -AssemblyName System.Windows.Forms
   $dialog = New-Object System.Windows.Forms.OpenFileDialog
@@ -90,6 +105,10 @@ if ($Action -in @('Lock','Unlock')) {
         '-ElevationReceipt', ('"' + $receipt + '"')
       )
       $child = Start-Process -FilePath (Join-Path $PSHOME 'powershell.exe') -ArgumentList $elevationArguments -Verb RunAs -Wait -PassThru -ErrorAction Stop
+      if (Test-Path -LiteralPath $receipt -PathType Leaf) {
+        $answer = (Get-Content -LiteralPath $receipt -Raw -ErrorAction Stop).Trim()
+        if ($answer.StartsWith('ERROR ')) { throw $answer.Substring(6) }
+      }
       if ($child.ExitCode -ne 0) { throw 'APP_WFP_ELEVATED_COMMAND_FAILED' }
       if (!(Test-Path -LiteralPath $receipt -PathType Leaf)) { throw 'APP_WFP_ELEVATED_RECEIPT_MISSING' }
       $answer = (Get-Content -LiteralPath $receipt -Raw -ErrorAction Stop).Trim()
