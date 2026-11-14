@@ -15,15 +15,16 @@ Set-StrictMode -Version Latest
 # The elevated helper returns a single, bounded diagnostic code to the parent
 # on failure. Never return raw PowerShell errors containing filesystem paths.
 trap {
+  $details = [string]$_.Exception.Message
+  $native = [regex]::Match($details, 'APP_WFP_NATIVE_ARM_ERROR_[0-9]+')
+  $code = if ($native.Success) { $native.Value } else {
+    $match = [regex]::Match($details, '(APP_WFP_[A-Z0-9_]+|VERIFIED_TWINCONNECT_TUNNEL_REQUIRED)')
+    if ($match.Success) { $match.Value } else { 'APP_WFP_HELPER_FAILED' }
+  }
   if ($ElevationReceipt) {
-    $details = [string]$_.Exception.Message
-    $native = [regex]::Match($details, 'APP_WFP_NATIVE_ARM_ERROR_[0-9]+')
-    $code = if ($native.Success) { $native.Value } else {
-      $match = [regex]::Match($details, '(APP_WFP_[A-Z0-9_]+|VERIFIED_TWINCONNECT_TUNNEL_REQUIRED)')
-      if ($match.Success) { $match.Value } else { 'APP_WFP_HELPER_FAILED' }
-    }
     [IO.File]::WriteAllText($ElevationReceipt, 'ERROR ' + $code, [Text.Encoding]::UTF8)
   }
+  [Console]::Error.WriteLine($code)
   exit 1
 }
 
