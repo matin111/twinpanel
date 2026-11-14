@@ -13,6 +13,8 @@ class AndroidSingBoxTunnel {
 
   static final AndroidSingBoxTunnel instance = AndroidSingBoxTunnel._();
   bool _initialized = false;
+  int? _lastVerifiedLatencyMs;
+  int? get verifiedLatencyMs => _lastVerifiedLatencyMs;
 
   static const supported = <String>{
     'hysteria2', 'tuic', 'anytls', 'socks5',
@@ -46,8 +48,19 @@ class AndroidSingBoxTunnel {
     // Do not persist profiles in TwinConnect's own preferences.
     await SingBox.instance.connect(jsonEncode(outbound));
     if (SingBox.instance.status != SingBoxConnectionStatus.connected) {
+      await SingBox.instance.disconnect();
       throw const FormatException('SINGBOX_TUNNEL_NOT_VERIFIED');
     }
+    // Real URL test runs through sing-box's selected outbound. A started
+    // VpnService is NOT proof that encrypted user traffic reaches a server.
+    final result = await SingBox.instance.pingCurrentServer(
+      timeout: const Duration(seconds: 12),
+    );
+    if (!result.success) {
+      await SingBox.instance.disconnect();
+      throw const FormatException('SINGBOX_OUTBOUND_UNREACHABLE');
+    }
+    _lastVerifiedLatencyMs = result.ping;
   }
 
   bool get isConnected => _initialized &&
@@ -56,5 +69,6 @@ class AndroidSingBoxTunnel {
   Future<void> disconnect() async {
     if (!_initialized) return;
     await SingBox.instance.disconnect();
+    _lastVerifiedLatencyMs = null;
   }
 }
