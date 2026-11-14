@@ -1,0 +1,85 @@
+name: TwinConnect iOS Simulator Foundation
+
+on:
+  pull_request:
+    paths:
+      - 'clients/twinconnect/**'
+      - '.github/workflows/twinconnect-ios-simulator.yml'
+  push:
+    branches:
+      - 'feat/twinconnect-ios-simulator-foundation-20261115'
+    paths:
+      - 'clients/twinconnect/**'
+      - '.github/workflows/twinconnect-ios-simulator.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: twinconnect-ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ios-simulator:
+    name: iOS simulator build and launch smoke
+    runs-on: macos-15
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: clients/twinconnect
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode
+        shell: bash
+        run: |
+          xcodebuild -version
+          xcrun simctl list devices available
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: false
+      - name: Generate native iOS Runner project
+        run: flutter create --platforms=ios --org com.twinpanel --project-name twinconnect .
+      - name: Fetch Flutter packages
+        run: flutter pub get
+      - name: Check static analysis and Flutter tests
+        run: |
+          flutter analyze --no-fatal-infos
+          flutter test --reporter expanded
+      - name: Build unsigned iOS simulator app
+        env:
+          TWINCONNECT_DIRECTORY_URL: ${{ vars.TWINCONNECT_DIRECTORY_URL || 'https://panel.matindnspro.sbs' }}
+        run: |
+          flutter build ios --simulator --debug --no-codesign \
+            --dart-define=TWINCONNECT_DIRECTORY_URL="$TWINCONNECT_DIRECTORY_URL"
+          test -d build/ios/iphonesimulator/Runner.app
+      - name: Verify iPhone simulator boots and launches TwinConnect
+        shell: bash
+        run: |
+          set -euo pipefail
+          device="$(xcrun simctl list devices available -j | python3 -c 'import json,sys; d=json.load(sys.stdin); print(next((item["udid"] for runtime,devices in d["devices"].items() if "iOS" in runtime for item in devices if item["name"].startswith("iPhone") and item["state"] in ("Shutdown", "Booted")), ""))')"
+          if [ -z "$device" ]; then
+            echo "::error::No available iPhone Simulator runtime on this GitHub macOS runner."
+            exit 1
+          fi
+          xcrun simctl boot "$device" || true
+          xcrun simctl bootstatus "$device" -b
+          xcrun simctl install "$device" build/ios/iphonesimulator/Runner.app
+          xcrun simctl launch "$device" com.twinpanel.twinconnect
+          xcrun simctl spawn "$device" launchctl print system >/dev/null
+      - name: Archive iOS simulator app
+        shell: bash
+        run: |
+          ditto -c -k --sequesterRsrc --keepParent \
+            build/ios/iphonesimulator/Runner.app \
+            TwinConnect-iOS-Simulator-v0.1.0.zip
+          shasum -a 256 TwinConnect-iOS-Simulator-v0.1.0.zip > TwinConnect-iOS-Simulator-SHA256.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TwinConnect-iOS-Simulator-v0.1.0
+          path: |
+            clients/twinconnect/TwinConnect-iOS-Simulator-v0.1.0.zip
+            clients/twinconnect/TwinConnect-iOS-Simulator-SHA256.txt
+          if-no-files-found: error
+          retention-days: 14
