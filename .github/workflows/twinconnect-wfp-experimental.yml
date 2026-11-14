@@ -5,6 +5,8 @@ on:
     paths:
       - "clients/twinconnect/native/windows/twinconnect_global_guard_experimental.cpp"
       - "clients/twinconnect/native/windows/twinconnect_global_guard_service_experimental.cpp"
+      - "clients/twinconnect/native/windows/twinconnect_app_killswitch.cpp"
+      - "clients/twinconnect/tools/windows_app_network_lock.ps1"
       - ".github/workflows/twinconnect-wfp-experimental.yml"
   workflow_dispatch:
 
@@ -39,6 +41,22 @@ jobs:
           & $exe status
           if ($LASTEXITCODE -ne 0) { throw "Read-only guard status failed" }
           Remove-Item -LiteralPath $exe -Force
+      - name: Compile selected-app VPN bypass WFP engine read-only
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $vswhere = Join-Path "${env:ProgramFiles(x86)}" 'Microsoft Visual Studio/Installer/vswhere.exe'
+          $vs = (& $vswhere -latest -property installationPath).Trim()
+          $dev = Join-Path $vs 'Common7/Tools/VsDevCmd.bat'
+          $source = Join-Path (Get-Location) 'native/windows/twinconnect_app_killswitch.cpp'
+          $exe = Join-Path $env:RUNNER_TEMP 'TwinConnectAppKillSwitch.exe'
+          $compile = 'call "' + $dev + '" -arch=amd64 && cl /nologo /std:c++17 /EHsc /W4 /WX /Fe:"' + $exe + '" "' + $source + '" /link Fwpuclnt.lib Iphlpapi.lib Rpcrt4.lib'
+          & cmd.exe /d /s /c $compile
+          if ($LASTEXITCODE -ne 0 -or !(Test-Path $exe)) { throw 'WFP app guard build failed' }
+          $audit = & $exe audit
+          if ($LASTEXITCODE -ne 0 -or $audit -notmatch '^OWNED_APP_RULES_PRESENT 0 0') {
+            throw 'WFP app guard read-only audit failed'
+          }
       - name: Compile standalone privileged guard service and recovery client (never install)
         shell: pwsh
         run: |
