@@ -87,7 +87,7 @@ jobs:
             & $exe arm "TwinConnectSB" "not-an-ip" "$exe" $ack
             if ($LASTEXITCODE -eq 0) { throw "SECURITY: invalid endpoint arm was accepted" }
             $guardStatus = & $exe status
-            if ($LASTEXITCODE -ne 0 -or ($guardStatus -notmatch "OK 0 0 0")) {
+            if ($LASTEXITCODE -ne 0 -or ($guardStatus -notmatch "^OK 0 0 0 0$")) {
               throw "SECURITY: rejected commands left WFP rules installed"
             }
             # Normal stop must never strand TwinConnect-owned persistent WFP rules.
