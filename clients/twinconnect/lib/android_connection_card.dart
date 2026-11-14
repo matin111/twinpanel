@@ -132,7 +132,11 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
         final online = AndroidOpenVpnTunnel.instance.isConnected;
         if (!mounted) return;
         if (!online) {
-          setState(() { _openVpnUp = false; _clearTelemetry(); });
+          setState(() {
+            _openVpnUp = false;
+            _clearTelemetry();
+            _errorCode = 'OPENVPN_ENGINE_STOPPED';
+          });
         } else {
           _maybeCheckInternet();
           final counters = await AndroidOpenVpnTunnel.instance.counters();
@@ -159,6 +163,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
         if (!online) setState(() {
           _singBoxProtocol = null;
           _clearTelemetry();
+          _errorCode = 'SINGBOX_ENGINE_STOPPED';
         });
         if (online) {
           final core = AndroidSingBoxTunnel.instance;
@@ -234,8 +239,13 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
       if (up && _handshake) _maybeCheckInternet();
     } catch (_) {
       if (mounted) setState(() {
-        _up = false;
-        _clearTelemetry();
+        if (_openVpnUp || _singBoxProtocol != null || _ciscoUp) {
+          // A telemetry error must not silently tear down another VPN engine.
+          _errorCode = 'VPN_TELEMETRY_UNAVAILABLE';
+        } else {
+          _up = false;
+          _clearTelemetry();
+        }
       });
     } finally {
       _polling = false;
