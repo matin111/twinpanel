@@ -672,7 +672,7 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
                 Expanded(child: Text(
                   _selectedKillSwitchApp.isEmpty
                       ? tr('هنوز برنامه‌ای انتخاب نشده', 'No application selected')
-                      : _selectedKillSwitchApp.split(r'\').last,
+                      : _selectedKillSwitchApp.split(Platform.pathSeparator).last,
                   key: const Key('vpnSelectedAppName'),
                   overflow: TextOverflow.ellipsis,
                 )),
