@@ -438,9 +438,9 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
       }
       final item = choices.first;
       final profile = CiscoOpenConnectProfile.fromItem(item);
-      // No SHA-1 or unpinned TLS fallback: the upstream plugin trusts arbitrary
-      // certificates unless the app explicitly supplies a valid SHA-256 pin.
-      AndroidCiscoTunnel.requiredSha256Pin(profile);
+      // Use system CA+hostname validation or an explicit SHA-256 certificate pin.
+      // The vendored service rejects bad pins rather than bypassing TLS.
+      AndroidCiscoTunnel.validatedServerTrust(profile);
       stage = 'CISCO_NATIVE_CONNECTION_FAILED';
       await AndroidCiscoTunnel.instance.connect(profile);
       if (!mounted) return;
