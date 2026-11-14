@@ -49,6 +49,9 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
   WindowsAppRoutingMode _routingMode = WindowsAppRoutingMode.fullTunnel;
   List<String> _routingApps = <String>[];
   bool _routingBusy = false;
+  bool _systemProxyBusy = false;
+  bool? _systemProxyEnabled;
+  int? _systemProxyPort;
 
 
   @override
@@ -58,6 +61,7 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
     if (Platform.isWindows) {
       _loadSelectedKillSwitchApp();
       _loadRoutingSettings();
+      _loadSystemProxyStatus();
       // Keep the native Windows WFP service as the source of truth,
       // including when SYSTEM's timed emergency recovery removes filters.
       _guardStatusTimer = Timer.periodic(
@@ -238,6 +242,114 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
     }
   }
 
+
+
+  Future<String> _systemProxyCommand(String action, [int? port]) async {
+    final script = File(
+      File(Platform.resolvedExecutable).parent.path +
+      r'\tools\windows_system_proxy.ps1');
+    if (!await script.exists()) {
+      throw const FileSystemException('SYSTEM_PROXY_ENGINE_MISSING');
+    }
+    final result = await Process.run('powershell.exe', [
+      '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
+      '-File', script.path, '-Action', action,
+      if (port != null) ...['-SocksPort', port.toString()],
+    ]).timeout(const Duration(seconds: 15));
+    if (result.exitCode != 0) {
+      throw StateError('SYSTEM_PROXY_COMMAND_FAILED: ${result.stderr}');
+    }
+    return result.stdout.toString().trim();
+  }
+
+  Future<void> _loadSystemProxyStatus() async {
+    try {
+      final output = await _systemProxyCommand('Status');
+      if (!mounted) return;
+      if (output.startsWith('TWINCONNECT_SYSTEM_PROXY_ON ')) {
+        final port = int.tryParse(output.split(' ').last);
+        if (port == null) throw const FormatException('PROXY_PORT_INVALID');
+        setState(() {
+          _systemProxyEnabled = true;
+          _systemProxyPort = port;
+        });
+      } else if (output == 'TWINCONNECT_SYSTEM_PROXY_OFF') {
+        setState(() {
+          _systemProxyEnabled = false;
+          _systemProxyPort = null;
+        });
+      } else {
+        throw const FormatException('PROXY_STATUS_UNKNOWN');
+      }
+    } catch (_) {
+      if (mounted) setState(() => _systemProxyEnabled = null);
+    }
+  }
+
+  Future<void> _changeSystemProxy(bool enable) async {
+    if (!Platform.isWindows || _systemProxyBusy) return;
+    int? port;
+    if (enable) {
+      final controller = TextEditingController(
+          text: _systemProxyPort?.toString() ?? '1080');
+      try {
+        final accepted = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: Text(AppStrings.of(ctx).pick(
+              'فعال‌سازی پروکسی ویندوز', 'Enable Windows system proxy')),
+            content: Column(mainAxisSize: MainAxisSize.min, children: [
+              Text(AppStrings.of(ctx).pick(
+                'پورت SOCKS5 محلی را وارد کن؛ اتصال آن قبل از تغییر ویندوز بررسی می‌شود.',
+                'Enter a local SOCKS5 port; its listener is verified before Windows settings change.',
+              )),
+              TextField(
+                key: const Key('vpnSystemProxyPort'),
+                controller: controller,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'SOCKS5 port'),
+              ),
+            ]),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx, false),
+                  child: Text(AppStrings.of(ctx).pick('انصراف', 'Cancel'))),
+              FilledButton(onPressed: () => Navigator.pop(ctx, true),
+                  child: Text(AppStrings.of(ctx).pick('فعال', 'Enable'))),
+            ],
+          ),
+        );
+        if (accepted != true || !mounted) return;
+        port = int.tryParse(controller.text.trim());
+        if (port == null || port < 1025 || port > 65535) {
+          throw const FormatException('SYSTEM_PROXY_PORT_INVALID');
+        }
+      } finally {
+        controller.dispose();
+      }
+    }
+    if (!mounted) return;
+    setState(() => _systemProxyBusy = true);
+    try {
+      final output = await _systemProxyCommand(
+          enable ? 'Enable' : 'Disable', port);
+      if (enable
+          ? output != 'TWINCONNECT_SYSTEM_PROXY_ON $port'
+          : output != 'TWINCONNECT_SYSTEM_PROXY_OFF') {
+        throw const FormatException('SYSTEM_PROXY_RESULT_NOT_VERIFIED');
+      }
+      await _loadSystemProxyStatus();
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(
+          AppStrings.of(context).pick(
+            'تغییر پروکسی انجام نشد: $error',
+            'System proxy change failed: $error'))));
+      }
+      await _loadSystemProxyStatus();
+    } finally {
+      if (mounted) setState(() => _systemProxyBusy = false);
+    }
+  }
 
   Future<void> _loadRoutingSettings() async {
     try {
