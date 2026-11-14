@@ -60,8 +60,15 @@ function Test-Socks($port) {
     $stream.WriteTimeout = 1200
     $stream.Write([byte[]](5,1,0), 0, 3)
     $reply = New-Object byte[] 2
-    $count = $stream.Read($reply, 0, 2)
-    return ($count -eq 2 -and $reply[0] -eq 5 -and $reply[1] -eq 0)
+    # TCP is a stream: a valid SOCKS5 handshake can arrive in two reads.
+    # Read exactly two bytes rather than assuming the first Read fills it.
+    $received = 0
+    while ($received -lt $reply.Length) {
+      $count = $stream.Read($reply, $received, $reply.Length - $received)
+      if ($count -le 0) { return $false }
+      $received += $count
+    }
+    return ($reply[0] -eq 5 -and $reply[1] -eq 0)
   } catch { return $false }
   finally { $client.Dispose() }
 }
