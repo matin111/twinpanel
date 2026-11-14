@@ -78,9 +78,15 @@ if (!(Test-Path -LiteralPath $binary -PathType Leaf)) { throw 'APP_WFP_ENGINE_NO
 # interface and cannot safely be guarded by interface-based filters.
 $tunnel = $null
 if ($Action -eq 'Lock') {
+  # IncludeHidden is essential for installed, disconnected Wintun/WireGuard
+  # adapters: Get-NetAdapter's default view can omit these interfaces.
+  # Never substitute a physical NIC: only exact TwinConnect-owned aliases
+  # with a confirmed non-hardware interface are eligible.
   $tunnel = @('TwinConnectSB','TwinConnectAWG','TwinConnect') | Where-Object {
-    $adapter = Get-NetAdapter -Name $_ -ErrorAction SilentlyContinue
-    $adapter -and !$adapter.HardwareInterface
+    $alias = $_
+    $adapter = Get-NetAdapter -Name $alias -IncludeHidden -ErrorAction SilentlyContinue
+    $adapter -and !$adapter.HardwareInterface -and
+      $adapter.InterfaceDescription -notmatch 'Loopback'
   } | Select-Object -First 1
   if (!$tunnel) {
     throw 'APP_WFP_NO_VERIFIED_TUN_ADAPTER'
