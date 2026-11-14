@@ -63,7 +63,10 @@ bool TunnelLuid(const wchar_t* alias, UINT64* result) {
       luid.Value == 0) return false;
   MIB_IF_ROW2 row = {};
   row.InterfaceLuid = luid;
-  if (GetIfEntry2(&row) != NO_ERROR || row.OperStatus != IfOperStatusUp ||
+  // A persistent per-app guard must be armable BEFORE VPN connects.
+  // A verified virtual adapter may be temporarily Down; its LUID remains
+  // stable and the WFP rule will block direct egress until it comes Up.
+  if (GetIfEntry2(&row) != NO_ERROR ||
       row.InterfaceAndOperStatusFlags.HardwareInterface ||
       row.Type == IF_TYPE_SOFTWARE_LOOPBACK) return false;
   *result = luid.Value;
