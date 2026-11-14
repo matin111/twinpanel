@@ -165,6 +165,23 @@ void main() {
     expect(android, isNot(contains("if ((wireguard?.selected != true) && (cisco?.selected != true))")));
   });
 
+  test('Android quick connect shows real native diagnostics and no fake network figures', () {
+    final card = File('lib/android_connection_card.dart').readAsStringSync();
+    final native = File(
+      'native/android/kotlin/com/twinpanel/twinconnect/WireGuardRuntime.kt',
+    ).readAsStringSync();
+    final activity = File(
+      'native/android/kotlin/com/twinpanel/twinconnect/MainActivity.kt',
+    ).readAsStringSync();
+    expect(card, contains('loadFailClosed('));
+    expect(card, contains("Key('androidNetworkOverview')"));
+    expect(card, contains("'VPN error: "));
+    expect(native, contains('WIREGUARD_CONFIG_PARSE_FAILED'));
+    expect(native, contains('WIREGUARD_NATIVE_START_FAILED'));
+    expect(activity, contains('WIREGUARD_NATIVE_START_FAILED'));
+    expect(card, contains('wireGuardNoConfigs'));
+  });
+
   test('six dashboard locales and Arabic right-to-left are supported', () {
     final dashboard = File('lib/live_dashboard.dart').readAsStringSync();
     final localizer = File('lib/app_strings.dart').readAsStringSync();
