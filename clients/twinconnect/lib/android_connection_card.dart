@@ -11,6 +11,7 @@ import 'android_tunnel.dart';
 import 'android_singbox_tunnel.dart';
 import 'android_openvpn_tunnel.dart';
 import 'cisco_openconnect_profile.dart';
+import 'android_cisco_tunnel.dart';
 import 'app_strings.dart';
 import 'native_vpn_bridge.dart';
 import 'protocols.dart';
@@ -182,16 +183,35 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
         return;
       }
       if (_ciscoUp) {
-        final status = await _controller.ciscoStatus();
+        final status = await AndroidCiscoTunnel.instance.status();
         if (!mounted) return;
-        if (status['state'] != 'interface_up' ||
-            status['trafficRoutingVerified'] != true) {
+        if (!status.connected) {
           setState(() {
             _ciscoUp = false;
             _clearTelemetry();
+            _errorCode = 'CISCO_NATIVE_ENGINE_STOPPED';
           });
+        } else {
+          final now = DateTime.now();
+          final rx = status.rx, tx = status.tx;
+          setState(() {
+            if (rx != null && tx != null) {
+              final previous = _lastCountersAt;
+              final elapsed = previous == null ? 0 :
+                  now.difference(previous).inMilliseconds / 1000.0;
+              if (elapsed > 0.1 && _rxBytes != null && _txBytes != null) {
+                _downloadBps = rx >= _rxBytes! ? (rx - _rxBytes!) / elapsed : null;
+                _uploadBps = tx >= _txBytes! ? (tx - _txBytes!) / elapsed : null;
+              }
+              _rxBytes = rx; _txBytes = tx; _lastCountersAt = now;
+              _rxSamples.add(_downloadBps ?? 0);
+              _txSamples.add(_uploadBps ?? 0);
+              if (_rxSamples.length > 32) _rxSamples.removeAt(0);
+              if (_txSamples.length > 32) _txSamples.removeAt(0);
+            }
+          });
+          _maybeCheckInternet();
         }
-        if (_ciscoUp) _maybeCheckInternet();
         return;
       }
       final status = await _controller.status();
@@ -386,48 +406,48 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
   /// Cisco uses its own engine and authenticated panel profile. Never hand
   /// Cisco credentials to WireGuard or download secrets before readiness.
   Future<void> _connectCisco() async {
-    if (_busy || _up || _ciscoUp || !Platform.isAndroid ||
-        !widget.native.supports('cisco')) return;
-    setState(() {
-      _busy = true;
-      _errorCode = null;
-    });
+    if (_busy || _up || _openVpnUp || _ciscoUp ||
+        _singBoxProtocol != null || !Platform.isAndroid) return;
+    setState(() { _busy = true; _errorCode = null; });
+    var stage = 'CISCO_NATIVE_ENGINE_UNAVAILABLE';
     try {
-      final profiles = await TenantApi.fromBuildConfig()
-          .loadSessionNativeProfiles(
-            panel: widget.panel,
-            sessionToken: widget.sessionToken,
-            protocol: VpnProtocols.byCode('cisco')!,
-            native: widget.native,
-          );
-      final selectedId = widget.selectedNodeId;
+      // Missing native plugin fails before fetching private login material.
+      await AndroidCiscoTunnel.instance.initialize();
+      final policy = await _store.loadFailClosed(
+        widget.panel.namespace, widget.username,
+      );
+      final capabilities = await NativeVpnBridge.probe();
+      NativeVpnBridge.requireSafeToConnect(policy, capabilities);
+      stage = 'CISCO_PROFILE_FETCH_FAILED';
+      final profiles = await TenantApi.fromBuildConfig().loadSessionNativeProfiles(
+        panel: widget.panel,
+        sessionToken: widget.sessionToken,
+        protocol: VpnProtocols.byCode('cisco')!,
+        native: const NativeProtocolReadiness(supportedCodes: {'cisco'}),
+      );
       final inventory = widget.servers?.servers ?? const <AppServer>[];
+      final selectedId = widget.selectedNodeId;
       final choices = profiles.items.where((item) {
         final id = item['node_id']?.toString();
-        if (id == null || (selectedId != null && selectedId != id)) {
-          return false;
-        }
-        final match = inventory.where((node) => node.id == id).firstOrNull;
-        return inventory.isEmpty || match?.nodeOnline == true;
+        if (id == null || (selectedId != null && id != selectedId)) return false;
+        final node = inventory.where((n) => n.id == id).firstOrNull;
+        return inventory.isEmpty || node?.nodeOnline == true;
       }).toList(growable: false);
       if (choices.isEmpty) {
         throw const FormatException('CISCO_NO_AUTHORIZED_SERVER');
       }
       final item = choices.first;
       final profile = CiscoOpenConnectProfile.fromItem(item);
-      final response = await _controller.connectCisco(
-        profile: profile,
-        nativeProtocols: widget.native,
-      );
+      // No SHA-1 or unpinned TLS fallback: the upstream plugin trusts arbitrary
+      // certificates unless the app explicitly supplies a valid SHA-256 pin.
+      AndroidCiscoTunnel.requiredSha256Pin(profile);
+      stage = 'CISCO_NATIVE_CONNECTION_FAILED';
+      await AndroidCiscoTunnel.instance.connect(profile);
       if (!mounted) return;
-      if (response['state'] != 'interface_up' ||
-          response['trafficRoutingVerified'] != true) {
-        throw const FormatException('CISCO_NATIVE_TUNNEL_UNVERIFIED');
-      }
       final id = item['node_id']?.toString();
       setState(() {
         _ciscoUp = true;
-        _activeServer = inventory.where((node) => node.id == id).firstOrNull;
+        _activeServer = inventory.where((n) => n.id == id).firstOrNull;
         _activeServerName = _activeServer?.name ??
             (item['node'] is String ? item['node'] as String : null);
       });
@@ -435,7 +455,9 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
     } on FormatException catch (error) {
       if (mounted) setState(() => _errorCode = error.message);
     } catch (error) {
-      if (mounted) setState(() => _errorCode = _nativeError(error));
+      if (mounted) setState(() => _errorCode =
+          error is PlatformException ? error.code :
+          error is TenantApiException ? error.message : stage);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -445,13 +467,13 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
     if (_busy || !_ciscoUp) return;
     setState(() => _busy = true);
     try {
-      await _controller.stopCisco();
+      await AndroidCiscoTunnel.instance.disconnect();
       if (mounted) setState(() {
         _ciscoUp = false;
         _clearTelemetry();
       });
-    } catch (error) {
-      if (mounted) setState(() => _errorCode = _nativeError(error));
+    } catch (_) {
+      if (mounted) setState(() => _errorCode = 'CISCO_DISCONNECT_FAILED');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -767,7 +789,8 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
         entry.configRecordPresent &&
         (widget.native.supports(entry.protocol.code) ||
          AndroidSingBoxTunnel.supported.contains(entry.protocol.code) ||
-         entry.protocol.code == 'openvpn')).toList(growable: false);
+         entry.protocol.code == 'openvpn' ||
+         entry.protocol.code == 'cisco')).toList(growable: false);
     final chosen = requested != null
         ? available.where((e) => e.protocol.code == requested).firstOrNull
         : readyOptions.where((e) => e.protocol.code == 'wireguard').firstOrNull ??
@@ -789,8 +812,9 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
     final internetVerified = _activeVerifiedTransport && _publicIp != null;
     // A sing-box start acknowledgement is not proof of internet access.
     final ciscoSelected = chosen?.protocol.code == 'cisco';
-    final ciscoReady = ciscoSelected &&
-        widget.native.supports('cisco') &&
+    // Cisco runs through an independent installed Flutter VpnService plugin.
+    // The actual plugin is initialized before fetching credentials.
+    final ciscoReady = Platform.isAndroid && ciscoSelected &&
         chosen?.configRecordPresent == true;
     final openVpnSelected = chosen?.protocol.code == 'openvpn' &&
         chosen?.configRecordPresent == true;
