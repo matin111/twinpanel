@@ -533,12 +533,13 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
           r'(APP_WFP_[A-Z_0-9]+|WFP_[A-Z_0-9]+|VERIFIED_TWINCONNECT_TUNNEL_REQUIRED)')
             .firstMatch(raw);
         _appKillSwitchDiagnostic = matched?.group(0) ?? 'UNKNOWN_WFP_FAILURE';
-        final message = raw.contains('NO_TUN_INTERFACE') ||
+        final message = raw.contains('NO_VERIFIED_TUN_ADAPTER') ||
+                raw.contains('NO_TUN_INTERFACE') ||
                 raw.contains('VERIFIED_TWINCONNECT_TUNNEL_REQUIRED') ||
                 raw.contains('CONNECT_TO_TWINCONNECT_VPN')
             ? AppStrings.of(context).pick(
-                'رابط VPN شناسایی نشد. ابتدا به VPN وصل شو؛ این محافظ فقط روی اتصال TUN پشتیبانی می‌شود.',
-                'No VPN tunnel found. Connect first; this guard requires a TUN interface.')
+                'آداپتور مجازی TwinConnect پیدا نشد. یک‌بار با VPN وصل شو تا نصب شود.',
+                'TwinConnect virtual adapter was not found. Connect once to install it.')
             : raw.contains('ADMINISTRATOR_REQUIRED') ||
                     raw.contains('ACCESS_DENIED') ||
                     raw.contains('ELEVATED_COMMAND_FAILED')
