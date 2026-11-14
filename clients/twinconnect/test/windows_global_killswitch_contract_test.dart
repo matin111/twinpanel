@@ -222,6 +222,12 @@ void main() {
     expect(script, contains('TWINCONNECT_APP_UNLOCKED'));
     expect(script, contains(r'Remove-Item -LiteralPath $receipt'));
     expect(native, contains('APP_WFP_NATIVE_ARM_ERROR_'));
+    // Persistent Kill Switch must be switchable on with the VPN disconnected,
+    // provided its trusted virtual adapter was already provisioned.
+    expect(native, isNot(contains('row.OperStatus != IfOperStatusUp')));
+    expect(native, contains('row.InterfaceAndOperStatusFlags.HardwareInterface'));
+    expect(script, contains('APP_WFP_NO_VERIFIED_TUN_ADAPTER'));
+    expect(script, isNot(contains("Status -eq 'Up'")));
     expect(native, contains('const bool sameApp'));
     expect(native, contains('if (sameApp) {'));
     expect(native, contains('FwpmTransactionAbort0(h)'));
