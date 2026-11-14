@@ -50,13 +50,6 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
   bool _up = false;
   String? _errorCode;
 
-  PanelProtocolStatus? _entry(String code) {
-    for (final row in widget.catalog.entries) {
-      if (row.protocol.code == code) return row;
-    }
-    return null;
-  }
-
   @override
   void initState() {
     super.initState();
@@ -212,7 +205,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
             available.first;
     final nativeReady = Platform.isAndroid &&
         widget.native.supports('wireguard') &&
-        chosen != null && chosen.protocol.code == 'wireguard' &&
+        chosen?.protocol.code == 'wireguard' &&
         chosen.configRecordPresent;
     final protocolName = chosen?.protocol.name ?? (requested ?? '—');
     final connected = _up;
