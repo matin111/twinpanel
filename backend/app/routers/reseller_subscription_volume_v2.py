@@ -29,6 +29,7 @@ from ..models_reseller import (
 from ..mother_access import reseller_can_use_mother
 from ..services.quota_refresh import sync_subscription_quota_nodes
 from ..subscription_enforcement import queue_subscription_enforcement
+from ..services.subscription_cycle_reset_v1 import reset_subscription_period_usage, restore_after_period_change
 
 
 router = APIRouter(
@@ -147,6 +148,54 @@ def reseller_server_options_volume_v2(
             for node in rows
         ],
         "selection_policy": "exit_only",
+    }
+
+
+
+@router.post("/subscriptions/{subscription_id}/reset-usage")
+def reset_reseller_subscription_usage(
+    subscription_id: int,
+    reseller: Reseller = Depends(require_reseller),
+    db: Session = Depends(get_db),
+):
+    """Reset only the current consumed bytes; preserve quota/expiry/cursors.
+
+    Ownership is checked before locking. The row lock serializes this mutation
+    with concurrent quota collectors; audit and reset commit atomically.
+    """
+    _owned_link(db, int(reseller.id), subscription_id)
+    sub = (
+        db.query(Subscription)
+        .filter(Subscription.id == subscription_id)
+        .with_for_update()
+        .first()
+    )
+    if sub is None:
+        raise HTTPException(status_code=404, detail="اشتراک پیدا نشد")
+    if sub.status == SubscriptionStatus.CANCELED:
+        raise HTTPException(status_code=409, detail="اشتراک حذف‌شده قابل ریست نیست")
+    try:
+        limit_before = int(sub.traffic_limit_bytes or 0)
+        expiry_before = sub.expires_at
+        was_exhausted = limit_before > 0 and int(sub.traffic_used_bytes or 0) >= limit_before
+        used_before = reset_subscription_period_usage(
+            db, sub, origin="reseller_direct", actor_id=str(reseller.id),
+        )
+        restore_after_period_change(db, sub, was_exhausted=was_exhausted)
+        db.commit()
+        db.refresh(sub)
+    except Exception:
+        db.rollback()
+        raise
+    return {
+        "ok": True,
+        "subscription_id": sub.id,
+        "previous_usage_bytes": used_before,
+        "traffic_used_bytes": int(sub.traffic_used_bytes or 0),
+        "traffic_limit_bytes": int(sub.traffic_limit_bytes or 0),
+        "expires_at": sub.expires_at,
+        "status": getattr(sub.status, "value", sub.status),
+        "reset_usage": True,
     }
 
 
