@@ -45,6 +45,35 @@ void main() {
     expect(row.userCountCategory, 'سایر پلن‌ها');
   });
 
+  test('vitory category limits app filters to V2Ray and Hysteria2', () {
+    final plan = AppPlanClassification.fromJson({
+      'schema': 1,
+      'namespace': 'TPABCDEF',
+      'plan_id': 22,
+      'subscription_type': 'اشتراک ویتوری',
+      'user_count_category': 'یک کاربره',
+      'device_limit': 1,
+    });
+    expect(plan.permitsProtocol('v2ray'), isTrue);
+    expect(plan.permitsProtocol('hysteria2'), isTrue);
+    for (final other in ['cisco', 'wireguard', 'openvpn', 'tuic', 'socks5']) {
+      expect(plan.permitsProtocol(other), isFalse);
+    }
+  });
+
+  test('special category follows live plan catalogue instead of hardcoded limit', () {
+    final plan = AppPlanClassification.fromJson({
+      'schema': 1,
+      'namespace': 'TPABCDEF',
+      'plan_id': 23,
+      'subscription_type': 'ویژه',
+      'user_count_category': 'دو کاربره',
+      'device_limit': 2,
+    });
+    expect(plan.permitsProtocol('cisco'), isTrue);
+    expect(plan.permitsProtocol('hysteria2'), isTrue);
+  });
+
   test('rejects negative plan IDs', () {
     expect(() => AppPlanClassification.fromJson({
       'schema': 1,
