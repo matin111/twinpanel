@@ -60,7 +60,7 @@ def test_all_four_templates_display_unlimited_instead_of_zero():
 def test_admin_can_assign_plan_type_and_zero_user_limit():
     admin = source("components/legacy-plans-exact.tsx")
     assert 'pick("نوع اشتراک","Subscription type")' in admin
-    assert "min={0} value={draft.device_limit}" in admin
+    assert 'min={0} required value={draft.device_limit}' in admin
     assert 'pick("تعداد کاربر (۰ = نامحدود)","Users (0 = unlimited)")' in admin
 
 
