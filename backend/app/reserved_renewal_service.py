@@ -28,14 +28,19 @@ def reserve_renewal(db: Session, *, subscription_id: int, plan_id: int | None,
     if sub.status == SubscriptionStatus.CANCELED:
         raise HTTPException(409, "اشتراک لغوشده قابل تمدید نیست")
     # Changes of protocol/plan require a separate atomic migration before payment.
-    if plan_id is not None and sub.plan_id is not None and int(plan_id) != int(sub.plan_id):
+    if plan_id is not None and (sub.plan_id is None or int(plan_id) != int(sub.plan_id)):
         raise HTTPException(409, "تغییر پلن در تمدید رزروی فعلاً مجاز نیست")
     prior = db.execute(select(PendingSubscriptionRenewal).where(
         PendingSubscriptionRenewal.source == source,
         PendingSubscriptionRenewal.source_reference == reference)).scalar_one_or_none()
     if prior is not None:
-        if prior.subscription_id != subscription_id:
-            raise HTTPException(409, "شناسه درخواست برای اشتراک دیگری ثبت شده است")
+        if (
+            prior.subscription_id != subscription_id
+            or prior.plan_id != plan_id
+            or int(prior.traffic_bytes) != int(traffic_bytes)
+            or int(prior.duration_days) != int(duration_days)
+        ):
+            raise HTTPException(409, "شناسه درخواست با اطلاعات تمدید دیگری ثبت شده است")
         return prior
     item = PendingSubscriptionRenewal(
         subscription_id=subscription_id, plan_id=plan_id, plan_name=plan_name,
@@ -88,7 +93,7 @@ def activate_due_renewals(db: Session, limit: int = 100) -> int:
             sub.activation_duration_days = pending.duration_days
             # Protect existing credentials: incompatible plan changes must never
             # be marked activated without provisioning the corresponding protocols.
-            if pending.plan_id is not None and sub.plan_id is not None and int(pending.plan_id) != int(sub.plan_id):
+            if pending.plan_id is not None and (sub.plan_id is None or int(pending.plan_id) != int(sub.plan_id)):
                 raise RuntimeError("reserved_renewal_incompatible_plan_change")
             if pending.plan_id is not None:
                 sub.plan_id = pending.plan_id
