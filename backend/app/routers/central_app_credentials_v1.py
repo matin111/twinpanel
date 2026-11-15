@@ -19,16 +19,17 @@ from ..central_app_credentials import (
 from ..central_app_identity import central_app_entitled, installation_namespace, subscription_app_namespace
 from ..database import get_db
 from ..deps import get_current_user, require_admin, require_reseller
-from ..models import Subscription, User, Node, SubscriptionNode, NodeStatus, Plan
+from ..models import Subscription, User, Node, SubscriptionNode, NodeStatus, Plan, ProtocolCredential
 from ..models_reseller import Reseller, ResellerSubscription
 from ..plan_category_models import PlanCategoryAssignment
 from ..plan_node_models import PlanNode
+from ..central_app_protocols import normalize_protocol, protocol_catalog
 from ..system_release import ensure_installation_id
 from .account_delivery import _share_token, _share_url
 from .central_app_v1 import (
     BrandPreviewIn, ProtocolProfilesIn,
     subscription_app_brand_preview, subscription_protocol_catalog,
-    subscription_protocol_profiles,
+    subscription_protocol_profiles, _selected_client_protocols,
 )
 
 router = APIRouter(prefix="/v1/central-app", tags=["central-app-login"])
@@ -143,14 +144,27 @@ def session_protocols(
     sub: Subscription = Depends(_session_subscription),
     db: Session = Depends(get_db),
 ):
-    response = subscription_protocol_catalog(
-        BrandPreviewIn(
-            account_username=sub.account_username or "",
-            share_token=_share_token(sub),
-        ), db=db,
-    )
-    response.headers.update(_PRIVATE_HEADERS)
-    return response
+    """Read protocol permissions from the VERIFIED app session directly.
+
+    Do not reauthenticate through a share URL. Existing app credentials and
+    old migrated subscriptions may have different short-link delivery state.
+    No secrets, user names or VPN config contents leave this endpoint.
+    """
+    selected = _selected_client_protocols(db, sub.id)
+    rows = db.query(ProtocolCredential).filter(
+        ProtocolCredential.subscription_id == sub.id,
+        ProtocolCredential.is_active.is_(True),
+    ).all()
+    configured = {
+        value for row in rows
+        if (value := normalize_protocol(row.protocol))
+        and bool(row.config_text_encrypted)
+    }
+    return JSONResponse({
+        "schema": 1,
+        "namespace": subscription_app_namespace(db, sub),
+        "protocols": protocol_catalog(selected, configured),
+    }, headers=_PRIVATE_HEADERS)
 
 
 @router.get("/session/plan")
