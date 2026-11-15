@@ -86,22 +86,28 @@ void main() {
     expect(dashboard, isNot(contains("tr('از پنل', 'Panel')")));
   });
 
-  test('fastest server toggle immediately probes selects and connects', () {
+  test('Fast Server checks independent engines and per-protocol node scope', () {
     final dashboard = File('lib/live_dashboard.dart').readAsStringSync();
-    final begin = dashboard.indexOf('Future<void> _enableFastestAndConnect()');
-    final end = dashboard.indexOf('void _resetNetworkStats()', begin);
-    expect(begin, greaterThan(0));
-    expect(end, greaterThan(begin));
-    final action = dashboard.substring(begin, end);
-    // Latency and native protocol readiness are checked concurrently.
-    expect(action, contains('_probeAllNodes().then((_) => true)'));
+    final start = dashboard.indexOf('Future<void> _enableFastestAndConnect()');
+    final end = dashboard.indexOf('void _resetNetworkStats()', start);
+    expect(start, greaterThan(0));
+    expect(end, greaterThan(start));
+    final action = dashboard.substring(start, end);
     expect(action, contains('NativeVpnBridge.protocolReadiness()'));
-    expect(action, contains('final best = _fastestKnownIndex'));
-    expect(action, contains('entry.selected && entry.configRecordPresent'));
-    expect(action, contains('_selected = best'));
-    expect(action, contains('_autoFastest = true'));
+    expect(action, contains('_fastEngineReady(code, native)'));
+    expect(action, contains('_fastestAuthorizedIndex(code)'));
     expect(action, contains('await _toggleVpn()'));
+    expect(action, contains('_autoFastest = true'));
     expect(action, contains('NO_MEASURED_SERVER'));
+    final scope = dashboard.substring(
+      dashboard.indexOf('Future<int?> _fastestAuthorizedIndex('),
+      dashboard.indexOf('Future<void> _enableFastestAndConnect()'));
+    expect(scope, contains('api.loadSessionProtocolCatalog('));
+    expect(scope, contains('api.loadSessionNativeProfiles('));
+    expect(scope, contains('permittedNodeIds: entitledNodeIds'));
+    expect(scope, contains('measuredRtts: sampled'));
+    expect(scope, contains('WindowsOpenConnectTunnel.enginePresent()'));
+    expect(scope, contains('WindowsOpenVpnTunnel.enginePresent()'));
     expect(dashboard, contains('_enableFastestAndConnect();'));
     expect(dashboard, contains("Key('autoFastestServerToggle')"));
   });
