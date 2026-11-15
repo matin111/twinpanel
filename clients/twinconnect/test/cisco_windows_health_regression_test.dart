@@ -40,4 +40,23 @@ void main() {
     expect(source, contains("'openConnectStatus'"));
     expect(source, contains('CISCO_EGRESS_NOT_VERIFIED'));
   });
+  test('DTLS diagnosis needs explicit upstream evidence and remains secret-free', () {
+    final native = File('native/windows/twinconnect_openconnect.h')
+        .readAsStringSync();
+    final bridge = File('tools/install_windows_native.py')
+        .readAsStringSync();
+    final dart = File('lib/windows_openconnect_tunnel.dart')
+        .readAsStringSync();
+    final ui = File('lib/live_dashboard.dart').readAsStringSync();
+    expect(native, contains('has("established dtls connection")'));
+    expect(native, contains('has("dtls handshake failed")'));
+    expect(native, contains('if (!Running()) return "stopped";'));
+    expect(native, contains('return "dtls_unverified";'));
+    expect(bridge, contains('openConnectTransportMode'));
+    expect(dart, contains("invokeMethod<String>('openConnectTransportMode')"));
+    expect(ui, contains('DTLS/UDP established (engine log)'));
+    expect(ui, contains('DTLS/UDP failed; TCP fallback possible'));
+    expect(ui, contains('unawaited(_refreshCiscoTransportAfterDelay())'));
+  });
+
 }
