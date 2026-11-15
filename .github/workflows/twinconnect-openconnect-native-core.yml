@@ -84,6 +84,20 @@ jobs:
           source = source.replace(original, patched)
           nettle_makefile.write_text(source)
           print("Patched target GMP include and library search paths for Nettle")
+
+          # GnuTLS independently checks for -lgmp after detecting hogweed.
+          # Use the target GMP archive from the local cross-build sysroot.
+          source = nettle_makefile.read_text()
+          original = 'cd $(GNUTLS_BUILD) && ../../$(GNUTLS_SRC)/configure $(CONFIGURE_ARGS) \\'
+          patched = (
+              'cd $(GNUTLS_BUILD) && ../../$(GNUTLS_SRC)/configure $(CONFIGURE_ARGS) \\'
+              '\n\t\tCPPFLAGS="-I$(OC_SYSROOT)/include" \\'
+              '\n\t\tLDFLAGS="-L$(OC_SYSROOT)/lib" \\'
+          )
+          if source.count(original) != 1:
+              raise SystemExit("Unexpected GnuTLS configure recipe")
+          nettle_makefile.write_text(source.replace(original, patched))
+          print("Patched GnuTLS target GMP link search path")
           PY
 
       - name: Build actual libopenconnect for arm64
