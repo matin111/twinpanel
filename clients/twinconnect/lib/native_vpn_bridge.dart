@@ -24,8 +24,9 @@ class NativeVpnBridge {
 
   static Future<NativeVpnCapabilities> probe() async {
     final os = platform;
-    if (os != VpnPlatform.android && os != VpnPlatform.windows) {
-      // iOS/macOS have no native VPN bridge yet.
+    if (os != VpnPlatform.android && os != VpnPlatform.windows &&
+        os != VpnPlatform.ios) {
+      // macOS has no native VPN bridge yet.
       return NativeVpnCapabilities.unavailable(os);
     }
     try {
@@ -137,8 +138,9 @@ class NativeVpnBridge {
     NativeVpnCapabilities? validatedCapabilities,
   }) async {
     // Missing plugin is expected until real protocol engines are built.
-    if (platform != VpnPlatform.android && platform != VpnPlatform.windows) {
-      // No iOS/macOS protocol adapter has been installed.
+    if (platform != VpnPlatform.android && platform != VpnPlatform.windows &&
+        platform != VpnPlatform.ios) {
+      // No macOS protocol adapter has been installed.
       return const NativeProtocolReadiness(supportedCodes: {});
     }
     // This additional OS-level probe is mandatory: a plugin must not report
