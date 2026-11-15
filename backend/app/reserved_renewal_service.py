@@ -27,6 +27,23 @@ def reserve_renewal(db: Session, *, subscription_id: int, plan_id: int | None,
         raise HTTPException(404, "اشتراک پیدا نشد")
     if sub.status == SubscriptionStatus.CANCELED:
         raise HTTPException(409, "اشتراک لغوشده قابل تمدید نیست")
+    # Legacy admin and reseller flows may specify ONLY days or ONLY traffic.
+    # Missing dimension means "retain current period's allowance", never
+    # "make the next period unlimited". Resolve under the subscription lock.
+    if traffic_bytes == 0:
+        traffic_bytes = max(0, int(sub.traffic_limit_bytes or 0))
+    if duration_days == 0:
+        from .models import Plan
+        current_plan = db.get(Plan, sub.plan_id) if sub.plan_id else None
+        duration_days = int(getattr(current_plan, "duration_days", 0) or 0)
+        if duration_days <= 0:
+            duration_days = int(sub.activation_duration_days or 0)
+        if duration_days <= 0 and sub.expires_at and sub.starts_at:
+            duration_days = max(0, (sub.expires_at - sub.starts_at).days)
+    if duration_days <= 0:
+        raise HTTPException(422, "مدت دوره تمدید باید مشخص باشد")
+    if traffic_bytes <= 0:
+        raise HTTPException(422, "حجم دوره تمدید باید مشخص باشد")
     if sub.expires_at is None and int(sub.traffic_limit_bytes or 0) <= 0:
         raise HTTPException(409, "اشتراک بدون انقضای حجم و تاریخ، زمان فعال‌سازی تمدید ندارد")
     # Changes of protocol/plan require a separate atomic migration before payment.
