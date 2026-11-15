@@ -49,17 +49,41 @@ jobs:
           app = Path("ios/Runner/AppDelegate.swift")
           bridge = Path("ios_native/TwinConnectIOSVpnBridge.swift")
           source = app.read_text()
-          marker = "GeneratedPluginRegistrant.register(with: self)"
-          if source.count(marker) != 1:
-              raise SystemExit("Cannot locate the Flutter plugin registration anchor")
-          call = """if let controller = window?.rootViewController as? FlutterViewController {
-                  TwinConnectIOSVpnBridge.register(binaryMessenger: controller.binaryMessenger)
-              }"""
-          source = source.replace(marker, marker + "\n    " + call)
           native = bridge.read_text()
           for declaration in ("import Foundation", "import Flutter", "import NetworkExtension"):
-              native = native.replace(declaration + "\n", "")
-          app.write_text("import NetworkExtension\n" + source + "\n" + native)
+              native = native.replace(declaration + "\\n", "")
+          # Flutter has two supported iOS templates:
+          # legacy AppDelegate registers against self; modern scene-based
+          # AppDelegate registers on FlutterImplicitEngineBridge.pluginRegistry.
+          import re
+          legacy = re.search(
+              r"GeneratedPluginRegistrant\\.register\\(with:\\s*self\\)",
+              source)
+          modern = re.search(
+              r"GeneratedPluginRegistrant\\.register\\(with:\\s*engineBridge\\.pluginRegistry\\)",
+              source)
+          if legacy and not modern:
+              registration = """
+                  if let controller = window?.rootViewController as? FlutterViewController {
+                      TwinConnectIOSVpnBridge.register(binaryMessenger: controller.binaryMessenger)
+                  }
+              """
+              anchor = legacy
+          elif modern and not legacy:
+              registration = """
+                  if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "TwinConnectIOSVpnBridge") {
+                      TwinConnectIOSVpnBridge.register(binaryMessenger: registrar.messenger())
+                  }
+              """
+              anchor = modern
+          else:
+              raise SystemExit(
+                  "Unsupported AppDelegate template; inspect ios/Runner/AppDelegate.swift:\\n"
+                  + source[:5000])
+          source = (
+              source[:anchor.end()] + "\\n" + registration +
+              source[anchor.end():])
+          app.write_text("import NetworkExtension\\n" + source + "\\n" + native)
           PY
       - name: Type-check packet tunnel provider against iOS Simulator SDK
         shell: bash
