@@ -11,7 +11,8 @@ import plistlib
 root = Path(__file__).resolve().parents[1]
 window = root / "macos/Runner/MainFlutterWindow.swift"
 native = root / "macos_native/TwinConnectMacOSVPNBridge.swift"
-if not window.is_file() or not native.is_file():
+control = root / "macos_native/TwinConnectMacOSVPNControl.swift"
+if not window.is_file() or not native.is_file() or not control.is_file():
     raise SystemExit("macOS Flutter project / native bridge not found")
 
 content = window.read_text(encoding="utf-8")
@@ -27,6 +28,9 @@ if "TwinConnectMacOSVPNBridge.register(" not in content:
 marker = "// TWINCONNECT_MACOS_NATIVE_BRIDGE_V1"
 if marker not in content:
     content = content.rstrip() + "\n\n" + marker + "\n" + native.read_text(encoding="utf-8")
+control_marker = "// TWINCONNECT_MACOS_CONTROL_V1"
+if control_marker not in content:
+    content = content.rstrip() + "\n\n" + control_marker + "\n" + control.read_text(encoding="utf-8")
 window.write_text(content, encoding="utf-8")
 
 # App sandbox requires a client-network entitlement for license discovery,
