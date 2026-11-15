@@ -3154,12 +3154,23 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   /// The panel's current category and subscription catalog decide which
   /// protocol chips can appear. Never display all 16 merely because those
   /// engines are compiled into TwinConnect.
-  bool _protocolEntitled(String code) {
+  bool _protocolInPlan(String code) {
     if (widget.simulatorPreview) return true; // Offline layout fixture only.
-    final selected = widget.catalog?.entries.any(
+    final plan = widget.plan;
+    if (plan != null && !plan.permitsProtocol(code)) return false;
+    // New panels return the editor's exact whitelist, independent of
+    // whether this account's credential has been provisioned yet.
+    if (plan?.allowedProtocolCodes != null) return true;
+    // Older panels: show only account-authorized flags; never all 16.
+    return widget.catalog?.entries.any(
         (entry) => entry.protocol.code == code && entry.selected) ?? false;
-    if (!selected) return false;
-    return widget.plan?.permitsProtocol(code) ?? true;
+  }
+
+  bool _protocolEntitled(String code) {
+    if (!_protocolInPlan(code)) return false;
+    if (widget.simulatorPreview) return true;
+    return widget.catalog?.entries.any(
+        (entry) => entry.protocol.code == code && entry.selected) ?? false;
   }
 
   bool get _xrayAuthorized => _protocolEntitled('v2ray') &&
@@ -4617,7 +4628,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           for (final entry in <(String, String)>[
             ('all', tr('همه', 'All')),
             for (final p in VpnProtocols.all)
-              if (_protocolEntitled(p.code)) (p.code, p.name),
+              if (_protocolInPlan(p.code)) (p.code, p.name),
           ])
             ChoiceChip(
               key: Key('devFilter_${entry.$1}'),
@@ -4631,7 +4642,9 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
               side: BorderSide(color: _filter == entry.$1 ? purple : line),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12)),
-              onSelected: (_) {
+              onSelected: entry.$1 != 'all' &&
+                      !_protocolEntitled(entry.$1)
+                  ? null : (_) {
                 setState(() {
                   // A protocol chip is an explicit manual choice.
                   _filter = entry.$1;
