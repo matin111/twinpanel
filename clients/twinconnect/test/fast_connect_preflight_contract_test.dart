@@ -27,8 +27,8 @@ void main() {
     // WireGuard is native, but independently installed engines must not be
     // silently discarded just because the OS bridge reports only WireGuard.
     expect(fast, contains('_fastEngineReady(code, native)'));
-    expect(fast, contains('WindowsOpenConnectTunnel.enginePresent()'));
-    expect(fast, contains('WindowsOpenVpnTunnel.enginePresent()'));
+    expect(ui, contains('WindowsOpenConnectTunnel.enginePresent()'));
+    expect(ui, contains('WindowsOpenVpnTunnel.enginePresent()'));
     expect(fast, contains('_fastestAuthorizedIndex(code)'));
     expect(fast, contains("prefs.getString('twinconnect_last_verified_protocol')"));
     expect(fast, contains("_filter != 'all'"));
