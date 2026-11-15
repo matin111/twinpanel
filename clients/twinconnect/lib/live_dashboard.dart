@@ -2561,6 +2561,10 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     _refreshNativeReadiness();
     _refreshVpnStatus();
     unawaited(_restoreCachedXrayInbounds());
+    if (_isVitoryPlan) {
+      if (_xrayAuthorized) unawaited(_loadXrayGroups(refresh: true));
+      unawaited(_loadVitoryHysteriaNodes());
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && (widget.servers?.servers.isNotEmpty ?? false)) {
         _probeAllNodes();
@@ -2588,6 +2592,13 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     }
     if (accountChanged ||
         oldWidget.panel.apiOrigin != widget.panel.apiOrigin) {
+      ++_vitoryProfileRevision;
+      _vitoryHysteriaNodeIds = null;
+      _vitoryHysteriaLoading = false;
+      _vitoryHysteriaError = null;
+      if (_isVitoryPlan) {
+        unawaited(_loadVitoryHysteriaNodes(refresh: true));
+      }
       _socks5AssignedNodeIds = null;
       _socks5NodesError = null;
       // No in-memory Xray credentials may cross tenants or accounts.
@@ -2608,6 +2619,9 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       // This never changes credentials or connection state.
       if (_xrayAuthorized) {
         unawaited(_loadXrayGroups(refresh: true));
+      }
+      if (_isVitoryPlan) {
+        unawaited(_loadVitoryHysteriaNodes(refresh: true));
       }
       _xrayGroups = _assignedXrayGroups(_xrayGroups);
       if (_xrayGroups.isEmpty && !_xrayGroupsLoaded) {
@@ -3180,6 +3194,88 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   bool get _xrayAuthorized => _protocolEntitled('v2ray') &&
       (widget.catalog?.entries.any((entry) =>
         entry.protocol.code == 'v2ray' && entry.configRecordPresent) ?? false);
+
+  bool get _isVitoryPlan {
+    if (widget.simulatorPreview) return false;
+    final kind = widget.plan?.subscriptionType.trim().toLowerCase() ?? '';
+    return kind.contains('ویتوری') ||
+        kind.contains('vitory') || kind.contains('v2ray');
+  }
+
+  Set<String>? _vitoryHysteriaNodeIds;
+  bool _vitoryHysteriaLoading = false;
+  String? _vitoryHysteriaError;
+  int _vitoryProfileRevision = 0;
+
+  /// Restrict Vitory's Hysteria node list to actual, syntactically valid
+  /// per-account profiles. An inventory assignment alone is not sufficient.
+  Future<void> _loadVitoryHysteriaNodes({bool refresh = false}) async {
+    if (!_isVitoryPlan || !_protocolEntitled('hysteria2') ||
+        _vitoryHysteriaLoading ||
+        (!refresh && _vitoryHysteriaNodeIds != null)) return;
+    final revision = ++_vitoryProfileRevision;
+    final username = widget.username;
+    final namespace = widget.panel.namespace;
+    final origin = widget.panel.apiOrigin;
+    final token = widget.sessionToken;
+    setState(() {
+      _vitoryHysteriaLoading = true;
+      _vitoryHysteriaError = null;
+    });
+    try {
+      final response = await TenantApi.fromBuildConfig()
+          .loadSessionNativeProfiles(
+        panel: widget.panel,
+        sessionToken: token,
+        protocol: VpnProtocols.byCode('hysteria2')!,
+        native: const NativeProtocolReadiness(
+          supportedCodes: {'hysteria2'},
+        ),
+      );
+      if (!mounted || revision != _vitoryProfileRevision ||
+          username != widget.username ||
+          namespace != widget.panel.namespace ||
+          origin != widget.panel.apiOrigin ||
+          token != widget.sessionToken) return;
+      final allowed = widget.servers?.servers.map((s) => s.id).toSet()
+          ?? <String>{};
+      final available = <String>{};
+      for (final item in response.items) {
+        final id = item['node_id']?.toString();
+        if (id == null || !allowed.contains(id)) continue;
+        try {
+          SingBoxProfileValidator.validateOutbound(
+              protocolCode: 'hysteria2', item: item);
+          available.add(id);
+        } catch (_) {
+          // Never advertise a server that the local transport validator
+          // would reject when connecting.
+        }
+      }
+      setState(() => _vitoryHysteriaNodeIds = available);
+    } catch (_) {
+      if (mounted && revision == _vitoryProfileRevision) {
+        setState(() => _vitoryHysteriaError =
+            'VITORY_HYSTERIA_PROFILES_UNAVAILABLE');
+      }
+    } finally {
+      if (mounted && revision == _vitoryProfileRevision) {
+        setState(() => _vitoryHysteriaLoading = false);
+      }
+    }
+  }
+
+  bool _vitoryNodeHasProfile(String nodeId) {
+    if (!_isVitoryPlan) return true;
+    final hasXray = _inboundsForNode(nodeId).isNotEmpty;
+    final hasHysteria = _vitoryHysteriaNodeIds?.contains(nodeId) ?? false;
+    return switch (_filter) {
+      'v2ray' => hasXray,
+      'hysteria2' => hasHysteria,
+      'all' => hasXray || hasHysteria,
+      _ => false,
+    };
+  }
 
   List<XrayServerProfiles> _assignedXrayGroups(
       List<XrayServerProfiles> groups) {
@@ -4657,6 +4753,13 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                 });
                 _persistManualConnectionChoice();
                 if (entry.$1 == 'v2ray') _loadXrayGroups();
+                if (_isVitoryPlan &&
+                    (entry.$1 == 'hysteria2' || entry.$1 == 'all')) {
+                  unawaited(_loadVitoryHysteriaNodes());
+                  if (_xrayAuthorized) {
+                    unawaited(_loadXrayGroups());
+                  }
+                }
                 if (entry.$1 == 'socks5') {
                   unawaited(_refreshSocks5AvailableNodes());
                 }
@@ -4675,7 +4778,9 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           _protocolEntitled(_filter);
       final matching = <int>[
         for (int i = 0; i < demoServers.length; i++)
-          if (allowedFilter && (_filter != 'socks5' ||
+          if (allowedFilter &&
+              _vitoryNodeHasProfile(widget.servers!.servers[i].id) &&
+              (_filter != 'socks5' ||
               _socks5AssignedNodeIds == null ||
               _socks5AssignedNodeIds!.contains(widget.servers!.servers[i].id)) &&
               (query.isEmpty ||
