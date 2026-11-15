@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:developer' as developer;
 
 import 'package:openvpn_flutter/openvpn_flutter.dart';
 
@@ -33,11 +34,28 @@ class AndroidOpenVpnTunnel {
       required String name}) async {
     await initialize();
     final config = OpenVpnProfileValidator.validate(profile);
-    // Log only static transport metadata, never endpoints, passwords,
-    // certificates or user-supplied profile lines. This makes it possible
-    // to compare Android and Windows transport/MTU without exposing secrets.
-    // Engine owns tunnel configuration. Do not modify MTU, cipher or protocol
-    // until a measured comparison with the Windows profile is available.
+    // Only static configuration properties are logged for performance
+    // comparisons. Never emit remote addresses, credentials or certificates.
+    String directiveValue(String key) {
+      for (final line in config.split('\n')) {
+        final value = line.trim().toLowerCase();
+        if (!value.startsWith(key + ' ')) continue;
+        final field = value.substring(key.length).trim();
+        if (key == 'proto' && (field == 'udp' || field == 'tcp-client')) {
+          return field;
+        }
+        if ((key == 'tun-mtu' || key == 'mssfix') &&
+            RegExp(r'^[0-9]{2,5}').hasMatch(field) &&
+            int.tryParse(field) != null) {
+          return field;
+        }
+      }
+      return 'default';
+    }
+    developer.log('OPENVPN_CONFIG_PROTO=' + directiveValue('proto') +
+        ' MTU=' + directiveValue('tun-mtu') +
+        ' MSS=' + directiveValue('mssfix'),
+        name: 'TwinOpenVpnDiagnostics');
     final engine = _engine!;
     _verified = false;
     final username = profile['username'] ?? profile['user'];
