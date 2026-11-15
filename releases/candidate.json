@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.846",
-  "source_sha": "5e9272235f467edc81f5e6eaaacbfd2fc3cac158",
+  "version": "1.1.0-rc.847",
+  "source_sha": "e22de5f89c2e252b0cc9774290bfc7476f0e9d91",
   "notes": {
-    "fa": "تاریخچه واقعی اشتراک‌های نماینده در کارت اشتراک شامل رویدادها و تمدیدهای رزرو، مستقل از صفحه مشتریان؛ نوار پیشرفت مصرف حجم در کارت‌های اشتراک ادمین هم‌ظاهر با نماینده؛ بدون تغییر حجم، اتصال و اعتبار اشتراک‌ها.",
-    "en": "Add subscription history popup to reseller subscription cards, showing ownership-scoped events and reserved renewals, and a visual quota usage progress bar for admin subscription cards. No balance or connection changes."
+    "fa": "تکمیل تاریخچه مالی کاربران در پنل ادمین و نمایندگان: نمایش سفارش‌های خرید اشتراک از سایت و ربات نماینده، فروش‌های دستی نماینده، روش و وضعیت پرداخت، شناسه اشتراک و رسید در کنار گردش کیف پول؛ جلوگیری از تکرار سفارش‌ها و رعایت دسترسی هر نمایندگی؛ بدون تغییر مالی در حساب کاربران.",
+    "en": "Expand admin and reseller customer financial history to include site subscription purchases, reseller bot orders and manual reseller sales, payment states, receipt references and subscription IDs alongside wallet ledger. Deduplicate bot/manual sale records; read-only and tenant-scoped."
   }
 }
