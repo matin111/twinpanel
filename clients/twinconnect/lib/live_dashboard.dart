@@ -2602,8 +2602,12 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         oldWidget.catalog != widget.catalog) {
       // The first session inventory often arrives after the dashboard
       // initializes; retry restore once authorized nodes become available.
-      if (_filter == 'v2ray' && _xrayAuthorized && !_xrayGroupsLoaded) {
-        unawaited(_loadXrayGroups());
+      // A node added to this account after the first fetch (including
+      // Germany/USA/Finland) must trigger an actual refresh of the inbound
+      // feed. Re-filtering the old in-memory groups cannot discover it.
+      // This never changes credentials or connection state.
+      if (_xrayAuthorized) {
+        unawaited(_loadXrayGroups(refresh: true));
       }
       _xrayGroups = _assignedXrayGroups(_xrayGroups);
       if (_xrayGroups.isEmpty && !_xrayGroupsLoaded) {
