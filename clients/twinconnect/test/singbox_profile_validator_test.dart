@@ -28,7 +28,10 @@ void main() {
         'type': entry.value,
         'server': 'vpn.example.org',
         'server_port': 443,
-        'password': 'confidential',
+        if (entry.key == 'snell') ...{
+          'psk': 'confidential',
+          'version': 4,
+        } else 'password': 'confidential',
         if (entry.key == 'socks5') ...{
           'username': 'synthetic',
           'version': '5',
@@ -41,7 +44,8 @@ void main() {
       final parsed = SingBoxProfileValidator.validateOutbound(
         protocolCode: entry.key, item: profile);
       expect(parsed['type'], entry.value);
-      expect(parsed['password'], 'confidential');
+      expect(entry.key == 'snell' ? parsed['psk'] : parsed['password'],
+          'confidential');
       expect(identical(parsed, outbound), isFalse);
     });
   }
@@ -166,6 +170,38 @@ void main() {
     (outer['tls'] as Map)['insecure'] = true;
     expect(() => SingBoxProfileValidator.validateShadowTlsChain(item),
         throwsFormatException);
+  });
+
+  test('Snell v6 requires a valid 12-255 byte PSK', () {
+    Map<String, dynamic> profile(String psk) => {
+      'outbound': {
+        'type': 'snell',
+        'server': 'vpn.example.org',
+        'server_port': 443,
+        'version': 6,
+        'psk': psk,
+      },
+    };
+    expect(() => SingBoxProfileValidator.validateOutbound(
+        protocolCode: 'snell', item: profile('short')),
+        throwsFormatException);
+    final result = SingBoxProfileValidator.validateOutbound(
+        protocolCode: 'snell', item: profile('validSnellKey123'));
+    expect(result['psk'], 'validSnellKey123');
+    expect(result['version'], 6);
+  });
+
+  test('unsupported Snell v5 QUIC is not disguised as TCP v4', () {
+    expect(() => SingBoxProfileValidator.validateOutbound(
+      protocolCode: 'snell',
+      item: {'outbound': {
+        'type': 'snell',
+        'server': 'vpn.example.org',
+        'server_port': 443,
+        'version': 5,
+        'psk': 'secret',
+      }},
+    ), throwsFormatException);
   });
 
   test('ShadowTLS detour cannot be flattened to a single node', () {
