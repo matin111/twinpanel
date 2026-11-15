@@ -41,6 +41,32 @@ jobs:
           cache: false
       - name: Generate native iOS Runner project
         run: flutter create --platforms=ios --org com.twinpanel --project-name twinconnect .
+      - name: Install iOS native capability bridge into generated Runner
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          app = Path("ios/Runner/AppDelegate.swift")
+          bridge = Path("ios_native/TwinConnectIOSVpnBridge.swift")
+          source = app.read_text()
+          marker = "GeneratedPluginRegistrant.register(with: self)"
+          if source.count(marker) != 1:
+              raise SystemExit("Cannot locate the Flutter plugin registration anchor")
+          call = """if let controller = window?.rootViewController as? FlutterViewController {
+                  TwinConnectIOSVpnBridge.register(binaryMessenger: controller.binaryMessenger)
+              }"""
+          source = source.replace(marker, marker + "\n    " + call)
+          native = bridge.read_text()
+          for declaration in ("import Foundation", "import Flutter", "import NetworkExtension"):
+              native = native.replace(declaration + "\n", "")
+          app.write_text("import NetworkExtension\n" + source + "\n" + native)
+          PY
+      - name: Type-check packet tunnel provider against iOS Simulator SDK
+        shell: bash
+        run: |
+          xcrun swiftc -typecheck -target arm64-apple-ios17.0-simulator \
+            -sdk "$(xcrun --sdk iphonesimulator --show-sdk-path)" \
+            ios_native/PacketTunnelProvider.swift
       - name: Fetch Flutter packages
         run: flutter pub get
       - name: Check static analysis and Flutter tests
