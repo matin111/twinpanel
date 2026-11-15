@@ -2087,7 +2087,10 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       return;
     }
     if (!Platform.isWindows) {
-      setState(() => _vpnError = 'WINDOWS_ENGINE_REQUIRED');
+      // Selecting a server must never launch a Windows-only VPN process or
+      // display a misleading Windows engine error on Android/iPhone.
+      // The platform-specific Connect control remains independently gated
+      // until a verified native VPN tunnel engine is installed.
       return;
     }
     if (_filter != 'all' && _filter != 'wireguard') {
