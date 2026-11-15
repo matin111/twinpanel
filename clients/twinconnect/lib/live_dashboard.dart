@@ -18,6 +18,7 @@ import 'server_inventory.dart';
 import 'server_latency.dart';
 import 'fast_server_selection.dart';
 import 'connection_choice_store.dart';
+import 'vitory_server_visibility.dart';
 import 'windows_singbox_preflight.dart';
 import 'singbox_profile_validator.dart';
 import 'shadowtls_chain.dart';
@@ -2595,6 +2596,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       ++_vitoryProfileRevision;
       _vitoryHysteriaNodeIds = null;
       _vitoryHysteriaLoading = false;
+      _vitoryHysteriaRefreshPending = false;
       _vitoryHysteriaError = null;
       if (_isVitoryPlan) {
         unawaited(_loadVitoryHysteriaNodes(refresh: true));
@@ -2610,7 +2612,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       _xrayInboundRtts.clear();
       unawaited(_restoreCachedXrayInbounds());
     } else if (oldWidget.servers != widget.servers ||
-        oldWidget.catalog != widget.catalog) {
+        oldWidget.catalog != widget.catalog ||
+        oldWidget.plan != widget.plan) {
       // The first session inventory often arrives after the dashboard
       // initializes; retry restore once authorized nodes become available.
       // A node added to this account after the first fetch (including
@@ -3204,15 +3207,19 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
 
   Set<String>? _vitoryHysteriaNodeIds;
   bool _vitoryHysteriaLoading = false;
+  bool _vitoryHysteriaRefreshPending = false;
   String? _vitoryHysteriaError;
   int _vitoryProfileRevision = 0;
 
   /// Restrict Vitory's Hysteria node list to actual, syntactically valid
   /// per-account profiles. An inventory assignment alone is not sufficient.
   Future<void> _loadVitoryHysteriaNodes({bool refresh = false}) async {
-    if (!_isVitoryPlan || !_protocolEntitled('hysteria2') ||
-        _vitoryHysteriaLoading ||
-        (!refresh && _vitoryHysteriaNodeIds != null)) return;
+    if (!_isVitoryPlan || !_protocolEntitled('hysteria2')) return;
+    if (_vitoryHysteriaLoading) {
+      if (refresh) _vitoryHysteriaRefreshPending = true;
+      return;
+    }
+    if (!refresh && _vitoryHysteriaNodeIds != null) return;
     final revision = ++_vitoryProfileRevision;
     final username = widget.username;
     final namespace = widget.panel.namespace;
@@ -3261,6 +3268,10 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     } finally {
       if (mounted && revision == _vitoryProfileRevision) {
         setState(() => _vitoryHysteriaLoading = false);
+        if (_vitoryHysteriaRefreshPending) {
+          _vitoryHysteriaRefreshPending = false;
+          unawaited(_loadVitoryHysteriaNodes(refresh: true));
+        }
       }
     }
   }
@@ -3269,12 +3280,11 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     if (!_isVitoryPlan) return true;
     final hasXray = _inboundsForNode(nodeId).isNotEmpty;
     final hasHysteria = _vitoryHysteriaNodeIds?.contains(nodeId) ?? false;
-    return switch (_filter) {
-      'v2ray' => hasXray,
-      'hysteria2' => hasHysteria,
-      'all' => hasXray || hasHysteria,
-      _ => false,
-    };
+    return VitoryServerVisibility.shows(
+      protocolFilter: _filter,
+      hasValidV2rayInbound: hasXray,
+      hasValidHysteriaProfile: hasHysteria,
+    );
   }
 
   List<XrayServerProfiles> _assignedXrayGroups(
@@ -4952,6 +4962,21 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                                'Retry authorized SOCKS5 nodes')),
               ),
             ),
+          if (_isVitoryPlan && _vitoryHysteriaLoading &&
+              (_filter == 'all' || _filter == 'hysteria2'))
+            const Padding(
+              padding: EdgeInsets.all(12),
+              child: Center(child: CircularProgressIndicator()),
+            ),
+          if (_isVitoryPlan && _vitoryHysteriaError != null &&
+              (_filter == 'all' || _filter == 'hysteria2'))
+            TextButton.icon(
+              onPressed: () => _loadVitoryHysteriaNodes(refresh: true),
+              icon: const Icon(Icons.refresh_rounded),
+              label: Text(tr(
+                'دریافت دوباره سرورهای هیستریا',
+                'Retry loading Hysteria servers')),
+            ),
           if (_filter == 'v2ray' && _xrayGroupsLoading)
             const Padding(
               padding: EdgeInsets.all(12),
@@ -5021,6 +5046,9 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                      'This protocol is not available in your plan category.')
                 : widget.servers == null
                 ? tr('در حال دریافت سرورها...', 'Loading servers...')
+                : _isVitoryPlan
+                ? tr('هیچ سروری با پروفایل معتبر این پروتکل برای اشتراک شما دریافت نشده است.',
+                     'No server with a valid profile for this protocol was delivered to your account.')
                 : tr('سروری پیدا نشد', 'No servers found'),
                 align: TextAlign.center, color: sub),
             ),
