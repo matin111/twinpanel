@@ -17,15 +17,16 @@ final class TwinConnectIOSVpnBridge {
         channel.setMethodCallHandler { call, result in
             switch call.method {
             case "getCapabilities":
+                let wireGuardReady = TwinConnectIOSVPNControl.backendLinked()
                 result([
                     "contractVersion": 1,
-                    "engineReady": false,
-                    "fullTunnel": false,
+                    "engineReady": wireGuardReady,
+                    "fullTunnel": wireGuardReady,
                     "includeApps": false,
                     "excludeApps": false,
                     "killSwitchEnforced": false,
-                    "dnsGuard": false,
-                    "ipv6Guard": false,
+                    "dnsGuard": wireGuardReady,
+                    "ipv6Guard": wireGuardReady,
                     "localNetworkBypass": false,
                     "autoConnect": false,
                     "autoReconnect": false,
@@ -36,7 +37,9 @@ final class TwinConnectIOSVpnBridge {
                 // and its protocol transport are installed on this device.
                 result([
                     "contractVersion": 1,
-                    "supportedProtocols": [String]()
+                    "supportedProtocols":
+                        TwinConnectIOSVPNControl.backendLinked()
+                            ? ["wireguard"] : [String]()
                 ] as [String: Any])
             case "getEngineInstallation":
                 TwinConnectIOSVPNControl.checkInstallation(result)
