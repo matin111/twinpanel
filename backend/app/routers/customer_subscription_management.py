@@ -25,6 +25,7 @@ from ..renewal_models import (
     SubscriptionRenewalOrder,
 )
 from ..store_models import StoreOrder
+from ..subscription_renewal_status_v1 import next_reserved_renewal
 
 from .store import _order_out
 from .subscriptions import selected_protocols
@@ -233,6 +234,8 @@ def manage_subscription(
         "plan_id": sub.plan_id,
         "plan_name":
             plan.name if plan else None,
+
+        "reserved_renewal": next_reserved_renewal(db, sub.id),
 
         "account_username":
             account_username or None,
