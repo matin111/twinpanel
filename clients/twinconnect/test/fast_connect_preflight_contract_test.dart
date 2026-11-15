@@ -16,20 +16,26 @@ void main() {
     expect(engine, contains('ip != before && ip == verifiedProxyIp'));
   });
 
-  test('Fast Server respects ready protocols and never defaults to WireGuard', () {
+  test('Fast Server checks standalone engines and selected-protocol nodes', () {
     final ui = File('lib/live_dashboard.dart').readAsStringSync();
     final begin = ui.indexOf('Future<void> _enableFastestAndConnect()');
     final end = ui.indexOf('void _resetNetworkStats()', begin);
+    expect(begin, greaterThan(0));
+    expect(end, greaterThan(begin));
     final fast = ui.substring(begin, end);
     expect(fast, contains('NativeVpnBridge.protocolReadiness()'));
-    expect(fast, contains('authorized.where(ready.supports)'));
+    // WireGuard is native, but independently installed engines must not be
+    // silently discarded just because the OS bridge reports only WireGuard.
+    expect(fast, contains('_fastEngineReady(code, native)'));
+    expect(fast, contains('WindowsOpenConnectTunnel.enginePresent()'));
+    expect(fast, contains('WindowsOpenVpnTunnel.enginePresent()'));
+    expect(fast, contains('_fastestAuthorizedIndex(code)'));
     expect(fast, contains("prefs.getString('twinconnect_last_verified_protocol')"));
-    expect(fast, contains('_filter != \'all\''));
-    expect(fast, contains('_fastestKnownIndex'));
+    expect(fast, contains("_filter != 'all'"));
     expect(fast, contains('await _toggleVpn()'));
     expect(fast, contains('_filter = previousFilter'));
-    expect(fast, isNot(contains("'wireguard', 'openvpn', 'cisco'")));
-    expect(fast, isNot(contains('eligible.where(authorized.contains).firstOrNull')));
+    expect(fast, isNot(contains('authorized.where(ready.supports)')));
+    expect(fast, isNot(contains('final best = _fastestKnownIndex')));
     expect(ui, contains('value: _autoFastest,'));
   });
 
