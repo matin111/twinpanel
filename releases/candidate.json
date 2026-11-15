@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.843",
-  "source_sha": "d8a2d469dd45a7667b82ba0313ae553830dee64a",
+  "version": "1.1.0-rc.844",
+  "source_sha": "e99fbd878728301b8c4bc8164c93e63dac8dc946",
   "notes": {
-    "fa": "نمایش تمدید رزروی داخل فهرست و جزئیات اشتراک ربات تلگرام (ازجمله اکانت‌های واردشده با ساب‌لینک)، کارت اشتراک در سایت و API حساب TwinConnect؛ پلن، حجم، مدت دوره بعد و تاریخ ثبت با وضعیت در انتظار یا نیازمند بررسی، بدون تغییر اعتبار فعلی.",
-    "en": "Display reserved renewals in Telegram subscription lists/details including imported accounts, customer website cards and authenticated TwinConnect account/plan/login APIs. Show next plan, traffic, duration and pending/review state without changing current entitlements."
+    "fa": "افزودن تاریخچه کیف پول برای هر کاربر در پنل مدیریت: تراکنش‌های واقعی شارژ و برداشت، خرید با کیف پول، درخواست‌های شارژ و وضعیت تأیید یا رد، جستجو و جزئیات رسید بدون تغییر موجودی‌ها یا اشتراک‌های موجود.",
+    "en": "Add per-user wallet history to admin user cards with real ledger credits/debits, wallet purchases, top-up review statuses, receipt references and search. No wallet balances or subscriptions are modified."
   }
 }
