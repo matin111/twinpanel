@@ -766,8 +766,12 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         _selected = previousSelected;
       });
       if (connected) {
-        await prefs.setString(
-            'twinconnect_last_verified_protocol', selectedProtocol);
+        try {
+          await prefs.setString(
+              'twinconnect_last_verified_protocol', selectedProtocol);
+        } catch (_) {
+          // The verified tunnel remains connected if preferences are locked.
+        }
       }
     } catch (error) {
       if (mounted && _choiceRevision == manualRevision) {
@@ -1491,7 +1495,10 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       // Each inbound is a separate server-list choice. Never interrupt the
       // user's connection to show a second selection dialog.
       final requestedInboundId = inboundId ??
-          (_selectedXrayNodeId == serverId ? _selectedXrayInboundId : null);
+          (_explicitNodeId == serverId && _explicitXrayInboundId != null
+              ? _explicitXrayInboundId
+              : (_selectedXrayNodeId == serverId
+                  ? _selectedXrayInboundId : null));
       final eligible = requestedInboundId == null
           ? matches
           : matches.where((item) => item.id == requestedInboundId)
@@ -2580,6 +2587,9 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         oldWidget.catalog != widget.catalog) {
       // The first session inventory often arrives after the dashboard
       // initializes; retry restore once authorized nodes become available.
+      if (_filter == 'v2ray' && _xrayAuthorized && !_xrayGroupsLoaded) {
+        unawaited(_loadXrayGroups());
+      }
       _xrayGroups = _assignedXrayGroups(_xrayGroups);
       if (_xrayGroups.isEmpty && !_xrayGroupsLoaded) {
         unawaited(_restoreCachedXrayInbounds());
@@ -2808,7 +2818,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       return;
     }
     if (!_vpnUp && !_vpnCleanup && (!_vpnReady || !_wireGuardAllowed ||
-        _selectedServerId == null || _filter != 'all' && _filter != 'wireguard')) {
+        (!_autoFastest && _selectedServerId == null) ||
+        _filter != 'all' && _filter != 'wireguard')) {
       setState(() => _vpnError = !_wireGuardAllowed
           ? 'WIREGUARD_NOT_ALLOWED'
           : !_vpnReady ? 'WIREGUARD_NOT_INSTALLED_OR_ADMIN_REQUIRED'
@@ -3060,23 +3071,24 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     }
     if (!mounted || _choiceAccountKey != account ||
         _choiceRevision != revision || saved == null) return;
+    final restored = saved;
     final nodes = widget.servers?.servers ?? const <AppServer>[];
-    final selected = saved.nodeId == null
+    final selected = restored.nodeId == null
         ? _selected
-        : nodes.indexWhere((node) => node.id == saved!.nodeId);
+        : nodes.indexWhere((node) => node.id == restored.nodeId);
     setState(() {
-      _filter = saved!.protocolCode;
-      _explicitNodeId = saved.nodeId;
-      _explicitXrayInboundId = saved.xrayInboundId;
+      _filter = restored.protocolCode;
+      _explicitNodeId = restored.nodeId;
+      _explicitXrayInboundId = restored.xrayInboundId;
       _selected = selected;
-      if (saved.protocolCode == 'v2ray' && saved.nodeId != null) {
-        _selectedXrayNodeId = saved.nodeId;
-        _selectedXrayInboundId = saved.xrayInboundId;
+      if (restored.protocolCode == 'v2ray' && restored.nodeId != null) {
+        _selectedXrayNodeId = restored.nodeId;
+        _selectedXrayInboundId = restored.xrayInboundId;
       }
       _autoFastest = false;
     });
-    if (saved.protocolCode == 'v2ray') unawaited(_loadXrayGroups());
-    if (saved.protocolCode == 'socks5') {
+    if (restored.protocolCode == 'v2ray') unawaited(_loadXrayGroups());
+    if (restored.protocolCode == 'socks5') {
       unawaited(_refreshSocks5AvailableNodes());
     }
   }
@@ -4434,7 +4446,9 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         padding: const EdgeInsets.only(bottom: 9),
         child: glassCard(
           key: Key('xrayInbound_${nodeId}_${inbound.id}'),
-          selected: connected,
+          selected: connected ||
+              (_filter == 'v2ray' && _explicitNodeId == nodeId &&
+                  _explicitXrayInboundId == inbound.id),
           radius: 16,
           child: Material(
             color: Colors.transparent,
