@@ -631,25 +631,96 @@ def public_connection_hub_live_v5(
     # Per-connection history is fetched only after the page loads. No
     # historical usage totals are inferred from subscription aggregate counters.
     history_html = r"""
-    <section id="tp-session-history" dir="rtl" style="max-width:1176px;margin:12px auto;padding:0 14px;box-sizing:border-box">
-      <button id="tp-session-open" type="button" aria-haspopup="dialog" aria-controls="tp-session-dialog"
-        style="background:linear-gradient(120deg,#2365db,#138ab9);border:0;border-radius:12px;color:#fff;cursor:pointer;padding:12px 20px;font:inherit;font-weight:700;box-shadow:0 8px 28px #0003">
-        ◷ تاریخچه اتصال‌ها و ریز مصرف
-      </button>
+    <style>
+      #tp-session-history {max-width:1176px;margin:12px auto;padding:0 14px;box-sizing:border-box}
+      #tp-session-open {display:inline-flex;align-items:center;gap:10px;border:1px solid #25bed680;border-radius:14px;padding:12px 20px;background:linear-gradient(120deg,#124575,#147caa);color:#fff;font:inherit;font-weight:800;box-shadow:0 8px 28px #06173366;cursor:pointer;transition:transform .2s,box-shadow .2s}
+      #tp-session-open:hover {transform:translateY(-2px);box-shadow:0 10px 30px #08b8e244}
+      #tp-session-dialog {position:fixed;inset:0;z-index:2147483000;align-items:center;justify-content:center;padding:14px;box-sizing:border-box;font-family:inherit}
+      #tp-session-dialog[hidden] {display:none!important}
+      #tp-session-overlay {position:absolute;inset:0;background:rgba(3,9,25,.81);backdrop-filter:blur(7px)}
+      #tp-session-panel {position:relative;isolation:isolate;width:min(1000px,100%);max-height:min(90vh,920px);overflow:hidden;display:flex;flex-direction:column;color:#eaf4ff;background:linear-gradient(150deg,rgba(12,34,64,.97),rgba(6,18,40,.98));border:1px solid #3d9ecaaa;border-radius:28px;box-shadow:0 24px 100px #000b,0 0 32px #00c9f01c,inset 0 1px 0 #b0eaff3b;box-sizing:border-box}
+      #tp-session-panel:before {content:"";position:absolute;pointer-events:none;inset:0 0 auto;height:135px;background:radial-gradient(ellipse at 52% 0%,#00c5e333,transparent 68%);z-index:-1}
+      #tp-session-header {display:flex;align-items:flex-start;justify-content:space-between;gap:14px;padding:28px 32px 18px}
+      #tp-session-heading {display:flex;align-items:center;gap:14px;min-width:0}
+      .tp-sess-history-icon {flex:none;display:grid;place-items:center;width:52px;height:52px;color:#4be5ff;background:linear-gradient(145deg,#07314b,#0e233d);border:1px solid #18bfde;border-radius:16px;box-shadow:0 0 18px #00c8eb30;font-size:28px}
+      #tp-session-title {margin:0 0 7px;font-size:clamp(19px,2.4vw,27px);font-weight:850;line-height:1.4;color:#f5fbff;letter-spacing:-.35px}
+      .tp-sess-subtitle {margin:0;color:#a9c7e5;font-size:13px;line-height:1.9}
+      .tp-sess-toolbar {display:flex;gap:9px;flex:none;align-items:center}
+      #tp-session-close,#tp-session-refresh {display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:39px;background:#14314cbb;color:#edfaff;border:1px solid #3b7c9d;border-radius:12px;padding:8px 12px;font:inherit;font-weight:750;cursor:pointer;transition:background .2s,border-color .2s}
+      #tp-session-close {width:40px;padding:6px;font-size:20px;line-height:1}
+      #tp-session-refresh {color:#70eaff;border-color:#19aaca}
+      #tp-session-close:hover,#tp-session-refresh:hover {background:#194d69;border-color:#69dafa}
+      #tp-session-refresh:disabled {opacity:.55;cursor:wait}
+      .tp-sess-note {margin:0 32px 15px;padding:9px 12px;border-radius:11px;background:#0d31503b;border:1px solid #28547366;color:#9bb6d0;font-size:12px;line-height:1.7}
+      #tp-session-items {padding:0 26px 25px;overflow-y:auto;overscroll-behavior:contain;display:grid;gap:18px;align-content:start;scrollbar-width:thin;scrollbar-color:#4998b4 #0b203a}
+      #tp-session-items::-webkit-scrollbar {width:8px}
+      #tp-session-items::-webkit-scrollbar-track {background:#0b203a;border-radius:10px}
+      #tp-session-items::-webkit-scrollbar-thumb {background:#4998b4;border-radius:10px}
+      .tp-sess-card {position:relative;background:linear-gradient(132deg,#0b2441ed,#0f2037e8);border:1px solid #2a779dd9;border-radius:22px;padding:20px 24px 22px;box-shadow:inset 0 1px 0 #b2efff17,0 8px 26px #0004;overflow:hidden}
+      .tp-sess-card:before {content:"";position:absolute;inset:0 14px auto;height:2px;background:linear-gradient(90deg,transparent,#22d5ed99,transparent)}
+      .tp-sess-top {display:flex;align-items:center;justify-content:space-between;gap:12px;padding-bottom:16px;border-bottom:1px solid #3160809c;flex-wrap:wrap}
+      .tp-sess-identities {display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+      .tp-sess-chip {display:inline-flex;align-items:center;gap:8px;border:1px solid #426f91;border-radius:11px;padding:7px 12px;background:#112f4b;color:#eff9ff;font-size:13px;font-weight:800}
+      .tp-sess-country-flag {font-size:20px;line-height:1}
+      .tp-sess-chip-protocol {color:#c4ecff;background:#0b2c47}
+      .tp-sess-status {display:inline-flex;align-items:center;gap:8px;border:1px solid #5b829a;border-radius:999px;background:#26334b;color:#c0cbd7;padding:6px 15px;font-size:13px;font-weight:800}
+      .tp-sess-status:before {content:"";width:8px;height:8px;border-radius:99px;background:currentColor;box-shadow:0 0 8px currentColor}
+      .tp-sess-status.is-active {background:#07523796;color:#56f4a1;border-color:#16965d}
+      .tp-sess-body {display:grid;grid-template-columns:minmax(0,1.45fr) minmax(0,1fr) minmax(175px,.93fr);align-items:stretch;gap:18px;padding-top:18px}
+      .tp-sess-dates {display:grid;gap:0;align-content:center}
+      .tp-sess-detail {display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 0;border-bottom:1px solid #284c6990;font-size:13px;min-width:0}
+      .tp-sess-detail:last-child {border-bottom:0}
+      .tp-sess-detail dt {flex:none;color:#80dcf4;font-weight:800}
+      .tp-sess-detail dd {margin:0;min-width:0;color:#e6f6ff;text-align:left;overflow-wrap:anywhere;font-weight:600}
+      .tp-sess-transfers {display:grid;align-content:center;gap:9px;padding-inline:16px;border-inline:1px solid #32638096}
+      .tp-sess-transfer {display:flex;justify-content:space-between;align-items:center;gap:8px;padding:13px 12px;border:1px solid #2546636b;border-radius:13px;background:#18334d88;font-size:13px}
+      .tp-sess-transfer-label {color:#b8e4fa;font-weight:750}
+      .tp-sess-transfer-value {font-weight:850;font-variant-numeric:tabular-nums}
+      .tp-sess-total {display:grid;place-content:center;gap:10px;text-align:center;min-height:130px;border:1px solid #1eb4d0;border-radius:17px;background:linear-gradient(145deg,#073c56c2,#10314cc9);box-shadow:inset 0 0 25px #10bfe116,0 0 16px #0bb9d31f}
+      .tp-sess-total-label {color:#b4eafa;font-size:13px;font-weight:750}
+      .tp-sess-total-value {color:#fff;font-size:clamp(20px,2.5vw,29px);font-weight:900;direction:ltr;font-variant-numeric:tabular-nums}
+      .tp-sess-empty {text-align:center;padding:32px 16px;border:1px dashed #397c9a;border-radius:15px;color:#badbef;background:#0c2945}
+      @media(max-width:740px) {
+        #tp-session-panel {border-radius:19px;max-height:92vh}
+        #tp-session-header {padding:18px 17px 12px;align-items:center}
+        .tp-sess-history-icon {width:38px;height:38px;font-size:22px;border-radius:11px}
+        #tp-session-title {font-size:17px;margin-bottom:3px}
+        .tp-sess-subtitle {font-size:11px}
+        .tp-sess-toolbar {flex-direction:column-reverse}
+        #tp-session-refresh {font-size:12px;padding:7px}
+        .tp-sess-note {margin:0 15px 12px;font-size:11px}
+        #tp-session-items {padding:0 12px 18px;gap:12px}
+        .tp-sess-card {padding:14px;border-radius:15px}
+        .tp-sess-body {grid-template-columns:1fr 1fr;gap:10px}
+        .tp-sess-dates {grid-column:1/-1}
+        .tp-sess-transfers {padding-inline:0;border:0}
+        .tp-sess-total {min-height:105px}
+        .tp-sess-chip {padding:6px 9px;font-size:12px}
+      }
+      @media(max-width:390px) {.tp-sess-body{grid-template-columns:1fr}.tp-sess-dates{grid-column:auto}.tp-sess-total{min-height:90px}}
+      @media(prefers-reduced-motion:reduce) {#tp-session-close,#tp-session-refresh,#tp-session-open{transition:none}}
+    </style>
+    <section id="tp-session-history" dir="rtl">
+      <button id="tp-session-open" type="button" aria-haspopup="dialog" aria-controls="tp-session-dialog">◷ تاریخچه اتصال‌ها و ریز مصرف</button>
     </section>
-    <div id="tp-session-dialog" role="dialog" aria-modal="true" aria-labelledby="tp-session-title" dir="rtl" hidden
-      style="position:fixed;inset:0;z-index:2147483000;align-items:center;justify-content:center;padding:16px;box-sizing:border-box">
-      <div id="tp-session-overlay" style="position:absolute;inset:0;background:rgba(4,9,24,.8);backdrop-filter:blur(5px)"></div>
-      <div style="position:relative;width:min(760px,100%);max-height:min(88vh,850px);overflow:auto;background:#121d31;color:#e8eefc;border:1px solid #435679;border-radius:18px;box-shadow:0 20px 80px #0009;padding:18px;box-sizing:border-box">
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px">
-          <h2 id="tp-session-title" style="font-size:17px;margin:0;color:inherit">تاریخچه اتصال‌ها و ریز مصرف</h2>
-          <button id="tp-session-close" type="button" aria-label="بستن" style="border:1px solid #455572;background:#23344f;color:#fff;border-radius:10px;padding:7px 12px;cursor:pointer">✕</button>
-        </div>
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px">
-          <small style="color:#b5c7e5">مصرف هر نشست جداگانه؛ ترافیک فاقد شناسه نشست به آن نسبت داده نمی‌شود.</small>
-          <button id="tp-session-refresh" type="button" style="border:1px solid #455572;background:#23344f;color:#fff;border-radius:10px;padding:8px 12px;cursor:pointer">بروزرسانی</button>
-        </div>
-        <div id="tp-session-items" aria-live="polite" style="display:grid;gap:10px"></div>
+    <div id="tp-session-dialog" role="dialog" aria-modal="true" aria-labelledby="tp-session-title" dir="rtl" hidden>
+      <div id="tp-session-overlay"></div>
+      <div id="tp-session-panel">
+        <header id="tp-session-header">
+          <div id="tp-session-heading">
+            <span class="tp-sess-history-icon" aria-hidden="true">◷</span>
+            <div>
+              <h2 id="tp-session-title">تاریخچه اتصال‌ها و ریز مصرف</h2>
+              <p class="tp-sess-subtitle">جزئیات هر اتصال، زمان، وضعیت و مقدار واقعی مصرف</p>
+            </div>
+          </div>
+          <div class="tp-sess-toolbar">
+            <button id="tp-session-refresh" type="button">↻ بروزرسانی</button>
+            <button id="tp-session-close" type="button" aria-label="بستن">✕</button>
+          </div>
+        </header>
+        <p class="tp-sess-note">مصرف فقط از ترافیک قابل انتساب به همان نشست محاسبه شده است؛ ترافیک فاقد شناسه نشست در این قسمت نمایش داده نمی‌شود.</p>
+        <div id="tp-session-items" aria-live="polite"></div>
       </div>
     </div>
     """
@@ -716,17 +787,26 @@ def public_connection_hub_live_v5(
         const flag = String.fromCodePoint(...[...code].map(ch => 127397 + ch.charCodeAt(0)));
         return flag + ' ' + localized;
       };
-      const append = (parent, name, value) => {
-        const el = document.createElement('div');
-        const b = document.createElement('b');
-        b.textContent = name+': ';
-        el.append(b, document.createTextNode(String(value)));
-        parent.appendChild(el);
+      const make = (tag, className, value) => {
+        const el = document.createElement(tag);
+        if (className) el.className = className;
+        if (value != null) el.textContent = String(value);
+        return el;
+      };
+      const detail = (parent, name, value) => {
+        const line = make('div','tp-sess-detail');
+        line.append(make('dt','',name),make('dd','',value));
+        parent.append(line);
+      };
+      const transfer = (parent,label,value) => {
+        const line=make('div','tp-sess-transfer');
+        line.append(make('span','tp-sess-transfer-label',label),make('strong','tp-sess-transfer-value',value));
+        parent.append(line);
       };
       async function load() {
         if (activeFetch) return;
         activeFetch = true;
-        container.textContent = 'در حال دریافت تاریخچه…';
+        container.replaceChildren(make('div','tp-sess-empty','در حال دریافت تاریخچه…'));
         if (refresh) refresh.disabled = true;
         try {
           const url = '/v1/connect/'+encodeURIComponent(token)+'/sessions';
@@ -736,26 +816,39 @@ def public_connection_hub_live_v5(
           loaded = true;
           container.replaceChildren();
           if (!Array.isArray(data.items) || !data.items.length) {
-            container.textContent = 'هنوز نشست ثبت‌شده‌ای وجود ندارد.';
+            container.replaceChildren(make('div','tp-sess-empty','هنوز نشست ثبت‌شده‌ای وجود ندارد.'));
             return;
           }
           for (const item of data.items) {
-            const card = document.createElement('article');
-            card.style.cssText='border:1px solid #384965;background:#17243b;border-radius:12px;padding:12px;display:grid;gap:5px;line-height:1.65';
-            const heading = document.createElement('strong');
-            heading.textContent = countryTitle(item) + ' · ' + String(item.protocol||'—').toUpperCase();
-            card.appendChild(heading);
-            append(card,'وضعیت',item.active?'متصل':'پایان‌یافته');
-            append(card,'شروع',dt(item.started_at));
-            append(card,'پایان',item.active?'در حال اتصال':dt(item.ended_at));
-            append(card,'مدت',duration(item.duration_seconds));
-            append(card,'دانلود',bytes(item.download_bytes));
-            append(card,'آپلود',bytes(item.upload_bytes));
-            append(card,'مجموع همین اتصال',bytes(item.total_bytes));
+            const card = make('article','tp-sess-card');
+            const head = make('div','tp-sess-top');
+            const identifiers = make('div','tp-sess-identities');
+            const country = make('span','tp-sess-chip');
+            country.append(make('span','tp-sess-country-flag',countryTitle(item).split(' ')[0]),
+                           make('span','',countryTitle(item).split(' ').slice(1).join(' ')));
+            const protocol = make('span','tp-sess-chip tp-sess-chip-protocol',
+                                  String(item.protocol||'—').toUpperCase());
+            identifiers.append(country,protocol);
+            const state = make('span','tp-sess-status'+(item.active?' is-active':''),
+                               item.active?'متصل':'پایان‌یافته');
+            head.append(identifiers,state);
+            const body = make('div','tp-sess-body');
+            const dates = make('dl','tp-sess-dates');
+            detail(dates,'◷ شروع',dt(item.started_at));
+            detail(dates,'⚑ پایان',item.active?'در حال اتصال':dt(item.ended_at));
+            detail(dates,'◷ مدت',duration(item.duration_seconds));
+            const transfers = make('div','tp-sess-transfers');
+            transfer(transfers,'↓ دانلود',bytes(item.download_bytes));
+            transfer(transfers,'↑ آپلود',bytes(item.upload_bytes));
+            const total = make('div','tp-sess-total');
+            total.append(make('span','tp-sess-total-label','مجموع همین اتصال'),
+                         make('strong','tp-sess-total-value',bytes(item.total_bytes)));
+            body.append(dates,transfers,total);
+            card.append(head,body);
             container.appendChild(card);
           }
         } catch (_) {
-          container.textContent = 'دریافت تاریخچه ممکن نشد. دوباره تلاش کنید.';
+          container.replaceChildren(make('div','tp-sess-empty','دریافت تاریخچه ممکن نشد. دوباره تلاش کنید.'));
         } finally {
           activeFetch = false;
           if (refresh) refresh.disabled = false;
