@@ -60,6 +60,13 @@ final class TwinConnectMacOSVPNBridge {
                         ? "MACOS_PROTOCOL_BACKEND_NOT_LINKED"
                         : "MACOS_PACKET_TUNNEL_NOT_INSTALLED",
                 ] as [String: Any])
+            case "startTunnel":
+                TwinConnectMacOSVPNControl.start(
+                    call.arguments, backendLinked: backendReady(), result: result)
+            case "stopTunnel":
+                TwinConnectMacOSVPNControl.stop(result)
+            case "getTunnelStatus":
+                TwinConnectMacOSVPNControl.status(result)
             default:
                 result(FlutterMethodNotImplemented)
             }
