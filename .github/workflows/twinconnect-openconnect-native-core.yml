@@ -68,6 +68,22 @@ jobs:
               source = source.replace(old, "--sysroot=$(TOOLCHAIN)/sysroot")
               path.write_text(source)
               print(f"Patched NDK sysroot in {path}")
+
+          # Nettle must link against the freshly built target GMP, not
+          # the host installation. Otherwise hogweed support is disabled.
+          nettle_makefile = Path("upstream/external/openconnect/android/Makefile")
+          source = nettle_makefile.read_text()
+          original = "cd $(NETTLE_BUILD) && ../../$(NETTLE_SRC)/configure $(CONFIGURE_ARGS)"
+          patched = (
+              'cd $(NETTLE_BUILD) && ../../$(NETTLE_SRC)/configure $(CONFIGURE_ARGS) '
+              'CPPFLAGS="-I$(OC_SYSROOT)/include" '
+              'LDFLAGS="-L$(OC_SYSROOT)/lib"'
+          )
+          if source.count(original) != 1:
+              raise SystemExit("Unexpected Nettle configure recipe")
+          source = source.replace(original, patched)
+          nettle_makefile.write_text(source)
+          print("Patched target GMP include and library search paths for Nettle")
           PY
 
       - name: Build actual libopenconnect for arm64
