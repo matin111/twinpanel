@@ -17,7 +17,7 @@ void main() {
         'type': entry.value,
         'server': 'vpn.example.org',
         'server_port': 443,
-        'password': 'synthetic',
+        if (entry.key != 'snell') 'password': 'synthetic',
         if (entry.key == 'tuic')
           'uuid': '2DD61D93-75D8-4DA4-AC0E-6AECE7EAC365',
         if (entry.key == 'naive' || entry.key == 'socks5')
