@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.847",
+  "version": "1.1.0-rc.848",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-15T08:18:15Z",
+  "released_at": "2026-11-15T10:11:31Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "e22de5f89c2e252b0cc9774290bfc7476f0e9d91",
+  "source_sha": "ffb5775698662c90d0f43d0a79c745d95a58c371",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.847/twinpanel-1.1.0-rc.847-linux-x86_64.tar.gz",
-    "sha256": "a6690aa8e23d625dc8846c9f0ec1f8b07017ea68f347aca085824b0fee44604e",
-    "size_bytes": 30883851
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.848/twinpanel-1.1.0-rc.848-linux-x86_64.tar.gz",
+    "sha256": "49f282c3b78b085ff885c2b58307c373f79670f1201fdef056a4ec85ec680f68",
+    "size_bytes": 30892036
   },
   "notes": {
-    "fa": "تکمیل تاریخچه مالی کاربران در پنل ادمین و نمایندگان: نمایش سفارش‌های خرید اشتراک از سایت و ربات نماینده، فروش‌های دستی نماینده، روش و وضعیت پرداخت، شناسه اشتراک و رسید در کنار گردش کیف پول؛ جلوگیری از تکرار سفارش‌ها و رعایت دسترسی هر نمایندگی؛ بدون تغییر مالی در حساب کاربران.",
-    "en": "Expand admin and reseller customer financial history to include site subscription purchases, reseller bot orders and manual reseller sales, payment states, receipt references and subscription IDs alongside wallet ledger. Deduplicate bot/manual sale records; read-only and tenant-scoped."
+    "fa": "اصلاح پیام بررسی رسید در ربات مدیریت: نمایش شناسه واقعی کاربر، نام کاربر، شناسه تلگرام، پلن انتخابی، شماره سفارش، مبلغ، روش پرداخت، تخفیف، وضعیت و کد پیگیری با خط‌بندی صحیح؛ پیام رسید و دکمه بررسی وضعیت از قالب مشترک استفاده می‌کنند؛ منطق تأیید و رد بدون تغییر.",
+    "en": "Use a shared readable Telegram admin receipt formatter for original receipt pushes and in-place refresh, including real user ID, selected plan, order ID, amount, discounts, method and tracking code, with actual newlines. Approval logic unchanged. Regression tested."
   }
 }
