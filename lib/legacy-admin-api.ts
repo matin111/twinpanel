@@ -73,7 +73,9 @@ export type ClassicProtocolInventoryResponse={
 export const legacyAdminApi={
   usersPage:(params:{limit:number;offset:number;q:string;status:"all"|"active"|"inactive"|"subscribed"})=>request<UsersPageResponse>(`/v1/admin/users-page?limit=${encodeURIComponent(String(params.limit))}&offset=${encodeURIComponent(String(params.offset))}&q=${encodeURIComponent(params.q)}&status=${encodeURIComponent(params.status)}`),
   subscriptionsByUser:(userId:number)=>request<RuntimeRow[]>(`/v1/subscriptions/by-user/${userId}`),
-  extendSubscription:(id:number,payload:{add_traffic_gb?:number;add_days?:number;reset_usage?:boolean;reset_date?:boolean})=>request<RuntimeRow>(`/v1/subscriptions/${id}/extend`,{method:"PATCH",body:JSON.stringify(payload)}),
+  reserveSubscriptionRenewal:(id:number,payload:{traffic_gb:number;duration_days:number;plan_id?:number})=>request<{ok:boolean;renewal_id:number;status:string}>(`/v1/subscriptions/${id}/reserve-renewal`,{method:"POST",body:JSON.stringify(payload)}),
+  subscriptionHistory:(id:number)=>request<{events:Array<{id:number;type:string;source:string;actor:string;details:Record<string,unknown>;created_at:string}>;queued:Array<{id:number;plan:string;traffic_bytes:number;duration_days:number;created_at:string}>}>(`/v1/subscriptions/${id}/history`),
+  cancelReservedRenewal:(id:number,renewalId:number)=>request<{ok:boolean}>(`/v1/subscriptions/${id}/reserve-renewal/${renewalId}`,{method:"DELETE"}),
   nodeAccess:(id:number)=>request<RuntimeRow>(`/v1/provision/node-access/${id}`),
   saveNodeAccess:(payload:{node_id:number;host:string;port:number;username:string;password:string})=>request<RuntimeRow>("/v1/provision/save-node-access",{method:"POST",body:JSON.stringify(payload)}),
   classicProtocols:()=>request<ClassicProtocolInventoryResponse>("/v1/provision/classic-protocols"),
