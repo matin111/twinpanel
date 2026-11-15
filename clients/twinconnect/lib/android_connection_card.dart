@@ -314,18 +314,24 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
           .timeout(const Duration(seconds: 6));
       request.headers.set(HttpHeaders.acceptHeader, 'text/plain');
       final response = await request.close().timeout(const Duration(seconds: 6));
+      // HTTPS response latency is measured as soon as valid TLS+HTTP
+      // response headers arrive. Public-IP parsing is independent.
+      watch.stop();
+      final httpsMs = watch.elapsedMilliseconds.clamp(1, 60000);
+      if (response.statusCode == HttpStatus.noContent) {
+        return (ip: null, latencyMs: httpsMs);
+      }
       if (response.statusCode != HttpStatus.ok) {
         return (ip: null, latencyMs: null);
       }
       final body = (await utf8.decoder.bind(response)
           .join().timeout(const Duration(seconds: 6)));
-      watch.stop();
-      if (body.length > 2048) return (ip: null, latencyMs: null);
+      if (body.length > 2048) return (ip: null, latencyMs: httpsMs);
       final candidate = cloudflareTrace
           ? RegExp(r'^ip=([^\r\n]+)', multiLine: true).firstMatch(body)?.group(1)
           : body.trim();
       final parsed = candidate == null ? null : InternetAddress.tryParse(candidate);
-      return (ip: parsed?.address, latencyMs: watch.elapsedMilliseconds);
+      return (ip: parsed?.address, latencyMs: httpsMs);
     } catch (_) {
       return (ip: null, latencyMs: null);
     } finally {
@@ -345,18 +351,18 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
         _probeHttps('api.ipify.org', '/'),
         _probeHttps('icanhazip.com', '/'),
         _probeHttps('www.cloudflare.com', '/cdn-cgi/trace', cloudflareTrace: true),
+        _probeHttps('www.google.com', '/generate_204'),
       ]);
+      // A successful HTTPS response is measurable even if the IP endpoint
+      // returns non-IP content. Never tie HTTPS latency to IP parsing.
       String? ip;
       int? latency;
       for (final result in probes) {
-        if (result.ip != null) {
-          ip = result.ip;
+        if (result.ip != null) ip ??= result.ip;
+        if (result.latencyMs != null &&
+            (latency == null || result.latencyMs! < latency)) {
           latency = result.latencyMs;
-          break;
         }
-        // A successful HTTPS response measures reachability even when its
-        // payload is not an IP; never manufacture a public IP from the TUN.
-        latency ??= result.latencyMs;
       }
       if (mounted && generation == _networkProbeGeneration) {
         setState(() {
