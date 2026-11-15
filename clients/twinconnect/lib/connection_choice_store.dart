@@ -60,12 +60,11 @@ class ConnectionChoiceStore {
 
   static String key({
     required String namespace,
-    required String apiOrigin,
     required String username,
   }) {
-    // An unambiguous tuple: a second panel or account must NEVER inherit
-    // another customer's preferred VPN server/protocol.
-    final tuple = jsonEncode([namespace, apiOrigin, username]);
+    // License/tenant namespace and account are stable when the panel domain
+    // rotates. A different panel or username must not inherit this choice.
+    final tuple = jsonEncode([namespace, username]);
     return 'twinconnect_manual_connection_v1:${base64UrlEncode(utf8.encode(tuple))}';
   }
 
