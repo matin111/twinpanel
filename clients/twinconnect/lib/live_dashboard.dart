@@ -219,6 +219,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   int? _httpsLatencyMs;
   bool _autoFastest = false;
   bool _fastestSelecting = false;
+  bool _fastestConnecting = false;
   String? _lastExplicitFastProtocol;
   bool _networkRefreshing = false;
   int _networkEpoch = 0;
@@ -517,6 +518,153 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     // node, and never label that estimate an actual user-device ping.
     return measured ?? FastServerSelection.chooseReportedEstimate(
         servers: servers, permittedNodeIds: entitledNodeIds);
+  }
+
+  /// Legacy VPN engines start outside WireGuard's native capability list.
+  /// Check their real bundled prerequisites; absence is not readiness.
+  Future<bool> _fastEngineReady(
+      String code, NativeProtocolReadiness native) async {
+    if (!Platform.isWindows) return false;
+    if (code == 'wireguard' || code == 'amneziawg') {
+      return native.supports(code);
+    }
+    if (code == 'cisco') return WindowsOpenConnectTunnel.enginePresent();
+    if (code == 'openvpn') return WindowsOpenVpnTunnel.enginePresent();
+    if (code == 'v2ray') {
+      final checks = await Future.wait<bool>([
+        WindowsXrayPreflight.enginePresent(),
+        WindowsSingBoxPreflight.enginePresent(),
+      ]);
+      return checks.every((ok) => ok);
+    }
+    if (code == 'l2tp') return true; // Built-in Windows RAS/IPsec transport.
+    if (code == 'sudoku') {
+      final checks = await Future.wait<bool>([
+        WindowsSudokuProxy.enginePresent(),
+        WindowsSingBoxPreflight.enginePresent(),
+      ]);
+      return checks.every((ok) => ok);
+    }
+    if (code == 'mieru') {
+      final checks = await Future.wait<bool>([
+        WindowsMieruProxy.enginePresent(),
+        WindowsSingBoxPreflight.enginePresent(),
+      ]);
+      return checks.every((ok) => ok);
+    }
+    if (code == 'trusttunnel') {
+      final checks = await Future.wait<bool>([
+        WindowsTrustTunnelProxy.enginePresent(),
+        WindowsSingBoxPreflight.enginePresent(),
+      ]);
+      return checks.every((ok) => ok);
+    }
+    if (SingBoxProfileValidator.supportsFamily(code)) {
+      return WindowsSingBoxPreflight.enginePresent();
+    }
+    return false;
+  }
+
+  Future<void> _enableFastestAndConnect() async {
+    if (_vpnBusy || _fastestConnecting || _verifiedConnectionActive ||
+        _vpnUp || _modernUp || _vpnCleanup || !Platform.isWindows) return;
+    final authorized = widget.catalog?.entries.where((entry) =>
+        entry.selected && entry.configRecordPresent)
+        .map((entry) => entry.protocol.code).toSet() ?? <String>{};
+    if (authorized.isEmpty) {
+      setState(() => _vpnError = 'PROTOCOL_NOT_INCLUDED_IN_SUBSCRIPTION');
+      return;
+    }
+    final previousFilter = _filter;
+    final previousSelected = _selected;
+    setState(() { _fastestConnecting = true; _vpnError = null; });
+    try {
+      final checks = await Future.wait<Object>([
+        NativeVpnBridge.protocolReadiness()
+            .timeout(const Duration(seconds: 8)),
+        SharedPreferences.getInstance(),
+      ]);
+      if (!mounted) return;
+      final native = checks[0] as NativeProtocolReadiness;
+      final prefs = checks[1] as SharedPreferences;
+      final preferred = _filter != 'all'
+          ? _filter
+          : prefs.getString('twinconnect_last_verified_protocol');
+      final priority = <String>[
+        'hysteria2', 'tuic', 'anytls', 'v2ray', 'openvpn', 'cisco',
+        'shadowtls', 'naive', 'snell', 'mieru', 'trusttunnel',
+        'amneziawg', 'wireguard', 'l2tp', 'sudoku', 'socks5',
+      ];
+      final choices = <String>[
+        if (preferred != null && authorized.contains(preferred)) preferred,
+        if (_filter == 'all')
+          for (final code in priority)
+            if (code != preferred && authorized.contains(code)) code,
+      ];
+      String? selectedProtocol;
+      int? selectedIndex;
+      for (final code in choices) {
+        if (!await _fastEngineReady(code, native)) {
+          if (_filter != 'all') {
+            throw const FormatException('NATIVE_PROTOCOL_ENGINE_NOT_READY');
+          }
+          continue;
+        }
+        try {
+          final index = await _fastestAuthorizedIndex(code);
+          if (index != null) {
+            selectedProtocol = code;
+            selectedIndex = index;
+            break;
+          }
+          if (_filter != 'all') {
+            throw const FormatException('NO_MEASURED_SERVER');
+          }
+        } on FormatException catch (error) {
+          if (_filter != 'all' ||
+              !const {'PROTOCOL_SERVER_PROFILE_MISSING',
+                      'NO_MEASURED_SERVER'}
+                  .contains(error.message)) {
+            rethrow;
+          }
+          // In All mode only, check another authorized/installed family.
+        }
+      }
+      if (!mounted) return;
+      if (selectedProtocol == null || selectedIndex == null) {
+        throw const FormatException('NO_MEASURED_SERVER');
+      }
+      // The fast chooser already validated profile membership and measured
+      // the exact node. Don't run a second global (possibly wrong) choice.
+      setState(() {
+        _filter = selectedProtocol!;
+        _selected = selectedIndex!;
+        _autoFastest = false;
+        _page = 'home';
+      });
+      await _toggleVpn();
+      if (!mounted) return;
+      if (_verifiedConnectionActive && _vpnError == null) {
+        setState(() => _autoFastest = true);
+        await prefs.setString(
+            'twinconnect_last_verified_protocol', selectedProtocol);
+      } else {
+        setState(() {
+          _autoFastest = false;
+          _filter = previousFilter;
+          _selected = previousSelected;
+        });
+      }
+    } catch (error) {
+      if (mounted) setState(() {
+        _vpnError = _errorText(error);
+        _autoFastest = false;
+        _filter = previousFilter;
+        _selected = previousSelected;
+      });
+    } finally {
+      if (mounted) setState(() => _fastestConnecting = false);
+    }
   }
 
   void _resetNetworkStats() {
@@ -3251,7 +3399,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
               ),
               FilledButton(
                 key: const Key('liveConnectionControlsButton'),
-                onPressed: _vpnBusy || _fastestSelecting ? null : _toggleVpn,
+                onPressed: _vpnBusy || _fastestSelecting || _fastestConnecting ? null : _toggleVpn,
                 style: FilledButton.styleFrom(
                   backgroundColor: Colors.transparent,
                   foregroundColor: Colors.white,
@@ -4344,22 +4492,21 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                     size: 11, color: sub),
               ],
             )),
-            Switch(
+            if (_fastestConnecting)
+              const SizedBox(width: 22, height: 22,
+                child: CircularProgressIndicator(strokeWidth: 2))
+            else Switch(
               key: const Key('autoFastestServerToggle'),
               value: _autoFastest,
-              onChanged: _vpnBusy || _fastestSelecting || _vpnUp || _modernUp
+              onChanged: !Platform.isWindows || _vpnBusy ||
+                  _fastestSelecting || _fastestConnecting ||
+                  ((_modernUp || _vpnUp) && !_autoFastest)
                   ? null : (enabled) {
-                if (enabled && _filter == 'all' &&
-                    _lastExplicitFastProtocol == null) {
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                    content: Text(tr('برای فست سرور ابتدا پروتکل را از مکان‌ها انتخاب کنید.',
-                        'Choose a protocol in Locations before using Fast Server.'))));
-                  return;
+                if (enabled) {
+                  unawaited(_enableFastestAndConnect());
+                } else {
+                  setState(() => _autoFastest = false);
                 }
-                // No secret fetch and no silent WireGuard switch on toggle.
-                // Authorized node profiles and fresh ICMP RTT are checked
-                // after the user presses Connect.
-                setState(() => _autoFastest = enabled);
               },
             ),
           ]),
