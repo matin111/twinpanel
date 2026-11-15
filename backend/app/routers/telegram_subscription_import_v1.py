@@ -249,6 +249,19 @@ def create_imported_renewal_order(
     ):
         raise HTTPException(status_code=409, detail="یک پلن تمدید فعال و معتبر انتخاب کنید")
 
+    # Deferred renewals cannot silently change a customer's plan/protocols.
+    # Reject at checkout, not after payment has already been accepted.
+    if sub.plan_id is None or int(plan.id) != int(sub.plan_id):
+        raise HTTPException(
+            status_code=409,
+            detail="تغییر پلن اکانت انتقالی در تمدید رزروی هنوز پشتیبانی نمی‌شود",
+        )
+    if sub.expires_at is None and int(sub.traffic_limit_bytes or 0) <= 0:
+        raise HTTPException(
+            status_code=409,
+            detail="اشتراک نامحدود فعلی زمان پایان مشخصی برای تمدید ندارد",
+        )
+
     # A payer can only purchase a renewal for an account deliberately added
     # by its share link; this does not authorize changing its owner or secrets.
     key = payload.idempotency_key or (
