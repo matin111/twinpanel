@@ -134,6 +134,7 @@ export const resellerApi={
   // Legacy internal-customer endpoints stay available for bot compatibility.
   // The reseller-facing UI no longer exposes customer management.
   customers:()=>request<ResellerRow[]>("/v1/reseller/customers"),
+  customerWalletHistory:(userId:number)=>request<ResellerRow>(`/v1/reseller/customers/${userId}/wallet-history`),
   createCustomer:(payload:{full_name:string;email?:string|null;phone?:string|null;password:string})=>request<ResellerRow>("/v1/reseller/customers",{method:"POST",body:JSON.stringify(payload)}),
   attachCustomer:(userId:number)=>request<ResellerRow>("/v1/reseller/customers/attach",{method:"POST",body:JSON.stringify({user_id:userId})}),
 
