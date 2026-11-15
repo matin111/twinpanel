@@ -76,6 +76,9 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
   double? _downloadBps, _uploadBps;
   DateTime? _lastCountersAt;
   String? _publicIp;
+  String? _tunnelIpv4;
+  int? _serverPingMs;
+  bool _serverPingIsTcp = false;
   int? _httpsLatencyMs;
   bool _checkingInternet = false;
   DateTime? _lastInternetCheck;
@@ -119,6 +122,9 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
     _txSamples.clear();
     _handshake = false;
     _publicIp = null;
+    _tunnelIpv4 = null;
+    _serverPingMs = null;
+    _serverPingIsTcp = false;
     _httpsLatencyMs = null;
     _lastInternetCheck = null;
     _activeServer = null;
@@ -195,6 +201,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
           final now = DateTime.now();
           final rx = status.rx, tx = status.tx;
           setState(() {
+            _tunnelIpv4 = status.vpnIpv4;
             if (rx != null && tx != null) {
               final previous = _lastCountersAt;
               final elapsed = previous == null ? 0 :
@@ -286,6 +293,54 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
       return;
     }
     unawaited(_checkInternet());
+    if (_activeServer != null) unawaited(_checkServerRtt());
+  }
+
+  /// A single measured server RTT, independent of public IP lookup.
+  /// ICMP is preferred; TCP connect latency is explicitly labeled fallback.
+  Future<void> _checkServerRtt() async {
+    final node = _activeServer;
+    final addr = node?.probeIp;
+    if (addr == null) return;
+    final generation = _networkProbeGeneration;
+    int? rtt;
+    bool tcp = false;
+    try {
+      final ping = await Process.run('/system/bin/ping',
+          ['-c', '1', '-W', '2', addr], runInShell: false)
+          .timeout(const Duration(seconds: 3));
+      if (ping.exitCode == 0) {
+        final match = RegExp(r'time\\s*[=<]\\s*([0-9]+(?:\\.[0-9]+)?)\\s*ms',
+            caseSensitive: false).firstMatch(ping.stdout.toString());
+        if (match != null) {
+          rtt = double.parse(match.group(1)!).ceil().clamp(1, 60000);
+        }
+      }
+    } catch (_) {
+      // Android builds without an ICMP-capable ping utility are common.
+    }
+    if (rtt == null) {
+      final protocol = _ciscoUp ? 'cisco' : _openVpnUp ? 'openvpn' : null;
+      final port = protocol == null ? null : node!.probePorts[protocol];
+      if (port != null) {
+        try {
+          final watch = Stopwatch()..start();
+          final socket = await Socket.connect(addr, port,
+              timeout: const Duration(milliseconds: 1800));
+          watch.stop();
+          socket.destroy();
+          rtt = watch.elapsedMilliseconds.clamp(1, 60000);
+          tcp = true;
+        } catch (_) {}
+      }
+    }
+    if (mounted && generation == _networkProbeGeneration &&
+        _activeServer?.id == node?.id) {
+      setState(() {
+        _serverPingMs = rtt;
+        _serverPingIsTcp = tcp;
+      });
+    }
   }
 
   Future<({String? ip, int? latencyMs})> _probeHttps(
@@ -1057,11 +1112,23 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
               ],
               const SizedBox(height: 12),
               Row(children: [
-                Expanded(child: _metric(context, Icons.public, 'IP', _publicIp ?? '—')),
+                Expanded(child: _metric(context, Icons.public,
+                    s.pick('IP عمومی', 'Public IP'), _publicIp ?? '—')),
                 const SizedBox(width: 8),
                 Expanded(child: _metric(context, Icons.bolt, 'HTTPS',
                     _httpsLatencyMs == null ? '—' : '${_httpsLatencyMs} ms')),
               ]),
+              if (_ciscoUp || _activeServer != null) ...[
+                const SizedBox(height: 8),
+                Row(children: [
+                  Expanded(child: _metric(context, Icons.lan,
+                      s.pick('IP تونل', 'Tunnel IP'), _tunnelIpv4 ?? '—')),
+                  const SizedBox(width: 8),
+                  Expanded(child: _metric(context, Icons.network_ping,
+                      _serverPingIsTcp ? 'Server TCP RTT' : 'Server ping',
+                      _serverPingMs == null ? '—' : '${_serverPingMs} ms')),
+                ]),
+              ],
               const SizedBox(height: 8),
               Row(children: [
                 Expanded(child: _metric(context, Icons.arrow_downward,
