@@ -18,6 +18,10 @@
   <string>$(MARKETING_VERSION)</string>
   <key>CFBundleVersion</key>
   <string>$(CURRENT_PROJECT_VERSION)</string>
+  <!-- Set true ONLY in a signed release that links WireGuardKitGo and
+       successfully compiles the real WireGuardAdapter transport. -->
+  <key>TwinConnectWireGuardBackendLinked</key>
+  <false/>
   <key>NSExtension</key>
   <dict>
     <key>NSExtensionPointIdentifier</key>
