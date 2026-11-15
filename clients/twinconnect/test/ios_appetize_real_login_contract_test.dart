@@ -12,6 +12,13 @@ void main() {
     expect(workflow, contains('--target lib/main.dart'));
     expect(workflow, contains('TwinConnect-iOS-Appetize-RealLogin-v0.1.0'));
     expect(workflow, contains('--target lib/ios_preview_main.dart'));
+    // The authenticated artifact MUST be smoke-tested independently from the
+    // offline simulator tour before being offered to an Appetize reviewer.
+    expect(workflow, contains(
+        'Smoke-test authenticated login target on a clean iPhone simulator'));
+    expect(workflow, contains('xcrun simctl uninstall'));
+    expect(workflow, contains('TwinConnect-iOS-RealLogin.png'));
+    expect(workflow, contains('clients/twinconnect/TwinConnect-iOS-RealLogin.png'));
     expect(main, contains('void main() => runApp(const TwinConnectApp());'));
     expect(main, contains('final _username = TextEditingController();'));
     expect(main, contains('final _password = TextEditingController();'));
