@@ -3,7 +3,7 @@ import 'app_strings.dart';
 import 'twinconnect_wave_indicator.dart';
 import 'dart:ui' show ImageFilter, FontFeature;
 import 'dart:io' show Platform, HttpClient, InternetAddress, Process, ProcessException, FileSystemException, SocketException, HttpException, Socket;
-import 'dart:convert' show utf8;
+import 'dart:convert' show utf8, base64Url, jsonEncode, jsonDecode;
 import 'dart:async' show Timer, TimeoutException, unawaited;
 
 import 'package:flutter/services.dart' show PlatformException;
@@ -2088,6 +2088,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       _autoFastest = false;
       if (!busy) _vpnError = null;
     });
+    if (Platform.isAndroid) unawaited(_saveSelection());
     if (busy) {
       ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(
         content: Text(tr('سرور انتخاب شد؛ عملیات قبلی هنوز در حال اجراست.',
@@ -2314,6 +2315,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     });
     _dark = true; // Premium dark canvas is the only supported app appearance.
     _restoreAppearance();
+    unawaited(_restoreSelection());
     _refreshNativeReadiness();
     _refreshVpnStatus();
     unawaited(_restoreCachedXrayInbounds());
@@ -2333,6 +2335,12 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         oldWidget.panel.apiOrigin != widget.panel.apiOrigin) {
       _socks5AssignedNodeIds = null;
       _socks5NodesError = null;
+      _selectionRevision++;
+      _selectionRestored = false;
+      _filter = 'all';
+      _selected = 0;
+      _androidExplicitNodeSelected = false;
+      unawaited(_restoreSelection());
       // No in-memory Xray credentials may cross tenants or accounts.
       _xrayGroups = const [];
       _xrayGroupsLoaded = false;
@@ -2346,6 +2354,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       // The first session inventory often arrives after the dashboard
       // initializes; retry restore once authorized nodes become available.
       _xrayGroups = _assignedXrayGroups(_xrayGroups);
+      if (!_selectionRestored) unawaited(_restoreSelection());
       if (_xrayGroups.isEmpty && !_xrayGroupsLoaded) {
         unawaited(_restoreCachedXrayInbounds());
       }
@@ -2718,6 +2727,77 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   String _search = '';
   int _selected = 0;
   bool _androidExplicitNodeSelected = false;
+
+  // Persist only UI selections; never cached VPN secrets or connectivity.
+  static const _selectionPreferencePrefix = 'twinconnect_selection_v1_';
+  bool _selectionRestored = false;
+  int _selectionRevision = 0;
+
+  String get _selectionPreferenceKey => _selectionPreferencePrefix +
+      base64Url.encode(utf8.encode([
+        widget.panel.namespace,
+        widget.panel.apiOrigin,
+        widget.username,
+      ].join('|')));
+
+  Future<void> _saveSelection() async {
+    if (!Platform.isAndroid) return;
+    _selectionRevision++;
+    final key = _selectionPreferenceKey;
+    final value = jsonEncode({
+      'protocol': _filter,
+      'node_id': _androidExplicitNodeSelected ? _selectedServerId : null,
+    });
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(key, value);
+    } catch (_) {
+      // A storage failure must not interrupt an active connection.
+    }
+  }
+
+  Future<void> _restoreSelection() async {
+    if (!Platform.isAndroid || _selectionRestored ||
+        widget.catalog == null || widget.servers == null) return;
+    final revision = _selectionRevision;
+    final key = _selectionPreferenceKey;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(key);
+      if (raw == null) {
+        if (mounted && revision == _selectionRevision &&
+            key == _selectionPreferenceKey) _selectionRestored = true;
+        return;
+      }
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map) return;
+      final protocol = decoded['protocol'];
+      final nodeId = decoded['node_id'];
+      if (!mounted || revision != _selectionRevision ||
+          key != _selectionPreferenceKey) return;
+      final entitled = widget.catalog!.entries.any((entry) =>
+          entry.protocol.code == protocol && entry.selected &&
+          entry.configRecordPresent);
+      final protocolAllowed = protocol == 'all' || entitled;
+      final nodes = widget.servers!.servers;
+      final matching = nodeId is String
+          ? nodes.indexWhere((node) => node.id == nodeId) : -1;
+      setState(() {
+        _filter = protocolAllowed && protocol is String ? protocol : 'all';
+        if (matching >= 0) {
+          _selected = matching;
+          _androidExplicitNodeSelected = true;
+        } else {
+          _selected = 0;
+          _androidExplicitNodeSelected = false;
+        }
+        _selectionRestored = true;
+      });
+    } catch (_) {
+      if (mounted && revision == _selectionRevision &&
+          key == _selectionPreferenceKey) _selectionRestored = true;
+    }
+  }
   final Set<int> _favorites = <int>{};
   // User-facing Xray inbounds remain distinct choices. Last validated
   // entries are stored in OS-encrypted short-lived display cache only.
@@ -4152,6 +4232,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                   _filter = entry.$1;
                   _autoFastest = false;
                 });
+                if (Platform.isAndroid) unawaited(_saveSelection());
                 if (entry.$1 == 'v2ray') _loadXrayGroups();
                 if (entry.$1 == 'socks5') {
                   unawaited(_refreshSocks5AvailableNodes());
