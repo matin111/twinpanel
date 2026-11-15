@@ -2,7 +2,7 @@ import 'twin_language_picker.dart';
 import 'app_strings.dart';
 import 'twinconnect_wave_indicator.dart';
 import 'dart:ui' show ImageFilter, FontFeature;
-import 'dart:io' show Platform, HttpClient, InternetAddress, Process, ProcessException, FileSystemException, SocketException, HttpException;
+import 'dart:io' show Platform, HttpClient, InternetAddress, Process, ProcessException, FileSystemException, SocketException, HttpException, Socket;
 import 'dart:convert' show utf8;
 import 'dart:async' show Timer, TimeoutException, unawaited;
 
@@ -386,8 +386,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
 
   Future<void> _probeNode(int index) async {
     final nodes = widget.servers?.servers;
-    if (!Platform.isWindows || nodes == null || index < 0 ||
-        index >= nodes.length) { return; }
+    if ((!Platform.isWindows && !Platform.isAndroid) ||
+        nodes == null || index < 0 || index >= nodes.length) { return; }
     final node = nodes[index];
     if (_pingingNodes.contains(node.id)) { return; }
     if (node.probeIp == null) {
@@ -402,6 +402,49 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     String? error;
     try {
       final clock = Stopwatch()..start();
+      if (Platform.isAndroid) {
+        // Android does not have Windows PING.EXE. Probe the real assigned
+        // numeric address with one platform ICMP echo; never invent an RTT.
+        try {
+          final response = await Process.run(
+            '/system/bin/ping',
+            ['-c', '1', '-W', '2', node.probeIp!],
+            runInShell: false,
+          ).timeout(const Duration(seconds: 4));
+          clock.stop();
+          if (response.exitCode == 0) {
+            final match = RegExp(r'time\\s*[=<]\\s*([0-9]+(?:\\.[0-9]+)?)\\s*ms',
+              caseSensitive: false).firstMatch(response.stdout.toString());
+            if (match != null) {
+              latency = double.parse(match.group(1)!).ceil().clamp(1, 60000);
+            } else {
+              latency = clock.elapsedMilliseconds.clamp(1, 60000);
+              error = 'APPROXIMATE_RTT';
+            }
+          } else {
+            error = 'ICMP_TIMEOUT_OR_BLOCKED';
+          }
+        } catch (_) {
+          error = 'ICMP_TIMEOUT_OR_BLOCKED';
+        }
+        // A blocked ICMP reply doesn't imply the VPN endpoint is unreachable.
+        // TCP:443 is only a reachability estimate, never represented as ICMP.
+        if (latency == null) {
+          final tcpClock = Stopwatch()..start();
+          try {
+            final socket = await Socket.connect(
+              node.probeIp!, 443, timeout: const Duration(milliseconds: 1800),
+            );
+            tcpClock.stop();
+            socket.destroy();
+            latency = tcpClock.elapsedMilliseconds.clamp(1, 60000);
+            error = 'TCP_CONNECT_RTT';
+          } catch (_) {
+            error = 'ICMP_TIMEOUT_OR_BLOCKED';
+          }
+        }
+        return;
+      }
       final windowsRoot = Platform.environment['SystemRoot'];
       if (windowsRoot == null || windowsRoot.isEmpty) {
         error = 'PING_PROGRAM_UNAVAILABLE';
@@ -3879,6 +3922,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                     'Ping test failed.'),
                   'APPROXIMATE_RTT' => tr('زمان تقریبی شامل سربار اجرای Ping',
                     'Approximate timing including ping startup overhead'),
+                  'TCP_CONNECT_RTT' => tr('زمان اتصال TCP به پورت ۴۴۳؛ پینگ ICMP نیست.',
+                    'TCP connect to port 443; not ICMP ping.'),
                   _ => tr('پینگ سرور', 'Server ping'),
                 },
                 child: Text(
@@ -3889,7 +3934,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                     : ServerLatency.label(
                         _latencyFor(widget.servers!.servers[index]),
                         approximate: _nodePingErrors[
-                          widget.servers!.servers[index].id] == 'APPROXIMATE_RTT'),
+                          widget.servers!.servers[index].id] == 'APPROXIMATE_RTT' ||
+                        _nodePingErrors[widget.servers!.servers[index].id] == 'TCP_CONNECT_RTT'),
                   style: TextStyle(
                     fontSize: 11, fontWeight: FontWeight.w700,
                     color: ServerLatency.color(
