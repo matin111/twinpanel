@@ -20,7 +20,20 @@ export type LoginResult={
   two_factor_token?:string|null;
 };
 
+export type ReservedRenewal={
+  status:"reserved"|"needs_review";
+  plan_name:string;
+  plan_id:number|null;
+  traffic_gb:number;
+  traffic_bytes:number;
+  duration_days:number;
+  reserved_at:string;
+  activation:"when_current_quota_or_expiry_ends";
+  message:string;
+};
+
 export type MySubscription={
+  reserved_renewal?:ReservedRenewal|null;
   id:number;
   user_id:number;
   plan_id:number;

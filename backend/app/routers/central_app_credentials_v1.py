@@ -17,6 +17,7 @@ from ..central_app_credentials import (
     verify_app_session, issue_app_refresh_token, renew_app_session,
 )
 from ..central_app_identity import central_app_entitled, installation_namespace, subscription_app_namespace
+from ..subscription_renewal_status_v1 import next_reserved_renewal
 from ..database import get_db
 from ..deps import get_current_user, require_admin, require_reseller
 from ..models import Subscription, User, Node, SubscriptionNode, NodeStatus, Plan
@@ -183,6 +184,7 @@ def session_plan(
         "user_count_category": str(grouping.category or "سایر پلن‌ها")
             if grouping else "سایر پلن‌ها",
         "device_limit": int(plan.device_limit) if plan and plan.device_limit is not None else 0,
+        "reserved_renewal": next_reserved_renewal(db, sub.id),
     }, headers=_PRIVATE_HEADERS)
 
 
@@ -203,6 +205,7 @@ def session_account(
         "expires_at": expiry.isoformat() + "Z" if expiry else None,
         "activation_duration_days": int(duration) if duration is not None else None,
         "status": sub.status.value if hasattr(sub.status, "value") else str(sub.status),
+        "reserved_renewal": next_reserved_renewal(db, sub.id),
     }, headers=_PRIVATE_HEADERS)
 
 

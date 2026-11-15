@@ -11,6 +11,7 @@ from ..models import (
     SubscriptionProtocol, SubscriptionStatus, ProtocolCredential, User,
 )
 from ..schemas import MySubscriptionOut, SubscriptionCreate, SubscriptionOut
+from ..subscription_renewal_status_v1 import next_reserved_renewal
 from ..subscription_override_models import effective_device_limit, duration_is_unlimited
 
 from ..services.subscription_factory import create_subscription_core
@@ -260,6 +261,7 @@ def my_subscriptions(user: User = Depends(get_current_user), db: Session = Depen
             traffic_remaining_gb=round(remaining_gb, 2), days_remaining=days_remaining,
             device_limit=effective_device_limit(db, sub, plan),
             duration_unlimited=duration_is_unlimited(db, sub, plan),
+            reserved_renewal=next_reserved_renewal(db, sub.id),
         ))
     return result
 
