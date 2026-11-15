@@ -24,7 +24,7 @@ void main() {
     final shared = File('lib/live_dashboard.dart').readAsStringSync();
     final native = File('ios_native/TwinConnectIOSVpnBridge.swift')
         .readAsStringSync();
-    expect(shared, contains('onPressed: !Platform.isWindows || _vpnBusy ? null : _toggleVpn'));
+    expect(shared, contains('onPressed: _vpnBusy ? null : (Platform.isIOS'));
     expect(shared, contains("Key('iosVpnEngineUnavailableNotice')"));
     expect(native, contains('"engineReady": false'));
     expect(native, contains('"supportedProtocols": [String]()'));
