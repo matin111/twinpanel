@@ -51,7 +51,28 @@ def patch_gradle() -> None:
         '    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")\n'
         "}\n"
     )
+    # R8 minification in release APKs must not rename JNI-visible fields or
+    # callback methods.  The C library looks up asyncLock, libctx and other
+    # class members by their original Java names (not by compile-time symbols).
+    current += (
+        "\n// Preserve the OpenConnect Java/JNI ABI in optimized release APKs.\n"
+        "android {\n"
+        "    buildTypes {\n"
+        '        getByName("release") {\n'
+        '            proguardFiles("proguard-rules.pro")\n'
+        "        }\n"
+        "    }\n"
+        "}\n"
+    )
     filename.write_text(current, encoding="utf-8")
+    rules = ANDROID / "app" / "proguard-rules.pro"
+    with rules.open("a", encoding="utf-8") as out:
+        out.write(
+            "\n# JNI ABI used by pinned libopenconnect.so. Never rename these.\n"
+            "-keep class org.infradead.libopenconnect.** { *; }\n"
+            "-keep class com.axevpn.flutter.openconnect.NativeOpenConnectSession { *; }\n"
+            "-keep class com.axevpn.flutter.openconnect.NativeOpenConnectSession$* { *; }\n"
+        )
 
 
 def patch_manifest() -> None:
