@@ -4755,12 +4755,23 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                         child: Column(children: [
                           Divider(color: line),
                           for (final i in indices)
-                             if (_filter == 'v2ray')
-                               for (final inbound in
-                                   _inboundsForNode(widget.servers!.servers[i].id))
-                                 xrayInboundRow(i, inbound)
-                             else
-                               serverRow(i),
+                            if (_filter == 'v2ray') ...[
+                              for (final inbound in _inboundsForNode(
+                                  widget.servers!.servers[i].id))
+                                xrayInboundRow(i, inbound),
+                              if (!_xrayGroupsLoading && _xrayGroupsLoaded &&
+                                  _inboundsForNode(
+                                      widget.servers!.servers[i].id).isEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 10),
+                                  child: txt(tr(
+                                    'اینباند واقعی این سرور برای این اشتراک از پنل دریافت نشد.',
+                                    'No provisioned Xray inbound was delivered for this account and node.'),
+                                    size: 11, color: const Color(0xFFFFBE67)),
+                                ),
+                            ] else
+                              serverRow(i),
                         ]),
                       )
                     : const SizedBox(width: double.infinity),
