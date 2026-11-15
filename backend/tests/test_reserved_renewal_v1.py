@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from app.models import SubscriptionStatus
+from app.models import SubscriptionStatus, Plan
 from app import reserved_renewal_service as service
 
 
@@ -42,6 +42,25 @@ class FakeDB:
         self.rollbacks += 1
 
 
+class ReservationDB(FakeDB):
+    def __init__(self, subscription, plan=None):
+        super().__init__([Result(value=subscription), Result(value=None)])
+        self.subscription = subscription
+        self.plan = plan
+        self.added = []
+
+    def get(self, model, ident):
+        return self.plan if model is Plan else None
+
+    def add(self, record):
+        self.added.append(record)
+
+    def flush(self):
+        for record in self.added:
+            if hasattr(record, "source_reference") and record.id is None:
+                record.id = 901
+
+
 class DeferredRenewalTest(unittest.TestCase):
     def subscription(self, **overrides):
         values = dict(id=22, plan_id=5, status=SubscriptionStatus.ACTIVE,
@@ -59,6 +78,37 @@ class DeferredRenewalTest(unittest.TestCase):
                                traffic_bytes=25 * 1024**3, duration_days=30,
                                source="website_bot", actor="customer:1",
                                status="queued", activated_at=None)
+
+    def test_days_only_renewal_retains_quota_instead_of_unlimited(self):
+        sub = self.subscription()
+        db = ReservationDB(sub, SimpleNamespace(duration_days=30))
+        row = service.reserve_renewal(
+            db, subscription_id=22, plan_id=5, plan_name="original",
+            traffic_bytes=0, duration_days=30, source="admin",
+            reference="days-only", actor="admin:1")
+        self.assertEqual(row.traffic_bytes, 10 * 1024**3)
+        self.assertEqual(row.duration_days, 30)
+        self.assertEqual(sub.traffic_used_bytes, 4 * 1024**3)
+
+    def test_traffic_only_renewal_retains_plan_duration(self):
+        sub = self.subscription()
+        db = ReservationDB(sub, SimpleNamespace(duration_days=45))
+        row = service.reserve_renewal(
+            db, subscription_id=22, plan_id=5, plan_name="original",
+            traffic_bytes=20 * 1024**3, duration_days=0,
+            source="reseller", reference="traffic-only", actor="reseller:1")
+        self.assertEqual(row.traffic_bytes, 20 * 1024**3)
+        self.assertEqual(row.duration_days, 45)
+
+    def test_missing_period_fallback_rejected_instead_of_creating_unlimited_account(self):
+        sub = self.subscription(activation_duration_days=0, starts_at=None)
+        db = ReservationDB(sub)
+        with self.assertRaises(Exception) as caught:
+            service.reserve_renewal(
+                db, subscription_id=22, plan_id=5, plan_name="original",
+                traffic_bytes=20 * 1024**3, duration_days=0,
+                source="admin", reference="missing-duration", actor="admin:1")
+        self.assertEqual(getattr(caught.exception, "status_code", None), 422)
 
     def test_not_due_does_not_modify_running_period(self):
         sub = self.subscription()
