@@ -42,10 +42,15 @@ embed.dst_subfolder_spec = '13'
 embed.dst_path = ''
 build_file = embed.add_file_reference(extension.product_reference)
 build_file.settings = { 'ATTRIBUTES' => ['RemoveHeadersOnCopy'] }
-# Keep extension embed before the Flutter Thin Binary script to prevent cycles.
-thin = runner.build_phases.find { |p| p.isa == 'PBXShellScriptBuildPhase' && p.name == 'Thin Binary' }
-raise 'Thin Binary build phase missing' unless thin
+# macOS Flutter projects may omit the iOS-only "Thin Binary" phase.
+# Embed before any shell scripts so generated build phases cannot introduce
+# a dependency cycle; if there is no shell script, append at the end.
+shell = runner.build_phases.find { |p| p.isa == 'PBXShellScriptBuildPhase' }
 runner.build_phases.delete(embed)
-runner.build_phases.insert(runner.build_phases.index(thin), embed)
+if shell
+  runner.build_phases.insert(runner.build_phases.index(shell), embed)
+else
+  runner.build_phases << embed
+end
 project.save
 puts 'Created macOS PacketTunnel extension target (backend not linked)'
