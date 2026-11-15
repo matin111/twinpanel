@@ -439,9 +439,17 @@ def subscription_list_keyboard(rows, imported=None):
     for imported_account in (imported or [])[:30]:
         sub_id = int(imported_account["id"])
         username = str(imported_account.get("account_username") or f"#{sub_id}")
+        renewal = imported_account.get("reserved_renewal")
+        renewal_label = (
+            " · ⚠️ تمدید نیازمند بررسی" if isinstance(renewal, dict)
+                and renewal.get("status") == "needs_review"
+            else " · 🕒 تمدید رزرو شده" if isinstance(renewal, dict)
+                and renewal.get("status") == "reserved"
+            else ""
+        )
         buttons.append([
             InlineKeyboardButton(
-                text=f"🔗 👤 {username}"[:60],
+                text=(f"🔗 👤 {username}" + renewal_label)[:60],
                 callback_data=f"subimp:{sub_id}",
             )
         ])
