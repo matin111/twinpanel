@@ -689,6 +689,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     }
     final previousFilter = _filter;
     final previousSelected = _selected;
+    final manualRevision = _choiceRevision;
     setState(() { _fastestConnecting = true; _vpnError = null; });
     try {
       final checks = await Future.wait<Object>([
@@ -742,7 +743,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           // In All mode only, check another authorized/installed family.
         }
       }
-      if (!mounted) return;
+      if (!mounted || _choiceRevision != manualRevision) return;
       if (selectedProtocol == null || selectedIndex == null) {
         throw const FormatException('NO_MEASURED_SERVER');
       }
@@ -755,25 +756,28 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         _page = 'home';
       });
       await _toggleVpn();
-      if (!mounted) return;
-      if (_verifiedConnectionActive && _vpnError == null) {
-        setState(() => _autoFastest = true);
+      if (!mounted || _choiceRevision != manualRevision) return;
+      final connected = _verifiedConnectionActive && _vpnError == null;
+      setState(() {
+        // Fast Server chooses a transport for THIS connection only. The
+        // protocol and node selected by the user remain unchanged.
+        _autoFastest = connected;
+        _filter = previousFilter;
+        _selected = previousSelected;
+      });
+      if (connected) {
         await prefs.setString(
             'twinconnect_last_verified_protocol', selectedProtocol);
-      } else {
+      }
+    } catch (error) {
+      if (mounted && _choiceRevision == manualRevision) {
         setState(() {
+          _vpnError = _errorText(error);
           _autoFastest = false;
           _filter = previousFilter;
           _selected = previousSelected;
         });
       }
-    } catch (error) {
-      if (mounted) setState(() {
-        _vpnError = _errorText(error);
-        _autoFastest = false;
-        _filter = previousFilter;
-        _selected = previousSelected;
-      });
     } finally {
       if (mounted) setState(() => _fastestConnecting = false);
     }
@@ -2758,11 +2762,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       return;
     }
     if (_filter != 'all' && _filter != 'wireguard') {
-      final id = _selectedServerId;
-      if (id == null) {
-        setState(() => _vpnError = 'SELECT_MODERN_SERVER');
-        return;
-      }
+      String? targetId = _selectedServerId;
       if (_autoFastest) {
         try {
           final best = await _fastestAuthorizedIndex(_filter);
@@ -2770,30 +2770,34 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
             throw const FormatException('NO_MEASURED_SERVER');
           }
           if (!mounted) return;
-          setState(() => _selected = best);
+          targetId = widget.servers!.servers[best].id;
         } catch (error) {
           if (mounted) setState(() => _vpnError = _errorText(error));
           return;
         }
       }
+      if (targetId == null) {
+        setState(() => _vpnError = 'SELECT_MODERN_SERVER');
+        return;
+      }
       if (_filter == 'cisco') {
-        await _startCiscoTunnel(_selectedServerId!);
+        await _startCiscoTunnel(targetId);
       } else if (_filter == 'openvpn') {
-        await _startOpenVpnTunnel(_selectedServerId!);
+        await _startOpenVpnTunnel(targetId);
       } else if (_filter == 'l2tp') {
-        await _startL2tpTunnel(_selectedServerId!);
+        await _startL2tpTunnel(targetId);
       } else if (_filter == 'v2ray') {
-        await _startXrayTunnel(_selectedServerId!);
+        await _startXrayTunnel(targetId);
       } else if (_filter == 'sudoku') {
-        await _startSudokuTunnel(_selectedServerId!);
+        await _startSudokuTunnel(targetId);
       } else if (_filter == 'mieru') {
-        await _startMieruTunnel(_selectedServerId!);
+        await _startMieruTunnel(targetId);
       } else if (_filter == 'trusttunnel') {
-        await _startTrustTunnel(_selectedServerId!);
+        await _startTrustTunnel(targetId);
       } else if (_filter == 'amneziawg') {
-        await _startAmneziaWgTunnel(_selectedServerId!);
+        await _startAmneziaWgTunnel(targetId);
       } else if (SingBoxProfileValidator.supportsFamily(_filter)) {
-        await _startModernTunnel(_filter, _selectedServerId!);
+        await _startModernTunnel(_filter, targetId);
       } else {
         setState(() => _vpnError = 'NATIVE_PROTOCOL_ENGINE_NOT_READY');
       }
@@ -2829,15 +2833,18 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         // Allow disconnect at any time, but never start a new WireGuard
         // session while requested OS-wide protection is unverified.
         await _requireVerifiedGuardIfRequested();
+        String? selectedId = _selectedServerId;
         if (_autoFastest) {
           final best = await _fastestAuthorizedIndex('wireguard');
           if (best == null) {
             throw const FormatException('NO_MEASURED_SERVER');
           }
           if (!mounted) return;
-          setState(() => _selected = best);
+          selectedId = widget.servers!.servers[best].id;
         }
-        final selectedId = _selectedServerId!;
+        if (selectedId == null) {
+          throw const FormatException('SELECT_WIREGUARD_SERVER');
+        }
         // Policy storage and native OS readiness are independent.
         // Probe both concurrently, then reuse the SAME native capability
         // snapshot for the mandatory per-protocol readiness gate.
