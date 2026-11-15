@@ -89,6 +89,25 @@ class WindowsOpenConnectTunnel {
 
   /// Returns real OS interface byte totals for the verified Cisco route.
   /// No whole-system fallback; null means the VPN interface was not identified.
+  /// DTLS transport evidence from the owned OpenConnect process only.
+  /// An unknown state must never be labelled TCP or UDP by assumption.
+  Future<String> transportMode() async {
+    if (!_nativeActive) return 'stopped';
+    try {
+      final raw = await _channel.invokeMethod<String>('openConnectTransportMode')
+          .timeout(const Duration(seconds: 4));
+      if (const {
+        'stopped', 'dtls_log_established', 'dtls_log_failed',
+        'dtls_unverified',
+      }.contains(raw)) {
+        return raw!;
+      }
+    } catch (_) {
+      // No native diagnostic is not proof of UDP failure or disconnection.
+    }
+    return 'dtls_unverified';
+  }
+
   Future<({int received, int sent})?> readTrafficTotals() async {
     if (!_nativeActive || _exitIp == null) return null;
     try {
