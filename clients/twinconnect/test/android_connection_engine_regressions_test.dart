@@ -24,6 +24,20 @@ void main() {
     expect(service, contains('throw error; // Fail closed on TLS/certificate verification.'));
   });
 
+  test('Cisco auth response parser never blocks reading a keep-alive body', () {
+    final service = File(
+      'native/android/java/com/axevpn/flutter/openconnect/'
+      'AxeOpenConnectVpnService.java',
+    ).readAsStringSync();
+    final start = service.indexOf('private String parseAuthCookie(');
+    final end = service.indexOf('private VpnTunnelConfig parseTunnelHeaders(', start);
+    expect(start, greaterThan(0));
+    expect(end, greaterThan(start));
+    final parser = service.substring(start, end);
+    expect(parser, isNot(contains('drainAll(is);')));
+    expect(service, contains('tls.setSoTimeout(12000);'));
+  });
+
   test('Cisco starts standard config-auth session before credentials', () {
     final service = File(
       'native/android/java/com/axevpn/flutter/openconnect/'
