@@ -343,6 +343,16 @@ void main() {
     expect(theme, contains('Color(0xFFF3F7F8), 0.97'));
   });
 
+  test('Android server ping probes numeric inventory IP without Windows-only gate', () {
+    final dashboard = File('lib/live_dashboard.dart').readAsStringSync();
+    expect(dashboard, contains('(!Platform.isWindows && !Platform.isAndroid)'));
+    expect(dashboard, contains("'/system/bin/ping'"));
+    expect(dashboard, contains('Socket.connect('));
+    expect(dashboard, contains("'TCP_CONNECT_RTT'"));
+    expect(dashboard, contains("Key('probeNode_"));
+    expect(dashboard, contains('TCP connect to port 443; not ICMP ping.'));
+  });
+
   test('all server ping actions use lightning instead of the old network icon', () {
     final dashboard = File('lib/live_dashboard.dart').readAsStringSync();
     expect(dashboard, isNot(contains('Icons.network_ping_rounded')));
