@@ -502,22 +502,6 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         measuredRtts: sampled);
   }
 
-  int? get _fastestKnownIndex {
-    final servers = widget.servers?.servers;
-    if (servers == null) return null;
-    int? best;
-    for (var i = 0; i < servers.length; i++) {
-      final node = servers[i];
-      // Only a measured ICMP value qualifies; panel hints are not live ping.
-      final latency = _nodePings[node.id];
-      if (!node.nodeOnline || latency == null || latency < 0) continue;
-      if (best == null || latency < _nodePings[servers[best].id]!) {
-        best = i;
-      }
-    }
-    return best;
-  }
-
   void _resetNetworkStats() {
     _networkEpoch++;
     _networkTimer?.cancel();
