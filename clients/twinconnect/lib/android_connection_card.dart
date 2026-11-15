@@ -89,10 +89,31 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
   @override
   void initState() {
     super.initState();
+    _restoreNativeXraySession();
     unawaited(_refresh());
     _telemetryTimer = Timer.periodic(const Duration(seconds: 2), (_) {
       unawaited(_refresh());
     });
+  }
+
+  @override
+  void didUpdateWidget(covariant AndroidConnectionCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Node inventory may arrive after the view is first mounted.
+    if (oldWidget.servers != widget.servers) {
+      _restoreNativeXraySession();
+    }
+  }
+
+  void _restoreNativeXraySession() {
+    final native = AndroidXrayTunnel.instance;
+    final nodeId = native.activeNodeId;
+    if (!native.isConnected || nodeId == null) return;
+    final node = widget.servers?.servers
+        .where((server) => server.id == nodeId).firstOrNull;
+    _xrayCoreUp = true;
+    _activeServer = node;
+    _activeServerName = node?.name;
   }
 
   @override
