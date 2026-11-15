@@ -412,12 +412,23 @@ def subscription_list_keyboard(rows, imported=None):
             or "اشتراک"
         ).strip()
 
+        # Show a queued next cycle directly in My Subscriptions.
+        renewal = sub.get("reserved_renewal")
+        reserved = isinstance(renewal, dict) and renewal.get("status") in (
+            "reserved", "needs_review",
+        )
+        renewal_mark = (
+            "⚠️ " if reserved and renewal.get("status") == "needs_review"
+            else "🕒 " if reserved else ""
+        )
         # Telegram button:
-        # 🟢 username | پلن
+        # 🟢 username · 🕒 تمدید رزرو شده
         buttons.append([
             InlineKeyboardButton(
                 text=(
-                    f"{dot} 👤 {username}"
+                    f"{dot} 👤 {username}" +
+                    (" · ⚠️ تمدید نیازمند بررسی" if renewal_mark == "⚠️ "
+                     else " · 🕒 تمدید رزرو شده" if reserved else "")
                 )[:60],
                 callback_data=(
                     f"sub:{sub_id}"
@@ -659,6 +670,7 @@ async def _enrich_subscription_rows(
                 "traffic_remaining_gb",
                 "plan_name",
                 "expires_at",
+                "reserved_renewal",
             ):
                 if (
                     key in manage
@@ -685,6 +697,23 @@ async def _enrich_subscription_rows(
 
 
 def _subscription_text(info):
+    renewal = info.get("reserved_renewal")
+    renewal_text = ""
+    if isinstance(renewal, dict) and renewal.get("status") in ("reserved", "needs_review"):
+        needs_review = renewal.get("status") == "needs_review"
+        renewal_heading = (
+            "⚠️ <b>تمدید نیازمند بررسی</b>"
+            if needs_review else
+            "🕒 <b>تمدید رزروشده برای دوره بعد</b>"
+        )
+        renewal_text = (
+            "\\n\\n" + renewal_heading + "\\n"
+            + "📦 پلن بعدی: <b>" + escape(str(renewal.get("plan_name") or "اشتراک")) + "</b>\\n"
+            + "📊 حجم دوره بعد: <b>" + escape(_fmt_gb(float(renewal.get("traffic_gb") or 0))) + " GB</b>\\n"
+            + "📅 مدت دوره بعد: <b>" + str(int(renewal.get("duration_days") or 0)) + " روز</b>\\n"
+            + "🕓 ثبت تمدید: <b>" + escape(_fmt_date(renewal.get("reserved_at"))) + "</b>\\n"
+            + escape(str(renewal.get("message") or ""))
+        )
     limit = float(
         info.get(
             "traffic_limit_gb",
@@ -774,6 +803,7 @@ def _subscription_text(info):
 
         f"🌐 پروتکل‌ها:\n"
         f"<b>{escape(_protocols_text(info.get('protocols')))}</b>"
+        + renewal_text
     )
 
 
