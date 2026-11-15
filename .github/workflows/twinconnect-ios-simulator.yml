@@ -48,9 +48,10 @@ jobs:
           from pathlib import Path
           app = Path("ios/Runner/AppDelegate.swift")
           bridge = Path("ios_native/TwinConnectIOSVpnBridge.swift")
+          controller = Path("ios_native/TwinConnectIOSVPNControl.swift")
           source = app.read_text()
-          native = bridge.read_text()
-          for declaration in ("import Foundation", "import Flutter", "import NetworkExtension"):
+          native = bridge.read_text() + "\n" + controller.read_text()
+          for declaration in ("import Foundation", "import Flutter", "import NetworkExtension", "import Security"):
               native = native.replace(declaration + "\n", "")
           # Flutter has two supported iOS templates:
           # legacy AppDelegate registers against self; modern scene-based
@@ -83,7 +84,7 @@ jobs:
           source = (
               source[:anchor.end()] + "\n" + registration +
               source[anchor.end():])
-          app.write_text("import NetworkExtension\n" + source + "\n" + native)
+          app.write_text("import NetworkExtension\nimport Security\n" + source + "\n" + native)
           PY
       - name: Type-check packet tunnel provider against iOS Simulator SDK
         shell: bash
