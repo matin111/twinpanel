@@ -348,6 +348,9 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
       // Try independent providers concurrently so a blocked endpoint cannot
       // hold the IP and latency cards blank for multiple sequential timeouts.
       final probes = await Future.wait([
+        // Verified on a real Android device using Cisco: Cloudflare HTTPS
+        // trace at its literal IPv4 address works without DNS/A-AAAA racing.
+        _probeHttps('1.1.1.1', '/cdn-cgi/trace', cloudflareTrace: true),
         _probeHttps('api.ipify.org', '/'),
         _probeHttps('icanhazip.com', '/'),
         _probeHttps('www.cloudflare.com', '/cdn-cgi/trace', cloudflareTrace: true),
