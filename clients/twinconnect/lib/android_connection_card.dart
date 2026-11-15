@@ -696,7 +696,9 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
     setState(() { _busy = true; _errorCode = null; });
     var stage = 'ENGINE_INIT';
     try {
-      await AndroidSingBoxTunnel.instance.initialize();
+      // The native Xray runtime is independent of libbox. In particular,
+      // failing to initialize an unrelated sing-box engine must never
+      // prevent an authorized XHTTP Reality session from starting.
       stage = 'PROFILE_FETCH';
       final response = await TenantApi.fromBuildConfig()
           .loadSessionNativeProfiles(
