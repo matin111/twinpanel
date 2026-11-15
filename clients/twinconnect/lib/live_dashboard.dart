@@ -538,7 +538,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     final locallyAuthorized = widget.catalog?.entries.any((entry) =>
         entry.protocol.code == protocolCode && entry.selected &&
         entry.configRecordPresent) ?? false;
-    if (!locallyAuthorized) {
+    if (!locallyAuthorized || !_protocolEntitled(protocolCode)) {
       throw const FormatException('PROTOCOL_NOT_INCLUDED_IN_SUBSCRIPTION');
     }
     final username = widget.username;
@@ -681,7 +681,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     if (_vpnBusy || _fastestConnecting || _verifiedConnectionActive ||
         _vpnUp || _modernUp || _vpnCleanup || !Platform.isWindows) return;
     final authorized = widget.catalog?.entries.where((entry) =>
-        entry.selected && entry.configRecordPresent)
+        entry.selected && entry.configRecordPresent &&
+        _protocolEntitled(entry.protocol.code))
         .map((entry) => entry.protocol.code).toSet() ?? <String>{};
     if (authorized.isEmpty) {
       setState(() => _vpnError = 'PROTOCOL_NOT_INCLUDED_IN_SUBSCRIPTION');
@@ -2315,6 +2316,16 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       // until a verified native VPN tunnel engine is installed.
       return;
     }
+    if (_filter != 'all' && !_protocolEntitled(_filter)) {
+      if (mounted) {
+        setState(() => _vpnError = 'PROTOCOL_NOT_INCLUDED_IN_SUBSCRIPTION');
+      }
+      return;
+    }
+    if (_filter == 'all' && !_protocolEntitled('wireguard')) {
+      // Browse all authorized servers without launching unrelated WireGuard.
+      return;
+    }
     if (_filter != 'all' && _filter != 'wireguard') {
       // Selecting a node when disconnected only changes the selection.
       // While a modern tunnel is connected, switching nodes triggers
@@ -2773,6 +2784,16 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         _ciscoTunnel.isRunning || _openVpnTunnel.hasChild ||
         _l2tpTunnel.hasChild) {
       await _stopModernTunnel();
+      return;
+    }
+    if (_filter != 'all' && !_protocolEntitled(_filter)) {
+      setState(() => _vpnError = 'PROTOCOL_NOT_INCLUDED_IN_SUBSCRIPTION');
+      return;
+    }
+    // "All" is a browsing filter, not a request to use unlicensed WG.
+    if (_filter == 'all' && !_autoFastest &&
+        !_protocolEntitled('wireguard')) {
+      setState(() => _vpnError = 'SELECT_PROTOCOL_FOR_FASTEST');
       return;
     }
     if (_filter != 'all' && _filter != 'wireguard') {
