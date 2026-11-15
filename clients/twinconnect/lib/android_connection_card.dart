@@ -272,10 +272,8 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
     }
   }
 
-  /// Probe two independent HTTPS IP services. A failed ipify request alone
-  /// must not be mistaken for an offline VPN. Responses are treated as a
-  /// network reachability signal ONLY when the native peer handshake is fresh.
-  /// Never disable TLS verification or send credentials to probe providers.
+  /// Independent HTTPS egress checks. The measured time is HTTPS response
+  /// latency, not ICMP ping or the VPN gateway round-trip time.
   bool get _activeVerifiedTransport =>
       (_up && _handshake) || _openVpnUp || _ciscoUp ||
       (_singBoxProtocol != null && AndroidSingBoxTunnel.instance.isConnected);
@@ -290,47 +288,70 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
     unawaited(_checkInternet());
   }
 
+  Future<({String? ip, int? latencyMs})> _probeHttps(
+      String host, String path, {bool cloudflareTrace = false}) async {
+    final client = HttpClient()
+      ..connectionTimeout = const Duration(seconds: 4)
+      ..findProxy = (_) => 'DIRECT';
+    try {
+      final watch = Stopwatch()..start();
+      final request = await client.getUrl(Uri.https(host, path))
+          .timeout(const Duration(seconds: 6));
+      request.headers.set(HttpHeaders.acceptHeader, 'text/plain');
+      final response = await request.close().timeout(const Duration(seconds: 6));
+      if (response.statusCode != HttpStatus.ok) {
+        return (ip: null, latencyMs: null);
+      }
+      final body = (await utf8.decoder.bind(response)
+          .join().timeout(const Duration(seconds: 6)));
+      watch.stop();
+      if (body.length > 2048) return (ip: null, latencyMs: null);
+      final candidate = cloudflareTrace
+          ? RegExp(r'^ip=([^\r\n]+)', multiLine: true).firstMatch(body)?.group(1)
+          : body.trim();
+      final parsed = candidate == null ? null : InternetAddress.tryParse(candidate);
+      return (ip: parsed?.address, latencyMs: watch.elapsedMilliseconds);
+    } catch (_) {
+      return (ip: null, latencyMs: null);
+    } finally {
+      client.close(force: true);
+    }
+  }
+
   Future<void> _checkInternet() async {
     if (_checkingInternet) return;
     _checkingInternet = true;
     final generation = _networkProbeGeneration;
     _lastInternetCheck = DateTime.now();
-    String? verifiedIp;
-    int? latencyMs;
-    for (final provider in const ['api.ipify.org', 'icanhazip.com']) {
-      final client = HttpClient()
-        ..connectionTimeout = const Duration(seconds: 4);
-      try {
-        final watch = Stopwatch()..start();
-        final request = await client
-            .getUrl(Uri.https(provider, '/'))
-            .timeout(const Duration(seconds: 5));
-        final response = await request.close()
-            .timeout(const Duration(seconds: 6));
-        if (response.statusCode != HttpStatus.ok) continue;
-        final result = (await utf8.decoder.bind(response)
-            .join().timeout(const Duration(seconds: 6))).trim();
-        watch.stop();
-        if (result.length <= 64 && InternetAddress.tryParse(result) != null) {
-          verifiedIp = result;
-          latencyMs = watch.elapsedMilliseconds;
+    try {
+      // Try independent providers concurrently so a blocked endpoint cannot
+      // hold the IP and latency cards blank for multiple sequential timeouts.
+      final probes = await Future.wait([
+        _probeHttps('api.ipify.org', '/'),
+        _probeHttps('icanhazip.com', '/'),
+        _probeHttps('www.cloudflare.com', '/cdn-cgi/trace', cloudflareTrace: true),
+      ]);
+      String? ip;
+      int? latency;
+      for (final result in probes) {
+        if (result.ip != null) {
+          ip = result.ip;
+          latency = result.latencyMs;
           break;
         }
-      } catch (_) {
-        // Try the other provider; no trust or connectivity inference here.
-      } finally {
-        client.close(force: true);
+        // A successful HTTPS response measures reachability even when its
+        // payload is not an IP; never manufacture a public IP from the TUN.
+        latency ??= result.latencyMs;
       }
+      if (mounted && generation == _networkProbeGeneration) {
+        setState(() {
+          _publicIp = _activeVerifiedTransport ? ip : null;
+          _httpsLatencyMs = _activeVerifiedTransport ? latency : null;
+        });
+      }
+    } finally {
+      _checkingInternet = false;
     }
-    if (mounted && generation == _networkProbeGeneration) {
-      // Probe confirms HTTPS reachability while a transport is active.
-      // It does not independently prove the traffic was routed through VPN.
-      setState(() {
-        _publicIp = _activeVerifiedTransport ? verifiedIp : null;
-        _httpsLatencyMs = _activeVerifiedTransport ? latencyMs : null;
-      });
-    }
-    _checkingInternet = false;
   }
 
   String _nativeError(Object error) {
