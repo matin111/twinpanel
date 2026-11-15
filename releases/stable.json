@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.842",
+  "version": "1.1.0-rc.843",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-15T04:03:44Z",
+  "released_at": "2026-11-15T04:45:12Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "7335f9a9678d4d8fd6f90f9d7019d929ce5e937c",
+  "source_sha": "d8a2d469dd45a7667b82ba0313ae553830dee64a",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.842/twinpanel-1.1.0-rc.842-linux-x86_64.tar.gz",
-    "sha256": "5134dadb2c003f1747c55cfa3da3bda83329cfd23eeb7a9d6b2318376caea736",
-    "size_bytes": 30900880
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.843/twinpanel-1.1.0-rc.843-linux-x86_64.tar.gz",
+    "sha256": "c1673cb3ab37419f7785161ae32111a2b783fb1e4a0fa7afab8e31902de27985",
+    "size_bytes": 30861073
   },
   "notes": {
-    "fa": "تمدید رزروی اشتراک‌ها از پنل ادمین، ربات، سایت و نمایندگی؛ فعال‌سازی خودکار پس از پایان حجم یا تاریخ، تاریخچه و مدیریت تمدیدهای نیازمند بررسی. حفظ شناسه و کانفیگ دوره فعلی؛ اصلاح کنترل ثبت دوباره سفارش و جلوگیری از خطاهای قدیمی ساخت اکانت.",
-    "en": "Reserved-only subscription renewal across admin, customer website, Telegram bot and reseller flows; automatic activation on quota or expiry, audit history and blocked renewal management. Preserve active account credentials; improve idempotent payment fulfillment and subscription creation."
+    "fa": "نمایش تمدید رزروی داخل فهرست و جزئیات اشتراک ربات تلگرام (ازجمله اکانت‌های واردشده با ساب‌لینک)، کارت اشتراک در سایت و API حساب TwinConnect؛ پلن، حجم، مدت دوره بعد و تاریخ ثبت با وضعیت در انتظار یا نیازمند بررسی، بدون تغییر اعتبار فعلی.",
+    "en": "Display reserved renewals in Telegram subscription lists/details including imported accounts, customer website cards and authenticated TwinConnect account/plan/login APIs. Show next plan, traffic, duration and pending/review state without changing current entitlements."
   }
 }
