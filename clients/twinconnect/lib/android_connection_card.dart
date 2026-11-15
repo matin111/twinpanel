@@ -77,6 +77,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
   DateTime? _lastCountersAt;
   String? _publicIp;
   int? _httpsLatencyMs;
+  String? _httpsProbeError;
   bool _checkingInternet = false;
   DateTime? _lastInternetCheck;
   int _networkProbeGeneration = 0;
@@ -120,6 +121,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
     _handshake = false;
     _publicIp = null;
     _httpsLatencyMs = null;
+    _httpsProbeError = null;
     _lastInternetCheck = null;
     _activeServer = null;
     _activeServerName = null;
@@ -288,52 +290,50 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
     unawaited(_checkInternet());
   }
 
-  /// HTTPS egress lookup is separate from the Cisco tunnel's internal IP.
-  Future<({String? ip, int? latencyMs})> _probeHttps(
+  /// HTTPS reachability and exit IP must come from genuine Internet
+  /// requests through the active Android VPN, never the tunnel's local IP.
+  /// Use the platform TLS stack; avoid a custom connectionFactory because it
+  /// can defeat Android's standard routing/proxy behavior on some devices.
+  Future<({String? ip, int? latencyMs, String? error})> _probeHttps(
       String host, String path, {bool cloudflareTrace = false}) async {
-    final client = HttpClient();
-    client.connectionTimeout = const Duration(seconds: 4);
-    client.findProxy = (_) => 'DIRECT';
-    // Cisco tunnels are often IPv4-only. Avoid an unusable IPv6 route
-    // when querying the *public* egress address. Retain the URI hostname
-    // for normal TLS hostname verification.
-    client.connectionFactory = (uri, proxyHost, proxyPort) async {
-        if (proxyHost != null || proxyPort != null) {
-          throw const SocketException('Unexpected HTTPS proxy');
-        }
-        final ipv4 = await InternetAddress.lookup(uri.host,
-            type: InternetAddressType.IPv4);
-        if (ipv4.isEmpty) {
-          throw const SocketException('No IPv4 record for HTTPS probe');
-        }
-        return Socket.startConnect(ipv4.first, uri.port);
-      };
+    final client = HttpClient()
+      ..connectionTimeout = const Duration(seconds: 5)
+      ..findProxy = (_) => 'DIRECT';
     try {
       final watch = Stopwatch()..start();
       final request = await client.getUrl(Uri.https(host, path))
-          .timeout(const Duration(seconds: 6));
+          .timeout(const Duration(seconds: 8));
       request.headers.set(HttpHeaders.acceptHeader, 'text/plain');
-      final response = await request.close().timeout(const Duration(seconds: 6));
-      // HTTPS response latency is measured as soon as valid TLS+HTTP
-      // response headers arrive. Public-IP parsing is independent.
+      final response = await request.close().timeout(
+          const Duration(seconds: 8));
       watch.stop();
-      final httpsMs = watch.elapsedMilliseconds.clamp(1, 60000);
+      final latency = watch.elapsedMilliseconds.clamp(1, 60000);
       if (response.statusCode == HttpStatus.noContent) {
-        return (ip: null, latencyMs: httpsMs);
+        return (ip: null, latencyMs: latency, error: null);
       }
       if (response.statusCode != HttpStatus.ok) {
-        return (ip: null, latencyMs: null);
+        return (ip: null, latencyMs: null, error: 'HTTPS_HTTP_STATUS');
       }
-      final body = (await utf8.decoder.bind(response)
-          .join().timeout(const Duration(seconds: 6)));
-      if (body.length > 2048) return (ip: null, latencyMs: httpsMs);
+      final body = await utf8.decoder.bind(response).join().timeout(
+          const Duration(seconds: 6));
+      if (body.length > 4096) {
+        return (ip: null, latencyMs: latency, error: 'IP_RESPONSE_INVALID');
+      }
       final candidate = cloudflareTrace
           ? RegExp(r'^ip=([^\r\n]+)', multiLine: true).firstMatch(body)?.group(1)
           : body.trim();
-      final parsed = candidate == null ? null : InternetAddress.tryParse(candidate);
-      return (ip: parsed?.address, latencyMs: httpsMs);
+      final parsed = candidate == null
+          ? null : InternetAddress.tryParse(candidate);
+      // Successful HTTPS and valid public-IP extraction are independent.
+      return (ip: parsed?.address, latencyMs: latency, error: null);
+    } on TimeoutException {
+      return (ip: null, latencyMs: null, error: 'HTTPS_TIMEOUT');
+    } on HandshakeException {
+      return (ip: null, latencyMs: null, error: 'HTTPS_TLS_FAILED');
+    } on SocketException {
+      return (ip: null, latencyMs: null, error: 'HTTPS_SOCKET_FAILED');
     } catch (_) {
-      return (ip: null, latencyMs: null);
+      return (ip: null, latencyMs: null, error: 'HTTPS_PROBE_FAILED');
     } finally {
       client.close(force: true);
     }
@@ -345,32 +345,33 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
     final generation = _networkProbeGeneration;
     _lastInternetCheck = DateTime.now();
     try {
-      // Try independent providers concurrently so a blocked endpoint cannot
-      // hold the IP and latency cards blank for multiple sequential timeouts.
+      // Independent real exit-IP providers. DNS resolution failures on an
+      // IPv4-only Cisco tunnel cannot hide a working literal-IP HTTPS probe.
       final probes = await Future.wait([
-        // Verified on a real Android device using Cisco: Cloudflare HTTPS
-        // trace at its literal IPv4 address works without DNS/A-AAAA racing.
         _probeHttps('1.1.1.1', '/cdn-cgi/trace', cloudflareTrace: true),
         _probeHttps('api.ipify.org', '/'),
         _probeHttps('icanhazip.com', '/'),
-        _probeHttps('www.cloudflare.com', '/cdn-cgi/trace', cloudflareTrace: true),
+        _probeHttps('www.cloudflare.com', '/cdn-cgi/trace',
+            cloudflareTrace: true),
         _probeHttps('www.google.com', '/generate_204'),
       ]);
-      // A successful HTTPS response is measurable even if the IP endpoint
-      // returns non-IP content. Never tie HTTPS latency to IP parsing.
       String? ip;
       int? latency;
+      String? failure;
       for (final result in probes) {
-        if (result.ip != null) ip ??= result.ip;
+        ip ??= result.ip;
         if (result.latencyMs != null &&
             (latency == null || result.latencyMs! < latency)) {
           latency = result.latencyMs;
         }
+        failure ??= result.error;
       }
       if (mounted && generation == _networkProbeGeneration) {
         setState(() {
           _publicIp = _activeVerifiedTransport ? ip : null;
           _httpsLatencyMs = _activeVerifiedTransport ? latency : null;
+          _httpsProbeError = !_activeVerifiedTransport || latency != null
+              ? null : (failure ?? 'HTTPS_UNREACHABLE');
         });
       }
     } finally {
@@ -1085,7 +1086,9 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
                     s.pick('IP عمومی', 'Public IP'), _publicIp ?? '—')),
                 const SizedBox(width: 8),
                 Expanded(child: _metric(context, Icons.bolt, 'HTTPS',
-                    _httpsLatencyMs == null ? '—' : '${_httpsLatencyMs} ms')),
+                    _httpsLatencyMs == null
+                        ? (_httpsProbeError ?? '—')
+                        : '${_httpsLatencyMs} ms')),
               ]),
               const SizedBox(height: 8),
               Row(children: [
