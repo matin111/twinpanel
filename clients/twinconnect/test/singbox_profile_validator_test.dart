@@ -146,6 +146,51 @@ void main() {
     expect(chain.any((outbound) => outbound['type'] == 'direct'), false);
   });
 
+  test('ShadowTLS accepts panel SNI shorthand and omitted TLS enabled', () {
+    final chain = SingBoxProfileValidator.validateShadowTlsChain({
+      'config': {
+        'outbounds': [
+          {
+            'type': 'shadowsocks', 'tag': 'proxy',
+            'detour': 'st', 'method': 'aes-256-gcm',
+            'password': 'synthetic',
+          },
+          {
+            'type': 'shadowtls', 'tag': 'st',
+            'server': '198.51.100.16',
+            'server_port': 443, 'version': 3,
+            'password': 'synthetic',
+            'sni': 'www.example.org',
+            'tls': {'server_name': 'www.example.org'},
+          },
+        ],
+      },
+    });
+    expect(chain[1]['tls'], {
+      'server_name': 'www.example.org',
+      'enabled': true,
+    });
+    expect(chain[1].containsKey('sni'), isFalse);
+  });
+
+  test('ShadowTLS refuses invalid numeric SNI with no cover hostname', () {
+    expect(() => SingBoxProfileValidator.validateShadowTlsChain({
+      'outbounds': [
+        {
+          'type': 'shadowsocks', 'tag': 'proxy',
+          'detour': 'st', 'method': 'aes-256-gcm',
+          'password': 'synthetic',
+        },
+        {
+          'type': 'shadowtls', 'tag': 'st',
+          'server': '198.51.100.16',
+          'server_port': 443, 'version': 3,
+          'password': 'synthetic',
+        },
+      ],
+    }), throwsFormatException);
+  });
+
   test('ShadowTLS chain rejects mismatched detour and insecure TLS', () {
     final item = {
       'outbounds': [
