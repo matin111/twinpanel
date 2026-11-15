@@ -38,6 +38,12 @@ final class TwinConnectIOSVpnBridge {
                     "contractVersion": 1,
                     "supportedProtocols": [String]()
                 ] as [String: Any])
+            case "getEngineInstallation":
+                TwinConnectIOSVPNControl.checkInstallation(result)
+            case "startTunnel":
+                TwinConnectIOSVPNControl.start(call.arguments, result: result)
+            case "stopTunnel":
+                TwinConnectIOSVPNControl.stop(result)
             case "getTunnelStatus":
                 NETunnelProviderManager.loadAllFromPreferences {
                     managers, error in
