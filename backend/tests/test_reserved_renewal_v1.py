@@ -151,6 +151,22 @@ class DeferredRenewalTest(unittest.TestCase):
         self.assertEqual(sub.status, SubscriptionStatus.ACTIVE)
         self.assertGreater(sub.expires_at, datetime.utcnow())
 
+    def test_cancelled_account_does_not_consume_reserved_period(self):
+        sub = self.subscription(
+            status=SubscriptionStatus.CANCELED,
+            traffic_used_bytes=10 * 1024**3,
+        )
+        pending = self.pending()
+        db = FakeDB([Result(items=[22]), Result(value=sub), Result(value=pending)])
+        with patch.object(service, "reset_subscription_period_usage") as reset, \
+             patch.object(service, "queue_subscription_enforcement") as enforce, \
+             patch.object(service, "history"):
+            self.assertEqual(service.activate_due_renewals(db), 0)
+            reset.assert_not_called()
+            enforce.assert_not_called()
+        self.assertEqual(pending.status, "blocked")
+        self.assertEqual(sub.traffic_used_bytes, 10 * 1024**3)
+
     def test_manual_suspension_is_not_lifted(self):
         sub = self.subscription(status=SubscriptionStatus.SUSPENDED,
                                 expires_at=datetime.utcnow() - timedelta(seconds=1))
