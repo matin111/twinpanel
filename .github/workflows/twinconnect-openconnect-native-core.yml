@@ -147,3 +147,46 @@ jobs:
           path: upstream/app/src/main/jniLibs/arm64-v8a/
           if-no-files-found: error
           retention-days: 3
+
+      - name: Setup Flutter for experimental native Cisco APK
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Generate experimental Android scaffold and include native core
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd clients/twinconnect
+          flutter create --platforms=android --org com.twinpanel --project-name twinconnect .
+          python tools/install_android_native.py
+          dest="android/app/src/main/jniLibs/arm64-v8a"
+          mkdir -p "$dest"
+          cp "$GITHUB_WORKSPACE"/upstream/app/src/main/jniLibs/arm64-v8a/*.so "$dest/"
+          test -s "$dest/libopenconnect.so"
+          test -s "$dest/libstoken.so"
+          test -s android/app/src/main/java/org/infradead/libopenconnect/LibOpenConnect.java
+          test -s android/app/src/main/java/com/axevpn/flutter/openconnect/NativeOpenConnectSession.java
+
+      - name: Validate experimental Android native integration
+        working-directory: clients/twinconnect
+        run: |
+          flutter pub get
+          flutter analyze --no-fatal-infos
+          flutter test --reporter expanded
+
+      - name: Build experimental arm64 native Cisco APK
+        working-directory: clients/twinconnect
+        env:
+          TWINCONNECT_DIRECTORY_URLS: ${{ vars.TWINCONNECT_DIRECTORY_URLS || 'https://panel.matindnspro.sbs,https://167-104-219-168.sslip.io' }}
+        run: |
+          flutter build apk --release --target-platform android-arm64 "--dart-define=TWINCONNECT_DIRECTORY_URLS=$TWINCONNECT_DIRECTORY_URLS" "--dart-define=TWINCONNECT_BUILD_ID=$GITHUB_SHA"
+
+      - name: Upload native Cisco experimental Android APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: twinconnect-android-arm64-native-openconnect-test-apk
+          path: clients/twinconnect/build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+          retention-days: 3
