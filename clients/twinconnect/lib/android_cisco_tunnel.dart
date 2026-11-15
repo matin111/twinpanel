@@ -94,6 +94,12 @@ class AndroidCiscoTunnel {
           'CISCO_CSTP_HANDSHAKE_FAILED',
           'CISCO_CSTP_CONFIG_MISSING',
           'CISCO_TUN_INTERFACE_FAILED',
+          'CISCO_TLS_HANDSHAKE_FAILED',
+          'CISCO_SOCKET_TIMEOUT',
+          'CISCO_DNS_RESOLUTION_FAILED',
+          'CISCO_GATEWAY_UNREACHABLE',
+          'CISCO_AUTH_RESPONSE_INCOMPLETE',
+          'CISCO_AUTH_XML_CHALLENGE_UNSUPPORTED',
         };
         final reason = rawReason is String && allowedFailures.contains(rawReason)
             ? rawReason : null;
