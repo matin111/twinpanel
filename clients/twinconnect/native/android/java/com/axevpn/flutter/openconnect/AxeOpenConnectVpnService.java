@@ -339,6 +339,16 @@ public class AxeOpenConnectVpnService extends VpnService {
                 lastFailureCode = "CISCO_GATEWAY_UNREACHABLE";
             } else if (e instanceof java.io.EOFException) {
                 lastFailureCode = "CISCO_AUTH_RESPONSE_INCOMPLETE";
+            } else if (e instanceof java.io.IOException &&
+                       "CISCO_SOCKET_PROTECTION_FAILED".equals(e.getMessage())) {
+                lastFailureCode = "CISCO_SOCKET_PROTECTION_FAILED";
+            } else if (e instanceof javax.net.ssl.SSLException) {
+                lastFailureCode = "CISCO_TLS_HANDSHAKE_FAILED";
+            } else if (e instanceof java.net.SocketException) {
+                lastFailureCode = "CISCO_SOCKET_IO_FAILED";
+            } else if (e instanceof IllegalArgumentException &&
+                       "CISCO_CERT_PIN_INVALID".equals(e.getMessage())) {
+                lastFailureCode = "CISCO_CERT_PIN_INVALID";
             } else if (lastFailureCode.isEmpty()) {
                 lastFailureCode = failureStage;
             }
