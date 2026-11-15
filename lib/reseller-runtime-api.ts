@@ -139,6 +139,7 @@ export const resellerApi={
   attachCustomer:(userId:number)=>request<ResellerRow>("/v1/reseller/customers/attach",{method:"POST",body:JSON.stringify({user_id:userId})}),
 
   subscriptions:resellerSubscriptions,
+  subscriptionHistory:(id:number)=>request<{events:Array<{id:number;type:string;source:string;actor:string;details:Record<string,unknown>;created_at:string}>;queued:Array<{id:number;plan:string;traffic_bytes:number;duration_days:number;status:string;created_at:string}>}>(`/v1/reseller/subscriptions/${id}/history`),
   createSubscription:(payload:{plan_id:number;node_ids:number[];idempotency_key:string;username?:string|null;password?:string|null})=>request<ResellerRow>("/v1/reseller/subscriptions/create",{method:"POST",body:JSON.stringify(payload)}),
   sellSubscription:(payload:{user_id?:number|null;plan_id?:number|null;traffic_gb:number;duration_days:number;node_ids:number[];protocols:string[];sell_price_toman:number;idempotency_key:string;username?:string|null;password?:string|null})=>request<ResellerRow>("/v1/reseller/subscriptions/sell",{method:"POST",body:JSON.stringify(payload)}),
   editSubscription:(id:number,payload:ResellerRow)=>request<ResellerRow>(`/v1/reseller/subscriptions/${id}/edit`,{method:"PATCH",body:JSON.stringify(payload)}),
