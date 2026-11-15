@@ -10,7 +10,7 @@ class PendingSubscriptionRenewal(Base):
         UniqueConstraint("source", "source_reference", name="uq_pending_renewal_source"),
         Index("ix_pending_renewal_due", "status", "subscription_id"),
     )
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     subscription_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("subscriptions.id"), nullable=False, index=True)
     plan_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     plan_name: Mapped[str] = mapped_column(String(200), nullable=False)
@@ -27,7 +27,7 @@ class PendingSubscriptionRenewal(Base):
 class SubscriptionHistoryEvent(Base):
     __tablename__ = "subscription_history_events"
     __table_args__ = (Index("ix_subscription_history_recent", "subscription_id", "id"),)
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     subscription_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("subscriptions.id"), nullable=False)
     event_type: Mapped[str] = mapped_column(String(72), nullable=False)
     actor: Mapped[str] = mapped_column(String(180), nullable=False)
