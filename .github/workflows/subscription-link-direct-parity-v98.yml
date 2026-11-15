@@ -73,7 +73,7 @@ jobs:
           assert 'await adminApi.subscriptionConnectionInfo(id)' in admin
           assert 'modal==="sublink"' not in admin
           assert 'className="subscription-link-stack"' not in admin
-          assert 'type ModalKind="create"|"edit"|"extend"|"connect"|null;' in admin
+          assert 'type ModalKind="create"|"edit"|"extend"|"connect"|"history"|null;' in admin
 
           # Reseller click -> authorized reseller API -> shared modal. No legacy delivery DOM remains.
           assert 'onClick={()=>void openConnection(row)}' in reseller
