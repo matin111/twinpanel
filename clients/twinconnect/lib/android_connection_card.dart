@@ -310,7 +310,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
           ['-c', '1', '-W', '2', addr], runInShell: false)
           .timeout(const Duration(seconds: 3));
       if (ping.exitCode == 0) {
-        final match = RegExp(r'time\\s*[=<]\\s*([0-9]+(?:\\.[0-9]+)?)\\s*ms',
+        final match = RegExp(r'time\s*[=<]\s*([0-9]+(?:\.[0-9]+)?)\s*ms',
             caseSensitive: false).firstMatch(ping.stdout.toString());
         if (match != null) {
           rtt = double.parse(match.group(1)!).ceil().clamp(1, 60000);
