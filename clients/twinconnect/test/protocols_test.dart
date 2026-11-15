@@ -117,6 +117,9 @@ void main() {
     expect(() => PanelProtocolCatalog.fromJson(oversized), throwsFormatException);
 
     final malformed = _catalog();
+    // The full-catalog fixture is a List<Map<...>>; copy it to a dynamic
+    // list before injecting a deliberately malformed scalar row.
+    malformed['protocols'] = List<dynamic>.of(malformed['protocols'] as List);
     (malformed['protocols'] as List)[0] = 'cisco';
     expect(() => PanelProtocolCatalog.fromJson(malformed), throwsFormatException);
   });
