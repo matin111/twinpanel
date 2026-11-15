@@ -59,6 +59,12 @@ def history_page(subscription_id: int, limit: int = 50, offset: int = 0,
 
 @router.delete("/{subscription_id}/reserve-renewal/{renewal_id}")
 def cancel_reserved(subscription_id: int, renewal_id: int, db: Session = Depends(get_db), admin: User = Depends(require_admin)):
+    # Same lock order as activation: subscription first, queued row second.
+    # A concurrent worker cannot activate the renewal while it is canceled.
+    sub = db.execute(select(Subscription).where(
+        Subscription.id == subscription_id).with_for_update()).scalar_one_or_none()
+    if sub is None:
+        raise HTTPException(404, "اشتراک پیدا نشد")
     item = db.execute(select(PendingSubscriptionRenewal).where(
         PendingSubscriptionRenewal.id == renewal_id,
         PendingSubscriptionRenewal.subscription_id == subscription_id).with_for_update()).scalar_one_or_none()
