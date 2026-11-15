@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.843",
+  "version": "1.1.0-rc.844",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-15T04:45:12Z",
+  "released_at": "2026-11-15T05:33:06Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "d8a2d469dd45a7667b82ba0313ae553830dee64a",
+  "source_sha": "e99fbd878728301b8c4bc8164c93e63dac8dc946",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.843/twinpanel-1.1.0-rc.843-linux-x86_64.tar.gz",
-    "sha256": "c1673cb3ab37419f7785161ae32111a2b783fb1e4a0fa7afab8e31902de27985",
-    "size_bytes": 30861073
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.844/twinpanel-1.1.0-rc.844-linux-x86_64.tar.gz",
+    "sha256": "bbe99df994e890ba257ddaa1c9d7f2cbaec42d32324638748d072b25bc343e5a",
+    "size_bytes": 30870058
   },
   "notes": {
-    "fa": "نمایش تمدید رزروی داخل فهرست و جزئیات اشتراک ربات تلگرام (ازجمله اکانت‌های واردشده با ساب‌لینک)، کارت اشتراک در سایت و API حساب TwinConnect؛ پلن، حجم، مدت دوره بعد و تاریخ ثبت با وضعیت در انتظار یا نیازمند بررسی، بدون تغییر اعتبار فعلی.",
-    "en": "Display reserved renewals in Telegram subscription lists/details including imported accounts, customer website cards and authenticated TwinConnect account/plan/login APIs. Show next plan, traffic, duration and pending/review state without changing current entitlements."
+    "fa": "افزودن تاریخچه کیف پول برای هر کاربر در پنل مدیریت: تراکنش‌های واقعی شارژ و برداشت، خرید با کیف پول، درخواست‌های شارژ و وضعیت تأیید یا رد، جستجو و جزئیات رسید بدون تغییر موجودی‌ها یا اشتراک‌های موجود.",
+    "en": "Add per-user wallet history to admin user cards with real ledger credits/debits, wallet purchases, top-up review statuses, receipt references and search. No wallet balances or subscriptions are modified."
   }
 }
