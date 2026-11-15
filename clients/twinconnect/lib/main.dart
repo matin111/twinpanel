@@ -627,21 +627,29 @@ class _TwinConnectHomeState extends State<TwinConnectHome> with WidgetsBindingOb
     });
     try {
       final api = TenantApi.fromBuildConfig();
-      // Server refresh is also a plan/protocol entitlement refresh.
-      // Publish both together so removed permissions never remain in the UI
-      // alongside newly fetched servers.
-      // An access JWT expires after 30 minutes. Renew and retry once, instead
-      // of silently presenting an empty server list while still signed in.
-      Future<(PanelProtocolCatalog, AppServerInventory)> fetch(String token) async {
-        final catalog = await api.loadSessionProtocolCatalog(
-          panel: panel, sessionToken: token,
-        );
+      // Load the authenticated node inventory independently. A malformed or
+      // temporarily unavailable protocol catalog must never prevent the
+      // user's already assigned servers from appearing. In particular,
+      // two-protocol plans must not depend on a complete 16-protocol payload.
+      // Never grant or display a protocol that has not been validated.
+      Future<(PanelProtocolCatalog?, AppServerInventory, bool)> fetch(
+          String token) async {
         final inventory = await api.refreshSessionServers(
           panel: panel, sessionToken: token,
         );
-        return (catalog, inventory);
+        try {
+          final catalog = await api.loadSessionProtocolCatalog(
+            panel: panel, sessionToken: token,
+          );
+          return (catalog, inventory, false);
+        } on TenantApiException catch (error) {
+          if (error.message == 'APP_LOGIN_INVALID') rethrow;
+          return (null, inventory, true);
+        } catch (_) {
+          return (null, inventory, true);
+        }
       }
-      (PanelProtocolCatalog, AppServerInventory) result;
+      (PanelProtocolCatalog?, AppServerInventory, bool) result;
       try {
         result = await fetch(session);
       } on TenantApiException catch (error) {
@@ -655,12 +663,14 @@ class _TwinConnectHomeState extends State<TwinConnectHome> with WidgetsBindingOb
         if (updated == null || updated == session) rethrow;
         result = await fetch(updated);
       }
-      final (catalog, inventory) = result;
+      final (catalog, inventory, catalogUnavailable) = result;
       if (!mounted || serial != _lookupSerial) return;
       setState(() {
+        // Drop stale permissions on a failed refresh instead of leaking
+        // another account's / another plan's protocol selection.
         _catalog = catalog;
         _servers = inventory;
-        _protocolCatalogUnavailable = false;
+        _protocolCatalogUnavailable = catalogUnavailable;
       });
     } on TenantApiException catch (error) {
       if (!mounted || serial != _lookupSerial) return;
