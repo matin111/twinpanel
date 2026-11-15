@@ -8,6 +8,7 @@ on:
   push:
     branches:
       - 'feat/twinconnect-ios-simulator-foundation-20261115'
+      - 'feat/twinconnect-macos-packet-tunnel-foundation-20261116'
     paths:
       - 'clients/twinconnect/**'
       - '.github/workflows/twinconnect-macos-renewal-preview.yml'
@@ -61,6 +62,19 @@ jobs:
           assert "MACOS_PACKET_TUNNEL_NOT_INSTALLED" in source
           print("Mac app network permission and fail-closed native bridge confirmed")
           PY
+      - name: Create macOS packet tunnel extension and validate native sources
+        shell: bash
+        run: |
+          gem install xcodeproj --no-document
+          ruby macos_native/install_packet_tunnel_target.rb
+          ruby -e "require 'xcodeproj'; p=Xcodeproj::Project.open('macos/Runner.xcodeproj'); abort 'missing mac target' unless p.targets.any? { |t| t.name == 'PacketTunnel' }"
+          plutil -lint macos_native/PacketTunnel-Info.plist macos_native/PacketTunnel.entitlements
+          test -s macos_native/PacketTunnelProvider.swift
+      - name: Compile Packet Tunnel extension for macOS (unsigned)
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild -project macos/Runner.xcodeproj -target PacketTunnel -configuration Release -sdk macosx CODE_SIGNING_ALLOWED=NO build | tail -60
       - name: Resolve Flutter packages
         run: flutter pub get
       - name: Flutter analysis
@@ -83,6 +97,8 @@ jobs:
           test -x "$exe"
           test -d "$app/Contents/Frameworks/FlutterMacOS.framework"
           test -d "$app/Contents/Frameworks/App.framework"
+          test -d "$app/Contents/PlugIns/PacketTunnel.appex"
+          /usr/libexec/PlistBuddy -c 'Print TwinConnectProtocolBackendLinked' "$app/Contents/PlugIns/PacketTunnel.appex/Contents/Info.plist" | grep -qx false
           plutil -lint "$app/Contents/Info.plist"
           /usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$app/Contents/Info.plist"
           file "$exe"
@@ -94,7 +110,7 @@ jobs:
           {
             echo "TwinConnect macOS native UI and account preview"
             echo "Repository commit: $GITHUB_SHA"
-            echo "Mac packet-tunnel engine: NOT INSTALLED"
+            echo "Mac PacketTunnel extension: EMBEDDED, backend NOT LINKED"
             echo "Code signing/notarization: NOT a Developer ID release"
             echo "VPN connect/egress: NOT VERIFIED"
             echo "Built application: twinconnect.app"
