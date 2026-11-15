@@ -29,7 +29,7 @@ void main() {
       dashboard.indexOf("key: const Key('devLocationListingCard')"),
     );
     expect(locations, contains('_inboundsForNode(widget.servers!.servers[i].id)'));
-    expect(locations, contains('No provisioned Xray inbound'));
+    expect(locations, contains('No valid Xray inbound'));
     expect(locations, isNot(contains('synthetic')));
   });
 
