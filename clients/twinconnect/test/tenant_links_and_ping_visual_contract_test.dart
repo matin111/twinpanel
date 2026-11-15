@@ -350,7 +350,7 @@ void main() {
     expect(dashboard, contains('Socket.connect('));
     expect(dashboard, contains("'TCP_CONNECT_RTT'"));
     expect(dashboard, contains("Key('probeNode_"));
-    expect(dashboard, contains('TCP connect to port 443; not ICMP ping.'));
+    expect(dashboard, contains('TCP connection to the configured service port, not ICMP.'));
   });
 
   test('all server ping actions use lightning instead of the old network icon', () {
