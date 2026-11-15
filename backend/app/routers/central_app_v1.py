@@ -389,7 +389,7 @@ def _verified_protocol_subscription(
     return sub
 
 
-def _plan_client_protocols(db: Session, plan_id: int | None) -> set[str]:
+def _plan_client_protocols(db: Session, plan_id: int | None) -> set[str] | None:
     """Read the plan category and its configured protocol template.
 
     The plan's protocol selection is the authority for this plan *type*.
@@ -397,10 +397,10 @@ def _plan_client_protocols(db: Session, plan_id: int | None) -> set[str]:
     selection, never a guessed set of connections or credentials.
     """
     if not plan_id:
-        return set()
+        return None
     plan = db.get(Plan, int(plan_id))
     if plan is None:
-        return set()
+        return None
     assigned = {
         value for code in explicit_plan_protocols(db, int(plan_id))
         if (value := normalize_protocol(code))
@@ -409,6 +409,13 @@ def _plan_client_protocols(db: Session, plan_id: int | None) -> set[str]:
         PlanCategoryAssignment.plan_id == int(plan_id)
     ).first()
     subscription_type = grouping.subscription_type if grouping else ""
+    # None is legacy/no explicit restriction; an empty set is an explicit
+    # *deny all* (e.g. invalid Vitory template). Never confuse the two.
+    category = str(subscription_type).strip().casefold()
+    is_vitory = any(label in category for label in
+                    ("ویتوری", "vitory", "v2ray"))
+    if not assigned and not is_vitory:
+        return None
     return category_protocols(subscription_type, assigned)
 
 
@@ -428,7 +435,7 @@ def _selected_client_protocols(db: Session, subscription_id: int) -> set[str]:
     if sub is None:
         return set()
     permitted = _plan_client_protocols(db, sub.plan_id)
-    return selected & permitted if permitted else selected
+    return selected if permitted is None else selected & permitted
 
 
 @router.post("/public/protocols")
