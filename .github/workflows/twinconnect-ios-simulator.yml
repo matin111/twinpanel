@@ -181,6 +181,28 @@ jobs:
             --target lib/main.dart \
             --dart-define=TWINCONNECT_DIRECTORY_URL="$TWINCONNECT_DIRECTORY_URL"
           test -d build/ios/iphonesimulator/Runner.app
+      # Build success alone is insufficient: launch the REAL login target on
+      # a clean simulator installation and ship a screenshot beside the ZIP.
+      # This prevents an offline ios_preview_main.dart screen from being
+      # mistaken for the authenticated panel entry point.
+      - name: Smoke-test authenticated login target on a clean iPhone simulator
+        shell: bash
+        run: |
+          set -euo pipefail
+          device="$(xcrun simctl list devices booted -j | python3 -c 'import json,sys; d=json.load(sys.stdin); print(next((item["udid"] for devices in d["devices"].values() for item in devices if item["name"].startswith("iPhone")), ""))')"
+          if [ -z "$device" ]; then
+            echo "::error::No booted iPhone Simulator for authenticated login smoke."
+            exit 1
+          fi
+          # Remove offline tour app AND its preferences before installing the
+          # authenticated build. In particular, never reuse demo state here.
+          xcrun simctl terminate "$device" com.twinpanel.twinconnect || true
+          xcrun simctl uninstall "$device" com.twinpanel.twinconnect || true
+          xcrun simctl install "$device" build/ios/iphonesimulator/Runner.app
+          xcrun simctl launch "$device" com.twinpanel.twinconnect
+          sleep 5
+          xcrun simctl io "$device" screenshot TwinConnect-iOS-RealLogin.png
+          test -s TwinConnect-iOS-RealLogin.png
       - name: Package authenticated Appetize simulator build
         shell: bash
         run: |
@@ -198,6 +220,7 @@ jobs:
           path: |
             clients/twinconnect/TwinConnect-iOS-Appetize-RealLogin-v0.1.0.zip
             clients/twinconnect/TwinConnect-iOS-Appetize-RealLogin-SHA256.txt
+            clients/twinconnect/TwinConnect-iOS-RealLogin.png
           if-no-files-found: error
           retention-days: 14
       # Only screenshots are distributed for visual review. Bundling an
