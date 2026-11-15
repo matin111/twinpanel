@@ -256,6 +256,98 @@ def reseller_customers(
     return result
 
 
+
+@router.get("/customers/{user_id}/wallet-history")
+def reseller_customer_wallet_history(
+    user_id: int,
+    reseller: Reseller = Depends(require_reseller),
+    db: Session = Depends(get_db),
+):
+    """Read-only reseller-scoped ledger. Never expose another seller's transactions."""
+    from ..customer_wallet_models import CustomerWallet, CustomerWalletTransaction, CustomerWalletTopup
+    from ..reseller_bot_order_models import ResellerBotOrder
+    from ..reseller_telegram_models import ResellerTelegramLink
+
+    owned = (
+        db.query(ResellerCustomer.id)
+        .filter(
+            ResellerCustomer.reseller_id == int(reseller.id),
+            ResellerCustomer.user_id == int(user_id),
+        ).first()
+    )
+    linked_bot = (
+        db.query(ResellerTelegramLink.id)
+        .filter(
+            ResellerTelegramLink.reseller_id == int(reseller.id),
+            ResellerTelegramLink.user_id == int(user_id),
+        ).first()
+    )
+    if not owned and not linked_bot:
+        raise HTTPException(status_code=404, detail="customer_not_found")
+
+    wallet = db.get(CustomerWallet, int(user_id))
+    order_ids = {
+        int(r[0]) for r in db.query(ResellerBotOrder.id)
+        .filter(
+            ResellerBotOrder.reseller_id == int(reseller.id),
+            ResellerBotOrder.customer_user_id == int(user_id),
+        ).all()
+    }
+    adjust_prefix = f"reseller-bot-wallet:{int(reseller.id)}:"
+    order_prefix = "reseller-bot-wallet-order:"
+    # Do not return the unfiltered shared ledger: a user can have activity
+    # outside this reseller. Retain only records with provable reseller ownership.
+    candidates = (
+        db.query(CustomerWalletTransaction)
+        .filter(CustomerWalletTransaction.user_id == int(user_id))
+        .order_by(CustomerWalletTransaction.id.desc())
+        .limit(2000).all()
+    )
+    transactions = []
+    for tx in candidates:
+        ref = str(tx.reference or "")
+        visible = ref.startswith(adjust_prefix)
+        if ref.startswith(order_prefix):
+            order_id = ref[len(order_prefix):]
+            visible = order_id.isdigit() and int(order_id) in order_ids
+        if not visible:
+            continue
+        transactions.append({
+            "id": int(tx.id),
+            "amount_toman": int(tx.amount_toman or 0),
+            "kind": tx.kind,
+            "description": tx.description,
+            "reference": tx.reference,
+            "created_at": tx.created_at,
+        })
+        if len(transactions) >= 200:
+            break
+    topups = (
+        db.query(CustomerWalletTopup)
+        .filter(
+            CustomerWalletTopup.user_id == int(user_id),
+            CustomerWalletTopup.method.like(f"reseller_card:{int(reseller.id)}:%"),
+        )
+        .order_by(CustomerWalletTopup.id.desc())
+        .limit(200).all()
+    )
+    return {
+        "user_id": int(user_id),
+        "balance_toman": int(wallet.balance_toman or 0) if wallet else 0,
+        "transactions": transactions,
+        "topups": [{
+            "id": int(row.id),
+            "amount_toman": int(row.amount_toman or 0),
+            "method": row.method,
+            "status": row.status,
+            "tracking_code": row.tracking_code,
+            "created_at": row.created_at,
+            "review_note": row.review_note,
+        } for row in topups],
+        "scope": "reseller_only",
+    }
+
+
 @router.get("/subscriptions")
 def reseller_subscriptions(
     reseller: Reseller = Depends(require_reseller),
