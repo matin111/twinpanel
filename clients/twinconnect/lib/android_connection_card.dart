@@ -644,7 +644,8 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
   }
 
   Future<void> _connectModern(String code) async {
-    if (_busy || _up || _openVpnUp || _ciscoUp || _singBoxProtocol != null ||
+    if (_busy || _up || _openVpnUp || _ciscoUp || _xrayCoreUp ||
+        _singBoxProtocol != null ||
         !AndroidSingBoxTunnel.supported.contains(code)) return;
     setState(() { _busy = true; _errorCode = null; });
     var stage = 'ENGINE_INIT';
