@@ -29,6 +29,7 @@ from ..database import get_db
 from ..deps import require_admin, require_reseller
 from ..models_reseller import Reseller, ResellerSubscription
 from ..models import Subscription, SubscriptionProtocol, ProtocolCredential
+from ..plan_protocol_models import PlanProtocol
 from ..system_release import (
     _vendor_post, ensure_installation_id, load_license_state,
 )
@@ -387,12 +388,38 @@ def _verified_protocol_subscription(
 
 
 def _selected_client_protocols(db: Session, subscription_id: int) -> set[str]:
+    """Resolve one account's entitlement against its *assigned* panel plan.
+
+    Old migrated subscriptions may have subscription protocol records from a
+    previous plan. Those records may not grant protocols that the current
+    plan explicitly excludes. Keep old-account compatibility when no explicit
+    plan template exists: never manufacture new permissions from plan names.
+    """
+    sub = db.get(Subscription, int(subscription_id))
+    if sub is None:
+        return set()
     rows = (
         db.query(SubscriptionProtocol.protocol)
         .filter(SubscriptionProtocol.subscription_id == subscription_id)
         .all()
     )
-    return {value for row in rows if (value := normalize_protocol(row[0]))}
+    assigned = {value for row in rows
+                if (value := normalize_protocol(row[0]))}
+    plan_id = getattr(sub, "plan_id", None)
+    if plan_id is None:
+        return assigned
+    plan_rows = (
+        db.query(PlanProtocol.protocol)
+        .filter(PlanProtocol.plan_id == int(plan_id))
+        .all()
+    )
+    if not plan_rows:
+        # No explicit template for this legacy plan. Preserve assigned
+        # subscription permissions instead of granting all 16 protocols.
+        return assigned
+    plan_allowed = {value for row in plan_rows
+                    if (value := normalize_protocol(row[0]))}
+    return assigned & plan_allowed
 
 
 @router.post("/public/protocols")
