@@ -169,8 +169,13 @@ class PanelProtocolCatalog {
       throw const FormatException('INVALID_PROTOCOL_CATALOG');
     }
     final rows = input['protocols'] as List<dynamic>;
-    if (rows.length != VpnProtocols.all.length) {
-      throw const FormatException('INCOMPLETE_PROTOCOL_CATALOG');
+    // A plan-scoped catalogue may contain only its allowed protocols:
+    // Vitory has two, while Special can have up to sixteen. The former
+    // complete-16 requirement rejected valid restricted subscriptions.
+    // Reject excessive, duplicate or unknown entries; omitted protocols are
+    // explicitly DENIED, never granted by their presence in client binaries.
+    if (rows.length > VpnProtocols.all.length) {
+      throw const FormatException('INVALID_PROTOCOL_CATALOG');
     }
     final parsed = <String, PanelProtocolStatus>{};
     for (final row in rows) {
@@ -183,13 +188,16 @@ class PanelProtocolCatalog {
       }
       parsed[status.protocol.code] = status;
     }
-    if (parsed.length != VpnProtocols.all.length) {
-      throw const FormatException('INCOMPLETE_PROTOCOL_CATALOG');
-    }
     return PanelProtocolCatalog(
       namespace: (input['namespace'] as String).toUpperCase(),
       entries: [
-        for (final def in VpnProtocols.all) parsed[def.code]!,
+        for (final def in VpnProtocols.all)
+          parsed[def.code] ?? PanelProtocolStatus(
+            protocol: def,
+            selected: false,
+            configRecordPresent: false,
+            clientEngineReady: false,
+          ),
       ],
     );
   }
