@@ -26,11 +26,13 @@ It does not bundle WireGuardKitGo or create a signed extension.
 
 ## Required device build (not done yet)
 
-1. Add a dedicated iOS Packet Tunnel extension Xcode target named
-   `PacketTunnel` (bundle ID `com.twinpanel.twinconnect.PacketTunnel`).
-2. Add Network Extensions `packet-tunnel-provider` entitlement to the
-   extension; configure provisioning and signing for app and extension
-   using an eligible Apple Developer account.
+1. The generator `ios_native/install_packet_tunnel_target.rb` now creates
+   the `PacketTunnel` extension target (bundle ID
+   `com.twinpanel.twinconnect.PacketTunnel`) and embeds it into Runner.
+   Its current WireGuard backend is a fail-closed fallback until linked.
+2. Network Extensions and shared Keychain entitlement templates are now
+   checked in for Runner and the extension. Configure *real* provisioning
+   and Apple Developer signing for both bundle identifiers.
 3. Integrate and link official [WireGuardKit and WireGuardKitGo from
    wireguard-apple](https://github.com/WireGuard/wireguard-apple) into the
    extension target, including the wg-quick parser model from that project,
@@ -66,3 +68,19 @@ forwards unrelated system traffic.
   iPhone/device cloud that permits VPN/Network Extensions.
 - No tests or results may label a protocol `connected` or `ready` without
   verifiable native evidence.
+
+## Host app start/stop (implemented but not yet device-ready)
+
+- `lib/ios_wireguard_controller.dart` routes Flutter commands to iOS.
+- `lib/live_dashboard.dart` keeps the original **Connect now** UI and
+  fetches a fresh, authorized WireGuard profile from the owning panel
+  via `ConnectionBootstrap` only after native capability checks.
+- `ios_native/TwinConnectIOSVPNControl.swift` saves the single-node
+  profile in a shared Keychain group, configures `NETunnelProviderManager`,
+  and invokes `startVPNTunnel()` / `stopVPNTunnel()`.
+- `ios_native/install_packet_tunnel_target.rb` builds an embedded Xcode
+  app extension from the Flutter-generated `ios/` project.
+- Native capability handshake is deliberately **not ready** until the
+  upstream WireGuardKit plus its compiled Go backend are actually linked
+  and a signed device build is verified. Simulator/Appetize does not prove
+  any true VPN connection.
