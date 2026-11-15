@@ -291,13 +291,13 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
   /// HTTPS egress lookup is separate from the Cisco tunnel's internal IP.
   Future<({String? ip, int? latencyMs})> _probeHttps(
       String host, String path, {bool cloudflareTrace = false}) async {
-    final client = HttpClient()
-      ..connectionTimeout = const Duration(seconds: 4)
-      ..findProxy = (_) => 'DIRECT'
-      // Cisco tunnels are often IPv4-only. Avoid an unusable IPv6 route
-      // when querying the *public* egress address. The URI hostname is
-      // retained for normal HTTPS TLS certificate/hostname verification.
-      ..connectionFactory = (uri, proxyHost, proxyPort) async {
+    final client = HttpClient();
+    client.connectionTimeout = const Duration(seconds: 4);
+    client.findProxy = (_) => 'DIRECT';
+    // Cisco tunnels are often IPv4-only. Avoid an unusable IPv6 route
+    // when querying the *public* egress address. Retain the URI hostname
+    // for normal TLS hostname verification.
+    client.connectionFactory = (uri, proxyHost, proxyPort) async {
         if (proxyHost != null || proxyPort != null) {
           throw const SocketException('Unexpected HTTPS proxy');
         }
