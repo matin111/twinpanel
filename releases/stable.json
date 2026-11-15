@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.845",
+  "version": "1.1.0-rc.846",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-15T06:08:24Z",
+  "released_at": "2026-11-15T06:45:23Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "2ae666d678b773abe2c2c95893f3cc70d6166c08",
+  "source_sha": "5e9272235f467edc81f5e6eaaacbfd2fc3cac158",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.845/twinpanel-1.1.0-rc.845-linux-x86_64.tar.gz",
-    "sha256": "34559e4168325025c42686da0e6e795fbf69b77c1317367b970e283b982c387b",
-    "size_bytes": 30875162
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.846/twinpanel-1.1.0-rc.846-linux-x86_64.tar.gz",
+    "sha256": "7a21034361a8d1e08960103b0d70a32de41c3fecebd82880d678ad689c1a9349",
+    "size_bytes": 30881742
   },
   "notes": {
-    "fa": "افزودن تاریخچه کیف پول برای مشتریان هر نماینده در صفحه مشتریان: تراکنش‌های متعلق به همان نمایندگی، درخواست‌های شارژ و وضعیت تأیید یا رد، جستجو در پاپ‌آپ و محافظت از حریم اطلاعات بین نمایندگی‌ها؛ بدون تغییر در موجودی کیف پول یا جریان پرداخت.",
-    "en": "Add per-customer reseller-scoped wallet history popup with ledger activity, top-up requests and status, search and cross-reseller access isolation. Read-only; no balance or payment-flow changes."
+    "fa": "تاریخچه واقعی اشتراک‌های نماینده در کارت اشتراک شامل رویدادها و تمدیدهای رزرو، مستقل از صفحه مشتریان؛ نوار پیشرفت مصرف حجم در کارت‌های اشتراک ادمین هم‌ظاهر با نماینده؛ بدون تغییر حجم، اتصال و اعتبار اشتراک‌ها.",
+    "en": "Add subscription history popup to reseller subscription cards, showing ownership-scoped events and reserved renewals, and a visual quota usage progress bar for admin subscription cards. No balance or connection changes."
   }
 }
