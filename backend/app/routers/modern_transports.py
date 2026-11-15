@@ -103,6 +103,48 @@ def _status(value: object) -> str:
     return str(raw or "").strip().lower()
 
 
+def _tp27_quality_evidence(raw: str | None) -> dict:
+    """Expose last measured TP27 bidirectional loss without altering routing.
+
+    Candidate ONLINE only proves the link is reachable. This intentionally
+    retains the source observation and does not infer bandwidth from latency.
+    Older TP27 records may not contain current measurement timestamps, so
+    such samples are explicitly labelled as unverified/stale-unknown.
+    """
+    try:
+        data = json.loads(raw or "{}")
+        if not isinstance(data, dict):
+            data = {}
+    except (TypeError, ValueError):
+        data = {}
+
+    def percent(key: str) -> float | None:
+        try:
+            value = float(data[key])
+        except (KeyError, ValueError, TypeError):
+            return None
+        return round(max(0.0, min(100.0, value)), 3)
+
+    iran = percent("iran_packet_loss_pct")
+    exit_side = percent("exit_packet_loss_pct")
+    loss = max((x for x in (iran, exit_side) if x is not None), default=None)
+    quality = (
+        "unknown" if loss is None
+        else "severe_loss" if loss >= 20.0
+        else "degraded" if loss >= 5.0
+        else "measured_ok"
+    )
+    return {
+        "grade": quality,
+        "iran_packet_loss_pct": iran,
+        "exit_packet_loss_pct": exit_side,
+        "sample_freshness": "unknown",
+        "current_speed_verified": False,
+        "needs_fresh_bidirectional_probe": quality in {"severe_loss", "degraded", "unknown"},
+        "is_transport_online_independent_of_quality": True,
+    }
+
+
 def _candidate_view(
     *,
     name: str,
@@ -216,6 +258,11 @@ def _candidate_view(
         "auto_block_reason": block,
         "quarantine_until_epoch": state.get("quarantine_until_epoch"),
         "benchmark": throughput,
+        "path_quality": (
+            _tp27_quality_evidence(row.config_text if row else None)
+            if name == "tp27_fast"
+            else None
+        ),
         "benchmark_fresh": benchmark_fresh,
         "benchmark_age_seconds": (
             round(benchmark_age, 1)
