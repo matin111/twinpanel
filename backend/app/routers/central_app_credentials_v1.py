@@ -24,6 +24,8 @@ from ..models_reseller import Reseller, ResellerSubscription
 from ..plan_category_models import PlanCategoryAssignment
 from ..plan_node_models import PlanNode
 from ..central_app_protocols import normalize_protocol, protocol_catalog
+from ..central_app_plan_policy import category_protocols
+from ..protocol_account_registry import explicit_plan_protocols, ALL_PROTOCOL_KEYS
 from ..system_release import ensure_installation_id
 from .account_delivery import _share_token, _share_url
 from .central_app_v1 import (
@@ -184,15 +186,24 @@ def session_plan(
     grouping = db.query(PlanCategoryAssignment).filter(
         PlanCategoryAssignment.plan_id == int(plan.id)
     ).first()
+    subscription_type = str(grouping.subscription_type or "اشتراک عمومی") \
+        if grouping else "اشتراک عمومی"
+    # Mirror the plan editor's explicit protocol template, not the current
+    # node's installed services. Old unconfigured premium plans retain the
+    # editor's all-protocol default, while Vitory is capped at two families.
+    configured = set(explicit_plan_protocols(db, int(plan.id)))
+    if not configured:
+        configured = set(ALL_PROTOCOL_KEYS)
+    allowed = category_protocols(subscription_type, configured)
     return JSONResponse({
         "schema": 1,
         "namespace": subscription_app_namespace(db, sub),
         "plan_id": int(plan.id),
-        "subscription_type": str(grouping.subscription_type or "اشتراک عمومی")
-            if grouping else "اشتراک عمومی",
+        "subscription_type": subscription_type,
         "user_count_category": str(grouping.category or "سایر پلن‌ها")
             if grouping else "سایر پلن‌ها",
         "device_limit": int(plan.device_limit if plan.device_limit is not None else 1),
+        "allowed_protocols": [p for p in ALL_PROTOCOL_KEYS if p in allowed],
     }, headers=_PRIVATE_HEADERS)
 
 
