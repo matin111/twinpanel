@@ -17,6 +17,7 @@ const dateText=(value:unknown)=>{if(!value)return "—";const d=new Date(String(
 const statusTone=(status:string):"ok"|"warn"|"bad"|"violet"=>["active","online","approved","paid","completed","success","read"].includes(status.toLowerCase())?"ok":["expired","canceled","failed","rejected","offline","suspended"].includes(status.toLowerCase())?"bad":"warn";
 const protocols=(row:ResellerRow)=>[["enable_cisco","Cisco"],["enable_openvpn","OpenVPN"],["enable_wireguard","WireGuard"],["enable_l2tp","L2TP"],["enable_v2ray","V2Ray"]].filter(([key])=>Boolean(row[key])).map(([,label])=>label);
 
+const rowsOfPurchases=(value:unknown):ResellerRow[]=>Array.isArray(value)?value.filter(item=>item&&typeof item==="object") as ResellerRow[]:[];
 const resellerTypeLabel=(kind:string)=>({
   reseller_bot_adjustment:"تغییر دستی نماینده",reseller_bot_topup:"شارژ تأییدشده",
   reseller_bot_wallet_payment:"خرید با کیف پول",reseller_bot_order_wallet:"خرید از ربات"
@@ -95,7 +96,7 @@ export function ResellerCustomersParityV2(){
   };
   const ledgerRows=Array.isArray(walletHistory?.transactions)?walletHistory.transactions as ResellerRow[]:[];
   const topupRows=Array.isArray(walletHistory?.topups)?walletHistory.topups as ResellerRow[]:[];
-  const purchaseRows=Array.isArray(walletHistory?.purchases)?walletHistory.purchases as ResellerRow[]:[];
+  const purchaseRows=[...rowsOfPurchases(walletHistory?.purchases),...rowsOfPurchases(walletHistory?.manual_purchases)].sort((a,b)=>new Date(String(b.created_at||0)).getTime()-new Date(String(a.created_at||0)).getTime());
   const walletMatch=(row:ResellerRow)=>Object.values(row).some(v=>String(v??"").toLowerCase().includes(walletQuery.trim().toLowerCase()));
   const load=async()=>{setError("");try{setRows(await resellerApi.customers());}catch(reason){setError(reason instanceof Error?reason.message:String(reason));}};
   useEffect(()=>{void load();},[]);
