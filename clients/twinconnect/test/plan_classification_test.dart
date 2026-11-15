@@ -74,6 +74,44 @@ void main() {
     expect(plan.permitsProtocol('hysteria2'), isTrue);
   });
 
+  test('plan protocol whitelist comes from the panel, not all native engines', () {
+    final special = AppPlanClassification.fromJson({
+      'schema': 1,
+      'namespace': 'TPABCDEF',
+      'plan_id': 101,
+      'subscription_type': 'ویژه',
+      'user_count_category': 'دو کاربره',
+      'device_limit': 2,
+      'allowed_protocols': ['cisco', 'v2ray', 'hysteria2'],
+    });
+    expect(special.permitsProtocol('cisco'), isTrue);
+    expect(special.permitsProtocol('wireguard'), isFalse);
+    final vitory = AppPlanClassification.fromJson({
+      'schema': 1,
+      'namespace': 'TPABCDEF',
+      'plan_id': 102,
+      'subscription_type': 'ویتوری',
+      'user_count_category': 'یک کاربره',
+      'device_limit': 1,
+      'allowed_protocols': ['v2ray', 'hysteria2', 'cisco'],
+    });
+    expect(vitory.permitsProtocol('v2ray'), isTrue);
+    expect(vitory.permitsProtocol('hysteria2'), isTrue);
+    expect(vitory.permitsProtocol('cisco'), isFalse);
+  });
+
+  test('invalid panel protocol lists cannot expand account entitlement', () {
+    expect(() => AppPlanClassification.fromJson({
+      'schema': 1,
+      'namespace': 'TPABCDEF',
+      'plan_id': 3,
+      'subscription_type': 'ویژه',
+      'user_count_category': 'دو کاربره',
+      'device_limit': 2,
+      'allowed_protocols': ['not-a-real-protocol'],
+    }), throwsFormatException);
+  });
+
   test('rejects negative plan IDs', () {
     expect(() => AppPlanClassification.fromJson({
       'schema': 1,
