@@ -50,6 +50,7 @@ import 'brand_theme.dart';
 import 'plan_classification.dart';
 import 'account_snapshot.dart';
 import 'native_vpn_bridge.dart';
+import 'ios_wireguard_controller.dart';
 import 'country_flag.dart';
 import 'ambient_background.dart';
 import 'interactive_glass_card.dart';
@@ -114,6 +115,7 @@ class _DemoServer {
 
 class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   final WindowsWireGuardController _vpn = const WindowsWireGuardController();
+  final IosWireGuardController _iosVpn = const IosWireGuardController();
   final WindowsAmneziaWgController _awg = const WindowsAmneziaWgController();
   late final WindowsSingBoxTunnel _modernTunnel = WindowsSingBoxTunnel(
     onUnexpectedExit: () {
@@ -2452,6 +2454,80 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     }
   }
 
+  /// Device-only iOS path. Appetize can exercise the button but fails
+  /// safely without an embedded, signed PacketTunnel and WireGuardKitGo.
+  /// A successful OS start request is NOT a verified peer handshake.
+  Future<void> _toggleIosVpn() async {
+    if (!Platform.isIOS || _vpnBusy) return;
+    setState(() { _vpnBusy = true; _vpnError = null; });
+    try {
+      final status = await _iosVpn.status();
+      if (const {'connecting', 'os_connected_unverified', 'reasserting'}
+          .contains(status['state'])) {
+        await _iosVpn.stop();
+        if (mounted) setState(() {
+          _vpnUp = false;
+          _vpnVerified = false;
+          _activeNodeId = null;
+        });
+        return;
+      }
+      final protocol = _filter == 'all' ? 'wireguard' : _filter;
+      if (protocol != 'wireguard') {
+        throw const FormatException('IOS_PROTOCOL_ENGINE_NOT_INSTALLED');
+      }
+      final serverId = _selectedServerId;
+      if (serverId == null) {
+        throw const FormatException('SELECT_WIREGUARD_SERVER');
+      }
+      final installed = await _iosVpn.installation();
+      if (installed['engineReady'] != true) {
+        throw FormatException(installed['reason'] is String
+            ? installed['reason'] as String : 'IOS_ENGINE_NOT_READY');
+      }
+      final api = TenantApi.fromBuildConfig();
+      final checks = await Future.wait<Object>([
+        _vpnPolicy.load(widget.panel.namespace, widget.username),
+        NativeVpnBridge.probe(),
+        api.loadSessionProtocolCatalog(
+            panel: widget.panel, sessionToken: widget.sessionToken),
+      ]);
+      final policy = checks[0] as VpnPolicy;
+      final capabilities = checks[1] as NativeVpnCapabilities;
+      final native = await NativeVpnBridge.protocolReadiness(
+          validatedCapabilities: capabilities);
+      final candidate = await ConnectionBootstrap(api: api).prepare(
+        panel: widget.panel,
+        sessionToken: widget.sessionToken,
+        serverId: serverId,
+        protocolCode: 'wireguard',
+        policy: policy,
+        capabilities: capabilities,
+        nativeProtocols: native,
+        currentAttemptCatalog: Future<PanelProtocolCatalog>.value(
+            checks[2] as PanelProtocolCatalog),
+      );
+      final profile = WindowsWireGuardController.configForSingleNode(
+          candidate.profiles, serverId);
+      await _iosVpn.start(
+        profile: profile.config,
+        namespace: widget.panel.namespace,
+        account: widget.username,
+        policy: policy,
+      );
+      // Do not call an OS-accepted start a connected VPN.
+      if (mounted) setState(() {
+        _vpnUp = false;
+        _vpnVerified = false;
+        _activeNodeId = serverId;
+      });
+    } catch (error) {
+      if (mounted) setState(() => _vpnError = _errorText(error));
+    } finally {
+      if (mounted) setState(() => _vpnBusy = false);
+    }
+  }
+
   Future<void> _toggleVpn() async {
     if (_vpnBusy || !Platform.isWindows) return;
     if (_modernUp || _awgServiceUp || _modernTunnel.isRunning || _xrayProxy.isRunning || _sudokuProxy.isRunning ||
@@ -3485,7 +3561,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
               ),
               child: FilledButton(
                 key: const Key('liveConnectionControlsButton'),
-                onPressed: !Platform.isWindows || _vpnBusy ? null : _toggleVpn,
+                onPressed: _vpnBusy ? null : (Platform.isIOS
+                    ? _toggleIosVpn : (Platform.isWindows ? _toggleVpn : null)),
                 style: FilledButton.styleFrom(
                   minimumSize: const Size(250, 59),
                   backgroundColor: Colors.transparent,
@@ -3541,6 +3618,21 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           const SizedBox(height: 8),
           Text(
             switch (_vpnError!) {
+              'IOS_PACKET_TUNNEL_EXTENSION_MISSING' => tr(
+                'افزونه Packet Tunnel هنوز در نسخه آیفون نصب نشده است.',
+                'The iOS Packet Tunnel extension is not embedded yet.'),
+              'IOS_ENGINE_NOT_RUNTIME_VERIFIED' => tr(
+                'موتور محلی iOS هنوز اجرا و تأیید نشده است.',
+                'The iOS local VPN engine is not yet runtime verified.'),
+              'IOS_PROTOCOL_ENGINE_NOT_INSTALLED' => tr(
+                'موتور این پروتکل هنوز روی iOS نصب نیست.',
+                'This iOS protocol engine is not installed.'),
+              'IOS_KEYCHAIN_PROFILE_STORE_FAILED' => tr(
+                'ذخیره امن کانفیگ در Keychain ناموفق بود.',
+                'Secure iOS Keychain profile storage failed.'),
+              'IOS_VPN_START_REJECTED' => tr(
+                'iOS درخواست شروع VPN را رد کرد.',
+                'iOS rejected the VPN start request.'),
               'WIREGUARD_NOT_ALLOWED' => tr(
                 'این اشتراک مجوز WireGuard ندارد.',
                 'WireGuard is not enabled for this subscription.'),
