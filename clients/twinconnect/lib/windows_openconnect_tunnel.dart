@@ -98,7 +98,7 @@ class WindowsOpenConnectTunnel {
           .timeout(const Duration(seconds: 4));
       if (const {
         'stopped', 'dtls_log_established', 'dtls_log_failed',
-        'dtls_unverified',
+        'dtls_unverified', 'tls_tcp_fallback_reported',
       }.contains(raw)) {
         return raw!;
       }
