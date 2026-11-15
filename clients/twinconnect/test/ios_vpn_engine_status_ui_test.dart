@@ -11,8 +11,8 @@ void main() {
     expect(dashboard, contains("onPressed: _vpnBusy ? null : (Platform.isIOS"));
     expect(dashboard, contains("tr('اتصال سریع', 'Connect now')"));
     expect(dashboard, contains('ورود و دریافت اشتراک برقرار است، اما تونل فعال نیست.'));
-    expect(bridge, contains('"engineReady": false'));
-    expect(bridge, contains('"supportedProtocols": [String]()'));
+    expect(bridge, contains('"engineReady": wireGuardReady'));
+    expect(bridge, contains('TwinConnectIOSVPNControl.backendLinked()'));
     expect(bridge, contains('"verified": false'));
   });
 }
