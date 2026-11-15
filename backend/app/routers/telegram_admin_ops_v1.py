@@ -20,7 +20,8 @@ from sqlalchemy.orm import Session
 
 from ..customer_wallet_models import CustomerWallet, CustomerWalletTopup
 from ..database import get_db
-from ..models import Subscription, User, UserRole
+from ..models import Plan, Subscription, User, UserRole
+from ..store_models import StoreOrder
 from ..payment_models import PaymentIntent
 from ..telegram_models import TelegramUserLink
 from ..runtime_settings_model import RuntimeSetting
@@ -211,19 +212,128 @@ def _purchase(db: Session, intent_id: int) -> PaymentIntent:
     return row
 
 
-def _summary(db: Session, row: PaymentIntent) -> dict:
-    user = db.get(User, row.user_id)
+def _linked_user_details(db: Session, user_id: int) -> dict:
+    user = db.get(User, int(user_id))
+    link = (
+        db.query(TelegramUserLink)
+        .filter(TelegramUserLink.user_id == int(user_id))
+        .first()
+    )
     return {
-        "id": row.id, "user_id": row.user_id,
-        "user_label": (user.full_name or user.email) if user else "-",
-        "order_id": row.order_id, "method": row.method,
+        "user_id": int(user_id),
+        "user_label": (user.full_name or user.email or "-") if user else "-",
+        "telegram_id": int(link.telegram_id) if link else None,
+        "telegram_username": link.telegram_username if link else None,
+    }
+
+
+def _summary(db: Session, row: PaymentIntent) -> dict:
+    order = db.get(StoreOrder, row.order_id)
+    plan = db.get(Plan, order.plan_id) if order and order.plan_id else None
+    amount = int(row.payable_amount_toman if row.payable_amount_toman is not None
+                 else row.base_amount_toman or 0)
+    return {
+        "id": row.id,
+        **_linked_user_details(db, row.user_id),
+        "order_id": row.order_id,
+        "plan_id": int(order.plan_id) if order and order.plan_id else None,
+        "plan_name": plan.name if plan else None,
+        "subscription_id": int(order.subscription_id) if order and order.subscription_id else None,
+        "method": row.method,
         "status": row.status,
-        "amount_toman": int(row.payable_amount_toman or row.base_amount_toman or 0),
+        "amount_toman": amount,
+        "base_amount_toman": int(order.base_amount_toman or order.amount_toman or 0) if order else None,
+        "discount_amount_toman": int(order.discount_amount_toman or 0) if order else 0,
         "tracking_code": row.tracking_code,
         "has_receipt": bool(row.receipt_telegram_file_id),
         "submitted_at": row.submitted_at.isoformat() if row.submitted_at else None,
     }
 
+
+def _wallet_summary(db: Session, row: CustomerWalletTopup) -> dict:
+    return {
+        "id": int(row.id),
+        **_linked_user_details(db, row.user_id),
+        "status": row.status,
+        "method": row.method,
+        "amount_toman": int(row.payable_amount_toman or 0),
+        "wallet_credit_toman": int(row.amount_toman or 0),
+        "tracking_code": row.tracking_code,
+        "has_receipt": bool(row.receipt_file_marker),
+    }
+
+
+_RECEIPT_STATUS_FA = {
+    "pending_payment": "در انتظار پرداخت / بررسی",
+    "awaiting_review": "در انتظار بررسی",
+    "payment_submitted": "رسید ثبت شده",
+    "submitted": "رسید ثبت شده",
+    "review": "در حال بررسی",
+    "waiting": "در انتظار بررسی",
+    "approved": "تأیید شده",
+    "paid": "پرداخت شده",
+    "fulfilled": "تحویل شده",
+    "completed": "تکمیل شده",
+    "rejected": "رد شده",
+    "payment_rejected": "پرداخت رد شده",
+    "failed": "ناموفق",
+}
+
+
+def format_admin_receipt(kind: str, payload: dict) -> str:
+    """Stable Telegram HTML caption for new pushes and in-place refreshes.
+
+    All user/order fields are escaped and each section uses real newlines.
+    This is an audit view only; it must not approve or change any payment.
+    """
+    from html import escape as html_escape
+    def safe(value, max_len=90):
+        return html_escape(str(value if value is not None else "-")[:max_len], quote=False)
+
+    status = str(payload.get("status") or "-")
+    approved = status.lower() in {"fulfilled", "approved", "paid", "completed"}
+    rejected = status.lower() in {"rejected", "payment_rejected", "failed"}
+    heading = ("✅ رسید تأیید شد" if approved else
+               "❌ رسید رد شد" if rejected else "🧾 رسید در انتظار بررسی")
+    amount = int(payload.get("amount_toman") or 0)
+    user_id = payload.get("user_id")
+    lines = [
+        f"<b>{heading}</b>",
+        "",
+        f"📋 نوع درخواست: <b>{'خرید اشتراک' if kind == 'purchase' else 'شارژ کیف پول'}</b>",
+        f"🧾 شناسه رسید: <code>{safe(payload.get('id'))}</code>",
+        f"👤 کاربر: {safe(payload.get('user_label'))}",
+        f"🆔 شناسه کاربر: <code>{safe(user_id)}</code>",
+    ]
+    if payload.get("telegram_id"):
+        lines.append(f"📱 آیدی عددی تلگرام: <code>{safe(payload['telegram_id'])}</code>")
+    if payload.get("telegram_username"):
+        lines.append(f"🔗 تلگرام: @{safe(str(payload['telegram_username']).lstrip('@'), 64)}")
+    lines.append("")
+    if kind == "purchase":
+        lines.extend([
+            f"📦 پلن انتخابی: <b>{safe(payload.get('plan_name') or 'نامشخص')}</b>",
+            f"🛒 شماره سفارش: <code>{safe(payload.get('order_id'))}</code>",
+        ])
+        if payload.get("subscription_id"):
+            lines.append(f"🔑 اشتراک: MV-{safe(payload['subscription_id'])}")
+        base = payload.get("base_amount_toman")
+        discount = int(payload.get("discount_amount_toman") or 0)
+        if base is not None and (discount or int(base) != amount):
+            lines.append(f"💵 قیمت اولیه: {int(base):,} تومان")
+        if discount:
+            lines.append(f"🏷 تخفیف: {discount:,} تومان")
+    lines.extend([
+        f"💰 مبلغ قابل پرداخت: <b>{amount:,} تومان</b>",
+        f"💳 روش پرداخت: {safe(payload.get('method'))}",
+        f"📌 وضعیت: {safe(_RECEIPT_STATUS_FA.get(status.lower(), status))}",
+        f"🔖 کد پیگیری: <code>{safe(payload.get('tracking_code'))}</code>",
+    ])
+    if kind == "wallet" and payload.get("wallet_credit_toman") is not None:
+        lines.append(f"💼 مبلغ شارژ کیف پول: {int(payload['wallet_credit_toman']):,} تومان")
+    if not approved and not rejected:
+        lines.extend(["", "⚠️ قبل از تأیید، واریز را مستقل بررسی کنید."])
+    return "\n".join(lines)[:1024]
 
 @router.get("/me/{telegram_id}")
 def admin_identity(telegram_id: int, db: Session = Depends(get_db)):
@@ -274,9 +384,7 @@ def receipt_detail(
         # Read-only status must remain accessible after automatic/manual
         # approval or rejection; do not create another topup or receipt.
         marker = str(row.receipt_file_marker or "").strip()
-        payload = {"id": row.id, "status": row.status, "user_id": row.user_id,
-                   "amount_toman": int(row.payable_amount_toman or 0),
-                   "can_approve": _manual_topup(row)}
+        payload = {**_wallet_summary(db, row), "can_approve": _manual_topup(row)}
     else:
         raise HTTPException(status_code=404, detail="نوع رسید نامعتبر است")
     payload["kind"] = kind
