@@ -233,9 +233,7 @@ export function LegacySubscriptionsRuntimePage(){
       "reset-usage",
       pick("حجم مصرفی اشتراک صفر شد؛ حجم کل و تاریخ انقضا تغییر نکردند","Subscription usage was reset; total quota and expiry were unchanged"),
       async()=>{
-        await legacyAdminApi.extendSubscription(subscriptionId,{
-          add_traffic_gb:0,add_days:0,reset_usage:true,reset_date:false,
-        });
+        await legacyAdminApi.resetSubscriptionUsage(subscriptionId);
         setResetTarget(null);
       },
     );
