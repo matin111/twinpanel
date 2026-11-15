@@ -62,5 +62,21 @@ embed.dst_path = ''
 build_file = embed.add_file_reference(extension.product_reference)
 build_file.settings = { 'ATTRIBUTES' => ['RemoveHeadersOnCopy'] }
 
+# Flutter's Runner target has a `Thin Binary` shell-script phase. Xcode's
+# new build system reports a dependency cycle if `Embed App Extensions` is
+# appended AFTER it (Copy .appex -> Thin Binary -> ProcessInfoPlist -> Copy).
+# Order the extension copy phase BEFORE Thin Binary so there is no cycle.
+thin_binary = runner.build_phases.find do |phase|
+  phase.isa == 'PBXShellScriptBuildPhase' && phase.name == 'Thin Binary'
+end
+raise 'Flutter Runner Thin Binary build phase missing' unless thin_binary
+phases = runner.build_phases
+phases.delete(embed)
+thin_index = phases.index(thin_binary)
+raise 'Unable to locate Thin Binary in Runner build phases' unless thin_index
+phases.insert(thin_index, embed)
+raise 'Embed App Extensions must precede Thin Binary' unless
+  runner.build_phases.index(embed) < runner.build_phases.index(thin_binary)
+
 project.save
 puts 'Created PacketTunnel Xcode target and embedded extension in Runner'
