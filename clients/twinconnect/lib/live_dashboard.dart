@@ -838,16 +838,25 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         }
         if (!healthy && _modernProtocol == 'cisco') {
           _modernHealthFailures++;
-          if (!_ciscoTunnel.isRunning || _modernHealthFailures >= 2) {
+          // An HTTPS public-IP probe can time out or be rate-limited while
+          // the OpenConnect child and Windows tunnel remain alive. Do not
+          // falsely mark that live tunnel as disconnected or allow a second
+          // connection on top of it. Clear the *verified egress* separately.
+          if (!_ciscoTunnel.isRunning) {
             _modernHealthTimer?.cancel();
+            _stopModernTrafficMonitoring();
             setState(() {
               _modernUp = false;
               _publicIp = null;
-              _vpnError = _ciscoTunnel.isRunning
-                  ? 'CISCO_HEALTH_DEGRADED' : 'CISCO_PROCESS_EXITED';
+              _vpnError = 'CISCO_PROCESS_EXITED';
             });
-            return;
+          } else if (_modernHealthFailures >= 2) {
+            setState(() {
+              _publicIp = null;
+              _vpnError = 'CISCO_HEALTH_DEGRADED';
+            });
           }
+          return;
         }
         if (healthy) {
           _modernHealthFailures = 0;
