@@ -196,7 +196,7 @@ public class AxeOpenConnectVpnService extends VpnService {
 
             if (contextCookie == null || contextCookie.isEmpty()) {
                 Log.e(TAG, "Authentication step 1 failed — no context cookie received");
-                lastFailureCode = "CISCO_AUTH_CONTEXT_REJECTED";
+                if (lastFailureCode.isEmpty()) lastFailureCode = "CISCO_AUTH_CONTEXT_REJECTED";
                 broadcastStage("denied");
                 stopSelf();
                 return;
@@ -240,7 +240,7 @@ public class AxeOpenConnectVpnService extends VpnService {
 
             if (sessionCookie == null || sessionCookie.isEmpty()) {
                 Log.e(TAG, "Authentication step 2 failed — no webvpn= session cookie (wrong password or server rejected login)");
-                lastFailureCode = "CISCO_AUTH_SESSION_REJECTED";
+                if (lastFailureCode.isEmpty()) lastFailureCode = "CISCO_AUTH_SESSION_REJECTED";
                 broadcastStage("denied");
                 stopSelf();
                 return;
@@ -300,8 +300,22 @@ public class AxeOpenConnectVpnService extends VpnService {
             forwardPackets(tunSock.getInputStream(), tos, cfg.mtu > 0 ? cfg.mtu : 1406);
 
         } catch (Exception e) {
+            // Only expose safe error categories; never expose credentials.
             Log.e(TAG, "Connection error", e);
-            lastFailureCode = failureStage;
+            if (e instanceof javax.net.ssl.SSLHandshakeException ||
+                e instanceof javax.net.ssl.SSLPeerUnverifiedException) {
+                lastFailureCode = "CISCO_TLS_HANDSHAKE_FAILED";
+            } else if (e instanceof java.net.SocketTimeoutException) {
+                lastFailureCode = "CISCO_SOCKET_TIMEOUT";
+            } else if (e instanceof java.net.UnknownHostException) {
+                lastFailureCode = "CISCO_DNS_RESOLUTION_FAILED";
+            } else if (e instanceof java.net.ConnectException) {
+                lastFailureCode = "CISCO_GATEWAY_UNREACHABLE";
+            } else if (e instanceof java.io.EOFException) {
+                lastFailureCode = "CISCO_AUTH_RESPONSE_INCOMPLETE";
+            } else if (lastFailureCode.isEmpty()) {
+                lastFailureCode = failureStage;
+            }
             broadcastStage("error");
         } finally {
             safeClose(authSock);
@@ -420,8 +434,13 @@ public class AxeOpenConnectVpnService extends VpnService {
         if (code != 200) { drainAll(is); Log.e(TAG, "Auth HTTP " + code); return null; }
 
         StringBuilder cookies = new StringBuilder();
+        boolean xmlChallenge = false;
         String line;
         while ((line = readLine(is)) != null && !line.isEmpty()) {
+            if (line.toLowerCase(Locale.US).startsWith("content-type:") &&
+                line.toLowerCase(Locale.US).contains("xml")) {
+                xmlChallenge = true;
+            }
             if (line.toLowerCase(Locale.US).startsWith("set-cookie:")) {
                 String cookie = line.substring(11).trim();
                 int sc = cookie.indexOf(';');
@@ -434,6 +453,11 @@ public class AxeOpenConnectVpnService extends VpnService {
             }
         }
         drainAll(is);
+        if (cookies.length() == 0 && xmlChallenge) {
+            // This custom client cannot process standard config-auth forms.
+            // Do not retry credentials blindly.
+            lastFailureCode = "CISCO_AUTH_XML_CHALLENGE_UNSUPPORTED";
+        }
         return cookies.length() > 0 ? cookies.toString() : null;
     }
 
