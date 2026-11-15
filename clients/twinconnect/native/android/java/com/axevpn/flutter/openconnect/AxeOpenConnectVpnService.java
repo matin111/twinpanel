@@ -189,11 +189,17 @@ public class AxeOpenConnectVpnService extends VpnService {
                         for (String dns : ip.DNS) {
                             builder.addDnsServer(dns);
                         }
-                        // Fail closed for IPv6 if gateway does not assign IPv6.
-                        builder.addRoute("::", 0);
+                        // Android blocks an address family if the VPN has no
+                        // address, DNS or route for it. Never advertise an
+                        // IPv6 default route unless the gateway assigned a
+                        // usable IPv6 address: that would capture IPv6 traffic
+                        // into an IPv4-only tunnel, blackholing HTTPS.
+                        // Keep IPv6 blocked rather than allowing a cleartext
+                        // bypass on IPv4-only gateways.
                         if (ip.netmask6 != null && ip.netmask6.contains("/")) {
                             String[] ipv6 = ip.netmask6.split("/", 2);
                             builder.addAddress(ipv6[0], Integer.parseInt(ipv6[1]));
+                            builder.addRoute("::", 0);
                         }
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                             builder.setMetered(false);
