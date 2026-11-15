@@ -10,6 +10,7 @@ from ..deps import require_admin
 from ..models import Plan, Subscription, User
 from ..reserved_renewal_models import PendingSubscriptionRenewal, SubscriptionHistoryEvent
 from ..reserved_renewal_service import reserve_renewal, history
+from ..quota_models import QuotaAuditLog
 
 router = APIRouter(prefix="/v1/subscriptions", tags=["reserved-renewals"],
                    dependencies=[Depends(require_admin)])
@@ -50,9 +51,24 @@ def history_page(subscription_id: int, limit: int = 50, offset: int = 0,
         PendingSubscriptionRenewal.subscription_id == subscription_id,
         PendingSubscriptionRenewal.status == "queued")
         .order_by(PendingSubscriptionRenewal.id.asc())).scalars().all()
-    return {"events": [{"id": event.id, "type": event.event_type, "source": event.source,
-                         "actor": event.actor, "details": event.details,
-                         "created_at": event.created_at.isoformat()} for event in events],
+    # Retain existing audit records from older admin operations without
+    # inventing snapshots or exposing credentials to the history popup.
+    audit = db.execute(select(QuotaAuditLog).where(
+        QuotaAuditLog.subject_type == "subscription",
+        QuotaAuditLog.subject_id == str(subscription_id))
+        .order_by(QuotaAuditLog.created_at.desc()).limit(100)).scalars().all()
+    merged = [{"id": event.id, "type": event.event_type, "source": event.source,
+               "actor": event.actor, "details": event.details,
+               "created_at": event.created_at.isoformat()} for event in events]
+    merged.extend({
+        "id": record.id, "type": record.action,
+        "source": "legacy_audit", "actor": f"{record.actor_type}:{record.actor_id}",
+        "details": {key: value for key, value in (record.details or {}).items()
+                    if not any(s in key.lower() for s in ("password", "token", "secret", "credential"))},
+        "created_at": record.created_at.isoformat()
+    } for record in audit)
+    merged.sort(key=lambda row: row["created_at"], reverse=True)
+    return {"events": merged[:limit],
             "queued": [{"id": item.id, "plan": item.plan_name, "traffic_bytes": item.traffic_bytes,
                         "duration_days": item.duration_days, "created_at": item.created_at.isoformat()}
                        for item in queued]}
