@@ -249,6 +249,40 @@ void main() {
     ), throwsFormatException);
   });
 
+  test('TLS-enabled modern protocols accept missing enabled flag securely', () {
+    for (final protocol in ['hysteria2', 'tuic', 'anytls']) {
+      final result = SingBoxProfileValidator.validateOutbound(
+        protocolCode: protocol,
+        item: {
+          'outbound': {
+            'type': protocol,
+            'server': 'vpn.example.org',
+            'server_port': 443,
+            'tls': {'server_name': 'www.example.org'},
+          },
+        },
+      );
+      expect((result['tls'] as Map)['enabled'], isTrue);
+      expect((result['tls'] as Map)['server_name'], 'www.example.org');
+    }
+  });
+
+  test('TLS-enabled modern protocols reject insecure certificates', () {
+    for (final protocol in ['hysteria2', 'tuic', 'anytls']) {
+      expect(() => SingBoxProfileValidator.validateOutbound(
+        protocolCode: protocol,
+        item: {
+          'outbound': {
+            'type': protocol,
+            'server': 'vpn.example.org',
+            'server_port': 443,
+            'tls': {'enabled': true, 'insecure': true},
+          },
+        },
+      ), throwsFormatException);
+    }
+  });
+
   test('ShadowTLS detour cannot be flattened to a single node', () {
     expect(() => SingBoxProfileValidator.validateOutbound(
       protocolCode: 'shadowtls', item: {
