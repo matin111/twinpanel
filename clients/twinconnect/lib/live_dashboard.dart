@@ -303,6 +303,18 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     return null;
   }
 
+  bool get _connectedServerPingApproximate {
+    if (_modernUp && _modernProtocol == 'v2ray' &&
+        _selectedXrayNodeId != null && _selectedXrayInboundId != null &&
+        _xrayInboundRtts['${_selectedXrayNodeId!}:${_selectedXrayInboundId!}'] != null) {
+      return false;
+    }
+    final id = _modernUp ? _modernNodeId : _activeNodeId;
+    if (id == null || _nodePings[id] != null) return false;
+    return widget.servers?.servers.any(
+        (node) => node.id == id && node.latencyMs != null) ?? false;
+  }
+
   Future<void> _refreshNativeReadiness() async {
     if (_nativeReadyRefreshing || !Platform.isWindows) return;
     _nativeReadyRefreshing = true;
@@ -496,10 +508,15 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                 const Duration(seconds: 90))
           id: _nodePings[id],
     };
-    return FastServerSelection.choose(
+    final measured = FastServerSelection.choose(
         servers: servers,
         permittedNodeIds: entitledNodeIds,
         measuredRtts: sampled);
+    // An ICMP-blocked host may still accept VPN sessions. Only as a last
+    // resort use its panel-reported latency estimate, never an unentitled
+    // node, and never label that estimate an actual user-device ping.
+    return measured ?? FastServerSelection.chooseReportedEstimate(
+        servers: servers, permittedNodeIds: entitledNodeIds);
   }
 
   void _resetNetworkStats() {
@@ -4214,7 +4231,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                         size: 11, color: sub)),
                   ]),
                   const SizedBox(height: 16),
-                  Text(ServerLatency.label(_connectedServerRtt),
+                  Text(ServerLatency.label(_connectedServerRtt,
+                      approximate: _connectedServerPingApproximate),
                     style: TextStyle(
                       fontSize: 18, fontWeight: FontWeight.bold,
                       color: ServerLatency.color(_connectedServerRtt))),
