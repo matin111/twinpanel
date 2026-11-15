@@ -116,6 +116,18 @@ def activate_due_renewals(db: Session, limit: int = 100) -> int:
             if pending is None:
                 db.rollback()
                 continue
+            # A renewal was paid against an existing account. If that account
+            # was later canceled or is still pending first provisioning,
+            # do not consume the purchased next period or restore its access.
+            if sub.status in (SubscriptionStatus.CANCELED, SubscriptionStatus.PENDING):
+                pending.status = "blocked"
+                history(db, sub_id, "renewal_blocked", pending.source, "system", {
+                    "renewal_id": pending.id,
+                    "reason": "account_canceled_or_not_provisioned",
+                    "account_status": str(getattr(sub.status, "value", sub.status)),
+                })
+                db.commit()
+                continue
             if pending.plan_id is not None and (
                 sub.plan_id is None or int(pending.plan_id) != int(sub.plan_id)
             ):
