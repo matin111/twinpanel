@@ -4569,6 +4569,60 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     // Main connection page: compact, real subscription lifecycle details.
     // The account page still owns the full breakdown and edit/refresh actions.
     // A missing snapshot displays dashes, never fictitious quota/dates.
+    Widget reservedRenewalNotice(ReservedRenewalSnapshot renewal,
+        {required bool compact}) {
+      final accent = renewal.needsReview
+          ? const Color(0xFFFFB878) : purple;
+      final description = renewal.needsReview
+          ? tr('تمدید نیازمند بررسی است؛ اعتبار دوره بعد مصرف نشده است.',
+               'Renewal needs review; the next period has not been used.')
+          : tr('با پایان حجم یا تاریخ فعلی، دوره بعد خودکار فعال می‌شود.',
+               'The next period activates after current quota or expiry ends.');
+      return Container(
+        key: Key(compact ? 'liveHomeReservedRenewal' : 'accountReservedRenewal'),
+        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 12),
+        decoration: BoxDecoration(
+          color: accent.withValues(alpha: _dark ? .12 : .06),
+          borderRadius: BorderRadius.circular(15),
+          border: Border.all(color: accent.withValues(alpha: .32)),
+        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min, children: [
+            Row(children: [
+              Icon(renewal.needsReview ? Icons.info_outline_rounded
+                  : Icons.event_repeat_rounded, color: accent, size: 18),
+              const SizedBox(width: 7),
+              Expanded(child: Text(
+                renewal.needsReview
+                    ? tr('تمدید نیازمند بررسی', 'Renewal needs review')
+                    : tr('تمدید رزرو شده', 'Reserved renewal'),
+                style: TextStyle(color: ink, fontWeight: FontWeight.w800,
+                    fontSize: compact ? 11 : 14))),
+            ]),
+            const SizedBox(height: 7),
+            Text(renewal.planName,
+                maxLines: 2, overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: ink, fontWeight: FontWeight.w700,
+                    fontSize: compact ? 11 : 13)),
+            const SizedBox(height: 4),
+            Text(
+              '${_formatBytes(renewal.trafficBytes)} · ${renewal.durationDays} '
+              + tr('روز', 'days'),
+              style: TextStyle(color: ink, fontWeight: FontWeight.w600,
+                  fontSize: compact ? 10 : 12)),
+            const SizedBox(height: 6),
+            Text(description, style: TextStyle(color: sub,
+                fontSize: compact ? 10 : 12)),
+            if (!compact) ...[
+              const SizedBox(height: 6),
+              Text(tr('ثبت تمدید: ', 'Reserved on: ')
+                  + renewal.reservedAt.toLocal().toIso8601String().split('T').first,
+                style: TextStyle(color: sub, fontSize: 11)),
+            ],
+          ]),
+      );
+    }
+
     Widget homeSubscriptionSummary() {
       final account = widget.account;
       final used = account?.trafficUsedBytes ?? 0;
@@ -4707,6 +4761,10 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                 tr('زمان باقی‌مانده', 'Time remaining'),
                 daysLabel, cyan)),
             ]),
+            if (account?.reservedRenewal != null) ...[
+              const SizedBox(height: 8),
+              reservedRenewalNotice(account!.reservedRenewal!, compact: true),
+            ],
             if (widget.accountError != null) ...[
               const SizedBox(height: 6),
               Text(tr('اطلاعات حساب در دسترس نیست؛ تازه‌سازی کنید.',
@@ -4929,6 +4987,10 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
             ]),
           ),
           const SizedBox(height: 15),
+          if (current?.reservedRenewal != null) ...[
+            reservedRenewalNotice(current!.reservedRenewal!, compact: false),
+            const SizedBox(height: 15),
+          ],
           glassCard(
             key: const Key('accountTrafficCard'),
             radius: 24,
