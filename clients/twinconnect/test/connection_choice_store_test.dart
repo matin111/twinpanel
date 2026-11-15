@@ -9,8 +9,7 @@ void main() {
 
   test('manual Cisco node survives app reopen and is not an index', () async {
     final key = ConnectionChoiceStore.key(
-        namespace: 'panelA', apiOrigin: 'https://panel.example',
-        username: 'ali');
+        namespace: 'panelA', username: 'ali');
     const saved = ConnectionChoice(protocolCode: 'cisco', nodeId: 'germany-2');
     await ConnectionChoiceStore.save(key, saved);
     final restored = await ConnectionChoiceStore.load(key);
@@ -20,27 +19,26 @@ void main() {
     expect(reorderedIds.indexOf(restored!.nodeId!), 1);
   });
 
-  test('different account, tenant and origin have separate selections',
+  test('accounts and tenants are isolated even when domains rotate',
       () async {
-    String key(String user, String ns, String origin) =>
-        ConnectionChoiceStore.key(
-            namespace: ns, apiOrigin: origin, username: user);
-    final a = key('ali', 'panelA', 'https://a.example');
+    String key(String user, String ns) =>
+        ConnectionChoiceStore.key(namespace: ns, username: user);
+    final a = key('ali', 'panelA');
     await ConnectionChoiceStore.save(
         a, const ConnectionChoice(protocolCode: 'openvpn', nodeId: 'de-1'));
     expect((await ConnectionChoiceStore.load(a))?.nodeId, 'de-1');
     expect(await ConnectionChoiceStore.load(
-        key('reza', 'panelA', 'https://a.example')), isNull);
+        key('reza', 'panelA')), isNull);
     expect(await ConnectionChoiceStore.load(
-        key('ali', 'panelB', 'https://a.example')), isNull);
-    expect(await ConnectionChoiceStore.load(
-        key('ali', 'panelA', 'https://b.example')), isNull);
+        key('ali', 'panelB')), isNull);
+    // Changing an external domain does not alter the stable tenant key.
+    expect(key('ali', 'panelA'), a);
   });
 
   test('Xray inbound is kept with the exact manually chosen node',
       () async {
     final key = ConnectionChoiceStore.key(
-        namespace: 'n', apiOrigin: 'https://x.example', username: 'u');
+        namespace: 'n', username: 'u');
     await ConnectionChoiceStore.save(
         key, const ConnectionChoice(
             protocolCode: 'v2ray', nodeId: 'node-19',
