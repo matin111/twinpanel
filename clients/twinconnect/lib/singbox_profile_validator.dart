@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 
 /// The sing-box family uses one engine process. Profiles may be native
@@ -113,6 +114,10 @@ class SingBoxProfileValidator {
         throw const FormatException('SHADOWTLS_TLS_INVALID');
       }
       tls['server_name'] = explicitSni;
+    } else if (InternetAddress.tryParse(host) != null) {
+      // The IP does not identify the certificate's cover hostname.
+      // Never synthesize a false SNI to make this validation pass.
+      throw const FormatException('SHADOWTLS_TLS_INVALID');
     }
     tls['enabled'] = true;
     wrapper['tls'] = tls;
