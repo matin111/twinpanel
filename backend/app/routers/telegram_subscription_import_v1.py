@@ -89,6 +89,8 @@ def _extract_token(db: Session, url: str) -> str:
 
 
 def _row(db: Session, sub: Subscription, telegram_id: int | None = None) -> dict:
+    from ..subscription_renewal_status_v1 import next_reserved_renewal
+
     from .account_delivery import _share_url
 
     plan = db.get(Plan, sub.plan_id) if sub.plan_id else None
@@ -115,6 +117,7 @@ def _row(db: Session, sub: Subscription, telegram_id: int | None = None) -> dict
         "device_limit": int(plan.device_limit) if plan else None,
         "subscription_link": str(_share_url(db, sub)),
         "imported": True,
+        "reserved_renewal": next_reserved_renewal(db, sub.id),
         "management_mode": "owner_renewal" if is_owner else "support_request",
         "can_direct_renew": is_owner,
         "can_paid_renew": eligible_status,
