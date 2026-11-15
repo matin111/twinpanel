@@ -643,11 +643,27 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
             setState(() {
               _modernUp = false;
               _publicIp = null;
-              _vpnError = _ciscoTunnel.isRunning
-                  ? 'CISCO_HEALTH_DEGRADED' : 'CISCO_PROCESS_EXITED';
+              _vpnError = _ciscoTunnel.lastHealthError ??
+                  (_ciscoTunnel.isRunning
+                    ? 'CISCO_HEALTH_DEGRADED' : 'CISCO_PROCESS_EXITED');
             });
-            return;
           }
+          // Cisco has its own health state. Never increment the generic
+          // sing-box failure counter again in the same polling cycle.
+          return;
+        }
+        if (healthy && _modernProtocol == 'cisco') {
+          _modernHealthFailures = 0;
+          // A third-party public-IP service may time out while the native
+          // OpenConnect child stays alive. Warn, but do not fake a disconnect.
+          final reason = _ciscoTunnel.lastHealthError;
+          if (reason != null && _vpnError != reason) {
+            setState(() => _vpnError = reason);
+          } else if (reason == null &&
+              _vpnError == 'CISCO_EGRESS_RECHECK_UNAVAILABLE') {
+            setState(() => _vpnError = null);
+          }
+          return;
         }
         if (healthy) {
           _modernHealthFailures = 0;
@@ -3503,6 +3519,15 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
               'CISCO_HEALTH_DEGRADED' => tr(
                 'مسیر اینترنت سیسکو پاسخ تأییدشده ندارد.',
                 'Cisco internet route is no longer verified.'),
+              'CISCO_EGRESS_RECHECK_UNAVAILABLE' => tr(
+                'موتور Cisco هنوز فعال است، اما بررسی مجدد IP اینترنت پاسخ نداد.',
+                'Cisco is still running, but the public-IP recheck was unavailable.'),
+              'CISCO_ROUTE_BYPASS_DETECTED' => tr(
+                'IP اینترنت به مقدار قبل از اتصال برگشته؛ مسیر Cisco تأیید نشد.',
+                'Public IP returned to its pre-VPN value; Cisco routing is unverified.'),
+              'CISCO_NATIVE_STATUS_UNAVAILABLE' => tr(
+                'وضعیت موتور Cisco از ویندوز دریافت نشد.',
+                'Windows did not return the native Cisco process status.'),
               final code => tr(
                 'خطای اتصال ${(_modernProtocol ?? _filter).toUpperCase()}: $code',
                 '${(_modernProtocol ?? _filter).toUpperCase()} connection error: $code'),
