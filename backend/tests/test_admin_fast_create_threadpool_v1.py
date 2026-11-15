@@ -21,7 +21,7 @@ class AdminFastCreateThreadpoolTest(unittest.TestCase):
         self.assertNotIn("signal:controller.signal", js)
         self.assertIn("/v1/subscriptions/admin-create-fast-v1", js)
         self.assertIn("body:JSON.stringify(payload)", js)
-        self.assertNotIn("retry", js.split("export async function createSubscriptionFastV1", 1)[1])
+        self.assertEqual(js.split("export async function createSubscriptionFastV1", 1)[1].count("await fetch("), 1)
 
 if __name__ == "__main__":
     unittest.main()
