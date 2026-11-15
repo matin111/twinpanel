@@ -41,6 +41,12 @@ jobs:
           cache: false
       - name: Generate native iOS Runner project
         run: flutter create --platforms=ios --org com.twinpanel --project-name twinconnect .
+      - name: Add native PacketTunnel app extension target to Xcode
+        shell: bash
+        run: |
+          gem list -i xcodeproj || gem install xcodeproj --no-document
+          ruby ios_native/install_packet_tunnel_target.rb
+          xcodebuild -list -project ios/Runner.xcodeproj
       - name: Install iOS native capability bridge into generated Runner
         shell: bash
         run: |
