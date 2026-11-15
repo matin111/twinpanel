@@ -348,6 +348,28 @@ def reseller_customer_wallet_history(
     }
 
 
+@router.get("/subscriptions/{subscription_id}/history")
+def reseller_subscription_history(
+    subscription_id: int,
+    db: Session = Depends(get_db),
+    reseller: Reseller = Depends(require_reseller),
+):
+    # Verify ownership before reading history: no cross-reseller data leaks.
+    link = (
+        db.query(ResellerSubscription.id)
+        .filter(
+            ResellerSubscription.reseller_id == int(reseller.id),
+            ResellerSubscription.subscription_id == int(subscription_id),
+        ).first()
+    )
+    if link is None:
+        raise HTTPException(status_code=404, detail="اشتراک متعلق به این نمایندگی نیست")
+    # Reuse the same event, queued-renewal and audited-operation history
+    # semantics as the administrator, without exposing admin endpoints.
+    from .reserved_renewal_v1 import history_page
+    return history_page(subscription_id=subscription_id, limit=100, offset=0, db=db)
+
+
 @router.get("/subscriptions")
 def reseller_subscriptions(
     reseller: Reseller = Depends(require_reseller),
