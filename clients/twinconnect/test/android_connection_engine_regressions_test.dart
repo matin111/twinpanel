@@ -10,6 +10,20 @@ void main() {
     expect(dashboard, contains("if (_page != 'home')"));
   });
 
+  test('Cisco starts standard config-auth session before credentials', () {
+    final service = File(
+      'native/android/java/com/axevpn/flutter/openconnect/'
+      'AxeOpenConnectVpnService.java',
+    ).readAsStringSync();
+    final init = service.indexOf('type=\\\"init\\\"');
+    final username = service.indexOf('String body1 = "username="');
+    expect(init, greaterThan(0));
+    expect(username, greaterThan(init));
+    expect(service, contains('Cookie: " + initCookies'));
+    expect(service, contains('CISCO_AUTH_INIT_CONTEXT_MISSING'));
+    expect(service, contains('Content-Type: text/xml'));
+  });
+
   test('Cisco native error category survives service shutdown', () {
     final service = File(
       'native/android/java/com/axevpn/flutter/openconnect/'
