@@ -869,8 +869,14 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           _modernHealthFailures = 0;
           final mode = await _ciscoTunnel.transportMode();
           if (!mounted || !_modernUp || _modernProtocol != 'cisco') return;
-          if (_ciscoTransportMode != mode) {
-            setState(() => _ciscoTransportMode = mode);
+          final liveExitIp = _ciscoTunnel.exitIp;
+          if (_ciscoTransportMode != mode ||
+              (liveExitIp != null && _publicIp != liveExitIp)) {
+            setState(() {
+              _ciscoTransportMode = mode;
+              // Display only a re-verified non-baseline exit IP.
+              if (liveExitIp != null) _publicIp = liveExitIp;
+            });
           }
           // A third-party public-IP service may time out while the native
           // OpenConnect child stays alive. Warn, but do not fake a disconnect.
