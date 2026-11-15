@@ -253,6 +253,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   String? _activeNodeId;
 
   final Map<String, int?> _nodePings = {};
+  final Map<String, DateTime> _nodePingMeasuredAt = {};
   final Map<String, String> _nodePingErrors = {};
   // Group headers are collapsed by default. Keep expansion state per country,
   // not per server, so refreshed inventories never make the list jump around.
@@ -326,6 +327,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     if (node.probeIp == null) {
       if (mounted) { setState(() {
         _nodePings[node.id] = null;
+        _nodePingMeasuredAt.remove(node.id);
         _nodePingErrors[node.id] = 'NO_PROBE_ADDRESS';
       }); }
       return;
@@ -369,6 +371,11 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     } finally {
       if (mounted) { setState(() {
         _nodePings[node.id] = latency;
+        if (latency != null) {
+          _nodePingMeasuredAt[node.id] = DateTime.now();
+        } else {
+          _nodePingMeasuredAt.remove(node.id);
+        }
         if (error == null) {
           _nodePingErrors.remove(node.id);
         } else {
@@ -464,8 +471,12 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     // Probe only eligible nodes. Keep UI responsive for large inventories:
     // a 24-node cap is explicit, and previously measured eligible nodes
     // remain candidates. Never measure unrelated protocols' exit nodes.
+    final now = DateTime.now();
+    bool fresh(String id) => _nodePingMeasuredAt[id] != null &&
+        now.difference(_nodePingMeasuredAt[id]!) <
+            const Duration(seconds: 90);
     final missing = candidates.where((i) =>
-        !_nodePings.containsKey(servers[i].id) &&
+        !fresh(servers[i].id) &&
         servers[i].probeIp != null).take(24).toList();
     for (var start = 0; start < missing.length && mounted; start += 4) {
       final end = start + 4 < missing.length ? start + 4 : missing.length;
@@ -478,10 +489,17 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         widget.sessionToken != sessionToken) {
       throw const FormatException('APP_SESSION_CHANGED');
     }
+    final sampled = <String, int?>{
+      for (final id in entitledNodeIds)
+        if (_nodePingMeasuredAt[id] != null &&
+            DateTime.now().difference(_nodePingMeasuredAt[id]!) <
+                const Duration(seconds: 90))
+          id: _nodePings[id],
+    };
     return FastServerSelection.choose(
         servers: servers,
         permittedNodeIds: entitledNodeIds,
-        measuredRtts: _nodePings);
+        measuredRtts: sampled);
   }
 
   int? get _fastestKnownIndex {
@@ -2357,10 +2375,9 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     // "All" is a browsing filter, not a protocol. In Fast Server mode
     // retain the explicitly selected protocol instead of silently forcing
     // a WireGuard connection.
-    final requestedProtocol = _autoFastest && _filter == 'all'
-        ? _lastExplicitFastProtocol : _filter;
-    if (_autoFastest && (requestedProtocol == null ||
-        requestedProtocol == 'all')) {
+    final String requestedProtocol = _autoFastest && _filter == 'all'
+        ? (_lastExplicitFastProtocol ?? 'all') : _filter;
+    if (_autoFastest && requestedProtocol == 'all') {
       setState(() => _vpnError = 'SELECT_PROTOCOL_FOR_FASTEST');
       return;
     }
@@ -2371,7 +2388,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           _vpnError = null;
         });
         try {
-          final best = await _fastestAuthorizedIndex(requestedProtocol!);
+          final best = await _fastestAuthorizedIndex(requestedProtocol);
           if (!mounted) return;
           if (best == null) {
             throw const FormatException('NO_MEASURED_SERVER');
@@ -3233,7 +3250,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
               ),
               FilledButton(
                 key: const Key('liveConnectionControlsButton'),
-                onPressed: _vpnBusy ? null : _toggleVpn,
+                onPressed: _vpnBusy || _fastestSelecting ? null : _toggleVpn,
                 style: FilledButton.styleFrom(
                   backgroundColor: Colors.transparent,
                   foregroundColor: Colors.white,
