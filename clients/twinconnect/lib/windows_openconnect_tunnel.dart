@@ -13,9 +13,11 @@ class WindowsOpenConnectTunnel {
   String? _baselineIp;
   bool _pending = false;
   bool _nativeActive = false;
+  String? _lastHealthError;
 
   bool get isRunning => _nativeActive;
   String? get exitIp => _exitIp;
+  String? get lastHealthError => _lastHealthError;
 
   static Future<({String executable, String script})?> _engine() async {
     if (!Platform.isWindows) return null;
@@ -104,18 +106,42 @@ class WindowsOpenConnectTunnel {
 
   Future<bool> checkHealth() async {
     if (!_nativeActive || _exitIp == null) return false;
+    // Check whether the owned OpenConnect process is still alive first.
+    // A failed third-party HTTPS IP probe cannot establish that a native
+    // tunnel has exited; do not mark Cisco disconnected on that basis.
     try {
       final up = await _channel.invokeMethod<bool>('openConnectStatus')
           .timeout(const Duration(seconds: 6));
       if (up != true) {
         _nativeActive = false;
         _exitIp = null;
+        _lastHealthError = 'CISCO_PROCESS_EXITED';
         return false;
       }
-      final ip = await _publicIp().timeout(const Duration(seconds: 8));
-      return _nativeActive && ip == _exitIp;
     } catch (_) {
+      _lastHealthError = 'CISCO_NATIVE_STATUS_UNAVAILABLE';
       return false;
+    }
+
+    try {
+      final ip = await _publicIp().timeout(const Duration(seconds: 8));
+      if (ip == _baselineIp) {
+        // An independently observed return to the pre-VPN egress is not a
+        // verified tunnel. Keep the child owned so Disconnect can clean it.
+        _lastHealthError = 'CISCO_ROUTE_BYPASS_DETECTED';
+        return false;
+      }
+      // An exit server can rotate its public IP. It must still differ from
+      // the pre-tunnel baseline before the new address can be accepted.
+      _exitIp = ip;
+      _lastHealthError = null;
+      return true;
+    } catch (_) {
+      // The process was just verified alive. This is indeterminate egress,
+      // NOT a native disconnect. Retain the last verified IP and surface a
+      // warning without a false stop/reconnect cycle.
+      _lastHealthError = 'CISCO_EGRESS_RECHECK_UNAVAILABLE';
+      return true;
     }
   }
 
@@ -134,6 +160,7 @@ class WindowsOpenConnectTunnel {
       throw const FormatException('BASELINE_IP_UNAVAILABLE');
     }
     _pending = true;
+    _lastHealthError = null;
     try {
       // Engine file inspection and the direct baseline HTTPS request are
       // both read-only. Run them together, but never start the OS tunnel
@@ -236,6 +263,7 @@ class WindowsOpenConnectTunnel {
       }
       _nativeActive = false;
       _exitIp = null;
+      _lastHealthError = null;
       final now = await _publicIp().timeout(const Duration(seconds: 10));
       if (_baselineIp != null && now != _baselineIp) {
         throw const FormatException('CISCO_ROUTE_RESTORE_UNVERIFIED');
