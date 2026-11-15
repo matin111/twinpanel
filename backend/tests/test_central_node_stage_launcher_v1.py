@@ -26,8 +26,9 @@ class CentralStageLauncherTests(unittest.TestCase):
 
     def test_hidden_verified_exit_launches_one_systemd_unit(self):
         db=self.db()
+        stage_stub = MagicMock(is_file=MagicMock(return_value=True))
         with (patch.object(launcher.shutil, "which", return_value="/usr/bin/systemd-run"),
-              patch.object(launcher, "STAGE", MagicMock(is_file=MagicMock(return_value=True))),
+              patch.object(launcher, "STAGE", stage_stub),
               patch.object(launcher.subprocess, "run") as run):
             run.return_value.returncode=0
             status=launcher.launch(db,14)
@@ -40,7 +41,7 @@ class CentralStageLauncherTests(unittest.TestCase):
         self.assertIn("--setenv=TP_CENTRAL_STAGE_GLOBAL_LOCK_HELD=1",command)
         self.assertIn("-x",command)
         self.assertIn("/tmp/twinpanel-central-node-stage-global.lock",command)
-        self.assertLess(command.index("/tmp/twinpanel-central-node-stage-global.lock"), command.index(str(launcher.STAGE)))
+        self.assertLess(command.index("/tmp/twinpanel-central-node-stage-global.lock"), command.index(str(stage_stub)))
         self.assertEqual(command[-5:],
                          ["--limit","3000","--apply","--confirm-node-id","14"])
         self.assertFalse(run.call_args.kwargs.get("shell",False))
