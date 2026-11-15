@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.848",
+  "version": "1.1.0-rc.849",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-15T10:11:31Z",
+  "released_at": "2026-11-15T11:31:21Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "ffb5775698662c90d0f43d0a79c745d95a58c371",
+  "source_sha": "7a70dc19c7fe97ec3f21de089b141294fa1dd3d9",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.848/twinpanel-1.1.0-rc.848-linux-x86_64.tar.gz",
-    "sha256": "49f282c3b78b085ff885c2b58307c373f79670f1201fdef056a4ec85ec680f68",
-    "size_bytes": 30892036
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.849/twinpanel-1.1.0-rc.849-linux-x86_64.tar.gz",
+    "sha256": "85ef62cc94df309798125c94fb011b8c155e52551cd410fe7a9aa3cad81d0e30",
+    "size_bytes": 30890771
   },
   "notes": {
-    "fa": "اصلاح پیام بررسی رسید در ربات مدیریت: نمایش شناسه واقعی کاربر، نام کاربر، شناسه تلگرام، پلن انتخابی، شماره سفارش، مبلغ، روش پرداخت، تخفیف، وضعیت و کد پیگیری با خط‌بندی صحیح؛ پیام رسید و دکمه بررسی وضعیت از قالب مشترک استفاده می‌کنند؛ منطق تأیید و رد بدون تغییر.",
-    "en": "Use a shared readable Telegram admin receipt formatter for original receipt pushes and in-place refresh, including real user ID, selected plan, order ID, amount, discounts, method and tracking code, with actual newlines. Approval logic unchanged. Regression tested."
+    "fa": "اصلاح پایدار تنظیمات موبایل OpenVPN و Cisco/OpenConnect: ارسال DNS و مسیر پیش‌فرض OpenVPN و عبور DNS سیسکو از تونل؛ ثبت تنظیمات در قالب نصب نودها. تغییر بدون دست‌کاری اشتراک‌ها، حسابداری یا تنظیمات پروتکل‌های دیگر.",
+    "en": "Persist mobile OpenVPN IPv4 default-route and DNS pushes and ocserv Cisco/OpenConnect tunnel-all-dns with redundant DNS resolvers in provisioning templates. No subscription, billing or other VPN protocol changes."
   }
 }
