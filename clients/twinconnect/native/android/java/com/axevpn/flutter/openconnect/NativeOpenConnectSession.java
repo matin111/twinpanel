@@ -134,8 +134,20 @@ final class NativeOpenConnectSession extends LibOpenConnect {
     }
 
     @Override public void onProgress(int level, String msg) {
-        // No credentials or server-supplied text in logcat.
-        if (level == PRG_ERR) Log.w(TAG, "Native transport reported an error");
+        // Native logs may include private endpoint/session details. Never log
+        // the raw OpenConnect message. Only emit coarse protocol diagnostics.
+        if (msg == null) return;
+        final String event = msg.toLowerCase(java.util.Locale.ROOT);
+        if (event.contains("established dtls connection") ||
+                event.contains("dtls connected")) {
+            Log.i(TAG, "CISCO_TRANSPORT_DTLS_ESTABLISHED");
+        } else if (event.contains("dtls") &&
+                (event.contains("failed") || event.contains("error") ||
+                 event.contains("timeout") || event.contains("unavailable"))) {
+            Log.w(TAG, "CISCO_TRANSPORT_DTLS_FAILED_OR_UNAVAILABLE");
+        } else if (level == PRG_ERR) {
+            Log.w(TAG, "CISCO_NATIVE_TRANSPORT_ERROR");
+        }
     }
 
     @Override public void onStatsUpdate(VPNStats stats) {
@@ -164,7 +176,16 @@ final class NativeOpenConnectSession extends LibOpenConnect {
                 throw new IllegalStateException("TUN");
             }
             listener.stage("connected", "");
-            setupDTLS(60);
+            // DTLS/UDP is the preferred high-throughput data path. A working
+            // CSTP/TCP session alone is not proof that UDP was established.
+            // Do not fail or restart a healthy TCP tunnel if the UDP probe
+            // fails: record a non-sensitive diagnostic for device comparison.
+            final int dtlsSetup = setupDTLS(60);
+            if (dtlsSetup != 0) {
+                Log.w(TAG, "CISCO_TRANSPORT_DTLS_SETUP_UNAVAILABLE code=" + dtlsSetup);
+            } else {
+                Log.i(TAG, "CISCO_TRANSPORT_DTLS_SETUP_REQUESTED");
+            }
             // libopenconnect.mainloop() blocks while handling the tunnel.
             // Stats must be requested from another thread, otherwise they
             // remain at zero during a healthy long-running connection.
