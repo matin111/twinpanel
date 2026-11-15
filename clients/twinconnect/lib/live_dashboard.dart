@@ -3159,10 +3159,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     final selected = widget.catalog?.entries.any(
         (entry) => entry.protocol.code == code && entry.selected) ?? false;
     if (!selected) return false;
-    final type = widget.plan?.subscriptionType.trim().toLowerCase() ?? '';
-    final vitory = type.contains('ویتوری') ||
-        type.contains('vitory') || type.contains('v2ray');
-    return !vitory || code == 'v2ray' || code == 'hysteria2';
+    return widget.plan?.permitsProtocol(code) ?? true;
   }
 
   bool get _xrayAuthorized => _protocolEntitled('v2ray') &&
