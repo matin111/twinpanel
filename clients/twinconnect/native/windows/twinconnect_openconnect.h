@@ -109,6 +109,10 @@ enum FailureCode : LONG {
   kPostAuthExit = 7
 };
 inline volatile LONG& Authenticated() { static volatile LONG seen = 0; return seen; }
+// Status derives solely from explicit upstream OpenConnect log markers.
+// 0 = unknown, 1 = DTLS failure marker, 2 = DTLS established marker.
+// No private endpoint, username, certificate or raw stderr crosses the bridge.
+inline volatile LONG& DtlsState() { static volatile LONG value = 0; return value; }
 inline void Classify(const std::string& data) {
   std::string lower(data);
   std::transform(lower.begin(), lower.end(), lower.begin(),
@@ -119,6 +123,23 @@ inline void Classify(const std::string& data) {
   if (has("authentication completed") || has("authenticated successfully") ||
       has("got connect response") || has("cookie obtained")) {
     InterlockedExchange(&Authenticated(), 1);
+  }
+  // A live TLS session alone is not proof of a fast UDP data path.
+  // Do not describe unknown as "TCP" or advertise DTLS without evidence.
+  if (has("established dtls connection") ||
+      has("dtls connection established") ||
+      has("dtls connected") ||
+      has("established esp session") ||
+      has("esp session established")) {
+    InterlockedExchange(&DtlsState(), 2);
+  } else if (has("dtls handshake failed") ||
+             has("dtls connection failed") ||
+             has("failed to establish dtls") ||
+             has("dtls connection timed out") ||
+             has("dtls setup failed")) {
+    if (InterlockedCompareExchange(&DtlsState(), 0, 0) != 2) {
+      InterlockedExchange(&DtlsState(), 1);
+    }
   }
   LONG reason = kUnknown;
   if (has("certificate verify failed") || has("server certificate verify failed") ||
@@ -159,6 +180,14 @@ inline DWORD WINAPI ConsumeErrors(LPVOID context) {
   CloseHandle(pipe);
   return 0;
 }
+inline const char* TransportMode() {
+  if (!Running()) return "stopped";
+  const LONG state = InterlockedCompareExchange(&DtlsState(), 0, 0);
+  if (state == 2) return "dtls_log_established";
+  if (state == 1) return "dtls_log_failed";
+  return "dtls_unverified";
+}
+
 inline const char* FailureName() {
   switch (InterlockedCompareExchange(&Failure(), 0, 0)) {
     case kCertificate: return "CISCO_CERTIFICATE_UNTRUSTED";
@@ -316,6 +345,7 @@ inline bool Start(const std::string& executableUtf8,
   }
   InterlockedExchange(&Failure(), kUnknown);
   InterlockedExchange(&Authenticated(), 0);
+  InterlockedExchange(&DtlsState(), 0);
 
   std::wstring command = Quote(executable) +
       L" --protocol=anyconnect --non-inter --passwd-on-stdin --no-proxy" +
