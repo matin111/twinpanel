@@ -64,7 +64,7 @@ class FakeDb:
 
 class MainRenewOrderTests(unittest.TestCase):
     def setUp(self):
-        self.sub = SimpleNamespace(id=39, user_id=77, plan_id=3, status="active")
+        self.sub = SimpleNamespace(id=39, user_id=77, plan_id=3, status="active", expires_at=None, traffic_limit_bytes=30 * 1024**3)
         self.user = SimpleNamespace(id=77)
 
     def call(self, db, plan_id, key="unique-key"):
