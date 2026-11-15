@@ -155,11 +155,21 @@ def install_native_sources() -> None:
                     "com" / "axevpn" / "flutter" / "openconnect")
     java_source = NATIVE / "java" / "com" / "axevpn" / "flutter" / "openconnect"
     java_package.mkdir(parents=True, exist_ok=True)
-    for filename in ("AxeOpenConnectVpnService.java", "OpenConnectFlutterPlugin.java"):
+    for filename in ("AxeOpenConnectVpnService.java", "OpenConnectFlutterPlugin.java",
+                     "NativeOpenConnectSession.java"):
         src = java_source / filename
         if not src.is_file():
             raise RuntimeError(f"Missing Cisco native source: {src}")
         shutil.copy2(src, java_package / filename)
+
+    # The JNI Java ABI is pinned to the same upstream revision as the built SO.
+    upstream_abi = NATIVE / "java" / "org" / "infradead" / "libopenconnect" / "LibOpenConnect.java"
+    if not upstream_abi.is_file():
+        raise RuntimeError("Missing pinned libopenconnect JNI Java binding")
+    target_abi = (ANDROID / "app" / "src" / "main" / "java" /
+                  "org" / "infradead" / "libopenconnect")
+    target_abi.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(upstream_abi, target_abi / "LibOpenConnect.java")
 
 
 def main() -> None:
