@@ -41,8 +41,13 @@ router = APIRouter(tags=["public-connection-multilink-v7"])
 # deliberately not returned.
 
 
-def _subscription_and_payload(token: str, db: Session):
-    sub = account_delivery._subscription_from_share_token(token, db)
+def _xray_payload_for_verified_subscription(sub: Subscription, db: Session) -> dict[str, Any]:
+    """Project only this already-authenticated subscription's stored profiles.
+
+    The app's Bearer session must not depend on a share link that may have
+    been rotated or not yet generated for an older Vitory subscription.
+    Public /sub callers continue to validate the share token separately.
+    """
     status = str(getattr(sub.status, "value", sub.status)).strip().lower()
     if status != "active":
         raise HTTPException(status_code=403, detail="اشتراک فعال نیست")
@@ -50,7 +55,7 @@ def _subscription_and_payload(token: str, db: Session):
     # unrelated files/QRs, or run synchronous provisioning. Keep explicit
     # delivery-policy subscriptions on their canonical, policy-aware route.
     if delivery_policy.is_explicit_policy(db, sub.id):
-        return sub, account_delivery._public_payload(db, sub)
+        return account_delivery._public_payload(db, sub)
 
     cred = (
         db.query(ProtocolCredential)
@@ -61,7 +66,7 @@ def _subscription_and_payload(token: str, db: Session):
         ).first()
     )
     if not cred:
-        return sub, {"credentials": []}
+        return {"credentials": []}
 
     raw_items = account_delivery._dec(cred.config_text_encrypted)
     raw_items = (
@@ -86,10 +91,14 @@ def _subscription_and_payload(token: str, db: Session):
         )
         if safe is not None:
             items.append(safe)
-    return sub, {
+    return {
         "credentials": ([{"protocol": "v2ray", "items": items}] if items else []),
     }
 
+
+def _subscription_and_payload(token: str, db: Session):
+    sub = account_delivery._subscription_from_share_token(token, db)
+    return sub, _xray_payload_for_verified_subscription(sub, db)
 
 def _v2ray_items(payload: dict[str, Any]) -> list[dict[str, Any]]:
     output: list[dict[str, Any]] = []
