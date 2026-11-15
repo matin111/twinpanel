@@ -147,9 +147,9 @@ class AndroidCiscoTunnel {
     }
   }
 
-  Future<({bool connected, int? rx, int? tx})> status() async {
+  Future<({bool connected, int? rx, int? tx, String? vpnIpv4})> status() async {
     if (!_initialized || !_connected) {
-      return (connected: false, rx: null, tx: null);
+      return (connected: false, rx: null, tx: null, vpnIpv4: null);
     }
     final stage = await _stage();
     final running = await _serviceRunning();
@@ -165,6 +165,12 @@ class AndroidCiscoTunnel {
       connected: active,
       rx: active ? count(stats['bytes_in']) : null,
       tx: active ? count(stats['bytes_out']) : null,
+      vpnIpv4: active &&
+              stats['vpn_ipv4'] is String &&
+              InternetAddress.tryParse(stats['vpn_ipv4'] as String)?.type ==
+                  InternetAddressType.IPv4
+          ? stats['vpn_ipv4'] as String
+          : null,
     );
   }
 
