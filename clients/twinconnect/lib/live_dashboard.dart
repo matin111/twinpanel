@@ -3449,6 +3449,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         // Real connection status drives the waves. Offline has no animation.
         TwinConnectWaveIndicator(
           key: const Key('liveConnectionDataFabric'),
+          compact: Platform.isIOS || Platform.isAndroid,
           connected: _verifiedConnectionActive,
           connecting: _vpnBusy,
           dark: _dark,
