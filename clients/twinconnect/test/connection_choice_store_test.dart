@@ -59,9 +59,6 @@ void main() {
       'protocol': 'rogue', 'node_id': 'x',
     }));
     expect(await ConnectionChoiceStore.load('broken'), isNull);
-    expect(() => ConnectionChoice(
-        protocolCode: 'cisco', nodeId: '\nunsafe').isValid,
-        returnsNormally);
     expect(const ConnectionChoice(
         protocolCode: 'cisco', nodeId: '\nunsafe').isValid, isFalse);
   });
