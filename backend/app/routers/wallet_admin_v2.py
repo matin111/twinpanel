@@ -6,7 +6,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from ..customer_wallet_models import CustomerWallet, CustomerWalletTopup
+from ..customer_wallet_models import CustomerWallet, CustomerWalletTopup, CustomerWalletTransaction
 from ..database import get_db
 from ..deps import require_admin
 from ..models import User
@@ -235,3 +235,76 @@ def adjust_wallet_v2(
     db.commit()
 
     return result
+
+
+@router.get("/wallets/{user_id}/history")
+def admin_user_wallet_history(
+    user_id: int,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+):
+    """Read-only wallet activity for the admin's user card.
+
+    Historical transactions are shown as recorded; never infer an opening
+    balance or create synthetic ledger entries from the current balance.
+    """
+    user = db.get(User, int(user_id))
+    if user is None or _is_reseller_scoped_user(db, int(user_id)):
+        raise HTTPException(status_code=404, detail="user_not_found")
+    wallet = db.get(CustomerWallet, int(user_id))
+    size = max(1, min(int(limit), 200))
+    transactions = (
+        db.query(CustomerWalletTransaction)
+        .filter(CustomerWalletTransaction.user_id == int(user_id))
+        .order_by(
+            CustomerWalletTransaction.created_at.desc(),
+            CustomerWalletTransaction.id.desc(),
+        )
+        .limit(size)
+        .all()
+    )
+    topups = (
+        db.query(CustomerWalletTopup)
+        .filter(CustomerWalletTopup.user_id == int(user_id))
+        .order_by(
+            CustomerWalletTopup.created_at.desc(),
+            CustomerWalletTopup.id.desc(),
+        )
+        .limit(size)
+        .all()
+    )
+    topup_by_ref = {f"wallet-topup:{row.id}": row for row in topups}
+    items = []
+    for tx in transactions:
+        topup = topup_by_ref.get(str(tx.reference or ""))
+        items.append({
+            "id": int(tx.id),
+            "amount_toman": int(tx.amount_toman or 0),
+            "kind": tx.kind,
+            "description": tx.description,
+            "reference": tx.reference,
+            "created_at": tx.created_at,
+            "method": topup.method if topup else None,
+            "tracking_code": topup.tracking_code if topup else None,
+            "topup_id": int(topup.id) if topup else None,
+        })
+    pending = [{
+        "id": int(t.id),
+        "amount_toman": int(t.amount_toman or 0),
+        "payable_amount_toman": int(t.payable_amount_toman or 0),
+        "method": t.method,
+        "status": t.status,
+        "tracking_code": t.tracking_code,
+        "txid": t.txid,
+        "created_at": t.created_at,
+        "approved_at": t.approved_at,
+        "review_note": t.review_note,
+    } for t in topups]
+    return {
+        "user_id": int(user_id),
+        "balance_toman": int(wallet.balance_toman or 0) if wallet else 0,
+        "transactions": items,
+        "topups": pending,
+        "has_more_transactions": len(transactions) == size,
+        "has_more_topups": len(topups) == size,
+    }
