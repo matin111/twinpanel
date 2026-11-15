@@ -10,9 +10,9 @@ void main() {
     final native = File('lib/native_vpn_bridge.dart').readAsStringSync();
     final provider = File('ios_native/PacketTunnelProvider.swift')
         .readAsStringSync();
-    expect(swift, contains('"engineReady": false'));
-    expect(swift, contains('"fullTunnel": false'));
-    expect(swift, contains('"supportedProtocols": [String]()'));
+    expect(swift, contains('"engineReady": wireGuardReady'));
+    expect(swift, contains('"fullTunnel": wireGuardReady'));
+    expect(swift, contains('TwinConnectIOSVPNControl.backendLinked()'));
     expect(swift, contains('NETunnelProviderManager.loadAllFromPreferences'));
     expect(swift, contains('"verified": false'));
     expect(native, contains('os != VpnPlatform.ios'));
