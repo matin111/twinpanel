@@ -5486,6 +5486,33 @@ def extend_subscription_v17(subscription_id:int,payload:dict=Body(...),db:Sessio
         raise HTTPException(status_code=422,detail="مقداری برای افزایش یا ریست وارد نشده")
     if reset_date and add_days<=0:
         raise HTTPException(status_code=422,detail="برای ریست تاریخ، مدت دوره جدید را به روز وارد کنید")
+    if add_traffic_gb > 0 or add_days > 0:
+        # Legacy callers must obey the same reserved-only renewal contract
+        # as the new admin UI. A standalone usage reset remains an immediate
+        # administrative maintenance action, not a renewal.
+        from ..reserved_renewal_service import reserve_renewal
+        from ..models import Plan
+        import secrets
+        plan = db.get(Plan, sub.plan_id) if sub.plan_id else None
+        row = reserve_renewal(
+            db,
+            subscription_id=int(sub.id),
+            plan_id=int(sub.plan_id) if sub.plan_id is not None else None,
+            plan_name=plan.name if plan else "تمدید دستی",
+            traffic_bytes=int(add_traffic_gb * 1024**3),
+            duration_days=add_days,
+            source="admin",
+            reference=str(payload.get("request_id") or secrets.token_urlsafe(24)),
+            actor=f"admin:{getattr(actor, 'id', 'unknown')}",
+        )
+        db.commit()
+        return {
+            "ok": True, "queued": True, "renewal_id": row.id,
+            "traffic_limit_bytes": int(sub.traffic_limit_bytes or 0),
+            "traffic_used_bytes": int(sub.traffic_used_bytes or 0),
+            "expires_at": sub.expires_at.isoformat() if sub.expires_at else None,
+            "reset_usage": False, "reset_date": False,
+        }
     was_exhausted=bool(
         int(sub.traffic_limit_bytes or 0)>0
         and int(sub.traffic_used_bytes or 0)>=int(sub.traffic_limit_bytes or 0)
