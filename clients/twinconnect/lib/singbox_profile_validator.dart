@@ -225,10 +225,21 @@ class SingBoxProfileValidator {
         throw const FormatException('SOCKS5_TCP_TRANSPORT_REQUIRED');
       }
     }
-    if ((protocolCode == 'hysteria2' || protocolCode == 'tuic' ||
-         protocolCode == 'anytls' || protocolCode == 'naive') &&
-        object['tls'] is! Map) {
-      throw const FormatException('SINGBOX_TLS_REQUIRED');
+    if (protocolCode == 'hysteria2' || protocolCode == 'tuic' ||
+        protocolCode == 'anytls' || protocolCode == 'naive') {
+      final rawTls = object['tls'];
+      if (rawTls is! Map) {
+        throw const FormatException('SINGBOX_TLS_REQUIRED');
+      }
+      final tls = Map<String, dynamic>.from(rawTls);
+      if (tls['enabled'] == false || tls['insecure'] == true ||
+          tls['disable_sni'] == true) {
+        throw const FormatException('SINGBOX_TLS_UNSAFE');
+      }
+      // Some panel profiles omit "enabled" but provide a valid TLS block.
+      // Make TLS explicit rather than accidentally dialing without TLS.
+      tls['enabled'] = true;
+      object['tls'] = tls;
     }
     // ShadowTLS detours cannot safely be flattened into one outbound.
     if (protocolCode == 'shadowtls') {
