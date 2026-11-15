@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.848",
-  "source_sha": "ffb5775698662c90d0f43d0a79c745d95a58c371",
+  "version": "1.1.0-rc.849",
+  "source_sha": "7a70dc19c7fe97ec3f21de089b141294fa1dd3d9",
   "notes": {
-    "fa": "اصلاح پیام بررسی رسید در ربات مدیریت: نمایش شناسه واقعی کاربر، نام کاربر، شناسه تلگرام، پلن انتخابی، شماره سفارش، مبلغ، روش پرداخت، تخفیف، وضعیت و کد پیگیری با خط‌بندی صحیح؛ پیام رسید و دکمه بررسی وضعیت از قالب مشترک استفاده می‌کنند؛ منطق تأیید و رد بدون تغییر.",
-    "en": "Use a shared readable Telegram admin receipt formatter for original receipt pushes and in-place refresh, including real user ID, selected plan, order ID, amount, discounts, method and tracking code, with actual newlines. Approval logic unchanged. Regression tested."
+    "fa": "اصلاح پایدار تنظیمات موبایل OpenVPN و Cisco/OpenConnect: ارسال DNS و مسیر پیش‌فرض OpenVPN و عبور DNS سیسکو از تونل؛ ثبت تنظیمات در قالب نصب نودها. تغییر بدون دست‌کاری اشتراک‌ها، حسابداری یا تنظیمات پروتکل‌های دیگر.",
+    "en": "Persist mobile OpenVPN IPv4 default-route and DNS pushes and ocserv Cisco/OpenConnect tunnel-all-dns with redundant DNS resolvers in provisioning templates. No subscription, billing or other VPN protocol changes."
   }
 }
