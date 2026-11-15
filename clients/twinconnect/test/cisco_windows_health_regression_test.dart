@@ -9,7 +9,7 @@ void main() {
     // Git on Windows can check out CRLF while Linux/macOS use LF.
     // Normalize only the source snapshot, never the actual VPN behavior.
     final health = source.substring(source.indexOf('Future<bool> checkHealth()'))
-        .replaceAll('\\r\\n', '\\n');
+        .replaceAll('\r\n', '\n');
     final status = health.indexOf("'openConnectStatus'");
     final ip = health.indexOf('final ip = await _publicIp()');
     expect(status, greaterThanOrEqualTo(0));
