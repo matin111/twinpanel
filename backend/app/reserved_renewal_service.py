@@ -11,6 +11,30 @@ from .models import Subscription, SubscriptionStatus
 from .reserved_renewal_models import PendingSubscriptionRenewal, SubscriptionHistoryEvent
 from .services.subscription_cycle_reset_v1 import reset_subscription_period_usage
 from .subscription_enforcement import queue_subscription_enforcement
+from .quota_models import QuotaUsageEvent, QuotaAuditLog
+
+def verified_quota_suspension(db: Session, subscription_id: int) -> bool:
+    """Only auto-restore a suspended account when a quota event proves the cause.
+
+    Ambiguous and manual suspensions must not be overridden by a paid renewal.
+    """
+    evidence = db.execute(select(QuotaUsageEvent.created_at)
+        .where(
+            QuotaUsageEvent.subscription_id == subscription_id,
+            QuotaUsageEvent.resulting_subscription_status == "suspended",
+            QuotaUsageEvent.accepted_bytes > 0,
+        ).order_by(QuotaUsageEvent.created_at.desc()).limit(1)).scalar_one_or_none()
+    if evidence is None:
+        return False
+    manual_change = db.execute(select(QuotaAuditLog.id)
+        .where(
+            QuotaAuditLog.subject_type == "subscription",
+            QuotaAuditLog.subject_id == str(subscription_id),
+            QuotaAuditLog.actor_type.in_(("admin", "reseller")),
+            QuotaAuditLog.created_at > evidence,
+        ).limit(1)).scalar_one_or_none()
+    return manual_change is None
+
 
 def history(db: Session, subscription_id: int, event_type: str, source: str, actor: str, details: dict) -> None:
     db.add(SubscriptionHistoryEvent(subscription_id=subscription_id, event_type=event_type,
@@ -128,6 +152,18 @@ def activate_due_renewals(db: Session, limit: int = 100) -> int:
                 })
                 db.commit()
                 continue
+            quota_suspended = False
+            if sub.status == SubscriptionStatus.SUSPENDED:
+                quota_suspended = bool(due_quota and verified_quota_suspension(db, int(sub_id)))
+                if not quota_suspended:
+                    # Never spend a reserved period while a manual or unknown
+                    # suspension would keep the customer offline.
+                    pending.status = "blocked"
+                    history(db, sub_id, "renewal_blocked", pending.source, "system", {
+                        "renewal_id": pending.id, "reason": "suspension_requires_review",
+                    })
+                    db.commit()
+                    continue
             if pending.plan_id is not None and (
                 sub.plan_id is None or int(pending.plan_id) != int(sub.plan_id)
             ):
@@ -156,7 +192,7 @@ def activate_due_renewals(db: Session, limit: int = 100) -> int:
                 sub.plan_id = pending.plan_id
             # Preserve manual suspensions. Refresh entitlements even if the
             # quota monitor has not yet marked the exhausted account EXPIRED.
-            if sub.status == SubscriptionStatus.EXPIRED:
+            if sub.status == SubscriptionStatus.EXPIRED or quota_suspended:
                 sub.status = SubscriptionStatus.ACTIVE
             if sub.status == SubscriptionStatus.ACTIVE:
                 queue_subscription_enforcement(db, sub, command_type="restore_subscription",
