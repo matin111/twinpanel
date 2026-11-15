@@ -17,12 +17,24 @@ jobs:
       - name: Checkout TwinPanel
         uses: actions/checkout@v4
 
-      - name: Use runner Android SDK
+      - name: Locate Android SDK command-line tools
+        shell: bash
         run: |
-          test -n "${ANDROID_HOME}"
-          command -v sdkmanager
+          set -euo pipefail
+          SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
+          test -n "${SDK_ROOT}"
+          SDKMANAGER="${SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager"
+          if [[ ! -x "${SDKMANAGER}" ]]; then
+            SDKMANAGER="$(find "${SDK_ROOT}/cmdline-tools" -type f -name sdkmanager -print -quit 2>/dev/null || true)"
+          fi
+          test -n "${SDKMANAGER}" && test -x "${SDKMANAGER}"
+          echo "SDKMANAGER=${SDKMANAGER}" >> "${GITHUB_ENV}"
+          "${SDKMANAGER}" --version
+
       - name: Install Android NDK
-        run: sdkmanager --install "ndk;27.2.12479018"
+        run: |
+          yes | "${SDKMANAGER}" --licenses >/dev/null || true
+          "${SDKMANAGER}" --install "ndk;27.2.12479018"
 
       - name: Install native build dependencies
         run: |
