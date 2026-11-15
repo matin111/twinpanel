@@ -167,6 +167,38 @@ class DeferredRenewalTest(unittest.TestCase):
         self.assertEqual(pending.status, "blocked")
         self.assertEqual(sub.traffic_used_bytes, 10 * 1024**3)
 
+    def test_verified_quota_suspension_is_restored_after_renewal(self):
+        sub = self.subscription(status=SubscriptionStatus.SUSPENDED,
+                                traffic_used_bytes=10 * 1024**3)
+        pending = self.pending()
+        db = FakeDB([Result(items=[22]), Result(value=sub), Result(value=pending)])
+        with patch.object(service, "verified_quota_suspension", return_value=True), \
+             patch.object(service, "reset_subscription_period_usage",
+                          side_effect=lambda db, sub, **kw: setattr(sub, "traffic_used_bytes", 0)), \
+             patch.object(service, "queue_subscription_enforcement") as enforce, \
+             patch.object(service, "history"):
+            self.assertEqual(service.activate_due_renewals(db), 1)
+            enforce.assert_called_once()
+        self.assertEqual(sub.status, SubscriptionStatus.ACTIVE)
+        self.assertEqual(pending.status, "activated")
+        self.assertEqual(sub.traffic_used_bytes, 0)
+
+    def test_ambiguous_suspension_does_not_consume_paid_renewal(self):
+        sub = self.subscription(status=SubscriptionStatus.SUSPENDED,
+                                traffic_used_bytes=10 * 1024**3)
+        pending = self.pending()
+        db = FakeDB([Result(items=[22]), Result(value=sub), Result(value=pending)])
+        with patch.object(service, "verified_quota_suspension", return_value=False), \
+             patch.object(service, "reset_subscription_period_usage") as reset, \
+             patch.object(service, "queue_subscription_enforcement") as enforce, \
+             patch.object(service, "history"):
+            self.assertEqual(service.activate_due_renewals(db), 0)
+            reset.assert_not_called()
+            enforce.assert_not_called()
+        self.assertEqual(pending.status, "blocked")
+        self.assertEqual(sub.traffic_used_bytes, 10 * 1024**3)
+        self.assertEqual(sub.status, SubscriptionStatus.SUSPENDED)
+
     def test_manual_suspension_is_not_lifted(self):
         sub = self.subscription(status=SubscriptionStatus.SUSPENDED,
                                 expires_at=datetime.utcnow() - timedelta(seconds=1))
