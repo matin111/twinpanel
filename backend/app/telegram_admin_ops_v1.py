@@ -155,24 +155,7 @@ def install_telegram_admin_ops(router, request_fn):
         except Exception as exc:
             await callback.answer("❌ " + str(exc)[:155], show_alert=True)
             return
-        status = str(data.get("status") or "-")
-        approved = (
-            status.lower() in ("fulfilled", "approved", "paid", "completed")
-        )
-        rejected = status.lower() in ("rejected", "payment_rejected", "failed")
-        title = (
-            "✅ رسید تأیید شد" if approved else
-            "❌ رسید رد شد" if rejected else
-            "🧾 رسید در انتظار بررسی"
-        )
-        caption = (
-            f"{title}\\n"
-            f"نوع: {escape(kind)} | شناسه: {item_id}\\n"
-            f"کاربر: {data.get('user_id')}\\n"
-            f"مبلغ: {int(data.get('amount_toman') or 0):,} تومان\\n"
-            f"وضعیت: {escape(status)}\\n"
-            f"کد پیگیری: {escape(str(data.get('tracking_code') or '-'))}"
-        )
+        caption = format_admin_receipt(kind, data)
         rows = []
         if data.get("can_approve") and data.get("has_receipt"):
             rows.append([
@@ -202,6 +185,8 @@ def install_telegram_admin_ops(router, request_fn):
         if not message:
             return
         previous = str(message.caption or message.text or "")
+        # Normalize old bot captions that accidentally contained literal \\n.
+        previous = previous.replace("\\\\n", "\\n")
         first = previous.split("\n", 1)[0]
         rest = previous.split("\n", 1)[1] if "\n" in previous else ""
         if "رسید" in first:
