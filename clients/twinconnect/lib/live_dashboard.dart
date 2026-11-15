@@ -860,7 +860,15 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         }
         if (healthy) {
           _modernHealthFailures = 0;
-          if (_vpnError == 'SINGBOX_TUN_HEALTH_DEGRADED') {
+          if (_modernProtocol == 'cisco') {
+            if (_vpnError == 'CISCO_HEALTH_DEGRADED' ||
+                _publicIp != _ciscoTunnel.exitIp) {
+              setState(() {
+                _publicIp = _ciscoTunnel.exitIp;
+                if (_vpnError == 'CISCO_HEALTH_DEGRADED') _vpnError = null;
+              });
+            }
+          } else if (_vpnError == 'SINGBOX_TUN_HEALTH_DEGRADED') {
             setState(() => _vpnError = null);
           }
         } else {
