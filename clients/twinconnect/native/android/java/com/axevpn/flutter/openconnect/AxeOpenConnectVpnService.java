@@ -72,6 +72,8 @@ public class AxeOpenConnectVpnService extends VpnService {
     public static volatile boolean isRunning = false;
     // Non-sensitive diagnostic category. Never broadcast credentials or URLs.
     public static volatile String lastFailureCode = "";
+    // The address assigned by the authenticated gateway, never a public IP.
+    public static volatile String assignedVpnIpv4 = "";
     public static final AtomicLong bytesReceived = new AtomicLong();
     public static final AtomicLong bytesSent = new AtomicLong();
 
@@ -197,6 +199,7 @@ public class AxeOpenConnectVpnService extends VpnService {
                             builder.setMetered(false);
                         }
                         tunInterface = builder.establish();
+                        assignedVpnIpv4 = tunInterface != null ? ip.addr : "";
                         return tunInterface;
                     } catch (Exception ex) {
                         Log.e(TAG, "Native VPN interface setup failed", ex);
@@ -806,6 +809,7 @@ public class AxeOpenConnectVpnService extends VpnService {
     // ── Teardown ───────────────────────────────────────────────────────────────
 
     private void shutdown() {
+        assignedVpnIpv4 = "";
         NativeOpenConnectSession session = nativeSession;
         if (session != null) session.stopSession();
         running = false;
