@@ -598,8 +598,9 @@ device = vpns
 ipv4-network = 10.91.0.0
 ipv4-netmask = 255.255.255.0
 dns = 1.1.1.1
-dns = 8.8.8.8
+dns = 1.0.0.1
 route = default
+tunnel-all-dns = true
 '''
 
     b64 = base64.b64encode(
@@ -766,6 +767,10 @@ dh none
 ecdh-curve prime256v1
 topology subnet
 server 10.92.0.0 255.255.255.0
+# Push full-tunnel IPv4 and DNS to Android/iOS OpenVPN clients.
+push "redirect-gateway def1"
+push "dhcp-option DNS 1.1.1.1"
+push "dhcp-option DNS 1.0.0.1"
 keepalive 10 60
 persist-key
 persist-tun
