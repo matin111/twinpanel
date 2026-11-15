@@ -27,7 +27,7 @@ class AndroidSingBoxTunnel {
   int? get sentBytes => _latestStats?.uploadTotal;
 
   static const supported = <String>{
-    'hysteria2', 'tuic', 'anytls', 'socks5', 'shadowtls',
+    'hysteria2', 'tuic', 'anytls', 'socks5', 'shadowtls', 'snell',
   };
 
   Future<void> initialize() async {
