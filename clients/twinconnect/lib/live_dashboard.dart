@@ -3518,9 +3518,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(Platform.isIOS
-                          ? tr('موتور آیفون آماده نیست', 'iOS engine unavailable')
-                          : _vpnBusy
+                      Text(_vpnBusy
                           ? tr('در حال اتصال', 'Connecting')
                           : (_vpnUp || _modernUp)
                             ? tr('قطع اتصال', 'Disconnect')
