@@ -1,0 +1,42 @@
+name: TwinConnect macOS Reserved Renewal Preview
+
+on:
+  push:
+    branches: [feat/twinconnect-ios-simulator-foundation-20261115]
+    paths:
+      - "clients/twinconnect/lib/account_snapshot.dart"
+      - "clients/twinconnect/lib/live_dashboard.dart"
+      - "clients/twinconnect/test/account_reserved_renewal_test.dart"
+      - ".github/workflows/twinconnect-macos-renewal-preview.yml"
+  workflow_dispatch:
+
+jobs:
+  macos-preview:
+    runs-on: macos-15
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: clients/twinconnect
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Generate macOS Flutter scaffolding
+        run: flutter create --platforms=macos --org com.twinpanel --project-name twinconnect .
+      - name: Resolve dependencies
+        run: flutter pub get
+      - name: Test reserved renewal account model
+        run: flutter test test/account_reserved_renewal_test.dart --reporter expanded
+      - name: Build macOS unsigned preview
+        run: flutter build macos --release
+      - name: Archive macOS preview
+        run: |
+          cd build/macos/Build/Products/Release
+          ditto -c -k --sequesterRsrc --keepParent twinconnect.app twinconnect-macos-renewal-preview.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TwinConnect-macOS-Reserved-Renewal-Preview
+          path: clients/twinconnect/build/macos/Build/Products/Release/twinconnect-macos-renewal-preview.zip
+          if-no-files-found: error
