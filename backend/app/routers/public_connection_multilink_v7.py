@@ -19,7 +19,7 @@ from .. import subscription_delivery_policy_v1 as delivery_policy
 from .. import xray_customer_profile_policy_v30 as customer_policy
 from .. import mother_subscription_delivery_policy_v108 as mother_policy
 from ..database import get_db
-from ..models import Node, ProtocolCredential
+from ..models import Node, ProtocolCredential, Subscription
 from . import account_delivery
 
 
