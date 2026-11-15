@@ -13,6 +13,7 @@ class TwinConnectWaveIndicator extends StatefulWidget {
     required this.dark,
     this.rxSamples = const <double>[],
     this.txSamples = const <double>[],
+    this.compact = false,
   });
 
   final bool connected;
@@ -20,6 +21,7 @@ class TwinConnectWaveIndicator extends StatefulWidget {
   final bool dark;
   final List<double> rxSamples;
   final List<double> txSamples;
+  final bool compact;
 
   @override
   State<TwinConnectWaveIndicator> createState() =>
@@ -61,8 +63,8 @@ class _TwinConnectWaveIndicatorState extends State<TwinConnectWaveIndicator>
 
   @override
   Widget build(BuildContext context) => SizedBox(
-        width: 342,
-        height: 178,
+        width: widget.compact ? 258 : 342,
+        height: widget.compact ? 105 : 178,
         child: RepaintBoundary(
           child: AnimatedBuilder(
             animation: _motion,

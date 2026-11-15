@@ -16,6 +16,9 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'protocols.dart';
 import 'server_inventory.dart';
 import 'server_latency.dart';
+import 'fast_server_selection.dart';
+import 'connection_choice_store.dart';
+import 'vitory_server_visibility.dart';
 import 'windows_singbox_preflight.dart';
 import 'singbox_profile_validator.dart';
 import 'shadowtls_chain.dart';
@@ -50,6 +53,7 @@ import 'brand_theme.dart';
 import 'plan_classification.dart';
 import 'account_snapshot.dart';
 import 'native_vpn_bridge.dart';
+import 'ios_wireguard_controller.dart';
 import 'country_flag.dart';
 import 'ambient_background.dart';
 import 'interactive_glass_card.dart';
@@ -76,6 +80,8 @@ class TwinConnectLiveDashboard extends StatefulWidget {
     required this.onLogout,
     required this.onRefreshAccount,
     this.accountError,
+    this.simulatorPreview = false,
+    this.previewPage = 0,
     super.key,
   });
   final PanelDirectoryEntry panel;
@@ -94,6 +100,10 @@ class TwinConnectLiveDashboard extends StatefulWidget {
   final VoidCallback onLogout;
   final VoidCallback onRefreshAccount;
   final String? accountError;
+  /// Used ONLY by the alternate simulator-preview entry point.
+  /// Production sign-in never sets this, and no sample credentials are valid.
+  final bool simulatorPreview;
+  final int previewPage;
   @override
   State<TwinConnectLiveDashboard> createState() => _TwinConnectLiveDashboardState();
 }
@@ -108,6 +118,7 @@ class _DemoServer {
 
 class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   final WindowsWireGuardController _vpn = const WindowsWireGuardController();
+  final IosWireGuardController _iosVpn = const IosWireGuardController();
   final WindowsAmneziaWgController _awg = const WindowsAmneziaWgController();
   late final WindowsSingBoxTunnel _modernTunnel = WindowsSingBoxTunnel(
     onUnexpectedExit: () {
@@ -203,6 +214,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   bool _modernHealthBusy = false;
   int _modernHealthFailures = 0;
   String? _modernProtocol;
+  String? _ciscoTransportMode;
   String? _modernNodeId;
   final VpnPolicyStore _vpnPolicy = const VpnPolicyStore();
   /// Every protocol switch passes this gate BEFORE interrupting an existing
@@ -354,6 +366,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   String? _activeNodeId;
 
   final Map<String, int?> _nodePings = {};
+  final Map<String, DateTime> _nodePingMeasuredAt = {};
   final Map<String, String> _nodePingErrors = {};
   // Group headers are collapsed by default. Keep expansion state per country,
   // not per server, so refreshed inventories never make the list jump around.
@@ -403,6 +416,18 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     return null;
   }
 
+  bool get _connectedServerPingApproximate {
+    if (_modernUp && _modernProtocol == 'v2ray' &&
+        _selectedXrayNodeId != null && _selectedXrayInboundId != null &&
+        _xrayInboundRtts['${_selectedXrayNodeId!}:${_selectedXrayInboundId!}'] != null) {
+      return false;
+    }
+    final id = _modernUp ? _modernNodeId : _activeNodeId;
+    if (id == null || _nodePings[id] != null) return false;
+    return widget.servers?.servers.any(
+        (node) => node.id == id && node.latencyMs != null) ?? false;
+  }
+
   Future<void> _refreshNativeReadiness() async {
     if (_nativeReadyRefreshing || !Platform.isWindows) return;
     _nativeReadyRefreshing = true;
@@ -427,6 +452,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     if (node.probeIp == null) {
       if (mounted) { setState(() {
         _nodePings[node.id] = null;
+        _nodePingMeasuredAt.remove(node.id);
         _nodePingErrors[node.id] = 'NO_PROBE_ADDRESS';
       }); }
       return;
@@ -470,6 +496,11 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     } finally {
       if (mounted) { setState(() {
         _nodePings[node.id] = latency;
+        if (latency != null) {
+          _nodePingMeasuredAt[node.id] = DateTime.now();
+        } else {
+          _nodePingMeasuredAt.remove(node.id);
+        }
         if (error == null) {
           _nodePingErrors.remove(node.id);
         } else {
@@ -496,113 +527,263 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   }
 
 
-  int? get _fastestKnownIndex {
-    final servers = widget.servers?.servers;
-    if (servers == null) return null;
-    int? best;
-    for (var i = 0; i < servers.length; i++) {
-      final node = servers[i];
-      // Prefer real measured RTT; use the panel's nonzero last-known
-      // latency only when ICMP is blocked or unavailable on Windows.
-      // Never treat an unmeasured server as zero-latency.
-      final latency = _nodePings[node.id] ?? node.latencyMs;
-      if (!node.nodeOnline || latency == null || latency <= 0) continue;
-      final bestLatency = best == null ? null :
-          (_nodePings[servers[best].id] ?? servers[best].latencyMs);
-      if (bestLatency == null || latency < bestLatency) {
-        best = i;
-      }
+  /// Find a measured server that actually belongs to the selected protocol.
+  /// The panel must re-authorize the protocol before supplying any private
+  /// profile. Only node IDs are retained transiently; credentials are never
+  /// cached, logged or included in UI diagnostics.
+  Future<int?> _fastestAuthorizedIndex(String protocolCode) async {
+    final definition = VpnProtocols.byCode(protocolCode);
+    if (definition == null || definition.code != protocolCode) {
+      throw const FormatException('SELECT_PROTOCOL_FOR_FASTEST');
     }
-    return best;
+    final locallyAuthorized = widget.catalog?.entries.any((entry) =>
+        entry.protocol.code == protocolCode && entry.selected &&
+        entry.configRecordPresent) ?? false;
+    if (!locallyAuthorized || !_protocolEntitled(protocolCode)) {
+      throw const FormatException('PROTOCOL_NOT_INCLUDED_IN_SUBSCRIPTION');
+    }
+    final username = widget.username;
+    final namespace = widget.panel.namespace;
+    final sessionToken = widget.sessionToken;
+    await _requireVerifiedGuardIfRequested();
+    final api = TenantApi.fromBuildConfig();
+    // WireGuard has a stronger OS-native entitlement gate than the legacy
+    // per-protocol Windows adapters. Preserve it before requesting secrets.
+    if (protocolCode == 'wireguard') {
+      final checks = await Future.wait<Object>([
+        _vpnPolicy.load(namespace, username),
+        NativeVpnBridge.probe(),
+      ]);
+      final capabilities = checks[1] as NativeVpnCapabilities;
+      final native = await NativeVpnBridge.protocolReadiness(
+          validatedCapabilities: capabilities);
+      NativeVpnBridge.requireProtocolSafeToConnect(
+          checks[0] as VpnPolicy, capabilities, definition, native);
+    }
+    final liveCatalog = await api.loadSessionProtocolCatalog(
+        panel: widget.panel, sessionToken: sessionToken);
+    if (liveCatalog.namespace != namespace ||
+        !liveCatalog.entries.any((entry) =>
+            entry.protocol.code == protocolCode && entry.selected &&
+            entry.configRecordPresent)) {
+      throw const FormatException('PROTOCOL_NOT_INCLUDED_IN_SUBSCRIPTION');
+    }
+    final profiles = await api.loadSessionNativeProfiles(
+        panel: widget.panel, sessionToken: sessionToken,
+        protocol: definition,
+        native: NativeProtocolReadiness(supportedCodes: {protocolCode}));
+    if (!mounted || widget.username != username ||
+        widget.panel.namespace != namespace ||
+        widget.sessionToken != sessionToken) {
+      throw const FormatException('APP_SESSION_CHANGED');
+    }
+    // v2ray includes independently selectable inbounds; only real panel
+    // node assignments can qualify. All other families use item.node_id.
+    final entitledNodeIds = <String>{
+      for (final item in profiles.items)
+        if (item['node_id'] != null) item['node_id'].toString(),
+      for (final group in profiles.xrayServerGroups)
+        if (group.inbounds.isNotEmpty) group.serverId,
+    };
+    final servers = widget.servers?.servers ?? const <AppServer>[];
+    final candidates = <int>[
+      for (var i = 0; i < servers.length; i++)
+        if (servers[i].nodeOnline &&
+            entitledNodeIds.contains(servers[i].id)) i,
+    ];
+    if (candidates.isEmpty) {
+      throw const FormatException('PROTOCOL_SERVER_PROFILE_MISSING');
+    }
+    // Probe only eligible nodes. Keep UI responsive for large inventories:
+    // a 24-node cap is explicit, and previously measured eligible nodes
+    // remain candidates. Never measure unrelated protocols' exit nodes.
+    final now = DateTime.now();
+    bool fresh(String id) => _nodePingMeasuredAt[id] != null &&
+        now.difference(_nodePingMeasuredAt[id]!) <
+            const Duration(seconds: 90);
+    final missing = candidates.where((i) =>
+        !fresh(servers[i].id) &&
+        servers[i].probeIp != null).take(24).toList();
+    for (var start = 0; start < missing.length && mounted; start += 4) {
+      final end = start + 4 < missing.length ? start + 4 : missing.length;
+      await Future.wait([
+        for (var i = start; i < end; i++) _probeNode(missing[i]),
+      ]);
+    }
+    if (!mounted || widget.username != username ||
+        widget.panel.namespace != namespace ||
+        widget.sessionToken != sessionToken) {
+      throw const FormatException('APP_SESSION_CHANGED');
+    }
+    final sampled = <String, int?>{
+      for (final id in entitledNodeIds)
+        if (_nodePingMeasuredAt[id] != null &&
+            DateTime.now().difference(_nodePingMeasuredAt[id]!) <
+                const Duration(seconds: 90))
+          id: _nodePings[id],
+    };
+    final measured = FastServerSelection.choose(
+        servers: servers,
+        permittedNodeIds: entitledNodeIds,
+        measuredRtts: sampled);
+    // An ICMP-blocked host may still accept VPN sessions. Only as a last
+    // resort use its panel-reported latency estimate, never an unentitled
+    // node, and never label that estimate an actual user-device ping.
+    return measured ?? FastServerSelection.chooseReportedEstimate(
+        servers: servers, permittedNodeIds: entitledNodeIds);
+  }
+
+  /// Legacy VPN engines start outside WireGuard's native capability list.
+  /// Check their real bundled prerequisites; absence is not readiness.
+  Future<bool> _fastEngineReady(
+      String code, NativeProtocolReadiness native) async {
+    if (!Platform.isWindows) return false;
+    if (code == 'wireguard' || code == 'amneziawg') {
+      return native.supports(code);
+    }
+    if (code == 'cisco') return WindowsOpenConnectTunnel.enginePresent();
+    if (code == 'openvpn') return WindowsOpenVpnTunnel.enginePresent();
+    if (code == 'v2ray') {
+      final checks = await Future.wait<bool>([
+        WindowsXrayPreflight.enginePresent(),
+        WindowsSingBoxPreflight.enginePresent(),
+      ]);
+      return checks.every((ok) => ok);
+    }
+    if (code == 'l2tp') return true; // Built-in Windows RAS/IPsec transport.
+    if (code == 'sudoku') {
+      final checks = await Future.wait<bool>([
+        WindowsSudokuProxy.enginePresent(),
+        WindowsSingBoxPreflight.enginePresent(),
+      ]);
+      return checks.every((ok) => ok);
+    }
+    if (code == 'mieru') {
+      final checks = await Future.wait<bool>([
+        WindowsMieruProxy.enginePresent(),
+        WindowsSingBoxPreflight.enginePresent(),
+      ]);
+      return checks.every((ok) => ok);
+    }
+    if (code == 'trusttunnel') {
+      final checks = await Future.wait<bool>([
+        WindowsTrustTunnelProxy.enginePresent(),
+        WindowsSingBoxPreflight.enginePresent(),
+      ]);
+      return checks.every((ok) => ok);
+    }
+    if (SingBoxProfileValidator.supportsFamily(code)) {
+      return WindowsSingBoxPreflight.enginePresent();
+    }
+    return false;
   }
 
   Future<void> _enableFastestAndConnect() async {
     if (_vpnBusy || _fastestConnecting || _verifiedConnectionActive ||
         _vpnUp || _modernUp || _vpnCleanup || !Platform.isWindows) return;
-    // An existing fresh probe or panel RTT can be used immediately.
-    // Do not hold Quick Connect until every node completes ICMP probing.
-    if (_pingAllBusy && _fastestKnownIndex == null) {
-      ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(
-        content: Text(tr('تست پینگ سرورها هنوز در حال اجراست.',
-            'Server latency measurement is still running.'))));
-      return;
-    }
     final authorized = widget.catalog?.entries.where((entry) =>
-        entry.selected && entry.configRecordPresent).map((e) =>
-        e.protocol.code).toSet() ?? <String>{};
+        entry.selected && entry.configRecordPresent &&
+        _protocolEntitled(entry.protocol.code))
+        .map((entry) => entry.protocol.code).toSet() ?? <String>{};
     if (authorized.isEmpty) {
       setState(() => _vpnError = 'PROTOCOL_NOT_INCLUDED_IN_SUBSCRIPTION');
       return;
     }
     final previousFilter = _filter;
     final previousSelected = _selected;
+    final manualRevision = _choiceRevision;
     setState(() { _fastestConnecting = true; _vpnError = null; });
     try {
-      // Fast Server chooses the lowest measured server RTT; it does not
-      // silently equate WireGuard with the fastest protocol.
       final checks = await Future.wait<Object>([
-        NativeVpnBridge.protocolReadiness().timeout(
-            const Duration(seconds: 8)),
+        NativeVpnBridge.protocolReadiness()
+            .timeout(const Duration(seconds: 8)),
         SharedPreferences.getInstance(),
-        (_fastestKnownIndex != null || _pingAllBusy
-            ? Future<bool>.value(true)
-            : _probeAllNodes().then((_) => true)),
       ]);
       if (!mounted) return;
-      final ready = checks[0] as NativeProtocolReadiness;
+      final native = checks[0] as NativeProtocolReadiness;
       final prefs = checks[1] as SharedPreferences;
-      final available = authorized.where(ready.supports).toSet();
-      // Explicit protocol choice wins. With "All", reuse the last verified
-      // successful protocol before falling back to another ready engine.
       final preferred = _filter != 'all'
           ? _filter
           : prefs.getString('twinconnect_last_verified_protocol');
-      final eligible = <String>[
+      final priority = <String>[
         'hysteria2', 'tuic', 'anytls', 'v2ray', 'openvpn', 'cisco',
         'shadowtls', 'naive', 'snell', 'mieru', 'trusttunnel',
-        'amneziawg', 'wireguard', 'l2tp', 'sudoku',
+        'amneziawg', 'wireguard', 'l2tp', 'sudoku', 'socks5',
       ];
-      final protocol = preferred != null && available.contains(preferred)
-          ? preferred
-          : _filter != 'all'
-              ? null
-              : eligible.where(available.contains).firstOrNull;
-      if (protocol == null) {
-        setState(() => _vpnError = 'NATIVE_PROTOCOL_ENGINE_NOT_READY');
-        return;
+      final choices = <String>[
+        if (preferred != null && authorized.contains(preferred)) preferred,
+        if (_filter == 'all')
+          for (final code in priority)
+            if (code != preferred && authorized.contains(code)) code,
+      ];
+      String? selectedProtocol;
+      int? selectedIndex;
+      for (final code in choices) {
+        if (!await _fastEngineReady(code, native)) {
+          if (_filter != 'all') {
+            throw const FormatException('NATIVE_PROTOCOL_ENGINE_NOT_READY');
+          }
+          continue;
+        }
+        try {
+          final index = await _fastestAuthorizedIndex(code);
+          if (index != null) {
+            selectedProtocol = code;
+            selectedIndex = index;
+            break;
+          }
+          if (_filter != 'all') {
+            throw const FormatException('NO_MEASURED_SERVER');
+          }
+        } on FormatException catch (error) {
+          if (_filter != 'all' ||
+              !const {'PROTOCOL_SERVER_PROFILE_MISSING',
+                      'NO_MEASURED_SERVER'}
+                  .contains(error.message)) {
+            rethrow;
+          }
+          // In All mode only, check another authorized/installed family.
+        }
       }
-      final best = _fastestKnownIndex;
-      if (best == null) {
-        setState(() => _vpnError = 'NO_MEASURED_SERVER');
-        ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(
-          content: Text(tr('سرور آنلاین با پینگ معتبر پیدا نشد.',
-              'No online server has a verified latency measurement.'))));
-        return;
+      if (!mounted || _choiceRevision != manualRevision) return;
+      if (selectedProtocol == null || selectedIndex == null) {
+        throw const FormatException('NO_MEASURED_SERVER');
       }
+      // The fast chooser already validated profile membership and measured
+      // the exact node. Don't run a second global (possibly wrong) choice.
       setState(() {
-        _filter = protocol;
-        _selected = best;
-        _autoFastest = true;
+        _filter = selectedProtocol!;
+        _selected = selectedIndex!;
+        _autoFastest = false;
         _page = 'home';
       });
       await _toggleVpn();
-      if (!mounted) return;
-      if (_verifiedConnectionActive && _vpnError == null) {
-        await prefs.setString('twinconnect_last_verified_protocol', protocol);
-      } else {
+      if (!mounted || _choiceRevision != manualRevision) return;
+      final connected = _verifiedConnectionActive && _vpnError == null;
+      setState(() {
+        // Fast Server chooses a transport for THIS connection only. The
+        // protocol and node selected by the user remain unchanged.
+        _autoFastest = connected;
+        _filter = previousFilter;
+        _selected = previousSelected;
+      });
+      if (connected) {
+        try {
+          await prefs.setString(
+              'twinconnect_last_verified_protocol', selectedProtocol);
+        } catch (_) {
+          // The verified tunnel remains connected if preferences are locked.
+        }
+      }
+    } catch (error) {
+      if (mounted && _choiceRevision == manualRevision) {
         setState(() {
+          _vpnError = _errorText(error);
           _autoFastest = false;
           _filter = previousFilter;
           _selected = previousSelected;
         });
       }
-    } catch (error) {
-      if (mounted) setState(() {
-        _vpnError = _errorText(error);
-        _autoFastest = false;
-        _filter = previousFilter;
-        _selected = previousSelected;
-      });
     } finally {
       if (mounted) setState(() => _fastestConnecting = false);
     }
@@ -847,11 +1028,38 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
             setState(() {
               _modernUp = false;
               _publicIp = null;
-              _vpnError = _ciscoTunnel.isRunning
-                  ? 'CISCO_HEALTH_DEGRADED' : 'CISCO_PROCESS_EXITED';
+              _vpnError = _ciscoTunnel.lastHealthError ??
+                  (_ciscoTunnel.isRunning
+                    ? 'CISCO_HEALTH_DEGRADED' : 'CISCO_PROCESS_EXITED');
             });
-            return;
           }
+          // Cisco has its own health state. Never increment the generic
+          // sing-box failure counter again in the same polling cycle.
+          return;
+        }
+        if (healthy && _modernProtocol == 'cisco') {
+          _modernHealthFailures = 0;
+          final mode = await _ciscoTunnel.transportMode();
+          if (!mounted || !_modernUp || _modernProtocol != 'cisco') return;
+          final liveExitIp = _ciscoTunnel.exitIp;
+          if (_ciscoTransportMode != mode ||
+              (liveExitIp != null && _publicIp != liveExitIp)) {
+            setState(() {
+              _ciscoTransportMode = mode;
+              // Display only a re-verified non-baseline exit IP.
+              if (liveExitIp != null) _publicIp = liveExitIp;
+            });
+          }
+          // A third-party public-IP service may time out while the native
+          // OpenConnect child stays alive. Warn, but do not fake a disconnect.
+          final reason = _ciscoTunnel.lastHealthError;
+          if (reason != null && _vpnError != reason) {
+            setState(() => _vpnError = reason);
+          } else if (reason == null &&
+              _vpnError == 'CISCO_EGRESS_RECHECK_UNAVAILABLE') {
+            setState(() => _vpnError = null);
+          }
+          return;
         }
         if (healthy) {
           _modernHealthFailures = 0;
@@ -907,6 +1115,18 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         const Duration(seconds: 8);
     return (profiles: both[0] as ClientProtocolProfiles,
             baselineIp: fresh ? sample.ip : null);
+  }
+
+  Future<void> _refreshCiscoTransportAfterDelay() async {
+    // DTLS starts after TLS authentication. This is diagnostic only and
+    // never overrides the native connected/egress verification state.
+    await Future<void>.delayed(const Duration(seconds: 6));
+    if (!mounted || !_modernUp || _modernProtocol != 'cisco') return;
+    final mode = await _ciscoTunnel.transportMode();
+    if (mounted && _modernUp && _modernProtocol == 'cisco' &&
+        _ciscoTransportMode != mode) {
+      setState(() => _ciscoTransportMode = mode);
+    }
   }
 
   Future<void> _startCiscoTunnel(String serverId) async {
@@ -993,12 +1213,14 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       setState(() {
         _modernUp = true;
         _modernProtocol = 'cisco';
+        _ciscoTransportMode = null;
         _modernNodeId = serverId;
         _publicIp = verifiedIp;
         _vpnError = null;
       });
       _startModernTrafficMonitoring();
       _startModernHealthMonitoring();
+      unawaited(_refreshCiscoTransportAfterDelay());
     } catch (error) {
       if (mounted) {
         setState(() {
@@ -1275,7 +1497,10 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       // Each inbound is a separate server-list choice. Never interrupt the
       // user's connection to show a second selection dialog.
       final requestedInboundId = inboundId ??
-          (_selectedXrayNodeId == serverId ? _selectedXrayInboundId : null);
+          (_explicitNodeId == serverId && _explicitXrayInboundId != null
+              ? _explicitXrayInboundId
+              : (_selectedXrayNodeId == serverId
+                  ? _selectedXrayInboundId : null));
       final eligible = requestedInboundId == null
           ? matches
           : matches.where((item) => item.id == requestedInboundId)
@@ -1503,7 +1728,9 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         _modernUp = true;
         _modernProtocol = 'sudoku';
         _modernNodeId = resolvedServerId;
-        if (fallbackIndex >= 0) _selected = fallbackIndex;
+        if (fallbackIndex >= 0 && _explicitNodeId == null) {
+          _selected = fallbackIndex;
+        }
         _publicIp = ip;
         _vpnError = null;
       });
@@ -2070,10 +2297,13 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     final busy = _vpnBusy;
     setState(() {
       _selected = index;
+      _explicitNodeId = nodes[index].id;
+      // A server tap must not silently change the chosen protocol.
       _page = 'home';
       _autoFastest = false;
       if (!busy) _vpnError = null;
     });
+    _persistManualConnectionChoice();
     if (busy) {
       ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(
         content: Text(tr('سرور انتخاب شد؛ عملیات قبلی هنوز در حال اجراست.',
@@ -2081,7 +2311,20 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       return;
     }
     if (!Platform.isWindows) {
-      setState(() => _vpnError = 'WINDOWS_ENGINE_REQUIRED');
+      // Selecting a server must never launch a Windows-only VPN process or
+      // display a misleading Windows engine error on Android/iPhone.
+      // The platform-specific Connect control remains independently gated
+      // until a verified native VPN tunnel engine is installed.
+      return;
+    }
+    if (_filter != 'all' && !_protocolEntitled(_filter)) {
+      if (mounted) {
+        setState(() => _vpnError = 'PROTOCOL_NOT_INCLUDED_IN_SUBSCRIPTION');
+      }
+      return;
+    }
+    if (_filter == 'all' && !_protocolEntitled('wireguard')) {
+      // Browse all authorized servers without launching unrelated WireGuard.
       return;
     }
     if (_filter != 'all' && _filter != 'wireguard') {
@@ -2222,7 +2465,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       if (!mounted) return;
       setState(() {
         _selected = index;
-        _filter = 'wireguard';
+        // Keep the manually selected protocol/filter. The verified native
+        // tunnel status already indicates that this connection is WireGuard.
         _autoFastest = false;
         _page = 'home';
         _vpnUp = started['state'] == 'interface_up' ||
@@ -2241,8 +2485,11 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     }
   }
 
+  Timer? _previewTour;
+
   @override
   void dispose() {
+    _previewTour?.cancel();
     _durationTicker?.cancel();
     _connectedSeconds.dispose();
     _modernHealthTimer?.cancel();
@@ -2294,10 +2541,31 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       if (mounted) _updateConnectionClock();
     });
     _dark = true; // Premium dark canvas is the only supported app appearance.
+    if (widget.simulatorPreview) {
+      _languageCode = 'fa';
+      _page = const ['home', 'locations', 'settings', 'account'][
+          widget.previewPage.clamp(0, 3).toInt()];
+      // This tour is confined to the simulator-only alternate entry point.
+      // The same dashboard layouts are used by authenticated clients.
+      _previewTour = Timer.periodic(const Duration(seconds: 12), (_) {
+        if (!mounted) return;
+        setState(() {
+          _page = const ['home', 'locations', 'settings', 'account'][
+              (const ['home', 'locations', 'settings', 'account']
+                  .indexOf(_page) + 1) % 4];
+        });
+      });
+      return; // No network, VPN, or credential calls from an offline mock.
+    }
     _restoreAppearance();
+    unawaited(_restoreManualConnectionChoice());
     _refreshNativeReadiness();
     _refreshVpnStatus();
     unawaited(_restoreCachedXrayInbounds());
+    if (_isVitoryPlan) {
+      if (_xrayAuthorized) unawaited(_loadXrayGroups(refresh: true));
+      unawaited(_loadVitoryHysteriaNodes());
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && (widget.servers?.servers.isNotEmpty ?? false)) {
         _probeAllNodes();
@@ -2309,9 +2577,30 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   void didUpdateWidget(covariant TwinConnectLiveDashboard oldWidget) {
     super.didUpdateWidget(oldWidget);
     // All tenants use the same dark UI; branded colors remain customizable.
-    if (oldWidget.username != widget.username ||
-        oldWidget.panel.namespace != widget.panel.namespace ||
+    if (widget.simulatorPreview) return;
+    final accountChanged = oldWidget.username != widget.username ||
+        oldWidget.panel.namespace != widget.panel.namespace;
+    if (accountChanged) {
+      // A different login/tenant gets its own saved selection, while a
+      // changing panel origin must never reset a customer's manual choice.
+      ++_choiceRevision;
+      _filter = 'all';
+      _selected = 0;
+      _explicitNodeId = null;
+      _explicitXrayInboundId = null;
+      _autoFastest = false;
+      unawaited(_restoreManualConnectionChoice());
+    }
+    if (accountChanged ||
         oldWidget.panel.apiOrigin != widget.panel.apiOrigin) {
+      ++_vitoryProfileRevision;
+      _vitoryHysteriaNodeIds = null;
+      _vitoryHysteriaLoading = false;
+      _vitoryHysteriaRefreshPending = false;
+      _vitoryHysteriaError = null;
+      if (_isVitoryPlan) {
+        unawaited(_loadVitoryHysteriaNodes(refresh: true));
+      }
       _socks5AssignedNodeIds = null;
       _socks5NodesError = null;
       // No in-memory Xray credentials may cross tenants or accounts.
@@ -2323,15 +2612,28 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       _xrayInboundRtts.clear();
       unawaited(_restoreCachedXrayInbounds());
     } else if (oldWidget.servers != widget.servers ||
-        oldWidget.catalog != widget.catalog) {
+        oldWidget.catalog != widget.catalog ||
+        oldWidget.plan != widget.plan) {
       // The first session inventory often arrives after the dashboard
       // initializes; retry restore once authorized nodes become available.
+      // A node added to this account after the first fetch (including
+      // Germany/USA/Finland) must trigger an actual refresh of the inbound
+      // feed. Re-filtering the old in-memory groups cannot discover it.
+      // This never changes credentials or connection state.
+      if (_xrayAuthorized) {
+        unawaited(_loadXrayGroups(refresh: true));
+      }
+      if (_isVitoryPlan) {
+        unawaited(_loadVitoryHysteriaNodes(refresh: true));
+      }
       _xrayGroups = _assignedXrayGroups(_xrayGroups);
       if (_xrayGroups.isEmpty && !_xrayGroupsLoaded) {
         unawaited(_restoreCachedXrayInbounds());
       }
     }
     if (oldWidget.servers != widget.servers) {
+      // Inventories can reorder. Match the saved stable ID, not the old index.
+      _alignSelectedNodeWithInventory();
       final ids = widget.servers?.servers.map((node) => node.id).toSet()
           ?? <String>{};
       _nodePings.removeWhere((id, value) => !ids.contains(id));
@@ -2423,6 +2725,109 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     }
   }
 
+  /// Device-only iOS path. Appetize can exercise the button but fails
+  /// safely without an embedded, signed PacketTunnel and WireGuardKitGo.
+  /// A successful OS start request is NOT a verified peer handshake.
+  /// macOS has its own native channel; never run any Windows adapter on a
+  /// Mac. This unsigned preview has no Apple-entitled Packet Tunnel provider.
+  /// Keep the UI interactive and report the missing engine instead of
+  /// silently ignoring Connect or claiming a connected session.
+  Future<void> _toggleMacVpn() async {
+    if (!Platform.isMacOS || _vpnBusy) return;
+    setState(() { _vpnBusy = true; _vpnError = null; });
+    try {
+      final capabilities = await NativeVpnBridge.probe();
+      if (!capabilities.engineReady || !capabilities.fullTunnel) {
+        throw const FormatException('MACOS_PACKET_TUNNEL_NOT_INSTALLED');
+      }
+      final native = await NativeVpnBridge.protocolReadiness(
+          validatedCapabilities: capabilities);
+      final selectedProtocol = _filter == 'all' ? null : _filter;
+      if (selectedProtocol == null || !_protocolEntitled(selectedProtocol) ||
+          !native.supports(selectedProtocol)) {
+        throw const FormatException('MACOS_PROTOCOL_ENGINE_NOT_READY');
+      }
+      // Do not report success until a correctly signed, fully functional
+      // Network Extension connects and verifies actual tunnel traffic.
+      throw const FormatException('MACOS_VPN_CONNECTOR_NOT_LINKED');
+    } catch (error) {
+      if (mounted) setState(() => _vpnError = _errorText(error));
+    } finally {
+      if (mounted) setState(() => _vpnBusy = false);
+    }
+  }
+
+  Future<void> _toggleIosVpn() async {
+    if (!Platform.isIOS || _vpnBusy) return;
+    setState(() { _vpnBusy = true; _vpnError = null; });
+    try {
+      final status = await _iosVpn.status();
+      if (const {'connecting', 'os_connected_unverified', 'reasserting'}
+          .contains(status['state'])) {
+        await _iosVpn.stop();
+        if (mounted) setState(() {
+          _vpnUp = false;
+          _vpnVerified = false;
+          _activeNodeId = null;
+        });
+        return;
+      }
+      final protocol = _filter == 'all' ? 'wireguard' : _filter;
+      if (protocol != 'wireguard') {
+        throw const FormatException('IOS_PROTOCOL_ENGINE_NOT_INSTALLED');
+      }
+      final serverId = _selectedServerId;
+      if (serverId == null) {
+        throw const FormatException('SELECT_WIREGUARD_SERVER');
+      }
+      final installed = await _iosVpn.installation();
+      if (installed['engineReady'] != true) {
+        throw FormatException(installed['reason'] is String
+            ? installed['reason'] as String : 'IOS_ENGINE_NOT_READY');
+      }
+      final api = TenantApi.fromBuildConfig();
+      final checks = await Future.wait<Object>([
+        _vpnPolicy.load(widget.panel.namespace, widget.username),
+        NativeVpnBridge.probe(),
+        api.loadSessionProtocolCatalog(
+            panel: widget.panel, sessionToken: widget.sessionToken),
+      ]);
+      final policy = checks[0] as VpnPolicy;
+      final capabilities = checks[1] as NativeVpnCapabilities;
+      final native = await NativeVpnBridge.protocolReadiness(
+          validatedCapabilities: capabilities);
+      final candidate = await ConnectionBootstrap(api: api).prepare(
+        panel: widget.panel,
+        sessionToken: widget.sessionToken,
+        serverId: serverId,
+        protocolCode: 'wireguard',
+        policy: policy,
+        capabilities: capabilities,
+        nativeProtocols: native,
+        currentAttemptCatalog: Future<PanelProtocolCatalog>.value(
+            checks[2] as PanelProtocolCatalog),
+      );
+      final profile = WindowsWireGuardController.configForSingleNode(
+          candidate.profiles, serverId);
+      await _iosVpn.start(
+        profile: profile.config,
+        namespace: widget.panel.namespace,
+        account: widget.username,
+        policy: policy,
+      );
+      // Do not call an OS-accepted start a connected VPN.
+      if (mounted) setState(() {
+        _vpnUp = false;
+        _vpnVerified = false;
+        _activeNodeId = serverId;
+      });
+    } catch (error) {
+      if (mounted) setState(() => _vpnError = _errorText(error));
+    } finally {
+      if (mounted) setState(() => _vpnBusy = false);
+    }
+  }
+
   Future<void> _toggleVpn() async {
     if (_vpnBusy || !Platform.isWindows) return;
     if (_modernUp || _awgServiceUp || _modernTunnel.isRunning || _xrayProxy.isRunning || _sudokuProxy.isRunning ||
@@ -2431,42 +2836,53 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       await _stopModernTunnel();
       return;
     }
+    if (_filter != 'all' && !_protocolEntitled(_filter)) {
+      setState(() => _vpnError = 'PROTOCOL_NOT_INCLUDED_IN_SUBSCRIPTION');
+      return;
+    }
+    // "All" is a browsing filter, not a request to use unlicensed WG.
+    if (_filter == 'all' && !_autoFastest &&
+        !_protocolEntitled('wireguard')) {
+      setState(() => _vpnError = 'SELECT_PROTOCOL_FOR_FASTEST');
+      return;
+    }
     if (_filter != 'all' && _filter != 'wireguard') {
-      final id = _selectedServerId;
-      if (id == null) {
+      String? targetId = _selectedServerId;
+      if (_autoFastest) {
+        try {
+          final best = await _fastestAuthorizedIndex(_filter);
+          if (best == null) {
+            throw const FormatException('NO_MEASURED_SERVER');
+          }
+          if (!mounted) return;
+          targetId = widget.servers!.servers[best].id;
+        } catch (error) {
+          if (mounted) setState(() => _vpnError = _errorText(error));
+          return;
+        }
+      }
+      if (targetId == null) {
         setState(() => _vpnError = 'SELECT_MODERN_SERVER');
         return;
       }
-      if (_autoFastest) {
-        if (_filter == 'all') {
-          setState(() => _vpnError = 'SELECT_PROTOCOL_FOR_FASTEST');
-          return;
-        }
-        final best = _fastestKnownIndex;
-        if (best == null) {
-          setState(() => _vpnError = 'NO_MEASURED_SERVER');
-          return;
-        }
-        setState(() => _selected = best);
-      }
       if (_filter == 'cisco') {
-        await _startCiscoTunnel(_selectedServerId!);
+        await _startCiscoTunnel(targetId);
       } else if (_filter == 'openvpn') {
-        await _startOpenVpnTunnel(_selectedServerId!);
+        await _startOpenVpnTunnel(targetId);
       } else if (_filter == 'l2tp') {
-        await _startL2tpTunnel(_selectedServerId!);
+        await _startL2tpTunnel(targetId);
       } else if (_filter == 'v2ray') {
-        await _startXrayTunnel(_selectedServerId!);
+        await _startXrayTunnel(targetId);
       } else if (_filter == 'sudoku') {
-        await _startSudokuTunnel(_selectedServerId!);
+        await _startSudokuTunnel(targetId);
       } else if (_filter == 'mieru') {
-        await _startMieruTunnel(_selectedServerId!);
+        await _startMieruTunnel(targetId);
       } else if (_filter == 'trusttunnel') {
-        await _startTrustTunnel(_selectedServerId!);
+        await _startTrustTunnel(targetId);
       } else if (_filter == 'amneziawg') {
-        await _startAmneziaWgTunnel(_selectedServerId!);
+        await _startAmneziaWgTunnel(targetId);
       } else if (SingBoxProfileValidator.supportsFamily(_filter)) {
-        await _startModernTunnel(_filter, _selectedServerId!);
+        await _startModernTunnel(_filter, targetId);
       } else {
         setState(() => _vpnError = 'NATIVE_PROTOCOL_ENGINE_NOT_READY');
       }
@@ -2477,7 +2893,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       return;
     }
     if (!_vpnUp && !_vpnCleanup && (!_vpnReady || !_wireGuardAllowed ||
-        _selectedServerId == null || _filter != 'all' && _filter != 'wireguard')) {
+        (!_autoFastest && _selectedServerId == null) ||
+        _filter != 'all' && _filter != 'wireguard')) {
       setState(() => _vpnError = !_wireGuardAllowed
           ? 'WIREGUARD_NOT_ALLOWED'
           : !_vpnReady ? 'WIREGUARD_NOT_INSTALLED_OR_ADMIN_REQUIRED'
@@ -2502,15 +2919,18 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         // Allow disconnect at any time, but never start a new WireGuard
         // session while requested OS-wide protection is unverified.
         await _requireVerifiedGuardIfRequested();
+        String? selectedId = _selectedServerId;
         if (_autoFastest) {
-          if (_filter != 'wireguard') {
-            throw const FormatException('SELECT_PROTOCOL_FOR_FASTEST');
+          final best = await _fastestAuthorizedIndex('wireguard');
+          if (best == null) {
+            throw const FormatException('NO_MEASURED_SERVER');
           }
-          final best = _fastestKnownIndex;
-          if (best == null) throw const FormatException('NO_MEASURED_SERVER');
-          _selected = best;
+          if (!mounted) return;
+          selectedId = widget.servers!.servers[best].id;
         }
-        final selectedId = _selectedServerId!;
+        if (selectedId == null) {
+          throw const FormatException('SELECT_WIREGUARD_SERVER');
+        }
         // Policy storage and native OS readiness are independent.
         // Probe both concurrently, then reuse the SAME native capability
         // snapshot for the mandatory per-protocol readiness gate.
@@ -2674,9 +3094,11 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         _socks5AssignedNodeIds = assigned;
         _socks5NodesError = assigned.isEmpty
             ? 'SOCKS5_SERVER_PROFILE_MISSING' : null;
-        if (_filter == 'socks5' && !alreadyValid && firstValid >= 0) {
+        if (_filter == 'socks5' && !_autoFastest &&
+            _explicitNodeId == null && !alreadyValid &&
+            firstValid >= 0) {
+          // No manual server has ever been chosen for this account.
           _selected = firstValid;
-          _autoFastest = false;
         }
       });
     } catch (_) {
@@ -2698,6 +3120,80 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   String _filter = 'all';
   String _search = '';
   int _selected = 0;
+  String? _explicitNodeId;
+  String? _explicitXrayInboundId;
+  int _choiceRevision = 0;
+  Future<void> _choiceWrites = Future<void>.value();
+
+  String get _choiceAccountKey => ConnectionChoiceStore.key(
+    namespace: widget.panel.namespace,
+    username: widget.username,
+  );
+
+  /// Restore only the user's explicit choice, not an automatically chosen
+  /// Fast Server or the most recently active tunnel. Never select a different
+  /// node if a saved node is missing from a refreshed inventory.
+  Future<void> _restoreManualConnectionChoice() async {
+    if (widget.simulatorPreview) return;
+    final account = _choiceAccountKey;
+    final revision = _choiceRevision;
+    ConnectionChoice? saved;
+    try {
+      saved = await ConnectionChoiceStore.load(account);
+    } catch (_) {
+      return; // A storage failure is never a reason to switch VPN servers.
+    }
+    if (!mounted || _choiceAccountKey != account ||
+        _choiceRevision != revision || saved == null) return;
+    final restored = saved;
+    final nodes = widget.servers?.servers ?? const <AppServer>[];
+    final selected = restored.nodeId == null
+        ? _selected
+        : nodes.indexWhere((node) => node.id == restored.nodeId);
+    setState(() {
+      _filter = restored.protocolCode;
+      _explicitNodeId = restored.nodeId;
+      _explicitXrayInboundId = restored.xrayInboundId;
+      _selected = selected;
+      if (restored.protocolCode == 'v2ray' && restored.nodeId != null) {
+        _selectedXrayNodeId = restored.nodeId;
+        _selectedXrayInboundId = restored.xrayInboundId;
+      }
+      _autoFastest = false;
+    });
+    if (restored.protocolCode == 'v2ray') unawaited(_loadXrayGroups());
+    if (restored.protocolCode == 'socks5') {
+      unawaited(_refreshSocks5AvailableNodes());
+    }
+  }
+
+  /// Called *only* for explicit taps on a protocol, server or Xray inbound.
+  /// Queue writes in click order so a delayed disk operation cannot replace
+  /// the user's newest selection. Only IDs and protocol codes are persisted.
+  void _persistManualConnectionChoice() {
+    if (widget.simulatorPreview) return;
+    ++_choiceRevision;
+    final key = _choiceAccountKey;
+    final choice = ConnectionChoice(
+      protocolCode: _filter,
+      nodeId: _explicitNodeId,
+      xrayInboundId: _filter == 'v2ray' ? _explicitXrayInboundId : null,
+    );
+    _choiceWrites = _choiceWrites.catchError((Object _) {}).then((_) async {
+      try {
+        await ConnectionChoiceStore.save(key, choice);
+      } catch (_) {
+        // A failed local preference write must not interrupt the VPN.
+      }
+    });
+  }
+
+  void _alignSelectedNodeWithInventory() {
+    if (_explicitNodeId == null) return;
+    final nodes = widget.servers?.servers ?? const <AppServer>[];
+    _selected = nodes.indexWhere((node) => node.id == _explicitNodeId);
+  }
+
   final Set<int> _favorites = <int>{};
   // User-facing Xray inbounds remain distinct choices. Last validated
   // entries are stored in OS-encrypted short-lived display cache only.
@@ -2705,9 +3201,123 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   final XrayInboundSecureCache _xrayCache = const XrayInboundSecureCache();
   List<XrayServerProfiles> _xrayGroups = const [];
 
-  bool get _xrayAuthorized => widget.catalog?.entries.any((entry) =>
-      entry.protocol.code == 'v2ray' && entry.selected &&
-      entry.configRecordPresent) ?? false;
+  /// The panel's current category and subscription catalog decide which
+  /// protocol chips can appear. Never display all 16 merely because those
+  /// engines are compiled into TwinConnect.
+  bool _protocolInPlan(String code) {
+    if (widget.simulatorPreview) return true; // Offline layout fixture only.
+    final plan = widget.plan;
+    if (plan != null && !plan.permitsProtocol(code)) return false;
+    // New panels return the editor's exact whitelist, independent of
+    // whether this account's credential has been provisioned yet.
+    if (plan?.allowedProtocolCodes != null) return true;
+    // Older panels: show only account-authorized flags; never all 16.
+    return widget.catalog?.entries.any(
+        (entry) => entry.protocol.code == code && entry.selected) ?? false;
+  }
+
+  bool _protocolEntitled(String code) {
+    if (!_protocolInPlan(code)) return false;
+    if (widget.simulatorPreview) return true;
+    return widget.catalog?.entries.any(
+        (entry) => entry.protocol.code == code && entry.selected) ?? false;
+  }
+
+  bool get _xrayAuthorized => _protocolEntitled('v2ray') &&
+      (widget.catalog?.entries.any((entry) =>
+        entry.protocol.code == 'v2ray' && entry.configRecordPresent) ?? false);
+
+  bool get _isVitoryPlan {
+    if (widget.simulatorPreview) return false;
+    final kind = widget.plan?.subscriptionType.trim().toLowerCase() ?? '';
+    return kind.contains('ویتوری') ||
+        kind.contains('vitory') || kind.contains('v2ray');
+  }
+
+  Set<String>? _vitoryHysteriaNodeIds;
+  bool _vitoryHysteriaLoading = false;
+  bool _vitoryHysteriaRefreshPending = false;
+  String? _vitoryHysteriaError;
+  int _vitoryProfileRevision = 0;
+
+  /// Restrict Vitory's Hysteria node list to actual, syntactically valid
+  /// per-account profiles. An inventory assignment alone is not sufficient.
+  Future<void> _loadVitoryHysteriaNodes({bool refresh = false}) async {
+    if (!_isVitoryPlan || !_protocolEntitled('hysteria2')) return;
+    if (_vitoryHysteriaLoading) {
+      if (refresh) _vitoryHysteriaRefreshPending = true;
+      return;
+    }
+    if (!refresh && _vitoryHysteriaNodeIds != null) return;
+    final revision = ++_vitoryProfileRevision;
+    final username = widget.username;
+    final namespace = widget.panel.namespace;
+    final origin = widget.panel.apiOrigin;
+    final token = widget.sessionToken;
+    setState(() {
+      _vitoryHysteriaLoading = true;
+      _vitoryHysteriaError = null;
+    });
+    try {
+      final response = await TenantApi.fromBuildConfig()
+          .loadSessionNativeProfiles(
+        panel: widget.panel,
+        sessionToken: token,
+        protocol: VpnProtocols.byCode('hysteria2')!,
+        native: const NativeProtocolReadiness(
+          supportedCodes: {'hysteria2'},
+        ),
+      );
+      if (!mounted || revision != _vitoryProfileRevision ||
+          username != widget.username ||
+          namespace != widget.panel.namespace ||
+          origin != widget.panel.apiOrigin ||
+          token != widget.sessionToken) return;
+      final allowed = widget.servers?.servers.map((s) => s.id).toSet()
+          ?? <String>{};
+      final available = <String>{};
+      for (final item in response.items) {
+        final id = item['node_id']?.toString();
+        if (id == null || !allowed.contains(id)) continue;
+        try {
+          SingBoxProfileValidator.validateOutbound(
+              protocolCode: 'hysteria2', item: item);
+          available.add(id);
+        } catch (_) {
+          // Never advertise a server that the local transport validator
+          // would reject when connecting.
+        }
+      }
+      setState(() => _vitoryHysteriaNodeIds = available);
+    } catch (_) {
+      if (mounted && revision == _vitoryProfileRevision) {
+        setState(() => _vitoryHysteriaError =
+            'VITORY_HYSTERIA_PROFILES_UNAVAILABLE');
+      }
+    } finally {
+      if (mounted && revision == _vitoryProfileRevision) {
+        setState(() => _vitoryHysteriaLoading = false);
+        if (_vitoryHysteriaRefreshPending) {
+          _vitoryHysteriaRefreshPending = false;
+          unawaited(_loadVitoryHysteriaNodes(refresh: true));
+        }
+      }
+    }
+  }
+
+  bool _vitoryNodeHasProfile(String nodeId) {
+    if (!_isVitoryPlan) return true;
+    // Cached preview inbounds must not grant visibility to a Vitory
+    // server after its live profile was revoked or unavailable.
+    final hasXray = _xrayGroupsLoaded && _xrayGroupsError == null &&
+        _inboundsForNode(nodeId).isNotEmpty;
+    final hasHysteria = _vitoryHysteriaNodeIds?.contains(nodeId) ?? false;
+    return VitoryServerVisibility.shows(
+      protocolFilter: _filter,
+      hasValidV2rayInbound: hasXray,
+      hasValidHysteriaProfile: hasHysteria,
+    );
+  }
 
   List<XrayServerProfiles> _assignedXrayGroups(
       List<XrayServerProfiles> groups) {
@@ -2991,6 +3601,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
 
   @override
   Widget build(BuildContext context) {
+    // Every platform renders the same authenticated dashboard and tenant
+    // theme. Only screen-size navigation and native engines differ.
     return MaterialApp(
       title: widget.brand.brandName,
       debugShowCheckedModeBanner: false,
@@ -3012,6 +3624,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     // Keep the authenticated desktop sidebar spacious; compact mode is only
     // for narrow windows where a full sidebar would crowd live connection cards.
     final wide = MediaQuery.sizeOf(context).width >= 980;
+    final iosMobile = (Platform.isIOS || Platform.isAndroid) &&
+        MediaQuery.sizeOf(context).width < 700;
     final ink = _dark ? const Color(0xFFE9F2F4) : const Color(0xFF223945);
     final sub = _dark ? const Color(0xFFABB4C9) : const Color(0xFF565D75);
     final line = _dark ? const Color(0xFF3A5461) : const Color(0xFFCCDDE2);
@@ -3397,9 +4011,26 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           ),
         ),
         const SizedBox(height: 9),
+        if (widget.simulatorPreview)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: txt(tr('پیش‌نمایش — داده‌ها ساختگی هستند',
+                'SIMULATOR PREVIEW — SAMPLE DATA'), size: 11),
+          ),
+        if (Platform.isIOS) ...[
+          Text(
+            tr('موتور VPN آیفون هنوز نصب و تأیید نشده است؛ ورود و دریافت اشتراک برقرار است، اما تونل فعال نیست.',
+               'The iOS VPN engine is not installed and verified; login and subscription sync work, but no tunnel is active.'),
+            key: const Key('iosVpnEngineUnavailableNotice'),
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 11, color: Color(0xFFFFCA81)),
+          ),
+          const SizedBox(height: 9),
+        ],
         // Real connection status drives the waves. Offline has no animation.
         TwinConnectWaveIndicator(
           key: const Key('liveConnectionDataFabric'),
+          compact: Platform.isIOS || Platform.isAndroid,
           connected: _verifiedConnectionActive,
           connecting: _vpnBusy,
           dark: _dark,
@@ -3435,7 +4066,9 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
               ),
               child: FilledButton(
                 key: const Key('liveConnectionControlsButton'),
-                onPressed: _vpnBusy ? null : _toggleVpn,
+                onPressed: _vpnBusy ? null : (Platform.isIOS
+                    ? _toggleIosVpn : Platform.isMacOS
+                    ? _toggleMacVpn : (Platform.isWindows ? _toggleVpn : null)),
                 style: FilledButton.styleFrom(
                   minimumSize: const Size(250, 59),
                   backgroundColor: Colors.transparent,
@@ -3491,6 +4124,30 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           const SizedBox(height: 8),
           Text(
             switch (_vpnError!) {
+              'MACOS_PACKET_TUNNEL_NOT_INSTALLED' => tr(
+                'افزونه امضاشده Packet Tunnel هنوز روی نسخه مک نصب نیست.',
+                'The signed macOS Packet Tunnel extension is not installed yet.'),
+              'MACOS_PROTOCOL_ENGINE_NOT_READY' => tr(
+                'موتور این پروتکل هنوز برای مک آماده نشده است.',
+                'The selected macOS protocol engine is not yet ready.'),
+              'MACOS_VPN_CONNECTOR_NOT_LINKED' => tr(
+                'اتصال بومی macOS هنوز به موتور واقعی VPN متصل نشده است.',
+                'The native macOS VPN connector is not yet linked.'),
+              'IOS_PACKET_TUNNEL_EXTENSION_MISSING' => tr(
+                'افزونه Packet Tunnel هنوز در نسخه آیفون نصب نشده است.',
+                'The iOS Packet Tunnel extension is not embedded yet.'),
+              'IOS_ENGINE_NOT_RUNTIME_VERIFIED' => tr(
+                'موتور محلی iOS هنوز اجرا و تأیید نشده است.',
+                'The iOS local VPN engine is not yet runtime verified.'),
+              'IOS_PROTOCOL_ENGINE_NOT_INSTALLED' => tr(
+                'موتور این پروتکل هنوز روی iOS نصب نیست.',
+                'This iOS protocol engine is not installed.'),
+              'IOS_KEYCHAIN_PROFILE_STORE_FAILED' => tr(
+                'ذخیره امن کانفیگ در Keychain ناموفق بود.',
+                'Secure iOS Keychain profile storage failed.'),
+              'IOS_VPN_START_REJECTED' => tr(
+                'iOS درخواست شروع VPN را رد کرد.',
+                'iOS rejected the VPN start request.'),
               'WIREGUARD_NOT_ALLOWED' => tr(
                 'این اشتراک مجوز WireGuard ندارد.',
                 'WireGuard is not enabled for this subscription.'),
@@ -3798,6 +4455,15 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
               'CISCO_HEALTH_DEGRADED' => tr(
                 'مسیر اینترنت سیسکو پاسخ تأییدشده ندارد.',
                 'Cisco internet route is no longer verified.'),
+              'CISCO_EGRESS_RECHECK_UNAVAILABLE' => tr(
+                'موتور Cisco هنوز فعال است، اما بررسی مجدد IP اینترنت پاسخ نداد.',
+                'Cisco is still running, but the public-IP recheck was unavailable.'),
+              'CISCO_ROUTE_BYPASS_DETECTED' => tr(
+                'IP اینترنت به مقدار قبل از اتصال برگشته؛ مسیر Cisco تأیید نشد.',
+                'Public IP returned to its pre-VPN value; Cisco routing is unverified.'),
+              'CISCO_NATIVE_STATUS_UNAVAILABLE' => tr(
+                'وضعیت موتور Cisco از ویندوز دریافت نشد.',
+                'Windows did not return the native Cisco process status.'),
               final code => tr(
                 'خطای اتصال ${(_modernProtocol ?? _filter).toUpperCase()}: $code',
                 '${(_modernProtocol ?? _filter).toUpperCase()} connection error: $code'),
@@ -3978,16 +4644,20 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         padding: const EdgeInsets.only(bottom: 9),
         child: glassCard(
           key: Key('xrayInbound_${nodeId}_${inbound.id}'),
-          selected: connected,
+          selected: connected ||
+              (_filter == 'v2ray' && _explicitNodeId == nodeId &&
+                  _explicitXrayInboundId == inbound.id),
           radius: 16,
           child: Material(
             color: Colors.transparent,
             child: InkWell(
               key: Key('connectXray_${nodeId}_${inbound.id}'),
               borderRadius: BorderRadius.circular(16),
-              onTap: _vpnBusy ? null : () {
+              onTap: !Platform.isWindows || _vpnBusy ? null : () {
                 setState(() {
                   _selected = index;
+                  _explicitNodeId = nodeId;
+                  _explicitXrayInboundId = inbound.id;
                   _selectedXrayNodeId = nodeId;
                   _selectedXrayInboundId = inbound.id;
                   _filter = 'v2ray';
@@ -3995,6 +4665,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                   _autoFastest = false;
                   _vpnError = null;
                 });
+                _persistManualConnectionChoice();
                 _startXrayTunnel(nodeId, inboundId: inbound.id);
               },
               child: Padding(
@@ -4084,7 +4755,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
           // Allow turning automatic selection OFF while connected; never
           // start a replacement tunnel in the middle of an active session.
-          onChanged: _vpnBusy || _fastestConnecting ||
+          onChanged: !Platform.isWindows || _vpnBusy || _fastestConnecting ||
                   ((_modernUp || _vpnUp) && !_autoFastest)
               ? null : (enabled) {
             if (enabled) {
@@ -4108,7 +4779,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         children: [
           for (final entry in <(String, String)>[
             ('all', tr('همه', 'All')),
-            for (final p in VpnProtocols.all) (p.code, p.name),
+            for (final p in VpnProtocols.all)
+              if (_protocolInPlan(p.code)) (p.code, p.name),
           ])
             ChoiceChip(
               key: Key('devFilter_${entry.$1}'),
@@ -4122,13 +4794,24 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
               side: BorderSide(color: _filter == entry.$1 ? purple : line),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12)),
-              onSelected: (_) {
+              onSelected: entry.$1 != 'all' &&
+                      !_protocolEntitled(entry.$1)
+                  ? null : (_) {
                 setState(() {
-                  // An automatic choice is valid only for its selected protocol.
+                  // A protocol chip is an explicit manual choice.
                   _filter = entry.$1;
+                  if (_filter != 'v2ray') _explicitXrayInboundId = null;
                   _autoFastest = false;
                 });
+                _persistManualConnectionChoice();
                 if (entry.$1 == 'v2ray') _loadXrayGroups();
+                if (_isVitoryPlan &&
+                    (entry.$1 == 'hysteria2' || entry.$1 == 'all')) {
+                  unawaited(_loadVitoryHysteriaNodes());
+                  if (_xrayAuthorized) {
+                    unawaited(_loadXrayGroups());
+                  }
+                }
                 if (entry.$1 == 'socks5') {
                   unawaited(_refreshSocks5AvailableNodes());
                 }
@@ -4140,9 +4823,16 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
 
     Widget locations() {
       final query = _search.trim().toLowerCase();
+      // A previously saved protocol can become unavailable when the owner
+      // changes the plan. Preserve the choice, but never show/connect nodes
+      // under a protocol this account is no longer entitled to use.
+      final allowedFilter = _filter == 'all' ||
+          _protocolEntitled(_filter);
       final matching = <int>[
         for (int i = 0; i < demoServers.length; i++)
-          if ((_filter != 'socks5' ||
+          if (allowedFilter &&
+              _vitoryNodeHasProfile(widget.servers!.servers[i].id) &&
+              (_filter != 'socks5' ||
               _socks5AssignedNodeIds == null ||
               _socks5AssignedNodeIds!.contains(widget.servers!.servers[i].id)) &&
               (query.isEmpty ||
@@ -4222,12 +4912,23 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                         child: Column(children: [
                           Divider(color: line),
                           for (final i in indices)
-                             if (_filter == 'v2ray')
-                               for (final inbound in
-                                   _inboundsForNode(widget.servers!.servers[i].id))
-                                 xrayInboundRow(i, inbound)
-                             else
-                               serverRow(i),
+                            if (_filter == 'v2ray') ...[
+                              for (final inbound in _inboundsForNode(
+                                  widget.servers!.servers[i].id))
+                                xrayInboundRow(i, inbound),
+                              if (!_xrayGroupsLoading && _xrayGroupsLoaded &&
+                                  _inboundsForNode(
+                                      widget.servers!.servers[i].id).isEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 10),
+                                  child: txt(tr(
+                                    'اینباند معتبر Xray برای این سرور و اشتراک دریافت نشد.',
+                                    'No valid Xray inbound was delivered for this account and node.'),
+                                    size: 11, color: const Color(0xFFFFBE67)),
+                                ),
+                            ] else
+                              serverRow(i),
                         ]),
                       )
                     : const SizedBox(width: double.infinity),
@@ -4303,6 +5004,21 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                                'Retry authorized SOCKS5 nodes')),
               ),
             ),
+          if (_isVitoryPlan && _vitoryHysteriaLoading &&
+              (_filter == 'all' || _filter == 'hysteria2'))
+            const Padding(
+              padding: EdgeInsets.all(12),
+              child: Center(child: CircularProgressIndicator()),
+            ),
+          if (_isVitoryPlan && _vitoryHysteriaError != null &&
+              (_filter == 'all' || _filter == 'hysteria2'))
+            TextButton.icon(
+              onPressed: () => _loadVitoryHysteriaNodes(refresh: true),
+              icon: const Icon(Icons.refresh_rounded),
+              label: Text(tr(
+                'دریافت دوباره سرورهای هیستریا',
+                'Retry loading Hysteria servers')),
+            ),
           if (_filter == 'v2ray' && _xrayGroupsLoading)
             const Padding(
               padding: EdgeInsets.all(12),
@@ -4320,12 +5036,42 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
             Padding(
               padding: const EdgeInsets.all(18),
               child: Column(children: [
-                txt(widget.serverRefreshError == 'APP_SESSION_EXPIRED'
-                  ? tr('نشست ورود منقضی شده است. برای دریافت سرورها دوباره وارد حساب شوید.',
-                       'Session expired. Sign in again to restore servers.')
-                  : tr('دریافت فهرست سرورها ناموفق بود. اتصال پنل را بررسی و دوباره تلاش کنید.',
-                       'Server refresh failed. Check panel access and retry.'),
-                  align: TextAlign.center, color: const Color(0xFFFFBE67)),
+                txt(switch (widget.serverRefreshError) {
+                  'APP_SESSION_EXPIRED' => tr(
+                    'نشست ورود منقضی شده است. دوباره وارد حساب شوید.',
+                    'Session expired. Sign in again.'),
+                  'APP_NOT_AUTHORIZED' => tr(
+                    'دسترسی این حساب در پنل مجاز نیست.',
+                    'This account is not authorized on the panel.'),
+                  'APP_PANEL_ENDPOINT_MISSING' => tr(
+                    'مسیر دریافت سرورها در نسخه فعلی پنل وجود ندارد.',
+                    'The panel does not provide the required server endpoint.'),
+                  'APP_SERVER_SCHEMA_INVALID' => tr(
+                    'اطلاعات سرورهای پنل ناقص یا نامعتبر است.',
+                    'Panel server inventory is malformed.'),
+                  'APP_PROTOCOL_SCHEMA_INVALID' => tr(
+                    'فهرست پروتکل‌های پلن از پنل نامعتبر دریافت شد.',
+                    'The panel returned an invalid plan protocol catalog.'),
+                  'APP_PANEL_TLS_FAILURE' => tr(
+                    'اتصال امن TLS به پنل ناموفق بود.',
+                    'Secure TLS connection to the panel failed.'),
+                  'APP_PANEL_NETWORK_UNAVAILABLE' => tr(
+                    'ارتباط شبکه با پنل برقرار نشد.',
+                    'Could not reach the panel over the network.'),
+                  'APP_PANEL_TIMEOUT' => tr(
+                    'دریافت اطلاعات پنل بیش از حد طول کشید.',
+                    'Panel request timed out.'),
+                  'APP_PANEL_RATE_LIMITED' => tr(
+                    'تعداد درخواست‌ها زیاد است. کمی بعد دوباره تلاش کنید.',
+                    'Too many requests. Retry later.'),
+                  'APP_PANEL_SERVER_ERROR' => tr(
+                    'سرور پنل هنگام دریافت اطلاعات خطا داد.',
+                    'Panel server returned an error.'),
+                  _ => tr(
+                    'دریافت فهرست سرورها ناموفق بود. دوباره تلاش کنید.',
+                    'Server refresh failed. Please retry.'),
+                }, align: TextAlign.center,
+                  color: const Color(0xFFFFBE67)),
                 const SizedBox(height: 8),
                 OutlinedButton.icon(
                   onPressed: widget.onRefresh,
@@ -4337,8 +5083,14 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           else if (matching.isEmpty)
             Padding(
               padding: const EdgeInsets.all(22),
-              child: txt(widget.servers == null
+              child: txt(!allowedFilter
+                ? tr('این پروتکل در دسته‌بندی فعلی اشتراک مجاز نیست.',
+                     'This protocol is not available in your plan category.')
+                : widget.servers == null
                 ? tr('در حال دریافت سرورها...', 'Loading servers...')
+                : _isVitoryPlan
+                ? tr('هیچ سروری با پروفایل معتبر این پروتکل برای اشتراک شما دریافت نشده است.',
+                     'No server with a valid profile for this protocol was delivered to your account.')
                 : tr('سروری پیدا نشد', 'No servers found'),
                 align: TextAlign.center, color: sub),
             ),
@@ -4489,7 +5241,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                         size: 11, color: sub)),
                   ]),
                   const SizedBox(height: 16),
-                  Text(ServerLatency.label(_connectedServerRtt),
+                  Text(ServerLatency.label(_connectedServerRtt,
+                      approximate: _connectedServerPingApproximate),
                     style: TextStyle(
                       fontSize: 18, fontWeight: FontWeight.bold,
                       color: ServerLatency.color(_connectedServerRtt))),
@@ -4501,6 +5254,22 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                           ? tr('زمان برقراری TCP اینباند', 'Inbound TCP handshake time')
                           : tr('زمان پاسخ ICMP', 'ICMP round-trip time'),
                     style: TextStyle(fontSize: 10, color: sub)),
+                  if (_modernUp && _modernProtocol == 'cisco') ...[
+                    const SizedBox(height: 5),
+                    Text(
+                      switch (_ciscoTransportMode) {
+                        'dtls_log_established' => tr(
+                            'DTLS/UDP برقرار (گزارش موتور)',
+                            'DTLS/UDP established (engine log)'),
+                        'dtls_log_failed' => tr(
+                            'DTLS/UDP ناموفق؛ احتمال استفاده از TCP',
+                            'DTLS/UDP failed; TCP fallback possible'),
+                        _ => tr('DTLS/UDP تأیید نشده', 'DTLS/UDP unverified'),
+                      },
+                      style: TextStyle(fontSize: 10,
+                          color: _ciscoTransportMode == 'dtls_log_failed'
+                              ? const Color(0xFFFFB878) : sub)),
+                  ],
                 ],
               ),
             )),
@@ -4862,12 +5631,25 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       children: [
         heading(tr('تنظیمات', 'Settings')),
         const SizedBox(height: 17),
-        VpnSettingsScreen(
-          key: const Key('inlineVpnSettings'),
-          tenant: widget.panel.namespace,
-          account: widget.username,
-          embedded: true,
-        ),
+        if (Platform.isIOS)
+          glassCard(
+            padding: const EdgeInsets.all(18),
+            child: Row(children: [
+              Icon(Icons.shield_outlined, color: purple),
+              const SizedBox(width: 12),
+              Expanded(child: txt(tr(
+                'تنظیمات موتور VPN پس از تکمیل Network Extension فعال می‌شوند.',
+                'VPN engine settings will be available after Network Extension integration.'),
+                size: 12)),
+            ]),
+          )
+        else
+          VpnSettingsScreen(
+            key: const Key('inlineVpnSettings'),
+            tenant: widget.panel.namespace,
+            account: widget.username,
+            embedded: true,
+          ),
         const SizedBox(height: 16),
         settingsSectionTitle(tr('برنامه', 'Application'),
             Icons.tune_rounded),
@@ -5165,6 +5947,40 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       key: ValueKey<String>(_rtl ? 'dashboard-rtl' : 'dashboard-ltr'),
       textDirection: _rtl ? TextDirection.rtl : TextDirection.ltr,
       child: Scaffold(
+      bottomNavigationBar: iosMobile
+          ? SafeArea(
+              top: false,
+              child: NavigationBar(
+                key: const Key('iosBottomNavigation'),
+                height: 70,
+                backgroundColor: sidebar,
+                indicatorColor: purple.withValues(alpha: .26),
+                selectedIndex: switch (_page) {
+                  'locations' => 1,
+                  'settings' => 2,
+                  'account' => 3,
+                  _ => 0,
+                },
+                onDestinationSelected: (index) => setState(() {
+                  _page = const ['home', 'locations', 'settings', 'account'][index];
+                }),
+                destinations: [
+                  NavigationDestination(
+                    icon: const Icon(Icons.bolt_rounded),
+                    label: tr('اتصال', 'Connect')),
+                  NavigationDestination(
+                    icon: const Icon(Icons.place_outlined),
+                    label: tr('مکان‌ها', 'Locations')),
+                  NavigationDestination(
+                    icon: const Icon(Icons.tune_rounded),
+                    label: tr('تنظیمات', 'Settings')),
+                  NavigationDestination(
+                    icon: const Icon(Icons.person_outline_rounded),
+                    label: tr('حساب', 'Account')),
+                ],
+              ),
+            )
+          : null,
       body: TwinConnectAmbientBackground(
         dark: _dark,
         backgroundColor: sidebar,
@@ -5174,7 +5990,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         // Sidebar belongs to the reading-direction start edge:
         // Persian -> right; English -> left.
         child: Row(children: [
-          sideBar(),
+          if (!iosMobile) sideBar(),
           Expanded(child: SafeArea(child: ListView(
             padding: EdgeInsets.symmetric(
                 horizontal: wide ? 30 : 17, vertical: 25),

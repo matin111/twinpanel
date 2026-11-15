@@ -19,15 +19,19 @@ from ..central_app_credentials import (
 from ..central_app_identity import central_app_entitled, installation_namespace, subscription_app_namespace
 from ..database import get_db
 from ..deps import get_current_user, require_admin, require_reseller
-from ..models import Subscription, User, Node, SubscriptionNode, NodeStatus, Plan
+from ..models import Subscription, User, Node, SubscriptionNode, NodeStatus, Plan, ProtocolCredential
 from ..models_reseller import Reseller, ResellerSubscription
 from ..plan_category_models import PlanCategoryAssignment
+from ..plan_node_models import PlanNode
+from ..central_app_protocols import normalize_protocol, protocol_catalog
+from ..central_app_plan_policy import category_protocols
+from ..protocol_account_registry import explicit_plan_protocols, ALL_PROTOCOL_KEYS
 from ..system_release import ensure_installation_id
 from .account_delivery import _share_token, _share_url
 from .central_app_v1 import (
     BrandPreviewIn, ProtocolProfilesIn,
     subscription_app_brand_preview, subscription_protocol_catalog,
-    subscription_protocol_profiles,
+    _profiles_for_verified_subscription, _selected_client_protocols,
 )
 
 router = APIRouter(prefix="/v1/central-app", tags=["central-app-login"])
@@ -142,14 +146,27 @@ def session_protocols(
     sub: Subscription = Depends(_session_subscription),
     db: Session = Depends(get_db),
 ):
-    response = subscription_protocol_catalog(
-        BrandPreviewIn(
-            account_username=sub.account_username or "",
-            share_token=_share_token(sub),
-        ), db=db,
-    )
-    response.headers.update(_PRIVATE_HEADERS)
-    return response
+    """Read protocol permissions from the VERIFIED app session directly.
+
+    Do not reauthenticate through a share URL. Existing app credentials and
+    old migrated subscriptions may have different short-link delivery state.
+    No secrets, user names or VPN config contents leave this endpoint.
+    """
+    selected = _selected_client_protocols(db, sub.id)
+    rows = db.query(ProtocolCredential).filter(
+        ProtocolCredential.subscription_id == sub.id,
+        ProtocolCredential.is_active.is_(True),
+    ).all()
+    configured = {
+        value for row in rows
+        if (value := normalize_protocol(row.protocol))
+        and bool(row.config_text_encrypted)
+    }
+    return JSONResponse({
+        "schema": 1,
+        "namespace": subscription_app_namespace(db, sub),
+        "protocols": protocol_catalog(selected, configured),
+    }, headers=_PRIVATE_HEADERS)
 
 
 @router.get("/session/plan")
@@ -169,15 +186,24 @@ def session_plan(
     grouping = db.query(PlanCategoryAssignment).filter(
         PlanCategoryAssignment.plan_id == int(plan.id)
     ).first()
+    subscription_type = str(grouping.subscription_type or "اشتراک عمومی") \
+        if grouping else "اشتراک عمومی"
+    # Mirror the plan editor's explicit protocol template, not the current
+    # node's installed services. Old unconfigured premium plans retain the
+    # editor's all-protocol default, while Vitory is capped at two families.
+    configured = set(explicit_plan_protocols(db, int(plan.id)))
+    if not configured:
+        configured = set(ALL_PROTOCOL_KEYS)
+    allowed = category_protocols(subscription_type, configured)
     return JSONResponse({
         "schema": 1,
         "namespace": subscription_app_namespace(db, sub),
         "plan_id": int(plan.id),
-        "subscription_type": str(grouping.subscription_type or "اشتراک عمومی")
-            if grouping else "اشتراک عمومی",
+        "subscription_type": subscription_type,
         "user_count_category": str(grouping.category or "سایر پلن‌ها")
             if grouping else "سایر پلن‌ها",
         "device_limit": int(plan.device_limit if plan.device_limit is not None else 1),
+        "allowed_protocols": [p for p in ALL_PROTOCOL_KEYS if p in allowed],
     }, headers=_PRIVATE_HEADERS)
 
 
@@ -227,6 +253,14 @@ def session_servers(
     This is an inventory refresh, not a ping or connection success check.
     Never return server credentials, agent URLs, or other customers' nodes.
     """
+    # Node access is the intersection of historical subscription assignments
+    # and the CURRENT plan's explicitly configured servers. A missing plan
+    # node template is legacy behaviour; never expand beyond SubscriptionNode.
+    configured_node_ids = [
+        int(node_id) for (node_id,) in db.query(PlanNode.node_id).filter(
+            PlanNode.plan_id == int(sub.plan_id)
+        ).all()
+    ] if sub.plan_id else []
     nodes = (
         db.query(Node)
         .join(SubscriptionNode, SubscriptionNode.node_id == Node.id)
@@ -234,6 +268,7 @@ def session_servers(
             SubscriptionNode.subscription_id == sub.id,
             Node.show_to_users.is_(True),
             Node.retired_at.is_(None),
+            *([Node.id.in_(configured_node_ids)] if configured_node_ids else []),
         )
         .order_by(Node.id)
         .limit(500)
@@ -245,8 +280,8 @@ def session_servers(
         "servers": [
             {
                 "id": str(node.id),
-                "name": node.name,
-                "country_code": node.country_code,
+                "name": str(node.name or node.id).strip()[:120],
+                "country_code": str(node.country_code or "ZZ").strip().upper()[:8] or "ZZ",
                 "node_online": node.status == NodeStatus.ONLINE,
                 # An address for an already authorized, assigned server:
                 # used only for client-side ICMP reachability checks.
@@ -265,13 +300,10 @@ def session_profiles(
     sub: Subscription = Depends(_session_subscription),
     db: Session = Depends(get_db),
 ):
-    response = subscription_protocol_profiles(
-        ProtocolProfilesIn(
-            account_username=sub.account_username or "",
-            share_token=_share_token(sub),
-            protocol=payload.protocol,
-        ), db=db,
-    )
+    # The logged-in account's Bearer token already authorizes this exact
+    # subscription. Do not make availability depend on its public share link
+    # (which might be absent/rotated on migrated Vitory accounts).
+    response = _profiles_for_verified_subscription(sub, payload.protocol, db)
     response.headers.update(_PRIVATE_HEADERS)
     return response
 

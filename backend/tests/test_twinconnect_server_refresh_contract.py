@@ -7,6 +7,21 @@ ROUTES = ROOT / "backend/app/routers/central_app_credentials_v1.py"
 
 
 class ServerRefreshContract(unittest.TestCase):
+    def test_authenticated_profile_endpoint_uses_bearer_session_not_share_token(self):
+        source = ROUTES.read_text(encoding="utf-8")
+        route = source.split('@router.post("/session/profiles")', 1)[1].split(
+            '@router.post("/admin/subscriptions/', 1)[0]
+        self.assertIn("Depends(_session_subscription)", route)
+        self.assertIn("_profiles_for_verified_subscription(sub, payload.protocol, db)", route)
+        self.assertNotIn("_share_token(sub)", route)
+        self.assertNotIn("subscription_protocol_profiles(", route)
+        public = (ROOT / "backend/app/routers/central_app_v1.py").read_text(encoding="utf-8")
+        self.assertIn("def _profiles_for_verified_subscription(", public)
+        self.assertIn("_xray_payload_for_verified_subscription(sub, db)", public)
+        v7 = (ROOT / "backend/app/routers/public_connection_multilink_v7.py").read_text(encoding="utf-8")
+        self.assertIn("def _xray_payload_for_verified_subscription(", v7)
+        self.assertIn("return sub, _xray_payload_for_verified_subscription(sub, db)", v7)
+
     def test_authenticated_inventory_only_contains_assigned_visible_nodes(self):
         src = ROUTES.read_text(encoding="utf-8")
         route = src.split('@router.get("/session/servers")', 1)[1].split(

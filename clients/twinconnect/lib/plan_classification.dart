@@ -8,6 +8,7 @@ class AppPlanClassification {
     required this.subscriptionType,
     required this.userCountCategory,
     required this.deviceLimit,
+    this.allowedProtocolCodes,
   });
 
   final String namespace;
@@ -18,6 +19,18 @@ class AppPlanClassification {
   final String subscriptionType;
   final String userCountCategory;
   final int deviceLimit;
+  /// Null means a legacy panel did not provide an explicit whitelist.
+  final Set<String>? allowedProtocolCodes;
+
+  /// Commercial type comes from /session/plan, never a guessed plan title.
+  /// Explicit protocol flags in the session catalogue are checked separately.
+  bool permitsProtocol(String code) {
+    final kind = subscriptionType.trim().toLowerCase();
+    final vitory = kind.contains('ویتوری') ||
+        kind.contains('vitory') || kind.contains('v2ray');
+    if (vitory && code != 'v2ray' && code != 'hysteria2') return false;
+    return allowedProtocolCodes?.contains(code) ?? true;
+  }
 
   factory AppPlanClassification.fromJson(Map<String, dynamic> json) {
     final namespace = json['namespace'];
@@ -25,6 +38,19 @@ class AppPlanClassification {
     final type = json['subscription_type'];
     final group = json['user_count_category'];
     final limit = json['device_limit'];
+    final rawAllowed = json['allowed_protocols'];
+    if (rawAllowed != null &&
+        (rawAllowed is! List ||
+         rawAllowed.length > 16 ||
+         rawAllowed.any((x) => x is! String ||
+             !const {
+               'cisco', 'openvpn', 'wireguard', 'l2tp', 'v2ray',
+               'hysteria2', 'tuic', 'anytls', 'naive', 'shadowtls',
+               'snell', 'socks5', 'mieru', 'trusttunnel',
+               'amneziawg', 'sudoku',
+             }.contains(x)))) {
+      throw const FormatException('INVALID_PLAN_PROTOCOLS');
+    }
     if (json['schema'] != 1 ||
         namespace is! String ||
         !RegExp(r'^TP[A-Fa-f0-9]{6,16}$').hasMatch(namespace) ||
@@ -40,6 +66,8 @@ class AppPlanClassification {
       subscriptionType: type.trim(),
       userCountCategory: group.trim(),
       deviceLimit: limit,
+      allowedProtocolCodes: rawAllowed == null
+          ? null : Set.unmodifiable((rawAllowed as List).cast<String>()),
     );
   }
 }

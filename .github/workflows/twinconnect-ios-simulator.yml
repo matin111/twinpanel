@@ -1,0 +1,240 @@
+name: TwinConnect iOS Simulator Foundation
+
+on:
+  pull_request:
+    paths:
+      - 'clients/twinconnect/**'
+      - '.github/workflows/twinconnect-ios-simulator.yml'
+  push:
+    branches:
+      - 'feat/twinconnect-ios-simulator-foundation-20261115'
+    paths:
+      - 'clients/twinconnect/**'
+      - '.github/workflows/twinconnect-ios-simulator.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: twinconnect-ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ios-simulator:
+    name: iOS simulator build and launch smoke
+    runs-on: macos-15
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: clients/twinconnect
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode
+        shell: bash
+        run: |
+          xcodebuild -version
+          xcrun simctl list devices available
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: false
+      - name: Generate native iOS Runner project
+        run: flutter create --platforms=ios --org com.twinpanel --project-name twinconnect .
+      - name: Add native PacketTunnel app extension target to Xcode
+        shell: bash
+        run: |
+          gem list -i xcodeproj || gem install xcodeproj --no-document
+          ruby ios_native/install_packet_tunnel_target.rb
+          xcodebuild -list -project ios/Runner.xcodeproj
+      - name: Install iOS native capability bridge into generated Runner
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          app = Path("ios/Runner/AppDelegate.swift")
+          bridge = Path("ios_native/TwinConnectIOSVpnBridge.swift")
+          controller = Path("ios_native/TwinConnectIOSVPNControl.swift")
+          source = app.read_text()
+          native = bridge.read_text() + "\n" + controller.read_text()
+          for declaration in ("import Foundation", "import Flutter", "import NetworkExtension", "import Security"):
+              native = native.replace(declaration + "\n", "")
+          # Flutter has two supported iOS templates:
+          # legacy AppDelegate registers against self; modern scene-based
+          # AppDelegate registers on FlutterImplicitEngineBridge.pluginRegistry.
+          import re
+          legacy = re.search(
+              r"GeneratedPluginRegistrant\.register\(with:\s*self\)",
+              source)
+          modern = re.search(
+              r"GeneratedPluginRegistrant\.register\(with:\s*engineBridge\.pluginRegistry\)",
+              source)
+          if legacy and not modern:
+              registration = """
+                  if let controller = window?.rootViewController as? FlutterViewController {
+                      TwinConnectIOSVpnBridge.register(binaryMessenger: controller.binaryMessenger)
+                  }
+              """
+              anchor = legacy
+          elif modern and not legacy:
+              registration = """
+                  if let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "TwinConnectIOSVpnBridge") {
+                      TwinConnectIOSVpnBridge.register(binaryMessenger: registrar.messenger())
+                  }
+              """
+              anchor = modern
+          else:
+              raise SystemExit(
+                  "Unsupported AppDelegate template; inspect ios/Runner/AppDelegate.swift:\n"
+                  + source[:5000])
+          source = (
+              source[:anchor.end()] + "\n" + registration +
+              source[anchor.end():])
+          app.write_text("import NetworkExtension\nimport Security\n" + source + "\n" + native)
+          PY
+      - name: Type-check packet tunnel provider against iOS Simulator SDK
+        shell: bash
+        run: |
+          xcrun swiftc -typecheck -target arm64-apple-ios17.0-simulator \
+            -sdk "$(xcrun --sdk iphonesimulator --show-sdk-path)" \
+            ios_native/PacketTunnelProvider.swift \
+            ios_native/TwinConnectWireGuardEngine.swift
+      - name: Fetch Flutter packages
+        run: flutter pub get
+      - name: Check static analysis and Flutter tests
+        run: |
+          flutter analyze --no-fatal-infos
+          flutter test --reporter expanded
+      - name: Build unsigned iOS simulator app
+        env:
+          TWINCONNECT_DIRECTORY_URL: ${{ vars.TWINCONNECT_DIRECTORY_URL || 'https://panel.matindnspro.sbs' }}
+        run: |
+          flutter build ios --simulator --debug --no-codesign \
+            --target lib/ios_preview_main.dart \
+            --dart-define=TWINCONNECT_DIRECTORY_URL="$TWINCONNECT_DIRECTORY_URL"
+          test -d build/ios/iphonesimulator/Runner.app
+      - name: Validate embedded PacketTunnel metadata before install
+        shell: bash
+        run: |
+          set -euo pipefail
+          app="build/ios/iphonesimulator/Runner.app"
+          extension="$app/PlugIns/PacketTunnel.appex"
+          test -d "$extension"
+          plist="$extension/Info.plist"
+          test -s "$plist"
+          /usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$plist"
+          /usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$plist"
+          /usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$plist"
+          /usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$plist"
+          /usr/libexec/PlistBuddy -c "Print :NSExtension:NSExtensionPointIdentifier" "$plist"
+          python3 - <<'PY'
+          from pathlib import Path
+          import plistlib
+          root = Path("build/ios/iphonesimulator/Runner.app")
+          host = plistlib.loads((root / "Info.plist").read_bytes())
+          extension = plistlib.loads((root / "PlugIns/PacketTunnel.appex/Info.plist").read_bytes())
+          host_id = host.get("CFBundleIdentifier", "")
+          extension_id = extension.get("CFBundleIdentifier", "")
+          assert host_id and extension_id == host_id + ".PacketTunnel", (host_id, extension_id)
+          for key in ("CFBundleExecutable", "CFBundleShortVersionString", "CFBundleVersion"):
+              value = extension.get(key, "")
+              assert isinstance(value, str) and value and "$(" not in value, (key, value)
+          expected_point = "com.apple.networkextension.packet-tunnel"
+          assert extension.get("NSExtension", {}).get("NSExtensionPointIdentifier") == expected_point
+          assert (root / "PlugIns/PacketTunnel.appex" / extension["CFBundleExecutable"]).is_file()
+          print("PacketTunnel metadata and executable validated")
+          PY
+      - name: Verify iPhone simulator boots and launches TwinConnect
+        shell: bash
+        run: |
+          set -euo pipefail
+          device="$(xcrun simctl list devices available -j | python3 -c 'import json,sys; d=json.load(sys.stdin); print(next((item["udid"] for runtime,devices in d["devices"].items() if "iOS" in runtime for item in devices if item["name"].startswith("iPhone") and item["state"] in ("Shutdown", "Booted")), ""))')"
+          if [ -z "$device" ]; then
+            echo "::error::No available iPhone Simulator runtime on this GitHub macOS runner."
+            exit 1
+          fi
+          xcrun simctl boot "$device" || true
+          xcrun simctl bootstatus "$device" -b
+          xcrun simctl install "$device" build/ios/iphonesimulator/Runner.app
+          xcrun simctl launch "$device" com.twinpanel.twinconnect
+          xcrun simctl spawn "$device" launchctl print system >/dev/null
+          # The isolated preview automatically tours the four real iOS UI
+          # screens every 12 seconds. Capture all four on a cloud Mac so the
+          # developer can inspect them from a Windows PC, without an iPhone.
+          sleep 4
+          xcrun simctl io "$device" screenshot TwinConnect-iOS-01-Connect.png
+          sleep 12
+          xcrun simctl io "$device" screenshot TwinConnect-iOS-02-Locations.png
+          sleep 12
+          xcrun simctl io "$device" screenshot TwinConnect-iOS-03-Settings.png
+          sleep 12
+          xcrun simctl io "$device" screenshot TwinConnect-iOS-04-Account.png
+      - name: Build authenticated iPhone app for interactive panel testing
+        env:
+          TWINCONNECT_DIRECTORY_URL: ${{ vars.TWINCONNECT_DIRECTORY_URL || 'https://panel.matindnspro.sbs' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The Appetize artifact must start at the *real* username/password
+          # screen. Demo fixtures are confined to the screenshot tour above.
+          flutter build ios --simulator --debug --no-codesign \
+            --target lib/main.dart \
+            --dart-define=TWINCONNECT_DIRECTORY_URL="$TWINCONNECT_DIRECTORY_URL"
+          test -d build/ios/iphonesimulator/Runner.app
+      # Build success alone is insufficient: launch the REAL login target on
+      # a clean simulator installation and ship a screenshot beside the ZIP.
+      # This prevents an offline ios_preview_main.dart screen from being
+      # mistaken for the authenticated panel entry point.
+      - name: Smoke-test authenticated login target on a clean iPhone simulator
+        shell: bash
+        run: |
+          set -euo pipefail
+          device="$(xcrun simctl list devices booted -j | python3 -c 'import json,sys; d=json.load(sys.stdin); print(next((item["udid"] for devices in d["devices"].values() for item in devices if item["name"].startswith("iPhone")), ""))')"
+          if [ -z "$device" ]; then
+            echo "::error::No booted iPhone Simulator for authenticated login smoke."
+            exit 1
+          fi
+          # Remove offline tour app AND its preferences before installing the
+          # authenticated build. In particular, never reuse demo state here.
+          xcrun simctl terminate "$device" com.twinpanel.twinconnect || true
+          xcrun simctl uninstall "$device" com.twinpanel.twinconnect || true
+          xcrun simctl install "$device" build/ios/iphonesimulator/Runner.app
+          xcrun simctl launch "$device" com.twinpanel.twinconnect
+          sleep 5
+          xcrun simctl io "$device" screenshot TwinConnect-iOS-RealLogin.png
+          test -s TwinConnect-iOS-RealLogin.png
+      - name: Package authenticated Appetize simulator build
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd build/ios/iphonesimulator
+          ditto -c -k --sequesterRsrc --keepParent Runner.app \
+            ../../../TwinConnect-iOS-Appetize-RealLogin-v0.1.0.zip
+          cd ../../..
+          shasum -a 256 TwinConnect-iOS-Appetize-RealLogin-v0.1.0.zip \
+            > TwinConnect-iOS-Appetize-RealLogin-SHA256.txt
+      - name: Upload Appetize app with real panel login (no bundled credentials)
+        uses: actions/upload-artifact@v4
+        with:
+          name: TwinConnect-iOS-Appetize-RealLogin-v0.1.0
+          path: |
+            clients/twinconnect/TwinConnect-iOS-Appetize-RealLogin-v0.1.0.zip
+            clients/twinconnect/TwinConnect-iOS-Appetize-RealLogin-SHA256.txt
+            clients/twinconnect/TwinConnect-iOS-RealLogin.png
+          if-no-files-found: error
+          retention-days: 14
+      # Only screenshots are distributed for visual review. Bundling an
+      # executable Runner.app inside the artifact made Chrome flag the
+      # entire archive as a dangerous download, although the reviewer needs
+      # only images, not an executable for Windows.
+      - name: Upload four iPhone screen screenshots (no executable)
+        uses: actions/upload-artifact@v4
+        with:
+          name: TwinConnect-iPhone-Screenshots-v0.1.0
+          path: |
+            clients/twinconnect/TwinConnect-iOS-01-Connect.png
+            clients/twinconnect/TwinConnect-iOS-02-Locations.png
+            clients/twinconnect/TwinConnect-iOS-03-Settings.png
+            clients/twinconnect/TwinConnect-iOS-04-Account.png
+          if-no-files-found: error
+          retention-days: 14

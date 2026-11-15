@@ -611,10 +611,35 @@ class _TwinConnectHomeState extends State<TwinConnectHome> with WidgetsBindingOb
       });
     } on TenantApiException catch (error) {
       if (!mounted || serial != _lookupSerial) return;
-      setState(() => _serverRefreshError =
-          error.message == 'APP_LOGIN_INVALID'
-              ? 'APP_SESSION_EXPIRED'
-              : 'SERVER_REFRESH_FAILED');
+      // Keep diagnostic categories local and credential-free. Do not expose
+      // raw API payloads, bearer tokens, addresses or stack traces.
+      final code = switch (error.message) {
+        'APP_LOGIN_INVALID' => 'APP_SESSION_EXPIRED',
+        'APP_NOT_AUTHORIZED' => 'APP_NOT_AUTHORIZED',
+        'PANEL_NOT_FOUND' => 'APP_PANEL_ENDPOINT_MISSING',
+        'NETWORK_UNAVAILABLE' => 'APP_PANEL_NETWORK_UNAVAILABLE',
+        'INVALID_TLS' => 'APP_PANEL_TLS_FAILURE',
+        'RESPONSE_TOO_LARGE' => 'APP_PANEL_RESPONSE_TOO_LARGE',
+        'INVALID_SERVER_RESPONSE' => 'APP_PANEL_RESPONSE_INVALID',
+        'SERVER_ERROR' => 'APP_PANEL_SERVER_ERROR',
+        'APP_LOGIN_LOCKED' => 'APP_PANEL_RATE_LIMITED',
+        _ => 'SERVER_REFRESH_FAILED',
+      };
+      setState(() => _serverRefreshError = code);
+    } on FormatException catch (error) {
+      if (!mounted || serial != _lookupSerial) return;
+      final code = switch (error.message) {
+        'INVALID_SERVER_INVENTORY' => 'APP_SERVER_SCHEMA_INVALID',
+        'DUPLICATE_SERVER' => 'APP_SERVER_SCHEMA_INVALID',
+        'INVALID_PROTOCOL_CATALOG' => 'APP_PROTOCOL_SCHEMA_INVALID',
+        'INCOMPLETE_PROTOCOL_CATALOG' => 'APP_PROTOCOL_SCHEMA_INVALID',
+        'UNKNOWN_PROTOCOL' => 'APP_PROTOCOL_SCHEMA_INVALID',
+        _ => 'APP_PANEL_RESPONSE_INVALID',
+      };
+      setState(() => _serverRefreshError = code);
+    } on TimeoutException {
+      if (!mounted || serial != _lookupSerial) return;
+      setState(() => _serverRefreshError = 'APP_PANEL_TIMEOUT');
     } catch (_) {
       if (!mounted || serial != _lookupSerial) return;
       setState(() => _serverRefreshError = 'SERVER_REFRESH_FAILED');
