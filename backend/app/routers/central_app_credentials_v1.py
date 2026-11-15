@@ -31,7 +31,7 @@ from .account_delivery import _share_token, _share_url
 from .central_app_v1 import (
     BrandPreviewIn, ProtocolProfilesIn,
     subscription_app_brand_preview, subscription_protocol_catalog,
-    subscription_protocol_profiles, _selected_client_protocols,
+    _profiles_for_verified_subscription, _selected_client_protocols,
 )
 
 router = APIRouter(prefix="/v1/central-app", tags=["central-app-login"])
@@ -300,13 +300,10 @@ def session_profiles(
     sub: Subscription = Depends(_session_subscription),
     db: Session = Depends(get_db),
 ):
-    response = subscription_protocol_profiles(
-        ProtocolProfilesIn(
-            account_username=sub.account_username or "",
-            share_token=_share_token(sub),
-            protocol=payload.protocol,
-        ), db=db,
-    )
+    # The logged-in account's Bearer token already authorizes this exact
+    # subscription. Do not make availability depend on its public share link
+    # (which might be absent/rotated on migrated Vitory accounts).
+    response = _profiles_for_verified_subscription(sub, payload.protocol, db)
     response.headers.update(_PRIVATE_HEADERS)
     return response
 
