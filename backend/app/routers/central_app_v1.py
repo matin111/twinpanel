@@ -482,15 +482,18 @@ def subscription_protocol_profiles(
     payload: ProtocolProfilesIn,
     db: Session = Depends(get_db),
 ):
-    """Fetch one authorized protocol's *existing* panel profiles on demand.
-
-    This is a credential-bearing endpoint: HTTPS POST, no URL tokens, no
-    caches. The vendor directory is never involved. Client code must request
-    it only when an actual native engine is ready and immediately erase the
-    profiles after delivery to the protected native process.
-    """
+    """Public share-token API; token authorization stays at this boundary."""
     sub = _verified_protocol_subscription(payload, db)
-    protocol = normalize_protocol(payload.protocol)
+    return _profiles_for_verified_subscription(sub, payload.protocol, db)
+
+
+def _profiles_for_verified_subscription(
+    sub: Subscription,
+    requested_protocol: str,
+    db: Session,
+):
+    """Only the authorized account's stored profile items, no token fallback."""
+    protocol = normalize_protocol(requested_protocol)
     if not protocol or protocol not in _selected_client_protocols(db, sub.id):
         raise HTTPException(status_code=404, detail="PROTOCOL_NOT_SELECTED")
 
@@ -499,11 +502,10 @@ def subscription_protocol_profiles(
         # Reuse the same public projection as the canonical Xray feed so that
         # TCP/WS/XHTTP profiles, Reality SNI, and availability stay consistent.
         from .public_connection_multilink_v7 import (
-            _subscription_and_payload, _v2ray_items, _v2ray_profile_groups,
+            _xray_payload_for_verified_subscription,
+            _v2ray_items, _v2ray_profile_groups,
         )
-        _verified, projected = _subscription_and_payload(
-            payload.share_token, db
-        )
+        projected = _xray_payload_for_verified_subscription(sub, db)
         profile_items = [
             dict(item) for item in _v2ray_items(projected)
         ]
