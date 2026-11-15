@@ -2562,10 +2562,11 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     super.didUpdateWidget(oldWidget);
     // All tenants use the same dark UI; branded colors remain customizable.
     if (widget.simulatorPreview) return;
-    if (oldWidget.username != widget.username ||
-        oldWidget.panel.namespace != widget.panel.namespace ||
-        oldWidget.panel.apiOrigin != widget.panel.apiOrigin) {
-      // A reused dashboard state must not leak any previous tenant's choice.
+    final accountChanged = oldWidget.username != widget.username ||
+        oldWidget.panel.namespace != widget.panel.namespace;
+    if (accountChanged) {
+      // A different login/tenant gets its own saved selection, while a
+      // changing panel origin must never reset a customer's manual choice.
       ++_choiceRevision;
       _filter = 'all';
       _selected = 0;
@@ -2573,6 +2574,9 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       _explicitXrayInboundId = null;
       _autoFastest = false;
       unawaited(_restoreManualConnectionChoice());
+    }
+    if (accountChanged ||
+        oldWidget.panel.apiOrigin != widget.panel.apiOrigin) {
       _socks5AssignedNodeIds = null;
       _socks5NodesError = null;
       // No in-memory Xray credentials may cross tenants or accounts.
@@ -3052,7 +3056,6 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
 
   String get _choiceAccountKey => ConnectionChoiceStore.key(
     namespace: widget.panel.namespace,
-    apiOrigin: widget.panel.apiOrigin.toString(),
     username: widget.username,
   );
 
