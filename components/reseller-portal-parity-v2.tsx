@@ -122,8 +122,8 @@ export function ResellerCustomersParityV2(){
             {ledgerRows.filter(walletMatch).map(tx=><div key={String(tx.id)} style={{padding:10,border:"1px solid var(--line,#dbe2ed)",borderRadius:12,display:"grid",gap:4}}>
               <div style={{display:"flex",justifyContent:"space-between",gap:8}}><b>{resellerTypeLabel(str(tx,"kind"))}</b><b style={{color:num(tx,"amount_toman")>=0?"#15803d":"#dc2626"}}>{num(tx,"amount_toman")>0?"+":""}{money(num(tx,"amount_toman"))}</b></div>
               <small>{dateText(tx.created_at)} · #{str(tx,"id")}</small>
-              {tx.description&&<small>{str(tx,"description")}</small>}
-              {tx.reference&&<small style={{overflowWrap:"anywhere"}}>{pick("مرجع","Reference")}: {str(tx,"reference")}</small>}
+              {str(tx,"description")&&<small>{str(tx,"description")}</small>}
+              {str(tx,"reference")&&<small style={{overflowWrap:"anywhere"}}>{pick("مرجع","Reference")}: {str(tx,"reference")}</small>}
             </div>)}
             {!ledgerRows.filter(walletMatch).length&&<Empty>{pick("تراکنشی برای این نمایندگی پیدا نشد.","No scoped transactions found.")}</Empty>}
           </div>
@@ -132,8 +132,8 @@ export function ResellerCustomersParityV2(){
             {topupRows.filter(walletMatch).map(tx=><div key={String(tx.id)} style={{padding:10,border:"1px solid var(--line,#dbe2ed)",borderRadius:12,display:"grid",gap:4}}>
               <div style={{display:"flex",justifyContent:"space-between",gap:8}}><b>#{str(tx,"id")} · {topupStatus(str(tx,"status"))}</b><b>{money(num(tx,"amount_toman"))}</b></div>
               <small>{dateText(tx.created_at)} · {str(tx,"method")}</small>
-              {tx.tracking_code&&<small>{pick("کد پیگیری","Tracking code")}: {str(tx,"tracking_code")}</small>}
-              {tx.review_note&&<small>{str(tx,"review_note")}</small>}
+              {str(tx,"tracking_code")&&<small>{pick("کد پیگیری","Tracking code")}: {str(tx,"tracking_code")}</small>}
+              {str(tx,"review_note")&&<small>{str(tx,"review_note")}</small>}
             </div>)}
             {!topupRows.filter(walletMatch).length&&<Empty>{pick("درخواست شارژی پیدا نشد.","No top-up requests found.")}</Empty>}
           </div>
