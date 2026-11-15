@@ -5,7 +5,7 @@ All callers must commit the queue insertion in their existing payment/credit tra
 """
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
-from sqlalchemy import select
+from sqlalchemy import select, or_, and_
 from fastapi import HTTPException
 from .models import Subscription, SubscriptionStatus
 from .reserved_renewal_models import PendingSubscriptionRenewal, SubscriptionHistoryEvent
@@ -59,10 +59,24 @@ def reserve_renewal(db: Session, *, subscription_id: int, plan_id: int | None,
 def activate_due_renewals(db: Session, limit: int = 100) -> int:
     """Called on a short recurring worker tick; locks per-subscription against usage collectors."""
     now = datetime.utcnow()
+    # Select only expired or exhausted accounts. Taking an arbitrary first
+    # page of queued orders starves every due account beyond that page.
     candidates = db.execute(
         select(PendingSubscriptionRenewal.subscription_id)
-        .where(PendingSubscriptionRenewal.status == "queued")
-        .distinct().limit(limit)
+        .join(Subscription, Subscription.id == PendingSubscriptionRenewal.subscription_id)
+        .where(
+            PendingSubscriptionRenewal.status == "queued",
+            or_(
+                Subscription.expires_at <= now,
+                and_(
+                    Subscription.traffic_limit_bytes > 0,
+                    Subscription.traffic_used_bytes >= Subscription.traffic_limit_bytes,
+                ),
+            ),
+        )
+        .distinct()
+        .order_by(PendingSubscriptionRenewal.subscription_id.asc())
+        .limit(limit)
     ).scalars().all()
     activated = 0
     for sub_id in candidates:
