@@ -27,7 +27,7 @@ class AndroidSingBoxTunnel {
   int? get sentBytes => _latestStats?.uploadTotal;
 
   static const supported = <String>{
-    'hysteria2', 'tuic', 'anytls', 'socks5',
+    'hysteria2', 'tuic', 'anytls', 'socks5', 'shadowtls',
   };
 
   Future<void> initialize() async {
@@ -47,6 +47,11 @@ class AndroidSingBoxTunnel {
   }) async {
     if (!supported.contains(protocol)) {
       throw const FormatException('SINGBOX_PROTOCOL_UNSUPPORTED');
+    }
+    if (protocol == 'shadowtls') {
+      final chain = SingBoxProfileValidator.validateShadowTlsChain(profile);
+      await _connectNative(jsonEncode(chain));
+      return;
     }
     final outbound = SingBoxProfileValidator.validateOutbound(
       protocolCode: protocol,
