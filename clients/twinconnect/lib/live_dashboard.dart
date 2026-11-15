@@ -427,13 +427,22 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         } catch (_) {
           error = 'ICMP_TIMEOUT_OR_BLOCKED';
         }
-        // A blocked ICMP reply doesn't imply the VPN endpoint is unreachable.
-        // TCP:443 is only a reachability estimate, never represented as ICMP.
-        if (latency == null) {
+        // Test an actual applied listener, never assume every node uses 443.
+        // ICMP and TCP are distinct; no success is fabricated.
+        const tcpProtocols = <String>{
+          'cisco', 'openvpn', 'v2ray', 'anytls', 'naive', 'snell',
+        };
+        final selectedPort = tcpProtocols.contains(_filter)
+            ? node.probePorts[_filter]
+            : _filter == 'all'
+                ? node.probePorts['cisco'] ?? node.probePorts['openvpn']
+                : null;
+        if (latency == null && selectedPort != null) {
           final tcpClock = Stopwatch()..start();
           try {
             final socket = await Socket.connect(
-              node.probeIp!, 443, timeout: const Duration(milliseconds: 1800),
+              node.probeIp!, selectedPort,
+              timeout: const Duration(milliseconds: 1800),
             );
             tcpClock.stop();
             socket.destroy();
@@ -3922,8 +3931,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                     'Ping test failed.'),
                   'APPROXIMATE_RTT' => tr('زمان تقریبی شامل سربار اجرای Ping',
                     'Approximate timing including ping startup overhead'),
-                  'TCP_CONNECT_RTT' => tr('زمان اتصال TCP به پورت ۴۴۳؛ پینگ ICMP نیست.',
-                    'TCP connect to port 443; not ICMP ping.'),
+                  'TCP_CONNECT_RTT' => tr('زمان اتصال TCP به پورت واقعی سرویس؛ پینگ ICMP نیست.',
+                    'TCP connection to the configured service port, not ICMP.'),
                   _ => tr('پینگ سرور', 'Server ping'),
                 },
                 child: Text(
