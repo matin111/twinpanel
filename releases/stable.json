@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.846",
+  "version": "1.1.0-rc.847",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-15T06:45:23Z",
+  "released_at": "2026-11-15T08:18:15Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "5e9272235f467edc81f5e6eaaacbfd2fc3cac158",
+  "source_sha": "e22de5f89c2e252b0cc9774290bfc7476f0e9d91",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.846/twinpanel-1.1.0-rc.846-linux-x86_64.tar.gz",
-    "sha256": "7a21034361a8d1e08960103b0d70a32de41c3fecebd82880d678ad689c1a9349",
-    "size_bytes": 30881742
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.847/twinpanel-1.1.0-rc.847-linux-x86_64.tar.gz",
+    "sha256": "a6690aa8e23d625dc8846c9f0ec1f8b07017ea68f347aca085824b0fee44604e",
+    "size_bytes": 30883851
   },
   "notes": {
-    "fa": "تاریخچه واقعی اشتراک‌های نماینده در کارت اشتراک شامل رویدادها و تمدیدهای رزرو، مستقل از صفحه مشتریان؛ نوار پیشرفت مصرف حجم در کارت‌های اشتراک ادمین هم‌ظاهر با نماینده؛ بدون تغییر حجم، اتصال و اعتبار اشتراک‌ها.",
-    "en": "Add subscription history popup to reseller subscription cards, showing ownership-scoped events and reserved renewals, and a visual quota usage progress bar for admin subscription cards. No balance or connection changes."
+    "fa": "تکمیل تاریخچه مالی کاربران در پنل ادمین و نمایندگان: نمایش سفارش‌های خرید اشتراک از سایت و ربات نماینده، فروش‌های دستی نماینده، روش و وضعیت پرداخت، شناسه اشتراک و رسید در کنار گردش کیف پول؛ جلوگیری از تکرار سفارش‌ها و رعایت دسترسی هر نمایندگی؛ بدون تغییر مالی در حساب کاربران.",
+    "en": "Expand admin and reseller customer financial history to include site subscription purchases, reseller bot orders and manual reseller sales, payment states, receipt references and subscription IDs alongside wallet ledger. Deduplicate bot/manual sale records; read-only and tenant-scoped."
   }
 }
