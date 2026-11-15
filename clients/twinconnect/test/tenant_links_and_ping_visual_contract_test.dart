@@ -253,10 +253,14 @@ void main() {
 
   test('Android HTTPS probe requires live transport and never disables TLS', () {
     final card = File('lib/android_connection_card.dart').readAsStringSync();
-    expect(card, contains("'api.ipify.org', 'icanhazip.com'"));
-    expect(card, contains('Uri.https(provider,'));
+    expect(card, contains("_probeHttps('api.ipify.org', '/')"));
+    expect(card, contains("_probeHttps('icanhazip.com', '/')"));
+    expect(card, contains("_probeHttps('www.cloudflare.com', '/cdn-cgi/trace'"));
+    expect(card, contains('Uri.https(host, path)'));
+    expect(card, contains('Future.wait(['));
     expect(card, contains('(_up && _handshake) || _openVpnUp || _ciscoUp ||'));
-    expect(card, contains('_activeVerifiedTransport ? verifiedIp : null'));
+    expect(card, contains('_activeVerifiedTransport ? ip : null'));
+    expect(card, contains('_activeVerifiedTransport ? latency : null'));
     expect(card, contains('generation == _networkProbeGeneration'));
     expect(card, contains('VPN routing not independently verified'));
     expect(card, isNot(contains('badCertificateCallback')));
@@ -287,8 +291,10 @@ void main() {
     expect(card, contains("status['rxBytes']"));
     expect(card, contains("status['txBytes']"));
     expect(card, contains("status['peerHandshakeVerified']"));
-    expect(card, contains("Uri.https(provider, '/')"));
-    expect(card, contains("'api.ipify.org', 'icanhazip.com'"));
+    expect(card, contains('Uri.https(host, path)'));
+    expect(card, contains("_probeHttps('api.ipify.org', '/')"));
+    expect(card, contains("_probeHttps('icanhazip.com', '/')"));
+    expect(card, contains("_probeHttps('www.cloudflare.com', '/cdn-cgi/trace'"));
     expect(card, contains("_speed(_downloadBps)"));
     expect(card, contains("_speed(_uploadBps)"));
     expect(card, contains("Icons.bolt, 'HTTPS'"));
