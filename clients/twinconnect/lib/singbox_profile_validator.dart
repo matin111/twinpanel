@@ -169,6 +169,28 @@ class SingBoxProfileValidator {
         port is! int || port < 1 || port > 65535) {
       throw const FormatException('SINGBOX_ENDPOINT_INVALID');
     }
+    if (protocolCode == 'snell') {
+      // sing-box 1.14 implements Snell v4 TCP and v6, but not the
+      // Snell v5 QUIC proxy. Never silently choose a different version.
+      final version = object['version'];
+      if (version != 4 && version != 6) {
+        throw const FormatException('SNELL_VERSION_UNSUPPORTED');
+      }
+      final psk = object['psk'];
+      if (psk is! String || psk.isEmpty ||
+          (version == 6 &&
+              (utf8.encode(psk).length < 12 ||
+               utf8.encode(psk).length > 255))) {
+        throw const FormatException('SNELL_PSK_REQUIRED');
+      }
+      if (object['password'] != null) {
+        throw const FormatException('SNELL_WRONG_CREDENTIAL_FIELD');
+      }
+      final network = object['network'];
+      if (network != null && network != 'tcp' && network != 'udp') {
+        throw const FormatException('SNELL_NETWORK_UNSUPPORTED');
+      }
+    }
     if (protocolCode == 'socks5') {
       // Do not quietly downgrade the entitled SOCKS5 account to SOCKS4
       // or attempt an unauthenticated session with incomplete credentials.
