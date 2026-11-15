@@ -195,6 +195,28 @@ void main() {
     expect(chain[1].containsKey('sni'), isFalse);
   });
 
+  test('ShadowTLS accepts panel SNI without nested TLS block', () {
+    final chain = SingBoxProfileValidator.validateShadowTlsChain({
+      'outbounds': [
+        {
+          'type': 'shadowsocks', 'tag': 'proxy',
+          'detour': 'st', 'method': 'aes-256-gcm',
+          'password': 'test-inner',
+        },
+        {
+          'type': 'shadowtls', 'tag': 'st',
+          'server': '198.51.100.16', 'server_port': 443,
+          'version': 3, 'password': 'test-outer',
+          'sni': 'www.example.org',
+        },
+      ],
+    });
+    expect(chain[1]['tls'], {
+      'enabled': true,
+      'server_name': 'www.example.org',
+    });
+  });
+
   test('ShadowTLS refuses invalid numeric SNI with no cover hostname', () {
     expect(() => SingBoxProfileValidator.validateShadowTlsChain({
       'outbounds': [
