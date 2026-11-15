@@ -16,6 +16,11 @@ on:
 jobs:
   unit-tests:
     runs-on: ubuntu-24.04
+    env:
+      APP_SECRET_KEY: test-only-do-not-use-in-production
+      DATABASE_URL: sqlite:////tmp/twinpanel-renewal-ci-isolated.sqlite
+      NODE_AGENT_SHARED_SECRET: test-only-do-not-use-in-production
+      PYTHONDONTWRITEBYTECODE: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
