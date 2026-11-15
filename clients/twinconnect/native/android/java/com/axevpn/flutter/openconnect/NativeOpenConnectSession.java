@@ -9,7 +9,11 @@ import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.io.ByteArrayInputStream;
 import java.util.Arrays;
-import java.util.Base64;
+import java.net.URI;
+import java.util.List;
+import javax.net.ssl.TrustManagerFactory;
+import javax.net.ssl.X509TrustManager;
+import android.net.http.X509TrustManagerExtensions;
 import org.infradead.libopenconnect.LibOpenConnect;
 
 /**
@@ -31,20 +35,23 @@ final class NativeOpenConnectSession extends LibOpenConnect {
     private final String password;
     private final byte[] expectedPin;
     private final boolean spkiPin;
+    private final String serverHost;
     private ParcelFileDescriptor tun;
     private volatile boolean stopped;
 
     NativeOpenConnectSession(VpnService service, Listener listener,
-                              String username, String password, String pin) throws Exception {
+                              String username, String password, String pin, String serverUrl) throws Exception {
         super("TwinConnect Android OpenConnect/1.0");
         this.service = service;
         this.listener = listener;
         this.username = username;
         this.password = password;
+        this.serverHost = new URI(serverUrl).getHost();
+        if (serverHost == null || serverHost.isEmpty()) throw new IllegalArgumentException("CISCO_GATEWAY_INVALID");
         if (pin == null || pin.isEmpty()) {
-            throw new IllegalArgumentException("CISCO_CERT_PIN_REQUIRED");
-        }
-        if (pin.startsWith("pin-sha256:")) {
+            spkiPin = false;
+            expectedPin = null;
+        } else if (pin.startsWith("pin-sha256:")) {
             spkiPin = true;
             expectedPin = android.util.Base64.decode(pin.substring(11), android.util.Base64.DEFAULT);
         } else if (pin.matches("[0-9a-fA-F]{64}")) {
@@ -56,7 +63,7 @@ final class NativeOpenConnectSession extends LibOpenConnect {
         } else {
             throw new IllegalArgumentException("CISCO_CERT_PIN_INVALID");
         }
-        if (expectedPin.length != 32) throw new IllegalArgumentException("CISCO_CERT_PIN_INVALID");
+        if (expectedPin != null && expectedPin.length != 32) throw new IllegalArgumentException("CISCO_CERT_PIN_INVALID");
     }
 
     @Override public int onProcessAuthForm(AuthForm form) {
@@ -83,6 +90,27 @@ final class NativeOpenConnectSession extends LibOpenConnect {
         try {
             byte[] der = getPeerCertDER();
             if (der == null || der.length == 0) return -1;
+            if (expectedPin == null) {
+                // Android platform CA + hostname verification, never trust-all.
+                byte[][] chainDer = getPeerCertChain();
+                if (chainDer == null || chainDer.length == 0) return -1;
+                X509Certificate[] chain = new X509Certificate[chainDer.length];
+                for (int i = 0; i < chainDer.length; i++) {
+                    chain[i] = (X509Certificate) CertificateFactory.getInstance("X.509")
+                            .generateCertificate(new ByteArrayInputStream(chainDer[i]));
+                }
+                TrustManagerFactory tmf = TrustManagerFactory.getInstance(
+                        TrustManagerFactory.getDefaultAlgorithm());
+                tmf.init((java.security.KeyStore) null);
+                for (javax.net.ssl.TrustManager manager : tmf.getTrustManagers()) {
+                    if (manager instanceof X509TrustManager) {
+                        new X509TrustManagerExtensions((X509TrustManager) manager)
+                                .checkServerTrusted(chain, chain[0].getPublicKey().getAlgorithm(), serverHost);
+                        return 0;
+                    }
+                }
+                return -1;
+            }
             byte[] fingerprint;
             if (spkiPin) {
                 X509Certificate cert = (X509Certificate) CertificateFactory.getInstance("X.509")
