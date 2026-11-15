@@ -151,11 +151,24 @@ jobs:
           if-no-files-found: error
           retention-days: 3
 
+      - name: Use JDK 21 for Android Gradle and Lint
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
       - name: Setup Flutter for experimental native Cisco APK
         uses: subosito/flutter-action@v2
         with:
           channel: stable
           cache: true
+
+      - name: Verify Gradle Java runtime supports Java 21 APIs
+        shell: bash
+        run: |
+          java -version
+          test "$(java -XshowSettings:properties -version 2>&1 | sed -n 's/.*java.specification.version = //p' | head -1)" = "21"
+          echo "JAVA_HOME=${JAVA_HOME}"
 
       - name: Generate experimental Android scaffold and include native core
         shell: bash
