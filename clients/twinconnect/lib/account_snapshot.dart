@@ -1,3 +1,44 @@
+/// A paid next period, never part of the currently consumable account quota.
+class ReservedRenewalSnapshot {
+  const ReservedRenewalSnapshot({
+    required this.status,
+    required this.planName,
+    required this.trafficBytes,
+    required this.durationDays,
+    required this.reservedAt,
+  });
+
+  final String status;
+  final String planName;
+  final int trafficBytes;
+  final int durationDays;
+  final DateTime reservedAt;
+  bool get needsReview => status == 'needs_review';
+
+  factory ReservedRenewalSnapshot.fromJson(Map<String, dynamic> json) {
+    final status = json['status'];
+    final plan = json['plan_name'];
+    final traffic = json['traffic_bytes'];
+    final duration = json['duration_days'];
+    final created = json['reserved_at'];
+    final parsedDate = created is String ? DateTime.tryParse(created) : null;
+    if ((status != 'reserved' && status != 'needs_review') ||
+        plan is! String || plan.trim().isEmpty ||
+        traffic is! int || traffic < 0 ||
+        duration is! int || duration < 0 ||
+        parsedDate == null) {
+      throw const FormatException('INVALID_RESERVED_RENEWAL');
+    }
+    return ReservedRenewalSnapshot(
+      status: status as String,
+      planName: plan.trim(),
+      trafficBytes: traffic,
+      durationDays: duration,
+      reservedAt: parsedDate.toUtc(),
+    );
+  }
+}
+
 /// Authenticated and non-secret subscription totals from the owning panel.
 class AppAccountSnapshot {
   const AppAccountSnapshot({
@@ -7,6 +48,7 @@ class AppAccountSnapshot {
     required this.expiresAt,
     required this.activationDurationDays,
     required this.status,
+    this.reservedRenewal,
   });
   final String namespace;
   final int trafficLimitBytes;
@@ -14,6 +56,7 @@ class AppAccountSnapshot {
   final DateTime? expiresAt;
   final int? activationDurationDays;
   final String status;
+  final ReservedRenewalSnapshot? reservedRenewal;
 
   factory AppAccountSnapshot.fromJson(Map<String, dynamic> json) {
     final limit = json['traffic_limit_bytes'];
@@ -35,6 +78,15 @@ class AppAccountSnapshot {
     if (expiry is String && parsedExpiry == null) {
       throw const FormatException('INVALID_ACCOUNT_EXPIRY');
     }
+    ReservedRenewalSnapshot? nextRenewal;
+    final next = json['reserved_renewal'];
+    if (next is Map<String, dynamic>) {
+      try {
+        nextRenewal = ReservedRenewalSnapshot.fromJson(next);
+      } on FormatException {
+        // A malformed optional field must not hide existing quota/expiry.
+      }
+    }
     return AppAccountSnapshot(
       namespace: namespace.toUpperCase(),
       trafficLimitBytes: limit,
@@ -42,6 +94,7 @@ class AppAccountSnapshot {
       expiresAt: parsedExpiry?.toUtc(),
       activationDurationDays: duration,
       status: status,
+      reservedRenewal: nextRenewal,
     );
   }
 }
