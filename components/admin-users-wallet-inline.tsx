@@ -17,6 +17,8 @@ type WalletHistory={
   balance_toman:number;
   transactions:Array<{id:number;amount_toman:number;kind:string;description?:string|null;reference?:string|null;created_at:string;method?:string|null;tracking_code?:string|null}>;
   topups:Array<{id:number;amount_toman:number;method:string;status:string;tracking_code?:string|null;txid?:string|null;created_at:string;review_note?:string|null}>;
+  purchases:Array<{id:number;source:string;kind:string;amount_toman:number;plan_name?:string|null;status:string;payment_method?:string|null;payment_status?:string|null;tracking_code?:string|null;subscription_id?:number|null;created_at:string;paid_at?:string|null}>;
+  has_more_purchases:boolean;
   has_more_transactions:boolean;
   has_more_topups:boolean;
 };
@@ -227,7 +229,7 @@ export function AdminUsersWalletInline(){
         <form className="runtime-modal-card" onSubmit={submit} style={mode==="history"?{width:"min(720px,96vw)",maxHeight:"88vh",overflowY:"auto"}:undefined}>
           <div className="card-head">
             <div>
-              <b>{mode==="history"?pick("تاریخچه کیف پول","Wallet history"):mode==="debit"?pick("کاهش موجودی کیف پول","Deduct from wallet"):pick("افزایش موجودی کیف پول","Credit user wallet")} #{userId}</b>
+              <b>{mode==="history"?pick("تاریخچه مالی و خرید","Financial and purchase history"):mode==="debit"?pick("کاهش موجودی کیف پول","Deduct from wallet"):pick("افزایش موجودی کیف پول","Credit user wallet")} #{userId}</b>
               <small>{pick("موجودی فعلی","Current balance")}: {money(currentBalance)}</small>
               <small>{pick("توجه: این تغییر فقط برای شناسه همین کاربر است. ربات باید به همین حساب متصل باشد.","This change affects only this user ID. The bot must be linked to the same account.")}</small>
             </div>
@@ -264,7 +266,21 @@ export function AdminUsersWalletInline(){
               </div>)}
               {!history.transactions.length&&<small>{pick("تراکنش ثبت‌شده‌ای یافت نشد.","No recorded transactions found.")}</small>}
               {history.has_more_transactions&&<small>{pick("فقط ۲۰۰ تراکنش آخر نمایش داده شده است.","Showing the latest 200 transactions.")}</small>}
-              <b>{pick("درخواست‌های شارژ","Top-up requests")}</b>
+              <b>{pick("خریدها و سفارش‌های کاربر","Customer purchases and orders")}</b>
+              {(history.purchases||[]).filter(o=>[o.plan_name,o.status,o.payment_method,o.tracking_code,String(o.id),String(o.subscription_id||""),String(o.amount_toman)].join(" ").toLowerCase().includes(historySearch.toLowerCase())).map(o=><div key={o.source+"-"+o.id} style={{border:"1px solid var(--line,#dbe2ed)",borderRadius:12,padding:12,display:"grid",gap:5}}>
+                <div style={{display:"flex",justifyContent:"space-between",gap:8,flexWrap:"wrap"}}>
+                  <strong>{pick("خرید اشتراک","Subscription purchase")} #{o.id} · {o.plan_name||pick("پلن ثبت نشده","Unknown plan")}</strong>
+                  <strong>{money(o.amount_toman)}</strong>
+                </div>
+                <small>{walletDate(o.created_at)} · {pick("وضعیت سفارش","Order status")}: {o.status}</small>
+                {o.payment_method&&<small>{pick("روش پرداخت","Payment method")}: {o.payment_method}</small>}
+                {o.payment_status&&<small>{pick("وضعیت پرداخت","Payment status")}: {o.payment_status}</small>}
+                {o.subscription_id&&<small>{pick("اشتراک","Subscription")}: MV-{o.subscription_id}</small>}
+                {o.tracking_code&&<small>{pick("کد پیگیری","Tracking code")}: {o.tracking_code}</small>}
+              </div>)}
+              {!history.purchases?.length&&<small>{pick("سفارش خریدی ثبت نشده است.","No purchases recorded.")}</small>}
+              {history.has_more_purchases&&<small>{pick("فقط آخرین سفارش‌ها نمایش داده شده‌اند.","Only recent orders are shown.")}</small>}
+                            <b>{pick("درخواست‌های شارژ","Top-up requests")}</b>
               {history.topups.filter(t=>[t.method,t.status,t.tracking_code,t.txid,t.review_note,String(t.amount_toman)].join(" ").toLowerCase().includes(historySearch.toLowerCase())).map(t=><div key={t.id} style={{border:"1px solid var(--line, #dbe2ed)",borderRadius:12,padding:10,display:"grid",gap:4}}>
                 <div style={{display:"flex",justifyContent:"space-between",gap:8}}><strong>#{t.id} · {walletStatus(t.status)}</strong><strong>{money(t.amount_toman)}</strong></div>
                 <small>{walletDate(t.created_at)} · {t.method}</small>
