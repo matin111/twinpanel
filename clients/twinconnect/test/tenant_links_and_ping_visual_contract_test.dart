@@ -178,7 +178,7 @@ void main() {
       expect(modern, contains("'$code'"));
     }
     expect(modern, contains('SingBoxProfileValidator.validateOutbound('));
-    expect(modern, contains('SingBox.instance.connect(jsonEncode(outbound))'));
+    expect(modern, contains('SingBox.instance.connect(config)'));
     expect(card, contains('Future<void> _connectModern('));
     expect(card, contains('Future<void> _disconnectModern()'));
     expect(card, contains('loadSessionNativeProfiles('));
