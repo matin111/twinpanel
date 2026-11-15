@@ -43,6 +43,18 @@ class PlanScopeTests(unittest.TestCase):
                        "db.commit", "agent_url"):
             self.assertNotIn(secret, source)
 
+    def test_authenticated_app_catalog_does_not_require_share_link(self):
+        route = (Path(__file__).resolve().parents[1] / "app" / "routers" /
+                 "central_app_credentials_v1.py").read_text(encoding="utf-8")
+        block = route.split('@router.get("/session/protocols")', 1)[1].split(
+            '@router.get("/session/plan")', 1)[0]
+        self.assertIn("Depends(_session_subscription)", block)
+        self.assertIn("_selected_client_protocols(db, sub.id)", block)
+        self.assertIn("ProtocolCredential.subscription_id == sub.id", block)
+        self.assertIn("protocol_catalog(selected, configured)", block)
+        self.assertNotIn("_share_token(sub)", block)
+        self.assertNotIn("subscription_protocol_catalog(", block)
+
     def test_api_enforces_plan_category_on_protocols_profiles_and_nodes(self):
         root = Path(__file__).resolve().parents[1] / "app" / "routers"
         api = (root / "central_app_v1.py").read_text(encoding="utf-8")
