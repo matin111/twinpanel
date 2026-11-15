@@ -3052,7 +3052,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
 
   String get _choiceAccountKey => ConnectionChoiceStore.key(
     namespace: widget.panel.namespace,
-    apiOrigin: widget.panel.apiOrigin,
+    apiOrigin: widget.panel.apiOrigin.toString(),
     username: widget.username,
   );
 
