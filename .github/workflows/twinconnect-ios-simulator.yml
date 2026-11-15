@@ -51,16 +51,16 @@ jobs:
           source = app.read_text()
           native = bridge.read_text()
           for declaration in ("import Foundation", "import Flutter", "import NetworkExtension"):
-              native = native.replace(declaration + "\\n", "")
+              native = native.replace(declaration + "\n", "")
           # Flutter has two supported iOS templates:
           # legacy AppDelegate registers against self; modern scene-based
           # AppDelegate registers on FlutterImplicitEngineBridge.pluginRegistry.
           import re
           legacy = re.search(
-              r"GeneratedPluginRegistrant\\.register\\(with:\\s*self\\)",
+              r"GeneratedPluginRegistrant\.register\(with:\s*self\)",
               source)
           modern = re.search(
-              r"GeneratedPluginRegistrant\\.register\\(with:\\s*engineBridge\\.pluginRegistry\\)",
+              r"GeneratedPluginRegistrant\.register\(with:\s*engineBridge\.pluginRegistry\)",
               source)
           if legacy and not modern:
               registration = """
@@ -78,12 +78,12 @@ jobs:
               anchor = modern
           else:
               raise SystemExit(
-                  "Unsupported AppDelegate template; inspect ios/Runner/AppDelegate.swift:\\n"
+                  "Unsupported AppDelegate template; inspect ios/Runner/AppDelegate.swift:\n"
                   + source[:5000])
           source = (
-              source[:anchor.end()] + "\\n" + registration +
+              source[:anchor.end()] + "\n" + registration +
               source[anchor.end():])
-          app.write_text("import NetworkExtension\\n" + source + "\\n" + native)
+          app.write_text("import NetworkExtension\n" + source + "\n" + native)
           PY
       - name: Type-check packet tunnel provider against iOS Simulator SDK
         shell: bash
