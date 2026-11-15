@@ -28,6 +28,9 @@ void main() {
     expect(ruby, contains("project.new_target(:app_extension, 'PacketTunnel'"));
     expect(ruby, contains("runner.add_dependency(extension)"));
     expect(ruby, contains("runner.new_copy_files_build_phase('Embed App Extensions')"));
+    expect(ruby, contains("phase.name == 'Thin Binary'"));
+    expect(ruby, contains('phases.insert(thin_index, embed)'));
+    expect(ruby, contains('runner.build_phases.index(embed) < runner.build_phases.index(thin_binary)'));
     expect(native, contains('SecItemAdd('));
     expect(native, contains('saveToPreferences'));
     expect(native, contains('startVPNTunnel()'));
