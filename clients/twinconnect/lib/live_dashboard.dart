@@ -4836,12 +4836,42 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
             Padding(
               padding: const EdgeInsets.all(18),
               child: Column(children: [
-                txt(widget.serverRefreshError == 'APP_SESSION_EXPIRED'
-                  ? tr('نشست ورود منقضی شده است. برای دریافت سرورها دوباره وارد حساب شوید.',
-                       'Session expired. Sign in again to restore servers.')
-                  : tr('دریافت فهرست سرورها ناموفق بود. اتصال پنل را بررسی و دوباره تلاش کنید.',
-                       'Server refresh failed. Check panel access and retry.'),
-                  align: TextAlign.center, color: const Color(0xFFFFBE67)),
+                txt(switch (widget.serverRefreshError) {
+                  'APP_SESSION_EXPIRED' => tr(
+                    'نشست ورود منقضی شده است. دوباره وارد حساب شوید.',
+                    'Session expired. Sign in again.'),
+                  'APP_NOT_AUTHORIZED' => tr(
+                    'دسترسی این حساب در پنل مجاز نیست.',
+                    'This account is not authorized on the panel.'),
+                  'APP_PANEL_ENDPOINT_MISSING' => tr(
+                    'مسیر دریافت سرورها در نسخه فعلی پنل وجود ندارد.',
+                    'The panel does not provide the required server endpoint.'),
+                  'APP_SERVER_SCHEMA_INVALID' => tr(
+                    'اطلاعات سرورهای پنل ناقص یا نامعتبر است.',
+                    'Panel server inventory is malformed.'),
+                  'APP_PROTOCOL_SCHEMA_INVALID' => tr(
+                    'فهرست پروتکل‌های پلن از پنل نامعتبر دریافت شد.',
+                    'The panel returned an invalid plan protocol catalog.'),
+                  'APP_PANEL_TLS_FAILURE' => tr(
+                    'اتصال امن TLS به پنل ناموفق بود.',
+                    'Secure TLS connection to the panel failed.'),
+                  'APP_PANEL_NETWORK_UNAVAILABLE' => tr(
+                    'ارتباط شبکه با پنل برقرار نشد.',
+                    'Could not reach the panel over the network.'),
+                  'APP_PANEL_TIMEOUT' => tr(
+                    'دریافت اطلاعات پنل بیش از حد طول کشید.',
+                    'Panel request timed out.'),
+                  'APP_PANEL_RATE_LIMITED' => tr(
+                    'تعداد درخواست‌ها زیاد است. کمی بعد دوباره تلاش کنید.',
+                    'Too many requests. Retry later.'),
+                  'APP_PANEL_SERVER_ERROR' => tr(
+                    'سرور پنل هنگام دریافت اطلاعات خطا داد.',
+                    'Panel server returned an error.'),
+                  _ => tr(
+                    'دریافت فهرست سرورها ناموفق بود. دوباره تلاش کنید.',
+                    'Server refresh failed. Please retry.'),
+                }, align: TextAlign.center,
+                  color: const Color(0xFFFFBE67)),
                 const SizedBox(height: 8),
                 OutlinedButton.icon(
                   onPressed: widget.onRefresh,
