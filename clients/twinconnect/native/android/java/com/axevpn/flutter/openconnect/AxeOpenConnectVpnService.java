@@ -480,7 +480,12 @@ public class AxeOpenConnectVpnService extends VpnService {
         int code = -1;
         String[] parts = statusLine.split(" ", 3);
         if (parts.length >= 2) { try { code = Integer.parseInt(parts[1].trim()); } catch (Exception ignored) {} }
-        if (code != 200) { drainAll(is); Log.e(TAG, "Auth HTTP " + code); return null; }
+        if (code != 200) {
+            // We need response headers only. Never block consuming a
+            // keep-alive body when the server rejects the request.
+            Log.e(TAG, "Auth HTTP " + code);
+            return null;
+        }
 
         StringBuilder cookies = new StringBuilder();
         boolean xmlChallenge = false;
@@ -501,7 +506,8 @@ public class AxeOpenConnectVpnService extends VpnService {
                 cookies.append(cookie);
             }
         }
-        drainAll(is);
+        // Session cookies are in headers; consuming the response body
+        // can block on keep-alive and incorrectly fail a valid auth-init.
         if (cookies.length() == 0 && xmlChallenge) {
             // This custom client cannot process standard config-auth forms.
             // Do not retry credentials blindly.
