@@ -1059,6 +1059,9 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
                 style: Theme.of(context).textTheme.titleMedium),
               const SizedBox(height: 10),
               Text(!connected ? s.pick('تونل غیرفعال است', 'Tunnel disconnected')
+                  : !selectedIsActive
+                      ? s.pick('یک تونل دیگر فعال است؛ پروتکل انتخاب‌شده متصل نیست.',
+                          'A different VPN tunnel is active; the selected protocol is not connected.')
                   : internetVerified
                       ? s.pick('دسترسی HTTPS برقرار است؛ مسیر VPN هنوز مستقل تأیید نشده.', 'HTTPS reachable; VPN routing not independently verified.')
                       : _ciscoUp
