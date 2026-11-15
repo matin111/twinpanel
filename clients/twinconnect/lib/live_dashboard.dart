@@ -2868,7 +2868,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   bool _xrayPingAllBusy = false;
 
   Future<void> _probeXrayInbound(XrayInboundProfile inbound) async {
-    if (!Platform.isWindows || !mounted) return;
+    if ((!Platform.isWindows && !Platform.isAndroid) || !mounted) return;
     final key = XrayInboundLatency.key(inbound);
     if (_xrayInboundsProbing.contains(key)) return;
     setState(() => _xrayInboundsProbing.add(key));
@@ -4122,12 +4122,19 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                   _selected = index;
                   _selectedXrayNodeId = nodeId;
                   _selectedXrayInboundId = inbound.id;
+                  _androidExplicitNodeSelected = Platform.isAndroid;
                   _filter = 'v2ray';
                   _page = 'home';
                   _autoFastest = false;
                   _vpnError = null;
                 });
-                _startXrayTunnel(nodeId, inboundId: inbound.id);
+                if (Platform.isWindows) {
+                  _startXrayTunnel(nodeId, inboundId: inbound.id);
+                } else if (Platform.isAndroid) {
+                  // The Android card starts the native VLESS engine when
+                  // Connect is pressed; do not call Windows-only launcher.
+                  unawaited(_saveSelection());
+                }
               },
               child: Padding(
                 padding: const EdgeInsets.symmetric(
@@ -4932,6 +4939,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                     // Preserve the actual choice, even when its Android
                     // engine is unavailable; never substitute WireGuard.
                     selectedProtocolCode: _filter == 'all' ? null : _filter,
+                    selectedInboundId: _filter == 'v2ray'
+                        ? _selectedXrayInboundId : null,
                     selectedNodeId: _androidExplicitNodeSelected
                         ? _selectedServerId : null,
                     subscriptionContent: Container(
