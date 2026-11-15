@@ -26,8 +26,8 @@ void main() {
         .readAsStringSync();
     expect(shared, contains('onPressed: _vpnBusy ? null : (Platform.isIOS'));
     expect(shared, contains("Key('iosVpnEngineUnavailableNotice')"));
-    expect(native, contains('"engineReady": false'));
-    expect(native, contains('"supportedProtocols": [String]()'));
+    expect(native, contains('"engineReady": wireGuardReady'));
+    expect(native, contains('TwinConnectIOSVPNControl.backendLinked()'));
     expect(native, contains('"verified": false'));
   });
 }
