@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:developer' as developer;
 
 import 'package:openvpn_flutter/openvpn_flutter.dart';
 
@@ -37,7 +36,9 @@ class AndroidOpenVpnTunnel {
     // Log only static transport metadata, never endpoints, passwords,
     // certificates or user-supplied profile lines. This makes it possible
     // to compare Android and Windows transport/MTU without exposing secrets.
-    final protocol = RegExp(r'^proto\\s+(udp|tcp-client)\\s*
+    // Engine owns tunnel configuration. Do not modify MTU, cipher or protocol
+    // until a measured comparison with the Windows profile is available.
+    final engine = _engine!;
     _verified = false;
     final username = profile['username'] ?? profile['user'];
     final password = profile['password'];
