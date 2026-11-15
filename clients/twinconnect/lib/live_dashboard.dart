@@ -17,6 +17,7 @@ import 'protocols.dart';
 import 'server_inventory.dart';
 import 'server_latency.dart';
 import 'fast_server_selection.dart';
+import 'connection_choice_store.dart';
 import 'windows_singbox_preflight.dart';
 import 'singbox_profile_validator.dart';
 import 'shadowtls_chain.dart';
@@ -2528,6 +2529,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       return; // No network, VPN, or credential calls from an offline mock.
     }
     _restoreAppearance();
+    unawaited(_restoreManualConnectionChoice());
     _refreshNativeReadiness();
     _refreshVpnStatus();
     unawaited(_restoreCachedXrayInbounds());
@@ -2546,6 +2548,14 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     if (oldWidget.username != widget.username ||
         oldWidget.panel.namespace != widget.panel.namespace ||
         oldWidget.panel.apiOrigin != widget.panel.apiOrigin) {
+      // A reused dashboard state must not leak any previous tenant's choice.
+      ++_choiceRevision;
+      _filter = 'all';
+      _selected = 0;
+      _explicitNodeId = null;
+      _explicitXrayInboundId = null;
+      _autoFastest = false;
+      unawaited(_restoreManualConnectionChoice());
       _socks5AssignedNodeIds = null;
       _socks5NodesError = null;
       // No in-memory Xray credentials may cross tenants or accounts.
@@ -2566,6 +2576,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       }
     }
     if (oldWidget.servers != widget.servers) {
+      // Inventories can reorder. Match the saved stable ID, not the old index.
+      _alignSelectedNodeWithInventory();
       final ids = widget.servers?.servers.map((node) => node.id).toSet()
           ?? <String>{};
       _nodePings.removeWhere((id, value) => !ids.contains(id));
@@ -3007,6 +3019,80 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   String _filter = 'all';
   String _search = '';
   int _selected = 0;
+  String? _explicitNodeId;
+  String? _explicitXrayInboundId;
+  int _choiceRevision = 0;
+  Future<void> _choiceWrites = Future<void>.value();
+
+  String get _choiceAccountKey => ConnectionChoiceStore.key(
+    namespace: widget.panel.namespace,
+    apiOrigin: widget.panel.apiOrigin,
+    username: widget.username,
+  );
+
+  /// Restore only the user's explicit choice, not an automatically chosen
+  /// Fast Server or the most recently active tunnel. Never select a different
+  /// node if a saved node is missing from a refreshed inventory.
+  Future<void> _restoreManualConnectionChoice() async {
+    if (widget.simulatorPreview) return;
+    final account = _choiceAccountKey;
+    final revision = _choiceRevision;
+    ConnectionChoice? saved;
+    try {
+      saved = await ConnectionChoiceStore.load(account);
+    } catch (_) {
+      return; // A storage failure is never a reason to switch VPN servers.
+    }
+    if (!mounted || _choiceAccountKey != account ||
+        _choiceRevision != revision || saved == null) return;
+    final nodes = widget.servers?.servers ?? const <AppServer>[];
+    final selected = saved.nodeId == null
+        ? _selected
+        : nodes.indexWhere((node) => node.id == saved!.nodeId);
+    setState(() {
+      _filter = saved!.protocolCode;
+      _explicitNodeId = saved.nodeId;
+      _explicitXrayInboundId = saved.xrayInboundId;
+      _selected = selected;
+      if (saved.protocolCode == 'v2ray' && saved.nodeId != null) {
+        _selectedXrayNodeId = saved.nodeId;
+        _selectedXrayInboundId = saved.xrayInboundId;
+      }
+      _autoFastest = false;
+    });
+    if (saved.protocolCode == 'v2ray') unawaited(_loadXrayGroups());
+    if (saved.protocolCode == 'socks5') {
+      unawaited(_refreshSocks5AvailableNodes());
+    }
+  }
+
+  /// Called *only* for explicit taps on a protocol, server or Xray inbound.
+  /// Queue writes in click order so a delayed disk operation cannot replace
+  /// the user's newest selection. Only IDs and protocol codes are persisted.
+  void _persistManualConnectionChoice() {
+    if (widget.simulatorPreview) return;
+    ++_choiceRevision;
+    final key = _choiceAccountKey;
+    final choice = ConnectionChoice(
+      protocolCode: _filter,
+      nodeId: _explicitNodeId,
+      xrayInboundId: _filter == 'v2ray' ? _explicitXrayInboundId : null,
+    );
+    _choiceWrites = _choiceWrites.catchError((Object _) {}).then((_) async {
+      try {
+        await ConnectionChoiceStore.save(key, choice);
+      } catch (_) {
+        // A failed local preference write must not interrupt the VPN.
+      }
+    });
+  }
+
+  void _alignSelectedNodeWithInventory() {
+    if (_explicitNodeId == null) return;
+    final nodes = widget.servers?.servers ?? const <AppServer>[];
+    _selected = nodes.indexWhere((node) => node.id == _explicitNodeId);
+  }
+
   final Set<int> _favorites = <int>{};
   // User-facing Xray inbounds remain distinct choices. Last validated
   // entries are stored in OS-encrypted short-lived display cache only.
