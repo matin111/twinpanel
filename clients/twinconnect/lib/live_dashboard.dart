@@ -2728,6 +2728,35 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   /// Device-only iOS path. Appetize can exercise the button but fails
   /// safely without an embedded, signed PacketTunnel and WireGuardKitGo.
   /// A successful OS start request is NOT a verified peer handshake.
+  /// macOS has its own native channel; never run any Windows adapter on a
+  /// Mac. This unsigned preview has no Apple-entitled Packet Tunnel provider.
+  /// Keep the UI interactive and report the missing engine instead of
+  /// silently ignoring Connect or claiming a connected session.
+  Future<void> _toggleMacVpn() async {
+    if (!Platform.isMacOS || _vpnBusy) return;
+    setState(() { _vpnBusy = true; _vpnError = null; });
+    try {
+      final capabilities = await NativeVpnBridge.probe();
+      if (!capabilities.engineReady || !capabilities.fullTunnel) {
+        throw const FormatException('MACOS_PACKET_TUNNEL_NOT_INSTALLED');
+      }
+      final native = await NativeVpnBridge.protocolReadiness(
+          validatedCapabilities: capabilities);
+      final selectedProtocol = _filter == 'all' ? null : _filter;
+      if (selectedProtocol == null || !_protocolEntitled(selectedProtocol) ||
+          !native.supports(selectedProtocol)) {
+        throw const FormatException('MACOS_PROTOCOL_ENGINE_NOT_READY');
+      }
+      // Do not report success until a correctly signed, fully functional
+      // Network Extension connects and verifies actual tunnel traffic.
+      throw const FormatException('MACOS_VPN_CONNECTOR_NOT_LINKED');
+    } catch (error) {
+      if (mounted) setState(() => _vpnError = _errorText(error));
+    } finally {
+      if (mounted) setState(() => _vpnBusy = false);
+    }
+  }
+
   Future<void> _toggleIosVpn() async {
     if (!Platform.isIOS || _vpnBusy) return;
     setState(() { _vpnBusy = true; _vpnError = null; });
@@ -4038,7 +4067,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
               child: FilledButton(
                 key: const Key('liveConnectionControlsButton'),
                 onPressed: _vpnBusy ? null : (Platform.isIOS
-                    ? _toggleIosVpn : (Platform.isWindows ? _toggleVpn : null)),
+                    ? _toggleIosVpn : Platform.isMacOS
+                    ? _toggleMacVpn : (Platform.isWindows ? _toggleVpn : null)),
                 style: FilledButton.styleFrom(
                   minimumSize: const Size(250, 59),
                   backgroundColor: Colors.transparent,
@@ -4094,6 +4124,15 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           const SizedBox(height: 8),
           Text(
             switch (_vpnError!) {
+              'MACOS_PACKET_TUNNEL_NOT_INSTALLED' => tr(
+                'افزونه امضاشده Packet Tunnel هنوز روی نسخه مک نصب نیست.',
+                'The signed macOS Packet Tunnel extension is not installed yet.'),
+              'MACOS_PROTOCOL_ENGINE_NOT_READY' => tr(
+                'موتور این پروتکل هنوز برای مک آماده نشده است.',
+                'The selected macOS protocol engine is not yet ready.'),
+              'MACOS_VPN_CONNECTOR_NOT_LINKED' => tr(
+                'اتصال بومی macOS هنوز به موتور واقعی VPN متصل نشده است.',
+                'The native macOS VPN connector is not yet linked.'),
               'IOS_PACKET_TUNNEL_EXTENSION_MISSING' => tr(
                 'افزونه Packet Tunnel هنوز در نسخه آیفون نصب نشده است.',
                 'The iOS Packet Tunnel extension is not embedded yet.'),
