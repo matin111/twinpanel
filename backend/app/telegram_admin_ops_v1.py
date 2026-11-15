@@ -186,7 +186,7 @@ def install_telegram_admin_ops(router, request_fn):
             return
         previous = str(message.caption or message.text or "")
         # Normalize old bot captions that accidentally contained literal \\n.
-        previous = previous.replace("\\\\n", "\\n")
+        previous = previous.replace("\\n", "\n")
         first = previous.split("\n", 1)[0]
         rest = previous.split("\n", 1)[1] if "\n" in previous else ""
         if "رسید" in first:
