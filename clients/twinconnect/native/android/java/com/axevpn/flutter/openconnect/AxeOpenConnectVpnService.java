@@ -215,7 +215,7 @@ public class AxeOpenConnectVpnService extends VpnService {
             Log.e(TAG, "Cisco JNI linking failed", error);
             lastFailureCode = "CISCO_NATIVE_ENGINE_UNAVAILABLE";
             broadcastStage("error");
-        } catch (RuntimeException error) {
+        } catch (Exception error) {
             Log.e(TAG, "Cisco native bridge failed", error);
             lastFailureCode = "CISCO_NATIVE_START_FAILED";
             broadcastStage("error");
