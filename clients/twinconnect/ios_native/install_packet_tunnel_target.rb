@@ -21,6 +21,11 @@ extension.product_reference.path = 'PacketTunnel.appex'
 extension.build_configurations.each do |configuration|
   settings = configuration.build_settings
   settings['SWIFT_VERSION'] = '5.0'
+  # Explicit product naming is required. With no PRODUCT_NAME Xcode
+  # computes a bare ".appex" output for the new app-extension target,
+  # which collides with the embed/copy phase during Flutter builds.
+  settings['PRODUCT_NAME'] = 'PacketTunnel'
+  settings['WRAPPER_EXTENSION'] = 'appex'
   settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
   settings['PRODUCT_BUNDLE_IDENTIFIER'] = 'com.twinpanel.twinconnect.PacketTunnel'
   settings['INFOPLIST_FILE'] = '../ios_native/PacketTunnel-Info.plist'
