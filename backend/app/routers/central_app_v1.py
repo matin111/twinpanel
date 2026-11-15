@@ -28,12 +28,14 @@ from ..central_app_appearance import resolve_appearance
 from ..database import get_db
 from ..deps import require_admin, require_reseller
 from ..models_reseller import Reseller, ResellerSubscription
-from ..models import Subscription, SubscriptionProtocol, ProtocolCredential
+from ..models import Subscription, SubscriptionProtocol, ProtocolCredential, Plan
 from ..system_release import (
     _vendor_post, ensure_installation_id, load_license_state,
 )
 from .account_delivery import _subscription_from_share_token, _stored_info
 from ..central_app_protocols import protocol_catalog, normalize_protocol
+from ..plan_category_models import PlanCategoryAssignment
+from ..protocol_account_registry import explicit_plan_protocols
 
 router = APIRouter(prefix="/v1/central-app", tags=["central-app"])
 _COLOR = re.compile(r"^#[0-9A-Fa-f]{6}$")
@@ -386,13 +388,59 @@ def _verified_protocol_subscription(
     return sub
 
 
+def _plan_client_protocols(db: Session, plan_id: int | None) -> set[str]:
+    """Read the plan category and its configured protocol template.
+
+    The plan's protocol selection is the authority for this plan *type*.
+    Historical plans without a protocol template keep legacy subscription
+    selection, never a guessed set of connections or credentials.
+    """
+    if not plan_id:
+        return set()
+    plan = db.get(Plan, int(plan_id))
+    if plan is None:
+        return set()
+    assigned = {
+        value for code in explicit_plan_protocols(db, int(plan_id))
+        if (value := normalize_protocol(code))
+    }
+    grouping = db.query(PlanCategoryAssignment).filter(
+        PlanCategoryAssignment.plan_id == int(plan_id)
+    ).first()
+    subscription_type = str(
+        grouping.subscription_type if grouping else ""
+    ).strip().casefold()
+    # The v2ray/vitory commercial category has two possible protocols
+    # even when an older panel row accidentally retained all 16 flags.
+    # Its grouping is read from the panel, not guessed from a plan title.
+    is_vitory = (
+        "ویتوری" in subscription_type or
+        "vitory" in subscription_type or
+        "v2ray" in subscription_type
+    )
+    if is_vitory:
+        permitted = {"v2ray", "hysteria2"}
+        return assigned & permitted if assigned else permitted
+    return assigned
+
+
 def _selected_client_protocols(db: Session, subscription_id: int) -> set[str]:
     rows = (
         db.query(SubscriptionProtocol.protocol)
         .filter(SubscriptionProtocol.subscription_id == subscription_id)
         .all()
     )
-    return {value for row in rows if (value := normalize_protocol(row[0]))}
+    selected = {
+        value for row in rows if (value := normalize_protocol(row[0]))
+    }
+    # A subscription may hold old/copied protocol rows from before its
+    # commercial category changed. Enforce the plan's CURRENT template
+    # without changing historical subscription rows or service configs.
+    sub = db.get(Subscription, int(subscription_id))
+    if sub is None:
+        return set()
+    permitted = _plan_client_protocols(db, sub.plan_id)
+    return selected & permitted if permitted else selected
 
 
 @router.post("/public/protocols")
