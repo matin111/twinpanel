@@ -131,24 +131,35 @@ jobs:
           xcrun simctl io "$device" screenshot TwinConnect-iOS-03-Settings.png
           sleep 12
           xcrun simctl io "$device" screenshot TwinConnect-iOS-04-Account.png
-      - name: Package Appetize iOS simulator build
+      - name: Build authenticated iPhone app for interactive panel testing
+        env:
+          TWINCONNECT_DIRECTORY_URL: ${{ vars.TWINCONNECT_DIRECTORY_URL || 'https://panel.matindnspro.sbs' }}
         shell: bash
         run: |
           set -euo pipefail
+          # The Appetize artifact must start at the *real* username/password
+          # screen. Demo fixtures are confined to the screenshot tour above.
+          flutter build ios --simulator --debug --no-codesign \
+            --target lib/main.dart \
+            --dart-define=TWINCONNECT_DIRECTORY_URL="$TWINCONNECT_DIRECTORY_URL"
           test -d build/ios/iphonesimulator/Runner.app
+      - name: Package authenticated Appetize simulator build
+        shell: bash
+        run: |
+          set -euo pipefail
           cd build/ios/iphonesimulator
           ditto -c -k --sequesterRsrc --keepParent Runner.app \
-            ../../../TwinConnect-iOS-Appetize-v0.1.0.zip
+            ../../../TwinConnect-iOS-Appetize-RealLogin-v0.1.0.zip
           cd ../../..
-          shasum -a 256 TwinConnect-iOS-Appetize-v0.1.0.zip \
-            > TwinConnect-iOS-Appetize-SHA256.txt
-      - name: Upload installable Appetize simulator app separately
+          shasum -a 256 TwinConnect-iOS-Appetize-RealLogin-v0.1.0.zip \
+            > TwinConnect-iOS-Appetize-RealLogin-SHA256.txt
+      - name: Upload Appetize app with real panel login (no bundled credentials)
         uses: actions/upload-artifact@v4
         with:
-          name: TwinConnect-iOS-Appetize-v0.1.0
+          name: TwinConnect-iOS-Appetize-RealLogin-v0.1.0
           path: |
-            clients/twinconnect/TwinConnect-iOS-Appetize-v0.1.0.zip
-            clients/twinconnect/TwinConnect-iOS-Appetize-SHA256.txt
+            clients/twinconnect/TwinConnect-iOS-Appetize-RealLogin-v0.1.0.zip
+            clients/twinconnect/TwinConnect-iOS-Appetize-RealLogin-SHA256.txt
           if-no-files-found: error
           retention-days: 14
       # Only screenshots are distributed for visual review. Bundling an
