@@ -36,6 +36,7 @@ from .account_delivery import _subscription_from_share_token, _stored_info
 from ..central_app_protocols import protocol_catalog, normalize_protocol
 from ..plan_category_models import PlanCategoryAssignment
 from ..protocol_account_registry import explicit_plan_protocols
+from ..central_app_plan_policy import category_protocols
 
 router = APIRouter(prefix="/v1/central-app", tags=["central-app"])
 _COLOR = re.compile(r"^#[0-9A-Fa-f]{6}$")
@@ -407,21 +408,8 @@ def _plan_client_protocols(db: Session, plan_id: int | None) -> set[str]:
     grouping = db.query(PlanCategoryAssignment).filter(
         PlanCategoryAssignment.plan_id == int(plan_id)
     ).first()
-    subscription_type = str(
-        grouping.subscription_type if grouping else ""
-    ).strip().casefold()
-    # The v2ray/vitory commercial category has two possible protocols
-    # even when an older panel row accidentally retained all 16 flags.
-    # Its grouping is read from the panel, not guessed from a plan title.
-    is_vitory = (
-        "ویتوری" in subscription_type or
-        "vitory" in subscription_type or
-        "v2ray" in subscription_type
-    )
-    if is_vitory:
-        permitted = {"v2ray", "hysteria2"}
-        return assigned & permitted if assigned else permitted
-    return assigned
+    subscription_type = grouping.subscription_type if grouping else ""
+    return category_protocols(subscription_type, assigned)
 
 
 def _selected_client_protocols(db: Session, subscription_id: int) -> set[str]:
