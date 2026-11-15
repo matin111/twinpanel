@@ -27,6 +27,9 @@ def reserve_renewal(db: Session, *, subscription_id: int, plan_id: int | None,
         raise HTTPException(404, "اشتراک پیدا نشد")
     if sub.status == SubscriptionStatus.CANCELED:
         raise HTTPException(409, "اشتراک لغوشده قابل تمدید نیست")
+    # Changes of protocol/plan require a separate atomic migration before payment.
+    if plan_id is not None and sub.plan_id is not None and int(plan_id) != int(sub.plan_id):
+        raise HTTPException(409, "تغییر پلن در تمدید رزروی فعلاً مجاز نیست")
     prior = db.execute(select(PendingSubscriptionRenewal).where(
         PendingSubscriptionRenewal.source == source,
         PendingSubscriptionRenewal.source_reference == reference)).scalar_one_or_none()
@@ -83,12 +86,17 @@ def activate_due_renewals(db: Session, limit: int = 100) -> int:
             sub.starts_at = now
             sub.expires_at = now + timedelta(days=pending.duration_days) if pending.duration_days > 0 else None
             sub.activation_duration_days = pending.duration_days
-            # Preserve existing credential/protocol bindings. A plan switch needs a separate
-            # provisioning compatibility check; do not silently issue incompatible configs.
-            if pending.plan_id is not None and sub.plan_id == pending.plan_id:
+            # Protect existing credentials: incompatible plan changes must never
+            # be marked activated without provisioning the corresponding protocols.
+            if pending.plan_id is not None and sub.plan_id is not None and int(pending.plan_id) != int(sub.plan_id):
+                raise RuntimeError("reserved_renewal_incompatible_plan_change")
+            if pending.plan_id is not None:
                 sub.plan_id = pending.plan_id
+            # Preserve manual suspensions. Refresh entitlements even if the
+            # quota monitor has not yet marked the exhausted account EXPIRED.
             if sub.status == SubscriptionStatus.EXPIRED:
                 sub.status = SubscriptionStatus.ACTIVE
+            if sub.status == SubscriptionStatus.ACTIVE:
                 queue_subscription_enforcement(db, sub, command_type="restore_subscription",
                                                reason="reserved_renewal")
             pending.status = "activated"
