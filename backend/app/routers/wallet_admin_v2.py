@@ -300,10 +300,55 @@ def admin_user_wallet_history(
         "approved_at": t.approved_at,
         "review_note": t.review_note,
     } for t in topups]
+    # Purchase records are separate from wallet debits. Expose the order once,
+    # and attach payment metadata rather than treating a debit as a second sale.
+    from ..store_models import StoreOrder
+    from ..payment_models import PaymentIntent
+    from ..models import Plan
+    orders = (
+        db.query(StoreOrder)
+        .filter(StoreOrder.user_id == int(user_id))
+        .order_by(StoreOrder.created_at.desc(), StoreOrder.id.desc())
+        .limit(size).all()
+    )
+    order_ids = [int(order.id) for order in orders]
+    payment_rows = (
+        db.query(PaymentIntent)
+        .filter(PaymentIntent.order_id.in_(order_ids))
+        .order_by(PaymentIntent.created_at.desc(), PaymentIntent.id.desc()).all()
+        if order_ids else []
+    )
+    payments_by_order = {}
+    for payment in payment_rows:
+        payments_by_order.setdefault(int(payment.order_id), payment)
+    plan_ids = {int(order.plan_id) for order in orders if order.plan_id}
+    plans = {
+        int(plan.id): plan.name for plan in
+        (db.query(Plan).filter(Plan.id.in_(plan_ids)).all() if plan_ids else [])
+    }
+    purchases = []
+    for order in orders:
+        payment = payments_by_order.get(int(order.id))
+        purchases.append({
+            "id": int(order.id),
+            "source": "store",
+            "kind": "subscription_purchase",
+            "amount_toman": int(order.amount_toman or 0),
+            "plan_name": plans.get(int(order.plan_id)) if order.plan_id else None,
+            "status": order.status,
+            "payment_method": order.payment_method or (payment.method if payment else None),
+            "payment_status": payment.status if payment else None,
+            "tracking_code": payment.tracking_code if payment else None,
+            "subscription_id": int(order.subscription_id) if order.subscription_id else None,
+            "created_at": order.created_at,
+            "paid_at": order.paid_at,
+        })
     return {
         "user_id": int(user_id),
         "balance_toman": int(wallet.balance_toman or 0) if wallet else 0,
         "transactions": items,
+        "purchases": purchases,
+        "has_more_purchases": len(orders) == size,
         "topups": pending,
         "has_more_transactions": len(transactions) == size,
         "has_more_topups": len(topups) == size,
