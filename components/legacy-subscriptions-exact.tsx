@@ -407,7 +407,17 @@ export function LegacySubscriptionsRuntimePage(){
   const selectedCredential=credentials.find(item=>s(item.protocol)===activeProtocol)||credentials[0]||null;
   const selectedItems=selectedCredential?list(selectedCredential.items):[];
 
-  const trafficCell=(item:RuntimeRow)=>{const limit=n(item.traffic_limit_bytes);const used=n(item.traffic_used_bytes);if(limit<=0)return <div className="user-cell"><b dir="ltr">{formatBytes(used)} / {pick("نامحدود","Unlimited")}</b><small>∞</small></div>;const percent=Math.min(100,Math.round(used/limit*100));return <div className="user-cell"><b dir="ltr">{formatBytes(used)} / {formatBytes(limit)}</b><small>{percent.toLocaleString("fa-IR")}٪</small></div>;};
+  const trafficCell=(item:RuntimeRow)=>{
+    const limit=n(item.traffic_limit_bytes),used=n(item.traffic_used_bytes);
+    const percent=limit>0?Math.max(0,Math.min(100,(used/limit)*100)):0;
+    return <div className="user-cell" style={{display:"grid",gap:7,width:"100%",minWidth:0}}>
+      <b dir="ltr" style={{fontVariantNumeric:"tabular-nums",fontSize:13,whiteSpace:"nowrap"}}>{formatBytes(used)} / {limit>0?formatBytes(limit):pick("نامحدود","Unlimited")}</b>
+      <div role="progressbar" aria-label={pick("میزان مصرف اشتراک","Subscription usage")} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(percent)} style={{height:7,borderRadius:999,overflow:"hidden",background:"rgba(126,148,201,.2)",width:"100%"}}>
+        <i style={{display:"block",height:"100%",borderRadius:999,width:`${percent}%`,background:percent>=90?"#ef6464":"linear-gradient(90deg,#407cf6,#a460ff)",transition:"width .3s ease"}}/>
+      </div>
+      <small style={{fontVariantNumeric:"tabular-nums"}}>{limit>0?`${Math.round(percent).toLocaleString("fa-IR")}٪`:"∞"}</small>
+    </div>;
+  };
   const expiryCell=(item:RuntimeRow)=>{
     if(item.expires_at){
       const expires=new Date(String(item.expires_at));
