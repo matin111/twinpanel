@@ -413,7 +413,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           ).timeout(const Duration(seconds: 4));
           clock.stop();
           if (response.exitCode == 0) {
-            final match = RegExp(r'time\\s*[=<]\\s*([0-9]+(?:\\.[0-9]+)?)\\s*ms',
+            final match = RegExp(r'time\s*[=<]\s*([0-9]+(?:\.[0-9]+)?)\s*ms',
               caseSensitive: false).firstMatch(response.stdout.toString());
             if (match != null) {
               latency = double.parse(match.group(1)!).ceil().clamp(1, 60000);
