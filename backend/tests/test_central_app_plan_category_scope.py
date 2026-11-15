@@ -28,6 +28,8 @@ class PlanScopeTests(unittest.TestCase):
     def test_vitory_uses_stricter_admin_protocol_selection(self):
         self.assertEqual(POLICY.category_protocols("ویتوری", {"v2ray"}),
                          {"v2ray"})
+        self.assertEqual(POLICY.category_protocols("ویتوری", {"cisco"}),
+                         set())
         self.assertEqual(POLICY.category_protocols("ویتوری", set()),
                          {"v2ray", "hysteria2"})
 
@@ -60,7 +62,7 @@ class PlanScopeTests(unittest.TestCase):
         api = (root / "central_app_v1.py").read_text(encoding="utf-8")
         auth = (root / "central_app_credentials_v1.py").read_text(encoding="utf-8")
         self.assertIn("category_protocols(", api)
-        self.assertIn("selected & permitted if permitted else selected", api)
+        self.assertIn("return selected if permitted is None else selected & permitted", api)
         self.assertIn("protocol not in _selected_client_protocols(db, sub.id)", api)
         self.assertIn("protocol_catalog(selected, configured)", api)
         self.assertIn("PlanNode.plan_id == int(sub.plan_id)", auth)
