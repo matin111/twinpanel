@@ -83,6 +83,18 @@ def activate_due_renewals(db: Session, limit: int = 100) -> int:
             if pending is None:
                 db.rollback()
                 continue
+            if pending.plan_id is not None and (
+                sub.plan_id is None or int(pending.plan_id) != int(sub.plan_id)
+            ):
+                pending.status = "blocked"
+                history(db, sub_id, "renewal_blocked", pending.source, "system", {
+                    "renewal_id": pending.id,
+                    "reason": "plan_changed_after_renewal",
+                    "current_plan_id": sub.plan_id,
+                    "reserved_plan_id": pending.plan_id,
+                })
+                db.commit()
+                continue
             before = {"plan_id": sub.plan_id, "traffic_limit_bytes": int(sub.traffic_limit_bytes or 0),
                       "traffic_used_bytes": int(sub.traffic_used_bytes or 0),
                       "expires_at": sub.expires_at.isoformat() if sub.expires_at else None}
