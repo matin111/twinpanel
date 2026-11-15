@@ -106,6 +106,26 @@ jobs:
           xcrun simctl io "$device" screenshot TwinConnect-iOS-03-Settings.png
           sleep 12
           xcrun simctl io "$device" screenshot TwinConnect-iOS-04-Account.png
+      - name: Package Appetize iOS simulator build
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -d build/ios/iphonesimulator/Runner.app
+          cd build/ios/iphonesimulator
+          ditto -c -k --sequesterRsrc --keepParent Runner.app \
+            ../../../TwinConnect-iOS-Appetize-v0.1.0.zip
+          cd ../../..
+          shasum -a 256 TwinConnect-iOS-Appetize-v0.1.0.zip \
+            > TwinConnect-iOS-Appetize-SHA256.txt
+      - name: Upload installable Appetize simulator app separately
+        uses: actions/upload-artifact@v4
+        with:
+          name: TwinConnect-iOS-Appetize-v0.1.0
+          path: |
+            clients/twinconnect/TwinConnect-iOS-Appetize-v0.1.0.zip
+            clients/twinconnect/TwinConnect-iOS-Appetize-SHA256.txt
+          if-no-files-found: error
+          retention-days: 14
       # Only screenshots are distributed for visual review. Bundling an
       # executable Runner.app inside the artifact made Chrome flag the
       # entire archive as a dangerous download, although the reviewer needs
