@@ -34,6 +34,7 @@ class AndroidConnectionCard extends StatefulWidget {
     required this.native,
     this.selectedNodeId,
     this.selectedProtocolCode,
+    this.selectedInboundId,
     this.servers,
     this.subscriptionContent,
     super.key,
@@ -48,6 +49,7 @@ class AndroidConnectionCard extends StatefulWidget {
   final String? selectedNodeId;
   /// The server screen owns protocol selection, not the connect screen.
   final String? selectedProtocolCode;
+  final String? selectedInboundId;
   final AppServerInventory? servers;
   final Widget? subscriptionContent;
 
@@ -655,6 +657,78 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
     }
   }
 
+  Future<void> _connectXray() async {
+    if (_busy || _up || _openVpnUp || _ciscoUp || _singBoxProtocol != null ||
+        !Platform.isAndroid) return;
+    final entitled = widget.catalog.entries.any((entry) =>
+        entry.protocol.code == 'v2ray' && entry.selected &&
+        entry.configRecordPresent);
+    if (!entitled) {
+      setState(() => _errorCode = 'XRAY_NOT_INCLUDED_IN_SUBSCRIPTION');
+      return;
+    }
+    setState(() { _busy = true; _errorCode = null; });
+    var stage = 'ENGINE_INIT';
+    try {
+      await AndroidSingBoxTunnel.instance.initialize();
+      stage = 'PROFILE_FETCH';
+      final response = await TenantApi.fromBuildConfig()
+          .loadSessionNativeProfiles(
+            panel: widget.panel,
+            sessionToken: widget.sessionToken,
+            protocol: VpnProtocols.byCode('v2ray')!,
+            native: const NativeProtocolReadiness(
+                supportedCodes: {'v2ray'}),
+          );
+      final authorizedNodes =
+          widget.servers?.servers.map((n) => n.id).toSet() ?? <String>{};
+      final choices = response.xrayServerGroups
+          .where((g) => authorizedNodes.contains(g.serverId) &&
+              (widget.selectedNodeId == null ||
+                  g.serverId == widget.selectedNodeId))
+          .expand((g) => g.inbounds)
+          .where((inbound) => widget.selectedInboundId == null ||
+              inbound.id == widget.selectedInboundId)
+          .toList(growable: false);
+      if (choices.isEmpty) {
+        throw const FormatException('XRAY_INBOUND_NOT_AVAILABLE');
+      }
+      // The built-in sing-box 1.14 core supports VLESS TCP/WS TLS.
+      // XHTTP Reality needs Xray-core; never silently switch transport.
+      final compatible = choices.where((inbound) =>
+          inbound.id == 'tcp_tls' || inbound.id == 'websocket_tls')
+          .toList(growable: false);
+      if (compatible.isEmpty) {
+        throw const FormatException('XRAY_XHTTP_ENGINE_NOT_INSTALLED');
+      }
+      final chosen = compatible.first;
+      stage = 'NATIVE_CONNECT';
+      await AndroidSingBoxTunnel.instance.connectVlessUri(chosen.uri);
+      if (!mounted) return;
+      final node = widget.servers!.servers
+          .where((n) => n.id == chosen.serverId).firstOrNull;
+      setState(() {
+        _singBoxProtocol = 'v2ray';
+        _activeServer = node;
+        _activeServerName = node?.name;
+        _httpsLatencyMs = null;
+        _publicIp = null;
+      });
+      _maybeCheckInternet();
+    } on FormatException catch (error) {
+      if (mounted) setState(() => _errorCode = error.message);
+    } catch (error) {
+      final errorCode = error is TenantApiException ? error.message :
+          error is PlatformException ? error.code :
+          stage == 'ENGINE_INIT' ? 'SINGBOX_ENGINE_INIT_FAILED' :
+          stage == 'PROFILE_FETCH' ? 'XRAY_PROFILE_FETCH_FAILED' :
+          'XRAY_NATIVE_CONNECT_FAILED';
+      if (mounted) setState(() => _errorCode = errorCode);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _disconnectModern() async {
     if (_busy || _singBoxProtocol == null) return;
     setState(() => _busy = true);
@@ -864,11 +938,13 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
         chosen?.configRecordPresent == true;
     final openVpnSelected = chosen?.protocol.code == 'openvpn' &&
         chosen?.configRecordPresent == true;
+    final xraySelected = chosen?.protocol.code == 'v2ray' &&
+        chosen?.configRecordPresent == true;
     final modernSelected = chosen != null &&
         AndroidSingBoxTunnel.supported.contains(chosen.protocol.code) &&
         chosen.configRecordPresent;
     final canStartSelected = ciscoSelected ? ciscoReady :
-        openVpnSelected || modernSelected || nativeReady;
+        xraySelected || openVpnSelected || modernSelected || nativeReady;
     // An interface without a peer handshake is NOT a successful VPN.
     // Reserve the connected green treatment for verified transport.
     final accent = internetVerified ? const Color(0xFF35D9AE)
@@ -999,7 +1075,8 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
                     _ciscoUp ? _disconnectCisco : _disconnect)
                 : connected ? null
                 : canStartSelected
-                    ? (modernSelected ? () => _connectModern(chosen.protocol.code) :
+                    ? (xraySelected ? _connectXray :
+                       modernSelected ? () => _connectModern(chosen.protocol.code) :
                        openVpnSelected ? _connectOpenVpn :
                        ciscoSelected ? _connectCisco : _connect) : null,
             icon: Icon(selectedIsActive ? Icons.stop_rounded :
