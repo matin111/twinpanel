@@ -184,6 +184,9 @@ jobs:
           test -s "$dest/libstoken.so"
           test -s android/app/src/main/java/org/infradead/libopenconnect/LibOpenConnect.java
           test -s android/app/src/main/java/com/axevpn/flutter/openconnect/NativeOpenConnectSession.java
+          grep -F -- '-keep class org.infradead.libopenconnect.** { *; }' android/app/proguard-rules.pro
+          grep -F -- '-keep class com.axevpn.flutter.openconnect.NativeOpenConnectSession { *; }' android/app/proguard-rules.pro
+          grep -F 'proguardFiles("proguard-rules.pro")' android/app/build.gradle.kts
 
       - name: Validate experimental Android native integration
         working-directory: clients/twinconnect
