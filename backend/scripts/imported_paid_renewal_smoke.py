@@ -33,8 +33,17 @@ assert 'subimprenewplan:' in bot
 assert '"plan_id": plan_id' in bot
 assert 'payload.plan_id' in api
 assert 'is_internal_reseller_plan(plan)' in api
-assert 'legacy_unmetered' in fulfill
-assert 'baseline_limit = max(old_limit, old_used)' in fulfill
+# Paid renewal must ONLY reserve a future period; do not mutate current
+# traffic, expiry, or connection credentials on payment fulfillment.
+assert 'from .reserved_renewal_service import reserve_renewal' in fulfill
+assert 'reserve_renewal(' in fulfill
+assert 'reference=f"store-order:{int(order.id)}"' in fulfill
+assert 'sub.traffic_limit_bytes =' not in fulfill
+assert 'sub.expires_at =' not in fulfill
+assert 'sub.account_username =' not in fulfill
+assert 'sub.account_password_encrypted =' not in fulfill
+assert 'int(plan.id) != int(sub.plan_id)' in api
+assert 'sub.expires_at is None and int(sub.traffic_limit_bytes or 0) <= 0' in api
 assert '"/v1/payments/methods"' in bot
 assert 'callback_data=f"renewpay:{int(order[\'id\'])}:{method[\'id\']}"' in bot
 assert 'await callback.answer()' in bot
@@ -47,5 +56,5 @@ assert 'int(renewal.user_id)' in fulfill
 assert 'int(sub.user_id)' in fulfill
 assert 'if renewal.fulfilled_at:' in fulfill
 assert 'order.subscription_id = sub.id' in fulfill
-assert 'queue_subscription_enforcement(' in fulfill
+assert 'renewal.fulfilled_at = now' in fulfill
 print("IMPORTED_PAID_RENEWAL_CONTRACT=PASS")
