@@ -64,7 +64,7 @@ class FakeDb:
 
 class MainRenewOrderTests(unittest.TestCase):
     def setUp(self):
-        self.sub = SimpleNamespace(id=39, user_id=77, plan_id=3, status="active")
+        self.sub = SimpleNamespace(id=39, user_id=77, plan_id=3, status="active", expires_at=None, traffic_limit_bytes=30 * 1024**3)
         self.user = SimpleNamespace(id=77)
 
     def call(self, db, plan_id, key="unique-key"):
@@ -82,19 +82,28 @@ class MainRenewOrderTests(unittest.TestCase):
                 user=self.user, db=db,
             )
 
-    def test_new_plan_billed_without_replacing_account(self):
+    def test_cross_plan_renewal_rejected_before_money_write(self):
+        db = FakeDb(mock_plan())
+        with self.assertRaises(HTTPException) as caught:
+            self.call(db, plan_id=8)
+        self.assertEqual(caught.exception.status_code, 409)
+        self.assertEqual(db.added, [])
+        self.assertEqual(db.commits, 0)
+        self.assertEqual(self.sub.plan_id, 3)
+
+    def test_same_plan_renewal_creates_pending_payment_order(self):
+        self.sub.plan_id = 8
         db = FakeDb(mock_plan())
         result = self.call(db, plan_id=8)
         self.assertEqual(result["amount_toman"], 150000)
         self.assertTrue(result["renewal"])
         self.assertEqual(result["renew_subscription_id"], 39)
-        self.assertEqual(self.sub.plan_id, 3)
+        self.assertEqual(self.sub.plan_id, 8)
         order = next(r for r in db.added if isinstance(r, StoreOrder))
         renewal = next(r for r in db.added if isinstance(r, SubscriptionRenewalOrder))
         self.assertEqual(order.plan_id, 8)
         self.assertEqual(renewal.plan_id, 8)
-        self.assertEqual(renewal.subscription_id, 39)
-        self.assertEqual(renewal.user_id, 77)
+        self.assertEqual(order.status, "pending_payment")
         self.assertEqual(db.commits, 1)
 
     def test_private_reseller_plan_rejected_before_money_write(self):

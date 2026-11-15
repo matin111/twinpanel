@@ -128,7 +128,7 @@ class DurableFastCreateRoutingTests(unittest.TestCase):
         with patch.object(route, "_persist_subscription",
                           return_value=(501, ["anytls"], {"ok": True})), \
              patch.object(route, "fast_provision_queue_enabled", return_value=True):
-            result = asyncio.run(route.admin_create_fast_v1({}, background))
+            result = route.admin_create_fast_v1({}, background)
         self.assertTrue(result["queued"])
         self.assertTrue(result["durable_queue"])
         background.add_task.assert_not_called()
@@ -138,7 +138,7 @@ class DurableFastCreateRoutingTests(unittest.TestCase):
         background = MagicMock()
         with patch.object(route, "_persist_subscription",
                           return_value=(502, ["anytls"], {"ok": True})):
-            result = asyncio.run(route.admin_create_fast_v1({}, background))
+            result = route.admin_create_fast_v1({}, background)
         self.assertTrue(result["queued"])
         self.assertTrue(result["durable_queue"])
         background.add_task.assert_not_called()

@@ -93,7 +93,10 @@ class TwinConnectMainlineContract(unittest.TestCase):
         self.assertIn(".protocol-choice", source)
         self.assertIn(".traffic", source)
         self.assertIn("#tp-app-access", source)
-        self.assertNotIn("radial-gradient(ellipse", source)
+        # Scope the visual contract to the connection glass layer. Other
+        # independent Public Connect sections may use decorative gradients.
+        glass = source.split('_CONNECTION_GLASS_CSS = r"""', 1)[1].split('"""', 1)[0]
+        self.assertNotIn("radial-gradient(ellipse", glass)
         self.assertIn('source.replace("</body>", "<style>" + _CONNECTION_GLASS_CSS + "</style></body>", 1)', source)
 
     def test_frontend_entry_and_vendor_registration_are_reachable(self):

@@ -73,22 +73,30 @@ def check():
     assert result["reset_usage"] is True and result["reset_date"] is False
     assert sub.traffic_used_bytes == 0 and sub.traffic_limit_bytes == first_limit
     assert sub.expires_at == first_expiry
-    assert len(db.events) == 1 and isinstance(db.events[0], QuotaAuditLog)
+    assert len(db.events) == 2 and all(isinstance(x, QuotaAuditLog) for x in db.events)
     assert db.events[0].details["previous_usage_bytes"] == 800000000
     assert db.events[0].details["preserves_node_cursors"] is True
     assert db.events[0].details["preserves_historical_usage_events"] is True
 
     before = datetime.utcnow()
-    result = extend_subscription_v17(9333, {"add_days": 30, "add_traffic_gb": 3, "reset_date": True}, db)
-    assert result["reset_date"] and not result["reset_usage"]
-    assert before <= sub.starts_at <= datetime.utcnow()
-    assert sub.expires_at == sub.starts_at + timedelta(days=30)
-    assert sub.traffic_limit_bytes == first_limit + 3*1024**3
-    assert len(db.events) == 1
+    with patch("app.reserved_renewal_service.reserve_renewal",
+               return_value=SimpleNamespace(id=812)) as reserve:
+        result = extend_subscription_v17(
+            9333, {"add_days": 30, "add_traffic_gb": 3, "reset_date": True}, db
+        )
+        assert result["queued"] is True and result["renewal_id"] == 812
+        assert result["reset_date"] is False and result["reset_usage"] is False
+        assert sub.starts_at < before
+        assert sub.expires_at == first_expiry
+        assert sub.traffic_limit_bytes == first_limit
+        assert reserve.call_args.kwargs["traffic_bytes"] == 3 * 1024**3
+        assert reserve.call_args.kwargs["duration_days"] == 30
 
-    previous = sub.expires_at
-    extend_subscription_v17(9333, {"add_days": 2}, db)
-    assert sub.expires_at == previous + timedelta(days=2)
+    with patch("app.reserved_renewal_service.reserve_renewal",
+               return_value=SimpleNamespace(id=813)):
+        extend_subscription_v17(9333, {"add_days": 2}, db)
+    assert sub.expires_at == first_expiry
+
     for invalid in (
         {"reset_date": True, "add_days": 0},
         {"reset_date": True, "add_days": -1},
@@ -131,7 +139,7 @@ def check():
     ui=(root.parent/"components/legacy-subscriptions-exact.tsx").read_text()
     assert 'reset_subscription_period_usage(db, sub, origin="admin_edit")' in fast
     assert "reset_usage:editResetUsage" in ui
-    assert "reset_usage:extendResetUsage,reset_date:extendResetDate" in ui
+    assert "reserveSubscriptionRenewal" in ui
     assert "setExtendResetUsage(false)" in ui and "setExtendResetDate(false)" in ui
     print("SUBSCRIPTION_ADMIN_CYCLE_RESET_SMOKE_PASS")
 

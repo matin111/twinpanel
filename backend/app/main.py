@@ -13,6 +13,7 @@ from . import support_models
 from . import user_notification_models
 from . import telegram_models
 from . import renewal_models
+from . import reserved_renewal_models  # persistent queued renewal and history
 from . import models_reseller
 from . import reseller_bot_order_models
 from . import reseller_pool_models
@@ -110,6 +111,24 @@ from .routers.wallet_admin_v2 import router as wallet_admin_v2_router
 from .routers.customer_wallet import router as customer_wallet_router, admin_router as customer_wallet_admin_router
 from .routers.customer_subscription_management import router as customer_subscription_management_router
 from .routers.subscription_admin_v2 import router as subscription_admin_v2_router
+from .routers.reserved_renewal_v1 import router as reserved_renewal_router
+from .reserved_renewal_service import activate_due_renewals
+from .database import SessionLocal
+
+async def reserved_renewal_worker_loop():
+    while True:
+        try:
+            await asyncio.to_thread(_run_reserved_renewal_tick)
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            print('reserved renewal tick failed', str(exc)[:250], flush=True)
+        await asyncio.sleep(15)
+
+def _run_reserved_renewal_tick():
+    with SessionLocal() as db:
+        activate_due_renewals(db)
+
 
 # Product/self-hosted compatibility must be applied before requests or
 # background workers can invoke migrated tunnel/node helpers.
@@ -203,6 +222,9 @@ async def lifespan(app: FastAPI):
         license_validation_loop(),
         name="license-validation",
     )
+    reserved_renewal_task = asyncio.create_task(
+        reserved_renewal_worker_loop(), name="reserved-renewal-worker"
+    )
 
     try:
         yield
@@ -217,6 +239,7 @@ async def lifespan(app: FastAPI):
         payment_market_task.cancel()
         wallet_payment_task.cancel()
         license_validation_task.cancel()
+        reserved_renewal_task.cancel()
 
         for task in (
             watchdog_task,
@@ -227,6 +250,7 @@ async def lifespan(app: FastAPI):
             payment_market_task,
             wallet_payment_task,
             license_validation_task,
+            reserved_renewal_task,
         ):
             if task is None:
                 continue
@@ -366,6 +390,7 @@ app.include_router(nodes.router)
 app.include_router(admin_node_connection_settings_v1_router)
 app.include_router(node_recovery_router)
 app.include_router(subscriptions.router)
+app.include_router(reserved_renewal_router)
 app.include_router(subscription_admin_v2_router, prefix="/v1")
 app.include_router(subscription_delivery_policy_v1_router)
 app.include_router(tunnels.router)

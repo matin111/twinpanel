@@ -234,44 +234,20 @@ def extend_subscription_usage_only(
     elif add_bytes <= 0 and add_days <= 0:
         raise HTTPException(status_code=422, detail="حجم یا روز افزایش را وارد کنید")
 
+    from ..reserved_renewal_service import reserve_renewal
     now = datetime.utcnow()
-    old_limit = int(sub.traffic_limit_bytes or 0)
-    old_used = int(sub.traffic_used_bytes or 0)
-    was_exhausted = old_limit > 0 and old_used >= old_limit
-
-    if payload.reset_usage:
-        sub.traffic_limit_bytes = add_bytes
-        sub.traffic_used_bytes = 0
-    elif add_bytes > 0:
-        sub.traffic_limit_bytes = old_limit + add_bytes
-    if add_days > 0:
-        from ..models import Plan
-        from ..subscription_override_models import SubscriptionRuntimeOverride
-        from ..services.subscription_validity_v1 import add_validity_days
-        override = db.get(SubscriptionRuntimeOverride, int(sub.id))
-        plan = db.get(Plan, sub.plan_id) if sub.plan_id is not None else None
-        add_validity_days(
-            sub, add_days, now, override=override,
-            plan_days=int(plan.duration_days or 0) if plan else 0,
-            reset_date=bool(payload.reset_usage),
-        )
-
-    expiry_ok = not sub.expires_at or sub.expires_at > now
-    limit = int(sub.traffic_limit_bytes or 0)
-    used = int(sub.traffic_used_bytes or 0)
-    quota_ok = limit <= 0 or used < limit
-    if expiry_ok and quota_ok and (
-        sub.status == SubscriptionStatus.EXPIRED
-        or (sub.status == SubscriptionStatus.SUSPENDED and was_exhausted)
-    ):
-        sub.status = SubscriptionStatus.ACTIVE
-        queue_subscription_enforcement(
-            db,
-            sub,
-            command_type="restore_subscription",
-            reason="reseller_renewal",
-        )
-
+    reserve_renewal(
+        db,
+        subscription_id=int(sub.id),
+        plan_id=int(sub.plan_id) if sub.plan_id is not None else None,
+        plan_name="تمدید نماینده",
+        traffic_bytes=add_bytes,
+        duration_days=add_days,
+        source="reseller",
+        reference=payload.idempotency_key,
+        actor=f"reseller:{int(reseller.id)}",
+        amount_toman=int(payload.charge_toman or 0),
+    )
     db.add(
         ResellerTrafficTransaction(
             reseller_id=reseller.id,
@@ -280,7 +256,7 @@ def extend_subscription_usage_only(
             transaction_type="subscription_period_change",
             reference_type="subscription",
             reference_id=sub.id,
-            description=f"تغییر دوره اشتراک #{sub.id} بدون رزرو حجم نمایندگی",
+            description=f"ثبت تمدید رزروی اشتراک #{sub.id} بدون رزرو حجم نمایندگی",
             idempotency_key=payload.idempotency_key,
         )
     )
@@ -297,9 +273,9 @@ def extend_subscription_usage_only(
         "status": getattr(sub.status, "value", sub.status),
         "traffic_balance_bytes": int(reseller.traffic_balance_bytes or 0),
         "traffic_balance_gb": round(int(reseller.traffic_balance_bytes or 0) / GB, 2),
-        "reset_usage": bool(payload.reset_usage),
+        "reset_usage": False,
         "pricing_model": "volume_only",
-        "message": "اشتراک تمدید شد؛ حجم نمایندگی فقط با مصرف واقعی کم می‌شود",
+        "message": "تمدید ثبت شد و پس از اتمام حجم یا تاریخ فعال می‌شود",
     }
 
 
