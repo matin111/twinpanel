@@ -98,6 +98,18 @@ jobs:
               raise SystemExit("Unexpected GnuTLS configure recipe")
           nettle_makefile.write_text(source.replace(original, patched))
           print("Patched GnuTLS target GMP link search path")
+
+          # cURL's configure link test uses static target crypto libs.
+          # Those libraries live in the Android OpenConnect sysroot, not
+          # in the default NDK sysroot library search directories.
+          external_makefile = Path("upstream/external/Makefile")
+          source = external_makefile.read_text()
+          old_curl = 'LDFLAGS="-fPIE -pie $(ANDROID_LDFLAGS)"'
+          new_curl = 'LDFLAGS="-fPIE -pie -L$(call get_oc_sysroot,$*)/lib $(ANDROID_LDFLAGS)"'
+          if source.count(old_curl) != 1:
+              raise SystemExit("Unexpected upstream curl linker flags")
+          external_makefile.write_text(source.replace(old_curl, new_curl))
+          print("Added Android target crypto library path to cURL link tests")
           PY
 
       - name: Build actual libopenconnect for arm64
@@ -115,6 +127,18 @@ jobs:
             BINDIR="${ANDROID_SYSROOT}/bin"
           test -s upstream/app/src/main/jniLibs/arm64-v8a/libopenconnect.so
           readelf -h upstream/app/src/main/jniLibs/arm64-v8a/libopenconnect.so | grep -q AArch64
+
+      - name: Diagnose native configure and compile failures
+        if: failure()
+        shell: bash
+        run: |
+          for file in upstream/external/arm64/build-curl/config.log upstream/external/openconnect/android/aarch64-linux-android/gnutls/config.log; do
+            if [[ -f "${file}" ]]; then
+              echo "::group::${file} (last 180 lines)"
+              tail -n 180 "${file}"
+              echo "::endgroup::"
+            fi
+          done
 
       - name: Upload native core for subsequent integration testing
         uses: actions/upload-artifact@v4
