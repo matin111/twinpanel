@@ -146,6 +146,28 @@ void main() {
     expect(chain.any((outbound) => outbound['type'] == 'direct'), false);
   });
 
+  test('ShadowTLS accepts standard sing-box TLS object without explicit fields', () {
+    final chain = SingBoxProfileValidator.validateShadowTlsChain({
+      'config': {
+        'outbounds': [
+          {
+            'type': 'shadowsocks', 'tag': 'inner',
+            'method': 'aes-256-gcm', 'password': 'synthetic',
+            'detour': 'wrapper',
+          },
+          {
+            'type': 'shadowtls', 'tag': 'wrapper',
+            'server': 'vpn.example.org',
+            'server_port': 443, 'version': 3,
+            'password': 'synthetic', 'tls': <String, dynamic>{},
+          },
+        ],
+      },
+    });
+    expect(chain[1]['tls'], {'enabled': true});
+    expect(chain[0]['detour'], 'wrapper');
+  });
+
   test('ShadowTLS accepts panel SNI shorthand and omitted TLS enabled', () {
     final chain = SingBoxProfileValidator.validateShadowTlsChain({
       'config': {
