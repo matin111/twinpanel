@@ -2360,6 +2360,22 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       }
     }
     if (oldWidget.servers != widget.servers) {
+      // Server lists may be reordered during refresh. Preserve the exact
+      // selected server ID instead of accidentally switching by list index.
+      if (_androidExplicitNodeSelected && oldWidget.servers != null) {
+        final previous = oldWidget.servers!.servers;
+        if (_selected >= 0 && _selected < previous.length) {
+          final selectedId = previous[_selected].id;
+          final refreshed = widget.servers?.servers ?? const <AppServer>[];
+          final newIndex = refreshed.indexWhere((n) => n.id == selectedId);
+          if (newIndex >= 0) {
+            _selected = newIndex;
+          } else if (widget.servers != null) {
+            _androidExplicitNodeSelected = false;
+            _selected = 0;
+          }
+        }
+      }
       final ids = widget.servers?.servers.map((node) => node.id).toSet()
           ?? <String>{};
       _nodePings.removeWhere((id, value) => !ids.contains(id));
