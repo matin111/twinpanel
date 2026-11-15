@@ -134,8 +134,8 @@ final class NativeOpenConnectSession extends LibOpenConnect {
     }
 
     @Override public void onProgress(int level, String msg) {
-        // Native logs may include private endpoint/session details. Never log
-        // the raw OpenConnect message. Only emit coarse protocol diagnostics.
+        // Never log raw library messages: they can contain hosts, credentials
+        // or server-provided text. Only coarse categories are emitted.
         if (msg == null) return;
         final String event = msg.toLowerCase(java.util.Locale.ROOT);
         if (event.contains("established dtls connection") ||
@@ -146,12 +146,31 @@ final class NativeOpenConnectSession extends LibOpenConnect {
                  event.contains("timeout") || event.contains("unavailable"))) {
             Log.w(TAG, "CISCO_TRANSPORT_DTLS_FAILED_OR_UNAVAILABLE");
         } else if (level == PRG_ERR) {
-            Log.w(TAG, "CISCO_NATIVE_TRANSPORT_ERROR");
+            final String category =
+                    event.contains("dtls") || event.contains("udp") ? "DTLS_UDP" :
+                    event.contains("cstp") || event.contains("tcp") ? "CSTP_TCP" :
+                    event.contains("certificate") || event.contains("tls") ? "TLS" :
+                    event.contains("tun") || event.contains("packet") ? "TUN_PACKET" :
+                    event.contains("timeout") || event.contains("timed out") ? "TIMEOUT" :
+                    event.contains("dns") || event.contains("resolve") ? "DNS" :
+                    event.contains("reconnect") ? "RECONNECT" : "OTHER";
+            Log.w(TAG, "CISCO_NATIVE_TRANSPORT_ERROR category=" + category);
         }
     }
 
+    private long lastTrafficLogAtMs;
+
     @Override public void onStatsUpdate(VPNStats stats) {
-        if (stats != null) listener.traffic(stats.rxBytes, stats.txBytes);
+        if (stats == null) return;
+        listener.traffic(stats.rxBytes, stats.txBytes);
+        // Counters are non-sensitive and help distinguish blackholed return
+        // traffic from broken DNS/HTTPS. Throttle diagnostic logs.
+        long now = android.os.SystemClock.elapsedRealtime();
+        if (now - lastTrafficLogAtMs >= 15000) {
+            lastTrafficLogAtMs = now;
+            Log.i(TAG, "CISCO_TUN_COUNTERS tx=" + Math.max(0, stats.txBytes)
+                    + " rx=" + Math.max(0, stats.rxBytes));
+        }
     }
 
     void start(String serverUrl) {
