@@ -342,7 +342,36 @@ def reseller_customer_wallet_history(
         .order_by(ResellerBotOrder.created_at.desc(), ResellerBotOrder.id.desc())
         .limit(200).all()
     )
+    # Manual reseller sales also count as customer purchases. Skip subscriptions
+    # already represented by a bot order, to avoid duplicate purchase rows.
+    bot_subscription_ids = {
+        int(order.subscription_id) for order in purchase_orders if order.subscription_id
+    }
+    manual_sales = (
+        db.query(ResellerSubscription)
+        .filter(
+            ResellerSubscription.reseller_id == int(reseller.id),
+            ResellerSubscription.customer_user_id == int(user_id),
+        )
+        .order_by(ResellerSubscription.created_at.desc(), ResellerSubscription.id.desc())
+        .limit(200).all()
+    )
+    manual_sales = [
+        sale for sale in manual_sales
+        if int(sale.subscription_id) not in bot_subscription_ids
+    ]
+    sale_sub_ids = [int(sale.subscription_id) for sale in manual_sales]
+    sale_subs = {
+        int(sub.id): sub for sub in
+        (db.query(Subscription).filter(Subscription.id.in_(sale_sub_ids)).all()
+         if sale_sub_ids else [])
+    }
     order_plan_ids = {int(order.plan_id) for order in purchase_orders if order.plan_id}
+    order_plan_ids.update(
+        int(sale_subs[sale.subscription_id].plan_id)
+        for sale in manual_sales
+        if sale.subscription_id in sale_subs and sale_subs[sale.subscription_id].plan_id
+    )
     plan_names = {
         int(plan.id): plan.name for plan in
         (db.query(Plan).filter(Plan.id.in_(order_plan_ids)).all() if order_plan_ids else [])
@@ -374,6 +403,23 @@ def reseller_customer_wallet_history(
             "created_at": order.created_at,
             "paid_at": order.approved_at,
         } for order in purchase_orders],
+        "manual_purchases": [{
+            "id": int(sale.id),
+            "source": "reseller_manual",
+            "kind": "subscription_purchase",
+            "amount_toman": int(sale.sell_price_toman or 0),
+            "plan_name": (
+                plan_names.get(int(sale_subs[sale.subscription_id].plan_id))
+                if sale.subscription_id in sale_subs
+                and sale_subs[sale.subscription_id].plan_id else None
+            ),
+            "status": "created",
+            "payment_method": None,
+            "tracking_code": None,
+            "subscription_id": int(sale.subscription_id),
+            "created_at": sale.created_at,
+            "paid_at": None,
+        } for sale in manual_sales],
         "scope": "reseller_only",
     }
 
