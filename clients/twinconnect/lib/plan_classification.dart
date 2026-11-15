@@ -19,6 +19,15 @@ class AppPlanClassification {
   final String userCountCategory;
   final int deviceLimit;
 
+  /// Commercial type comes from /session/plan, never a guessed plan title.
+  /// Explicit protocol flags in the session catalogue are checked separately.
+  bool permitsProtocol(String code) {
+    final kind = subscriptionType.trim().toLowerCase();
+    final vitory = kind.contains('ویتوری') ||
+        kind.contains('vitory') || kind.contains('v2ray');
+    return !vitory || code == 'v2ray' || code == 'hysteria2';
+  }
+
   factory AppPlanClassification.fromJson(Map<String, dynamic> json) {
     final namespace = json['namespace'];
     final planId = json['plan_id'];
