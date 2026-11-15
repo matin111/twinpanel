@@ -27,6 +27,8 @@ def reserve_renewal(db: Session, *, subscription_id: int, plan_id: int | None,
         raise HTTPException(404, "اشتراک پیدا نشد")
     if sub.status == SubscriptionStatus.CANCELED:
         raise HTTPException(409, "اشتراک لغوشده قابل تمدید نیست")
+    if sub.expires_at is None and int(sub.traffic_limit_bytes or 0) <= 0:
+        raise HTTPException(409, "اشتراک بدون انقضای حجم و تاریخ، زمان فعال‌سازی تمدید ندارد")
     # Changes of protocol/plan require a separate atomic migration before payment.
     if plan_id is not None and (sub.plan_id is None or int(plan_id) != int(sub.plan_id)):
         raise HTTPException(409, "تغییر پلن در تمدید رزروی فعلاً مجاز نیست")
