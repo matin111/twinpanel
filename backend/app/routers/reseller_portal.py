@@ -331,6 +331,22 @@ def reseller_customer_wallet_history(
         .order_by(CustomerWalletTopup.id.desc())
         .limit(200).all()
     )
+    # Include all orders placed with this reseller (paid, pending, rejected),
+    # not just transactions paid from its wallet.
+    purchase_orders = (
+        db.query(ResellerBotOrder)
+        .filter(
+            ResellerBotOrder.reseller_id == int(reseller.id),
+            ResellerBotOrder.customer_user_id == int(user_id),
+        )
+        .order_by(ResellerBotOrder.created_at.desc(), ResellerBotOrder.id.desc())
+        .limit(200).all()
+    )
+    order_plan_ids = {int(order.plan_id) for order in purchase_orders if order.plan_id}
+    plan_names = {
+        int(plan.id): plan.name for plan in
+        (db.query(Plan).filter(Plan.id.in_(order_plan_ids)).all() if order_plan_ids else [])
+    }
     return {
         "user_id": int(user_id),
         "balance_toman": int(wallet.balance_toman or 0) if wallet else 0,
@@ -344,6 +360,20 @@ def reseller_customer_wallet_history(
             "created_at": row.created_at,
             "review_note": row.review_note,
         } for row in topups],
+        "purchases": [{
+            "id": int(order.id),
+            "source": "reseller_bot",
+            "kind": "subscription_purchase",
+            "amount_toman": int(order.sell_price_toman or 0),
+            "plan_name": plan_names.get(int(order.plan_id)) if order.plan_id else None,
+            "status": order.status,
+            "payment_method": ("wallet" if str(order.payment_note or "") == "wallet" else
+                               (str(order.payment_method_id) if order.payment_method_id else None)),
+            "tracking_code": order.tracking_code,
+            "subscription_id": int(order.subscription_id) if order.subscription_id else None,
+            "created_at": order.created_at,
+            "paid_at": order.approved_at,
+        } for order in purchase_orders],
         "scope": "reseller_only",
     }
 
