@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.849",
-  "source_sha": "7a70dc19c7fe97ec3f21de089b141294fa1dd3d9",
+  "version": "1.1.0-rc.850",
+  "source_sha": "268174485845bf3c4d792778b2f587c7726e4dec",
   "notes": {
-    "fa": "اصلاح پایدار تنظیمات موبایل OpenVPN و Cisco/OpenConnect: ارسال DNS و مسیر پیش‌فرض OpenVPN و عبور DNS سیسکو از تونل؛ ثبت تنظیمات در قالب نصب نودها. تغییر بدون دست‌کاری اشتراک‌ها، حسابداری یا تنظیمات پروتکل‌های دیگر.",
-    "en": "Persist mobile OpenVPN IPv4 default-route and DNS pushes and ocserv Cisco/OpenConnect tunnel-all-dns with redundant DNS resolvers in provisioning templates. No subscription, billing or other VPN protocol changes."
+    "fa": "رفع قطع‌ووصلی OpenVPN هنگام اتصال هم‌زمان ویندوز و موبایل با یک اکانت: فعال‌سازی نشست‌های هم‌زمان روی سرور و در قالب نصب نود، حفظ مدیریت سقف اتصال از موتور سهمیه/نشست TwinPanel؛ بدون تغییر گواهی، سهمیه، اتصال پروتکل‌های دیگر.",
+    "en": "Fix OpenVPN simultaneous multi-device disconnects due to duplicate certificate CN by enabling duplicate-cn in node provisioning; quota runtime continues session-level device-limit enforcement. No changes to credentials, subscriptions or other protocols."
   }
 }
