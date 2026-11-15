@@ -1015,10 +1015,16 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
               Text(!connected ? s.pick('تونل غیرفعال است', 'Tunnel disconnected')
                   : internetVerified
                       ? s.pick('دسترسی HTTPS برقرار است؛ مسیر VPN هنوز مستقل تأیید نشده.', 'HTTPS reachable; VPN routing not independently verified.')
-                      : _up && _handshake
-                          ? s.pick('دست‌دهی انجام شده اما اینترنت هنوز تأیید نشده.', 'Peer handshake received; VPN internet not yet verified.')
-                          : s.pick('رابط VPN فعال است اما هنوز پاسخ سرور دریافت نشده است. ممکن است اینترنت کار نکند.',
-                              'VPN interface is up but no server handshake has been verified. Internet may not work.')),
+                      : _ciscoUp
+                          ? s.pick('تونل Cisco فعال است؛ دسترسی اینترنت هنوز با HTTPS تأیید نشده است.',
+                              'Cisco tunnel is active; HTTPS internet access is not yet verified.')
+                          : _openVpnUp || _singBoxProtocol != null
+                              ? s.pick('تونل فعال است؛ دسترسی اینترنت هنوز با HTTPS تأیید نشده است.',
+                                  'VPN tunnel is active; HTTPS internet access is not yet verified.')
+                              : _up && _handshake
+                                  ? s.pick('دست‌دهی انجام شده اما اینترنت هنوز تأیید نشده.', 'Peer handshake received; VPN internet not yet verified.')
+                                  : s.pick('رابط VPN فعال است اما هنوز پاسخ سرور دریافت نشده است. ممکن است اینترنت کار نکند.',
+                                      'VPN interface is up but no server handshake has been verified. Internet may not work.')),
               if (_up && !_handshake) ...[
                 const SizedBox(height: 8),
                 SelectableText(
