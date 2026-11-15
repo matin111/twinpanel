@@ -113,6 +113,37 @@ jobs:
             --target lib/ios_preview_main.dart \
             --dart-define=TWINCONNECT_DIRECTORY_URL="$TWINCONNECT_DIRECTORY_URL"
           test -d build/ios/iphonesimulator/Runner.app
+      - name: Validate embedded PacketTunnel metadata before install
+        shell: bash
+        run: |
+          set -euo pipefail
+          app="build/ios/iphonesimulator/Runner.app"
+          extension="$app/PlugIns/PacketTunnel.appex"
+          test -d "$extension"
+          plist="$extension/Info.plist"
+          test -s "$plist"
+          /usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$plist"
+          /usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$plist"
+          /usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$plist"
+          /usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$plist"
+          /usr/libexec/PlistBuddy -c "Print :NSExtension:NSExtensionPointIdentifier" "$plist"
+          python3 - <<'PY'
+          from pathlib import Path
+          import plistlib
+          root = Path("build/ios/iphonesimulator/Runner.app")
+          host = plistlib.loads((root / "Info.plist").read_bytes())
+          extension = plistlib.loads((root / "PlugIns/PacketTunnel.appex/Info.plist").read_bytes())
+          host_id = host.get("CFBundleIdentifier", "")
+          extension_id = extension.get("CFBundleIdentifier", "")
+          assert host_id and extension_id == host_id + ".PacketTunnel", (host_id, extension_id)
+          for key in ("CFBundleExecutable", "CFBundleShortVersionString", "CFBundleVersion"):
+              value = extension.get(key, "")
+              assert isinstance(value, str) and value and "$(" not in value, (key, value)
+          expected_point = "com.apple.networkextension.packet-tunnel"
+          assert extension.get("NSExtension", {}).get("NSExtensionPointIdentifier") == expected_point
+          assert (root / "PlugIns/PacketTunnel.appex" / extension["CFBundleExecutable"]).is_file()
+          print("PacketTunnel metadata and executable validated")
+          PY
       - name: Verify iPhone simulator boots and launches TwinConnect
         shell: bash
         run: |
