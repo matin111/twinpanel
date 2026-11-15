@@ -1,0 +1,52 @@
+name: TwinConnect OpenConnect Native Core (experimental)
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/twinconnect-openconnect-native-core.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  native-openconnect-arm64:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Checkout TwinPanel
+        uses: actions/checkout@v4
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android NDK
+        run: sdkmanager --install "ndk;27.2.12479018"
+
+      - name: Install native build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y autoconf automake libtool pkg-config gettext autopoint             bison flex make gcc g++ cmake ninja-build libxml2-dev libgmp-dev             libgnutls28-dev zlib1g-dev liblzma-dev
+
+      - name: Fetch pinned GPLv2 OpenConnect Android source
+        run: |
+          git clone --no-checkout https://github.com/pengyue-polaron/oconnect-android.git upstream
+          cd upstream
+          git checkout --detach 8cc4fa6c0027e9021e81127b6980a6b352af1368
+          git submodule update --init --recursive
+          git status --porcelain
+
+      - name: Build actual libopenconnect for arm64
+        run: |
+          make -C upstream/external install-arch-arm64 \
+            ANDROID_NDK="${ANDROID_HOME}/ndk/27.2.12479018"
+          test -s upstream/app/src/main/jniLibs/arm64-v8a/libopenconnect.so
+          readelf -h upstream/app/src/main/jniLibs/arm64-v8a/libopenconnect.so | grep -q AArch64
+
+      - name: Upload native core for subsequent integration testing
+        uses: actions/upload-artifact@v4
+        with:
+          name: openconnect-arm64-native-core-experimental
+          path: upstream/app/src/main/jniLibs/arm64-v8a/
+          if-no-files-found: error
+          retention-days: 3
