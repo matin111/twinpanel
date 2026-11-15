@@ -21,6 +21,9 @@ void main() {
     ).readAsStringSync();
     final tunnel = File('lib/android_cisco_tunnel.dart').readAsStringSync();
     expect(service, contains('lastFailureCode = failureStage'));
+    expect(service, contains('CISCO_AUTH_XML_CHALLENGE_UNSUPPORTED'));
+    expect(service, contains('CISCO_TLS_HANDSHAKE_FAILED'));
+    expect(tunnel, contains('CISCO_AUTH_XML_CHALLENGE_UNSUPPORTED'));
     expect(plugin, contains('json.put("failure_code"'));
     expect(tunnel, contains("nativeStatus['failure_code']"));
     expect(tunnel, contains('CISCO_CSTP_CONFIG_MISSING'));
