@@ -231,6 +231,7 @@ class SubscriptionOut(BaseModel):
 
 
 class MySubscriptionOut(SubscriptionOut):
+    reserved_renewal: dict | None = None
     plan_name: str | None = None
     account_username: str | None = None
     traffic_limit_gb: float = 0
