@@ -5,6 +5,9 @@ on:
   pull_request:
     paths:
       - '.github/workflows/twinconnect-openconnect-native-core.yml'
+      - 'clients/twinconnect/native/android/**'
+      - 'clients/twinconnect/tools/install_android_native.py'
+      - 'clients/twinconnect/lib/android_cisco_tunnel.dart'
 
 permissions:
   contents: read
