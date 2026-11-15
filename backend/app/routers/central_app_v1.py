@@ -390,10 +390,10 @@ def _verified_protocol_subscription(
 def _selected_client_protocols(db: Session, subscription_id: int) -> set[str]:
     """Resolve one account's entitlement against its *assigned* panel plan.
 
-    Old migrated subscriptions may have subscription protocol records from a
-    previous plan. Those records may not grant protocols that the current
-    plan explicitly excludes. Keep old-account compatibility when no explicit
-    plan template exists: never manufacture new permissions from plan names.
+    Old migrated subscriptions may have protocol records from a previous
+    plan. When an explicit plan template exists it is authoritative for
+    *selected* protocols. Keep old-account compatibility when no explicit
+    template exists: never manufacture permissions from plan names.
     """
     sub = db.get(Subscription, int(subscription_id))
     if sub is None:
@@ -419,7 +419,11 @@ def _selected_client_protocols(db: Session, subscription_id: int) -> set[str]:
         return assigned
     plan_allowed = {value for row in plan_rows
                     if (value := normalize_protocol(row[0]))}
-    return assigned & plan_allowed
+    # Plan is the source of truth for selected protocols. Provisioning is
+    # represented separately by config_record_present (and enforced again
+    # when a profile is requested); a missing legacy assignment must not
+    # hide a protocol explicitly included in the active plan.
+    return plan_allowed
 
 
 @router.post("/public/protocols")
