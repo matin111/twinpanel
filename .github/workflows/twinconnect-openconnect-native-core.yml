@@ -106,7 +106,10 @@ jobs:
           # depends on upstream's own per-library sysroot prefixes.
           # LZ4's nested "make install" otherwise writes to /usr/local/bin.
           ANDROID_SYSROOT="${GITHUB_WORKSPACE}/upstream/external/openconnect/android/aarch64-linux-android/sysroot/usr"
-          mkdir -p "${ANDROID_SYSROOT}/bin"
+          # IMPORTANT: never create ANDROID_SYSROOT before the upstream make.
+          # Its sysroot target initializes NDK headers and applies the pinned
+          # 00-time.h.patch for Android API < 35 / mktime_z.
+          test ! -e "${ANDROID_SYSROOT}" || { echo "Unexpected precreated sysroot"; exit 1; }
           make -C upstream/external install-arch-arm64 \
             ANDROID_NDK="${ANDROID_HOME}/ndk/27.2.12479018" \
             BINDIR="${ANDROID_SYSROOT}/bin"
