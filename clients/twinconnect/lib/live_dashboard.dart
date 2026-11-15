@@ -4766,8 +4766,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 12, vertical: 10),
                                   child: txt(tr(
-                                    'اینباند واقعی این سرور برای این اشتراک از پنل دریافت نشد.',
-                                    'No provisioned Xray inbound was delivered for this account and node.'),
+                                    'اینباند معتبر Xray برای این سرور و اشتراک دریافت نشد.',
+                                    'No valid Xray inbound was delivered for this account and node.'),
                                     size: 11, color: const Color(0xFFFFBE67)),
                                 ),
                             ] else
