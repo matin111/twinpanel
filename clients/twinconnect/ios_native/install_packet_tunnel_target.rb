@@ -43,6 +43,13 @@ info.last_known_file_type = 'text.plist.xml'
 entitlement = files_group.new_file('PacketTunnel.entitlements')
 entitlement.last_known_file_type = 'text.plist.xml'
 
+runner.build_configurations.each do |configuration|
+  settings = configuration.build_settings
+  settings['CODE_SIGN_ENTITLEMENTS'] = '../ios_native/Runner.entitlements'
+  settings['INFOPLIST_KEY_TwinConnectKeychainAccessGroup'] =
+    '$(AppIdentifierPrefix)com.twinpanel.twinconnect.shared'
+end
+
 runner.add_dependency(extension)
 embed = runner.new_copy_files_build_phase('Embed App Extensions')
 embed.dst_subfolder_spec = '13' # PlugIns
