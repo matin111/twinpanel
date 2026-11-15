@@ -7,7 +7,8 @@ import 'protocols.dart';
 
 /// Versioned channel for OS-native VPN capabilities.
 ///
-/// Windows now has a real native channel, but no tunnel engine yet.
+/// Windows, iOS and macOS platform channels are probed independently; a
+/// channel handshake alone is never evidence that a VPN engine is installed.
 /// Missing plugins, incompatible contract versions, or errors always return
 /// "unavailable" rather than making false kill-switch/connection claims.
 class NativeVpnBridge {
@@ -25,8 +26,7 @@ class NativeVpnBridge {
   static Future<NativeVpnCapabilities> probe() async {
     final os = platform;
     if (os != VpnPlatform.android && os != VpnPlatform.windows &&
-        os != VpnPlatform.ios) {
-      // macOS has no native VPN bridge yet.
+        os != VpnPlatform.ios && os != VpnPlatform.macos) {
       return NativeVpnCapabilities.unavailable(os);
     }
     try {
@@ -139,8 +139,7 @@ class NativeVpnBridge {
   }) async {
     // Missing plugin is expected until real protocol engines are built.
     if (platform != VpnPlatform.android && platform != VpnPlatform.windows &&
-        platform != VpnPlatform.ios) {
-      // No macOS protocol adapter has been installed.
+        platform != VpnPlatform.ios && platform != VpnPlatform.macos) {
       return const NativeProtocolReadiness(supportedCodes: {});
     }
     // This additional OS-level probe is mandatory: a plugin must not report
