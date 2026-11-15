@@ -228,6 +228,11 @@ def install() -> None:
         } else if (call.method_name() == "openConnectStatus") {
           result->Success(flutter::EncodableValue(
               twinconnect_openconnect::Running()));
+        } else if (call.method_name() == "openConnectTransportMode") {
+          // Only an upstream DTLS status category, never raw output or
+          // certificate/username information, crosses this method channel.
+          result->Success(flutter::EncodableValue(
+              std::string(twinconnect_openconnect::TransportMode())));
         } else if (call.method_name() == "openConnectExitReason") {
           // Reap the child so stderr is fully classified before responding.
           const bool active = twinconnect_openconnect::Running();
