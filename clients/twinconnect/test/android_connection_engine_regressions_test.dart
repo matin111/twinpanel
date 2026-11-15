@@ -10,6 +10,20 @@ void main() {
     expect(dashboard, contains("if (_page != 'home')"));
   });
 
+  test('Cisco gateway retries IP addresses without weakening TLS', () {
+    final service = File(
+      'native/android/java/com/axevpn/flutter/openconnect/'
+      'AxeOpenConnectVpnService.java',
+    ).readAsStringSync();
+    expect(service, contains('InetAddress.getAllByName(host)'));
+    expect(service, contains('for (InetAddress address : addresses)'));
+    expect(service, contains('if (!protect(base))'));
+    expect(service, contains('factory.createSocket(base, host, port, true)'));
+    expect(service, contains('requireVerifiedHost(tls, pin)'));
+    expect(service, contains('tls.startHandshake()'));
+    expect(service, contains('throw error; // Fail closed on TLS/certificate verification.'));
+  });
+
   test('Cisco starts standard config-auth session before credentials', () {
     final service = File(
       'native/android/java/com/axevpn/flutter/openconnect/'
