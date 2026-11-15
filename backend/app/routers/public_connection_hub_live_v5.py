@@ -652,11 +652,11 @@ def public_connection_hub_live_v5(
       #tp-session-close:hover,#tp-session-refresh:hover {background:#194d69;border-color:#69dafa}
       #tp-session-refresh:disabled {opacity:.55;cursor:wait}
       .tp-sess-note {margin:0 32px 15px;padding:9px 12px;border-radius:11px;background:#0d31503b;border:1px solid #28547366;color:#9bb6d0;font-size:12px;line-height:1.7}
-      #tp-session-items {padding:0 26px 25px;overflow-y:auto;overscroll-behavior:contain;display:grid;gap:18px;align-content:start;scrollbar-width:thin;scrollbar-color:#4998b4 #0b203a}
+      #tp-session-items {padding:0 26px 25px;min-height:0;overflow-y:auto;overscroll-behavior:contain;display:grid;grid-auto-rows:max-content;gap:18px;align-content:start;scrollbar-width:thin;scrollbar-color:#4998b4 #0b203a}
       #tp-session-items::-webkit-scrollbar {width:8px}
       #tp-session-items::-webkit-scrollbar-track {background:#0b203a;border-radius:10px}
       #tp-session-items::-webkit-scrollbar-thumb {background:#4998b4;border-radius:10px}
-      .tp-sess-card {position:relative;background:linear-gradient(132deg,#0b2441ed,#0f2037e8);border:1px solid #2a779dd9;border-radius:22px;padding:20px 24px 22px;box-shadow:inset 0 1px 0 #b2efff17,0 8px 26px #0004;overflow:hidden}
+      .tp-sess-card {position:relative;min-height:204px;height:auto;flex-shrink:0;box-sizing:border-box;background:linear-gradient(132deg,#0b2441ed,#0f2037e8);border:1px solid #2a779dd9;border-radius:22px;padding:20px 24px 22px;box-shadow:inset 0 1px 0 #b2efff17,0 8px 26px #0004;overflow:hidden}
       .tp-sess-card:before {content:"";position:absolute;inset:0 14px auto;height:2px;background:linear-gradient(90deg,transparent,#22d5ed99,transparent)}
       .tp-sess-top {display:flex;align-items:center;justify-content:space-between;gap:12px;padding-bottom:16px;border-bottom:1px solid #3160809c;flex-wrap:wrap}
       .tp-sess-identities {display:flex;align-items:center;gap:10px;flex-wrap:wrap}
@@ -690,7 +690,7 @@ def public_connection_hub_live_v5(
         #tp-session-refresh {font-size:12px;padding:7px}
         .tp-sess-note {margin:0 15px 12px;font-size:11px}
         #tp-session-items {padding:0 12px 18px;gap:12px}
-        .tp-sess-card {padding:14px;border-radius:15px}
+        .tp-sess-card {min-height:0;padding:14px;border-radius:15px}
         .tp-sess-body {grid-template-columns:1fr 1fr;gap:10px}
         .tp-sess-dates {grid-column:1/-1}
         .tp-sess-transfers {padding-inline:0;border:0}
