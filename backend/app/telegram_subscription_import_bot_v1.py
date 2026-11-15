@@ -117,6 +117,19 @@ def install(router, request_fn):
         remaining = escape(str(info.get("traffic_remaining_gb", 0)))
         devices = str(info.get("device_limit") or "نامشخص")
         url = escape(str(info.get("subscription_link") or ""))
+        renewal = info.get("reserved_renewal")
+        renewal_text = ""
+        if isinstance(renewal, dict) and renewal.get("status") in ("reserved", "needs_review"):
+            heading = ("⚠️ تمدید نیازمند بررسی" if renewal["status"] == "needs_review"
+                       else "🕒 تمدید رزرو شده")
+            renewal_text = (
+                "\n" + heading + "\n"
+                + "📦 پلن بعدی: " + escape(str(renewal.get("plan_name") or "اشتراک")) + "\n"
+                + "📊 حجم دوره بعد: " + str(renewal.get("traffic_gb") or 0) + " GB\n"
+                + "📅 مدت دوره بعد: " + str(int(renewal.get("duration_days") or 0)) + " روز\n"
+                + "🕓 ثبت تمدید: " + escape(str(renewal.get("reserved_at") or "")[:10]) + "\n"
+                + escape(str(renewal.get("message") or "")) + "\n"
+            )
         return (
             "📦 <b>مدیریت اکانت</b>\n\n"
             f"👤 نام کاربری: <code>{name}</code>\n"
@@ -129,7 +142,8 @@ def install(router, request_fn):
             f"📶 حجم باقی‌مانده: {remaining} گیگابایت\n"
             f"📱 سقف دستگاه: {escape(devices)}\n\n"
             "🔗 ساب‌لینک و QR Code در دکمه زیر با هم نمایش داده می‌شوند.\n\n"
-            "با دکمه تمدید اکانت می‌توانید برای همین اشتراک اعتبار و حجم اضافه خریداری کنید. "
+            + renewal_text
+            + "با دکمه تمدید اکانت می‌توانید دوره بعدی این اشتراک را رزرو کنید. "
             "مالکیت اکانت با پرداخت تغییر نمی‌کند. "
             "برای تغییر رمز Cisco/L2TP باید رمز فعلی اکانت را تأیید کنید."
         )
