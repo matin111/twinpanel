@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.841",
-  "source_sha": "3cd9a7327e89cac6e0de503ad01a0cfeb29a0476",
+  "version": "1.1.0-rc.842",
+  "source_sha": "7335f9a9678d4d8fd6f90f9d7019d929ce5e937c",
   "notes": {
-    "fa": "تاریخچه نشست‌های Connection: نمایش نام فارسی کشور و پرچم از country_code واقعی نود به‌جای شماره سرور در تیتر هر اتصال؛ حفظ اطلاعات مصرف، زمان و پروتکل و نمایش کشور نامشخص در صورت نبود داده.",
-    "en": "Connection session history shows the Persian country name and flag from the actual node country_code instead of raw server ID. Preserves session protocol, timestamps, and traffic details."
+    "fa": "تمدید رزروی اشتراک‌ها از پنل ادمین، ربات، سایت و نمایندگی؛ فعال‌سازی خودکار پس از پایان حجم یا تاریخ، تاریخچه و مدیریت تمدیدهای نیازمند بررسی. حفظ شناسه و کانفیگ دوره فعلی؛ اصلاح کنترل ثبت دوباره سفارش و جلوگیری از خطاهای قدیمی ساخت اکانت.",
+    "en": "Reserved-only subscription renewal across admin, customer website, Telegram bot and reseller flows; automatic activation on quota or expiry, audit history and blocked renewal management. Preserve active account credentials; improve idempotent payment fulfillment and subscription creation."
   }
 }
