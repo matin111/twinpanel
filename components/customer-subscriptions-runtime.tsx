@@ -118,6 +118,21 @@ function Body(){
           <span><small>{pick("حجم باقی‌مانده","Traffic left")}</small><b>{row.traffic_remaining_gb.toLocaleString("fa-IR")} GB</b></span>
         </div>
 
+        {row.reserved_renewal&&<section className="customerSubReservedRenewal" aria-label={pick("تمدید رزروی","Reserved renewal")} style={{border:"1px solid var(--border-color,rgba(124,58,237,.25))",borderRadius:14,padding:14,background:"var(--card-bg,rgba(124,58,237,.06))",marginBlock:12}}>
+          <div className="card-head">
+            <b>{row.reserved_renewal.status==="needs_review"?pick("⚠️ تمدید نیازمند بررسی","Renewal needs review"):pick("🕒 تمدید رزرو شده","Reserved renewal")}</b>
+          </div>
+          <div className="customerSubStats">
+            <span><small>{pick("پلن بعدی","Next plan")}</small><b>{row.reserved_renewal.plan_name}</b></span>
+            <span><small>{pick("حجم دوره بعد","Next traffic")}</small><b>{row.reserved_renewal.traffic_gb.toLocaleString("fa-IR")} GB</b></span>
+            <span><small>{pick("مدت دوره بعد","Next duration")}</small><b>{row.reserved_renewal.duration_days.toLocaleString("fa-IR")} {pick("روز","days")}</b></span>
+          </div>
+          <small>{pick("ثبت شده در","Reserved on")} {new Date(row.reserved_renewal.reserved_at).toLocaleDateString("fa-IR")}</small>
+          <p>{row.reserved_renewal.status==="needs_review"
+            ?pick("تمدید نیاز به بررسی پشتیبانی دارد و اعتبار آن مصرف نشده است.","Renewal needs support review; the next period has not been used.")
+            :pick("پس از پایان حجم یا تاریخ فعلی، تمدید خودکار فعال می‌شود.","The next period activates automatically after current quota or expiry ends.")}</p>
+        </section>}
+
         <div className="customerSubTraffic"><div><span>{pick("مصرف","Usage")}</span><b>{usage}%</b></div><div className="progress"><i style={{width:`${usage}%`}}/></div><small>{row.traffic_used_gb.toLocaleString("fa-IR")} / {row.traffic_limit_gb.toLocaleString("fa-IR")} GB</small></div>
 
         {unavailableReason&&<div className="runtime-error" role="alert">{unavailableReason}</div>}
