@@ -66,6 +66,10 @@ class PlanScopeTests(unittest.TestCase):
         self.assertIn("PlanNode.plan_id == int(sub.plan_id)", auth)
         self.assertIn("SubscriptionNode.subscription_id == sub.id", auth)
         self.assertIn("Node.id.in_(configured_node_ids)", auth)
+        plan = auth.split('@router.get("/session/plan")', 1)[1].split(
+            '@router.get("/session/account")', 1)[0]
+        self.assertIn("category_protocols(subscription_type, configured)", plan)
+        self.assertIn('"allowed_protocols": [p for p in ALL_PROTOCOL_KEYS if p in allowed]', plan)
 
 
 if __name__ == "__main__":
