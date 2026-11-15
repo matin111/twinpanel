@@ -250,7 +250,11 @@ public class OpenConnectFlutterPlugin implements FlutterPlugin, ActivityAware, M
             serviceIntent.putExtra(AxeOpenConnectVpnService.EXTRA_CA_PATH,       pendingCaPath);
             serviceIntent.putExtra(AxeOpenConnectVpnService.EXTRA_AUTH_GROUP,    pendingAuthGroup);
             serviceIntent.putExtra(AxeOpenConnectVpnService.EXTRA_SERVERCERT,    pendingServercert);
-            context.startService(serviceIntent);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                context.startForegroundService(serviceIntent);
+            } else {
+                context.startService(serviceIntent);
+            }
 
             if (pendingResult != null) {
                 pendingResult.success(null);
@@ -271,7 +275,11 @@ public class OpenConnectFlutterPlugin implements FlutterPlugin, ActivityAware, M
             updateStage("disconnecting");
             Intent serviceIntent = new Intent(context, AxeOpenConnectVpnService.class);
             serviceIntent.setAction(AxeOpenConnectVpnService.ACTION_DISCONNECT);
-            context.startService(serviceIntent);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                context.startForegroundService(serviceIntent);
+            } else {
+                context.startService(serviceIntent);
+            }
             updateStage("disconnected");
             result.success(null);
         } catch (Exception e) {
