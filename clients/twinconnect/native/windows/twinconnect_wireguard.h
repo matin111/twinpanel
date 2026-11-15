@@ -276,7 +276,11 @@ inline bool InvokeOfficialWireGuard(const wchar_t* command,
   if (!CreateProcessW(exe.c_str(), args.data(), nullptr, nullptr, FALSE,
                       CREATE_NO_WINDOW, nullptr, nullptr, &startup, &process))
     return false;
-  const DWORD wait = WaitForSingleObject(process.hProcess, 30000);
+  // The Flutter Windows method handler runs on the platform UI thread.
+  // Bound this external helper wait so a stuck WireGuard CLI cannot freeze
+  // the desktop for thirty seconds. Never kill a possibly active service:
+  // callers verify Windows service state before reporting disconnection.
+  const DWORD wait = WaitForSingleObject(process.hProcess, 6000);
   DWORD exit_code = 1;
   if (wait == WAIT_OBJECT_0)
     GetExitCodeProcess(process.hProcess, &exit_code);
@@ -505,8 +509,11 @@ inline bool Stop() {
   // Never remove a same-named tunnel created by another client/tool.
   if (ServiceExists() && !IsFile(EncryptedPath())) return false;
   if (ServiceExists()) {
-    if (!InvokeOfficialWireGuard(L"/uninstalltunnelservice", kTunnelName))
-      return false;
+    // A helper timeout does not prove the service is still running.
+    // Check the actual SCM state before failing or clearing local data.
+    const bool command_ok =
+        InvokeOfficialWireGuard(L"/uninstalltunnelservice", kTunnelName);
+    if (!command_ok && ServiceExists()) return false;
     for (int i = 0; i < 20; i++) {
       if (!ServiceExists()) break;
       Sleep(250);

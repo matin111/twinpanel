@@ -115,6 +115,39 @@ void main() {
     expect(api.profileCalls, 0);
   });
 
+  test('WireGuard reuses a freshly fetched same-attempt catalog', () async {
+    final api = FakePanel();
+    final fresh = await api.loadSessionProtocolCatalog(
+      panel: _panel, sessionToken: _session,
+    );
+    final candidate = await ConnectionBootstrap(api: api).prepare(
+      panel: _panel, sessionToken: _session, serverId: '17',
+      protocolCode: 'wireguard', policy: const VpnPolicy(),
+      capabilities: _native, nativeProtocols: _ready,
+      currentAttemptCatalog: Future.value(fresh),
+    );
+    expect(candidate.server.id, '17');
+    expect(api.catalogCalls, 1); // no duplicate catalog API request
+    expect(api.serverCalls, 1);
+    expect(api.profileCalls, 1);
+  });
+
+  test('WireGuard pre-fetched revoked catalog still blocks secrets', () async {
+    final api = FakePanel()..authorized = false;
+    final revoked = await api.loadSessionProtocolCatalog(
+      panel: _panel, sessionToken: _session,
+    );
+    await expectLater(ConnectionBootstrap(api: api).prepare(
+      panel: _panel, sessionToken: _session, serverId: '17',
+      protocolCode: 'wireguard', policy: const VpnPolicy(),
+      capabilities: _native, nativeProtocols: _ready,
+      currentAttemptCatalog: Future.value(revoked),
+    ), throwsA(isA<ConnectionBootstrapException>().having(
+        (e) => e.code, 'code', 'PROTOCOL_NOT_ALLOWED')));
+    expect(api.serverCalls, 0);
+    expect(api.profileCalls, 0);
+  });
+
   test('unassigned node refuses before downloading secrets', () async {
     final api = FakePanel();
     await expectLater(

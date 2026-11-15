@@ -8,11 +8,13 @@ import 'package:flutter/material.dart';
 class TwinConnectAmbientBackground extends StatefulWidget {
   const TwinConnectAmbientBackground({
     required this.dark,
+    this.backgroundColor,
     required this.child,
     super.key,
   });
 
   final bool dark;
+  final Color? backgroundColor;
   final Widget child;
 
   @override
@@ -35,7 +37,7 @@ class _TwinConnectAmbientBackgroundState
   @override
   void didUpdateWidget(covariant TwinConnectAmbientBackground oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.dark != widget.dark) {
+    if (oldWidget.dark != widget.dark || oldWidget.backgroundColor != widget.backgroundColor) {
       _intro.forward(from: 0.0);
     }
   }
@@ -49,6 +51,16 @@ class _TwinConnectAmbientBackgroundState
   @override
   Widget build(BuildContext context) {
     final dark = widget.dark;
+    final brandBackground = widget.backgroundColor;
+    final gradientColors = brandBackground == null
+        ? (dark
+            ? const [Color(0xFF0A1024), Color(0xFF181432), Color(0xFF0C1A2B)]
+            : const [Color(0xFFF6F1FF), Color(0xFFEFF2FF), Color(0xFFFBFAFF)])
+        : [
+            brandBackground,
+            Color.lerp(brandBackground, dark ? Colors.white : Colors.black, .045)!,
+            brandBackground,
+          ];
     return AnimatedContainer(
       key: const Key('devAnimatedBackground'),
       duration: const Duration(milliseconds: 550),
@@ -58,17 +70,7 @@ class _TwinConnectAmbientBackgroundState
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           stops: const [0, .48, 1],
-          colors: dark
-              ? const [
-                  Color(0xFF0A1024),
-                  Color(0xFF181432),
-                  Color(0xFF0C1A2B),
-                ]
-              : const [
-                  Color(0xFFF6F1FF),
-                  Color(0xFFEFF2FF),
-                  Color(0xFFFBFAFF),
-                ],
+          colors: gradientColors,
         ),
       ),
       child: Stack(

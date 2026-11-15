@@ -1,3 +1,5 @@
+import 'dart:io' show InternetAddress;
+
 /// Read-only server inventory, returned by the subscription's own panel.
 /// Node health is NOT the same as an established VPN tunnel or ping.
 class AppServer {
@@ -7,6 +9,7 @@ class AppServer {
     required this.countryCode,
     required this.nodeOnline,
     required this.latencyMs,
+    this.probeIp,
   });
 
   final String id;
@@ -14,6 +17,7 @@ class AppServer {
   final String countryCode;
   final bool nodeOnline;
   final int? latencyMs;
+  final String? probeIp;
 
   factory AppServer.fromJson(Map<String, dynamic> data) {
     final id = data['id'];
@@ -21,6 +25,11 @@ class AppServer {
     final country = data['country_code'];
     final online = data['node_online'];
     final latency = data['latency_ms'];
+    final rawProbe = data['probe_ip'];
+    final parsedProbe = rawProbe is String ? InternetAddress.tryParse(rawProbe) : null;
+    final probeIp = parsedProbe != null && !parsedProbe.isLoopback &&
+        !parsedProbe.isLinkLocal && !parsedProbe.isMulticast
+        ? rawProbe as String : null;
     if (id is! String || !RegExp(r'^[0-9]{1,20}$').hasMatch(id) ||
         name is! String || name.trim().isEmpty || name.length > 120 ||
         country is! String || country.length > 8 || country.isEmpty ||
@@ -30,7 +39,7 @@ class AppServer {
     }
     return AppServer(
       id: id, name: name, countryCode: country,
-      nodeOnline: online, latencyMs: latency,
+      nodeOnline: online, latencyMs: latency, probeIp: probeIp,
     );
   }
 }

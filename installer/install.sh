@@ -282,6 +282,11 @@ if [[ -f "$RELEASE_ROOT/deploy/systemd/twinpanel-node-auto-backfill.service" && 
   install -m 644 "$RELEASE_ROOT/deploy/systemd/twinpanel-node-auto-backfill.service" /etc/systemd/system/twinpanel-node-auto-backfill.service
   install -m 644 "$RELEASE_ROOT/deploy/systemd/twinpanel-node-auto-backfill.timer" /etc/systemd/system/twinpanel-node-auto-backfill.timer
 fi
+# Reinstall on every clean install or reinstall; no old credentials are changed.
+if [[ -f "$RELEASE_ROOT/deploy/systemd/twinpanel-cisco-pin-sync.service" && -f "$RELEASE_ROOT/deploy/systemd/twinpanel-cisco-pin-sync.timer" ]]; then
+  install -m 644 "$RELEASE_ROOT/deploy/systemd/twinpanel-cisco-pin-sync.service" /etc/systemd/system/twinpanel-cisco-pin-sync.service
+  install -m 644 "$RELEASE_ROOT/deploy/systemd/twinpanel-cisco-pin-sync.timer" /etc/systemd/system/twinpanel-cisco-pin-sync.timer
+fi
 if [[ -f "$RELEASE_ROOT/deploy/systemd/twinpanel-backup.timer" ]]; then
   install -m 644 "$RELEASE_ROOT/deploy/systemd/twinpanel-backup.timer" /etc/systemd/system/twinpanel-backup.timer
 fi
@@ -313,6 +318,9 @@ nginx -t
 
 systemctl daemon-reload
 systemctl enable --now twinpanel-api.service twinpanel-web.service
+if systemctl cat twinpanel-cisco-pin-sync.timer >/dev/null 2>&1; then
+  systemctl enable --now twinpanel-cisco-pin-sync.timer
+fi
 if systemctl cat twinpanel-node-auto-backfill.timer >/dev/null 2>&1; then
   systemctl enable --now twinpanel-node-auto-backfill.timer
 fi

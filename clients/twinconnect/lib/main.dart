@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -19,6 +21,12 @@ import 'server_inventory.dart';
 import 'country_flag.dart';
 import 'ambient_background.dart';
 import 'interactive_glass_card.dart';
+import 'live_dashboard.dart';
+import 'frameless_window_controls.dart';
+import 'app_session_store.dart';
+import 'xray_inbound_secure_cache.dart';
+import 'account_snapshot.dart';
+import 'plan_classification.dart';
 
 void main() => runApp(const TwinConnectApp());
 
@@ -83,7 +91,7 @@ class _TwinConnectAppState extends State<TwinConnectApp> {
     };
 
     return MaterialApp(
-      title: 'TwinConnect',
+      title: _activeBrand?.brandName ?? 'TwinConnect',
       debugShowCheckedModeBanner: false,
       locale: selectedLocale,
       supportedLocales: const [Locale('en'), Locale('fa')],
@@ -95,6 +103,10 @@ class _TwinConnectAppState extends State<TwinConnectApp> {
       theme: BrandTheme.make(_activeBrand, Brightness.light),
       darkTheme: BrandTheme.make(_activeBrand, Brightness.dark),
       themeMode: BrandTheme.mode(_activeBrand),
+      builder: (context, child) => Stack(children: [
+        Positioned.fill(child: child ?? const SizedBox.shrink()),
+        const Positioned.fill(child: TwinConnectFramelessControls()),
+      ]),
       home: TwinConnectHome(
         language: _language,
         onLanguageChanged: _changeLanguage,
@@ -120,17 +132,27 @@ class TwinConnectHome extends StatefulWidget {
   State<TwinConnectHome> createState() => _TwinConnectHomeState();
 }
 
-class _TwinConnectHomeState extends State<TwinConnectHome> {
+class _TwinConnectHomeState extends State<TwinConnectHome> with WidgetsBindingObserver {
   final _formKey = GlobalKey<FormState>();
   final _username = TextEditingController();
   final _password = TextEditingController();
+  final AppSessionStore _sessionStore = const AppSessionStore();
+  AppPlanClassification? _plan;
+  AppAccountSnapshot? _account;
+  String? _accountError;
 
+  int _dashboardTab = 0;
   bool _loading = false;
   String? _errorCode;
   BrandPreview? _brand;
   PanelDirectoryEntry? _confirmedPanel;
   String? _confirmedUsername;
   String? _confirmedSessionToken;
+  String? _sessionRefreshToken;
+  Timer? _sessionRefreshTimer;
+  Timer? _brandRefreshTimer;
+  bool _brandRefreshBusy = false;
+  bool _renewingSession = false;
   PanelProtocolCatalog? _catalog;
   AppServerInventory? _servers;
   bool _refreshingServers = false;
@@ -141,7 +163,300 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
   int _lookupSerial = 0;
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _restoreSession();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_renewSession());
+      unawaited(_refreshBrand());
+    }
+  }
+
+  void _startSessionRenewal() {
+    _sessionRefreshTimer?.cancel();
+    _startBrandRefresh();
+    if (_sessionRefreshToken == null) return;
+    // Access JWT expires after 30 min. Renew proactively, and on app resume.
+    _sessionRefreshTimer = Timer.periodic(
+      const Duration(minutes: 15), (_) => unawaited(_renewSession()),
+    );
+  }
+
+  void _startBrandRefresh() {
+    _brandRefreshTimer?.cancel();
+    _brandRefreshTimer = Timer.periodic(
+      const Duration(minutes: 1), (_) => unawaited(_refreshBrand()),
+    );
+  }
+
+  /// Refresh the brand from the account owner's panel, not a vendor/global
+  /// default or the last saved snapshot. Transient failures retain the
+  /// last verified brand and never log or expose the app session token.
+  Future<bool> _refreshBrand() async {
+    if (_brandRefreshBusy) return false;
+    final panel = _confirmedPanel;
+    final username = _confirmedUsername;
+    final token = _confirmedSessionToken;
+    if (panel == null || username == null || token == null) return false;
+    final serial = _lookupSerial;
+    _brandRefreshBusy = true;
+    try {
+      final api = TenantApi.fromBuildConfig();
+      BrandPreview latest;
+      try {
+        latest = await api.loadSessionBrand(
+          panel: panel, sessionToken: token,
+        );
+      } on TenantApiException catch (error) {
+        if (error.message != 'APP_LOGIN_INVALID' ||
+            _sessionRefreshToken == null) rethrow;
+        await _renewSession();
+        final renewed = _confirmedSessionToken;
+        if (renewed == null || renewed == token) return false;
+        latest = await api.loadSessionBrand(
+          panel: panel, sessionToken: renewed,
+        );
+      }
+      if (!mounted || serial != _lookupSerial ||
+          username != _confirmedUsername || panel != _confirmedPanel) return false;
+      if (latest.ownerType == 'reseller' &&
+          !username.startsWith(latest.appUsernamePrefix)) {
+        return false;
+      }
+      setState(() => _brand = latest);
+      widget.onBrandChanged(latest);
+      final currentToken = _confirmedSessionToken;
+      if (currentToken != null) {
+        try {
+          await _sessionStore.save(
+            username: username,
+            sessionToken: currentToken,
+            refreshToken: _sessionRefreshToken,
+            panelOrigin: panel.apiOrigin,
+            brand: latest,
+          );
+        } catch (_) {/* A storage failure must not undo the live brand. */}
+      }
+      return true;
+    } catch (_) {
+      // Offline mode keeps the last authenticated brand.
+      return false;
+    } finally {
+      _brandRefreshBusy = false;
+    }
+  }
+
+  Future<void> _renewSession() async {
+    if (_renewingSession) return;
+    final panel = _confirmedPanel;
+    final username = _confirmedUsername;
+    final refresh = _sessionRefreshToken;
+    final brand = _brand;
+    if (panel == null || username == null || refresh == null || brand == null) return;
+    final serial = _lookupSerial;
+    _renewingSession = true;
+    try {
+      final tokens = await TenantApi.fromBuildConfig().refreshSession(
+        panel: panel, refreshToken: refresh);
+      if (!mounted || serial != _lookupSerial) return;
+      // Save first, so a crash/restart retains the new credentials.
+      await _sessionStore.save(
+        username: username, sessionToken: tokens.sessionToken,
+        refreshToken: tokens.refreshToken,
+        panelOrigin: panel.apiOrigin, brand: brand);
+      if (!mounted || serial != _lookupSerial) return;
+      setState(() {
+        _confirmedSessionToken = tokens.sessionToken;
+        _sessionRefreshToken = tokens.refreshToken;
+      });
+    } catch (_) {
+      // Offline/temporarily unavailable panel NEVER signs out the user.
+      // A revoked or expired account remains server-side unauthorized.
+    } finally {
+      _renewingSession = false;
+    }
+  }
+
+  Future<void> _restoreSession() async {
+    final serial = _lookupSerial;
+    try {
+      final remembered = await _sessionStore.lastUsername();
+      if (!mounted || serial != _lookupSerial) return;
+      if (remembered != null) _username.text = remembered;
+      final saved = await _sessionStore.read();
+      if (saved == null) return;
+      final namespace = TenantIdentity.parseNamespace(saved.username, '');
+      if (namespace != saved.brand.namespace) return;
+
+      // Restore the locally authenticated app shell immediately. Losing the
+      // network does not discard the user's secure-storage session; the
+      // backend still checks token validity before revealing any profiles.
+      PanelDirectoryEntry? panel;
+      if (saved.panelOrigin != null) {
+        panel = PanelDirectoryEntry(
+          namespace: namespace, apiOrigin: saved.panelOrigin!);
+        if (!mounted || serial != _lookupSerial) return;
+        setState(() {
+          _brand = saved.brand;
+          widget.onBrandChanged(saved.brand);
+          _confirmedPanel = panel;
+          _confirmedUsername = saved.username;
+          _confirmedSessionToken = saved.sessionToken;
+          _sessionRefreshToken = saved.refreshToken;
+        });
+      }
+
+      final api = TenantApi.fromBuildConfig();
+      try {
+        panel = await api.resolve(namespace);
+      } catch (_) {
+        if (panel == null) return;
+        // Use the last verified origin if the vendor directory is offline.
+      }
+      final activePanel = panel;
+      var accessToken = saved.sessionToken;
+      var refreshToken = saved.refreshToken;
+      if (refreshToken != null) {
+        try {
+          final renewed = await api.refreshSession(
+            panel: activePanel, refreshToken: refreshToken);
+          accessToken = renewed.sessionToken;
+          refreshToken = renewed.refreshToken;
+        } on TenantApiException catch (error) {
+          if (error.message == 'APP_LOGIN_INVALID' ||
+              error.message == 'APP_NOT_AUTHORIZED') {
+            // A definitive authorization denial requires authentication.
+            await _sessionStore.clearSession();
+            if (mounted && serial == _lookupSerial) {
+              setState(() {
+                _brand = null;
+                _confirmedPanel = null;
+                _confirmedUsername = null;
+                _confirmedSessionToken = null;
+                _sessionRefreshToken = null;
+                widget.onBrandChanged(null);
+              });
+            }
+            return;
+          }
+        } catch (_) {
+          // Transient errors preserve the saved session.
+        }
+      }
+      // Never fabricate account/server permissions from locally cached data.
+      final catalog = await api.loadSessionProtocolCatalog(
+        panel: activePanel, sessionToken: accessToken);
+      final native = await NativeVpnBridge.protocolReadiness();
+      if (!mounted || serial != _lookupSerial) return;
+      setState(() {
+        _brand = saved.brand;
+        widget.onBrandChanged(saved.brand);
+        _confirmedPanel = activePanel;
+        _confirmedUsername = saved.username;
+        _confirmedSessionToken = accessToken;
+        _sessionRefreshToken = refreshToken;
+        _catalog = catalog;
+        _nativeProtocols = native;
+      });
+      try {
+        await _sessionStore.save(username: saved.username,
+          sessionToken: accessToken, refreshToken: refreshToken,
+          panelOrigin: activePanel.apiOrigin, brand: saved.brand);
+      } catch (_) {}
+      _startSessionRenewal();
+      _refreshServers();
+      unawaited(_refreshBrand());
+      _loadAccountPlan(activePanel, accessToken, serial);
+      _loadAccountSnapshot(activePanel, accessToken, serial);
+    } catch (_) {
+      // Keep the offline app shell intact; user explicitly signs out.
+      // The panel continues to authorize every sensitive API operation.
+    }
+  }
+
+  Future<void> _loadAccountSnapshot(
+    PanelDirectoryEntry panel, String session, int serial,
+  ) async {
+    try {
+      final snapshot = await TenantApi.fromBuildConfig().loadSessionAccount(
+        panel: panel, sessionToken: session,
+      );
+      if (mounted && serial == _lookupSerial) {
+        setState(() { _account = snapshot; _accountError = null; });
+      }
+    } catch (error) {
+      if (mounted && serial == _lookupSerial) {
+        setState(() => _accountError = error is TenantApiException
+            ? error.message : 'ACCOUNT_RESPONSE_INVALID');
+      }
+    }
+  }
+
+  Future<void> _loadAccountPlan(
+    PanelDirectoryEntry panel, String session, int serial,
+  ) async {
+    try {
+      final plan = await TenantApi.fromBuildConfig().loadSessionPlan(
+        panel: panel, sessionToken: session,
+      );
+      if (mounted && serial == _lookupSerial) {
+        setState(() => _plan = plan);
+      }
+    } catch (_) {
+      // Missing plan metadata is not a reason to sign out.
+    }
+  }
+
+  Future<void> _signOutSafely() async {
+    // Invalidate stale account / inventory requests immediately, then
+    // erase the OS-protected session before displaying the login screen.
+    ++_lookupSerial;
+    _sessionRefreshTimer?.cancel();
+    _brandRefreshTimer?.cancel();
+    try {
+      await _sessionStore.clearSession();
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Unable to clear saved session. Try again.'),
+        ));
+      }
+      return;
+    }
+    // Session deletion has succeeded. Best-effort removal of the encrypted
+    // display cache must never prevent sign-out if OS vault I/O fails.
+    try {
+      await const XrayInboundSecureCache().clear();
+    } catch (_) {}
+    if (!mounted) return;
+    setState(() {
+      _brand = null;
+      _confirmedPanel = null;
+      _confirmedUsername = null;
+      _confirmedSessionToken = null;
+      _sessionRefreshToken = null;
+      _catalog = null;
+      _servers = null;
+      _plan = null;
+      _account = null;
+      _accountError = null;
+      _dashboardTab = 0;
+      _errorCode = null;
+      widget.onBrandChanged(null);
+      _password.clear();
+    });
+  }
+
+  @override
   void dispose() {
+    _sessionRefreshTimer?.cancel();
+    _brandRefreshTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
     _username.dispose();
     _password.dispose();
     super.dispose();
@@ -161,6 +476,9 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
       _confirmedSessionToken = null;
       _catalog = null;
       _servers = null;
+      _plan = null;
+      _account = null;
+      _accountError = null;
       _refreshingServers = false;
       _serverRefreshError = null;
       _protocolCatalogUnavailable = false;
@@ -186,9 +504,21 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
         _confirmedPanel = panel;
         _confirmedUsername = username;
         _confirmedSessionToken = loggedIn.sessionToken;
+        _sessionRefreshToken = loggedIn.refreshToken;
       });
+      _startSessionRenewal();
+      // Persist only in OS secure storage; invalid sessions must reauthenticate.
+      try {
+        await _sessionStore.save(username: username,
+          sessionToken: loggedIn.sessionToken,
+          refreshToken: loggedIn.refreshToken,
+          panelOrigin: panel.apiOrigin, brand: brand);
+      } catch (_) {}
+      _loadAccountPlan(panel, loggedIn.sessionToken, serial);
+      _loadAccountSnapshot(panel, loggedIn.sessionToken, serial);
       // Refresh server inventory after authenticated login; failures are isolated.
       _refreshServers();
+      unawaited(_refreshBrand());
       // Subscription metadata is not secret and is fetched independently of
       // brand details. A temporary metadata error must not hide renewal links.
       try {
@@ -224,6 +554,7 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
     final panel = _confirmedPanel;
     final session = _confirmedSessionToken;
     if (panel == null || session == null || _refreshingServers) return;
+    unawaited(_refreshBrand());
     final serial = _lookupSerial;
     setState(() {
       _refreshingServers = true;
@@ -234,18 +565,44 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
       // Server refresh is also a plan/protocol entitlement refresh.
       // Publish both together so removed permissions never remain in the UI
       // alongside newly fetched servers.
-      final catalog = await api.loadSessionProtocolCatalog(
-        panel: panel, sessionToken: session,
-      );
-      final inventory = await api.refreshSessionServers(
-        panel: panel, sessionToken: session,
-      );
+      // An access JWT expires after 30 minutes. Renew and retry once, instead
+      // of silently presenting an empty server list while still signed in.
+      Future<(PanelProtocolCatalog, AppServerInventory)> fetch(String token) async {
+        final catalog = await api.loadSessionProtocolCatalog(
+          panel: panel, sessionToken: token,
+        );
+        final inventory = await api.refreshSessionServers(
+          panel: panel, sessionToken: token,
+        );
+        return (catalog, inventory);
+      }
+      (PanelProtocolCatalog, AppServerInventory) result;
+      try {
+        result = await fetch(session);
+      } on TenantApiException catch (error) {
+        if (error.message != 'APP_LOGIN_INVALID' ||
+            _sessionRefreshToken == null) {
+          rethrow;
+        }
+        await _renewSession();
+        if (!mounted || serial != _lookupSerial) return;
+        final updated = _confirmedSessionToken;
+        if (updated == null || updated == session) rethrow;
+        result = await fetch(updated);
+      }
+      final (catalog, inventory) = result;
       if (!mounted || serial != _lookupSerial) return;
       setState(() {
         _catalog = catalog;
         _servers = inventory;
         _protocolCatalogUnavailable = false;
       });
+    } on TenantApiException catch (error) {
+      if (!mounted || serial != _lookupSerial) return;
+      setState(() => _serverRefreshError =
+          error.message == 'APP_LOGIN_INVALID'
+              ? 'APP_SESSION_EXPIRED'
+              : 'SERVER_REFRESH_FAILED');
     } catch (_) {
       if (!mounted || serial != _lookupSerial) return;
       setState(() => _serverRefreshError = 'SERVER_REFRESH_FAILED');
@@ -256,10 +613,353 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
     }
   }
 
+
+  // ignore: unused_element
+  Widget _buildAuthenticatedDashboard(
+    BuildContext context,
+    AppStrings strings,
+    BrandPreview brand,
+  ) {
+    final theme = Theme.of(context);
+    final dark = theme.brightness == Brightness.dark;
+    final accent = theme.colorScheme.primary;
+    final isWide = MediaQuery.sizeOf(context).width >= 820;
+    final sections = [
+      strings.pick('اتصال', 'Connect'),
+      strings.pick('مکان‌ها', 'Locations'),
+      strings.pick('تنظیمات', 'Settings'),
+      strings.pick('حساب', 'Account'),
+    ];
+    final icons = [
+      Icons.power_settings_new_rounded,
+      Icons.public_rounded,
+      Icons.tune_rounded,
+      Icons.person_outline_rounded,
+    ];
+
+    Widget glass(Widget child) => TwinConnectGlassCard(
+      dark: dark,
+      radius: 24,
+      padding: const EdgeInsets.all(22),
+      child: child,
+    );
+
+    Widget header(String title, IconData icon, {Widget? trailing}) => Row(
+      children: [
+        Icon(icon, color: accent),
+        const SizedBox(width: 12),
+        Expanded(child: Text(title, style: theme.textTheme.titleLarge?.copyWith(
+          fontWeight: FontWeight.w800,
+        ))),
+        if (trailing != null) trailing,
+      ],
+    );
+
+    Widget serverInventory() {
+      if (_servers == null) {
+        return glass(Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            header(strings.pick('سرورهای اشتراک', 'Subscription servers'),
+              Icons.public_rounded,
+              trailing: IconButton(
+                tooltip: strings.pick('به‌روزرسانی', 'Refresh'),
+                onPressed: _refreshingServers ? null : _refreshServers,
+                icon: const Icon(Icons.refresh_rounded),
+              )),
+            const SizedBox(height: 14),
+            Text(_serverRefreshError == null
+              ? strings.pick('در حال دریافت اطلاعات سرورها…', 'Loading servers…')
+              : strings.pick('دریافت سرورها ناموفق بود', 'Could not refresh servers')),
+          ],
+        ));
+      }
+      return glass(Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          header(strings.pick('مکان‌های در دسترس', 'Available locations'),
+            Icons.public_rounded,
+            trailing: IconButton(
+              tooltip: strings.pick('به‌روزرسانی سرورها', 'Refresh servers'),
+              onPressed: _refreshingServers ? null : _refreshServers,
+              icon: _refreshingServers
+                ? const SizedBox.square(dimension: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2))
+                : const Icon(Icons.refresh_rounded),
+            )),
+          const SizedBox(height: 14),
+          if (_servers!.servers.isEmpty)
+            Text(strings.pick('سروری برای این اشتراک ثبت نشده',
+              'No servers assigned to this subscription')),
+          for (final server in _servers!.servers)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: ListTile(
+                key: Key('assignedServer_${server.id}'),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
+                tileColor: accent.withValues(alpha: 0.065),
+                leading: CountryFlag(server.countryCode, width: 31),
+                title: Text(server.name),
+                subtitle: Text(server.countryCode),
+                trailing: Text(server.nodeOnline
+                  ? strings.pick('نود آنلاین', 'Node online')
+                  : strings.pick('نود آفلاین', 'Node offline')),
+              ),
+            ),
+        ],
+      ));
+    }
+
+    Widget page;
+    switch (_dashboardTab) {
+      case 0:
+        page = Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            glass(Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                header(strings.pick('اتصال امن', 'Secure connection'),
+                  Icons.shield_outlined),
+                const SizedBox(height: 10),
+                Text(strings.pick(
+                  'برای اتصال، یکی از پروتکل‌های فعال اشتراک را انتخاب کنید.',
+                  'Choose an enabled subscription protocol to connect.')),
+              ],
+            )),
+            const SizedBox(height: 16),
+            if (_protocolCatalogUnavailable)
+              glass(Text(strings.protocolCatalogUnavailable)),
+            if (_catalog == null && !_protocolCatalogUnavailable)
+              glass(const Center(child: CircularProgressIndicator())),
+            if (_catalog != null) ...[
+              ProtocolCatalogCard(catalog: _catalog!, native: _nativeProtocols),
+              if (_confirmedPanel != null &&
+                  _confirmedUsername != null &&
+                  _confirmedSessionToken != null) ...[
+                const SizedBox(height: 12),
+                if (Theme.of(context).platform == TargetPlatform.android)
+                  AndroidConnectionCard(
+                    key: ValueKey(_confirmedUsername),
+                    panel: _confirmedPanel!,
+                    username: _confirmedUsername!,
+                    sessionToken: _confirmedSessionToken!,
+                    catalog: _catalog!,
+                    native: _nativeProtocols,
+                  ),
+                if (Theme.of(context).platform != TargetPlatform.android &&
+                    _servers != null)
+                  WindowsConnectionCard(
+                    key: ValueKey('windows_${_confirmedUsername!}'),
+                    panel: _confirmedPanel!,
+                    username: _confirmedUsername!,
+                    sessionToken: _confirmedSessionToken!,
+                    catalog: _catalog!,
+                    servers: _servers!,
+                  ),
+              ],
+            ],
+          ],
+        );
+        break;
+      case 1:
+        page = serverInventory();
+        break;
+      case 2:
+        page = Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            glass(Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                header(strings.pick('تنظیمات اتصال', 'Connection settings'),
+                  Icons.tune_rounded),
+                const SizedBox(height: 18),
+                FilledButton.icon(
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => VpnSettingsScreen(
+                        brand: brand,
+                        tenant: brand.namespace,
+                        account: _confirmedUsername ?? '',
+                      ),
+                    ),
+                  ),
+                  icon: const Icon(Icons.settings_rounded),
+                  label: Text(strings.vpnSettingsTitle),
+                ),
+              ],
+            )),
+            const SizedBox(height: 16),
+            glass(Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                header(strings.pick('زبان برنامه', 'App language'),
+                  Icons.language_rounded),
+                const SizedBox(height: 12),
+                DropdownButton<AppLanguage>(
+                  isExpanded: true,
+                  value: widget.language,
+                  onChanged: (language) {
+                    if (language != null) widget.onLanguageChanged(language);
+                  },
+                  items: [
+                    DropdownMenuItem(value: AppLanguage.automatic,
+                      child: Text(strings.systemLanguage)),
+                    DropdownMenuItem(value: AppLanguage.persian,
+                      child: Text(strings.persianLanguage)),
+                    DropdownMenuItem(value: AppLanguage.english,
+                      child: Text(strings.englishLanguage)),
+                  ],
+                ),
+              ],
+            )),
+          ],
+        );
+        break;
+      default:
+        page = Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            glass(Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                header(strings.pick('حساب کاربری', 'Account'),
+                  Icons.person_outline_rounded),
+                const SizedBox(height: 16),
+                Text(_confirmedUsername ?? '',
+                  style: theme.textTheme.titleMedium),
+                const SizedBox(height: 8),
+                Text(strings.pick('وضعیت اشتراک', 'Subscription status')),
+                Text(brand.accountStatus == 'active'
+                  ? strings.statusActive
+                  : brand.accountStatus == 'expired'
+                    ? strings.statusExpired
+                    : strings.statusOther(brand.accountStatus)),
+              ],
+            )),
+            const SizedBox(height: 16),
+            glass(Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                header(strings.pick('پشتیبانی و تمدید', 'Support and renewal'),
+                  Icons.help_outline_rounded),
+                const SizedBox(height: 12),
+                _CopyValue(label: strings.supportTelegram, value: brand.telegramUrl),
+                _CopyValue(label: strings.renewalLink, value: brand.renewalUrl),
+                _CopyValue(label: strings.supportPhone, value: brand.phone),
+                _CopyValue(label: strings.website, value: brand.websiteUrl),
+                if (brand.supportText != null) Text(brand.supportText!),
+              ],
+            )),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: _signOutSafely,
+              icon: const Icon(Icons.logout_rounded),
+              label: Text(strings.pick('خروج از حساب', 'Sign out')),
+            ),
+          ],
+        );
+        break;
+    }
+
+    final content = ListView(
+      key: ValueKey('dashboard_page_$_dashboardTab'),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+      children: [
+        Text(sections[_dashboardTab],
+          style: theme.textTheme.headlineMedium?.copyWith(
+            fontWeight: FontWeight.w800)),
+        const SizedBox(height: 20),
+        page,
+      ],
+    );
+
+    return Scaffold(
+      key: const Key('authenticatedDashboard'),
+      extendBodyBehindAppBar: true,
+      body: TwinConnectAmbientBackground(
+        dark: dark,
+        child: SafeArea(
+          child: isWide
+            ? Row(children: [
+                Container(
+                  width: 224,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12, vertical: 20),
+                  child: glass(Column(
+                    children: [
+                      for (var i = 0; i < sections.length; i++)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: ListTile(
+                            key: Key('dashboardNav_$i'),
+                            selected: _dashboardTab == i,
+                            selectedTileColor: accent.withValues(alpha: 0.14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14)),
+                            leading: Icon(icons[i]),
+                            title: Text(sections[i]),
+                            onTap: () => setState(() => _dashboardTab = i),
+                          ),
+                        ),
+                    ],
+                  )),
+                ),
+                Expanded(child: content),
+              ])
+            : Column(children: [
+                Expanded(child: content),
+                NavigationBar(
+                  selectedIndex: _dashboardTab,
+                  onDestinationSelected: (index) =>
+                    setState(() => _dashboardTab = index),
+                  destinations: [
+                    for (var i = 0; i < sections.length; i++)
+                      NavigationDestination(
+                        icon: Icon(icons[i]),
+                        label: sections[i],
+                      ),
+                  ],
+                ),
+              ]),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final strings = AppStrings.of(context);
     final brand = _brand;
+    if (brand != null && _confirmedPanel != null &&
+        _confirmedUsername != null && _confirmedSessionToken != null) {
+      return TwinConnectLiveDashboard(
+        key: ValueKey(_confirmedUsername),
+        brand: brand,
+        onBrandRefresh: _refreshBrand,
+        panel: _confirmedPanel!,
+        username: _confirmedUsername!,
+        sessionToken: _confirmedSessionToken!,
+        catalog: _catalog,
+        servers: _servers,
+        serverRefreshError: _serverRefreshError,
+        native: _nativeProtocols,
+        plan: _plan,
+        account: _account,
+        accountError: _accountError,
+        onRefreshAccount: () {
+          if (_confirmedPanel != null && _confirmedSessionToken != null) {
+            _loadAccountSnapshot(_confirmedPanel!, _confirmedSessionToken!, _lookupSerial);
+            _loadAccountPlan(_confirmedPanel!, _confirmedSessionToken!, _lookupSerial);
+          }
+        },
+        accountStatus: _brand?.accountStatus ?? 'unknown',
+        onRefresh: _refreshServers,
+        onLogout: _signOutSafely,
+      );
+    }
 
     final accent = Theme.of(context).colorScheme.primary;
     final dark = Theme.of(context).brightness == Brightness.dark;
@@ -304,20 +1004,6 @@ class _TwinConnectHomeState extends State<TwinConnectHome> {
           ],
         ),
         actions: [
-          IconButton(
-            key: const Key('vpnSettingsButton'),
-            tooltip: strings.vpnSettingsTitle,
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => VpnSettingsScreen(
-                  brand: brand,
-                  tenant: brand?.namespace ?? '',
-                  account: brand == null ? '' : _username.text.trim(),
-                ),
-              ),
-            ),
-            icon: const Icon(Icons.tune_rounded),
-          ),
           Padding(
             padding: const EdgeInsetsDirectional.only(start: 5, end: 18),
             child: DropdownButtonHideUnderline(

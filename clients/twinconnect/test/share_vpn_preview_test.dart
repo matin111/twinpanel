@@ -18,10 +18,9 @@ void main() {
     expect(find.byKey(const Key('devShareVpnCard')), findsOneWidget);
     expect(find.byKey(const Key('devWifiSettingsCard')), findsOneWidget);
     expect(find.byKey(const Key('devShareVpnGuideCard')), findsOneWidget);
-    final toggle = tester.widget<Switch>(
-      find.byKey(const Key('devShareVpnSwitch')));
-    expect(toggle.value, isFalse);
-    expect(toggle.onChanged, isNull);
+    // No fake switch: real VPN egress sharing is not implemented.
+    expect(find.byKey(const Key('devShareVpnSwitch')), findsNothing);
+    expect(find.text('غیرفعال'), findsOneWidget);
   });
 
   testWidgets('Share VPN guide explains native requirements',

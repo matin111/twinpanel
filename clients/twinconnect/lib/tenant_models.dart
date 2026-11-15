@@ -163,6 +163,28 @@ class BrandPreview {
   final String? backgroundImageUrl;
   final String themeMode;
 
+  Map<String, dynamic> toJson() => {
+    'namespace': namespace,
+    'brand_name': brandName,
+    'owner_type': ownerType,
+    'account_status': accountStatus,
+    'app_username_prefix': appUsernamePrefix,
+    'telegram_url': telegramUrl,
+    'renewal_url': renewalUrl,
+    'website_url': websiteUrl,
+    'support_phone': phone,
+    'support_text': supportText,
+    'logo_url': logoUrl,
+    'primary_color': primaryColor,
+    'secondary_color': secondaryColor,
+    'button_color': buttonColor,
+    'background_color': backgroundColor,
+    'surface_color': surfaceColor,
+    'background_style': backgroundStyle,
+    'background_image_url': backgroundImageUrl,
+    'theme_mode': themeMode,
+  };
+
   factory BrandPreview.fromJson(Map<String, dynamic> json) {
     String field(String key, [String fallback = '']) {
       final value = json[key];

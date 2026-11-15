@@ -33,7 +33,13 @@ void main() {
     expect(branded.backgroundColor, '#090B14');
     expect(branded.surfaceColor, '#162434');
     expect(BrandTheme.mode(branded), ThemeMode.light);
+    // Light mode keeps the tenant hue but darkens bright accents for legible
+    // controls on frosted white cards; dark mode retains the configured color.
     expect(BrandTheme.make(branded, Brightness.light).colorScheme.primary,
+        BrandTheme.accent(branded, Brightness.light));
+    expect(BrandTheme.make(branded, Brightness.light).colorScheme.primary,
+        isNot(const Color(0xFF009977)));
+    expect(BrandTheme.make(branded, Brightness.dark).colorScheme.primary,
         const Color(0xFF009977));
     expect(BrandTheme.make(branded, Brightness.dark).cardTheme.color,
         const Color(0xFF162434));

@@ -19,8 +19,12 @@ class ServerRefreshContract(unittest.TestCase):
         self.assertIn("Node.retired_at.is_(None)", route)
         self.assertIn("subscription_app_namespace(db, sub)", route)
         self.assertIn('"latency_ms": None', route)
-        for secret in ("public_ip", "public_domain", "agent_url",
-                       "secret_encrypted", "config_text_encrypted"):
+        # A validated global probe IP is intentionally returned only for
+        # nodes already assigned to this authenticated subscription.
+        self.assertIn('"probe_ip": _public_node_probe_ip(node.public_ip)', route)
+        self.assertIn('address.is_global', src)
+        for secret in ('"public_ip":', '"public_domain":', '"agent_url":',
+                       '"secret_encrypted":', '"config_text_encrypted":'):
             self.assertNotIn(secret, route)
 
 

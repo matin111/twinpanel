@@ -4,6 +4,8 @@ import 'tenant_api.dart';
 import 'tenant_models.dart';
 import 'vpn_policy.dart';
 import 'native_vpn_bridge.dart';
+import 'singbox_profile_validator.dart';
+import 'cisco_openconnect_profile.dart';
 
 /// A validated, subscription-scoped connection candidate. These checks do
 /// not start a VPN tunnel and must never be shown as "connected".
@@ -23,6 +25,9 @@ class ConnectionBootstrap {
     required VpnPolicy policy,
     required NativeVpnCapabilities capabilities,
     required NativeProtocolReadiness nativeProtocols,
+    // A new authenticated catalog read issued DURING this same connect
+    // attempt may overlap local native checks. Never pass UI-cached data.
+    Future<PanelProtocolCatalog>? currentAttemptCatalog,
   }) async {
     if (sessionToken.trim().length < 40 || sessionToken != sessionToken.trim()) {
       throw const ConnectionBootstrapException('INVALID_APP_SESSION');
@@ -41,8 +46,15 @@ class ConnectionBootstrap {
       throw const ConnectionBootstrapException('NATIVE_ENGINE_UNAVAILABLE');
     }
 
-    final catalog = await api.loadSessionProtocolCatalog(
-      panel: panel, sessionToken: sessionToken);
+    // Refresh the entitlement gate before asking for any node metadata.
+    // Revoked plans must NOT cause a speculative server lookup, even when
+    // such a request would not include connection secrets.
+    final catalog = await (currentAttemptCatalog ??
+        api.loadSessionProtocolCatalog(
+          panel: panel, sessionToken: sessionToken));
+    if (catalog.namespace != panel.namespace) {
+      throw const ConnectionBootstrapException('PROTOCOL_CATALOG_SCOPE_MISMATCH');
+    }
     final allowed = catalog.entries.where((entry) =>
         entry.protocol.code == definition.code &&
         entry.selected && entry.configRecordPresent);
@@ -52,6 +64,7 @@ class ConnectionBootstrap {
 
     final inventory = await api.refreshSessionServers(
       panel: panel, sessionToken: sessionToken);
+
     // A node-health heartbeat is advisory and is not proof the VPN endpoint
     // works or fails. Authorization comes from this subscription-scoped
     // inventory; the native peer handshake determines real connectivity.
@@ -81,6 +94,32 @@ class ConnectionBootstrap {
     }).toList(growable: false);
     if (nodeItems.isEmpty) {
       throw const ConnectionBootstrapException('SERVER_PROFILE_MISSING');
+    }
+    if (definition.code == 'cisco') {
+      // Never pass an incomplete manual-credential profile into the native
+      // OpenConnect transport once that engine becomes available.
+      for (final item in nodeItems) {
+        try {
+          CiscoOpenConnectProfile.fromItem(item);
+        } on FormatException {
+          throw const ConnectionBootstrapException(
+              'CISCO_PROFILE_NOT_NATIVE_READY');
+        }
+      }
+    }
+    if (SingBoxProfileValidator.supportsFamily(definition.code)) {
+      // Do not attempt a mixed-engine or lossy URI conversion. Once the
+      // native engine advertises readiness, profiles must be valid native
+      // sing-box outbounds before they reach it.
+      for (final item in nodeItems) {
+        try {
+          SingBoxProfileValidator.validateOutbound(
+            protocolCode: definition.code, item: item);
+        } on FormatException {
+          throw const ConnectionBootstrapException(
+              'SINGBOX_PROFILE_NOT_NATIVE_READY');
+        }
+      }
     }
     return ConnectionCandidate(
       server: selected.single,

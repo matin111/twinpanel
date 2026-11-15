@@ -46,7 +46,9 @@ class NativeVpnBridge {
   }
 
 
-  static Future<NativeProtocolReadiness> protocolReadiness() async {
+  static Future<NativeProtocolReadiness> protocolReadiness({
+    NativeVpnCapabilities? validatedCapabilities,
+  }) async {
     // Missing plugin is expected until real protocol engines are built.
     if (platform != VpnPlatform.android && platform != VpnPlatform.windows) {
       // No iOS/macOS protocol adapter has been installed.
@@ -54,7 +56,10 @@ class NativeVpnBridge {
     }
     // This additional OS-level probe is mandatory: a plugin must not report
     // protocol names without an actually initialized native VPN engine.
-    final capabilities = await probe();
+    // An immediately preceding native capability probe can be reused
+    // during the same connect attempt instead of calling the platform
+    // channel twice. All other callers still probe normally.
+    final capabilities = validatedCapabilities ?? await probe();
     if (!capabilities.engineReady || !capabilities.fullTunnel) {
       return const NativeProtocolReadiness(supportedCodes: {});
     }

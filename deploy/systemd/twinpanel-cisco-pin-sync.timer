@@ -1,0 +1,12 @@
+[Unit]
+Description=TwinPanel periodic Cisco trusted certificate discovery for new VPN nodes
+
+[Timer]
+OnBootSec=90s
+OnUnitInactiveSec=3min
+RandomizedDelaySec=20s
+Persistent=false
+Unit=twinpanel-cisco-pin-sync.service
+
+[Install]
+WantedBy=timers.target

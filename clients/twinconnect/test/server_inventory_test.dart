@@ -18,6 +18,20 @@ void main() {
     expect(list.servers.single.latencyMs, isNull);
   });
 
+  test('server probe IP stays optional and is parsed only as an address', () {
+    const row = {
+      'id': '42', 'name': 'Turkey', 'country_code': 'TR',
+      'node_online': true, 'latency_ms': null,
+    };
+    expect(AppServer.fromJson(row).probeIp, isNull);
+    expect(AppServer.fromJson({...row, 'probe_ip': '8.8.8.8'}).probeIp,
+        '8.8.8.8');
+    expect(AppServer.fromJson({...row, 'probe_ip': 'localhost'}).probeIp,
+        isNull);
+    expect(AppServer.fromJson({...row, 'probe_ip': '127.0.0.1'}).probeIp,
+        isNull);
+  });
+
   test('rejects duplicate or invented latency', () {
     const row = {
       'id': '2', 'name': 'Germany', 'country_code': 'DE',

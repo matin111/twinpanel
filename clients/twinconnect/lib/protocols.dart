@@ -1,3 +1,5 @@
+import 'xray_inbound_profiles.dart';
+
 /// TwinPanel's 16 canonical protocols. Client engines are PLANNED families,
 /// not proof the protocol currently connects in this Flutter app.
 ///
@@ -230,11 +232,13 @@ class ClientProtocolProfiles {
     required this.namespace,
     required this.protocol,
     required this.items,
+    this.xrayServerGroups = const [],
   });
 
   final String namespace;
   final VpnProtocolDefinition protocol;
   final List<Map<String, dynamic>> items;
+  final List<XrayServerProfiles> xrayServerGroups;
 
   factory ClientProtocolProfiles.fromJson(Map<String, dynamic> input) {
     if (input['schema'] != 1 || input['namespace'] is! String ||
@@ -261,6 +265,10 @@ class ClientProtocolProfiles {
       namespace: (input['namespace'] as String).toUpperCase(),
       protocol: definition,
       items: items,
+      xrayServerGroups: definition.code == 'v2ray' &&
+              input.containsKey('server_groups')
+          ? XrayServerProfiles.fromResponse(input)
+          : const [],
     );
   }
 }

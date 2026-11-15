@@ -33,6 +33,7 @@ from ..openvpn_profile_delivery_guard_v1 import (
     disambiguate_openvpn_filenames, validate_openvpn_profile,
 )
 from ..database import get_db
+from ..runtime_settings_model import RuntimeSetting
 from ..deps import require_admin, get_current_user
 from ..quota_models import QuotaUsageEvent
 from ..subscription_enforcement import queue_subscription_enforcement
@@ -68,6 +69,89 @@ customer_router = APIRouter(
     prefix="/v1/customer/subscriptions",
     tags=["customer-account-delivery"],
 )
+
+
+# TWINPANEL_CISCO_TRUSTED_CERT_PIN_V1
+# Trusted SSH certificate identity is stored per Exit node, never per user.
+def _cisco_pin_key(node_id: int) -> str:
+    return f"cisco.trusted_servercert.node.{int(node_id)}"
+
+
+def _cisco_saved_pin(db: Session, node_id: int) -> str | None:
+    row = db.get(RuntimeSetting, _cisco_pin_key(node_id))
+    pin = str(row.setting_value or "") if row else ""
+    return pin if re.fullmatch(r"pin-sha256:[A-Za-z0-9+/]{43}=", pin) else None
+
+
+def _save_cisco_pin(db: Session, node_id: int, pin: str) -> None:
+    if not re.fullmatch(r"pin-sha256:[A-Za-z0-9+/]{43}=", pin):
+        raise ValueError("INVALID_CISCO_CERT_PIN")
+    key = _cisco_pin_key(node_id)
+    row = db.get(RuntimeSetting, key)
+    if row is None:
+        db.add(RuntimeSetting(setting_key=key, setting_value=pin))
+    else:
+        row.setting_value = pin
+
+
+async def _cisco_pin_from_management_ssh(node: Node, db: Session) -> str | None:
+    conn = await ssh_connect_saved(node, db)
+    try:
+        raw = await cmd(conn, """python3 - <<'PY'
+import base64, hashlib, pathlib, re, subprocess
+cfg = pathlib.Path('/etc/ocserv/ocserv.conf')
+if cfg.is_file():
+    for line in cfg.read_text(errors='replace').splitlines():
+        match = re.match(r'^\s*server-cert\s*=\s*(\S+)\s*$', line)
+        if not match:
+            continue
+        cert = pathlib.Path(match.group(1))
+        if cert.is_file():
+            pub = subprocess.run(
+                ['openssl', 'x509', '-in', str(cert), '-pubkey', '-noout'],
+                capture_output=True, timeout=5, check=False)
+            if pub.returncode == 0:
+                spki = subprocess.run(
+                    ['openssl', 'pkey', '-pubin', '-outform', 'DER'],
+                    input=pub.stdout, capture_output=True, timeout=5, check=False)
+                if spki.returncode == 0 and spki.stdout:
+                    digest = hashlib.sha256(spki.stdout).digest()
+                    print('pin-sha256:' + base64.b64encode(digest).decode('ascii'))
+        break
+PY""", timeout=15, check=False)
+    finally:
+        conn.close()
+        await conn.wait_closed()
+    match = re.search(r"pin-sha256:([A-Za-z0-9+/]{43}=)", raw)
+    return match.group(0) if match else None
+
+@router.post("/admin/cisco/certificate-pins/refresh")
+async def refresh_cisco_certificate_pins(db: Session = Depends(get_db)):
+    """Refresh per-node verified identity; does not touch running VPNs."""
+    nodes = (
+        db.query(Node).filter(
+            Node.node_type == NodeType.EXIT,
+            Node.retired_at.is_(None),
+            Node.enable_cisco.is_(True),
+        ).order_by(Node.id).limit(100).all()
+    )
+    results = []
+    for node in nodes:
+        try:
+            pin = await _cisco_pin_from_management_ssh(node, db)
+            if not pin:
+                results.append({"node_id": int(node.id), "status": "certificate_unavailable"})
+                continue
+            old = _cisco_saved_pin(db, node.id)
+            _save_cisco_pin(db, node.id, pin)
+            results.append({
+                "node_id": int(node.id),
+                "status": "unchanged" if old == pin else "updated",
+            })
+        except Exception:
+            results.append({"node_id": int(node.id), "status": "ssh_unavailable"})
+    db.commit()
+    return {"schema": 1, "checked": len(results), "nodes": results}
 
 
 DEFAULT_PORTS = {"cisco": 4443, "openvpn": 1194, "wireguard": 51820, "l2tp": 1701, "v2ray": 8443}
@@ -717,12 +801,8 @@ async def _cisco(db: Session, node: Node, sub: Subscription, user: User, usernam
     try:
         encoded = base64.b64encode((password + "\n" + password + "\n").encode()).decode()
         await cmd(conn, f"printf '%s' {shlex.quote(encoded)} | base64 -d | ocpasswd -c /etc/ocserv/ocpasswd {shlex.quote(username)}")
-        host, port = _tunnel_access_endpoint(
-            db,
-            node,
-            "cisco",
-        )
-        return {
+        host, port = _tunnel_access_endpoint(db, node, "cisco")
+        result = {
             "node_id": node.id,
             "node": node.name,
             "server": host,
@@ -731,9 +811,39 @@ async def _cisco(db: Session, node: Node, sub: Subscription, user: User, usernam
             "username": username,
             "password": password,
         }
+        # Read the authentic server public-key pin over the same trusted SSH.
+        try:
+            pin = await cmd(conn, """python3 - <<'PY'
+import base64, hashlib, pathlib, re, subprocess
+cfg = pathlib.Path('/etc/ocserv/ocserv.conf')
+if cfg.is_file():
+    for line in cfg.read_text(errors='replace').splitlines():
+        match = re.match(r'^\s*server-cert\s*=\s*(\S+)\s*$', line)
+        if not match:
+            continue
+        cert = pathlib.Path(match.group(1))
+        if cert.is_file():
+            pub = subprocess.run(
+                ['openssl', 'x509', '-in', str(cert), '-pubkey', '-noout'],
+                capture_output=True, timeout=5, check=False)
+            if pub.returncode == 0:
+                spki = subprocess.run(
+                    ['openssl', 'pkey', '-pubin', '-outform', 'DER'],
+                    input=pub.stdout, capture_output=True, timeout=5, check=False)
+                if spki.returncode == 0 and spki.stdout:
+                    digest = hashlib.sha256(spki.stdout).digest()
+                    print('pin-sha256:' + base64.b64encode(digest).decode('ascii'))
+        break
+PY""", timeout=15, check=False)
+            match = re.search(r"pin-sha256:([A-Za-z0-9+/]{43}=)", pin)
+            if match:
+                result["servercert"] = match.group(0)
+                _save_cisco_pin(db, node.id, result["servercert"])
+        except Exception:
+            pass
+        return result
     finally:
         conn.close(); await conn.wait_closed()
-
 
 # TWINPANEL_L2TP_IRAN_ENTRY_V1
 def _l2tp_tunnel_access_host(
@@ -1331,6 +1441,12 @@ def _live_client_item(
         protocol
         or ""
     ).strip().lower()
+
+    # Refresh old subscriptions from per-node authenticated certificate trust.
+    if protocol == "cisco":
+        trusted_pin = _cisco_saved_pin(db, node_id)
+        if trusted_pin:
+            result["servercert"] = trusted_pin
 
     try:
 

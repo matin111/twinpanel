@@ -5,6 +5,8 @@ is delivered as a separate field. No app password appears in a public URL.
 """
 from __future__ import annotations
 
+import ipaddress
+
 from fastapi import APIRouter, Depends, Header, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
@@ -12,7 +14,7 @@ from sqlalchemy.orm import Session
 
 from ..central_app_credentials import (
     app_delivery_payload, authenticate_app, rotate_app_credentials,
-    verify_app_session,
+    verify_app_session, issue_app_refresh_token, renew_app_session,
 )
 from ..central_app_identity import central_app_entitled, installation_namespace, subscription_app_namespace
 from ..database import get_db
@@ -40,6 +42,10 @@ _PRIVATE_HEADERS = {
 class AppLoginIn(BaseModel):
     username: str = Field(min_length=6, max_length=120)
     password: str = Field(min_length=8, max_length=256)
+
+
+class AppRefreshIn(BaseModel):
+    refresh_token: str = Field(min_length=40, max_length=3000)
 
 
 class SessionProtocolIn(BaseModel):
@@ -102,8 +108,18 @@ def login_app(payload: AppLoginIn, db: Session = Depends(get_db)):
         "schema": 1,
         "namespace": subscription_app_namespace(db, sub),
         "session_token": token,
+        "refresh_token": issue_app_refresh_token(db, sub),
         "account_status": brand.get("account_status"),
         "brand": brand,
+    }, headers=_PRIVATE_HEADERS)
+
+
+@router.post("/session/refresh")
+def refresh_app_session(payload: AppRefreshIn, db: Session = Depends(get_db)):
+    _, token, refresh = renew_app_session(db, payload.refresh_token)
+    return JSONResponse({
+        "session_token": token,
+        "refresh_token": refresh,
     }, headers=_PRIVATE_HEADERS)
 
 
@@ -165,6 +181,42 @@ def session_plan(
     }, headers=_PRIVATE_HEADERS)
 
 
+@router.get("/session/account")
+def session_account(
+    sub: Subscription = Depends(_session_subscription),
+    db: Session = Depends(get_db),
+):
+    """Authenticated subscription-only account snapshot without credentials.
+
+    Zero traffic limit means unlimited. A missing expiry with a configured
+    activation duration represents a first-use period not yet started.
+    """
+    limit = max(0, int(sub.traffic_limit_bytes or 0))
+    used = max(0, int(sub.traffic_used_bytes or 0))
+    expiry = sub.expires_at
+    duration = sub.activation_duration_days
+    return JSONResponse({
+        "schema": 1,
+        "namespace": subscription_app_namespace(db, sub),
+        "subscription_id": str(sub.id),
+        "traffic_limit_bytes": limit,
+        "traffic_used_bytes": used,
+        "expires_at": expiry.isoformat() + "Z" if expiry else None,
+        "activation_duration_days": int(duration) if duration is not None else None,
+        "status": sub.status.value if hasattr(sub.status, "value") else str(sub.status),
+    }, headers=_PRIVATE_HEADERS)
+
+
+def _public_node_probe_ip(value: str | None) -> str | None:
+    if not value:
+        return None
+    try:
+        address = ipaddress.ip_address(str(value).strip())
+        return str(address) if address.is_global else None
+    except ValueError:
+        return None
+
+
 @router.get("/session/servers")
 def session_servers(
     sub: Subscription = Depends(_session_subscription),
@@ -196,6 +248,10 @@ def session_servers(
                 "name": node.name,
                 "country_code": node.country_code,
                 "node_online": node.status == NodeStatus.ONLINE,
+                # An address for an already authorized, assigned server:
+                # used only for client-side ICMP reachability checks.
+                # Never reveal agent_url, private hostnames or credentials.
+                "probe_ip": _public_node_probe_ip(node.public_ip),
                 "latency_ms": None,
             }
             for node in nodes
