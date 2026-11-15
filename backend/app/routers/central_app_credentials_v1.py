@@ -22,6 +22,7 @@ from ..deps import get_current_user, require_admin, require_reseller
 from ..models import Subscription, User, Node, SubscriptionNode, NodeStatus, Plan
 from ..models_reseller import Reseller, ResellerSubscription
 from ..plan_category_models import PlanCategoryAssignment
+from ..plan_node_models import PlanNode
 from ..system_release import ensure_installation_id
 from .account_delivery import _share_token, _share_url
 from .central_app_v1 import (
@@ -227,6 +228,14 @@ def session_servers(
     This is an inventory refresh, not a ping or connection success check.
     Never return server credentials, agent URLs, or other customers' nodes.
     """
+    # Node access is the intersection of historical subscription assignments
+    # and the CURRENT plan's explicitly configured servers. A missing plan
+    # node template is legacy behaviour; never expand beyond SubscriptionNode.
+    configured_node_ids = [
+        int(node_id) for (node_id,) in db.query(PlanNode.node_id).filter(
+            PlanNode.plan_id == int(sub.plan_id)
+        ).all()
+    ] if sub.plan_id else []
     nodes = (
         db.query(Node)
         .join(SubscriptionNode, SubscriptionNode.node_id == Node.id)
@@ -234,6 +243,7 @@ def session_servers(
             SubscriptionNode.subscription_id == sub.id,
             Node.show_to_users.is_(True),
             Node.retired_at.is_(None),
+            *([Node.id.in_(configured_node_ids)] if configured_node_ids else []),
         )
         .order_by(Node.id)
         .limit(500)
@@ -245,8 +255,8 @@ def session_servers(
         "servers": [
             {
                 "id": str(node.id),
-                "name": node.name,
-                "country_code": node.country_code,
+                "name": str(node.name or node.id).strip()[:120],
+                "country_code": str(node.country_code or "ZZ").strip().upper()[:8] or "ZZ",
                 "node_online": node.status == NodeStatus.ONLINE,
                 # An address for an already authorized, assigned server:
                 # used only for client-side ICMP reachability checks.
