@@ -101,7 +101,7 @@ export function LegacySubscriptionsRuntimePage(){
   const [userSearch,setUserSearch]=useState("");
   const [extendDays,setExtendDays]=useState(30);
   const [extendTraffic,setExtendTraffic]=useState(10);
-  const [renewalHistory,setRenewalHistory]=useState<{events:Array<{id:number;type:string;source:string;actor:string;details:Record<string,unknown>;created_at:string}>;queued:Array<{id:number;plan:string;traffic_bytes:number;duration_days:number;created_at:string}>}|null>(null);
+  const [renewalHistory,setRenewalHistory]=useState<{events:Array<{id:number;type:string;source:string;actor:string;details:Record<string,unknown>;created_at:string}>;queued:Array<{id:number;plan:string;traffic_bytes:number;duration_days:number;status:"queued"|"blocked";created_at:string}>}|null>(null);
   const [editResetUsage,setEditResetUsage]=useState(false);
   const [resetTarget,setResetTarget]=useState<RuntimeRow|null>(null);
   const [extendResetUsage,setExtendResetUsage]=useState(false);
@@ -803,8 +803,9 @@ export function LegacySubscriptionsRuntimePage(){
       <Notice error={error} ok={ok}/>
       {!renewalHistory?<div className="runtime-loading">{pick("در حال دریافت…","Loading…")}</div>:<>
         {renewalHistory.queued.map(item=><div className="setting-box" key={item.id} style={{marginBottom:10}}>
-          <b>{pick("تمدید در انتظار","Queued renewal")} · {item.plan}</b>
+          <b>{item.status==="blocked"?pick("تمدید نیازمند بررسی","Renewal needs review"):pick("تمدید در انتظار","Queued renewal")} · {item.plan}</b>
           <p>{(item.traffic_bytes/GB).toLocaleString("fa-IR")} GB · {item.duration_days.toLocaleString("fa-IR")} {pick("روز","days")}</p>
+          {item.status==="blocked"&&<button type="button" className="ghost" disabled={!!busy} onClick={()=>void act("retry-renewal",pick("تمدید برای بررسی مجدد در صف قرار گرفت","Renewal requeued"),async()=>{await legacyAdminApi.retryReservedRenewal(n(selected.id),item.id);setRenewalHistory(await legacyAdminApi.subscriptionHistory(n(selected.id)));})}>{pick("بررسی مجدد پس از رفع مشکل","Retry after fixing account")}</button>}
           <button type="button" className="ghost" onClick={()=>void act("cancel-renewal",pick("تمدید لغو شد","Renewal canceled"),async()=>{await legacyAdminApi.cancelReservedRenewal(n(selected.id),item.id);setRenewalHistory(await legacyAdminApi.subscriptionHistory(n(selected.id)));})}>{pick("لغو تمدید","Cancel renewal")}</button>
         </div>)}
         {renewalHistory.events.length===0?<div className="runtime-empty">{pick("سابقه‌ای ثبت نشده است؛ عملیات قدیمی قابل بازسازی نیستند.","No recorded events; older actions cannot be reconstructed.")}</div>:renewalHistory.events.map(event=><div className="setting-box" key={event.id} style={{marginBottom:10}}>
