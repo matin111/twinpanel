@@ -165,9 +165,27 @@ final class NativeOpenConnectSession extends LibOpenConnect {
             }
             listener.stage("connected", "");
             setupDTLS(60);
+            // libopenconnect.mainloop() blocks while handling the tunnel.
+            // Stats must be requested from another thread, otherwise they
+            // remain at zero during a healthy long-running connection.
+            Thread statsPoller = new Thread(() -> {
+                while (!stopped) {
+                    try {
+                        Thread.sleep(1000);
+                        if (!stopped) requestStats();
+                    } catch (InterruptedException interrupted) {
+                        Thread.currentThread().interrupt();
+                        break;
+                    } catch (RuntimeException failureToPoll) {
+                        break;
+                    }
+                }
+            }, "oc-native-stats");
+            statsPoller.setDaemon(true);
+            statsPoller.start();
             failure = "CISCO_NATIVE_LOOP_FAILED";
             while (!stopped && mainloop(300, RECONNECT_INTERVAL_MIN) >= 0) {
-                requestStats();
+                // Keep all packet processing on the OpenConnect tunnel thread.
             }
             if (!stopped) listener.stage("error", failure);
         } catch (Exception ex) {
