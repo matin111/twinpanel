@@ -142,8 +142,8 @@ def test_reseller_filter_is_database_side_before_pagination():
     try:
         transfer_subscription_to_reseller(
             3, 2816, SubscriptionTransferIn(customer_user_id=2), db)
-        with patch("app.routers.subscription_admin_v2._online_subscription_ids",
-                   return_value=set()):
+        with patch("app.routers.subscription_admin_v2._subscription_live_states",
+                   return_value={}):
             owned = admin_page_v3(limit=1, offset=0, status="all",
                                   reseller_id=3, db=db)
             direct = admin_page_v3(limit=1, offset=0, status="all",
