@@ -92,6 +92,7 @@ public class AxeOpenConnectVpnService extends VpnService {
     private ParcelFileDescriptor tunInterface;
     private volatile boolean     running      = false;
     private SSLSocket            tunnelSocket;
+    private volatile NativeOpenConnectSession nativeSession;
 
     // ── Lifecycle ──────────────────────────────────────────────────────────────
 
@@ -119,8 +120,8 @@ public class AxeOpenConnectVpnService extends VpnService {
                 } else {
                     startForeground(NOTIFICATION_ID, fgNotif);
                 }
-                new Thread(() -> connectToServer(serverUrl, name, username,
-                        password, authGroup, servercert), "oc-connect").start();
+                new Thread(() -> connectWithNativeCore(serverUrl, name, username,
+                        password, servercert), "oc-native-connect").start();
             } else {
                 stopSelf();
             }
@@ -136,6 +137,79 @@ public class AxeOpenConnectVpnService extends VpnService {
 
     @Override
     public IBinder onBind(Intent intent) { return null; }
+
+    // The bundled JNI core replaces the custom CSTP authentication/packet path.
+    // On ABI/library mismatch fail closed rather than invoking the old engine.
+    private void connectWithNativeCore(String url, String name, String username,
+                                       String password, String pin) {
+        lastFailureCode = "";
+        broadcastStage("preparing");
+        try {
+            System.loadLibrary("stoken");
+            System.loadLibrary("openconnect");
+            NativeOpenConnectSession session = new NativeOpenConnectSession(
+                    this, new NativeOpenConnectSession.Listener() {
+                @Override public void stage(String stage, String error) {
+                    if (error != null && !error.isEmpty()) lastFailureCode = error;
+                    if ("connected".equals(stage)) {
+                        running = true;
+                        isRunning = true;
+                        bytesReceived.set(0);
+                        bytesSent.set(0);
+                    }
+                    broadcastStage(stage);
+                }
+
+                @Override public ParcelFileDescriptor establish(
+                        org.infradead.libopenconnect.LibOpenConnect.IPInfo ip) {
+                    try {
+                        if (ip.addr == null || ip.netmask == null || ip.DNS == null
+                                || ip.DNS.isEmpty()) return null;
+                        int prefix = maskToPrefix(ip.netmask);
+                        Builder builder = new Builder()
+                                .setSession(name == null ? "TwinConnect Cisco" : name)
+                                .setMtu(Math.max(1280, ip.MTU))
+                                .addAddress(ip.addr, prefix)
+                                .addRoute("0.0.0.0", 0);
+                        for (String dns : ip.DNS) {
+                            builder.addDnsServer(dns);
+                        }
+                        // Fail closed for IPv6 if gateway does not assign IPv6.
+                        builder.addRoute("::", 0);
+                        if (ip.netmask6 != null && ip.netmask6.contains("/")) {
+                            String[] ipv6 = ip.netmask6.split("/", 2);
+                            builder.addAddress(ipv6[0], Integer.parseInt(ipv6[1]));
+                        }
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                            builder.setMetered(false);
+                        }
+                        tunInterface = builder.establish();
+                        return tunInterface;
+                    } catch (Exception ex) {
+                        Log.e(TAG, "Native VPN interface setup failed", ex);
+                        return null;
+                    }
+                }
+
+                @Override public void traffic(long rx, long tx) {
+                    bytesReceived.set(Math.max(0, rx));
+                    bytesSent.set(Math.max(0, tx));
+                }
+            }, username, password, pin);
+            nativeSession = session;
+            session.start(url);
+        } catch (UnsatisfiedLinkError error) {
+            lastFailureCode = "CISCO_NATIVE_ENGINE_UNAVAILABLE";
+            broadcastStage("error");
+        } catch (Exception error) {
+            lastFailureCode = "CISCO_NATIVE_START_FAILED";
+            broadcastStage("error");
+        } finally {
+            nativeSession = null;
+            shutdown();
+            stopSelf();
+        }
+    }
 
     // ── Connection flow ────────────────────────────────────────────────────────
 
@@ -717,6 +791,8 @@ public class AxeOpenConnectVpnService extends VpnService {
     // ── Teardown ───────────────────────────────────────────────────────────────
 
     private void shutdown() {
+        NativeOpenConnectSession session = nativeSession;
+        if (session != null) session.stopSession();
         running = false;
         isRunning = false;
         safeClose(tunnelSocket);
