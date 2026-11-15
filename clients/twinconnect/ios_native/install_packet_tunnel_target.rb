@@ -26,6 +26,15 @@ extension.build_configurations.each do |configuration|
   # which collides with the embed/copy phase during Flutter builds.
   settings['PRODUCT_NAME'] = 'PacketTunnel'
   settings['WRAPPER_EXTENSION'] = 'appex'
+  # The extension has its own build settings; unlike the Runner target, it
+  # does not inherit Flutter's generated version configuration. Leaving
+  # MARKETING_VERSION / CURRENT_PROJECT_VERSION unset produces an invalid
+  # Info.plist and iOS simctl install fails with IXErrorDomain code 2
+  # ("Invalid placeholder attributes") despite a successful Xcode build.
+  settings['MARKETING_VERSION'] = '0.1.0'
+  settings['CURRENT_PROJECT_VERSION'] = '1'
+  settings['DEVELOPMENT_LANGUAGE'] = 'en'
+  settings['PRODUCT_MODULE_NAME'] = 'PacketTunnel'
   settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
   settings['PRODUCT_BUNDLE_IDENTIFIER'] = 'com.twinpanel.twinconnect.PacketTunnel'
   settings['INFOPLIST_FILE'] = '../ios_native/PacketTunnel-Info.plist'
