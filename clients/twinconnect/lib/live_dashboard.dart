@@ -3278,7 +3278,10 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
 
   bool _vitoryNodeHasProfile(String nodeId) {
     if (!_isVitoryPlan) return true;
-    final hasXray = _inboundsForNode(nodeId).isNotEmpty;
+    // Cached preview inbounds must not grant visibility to a Vitory
+    // server after its live profile was revoked or unavailable.
+    final hasXray = _xrayGroupsLoaded && _xrayGroupsError == null &&
+        _inboundsForNode(nodeId).isNotEmpty;
     final hasHysteria = _vitoryHysteriaNodeIds?.contains(nodeId) ?? false;
     return VitoryServerVisibility.shows(
       protocolFilter: _filter,
