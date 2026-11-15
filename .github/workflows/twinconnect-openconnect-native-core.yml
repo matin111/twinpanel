@@ -49,6 +49,27 @@ jobs:
           git submodule update --init --recursive
           git status --porcelain
 
+      - name: Fix upstream cross-compiler sysroot for modern NDK
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          paths = [
+              Path("upstream/external/Makefile"),
+              Path("upstream/external/openconnect/android/Makefile"),
+          ]
+          for path in paths:
+              source = path.read_text()
+              old = "--sysroot=$(OC_SYSROOT)/.."
+              if path.name == "Makefile" and path.parent.name == "external":
+                  old = "--sysroot=$(call get_oc_sysroot,$(1))/.."
+              if old not in source:
+                  raise SystemExit(f"Unexpected upstream toolchain layout in {path}")
+              source = source.replace(old, "--sysroot=$(TOOLCHAIN)/sysroot")
+              path.write_text(source)
+              print(f"Patched NDK sysroot in {path}")
+          PY
+
       - name: Build actual libopenconnect for arm64
         run: |
           # Do not override PREFIX globally: the GMP cross-compiler setup
