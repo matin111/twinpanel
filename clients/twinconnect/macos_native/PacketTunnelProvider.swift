@@ -1,32 +1,48 @@
 import Foundation
 import NetworkExtension
 
-/// macOS packet tunnel entry point. A real protocol backend must be linked
-/// before an active tunnel can be established. Never create dummy routes.
+/// Native packet-tunnel extension. A tunnel is only started by a linked,
+/// functioning protocol backend. All unsupported protocols fail closed.
 final class PacketTunnelProvider: NEPacketTunnelProvider {
+    private var wireGuard: TwinConnectMacWireGuardEngine?
+
     private func unavailable(_ reason: String) -> NSError {
-        NSError(domain: "com.twinpanel.twinconnect.mac",
-                code: 1001,
+        NSError(domain: "com.twinpanel.twinconnect.mac", code: 1001,
                 userInfo: [NSLocalizedDescriptionKey: reason])
     }
 
     override func startTunnel(options: [String: NSObject]?,
                               completionHandler: @escaping (Error?) -> Void) {
         guard let configuration = protocolConfiguration as? NETunnelProviderProtocol,
-              let protocolCode = configuration.providerConfiguration?["protocol"] as? String,
-              !protocolCode.isEmpty else {
+              let code = configuration.providerConfiguration?["protocol"] as? String else {
             completionHandler(unavailable("MACOS_PROFILE_PROTOCOL_MISSING"))
             return
         }
-        // WireGuard requires WireGuardKit and wireguard-go, Xray and
-        // sing-box require local TUN-capable engines, and OpenVPN needs
-        // its own integrated engine. None are linked to this target yet.
-        // Never mark a VPN connected solely because the extension launched.
-        completionHandler(unavailable("MACOS_PROTOCOL_ENGINE_NOT_LINKED_\(protocolCode)"))
+
+        switch code {
+        case "wireguard":
+            let engine = TwinConnectMacWireGuardEngine(provider: self)
+            wireGuard = engine
+            engine.start { [weak self] error in
+                if error != nil { self?.wireGuard = nil }
+                completionHandler(error)
+            }
+        default:
+            // OpenVPN, Cisco, Xray and sing-box require separate native
+            // backends. Never claim a successful connection without one.
+            completionHandler(unavailable("MACOS_PROTOCOL_ENGINE_NOT_LINKED_\(code)"))
+        }
     }
 
     override func stopTunnel(with reason: NEProviderStopReason,
                              completionHandler: @escaping () -> Void) {
-        completionHandler()
+        guard let engine = wireGuard else {
+            completionHandler()
+            return
+        }
+        engine.stop { [weak self] in
+            self?.wireGuard = nil
+            completionHandler()
+        }
     }
 }
