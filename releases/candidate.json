@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.845",
-  "source_sha": "2ae666d678b773abe2c2c95893f3cc70d6166c08",
+  "version": "1.1.0-rc.846",
+  "source_sha": "5e9272235f467edc81f5e6eaaacbfd2fc3cac158",
   "notes": {
-    "fa": "افزودن تاریخچه کیف پول برای مشتریان هر نماینده در صفحه مشتریان: تراکنش‌های متعلق به همان نمایندگی، درخواست‌های شارژ و وضعیت تأیید یا رد، جستجو در پاپ‌آپ و محافظت از حریم اطلاعات بین نمایندگی‌ها؛ بدون تغییر در موجودی کیف پول یا جریان پرداخت.",
-    "en": "Add per-customer reseller-scoped wallet history popup with ledger activity, top-up requests and status, search and cross-reseller access isolation. Read-only; no balance or payment-flow changes."
+    "fa": "تاریخچه واقعی اشتراک‌های نماینده در کارت اشتراک شامل رویدادها و تمدیدهای رزرو، مستقل از صفحه مشتریان؛ نوار پیشرفت مصرف حجم در کارت‌های اشتراک ادمین هم‌ظاهر با نماینده؛ بدون تغییر حجم، اتصال و اعتبار اشتراک‌ها.",
+    "en": "Add subscription history popup to reseller subscription cards, showing ownership-scoped events and reserved renewals, and a visual quota usage progress bar for admin subscription cards. No balance or connection changes."
   }
 }
