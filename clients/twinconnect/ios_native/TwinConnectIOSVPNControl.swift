@@ -25,17 +25,32 @@ enum TwinConnectIOSVPNControl {
         return true
     }
 
+    /// True only in a signed distribution whose embedded extension was
+    /// built with the real WireGuardKit + libwg-go backend. Simulator builds
+    /// have the linkage marker set to false and must never advertise support.
+    static func backendLinked() -> Bool {
+        guard extensionInstalled(),
+              let plugins = Bundle.main.builtInPlugInsPath,
+              let ext = Bundle(path: URL(fileURLWithPath: plugins)
+                  .appendingPathComponent("PacketTunnel.appex").path) else {
+            return false
+        }
+        return ext.object(forInfoDictionaryKey:
+            "TwinConnectWireGuardBackendLinked") as? Bool == true
+    }
+
     static func checkInstallation(_ result: @escaping FlutterResult) {
         result([
             "contractVersion": 1,
             "extensionInstalled": extensionInstalled(),
             // Presence of the .appex alone is NOT evidence of a WireGuardGo
             // backend, provisioned entitlement, live peer or protected DNS.
-            "engineReady": false,
-            "wireguardReady": false,
-            "reason": extensionInstalled()
-                ? "IOS_ENGINE_NOT_RUNTIME_VERIFIED"
-                : "IOS_PACKET_TUNNEL_EXTENSION_MISSING"
+            "engineReady": backendLinked(),
+            "wireguardReady": backendLinked(),
+            "reason": backendLinked() ? "IOS_BACKEND_LINKED_NOT_CONNECTED"
+                : (extensionInstalled()
+                    ? "IOS_ENGINE_NOT_RUNTIME_VERIFIED"
+                    : "IOS_PACKET_TUNNEL_EXTENSION_MISSING")
         ] as [String: Any])
     }
 
