@@ -113,12 +113,22 @@ public class AxeOpenConnectVpnService extends VpnService {
                 // Must call startForeground() within 5 s of startService() (Android 8+).
                 // On Android 14+ (API 34), the 3-arg overload with a type is mandatory
                 // — using the 2-arg version throws MissingForegroundServiceTypeException.
-                Notification fgNotif = buildNotification(name != null ? name : "OpenConnect VPN");
-                if (Build.VERSION.SDK_INT >= 34) {
-                    startForeground(NOTIFICATION_ID, fgNotif,
-                            android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE);
-                } else {
-                    startForeground(NOTIFICATION_ID, fgNotif);
+                try {
+                    Notification fgNotif = buildNotification(name != null ? name : "OpenConnect VPN");
+                    if (Build.VERSION.SDK_INT >= 34) {
+                        startForeground(NOTIFICATION_ID, fgNotif,
+                                android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE);
+                    } else {
+                        startForeground(NOTIFICATION_ID, fgNotif);
+                    }
+                } catch (RuntimeException foregroundError) {
+                    // Android 8-17: permission/type/background launch failures must
+                    // surface to Flutter, not terminate the main app process.
+                    Log.e(TAG, "Cisco foreground VPN service could not start", foregroundError);
+                    lastFailureCode = "CISCO_FOREGROUND_SERVICE_FAILED";
+                    broadcastStage("error");
+                    stopSelf(startId);
+                    return START_NOT_STICKY;
                 }
                 new Thread(() -> connectWithNativeCore(serverUrl, name, username,
                         password, servercert), "oc-native-connect").start();
@@ -136,7 +146,10 @@ public class AxeOpenConnectVpnService extends VpnService {
     public void onRevoke() { shutdown(); stopSelf(); super.onRevoke(); }
 
     @Override
-    public IBinder onBind(Intent intent) { return null; }
+    public IBinder onBind(Intent intent) {
+        // VpnService must expose its platform binder for Android VPN lifecycle.
+        return super.onBind(intent);
+    }
 
     // The bundled JNI core replaces the custom CSTP authentication/packet path.
     // On ABI/library mismatch fail closed rather than invoking the old engine.
@@ -198,10 +211,12 @@ public class AxeOpenConnectVpnService extends VpnService {
             }, username, password, pin, url);
             nativeSession = session;
             session.start(url);
-        } catch (UnsatisfiedLinkError error) {
+        } catch (LinkageError error) {
+            Log.e(TAG, "Cisco JNI linking failed", error);
             lastFailureCode = "CISCO_NATIVE_ENGINE_UNAVAILABLE";
             broadcastStage("error");
-        } catch (Exception error) {
+        } catch (RuntimeException error) {
+            Log.e(TAG, "Cisco native bridge failed", error);
             lastFailureCode = "CISCO_NATIVE_START_FAILED";
             broadcastStage("error");
         } finally {
