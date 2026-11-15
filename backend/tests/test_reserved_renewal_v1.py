@@ -207,9 +207,10 @@ class DeferredRenewalTest(unittest.TestCase):
         with patch.object(service, "reset_subscription_period_usage"), \
              patch.object(service, "queue_subscription_enforcement") as enforce, \
              patch.object(service, "history"):
-            self.assertEqual(service.activate_due_renewals(db), 1)
+            self.assertEqual(service.activate_due_renewals(db), 0)
             enforce.assert_not_called()
         self.assertEqual(sub.status, SubscriptionStatus.SUSPENDED)
+        self.assertEqual(pending.status, "blocked")
 
 if __name__ == "__main__":
     unittest.main()
