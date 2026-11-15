@@ -4,7 +4,7 @@
 # establish a VPN until signed with a suitable Network Extension entitlement.
 require 'xcodeproj'
 project_file = File.expand_path('../macos/Runner.xcodeproj', __dir__)
-raise 'Flutter macOS project missing' unless File.file?(project_file)
+raise 'Flutter macOS project missing' unless File.directory?(project_file)
 project = Xcodeproj::Project.open(project_file)
 runner = project.targets.find { |t| t.name == 'Runner' }
 raise 'Runner missing' unless runner
