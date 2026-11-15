@@ -2351,6 +2351,15 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       unawaited(_restoreCachedXrayInbounds());
     } else if (oldWidget.servers != widget.servers ||
         oldWidget.catalog != widget.catalog) {
+      // A plan/category change can revoke a previously selected protocol.
+      // Never retain a filter that this subscription no longer authorizes.
+      if (oldWidget.catalog != widget.catalog && widget.catalog != null &&
+          _filter != 'all' &&
+          !widget.catalog!.entries.any((entry) =>
+              entry.selected && entry.protocol.code == _filter)) {
+        _filter = 'all';
+        _autoFastest = false;
+      }
       // The first session inventory often arrives after the dashboard
       // initializes; retry restore once authorized nodes become available.
       _xrayGroups = _assignedXrayGroups(_xrayGroups);
@@ -4181,8 +4190,9 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       );
     }
 
-    // All 16 chips remain visible. Admin-selected protocols will replace
-    // the preview's complete catalog after an authenticated panel session.
+    // Only the current authenticated subscription's permitted protocols
+    // belong in the server filters. Never expose the fixed 16-item contract
+    // as an account-specific list.
     Widget fastestServerControl() => Container(
       key: const Key('liveAutoFastestServer'),
       padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
@@ -4228,7 +4238,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         children: [
           for (final entry in <(String, String)>[
             ('all', tr('همه', 'All')),
-            for (final p in VpnProtocols.all) (p.code, p.name),
+            for (final entry in widget.catalog?.entries ?? const <PanelProtocolStatus>[])
+              if (entry.selected) (entry.protocol.code, entry.protocol.name),
           ])
             ChoiceChip(
               key: Key('devFilter_${entry.$1}'),
