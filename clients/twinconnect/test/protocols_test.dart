@@ -77,6 +77,32 @@ void main() {
     expect(() => PanelProtocolCatalog.fromJson(duplicated), throwsFormatException);
   });
 
+  test('V2Ray plan can return only its two entitled protocols', () {
+    final compact = _catalog();
+    compact['protocols'] = (compact['protocols'] as List)
+        .where((row) => row['code'] == 'v2ray' ||
+            row['code'] == 'hysteria2')
+        .toList();
+    final result = PanelProtocolCatalog.fromJson(compact);
+    expect(result.entries.map((entry) => entry.protocol.code).toList(),
+        ['v2ray', 'hysteria2']);
+    expect(result.entries.every((entry) => entry.selected), true);
+    expect(result.entries.any((entry) => entry.protocol.code == 'cisco'),
+        false);
+  });
+
+  test('sparse catalog cannot pretend missing protocols are selected', () {
+    final partial = _catalog();
+    partial['protocols'] = (partial['protocols'] as List)
+        .where((row) => row['code'] == 'v2ray' ||
+            row['code'] == 'l2tp')
+        .toList();
+    // A sparse response that contains an explicitly unselected entry
+    // is malformed, not an invitation to restore all other protocols.
+    expect(() => PanelProtocolCatalog.fromJson(partial),
+        throwsFormatException);
+  });
+
   test('native engines must provide a valid complete handshake', () {
     final wrong = NativeProtocolReadiness.fromNative({
       'contractVersion': 2,
