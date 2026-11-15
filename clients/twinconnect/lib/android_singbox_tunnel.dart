@@ -52,6 +52,27 @@ class AndroidSingBoxTunnel {
       protocolCode: protocol,
       item: profile,
     );
+    await _connectNative(jsonEncode(outbound));
+  }
+
+  /// The bundled libbox supports VLESS over TCP TLS and WebSocket TLS.
+  /// The panel-signed VLESS URI is used exactly as supplied; never transform
+  /// XHTTP Reality into a different transport or weaken TLS verification.
+  Future<void> connectVlessUri(Uri uri) async {
+    if (!Platform.isAndroid || uri.scheme != 'vless' ||
+        uri.userInfo.isEmpty || uri.host.isEmpty || !uri.hasPort ||
+        uri.port <= 0 || uri.port > 65535) {
+      throw const FormatException('XRAY_URI_INVALID');
+    }
+    final transport = uri.queryParameters['type'];
+    final security = uri.queryParameters['security'];
+    if (security != 'tls' || (transport != 'tcp' && transport != 'ws')) {
+      throw const FormatException('XRAY_ANDROID_TRANSPORT_UNSUPPORTED');
+    }
+    await _connectNative(uri.toString());
+  }
+
+  Future<void> _connectNative(String config) async {
     await initialize();
     // The plugin builds the local TUN/DNS/routing config; never accept
     // untrusted subscription-provided inbounds, routes or app settings.
@@ -61,7 +82,7 @@ class AndroidSingBoxTunnel {
     _statsSubscription = null;
     _latestStats = null;
     try {
-      await SingBox.instance.connect(jsonEncode(outbound));
+      await SingBox.instance.connect(config);
       if (SingBox.instance.status != SingBoxConnectionStatus.connected) {
         throw const FormatException('SINGBOX_TUNNEL_NOT_VERIFIED');
       }
