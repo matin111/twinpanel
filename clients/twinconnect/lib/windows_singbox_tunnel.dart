@@ -6,6 +6,7 @@ import 'dart:math';
 import 'package:flutter/services.dart';
 
 import 'singbox_windows_config.dart';
+import 'windows_app_route_engine.dart';
 import 'xray_endpoint_route.dart';
 import 'singbox_profile_validator.dart';
 import 'shadowtls_chain.dart';
@@ -286,6 +287,10 @@ class WindowsSingBoxTunnel {
         mieruEndpointIPv4: mieruEndpointIPv4,
         trusttunnelSocksPort: trusttunnelSocksPort,
         trusttunnelEndpointIPv4: trusttunnelEndpointIPv4);
+      // Separate app-routing engine. Apply the selected policy to the actual
+      // in-memory native sing-box configuration for this VPN session.
+      final routingPolicy = await WindowsAppRoutePolicy.load();
+      routingPolicy.applyTo(config);
       // Independently verify that the selected Hysteria2/TUIC/etc outbound
       // can reach the internet before changing any Windows routes.
       // A failure here points to profile/transport rather than TUN routing.

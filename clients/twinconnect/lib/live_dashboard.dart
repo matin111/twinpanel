@@ -293,18 +293,54 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   final ValueNotifier<int> _connectedSeconds = ValueNotifier<int>(0);
   DateTime? _connectedSince;
   Timer? _durationTicker;
+  // Retain one session anchor across dashboard widget remounts. The anchor
+  // is never used as proof that a VPN is connected; OS/core status owns that.
+  static final Map<String, DateTime> _sessionAnchors = {};
+  String get _clockKey => '${widget.panel.namespace}:${widget.username}';
 
   bool get _verifiedConnectionActive => _modernUp || _vpnVerified;
+  bool get _transportStillPresent => _vpnUp || _awgServiceUp ||
+      _modernTunnel.isRunning || _ciscoTunnel.isRunning ||
+      _openVpnTunnel.isRunning || _l2tpTunnel.isRunning;
 
   void _updateConnectionClock() {
-    if (!_verifiedConnectionActive) {
-      _connectedSince = null;
+    if (!_verifiedConnectionActive && !_transportStillPresent) {
+      // An initial status probe on a remounted widget can briefly report
+      // offline. Only clear an anchor if this instance had seen the session.
+      if (_connectedSince != null) {
+        _connectedSince = null;
+        _sessionAnchors.remove(_clockKey);
+      }
       if (_connectedSeconds.value != 0) _connectedSeconds.value = 0;
       return;
     }
-    _connectedSince ??= DateTime.now();
+    // A temporary native handshake/health probe failure is NOT a disconnect.
+    // Keep displaying the elapsed session duration while its tunnel exists.
+    if (_connectedSince == null && !_verifiedConnectionActive) return;
+    if (_connectedSince == null) {
+      _connectedSince = _sessionAnchors.putIfAbsent(
+          _clockKey, () => DateTime.now());
+
+      // Remember the actual verified protocol, including manual connections.
+      // Fast Server must not guess WireGuard just because it is listed first.
+      final verifiedProtocol = _modernUp
+          ? _modernProtocol
+          : _vpnVerified ? 'wireguard' : null;
+      if (verifiedProtocol != null) {
+        unawaited(_rememberVerifiedProtocol(verifiedProtocol));
+      }
+    }
     final seconds = DateTime.now().difference(_connectedSince!).inSeconds;
     if (_connectedSeconds.value != seconds) _connectedSeconds.value = seconds;
+  }
+
+  Future<void> _rememberVerifiedProtocol(String protocol) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('twinconnect_last_verified_protocol', protocol);
+    } catch (_) {
+      // Preference failure must not interrupt a working VPN session.
+    }
   }
 
   static String _formatConnectedSeconds(int seconds) {
@@ -466,10 +502,14 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     int? best;
     for (var i = 0; i < servers.length; i++) {
       final node = servers[i];
-      // Only a measured ICMP value qualifies; panel hints are not live ping.
-      final latency = _nodePings[node.id];
-      if (!node.nodeOnline || latency == null || latency < 0) continue;
-      if (best == null || latency < _nodePings[servers[best].id]!) {
+      // Prefer real measured RTT; use the panel's nonzero last-known
+      // latency only when ICMP is blocked or unavailable on Windows.
+      // Never treat an unmeasured server as zero-latency.
+      final latency = _nodePings[node.id] ?? node.latencyMs;
+      if (!node.nodeOnline || latency == null || latency <= 0) continue;
+      final bestLatency = best == null ? null :
+          (_nodePings[servers[best].id] ?? servers[best].latencyMs);
+      if (bestLatency == null || latency < bestLatency) {
         best = i;
       }
     }
@@ -479,7 +519,9 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   Future<void> _enableFastestAndConnect() async {
     if (_vpnBusy || _fastestConnecting || _verifiedConnectionActive ||
         _vpnUp || _modernUp || _vpnCleanup || !Platform.isWindows) return;
-    if (_pingAllBusy) {
+    // An existing fresh probe or panel RTT can be used immediately.
+    // Do not hold Quick Connect until every node completes ICMP probing.
+    if (_pingAllBusy && _fastestKnownIndex == null) {
       ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(
         content: Text(tr('تست پینگ سرورها هنوز در حال اجراست.',
             'Server latency measurement is still running.'))));
@@ -488,22 +530,47 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     final authorized = widget.catalog?.entries.where((entry) =>
         entry.selected && entry.configRecordPresent).map((e) =>
         e.protocol.code).toSet() ?? <String>{};
-    final eligible = <String>[
-      'wireguard', 'openvpn', 'cisco', 'l2tp', 'hysteria2', 'tuic',
-      'anytls', 'naive', 'shadowtls', 'snell', 'mieru',
-      'trusttunnel', 'amneziawg', 'v2ray', 'sudoku',
-    ];
-    final protocol = _filter != 'all'
-        ? (authorized.contains(_filter) ? _filter : null)
-        : eligible.where(authorized.contains).firstOrNull;
-    if (protocol == null) {
+    if (authorized.isEmpty) {
       setState(() => _vpnError = 'PROTOCOL_NOT_INCLUDED_IN_SUBSCRIPTION');
       return;
     }
+    final previousFilter = _filter;
+    final previousSelected = _selected;
     setState(() { _fastestConnecting = true; _vpnError = null; });
     try {
-      await _probeAllNodes();
+      // Fast Server chooses the lowest measured server RTT; it does not
+      // silently equate WireGuard with the fastest protocol.
+      final checks = await Future.wait<Object>([
+        NativeVpnBridge.protocolReadiness().timeout(
+            const Duration(seconds: 8)),
+        SharedPreferences.getInstance(),
+        (_fastestKnownIndex != null || _pingAllBusy
+            ? Future<bool>.value(true)
+            : _probeAllNodes().then((_) => true)),
+      ]);
       if (!mounted) return;
+      final ready = checks[0] as NativeProtocolReadiness;
+      final prefs = checks[1] as SharedPreferences;
+      final available = authorized.where(ready.supports).toSet();
+      // Explicit protocol choice wins. With "All", reuse the last verified
+      // successful protocol before falling back to another ready engine.
+      final preferred = _filter != 'all'
+          ? _filter
+          : prefs.getString('twinconnect_last_verified_protocol');
+      final eligible = <String>[
+        'hysteria2', 'tuic', 'anytls', 'v2ray', 'openvpn', 'cisco',
+        'shadowtls', 'naive', 'snell', 'mieru', 'trusttunnel',
+        'amneziawg', 'wireguard', 'l2tp', 'sudoku',
+      ];
+      final protocol = preferred != null && available.contains(preferred)
+          ? preferred
+          : _filter != 'all'
+              ? null
+              : eligible.where(available.contains).firstOrNull;
+      if (protocol == null) {
+        setState(() => _vpnError = 'NATIVE_PROTOCOL_ENGINE_NOT_READY');
+        return;
+      }
       final best = _fastestKnownIndex;
       if (best == null) {
         setState(() => _vpnError = 'NO_MEASURED_SERVER');
@@ -519,8 +586,23 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         _page = 'home';
       });
       await _toggleVpn();
+      if (!mounted) return;
+      if (_verifiedConnectionActive && _vpnError == null) {
+        await prefs.setString('twinconnect_last_verified_protocol', protocol);
+      } else {
+        setState(() {
+          _autoFastest = false;
+          _filter = previousFilter;
+          _selected = previousSelected;
+        });
+      }
     } catch (error) {
-      if (mounted) setState(() => _vpnError = _errorText(error));
+      if (mounted) setState(() {
+        _vpnError = _errorText(error);
+        _autoFastest = false;
+        _filter = previousFilter;
+        _selected = previousSelected;
+      });
     } finally {
       if (mounted) setState(() => _fastestConnecting = false);
     }
@@ -3762,10 +3844,6 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
 
     Widget heading(String name) => Row(children: [
       Expanded(child: txt(name, size: 24, bold: true)),
-      Container(
-        key: const Key('devSampleNotice'),
-        child: smallPill(tr('حساب واقعی', 'Live account')),
-      ),
     ]);
 
     Widget serverRow(int index) {
@@ -4002,9 +4080,12 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
             child: CircularProgressIndicator(strokeWidth: 2))
         else Switch(
           key: const Key('autoFastestServerToggle'),
-          value: _autoFastest && (_vpnUp || _modernUp || _vpnBusy),
+          value: _autoFastest,
           materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          onChanged: _vpnBusy || _modernUp || _vpnUp
+          // Allow turning automatic selection OFF while connected; never
+          // start a replacement tunnel in the middle of an active session.
+          onChanged: _vpnBusy || _fastestConnecting ||
+                  ((_modernUp || _vpnUp) && !_autoFastest)
               ? null : (enabled) {
             if (enabled) {
               _enableFastestAndConnect();
@@ -4488,6 +4569,60 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     // Main connection page: compact, real subscription lifecycle details.
     // The account page still owns the full breakdown and edit/refresh actions.
     // A missing snapshot displays dashes, never fictitious quota/dates.
+    Widget reservedRenewalNotice(ReservedRenewalSnapshot renewal,
+        {required bool compact}) {
+      final accent = renewal.needsReview
+          ? const Color(0xFFFFB878) : purple;
+      final description = renewal.needsReview
+          ? tr('تمدید نیازمند بررسی است؛ اعتبار دوره بعد مصرف نشده است.',
+               'Renewal needs review; the next period has not been used.')
+          : tr('با پایان حجم یا تاریخ فعلی، دوره بعد خودکار فعال می‌شود.',
+               'The next period activates after current quota or expiry ends.');
+      return Container(
+        key: Key(compact ? 'liveHomeReservedRenewal' : 'accountReservedRenewal'),
+        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 12),
+        decoration: BoxDecoration(
+          color: accent.withValues(alpha: _dark ? .12 : .06),
+          borderRadius: BorderRadius.circular(15),
+          border: Border.all(color: accent.withValues(alpha: .32)),
+        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min, children: [
+            Row(children: [
+              Icon(renewal.needsReview ? Icons.info_outline_rounded
+                  : Icons.event_repeat_rounded, color: accent, size: 18),
+              const SizedBox(width: 7),
+              Expanded(child: Text(
+                renewal.needsReview
+                    ? tr('تمدید نیازمند بررسی', 'Renewal needs review')
+                    : tr('تمدید رزرو شده', 'Reserved renewal'),
+                style: TextStyle(color: ink, fontWeight: FontWeight.w800,
+                    fontSize: compact ? 11 : 14))),
+            ]),
+            const SizedBox(height: 7),
+            Text(renewal.planName,
+                maxLines: 2, overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: ink, fontWeight: FontWeight.w700,
+                    fontSize: compact ? 11 : 13)),
+            const SizedBox(height: 4),
+            Text(
+              '${_formatBytes(renewal.trafficBytes)} · ${renewal.durationDays} '
+              + tr('روز', 'days'),
+              style: TextStyle(color: ink, fontWeight: FontWeight.w600,
+                  fontSize: compact ? 10 : 12)),
+            const SizedBox(height: 6),
+            Text(description, style: TextStyle(color: sub,
+                fontSize: compact ? 10 : 12)),
+            if (!compact) ...[
+              const SizedBox(height: 6),
+              Text(tr('ثبت تمدید: ', 'Reserved on: ')
+                  + renewal.reservedAt.toLocal().toIso8601String().split('T').first,
+                style: TextStyle(color: sub, fontSize: 11)),
+            ],
+          ]),
+      );
+    }
+
     Widget homeSubscriptionSummary() {
       final account = widget.account;
       final used = account?.trafficUsedBytes ?? 0;
@@ -4626,6 +4761,10 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                 tr('زمان باقی‌مانده', 'Time remaining'),
                 daysLabel, cyan)),
             ]),
+            if (account?.reservedRenewal != null) ...[
+              const SizedBox(height: 8),
+              reservedRenewalNotice(account!.reservedRenewal!, compact: true),
+            ],
             if (widget.accountError != null) ...[
               const SizedBox(height: 6),
               Text(tr('اطلاعات حساب در دسترس نیست؛ تازه‌سازی کنید.',
@@ -4848,6 +4987,10 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
             ]),
           ),
           const SizedBox(height: 15),
+          if (current?.reservedRenewal != null) ...[
+            reservedRenewalNotice(current!.reservedRenewal!, compact: false),
+            const SizedBox(height: 15),
+          ],
           glassCard(
             key: const Key('accountTrafficCard'),
             radius: 24,
