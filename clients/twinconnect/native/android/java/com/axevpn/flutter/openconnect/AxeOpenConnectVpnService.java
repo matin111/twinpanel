@@ -195,7 +195,7 @@ public class AxeOpenConnectVpnService extends VpnService {
                     bytesReceived.set(Math.max(0, rx));
                     bytesSent.set(Math.max(0, tx));
                 }
-            }, username, password, pin);
+            }, username, password, pin, url);
             nativeSession = session;
             session.start(url);
         } catch (UnsatisfiedLinkError error) {
