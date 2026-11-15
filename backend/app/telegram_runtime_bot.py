@@ -707,11 +707,11 @@ def _subscription_text(info):
             "🕒 <b>تمدید رزروشده برای دوره بعد</b>"
         )
         renewal_text = (
-            "\\n\\n" + renewal_heading + "\\n"
-            + "📦 پلن بعدی: <b>" + escape(str(renewal.get("plan_name") or "اشتراک")) + "</b>\\n"
-            + "📊 حجم دوره بعد: <b>" + escape(_fmt_gb(float(renewal.get("traffic_gb") or 0))) + " GB</b>\\n"
-            + "📅 مدت دوره بعد: <b>" + str(int(renewal.get("duration_days") or 0)) + " روز</b>\\n"
-            + "🕓 ثبت تمدید: <b>" + escape(_fmt_date(renewal.get("reserved_at"))) + "</b>\\n"
+            "\n\n" + renewal_heading + "\n"
+            + "📦 پلن بعدی: <b>" + escape(str(renewal.get("plan_name") or "اشتراک")) + "</b>\n"
+            + "📊 حجم دوره بعد: <b>" + escape(_fmt_gb(float(renewal.get("traffic_gb") or 0))) + " GB</b>\n"
+            + "📅 مدت دوره بعد: <b>" + str(int(renewal.get("duration_days") or 0)) + " روز</b>\n"
+            + "🕓 ثبت تمدید: <b>" + escape(_fmt_date(renewal.get("reserved_at"))) + "</b>\n"
             + escape(str(renewal.get("message") or ""))
         )
     limit = float(
