@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 from ..database import get_db
 from ..deps import require_admin
-from ..models import Plan, Subscription
+from ..models import Plan, Subscription, User
 from ..reserved_renewal_models import PendingSubscriptionRenewal, SubscriptionHistoryEvent
 from ..reserved_renewal_service import reserve_renewal, history
 
@@ -21,7 +21,7 @@ class ReserveRequest(BaseModel):
     request_id: str | None = Field(default=None, max_length=100)
 
 @router.post("/{subscription_id}/reserve-renewal")
-def reserve_admin(subscription_id: int, payload: ReserveRequest, db: Session = Depends(get_db)):
+def reserve_admin(subscription_id: int, payload: ReserveRequest, db: Session = Depends(get_db), admin: User = Depends(require_admin)):
     sub = db.get(Subscription, subscription_id)
     if sub is None:
         raise HTTPException(404, "اشتراک پیدا نشد")
@@ -32,7 +32,7 @@ def reserve_admin(subscription_id: int, payload: ReserveRequest, db: Session = D
         traffic_bytes=int(payload.traffic_gb * 1024**3),
         duration_days=payload.duration_days, source="admin",
         reference=payload.request_id or secrets.token_urlsafe(24),
-        actor="admin-panel")
+        actor=f"admin:{admin.id}")
     db.commit()
     return {"ok": True, "renewal_id": record.id, "status": record.status}
 
@@ -58,7 +58,7 @@ def history_page(subscription_id: int, limit: int = 50, offset: int = 0,
                        for item in queued]}
 
 @router.delete("/{subscription_id}/reserve-renewal/{renewal_id}")
-def cancel_reserved(subscription_id: int, renewal_id: int, db: Session = Depends(get_db)):
+def cancel_reserved(subscription_id: int, renewal_id: int, db: Session = Depends(get_db), admin: User = Depends(require_admin)):
     item = db.execute(select(PendingSubscriptionRenewal).where(
         PendingSubscriptionRenewal.id == renewal_id,
         PendingSubscriptionRenewal.subscription_id == subscription_id).with_for_update()).scalar_one_or_none()
@@ -67,7 +67,7 @@ def cancel_reserved(subscription_id: int, renewal_id: int, db: Session = Depends
     if item.status != "queued":
         raise HTTPException(409, "تمدید دیگر در انتظار نیست")
     item.status = "canceled"
-    history(db, subscription_id, "renewal_canceled", "admin", "admin-panel",
+    history(db, subscription_id, "renewal_canceled", "admin", f"admin:{admin.id}",
             {"renewal_id": renewal_id})
     db.commit()
     return {"ok": True}
