@@ -4,7 +4,10 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   test('original Connect button uses iOS native controller, not a fake switch', () {
-    final dashboard = File('lib/live_dashboard.dart').readAsStringSync();
+    // Normalize platform checkout line endings before testing the multiline
+    // native controller dispatch contract.
+    final dashboard = File('lib/live_dashboard.dart').readAsStringSync()
+        .replaceAll('\r\n', '\n');
     expect(dashboard, contains("tr('اتصال سریع', 'Connect now')"));
     expect(dashboard, contains('Platform.isIOS\n                    ? _toggleIosVpn'));
     expect(dashboard, contains('Future<void> _toggleIosVpn() async'));
