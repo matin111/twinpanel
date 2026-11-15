@@ -8,8 +8,8 @@ void main() {
     final bridge = File('ios_native/TwinConnectIOSVpnBridge.swift')
         .readAsStringSync();
 
-    expect(dashboard, contains("onPressed: !Platform.isWindows || _vpnBusy ? null : _toggleVpn"));
-    expect(dashboard, contains("tr('موتور آیفون آماده نیست', 'iOS engine unavailable')"));
+    expect(dashboard, contains("onPressed: _vpnBusy ? null : (Platform.isIOS"));
+    expect(dashboard, contains("tr('اتصال سریع', 'Connect now')"));
     expect(dashboard, contains('ورود و دریافت اشتراک برقرار است، اما تونل فعال نیست.'));
     expect(bridge, contains('"engineReady": false'));
     expect(bridge, contains('"supportedProtocols": [String]()'));
