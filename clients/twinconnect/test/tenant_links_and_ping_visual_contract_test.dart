@@ -97,7 +97,9 @@ void main() {
     expect(action, contains('_fastEngineReady(code, native)'));
     expect(action, contains('_fastestAuthorizedIndex(code)'));
     expect(action, contains('await _toggleVpn()'));
-    expect(action, contains('_autoFastest = true'));
+    expect(action, contains('_autoFastest = connected;'));
+    expect(action, contains('_filter = previousFilter;'));
+    expect(action, contains('_selected = previousSelected;'));
     expect(action, contains('NO_MEASURED_SERVER'));
     final scope = dashboard.substring(
       dashboard.indexOf('Future<int?> _fastestAuthorizedIndex('),
