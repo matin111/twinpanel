@@ -1715,7 +1715,9 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         _modernUp = true;
         _modernProtocol = 'sudoku';
         _modernNodeId = resolvedServerId;
-        if (fallbackIndex >= 0) _selected = fallbackIndex;
+        if (fallbackIndex >= 0 && _explicitNodeId == null) {
+          _selected = fallbackIndex;
+        }
         _publicIp = ip;
         _vpnError = null;
       });
@@ -2282,10 +2284,13 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     final busy = _vpnBusy;
     setState(() {
       _selected = index;
+      _explicitNodeId = nodes[index].id;
+      // A server tap must not silently change the chosen protocol.
       _page = 'home';
       _autoFastest = false;
       if (!busy) _vpnError = null;
     });
+    _persistManualConnectionChoice();
     if (busy) {
       ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(
         content: Text(tr('سرور انتخاب شد؛ عملیات قبلی هنوز در حال اجراست.',
@@ -2437,7 +2442,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       if (!mounted) return;
       setState(() {
         _selected = index;
-        _filter = 'wireguard';
+        // Keep the manually selected protocol/filter. The verified native
+        // tunnel status already indicates that this connection is WireGuard.
         _autoFastest = false;
         _page = 'home';
         _vpnUp = started['state'] == 'interface_up' ||
@@ -2996,7 +3002,9 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         _socks5NodesError = assigned.isEmpty
             ? 'SOCKS5_SERVER_PROFILE_MISSING' : null;
         if (_filter == 'socks5' && !_autoFastest &&
-            !alreadyValid && firstValid >= 0) {
+            _explicitNodeId == null && !alreadyValid &&
+            firstValid >= 0) {
+          // No manual server has ever been chosen for this account.
           _selected = firstValid;
         }
       });
@@ -4429,6 +4437,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
               onTap: !Platform.isWindows || _vpnBusy ? null : () {
                 setState(() {
                   _selected = index;
+                  _explicitNodeId = nodeId;
+                  _explicitXrayInboundId = inbound.id;
                   _selectedXrayNodeId = nodeId;
                   _selectedXrayInboundId = inbound.id;
                   _filter = 'v2ray';
@@ -4436,6 +4446,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                   _autoFastest = false;
                   _vpnError = null;
                 });
+                _persistManualConnectionChoice();
                 _startXrayTunnel(nodeId, inboundId: inbound.id);
               },
               child: Padding(
@@ -4565,10 +4576,12 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                 borderRadius: BorderRadius.circular(12)),
               onSelected: (_) {
                 setState(() {
-                  // An automatic choice is valid only for its selected protocol.
+                  // A protocol chip is an explicit manual choice.
                   _filter = entry.$1;
+                  if (_filter != 'v2ray') _explicitXrayInboundId = null;
                   _autoFastest = false;
                 });
+                _persistManualConnectionChoice();
                 if (entry.$1 == 'v2ray') _loadXrayGroups();
                 if (entry.$1 == 'socks5') {
                   unawaited(_refreshSocks5AvailableNodes());
