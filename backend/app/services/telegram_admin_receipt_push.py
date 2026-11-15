@@ -20,7 +20,7 @@ from ..models import User, UserRole
 from ..payment_models import PaymentIntent
 from ..runtime_settings_model import RuntimeSetting
 from ..routers.payment_receipts_local import _is_reseller_bot_internal_user, _local_path
-from ..routers.telegram_admin_ops_v1 import _manual_purchase, _manual_topup
+from ..routers.telegram_admin_ops_v1 import (_manual_purchase, _manual_topup, _summary, _wallet_summary, format_admin_receipt)
 from ..routers.telegram_manager import load_bot_token
 from ..routers.wallet_admin_v2 import _is_reseller_scoped_topup
 
@@ -75,20 +75,14 @@ def _detail(db, kind: str, item_id: int):
             return None
         return {
             "file": str(row.receipt_telegram_file_id or ""),
-            "user": row.user_id,
-            "amount": int(row.payable_amount_toman or row.base_amount_toman or 0),
-            "status": str(row.status or ""),
-            "tracking": str(row.tracking_code or "-"),
+            **_summary(db, row),
         }
     row = db.get(CustomerWalletTopup, item_id)
     if not row or _is_reseller_scoped_topup(row) or not _manual_topup(row):
         return None
     return {
         "file": str(row.receipt_file_marker or ""),
-        "user": row.user_id,
-        "amount": int(row.payable_amount_toman or 0),
-        "status": str(row.status or ""),
-        "tracking": "-",
+        **_wallet_summary(db, row),
     }
 
 
@@ -135,17 +129,7 @@ async def _deliver(client: httpx.AsyncClient, token: str, chat_id: int,
     marker = receipt["file"]
     if not marker:
         return False
-    label = "خرید اشتراک" if kind == "purchase" else "شارژ کیف پول"
-    caption = (
-        "🧾 <b>رسید نیازمند تأیید دستی</b>\n"
-        f"نوع: {label}\n"
-        f"شناسه: <code>{item_id}</code>\n"
-        f"کاربر: <code>{int(receipt['user'])}</code>\n"
-        f"مبلغ: <b>{receipt['amount']:,} تومان</b>\n"
-        f"وضعیت: {html.escape(receipt['status'])}\n"
-        f"کد پیگیری: {html.escape(receipt['tracking'])}\n\n"
-        "⚠️ پیش از تأیید، تراکنش را مستقل بررسی کنید."
-    )
+    caption = format_admin_receipt(kind, receipt)
     keyboard = {"inline_keyboard": [
         [
             {"text": "✅ تأیید رسید", "callback_data": f"adm:do:approve:{kind}:{item_id}"},
