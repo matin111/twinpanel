@@ -17,6 +17,14 @@ const dateText=(value:unknown)=>{if(!value)return "—";const d=new Date(String(
 const statusTone=(status:string):"ok"|"warn"|"bad"|"violet"=>["active","online","approved","paid","completed","success","read"].includes(status.toLowerCase())?"ok":["expired","canceled","failed","rejected","offline","suspended"].includes(status.toLowerCase())?"bad":"warn";
 const protocols=(row:ResellerRow)=>[["enable_cisco","Cisco"],["enable_openvpn","OpenVPN"],["enable_wireguard","WireGuard"],["enable_l2tp","L2TP"],["enable_v2ray","V2Ray"]].filter(([key])=>Boolean(row[key])).map(([,label])=>label);
 
+const resellerTypeLabel=(kind:string)=>({
+  reseller_bot_adjustment:"تغییر دستی نماینده",reseller_bot_topup:"شارژ تأییدشده",
+  reseller_bot_wallet_payment:"خرید با کیف پول",reseller_bot_order_wallet:"خرید از ربات"
+} as Record<string,string>)[kind]||kind;
+const topupStatus=(status:string)=>({
+  approved:"تأیید و شارژ شده",rejected:"رد شده",pending_payment:"در انتظار پرداخت",awaiting_review:"در انتظار بررسی"
+} as Record<string,string>)[status]||status;
+
 function Notice({error,ok}:{error:string;ok:string}){return <>{error&&<div className="runtime-error">{error}</div>}{ok&&<div className="runtime-success">{ok}</div>}</>;}
 function Empty({children}:{children:React.ReactNode}){return <div className="runtime-empty">{children}</div>;}
 
@@ -73,13 +81,66 @@ export function ResellerCustomersParityV2(){
   const [error,setError]=useState("");
   const [ok,setOk]=useState("");
   const [form,setForm]=useState({full_name:"",email:"",phone:"",password:""});
+  const [walletUser,setWalletUser]=useState<ResellerRow|null>(null);
+  const [walletHistory,setWalletHistory]=useState<ResellerRow|null>(null);
+  const [walletBusy,setWalletBusy]=useState(false);
+  const [walletError,setWalletError]=useState("");
+  const [walletQuery,setWalletQuery]=useState("");
+  const showHistory=async(row:ResellerRow)=>{
+    const id=Number(row.id||0);if(!id)return;
+    setWalletUser(row);setWalletHistory(null);setWalletError("");setWalletQuery("");setWalletBusy(true);
+    try{setWalletHistory(await resellerApi.customerWalletHistory(id));}
+    catch(e){setWalletError(e instanceof Error?e.message:String(e));}
+    finally{setWalletBusy(false);}
+  };
+  const ledgerRows=Array.isArray(walletHistory?.transactions)?walletHistory.transactions as ResellerRow[]:[];
+  const topupRows=Array.isArray(walletHistory?.topups)?walletHistory.topups as ResellerRow[]:[];
+  const walletMatch=(row:ResellerRow)=>Object.values(row).some(v=>String(v??"").toLowerCase().includes(walletQuery.trim().toLowerCase()));
   const load=async()=>{setError("");try{setRows(await resellerApi.customers());}catch(reason){setError(reason instanceof Error?reason.message:String(reason));}};
   useEffect(()=>{void load();},[]);
   const filtered=useMemo(()=>{const needle=q.trim().toLowerCase();if(!needle)return rows;return rows.filter(row=>[row.id,row.full_name,row.email,row.phone].some(v=>String(v??"").toLowerCase().includes(needle)));},[rows,q]);
   const submit=async(event:FormEvent)=>{event.preventDefault();if(busy)return;setBusy(true);setError("");setOk("");try{await resellerApi.createCustomer({full_name:form.full_name.trim(),email:form.email.trim()||null,phone:form.phone.trim()||null,password:form.password});setOk(pick("مشتری ساخته شد","Customer created"));setForm({full_name:"",email:"",phone:"",password:""});setOpen(false);await load();}catch(reason){setError(reason instanceof Error?reason.message:String(reason));}finally{setBusy(false);}};
   return <PortalShell type="reseller" active="/reseller/customers"><div className="page reseller-parity-page"><div className="page-head"><h1>{pick("مشتریان","Customers")}</h1><button className="primary" onClick={()=>setOpen(true)}>＋ {pick("مشتری جدید","New customer")}</button></div><Notice error={error} ok={ok}/>
     {open&&<Card className="runtime-editor"><form onSubmit={submit}><div className="setting-grid"><label className="field"><span>{pick("نام","Name")}</span><input required minLength={2} value={form.full_name} onChange={e=>setForm(v=>({...v,full_name:e.target.value}))}/></label><label className="field"><span>Email</span><input type="email" dir="ltr" value={form.email} onChange={e=>setForm(v=>({...v,email:e.target.value}))}/></label><label className="field"><span>{pick("موبایل","Phone")}</span><input dir="ltr" value={form.phone} onChange={e=>setForm(v=>({...v,phone:e.target.value}))}/></label><label className="field"><span>{pick("رمز عبور","Password")}</span><input required minLength={8} type="password" dir="ltr" value={form.password} onChange={e=>setForm(v=>({...v,password:e.target.value}))}/></label></div><div className="action-row"><button className="ghost" type="button" onClick={()=>setOpen(false)}>{pick("انصراف","Cancel")}</button><button className="primary" disabled={busy}>{pick("ساخت مشتری","Create customer")}</button></div></form></Card>}
-    <Card><div className="runtime-toolbar"><label>⌕ <input value={q} onChange={e=>setQ(e.target.value)} placeholder={pick("جستجوی نام، ایمیل یا موبایل...","Search name, email or phone...")}/></label><Badge tone="violet">{filtered.length}</Badge></div><div className="table"><table><thead><tr><th>ID</th><th>{pick("نام","Name")}</th><th>Email</th><th>{pick("موبایل","Phone")}</th><th>{pick("اشتراک‌ها","Subscriptions")}</th><th>{pick("وضعیت","Status")}</th></tr></thead><tbody>{filtered.map((row,index)=><tr key={str(row,"id")||index}><td>#{str(row,"id")}</td><td><b>{str(row,"full_name")||"—"}</b></td><td dir="ltr">{str(row,"email")||"—"}</td><td dir="ltr">{str(row,"phone")||"—"}</td><td>{num(row,"subscription_count")}</td><td><Badge tone={Boolean(row.is_active)?"ok":"bad"}>{Boolean(row.is_active)?pick("فعال","Active"):pick("غیرفعال","Inactive")}</Badge></td></tr>)}</tbody></table></div>{!filtered.length&&<Empty>{pick("مشتری پیدا نشد.","No customers found.")}</Empty>}</Card>
+    <Card><div className="runtime-toolbar"><label>⌕ <input value={q} onChange={e=>setQ(e.target.value)} placeholder={pick("جستجوی نام، ایمیل یا موبایل...","Search name, email or phone...")}/></label><Badge tone="violet">{filtered.length}</Badge></div><div className="table"><table><thead><tr><th>ID</th><th>{pick("نام","Name")}</th><th>Email</th><th>{pick("موبایل","Phone")}</th><th>{pick("اشتراک‌ها","Subscriptions")}</th><th>{pick("وضعیت","Status")}</th><th>{pick("تاریخچه","History")}</th></tr></thead><tbody>{filtered.map((row,index)=><tr key={str(row,"id")||index}><td>#{str(row,"id")}</td><td><b>{str(row,"full_name")||"—"}</b></td><td dir="ltr">{str(row,"email")||"—"}</td><td dir="ltr">{str(row,"phone")||"—"}</td><td>{num(row,"subscription_count")}</td><td><Badge tone={Boolean(row.is_active)?"ok":"bad"}>{Boolean(row.is_active)?pick("فعال","Active"):pick("غیرفعال","Inactive")}</Badge></td><td><button type="button" className="mini-btn" onClick={()=>void showHistory(row)}>{pick("تاریخچه کیف پول","Wallet history")}</button></td></tr>)}</tbody></table></div>{!filtered.length&&<Empty>{pick("مشتری پیدا نشد.","No customers found.")}</Empty>}</Card>
+    {walletUser&&<div className="runtime-modal" role="dialog" aria-modal="true">
+      <button className="runtime-modal-bg" type="button" onClick={()=>setWalletUser(null)}/>
+      <div className="runtime-modal-card" style={{width:"min(760px,96vw)",maxHeight:"85vh",overflowY:"auto",display:"grid",gap:12}}>
+        <div className="card-head"><div><b>{pick("تاریخچه کیف پول مشتری","Customer wallet history")}</b><small>#{str(walletUser,"id")} · {str(walletUser,"full_name")||str(walletUser,"email")||"—"}</small></div><button type="button" className="icon-button" onClick={()=>setWalletUser(null)}>×</button></div>
+        {walletBusy&&<div className="runtime-loading">{pick("در حال دریافت...","Loading...")}</div>}
+        {walletError&&<div className="runtime-error">{walletError}</div>}
+        {walletHistory&&<>
+          <div className="stats">
+            <Stat label={pick("موجودی فعلی مشتری","Current customer balance")} value={money(num(walletHistory,"balance_toman"))}/>
+            <Stat label={pick("تراکنش‌های ثبت‌شده این نمایندگی","This reseller's transactions")} value={String(ledgerRows.length)}/>
+            <Stat label={pick("درخواست‌های شارژ","Top-up requests")} value={String(topupRows.length)}/>
+          </div>
+          <small>{pick("فقط فعالیت‌های قابل انتساب به همین نمایندگی نمایش داده می‌شوند؛ موجودی مشترک ممکن است شامل تراکنش‌های دیگر باشد.","Only activity attributable to this reseller is shown; shared balance may include other activity.")}</small>
+          <label className="field"><span>{pick("جستجو در تاریخچه","Search history")}</span><input value={walletQuery} onChange={e=>setWalletQuery(e.target.value)} placeholder={pick("مبلغ، شماره تراکنش، توضیح یا رسید","Amount, transaction ID, note or receipt")}/></label>
+          <b>{pick("گردش کیف پول","Wallet transactions")}</b>
+          <div style={{display:"grid",gap:8}}>
+            {ledgerRows.filter(walletMatch).map(tx=><div key={String(tx.id)} style={{padding:10,border:"1px solid var(--line,#dbe2ed)",borderRadius:12,display:"grid",gap:4}}>
+              <div style={{display:"flex",justifyContent:"space-between",gap:8}}><b>{resellerTypeLabel(str(tx,"kind"))}</b><b style={{color:num(tx,"amount_toman")>=0?"#15803d":"#dc2626"}}>{num(tx,"amount_toman")>0?"+":""}{money(num(tx,"amount_toman"))}</b></div>
+              <small>{dateText(tx.created_at)} · #{str(tx,"id")}</small>
+              {tx.description&&<small>{str(tx,"description")}</small>}
+              {tx.reference&&<small style={{overflowWrap:"anywhere"}}>{pick("مرجع","Reference")}: {str(tx,"reference")}</small>}
+            </div>)}
+            {!ledgerRows.filter(walletMatch).length&&<Empty>{pick("تراکنشی برای این نمایندگی پیدا نشد.","No scoped transactions found.")}</Empty>}
+          </div>
+          <b>{pick("درخواست‌های شارژ","Top-up requests")}</b>
+          <div style={{display:"grid",gap:8}}>
+            {topupRows.filter(walletMatch).map(tx=><div key={String(tx.id)} style={{padding:10,border:"1px solid var(--line,#dbe2ed)",borderRadius:12,display:"grid",gap:4}}>
+              <div style={{display:"flex",justifyContent:"space-between",gap:8}}><b>#{str(tx,"id")} · {topupStatus(str(tx,"status"))}</b><b>{money(num(tx,"amount_toman"))}</b></div>
+              <small>{dateText(tx.created_at)} · {str(tx,"method")}</small>
+              {tx.tracking_code&&<small>{pick("کد پیگیری","Tracking code")}: {str(tx,"tracking_code")}</small>}
+              {tx.review_note&&<small>{str(tx,"review_note")}</small>}
+            </div>)}
+            {!topupRows.filter(walletMatch).length&&<Empty>{pick("درخواست شارژی پیدا نشد.","No top-up requests found.")}</Empty>}
+          </div>
+        </>}
+        <div className="runtime-modal-actions"><button type="button" className="ghost" onClick={()=>setWalletUser(null)}>{pick("بستن","Close")}</button></div>
+      </div>
+    </div>}
   </div></PortalShell>;
 }
 
