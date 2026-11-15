@@ -3438,8 +3438,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           ),
         if (Platform.isIOS) ...[
           Text(
-            tr('نسخه آزمایشی آیفون: اتصال VPN تا تکمیل Network Extension غیرفعال است.',
-               'iOS preview: VPN connection is unavailable until Network Extension is implemented.'),
+            tr('موتور VPN آیفون هنوز نصب و تأیید نشده است؛ ورود و دریافت اشتراک برقرار است، اما تونل فعال نیست.',
+               'The iOS VPN engine is not installed and verified; login and subscription sync work, but no tunnel is active.'),
             key: const Key('iosVpnEngineUnavailableNotice'),
             textAlign: TextAlign.center,
             style: const TextStyle(fontSize: 11, color: Color(0xFFFFCA81)),
@@ -3518,7 +3518,9 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(_vpnBusy
+                      Text(Platform.isIOS
+                          ? tr('موتور آیفون آماده نیست', 'iOS engine unavailable')
+                          : _vpnBusy
                           ? tr('در حال اتصال', 'Connecting')
                           : (_vpnUp || _modernUp)
                             ? tr('قطع اتصال', 'Disconnect')
