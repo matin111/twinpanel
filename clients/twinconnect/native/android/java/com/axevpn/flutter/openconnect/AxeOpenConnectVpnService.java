@@ -166,19 +166,44 @@ public class AxeOpenConnectVpnService extends VpnService {
 
             SSLSocketFactory ssf = buildSslSocketFactory(servercert);
 
-            // ── Phase 1: Authenticate (2-step: username → context cookie → password → session) ──
+            // Start a Cisco/ocserv authentication session before POST /auth.
+            // The server issues webvpncontext in response to config-auth init.
+            // Never send account credentials before obtaining that context.
             broadcastStage("authenticating");
-            failureStage = "CISCO_AUTH_EXCHANGE_FAILED";
-
-            // Step 1a: POST username to /auth to get context cookie
+            failureStage = "CISCO_AUTH_INIT_FAILED";
             authSock = connectProtectedTls(ssf, host, port, servercert);
+            String body0 = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
+                    + "<config-auth client=\"vpn\" type=\"init\">"
+                    + "<version who=\"vpn\">v5.01</version></config-auth>";
+            String authInitRequest = "POST / HTTP/1.1\r\n"
+                    + "Host: " + host + "\r\n"
+                    + "User-Agent: OpenConnect TwinConnect/1.0\r\n"
+                    + "Content-Type: text/xml\r\n"
+                    + "Content-Length: " + body0.getBytes("UTF-8").length + "\r\n"
+                    + "Connection: close\r\n\r\n" + body0;
+            OutputStream initOutput = authSock.getOutputStream();
+            initOutput.write(authInitRequest.getBytes("UTF-8"));
+            initOutput.flush();
+            String initCookies = parseAuthCookie(authSock.getInputStream());
+            safeClose(authSock);
+            authSock = null;
+            if (initCookies == null || !initCookies.contains("webvpncontext=")) {
+                lastFailureCode = "CISCO_AUTH_INIT_CONTEXT_MISSING";
+                broadcastStage("denied");
+                stopSelf();
+                return;
+            }
 
+            // Submit username within the server-issued session.
+            failureStage = "CISCO_AUTH_USERNAME_EXCHANGE_FAILED";
+            authSock = connectProtectedTls(ssf, host, port, servercert);
             String body1 = "username=" + URLEncoder.encode(username, "UTF-8");
             if (authGroup != null && !authGroup.isEmpty())
                 body1 += "&group_list=" + URLEncoder.encode(authGroup, "UTF-8");
 
             String authReq1 = "POST /auth HTTP/1.1\r\n"
                     + "Host: " + host + "\r\n"
+                    + "Cookie: " + initCookies + "\r\n"
                     + "User-Agent: AnyConnect Android 4.10.04065\r\n"
                     + "X-AnyConnect-Platform: android\r\n"
                     + "Content-Type: application/x-www-form-urlencoded\r\n"
@@ -202,7 +227,8 @@ public class AxeOpenConnectVpnService extends VpnService {
                 return;
             }
 
-            // Step 1b: POST password with context cookie to /auth to get VPN session cookies
+            // Follow the challenge with the password under the new context.
+            failureStage = "CISCO_AUTH_PASSWORD_EXCHANGE_FAILED";
             authSock = connectProtectedTls(ssf, host, port, servercert);
 
             String body2 = "password=" + URLEncoder.encode(password, "UTF-8");
