@@ -1,42 +1,117 @@
-name: TwinConnect macOS Reserved Renewal Preview
+name: TwinConnect macOS Native Preview
 
 on:
-  push:
-    branches: [feat/twinconnect-ios-simulator-foundation-20261115]
+  pull_request:
     paths:
-      - "clients/twinconnect/lib/account_snapshot.dart"
-      - "clients/twinconnect/lib/live_dashboard.dart"
-      - "clients/twinconnect/test/account_reserved_renewal_test.dart"
-      - ".github/workflows/twinconnect-macos-renewal-preview.yml"
+      - 'clients/twinconnect/**'
+      - '.github/workflows/twinconnect-macos-renewal-preview.yml'
+  push:
+    branches:
+      - 'feat/twinconnect-ios-simulator-foundation-20261115'
+    paths:
+      - 'clients/twinconnect/**'
+      - '.github/workflows/twinconnect-macos-renewal-preview.yml'
   workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: twinconnect-macos-native-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   macos-preview:
+    name: macOS native bridge, Flutter tests and unsigned app
     runs-on: macos-15
-    timeout-minutes: 45
+    timeout-minutes: 55
     defaults:
       run:
         working-directory: clients/twinconnect
     steps:
       - uses: actions/checkout@v4
+      - name: macOS toolchain
+        shell: bash
+        run: |
+          sw_vers
+          xcodebuild -version
+          xcrun --find swiftc
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
-          cache: true
-      - name: Generate macOS Flutter scaffolding
+          cache: false
+      - name: Generate native macOS runner
         run: flutter create --platforms=macos --org com.twinpanel --project-name twinconnect .
-      - name: Resolve dependencies
-        run: flutter pub get
-      - name: Test reserved renewal account model
-        run: flutter test test/account_reserved_renewal_test.dart --reporter expanded
-      - name: Build macOS unsigned preview
-        run: flutter build macos --release
-      - name: Archive macOS preview
+      - name: Install Mac capability channel and HTTPS sandbox entitlement
+        shell: bash
         run: |
+          python3 macos_native/install_macos_bridge.py
+          plutil -lint macos/Runner/DebugProfile.entitlements macos/Runner/Release.entitlements
+          python3 - <<'PY'
+          import plistlib
+          from pathlib import Path
+          for name in ("DebugProfile.entitlements","Release.entitlements"):
+              path = Path("macos/Runner") / name
+              with path.open("rb") as f:
+                  entitlements = plistlib.load(f)
+              assert entitlements.get("com.apple.security.network.client") is True, path
+              assert not entitlements.get("com.apple.developer.networking.networkextension"), path
+          source = Path("macos/Runner/MainFlutterWindow.swift").read_text()
+          assert source.count("TwinConnectMacOSVPNBridge.register(") == 1
+          assert "MACOS_PACKET_TUNNEL_NOT_INSTALLED" in source
+          print("Mac app network permission and fail-closed native bridge confirmed")
+          PY
+      - name: Resolve Flutter packages
+        run: flutter pub get
+      - name: Flutter analysis
+        run: flutter analyze --no-fatal-infos
+      - name: Run all Flutter and platform contract tests
+        run: flutter test --reporter expanded
+      - name: Build macOS Release app (unsigned preview)
+        env:
+          TWINCONNECT_DIRECTORY_URL: ${{ vars.TWINCONNECT_DIRECTORY_URL || 'https://panel.matindnspro.sbs' }}
+        run: |
+          flutter build macos --release \
+            --dart-define=TWINCONNECT_DIRECTORY_URL="$TWINCONNECT_DIRECTORY_URL"
+      - name: Verify Mac app bundle, native channel and architecture
+        shell: bash
+        run: |
+          set -euo pipefail
+          app="build/macos/Build/Products/Release/twinconnect.app"
+          test -d "$app"
+          exe="$app/Contents/MacOS/twinconnect"
+          test -x "$exe"
+          test -d "$app/Contents/Frameworks/FlutterMacOS.framework"
+          test -d "$app/Contents/Frameworks/App.framework"
+          plutil -lint "$app/Contents/Info.plist"
+          /usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$app/Contents/Info.plist"
+          file "$exe"
+          lipo -archs "$exe"
+          otool -L "$exe" | head -25
+          # CI is *not* a Developer ID notarization step. Do not claim this
+          # unsigned preview can establish a macOS Network Extension VPN.
+          codesign --display --verbose=2 "$app" 2>&1 || true
+          {
+            echo "TwinConnect macOS native UI and account preview"
+            echo "Repository commit: $GITHUB_SHA"
+            echo "Mac packet-tunnel engine: NOT INSTALLED"
+            echo "Code signing/notarization: NOT a Developer ID release"
+            echo "VPN connect/egress: NOT VERIFIED"
+            echo "Built application: twinconnect.app"
+          } > build/macos/Build/Products/Release/MACOS-TEST-NOTES.txt
+      - name: Archive Mac app and checksum
+        shell: bash
+        run: |
+          set -euo pipefail
           cd build/macos/Build/Products/Release
-          ditto -c -k --sequesterRsrc --keepParent twinconnect.app twinconnect-macos-renewal-preview.zip
+          ditto -c -k --sequesterRsrc --keepParent twinconnect.app TwinConnect-macOS-Native-Preview.zip
+          shasum -a 256 TwinConnect-macOS-Native-Preview.zip > SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: TwinConnect-macOS-Reserved-Renewal-Preview
-          path: clients/twinconnect/build/macos/Build/Products/Release/twinconnect-macos-renewal-preview.zip
+          name: TwinConnect-macOS-Native-Preview-UNSIGNED
+          path: |
+            clients/twinconnect/build/macos/Build/Products/Release/TwinConnect-macOS-Native-Preview.zip
+            clients/twinconnect/build/macos/Build/Products/Release/SHA256SUMS.txt
+            clients/twinconnect/build/macos/Build/Products/Release/MACOS-TEST-NOTES.txt
           if-no-files-found: error
+          retention-days: 14
