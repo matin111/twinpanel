@@ -101,6 +101,73 @@ void main() {
     ), throwsFormatException);
   });
 
+  test('ShadowTLS chain uses actual authenticated detour and retains secrets', () {
+    const innerSecret = 'synthetic-secret-inner';
+    const outerSecret = 'synthetic-secret-outer';
+    final item = {
+      'node_id': 25,
+      'config': {
+        // This full application envelope is NOT executed by the app.
+        'dns': {'servers': ['1.1.1.1']},
+        'route': {'final': 'direct'},
+        'outbounds': [
+          {'type': 'direct', 'tag': 'untrusted-direct'},
+          {
+            'type': 'shadowtls',
+            'tag': 'shad-outer',
+            'server': 'vpn.example.org',
+            'server_port': 443,
+            'version': 3,
+            'password': outerSecret,
+            'tls': {'enabled': true, 'server_name': 'www.example.org'},
+          },
+          {
+            'type': 'shadowsocks',
+            'tag': 'inner-proxy',
+            'method': 'aes-256-gcm',
+            'password': innerSecret,
+            'detour': 'shad-outer',
+          },
+        ],
+      },
+    };
+    final chain = SingBoxProfileValidator.validateShadowTlsChain(item);
+    expect(chain.length, 2);
+    expect(chain[0]['type'], 'shadowsocks');
+    expect(chain[0]['password'], innerSecret);
+    expect(chain[0]['detour'], 'shad-outer');
+    expect(chain[1]['type'], 'shadowtls');
+    expect(chain[1]['password'], outerSecret);
+    expect(chain.any((outbound) => outbound.containsKey('route')), false);
+    expect(chain.any((outbound) => outbound['type'] == 'direct'), false);
+  });
+
+  test('ShadowTLS chain rejects mismatched detour and insecure TLS', () {
+    final item = {
+      'outbounds': [
+        {
+          'type': 'shadowsocks', 'tag': 'inner-proxy',
+          'method': 'aes-256-gcm', 'password': 'test',
+          'detour': 'wrong-wrapper',
+        },
+        {
+          'type': 'shadowtls', 'tag': 'shadow',
+          'server': 'vpn.example.org', 'server_port': 443,
+          'version': 3, 'password': 'test',
+          'tls': {'enabled': true, 'server_name': 'example.org'},
+        },
+      ],
+    };
+    expect(() => SingBoxProfileValidator.validateShadowTlsChain(item),
+        throwsFormatException);
+    final inner = (item['outbounds'] as List)[0] as Map;
+    inner['detour'] = 'shadow';
+    final outer = (item['outbounds'] as List)[1] as Map;
+    (outer['tls'] as Map)['insecure'] = true;
+    expect(() => SingBoxProfileValidator.validateShadowTlsChain(item),
+        throwsFormatException);
+  });
+
   test('ShadowTLS detour cannot be flattened to a single node', () {
     expect(() => SingBoxProfileValidator.validateOutbound(
       protocolCode: 'shadowtls', item: {
