@@ -3130,9 +3130,23 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   final XrayInboundSecureCache _xrayCache = const XrayInboundSecureCache();
   List<XrayServerProfiles> _xrayGroups = const [];
 
-  bool get _xrayAuthorized => widget.catalog?.entries.any((entry) =>
-      entry.protocol.code == 'v2ray' && entry.selected &&
-      entry.configRecordPresent) ?? false;
+  /// The panel's current category and subscription catalog decide which
+  /// protocol chips can appear. Never display all 16 merely because those
+  /// engines are compiled into TwinConnect.
+  bool _protocolEntitled(String code) {
+    if (widget.simulatorPreview) return true; // Offline layout fixture only.
+    final selected = widget.catalog?.entries.any(
+        (entry) => entry.protocol.code == code && entry.selected) ?? false;
+    if (!selected) return false;
+    final type = widget.plan?.subscriptionType.trim().toLowerCase() ?? '';
+    final vitory = type.contains('ویتوری') ||
+        type.contains('vitory') || type.contains('v2ray');
+    return !vitory || code == 'v2ray' || code == 'hysteria2';
+  }
+
+  bool get _xrayAuthorized => _protocolEntitled('v2ray') &&
+      (widget.catalog?.entries.any((entry) =>
+        entry.protocol.code == 'v2ray' && entry.configRecordPresent) ?? false);
 
   List<XrayServerProfiles> _assignedXrayGroups(
       List<XrayServerProfiles> groups) {
@@ -4584,7 +4598,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         children: [
           for (final entry in <(String, String)>[
             ('all', tr('همه', 'All')),
-            for (final p in VpnProtocols.all) (p.code, p.name),
+            for (final p in VpnProtocols.all)
+              if (_protocolEntitled(p.code)) (p.code, p.name),
           ])
             ChoiceChip(
               key: Key('devFilter_${entry.$1}'),
@@ -4618,9 +4633,14 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
 
     Widget locations() {
       final query = _search.trim().toLowerCase();
+      // A previously saved protocol can become unavailable when the owner
+      // changes the plan. Preserve the choice, but never show/connect nodes
+      // under a protocol this account is no longer entitled to use.
+      final allowedFilter = _filter == 'all' ||
+          _protocolEntitled(_filter);
       final matching = <int>[
         for (int i = 0; i < demoServers.length; i++)
-          if ((_filter != 'socks5' ||
+          if (allowedFilter && (_filter != 'socks5' ||
               _socks5AssignedNodeIds == null ||
               _socks5AssignedNodeIds!.contains(widget.servers!.servers[i].id)) &&
               (query.isEmpty ||
@@ -4815,7 +4835,10 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           else if (matching.isEmpty)
             Padding(
               padding: const EdgeInsets.all(22),
-              child: txt(widget.servers == null
+              child: txt(!allowedFilter
+                ? tr('این پروتکل در دسته‌بندی فعلی اشتراک مجاز نیست.',
+                     'This protocol is not available in your plan category.')
+                : widget.servers == null
                 ? tr('در حال دریافت سرورها...', 'Loading servers...')
                 : tr('سروری پیدا نشد', 'No servers found'),
                 align: TextAlign.center, color: sub),
