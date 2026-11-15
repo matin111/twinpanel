@@ -28,7 +28,7 @@ void main() {
     expect(chooser, contains('_choiceRevision != manualRevision'));
 
     final protocolChoice = source.substring(
-        source.indexOf('key: Key(\'devFilter_\${entry.$1}\')'),
+        source.indexOf(r"key: Key('devFilter_${entry.$1}')"),
         source.indexOf('Widget locations()'));
     expect(protocolChoice, contains('_persistManualConnectionChoice();'));
 
