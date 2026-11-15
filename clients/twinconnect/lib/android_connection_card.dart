@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 import 'android_connection_strings.dart';
 import 'android_tunnel.dart';
 import 'android_singbox_tunnel.dart';
+import 'android_xray_tunnel.dart';
 import 'android_openvpn_tunnel.dart';
 import 'cisco_openconnect_profile.dart';
 import 'android_cisco_tunnel.dart';
@@ -65,6 +66,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
   bool _up = false;
   bool _ciscoUp = false;
   bool _openVpnUp = false;
+  bool _xrayCoreUp = false;
   String? _singBoxProtocol;
   String? _errorCode;
   AppServer? _activeServer;
@@ -159,6 +161,29 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
               _rxBytes = rx; _txBytes = tx; _lastCountersAt = now;
             }
           });
+        }
+        return;
+      }
+      if (_xrayCoreUp) {
+        final core = AndroidXrayTunnel.instance;
+        if (!core.isConnected) {
+          if (mounted) setState(() {
+            _xrayCoreUp = false;
+            _clearTelemetry();
+            _errorCode = 'XRAY_NATIVE_ENGINE_STOPPED';
+          });
+        } else if (mounted) {
+          setState(() {
+            _downloadBps = core.downloadBps;
+            _uploadBps = core.uploadBps;
+            _rxBytes = core.receivedBytes;
+            _txBytes = core.sentBytes;
+            _rxSamples.add(_downloadBps ?? 0);
+            _txSamples.add(_uploadBps ?? 0);
+            if (_rxSamples.length > 32) _rxSamples.removeAt(0);
+            if (_txSamples.length > 32) _txSamples.removeAt(0);
+          });
+          _maybeCheckInternet();
         }
         return;
       }
@@ -263,7 +288,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
       if (up && _handshake) _maybeCheckInternet();
     } catch (_) {
       if (mounted) setState(() {
-        if (_openVpnUp || _singBoxProtocol != null || _ciscoUp) {
+        if (_openVpnUp || _singBoxProtocol != null || _xrayCoreUp || _ciscoUp) {
           // A telemetry error must not silently tear down another VPN engine.
           _errorCode = 'VPN_TELEMETRY_UNAVAILABLE';
         } else {
@@ -280,6 +305,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
   /// latency, not ICMP ping or the VPN gateway round-trip time.
   bool get _activeVerifiedTransport =>
       (_up && _handshake) || _openVpnUp || _ciscoUp ||
+      (_xrayCoreUp && AndroidXrayTunnel.instance.isConnected) ||
       (_singBoxProtocol != null && AndroidSingBoxTunnel.instance.isConnected);
 
   void _maybeCheckInternet() {
@@ -659,7 +685,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
 
   Future<void> _connectXray() async {
     if (_busy || _up || _openVpnUp || _ciscoUp || _singBoxProtocol != null ||
-        !Platform.isAndroid) return;
+        _xrayCoreUp || !Platform.isAndroid) return;
     final entitled = widget.catalog.entries.any((entry) =>
         entry.protocol.code == 'v2ray' && entry.selected &&
         entry.configRecordPresent);
@@ -693,22 +719,24 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
       if (choices.isEmpty) {
         throw const FormatException('XRAY_INBOUND_NOT_AVAILABLE');
       }
-      // The built-in sing-box 1.14 core supports VLESS TCP/WS TLS.
-      // XHTTP Reality needs Xray-core; never silently switch transport.
-      final compatible = choices.where((inbound) =>
-          inbound.id == 'tcp_tls' || inbound.id == 'websocket_tls')
-          .toList(growable: false);
-      if (compatible.isEmpty) {
-        throw const FormatException('XRAY_XHTTP_ENGINE_NOT_INSTALLED');
-      }
-      final chosen = compatible.first;
+      // Honor the exact selected inbound. XHTTP Reality uses embedded
+      // Xray-core; TCP and WS TLS use libbox. Never substitute transports.
+      final chosen = choices.first;
       stage = 'NATIVE_CONNECT';
-      await AndroidSingBoxTunnel.instance.connectVlessUri(chosen.uri);
+      if (chosen.id == 'xhttp_reality') {
+        await AndroidXrayTunnel.instance.connect(chosen);
+      } else {
+        await AndroidSingBoxTunnel.instance.connectVlessUri(chosen.uri);
+      }
       if (!mounted) return;
       final node = widget.servers!.servers
           .where((n) => n.id == chosen.serverId).firstOrNull;
       setState(() {
-        _singBoxProtocol = 'v2ray';
+        if (chosen.id == 'xhttp_reality') {
+          _xrayCoreUp = true;
+        } else {
+          _singBoxProtocol = 'v2ray';
+        }
         _activeServer = node;
         _activeServerName = node?.name;
         _httpsLatencyMs = null;
@@ -730,16 +758,21 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
   }
 
   Future<void> _disconnectModern() async {
-    if (_busy || _singBoxProtocol == null) return;
+    if (_busy || (_singBoxProtocol == null && !_xrayCoreUp)) return;
     setState(() => _busy = true);
     try {
-      await AndroidSingBoxTunnel.instance.disconnect();
+      if (_xrayCoreUp) {
+        await AndroidXrayTunnel.instance.disconnect();
+      } else {
+        await AndroidSingBoxTunnel.instance.disconnect();
+      }
       if (mounted) setState(() {
+        _xrayCoreUp = false;
         _singBoxProtocol = null;
         _clearTelemetry();
       });
     } catch (_) {
-      if (mounted) setState(() => _errorCode = 'SINGBOX_DISCONNECT_FAILED');
+      if (mounted) setState(() => _errorCode = 'VPN_DISCONNECT_FAILED');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -921,10 +954,11 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
         chosen?.configRecordPresent == true;
     // The selected protocol and active transport are distinct. Selecting
     // OpenVPN/Hysteria2 never starts or disguises a WireGuard tunnel.
-    final connected = _up || _openVpnUp || _ciscoUp || _singBoxProtocol != null;
+    final connected = _up || _openVpnUp || _ciscoUp ||
+        _xrayCoreUp || _singBoxProtocol != null;
     final protocolName = chosen?.protocol.name ??
         (requested ?? s.pick('پروتکل آماده‌ای وجود ندارد', 'No ready protocol'));
-    final activeProtocolCode = _singBoxProtocol ??
+    final activeProtocolCode = _xrayCoreUp ? 'v2ray' : _singBoxProtocol ??
         (_openVpnUp ? 'openvpn' : _ciscoUp ? 'cisco' :
             _up ? 'wireguard' : null);
     final selectedIsActive = activeProtocolCode != null &&
@@ -1070,7 +1104,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
                 borderRadius: BorderRadius.circular(18)),
             ),
             onPressed: _busy ? null
-                : selectedIsActive ? (_singBoxProtocol != null ? _disconnectModern :
+                : selectedIsActive ? (_xrayCoreUp || _singBoxProtocol != null ? _disconnectModern :
                     _openVpnUp ? _disconnectOpenVpn :
                     _ciscoUp ? _disconnectCisco : _disconnect)
                 : connected ? null
@@ -1096,7 +1130,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
           const SizedBox(height: 10),
           Text(
             s.pick('تونل فعال جداگانه: ', 'Separate active tunnel: ') +
-                (_singBoxProtocol ?? (_openVpnUp ? 'OpenVPN' :
+                ((_xrayCoreUp ? 'V2Ray / Xray' : _singBoxProtocol) ?? (_openVpnUp ? 'OpenVPN' :
                     _ciscoUp ? 'Cisco / OpenConnect' : 'WireGuard')),
             key: const Key('androidSeparateActiveProtocol'),
             textAlign: TextAlign.center,
@@ -1105,7 +1139,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
           const SizedBox(height: 8),
           OutlinedButton.icon(
             key: const Key('androidDisconnectPreviousTunnel'),
-            onPressed: _busy ? null : _singBoxProtocol != null ? _disconnectModern :
+            onPressed: _busy ? null : _xrayCoreUp || _singBoxProtocol != null ? _disconnectModern :
                 _openVpnUp ? _disconnectOpenVpn :
                 _ciscoUp ? _disconnectCisco : _disconnect,
             icon: const Icon(Icons.stop_circle_outlined),
@@ -1144,7 +1178,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
                       : _ciscoUp
                           ? s.pick('تونل Cisco فعال است؛ دسترسی اینترنت هنوز با HTTPS تأیید نشده است.',
                               'Cisco tunnel is active; HTTPS internet access is not yet verified.')
-                          : _openVpnUp || _singBoxProtocol != null
+                          : _openVpnUp || _xrayCoreUp || _singBoxProtocol != null
                               ? s.pick('تونل فعال است؛ دسترسی اینترنت هنوز با HTTPS تأیید نشده است.',
                                   'VPN tunnel is active; HTTPS internet access is not yet verified.')
                               : _up && _handshake
