@@ -183,7 +183,13 @@ public class AxeOpenConnectVpnService extends VpnService {
                         int prefix = maskToPrefix(ip.netmask);
                         Builder builder = new Builder()
                                 .setSession(name == null ? "TwinConnect Cisco" : name)
-                                .setMtu(Math.max(1280, ip.MTU))
+                                // Mobile outer paths (Wi-Fi/LTE and tunneled
+                                // gateways) can have a lower effective PMTU.
+                                // Large TLS records otherwise hang while tiny
+                                // ICMP packets succeed. Cap only the Android
+                                // TUN MTU; do not modify the server's MTU.
+                                .setMtu(Math.max(1280,
+                                        Math.min(1300, ip.MTU > 0 ? ip.MTU : 1300)))
                                 .addAddress(ip.addr, prefix)
                                 .addRoute("0.0.0.0", 0);
                         for (String dns : ip.DNS) {
