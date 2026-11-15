@@ -73,7 +73,7 @@ function Modal({title,sub,onClose,children,wide=false}:{title:string;sub?:string
   </div>;
 }
 
-type ModalKind="create"|"edit"|"extend"|"connect"|null;
+type ModalKind="create"|"edit"|"extend"|"connect"|"history"|null;
 type Draft={user_id:number;plan_id:number;traffic_gb:string;duration_days:string;device_limit:string;username:string;password:string;protocols:string[]};
 
 export function LegacySubscriptionsRuntimePage(){
@@ -101,6 +101,7 @@ export function LegacySubscriptionsRuntimePage(){
   const [userSearch,setUserSearch]=useState("");
   const [extendDays,setExtendDays]=useState(30);
   const [extendTraffic,setExtendTraffic]=useState(10);
+  const [renewalHistory,setRenewalHistory]=useState<{events:Array<{id:number;type:string;source:string;actor:string;details:Record<string,unknown>;created_at:string}>;queued:Array<{id:number;plan:string;traffic_bytes:number;duration_days:number;created_at:string}>}|null>(null);
   const [editResetUsage,setEditResetUsage]=useState(false);
   const [resetTarget,setResetTarget]=useState<RuntimeRow|null>(null);
   const [extendResetUsage,setExtendResetUsage]=useState(false);
@@ -324,10 +325,15 @@ export function LegacySubscriptionsRuntimePage(){
   };
   const openExtend=(item:RuntimeRow)=>{setSelected(item);setExtendDays(30);setExtendTraffic(10);setExtendResetUsage(false);setExtendResetDate(false);setModal("extend");};
   const saveExtend=()=>{
-    if(!selected)return;
-    if(extendResetDate&&extendDays<=0){setError(pick("برای ریست تاریخ، مدت دوره جدید را وارد کنید.","Enter a new duration to reset the expiry date."));return;}
-    if((extendResetUsage||extendResetDate)&&!window.confirm(pick("ریست‌های انتخاب‌شده روی اشتراک اعمال شوند؟ ریست تاریخ، اعتبار را از همین لحظه و برای روزهای واردشده شروع می‌کند.","Apply selected resets? Date reset starts a fresh period now for the entered days.")))return;
-    void act("extend",pick("تمدید و تنظیمات ریست اعمال شد","Renewal and reset options applied"),()=>legacyAdminApi.extendSubscription(n(selected.id),{add_days:extendDays,add_traffic_gb:extendTraffic,reset_usage:extendResetUsage,reset_date:extendResetDate}),true);
+    if(!selected||(!extendDays&&!extendTraffic))return;
+    void act("extend",pick("تمدید برای دوره بعد ثبت شد","Renewal queued for the next period"),()=>legacyAdminApi.reserveSubscriptionRenewal(n(selected.id),{
+      traffic_gb:extendTraffic,duration_days:extendDays,plan_id:n(selected.plan_id)||undefined,
+    }),true);
+  };
+  const openHistory=async(item:RuntimeRow)=>{
+    setSelected(item);setRenewalHistory(null);setModal("history");setError("");
+    try{setRenewalHistory(await legacyAdminApi.subscriptionHistory(n(item.id)));}
+    catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
   };
   const toggleStatus=async(item:RuntimeRow)=>{const activate=s(item.status).toLowerCase()!=="active";await act(`status-${item.id}`,activate?pick("اشتراک فعال شد","Subscription activated"):pick("اشتراک معلق شد","Subscription suspended"),()=>adminApi.setSubscriptionActive(n(item.id),activate));};
   const remove=async(item:RuntimeRow)=>{
@@ -494,6 +500,7 @@ export function LegacySubscriptionsRuntimePage(){
               <summary>{pick("عملیات بیشتر","More actions")} <span aria-hidden="true">⋯</span></summary>
               <div className="mobile-subscription-more-actions">
                 <button type="button" className={s(item.status).toLowerCase()==="active"?"mobile-more-suspend":"mobile-more-activate"} disabled={!!busy} onClick={()=>void toggleStatus(item)}>{s(item.status).toLowerCase()==="active"?pick("تعلیق","Suspend"):pick("فعال‌سازی","Activate")}</button>
+                <button type="button" className="mobile-more-transfer" onClick={()=>void openHistory(item)}>{pick("تاریخچه","History")}</button>
                 <button type="button" className="mobile-more-transfer" disabled={!!busy} onClick={()=>void openTransfer(item)}>{pick("انتقال اکانت","Transfer account")}</button>
                 <button type="button" className="mobile-more-app" onClick={()=>setAppDeliverySubscriptionId(n(item.id)||null)}>{pick("ورود اپ","App Login")}</button>
                 <button type="button" className="danger mobile-more-delete" disabled={!!busy} onClick={()=>void remove(item)}>{pick("حذف","Delete")}</button>
@@ -785,18 +792,30 @@ export function LegacySubscriptionsRuntimePage(){
       {transferResellerId&&!transferLoading&&!transferCustomers.length?<p className="runtime-error">{pick("کاربری پیدا نشد؛ نام، ایمیل، موبایل یا شناسه کاربر موجود را جستجو کنید.","No active customer found for this reseller. Create a customer first.")}</p>:null}</>}
       <div className="modalActions"><button className="ghost" disabled={!!busy} onClick={()=>setTransferOpen(false)}>{pick("انصراف","Cancel")}</button><button className="primary" disabled={!!busy||transferLoading||(transferMode==="user"?!transferUserId:!transferResellerId||!transferCustomerId)} onClick={submitTransfer}>{busy==="transfer"?pick("در حال انتقال…","Transferring…"):pick("تأیید انتقال","Confirm transfer")}</button></div>
     </Modal>}
-    {modal==="extend"&&selected&&<Modal title={pick("تمدید اشتراک","Renew subscription")} sub={`MV-${n(selected.id)} · ${selected.expires_at?formatDate(selected.expires_at):selected.duration_unlimited===true||n(selected.activation_duration_days)<=0?pick("نامحدود","Unlimited"):pick("از اولین اتصال","From first connection")}`} onClose={()=>!busy&&setModal(null)}>
+    {modal==="extend"&&selected&&<Modal title={pick("تمدید اشتراک","Renew subscription")} sub={`MV-${n(selected.id)} · ${pick("تمدید پس از پایان حجم یا تاریخ فعال می‌شود","Activates after quota or expiry")}`} onClose={()=>!busy&&setModal(null)}>
       <Notice error={error} ok={ok}/>
       <div className="setting-grid">
-        <label className="field"><span>{pick("روز اضافه / مدت دوره جدید","Add days / new period days")}</span><input type="number" min={0} value={extendDays} onChange={event=>setExtendDays(Math.max(0,Number(event.target.value)||0))}/></label>
-        <label className="field"><span>{pick("حجم اضافه GB","Add traffic GB")}</span><input type="number" min={0} step="0.1" value={extendTraffic} onChange={event=>setExtendTraffic(Math.max(0,Number(event.target.value)||0))}/></label>
+        <label className="field"><span>{pick("مدت دوره بعد (روز)","Next period (days)")}</span><input type="number" min={0} value={extendDays} onChange={event=>setExtendDays(Math.max(0,Number(event.target.value)||0))}/></label>
+        <label className="field"><span>{pick("حجم دوره بعد (GB)","Next period traffic (GB)")}</span><input type="number" min={0} step="0.1" value={extendTraffic} onChange={event=>setExtendTraffic(Math.max(0,Number(event.target.value)||0))}/></label>
       </div>
-      <label className="field" style={{display:"flex",alignItems:"center",gap:10,marginTop:12}}><input type="checkbox" checked={extendResetUsage} onChange={event=>setExtendResetUsage(event.target.checked)}/><span>{pick("ریست ترافیک مصرفی","Reset used traffic")}</span></label>
-      <label className="field" style={{display:"flex",alignItems:"center",gap:10,marginTop:8}}><input type="checkbox" checked={extendResetDate} onChange={event=>setExtendResetDate(event.target.checked)}/><span>{pick("ریست تاریخ (شروع اعتبار جدید از امروز)","Reset expiry (new period begins now)")}</span></label>
-      {extendResetDate&&<small className="muted">{pick("با ریست تاریخ، روزهای واردشده از همین لحظه محاسبه می‌شوند، نه از انقضای قبلی.","The entered days start now rather than adding to the previous expiry.")}</small>}
-      <div className="modalActions"><button className="ghost" disabled={!!busy} onClick={()=>setModal(null)}>{pick("انصراف","Cancel")}</button><button className="primary" disabled={!!busy||(!extendDays&&!extendTraffic&&!extendResetUsage)||(extendResetDate&&!extendDays)} onClick={saveExtend}>{busy==="extend"?"…":pick("اعمال تمدید","Apply renewal")}</button></div>
+      <p className="muted">{pick("اعتبار دوره فعلی تا زمان پایان حجم یا تاریخ بدون تغییر باقی می‌ماند.","The current subscription remains unchanged until quota or expiry ends.")}</p>
+      <div className="modalActions"><button className="ghost" disabled={!!busy} onClick={()=>setModal(null)}>{pick("انصراف","Cancel")}</button><button className="primary" disabled={!!busy||(!extendDays&&!extendTraffic)} onClick={saveExtend}>{busy==="extend"?"…":pick("ثبت تمدید","Queue renewal")}</button></div>
     </Modal>}
-
+    {modal==="history"&&selected&&<Modal title={pick("تاریخچه اشتراک","Subscription history")} sub={`MV-${n(selected.id)}`} onClose={()=>setModal(null)} wide>
+      <Notice error={error} ok={ok}/>
+      {!renewalHistory?<div className="runtime-loading">{pick("در حال دریافت…","Loading…")}</div>:<>
+        {renewalHistory.queued.map(item=><div className="setting-box" key={item.id} style={{marginBottom:10}}>
+          <b>{pick("تمدید در انتظار","Queued renewal")} · {item.plan}</b>
+          <p>{(item.traffic_bytes/GB).toLocaleString("fa-IR")} GB · {item.duration_days.toLocaleString("fa-IR")} {pick("روز","days")}</p>
+          <button type="button" className="ghost" onClick={()=>void act("cancel-renewal",pick("تمدید لغو شد","Renewal canceled"),async()=>{await legacyAdminApi.cancelReservedRenewal(n(selected.id),item.id);setRenewalHistory(await legacyAdminApi.subscriptionHistory(n(selected.id)));})}>{pick("لغو تمدید","Cancel renewal")}</button>
+        </div>)}
+        {renewalHistory.events.length===0?<div className="runtime-empty">{pick("سابقه‌ای ثبت نشده است؛ عملیات قدیمی قابل بازسازی نیستند.","No recorded events; older actions cannot be reconstructed.")}</div>:renewalHistory.events.map(event=><div className="setting-box" key={event.id} style={{marginBottom:10}}>
+          <div className="card-head"><b>{event.type==="renewal_queued"?pick("تمدید ثبت شد","Renewal queued"):event.type==="renewal_activated"?pick("تمدید فعال شد","Renewal activated"):event.type==="renewal_canceled"?pick("تمدید لغو شد","Renewal canceled"):event.type}</b><small>{formatDate(event.created_at)}</small></div>
+          <small>{event.source} · {event.actor}</small>
+          <div style={{marginTop:8,whiteSpace:"pre-wrap",fontSize:12}}>{Object.entries(event.details||{}).filter(([key])=>!key.toLowerCase().includes("password")).map(([key,value])=>`${key}: ${typeof value==="object"?JSON.stringify(value):String(value)}`).join(" · ")}</div>
+        </div>)}
+      </>}
+    </Modal>}
     {modal==="connect"&&selected&&<Modal title={pick("اطلاعات اتصال","Connection information")} sub={`MV-${n(selected.id)}`} onClose={()=>setModal(null)} wide>
       <Notice error={error} ok={ok}/>
       {busy==="connection"?<div className="runtime-loading">…</div>:<>
