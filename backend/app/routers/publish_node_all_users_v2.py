@@ -462,6 +462,11 @@ async def reverify_and_stage_existing_exit_v1(
     job.state = "running"
     job.installed_protocols = int(live["ready_count"])
     job.error_code = "PARTIAL_PROTOCOLS_PENDING" if partial else None
+    # The canonical SessionLocal and request sessions use autoflush=False.
+    # Admission re-queries progress with populate_existing(), so flush the
+    # already-verified stage/count within this SAME transaction first.
+    # No commit or customer publication occurs before admission succeeds.
+    db.flush()
     admitted = False
     try:
         # Reuse the EXACT same fast set-based enrollment as a fresh Exit.
