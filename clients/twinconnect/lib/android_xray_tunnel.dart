@@ -21,6 +21,10 @@ class AndroidXrayTunnel {
   bool _initialized = false;
   bool _connected = false;
   int? _latencyMs;
+  String? _activeNodeId;
+  String? _activeInboundId;
+  String? get activeNodeId => _activeNodeId;
+  String? get activeInboundId => _activeInboundId;
 
   bool get isConnected => _connected;
   int? get latencyMs => _latencyMs;
@@ -70,10 +74,14 @@ class AndroidXrayTunnel {
         throw const FormatException('XRAY_XHTTP_EGRESS_NOT_VERIFIED');
       }
       _latencyMs = verifiedDelay;
+      _activeNodeId = inbound.serverId;
+      _activeInboundId = inbound.id;
       _connected = true;
     } catch (_) {
       _connected = false;
       _latencyMs = null;
+      _activeNodeId = null;
+      _activeInboundId = null;
       try { await _runtime.stopVless(); } catch (_) {}
       rethrow;
     }
@@ -86,6 +94,8 @@ class AndroidXrayTunnel {
     } finally {
       _connected = false;
       _latencyMs = null;
+      _activeNodeId = null;
+      _activeInboundId = null;
       _lastStatus = null;
     }
   }
