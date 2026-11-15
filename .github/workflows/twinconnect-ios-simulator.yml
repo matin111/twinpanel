@@ -90,7 +90,8 @@ jobs:
         run: |
           xcrun swiftc -typecheck -target arm64-apple-ios17.0-simulator \
             -sdk "$(xcrun --sdk iphonesimulator --show-sdk-path)" \
-            ios_native/PacketTunnelProvider.swift
+            ios_native/PacketTunnelProvider.swift \
+            ios_native/TwinConnectWireGuardEngine.swift
       - name: Fetch Flutter packages
         run: flutter pub get
       - name: Check static analysis and Flutter tests
