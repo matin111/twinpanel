@@ -44,4 +44,21 @@ void main() {
       permittedNodeIds: {'1', '2'},
       measuredRtts: {}), isNull);
   });
+  test('panel hint fallback is explicit, scoped and never outranks live RTT', () {
+    expect(FastServerSelection.chooseReportedEstimate(
+      servers: nodes,
+      permittedNodeIds: {'1', '2'}), 0);
+    expect(FastServerSelection.chooseReportedEstimate(
+      servers: nodes,
+      permittedNodeIds: {'2', '3'}), 1);
+    expect(FastServerSelection.chooseReportedEstimate(
+      servers: nodes,
+      permittedNodeIds: {'3'}), isNull);
+    // An actual client measurement is always selected first by callers.
+    expect(FastServerSelection.choose(
+      servers: nodes,
+      permittedNodeIds: {'1', '2'},
+      measuredRtts: {'1': 140, '2': 30}), 1);
+  });
+
 }
