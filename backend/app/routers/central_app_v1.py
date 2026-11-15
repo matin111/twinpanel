@@ -34,6 +34,7 @@ from ..system_release import (
 )
 from .account_delivery import _subscription_from_share_token, _stored_info
 from ..central_app_protocols import protocol_catalog, normalize_protocol
+from ..subscription_renewal_status_v1 import next_reserved_renewal
 
 router = APIRouter(prefix="/v1/central-app", tags=["central-app"])
 _COLOR = re.compile(r"^#[0-9A-Fa-f]{6}$")
@@ -350,6 +351,7 @@ def subscription_app_brand_preview(
     return {
         **brand,
         "account_status": "expired" if expired else status_value,
+        "reserved_renewal": next_reserved_renewal(db, sub.id),
         "vpn_connection_available": False,  # Client engine/session flow not available yet.
     }
 
