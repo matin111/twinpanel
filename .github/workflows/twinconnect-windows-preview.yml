@@ -522,6 +522,44 @@ jobs:
           path: clients/twinconnect/TwinConnect-Windows-x64-Setup.exe
           if-no-files-found: error
           retention-days: 7
+      # Separate portable build for draft PR testing. It contains the original
+      # full Release directory, not a renamed Inno Setup executable. The
+      # installer remains available in CI for audit, but unsigned copies are
+      # not promoted as trusted/public releases.
+      - name: Verify portable build is complete and executable is unsigned in draft
+        if: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $release = 'build/windows/x64/runner/Release'
+          $exe = Join-Path $release 'twinconnect.exe'
+          if (!(Test-Path $exe) -or !(Test-Path 'TwinConnect-Windows-Preview.zip')) {
+            throw 'Portable client missing; refusing artifact publication'
+          }
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $archive = [System.IO.Compression.ZipFile]::OpenRead(
+              (Join-Path (Get-Location) 'TwinConnect-Windows-Preview.zip'))
+          try {
+            foreach ($required in @('twinconnect.exe','flutter_windows.dll','BUILD-SOURCE.txt','README-TEST.txt')) {
+              if (!($archive.Entries | Where-Object { $_.FullName -eq $required })) {
+                throw "Portable ZIP missing $required"
+              }
+            }
+          } finally {
+            $archive.Dispose()
+          }
+          $status = (Get-AuthenticodeSignature -LiteralPath $exe).Status
+          Write-Host "Portable executable Authenticode: $status"
+          if ($status -ne 'Valid') {
+            Write-Warning 'Unsigned internal-only build. Browser/SmartScreen warnings may persist; never bypass security protections.'
+          }
+      - uses: actions/upload-artifact@v4
+        if: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft }}
+        with:
+          name: TwinConnect-Windows-x64-Portable-UNSIGNED-TEST
+          path: clients/twinconnect/TwinConnect-Windows-Preview.zip
+          if-no-files-found: error
+          retention-days: 7
       # Unsigned artifacts are for internal testing only. Never distribute
       # unsigned Windows executables as public GitHub Release assets.
       # A publisher code-signing certificate is mandatory for prereleases.
