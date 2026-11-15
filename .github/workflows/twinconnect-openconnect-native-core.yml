@@ -17,9 +17,10 @@ jobs:
       - name: Checkout TwinPanel
         uses: actions/checkout@v4
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
+      - name: Use runner Android SDK
+        run: |
+          test -n "${ANDROID_HOME}"
+          command -v sdkmanager
       - name: Install Android NDK
         run: sdkmanager --install "ndk;27.2.12479018"
 
