@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import SQLAlchemyError
 
 from ..central_app_credentials import (
     app_delivery_payload, authenticate_app, rotate_app_credentials,
@@ -245,13 +246,19 @@ def session_servers(
     allowed_ids = [node.id for node in nodes]
     ports_by_node: dict[int, dict[str, int]] = {}
     if allowed_ids:
-        endpoints = (
-            db.query(NodeProtocolAppliedEndpoint)
-            .filter(NodeProtocolAppliedEndpoint.node_id.in_(allowed_ids),
-                    NodeProtocolAppliedEndpoint.is_applied.is_(True),
-                    NodeProtocolAppliedEndpoint.applied_confirmed_at.isnot(None))
-            .all()
-        )
+        try:
+            endpoints = (
+                db.query(NodeProtocolAppliedEndpoint)
+                .filter(NodeProtocolAppliedEndpoint.node_id.in_(allowed_ids),
+                        NodeProtocolAppliedEndpoint.is_applied.is_(True),
+                        NodeProtocolAppliedEndpoint.applied_confirmed_at.isnot(None))
+                .all()
+            )
+        except SQLAlchemyError:
+            # Older installations may not yet have the additive metadata
+            # table. Never break the authenticated server inventory.
+            db.rollback()
+            endpoints = []
         for endpoint in endpoints:
             if (endpoint.port is not None and 1 <= endpoint.port <= 65535 and
                     endpoint.protocol in {"cisco", "openvpn", "wireguard",
