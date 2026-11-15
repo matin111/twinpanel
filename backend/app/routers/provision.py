@@ -771,6 +771,9 @@ server 10.92.0.0 255.255.255.0
 push "redirect-gateway def1"
 push "dhcp-option DNS 1.1.1.1"
 push "dhcp-option DNS 1.0.0.1"
+# Multiple client sessions use the same subscription CN. The quota runtime
+# counts sessions individually and disconnects those over the plan limit.
+duplicate-cn
 keepalive 10 60
 persist-key
 persist-tun
