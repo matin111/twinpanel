@@ -9,7 +9,7 @@ void main() {
     expect(dashboard, contains("Key('iosVpnEngineUnavailableNotice')"));
     expect(dashboard, contains("onPressed: !Platform.isWindows || _vpnBusy ? null : _toggleVpn"));
     expect(dashboard, contains("onTap: !Platform.isWindows || _vpnBusy ? null : ()"));
-    expect(native, contains('iOS/macOS have no native VPN bridge yet.'));
+    expect(native, contains('os != VpnPlatform.ios'));
     expect(native, contains('NativeVpnCapabilities.unavailable(os)'));
   });
 
