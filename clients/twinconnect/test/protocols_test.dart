@@ -63,18 +63,62 @@ void main() {
     expect(l2tp.configRecordPresent, false);
   });
 
-  test('unknown, incomplete, and duplicate catalogs fail closed', () {
+  test('restricted Vitory catalog of two protocols is accepted safely', () {
+    final limited = {
+      'schema': 1,
+      'namespace': 'TP0123456789ABCDEF',
+      'protocols': [
+        {
+          'code': 'v2ray', 'selected': true,
+          'config_record_present': true,
+          'client_engine_ready': true,
+        },
+        {
+          'code': 'hysteria2', 'selected': true,
+          'config_record_present': true,
+        },
+      ],
+    };
+    final catalog = PanelProtocolCatalog.fromJson(limited);
+    final selected = catalog.entries.where((p) => p.selected)
+        .map((p) => p.protocol.code).toSet();
+    expect(selected, {'v2ray', 'hysteria2'});
+    expect(catalog.entries.length, 16);
+    expect(catalog.entries.every((p) => !p.clientEngineReady), true);
+    expect(catalog.entries.where((p) =>
+        p.protocol.code == 'cisco' || p.protocol.code == 'wireguard')
+        .every((p) => !p.selected && !p.configRecordPresent), true);
+  });
+
+  test('empty protocol catalog is valid but grants no access', () {
+    final catalog = PanelProtocolCatalog.fromJson({
+      'schema': 1, 'namespace': 'TP0123456789ABCDEF',
+      'protocols': <Map<String, Object>>[],
+    });
+    expect(catalog.entries.length, 16);
+    expect(catalog.entries.every((p) =>
+        !p.selected && !p.configRecordPresent && !p.clientEngineReady), true);
+  });
+
+  test('unknown, duplicate, oversized and malformed catalogs fail closed', () {
     final unknown = _catalog();
     (unknown['protocols'] as List)[0]['code'] = 'unknown';
     expect(() => PanelProtocolCatalog.fromJson(unknown), throwsFormatException);
 
-    final missing = _catalog();
-    (missing['protocols'] as List).removeLast();
-    expect(() => PanelProtocolCatalog.fromJson(missing), throwsFormatException);
-
     final duplicated = _catalog();
     (duplicated['protocols'] as List)[1]['code'] = 'cisco';
     expect(() => PanelProtocolCatalog.fromJson(duplicated), throwsFormatException);
+
+    final oversized = _catalog();
+    (oversized['protocols'] as List).add({
+      'code': 'cisco', 'selected': true,
+      'config_record_present': true,
+    });
+    expect(() => PanelProtocolCatalog.fromJson(oversized), throwsFormatException);
+
+    final malformed = _catalog();
+    (malformed['protocols'] as List)[0] = 'cisco';
+    expect(() => PanelProtocolCatalog.fromJson(malformed), throwsFormatException);
   });
 
   test('native engines must provide a valid complete handshake', () {
