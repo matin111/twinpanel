@@ -404,20 +404,43 @@ public class AxeOpenConnectVpnService extends VpnService {
     private SSLSocket connectProtectedTls(
             SSLSocketFactory factory, String host, int port, String pin)
             throws IOException {
-        java.net.Socket base = new java.net.Socket();
-        try {
-            if (!protect(base)) {
-                throw new IOException("CISCO_SOCKET_PROTECTION_FAILED");
+        // An InetSocketAddress(host, port) attempts only one selected IP.
+        // Some Android networks resolve AAAA before A even when IPv6 is
+        // unreachable. Try all resolved addresses, but *never* retry after
+        // certificate validation fails. Each socket is protected before TCP.
+        final InetAddress[] addresses = InetAddress.getAllByName(host);
+        IOException connectError = null;
+        for (InetAddress address : addresses) {
+            java.net.Socket base = new java.net.Socket();
+            try {
+                if (!protect(base)) {
+                    throw new IOException("CISCO_SOCKET_PROTECTION_FAILED");
+                }
+                base.connect(new java.net.InetSocketAddress(address, port), 6000);
+            } catch (IOException error) {
+                try { base.close(); } catch (IOException ignored) {}
+                // VPN permission errors are not an address-family problem.
+                if ("CISCO_SOCKET_PROTECTION_FAILED".equals(error.getMessage())) {
+                    throw error;
+                }
+                connectError = error;
+                continue;
             }
-            base.connect(new java.net.InetSocketAddress(host, port), 10000);
-            SSLSocket tls = (SSLSocket) factory.createSocket(base, host, port, true);
-            requireVerifiedHost(tls, pin);
-            tls.startHandshake();
-            return tls;
-        } catch (IOException | RuntimeException error) {
-            try { base.close(); } catch (IOException ignored) {}
-            throw error;
+            try {
+                // Preserve original DNS hostname for SNI and TLS validation,
+                // rather than treating the selected IP as the certificate name.
+                SSLSocket tls = (SSLSocket) factory.createSocket(base, host, port, true);
+                tls.setSoTimeout(12000);
+                requireVerifiedHost(tls, pin);
+                tls.startHandshake();
+                return tls;
+            } catch (IOException | RuntimeException error) {
+                try { base.close(); } catch (IOException ignored) {}
+                throw error; // Fail closed on TLS/certificate verification.
+            }
         }
+        if (connectError != null) throw connectError;
+        throw new java.net.UnknownHostException("CISCO_GATEWAY_DNS_EMPTY");
     }
 
     /** Enforce DNS/IP hostname verification for CA-trusted (unpinned) TLS. */
