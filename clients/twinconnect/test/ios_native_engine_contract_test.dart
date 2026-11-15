@@ -17,7 +17,10 @@ void main() {
     expect(swift, contains('"verified": false'));
     expect(native, contains('os != VpnPlatform.ios'));
     expect(provider, contains('NEPacketTunnelProvider'));
-    expect(provider, contains('PACKET_TUNNEL_ENGINE_NOT_INSTALLED'));
+    final wireguard = File('ios_native/TwinConnectWireGuardEngine.swift')
+        .readAsStringSync();
+    expect(provider, contains('IOS_PROTOCOL_ENGINE_NOT_INSTALLED'));
+    expect(wireguard, contains('TwinConnectWireGuardError.engineNotLinked'));
     expect(provider, isNot(contains('setTunnelNetworkSettings(')));
   });
 
