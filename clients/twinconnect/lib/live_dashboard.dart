@@ -200,6 +200,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   bool _modernHealthBusy = false;
   int _modernHealthFailures = 0;
   String? _modernProtocol;
+  String? _ciscoTransportMode;
   String? _modernNodeId;
   final VpnPolicyStore _vpnPolicy = const VpnPolicyStore();
   bool _vpnBusy = false;
@@ -654,6 +655,11 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         }
         if (healthy && _modernProtocol == 'cisco') {
           _modernHealthFailures = 0;
+          final mode = await _ciscoTunnel.transportMode();
+          if (!mounted || !_modernUp || _modernProtocol != 'cisco') return;
+          if (_ciscoTransportMode != mode) {
+            setState(() => _ciscoTransportMode = mode);
+          }
           // A third-party public-IP service may time out while the native
           // OpenConnect child stays alive. Warn, but do not fake a disconnect.
           final reason = _ciscoTunnel.lastHealthError;
@@ -719,6 +725,18 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         const Duration(seconds: 8);
     return (profiles: both[0] as ClientProtocolProfiles,
             baselineIp: fresh ? sample.ip : null);
+  }
+
+  Future<void> _refreshCiscoTransportAfterDelay() async {
+    // DTLS starts after TLS authentication. This is diagnostic only and
+    // never overrides the native connected/egress verification state.
+    await Future<void>.delayed(const Duration(seconds: 6));
+    if (!mounted || !_modernUp || _modernProtocol != 'cisco') return;
+    final mode = await _ciscoTunnel.transportMode();
+    if (mounted && _modernUp && _modernProtocol == 'cisco' &&
+        _ciscoTransportMode != mode) {
+      setState(() => _ciscoTransportMode = mode);
+    }
   }
 
   Future<void> _startCiscoTunnel(String serverId) async {
@@ -804,12 +822,14 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       setState(() {
         _modernUp = true;
         _modernProtocol = 'cisco';
+        _ciscoTransportMode = null;
         _modernNodeId = serverId;
         _publicIp = verifiedIp;
         _vpnError = null;
       });
       _startModernTrafficMonitoring();
       _startModernHealthMonitoring();
+      unawaited(_refreshCiscoTransportAfterDelay());
     } catch (error) {
       if (mounted) {
         setState(() {
@@ -4078,6 +4098,22 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                           ? tr('زمان برقراری TCP اینباند', 'Inbound TCP handshake time')
                           : tr('زمان پاسخ ICMP', 'ICMP round-trip time'),
                     style: TextStyle(fontSize: 10, color: sub)),
+                  if (_modernUp && _modernProtocol == 'cisco') ...[
+                    const SizedBox(height: 5),
+                    Text(
+                      switch (_ciscoTransportMode) {
+                        'dtls_log_established' => tr(
+                            'DTLS/UDP برقرار (گزارش موتور)',
+                            'DTLS/UDP established (engine log)'),
+                        'dtls_log_failed' => tr(
+                            'DTLS/UDP ناموفق؛ احتمال استفاده از TCP',
+                            'DTLS/UDP failed; TCP fallback possible'),
+                        _ => tr('DTLS/UDP تأیید نشده', 'DTLS/UDP unverified'),
+                      },
+                      style: TextStyle(fontSize: 10,
+                          color: _ciscoTransportMode == 'dtls_log_failed'
+                              ? const Color(0xFFFFB878) : sub)),
+                  ],
                 ],
               ),
             )),
