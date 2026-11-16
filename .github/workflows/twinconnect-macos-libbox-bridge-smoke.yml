@@ -51,6 +51,26 @@ jobs:
             mkdir -p "$(dirname "$target")"
             ditto "$source" "$target"
           fi
+          # GitHub artifact archives flatten symbolic links. Restore the
+          # canonical macOS framework bundle links before Xcode embeds it.
+          if test -f "$target/Info.plist"; then
+            for framework in "$target"/*/Libbox.framework; do
+              test -d "$framework/Versions/A" || continue
+              test -s "$framework/Versions/A/Libbox" || exit 1
+              rm -rf "$framework/Versions/Current"
+              ln -s A "$framework/Versions/Current"
+              for entry in Libbox Headers Modules Resources; do
+                if test -e "$framework/Versions/A/$entry"; then
+                  rm -rf "$framework/$entry"
+                  ln -s "Versions/Current/$entry" "$framework/$entry"
+                fi
+              done
+              test -L "$framework/Versions/Current"
+              test -L "$framework/Libbox"
+              test -s "$framework/Libbox"
+              echo "Restored macOS Libbox framework symlinks: $framework"
+            done
+          fi
           if test -f "$target/Info.plist" &&
              plutil -lint "$target/Info.plist"; then
             echo 'ready=true' >> "$GITHUB_OUTPUT"
@@ -108,8 +128,11 @@ jobs:
           tail -20 "$log"
           embedded="$(find macos/build -type d -path '*/PacketTunnel.appex/Contents/Frameworks/Libbox.framework' -print -quit)"
           test -n "$embedded"
-          test -e "$embedded/Libbox"
-          echo "PacketTunnel runtime Libbox embedded: $embedded"
+          test -s "$embedded/Versions/A/Libbox"
+          test -L "$embedded/Libbox"
+          test -s "$embedded/Libbox"
+          file "$embedded/Libbox" | grep -q 'Mach-O'
+          echo "PacketTunnel runtime Libbox embedded with valid symlinks: $embedded"
           echo 'Libbox PlatformInterface and engine compiled; signed live traffic NOT VERIFIED'
       - name: Verify this is not a signed or connected VPN
         shell: bash
