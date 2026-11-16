@@ -261,10 +261,11 @@ async def _queue_main_bot_when_first_credential_ready(
     deadline = asyncio.get_running_loop().time() + EARLY_DELIVERY_TIMEOUT_SECONDS
 
     while asyncio.get_running_loop().time() < deadline:
-        watch_db = SessionLocal()
         try:
-            subscription_id = _try_queue_early_delivery_once(
-                watch_db,
+            # Reading and live-config validation can touch many nodes. Keep
+            # synchronous SQLAlchemy work off the FastAPI event loop.
+            subscription_id = await asyncio.to_thread(
+                _try_queue_early_delivery_with_fresh_session,
                 intent_id=int(intent_id),
                 order_id=int(order_id),
                 user_id=int(user_id),
@@ -284,7 +285,6 @@ async def _queue_main_bot_when_first_credential_ready(
         except asyncio.CancelledError:
             raise
         except Exception as exc:
-            watch_db.rollback()
             print(
                 "main bot early delivery watcher retry:",
                 {
@@ -294,9 +294,6 @@ async def _queue_main_bot_when_first_credential_ready(
                 },
                 flush=True,
             )
-        finally:
-            watch_db.close()
-
         await asyncio.sleep(EARLY_DELIVERY_POLL_SECONDS)
 
 
