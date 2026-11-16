@@ -585,23 +585,6 @@ async def _provision_new_singbox_node_batches(
                     )
                 items_by_protocol[p].append(item)
 
-            # PAYMENT_FIRST_VALID_CONFIG_COMMIT_V1: make one fully generated
-            # batch immediately visible to the independent Telegram delivery
-            # watcher, rather than holding all credentials uncommitted while
-            # slower nodes continue. Only the fresh-account fast path opts in.
-            # Do not publish empty/failed credentials or change node configs.
-            if publish_first_credential and not first_batch_published:
-                for p in ready:
-                    items = items_by_protocol[p]
-                    if not items:
-                        continue
-                    cred = credentials[p]
-                    cred.username = _credential_identity(p, secrets[p])
-                    cred.secret_encrypted = ad._enc(secret_to_dict(secrets[p]))
-                    cred.config_text_encrypted = ad._enc(items)
-                    cred.is_active = True
-                db.commit()
-                first_batch_published = True
         except asyncio.TimeoutError:
             for p in ready:
                 errors.append({
@@ -614,6 +597,24 @@ async def _provision_new_singbox_node_batches(
                     "protocol": p, "node": str(node.name),
                     "error": f"Sing-box node batch failed: {str(exc)[:700]}",
                 })
+        else:
+        # PAYMENT_FIRST_VALID_CONFIG_COMMIT_V1: make one fully generated
+        # batch immediately visible to the independent Telegram delivery
+        # watcher, rather than holding all credentials uncommitted while
+        # slower nodes continue. Only the fresh-account fast path opts in.
+        # Do not publish empty/failed credentials or change node configs.
+        if publish_first_credential and not first_batch_published:
+            for p in ready:
+                items = items_by_protocol[p]
+                if not items:
+                    continue
+                cred = credentials[p]
+                cred.username = _credential_identity(p, secrets[p])
+                cred.secret_encrypted = ad._enc(secret_to_dict(secrets[p]))
+                cred.config_text_encrypted = ad._enc(items)
+                cred.is_active = True
+            db.commit()
+            first_batch_published = True
 
     for p, items in items_by_protocol.items():
         if not items:
