@@ -3,7 +3,7 @@
 # Resolve the concrete macOS framework slice: passing only the XCFramework
 # parent folder to -F does not make its embedded Swift/Clang module visible.
 require 'xcodeproj'
-require 'plist'
+require 'xcodeproj/plist'
 root = File.expand_path('../..', __dir__)
 project_file = File.join(root, 'macos/Runner.xcodeproj')
 xcframework = File.join(root, 'macos_native/build/libbox/Libbox.xcframework')
@@ -11,7 +11,7 @@ plist_file = File.join(xcframework, 'Info.plist')
 raise 'Generated macOS Xcode project missing' unless File.directory?(project_file)
 raise 'Built Libbox XCFramework missing' unless File.file?(plist_file)
 
-metadata = Plist.parse_xml(plist_file)
+metadata = Xcodeproj::Plist.read_from_path(plist_file)
 libraries = metadata.fetch('AvailableLibraries')
 arm64 = libraries.find do |library|
   library['SupportedPlatform'] == 'macos' &&
