@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.854",
+  "version": "1.1.0-rc.855",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-16T05:47:02Z",
+  "released_at": "2026-11-16T06:02:27Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "e71b884e1eb80d06d1b99e7bf806317b0fa99ac9",
+  "source_sha": "f27749e8384a872f190da5c4cd29399b9605e01f",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.854/twinpanel-1.1.0-rc.854-linux-x86_64.tar.gz",
-    "sha256": "658484a573303770bab8358849c0826647b91e7c47b7ad5757b80bae86693f2d",
-    "size_bytes": 30958194
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.855/twinpanel-1.1.0-rc.855-linux-x86_64.tar.gz",
+    "sha256": "17fbb618471ab41bfe178b3588898ad4b13f89353aa994ac1ac28e7670350cf7",
+    "size_bytes": 30914551
   },
   "notes": {
-    "fa": "اصلاح عنوان «ثبت هش تراکنش (TXID)» در پرداخت‌های رمزارزی ربات، راهنمای پیدا کردن هش در کیف پول و حفظ پرداخت تمدید از کیف پول.",
-    "en": "Clarify Telegram crypto transaction hash (TXID) button and wallet instructions for new purchases and renewals; preserve wallet-based renewal checkout."
+    "fa": "اصلاح اعتبارسنجی TLS در Hysteria2 و TUIC و AnyTLS با گواهی CA معتبر و ترمیم خودکار کانفیگ‌های قدیمی بدون حذف اشتراک‌ها.",
+    "en": "Fix trusted CA TLS delivery for Hysteria2, TUIC and AnyTLS and reconcile legacy insecure profiles without deleting subscriptions."
   }
 }
