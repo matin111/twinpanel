@@ -85,7 +85,7 @@ void main() {
         .readAsStringSync();
     expect(bridge, contains('case "getHysteria2TunnelStatus":'));
     expect(bridge, contains('TwinConnectMacOSLibboxControl.status(result)'));
-    expect(host, contains('static func status(_ result: @escaping FlutterResult)'));
+    expect(host, contains('static func status(_ result: @escaping FlutterResult, protocolCode: String = "hysteria2")'));
     expect(host, contains('os_connected_unverified'));
     expect(host, contains('"peerHandshakeVerified": false'));
     expect(host, contains('"verified": false'));
