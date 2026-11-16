@@ -5,6 +5,7 @@ from html import escape
 from aiogram import F, Router
 
 from .telegram_navigation_v1 import show_navigation_page, acknowledge_navigation
+from .telegram_checkout_copy_v1 import (choose_payment_text, method_label, payment_detail_text, proof_prompt, proof_success, wallet_preview_text, wallet_success_text)
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import (
@@ -370,7 +371,7 @@ def payment_methods_keyboard(
 
         rows.append([
             InlineKeyboardButton(
-                text=f"💳 {title}",
+                text=method_label(method),
                 callback_data=(
                     f"shop:pay:"
                     f"{order_id}:"
@@ -916,8 +917,7 @@ def create_purchase_router(
         await callback.answer()
 
         await callback.message.edit_text(
-            "💳 <b>انتخاب روش پرداخت</b>\n\n"
-            "روش پرداخت را انتخاب کنید:",
+            choose_payment_text(),
             reply_markup=(
                 payment_methods_keyboard(
                     order_id,
@@ -1060,7 +1060,7 @@ def create_purchase_router(
         buttons = []
         if sufficient:
             buttons.append([InlineKeyboardButton(
-                text="✅ تأیید و پرداخت از کیف پول",
+                text="✅ تأیید پرداخت از کیف پول",
                 callback_data=f"shop:wallet:confirm:{order_id}",
             )])
         else:
@@ -1069,17 +1069,11 @@ def create_purchase_router(
                 callback_data="wallet:topup",
             )])
         buttons.append([InlineKeyboardButton(
-            text="⬅️ بازگشت به روش‌های پرداخت",
+            text="⬅️ روش‌های پرداخت",
             callback_data=f"shop:wallet:back:{order_id}",
         )])
         await callback.message.edit_text(
-            "💰 <b>پرداخت از کیف پول</b>\n\n"
-            f"🧾 سفارش: <b>#{order_id}</b>\n"
-            f"💳 موجودی: <b>{money(balance)} تومان</b>\n"
-            f"🛒 مبلغ نهایی: <b>{money(amount)} تومان</b>\n"
-            f"💵 مانده پس از خرید: <b>{money(max(0, balance-amount))} تومان</b>\n\n"
-            + ("برای کسر مبلغ و ساخت اکانت تأیید کنید."
-               if sufficient else "❌ موجودی کافی نیست؛ کیف پول را شارژ کنید."),
+            wallet_preview_text(order_id, amount, balance),
             reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons),
         )
 
@@ -1097,7 +1091,7 @@ def create_purchase_router(
             return
         await callback.answer()
         await callback.message.edit_text(
-            "💳 <b>انتخاب روش پرداخت</b>\n\nروش پرداخت را انتخاب کنید:",
+            choose_payment_text(),
             reply_markup=payment_methods_keyboard(order_id, methods),
         )
 
@@ -1117,19 +1111,7 @@ def create_purchase_router(
             return
         await callback.answer()
         order = result.get("order") or {}
-        if order.get("status") == "fulfilled":
-            description = (
-                "✅ <b>پرداخت با کیف پول موفق بود</b>\n\n"
-                f"🧾 سفارش: <b>#{order_id}</b>\n"
-                f"💰 مبلغ از کیف پول کسر شد.\n"
-                "🎉 اکانت ساخته شد؛ از بخش اشتراک‌های من دریافت کنید."
-            )
-        else:
-            description = (
-                "✅ <b>پرداخت ثبت شد</b>\n\n"
-                f"🧾 سفارش: <b>#{order_id}</b>\n"
-                "ساخت اکانت در حال تکمیل است. مبلغ دوباره کسر نمی‌شود."
-            )
+        description = wallet_success_text(order_id, fulfilled=order.get("status") == "fulfilled")
         await callback.message.edit_text(
             description,
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
@@ -1188,44 +1170,7 @@ def create_purchase_router(
 
         await callback.answer()
 
-        title = escape(
-            str(
-                method.get("title")
-                or method_id
-            )
-        )
-
-        text = (
-            f"💳 <b>{title}</b>\n\n"
-            f"مبلغ قابل پرداخت:\n"
-            f"<b>{money(intent.get('payable_amount_toman'))} تومان</b>\n"
-        )
-
-        if method_id == "card_to_card":
-            text += (
-                "\n💳 شماره کارت:\n"
-                f"<code>{escape(str(method.get('card_number') or '-'))}</code>\n"
-                f"👤 به نام: "
-                f"<b>{escape(str(method.get('card_holder') or '-'))}</b>\n"
-                "\nپس از واریز، فقط رسید پرداخت را ارسال کنید."
-            )
-        else:
-            text += (
-                "\n💰 آدرس کیف پول:\n"
-                f"<code>{escape(str(method.get('address') or '-'))}</code>\n"
-            )
-
-            if intent.get(
-                "crypto_amount_usdt"
-            ):
-                text += (
-                    "مقدار USDT:\n"
-                    f"<b>{escape(str(intent.get('crypto_amount_usdt')))} USDT</b>\n"
-                )
-
-            text += (
-                "\nپس از انتقال، هش تراکنش (TXID) را از تاریخچه کیف پول خود کپی کنید و روی دکمه «ثبت هش تراکنش (TXID)» بزنید.\nTXID با آدرس کیف پول و شماره سفارش متفاوت است."
-            )
+        text = payment_detail_text(method_id, method, intent)
 
         await callback.message.edit_text(
             text,
@@ -1273,10 +1218,7 @@ def create_purchase_router(
             )
 
             await callback.message.answer(
-                "📷 <b>رسید پرداخت را ارسال کنید.</b>\n\n"
-                "نیازی به کد پیگیری، شماره کارت مبدا، "
-                "تاریخ یا ساعت واریز نیست.\n\n"
-                "عکس، فایل تصویری یا PDF قابل قبول است."
+                proof_prompt(method_id)
             )
             return
 
@@ -1285,8 +1227,7 @@ def create_purchase_router(
         )
 
         await callback.message.answer(
-            "🔗 هش تراکنش (TXID) را از تاریخچه انتقال کیف پول خود کپی کرده و ارسال کنید. "
-            "آدرس کیف پول یا شماره سفارش را نفرستید."
+            proof_prompt(method_id)
         )
 
     @router.message(
@@ -1352,10 +1293,7 @@ def create_purchase_router(
         )
 
         await message.answer(
-            "✅ <b>اطلاعات پرداخت ثبت شد</b>\n\n"
-            f"وضعیت: <b>{status}</b>\n\n"
-            "پس از تأیید پرداخت، اکانت "
-            "به‌صورت خودکار ساخته می‌شود."
+            proof_success(status)
         )
 
     @router.message(
@@ -1450,11 +1388,7 @@ def create_purchase_router(
         await state.clear()
 
         await message.answer(
-            "✅ <b>رسید پرداخت ثبت شد</b>\n\n"
-            "وضعیت: <b>در انتظار بررسی</b>\n\n"
-            "پس از تأیید مدیر، اکانت "
-            "به‌صورت خودکار ساخته می‌شود و "
-            "اطلاعات اتصال برای شما ارسال خواهد شد."
+            proof_success("در انتظار بررسی", receipt=True)
         )
 
     return router

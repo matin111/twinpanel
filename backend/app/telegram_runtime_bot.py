@@ -23,6 +23,7 @@ from aiogram.types import (
 )
 
 from .telegram_navigation_v1 import show_navigation_page, acknowledge_navigation
+from .telegram_checkout_copy_v1 import (choose_payment_text, method_label, payment_detail_text, proof_prompt, proof_success, wallet_preview_text, wallet_success_text)
 from .routers.telegram_manager import load_bot_token
 from .telegram_legacy_contacts_v1 import acknowledge_legacy_start
 from .telegram_learning_center import register_learning_handlers
@@ -593,7 +594,7 @@ def renewal_payment_methods_keyboard(
 
         rows.append([
             InlineKeyboardButton(
-                text=f"💳 {title}",
+                text=method_label(method),
                 callback_data=(
                     f"renewpay:"
                     f"{order_id}:"
@@ -1835,7 +1836,7 @@ async def subscription_renew_plan(callback: CallbackQuery):
         f"🔄 <b>تمدید اشتراک #{sub_id}</b>\n\n"
         f"📦 پلن انتخابی: <b>{escape(str(plan.get('name') or '-'))}</b>\n"
         f"💳 مبلغ: <b>{_fmt_money(plan.get('price_toman'))} تومان</b>\n\n"
-        "پس از پرداخت، حجم و اعتبار همین اکانت افزایش می‌یابد. "
+        "پس از پرداخت، تمدید برای دوره بعد رزرو می‌شود. "
         "نام کاربری، رمز، دستگاه‌های مجاز و پروتکل‌های موجود تغییر نمی‌کنند.",
         reply_markup=renewal_confirm_keyboard(sub_id, plan_id, nonce),
     )
@@ -1887,10 +1888,7 @@ async def renewal_create_order(callback: CallbackQuery):
     await callback.answer()
     await show_navigation_page(
         callback.message,
-        "✅ <b>سفارش تمدید ساخته شد</b>\n\n"
-        f"شماره سفارش: <b>#{order.get('id')}</b>\n"
-        f"مبلغ: <b>{_fmt_money(order.get('amount_toman'))} تومان</b>\n\n"
-        "روش پرداخت را انتخاب کنید:",
+        choose_payment_text(order.get("id"), order.get("amount_toman"), renewal=True),
         reply_markup=renewal_payment_methods_keyboard(int(order["id"]), methods),
     )
 
@@ -1921,23 +1919,16 @@ async def renewal_wallet_preview(callback: CallbackQuery):
             raise RuntimeError("مبلغ سفارش معتبر نیست")
         sufficient = balance >= amount
         keyboard = [[InlineKeyboardButton(
-            text="✅ تأیید و پرداخت تمدید از کیف پول" if sufficient
+            text="✅ تأیید پرداخت از کیف پول" if sufficient
                  else "➕ افزایش موجودی کیف پول",
             callback_data=f"renewwallet:confirm:{order_id}" if sufficient
                           else "wallet:topup",
         )], [InlineKeyboardButton(
-            text="⬅️ روش‌های پرداخت تمدید",
+            text="⬅️ روش‌های پرداخت",
             callback_data=f"renewwallet:back:{order_id}",
         )]]
         await callback.message.edit_text(
-            "💰 <b>پرداخت تمدید از کیف پول</b>\n\n"
-            f"🧾 سفارش: <b>#{order_id}</b>\n"
-            f"مبلغ تمدید: <b>{_fmt_money(amount)} تومان</b>\n"
-            f"موجودی کیف پول: <b>{_fmt_money(balance)} تومان</b>\n"
-            + (f"مانده پس از پرداخت: <b>{_fmt_money(balance-amount)} تومان</b>\n\n"
-               "با تأیید، مبلغ فقط یک‌بار کسر و تمدید برای دوره بعد رزرو می‌شود."
-               if sufficient else
-               "\nموجودی کافی نیست؛ ابتدا کیف پول را شارژ کنید."),
+            wallet_preview_text(order_id, amount, balance, renewal=True),
             reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard),
         )
     except Exception as exc:
@@ -1960,7 +1951,7 @@ async def renewal_wallet_back(callback: CallbackQuery):
         if not order or order.get("status") != "pending_payment":
             raise RuntimeError("سفارش قابل پرداخت پیدا نشد")
         await callback.message.edit_text(
-            "💳 <b>انتخاب روش پرداخت تمدید</b>",
+            choose_payment_text(renewal=True),
             reply_markup=renewal_payment_methods_keyboard(
                 order_id, method_data.get("methods") or [],
             ),
@@ -1988,12 +1979,7 @@ async def renewal_wallet_confirm(callback: CallbackQuery):
         if state not in {"paid", "provisioning", "provision_failed", "fulfilled"}:
             raise RuntimeError("پرداخت ثبت شد ولی وضعیت سفارش نیاز به بررسی دارد")
         await callback.message.edit_text(
-            "✅ <b>پرداخت تمدید از کیف پول ثبت شد</b>\n\n"
-            f"🧾 شماره سفارش: <b>#{order_id}</b>\n"
-            "💰 مبلغ فقط یک‌بار از کیف پول کسر می‌شود.\n"
-            "🕒 تمدید برای دوره بعد رزرو می‌شود؛ اعتبار و پلن فعلی"
-            " تا پایان تاریخ یا حجم بدون تغییر می‌ماند.\n"
-            "در بخش اشتراک‌های من می‌توانید وضعیت تمدید را ببینید.",
+            wallet_success_text(order_id, renewal=True, fulfilled=state == "fulfilled"),
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                 [InlineKeyboardButton(
                     text="📦 اشتراک‌های من", callback_data="subs:list",
@@ -2069,46 +2055,7 @@ async def renewal_payment_method(
 
     await callback.answer()
 
-    title = escape(
-        str(
-            method.get("title")
-            or method_id
-        )
-    )
-
-    text = (
-        f"💳 <b>{title}</b>\n\n"
-        f"مبلغ قابل پرداخت: "
-        f"<b>{_fmt_money(intent.get('payable_amount_toman'))} تومان</b>\n"
-    )
-
-    if method_id == "card_to_card":
-
-        text += (
-            "\nشماره کارت:\n"
-            f"<code>{escape(str(method.get('card_number') or '-'))}</code>\n"
-            f"به نام: "
-            f"<b>{escape(str(method.get('card_holder') or '-'))}</b>\n"
-        )
-
-    else:
-
-        text += (
-            "\nآدرس کیف پول:\n"
-            f"<code>{escape(str(method.get('address') or '-'))}</code>\n"
-        )
-
-        if intent.get(
-            "crypto_amount_usdt"
-        ):
-            text += (
-                "مقدار USDT: "
-                f"<b>{escape(str(intent.get('crypto_amount_usdt')))}</b>\n"
-            )
-
-    text += (
-        "\nپس از انتقال وجه، دکمه زیر را بزنید."
-    )
+    text = payment_detail_text(method_id, method, intent, renewal=True)
 
     await callback.message.edit_text(
         text,
@@ -2156,14 +2103,12 @@ async def renewal_proof_start(
     if method == "card_to_card":
         await state.set_state(RenewalPaymentState.receipt)
         await callback.message.answer(
-            "📷 <b>رسید پرداخت تمدید را ارسال کنید.</b>\n\n"
-            "عکس یا فایل تصویری/PDF قابل قبول است؛ "
-            "کد پیگیری و مشخصات کارت لازم نیست."
+            proof_prompt(method, renewal=True)
         )
     else:
         await state.set_state(RenewalPaymentState.proof)
         await callback.message.answer(
-            "🔗 هش تراکنش (TXID) را از بخش تاریخچه انتقال کیف پول خود کپی کرده و همین‌جا ارسال کنید.\nTXID همان شناسه تراکنش است، نه آدرس کیف پول یا شماره سفارش."
+            proof_prompt(method, renewal=True)
         )
 
 
@@ -2214,11 +2159,7 @@ async def renewal_proof_submit(
     await state.clear()
 
     await message.answer(
-        "✅ <b>اطلاعات پرداخت ثبت شد</b>\n\n"
-        "پس از تأیید پرداخت، همان اشتراک "
-        "به‌صورت خودکار تمدید می‌شود.\n\n"
-        f"وضعیت پرداخت: "
-        f"<b>{escape(str(result.get('status') or 'ثبت شده'))}</b>",
+        proof_success(result.get("status") or "ثبت شده", renewal=True),
         reply_markup=main_keyboard(),
     )
 
@@ -2286,9 +2227,7 @@ async def renewal_receipt_submit(message: Message, state: FSMContext):
         )
         return
     await message.answer(
-        "✅ <b>رسید تمدید ثبت شد</b>\n\n"
-        "وضعیت: <b>در انتظار بررسی</b>\n"
-        "پس از تأیید پرداخت، همین اشتراک تمدید می‌شود.",
+        proof_success("در انتظار بررسی", renewal=True, receipt=True),
         reply_markup=main_keyboard(),
     )
 
