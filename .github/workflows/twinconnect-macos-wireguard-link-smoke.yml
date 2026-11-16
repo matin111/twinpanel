@@ -54,6 +54,14 @@ jobs:
           assert '.macOS(.v12)' in s and '.iOS(.v15)' in s
           p.write_text(s.replace('// swift-tools-version:5.3',
                                  '// swift-tools-version:5.5', 1))
+          # Xcode 16's Clang modules now require explicit Darwin integer types.
+          # Only patch the temporary pinned upstream checkout for CI.
+          header = Path('macos_native/vendor-wireguard-apple/Sources/WireGuardKitC/WireGuardKitC.h')
+          h = header.read_text()
+          assert '#include "key.h"' in h
+          assert '#include <sys/types.h>' not in h
+          header.write_text(h.replace('#include "key.h"',
+                                     '#include <sys/types.h>\\n#include "key.h"', 1))
           PY
       - name: Generate unsigned Mac project and native Packet Tunnel
         run: |
