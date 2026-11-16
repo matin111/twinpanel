@@ -79,9 +79,69 @@ enum TwinConnectMacOSLibboxControl {
         return true
     }
 
-    private static func allowedConfig(_ text: String, protocolCode: String) -> Bool {
+    private static func allowedSnellConfig(_ text: String) -> Bool {
+        guard (64...131072).contains(text.utf8.count),
+              let data = text.data(using: .utf8),
+              let raw = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+              let outbounds = raw["outbounds"] as? [[String: Any]],
+              outbounds.count == 1,
+              let outbound = outbounds.first,
+              outbound["type"] as? String == "snell",
+              outbound["tag"] as? String == "proxy",
+              let version = outbound["version"] as? Int,
+              [4, 6].contains(version),
+              let psk = outbound["psk"] as? String,
+              !psk.isEmpty, psk.utf8.count <= 4096,
+              (version != 6 || (12...255).contains(psk.utf8.count)),
+              let endpoint = outbound["server"] as? String,
+              !endpoint.isEmpty, endpoint.count <= 255,
+              let port = outbound["server_port"] as? Int,
+              (1...65535).contains(port),
+              Set(outbound.keys).isSubset(of: [
+                  "type", "tag", "server", "server_port", "version",
+                  "psk", "userkey", "reuse", "network", "obfs_mode",
+                  "obfs_host", "mode"
+              ]),
+              (outbound["userkey"] == nil || (outbound["userkey"] as? String)
+                  .map { $0.utf8.count <= 255 } == true),
+              (outbound["reuse"] == nil || outbound["reuse"] is Bool),
+              (outbound["network"] == nil ||
+                  ["tcp", "udp"].contains(outbound["network"] as? String ?? "")),
+              (version != 4 || (outbound["mode"] == nil &&
+                  (outbound["obfs_mode"] == nil ||
+                   ["none", "http"].contains(outbound["obfs_mode"] as? String ?? "")))),
+              (version != 6 || (outbound["obfs_mode"] == nil &&
+                  outbound["obfs_host"] == nil &&
+                  (outbound["mode"] == nil ||
+                   ["default", "unshaped"].contains(outbound["mode"] as? String ?? "")))),
+              let inbounds = raw["inbounds"] as? [[String: Any]],
+              inbounds.count == 1,
+              inbounds[0]["type"] as? String == "tun",
+              inbounds[0]["strict_route"] as? Bool == true,
+              inbounds[0]["auto_route"] as? Bool == true,
+              inbounds[0]["dns_mode"] as? String == "hijack",
+              let route = raw["route"] as? [String: Any],
+              route["final"] as? String == "proxy",
+              let rules = route["rules"] as? [[String: Any]],
+              rules.count == 2,
+              rules[0]["port"] as? Int == 53,
+              rules[0]["action"] as? String == "hijack-dns",
+              rules[1]["ip_version"] as? Int == 6,
+              rules[1]["action"] as? String == "reject",
+              let dns = raw["dns"] as? [String: Any],
+              dns["final"] as? String == "dns-remote",
+              let servers = dns["servers"] as? [[String: Any]],
+              servers.count == 2,
+              servers[0]["type"] as? String == "local",
+              servers[1]["detour"] as? String == "proxy"
+        else { return false }
+        return true
+    }
+
+    private static func allowedConfig(_ text: String, protocolCode: String) -> Bool {        if protocolCode == "snell" { return allowedSnellConfig(text) }
+
         if protocolCode == "shadowtls" { return allowedShadowTlsConfig(text) }
-        guard ["hysteria2", "tuic", "anytls", "naive", "shadowtls"].contains(protocolCode) else { return false }
+        guard ["hysteria2", "tuic", "anytls", "naive", "shadowtls", "snell"].contains(protocolCode) else { return false }
         guard (64...131072).contains(text.utf8.count),
               let data = text.data(using: .utf8),
               let raw = (try? JSONSerialization.jsonObject(with: data))
@@ -228,7 +288,8 @@ enum TwinConnectMacOSLibboxControl {
         let errorPrefix = protocolCode == "tuic" ? "MACOS_TUIC" :
             (protocolCode == "anytls" ? "MACOS_ANYTLS" :
              (protocolCode == "naive" ? "MACOS_NAIVE" :
-             (protocolCode == "shadowtls" ? "MACOS_SHADOWTLS" : "MACOS_HYSTERIA2")))
+             (protocolCode == "shadowtls" ? "MACOS_SHADOWTLS" :
+             (protocolCode == "snell" ? "MACOS_SNELL" : "MACOS_HYSTERIA2"))))
         guard backendLinked else {
             result(failure(errorPrefix + "_PACKET_FLOW_BRIDGE_MISSING"))
             return
