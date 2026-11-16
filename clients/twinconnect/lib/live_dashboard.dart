@@ -55,6 +55,7 @@ import 'account_snapshot.dart';
 import 'native_vpn_bridge.dart';
 import 'ios_wireguard_controller.dart';
 import 'macos_wireguard_controller.dart';
+import 'macos_hysteria2_controller.dart';
 import 'country_flag.dart';
 import 'ambient_background.dart';
 import 'interactive_glass_card.dart';
@@ -121,6 +122,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   final WindowsWireGuardController _vpn = const WindowsWireGuardController();
   final IosWireGuardController _iosVpn = const IosWireGuardController();
   final MacWireGuardController _macVpn = const MacWireGuardController();
+  final MacHysteria2Controller _macHysteria = const MacHysteria2Controller();
   final WindowsAmneziaWgController _awg = const WindowsAmneziaWgController();
   late final WindowsSingBoxTunnel _modernTunnel = WindowsSingBoxTunnel(
     onUnexpectedExit: () {
@@ -2750,6 +2752,55 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         return;
       }
       final protocol = _filter == 'all' ? 'wireguard' : _filter;
+      if (protocol == 'hysteria2') {
+        final entitled = widget.catalog?.entries.any((entry) =>
+            entry.protocol.code == protocol && entry.selected &&
+            entry.configRecordPresent) ?? false;
+        if (!entitled) {
+          throw const FormatException('PROTOCOL_NOT_INCLUDED_IN_SUBSCRIPTION');
+        }
+        final serverId = _selectedServerId;
+        if (serverId == null ||
+            widget.servers?.servers.any((server) => server.id == serverId)
+                != true) {
+          throw const FormatException('SELECT_HYSTERIA2_SERVER');
+        }
+        final installed = await _macHysteria.installation();
+        if (installed['engineReady'] != true ||
+            installed['packetFlowBridgeReady'] != true ||
+            installed['inProcessLibboxBundled'] != true) {
+          throw const FormatException('MACOS_HYSTERIA2_PACKET_FLOW_BRIDGE_MISSING');
+        }
+        final definition = VpnProtocols.byCode('hysteria2');
+        if (definition == null) {
+          throw const FormatException('HYSTERIA2_PROTOCOL_UNAVAILABLE');
+        }
+        final response = await TenantApi.fromBuildConfig()
+            .loadSessionNativeProfiles(
+          panel: widget.panel,
+          sessionToken: widget.sessionToken,
+          protocol: definition,
+          native: const NativeProtocolReadiness(
+              supportedCodes: {'hysteria2'}),
+        );
+        final matches = response.items.where(
+          (item) => item['node_id']?.toString() == serverId,
+        ).toList(growable: false);
+        if (matches.length != 1) {
+          throw const FormatException('HYSTERIA2_SERVER_PROFILE_MISSING');
+        }
+        await _macHysteria.start(
+          profile: matches.single,
+          namespace: widget.panel.namespace,
+          account: widget.username,
+        );
+        if (mounted) setState(() {
+          _vpnUp = false;
+          _vpnVerified = false;
+          _activeNodeId = serverId;
+        });
+        return;
+      }
       if (protocol != 'wireguard') {
         throw const FormatException('MACOS_PROTOCOL_ENGINE_NOT_READY');
       }
