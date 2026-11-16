@@ -14,7 +14,7 @@ enum TwinConnectMacOSLibboxControl {
     }
 
     private static func allowedConfig(_ text: String, protocolCode: String) -> Bool {
-        guard ["hysteria2", "tuic"].contains(protocolCode) else { return false }
+        guard ["hysteria2", "tuic", "anytls"].contains(protocolCode) else { return false }
         guard (64...131072).contains(text.utf8.count),
               let data = text.data(using: .utf8),
               let raw = (try? JSONSerialization.jsonObject(with: data))
@@ -32,6 +32,18 @@ enum TwinConnectMacOSLibboxControl {
                 } == true && outbound["zero_rtt_handshake"] as? Bool == false
               )),
               let tls = outbound["tls"] as? [String: Any],
+              (protocolCode != "anytls" || (
+                (outbound["min_idle_session"] == nil ||
+                    ((outbound["min_idle_session"] as? Int)
+                        .map { (0...512).contains($0) } == true)) &&
+                ["idle_session_check_interval", "idle_session_timeout"].allSatisfy { key in
+                    guard let value = outbound[key] else { return true }
+                    guard let seconds = value as? String else { return false }
+                    return seconds.range(
+                        of: "^[1-9][0-9]{0,3}(s|m)$",
+                        options: .regularExpression) != nil
+                }
+              )),
               tls["enabled"] as? Bool == true,
               tls["insecure"] == nil,
               let inbounds = raw["inbounds"] as? [[String: Any]],
@@ -127,11 +139,12 @@ enum TwinConnectMacOSLibboxControl {
     static func start(_ args: Any?, backendLinked: Bool,
                       protocolCode: String = "hysteria2",
                       result: @escaping FlutterResult) {
-        guard ["hysteria2", "tuic"].contains(protocolCode) else {
+        guard ["hysteria2", "tuic", "anytls"].contains(protocolCode) else {
             result(failure("MACOS_PROTOCOL_NOT_SUPPORTED"))
             return
         }
-        let errorPrefix = protocolCode == "tuic" ? "MACOS_TUIC" : "MACOS_HYSTERIA2"
+        let errorPrefix = protocolCode == "tuic" ? "MACOS_TUIC" :
+            (protocolCode == "anytls" ? "MACOS_ANYTLS" : "MACOS_HYSTERIA2")
         guard backendLinked else {
             result(failure(errorPrefix + "_PACKET_FLOW_BRIDGE_MISSING"))
             return
