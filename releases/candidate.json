@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.857",
-  "source_sha": "96de267d9409ff093964a08bad00a8179f1a5edc",
+  "version": "1.1.0-rc.858",
+  "source_sha": "e3d6ad6b4b39b68b40a865bcd92d21e03ceed620",
   "notes": {
-    "fa": "فعال‌سازی ترمیم خودکار کانفیگ‌های قدیمی Hysteria2، TUIC و AnyTLS در سرویس مستقل بدون تغییر اطلاعات اشتراک‌ها.",
-    "en": "Activate background repair of legacy Hysteria2 TUIC AnyTLS TLS credentials in external worker without rotating account identities."
+    "fa": "اضافه‌شدن انتخاب پلن در تمدید دستی پنل، با حالت پلن آماده یا حجم و مدت دلخواه و نام مستقل تمدید؛ بدون تغییر سهمیه و اطلاعات اکانت فعلی تا زمان فعال‌سازی.",
+    "en": "Add plan selector or custom quota/duration for admin reserved renewals, with proper labels and deferred cutover; preserve existing account and settings."
   }
 }
