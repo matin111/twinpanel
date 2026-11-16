@@ -76,6 +76,11 @@ with zipfile.ZipFile(src) as source, zipfile.ZipFile(dst, "w") as target:
     for item in source.infolist():
         data = source.read(item.filename)
         name = item.filename
+        # GoBackend uses libawg-go.so. The upstream AAR also contains
+        # libwg-quick.so for the unused WgQuickBackend; stock WireGuard
+        # already supplies that exact JNI name. Never bundle two copies.
+        if name.startswith("jni/") and name.endswith("/libwg-quick.so"):
+            continue
         if name.startswith("jni/") and name.endswith("/libwg-go.so"):
             name = name[:-len("libwg-go.so")] + "libawg-go.so"
         target.writestr(name, data)
@@ -83,6 +88,7 @@ with zipfile.ZipFile(dst) as staged:
     names = staged.namelist()
     assert any(n.endswith("/libawg-go.so") for n in names)
     assert not any(n.endswith("/libwg-go.so") for n in names)
+    assert not any(n.endswith("/libwg-quick.so") for n in names)
 print("AWG native loader isolated from stock WireGuard JNI name")
 PY
 echo "Staged collision-free AWG AAR: $OUT/tunnel-release.aar"
