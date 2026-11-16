@@ -146,6 +146,17 @@ class DeferredRenewalTest(unittest.TestCase):
         self.assertEqual(sub.traffic_used_bytes, 10 * 1024**3)
         self.assertEqual(sub.plan_id, 5)
 
+    def test_existing_plan_renewal_does_not_require_active_catalog_listing(self):
+        sub = self.subscription()
+        db = ReservationDB(sub, None)
+        item = service.reserve_renewal(
+            db, subscription_id=22, plan_id=5, plan_name="archived current",
+            traffic_bytes=10 * 1024**3, duration_days=30,
+            source="admin", reference="same-plan-archived", actor="admin:1")
+        self.assertEqual(item.status, "queued")
+        self.assertEqual(item.plan_id, 5)
+        self.assertEqual(sub.plan_id, 5)
+
     def test_days_only_renewal_retains_quota_instead_of_unlimited(self):
         sub = self.subscription()
         db = ReservationDB(sub, SimpleNamespace(duration_days=30,is_active=True))
