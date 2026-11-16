@@ -19,14 +19,14 @@ void main() {
     expect(bridge, contains('case "macOSNaiveEngineStatus":'));
     expect(bridge, contains('case "startNaive":'));
     expect(bridge, contains('case "getNaiveTunnelStatus":'));
-    expect(bridge, contains('["hysteria2", "tuic", "anytls", "naive", "shadowtls", "snell", "socks5", "socks5"]'));
+    expect(bridge, contains('["hysteria2", "tuic", "anytls", "naive", "shadowtls", "snell", "socks5"]'));
     expect(bridge, contains('libboxBackendReady()'));
-    expect(provider, contains('case "hysteria2", "tuic", "anytls", "naive", "shadowtls", "snell", "socks5", "socks5":'));
+    expect(provider, contains('case "hysteria2", "tuic", "anytls", "naive", "shadowtls", "snell", "socks5":'));
     expect(host, contains('allowedConfig(config, protocolCode: protocolCode)'));
     expect(host, contains('protocolCode == "naive"'));
     expect(host, contains('outbound["insecure_concurrency"] as? Int == 0'));
     expect(host, contains('namespace + ":" + account + ":" + protocolCode'));
-    expect(engine, contains('["hysteria2", "tuic", "anytls", "naive", "shadowtls", "snell", "socks5", "socks5"]'));
+    expect(engine, contains('["hysteria2", "tuic", "anytls", "naive", "shadowtls", "snell", "socks5"]'));
     expect(engine, contains('outbounds.first?["type"] as? String == code'));
     expect(engine, contains('outbound["username"] as? String'));
     expect(controller, contains('SingBoxMacConfig.encodeNaiveForEphemeralTunnel'));
