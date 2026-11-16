@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.861",
+  "version": "1.1.0-rc.862",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-16T11:59:59Z",
+  "released_at": "2026-11-16T13:21:17Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "043fe9e3a37df823b97cb366e2d021ee0d75ed70",
+  "source_sha": "420c31b5ff4073d23b2b48b229e5eb1a67f5cbf6",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.861/twinpanel-1.1.0-rc.861-linux-x86_64.tar.gz",
-    "sha256": "c8221979401bf511b3d395ad5708411366014b639ba996d21f23ecb8ed5532af",
-    "size_bytes": 31008304
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.862/twinpanel-1.1.0-rc.862-linux-x86_64.tar.gz",
+    "sha256": "2c48a322d61ed2c4fd5a0950894dbe7675e1ce5004e5ea726e18880a5025c755",
+    "size_bytes": 31054309
   },
   "notes": {
-    "fa": "افزایش سرعت تحویل اکانت در ربات پس از تأیید پرداخت با ارسال لینک و QR به محض آماده شدن اولین کانفیگ معتبر، بدون انتظار برای نصب همه پروتکل‌ها؛ رفع خطای مشاهده رسید در مدیریت ربات.",
-    "en": "Faster validated Telegram account link and QR delivery as soon as one live protocol is ready, with durable payment checks and off-loop readiness validation; restore admin receipt details."
+    "fa": "تسریع تحویل اکانت به ربات با ثبت فوری اولین کانفیگ معتبر پس از ساخت اولین نود؛ ادامه ساخت بقیه پروتکل‌ها بدون انتظار کاربر، به‌روزرسانی خودکار وضعیت سفارش در پنل و محافظ انتشار GitHub برای حفظ تغییرات.",
+    "en": "Commit the first valid protocol config as soon as the first node is provisioned, enabling verified early Telegram delivery while other nodes/protocols continue; auto-refresh admin payment delivery status; protect release parity."
   }
 }
