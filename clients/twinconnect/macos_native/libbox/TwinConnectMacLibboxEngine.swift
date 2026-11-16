@@ -49,11 +49,21 @@ final class TwinConnectMacLibboxEngine {
               outbounds.count == 1,
               let outbound = outbounds.first,
               let protocolCode = outbound["type"] as? String,
-              ["hysteria2", "tuic", "anytls"].contains(protocolCode),
+              ["hysteria2", "tuic", "anytls", "naive"].contains(protocolCode),
               (protocolCode != "tuic" || (
                 (outbound["uuid"] as? String).map {
                     $0.range(of: "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", options: .regularExpression) != nil
                 } == true && outbound["zero_rtt_handshake"] as? Bool == false
+              )),
+              (protocolCode != "naive" || (
+                (outbound["username"] as? String).map {
+                    !$0.isEmpty && $0.count <= 1024
+                } == true &&
+                outbound["insecure_concurrency"] as? Int == 0 &&
+                (outbound["quic"] == nil || outbound["quic"] as? Bool == true) &&
+                (outbound["udp_over_tcp"] == nil ||
+                    outbound["udp_over_tcp"] as? Bool == true) &&
+                outbound["extra_headers"] == nil
               )),
               outbound["tag"] as? String == "proxy",
               let secret = outbound["password"] as? String,
@@ -84,7 +94,7 @@ final class TwinConnectMacLibboxEngine {
                   let settings = tunnel.protocolConfiguration
                     as? NETunnelProviderProtocol,
                   let code = settings.providerConfiguration?["protocol"] as? String,
-                  ["hysteria2", "tuic", "anytls"].contains(code),
+                  ["hysteria2", "tuic", "anytls", "naive"].contains(code),
                   let reference = settings.passwordReference,
                   let config = Self.readProfile(reference),
                   Self.profileIsAllowed(config),
