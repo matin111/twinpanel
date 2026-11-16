@@ -21,8 +21,8 @@ void main() {
     expect(bridge, contains('case "getAnyTlsTunnelStatus":'));
     expect(bridge, contains('"protocol": "anytls"'));
     expect(bridge, contains('libboxBackendReady()'));
-    expect(extension, contains('case "hysteria2", "tuic", "anytls", "naive", "shadowtls", "snell", "socks5", "socks5":'));
-    expect(engine, contains('["hysteria2", "tuic", "anytls", "naive", "shadowtls", "snell", "socks5", "socks5"]'));
+    expect(extension, contains('case "hysteria2", "tuic", "anytls", "naive", "shadowtls", "snell", "socks5":'));
+    expect(engine, contains('["hysteria2", "tuic", "anytls", "naive", "shadowtls", "snell", "socks5"]'));
     expect(engine, contains('outbounds.first?["type"] as? String == code'));
     expect(host, contains('allowedConfig(config, protocolCode: protocolCode)'));
     expect(host, contains('namespace + ":" + account + ":" + protocolCode'));
