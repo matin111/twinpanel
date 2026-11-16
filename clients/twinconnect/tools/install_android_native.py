@@ -127,17 +127,10 @@ def patch_manifest() -> None:
     # Register the official AmneziaWG VPN service only when its native AAR
     # is bundled. Never alias it to the ordinary WireGuard VpnService.
     awg_aar = NATIVE / "amneziawg-core" / "tunnel-release.aar"
-    if awg_aar.is_file() and "org.amnezia.awg.backend.GoBackend$VpnService" not in current:
-        service += (
-            '\\n        <!-- Official AmneziaWG userspace GoBackend VPN service -->\\n'
-            '        <service android:name="org.amnezia.awg.backend.GoBackend$VpnService"\\n'
-            '            android:exported="false"\\n'
-            '            android:permission="android.permission.BIND_VPN_SERVICE">\\n'
-            '            <intent-filter>\\n'
-            '                <action android:name="android.net.VpnService" />\\n'
-            '            </intent-filter>\\n'
-            '        </service>\\n'
-        )
+    # Do not register AWG service: the AAR is staged, not actually bundled.
+    # WireGuard and AmneziaWG both export libwg-go.so, so packaging AWG
+    # requires a separate native namespace/loader integration first.
+    # A staged AAR alone does not provide the service class at runtime.
     if "com.wireguard.android.backend.GoBackend$VpnService" in current:
         service = ""
     if 'android:name=".OpenConnectVpnService"' not in current:
