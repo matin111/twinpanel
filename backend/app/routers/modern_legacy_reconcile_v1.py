@@ -77,34 +77,46 @@ def credential_state(credential: ProtocolCredential | None) -> str:
 
 
 def _modern_tls_item_requires_repair(item: dict[str, Any], protocol: str) -> bool:
-    """Flag persisted insecure TLS profiles; do not silently weaken verification."""
+    """Detect old insecure or incomplete TLS across actual delivery shapes.
+
+    Account delivery can store an outbound directly, under outbound or
+    singbox_outbound, or as a full config in a dict/JSON string. Never log
+    profile contents: they contain live account secrets.
+    """
     import json
 
     if not isinstance(item, dict):
         return False
-    candidates = []
-    outbound = item.get("outbound")
-    if isinstance(outbound, dict):
-        candidates.append(outbound)
-    raw = item.get("config")
-    if isinstance(raw, str) and raw.strip():
-        try:
-            config = json.loads(raw)
-            if isinstance(config, dict):
-                candidates.extend(
-                    entry for entry in config.get("outbounds", [])
-                    if isinstance(entry, dict)
-                )
-        except (ValueError, TypeError):
-            pass
+
+    candidates: list[dict[str, Any]] = []
+    def collect(value: Any) -> None:
+        if isinstance(value, str):
+            try:
+                value = json.loads(value)
+            except (ValueError, TypeError):
+                return
+        if not isinstance(value, dict):
+            return
+        if str(value.get("type") or "").lower() == protocol:
+            candidates.append(value)
+        outbounds = value.get("outbounds")
+        if isinstance(outbounds, list):
+            for outbound in outbounds:
+                if isinstance(outbound, dict) and str(outbound.get("type") or "").lower() == protocol:
+                    candidates.append(outbound)
+
+    collect(item)
+    for key in ("outbound", "singbox_outbound", "config"):
+        collect(item.get(key))
+
     for candidate in candidates:
-        if str(candidate.get("type") or "").lower() != protocol:
-            continue
         tls = candidate.get("tls")
-        if isinstance(tls, dict) and (
-            tls.get("insecure") is True
-            or not str(tls.get("certificate") or "").strip()
-        ):
+        if not isinstance(tls, dict):
+            return True
+        if (tls.get("insecure") is True
+                or tls.get("enabled") is False
+                or tls.get("disable_sni") is True
+                or not str(tls.get("certificate") or "").strip()):
             return True
     return False
 
