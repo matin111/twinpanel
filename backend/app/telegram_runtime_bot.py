@@ -23,7 +23,7 @@ from aiogram.types import (
 )
 
 from .telegram_navigation_v1 import show_navigation_page, acknowledge_navigation
-from .telegram_checkout_copy_v1 import (choose_payment_text, method_label, payment_detail_text, proof_prompt, proof_success, wallet_preview_text)
+from .telegram_checkout_copy_v1 import (choose_payment_text, method_label, payment_detail_text, proof_prompt, proof_success, wallet_preview_text, wallet_success_text)
 from .routers.telegram_manager import load_bot_token
 from .telegram_legacy_contacts_v1 import acknowledge_legacy_start
 from .telegram_learning_center import register_learning_handlers
@@ -1836,7 +1836,7 @@ async def subscription_renew_plan(callback: CallbackQuery):
         f"🔄 <b>تمدید اشتراک #{sub_id}</b>\n\n"
         f"📦 پلن انتخابی: <b>{escape(str(plan.get('name') or '-'))}</b>\n"
         f"💳 مبلغ: <b>{_fmt_money(plan.get('price_toman'))} تومان</b>\n\n"
-        "پس از پرداخت، حجم و اعتبار همین اکانت افزایش می‌یابد. "
+        "پس از پرداخت، تمدید برای دوره بعد رزرو می‌شود. "
         "نام کاربری، رمز، دستگاه‌های مجاز و پروتکل‌های موجود تغییر نمی‌کنند.",
         reply_markup=renewal_confirm_keyboard(sub_id, plan_id, nonce),
     )
@@ -1919,12 +1919,12 @@ async def renewal_wallet_preview(callback: CallbackQuery):
             raise RuntimeError("مبلغ سفارش معتبر نیست")
         sufficient = balance >= amount
         keyboard = [[InlineKeyboardButton(
-            text="✅ تأیید و پرداخت تمدید از کیف پول" if sufficient
+            text="✅ تأیید پرداخت از کیف پول" if sufficient
                  else "➕ افزایش موجودی کیف پول",
             callback_data=f"renewwallet:confirm:{order_id}" if sufficient
                           else "wallet:topup",
         )], [InlineKeyboardButton(
-            text="⬅️ روش‌های پرداخت تمدید",
+            text="⬅️ روش‌های پرداخت",
             callback_data=f"renewwallet:back:{order_id}",
         )]]
         await callback.message.edit_text(
@@ -1979,12 +1979,7 @@ async def renewal_wallet_confirm(callback: CallbackQuery):
         if state not in {"paid", "provisioning", "provision_failed", "fulfilled"}:
             raise RuntimeError("پرداخت ثبت شد ولی وضعیت سفارش نیاز به بررسی دارد")
         await callback.message.edit_text(
-            "✅ <b>پرداخت تمدید از کیف پول ثبت شد</b>\n\n"
-            f"🧾 شماره سفارش: <b>#{order_id}</b>\n"
-            "💰 مبلغ فقط یک‌بار از کیف پول کسر می‌شود.\n"
-            "🕒 تمدید برای دوره بعد رزرو می‌شود؛ اعتبار و پلن فعلی"
-            " تا پایان تاریخ یا حجم بدون تغییر می‌ماند.\n"
-            "در بخش اشتراک‌های من می‌توانید وضعیت تمدید را ببینید.",
+            wallet_success_text(order_id, renewal=True, fulfilled=state == "fulfilled"),
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                 [InlineKeyboardButton(
                     text="📦 اشتراک‌های من", callback_data="subs:list",
