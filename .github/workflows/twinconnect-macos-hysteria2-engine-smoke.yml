@@ -1,0 +1,50 @@
+name: TwinConnect macOS Hysteria2 Native Engine Smoke
+
+on:
+  push:
+    branches:
+      - 'feat/twinconnect-macos-packet-tunnel-foundation-20261116'
+    paths:
+      - 'clients/twinconnect/macos_native/fetch_singbox_macos.sh'
+      - 'clients/twinconnect/macos_native/hysteria2-config-check.json'
+      - '.github/workflows/twinconnect-macos-hysteria2-engine-smoke.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  macos-hysteria2-preflight:
+    runs-on: macos-15
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: clients/twinconnect
+    steps:
+      - uses: actions/checkout@v4
+      - name: Obtain verified official sing-box macOS binaries
+        run: bash macos_native/fetch_singbox_macos.sh
+      - name: Validate Hysteria2 protocol config offline (no network)
+        run: |
+          set -euo pipefail
+          macos_native/build/singbox/arm64/sing-box check -c macos_native/hysteria2-config-check.json
+          echo "Hysteria2 config parsed; no tunnel, handshake, DNS protection or traffic verified"
+      - name: Verify both binary architectures
+        run: |
+          set -euo pipefail
+          file macos_native/build/singbox/arm64/sing-box | grep -q arm64
+          file macos_native/build/singbox/amd64/sing-box | grep -q x86_64
+          shasum -a 256 macos_native/build/singbox/arm64/sing-box macos_native/build/singbox/amd64/sing-box
+      - name: Package verified engine binaries (not a VPN application)
+        run: |
+          cd macos_native/build/singbox
+          ditto -c -k --sequesterRsrc arm64 sing-box-macOS-arm64.zip
+          ditto -c -k --sequesterRsrc amd64 sing-box-macOS-amd64.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TwinConnect-macOS-Hysteria2-Engine-Preflight
+          path: |
+            clients/twinconnect/macos_native/build/singbox/sing-box-macOS-arm64.zip
+            clients/twinconnect/macos_native/build/singbox/sing-box-macOS-amd64.zip
+          retention-days: 7
+          if-no-files-found: error
