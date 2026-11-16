@@ -19,13 +19,12 @@ jobs:
           distribution: temurin
           java-version: '17'
       - name: Install pinned Android NDK and SDK
+        shell: bash
         run: |
+          set -euo pipefail
           SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
           SDKMANAGER="$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
-          if [ ! -x "$SDKMANAGER" ]; then
-            echo "Android SDK command-line tools missing at $SDKMANAGER" >&2
-            exit 1
-          fi
+          test -x "$SDKMANAGER"
           yes | "$SDKMANAGER" --licenses >/dev/null || true
           "$SDKMANAGER" --sdk_root="$SDK_ROOT" --install "ndk;26.1.10909125" "platforms;android-36" "build-tools;36.0.0"
       - name: Fetch pinned upstream AmneziaWG source and submodules
@@ -43,62 +42,17 @@ jobs:
           cd /tmp/amneziawg-android
           chmod +x gradlew
           ./gradlew :tunnel:assembleRelease --no-daemon --stacktrace
-          test -s tunnel/build/outputs/aar/tunnel-release.aar
           AAR=tunnel/build/outputs/aar/tunnel-release.aar
-          unzip -Z1 "$AAR" | grep -q '^classes.jar
-      - name: Stage compiled core
-        shell: bash
-        run: |
-          mkdir -p clients/twinconnect/native/android/amneziawg-core
-          cp /tmp/amneziawg-android/tunnel/build/outputs/aar/tunnel-release.aar clients/twinconnect/native/android/amneziawg-core/
-      - uses: actions/upload-artifact@v4
-        with:
-          name: twinconnect-amneziawg-native-aar
-          path: clients/twinconnect/native/android/amneziawg-core/tunnel-release.aar
-          if-no-files-found: error
-
-          unzip -Z1 "$AAR" | grep -qE '^jni/[^/]+/libwg-go.so
-      - name: Stage compiled core
-        shell: bash
-        run: |
-          mkdir -p clients/twinconnect/native/android/amneziawg-core
-          cp /tmp/amneziawg-android/tunnel/build/outputs/aar/tunnel-release.aar clients/twinconnect/native/android/amneziawg-core/
-      - uses: actions/upload-artifact@v4
-        with:
-          name: twinconnect-amneziawg-native-aar
-          path: clients/twinconnect/native/android/amneziawg-core/tunnel-release.aar
-          if-no-files-found: error
-
+          test -s "$AAR"
+          unzip -Z1 "$AAR" | grep -F 'classes.jar'
+          unzip -Z1 "$AAR" | grep -E 'jni/[^/]+/libwg-go.so'
           unzip -p "$AAR" classes.jar > /tmp/awg-classes.jar
-          jar tf /tmp/awg-classes.jar | grep -q '^org/amnezia/awg/backend/GoBackend.class
+          jar tf /tmp/awg-classes.jar | grep -F 'org/amnezia/awg/backend/GoBackend.class'
+          jar tf /tmp/awg-classes.jar | grep -F 'org/amnezia/awg/config/Config.class'
       - name: Stage compiled core
         shell: bash
         run: |
-          mkdir -p clients/twinconnect/native/android/amneziawg-core
-          cp /tmp/amneziawg-android/tunnel/build/outputs/aar/tunnel-release.aar clients/twinconnect/native/android/amneziawg-core/
-      - uses: actions/upload-artifact@v4
-        with:
-          name: twinconnect-amneziawg-native-aar
-          path: clients/twinconnect/native/android/amneziawg-core/tunnel-release.aar
-          if-no-files-found: error
-
-          jar tf /tmp/awg-classes.jar | grep -q '^org/amnezia/awg/config/Config.class
-      - name: Stage compiled core
-        shell: bash
-        run: |
-          mkdir -p clients/twinconnect/native/android/amneziawg-core
-          cp /tmp/amneziawg-android/tunnel/build/outputs/aar/tunnel-release.aar clients/twinconnect/native/android/amneziawg-core/
-      - uses: actions/upload-artifact@v4
-        with:
-          name: twinconnect-amneziawg-native-aar
-          path: clients/twinconnect/native/android/amneziawg-core/tunnel-release.aar
-          if-no-files-found: error
-
-          echo "Verified official AWG backend classes and native wg-go library"
-
-      - name: Stage compiled core
-        shell: bash
-        run: |
+          set -euo pipefail
           mkdir -p clients/twinconnect/native/android/amneziawg-core
           cp /tmp/amneziawg-android/tunnel/build/outputs/aar/tunnel-release.aar clients/twinconnect/native/android/amneziawg-core/
       - uses: actions/upload-artifact@v4
