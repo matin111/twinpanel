@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.851",
-  "source_sha": "4e6206015b56762afb2fea7f92975fec41717275",
+  "version": "1.1.0-rc.852",
+  "source_sha": "5329f1523d0f7f562c0fc6a03308f8ae0122856e",
   "notes": {
-    "fa": "نسخه رسمی از GitHub شامل اصلاح صفحه پرداخت‌ها، لینک مستقیم اکانت ساخته‌شده، نمایش شارژ کیف پول، تشخیص واقعی تحویل پیام تلگرام، تاریخچه اتصال و فیلتر دقیق اکانت در صفحه فعال اشتراک‌ها. حفظ تغییرات در آپدیت‌های بعدی از طریق سورس نسخه‌بندی‌شده.",
-    "en": "Official GitHub-built update preserving payment outcomes, wallet credits, real Telegram account delivery status, connection session history, and exact subscription filtering from payment links."
+    "fa": "اصلاح عنوان ثبت هش تراکنش (TXID) در پرداخت رمزارزی و شارژ کیف پول، هماهنگ‌سازی ربات، و رزرو تمدید با پلن متفاوت بدون تغییر پلن فعلی تا پایان حجم یا تاریخ.",
+    "en": "Clear crypto TXID submission controls across customer wallet, checkout and Telegram, plus deferred different-plan renewals until current quota or validity ends."
   }
 }
