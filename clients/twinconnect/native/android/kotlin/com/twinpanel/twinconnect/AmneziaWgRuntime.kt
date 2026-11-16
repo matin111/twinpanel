@@ -68,6 +68,7 @@ internal object AmneziaWgRuntime {
         require(state == Tunnel.State.UP && isUp()) { "AWG_TUN_NOT_ESTABLISHED" }
         return mapOf(
             "connected" to true,
+            // TUN-up is verified, but peer handshake is not yet confirmed.
             "tunnelVerified" to true,
             "peerHandshakeVerified" to false,
             "state" to "interface_up"
