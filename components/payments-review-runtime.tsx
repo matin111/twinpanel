@@ -28,6 +28,7 @@ type ReviewRow={
   trackingCode:string;
   orderId:number|null;
   subscriptionId:number|null;
+  accountUsername:string;
   orderStatus:string;
   fulfillmentStatus:string;
   deliveryStatus:string;
@@ -141,6 +142,7 @@ export function PaymentsReviewRuntime(){
       trackingCode:s(row.tracking_code),
       orderId:n(row.order_id)||null,
       subscriptionId:n(row.subscription_id)||null,
+      accountUsername:s(row.account_username),
       orderStatus:s(row.order_status),
       fulfillmentStatus:s(row.fulfillment_status),
       deliveryStatus:s(row.delivery_status),
@@ -172,6 +174,7 @@ export function PaymentsReviewRuntime(){
         trackingCode,
         orderId:null,
         subscriptionId:null,
+        accountUsername:"",
         orderStatus:"",
         fulfillmentStatus:"",
         deliveryStatus:"",
@@ -404,6 +407,7 @@ export function PaymentsReviewRuntime(){
                     <a className="mini-btn" href={`/admin/subscriptions?focus=${row.subscriptionId}`}>
                       {pick("مشاهده اکانت ساخته‌شده","Open created account")} #{row.subscriptionId}
                     </a>
+                    {row.accountUsername&&<small>{pick("نام کاربری","Username")}: <b dir="ltr">{row.accountUsername}</b></small>}
                     <small>{row.deliveryStatus==="telegram_sent"
                       ?pick("✓ پیام اطلاعات اکانت در تلگرام ارسال شد","✓ Account details sent via Telegram")
                       :row.deliveryStatus==="telegram_pending"
