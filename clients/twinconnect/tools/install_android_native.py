@@ -66,6 +66,17 @@ def patch_gradle() -> None:
         "    }\n"
         "}\n"
     )
+    # Bundle the independently built official AmneziaWG AAR only when present.
+    # This must be the AWG backend, never the stock WireGuard tunnel.
+    awg_aar = NATIVE / "amneziawg-core" / "tunnel-release.aar"
+    if awg_aar.is_file():
+        target = ANDROID / "app" / "libs" / "amneziawg-tunnel.aar"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(awg_aar, target)
+        current += (
+            "\\n// Official AmneziaWG backend and JNI, built from pinned upstream source.\\n"
+            'dependencies { implementation(files("libs/amneziawg-tunnel.aar")) }\\n'
+        )
     filename.write_text(current, encoding="utf-8")
     rules = ANDROID / "app" / "proguard-rules.pro"
     with rules.open("a", encoding="utf-8") as out:
