@@ -93,6 +93,33 @@ class MainActivity : FlutterActivity() {
                 else -> result.notImplemented()
             }
         }
+        // Dedicated AmneziaWG contract. The stock WireGuard backend cannot
+        // interpret AWG obfuscation parameters and must never be used here.
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            "com.twinpanel.twinconnect/amneziawg"
+        ).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "getCapabilities" -> result.success(
+                    mapOf(
+                        "contractVersion" to 1,
+                        "engineReady" to false,
+                        "vpnServiceReady" to false,
+                        "tunnelVerified" to false,
+                        "reason" to "AWG_NATIVE_BACKEND_NOT_BUNDLED"
+                    )
+                )
+                "connect" -> result.error(
+                    "AWG_NATIVE_BACKEND_NOT_BUNDLED",
+                    "AmneziaWG GoBackend and its native wg-go library must be bundled",
+                    null
+                )
+                "disconnect" -> result.success(
+                    mapOf("connected" to false, "tunnelVerified" to false)
+                )
+                else -> result.notImplemented()
+            }
+        }
         channel.setMethodCallHandler { call, result ->
             when (call.method) {
                 "getCapabilities" -> onWorker(result) {
