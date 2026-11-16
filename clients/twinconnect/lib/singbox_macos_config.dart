@@ -232,4 +232,8 @@ class SingBoxMacConfig {
   static String encodeTuicForEphemeralTunnel({
     required Map<String, dynamic> item,
   }) => jsonEncode(composeTuic(item: item));
+
+  static String encodeAnyTlsForEphemeralTunnel({
+    required Map<String, dynamic> item,
+  }) => jsonEncode(composeAnyTls(item: item));
 }
