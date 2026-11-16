@@ -102,6 +102,13 @@ export function AdminWalletV2(){
   };
 
   useEffect(()=>{void load();},[]);
+  useEffect(()=>{
+    const value=Number(new URLSearchParams(window.location.search).get("user")||0);
+    if(Number.isSafeInteger(value)&&value>0){
+      setQuery(String(value));
+      setUserId(String(value));
+    }
+  },[]);
 
   const run=async(message:string,fn:()=>Promise<unknown>)=>{
     if(busy)return;
