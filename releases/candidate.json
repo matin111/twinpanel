@@ -1,6 +1,6 @@
 {
   "version": "1.1.0-rc.862",
-  "source_sha": "023b78759f953dbeea32555ad065a8280d8e2251",
+  "source_sha": "420c31b5ff4073d23b2b48b229e5eb1a67f5cbf6",
   "notes": {
     "fa": "تسریع تحویل اکانت به ربات با ثبت فوری اولین کانفیگ معتبر پس از ساخت اولین نود؛ ادامه ساخت بقیه پروتکل‌ها بدون انتظار کاربر، به‌روزرسانی خودکار وضعیت سفارش در پنل و محافظ انتشار GitHub برای حفظ تغییرات.",
     "en": "Commit the first valid protocol config as soon as the first node is provisioned, enabling verified early Telegram delivery while other nodes/protocols continue; auto-refresh admin payment delivery status; protect release parity."
