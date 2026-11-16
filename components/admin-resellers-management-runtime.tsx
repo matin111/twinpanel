@@ -193,6 +193,15 @@ export function AdminResellersManagementRuntime(){
     }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
   };
 
+  useEffect(()=>{
+    const id=Number(new URLSearchParams(window.location.search).get("focus")||0);
+    if(Number.isSafeInteger(id)&&id>0){
+      void openManage(id).then(()=>setTab("finance"));
+    }
+    // The target is selected on mount; manual navigation remains unchanged.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[]);
+
   const refreshSelected=async()=>{
     if(selectedId)await openManage(selectedId);
   };

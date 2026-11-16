@@ -1006,19 +1006,105 @@ def update_payment_settings(
 def admin_payment_intents(
     db: Session = Depends(get_db),
 ):
+    """Include the *actual* order and Telegram-delivery result for admin review.
+
+    Approval is not fulfillment. Likewise, a sent Telegram notification proves
+    dispatch by our bot, not that the customer read the message.
+    """
+    from ..telegram_notify_models import TelegramNotification
+
     rows = (
         db.query(PaymentIntent)
-        .order_by(
-            PaymentIntent.id.desc()
-        )
+        .order_by(PaymentIntent.id.desc())
         .limit(500)
         .all()
     )
+    if not rows:
+        return []
 
-    return [
-        intent_out(row)
-        for row in rows
-    ]
+    order_ids = list({int(row.order_id) for row in rows})
+    orders = {
+        int(order.id): order
+        for order in db.query(StoreOrder).filter(StoreOrder.id.in_(order_ids)).all()
+    }
+
+    subscription_ids = list({
+        int(order.subscription_id)
+        for order in orders.values()
+        if order.subscription_id and order.status == "fulfilled"
+    })
+    subscriptions = {
+        int(sub.id): sub
+        for sub in db.query(Subscription)
+        .filter(Subscription.id.in_(subscription_ids)).all()
+    } if subscription_ids else {}
+
+    # Fetch only relevant notices, in one bounded query rather than an N+1
+    # lookup. Match the immutable payment id, not merely the order id: one
+    # order can have multiple payment attempts.
+    user_ids = list({int(row.user_id) for row in rows})
+    notifications = (
+        db.query(TelegramNotification)
+        .filter(
+            TelegramNotification.kind == "payment_approved",
+            TelegramNotification.user_id.in_(user_ids),
+        )
+        .order_by(TelegramNotification.id.desc())
+        .limit(10000)
+        .all()
+    )
+    notices_by_payment = {}
+    for notice in notifications:
+        payment_id = (notice.payload or {}).get("payment_id")
+        try:
+            key = int(payment_id)
+        except (ValueError, TypeError):
+            continue
+        notices_by_payment.setdefault(key, []).append(notice)
+
+    result = []
+    for row in rows:
+        order = orders.get(int(row.order_id))
+        account_id = (
+            int(order.subscription_id)
+            if order and order.subscription_id and order.status == "fulfilled"
+            else None
+        )
+        delivery = "not_ready"
+        if order and order.status == "fulfilled" and account_id:
+            delivery = "not_recorded"
+            notices = notices_by_payment.get(int(row.id), [])
+            if any(
+                notice.delivered_at is not None
+                and order.fulfilled_at is not None
+                and notice.delivered_at >= order.fulfilled_at
+                and str((notice.payload or {}).get("subscription_id") or "")
+                    == str(account_id)
+                for notice in notices
+            ):
+                delivery = "telegram_sent"
+            elif any(notice.delivered_at is None for notice in notices):
+                delivery = "telegram_pending"
+            elif any(notice.delivered_at is not None for notice in notices):
+                # A payment confirmation sent *before* the subscription was
+                # created cannot be evidence that account details were sent.
+                delivery = "telegram_early_confirmation"
+
+        item = intent_out(row)
+        account = subscriptions.get(account_id) if account_id else None
+        item.update({
+            "order_status": str(order.status) if order else None,
+            "subscription_id": account_id,
+            "account_username": str(account.account_username or "") if account else None,
+            "fulfillment_status": "created" if account_id else (
+                "provisioning" if order and order.status in {"paid", "provisioning"}
+                else "not_created"
+            ),
+            "delivery_status": delivery,
+            "delivery_note": "telegram_sent_is_not_customer_read_confirmation",
+        })
+        result.append(item)
+    return result
 
 
 @router.post(

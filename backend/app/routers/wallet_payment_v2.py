@@ -348,6 +348,9 @@ async def submit_wallet_topup_v2(
 
 @admin_router.get("/topups")
 def admin_wallet_topups_v2(db: Session = Depends(get_db)):
+    from ..customer_wallet_models import CustomerWalletTransaction
+    from ..models_reseller import Reseller, ResellerWalletTransaction
+
     rows = (
         db.query(CustomerWalletTopup)
         .filter(
@@ -359,16 +362,67 @@ def admin_wallet_topups_v2(db: Session = Depends(get_db)):
         .limit(500)
         .all()
     )
+    if not rows:
+        return []
 
+    # Confirm actual credit in the ledger; never equate a mere approval
+    # status with an increase of balance.
+    references = [f"wallet-topup:{int(row.id)}" for row in rows]
+    credits = {
+        str(tx.reference): int(tx.amount_toman or 0)
+        for tx in db.query(CustomerWalletTransaction)
+        .filter(
+            CustomerWalletTransaction.reference.in_(references),
+            CustomerWalletTransaction.kind == "topup",
+        )
+        .all()
+    }
+
+    reseller_credits = {
+        str(tx.idempotency_key): (int(tx.amount or 0), int(tx.reseller_id))
+        for tx in db.query(ResellerWalletTransaction)
+        .filter(ResellerWalletTransaction.idempotency_key.in_(references))
+        .all()
+    }
+    resellers_by_owner = {
+        int(r.owner_user_id): int(r.id)
+        for r in db.query(Reseller).filter(
+            Reseller.owner_user_id.in_({int(row.user_id) for row in rows})
+        ).all()
+    }
+
+    users = {
+        int(user.id): user
+        for user in db.query(User)
+        .filter(User.id.in_({int(row.user_id) for row in rows}))
+        .all()
+    }
     result = []
     for row in rows:
         item = _topup_out(row)
-        user = db.get(User, row.user_id)
+        user = users.get(int(row.user_id))
         item["user"] = {
             "email": user.email,
             "full_name": user.full_name,
             "phone": user.phone,
         } if user else None
+        reference = f"wallet-topup:{int(row.id)}"
+        reseller_credit = reseller_credits.get(reference)
+        credit = (
+            credits.get(reference) if reference in credits
+            else reseller_credit[0] if reseller_credit else None
+        )
+        wallet_type = "reseller" if reseller_credit else (
+            "customer_legacy" if reference in credits and int(row.user_id) in resellers_by_owner
+            else "customer"
+        )
+        item["wallet_credit_status"] = "credited" if credit is not None else "not_credited"
+        item["credited_amount_toman"] = credit
+        item["wallet_type"] = wallet_type
+        item["reseller_id"] = (
+            reseller_credit[1] if reseller_credit else resellers_by_owner.get(int(row.user_id))
+        )
+        item["wallet_user_id"] = int(row.user_id)
         result.append(item)
 
     return result
