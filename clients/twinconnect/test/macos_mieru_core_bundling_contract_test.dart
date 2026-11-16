@@ -13,7 +13,7 @@ void main() {
     expect(bridge, contains('case "macOSMieruEngineStatus":'));
     expect(bridge, contains('"binaryInstalled": mieruCoreBundled()'));
     expect(bridge, contains('"extensionBinaryInstalled": mieruCoreInExtension()'));
-    expect(bridge, contains('mieruCoreInExtension() &&'));
+    expect(bridge, contains('mieruCoreBundled() && mieruCoreInExtension()'));
     expect(File('lib/macos_mieru_controller.dart').readAsStringSync(),
         contains("raw['extensionBinaryInstalled'] is! bool"));
     expect(bridge, contains('"packetFlowBridgeReady": false'));
