@@ -195,8 +195,30 @@ def install_native_sources() -> None:
     shutil.copy2(upstream_abi, target_abi / "LibOpenConnect.java")
 
 
+def install_launcher_icon() -> None:
+    """Install the supplied TwinConnect artwork into Android launcher resources."""
+    from PIL import Image
+
+    source = NATIVE / "branding" / "twinconnect.webp"
+    if not source.is_file():
+        raise RuntimeError(f"Missing TwinConnect artwork: {source}")
+    res = ANDROID / "app" / "src" / "main" / "res"
+    with Image.open(source) as original:
+        image = original.convert("RGBA")
+        for density, pixels in (
+            ("mdpi", 48), ("hdpi", 72), ("xhdpi", 96),
+            ("xxhdpi", 144), ("xxxhdpi", 192),
+        ):
+            target = res / f"mipmap-{density}"
+            target.mkdir(parents=True, exist_ok=True)
+            image.resize((pixels, pixels), Image.Resampling.LANCZOS).save(
+                target / "ic_launcher.png", format="PNG"
+            )
+
+
 def main() -> None:
     install_native_sources()
+    install_launcher_icon()
     patch_gradle()
     patch_manifest()
     print("Installed WireGuard JNI and independent pinned Cisco CSTP/TLS VpnService.")
