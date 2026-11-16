@@ -408,6 +408,14 @@ async def admin_edit_subscription_protocol_lifecycle_v3(
                     cred.config_text_encrypted = ad._enc(items)
                     cred.is_active = True
 
+        # Reserved cross-plan cutovers must never commit a partially
+        # provisioned destination into the account's active entitlement.
+        # Existing admin-edit behavior remains unchanged.
+        if bool(payload.get("_strict_reserved_cutover")) and provision_errors:
+            raise HTTPException(
+                status_code=503,
+                detail="پروتکل‌های پلن جدید کامل آماده نشده‌اند؛ تمدید رزروی مصرف نشد",
+            )
         db.commit()
         db.refresh(sub)
     except HTTPException:
