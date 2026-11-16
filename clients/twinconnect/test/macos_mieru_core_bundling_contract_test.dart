@@ -15,7 +15,9 @@ void main() {
     expect(bridge, contains('"packetFlowBridgeReady": false'));
     expect(bridge, contains('"engineReady": false'));
     expect(bridge, contains('MACOS_MIERU_PACKET_FLOW_BRIDGE_MISSING'));
-    expect(dashboard, contains('MACOS_MIERU_NATIVE_CORE_NOT_LINKED'));
+    expect(dashboard, contains('_macMieru.installation()'));
+    expect(dashboard, contains('MACOS_MIERU_CONNECTION_NOT_VERIFIED'));
+    expect(dashboard, contains('PROTOCOL_NOT_INCLUDED_IN_SUBSCRIPTION'));
     expect(workflow, contains('lipo -create'));
     expect(workflow, contains('TwinConnect-macOS-Mieru-UNSIGNED.zip'));
     expect(workflow, contains('TwinConnectProtocolBackendLinked'));
