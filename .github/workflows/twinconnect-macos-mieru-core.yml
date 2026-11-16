@@ -37,6 +37,10 @@ jobs:
         with:
           channel: stable
           cache: false
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.x'
+          cache: false
       - name: Validate Mieru profile adapter
         shell: bash
         run: |
@@ -101,6 +105,47 @@ jobs:
             fi
             "${target}/mieru" version
           done
+      - name: Compile native in-process Mieru library for both Mac architectures
+        shell: bash
+        run: |
+          set -euo pipefail
+          workspace="$(pwd)"
+          temp="$(mktemp -d)"
+          trap 'rm -rf "$temp"' EXIT
+          git clone --depth 1 --branch v3.39.0 \
+            https://github.com/enfein/mieru.git "$temp/mieru"
+          cd "$temp/mieru"
+          test "$(go list -m)" = "github.com/enfein/mieru/v3"
+          mkdir -p cmd/twinconnect_mieru
+          cp "$workspace/macos_native/mieru/twin_mieru_cbridge.go" \
+            cmd/twinconnect_mieru/main.go
+          for arch in arm64 amd64; do
+            case "$arch" in
+              arm64) apple_arch=arm64 ;;
+              amd64) apple_arch=x86_64 ;;
+            esac
+            output="$workspace/build/macos_mieru_core/$arch/libtwinmieru.dylib"
+            mkdir -p "$(dirname "$output")"
+            GOOS=darwin GOARCH="$arch" CGO_ENABLED=1 \
+              CC="$(xcrun --find clang)" \
+              CGO_CFLAGS="-arch $apple_arch" \
+              CGO_LDFLAGS="-arch $apple_arch" \
+              go build -trimpath -buildmode=c-shared \
+                -o "$output" ./cmd/twinconnect_mieru
+            test -s "$output"
+            lipo -archs "$output" | grep -qw "$apple_arch"
+            nm -gU "$output" | grep -q TwinMieruStart
+            nm -gU "$output" | grep -q TwinMieruStop
+            nm -gU "$output" | grep -q TwinMieruLocalReady
+          done
+          lipo -create \
+            "$workspace/build/macos_mieru_core/amd64/libtwinmieru.dylib" \
+            "$workspace/build/macos_mieru_core/arm64/libtwinmieru.dylib" \
+            -output "$workspace/build/macos_mieru_core/libtwinmieru.dylib"
+          lipo -archs "$workspace/build/macos_mieru_core/libtwinmieru.dylib" \
+            | grep -qw arm64
+          lipo -archs "$workspace/build/macos_mieru_core/libtwinmieru.dylib" \
+            | grep -qw x86_64
       - name: Compile unsigned macOS app and packet tunnel scaffold
         shell: bash
         env:
@@ -147,6 +192,20 @@ jobs:
           cmp "$destination/mieru" "$extension_engines/mieru"
           file "$extension_engines/mieru" | grep -q Mach-O
           test -x "$extension_engines/mieru"
+          # In-process C ABI must live in the extension, never in the host.
+          # This unsigned app is intentionally NOT provisioned for activation.
+          extension_frameworks="$extension/Contents/Frameworks"
+          mkdir -p "$extension_frameworks"
+          cp build/macos_mieru_core/libtwinmieru.dylib \
+            "$extension_frameworks/libtwinmieru.dylib"
+          chmod 755 "$extension_frameworks/libtwinmieru.dylib"
+          lipo -archs "$extension_frameworks/libtwinmieru.dylib" \
+            | grep -qw arm64
+          lipo -archs "$extension_frameworks/libtwinmieru.dylib" \
+            | grep -qw x86_64
+          nm -gU "$extension_frameworks/libtwinmieru.dylib" \
+            | grep -q TwinMieruStart
+          test ! -f "$app/Contents/Frameworks/libtwinmieru.dylib"
           # Bundled executable does NOT grant the PacketTunnel subprocess
           # access or a working Mieru full-tunnel packet-flow bridge.
           echo "Mieru official dual-arch core bundled, VPN NOT READY"
@@ -159,7 +218,7 @@ jobs:
           Both arm64 and Intel macOS binaries provided.
           Bundled in unsigned TwinConnect.app and PacketTunnel.appex Resources/TwinConnectEngines/mieru.
           NOT code signed with Apple Developer identity.
-          NO PacketTunnel traffic bridge.
+          The signed-only Mieru C ABI is staged inside PacketTunnel.appex/Contents/Frameworks.\n          NO authenticated PacketTunnel + Libbox traffic orchestration yet.
           NO VPN connection, handshakes, egress, or DNS validation.
           This is a standalone core artifact for future signed integration.
           EOF
@@ -177,6 +236,7 @@ jobs:
             clients/twinconnect/build/macos_mieru_core/amd64/mieru
             clients/twinconnect/build/macos_mieru_core/arm64/mieru
             clients/twinconnect/build/macos_mieru_core/README.txt
+            clients/twinconnect/build/macos_mieru_core/libtwinmieru.dylib
             clients/twinconnect/build/macos/Build/Products/Release/TwinConnect-macOS-Mieru-UNSIGNED.zip
             clients/twinconnect/build/macos/Build/Products/Release/MIERU-APP-SHA256SUMS.txt
           retention-days: 14
