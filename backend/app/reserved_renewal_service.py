@@ -96,7 +96,8 @@ def reserve_renewal(db: Session, *, subscription_id: int, plan_id: int | None,
     item = PendingSubscriptionRenewal(
         subscription_id=subscription_id, plan_id=plan_id, plan_name=plan_name,
         traffic_bytes=traffic_bytes, duration_days=duration_days,
-        amount_toman=amount_toman, source=source, source_reference=reference, actor=actor)
+        amount_toman=amount_toman, source=source, source_reference=reference, actor=actor,
+        status="queued")
     db.add(item)
     db.flush()
     history(db, subscription_id, "renewal_queued", source, actor, {
