@@ -10,6 +10,7 @@ import 'android_connection_strings.dart';
 import 'android_tunnel.dart';
 import 'android_singbox_tunnel.dart';
 import 'android_mieru_tunnel.dart';
+import 'android_amneziawg_tunnel.dart';
 import 'android_xray_tunnel.dart';
 import 'android_openvpn_tunnel.dart';
 import 'cisco_openconnect_profile.dart';
@@ -712,6 +713,75 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
     }
   }
 
+  Future<void> _connectAmneziaWg() async {
+    if (_busy || _up || _openVpnUp || _ciscoUp || _xrayCoreUp ||
+        _singBoxProtocol != null || _mieruUp) return;
+    setState(() { _busy = true; _errorCode = null; });
+    try {
+      final engine = AndroidAmneziaWgTunnel.instance;
+      if (!await engine.engineReady) {
+        throw const FormatException('AWG_NATIVE_ENGINE_UNAVAILABLE');
+      }
+      final profiles = await TenantApi.fromBuildConfig()
+          .loadSessionNativeProfiles(
+            panel: widget.panel,
+            sessionToken: widget.sessionToken,
+            protocol: VpnProtocols.byCode('amneziawg')!,
+            native: const NativeProtocolReadiness(
+                supportedCodes: {'amneziawg'}),
+          );
+      final selectedId = widget.selectedNodeId;
+      final inventory = widget.servers?.servers ?? const <AppServer>[];
+      final items = profiles.items.where((item) {
+        final id = item['node_id']?.toString();
+        if (id == null || (selectedId != null && selectedId != id)) {
+          return false;
+        }
+        final node = inventory.where((n) => n.id == id).firstOrNull;
+        return inventory.isEmpty || node?.nodeOnline == true;
+      }).toList(growable: false);
+      if (items.isEmpty) {
+        throw const FormatException('AWG_NO_AUTHORIZED_SERVER');
+      }
+      final item = items.first;
+      await engine.connect(item);
+      if (!mounted) return;
+      final id = item['node_id']?.toString();
+      setState(() {
+        _singBoxProtocol = 'amneziawg';
+        _activeServer = inventory.where((n) => n.id == id).firstOrNull;
+        _activeServerName = _activeServer?.name;
+      });
+      _maybeCheckInternet();
+    } on FormatException catch (error) {
+      if (mounted) setState(() => _errorCode = error.message);
+    } on PlatformException catch (error) {
+      if (mounted) setState(() => _errorCode = error.code);
+    } catch (_) {
+      if (mounted) setState(() => _errorCode = 'AWG_NATIVE_CONNECT_FAILED');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _disconnectAmneziaWg() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      await AndroidAmneziaWgTunnel.instance.disconnect();
+      if (mounted) setState(() {
+        _singBoxProtocol = null;
+        _activeServer = null;
+        _activeServerName = null;
+        _clearTelemetry();
+      });
+    } on PlatformException catch (error) {
+      if (mounted) setState(() => _errorCode = error.code);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _connectModern(String code) async {
     if (_busy || _up || _openVpnUp || _ciscoUp || _xrayCoreUp ||
         _singBoxProtocol != null ||
@@ -1039,6 +1109,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
         entry.configRecordPresent &&
         (widget.native.supports(entry.protocol.code) ||
          AndroidSingBoxTunnel.supported.contains(entry.protocol.code) ||
+       entry.protocol.code == 'amneziawg' ||
          entry.protocol.code == 'openvpn' ||
          entry.protocol.code == 'cisco')).toList(growable: false);
     // A server selected without an explicit protocol must not silently
@@ -1076,12 +1147,15 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
         chosen?.configRecordPresent == true;
     final xraySelected = chosen?.protocol.code == 'v2ray' &&
         chosen?.configRecordPresent == true;
+    final awgSelected = chosen?.protocol.code == 'amneziawg' &&
+        chosen?.configRecordPresent == true;
     final modernSelected = chosen != null &&
         AndroidSingBoxTunnel.supported.contains(chosen.protocol.code) &&
         chosen.configRecordPresent;
     final mieruSelected = chosen?.protocol.code == 'mieru' &&
         chosen?.configRecordPresent == true;
-    final canStartSelected = mieruSelected ? _mieruEngineReady :
+    final canStartSelected = awgSelected ? true :
+        mieruSelected ? _mieruEngineReady :
         ciscoSelected ? ciscoReady :
         xraySelected || openVpnSelected || modernSelected || nativeReady;
     // An interface without a peer handshake is NOT a successful VPN.
@@ -1212,13 +1286,15 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
                 borderRadius: BorderRadius.circular(18)),
             ),
             onPressed: _busy ? null
-                : selectedIsActive ? (_mieruUp ? _disconnectMieru :
+                : selectedIsActive ? (_singBoxProtocol == 'amneziawg' ? _disconnectAmneziaWg :
+                    _mieruUp ? _disconnectMieru :
                     _xrayCoreUp || _singBoxProtocol != null ? _disconnectModern :
                     _openVpnUp ? _disconnectOpenVpn :
                     _ciscoUp ? _disconnectCisco : _disconnect)
                 : connected ? null
                 : canStartSelected
-                    ? (mieruSelected ? _connectMieru :
+                    ? (awgSelected ? _connectAmneziaWg :
+                       mieruSelected ? _connectMieru :
                        xraySelected ? _connectXray :
                        modernSelected ? () => _connectModern(chosen.protocol.code) :
                        openVpnSelected ? _connectOpenVpn :
