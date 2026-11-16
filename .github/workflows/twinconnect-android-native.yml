@@ -63,6 +63,11 @@ jobs:
           name: twinconnect-mieru-android-core-binaries
           path: clients/twinconnect/native/android/mieru-jni/**/libmieru.so
           if-no-files-found: error
+      - name: Use Java 17 for upstream AmneziaWG Gradle
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
       - name: Compile and stage official AmneziaWG AAR for the APK
         shell: bash
         run: |
@@ -72,7 +77,8 @@ jobs:
           git checkout --detach ff15093bf3856fea0947923474870b86efb682f0
           git submodule update --init --recursive
           chmod +x gradlew
-          ./gradlew :tunnel:assembleRelease --no-daemon
+          java -version
+          ./gradlew :tunnel:assembleRelease --no-daemon --stacktrace
           AAR=tunnel/build/outputs/aar/tunnel-release.aar
           test -s "$AAR"
           unzip -Z1 "$AAR" | grep -F 'jni/arm64-v8a/libwg-go.so'
