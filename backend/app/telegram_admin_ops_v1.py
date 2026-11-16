@@ -4,6 +4,8 @@ from __future__ import annotations
 import base64
 from html import escape
 
+from .routers.telegram_admin_ops_v1 import format_admin_receipt
+
 from aiogram import F
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
