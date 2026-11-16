@@ -93,8 +93,16 @@ class MainActivity : FlutterActivity() {
                 else -> result.notImplemented()
             }
         }
-        // Dedicated AmneziaWG contract. The stock WireGuard backend cannot
-        // interpret AWG obfuscation parameters and must never be used here.
+        // Dedicated AmneziaWG contract. Never alias it to stock WireGuard.
+        // The native service must exist in the APK before advertising support.
+        val awgServiceBundled = try {
+            Class.forName("org.amnezia.awg.backend.GoBackend\\$VpnService")
+            true
+        } catch (_: ClassNotFoundException) {
+            false
+        } catch (_: LinkageError) {
+            false
+        }
         MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
             "com.twinpanel.twinconnect/amneziawg"
@@ -104,9 +112,11 @@ class MainActivity : FlutterActivity() {
                     mapOf(
                         "contractVersion" to 1,
                         "engineReady" to false,
-                        "vpnServiceReady" to false,
+                        "vpnServiceReady" to awgServiceBundled,
                         "tunnelVerified" to false,
-                        "reason" to "AWG_NATIVE_BACKEND_NOT_BUNDLED"
+                        "reason" to if (awgServiceBundled)
+                            "AWG_NATIVE_RUNTIME_NOT_CONNECTED"
+                        else "AWG_NATIVE_BACKEND_NOT_BUNDLED"
                     )
                 )
                 "connect" -> result.error(
