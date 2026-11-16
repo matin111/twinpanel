@@ -16,6 +16,12 @@ final class TwinConnectMacOSVPNBridge {
         return bundle
     }
 
+    private static func mieruCoreBundled() -> Bool {
+        let core = Bundle.main.bundleURL.appendingPathComponent(
+            "Contents/Resources/TwinConnectEngines/mieru")
+        return FileManager.default.isExecutableFile(atPath: core.path)
+    }
+
     private static func xrayEngineInstalled() -> Bool {
         let executable = Bundle.main.bundleURL.appendingPathComponent(
             "Contents/Resources/TwinConnectEngines/xray")
@@ -94,6 +100,19 @@ final class TwinConnectMacOSVPNBridge {
                     "contractVersion": 1,
                     "supportedCodes": libboxBackendReady()
                         ? ["hysteria2", "tuic", "anytls", "naive", "shadowtls", "snell", "socks5"] : [String]()
+                ] as [String: Any])
+            case "macOSMieruEngineStatus":
+                // The standalone Mieru executable is not a PacketTunnel
+                // traffic bridge. Never report VPN readiness from its presence.
+                result([
+                    "contractVersion": 1,
+                    "protocol": "mieru",
+                    "binaryInstalled": mieruCoreBundled(),
+                    "packetFlowBridgeReady": false,
+                    "engineReady": false,
+                    "reason": mieruCoreBundled()
+                        ? "MACOS_MIERU_PACKET_FLOW_BRIDGE_MISSING"
+                        : "MACOS_MIERU_NATIVE_CORE_NOT_BUNDLED",
                 ] as [String: Any])
             case "macOSXrayEngineStatus":
                 result([
