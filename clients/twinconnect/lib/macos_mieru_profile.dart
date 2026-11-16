@@ -34,6 +34,46 @@ class MacMieruProfile {
     return runtime;
   }
 
+  /// Produces the isolated in-process core configuration. RPC/HTTP are
+  /// disabled; the only listener is the extension-owned loopback SOCKS5.
+  /// Requires a separately verified pre-TUN endpoint pin and signed host.
+  static Map<String, dynamic> composeInProcess({
+    required Map<String, dynamic> item,
+    required String pinnedEndpointIpv4,
+    required int socks5Port,
+    required bool extensionOwnsCore,
+    required bool endpointPinnedOutsideTunnel,
+  }) {
+    if (!extensionOwnsCore || !endpointPinnedOutsideTunnel) {
+      throw const FormatException('MAC_MIERU_INPROCESS_PRECONDITION_MISSING');
+    }
+    final runtime = compose(
+      item: item,
+      pinnedEndpointIpv4: pinnedEndpointIpv4,
+      socks5Port: socks5Port,
+      rpcPort: socks5Port == 65535 ? 65534 : socks5Port + 1,
+      httpProxyPort: socks5Port >= 65534 ? socks5Port - 2 : socks5Port + 2,
+    );
+    final isolated = Map<String, dynamic>.from(runtime)
+      ..['rpcPort'] = 0
+      ..remove('httpProxyPort');
+    return isolated;
+  }
+
+  static String encodeInProcess({
+    required Map<String, dynamic> item,
+    required String pinnedEndpointIpv4,
+    required int socks5Port,
+    required bool extensionOwnsCore,
+    required bool endpointPinnedOutsideTunnel,
+  }) => jsonEncode(composeInProcess(
+    item: item,
+    pinnedEndpointIpv4: pinnedEndpointIpv4,
+    socks5Port: socks5Port,
+    extensionOwnsCore: extensionOwnsCore,
+    endpointPinnedOutsideTunnel: endpointPinnedOutsideTunnel,
+  ));
+
   static String encode({
     required Map<String, dynamic> item,
     required String pinnedEndpointIpv4,
