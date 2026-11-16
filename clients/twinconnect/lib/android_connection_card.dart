@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 import 'android_connection_strings.dart';
 import 'android_tunnel.dart';
 import 'android_singbox_tunnel.dart';
+import 'android_mieru_tunnel.dart';
 import 'android_xray_tunnel.dart';
 import 'android_openvpn_tunnel.dart';
 import 'cisco_openconnect_profile.dart';
@@ -68,6 +69,8 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
   bool _openVpnUp = false;
   bool _xrayCoreUp = false;
   String? _singBoxProtocol;
+  bool _mieruUp = false;
+  bool _mieruEngineReady = false;
   String? _errorCode;
   AppServer? _activeServer;
   String? _activeServerName;
@@ -90,6 +93,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
   void initState() {
     super.initState();
     _restoreNativeXraySession();
+    unawaited(_refreshMieruCapability());
     unawaited(_refresh());
     _telemetryTimer = Timer.periodic(const Duration(seconds: 2), (_) {
       unawaited(_refresh());
@@ -643,6 +647,71 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
     }
   }
 
+  Future<void> _refreshMieruCapability() async {
+    final ready = await AndroidMieruTunnel.instance.engineReady;
+    if (mounted && _mieruEngineReady != ready) {
+      setState(() => _mieruEngineReady = ready);
+    }
+  }
+
+  Future<void> _connectMieru() async {
+    if (_busy || _up || _openVpnUp || _ciscoUp || _xrayCoreUp ||
+        _singBoxProtocol != null || _mieruUp) return;
+    setState(() { _busy = true; _errorCode = null; });
+    try {
+      if (!await AndroidMieruTunnel.instance.engineReady) {
+        throw const FormatException('MIERU_NATIVE_ENGINE_UNAVAILABLE');
+      }
+      final profiles = await TenantApi.fromBuildConfig().loadSessionNativeProfiles(
+        panel: widget.panel,
+        sessionToken: widget.sessionToken,
+        protocol: VpnProtocols.byCode('mieru')!,
+        native: const NativeProtocolReadiness(supportedCodes: {'mieru'}),
+      );
+      final inventory = widget.servers?.servers ?? const <AppServer>[];
+      final selectedId = widget.selectedNodeId;
+      final choices = profiles.items.where((item) {
+        final id = item['node_id']?.toString();
+        if (id == null || (selectedId != null && id != selectedId)) return false;
+        final node = inventory.where((n) => n.id == id).firstOrNull;
+        return inventory.isEmpty || node?.nodeOnline == true;
+      }).toList(growable: false);
+      if (choices.isEmpty) {
+        throw const FormatException('MIERU_NO_AUTHORIZED_SERVER');
+      }
+      await AndroidMieruTunnel.instance.connect(choices.first);
+      if (!mounted) return;
+      final id = choices.first['node_id']?.toString();
+      setState(() {
+        _mieruUp = true;
+        _activeServer = inventory.where((n) => n.id == id).firstOrNull;
+        _activeServerName = _activeServer?.name;
+      });
+      _maybeCheckInternet();
+    } on FormatException catch (error) {
+      if (mounted) setState(() => _errorCode = error.message);
+    } catch (error) {
+      if (mounted) setState(() => _errorCode =
+          error is PlatformException ? error.code :
+          error is TenantApiException ? error.message : 'MIERU_CONNECT_FAILED');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _disconnectMieru() async {
+    if (_busy || !_mieruUp) return;
+    setState(() => _busy = true);
+    try {
+      await AndroidMieruTunnel.instance.disconnect();
+      if (mounted) setState(() { _mieruUp = false; _clearTelemetry(); });
+    } catch (_) {
+      if (mounted) setState(() => _errorCode = 'MIERU_DISCONNECT_FAILED');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _connectModern(String code) async {
     if (_busy || _up || _openVpnUp || _ciscoUp || _xrayCoreUp ||
         _singBoxProtocol != null ||
@@ -1001,7 +1070,10 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
     final modernSelected = chosen != null &&
         AndroidSingBoxTunnel.supported.contains(chosen.protocol.code) &&
         chosen.configRecordPresent;
-    final canStartSelected = ciscoSelected ? ciscoReady :
+    final mieruSelected = chosen?.protocol.code == 'mieru' &&
+        chosen?.configRecordPresent == true;
+    final canStartSelected = mieruSelected ? _mieruEngineReady :
+        ciscoSelected ? ciscoReady :
         xraySelected || openVpnSelected || modernSelected || nativeReady;
     // An interface without a peer handshake is NOT a successful VPN.
     // Reserve the connected green treatment for verified transport.
@@ -1128,12 +1200,14 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
                 borderRadius: BorderRadius.circular(18)),
             ),
             onPressed: _busy ? null
-                : selectedIsActive ? (_xrayCoreUp || _singBoxProtocol != null ? _disconnectModern :
+                : selectedIsActive ? (_mieruUp ? _disconnectMieru :
+                    _xrayCoreUp || _singBoxProtocol != null ? _disconnectModern :
                     _openVpnUp ? _disconnectOpenVpn :
                     _ciscoUp ? _disconnectCisco : _disconnect)
                 : connected ? null
                 : canStartSelected
-                    ? (xraySelected ? _connectXray :
+                    ? (mieruSelected ? _connectMieru :
+                       xraySelected ? _connectXray :
                        modernSelected ? () => _connectModern(chosen.protocol.code) :
                        openVpnSelected ? _connectOpenVpn :
                        ciscoSelected ? _connectCisco : _connect) : null,
