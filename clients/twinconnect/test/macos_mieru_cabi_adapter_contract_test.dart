@@ -37,6 +37,9 @@ void main() {
     expect(candidate, contains('libtwinmieru.dylib'));
     expect(candidate, contains('extension_frameworks='));
     expect(candidate, contains('test ! -f "$app/Contents/Frameworks/libtwinmieru.dylib"'));
+    expect(bridge, contains('"extensionLibraryInstalled": mieruInProcessLibraryBundled()'));
+    expect(File('lib/macos_mieru_controller.dart').readAsStringSync(),
+        contains("raw['extensionLibraryInstalled'] is! bool"));
     expect(bridge, contains('"packetFlowBridgeReady": false'));
     expect(bridge, contains('"engineReady": false'));
     expect(provider, contains('MACOS_PROTOCOL_ENGINE_NOT_LINKED_'));
