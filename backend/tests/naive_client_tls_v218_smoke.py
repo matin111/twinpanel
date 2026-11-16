@@ -95,8 +95,8 @@ assert naive["tls"]["server_name"] == "203.0.113.10"
 assert "insecure" not in naive["tls"]
 assert naive["tls"]["certificate"] == naive_certificate
 
-# The fix is protocol-specific. Existing TLS behavior for the other sing-box
-# client outbounds must remain unchanged.
+# Naive uses its dedicated certificate pin. Hysteria2 now verifies TLS
+# by default (insecure=False); keep this safe existing runtime behavior.
 hysteria_secret = SimpleNamespace(
     protocol="hysteria2",
     username="tp-sub-17",
@@ -117,7 +117,7 @@ hysteria = client_outbound(
     server="203.0.113.10",
     port=443,
 )
-assert hysteria["tls"]["insecure"] is True
+assert hysteria["tls"]["insecure"] is False
 
 legacy_outbound = {
     "type": "naive",
