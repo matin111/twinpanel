@@ -15,7 +15,7 @@ final class TwinConnectMacLibboxPlatform: NSObject,
     private weak var tunnel: PacketTunnelProvider?
     private var settings: NEPacketTunnelNetworkSettings?
     private var monitor: NWPathMonitor?
-    private var observedPath: NWPath?
+    private var observedPath: Network.NWPath?
     private let stateLock = NSLock()
     private var stopped = false
 
