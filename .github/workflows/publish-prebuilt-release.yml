@@ -130,6 +130,28 @@ jobs:
           done
           python3 source/backend/tests/test_sudoku_shared_accounting_release_v1.py -v
 
+      - name: Protect admin manual renewal plan selection in published releases
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          for path in \
+            "components/legacy-subscriptions-exact.tsx" \
+            "lib/legacy-admin-api.ts" \
+            "backend/app/routers/reserved_renewal_v1.py" \
+            "backend/tests/test_admin_manual_renewal_modes_v1.py"; do
+            test -s "publisher/$path" && test -s "source/$path" || {
+              echo "::error file=$path::Manual renewal plan selection missing in release"
+              exit 1
+            }
+            cmp -s "publisher/$path" "source/$path" || {
+              echo "::error file=$path::Stale release would erase manual renewal plan selection"
+              exit 1
+            }
+          done
+          grep -Fq 'انتخاب از پلن‌های موجود' source/components/legacy-subscriptions-exact.tsx
+          grep -Fq 'mode: Literal["legacy", "custom", "plan"]' source/backend/app/routers/reserved_renewal_v1.py
+          grep -Fq 'mode?:"legacy"|"custom"|"plan"' source/lib/legacy-admin-api.ts
+
       - name: Guard legacy Telegram audience safe migration
         shell: bash
         run: |
