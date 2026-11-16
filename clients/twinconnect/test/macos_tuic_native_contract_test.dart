@@ -24,7 +24,7 @@ void main() {
     expect(host, contains('namespace + ":" + account + ":" + protocolCode'));
     expect(host, contains('outbound["zero_rtt_handshake"] as? Bool == false'));
     expect(engine, contains('["hysteria2", "tuic", "anytls", "naive", "shadowtls", "snell", "socks5"]'));
-    expect(engine, contains('outbounds.first?["type"] as? String == code'));
+    expect(engine, contains('code == "socks5" ? "socks" : code'));
     expect(provider, contains('case "hysteria2", "tuic", "anytls", "naive", "shadowtls", "snell", "socks5":'));
     expect(client, contains("SingBoxMacConfig.encodeTuicForEphemeralTunnel"));
     expect(client, contains("'startTuic'"));
