@@ -100,47 +100,52 @@ public class AxeOpenConnectVpnService extends VpnService {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        if (intent == null) return START_NOT_STICKY;
-
-        String action = intent.getAction();
+        final String action = intent == null ? null : intent.getAction();
         Log.d(TAG, "onStartCommand: action=" + action);
-        if (ACTION_CONNECT.equals(action)) {
-            String serverUrl  = intent.getStringExtra(EXTRA_SERVER_URL);
-            String name       = intent.getStringExtra(EXTRA_TUNNEL_NAME);
-            String username   = intent.getStringExtra(EXTRA_USERNAME);
-            String password   = intent.getStringExtra(EXTRA_PASSWORD);
-            String authGroup  = intent.getStringExtra(EXTRA_AUTH_GROUP);
-            String servercert = intent.getStringExtra(EXTRA_SERVERCERT);
-            if (serverUrl != null && username != null && password != null) {
-                // Must call startForeground() within 5 s of startService() (Android 8+).
-                // On Android 14+ (API 34), the 3-arg overload with a type is mandatory
-                // — using the 2-arg version throws MissingForegroundServiceTypeException.
-                try {
-                    Notification fgNotif = buildNotification(name != null ? name : "OpenConnect VPN");
-                    if (Build.VERSION.SDK_INT >= 34) {
-                        startForeground(NOTIFICATION_ID, fgNotif,
-                                android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE);
-                    } else {
-                        startForeground(NOTIFICATION_ID, fgNotif);
-                    }
-                } catch (RuntimeException foregroundError) {
-                    // Android 8-17: permission/type/background launch failures must
-                    // surface to Flutter, not terminate the main app process.
-                    Log.e(TAG, "Cisco foreground VPN service could not start", foregroundError);
-                    lastFailureCode = "CISCO_FOREGROUND_SERVICE_FAILED";
-                    broadcastStage("error");
-                    stopSelf(startId);
-                    return START_NOT_STICKY;
-                }
-                new Thread(() -> connectWithNativeCore(serverUrl, name, username,
-                        password, servercert), "oc-native-connect").start();
-            } else {
-                stopSelf();
-            }
-        } else if (ACTION_DISCONNECT.equals(action)) {
-            shutdown();
-            stopSelf();
+        if (!ACTION_CONNECT.equals(action)) {
+            // A DISCONNECT or null restart is never a foreground-service launch.
+            // The plugin dispatches disconnect with startService(), not
+            // startForegroundService(). Do not keep a stale VPN alive.
+            if (ACTION_DISCONNECT.equals(action)) shutdown();
+            stopSelf(startId);
+            return START_NOT_STICKY;
         }
+
+        // Android requires foreground promotion immediately after a
+        // startForegroundService() launch, including malformed connect intents.
+        // Do not read credentials or perform I/O before this call.
+        try {
+            final String name = intent.getStringExtra(EXTRA_TUNNEL_NAME);
+            final Notification notification = buildNotification(
+                    name != null ? name : "OpenConnect VPN");
+            if (Build.VERSION.SDK_INT >= 34) {
+                startForeground(NOTIFICATION_ID, notification,
+                        android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE);
+            } else {
+                startForeground(NOTIFICATION_ID, notification);
+            }
+        } catch (RuntimeException foregroundError) {
+            Log.e(TAG, "Cisco foreground VPN service could not start", foregroundError);
+            lastFailureCode = "CISCO_FOREGROUND_SERVICE_FAILED";
+            broadcastStage("error");
+            stopSelf(startId);
+            return START_NOT_STICKY;
+        }
+
+        final String serverUrl = intent.getStringExtra(EXTRA_SERVER_URL);
+        final String username = intent.getStringExtra(EXTRA_USERNAME);
+        final String password = intent.getStringExtra(EXTRA_PASSWORD);
+        if (serverUrl == null || serverUrl.isEmpty() ||
+                username == null || username.isEmpty() || password == null) {
+            lastFailureCode = "CISCO_AUTH_INIT_CONTEXT_MISSING";
+            broadcastStage("error");
+            stopSelf(startId);
+            return START_NOT_STICKY;
+        }
+        final String name = intent.getStringExtra(EXTRA_TUNNEL_NAME);
+        final String servercert = intent.getStringExtra(EXTRA_SERVERCERT);
+        new Thread(() -> connectWithNativeCore(serverUrl, name, username,
+                password, servercert), "oc-native-connect").start();
         return START_NOT_STICKY;
     }
 
