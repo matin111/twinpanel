@@ -34,6 +34,20 @@ if original in source:
 elif renamed not in source:
     raise SystemExit("Unexpected upstream GoBackend library loader")
 PY
+# The native ELF SONAME must also differ; merely renaming the ZIP entry
+# does not isolate two Go shared libraries in the Android linker.
+python3 - "$SOURCE_DIR" <<'PY'
+from pathlib import Path
+import sys
+p = Path(sys.argv[1]) / "tunnel/tools/libwg-go/Makefile"
+s = p.read_text()
+old = "-Wl,-soname=libwg-go.so"
+new = "-Wl,-soname=libawg-go.so"
+if old in s:
+    p.write_text(s.replace(old, new))
+elif new not in s:
+    raise SystemExit("Unexpected AWG native linker SONAME")
+PY
 (
   cd "$SOURCE_DIR"
   ./gradlew --no-daemon :tunnel:assembleRelease
