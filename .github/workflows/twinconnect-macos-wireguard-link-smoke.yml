@@ -61,7 +61,7 @@ jobs:
           assert '#include "key.h"' in h
           assert '#include <sys/types.h>' not in h
           header.write_text(h.replace('#include "key.h"',
-                                     '#include <sys/types.h>\\n#include "key.h"', 1))
+                                     '#include <sys/types.h>\n#include "key.h"', 1))
           # Avoid the overly generic KEY_H include guard colliding with
           # Xcode 16's Darwin SDK headers when C modules are imported by Swift.
           key = Path('macos_native/vendor-wireguard-apple/Sources/WireGuardKitC/key.h')
@@ -74,7 +74,7 @@ jobs:
           # avoid relying on the SWIFT_PACKAGE conditional build flag.
           private_key = Path('macos_native/vendor-wireguard-apple/Sources/WireGuardKit/PrivateKey.swift')
           swift = private_key.read_text()
-          conditional = '#if SWIFT_PACKAGE\\nimport WireGuardKitC\\n#endif'
+          conditional = '#if SWIFT_PACKAGE\nimport WireGuardKitC\n#endif'
           assert conditional in swift
           private_key.write_text(swift.replace(conditional, 'import WireGuardKitC', 1))
           PY
