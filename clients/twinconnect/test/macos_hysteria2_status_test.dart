@@ -14,7 +14,7 @@ void main() {
     messenger.setMockMethodCallHandler(channel, null);
   });
 
-  test('Hysteria2 only reports Apple's OS-connected state, never verified', () async {
+  test("Hysteria2 only reports the Apple OS-connected state, never verified", () async {
     messenger.setMockMethodCallHandler(channel, (call) async {
       expect(call.method, 'getHysteria2TunnelStatus');
       return <String, dynamic>{
