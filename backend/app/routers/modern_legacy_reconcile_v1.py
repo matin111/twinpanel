@@ -40,6 +40,7 @@ _LEGACY_REPAIR_STATES = frozenset(
         "missing",
         "legacy_empty",
         "legacy_naive_client",
+        "legacy_modern_tls_client",
         "legacy_amneziawg_egress",
     }
 )
@@ -75,6 +76,51 @@ def credential_state(credential: ProtocolCredential | None) -> str:
     return "partial"
 
 
+def _modern_tls_item_requires_repair(item: dict[str, Any], protocol: str) -> bool:
+    """Detect old insecure or incomplete TLS across actual delivery shapes.
+
+    Account delivery can store an outbound directly, under outbound or
+    singbox_outbound, or as a full config in a dict/JSON string. Never log
+    profile contents: they contain live account secrets.
+    """
+    import json
+
+    if not isinstance(item, dict):
+        return False
+
+    candidates: list[dict[str, Any]] = []
+    def collect(value: Any) -> None:
+        if isinstance(value, str):
+            try:
+                value = json.loads(value)
+            except (ValueError, TypeError):
+                return
+        if not isinstance(value, dict):
+            return
+        if str(value.get("type") or "").lower() == protocol:
+            candidates.append(value)
+        outbounds = value.get("outbounds")
+        if isinstance(outbounds, list):
+            for outbound in outbounds:
+                if isinstance(outbound, dict) and str(outbound.get("type") or "").lower() == protocol:
+                    candidates.append(outbound)
+
+    collect(item)
+    for key in ("outbound", "singbox_outbound", "config"):
+        collect(item.get(key))
+
+    for candidate in candidates:
+        tls = candidate.get("tls")
+        if not isinstance(tls, dict):
+            return True
+        if (tls.get("insecure") is True
+                or tls.get("enabled") is False
+                or tls.get("disable_sni") is True
+                or not str(tls.get("certificate") or "").strip()):
+            return True
+    return False
+
+
 def _reconcile_credential_state(credential: ProtocolCredential | None) -> str:
     """Extend storage state with safe, identity-preserving legacy repairs."""
 
@@ -83,7 +129,7 @@ def _reconcile_credential_state(credential: ProtocolCredential | None) -> str:
         return state
 
     protocol = str(credential.protocol or "").strip().lower()
-    if protocol not in {"naive", "amneziawg"}:
+    if protocol not in {"naive", "amneziawg", "hysteria2", "tuic", "anytls"}:
         return state
 
     try:
@@ -106,6 +152,10 @@ def _reconcile_credential_state(credential: ProtocolCredential | None) -> str:
             items = [payload] if payload else []
     else:
         items = []
+
+    if protocol in {"hysteria2", "tuic", "anytls"}:
+        if any(_modern_tls_item_requires_repair(item, protocol) for item in items):
+            return "legacy_modern_tls_client"
 
     if protocol == "naive":
         try:
