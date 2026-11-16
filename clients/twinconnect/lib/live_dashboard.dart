@@ -61,6 +61,7 @@ import 'macos_anytls_controller.dart';
 import 'macos_naive_controller.dart';
 import 'macos_shadowtls_controller.dart';
 import 'macos_snell_controller.dart';
+import 'macos_socks5_controller.dart';
 import 'country_flag.dart';
 import 'ambient_background.dart';
 import 'interactive_glass_card.dart';
@@ -133,6 +134,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   final MacNaiveController _macNaive = const MacNaiveController();
   final MacShadowTlsController _macShadowTls = const MacShadowTlsController();
   final MacSnellController _macSnell = const MacSnellController();
+  final MacSocks5Controller _macSocks5 = const MacSocks5Controller();
   Timer? _macOsStatusTimer;
   bool _macOsStatusRefreshing = false;
   String _macOsTunnelState = 'not_configured';
@@ -2201,7 +2203,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       // ShadowTLS cannot be flattened into one outbound: validate the
       // subscription's two-stage Shadowsocks -> ShadowTLS chain before
       // stopping any existing connection. Other protocols are unchanged.
-      if (protocol == 'shadowtls' || protocol == 'snell') {
+      if (protocol == 'shadowtls' || protocol == 'snell' ||
+          protocol == 'socks5') {
         ShadowTlsChain.fromItem(matches.single);
       }
       // When switching away from a working VPN, validate before stopping
@@ -2714,6 +2717,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       final naive = await _macNaive.status();
       final shadowtls = await _macShadowTls.status();
       final snell = await _macSnell.status();
+      final socks5 = await _macSocks5.status();
       if (!mounted) return;
       const active = <String>{
         'connecting', 'os_connected_unverified', 'reasserting', 'disconnecting',
@@ -2726,11 +2730,13 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           : active.contains(naive['state']) ? naive
           : active.contains(shadowtls['state']) ? shadowtls
           : active.contains(snell['state']) ? snell
+          : active.contains(socks5['state']) ? socks5
           : hy2['state'] != 'not_configured' ? hy2
           : tuic['state'] != 'not_configured' ? tuic
           : anytls['state'] != 'not_configured' ? anytls
           : naive['state'] != 'not_configured' ? naive
-          : shadowtls['state'] != 'not_configured' ? shadowtls : snell;
+          : shadowtls['state'] != 'not_configured' ? shadowtls
+          : snell['state'] != 'not_configured' ? snell : socks5;
       final next = status['state'] as String;
       if (next != _macOsTunnelState) {
         setState(() {
@@ -2884,7 +2890,9 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                         ? await _macShadowTls.installation()
                         : protocol == 'snell'
                             ? await _macSnell.installation()
-                            : await _macHysteria.installation();
+                            : protocol == 'socks5'
+                                ? await _macSocks5.installation()
+                                : await _macHysteria.installation();
         if (installed['engineReady'] != true ||
             installed['packetFlowBridgeReady'] != true ||
             installed['inProcessLibboxBundled'] != true) {
@@ -2900,7 +2908,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           sessionToken: widget.sessionToken,
           protocol: definition,
           native: const NativeProtocolReadiness(
-              supportedCodes: {'hysteria2', 'tuic', 'anytls', 'naive', 'shadowtls', 'snell'}),
+              supportedCodes: {'hysteria2', 'tuic', 'anytls', 'naive', 'shadowtls', 'snell', 'socks5'}),
         );
         final matches = response.items.where(
           (item) => item['node_id']?.toString() == serverId,
@@ -2934,6 +2942,12 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           );
         } else if (protocol == 'snell') {
           await _macSnell.start(
+            profile: matches.single,
+            namespace: widget.panel.namespace,
+            account: widget.username,
+          );
+        } else if (protocol == 'socks5') {
+          await _macSocks5.start(
             profile: matches.single,
             namespace: widget.panel.namespace,
             account: widget.username,
