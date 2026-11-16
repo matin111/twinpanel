@@ -41,15 +41,68 @@ final class TwinConnectMacLibboxEngine {
 
     /// Prevent a compromised or stale saved profile from injecting bypass
     /// routes, alternate protocols, or TLS verification downgrades.
+    private static func shadowTlsProfileAllowed(_ json: [String: Any]) -> Bool {
+        guard let outbounds = json["outbounds"] as? [[String: Any]],
+              outbounds.count == 2,
+              let inner = outbounds.first, let outer = outbounds.last,
+              inner["type"] as? String == "shadowsocks",
+              inner["tag"] as? String == "proxy",
+              inner["detour"] as? String == "shadowtls-transport",
+              let method = inner["method"] as? String,
+              ["aes-128-gcm", "aes-256-gcm", "chacha20-ietf-poly1305",
+               "2022-blake3-aes-128-gcm", "2022-blake3-aes-256-gcm",
+               "2022-blake3-chacha20-poly1305"].contains(method),
+              let innerSecret = inner["password"] as? String,
+              !innerSecret.isEmpty,
+              inner["server"] == nil,
+              Set(inner.keys).isSubset(of: [
+                "type", "tag", "detour", "method", "password"
+              ]),
+              outer["type"] as? String == "shadowtls",
+              outer["tag"] as? String == "shadowtls-transport",
+              outer["version"] as? Int == 3,
+              let outerSecret = outer["password"] as? String,
+              !outerSecret.isEmpty,
+              let endpoint = outer["server"] as? String,
+              !endpoint.isEmpty,
+              let port = outer["server_port"] as? Int,
+              (1...65535).contains(port),
+              Set(outer.keys).isSubset(of: [
+                "type", "tag", "version", "server", "server_port",
+                "password", "tls"
+              ]),
+              let tls = outer["tls"] as? [String: Any],
+              tls["enabled"] as? Bool == true,
+              let sni = tls["server_name"] as? String,
+              !sni.isEmpty,
+              Set(tls.keys).isSubset(of: ["enabled", "server_name"]),
+              let inbounds = json["inbounds"] as? [[String: Any]],
+              inbounds.count == 1,
+              inbounds[0]["type"] as? String == "tun",
+              inbounds[0]["strict_route"] as? Bool == true,
+              inbounds[0]["auto_route"] as? Bool == true,
+              let route = json["route"] as? [String: Any],
+              route["final"] as? String == "proxy",
+              let dns = json["dns"] as? [String: Any],
+              dns["final"] as? String == "dns-remote"
+        else { return false }
+        return true
+    }
+
     private static func profileIsAllowed(_ config: String) -> Bool {
         guard let data = config.data(using: .utf8),
               let json = (try? JSONSerialization.jsonObject(with: data))
                   as? [String: Any],
-              let outbounds = json["outbounds"] as? [[String: Any]],
-              outbounds.count == 1,
+              let outbounds = json["outbounds"] as? [[String: Any]] else {
+            return false
+        }
+        if outbounds.count == 2 {
+            return shadowTlsProfileAllowed(json)
+        }
+        guard outbounds.count == 1,
               let outbound = outbounds.first,
               let protocolCode = outbound["type"] as? String,
-              ["hysteria2", "tuic", "anytls", "naive"].contains(protocolCode),
+              ["hysteria2", "tuic", "anytls", "naive", "shadowtls"].contains(protocolCode),
               (protocolCode != "tuic" || (
                 (outbound["uuid"] as? String).map {
                     $0.range(of: "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", options: .regularExpression) != nil
@@ -94,14 +147,19 @@ final class TwinConnectMacLibboxEngine {
                   let settings = tunnel.protocolConfiguration
                     as? NETunnelProviderProtocol,
                   let code = settings.providerConfiguration?["protocol"] as? String,
-                  ["hysteria2", "tuic", "anytls", "naive"].contains(code),
+                  ["hysteria2", "tuic", "anytls", "naive", "shadowtls"].contains(code),
                   let reference = settings.passwordReference,
                   let config = Self.readProfile(reference),
                   Self.profileIsAllowed(config),
               let json = (try? JSONSerialization.jsonObject(
                     with: Data(config.utf8))) as? [String: Any],
               let outbounds = json["outbounds"] as? [[String: Any]],
-              outbounds.first?["type"] as? String == code else {
+              (code == "shadowtls" ?
+                  (outbounds.count == 2 &&
+                   outbounds.first?["type"] as? String == "shadowsocks" &&
+                   outbounds.last?["type"] as? String == "shadowtls") :
+                  (outbounds.count == 1 &&
+                   outbounds.first?["type"] as? String == code)) else {
                 completion(Self.failure("MACOS_LIBBOX_KEYCHAIN_PROFILE_MISSING"))
                 return
             }
