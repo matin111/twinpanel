@@ -68,6 +68,10 @@ jobs:
             exit 1
           fi
           tail -20 "$log"
+          embedded="$(find macos/build -type d -path '*/PacketTunnel.appex/Contents/Frameworks/Libbox.framework' -print -quit)"
+          test -n "$embedded"
+          test -e "$embedded/Libbox"
+          echo "PacketTunnel runtime Libbox embedded: $embedded"
           echo 'Libbox in PacketTunnel compiles; packet-flow forwarding still NOT IMPLEMENTED'
       - name: Verify this is not a signed or connected VPN
         shell: bash
