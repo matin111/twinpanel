@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.860",
+  "version": "1.1.0-rc.861",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-16T09:00:46Z",
+  "released_at": "2026-11-16T11:59:59Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "fff4153a58c523b52686d5ee60e7b69ea32ff3ac",
+  "source_sha": "043fe9e3a37df823b97cb366e2d021ee0d75ed70",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.860/twinpanel-1.1.0-rc.860-linux-x86_64.tar.gz",
-    "sha256": "09c4635955c2da1598dc43129a6812094dcb57ae9b88edd2fdc2c1da4a90527e",
-    "size_bytes": 31048420
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.861/twinpanel-1.1.0-rc.861-linux-x86_64.tar.gz",
+    "sha256": "c8221979401bf511b3d395ad5708411366014b639ba996d21f23ecb8ed5532af",
+    "size_bytes": 31008304
   },
   "notes": {
-    "fa": "تأیید واقعی ارسال اطلاعات اکانت و QR در ربات تلگرام؛ اصلاح نمایش وضعیت تحویل در پرداخت‌ها و ارسال نهایی یکتا برای سفارش‌هایی که پیام تأیید زودتر از تکمیل اکانت ارسال شده است.",
-    "en": "Record verified Telegram account QR dispatch, repair delivery-status evidence, and send a deduplicated final account message for early-confirmed purchases."
+    "fa": "افزایش سرعت تحویل اکانت در ربات پس از تأیید پرداخت با ارسال لینک و QR به محض آماده شدن اولین کانفیگ معتبر، بدون انتظار برای نصب همه پروتکل‌ها؛ رفع خطای مشاهده رسید در مدیریت ربات.",
+    "en": "Faster validated Telegram account link and QR delivery as soon as one live protocol is ready, with durable payment checks and off-loop readiness validation; restore admin receipt details."
   }
 }
