@@ -17,9 +17,12 @@ void main() {
     expect(proxy, isNot(contains('password')));
     expect(config['route']['final'], 'proxy');
     expect(config['dns']['final'], 'dns-remote');
-    expect(config['route']['rules'], contains({
-      'ip_version': 6, 'action': 'reject',
-    }));
+    final rules = (config['route']['rules'] as List).cast<Map>();
+    expect(
+      rules.any((rule) => rule['ip_version'] == 6 &&
+          rule['action'] == 'reject'),
+      isTrue,
+    );
     expect(config['inbounds'][0]['strict_route'], true);
   });
 
