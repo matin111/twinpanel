@@ -106,6 +106,12 @@ jobs:
           "$target/sing-box" check -c "$RUNNER_TEMP/twinconnect-macos-tuic-synthetic.json"
           dart run tool/macos_anytls_config_fixture.dart > "$RUNNER_TEMP/twinconnect-macos-anytls-synthetic.json"
           "$target/sing-box" check -c "$RUNNER_TEMP/twinconnect-macos-anytls-synthetic.json"
+          # NaiveProxy uses Cronet and is omitted from some sing-box builds.
+          # The official macOS release must contain the outbound build tag.
+          "$target/sing-box" version | grep -q 'with_naive_outbound'
+          dart run tool/macos_naive_config_fixture.dart > "$RUNNER_TEMP/twinconnect-macos-naive-synthetic.json"
+          "$target/sing-box" check -c "$RUNNER_TEMP/twinconnect-macos-naive-synthetic.json"
+          echo "Synthetic NaiveProxy outbound parsed by official Cronet-enabled sing-box"
           echo "Synthetic macOS AnyTLS, TUIC and Hysteria2 profiles parsed by official sing-box"
           file "$target/sing-box" | grep -q arm64
       - name: Bundle pinned Xray/V2Ray transport binary
