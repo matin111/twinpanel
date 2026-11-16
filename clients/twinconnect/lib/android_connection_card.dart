@@ -1325,7 +1325,8 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
           const SizedBox(height: 8),
           OutlinedButton.icon(
             key: const Key('androidDisconnectPreviousTunnel'),
-            onPressed: _busy ? null : _xrayCoreUp || _singBoxProtocol != null ? _disconnectModern :
+            onPressed: _busy ? null : _singBoxProtocol == 'amneziawg' ? _disconnectAmneziaWg :
+                _xrayCoreUp || _singBoxProtocol != null ? _disconnectModern :
                 _openVpnUp ? _disconnectOpenVpn :
                 _ciscoUp ? _disconnectCisco : _disconnect,
             icon: const Icon(Icons.stop_circle_outlined),
