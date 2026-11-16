@@ -66,11 +66,24 @@ def patch_gradle() -> None:
         "    }\n"
         "}\n"
     )
-    # Do not bundle the upstream AmneziaWG AAR yet: both its JNI library and
-    # the existing WireGuard dependency export jni/<abi>/libwg-go.so.
-    # Gradle pickFirst would silently substitute the wrong VPN engine.
-    # Keep the independently compiled AAR staged for a future isolated
-    # JNI namespace / native loader integration.
+    # The AWG build script stages an isolated libawg-go.so with its own
+    # ELF SONAME. Bundle it only when the verified AAR is available.
+    awg_aar = NATIVE / "amneziawg-core" / "tunnel-release.aar"
+    if awg_aar.is_file():
+        import zipfile
+        with zipfile.ZipFile(awg_aar) as archive:
+            names = set(archive.namelist())
+            if "classes.jar" not in names or not any(
+                name.endswith("/libawg-go.so") for name in names
+            ) or any(name.endswith("/libwg-go.so") for name in names):
+                raise RuntimeError("AWG AAR is not JNI-isolated")
+        target = ANDROID / "app" / "libs"
+        target.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(awg_aar, target / "amneziawg-tunnel.aar")
+        current += (
+            '\n// Independent AmneziaWG userspace engine.\n'
+            'dependencies { implementation(files("libs/amneziawg-tunnel.aar")) }\n'
+        )
     filename.write_text(current, encoding="utf-8")
     rules = ANDROID / "app" / "proguard-rules.pro"
     with rules.open("a", encoding="utf-8") as out:
@@ -127,10 +140,16 @@ def patch_manifest() -> None:
     # Register the official AmneziaWG VPN service only when its native AAR
     # is bundled. Never alias it to the ordinary WireGuard VpnService.
     awg_aar = NATIVE / "amneziawg-core" / "tunnel-release.aar"
-    # Do not register AWG service: the AAR is staged, not actually bundled.
-    # WireGuard and AmneziaWG both export libwg-go.so, so packaging AWG
-    # requires a separate native namespace/loader integration first.
-    # A staged AAR alone does not provide the service class at runtime.
+    if awg_aar.is_file() and 'org.amnezia.awg.backend.GoBackend$VpnService' not in current:
+        service += (
+            '\n        <service android:name="org.amnezia.awg.backend.GoBackend$VpnService"\n'
+            '            android:exported="false"\n'
+            '            android:permission="android.permission.BIND_VPN_SERVICE">\n'
+            '            <intent-filter>\n'
+            '                <action android:name="android.net.VpnService" />\n'
+            '            </intent-filter>\n'
+            '        </service>\n'
+        )
     if "com.wireguard.android.backend.GoBackend$VpnService" in current:
         service = ""
     if 'android:name=".OpenConnectVpnService"' not in current:
