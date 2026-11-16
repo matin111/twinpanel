@@ -1031,7 +1031,7 @@ def admin_payment_intents(
     subscription_ids = list({
         int(order.subscription_id)
         for order in orders.values()
-        if order.subscription_id and order.status == "fulfilled"
+        if order.subscription_id
     })
     subscriptions = {
         int(sub.id): sub
@@ -1067,7 +1067,7 @@ def admin_payment_intents(
         order = orders.get(int(row.order_id))
         account_id = (
             int(order.subscription_id)
-            if order and order.subscription_id and order.status == "fulfilled"
+            if order and order.subscription_id
             else None
         )
         delivery = "not_ready"
@@ -1096,8 +1096,10 @@ def admin_payment_intents(
             "order_status": str(order.status) if order else None,
             "subscription_id": account_id,
             "account_username": str(account.account_username or "") if account else None,
-            "fulfillment_status": "created" if account_id else (
-                "provisioning" if order and order.status in {"paid", "provisioning"}
+            "fulfillment_status": (
+                "created" if account_id and order and order.status == "fulfilled"
+                else "created_pending_fulfillment" if account_id
+                else "provisioning" if order and order.status in {"paid", "provisioning"}
                 else "not_created"
             ),
             "delivery_status": delivery,
@@ -1179,6 +1181,7 @@ async def approve_payment(
             )
 
         order.status = "paid"
+        order.paid_at = order.paid_at or row.verified_at or datetime.utcnow()
         order.payment_method = row.method
         order.payment_reference = (
             row.txid
