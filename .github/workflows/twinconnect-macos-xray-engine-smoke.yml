@@ -1,0 +1,48 @@
+name: TwinConnect macOS Xray Core Native Engine Smoke
+
+on:
+  push:
+    branches:
+      - 'feat/twinconnect-macos-packet-tunnel-foundation-20261116'
+    paths:
+      - 'clients/twinconnect/macos_native/fetch_xray_macos.sh'
+      - 'clients/twinconnect/macos_native/xray-config-check.json'
+      - '.github/workflows/twinconnect-macos-xray-engine-smoke.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  macos-xray-preflight:
+    runs-on: macos-15
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: clients/twinconnect
+    steps:
+      - uses: actions/checkout@v4
+      - name: Obtain verified official Xray macOS binaries
+        run: bash macos_native/fetch_xray_macos.sh
+      - name: Validate VLESS TLS test config offline
+        run: |
+          set -euo pipefail
+          macos_native/build/xray/arm64/xray run -test -config macos_native/xray-config-check.json
+          echo "VLESS test config parsed; no actual VPN handshake or tunnel verified"
+      - name: Validate binary architectures
+        run: |
+          file macos_native/build/xray/arm64/xray | grep -q arm64
+          file macos_native/build/xray/amd64/xray | grep -q x86_64
+      - name: Pack engine artifacts, not a complete VPN
+        run: |
+          cd macos_native/build/xray
+          ditto -c -k --sequesterRsrc arm64 xray-macOS-arm64.zip
+          ditto -c -k --sequesterRsrc amd64 xray-macOS-amd64.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TwinConnect-macOS-Xray-Engine-Preflight
+          path: |
+            clients/twinconnect/macos_native/build/xray/xray-macOS-arm64.zip
+            clients/twinconnect/macos_native/build/xray/xray-macOS-amd64.zip
+          retention-days: 7
+          if-no-files-found: error
