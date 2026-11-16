@@ -56,6 +56,7 @@ import 'native_vpn_bridge.dart';
 import 'ios_wireguard_controller.dart';
 import 'macos_wireguard_controller.dart';
 import 'macos_hysteria2_controller.dart';
+import 'macos_tuic_controller.dart';
 import 'country_flag.dart';
 import 'ambient_background.dart';
 import 'interactive_glass_card.dart';
@@ -123,6 +124,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   final IosWireGuardController _iosVpn = const IosWireGuardController();
   final MacWireGuardController _macVpn = const MacWireGuardController();
   final MacHysteria2Controller _macHysteria = const MacHysteria2Controller();
+  final MacTuicController _macTuic = const MacTuicController();
   Timer? _macOsStatusTimer;
   bool _macOsStatusRefreshing = false;
   String _macOsTunnelState = 'not_configured';
@@ -2698,8 +2700,17 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     if (!Platform.isMacOS || !mounted || _macOsStatusRefreshing) return;
     _macOsStatusRefreshing = true;
     try {
-      final status = await _macHysteria.status();
+      final hy2 = await _macHysteria.status();
+      final tuic = await _macTuic.status();
       if (!mounted) return;
+      const active = <String>{
+        'connecting', 'os_connected_unverified', 'reasserting', 'disconnecting',
+      };
+      // Exactly one macOS manager is active; never show 'Disconnected'
+      // because another protocol happens to be selected in the UI.
+      final status = active.contains(hy2['state']) ? hy2
+          : active.contains(tuic['state']) ? tuic
+          : hy2['state'] != 'not_configured' ? hy2 : tuic;
       final next = status['state'] as String;
       if (next != _macOsTunnelState) {
         setState(() {
@@ -2828,7 +2839,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         return;
       }
       final protocol = _filter == 'all' ? 'wireguard' : _filter;
-      if (protocol == 'hysteria2') {
+      if (protocol == 'hysteria2' || protocol == 'tuic') {
         final entitled = widget.catalog?.entries.any((entry) =>
             entry.protocol.code == protocol && entry.selected &&
             entry.configRecordPresent) ?? false;
@@ -2839,17 +2850,19 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         if (serverId == null ||
             widget.servers?.servers.any((server) => server.id == serverId)
                 != true) {
-          throw const FormatException('SELECT_HYSTERIA2_SERVER');
+          throw const FormatException('SELECT_MACOS_LIBBOX_SERVER');
         }
-        final installed = await _macHysteria.installation();
+        final installed = protocol == 'tuic'
+            ? await _macTuic.installation()
+            : await _macHysteria.installation();
         if (installed['engineReady'] != true ||
             installed['packetFlowBridgeReady'] != true ||
             installed['inProcessLibboxBundled'] != true) {
-          throw const FormatException('MACOS_HYSTERIA2_PACKET_FLOW_BRIDGE_MISSING');
+          throw const FormatException('MACOS_LIBBOX_PACKET_FLOW_BRIDGE_MISSING');
         }
-        final definition = VpnProtocols.byCode('hysteria2');
+        final definition = VpnProtocols.byCode(protocol);
         if (definition == null) {
-          throw const FormatException('HYSTERIA2_PROTOCOL_UNAVAILABLE');
+          throw const FormatException('MACOS_LIBBOX_PROTOCOL_UNAVAILABLE');
         }
         final response = await TenantApi.fromBuildConfig()
             .loadSessionNativeProfiles(
@@ -2857,19 +2870,27 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           sessionToken: widget.sessionToken,
           protocol: definition,
           native: const NativeProtocolReadiness(
-              supportedCodes: {'hysteria2'}),
+              supportedCodes: {'hysteria2', 'tuic'}),
         );
         final matches = response.items.where(
           (item) => item['node_id']?.toString() == serverId,
         ).toList(growable: false);
         if (matches.length != 1) {
-          throw const FormatException('HYSTERIA2_SERVER_PROFILE_MISSING');
+          throw const FormatException('MACOS_LIBBOX_SERVER_PROFILE_MISSING');
         }
-        await _macHysteria.start(
-          profile: matches.single,
-          namespace: widget.panel.namespace,
-          account: widget.username,
-        );
+        if (protocol == 'tuic') {
+          await _macTuic.start(
+            profile: matches.single,
+            namespace: widget.panel.namespace,
+            account: widget.username,
+          );
+        } else {
+          await _macHysteria.start(
+            profile: matches.single,
+            namespace: widget.panel.namespace,
+            account: widget.username,
+          );
+        }
         if (mounted) setState(() {
           _vpnUp = false;
           _vpnVerified = false;
