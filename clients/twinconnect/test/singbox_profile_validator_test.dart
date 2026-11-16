@@ -327,6 +327,34 @@ void main() {
     }
   });
 
+  test('TLS policy reports the exact unsafe field without weakening trust', () {
+    const cases = <String, String>{
+      'insecure': 'SINGBOX_TLS_CERT_VERIFICATION_DISABLED',
+      'disable_sni': 'SINGBOX_TLS_SNI_DISABLED',
+      'enabled': 'SINGBOX_TLS_DISABLED',
+    };
+    for (final protocol in ['hysteria2', 'tuic', 'anytls', 'naive']) {
+      for (final entry in cases.entries) {
+        final tls = <String, dynamic>{
+          'enabled': true,
+          'server_name': 'www.example.org',
+          entry.key: entry.key == 'enabled' ? false : true,
+        };
+        expect(
+          () => SingBoxProfileValidator.validateOutbound(
+            protocolCode: protocol,
+            item: {'outbound': {
+              'type': protocol, 'server': 'vpn.example.org',
+              'server_port': 443, 'tls': tls,
+            }},
+          ),
+          throwsA(isA<FormatException>().having(
+            (e) => e.message, 'error code', entry.value)),
+        );
+      }
+    }
+  });
+
   test('ShadowTLS detour cannot be flattened to a single node', () {
     expect(() => SingBoxProfileValidator.validateOutbound(
       protocolCode: 'shadowtls', item: {

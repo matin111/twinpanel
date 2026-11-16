@@ -243,9 +243,16 @@ class SingBoxProfileValidator {
         throw const FormatException('SINGBOX_TLS_REQUIRED');
       }
       final tls = Map<String, dynamic>.from(rawTls);
-      if (tls['enabled'] == false || tls['insecure'] == true ||
-          tls['disable_sni'] == true) {
-        throw const FormatException('SINGBOX_TLS_UNSAFE');
+      // Fail closed, but identify which panel setting is incompatible.
+      // Never silently disable certificate verification or SNI.
+      if (tls['insecure'] == true) {
+        throw const FormatException('SINGBOX_TLS_CERT_VERIFICATION_DISABLED');
+      }
+      if (tls['disable_sni'] == true) {
+        throw const FormatException('SINGBOX_TLS_SNI_DISABLED');
+      }
+      if (tls['enabled'] == false) {
+        throw const FormatException('SINGBOX_TLS_DISABLED');
       }
       // Some panel profiles omit "enabled" but provide a valid TLS block.
       // Make TLS explicit rather than accidentally dialing without TLS.
