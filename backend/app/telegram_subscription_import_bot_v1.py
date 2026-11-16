@@ -446,8 +446,11 @@ def install(router, request_fn):
                 )]
                 for method in methods if method.get("id")
             ]
-            if not buttons:
-                raise RuntimeError("روش پرداخت فعالی وجود ندارد؛ سفارش ذخیره شد")
+            buttons.append([InlineKeyboardButton(
+                text="💰 پرداخت تمدید از کیف پول",
+                callback_data=f"renewwallet:preview:{int(order['id'])}",
+            )])
+            # Wallet remains available when other gateways are disabled.
         except Exception as exc:
             if callback.message:
                 await callback.message.answer("❌ " + escape(str(exc)[:180]))
