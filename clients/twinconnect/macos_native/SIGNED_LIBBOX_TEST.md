@@ -45,11 +45,25 @@ and Network Extension capability provisioned to both app and extension:
      CODE_SIGNING_ALLOWED=YES build
    ```
 
-6. Verify the app, PacketTunnel.appex and embedded Libbox.framework signatures
-   with `codesign --verify --deep --strict`. Inspect app and extension
-   entitlements with `codesign -d --entitlements :-`. A build can be green
-   while provisioning, app-group access or Network Extension installation
-   still fails at runtime.
+6. Verify that the built application, embedded PacketTunnel.appex,
+   and Libbox.framework are signed with the **same real Apple Team**, that the
+   extension backend marker is enabled, and that the **effective** (signed)
+   Network Extension and Keychain entitlements match. The verification command
+   fails closed with an actionable reason:
+
+   ```bash
+   python3 macos_native/verify_signed_macos_bundle.py \
+     build/macos/Build/Products/Debug/twinconnect.app
+   ```
+
+   If your signed candidate is at a different path, substitute that exact
+   `.app` path. Do not copy the GitHub *unsigned* artifact to a Mac and expect
+   the VPN to work: rebuild with your own Apple identity, marker and signing
+   settings. A green Xcode build alone does not establish VPN functionality.
+
+7. Run a real Hysteria2 test connection and record **live** connection
+   state, handshake or endpoint reachability, IP change, packet counters,
+   default route, DNS and IPv6. The verifier checks signing only.
 
 **Required live acceptance tests** with a valid, entitled *test* subscription:
 select the exact Hysteria2 node, verify status transitions, obtain a
