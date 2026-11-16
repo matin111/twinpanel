@@ -22,6 +22,13 @@ final class TwinConnectMacOSVPNBridge {
         return FileManager.default.isExecutableFile(atPath: core.path)
     }
 
+    private static func mieruCoreInExtension() -> Bool {
+        guard let bundle = extensionBundle() else { return false }
+        let core = bundle.bundleURL.appendingPathComponent(
+            "Contents/Resources/TwinConnectEngines/mieru")
+        return FileManager.default.isExecutableFile(atPath: core.path)
+    }
+
     private static func xrayEngineInstalled() -> Bool {
         let executable = Bundle.main.bundleURL.appendingPathComponent(
             "Contents/Resources/TwinConnectEngines/xray")
@@ -108,9 +115,10 @@ final class TwinConnectMacOSVPNBridge {
                     "contractVersion": 1,
                     "protocol": "mieru",
                     "binaryInstalled": mieruCoreBundled(),
+                    "extensionBinaryInstalled": mieruCoreInExtension(),
                     "packetFlowBridgeReady": false,
                     "engineReady": false,
-                    "reason": mieruCoreBundled()
+                    "reason": mieruCoreBundled() && mieruCoreInExtension()
                         ? "MACOS_MIERU_PACKET_FLOW_BRIDGE_MISSING"
                         : "MACOS_MIERU_NATIVE_CORE_NOT_BUNDLED",
                 ] as [String: Any])
