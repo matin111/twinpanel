@@ -48,7 +48,13 @@ final class TwinConnectMacLibboxEngine {
               let outbounds = json["outbounds"] as? [[String: Any]],
               outbounds.count == 1,
               let outbound = outbounds.first,
-              outbound["type"] as? String == "hysteria2",
+              let protocolCode = outbound["type"] as? String,
+              ["hysteria2", "tuic"].contains(protocolCode),
+              (protocolCode != "tuic" || (
+                (outbound["uuid"] as? String).map {
+                    $0.range(of: "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", options: .regularExpression) != nil
+                } == true && outbound["zero_rtt_handshake"] as? Bool == false
+              )),
               outbound["tag"] as? String == "proxy",
               let secret = outbound["password"] as? String,
               !secret.isEmpty,
@@ -59,6 +65,7 @@ final class TwinConnectMacLibboxEngine {
               let tls = outbound["tls"] as? [String: Any],
               tls["enabled"] as? Bool == true,
               tls["insecure"] == nil,
+              tls["disable_sni"] == nil,
               let inbounds = json["inbounds"] as? [[String: Any]],
               inbounds.count == 1,
               inbounds.first?["type"] as? String == "tun",
@@ -76,12 +83,16 @@ final class TwinConnectMacLibboxEngine {
             guard let self, let tunnel = self.tunnel,
                   let settings = tunnel.protocolConfiguration
                     as? NETunnelProviderProtocol,
-                  settings.providerConfiguration?["protocol"]
-                    as? String == "hysteria2",
+                  let code = settings.providerConfiguration?["protocol"] as? String,
+                  ["hysteria2", "tuic"].contains(code),
                   let reference = settings.passwordReference,
                   let config = Self.readProfile(reference),
-                  Self.profileIsAllowed(config) else {
-                completion(Self.failure("MACOS_HYSTERIA2_KEYCHAIN_PROFILE_MISSING"))
+                  Self.profileIsAllowed(config),
+              let json = (try? JSONSerialization.jsonObject(
+                    with: Data(config.utf8))) as? [String: Any],
+              let outbounds = json["outbounds"] as? [[String: Any]],
+              outbounds.first?["type"] as? String == code else {
+                completion(Self.failure("MACOS_LIBBOX_KEYCHAIN_PROFILE_MISSING"))
                 return
             }
 
