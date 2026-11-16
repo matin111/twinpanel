@@ -21,6 +21,13 @@ final class TwinConnectMacOSVPNBridge {
         return FileManager.default.isExecutableFile(atPath: executable.path)
     }
 
+    private static func libboxInExtension() -> Bool {
+        guard let bundle = extensionBundle() else { return false }
+        let path = bundle.bundleURL.appendingPathComponent(
+            "Contents/Frameworks/Libbox.framework/Libbox")
+        return FileManager.default.fileExists(atPath: path.path)
+    }
+
     private static func hysteriaEngineInstalled() -> Bool {
         let root = Bundle.main.bundleURL.appendingPathComponent(
             "Contents/Resources/TwinConnectEngines/sing-box")
@@ -81,6 +88,7 @@ final class TwinConnectMacOSVPNBridge {
                     "contractVersion": 1,
                     "protocol": "hysteria2",
                     "binaryInstalled": hysteriaEngineInstalled(),
+                    "inProcessLibboxBundled": libboxInExtension(),
                     "packetFlowBridgeReady": false,
                     "engineReady": false,
                     "reason": hysteriaEngineInstalled()
@@ -101,6 +109,9 @@ final class TwinConnectMacOSVPNBridge {
                 ] as [String: Any])
             case "startTunnel":
                 TwinConnectMacOSVPNControl.start(
+                    call.arguments, backendLinked: backendReady(), result: result)
+            case "startHysteria2":
+                TwinConnectMacOSLibboxControl.start(
                     call.arguments, backendLinked: backendReady(), result: result)
             case "stopTunnel":
                 TwinConnectMacOSVPNControl.stop(result)
