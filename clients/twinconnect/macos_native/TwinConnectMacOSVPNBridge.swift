@@ -2,6 +2,7 @@
 // its real protocol backend marker. Installing an .appex alone is never proof
 // of a working VPN. Native controls are fail-closed until backend integration.
 import Foundation
+import Security
 
 final class TwinConnectMacOSVPNBridge {
     private static func extensionBundle() -> Bundle? {
@@ -39,10 +40,31 @@ final class TwinConnectMacOSVPNBridge {
         return true
     }
 
-    private static func backendReady() -> Bool {
-        // Additional signed entitlement and runtime checks are mandatory
-        // before this can be used to enable actual connections.
+    private static func wireGuardBackendReady() -> Bool {
+        // WireGuardKit's Go bridge is not in the shipping PacketTunnel.
         return false
+    }
+
+    private static func libboxBackendReady() -> Bool {
+        // CI builds are unsigned and must never report VPN readiness.
+        // Production may enable this only after a signed/manual egress test,
+        // with both the app and extension provisioned for NetworkExtension.
+        #if TWINCONNECT_SIGNED_LIBBOX
+        guard let bundle = extensionBundle(),
+              bundle.object(forInfoDictionaryKey:
+                  "TwinConnectProtocolBackendLinked") as? Bool == true,
+              libboxInExtension(),
+              let task = SecTaskCreateFromSelf(kCFAllocatorDefault),
+              let values = SecTaskCopyValueForEntitlement(task,
+                  "com.apple.developer.networking.networkextension" as CFString,
+                  nil) as? [String],
+              values.contains("packet-tunnel-provider") else {
+            return false
+        }
+        return true
+        #else
+        return false
+        #endif
     }
 
     static func register(binaryMessenger messenger: FlutterBinaryMessenger) {
@@ -55,8 +77,8 @@ final class TwinConnectMacOSVPNBridge {
             case "getCapabilities":
                 result([
                     "contractVersion": 1,
-                    "engineReady": false,
-                    "fullTunnel": false,
+                    "engineReady": libboxBackendReady(),
+                    "fullTunnel": libboxBackendReady(),
                     "includeApps": false,
                     "excludeApps": false,
                     "killSwitchEnforced": false,
@@ -70,7 +92,8 @@ final class TwinConnectMacOSVPNBridge {
             case "getProtocolCapabilities":
                 result([
                     "contractVersion": 1,
-                    "supportedCodes": [String]()
+                    "supportedCodes": libboxBackendReady()
+                        ? ["hysteria2"] : [String]()
                 ] as [String: Any])
             case "macOSXrayEngineStatus":
                 result([
@@ -89,8 +112,8 @@ final class TwinConnectMacOSVPNBridge {
                     "protocol": "hysteria2",
                     "binaryInstalled": hysteriaEngineInstalled(),
                     "inProcessLibboxBundled": libboxInExtension(),
-                    "packetFlowBridgeReady": false,
-                    "engineReady": false,
+                    "packetFlowBridgeReady": libboxBackendReady(),
+                    "engineReady": libboxBackendReady(),
                     "reason": hysteriaEngineInstalled()
                         ? "MACOS_HYSTERIA2_PACKET_FLOW_BRIDGE_MISSING"
                         : "MACOS_HYSTERIA2_ENGINE_BINARY_MISSING"
@@ -109,10 +132,10 @@ final class TwinConnectMacOSVPNBridge {
                 ] as [String: Any])
             case "startTunnel":
                 TwinConnectMacOSVPNControl.start(
-                    call.arguments, backendLinked: backendReady(), result: result)
+                    call.arguments, backendLinked: wireGuardBackendReady(), result: result)
             case "startHysteria2":
                 TwinConnectMacOSLibboxControl.start(
-                    call.arguments, backendLinked: backendReady(), result: result)
+                    call.arguments, backendLinked: libboxBackendReady(), result: result)
             case "stopTunnel":
                 TwinConnectMacOSVPNControl.stop(result)
             case "getTunnelStatus":
