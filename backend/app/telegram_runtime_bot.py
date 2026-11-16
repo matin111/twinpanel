@@ -179,6 +179,7 @@ async def request(
             "X-Telegram-Bot-Secret"
         ] = BOT_SECRET
 
+    started_at = time.monotonic()
     client = _api_client
     if client is None:
         # Support direct/unit calls outside main() without leaking a pool.
@@ -197,6 +198,18 @@ async def request(
             headers=headers,
             json=payload if files is None else None,
             files=files,
+        )
+
+    elapsed = time.monotonic() - started_at
+    if elapsed >= 0.75:
+        # Record only path + latency, never auth headers, body or credentials.
+        print(
+            "BOT_LOCAL_API_SLOW",
+            str(method).upper(),
+            str(path).split("?", 1)[0],
+            f"{elapsed:.3f}s",
+            f"HTTP_{response.status_code}",
+            flush=True,
         )
 
     try:
