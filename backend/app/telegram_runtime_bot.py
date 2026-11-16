@@ -2667,12 +2667,15 @@ async def _telegram_notification_worker(bot):
                             f"<b>{amount:,} تومان</b>"
                         ),
                         "",
-                        "🎉 <b>اشتراک شما فعال شد</b>",
+                        ("🔗 <b>لینک اتصال آماده شد</b>" if payload.get("account_setup_in_progress") else "🎉 <b>اشتراک شما فعال شد</b>"),
                         (
                             "👤 نام کاربری: "
                             f"<code>{safe_username}</code>"
                         ),
                     ]
+
+                    if payload.get("account_setup_in_progress"):
+                        lines.append("⏳ پروتکل‌های دیگر پس از آماده‌شدن به همین لینک اضافه می‌شوند.")
 
                     if password:
                         lines.append(
