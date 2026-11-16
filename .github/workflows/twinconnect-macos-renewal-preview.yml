@@ -120,6 +120,10 @@ jobs:
           dart run tool/macos_socks5_config_fixture.dart > "$RUNNER_TEMP/twinconnect-macos-socks5-synthetic.json"
           "$target/sing-box" check -c "$RUNNER_TEMP/twinconnect-macos-socks5-synthetic.json"
           echo "Synthetic authenticated SOCKS5 TCP outbound parsed by official sing-box"
+          dart run tool/macos_mieru_tun_fixture.dart > "$RUNNER_TEMP/twinconnect-macos-mieru-tun-synthetic.json"
+          "$target/sing-box" check -c "$RUNNER_TEMP/twinconnect-macos-mieru-tun-synthetic.json"
+          echo "Synthetic Mieru local SOCKS to Libbox TUN parsed (Mieru NOT started)"
+
 
           echo "Synthetic NaiveProxy outbound parsed by official Cronet-enabled sing-box"
           echo "Synthetic macOS AnyTLS, TUIC and Hysteria2 profiles parsed by official sing-box"
