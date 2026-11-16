@@ -66,19 +66,11 @@ def patch_gradle() -> None:
         "    }\n"
         "}\n"
     )
-    # Bundle the independently built official AmneziaWG AAR only when present.
-    # This must be the AWG backend, never the stock WireGuard tunnel.
-    awg_aar = NATIVE / "amneziawg-core" / "tunnel-release.aar"
-    if awg_aar.is_file():
-        target = ANDROID / "app" / "libs" / "amneziawg-tunnel.aar"
-        target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(awg_aar, target)
-        current += (
-            "\n// Official AmneziaWG backend and JNI, built from pinned upstream source.\n"
-            'dependencies { implementation(files("libs/amneziawg-tunnel.aar")) }\n'
-            'dependencies { implementation("androidx.collection:collection:1.4.5") }\n'
-            'dependencies { implementation("androidx.annotation:annotation:1.9.1") }\n'
-        )
+    # Do not bundle the upstream AmneziaWG AAR yet: both its JNI library and
+    # the existing WireGuard dependency export jni/<abi>/libwg-go.so.
+    # Gradle pickFirst would silently substitute the wrong VPN engine.
+    # Keep the independently compiled AAR staged for a future isolated
+    # JNI namespace / native loader integration.
     filename.write_text(current, encoding="utf-8")
     rules = ANDROID / "app" / "proguard-rules.pro"
     with rules.open("a", encoding="utf-8") as out:
@@ -134,19 +126,6 @@ def patch_manifest() -> None:
     )
     if "com.wireguard.android.backend.GoBackend$VpnService" in current:
         service = ""
-    if (NATIVE / "amneziawg-core" / "tunnel-release.aar").is_file() and (
-        'org.amnezia.awg.backend.GoBackend$VpnService' not in current
-    ):
-        service += (
-            '\n        <!-- Official AmneziaWG GoBackend VPN service -->\n'
-            '        <service android:name="org.amnezia.awg.backend.GoBackend$VpnService"\n'
-            '            android:exported="false"\n'
-            '            android:permission="android.permission.BIND_VPN_SERVICE">\n'
-            '            <intent-filter>\n'
-            '                <action android:name="android.net.VpnService" />\n'
-            '            </intent-filter>\n'
-            '        </service>\n'
-        )
     if 'android:name=".OpenConnectVpnService"' not in current:
         service += (
         '\n        <!-- Reserved Cisco / OpenConnect VpnService. The engine is '
