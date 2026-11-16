@@ -17,6 +17,7 @@ class MacMieruController {
         'protocol': 'mieru',
         'binaryInstalled': false,
         'extensionBinaryInstalled': false,
+        'extensionLibraryInstalled': false,
         'packetFlowBridgeReady': false,
         'engineReady': false,
         'reason': 'MACOS_REQUIRED',
@@ -30,6 +31,7 @@ class MacMieruController {
         raw['protocol'] != 'mieru' ||
         raw['binaryInstalled'] is! bool ||
         raw['extensionBinaryInstalled'] is! bool ||
+        raw['extensionLibraryInstalled'] is! bool ||
         raw['packetFlowBridgeReady'] is! bool ||
         raw['engineReady'] is! bool ||
         raw['reason'] is! String) {
@@ -38,7 +40,8 @@ class MacMieruController {
     if (raw['engineReady'] == true &&
         (raw['packetFlowBridgeReady'] != true ||
             raw['binaryInstalled'] != true ||
-            raw['extensionBinaryInstalled'] != true)) {
+            raw['extensionBinaryInstalled'] != true ||
+            raw['extensionLibraryInstalled'] != true)) {
       throw const FormatException('MACOS_MIERU_BACKEND_INCONSISTENT');
     }
     return Map.unmodifiable(raw);
