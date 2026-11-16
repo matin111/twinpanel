@@ -114,8 +114,8 @@ def retry_blocked_renewal(subscription_id: int, renewal_id: int,
         raise HTTPException(404, "تمدید پیدا نشد")
     if item.status != "blocked":
         raise HTTPException(409, "فقط تمدید مسدودشده قابل بررسی مجدد است")
-    if item.plan_id is not None and int(item.plan_id) != int(sub.plan_id or 0):
-        raise HTTPException(409, "ابتدا ناسازگاری پلن اشتراک را برطرف کنید")
+    # A blocked cross-plan reservation can be retried once provisioning
+    # has been repaired; the actual switch still waits for expiry/exhaustion.
     item.status = "queued"
     history(db, subscription_id, "renewal_requeued", "admin", f"admin:{admin.id}",
             {"renewal_id": renewal_id})

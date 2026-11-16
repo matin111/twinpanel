@@ -252,13 +252,8 @@ def create_imported_renewal_order(
     ):
         raise HTTPException(status_code=409, detail="یک پلن تمدید فعال و معتبر انتخاب کنید")
 
-    # Deferred renewals cannot silently change a customer's plan/protocols.
-    # Reject at checkout, not after payment has already been accepted.
-    if sub.plan_id is None or int(plan.id) != int(sub.plan_id):
-        raise HTTPException(
-            status_code=409,
-            detail="تغییر پلن اکانت انتقالی در تمدید رزروی هنوز پشتیبانی نمی‌شود",
-        )
+    # Imported accounts retain their current plan/protocols until the old
+    # period ends. A different paid plan is reserved for the next period.
     if sub.expires_at is None and int(sub.traffic_limit_bytes or 0) <= 0:
         raise HTTPException(
             status_code=409,

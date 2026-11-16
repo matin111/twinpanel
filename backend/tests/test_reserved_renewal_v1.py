@@ -25,6 +25,11 @@ class Result:
     def scalar_one_or_none(self):
         return self.value
 
+    def scalar_one(self):
+        if self.value is None:
+            raise ValueError("No result")
+        return self.value
+
 
 class FakeDB:
     def __init__(self, results):
@@ -79,9 +84,71 @@ class DeferredRenewalTest(unittest.TestCase):
                                source="website_bot", actor="customer:1",
                                status="queued", activated_at=None)
 
+    def test_different_plan_is_queued_without_changing_running_account(self):
+        sub = self.subscription()
+        old_expiry = sub.expires_at
+        db = ReservationDB(sub, SimpleNamespace(is_active=True, duration_days=45))
+        row = service.reserve_renewal(
+            db, subscription_id=22, plan_id=10, plan_name="new premium",
+            traffic_bytes=40 * 1024**3, duration_days=45,
+            source="website_bot", reference="order-222", actor="customer:1")
+        self.assertEqual(row.plan_id, 10)
+        self.assertEqual(row.status, "queued")
+        self.assertEqual(sub.plan_id, 5)
+        self.assertEqual(sub.expires_at, old_expiry)
+        self.assertEqual(sub.traffic_used_bytes, 4 * 1024**3)
+        self.assertEqual(sub.account_username, "untouched")
+
+    def test_different_plan_is_not_provisioned_before_expiry(self):
+        sub = self.subscription()
+        db = FakeDB([Result(items=[] )])
+        with patch.object(service, "provision_reserved_plan_at_cutover") as provision:
+            self.assertEqual(service.activate_due_renewals(db), 0)
+            provision.assert_not_called()
+        self.assertEqual(sub.plan_id, 5)
+
+    def test_different_plan_provisions_at_expiry_then_resets_period(self):
+        sub = self.subscription(expires_at=datetime.utcnow()-timedelta(seconds=1))
+        pending = self.pending()
+        pending.plan_id = 10
+        db = FakeDB([Result(items=[22]), Result(value=sub), Result(value=pending),
+                     Result(value=sub), Result(value=pending)])
+        def provision(_db, item, plan_id):
+            self.assertEqual(item.plan_id, 5)
+            self.assertEqual(plan_id, 10)
+            item.plan_id = 10
+            return True, "ready"
+        with patch.object(service, "provision_reserved_plan_at_cutover", side_effect=provision), \
+             patch.object(service, "reset_subscription_period_usage",
+                          side_effect=lambda db, item, **kw: setattr(item, "traffic_used_bytes", 0)), \
+             patch.object(service, "queue_subscription_enforcement"), \
+             patch.object(service, "history"):
+            self.assertEqual(service.activate_due_renewals(db), 1)
+        self.assertEqual(sub.plan_id, 10)
+        self.assertEqual(sub.account_username, "untouched")
+        self.assertEqual(sub.traffic_limit_bytes, pending.traffic_bytes)
+        self.assertEqual(pending.status, "activated")
+
+    def test_cross_plan_provision_failure_never_consumes_paid_cycle(self):
+        sub = self.subscription(traffic_used_bytes=10 * 1024**3)
+        pending = self.pending()
+        pending.plan_id = 10
+        db = FakeDB([Result(items=[22]), Result(value=sub), Result(value=pending)])
+        with patch.object(service, "provision_reserved_plan_at_cutover",
+                          return_value=(False, "target_plan_without_protocols")), \
+             patch.object(service, "reset_subscription_period_usage") as reset, \
+             patch.object(service, "queue_subscription_enforcement") as enforce, \
+             patch.object(service, "history"):
+            self.assertEqual(service.activate_due_renewals(db), 0)
+            reset.assert_not_called()
+            enforce.assert_not_called()
+        self.assertEqual(pending.status, "blocked")
+        self.assertEqual(sub.traffic_used_bytes, 10 * 1024**3)
+        self.assertEqual(sub.plan_id, 5)
+
     def test_days_only_renewal_retains_quota_instead_of_unlimited(self):
         sub = self.subscription()
-        db = ReservationDB(sub, SimpleNamespace(duration_days=30))
+        db = ReservationDB(sub, SimpleNamespace(duration_days=30,is_active=True))
         row = service.reserve_renewal(
             db, subscription_id=22, plan_id=5, plan_name="original",
             traffic_bytes=0, duration_days=30, source="admin",
@@ -92,7 +159,7 @@ class DeferredRenewalTest(unittest.TestCase):
 
     def test_traffic_only_renewal_retains_plan_duration(self):
         sub = self.subscription()
-        db = ReservationDB(sub, SimpleNamespace(duration_days=45))
+        db = ReservationDB(sub, SimpleNamespace(duration_days=45,is_active=True))
         row = service.reserve_renewal(
             db, subscription_id=22, plan_id=5, plan_name="original",
             traffic_bytes=20 * 1024**3, duration_days=0,

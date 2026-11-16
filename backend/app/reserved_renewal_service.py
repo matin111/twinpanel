@@ -4,6 +4,7 @@ Do not change the running subscription when a renewal is purchased.
 All callers must commit the queue insertion in their existing payment/credit transaction.
 """
 from datetime import datetime, timedelta
+import asyncio
 from sqlalchemy.orm import Session
 from sqlalchemy import select, or_, and_
 from fastapi import HTTPException
@@ -70,9 +71,16 @@ def reserve_renewal(db: Session, *, subscription_id: int, plan_id: int | None,
         raise HTTPException(422, "حجم دوره تمدید باید مشخص باشد")
     if sub.expires_at is None and int(sub.traffic_limit_bytes or 0) <= 0:
         raise HTTPException(409, "اشتراک بدون انقضای حجم و تاریخ، زمان فعال‌سازی تمدید ندارد")
-    # Changes of protocol/plan require a separate atomic migration before payment.
-    if plan_id is not None and (sub.plan_id is None or int(plan_id) != int(sub.plan_id)):
-        raise HTTPException(409, "تغییر پلن در تمدید رزروی فعلاً مجاز نیست")
+    # Different plans are purchased for the NEXT period. No plan, protocol,
+    # credential, quota or node on the current subscription changes here.
+    # At cutover the existing lifecycle provisions the destination plan.
+    if plan_id is not None:
+        from .models import Plan
+        chosen = db.get(Plan, int(plan_id))
+        if chosen is None:
+            raise HTTPException(404, "پلن تمدید پیدا نشد")
+        if not bool(chosen.is_active):
+            raise HTTPException(409, "پلن تمدید غیرفعال است")
     prior = db.execute(select(PendingSubscriptionRenewal).where(
         PendingSubscriptionRenewal.source == source,
         PendingSubscriptionRenewal.source_reference == reference)).scalar_one_or_none()
@@ -88,7 +96,8 @@ def reserve_renewal(db: Session, *, subscription_id: int, plan_id: int | None,
     item = PendingSubscriptionRenewal(
         subscription_id=subscription_id, plan_id=plan_id, plan_name=plan_name,
         traffic_bytes=traffic_bytes, duration_days=duration_days,
-        amount_toman=amount_toman, source=source, source_reference=reference, actor=actor)
+        amount_toman=amount_toman, source=source, source_reference=reference, actor=actor,
+        status="queued")
     db.add(item)
     db.flush()
     history(db, subscription_id, "renewal_queued", source, actor, {
@@ -96,6 +105,39 @@ def reserve_renewal(db: Session, *, subscription_id: int, plan_id: int | None,
         "traffic_bytes": traffic_bytes, "duration_days": duration_days,
         "amount_toman": amount_toman, "reference": reference})
     return item
+
+def provision_reserved_plan_at_cutover(db: Session, sub: Subscription, plan_id: int) -> tuple[bool, str]:
+    """Provision a changed plan ONLY after the previous period has ended.
+
+    Reuse the production subscription protocol lifecycle instead of merely
+    changing plan_id. A failed provision does not consume the paid renewal.
+    The caller runs in the dedicated renewal thread (not the FastAPI loop).
+    """
+    from .models import Plan
+    from .protocol_account_registry import plan_protocols
+    from .routers.subscription_protocol_lifecycle_v3 import admin_edit_subscription_protocol_lifecycle_v3
+
+    plan = db.get(Plan, int(plan_id))
+    if plan is None or not bool(plan.is_active):
+        return False, "target_plan_unavailable"
+    protocols = plan_protocols(db, plan)
+    if not protocols:
+        return False, "target_plan_without_protocols"
+    # Avoid resetting the customer's quota or renewal duration during
+    # provisioning; the next period is activated only after success below.
+    response = asyncio.run(admin_edit_subscription_protocol_lifecycle_v3(
+        subscription_id=int(sub.id),
+        payload={
+            "plan_id": int(plan.id),
+            "protocols": protocols,
+            "traffic_limit_bytes": int(sub.traffic_limit_bytes or 0),
+        },
+        db=db,
+    ))
+    if not bool(response.get("ok")):
+        return False, "destination_protocol_provision_incomplete"
+    return True, "ready"
+
 
 def activate_due_renewals(db: Session, limit: int = 100) -> int:
     """Called on a short recurring worker tick; locks per-subscription against usage collectors."""
@@ -167,15 +209,43 @@ def activate_due_renewals(db: Session, limit: int = 100) -> int:
             if pending.plan_id is not None and (
                 sub.plan_id is None or int(pending.plan_id) != int(sub.plan_id)
             ):
-                pending.status = "blocked"
-                history(db, sub_id, "renewal_blocked", pending.source, "system", {
-                    "renewal_id": pending.id,
-                    "reason": "plan_changed_after_renewal",
-                    "current_plan_id": sub.plan_id,
-                    "reserved_plan_id": pending.plan_id,
-                })
-                db.commit()
-                continue
+                # This branch is reached ONLY once the old period has expired
+                # or its traffic is exhausted. Keep the reserved period intact
+                # unless the destination protocols are actually provisioned.
+                try:
+                    ready, reason = provision_reserved_plan_at_cutover(
+                        db, sub, int(pending.plan_id)
+                    )
+                except Exception as exc:
+                    db.rollback()
+                    # Fail closed: no period reset or paid-reservation consume.
+                    # An admin may requeue after inspecting provisioning logs.
+                    pending = db.get(PendingSubscriptionRenewal, pending.id)
+                    if pending is not None:
+                        pending.status = "blocked"
+                        history(db, sub_id, "renewal_blocked", pending.source, "system", {
+                            "renewal_id": pending.id,
+                            "reason": "destination_protocol_provision_error",
+                            "error_class": type(exc).__name__,
+                        })
+                        db.commit()
+                    continue
+                if not ready:
+                    pending.status = "blocked"
+                    history(db, sub_id, "renewal_blocked", pending.source, "system", {
+                        "renewal_id": pending.id, "reason": reason,
+                        "reserved_plan_id": pending.plan_id,
+                    })
+                    db.commit()
+                    continue
+                # The lifecycle committed the new plan/protocol state. Reload
+                # the subscription before resetting the new accounting cycle.
+                sub = db.execute(select(Subscription).where(
+                    Subscription.id == sub_id
+                ).with_for_update()).scalar_one()
+                pending = db.execute(select(PendingSubscriptionRenewal).where(
+                    PendingSubscriptionRenewal.id == pending.id
+                ).with_for_update()).scalar_one()
             before = {"plan_id": sub.plan_id, "traffic_limit_bytes": int(sub.traffic_limit_bytes or 0),
                       "traffic_used_bytes": int(sub.traffic_used_bytes or 0),
                       "expires_at": sub.expires_at.isoformat() if sub.expires_at else None}
@@ -184,10 +254,7 @@ def activate_due_renewals(db: Session, limit: int = 100) -> int:
             sub.starts_at = now
             sub.expires_at = now + timedelta(days=pending.duration_days) if pending.duration_days > 0 else None
             sub.activation_duration_days = pending.duration_days
-            # Protect existing credentials: incompatible plan changes must never
-            # be marked activated without provisioning the corresponding protocols.
-            if pending.plan_id is not None and (sub.plan_id is None or int(pending.plan_id) != int(sub.plan_id)):
-                raise RuntimeError("reserved_renewal_incompatible_plan_change")
+            # Cross-plan provisioning completed before changing the period.
             if pending.plan_id is not None:
                 sub.plan_id = pending.plan_id
             # Preserve manual suspensions. Refresh entitlements even if the
