@@ -1074,10 +1074,21 @@ def admin_payment_intents(
         if order and order.status == "fulfilled" and account_id:
             delivery = "not_recorded"
             notices = notices_by_payment.get(int(row.id), [])
-            if any(notice.delivered_at is not None for notice in notices):
+            if any(
+                notice.delivered_at is not None
+                and order.fulfilled_at is not None
+                and notice.delivered_at >= order.fulfilled_at
+                and str((notice.payload or {}).get("subscription_id") or "")
+                    == str(account_id)
+                for notice in notices
+            ):
                 delivery = "telegram_sent"
-            elif notices:
+            elif any(notice.delivered_at is None for notice in notices):
                 delivery = "telegram_pending"
+            elif any(notice.delivered_at is not None for notice in notices):
+                # A payment confirmation sent *before* the subscription was
+                # created cannot be evidence that account details were sent.
+                delivery = "telegram_early_confirmation"
 
         item = intent_out(row)
         account = subscriptions.get(account_id) if account_id else None
