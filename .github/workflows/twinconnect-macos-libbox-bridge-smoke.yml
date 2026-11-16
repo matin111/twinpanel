@@ -11,6 +11,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: twinconnect-macos-libbox-${{ github.ref }}
@@ -26,7 +27,40 @@ jobs:
         with:
           go-version: '1.25.5'
           cache: false
+      - name: Reuse prior verified Libbox build for faster Swift-only regression checks
+        id: reuse
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: TwinConnect-macOS-Libbox-Unsigned-Framework
+          repository: matin111/twinpanel
+          run-id: 43791177981
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/libbox-verified
+      - name: Verify or reject reused framework
+        id: restored
+        shell: bash
+        run: |
+          set -euo pipefail
+          source="$RUNNER_TEMP/libbox-verified"
+          target="$GITHUB_WORKSPACE/clients/twinconnect/macos_native/build/libbox/Libbox.xcframework"
+          if test -f "$source/Libbox.xcframework/Info.plist"; then
+            mkdir -p "$(dirname "$target")"
+            ditto "$source/Libbox.xcframework" "$target"
+          elif test -f "$source/Info.plist"; then
+            mkdir -p "$(dirname "$target")"
+            ditto "$source" "$target"
+          fi
+          if test -f "$target/Info.plist" &&
+             plutil -lint "$target/Info.plist"; then
+            echo 'ready=true' >> "$GITHUB_OUTPUT"
+            echo 'Using CI-verified Libbox macOS artifact from successful source build'
+          else
+            echo 'ready=false' >> "$GITHUB_OUTPUT"
+            echo 'No reusable Libbox artifact; will build pinned official source'
+          fi
       - name: Build official in-process sing-box Libbox macOS framework
+        if: steps.restored.outputs.ready != 'true'
         shell: bash
         run: |
           set -euo pipefail
