@@ -25,7 +25,11 @@ void main() {
     expect(extension, contains('LibboxNewCommandServer('));
     expect(extension, contains('startOrReloadService('));
     expect(bridge, contains('case "startHysteria2":'));
-    expect(bridge, contains('backendLinked: backendReady()'));
+    expect(bridge, contains('backendLinked: libboxBackendReady()'));
+    expect(bridge, contains('TWINCONNECT_SIGNED_LIBBOX'));
+    expect(bridge, contains('SecTaskCopyValueForEntitlement'));
+    expect(bridge, contains('TwinConnectProtocolBackendLinked'));
+    expect(bridge, contains('backendLinked: wireGuardBackendReady()'));
     expect(bridge, contains('return false'));
     expect(installer, contains('TwinConnectMacOSLibboxControl.swift'));
     // Provider configuration must not store sensitive JSON directly.
