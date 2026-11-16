@@ -19,7 +19,7 @@ from ..routers.store import _fulfill_paid_order
 RECOVERY_INTERVAL_SECONDS = 1.0
 APPROVED_PAYMENT_STATUSES = {"approved", "auto_verified", "paid"}
 EARLY_DELIVERY_POLL_SECONDS = 0.5
-EARLY_DELIVERY_TIMEOUT_SECONDS = 45.0
+EARLY_DELIVERY_TIMEOUT_SECONDS = 240.0
 
 # TWINPANEL_PAYMENT_PROVISION_EVENTLOOP_ISOLATION_V1
 # Approved payments may provision all selected protocols for several minutes.
@@ -110,6 +110,7 @@ def _queue_ready_notification(
     user_id: int,
     amount_toman: int,
     subscription_id: int | None,
+    provisioning: bool = False,
 ) -> None:
     subscription = (
         db.get(Subscription, int(subscription_id))
@@ -132,6 +133,7 @@ def _queue_ready_notification(
                 else None
             ),
             "amount_toman": int(amount_toman or 0),
+            "account_setup_in_progress": bool(provisioning),
         },
     )
     db.commit()
@@ -152,16 +154,41 @@ def _try_queue_early_delivery_once(
     user_id: int,
     amount_toman: int,
 ) -> int | None:
-    """Queue main-bot delivery once the first committed credential is usable."""
+    """Deliver a verified paid account as soon as its first *usable* link exists.
 
+    The customer can import the stable sublink while the remaining protocols
+    continue provisioning.  Never mistake an allocated subscription or a
+    nonempty encrypted credential for customer-ready connection information.
+    """
     order = db.get(StoreOrder, int(order_id))
-    # Do not dispatch a "delivered" notification while provisioning is still
-    # running: Telegram may receive a payment confirmation with no account
-    # link, which the outbox then marks permanently delivered.
-    if order is None or order.status != "fulfilled" or not order.subscription_id:
+    if (
+        order is None
+        or order.status not in {"provisioning", "fulfilled"}
+        or not order.subscription_id
+        or int(order.user_id) != int(user_id)
+    ):
+        return None
+
+    payment = db.get(PaymentIntent, int(intent_id))
+    if (
+        payment is None
+        or str(payment.status or "") not in APPROVED_PAYMENT_STATUSES
+        or int(payment.order_id) != int(order_id)
+        or int(payment.user_id) != int(user_id)
+    ):
         return None
 
     subscription_id = int(order.subscription_id)
+    subscription = db.get(Subscription, subscription_id)
+    if (
+        subscription is None
+        or int(subscription.user_id) != int(user_id)
+        or str(getattr(subscription.status, "value", subscription.status)).lower() != "active"
+        or not str(subscription.account_username or "").strip()
+        or not str(subscription.share_code or "").strip()
+    ):
+        return None
+
     credential = (
         db.query(ProtocolCredential)
         .filter(
@@ -176,6 +203,25 @@ def _try_queue_early_delivery_once(
     if not _credential_ready_for_early_delivery(credential):
         return None
 
+    # The Telegram notification worker uses the same customer-facing view.
+    # Validate that at least one LIVE client config survives filtering and
+    # that the QR/sublink is an actual HTTPS URL, not an empty placeholder.
+    from urllib.parse import urlsplit
+    from ..routers.account_delivery import _stored_info
+
+    info = _stored_info(db, subscription) or {}
+    link = str(info.get("subscription_link") or "").strip()
+    parsed = urlsplit(link)
+    credentials = info.get("credentials") or []
+    account = info.get("account") or {}
+    if (
+        parsed.scheme != "https"
+        or not parsed.netloc
+        or not credentials
+        or str(account.get("username") or "").strip() != str(subscription.account_username).strip()
+    ):
+        return None
+
     _queue_ready_notification(
         db,
         intent_id=int(intent_id),
@@ -183,8 +229,26 @@ def _try_queue_early_delivery_once(
         user_id=int(user_id),
         amount_toman=int(amount_toman or 0),
         subscription_id=subscription_id,
+        provisioning=(order.status != "fulfilled"),
     )
     return subscription_id
+
+
+def _try_queue_early_delivery_with_fresh_session(
+    *, intent_id: int, order_id: int, user_id: int, amount_toman: int,
+) -> int | None:
+    """Do not share ORM sessions between fulfillment and delivery watchers."""
+    watch_db = SessionLocal()
+    try:
+        return _try_queue_early_delivery_once(
+            watch_db,
+            intent_id=intent_id,
+            order_id=order_id,
+            user_id=user_id,
+            amount_toman=amount_toman,
+        )
+    finally:
+        watch_db.close()
 
 
 async def _queue_main_bot_when_first_credential_ready(
@@ -295,18 +359,17 @@ async def fulfill_approved_payment_background(
             else result.get("subscription_id")
         )
 
-        _queue_ready_notification(
-            db,
-            intent_id=int(intent_id),
-            order_id=int(order_id),
-            user_id=int(user_id),
-            amount_toman=int(amount_toman or 0),
-            subscription_id=(
-                int(subscription_id)
-                if subscription_id
-                else None
-            ),
-        )
+        # A provisional purchase may still be waiting for the central
+        # protocol reconciliation stage.  Queue only a proven usable sublink,
+        # not a payment-only "account delivered" notification.
+        if final_order and final_order.status in {"provisioning", "fulfilled"}:
+            await asyncio.to_thread(
+                _try_queue_early_delivery_with_fresh_session,
+                intent_id=int(intent_id),
+                order_id=int(order_id),
+                user_id=int(user_id),
+                amount_toman=int(amount_toman or 0),
+            )
 
         print(
             "PAYMENT_FULFILL_FAST_PATH",
