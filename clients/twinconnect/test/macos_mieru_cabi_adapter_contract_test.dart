@@ -32,11 +32,11 @@ void main() {
     final candidate = File(
       '../../.github/workflows/twinconnect-macos-mieru-core.yml',
     ).readAsStringSync();
-    expect(candidate, contains('GOARCH="$arch" CGO_ENABLED=1'));
+    expect(candidate, contains(r'GOARCH="$arch" CGO_ENABLED=1'));
     expect(candidate, contains('buildmode=c-shared'));
     expect(candidate, contains('libtwinmieru.dylib'));
     expect(candidate, contains('extension_frameworks='));
-    expect(candidate, contains('test ! -f "$app/Contents/Frameworks/libtwinmieru.dylib"'));
+    expect(candidate, contains(r'test ! -f "$app/Contents/Frameworks/libtwinmieru.dylib"'));
     expect(bridge, contains('"extensionLibraryInstalled": mieruInProcessLibraryBundled()'));
     expect(File('lib/macos_mieru_controller.dart').readAsStringSync(),
         contains("raw['extensionLibraryInstalled'] is! bool"));
