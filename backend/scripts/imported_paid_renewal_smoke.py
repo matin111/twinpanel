@@ -42,7 +42,10 @@ assert 'sub.traffic_limit_bytes =' not in fulfill
 assert 'sub.expires_at =' not in fulfill
 assert 'sub.account_username =' not in fulfill
 assert 'sub.account_password_encrypted =' not in fulfill
-assert 'int(plan.id) != int(sub.plan_id)' in api
+assert 'if payload.plan_id is not None:' in api
+assert 'plan = db.get(Plan, payload.plan_id)' in api
+assert 'plan is None or not plan.is_active' in api
+assert 'A different paid plan is reserved for the next period.' in api
 assert 'sub.expires_at is None and int(sub.traffic_limit_bytes or 0) <= 0' in api
 assert '"/v1/payments/methods"' in bot
 assert 'callback_data=f"renewpay:{int(order[\'id\'])}:{method[\'id\']}"' in bot

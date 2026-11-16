@@ -13,10 +13,14 @@ worker = (root / "services/payment_fulfillment_fast_path.py").read_text(encoding
 for path, code in (("bot",bot),("wallet",wallet),("store",store),("payments",payments),("worker",worker)):
     ast.parse(code, filename=path)
 tree = ast.parse(bot)
+copy_tree = ast.parse((root / "telegram_checkout_copy_v1.py").read_text(encoding="utf-8"))
+method_label_fn = next(node for node in copy_tree.body
+                       if isinstance(node, ast.FunctionDef) and node.name == "method_label")
 keyboard_fn = next(node for node in tree.body
                    if isinstance(node, ast.FunctionDef) and node.name == "payment_methods_keyboard")
 env = {"InlineKeyboardButton": InlineKeyboardButton,
        "InlineKeyboardMarkup": InlineKeyboardMarkup}
+exec(compile(ast.Module(body=[method_label_fn], type_ignores=[]), "checkout_copy", "exec"), env)
 exec(compile(ast.Module(body=[keyboard_fn], type_ignores=[]), "bot_keyboard", "exec"), env)
 kb = env["payment_methods_keyboard"](12345, [
     {"id": "card_to_card", "title": "کارت به کارت"},
@@ -29,7 +33,7 @@ assert any(b.callback_data == "shop:wallet:preview:12345" for row in wallet_only
 
 for required in (
     'shop:wallet:preview:', 'shop:wallet:confirm:', 'shop:wallet:back:',
-    '✅ تأیید و پرداخت از کیف پول',
+    '✅ تأیید پرداخت از کیف پول',
     '/v1/wallet/orders/{order_id}/pay',
     '/v1/wallet/me',
     'balance >= amount',

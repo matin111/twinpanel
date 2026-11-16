@@ -160,13 +160,18 @@ jobs:
             "backend/app/routers/payments.py" \
             "backend/app/services/payment_fulfillment_fast_path.py" \
             "components/payments-review-runtime.tsx" \
-            "backend/tests/test_payment_ready_delivery_reconcile_v1.py"; do
+            "backend/tests/test_payment_ready_delivery_reconcile_v1.py" \
+            "backend/app/telegram_runtime_bot.py" \
+            "backend/tests/test_payment_account_dispatch_proof_v1.py"; do
             test -s "publisher/$path" && test -s "source/$path"
             cmp -s "publisher/$path" "source/$path" || {
               echo "::error file=$path::Pinned release would erase payment account display or recovery"
               exit 1
             }
           done
+          grep -Fq 'reconcile_early_payment_account_delivery_once' source/backend/app/services/payment_fulfillment_fast_path.py
+          grep -Fq 'account_delivery_sent' source/backend/app/telegram_runtime_bot.py
+          grep -Fq 'payment_account_ready' source/backend/app/routers/payments.py
           grep -Fq 'reconcile_ready_payment_orders_once' source/backend/app/services/payment_fulfillment_fast_path.py
           grep -Fq 'created_pending_fulfillment' source/backend/app/routers/payments.py
           grep -Fq 'created_pending_fulfillment' source/components/payments-review-runtime.tsx

@@ -1046,7 +1046,7 @@ def admin_payment_intents(
     notifications = (
         db.query(TelegramNotification)
         .filter(
-            TelegramNotification.kind == "payment_approved",
+            TelegramNotification.kind.in_(("payment_approved", "payment_account_ready")),
             TelegramNotification.user_id.in_(user_ids),
         )
         .order_by(TelegramNotification.id.desc())
@@ -1076,10 +1076,15 @@ def admin_payment_intents(
             notices = notices_by_payment.get(int(row.id), [])
             if any(
                 notice.delivered_at is not None
-                and order.fulfilled_at is not None
-                and notice.delivered_at >= order.fulfilled_at
                 and str((notice.payload or {}).get("subscription_id") or "")
                     == str(account_id)
+                and (
+                    bool((notice.payload or {}).get("account_delivery_sent"))
+                    or (
+                        order.fulfilled_at is not None
+                        and notice.delivered_at >= order.fulfilled_at
+                    )
+                )
                 for notice in notices
             ):
                 delivery = "telegram_sent"
