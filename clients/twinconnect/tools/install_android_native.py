@@ -92,6 +92,7 @@ def patch_gradle() -> None:
             "-keep class org.infradead.libopenconnect.** { *; }\n"
             "-keep class com.axevpn.flutter.openconnect.NativeOpenConnectSession { *; }\n"
             "-keep class com.axevpn.flutter.openconnect.NativeOpenConnectSession$* { *; }\n"
+            "-keep class org.amnezia.awg.** { *; }\n"
         )
 
 
