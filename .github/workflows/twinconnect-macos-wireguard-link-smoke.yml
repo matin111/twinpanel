@@ -70,6 +70,13 @@ jobs:
           key_src = key_src.replace('#ifndef KEY_H', '#ifndef TWINCONNECT_WGK_KEY_H', 1)
           key_src = key_src.replace('#define KEY_H', '#define TWINCONNECT_WGK_KEY_H', 1)
           key.write_text(key_src)
+          # Explicit C-module import for Xcode's local Swift package build;
+          # avoid relying on the SWIFT_PACKAGE conditional build flag.
+          private_key = Path('macos_native/vendor-wireguard-apple/Sources/WireGuardKit/PrivateKey.swift')
+          swift = private_key.read_text()
+          conditional = '#if SWIFT_PACKAGE\\nimport WireGuardKitC\\n#endif'
+          assert conditional in swift
+          private_key.write_text(swift.replace(conditional, 'import WireGuardKitC', 1))
           PY
       - name: Generate unsigned Mac project and native Packet Tunnel
         run: |
