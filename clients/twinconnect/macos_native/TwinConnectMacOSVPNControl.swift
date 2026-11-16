@@ -1,5 +1,5 @@
 import Foundation
-import Flutter
+import FlutterMacOS
 import NetworkExtension
 import Security
 
