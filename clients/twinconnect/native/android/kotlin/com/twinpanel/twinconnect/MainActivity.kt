@@ -168,6 +168,8 @@ class MainActivity : FlutterActivity() {
                         }
                     } catch (_: ReflectiveOperationException) {
                         throw IllegalArgumentException("AWG_NATIVE_RUNTIME_FAILED")
+                    } catch (_: LinkageError) {
+                        throw IllegalArgumentException("AWG_NATIVE_RUNTIME_FAILED")
                     }
                 }
             }
@@ -334,7 +336,8 @@ class MainActivity : FlutterActivity() {
                     "AWG_ENGINE_UNAVAILABLE", "AWG_PROFILE_INVALID",
                     "AWG_DNS_MISSING", "AWG_DEFAULT_ROUTE_MISSING",
                     "AWG_CONFIG_PARSE_FAILED", "AWG_TUN_NOT_ESTABLISHED",
-                    "AWG_ALREADY_CONNECTED", "OTHER_VPN_ACTIVE"
+                    "AWG_ALREADY_CONNECTED", "OTHER_VPN_ACTIVE",
+                    "AWG_NATIVE_RUNTIME_FAILED", "AWG_UNKNOWN_METHOD"
                 )
                 val safeCode = error.message?.takeIf { accepted.contains(it) }
                     ?: "NATIVE_VPN_START_FAILED"
