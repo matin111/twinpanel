@@ -22,7 +22,8 @@ class ProtocolCatalogCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final strings = AppStrings.of(context);
     final allowed = catalog.entries.where((entry) =>
-        entry.selected && !(Platform.isAndroid && entry.protocol.code == 'l2tp')
+        entry.selected && !(Platform.isAndroid &&
+            const {'l2tp', 'mieru'}.contains(entry.protocol.code))
     ).toList();
     return Card(
       key: const Key('protocolCatalogCard'),
