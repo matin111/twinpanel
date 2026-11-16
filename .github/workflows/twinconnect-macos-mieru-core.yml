@@ -132,6 +132,17 @@ jobs:
           echo "$arches" | grep -qw arm64
           file "$destination/mieru" | grep -q Mach-O
           test -x "$destination/mieru"
+          # Stage the same upstream-verified binary inside the extension.
+          # Native PacketTunnel must own the engine for future signed tests;
+          # executable presence alone is never permission to activate VPN.
+          extension="$app/Contents/PlugIns/PacketTunnel.appex"
+          extension_engines="$extension/Contents/Resources/TwinConnectEngines"
+          mkdir -p "$extension_engines"
+          ditto "$destination/mieru" "$extension_engines/mieru"
+          chmod 755 "$extension_engines/mieru"
+          cmp "$destination/mieru" "$extension_engines/mieru"
+          file "$extension_engines/mieru" | grep -q Mach-O
+          test -x "$extension_engines/mieru"
           # Bundled executable does NOT grant the PacketTunnel subprocess
           # access or a working Mieru full-tunnel packet-flow bridge.
           echo "Mieru official dual-arch core bundled, VPN NOT READY"
@@ -142,7 +153,7 @@ jobs:
           TwinConnect official Mieru macOS engine candidate, 3.39.0
           Official upstream sha256 checks verified in workflow.
           Both arm64 and Intel macOS binaries provided.
-          Bundled in unsigned TwinConnect.app as Resources/TwinConnectEngines/mieru.
+          Bundled in unsigned TwinConnect.app and PacketTunnel.appex Resources/TwinConnectEngines/mieru.
           NOT code signed with Apple Developer identity.
           NO PacketTunnel traffic bridge.
           NO VPN connection, handshakes, egress, or DNS validation.
