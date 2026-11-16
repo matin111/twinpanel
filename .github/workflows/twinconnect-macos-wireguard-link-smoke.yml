@@ -38,6 +38,23 @@ jobs:
           xcodebuild -version
           ruby --version
           gem install xcodeproj --no-document
+      - name: Fetch pinned upstream WireGuard and adapt Swift package manifest
+        run: |
+          set -euo pipefail
+          git clone https://github.com/WireGuard/wireguard-apple.git macos_native/vendor-wireguard-apple
+          cd macos_native/vendor-wireguard-apple
+          git checkout --detach 2fec12a6e1f6e3460b6ee483aa00ad29cddadab1
+          test "$(git rev-parse HEAD)" = "2fec12a6e1f6e3460b6ee483aa00ad29cddadab1"
+          cd ../..
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('macos_native/vendor-wireguard-apple/Package.swift')
+          s = p.read_text()
+          assert s.startswith('// swift-tools-version:5.3')
+          assert '.macOS(.v12)' in s and '.iOS(.v15)' in s
+          p.write_text(s.replace('// swift-tools-version:5.3',
+                                 '// swift-tools-version:5.5', 1))
+          PY
       - name: Generate unsigned Mac project and native Packet Tunnel
         run: |
           flutter create --platforms=macos --org com.twinpanel --project-name twinconnect .
@@ -46,18 +63,17 @@ jobs:
           ruby macos_native/link_wireguardkit.rb
       - name: Resolve pinned official WireGuardKit
         run: |
-          xcodebuild -resolvePackageDependencies -project macos/Runner.xcodeproj -clonedSourcePackagesDirPath "$RUNNER_TEMP/WireGuardPackages"
-          test -f "$RUNNER_TEMP/WireGuardPackages/checkouts/wireguard-apple/Package.swift"
+          xcodebuild -resolvePackageDependencies -project macos/Runner.xcodeproj
+          test -f macos_native/vendor-wireguard-apple/Package.swift
       - name: Compile upstream wireguard-go bridge
         run: |
-          bash macos_native/build_wireguard_go.sh "$RUNNER_TEMP/WireGuardPackages/checkouts/wireguard-apple"
+          bash macos_native/build_wireguard_go.sh "$PWD/macos_native/vendor-wireguard-apple"
       - name: Compile linked macOS PacketTunnel (unsigned)
         run: |
           set -o pipefail
           xcodebuild -project macos/Runner.xcodeproj -target PacketTunnel \
             -configuration Release -sdk macosx -arch arm64 \
-            -clonedSourcePackagesDirPath "$RUNNER_TEMP/WireGuardPackages" \
-            CODE_SIGNING_ALLOWED=NO build 2>&1 | tee "$RUNNER_TEMP/mac-wireguard-xcodebuild.log" | tail -90
+             CODE_SIGNING_ALLOWED=NO build 2>&1 | tee "$RUNNER_TEMP/mac-wireguard-xcodebuild.log" | tail -90
       - name: Validate compiled artifacts
         run: |
           test -s macos_native/build/wireguard/libwg-go.a
