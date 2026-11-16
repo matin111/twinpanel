@@ -193,7 +193,7 @@ class WindowsOpenVpnTunnel {
           },
         );
       }
-      child.exitCode.then((_) async {
+      child.exitCode.then((exitCode) async {
         // Allow final stderr/stdout events to arrive before choosing a
         // sanitized failure reason. Never include raw engine output in UI.
         await Future<void>.delayed(const Duration(milliseconds: 200));
@@ -201,7 +201,9 @@ class WindowsOpenVpnTunnel {
         _exitIp = null;
         if (!ready.isCompleted) {
           ready.completeError(FormatException(
-              startupFailure ?? 'OPENVPN_PROCESS_EXITED'));
+              startupFailure ??
+              OpenVpnStartupFailure.fromExitCode(exitCode) ??
+              'OPENVPN_PROCESS_EXITED'));
         }
         // Remove secrets when OpenVPN exits on its own, not just on Disconnect.
         unawaited(_cleanupIfExited());
