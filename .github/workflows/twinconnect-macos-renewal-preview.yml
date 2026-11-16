@@ -87,6 +87,18 @@ jobs:
         run: |
           flutter build macos --release \
             --dart-define=TWINCONNECT_DIRECTORY_URL="$TWINCONNECT_DIRECTORY_URL"
+      - name: Bundle verified native Hysteria2 transport binary (not a tunnel)
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash macos_native/fetch_singbox_macos.sh
+          app="build/macos/Build/Products/Release/twinconnect.app"
+          target="$app/Contents/Resources/TwinConnectEngines"
+          mkdir -p "$target"
+          cp macos_native/build/singbox/arm64/sing-box "$target/sing-box"
+          chmod 755 "$target/sing-box"
+          "$target/sing-box" check -c macos_native/hysteria2-config-check.json
+          file "$target/sing-box" | grep -q arm64
       - name: Verify Mac app bundle, native channel and architecture
         shell: bash
         run: |
@@ -98,6 +110,10 @@ jobs:
           test -d "$app/Contents/Frameworks/FlutterMacOS.framework"
           test -d "$app/Contents/Frameworks/App.framework"
           test -d "$app/Contents/PlugIns/PacketTunnel.appex"
+          test -x "$app/Contents/Resources/TwinConnectEngines/sing-box"
+          "$app/Contents/Resources/TwinConnectEngines/sing-box" version
+          # Transport binary is packaged but no PacketTunnel -> sing-box
+          # packetFlow adapter exists. Never claim connected traffic.
           /usr/libexec/PlistBuddy -c 'Print TwinConnectProtocolBackendLinked' "$app/Contents/PlugIns/PacketTunnel.appex/Contents/Info.plist" | grep -qx false
           plutil -lint "$app/Contents/Info.plist"
           /usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$app/Contents/Info.plist"
@@ -111,6 +127,8 @@ jobs:
             echo "TwinConnect macOS native UI and account preview"
             echo "Repository commit: $GITHUB_SHA"
             echo "Mac PacketTunnel extension: EMBEDDED, backend NOT LINKED"
+            echo "Hysteria2 sing-box arm64: BUNDLED and offline config checked"
+            echo "Hysteria2 packetFlow bridge: NOT IMPLEMENTED"
             echo "Code signing/notarization: NOT a Developer ID release"
             echo "VPN connect/egress: NOT VERIFIED"
             echo "Built application: twinconnect.app"
