@@ -27,6 +27,12 @@ type ReviewRow={
   txid:string;
   trackingCode:string;
   orderId:number|null;
+  subscriptionId:number|null;
+  orderStatus:string;
+  fulfillmentStatus:string;
+  deliveryStatus:string;
+  walletCreditStatus:string;
+  creditedAmount:number|null;
   sourceLabel:string;
 };
 
@@ -134,6 +140,12 @@ export function PaymentsReviewRuntime(){
       txid:s(row.txid),
       trackingCode:s(row.tracking_code),
       orderId:n(row.order_id)||null,
+      subscriptionId:n(row.subscription_id)||null,
+      orderStatus:s(row.order_status),
+      fulfillmentStatus:s(row.fulfillment_status),
+      deliveryStatus:s(row.delivery_status),
+      walletCreditStatus:"",
+      creditedAmount:null,
       sourceLabel:pick("خرید اشتراک","Subscription purchase"),
     }));
     const walletRows=wallets.map(row=>{
@@ -159,6 +171,12 @@ export function PaymentsReviewRuntime(){
         txid:s(row.txid),
         trackingCode,
         orderId:null,
+        subscriptionId:null,
+        orderStatus:"",
+        fulfillmentStatus:"",
+        deliveryStatus:"",
+        walletCreditStatus:s(row.wallet_credit_status),
+        creditedAmount:row.credited_amount_toman==null?null:n(row.credited_amount_toman),
         sourceLabel:pick("شارژ کیف پول","Wallet top-up"),
       };
     });
@@ -359,6 +377,7 @@ export function PaymentsReviewRuntime(){
           <th>{pick("روش","Method")}</th>
           <th>{pick("رسید / مدرک","Receipt / Proof")}</th>
           <th>{pick("وضعیت","Status")}</th>
+          <th>{pick("نتیجه پرداخت / تحویل","Payment outcome / Delivery")}</th>
           <th>{pick("زمان ارسال","Submitted")}</th>
           <th>{pick("عملیات","Actions")}</th>
         </tr></thead>
@@ -378,6 +397,35 @@ export function PaymentsReviewRuntime(){
               {proofCode?<span dir="ltr" style={{display:"block",wordBreak:"break-all",fontSize:11}}>{proofCode}</span>:!row.hasReceipt?<span>{pick("ارسال نشده","Not submitted")}</span>:null}
             </div></td>
             <td><Badge tone={statusTone(status)}>{statusLabel(row.displayStatus,pick)}</Badge></td>
+            <td>
+              <div style={{display:"grid",gap:6,minWidth:190,maxWidth:290}}>
+                {row.kind==="purchase"?(
+                  row.subscriptionId?<>
+                    <a className="mini-btn" href={`/admin/subscriptions?focus=${row.subscriptionId}`}>
+                      {pick("مشاهده اکانت ساخته‌شده","Open created account")} #{row.subscriptionId}
+                    </a>
+                    <small>{row.deliveryStatus==="telegram_sent"
+                      ?pick("✓ پیام اطلاعات اکانت در تلگرام ارسال شد","✓ Account details sent via Telegram")
+                      :row.deliveryStatus==="telegram_pending"
+                        ?pick("◷ پیام تحویل در صف ارسال است","◷ Delivery message queued")
+                        :pick("⚠ ارسال اطلاعات اکانت ثبت نشده","⚠ Account delivery not recorded")}</small>
+                  </>:row.orderStatus==="fulfilled"
+                    ?<small>{pick("⚠ سفارش تکمیل شده، اما اکانتی یافت نشد","⚠ Fulfilled order without an account")}</small>
+                    :["approved","auto_verified","paid"].includes(status)
+                      ?<small>{pick("◷ تأیید شد؛ در انتظار ساخت و تحویل اکانت","◷ Approved; awaiting account provisioning")}</small>
+                      :<small>{pick("هنوز اکانتی ساخته نشده","No account created yet")}</small>
+                ):<>
+                  <a className="mini-btn" href={`/admin/wallet?user=${row.userId}`}>
+                    {pick("مشاهده کیف پول کاربر","Open user wallet")} #{row.userId}
+                  </a>
+                  {row.walletCreditStatus==="credited"&&row.creditedAmount!=null
+                    ?<small>{pick("✓ مبلغ واریزشده به کیف پول","✓ Amount credited to wallet")}: {money(row.creditedAmount)}</small>
+                    :status==="approved"
+                      ?<small>{pick("⚠ تأیید شده؛ ثبت شارژ در دفتر تراکنش‌ها پیدا نشد","⚠ Approved, but ledger credit not found")}</small>
+                      :<small>{pick("شارژ کیف پول هنوز ثبت نشده","Wallet has not been credited")}</small>}
+                </>}
+              </div>
+            </td>
             <td>{dateText(row.submittedAt||row.createdAt)}</td>
             <td><div className="row-actions">
               {row.hasReceipt&&<button className="mini-btn" onClick={()=>void openReceipt(row)}>{pick("مشاهده رسید","View receipt")}</button>}
