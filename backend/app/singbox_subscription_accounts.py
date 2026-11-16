@@ -396,7 +396,10 @@ async def _modern_tls_trust_material(conn, inbound: dict[str, Any]) -> str:
     cert_path = str(server_tls.get("certificate_path") or "").strip()
     if not cert_path or not cert_path.startswith("/") or "\\n" in cert_path:
         raise SingBoxAccountError("modern TLS certificate path is missing")
-    return await _read_certificate(conn, cert_path, label="Modern TLS")
+    # Managed leaf certificates rotate. Pin the stable local CA instead of
+    # the short-lived server leaf, otherwise a healthy node breaks on renewal.
+    trust_path = MANAGED_CA_CERT_PATH if cert_path == CERT_PATH else cert_path
+    return await _read_certificate(conn, trust_path, label="Modern TLS trust")
 
 
 async def _naive_tls_trust_material(
@@ -640,13 +643,6 @@ def _node_host(node: Node) -> str:
 
 def _client_tls(node: Node, inbound: dict[str, Any], *, server_name: str | None = None) -> dict[str, Any]:
     host = str(server_name or getattr(node, "public_domain", None) or getattr(node, "public_ip", "") or "").strip()
-    server_tls = inbound.get("tls") if isinstance(inbound.get("tls"), dict) else {}
-    cert_path = str(server_tls.get("certificate_path") or "")
-    trusted_custom_cert = bool(
-        getattr(node, "public_domain", None)
-        and cert_path
-        and cert_path != CERT_PATH
-    )
     return {
         "enabled": True,
         "server_name": host,
