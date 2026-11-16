@@ -33,6 +33,8 @@ type ReviewRow={
   fulfillmentStatus:string;
   deliveryStatus:string;
   walletCreditStatus:string;
+  walletType:string;
+  resellerId:number|null;
   creditedAmount:number|null;
   sourceLabel:string;
 };
@@ -147,6 +149,8 @@ export function PaymentsReviewRuntime(){
       fulfillmentStatus:s(row.fulfillment_status),
       deliveryStatus:s(row.delivery_status),
       walletCreditStatus:"",
+      walletType:"",
+      resellerId:null,
       creditedAmount:null,
       sourceLabel:pick("خرید اشتراک","Subscription purchase"),
     }));
@@ -179,6 +183,8 @@ export function PaymentsReviewRuntime(){
         fulfillmentStatus:"",
         deliveryStatus:"",
         walletCreditStatus:s(row.wallet_credit_status),
+        walletType:s(row.wallet_type),
+        resellerId:n(row.reseller_id)||null,
         creditedAmount:row.credited_amount_toman==null?null:n(row.credited_amount_toman),
         sourceLabel:pick("شارژ کیف پول","Wallet top-up"),
       };
@@ -419,8 +425,8 @@ export function PaymentsReviewRuntime(){
                       ?<small>{pick("◷ تأیید شد؛ در انتظار ساخت و تحویل اکانت","◷ Approved; awaiting account provisioning")}</small>
                       :<small>{pick("هنوز اکانتی ساخته نشده","No account created yet")}</small>
                 ):<>
-                  <a className="mini-btn" href={`/admin/wallet?user=${row.userId}`}>
-                    {pick("مشاهده کیف پول کاربر","Open user wallet")} #{row.userId}
+                  <a className="mini-btn" href={row.walletType==="reseller"&&row.resellerId?`/admin/resellers?focus=${row.resellerId}`:`/admin/wallet?user=${row.userId}`}>
+                    {row.walletType==="reseller"?pick("مشاهده کیف پول نماینده","Open reseller wallet"):pick("مشاهده کیف پول کاربر","Open user wallet")} #{row.walletType==="reseller"&&row.resellerId?row.resellerId:row.userId}
                   </a>
                   {row.walletCreditStatus==="credited"&&row.creditedAmount!=null
                     ?<small>{pick("✓ مبلغ واریزشده به کیف پول","✓ Amount credited to wallet")}: {money(row.creditedAmount)}</small>
