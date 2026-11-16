@@ -17,6 +17,8 @@ if [[ ! -d "$SOURCE_DIR/.git" ]]; then
 fi
 git -C "$SOURCE_DIR" fetch origin "$REVISION"
 git -C "$SOURCE_DIR" checkout --detach "$REVISION"
+# The upstream Gradle project requires a package name supplied externally.
+export ORG_GRADLE_PROJECT_amneziawgPackageName=org.amnezia.awg
 git -C "$SOURCE_DIR" submodule update --init --recursive
 # The official AWG backend loads "wg-go", which collides with the stock
 # WireGuard backend bundled by TwinConnect. Patch ONLY the AWG source tree
@@ -50,7 +52,7 @@ elif new not in s:
 PY
 (
   cd "$SOURCE_DIR"
-  ./gradlew --no-daemon :tunnel:assembleRelease
+  ANDROID_PACKAGE_NAME=com.twinpanel.twinconnect ./gradlew --no-daemon :tunnel:assembleRelease
 )
 AAR="$SOURCE_DIR/tunnel/build/outputs/aar/tunnel-release.aar"
 test -s "$AAR"
@@ -83,4 +85,4 @@ with zipfile.ZipFile(dst) as staged:
 print("AWG native loader isolated from stock WireGuard JNI name")
 PY
 echo "Staged collision-free AWG AAR: $OUT/tunnel-release.aar"
-echo "NOT integrated into APK: VpnService wiring and device tests still required."
+echo "AWG AAR staged. The installer integrates it when present; device verification is still required."
