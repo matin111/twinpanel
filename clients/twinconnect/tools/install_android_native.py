@@ -76,6 +76,8 @@ def patch_gradle() -> None:
         current += (
             "\n// Official AmneziaWG backend and JNI, built from pinned upstream source.\n"
             'dependencies { implementation(files("libs/amneziawg-tunnel.aar")) }\n'
+            'dependencies { implementation("androidx.collection:collection:1.4.5") }\n'
+            'dependencies { implementation("androidx.annotation:annotation:1.9.1") }\n'
         )
     filename.write_text(current, encoding="utf-8")
     rules = ANDROID / "app" / "proguard-rules.pro"
@@ -132,6 +134,19 @@ def patch_manifest() -> None:
     )
     if "com.wireguard.android.backend.GoBackend$VpnService" in current:
         service = ""
+    if (NATIVE / "amneziawg-core" / "tunnel-release.aar").is_file() and (
+        'org.amnezia.awg.backend.GoBackend$VpnService' not in current
+    ):
+        service += (
+            '\\n        <!-- Official AmneziaWG GoBackend VPN service -->\\n'
+            '        <service android:name="org.amnezia.awg.backend.GoBackend$VpnService"\\n'
+            '            android:exported="false"\\n'
+            '            android:permission="android.permission.BIND_VPN_SERVICE">\\n'
+            '            <intent-filter>\\n'
+            '                <action android:name="android.net.VpnService" />\\n'
+            '            </intent-filter>\\n'
+            '        </service>\\n'
+        )
     if 'android:name=".OpenConnectVpnService"' not in current:
         service += (
         '\n        <!-- Reserved Cisco / OpenConnect VpnService. The engine is '
