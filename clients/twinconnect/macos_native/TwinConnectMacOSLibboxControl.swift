@@ -13,7 +13,8 @@ enum TwinConnectMacOSLibboxControl {
         FlutterError(code: code, message: code, details: nil)
     }
 
-    private static func allowedConfig(_ text: String) -> Bool {
+    private static func allowedConfig(_ text: String, protocolCode: String) -> Bool {
+        guard ["hysteria2", "tuic"].contains(protocolCode) else { return false }
         guard (64...131072).contains(text.utf8.count),
               let data = text.data(using: .utf8),
               let raw = (try? JSONSerialization.jsonObject(with: data))
@@ -21,9 +22,15 @@ enum TwinConnectMacOSLibboxControl {
               let outbounds = raw["outbounds"] as? [[String: Any]],
               outbounds.count == 1,
               let outbound = outbounds.first,
-              outbound["type"] as? String == "hysteria2",
+              outbound["type"] as? String == protocolCode,
               outbound["tag"] as? String == "proxy",
-              outbound["password"] is String,
+              let password = outbound["password"] as? String,
+              !password.isEmpty,
+              (protocolCode != "tuic" || (
+                (outbound["uuid"] as? String).map {
+                    $0.range(of: "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", options: .regularExpression) != nil
+                } == true && outbound["zero_rtt_handshake"] as? Bool == false
+              )),
               let tls = outbound["tls"] as? [String: Any],
               tls["enabled"] as? Bool == true,
               tls["insecure"] == nil,
@@ -56,7 +63,8 @@ enum TwinConnectMacOSLibboxControl {
               servers[1]["tag"] as? String == "dns-remote",
               let name = tls["server_name"] as? String,
               !name.isEmpty,
-              outbound["detour"] == nil
+              outbound["detour"] == nil,
+              tls["disable_sni"] == nil
         else { return false }
         return true
     }
