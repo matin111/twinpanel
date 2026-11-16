@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.859",
+  "version": "1.1.0-rc.860",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-16T08:41:40Z",
+  "released_at": "2026-11-16T09:00:46Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "be33d0460ab67b222d5646e17418b19a81ece7eb",
+  "source_sha": "fff4153a58c523b52686d5ee60e7b69ea32ff3ac",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.859/twinpanel-1.1.0-rc.859-linux-x86_64.tar.gz",
-    "sha256": "abd222718cc4ac45c437edd0466ced9745ecfc4ce6759ffc0b2766d223e8e103",
-    "size_bytes": 30991133
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.860/twinpanel-1.1.0-rc.860-linux-x86_64.tar.gz",
+    "sha256": "09c4635955c2da1598dc43129a6812094dcb57ae9b88edd2fdc2c1da4a90527e",
+    "size_bytes": 31048420
   },
   "notes": {
-    "fa": "رفع عدم نمایش اکانت ساخته‌شده در پرداخت‌ها و ترمیم سفارش‌های پرداخت‌شده‌ای که با وجود آماده‌بودن همه پروتکل‌ها در وضعیت ساخت باقی مانده‌اند؛ همراه با محافظ GitHub برای جلوگیری از بازگشت مشکل.",
-    "en": "Restore created-account links in admin payment review and reconcile verified ready purchases stuck in provisioning; enforce pinned-release regression protection."
+    "fa": "تأیید واقعی ارسال اطلاعات اکانت و QR در ربات تلگرام؛ اصلاح نمایش وضعیت تحویل در پرداخت‌ها و ارسال نهایی یکتا برای سفارش‌هایی که پیام تأیید زودتر از تکمیل اکانت ارسال شده است.",
+    "en": "Record verified Telegram account QR dispatch, repair delivery-status evidence, and send a deduplicated final account message for early-confirmed purchases."
   }
 }
