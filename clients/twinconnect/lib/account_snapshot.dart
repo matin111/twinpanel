@@ -49,6 +49,7 @@ class AppAccountSnapshot {
     required this.activationDurationDays,
     required this.status,
     this.reservedRenewal,
+    this.reservedRenewals = const [],
   });
   final String namespace;
   final int trafficLimitBytes;
@@ -57,6 +58,7 @@ class AppAccountSnapshot {
   final int? activationDurationDays;
   final String status;
   final ReservedRenewalSnapshot? reservedRenewal;
+  final List<ReservedRenewalSnapshot> reservedRenewals;
 
   factory AppAccountSnapshot.fromJson(Map<String, dynamic> json) {
     final limit = json['traffic_limit_bytes'];
@@ -87,6 +89,22 @@ class AppAccountSnapshot {
         // A malformed optional field must not hide existing quota/expiry.
       }
     }
+    // New panels expose every queued item. Older panels expose only the
+    // next renewal; never render the same reservation twice.
+    final queued = <ReservedRenewalSnapshot>[];
+    final rawQueue = json['reserved_renewals'];
+    if (rawQueue is List) {
+      for (final raw in rawQueue.take(100)) {
+        if (raw is! Map<String, dynamic>) continue;
+        try {
+          queued.add(ReservedRenewalSnapshot.fromJson(raw));
+        } on FormatException {
+          // Ignore malformed optional entries, preserve valid account data.
+        }
+      }
+    } else if (nextRenewal != null) {
+      queued.add(nextRenewal);
+    }
     return AppAccountSnapshot(
       namespace: namespace.toUpperCase(),
       trafficLimitBytes: limit,
@@ -94,7 +112,8 @@ class AppAccountSnapshot {
       expiresAt: parsedExpiry?.toUtc(),
       activationDurationDays: duration,
       status: status,
-      reservedRenewal: nextRenewal,
+      reservedRenewal: queued.isNotEmpty ? queued.first : nextRenewal,
+      reservedRenewals: List.unmodifiable(queued),
     );
   }
 }
