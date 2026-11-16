@@ -93,7 +93,7 @@ final class TwinConnectMacOSVPNBridge {
                 result([
                     "contractVersion": 1,
                     "supportedCodes": libboxBackendReady()
-                        ? ["hysteria2", "tuic"] : [String]()
+                        ? ["hysteria2", "tuic", "anytls"] : [String]()
                 ] as [String: Any])
             case "macOSXrayEngineStatus":
                 result([
@@ -119,6 +119,19 @@ final class TwinConnectMacOSVPNBridge {
                         : (libboxInExtension()
                             ? "MACOS_HYSTERIA2_SIGNING_OR_ENTITLEMENT_MISSING"
                             : "MACOS_HYSTERIA2_PACKET_FLOW_BRIDGE_MISSING")
+                ] as [String: Any])
+            case "macOSAnyTlsEngineStatus":
+                result([
+                    "contractVersion": 1,
+                    "protocol": "anytls",
+                    "inProcessLibboxBundled": libboxInExtension(),
+                    "packetFlowBridgeReady": libboxBackendReady(),
+                    "engineReady": libboxBackendReady(),
+                    "reason": libboxBackendReady()
+                        ? "MACOS_ANYTLS_SIGNED_START_UNVERIFIED"
+                        : (libboxInExtension()
+                            ? "MACOS_ANYTLS_SIGNING_OR_ENTITLEMENT_MISSING"
+                            : "MACOS_ANYTLS_PACKET_FLOW_BRIDGE_MISSING")
                 ] as [String: Any])
             case "macOSTuicEngineStatus":
                 result([
@@ -159,6 +172,12 @@ final class TwinConnectMacOSVPNBridge {
                     protocolCode: "tuic", result: result)
             case "getTuicTunnelStatus":
                 TwinConnectMacOSLibboxControl.status(result, protocolCode: "tuic")
+            case "startAnyTls":
+                TwinConnectMacOSLibboxControl.start(
+                    call.arguments, backendLinked: libboxBackendReady(),
+                    protocolCode: "anytls", result: result)
+            case "getAnyTlsTunnelStatus":
+                TwinConnectMacOSLibboxControl.status(result, protocolCode: "anytls")
             case "stopTunnel":
                 TwinConnectMacOSVPNControl.stop(result)
             case "getTunnelStatus":
