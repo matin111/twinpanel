@@ -5441,7 +5441,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     // The account page still owns the full breakdown and edit/refresh actions.
     // A missing snapshot displays dashes, never fictitious quota/dates.
     Widget reservedRenewalNotice(ReservedRenewalSnapshot renewal,
-        {required bool compact}) {
+        {required bool compact, int index = 0}) {
       final accent = renewal.needsReview
           ? const Color(0xFFFFB878) : purple;
       final description = renewal.needsReview
@@ -5450,7 +5450,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           : tr('با پایان حجم یا تاریخ فعلی، دوره بعد خودکار فعال می‌شود.',
                'The next period activates after current quota or expiry ends.');
       return Container(
-        key: Key(compact ? 'liveHomeReservedRenewal' : 'accountReservedRenewal'),
+        key: Key(compact ? 'liveHomeReservedRenewal' :
+            index == 0 ? 'accountReservedRenewal' : 'accountReservedRenewal-$index'),
         padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 12),
         decoration: BoxDecoration(
           color: accent.withValues(alpha: _dark ? .12 : .06),
@@ -5632,9 +5633,19 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                 tr('زمان باقی‌مانده', 'Time remaining'),
                 daysLabel, cyan)),
             ]),
-            if (account?.reservedRenewal != null) ...[
+            if (account != null && account.reservedRenewals.isNotEmpty) ...[
               const SizedBox(height: 8),
-              reservedRenewalNotice(account!.reservedRenewal!, compact: true),
+              reservedRenewalNotice(account.reservedRenewals.first,
+                  compact: true),
+              if (account.reservedRenewals.length > 1) ...[
+                const SizedBox(height: 5),
+                Text(
+                  tr('تعداد تمدیدهای رزروی: ', 'Reserved renewals: ') +
+                      '${account.reservedRenewals.length}',
+                  key: const Key('liveHomeReservedRenewalCount'),
+                  style: TextStyle(color: sub, fontSize: 11),
+                ),
+              ],
             ],
             if (widget.accountError != null) ...[
               const SizedBox(height: 6),
@@ -5871,9 +5882,21 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
             ]),
           ),
           const SizedBox(height: 15),
-          if (current?.reservedRenewal != null) ...[
-            reservedRenewalNotice(current!.reservedRenewal!, compact: false),
-            const SizedBox(height: 15),
+          if (current != null && current.reservedRenewals.isNotEmpty) ...[
+            Row(children: [
+              Expanded(child: txt(tr('لیست تمدیدهای رزرو شده',
+                  'Reserved renewal list'), size: 15, bold: true)),
+              txt('${current.reservedRenewals.length}',
+                  size: 13, color: purple, bold: true),
+            ]),
+            const SizedBox(height: 9),
+            for (var index = 0;
+                index < current.reservedRenewals.length; index++) ...[
+              reservedRenewalNotice(current.reservedRenewals[index],
+                  compact: false, index: index),
+              const SizedBox(height: 9),
+            ],
+            const SizedBox(height: 6),
           ],
           glassCard(
             key: const Key('accountTrafficCard'),
