@@ -108,6 +108,8 @@ jobs:
         run: ./tools/bundle_trusttunnel_windows.ps1
       - name: Bundle official SHA256-verified AmneziaWG Windows prerequisite
         shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: ./tools/bundle_amneziawg_windows.ps1
       - name: Bundle pinned and verified sing-box engine (not yet enabled)
         shell: pwsh
