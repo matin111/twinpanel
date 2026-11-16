@@ -65,6 +65,29 @@ and Network Extension capability provisioned to both app and extension:
    state, handshake or endpoint reachability, IP change, packet counters,
    default route, DNS and IPv6. The verifier checks signing only.
 
+## Local network evidence (signed cloud Mac only)
+
+The following workflow records two local snapshots without uploading account
+profiles or keys. Only `--probe-egress` contacts the public HTTPS IPv4 test
+service. These files contain sensitive network information; **do not upload**
+them to GitHub Actions or share them publicly.
+
+```bash
+python3 macos_native/capture_hysteria2_network_evidence.py sample \
+  --phase baseline --output /tmp/twin-before.json --probe-egress
+# Sign, install and start Hysteria2 from the actual TwinConnect app.
+python3 macos_native/capture_hysteria2_network_evidence.py sample \
+  --phase connected --output /tmp/twin-after.json --probe-egress
+python3 macos_native/capture_hysteria2_network_evidence.py compare \
+  --before /tmp/twin-before.json --after /tmp/twin-after.json
+```
+
+The tool captures only OS interfaces, route interface, a hash of the DNS
+configuration, and an optional public IPv4. A changed IPv4 or new utun interface
+is **supporting evidence, not proof** of a successful Hysteria2 handshake, DNS
+leak protection, or fail-closed behavior. These still require live independent
+verification on the signed Mac.
+
 **Required live acceptance tests** with a valid, entitled *test* subscription:
 select the exact Hysteria2 node, verify status transitions, obtain a
 nonzero network byte count and validated egress IP, check DNS and IPv6 leaks,
