@@ -19,8 +19,21 @@ void main() {
     expect(policy, contains('dns.matchDomains = [""]'));
     expect(policy, isNot(contains('setTunnelNetworkSettings(')));
     expect(extension, contains('case "hysteria2":'));
-    expect(extension, contains('TwinConnectMacTunnelPolicy.hysteria2Settings()'));
+    expect(extension, contains('TwinConnectMacLibboxEngine(tunnel: self)'));
+    expect(extension, contains('engine.start'));
+    expect(extension, contains('MACOS_HYSTERIA2_PACKET_FLOW_BRIDGE_MISSING'));
     expect(extension, contains('MACOS_HYSTERIA2_PACKET_FLOW_BRIDGE_MISSING'));
     expect(installer, contains('libbox/TwinConnectMacTunnelPolicy.swift'));
+    expect(installer, contains('libbox/TwinConnectMacLibboxPlatform.swift'));
+    expect(installer, contains('libbox/TwinConnectMacLibboxEngine.swift'));
+    final platform = File('macos_native/libbox/TwinConnectMacLibboxPlatform.swift').readAsStringSync();
+    final engine = File('macos_native/libbox/TwinConnectMacLibboxEngine.swift').readAsStringSync();
+    expect(platform, contains('LibboxPlatformInterfaceProtocol'));
+    expect(platform, contains('setTunnelNetworkSettings(candidate)'));
+    expect(platform, contains('LibboxGetTunnelFileDescriptor()'));
+    expect(engine, contains('LibboxNewCommandServer('));
+    expect(engine, contains('startOrReloadService('));
+    expect(engine, contains('kSecValuePersistentRef'));
+    expect(engine, contains('MACOS_HYSTERIA2_KEYCHAIN_PROFILE_MISSING'));
   });
 }
