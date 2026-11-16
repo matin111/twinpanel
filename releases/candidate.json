@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.853",
-  "source_sha": "49bfe523965b0451eddc92f3112b0010fbee5fba",
+  "version": "1.1.0-rc.854",
+  "source_sha": "e71b884e1eb80d06d1b99e7bf806317b0fa99ac9",
   "notes": {
-    "fa": "پرداخت تمدید اشتراک از کیف پول در ربات تلگرام برای اشتراک معمولی و واردشده؛ تأیید موجودی و کسر یکتای مبلغ از کیف پول، رزرو تمدید بدون فعال‌سازی زودهنگام، و بهینه‌سازی سرعت ارتباط ربات با API از طریق اتصال HTTP پایدار.",
-    "en": "Telegram bot wallet checkout for normal/imported renewal orders with idempotent wallet debit and deferred activation; pooled persistent bot-to-API HTTP connections and slow request diagnostics."
+    "fa": "اصلاح عنوان «ثبت هش تراکنش (TXID)» در پرداخت‌های رمزارزی ربات، راهنمای پیدا کردن هش در کیف پول و حفظ پرداخت تمدید از کیف پول.",
+    "en": "Clarify Telegram crypto transaction hash (TXID) button and wallet instructions for new purchases and renewals; preserve wallet-based renewal checkout."
   }
 }
