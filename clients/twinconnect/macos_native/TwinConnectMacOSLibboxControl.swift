@@ -61,6 +61,61 @@ enum TwinConnectMacOSLibboxControl {
         return true
     }
 
+    /// Report Apple's real connection-manager state without inferring a
+    /// Hysteria2 peer handshake, usable routing, or successful DNS.
+    /// The response never includes account identifiers or VPN credentials.
+    static func status(_ result: @escaping FlutterResult) {
+        NETunnelProviderManager.loadAllFromPreferences { managers, error in
+            guard error == nil else {
+                result([
+                    "contractVersion": 1,
+                    "protocol": "hysteria2",
+                    "state": "status_unavailable",
+                    "osConnected": false,
+                    "verified": false,
+                    "peerHandshakeVerified": false
+                ] as [String: Any])
+                return
+            }
+            let manager = (managers ?? []).first { candidate in
+                guard let config = candidate.protocolConfiguration
+                    as? NETunnelProviderProtocol else { return false }
+                return config.providerBundleIdentifier == bundleID &&
+                    config.providerConfiguration?["protocol"] as? String
+                        == "hysteria2"
+            }
+            guard let manager else {
+                result([
+                    "contractVersion": 1,
+                    "protocol": "hysteria2",
+                    "state": "not_configured",
+                    "osConnected": false,
+                    "verified": false,
+                    "peerHandshakeVerified": false
+                ] as [String: Any])
+                return
+            }
+            let state: String
+            switch manager.connection.status {
+            case .connected: state = "os_connected_unverified"
+            case .connecting: state = "connecting"
+            case .reasserting: state = "reasserting"
+            case .disconnecting: state = "disconnecting"
+            case .disconnected: state = "disconnected"
+            case .invalid: state = "invalid"
+            @unknown default: state = "unknown"
+            }
+            result([
+                "contractVersion": 1,
+                "protocol": "hysteria2",
+                "state": state,
+                "osConnected": manager.connection.status == .connected,
+                "verified": false,
+                "peerHandshakeVerified": false
+            ] as [String: Any])
+        }
+    }
+
     static func start(_ args: Any?, backendLinked: Bool,
                       result: @escaping FlutterResult) {
         guard backendLinked else {
