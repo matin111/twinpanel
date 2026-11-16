@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.856",
+  "version": "1.1.0-rc.857",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-16T06:05:19Z",
+  "released_at": "2026-11-16T06:38:39Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "a0adb9e725badb3dd3681eccff68e3b977c0ea1d",
+  "source_sha": "96de267d9409ff093964a08bad00a8179f1a5edc",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.856/twinpanel-1.1.0-rc.856-linux-x86_64.tar.gz",
-    "sha256": "8a4d60addcf67798fc2f8fd82a3122666eea7184dafa4672079eb6604753bb5f",
-    "size_bytes": 30961170
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.857/twinpanel-1.1.0-rc.857-linux-x86_64.tar.gz",
+    "sha256": "67270293b1ce6e8d04380568673f7579a0876bc9dad38fec887284215d34db83",
+    "size_bytes": 30914996
   },
   "notes": {
-    "fa": "یکپارچه‌سازی متن و طراحی مسیرهای خرید و تمدید ربات تلگرام برای پرداخت کارت‌به‌کارت، رمزارز، TXID، رسید و کیف پول؛ همراه با حفظ اصلاحات TLS نسخه قبل.",
-    "en": "Unified concise Telegram purchase and renewal checkout copy for card, crypto/TXID, receipt, and wallet, preserving previous TLS fixes."
+    "fa": "فعال‌سازی ترمیم خودکار کانفیگ‌های قدیمی Hysteria2، TUIC و AnyTLS در سرویس مستقل بدون تغییر اطلاعات اشتراک‌ها.",
+    "en": "Activate background repair of legacy Hysteria2 TUIC AnyTLS TLS credentials in external worker without rotating account identities."
   }
 }
