@@ -93,6 +93,16 @@ jobs:
         run: |
           test -s native/android/amneziawg-core/tunnel-release.aar
           unzip -Z1 native/android/amneziawg-core/tunnel-release.aar | grep -F 'classes.jar'
+      - name: Use Java 21 for Flutter Android Gradle and Lint
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Verify Android build JDK
+        shell: bash
+        run: |
+          java -version
+          test "$(java -XshowSettings:properties -version 2>&1 | sed -n 's/^[[:space:]]*java.specification.version = //p' | head -n1)" = "21"
       - name: Generate Android scaffold
         run: flutter create --platforms=android --org com.twinpanel --project-name twinconnect .
       - name: Install native source, supplied icon and pinned WireGuard dependency
