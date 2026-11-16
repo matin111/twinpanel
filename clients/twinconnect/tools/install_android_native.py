@@ -206,6 +206,16 @@ def install_native_sources() -> None:
         if not src.is_file():
             raise RuntimeError(f"Missing tracked native source: {src}")
         shutil.copy2(src, package / filename)
+    # This source imports the official AWG AAR. Never compile it without
+    # the matching verified native dependency.
+    awg_aar = NATIVE / "amneziawg-core" / "tunnel-release.aar"
+    awg_runtime = NATIVE / "kotlin" / "com" / "twinpanel" / "twinconnect" / "AmneziaWgRuntime.kt"
+    if awg_aar.is_file():
+        if not awg_runtime.is_file():
+            raise RuntimeError("AWG AAR supplied without its native runtime")
+        shutil.copy2(awg_runtime, package / "AmneziaWgRuntime.kt")
+    else:
+        (package / "AmneziaWgRuntime.kt").unlink(missing_ok=True)
     java_package = (ANDROID / "app" / "src" / "main" / "java" /
                     "com" / "axevpn" / "flutter" / "openconnect")
     java_source = NATIVE / "java" / "com" / "axevpn" / "flutter" / "openconnect"
