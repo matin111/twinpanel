@@ -40,6 +40,20 @@ class OpenVpnStartupFailure {
     return null;
   }
 
+  /// Well-known Windows NTSTATUS failures can be identified without
+  /// exposing raw OpenVPN output, configuration files, or credentials.
+  static String? fromExitCode(int code) {
+    final unsigned = code & 0xFFFFFFFF;
+    return switch (unsigned) {
+      0xC0000135 => 'OPENVPN_DEPENDENCY_MISSING',
+      0xC000007B => 'OPENVPN_INVALID_BINARY_ARCHITECTURE',
+      0xC0000005 => 'OPENVPN_NATIVE_CRASH',
+      0xC0000142 => 'OPENVPN_DLL_INITIALIZATION_FAILED',
+      0xC000013A => 'OPENVPN_PROCESS_INTERRUPTED',
+      _ => null,
+    };
+  }
+
   /// These errors cannot resolve by waiting for initialization.
   /// Others are only reported if the child process actually exits.
   static bool isTerminal(String reason) =>
