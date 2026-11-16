@@ -66,6 +66,33 @@ class MainActivity : FlutterActivity() {
                 else -> result.notImplemented()
             }
         }
+        // Fail closed until the Rust TrustTunnel engine and TUN forwarder are
+        // actually bundled. A SOCKS listener alone is not a device VPN.
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            "com.twinpanel.twinconnect/trusttunnel"
+        ).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "getCapabilities" -> result.success(
+                    mapOf(
+                        "contractVersion" to 1,
+                        "engineReady" to false,
+                        "vpnServiceReady" to false,
+                        "tunnelVerified" to false,
+                        "reason" to "TRUSTTUNNEL_NATIVE_ENGINE_NOT_INSTALLED"
+                    )
+                )
+                "connect" -> result.error(
+                    "TRUSTTUNNEL_NATIVE_ENGINE_NOT_INSTALLED",
+                    "Rust TrustTunnel client and Android TUN bridge are required",
+                    null
+                )
+                "disconnect" -> result.success(
+                    mapOf("connected" to false, "tunnelVerified" to false)
+                )
+                else -> result.notImplemented()
+            }
+        }
         channel.setMethodCallHandler { call, result ->
             when (call.method) {
                 "getCapabilities" -> onWorker(result) {
