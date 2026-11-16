@@ -16,7 +16,7 @@ void main() {
     expect(control, contains('allowedShadowTlsConfig'));
     expect(control, contains('inner["detour"] as? String == "shadowtls-transport"'));
     expect(engine, contains('shadowTlsProfileAllowed'));
-    expect(provider, contains('"naive", "shadowtls"'));
+    expect(provider, contains('"naive", "shadowtls", "snell"'));
     expect(controller, contains('MacShadowTlsConfig.encode'));
     expect(dashboard, contains('_macShadowTls.start('));
     expect(dashboard, contains("protocol == 'shadowtls'"));
