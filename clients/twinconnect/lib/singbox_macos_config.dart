@@ -322,6 +322,40 @@ class SingBoxMacConfig {
     required Map<String, dynamic> item,
   }) => jsonEncode(composeSnell(item: item));
 
+  /// SOCKS5 account profile for the signed macOS packet-tunnel backend.
+  /// Credentials and server are never replaced with fallback public proxies.
+  static Map<String, dynamic> composeSocks5({
+    required Map<String, dynamic> item,
+  }) {
+    final candidate = SingBoxProfileValidator.validateOutbound(
+      protocolCode: 'socks5', item: item,
+    );
+    if (candidate.keys.any((key) => !const {
+          'type', 'tag', 'server', 'server_port', 'version',
+          'username', 'password', 'network',
+        }.contains(key))) {
+      throw const FormatException('MAC_SOCKS5_UNREVIEWED_FIELD');
+    }
+    // For protected DNS-over-HTTPS, the server must support TCP CONNECT.
+    if (candidate['network'] != null && candidate['network'] != 'tcp') {
+      throw const FormatException('MAC_SOCKS5_TCP_REQUIRED');
+    }
+    return _envelope(<String, dynamic>{
+      'type': 'socks',
+      'tag': 'proxy',
+      'server': candidate['server'],
+      'server_port': candidate['server_port'],
+      'version': '5',
+      'username': candidate['username'],
+      'password': candidate['password'],
+      'network': 'tcp',
+    });
+  }
+
+  static String encodeSocks5ForEphemeralTunnel({
+    required Map<String, dynamic> item,
+  }) => jsonEncode(composeSocks5(item: item));
+
   static Map<String, dynamic> _envelope(Map<String, dynamic> outbound) {
     return <String, dynamic>{
       'log': <String, dynamic>{'level': 'error'},
