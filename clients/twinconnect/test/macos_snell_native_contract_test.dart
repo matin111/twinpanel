@@ -15,7 +15,7 @@ void main() {
     expect(host, contains('allowedSnellConfig'));
     expect(host, contains('namespace + ":" + account + ":" + protocolCode'));
     expect(engine, contains('snellProfileAllowed'));
-    expect(provider, contains('"shadowtls", "snell"'));
+    expect(provider, contains('"shadowtls", "snell", "socks5"'));
     expect(controller, contains('SingBoxMacConfig.encodeSnellForEphemeralTunnel'));
     expect(dashboard, contains('_macSnell.start('));
     expect(dashboard, contains("protocol == 'snell'"));
