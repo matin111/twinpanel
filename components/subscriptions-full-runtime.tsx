@@ -43,6 +43,13 @@ export function SubscriptionsFullRuntimePage(){
     }catch(e){setError(e instanceof Error?e.message:String(e));}finally{setLoading(false);}
   };
   useEffect(()=>{void load();},[]);
+  useEffect(()=>{
+    const value=Number(new URLSearchParams(window.location.search).get("focus")||0);
+    if(Number.isSafeInteger(value)&&value>0){
+      setQ(String(value));
+      setSelectedId(value);
+    }
+  },[]);
 
   const selected=useMemo(()=>rows.find(x=>n(x.id)===selectedId)||null,[rows,selectedId]);
   const userMap=useMemo(()=>new Map(users.map(x=>[x.id,x])),[users]);
