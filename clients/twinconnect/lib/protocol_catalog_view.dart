@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 
 import 'app_strings.dart';
@@ -19,7 +21,9 @@ class ProtocolCatalogCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final strings = AppStrings.of(context);
-    final allowed = catalog.entries.where((entry) => entry.selected).toList();
+    final allowed = catalog.entries.where((entry) =>
+        entry.selected && !(Platform.isAndroid && entry.protocol.code == 'l2tp')
+    ).toList();
     return Card(
       key: const Key('protocolCatalogCard'),
       child: Padding(
