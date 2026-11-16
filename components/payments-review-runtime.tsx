@@ -1,6 +1,6 @@
 "use client";
 
-import {useEffect,useMemo,useState} from "react";
+import {useCallback,useEffect,useMemo,useRef,useState} from "react";
 import {Badge,Card,Shell} from "./ui";
 import {matchesPaymentReviewFilter,needsPaymentReview,PaymentReviewFilter} from "../lib/payment-review-filters";
 import {adminApi,AdminUser,RuntimeRow} from "../lib/admin-api";
@@ -105,13 +105,14 @@ export function PaymentsReviewRuntime(){
   const [busyKey,setBusyKey]=useState("");
   const [error,setError]=useState("");
   const [ok,setOk]=useState("");
+  const deliveryPollRunning=useRef(false);
 
-  const load=async(quiet=false)=>{
+  const load=useCallback(async(quiet=false,includeUsers=true)=>{
     if(!quiet)setError("");
 
     // User names are secondary metadata. Do not block the payment table on a
     // potentially large /admin/users response.
-    void adminApi.users().then(setUsers).catch(()=>{});
+    if(includeUsers)void adminApi.users().then(setUsers).catch(()=>{});
 
     const result=await Promise.allSettled([
       adminApi.payments(),
@@ -123,9 +124,34 @@ export function PaymentsReviewRuntime(){
 
     const failed=result.find(item=>item.status==="rejected");
     if(!quiet&&failed&&failed.status==="rejected")setError(failed.reason instanceof Error?failed.reason.message:String(failed.reason));
-  };
+  },[]);
 
-  useEffect(()=>{void load();},[]);
+  useEffect(()=>{void load();},[load]);
+
+  // The approval endpoint returns before slow multi-node provisioning finishes.
+  // Refresh only recent incomplete purchase deliveries, not all payment history.
+  // Do not make the expensive /admin/users request on every poll.
+  useEffect(()=>{
+    const recentlyPending=purchases.some(row=>{
+      const status=s(row.status).toLowerCase();
+      if(!["approved","auto_verified","paid"].includes(status))return false;
+      const orderStatus=s(row.order_status).toLowerCase();
+      const deliveryStatus=s(row.delivery_status).toLowerCase();
+      if(orderStatus==="fulfilled"&&deliveryStatus==="telegram_sent")return false;
+      const raw=s(row.verified_at||row.receipt_submitted_at||row.created_at).replace(" ","T");
+      if(!raw)return false;
+      const utc=/(?:Z|[+-]\\d{2}:?\\d{2})$/i.test(raw)?raw:raw+"Z";
+      const age=Date.now()-Date.parse(utc);
+      return Number.isFinite(age)&&age>=-120_000&&age<=40*60_000;
+    });
+    if(!recentlyPending)return;
+    const timer=window.setInterval(()=>{
+      if(document.visibilityState==="hidden"||deliveryPollRunning.current)return;
+      deliveryPollRunning.current=true;
+      void load(true,false).finally(()=>{deliveryPollRunning.current=false;});
+    },8000);
+    return ()=>window.clearInterval(timer);
+  },[purchases,load]);
 
   const rows=useMemo<ReviewRow[]>(()=>{
     const purchaseRows=purchases.map(row=>({
@@ -414,7 +440,9 @@ export function PaymentsReviewRuntime(){
                       {pick("مشاهده اکانت ساخته‌شده","Open created account")} #{row.subscriptionId}
                     </a>
                     {row.accountUsername&&<small>{pick("نام کاربری","Username")}: <b dir="ltr">{row.accountUsername}</b></small>}
-                    {row.fulfillmentStatus==="created_pending_fulfillment"&&<small>{pick("◷ اکانت ساخته شده؛ تکمیل سفارش در حال بررسی است","◷ Account exists; final order reconciliation pending")}</small>}
+                    {row.fulfillmentStatus==="created_pending_fulfillment"&&<small>{row.deliveryStatus==="telegram_sent"
+                       ?pick("✓ اکانت تحویل شد؛ آماده‌سازی پروتکل‌های باقی‌مانده ادامه دارد","✓ Account sent; remaining protocols are still being prepared")
+                       :pick("◷ اکانت ساخته شده؛ تکمیل سفارش در حال بررسی است","◷ Account exists; final order reconciliation pending")}</small>}
                     <small>{row.deliveryStatus==="telegram_sent"
                       ?pick("✓ پیام اطلاعات اکانت در تلگرام ارسال شد","✓ Account details sent via Telegram")
                       :row.deliveryStatus==="telegram_pending"
