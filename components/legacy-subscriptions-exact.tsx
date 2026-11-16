@@ -103,6 +103,8 @@ export function LegacySubscriptionsRuntimePage(){
   const [userSearch,setUserSearch]=useState("");
   const [extendDays,setExtendDays]=useState(30);
   const [extendTraffic,setExtendTraffic]=useState(10);
+  const [extendMode,setExtendMode]=useState<"custom"|"plan">("custom");
+  const [extendPlanId,setExtendPlanId]=useState(0);
   const [renewalHistory,setRenewalHistory]=useState<{events:Array<{id:number;type:string;source:string;actor:string;details:Record<string,unknown>;created_at:string}>;queued:Array<{id:number;plan:string;traffic_bytes:number;duration_days:number;status:"queued"|"blocked";created_at:string}>}|null>(null);
   const [editResetUsage,setEditResetUsage]=useState(false);
   const [resetTarget,setResetTarget]=useState<RuntimeRow|null>(null);
@@ -348,11 +350,17 @@ export function LegacySubscriptionsRuntimePage(){
       setTransferOpen(false);
     });
   };
-  const openExtend=(item:RuntimeRow)=>{setSelected(item);setExtendDays(30);setExtendTraffic(10);setExtendResetUsage(false);setExtendResetDate(false);setModal("extend");};
+  const openExtend=(item:RuntimeRow)=>{setSelected(item);setExtendMode("custom");setExtendPlanId(0);setExtendDays(30);setExtendTraffic(10);setExtendResetUsage(false);setExtendResetDate(false);setModal("extend");};
+  const chooseRenewalPlan=(id:number)=>{
+    setExtendPlanId(id);
+    const chosen=planMap.get(id);
+    if(chosen){setExtendTraffic(n(chosen.traffic_gb));setExtendDays(n(chosen.duration_days));}
+  };
   const saveExtend=()=>{
-    if(!selected||(!extendDays&&!extendTraffic))return;
+    if(!selected||extendTraffic<=0||extendDays<=0||(extendMode==="plan"&&!extendPlanId))return;
     void act("extend",pick("تمدید برای دوره بعد ثبت شد","Renewal queued for the next period"),()=>legacyAdminApi.reserveSubscriptionRenewal(n(selected.id),{
-      traffic_gb:extendTraffic,duration_days:extendDays,plan_id:n(selected.plan_id)||undefined,
+      mode:extendMode,traffic_gb:extendTraffic,duration_days:extendDays,
+      ...(extendMode==="plan"?{plan_id:extendPlanId}:{}),
     }),true);
   };
   const openHistory=async(item:RuntimeRow)=>{
@@ -830,11 +838,24 @@ export function LegacySubscriptionsRuntimePage(){
     {modal==="extend"&&selected&&<Modal title={pick("تمدید اشتراک","Renew subscription")} sub={`MV-${n(selected.id)} · ${pick("تمدید پس از پایان حجم یا تاریخ فعال می‌شود","Activates after quota or expiry")}`} onClose={()=>!busy&&setModal(null)}>
       <Notice error={error} ok={ok}/>
       <div className="setting-grid">
-        <label className="field"><span>{pick("مدت دوره بعد (روز)","Next period (days)")}</span><input type="number" min={0} value={extendDays} onChange={event=>setExtendDays(Math.max(0,Number(event.target.value)||0))}/></label>
-        <label className="field"><span>{pick("حجم دوره بعد (GB)","Next period traffic (GB)")}</span><input type="number" min={0} step="0.1" value={extendTraffic} onChange={event=>setExtendTraffic(Math.max(0,Number(event.target.value)||0))}/></label>
+        <label className="field"><span>{pick("نوع تمدید","Renewal type")}</span>
+          <select value={extendMode} onChange={event=>{const mode=event.target.value as "custom"|"plan";setExtendMode(mode);if(mode==="custom"){setExtendPlanId(0);setExtendTraffic(10);setExtendDays(30);}else{const first=plans.find(plan=>plan.is_active!==false&&n(plan.traffic_gb)>0&&n(plan.duration_days)>0);chooseRenewalPlan(n(first?.id));}}}>
+            <option value="custom">{pick("حجم و مدت دلخواه","Custom traffic and duration")}</option>
+            <option value="plan">{pick("انتخاب از پلن‌های موجود","Select an existing plan")}</option>
+          </select>
+        </label>
+        {extendMode==="plan"&&<label className="field"><span>{pick("پلن دوره بعد","Next period plan")}</span>
+          <select value={extendPlanId} onChange={event=>chooseRenewalPlan(Number(event.target.value))}>
+            <option value={0}>{pick("انتخاب پلن","Select plan")}</option>
+            {plans.filter(plan=>plan.is_active!==false&&n(plan.traffic_gb)>0&&n(plan.duration_days)>0).map(plan=><option key={n(plan.id)} value={n(plan.id)}>{s(plan.name)} · {n(plan.traffic_gb)} GB · {n(plan.duration_days)} {pick("روز","days")}</option>)}
+          </select>
+        </label>}
+        <label className="field"><span>{pick("مدت دوره بعد (روز)","Next period (days)")}</span><input type="number" min={1} value={extendDays} disabled={extendMode==="plan"} onChange={event=>setExtendDays(Math.max(0,Number(event.target.value)||0))}/></label>
+        <label className="field"><span>{pick("حجم دوره بعد (GB)","Next period traffic (GB)")}</span><input type="number" min={0.1} step="0.1" value={extendTraffic} disabled={extendMode==="plan"} onChange={event=>setExtendTraffic(Math.max(0,Number(event.target.value)||0))}/></label>
       </div>
+      <p className="muted">{extendMode==="custom"?pick("تمدید با عنوان مستقل ثبت می‌شود؛ پلن فعلی تغییر نمی‌کند.","Custom renewal is labeled separately; the current plan stays unchanged."):pick("حجم و مدت از پلن انتخابی خوانده می‌شود.","Quota and duration come from the selected plan.")}</p>
       <p className="muted">{pick("اعتبار دوره فعلی تا زمان پایان حجم یا تاریخ بدون تغییر باقی می‌ماند.","The current subscription remains unchanged until quota or expiry ends.")}</p>
-      <div className="modalActions"><button className="ghost" disabled={!!busy} onClick={()=>setModal(null)}>{pick("انصراف","Cancel")}</button><button className="primary" disabled={!!busy||(!extendDays&&!extendTraffic)} onClick={saveExtend}>{busy==="extend"?"…":pick("ثبت تمدید","Queue renewal")}</button></div>
+      <div className="modalActions"><button className="ghost" disabled={!!busy} onClick={()=>setModal(null)}>{pick("انصراف","Cancel")}</button><button className="primary" disabled={!!busy||extendDays<=0||extendTraffic<=0||(extendMode==="plan"&&!extendPlanId)} onClick={saveExtend}>{busy==="extend"?"…":pick("ثبت تمدید","Queue renewal")}</button></div>
     </Modal>}
     {modal==="history"&&selected&&<Modal title={pick("تاریخچه اشتراک","Subscription history")} sub={`MV-${n(selected.id)}`} onClose={()=>setModal(null)} wide>
       <Notice error={error} ok={ok}/>
