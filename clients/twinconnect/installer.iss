@@ -71,6 +71,7 @@ var
   OpenConnectManifest: String;
   OpenVpnInstaller: String;
   OpenVpnBinary: String;
+  OpenVpnStamp: String;
   AmneziaWgInstaller: String;
   AmneziaWgBinary: String;
 #if IncludeVerifiedGlobalGuard
@@ -105,22 +106,30 @@ begin
       MsgBox('Cisco engine bundle missing; Cisco remains disabled.',
         mbError, MB_OK);
     end;
-    { Install official vendor-signed OpenVPN Community x64 package only if
-      its CLI is absent. The MSI was verified in Windows CI and is bundled.
-      Inno Setup is already elevated: users need no separate installation. }
+    { Install the vetted OpenVPN MSI when absent, and upgrade older
+      TwinConnect-installed I001 builds once to I002. A pre-existing CLI is
+      not evidence the Windows DCO driver was upgraded. The local stamp is
+      written only after msiexec reports successful completion. }
     OpenVpnBinary := ExpandConstant('{pf}\OpenVPN\bin\openvpn.exe');
     OpenVpnInstaller := ExpandConstant(
       '{app}\prerequisites\OpenVPN-2.7.9-I002-amd64.msi');
-    if not FileExists(OpenVpnBinary) then
+    OpenVpnStamp := ExpandConstant(
+      '{commonappdata}\TwinConnect\OpenVPN-I002-ready.txt');
+    if (not FileExists(OpenVpnBinary)) or (not FileExists(OpenVpnStamp)) then
     begin
       if FileExists(OpenVpnInstaller) then
       begin
         Ok := Exec(ExpandConstant('{sys}\msiexec.exe'),
                    '/i "' + OpenVpnInstaller + '" /qn /norestart',
                    '', SW_HIDE, ewWaitUntilTerminated, ExitCode);
-        if (not Ok) or ((ExitCode <> 0) and (ExitCode <> 3010)) then
-          MsgBox('OpenVPN engine installation failed; OpenVPN will remain disabled.' + #13#10 +
-                 'Other VPN connections are unaffected.',
+        if Ok and ((ExitCode = 0) or (ExitCode = 3010)) then
+        begin
+          if ForceDirectories(ExtractFileDir(OpenVpnStamp)) then
+            SaveStringToFile(OpenVpnStamp, 'OpenVPN Community 2.7.9 I002' + #13#10, False);
+        end
+        else
+          MsgBox('OpenVPN I002 install/upgrade failed. Check the local OpenVPN driver installation.' + #13#10 +
+                 'Other VPN protocols are unaffected.',
                  mbError, MB_OK);
       end
       else
