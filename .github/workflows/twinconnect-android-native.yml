@@ -61,8 +61,10 @@ jobs:
           if-no-files-found: error
       - name: Generate Android scaffold
         run: flutter create --platforms=android --org com.twinpanel --project-name twinconnect .
-      - name: Install native source and pinned WireGuard dependency
-        run: python tools/install_android_native.py
+      - name: Install native source, supplied icon and pinned WireGuard dependency
+        run: |
+          python -m pip install --user Pillow==11.3.0
+          python tools/install_android_native.py
       - name: Verify explicit VPN permission and native service
         shell: bash
         run: |
