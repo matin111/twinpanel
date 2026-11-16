@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.850",
+  "version": "1.1.0-rc.851",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-15T12:06:55Z",
+  "released_at": "2026-11-16T04:00:38Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "268174485845bf3c4d792778b2f587c7726e4dec",
+  "source_sha": "4e6206015b56762afb2fea7f92975fec41717275",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.850/twinpanel-1.1.0-rc.850-linux-x86_64.tar.gz",
-    "sha256": "bf654bf785586dde7b1698664b1640712ac73d852d6c4886139e2fb7129e08a0",
-    "size_bytes": 30892772
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.851/twinpanel-1.1.0-rc.851-linux-x86_64.tar.gz",
+    "sha256": "6d426f8bea47cdca7fbc5538fa88f3201d7c7aba4a8c1658edb75b3f9af29414",
+    "size_bytes": 30952141
   },
   "notes": {
-    "fa": "رفع قطع‌ووصلی OpenVPN هنگام اتصال هم‌زمان ویندوز و موبایل با یک اکانت: فعال‌سازی نشست‌های هم‌زمان روی سرور و در قالب نصب نود، حفظ مدیریت سقف اتصال از موتور سهمیه/نشست TwinPanel؛ بدون تغییر گواهی، سهمیه، اتصال پروتکل‌های دیگر.",
-    "en": "Fix OpenVPN simultaneous multi-device disconnects due to duplicate certificate CN by enabling duplicate-cn in node provisioning; quota runtime continues session-level device-limit enforcement. No changes to credentials, subscriptions or other protocols."
+    "fa": "نسخه رسمی از GitHub شامل اصلاح صفحه پرداخت‌ها، لینک مستقیم اکانت ساخته‌شده، نمایش شارژ کیف پول، تشخیص واقعی تحویل پیام تلگرام، تاریخچه اتصال و فیلتر دقیق اکانت در صفحه فعال اشتراک‌ها. حفظ تغییرات در آپدیت‌های بعدی از طریق سورس نسخه‌بندی‌شده.",
+    "en": "Official GitHub-built update preserving payment outcomes, wallet credits, real Telegram account delivery status, connection session history, and exact subscription filtering from payment links."
   }
 }
