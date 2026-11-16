@@ -696,6 +696,107 @@ def reconcile_ready_payment_orders_once(limit: int = 30) -> dict:
         db.close()
 
 
+
+def reconcile_early_payment_account_delivery_once(limit: int = 40) -> dict:
+    """Queue one final account delivery if an early notice predated fulfillment.
+
+    Legacy payment notifications may have gone out before all credentials were
+    ready. Send a distinct, idempotent account-ready message only for recently
+    fulfilled, verified orders with an earlier dispatched notice and without
+    recorded proof of complete account delivery. Never re-approve payments.
+    """
+    from ..telegram_notify_models import TelegramNotification
+
+    db = SessionLocal()
+    queued = []
+    try:
+        since = datetime.utcnow() - timedelta(hours=3)
+        orders = (
+            db.query(StoreOrder)
+            .filter(
+                StoreOrder.status == "fulfilled",
+                StoreOrder.fulfilled_at >= since,
+                StoreOrder.subscription_id.isnot(None),
+                StoreOrder.payment_method != "wallet",
+            )
+            .order_by(StoreOrder.id.desc())
+            .limit(max(1, min(int(limit), 100)))
+            .all()
+        )
+        for order in orders:
+            intent = (
+                db.query(PaymentIntent)
+                .filter(
+                    PaymentIntent.order_id == int(order.id),
+                    PaymentIntent.status.in_(APPROVED_PAYMENT_STATUSES),
+                )
+                .order_by(PaymentIntent.id.desc())
+                .first()
+            )
+            if intent is None:
+                continue
+            notices = (
+                db.query(TelegramNotification)
+                .filter(
+                    TelegramNotification.user_id == int(order.user_id),
+                    TelegramNotification.kind.in_(("payment_approved", "payment_account_ready")),
+                    TelegramNotification.created_at >= since,
+                )
+                .order_by(TelegramNotification.id.desc())
+                .limit(250)
+                .all()
+            )
+            matched = [
+                row for row in notices
+                if str((row.payload or {}).get("order_id") or "") == str(order.id)
+                and str((row.payload or {}).get("subscription_id") or "") == str(order.subscription_id)
+            ]
+            if not matched:
+                continue
+            # Already queued or delivered the guaranteed final message.
+            if any(row.kind == "payment_account_ready" for row in matched):
+                continue
+            if any(
+                row.delivered_at is not None
+                and bool((row.payload or {}).get("account_delivery_sent"))
+                for row in matched
+            ):
+                continue
+            early = any(
+                row.kind == "payment_approved"
+                and row.delivered_at is not None
+                and order.fulfilled_at is not None
+                and row.delivered_at < order.fulfilled_at
+                for row in matched
+            )
+            if not early:
+                continue
+            # Verify the complete account before notifying its owner.
+            from ..routers.store import _existing_delivery_snapshot, _delivery_ready_for_order
+            if not _delivery_ready_for_order(order, _existing_delivery_snapshot(order, db)):
+                continue
+            queue_telegram_notification(
+                db,
+                user_id=int(order.user_id),
+                event_key=(
+                    f"account-ready:order:{int(order.id)}:"
+                    f"payment:{int(intent.id)}:subscription:{int(order.subscription_id)}"
+                ),
+                kind="payment_account_ready",
+                payload={
+                    "payment_id": int(intent.id),
+                    "order_id": int(order.id),
+                    "subscription_id": int(order.subscription_id),
+                    "amount_toman": int(intent.payable_amount_toman or order.amount_toman or 0),
+                },
+            )
+            db.commit()
+            queued.append(int(order.id))
+        return {"queued": len(queued), "order_ids": queued}
+    finally:
+        db.close()
+
+
 async def payment_fulfillment_recovery_loop() -> None:
     try:
         recovered = await asyncio.to_thread(
@@ -729,6 +830,9 @@ async def payment_fulfillment_recovery_loop() -> None:
                 ready = await asyncio.to_thread(reconcile_ready_payment_orders_once)
                 if ready["completed"]:
                     print("PAYMENT_READY_DELIVERY_FINALIZED", ready, flush=True)
+                followups = await asyncio.to_thread(reconcile_early_payment_account_delivery_once)
+                if followups["queued"]:
+                    print("PAYMENT_ACCOUNT_DELIVERY_FOLLOWUP_QUEUED", followups, flush=True)
             result = await process_paid_store_orders_once()
             wallet_result = await process_wallet_paid_orders_once()
             if result.get("seen") or wallet_result.get("seen"):
