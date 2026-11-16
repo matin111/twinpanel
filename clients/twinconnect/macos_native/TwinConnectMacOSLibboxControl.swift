@@ -13,8 +13,75 @@ enum TwinConnectMacOSLibboxControl {
         FlutterError(code: code, message: code, details: nil)
     }
 
+    private static func allowedShadowTlsConfig(_ text: String) -> Bool {
+        guard (64...131072).contains(text.utf8.count),
+              let data = text.data(using: .utf8),
+              let raw = (try? JSONSerialization.jsonObject(with: data))
+                    as? [String: Any],
+              let outbounds = raw["outbounds"] as? [[String: Any]],
+              outbounds.count == 2,
+              let inner = outbounds.first,
+              let outer = outbounds.last,
+              inner["type"] as? String == "shadowsocks",
+              inner["tag"] as? String == "proxy",
+              inner["detour"] as? String == "shadowtls-transport",
+              let method = inner["method"] as? String,
+              ["aes-128-gcm", "aes-256-gcm", "chacha20-ietf-poly1305",
+               "2022-blake3-aes-128-gcm", "2022-blake3-aes-256-gcm",
+               "2022-blake3-chacha20-poly1305"].contains(method),
+              let innerPassword = inner["password"] as? String,
+              !innerPassword.isEmpty,
+              inner["server"] == nil,
+              inner["server_port"] == nil,
+              Set(inner.keys).isSubset(of: [
+                "type", "tag", "detour", "method", "password"
+              ]),
+              outer["type"] as? String == "shadowtls",
+              outer["tag"] as? String == "shadowtls-transport",
+              outer["version"] as? Int == 3,
+              let endpoint = outer["server"] as? String,
+              !endpoint.isEmpty,
+              let port = outer["server_port"] as? Int,
+              (1...65535).contains(port),
+              let outerPassword = outer["password"] as? String,
+              !outerPassword.isEmpty,
+              Set(outer.keys).isSubset(of: [
+                "type", "tag", "version", "server", "server_port",
+                "password", "tls"
+              ]),
+              let tls = outer["tls"] as? [String: Any],
+              tls["enabled"] as? Bool == true,
+              let serverName = tls["server_name"] as? String,
+              !serverName.isEmpty,
+              Set(tls.keys).isSubset(of: ["enabled", "server_name"]),
+              let inbounds = raw["inbounds"] as? [[String: Any]],
+              inbounds.count == 1,
+              inbounds[0]["type"] as? String == "tun",
+              inbounds[0]["auto_route"] as? Bool == true,
+              inbounds[0]["strict_route"] as? Bool == true,
+              inbounds[0]["dns_mode"] as? String == "hijack",
+              let route = raw["route"] as? [String: Any],
+              route["final"] as? String == "proxy",
+              route["default_domain_resolver"] as? String == "dns-bootstrap",
+              let rules = route["rules"] as? [[String: Any]],
+              rules.count == 2,
+              rules[0]["port"] as? Int == 53,
+              rules[0]["action"] as? String == "hijack-dns",
+              rules[1]["ip_version"] as? Int == 6,
+              rules[1]["action"] as? String == "reject",
+              let dns = raw["dns"] as? [String: Any],
+              dns["final"] as? String == "dns-remote",
+              let servers = dns["servers"] as? [[String: Any]],
+              servers.count == 2,
+              servers[0]["tag"] as? String == "dns-bootstrap",
+              servers[1]["detour"] as? String == "proxy"
+        else { return false }
+        return true
+    }
+
     private static func allowedConfig(_ text: String, protocolCode: String) -> Bool {
-        guard ["hysteria2", "tuic", "anytls", "naive"].contains(protocolCode) else { return false }
+        if protocolCode == "shadowtls" { return allowedShadowTlsConfig(text) }
+        guard ["hysteria2", "tuic", "anytls", "naive", "shadowtls"].contains(protocolCode) else { return false }
         guard (64...131072).contains(text.utf8.count),
               let data = text.data(using: .utf8),
               let raw = (try? JSONSerialization.jsonObject(with: data))
@@ -154,13 +221,14 @@ enum TwinConnectMacOSLibboxControl {
     static func start(_ args: Any?, backendLinked: Bool,
                       protocolCode: String = "hysteria2",
                       result: @escaping FlutterResult) {
-        guard ["hysteria2", "tuic", "anytls", "naive"].contains(protocolCode) else {
+        guard ["hysteria2", "tuic", "anytls", "naive", "shadowtls"].contains(protocolCode) else {
             result(failure("MACOS_PROTOCOL_NOT_SUPPORTED"))
             return
         }
         let errorPrefix = protocolCode == "tuic" ? "MACOS_TUIC" :
             (protocolCode == "anytls" ? "MACOS_ANYTLS" :
-             (protocolCode == "naive" ? "MACOS_NAIVE" : "MACOS_HYSTERIA2"))
+             (protocolCode == "naive" ? "MACOS_NAIVE" :
+             (protocolCode == "shadowtls" ? "MACOS_SHADOWTLS" : "MACOS_HYSTERIA2")))
         guard backendLinked else {
             result(failure(errorPrefix + "_PACKET_FLOW_BRIDGE_MISSING"))
             return
