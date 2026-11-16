@@ -113,10 +113,7 @@ with tempfile.TemporaryDirectory(prefix="twinpanel-shadowtls-v234-") as temp_dir
         "SHADOWTLS_IDENTITY_INNER_TAG": "twinpanel-shadowtls-identity-inner",
         "SHADOWTLS_IDENTITY_OUTER_TAG": "twinpanel-shadowtls-identity-in",
         "SHADOWTLS_IDENTITY_METHOD": "2022-blake3-aes-128-gcm",
-        "identity_client_outbounds": __import__(
-            "app.services.shadowtls_2022_identity_v1",
-            fromlist=["identity_client_outbounds"],
-        ).identity_client_outbounds,
+        "identity_client_outbounds": runpy.run_path(str(ROOT / "backend" / "app" / "services" / "shadowtls_2022_identity_v1.py"))["identity_client_outbounds"],
     }
     exec_functions(
         account_tree,
