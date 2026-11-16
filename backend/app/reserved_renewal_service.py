@@ -132,7 +132,7 @@ def provision_reserved_plan_at_cutover(db: Session, sub: Subscription, plan_id: 
         payload={
             "plan_id": int(plan.id),
             "protocols": protocols,
-            "traffic_limit_bytes": int(sub.traffic_limit_bytes or 0),
+            "_strict_reserved_cutover": True,
         },
         db=db,
     ))
