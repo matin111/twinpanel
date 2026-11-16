@@ -93,7 +93,7 @@ final class TwinConnectMacOSVPNBridge {
                 result([
                     "contractVersion": 1,
                     "supportedCodes": libboxBackendReady()
-                        ? ["hysteria2"] : [String]()
+                        ? ["hysteria2", "tuic"] : [String]()
                 ] as [String: Any])
             case "macOSXrayEngineStatus":
                 result([
@@ -120,6 +120,19 @@ final class TwinConnectMacOSVPNBridge {
                             ? "MACOS_HYSTERIA2_SIGNING_OR_ENTITLEMENT_MISSING"
                             : "MACOS_HYSTERIA2_PACKET_FLOW_BRIDGE_MISSING")
                 ] as [String: Any])
+            case "macOSTuicEngineStatus":
+                result([
+                    "contractVersion": 1,
+                    "protocol": "tuic",
+                    "inProcessLibboxBundled": libboxInExtension(),
+                    "packetFlowBridgeReady": libboxBackendReady(),
+                    "engineReady": libboxBackendReady(),
+                    "reason": libboxBackendReady()
+                        ? "MACOS_TUIC_SIGNED_START_UNVERIFIED"
+                        : (libboxInExtension()
+                            ? "MACOS_TUIC_SIGNING_OR_ENTITLEMENT_MISSING"
+                            : "MACOS_TUIC_PACKET_FLOW_BRIDGE_MISSING")
+                ] as [String: Any])
             case "macOSRuntimeStatus":
                 let installed = extensionBundle() != nil
                 result([
@@ -140,6 +153,12 @@ final class TwinConnectMacOSVPNBridge {
                     call.arguments, backendLinked: libboxBackendReady(), result: result)
             case "getHysteria2TunnelStatus":
                 TwinConnectMacOSLibboxControl.status(result)
+            case "startTuic":
+                TwinConnectMacOSLibboxControl.start(
+                    call.arguments, backendLinked: libboxBackendReady(),
+                    protocolCode: "tuic", result: result)
+            case "getTuicTunnelStatus":
+                TwinConnectMacOSLibboxControl.status(result, protocolCode: "tuic")
             case "stopTunnel":
                 TwinConnectMacOSVPNControl.stop(result)
             case "getTunnelStatus":
