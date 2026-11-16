@@ -114,9 +114,11 @@ final class TwinConnectMacOSVPNBridge {
                     "inProcessLibboxBundled": libboxInExtension(),
                     "packetFlowBridgeReady": libboxBackendReady(),
                     "engineReady": libboxBackendReady(),
-                    "reason": hysteriaEngineInstalled()
-                        ? "MACOS_HYSTERIA2_PACKET_FLOW_BRIDGE_MISSING"
-                        : "MACOS_HYSTERIA2_ENGINE_BINARY_MISSING"
+                    "reason": libboxBackendReady()
+                        ? "MACOS_HYSTERIA2_SIGNED_START_UNVERIFIED"
+                        : (libboxInExtension()
+                            ? "MACOS_HYSTERIA2_SIGNING_OR_ENTITLEMENT_MISSING"
+                            : "MACOS_HYSTERIA2_PACKET_FLOW_BRIDGE_MISSING")
                 ] as [String: Any])
             case "macOSRuntimeStatus":
                 let installed = extensionBundle() != nil
