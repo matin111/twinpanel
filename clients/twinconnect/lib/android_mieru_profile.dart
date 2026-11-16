@@ -1,37 +1,33 @@
 import 'dart:convert';
 
-/// Strict preflight for panel-issued Mieru profiles on Android.
+import 'mieru_client_profile.dart';
+
+/// Android-specific entry point for panel-issued Mieru profiles.
 ///
-/// This is deliberately separate from native engine readiness. A valid
-/// profile does not imply that an Android VPN transport has been installed.
+/// Reuses the production Windows validator instead of accepting arbitrary
+/// JSON as a usable native configuration. A validated profile is not proof
+/// that the Android Mieru engine or VpnService is installed.
 class AndroidMieruProfile {
   const AndroidMieruProfile._();
 
-  static Map<String, dynamic> validate(Map<String, dynamic> item) {
+  static MieruClientProfile validate(Map<String, dynamic> item) {
     final raw = item['config'];
-    Map<String, dynamic> config;
-    if (raw is String) {
-      if (raw.length > 262144) {
+    if (raw is String && raw.length > 262144) {
+      throw const FormatException('MIERU_PROFILE_TOO_LARGE');
+    }
+    if (raw is Map) {
+      final encoded = jsonEncode(raw);
+      if (encoded.length > 262144) {
         throw const FormatException('MIERU_PROFILE_TOO_LARGE');
       }
-      final decoded = jsonDecode(raw);
-      if (decoded is! Map<String, dynamic>) {
-        throw const FormatException('MIERU_PROFILE_INVALID');
-      }
-      config = decoded;
-    } else if (raw is Map<String, dynamic>) {
-      config = Map<String, dynamic>.from(raw);
-    } else {
+      return MieruClientProfile.fromItem({
+        ...item,
+        'config': encoded,
+      });
+    }
+    if (raw is! String) {
       throw const FormatException('MIERU_PROFILE_MISSING');
     }
-
-    // Only pass the Mieru-native profile to a future dedicated engine.
-    // Never execute arbitrary app-level VPN routing from a panel payload.
-    if (config.isEmpty || config.keys.any((key) =>
-        const {'inbounds', 'outbounds', 'route', 'dns', 'experimental'}
-            .contains(key))) {
-      throw const FormatException('MIERU_PROFILE_INVALID');
-    }
-    return config;
+    return MieruClientProfile.fromItem(item);
   }
 }
