@@ -8,6 +8,11 @@ on:
     paths:
       - 'clients/twinconnect/macos_native/**'
       - 'clients/twinconnect/lib/macos_hysteria2_controller.dart'
+      - 'clients/twinconnect/lib/macos_shadowtls_controller.dart'
+      - 'clients/twinconnect/lib/macos_shadowtls_config.dart'
+      - 'clients/twinconnect/lib/shadowtls_chain.dart'
+      - 'clients/twinconnect/test/macos_shadowtls_*.dart'
+      - 'clients/twinconnect/tool/macos_shadowtls_config_fixture.dart'
       - 'clients/twinconnect/lib/singbox_macos_config.dart'
       - 'clients/twinconnect/lib/live_dashboard.dart'
       - 'clients/twinconnect/test/macos_hysteria2_dashboard_lifecycle_contract_test.dart'
@@ -34,6 +39,15 @@ jobs:
         with:
           channel: stable
           cache: false
+      - name: Validate ShadowTLS v3 chain and signed-only native contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          flutter pub get
+          flutter test test/macos_shadowtls_config_test.dart test/macos_shadowtls_native_contract_test.dart
+          dart run tool/macos_shadowtls_config_fixture.dart > "$RUNNER_TEMP/twinconnect-shadowtls-synthetic.json"
+          test -s "$RUNNER_TEMP/twinconnect-shadowtls-synthetic.json"
+          echo "ShadowTLS two-hop profile and native contract passed (offline only)"
       - name: Verify signed-candidate opt-in and effective entitlement staging
         shell: bash
         run: |
@@ -150,7 +164,7 @@ jobs:
             echo 'App+PacketTunnel+Libbox: packaged and validated'
             echo 'Apple developer signing: NOT CONFIGURED'
             echo 'Network Extension provider usable: NO'
-            echo 'Hysteria2 VPN connection / egress / DNS: NOT VERIFIED'
+            echo 'Hysteria2 / ShadowTLS VPN connection / egress / DNS: NOT VERIFIED'
             echo 'For signing, rebuild on your provisioned Mac using macos_native/SIGNED_LIBBOX_TEST.md'
           } > build/macos/Build/Products/Release/MACOS-INTEGRATED-TEST-NOTES.txt
       - name: Package integrated app with symbolic links intact
