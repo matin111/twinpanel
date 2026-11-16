@@ -123,6 +123,12 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   final IosWireGuardController _iosVpn = const IosWireGuardController();
   final MacWireGuardController _macVpn = const MacWireGuardController();
   final MacHysteria2Controller _macHysteria = const MacHysteria2Controller();
+  Timer? _macOsStatusTimer;
+  bool _macOsStatusRefreshing = false;
+  String _macOsTunnelState = 'not_configured';
+  bool get _macOsTunnelPresent => Platform.isMacOS &&
+      const {'connecting', 'os_connected_unverified',
+        'reasserting', 'disconnecting'}.contains(_macOsTunnelState);
   final WindowsAmneziaWgController _awg = const WindowsAmneziaWgController();
   late final WindowsSingBoxTunnel _modernTunnel = WindowsSingBoxTunnel(
     onUnexpectedExit: () {
@@ -853,6 +859,40 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     }
     setState(() { _vpnBusy = true; _vpnError = null; });
     try {
+      if (Platform.isMacOS) {
+        // macOS must never run the Windows service adapter on sign-out.
+        // Do not revoke login while the OS still owns a VPN tunnel.
+        var state = (await _macVpn.status())['state'];
+        if (const {'connecting', 'os_connected_unverified', 'reasserting',
+              'disconnecting'}.contains(state)) {
+          await _macVpn.stop();
+          var stopped = false;
+          for (var attempt = 0; attempt < 8; attempt++) {
+            await Future<void>.delayed(const Duration(milliseconds: 500));
+            state = (await _macVpn.status())['state'];
+            if (const {'disconnected', 'not_configured', 'invalid'}
+                .contains(state)) {
+              stopped = true;
+              break;
+            }
+          }
+          if (!stopped) {
+            throw const FormatException('MACOS_TUNNEL_NOT_STOPPED');
+          }
+        } else if (!const {'disconnected', 'not_configured', 'invalid'}
+            .contains(state)) {
+          throw const FormatException('MACOS_TUNNEL_STATUS_UNKNOWN');
+        }
+        if (!mounted) return;
+        setState(() {
+          _macOsTunnelState = 'disconnected';
+          _vpnUp = false;
+          _vpnVerified = false;
+          _activeNodeId = null;
+        });
+        widget.onLogout();
+        return;
+      }
       if (_modernTunnel.isRunning || _xrayProxy.isRunning || _sudokuProxy.isRunning || _mieruProxy.isRunning || _trusttunnelProxy.isRunning ||
           _ciscoTunnel.isRunning ||
           _openVpnTunnel.hasChild || _l2tpTunnel.hasChild || _modernUp) {
@@ -2493,6 +2533,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
 
   @override
   void dispose() {
+    _macOsStatusTimer?.cancel();
     _previewTour?.cancel();
     _durationTicker?.cancel();
     _connectedSeconds.dispose();
@@ -2565,6 +2606,11 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     unawaited(_restoreManualConnectionChoice());
     _refreshNativeReadiness();
     _refreshVpnStatus();
+    if (Platform.isMacOS) {
+      _macOsStatusTimer = Timer.periodic(const Duration(seconds: 7), (_) {
+        unawaited(_refreshMacOsTunnelStatus());
+      });
+    }
     unawaited(_restoreCachedXrayInbounds());
     if (_isVitoryPlan) {
       if (_xrayAuthorized) unawaited(_loadXrayGroups(refresh: true));
@@ -2648,7 +2694,35 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     }
   }
 
+  Future<void> _refreshMacOsTunnelStatus() async {
+    if (!Platform.isMacOS || !mounted || _macOsStatusRefreshing) return;
+    _macOsStatusRefreshing = true;
+    try {
+      final status = await _macHysteria.status();
+      if (!mounted) return;
+      final next = status['state'] as String;
+      if (next != _macOsTunnelState) {
+        setState(() {
+          _macOsTunnelState = next;
+          // Apple's connected notification does not prove a working VPN.
+          _vpnVerified = false;
+        });
+      }
+    } catch (_) {
+      // An unavailable OS status must never become a green Connected badge.
+      if (mounted && _macOsTunnelState != 'status_unavailable') {
+        setState(() => _macOsTunnelState = 'status_unavailable');
+      }
+    } finally {
+      _macOsStatusRefreshing = false;
+    }
+  }
+
   Future<void> _refreshVpnStatus() async {
+    if (Platform.isMacOS) {
+      await _refreshMacOsTunnelStatus();
+      return;
+    }
     // Prevent method-channel calls from accumulating while Windows is busy.
     if (!Platform.isWindows || !mounted || _vpnBusy || _statusRefreshing) return;
     _statusRefreshing = true;
@@ -2747,8 +2821,10 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         if (mounted) setState(() {
           _vpnUp = false;
           _vpnVerified = false;
+          _macOsTunnelState = 'disconnecting';
           _activeNodeId = null;
         });
+        unawaited(_refreshMacOsTunnelStatus());
         return;
       }
       final protocol = _filter == 'all' ? 'wireguard' : _filter;
@@ -2797,8 +2873,10 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         if (mounted) setState(() {
           _vpnUp = false;
           _vpnVerified = false;
+          _macOsTunnelState = 'connecting';
           _activeNodeId = serverId;
         });
+        unawaited(_refreshMacOsTunnelStatus());
         return;
       }
       if (protocol != 'wireguard') {
@@ -4194,7 +4272,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                           padding: EdgeInsets.all(11),
                           child: CircularProgressIndicator(
                             strokeWidth: 2, color: Colors.white))
-                      : Icon((_vpnUp || _modernUp)
+                      : Icon((_vpnUp || _modernUp || _macOsTunnelPresent)
                           ? Icons.stop_rounded : Icons.bolt_rounded,
                           color: Colors.white, size: 23),
                   ),
@@ -4205,7 +4283,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                     children: [
                       Text(_vpnBusy
                           ? tr('در حال اتصال', 'Connecting')
-                          : (_vpnUp || _modernUp)
+                          : (_vpnUp || _modernUp || _macOsTunnelPresent)
                             ? tr('قطع اتصال', 'Disconnect')
                             : tr('اتصال سریع', 'Connect now'),
                         style: const TextStyle(color: Colors.white,
@@ -5269,7 +5347,18 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           Row(children: [
             Expanded(child: txt(tr('وضعیت شبکه', 'Network status'),
               size: 17, bold: true)),
-            smallPill(_modernUp ? tr('تونل فعال', 'Tunnel active') :
+            smallPill(
+                Platform.isMacOS && _macOsTunnelState == 'os_connected_unverified'
+                  ? tr('اتصال سیستم‌عامل؛ ترافیک تأیید نشده',
+                      'OS connected; traffic unverified')
+                : Platform.isMacOS &&
+                    const {'connecting', 'reasserting'}.contains(_macOsTunnelState)
+                  ? tr('در حال اتصال در macOS', 'macOS connecting')
+                : Platform.isMacOS && _macOsTunnelState == 'status_unavailable'
+                  ? tr('وضعیت نامشخص', 'Status unavailable')
+                : Platform.isMacOS && _macOsTunnelState == 'disconnecting'
+                  ? tr('در حال قطع اتصال', 'Disconnecting')
+                : _modernUp ? tr('تونل فعال', 'Tunnel active') :
                 _vpnVerified ? tr('دست‌دهی تأیید شد', 'Handshake verified') :
                 _vpnUp ? tr('رابط فعال', 'Interface active') :
                 tr('قطع', 'Disconnected')),
