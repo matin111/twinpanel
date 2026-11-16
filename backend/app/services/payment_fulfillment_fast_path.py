@@ -622,6 +622,80 @@ def reconcile_auto_payment_delivery_once(limit: int = 50) -> dict:
         db.close()
 
 
+
+def reconcile_ready_payment_orders_once(limit: int = 30) -> dict:
+    """Finalize aged paid orders whose entire requested delivery already exists.
+
+    A long-running provisioning task may return with an order still marked
+    provisioning (notably after central Sudoku reconciliation). Never assume
+    an ACTIVE subscription alone means delivery is complete: use the same
+    required-protocol verification as the canonical store fulfillment.
+    """
+    from ..routers.store import (
+        _delivery_ready_for_order,
+        _existing_delivery_snapshot,
+        _mark_order_fulfilled,
+    )
+
+    db = SessionLocal()
+    inspected = 0
+    completed = []
+    try:
+        cutoff = datetime.utcnow() - timedelta(seconds=120)
+        candidates = (
+            db.query(StoreOrder)
+            .filter(
+                StoreOrder.status.in_(("provisioning", "provision_failed")),
+                StoreOrder.subscription_id.isnot(None),
+                StoreOrder.created_at <= cutoff,
+            )
+            .order_by(StoreOrder.id.desc())
+            .limit(max(1, min(int(limit), 100)))
+            .all()
+        )
+        for candidate in candidates:
+            # Payment must genuinely be verified (or wallet-paid) before any
+            # order can be declared fulfilled.
+            intent = (
+                db.query(PaymentIntent)
+                .filter(
+                    PaymentIntent.order_id == int(candidate.id),
+                    PaymentIntent.status.in_(APPROVED_PAYMENT_STATUSES),
+                )
+                .order_by(PaymentIntent.id.desc())
+                .first()
+            )
+            if candidate.payment_method != "wallet" and intent is None:
+                continue
+            if intent is not None and intent.verified_at and intent.verified_at > cutoff:
+                continue
+            inspected += 1
+            snapshot = _existing_delivery_snapshot(candidate, db)
+            if not _delivery_ready_for_order(candidate, snapshot):
+                continue
+
+            # Lock and recheck current status before committing. The normal
+            # fulfillment worker may have completed this order concurrently.
+            order = (
+                db.query(StoreOrder)
+                .filter(StoreOrder.id == int(candidate.id))
+                .with_for_update(skip_locked=True)
+                .first()
+            )
+            if order is None or order.status not in {"provisioning", "provision_failed"}:
+                db.rollback()
+                continue
+            if not _delivery_ready_for_order(order, _existing_delivery_snapshot(order, db)):
+                db.rollback()
+                continue
+            order.paid_at = order.paid_at or (intent.verified_at if intent else None) or datetime.utcnow()
+            _mark_order_fulfilled(order, db)
+            completed.append(int(order.id))
+        return {"inspected": inspected, "completed": len(completed), "order_ids": completed}
+    finally:
+        db.close()
+
+
 async def payment_fulfillment_recovery_loop() -> None:
     try:
         recovered = await asyncio.to_thread(
@@ -652,6 +726,9 @@ async def payment_fulfillment_recovery_loop() -> None:
                 next_reconcile_at = time.monotonic() + 60.0
                 if repaired["repaired"]:
                     print("AUTO_PAYMENT_MISSING_DELIVERY_QUEUED", repaired, flush=True)
+                ready = await asyncio.to_thread(reconcile_ready_payment_orders_once)
+                if ready["completed"]:
+                    print("PAYMENT_READY_DELIVERY_FINALIZED", ready, flush=True)
             result = await process_paid_store_orders_once()
             wallet_result = await process_wallet_paid_orders_once()
             if result.get("seen") or wallet_result.get("seen"):

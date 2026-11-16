@@ -152,6 +152,26 @@ jobs:
           grep -Fq 'mode: Literal["legacy", "custom", "plan"]' source/backend/app/routers/reserved_renewal_v1.py
           grep -Fq 'mode?:"legacy"|"custom"|"plan"' source/lib/legacy-admin-api.ts
 
+      - name: Guard verified-payment account display and durable delivery completion
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          for path in \
+            "backend/app/routers/payments.py" \
+            "backend/app/services/payment_fulfillment_fast_path.py" \
+            "components/payments-review-runtime.tsx" \
+            "backend/tests/test_payment_ready_delivery_reconcile_v1.py"; do
+            test -s "publisher/$path" && test -s "source/$path"
+            cmp -s "publisher/$path" "source/$path" || {
+              echo "::error file=$path::Pinned release would erase payment account display or recovery"
+              exit 1
+            }
+          done
+          grep -Fq 'reconcile_ready_payment_orders_once' source/backend/app/services/payment_fulfillment_fast_path.py
+          grep -Fq 'created_pending_fulfillment' source/backend/app/routers/payments.py
+          grep -Fq 'created_pending_fulfillment' source/components/payments-review-runtime.tsx
+          python3 -m py_compile source/backend/app/routers/payments.py source/backend/app/services/payment_fulfillment_fast_path.py
+
       - name: Guard legacy Telegram audience safe migration
         shell: bash
         run: |
