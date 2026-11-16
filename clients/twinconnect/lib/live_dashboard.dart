@@ -2968,6 +2968,11 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         unawaited(_refreshMacOsTunnelStatus());
         return;
       }
+      if (protocol == 'mieru') {
+        // Mieru requires its own native macOS core and packet-flow bridge.
+        // A bundled CLI or validated profile alone is not a VPN engine.
+        throw const FormatException('MACOS_MIERU_NATIVE_CORE_NOT_LINKED');
+      }
       if (protocol != 'wireguard') {
         throw const FormatException('MACOS_PROTOCOL_ENGINE_NOT_READY');
       }
