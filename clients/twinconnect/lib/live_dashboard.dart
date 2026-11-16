@@ -59,6 +59,7 @@ import 'macos_hysteria2_controller.dart';
 import 'macos_tuic_controller.dart';
 import 'macos_anytls_controller.dart';
 import 'macos_naive_controller.dart';
+import 'macos_shadowtls_controller.dart';
 import 'country_flag.dart';
 import 'ambient_background.dart';
 import 'interactive_glass_card.dart';
@@ -129,6 +130,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   final MacTuicController _macTuic = const MacTuicController();
   final MacAnyTlsController _macAnyTls = const MacAnyTlsController();
   final MacNaiveController _macNaive = const MacNaiveController();
+  final MacShadowTlsController _macShadowTls = const MacShadowTlsController();
   Timer? _macOsStatusTimer;
   bool _macOsStatusRefreshing = false;
   String _macOsTunnelState = 'not_configured';
@@ -2708,6 +2710,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       final tuic = await _macTuic.status();
       final anytls = await _macAnyTls.status();
       final naive = await _macNaive.status();
+      final shadowtls = await _macShadowTls.status();
       if (!mounted) return;
       const active = <String>{
         'connecting', 'os_connected_unverified', 'reasserting', 'disconnecting',
@@ -2718,9 +2721,11 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           : active.contains(tuic['state']) ? tuic
           : active.contains(anytls['state']) ? anytls
           : active.contains(naive['state']) ? naive
+          : active.contains(shadowtls['state']) ? shadowtls
           : hy2['state'] != 'not_configured' ? hy2
           : tuic['state'] != 'not_configured' ? tuic
-          : anytls['state'] != 'not_configured' ? anytls : naive;
+          : anytls['state'] != 'not_configured' ? anytls
+          : naive['state'] != 'not_configured' ? naive : shadowtls;
       final next = status['state'] as String;
       if (next != _macOsTunnelState) {
         setState(() {
@@ -2850,7 +2855,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       }
       final protocol = _filter == 'all' ? 'wireguard' : _filter;
       if (protocol == 'hysteria2' || protocol == 'tuic' ||
-          protocol == 'anytls' || protocol == 'naive') {
+          protocol == 'anytls' || protocol == 'naive' ||
+          protocol == 'shadowtls') {
         final entitled = widget.catalog?.entries.any((entry) =>
             entry.protocol.code == protocol && entry.selected &&
             entry.configRecordPresent) ?? false;
@@ -2869,7 +2875,9 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                 ? await _macAnyTls.installation()
                 : protocol == 'naive'
                     ? await _macNaive.installation()
-                    : await _macHysteria.installation();
+                    : protocol == 'shadowtls'
+                        ? await _macShadowTls.installation()
+                        : await _macHysteria.installation();
         if (installed['engineReady'] != true ||
             installed['packetFlowBridgeReady'] != true ||
             installed['inProcessLibboxBundled'] != true) {
@@ -2885,7 +2893,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           sessionToken: widget.sessionToken,
           protocol: definition,
           native: const NativeProtocolReadiness(
-              supportedCodes: {'hysteria2', 'tuic', 'anytls', 'naive'}),
+              supportedCodes: {'hysteria2', 'tuic', 'anytls', 'naive', 'shadowtls'}),
         );
         final matches = response.items.where(
           (item) => item['node_id']?.toString() == serverId,
@@ -2907,6 +2915,12 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           );
         } else if (protocol == 'naive') {
           await _macNaive.start(
+            profile: matches.single,
+            namespace: widget.panel.namespace,
+            account: widget.username,
+          );
+        } else if (protocol == 'shadowtls') {
+          await _macShadowTls.start(
             profile: matches.single,
             namespace: widget.panel.namespace,
             account: widget.username,
