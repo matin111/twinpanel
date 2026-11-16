@@ -386,6 +386,19 @@ async def _read_certificate(conn, path: str, *, label: str) -> str:
     return certificate + "\n"
 
 
+async def _modern_tls_trust_material(conn, inbound: dict[str, Any]) -> str:
+    """Read the actual node TLS certificate; never ship insecure=True.
+
+    A new node must have readable certificate material before a client profile
+    is delivered. This also covers managed certificates without public CA trust.
+    """
+    server_tls = inbound.get("tls") if isinstance(inbound.get("tls"), dict) else {}
+    cert_path = str(server_tls.get("certificate_path") or "").strip()
+    if not cert_path or not cert_path.startswith("/") or "\\n" in cert_path:
+        raise SingBoxAccountError("modern TLS certificate path is missing")
+    return await _read_certificate(conn, cert_path, label="Modern TLS")
+
+
 async def _naive_tls_trust_material(
     conn,
     node: Node,
@@ -441,6 +454,8 @@ async def apply_account(
             node,
             inbound,
         )
+    elif secret.protocol in {"hysteria2", "tuic", "anytls"}:
+        tls_certificate = await _modern_tls_trust_material(conn, inbound)
     return client_item(
         node,
         secret,
@@ -585,6 +600,10 @@ async def apply_accounts_batch(
             certificate, trust_model = await _naive_tls_trust_material(
                 conn, node, inbounds[secret.protocol]
             )
+        elif secret.protocol in {"hysteria2", "tuic", "anytls"}:
+            certificate = await _modern_tls_trust_material(
+                conn, inbounds[secret.protocol]
+            )
         results.append(client_item(
             node, secret, inbounds[secret.protocol],
             tls_certificate=certificate, tls_trust_model=trust_model,
@@ -631,7 +650,9 @@ def _client_tls(node: Node, inbound: dict[str, Any], *, server_name: str | None 
     return {
         "enabled": True,
         "server_name": host,
-        "insecure": not trusted_custom_cert,
+        # Never weaken TLS for a newly provisioned node.
+        # Managed/custom certificates are provided explicitly by the caller.
+        "insecure": False,
     }
 
 
@@ -727,6 +748,8 @@ def client_outbound(
         if profile:
             out["bbr_profile"] = profile
         out["tls"] = _client_tls(node, inbound)
+        if tls_certificate:
+            out["tls"]["certificate"] = tls_certificate
 
     elif protocol == "tuic":
         if not secret.uuid:
@@ -737,13 +760,13 @@ def client_outbound(
             "congestion_control": str(inbound.get("congestion_control") or "cubic"),
             "zero_rtt_handshake": bool(inbound.get("zero_rtt_handshake", False)),
             "heartbeat": str(inbound.get("heartbeat") or "10s"),
-            "tls": _client_tls(node, inbound),
+            "tls": {**_client_tls(node, inbound), **({"certificate": tls_certificate} if tls_certificate else {})},
         })
 
     elif protocol == "anytls":
         out.update({
             "password": secret.password,
-            "tls": _client_tls(node, inbound),
+            "tls": {**_client_tls(node, inbound), **({"certificate": tls_certificate} if tls_certificate else {})},
         })
 
     elif protocol == "naive":
@@ -769,6 +792,8 @@ def client_outbound(
         out.update({
             "version": int(inbound.get("version") or 3),
             "password": secret.password,
+            # ShadowTLS authenticates the cover server using its real public
+            # certificate. The cover hostname must be checked, not bypassed.
             "tls": _client_tls(node, inbound, server_name=handshake_server),
         })
 
