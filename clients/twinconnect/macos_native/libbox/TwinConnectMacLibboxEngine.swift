@@ -123,6 +123,39 @@ final class TwinConnectMacLibboxEngine {
         return true
     }
 
+    private static func socks5ProfileAllowed(_ json: [String: Any]) -> Bool {
+        guard let outbounds = json["outbounds"] as? [[String: Any]],
+              outbounds.count == 1, let outbound = outbounds.first,
+              outbound["type"] as? String == "socks",
+              outbound["tag"] as? String == "proxy",
+              outbound["version"] as? String == "5",
+              outbound["network"] as? String == "tcp",
+              let username = outbound["username"] as? String,
+              !username.isEmpty, username.utf8.count <= 255,
+              let secret = outbound["password"] as? String,
+              !secret.isEmpty, secret.utf8.count <= 255,
+              let endpoint = outbound["server"] as? String,
+              !endpoint.isEmpty, endpoint.count <= 255,
+              !endpoint.contains("/"), !endpoint.contains(" "),
+              let port = outbound["server_port"] as? Int,
+              (1...65535).contains(port),
+              Set(outbound.keys).isSubset(of: [
+                  "type", "tag", "version", "network", "username",
+                  "password", "server", "server_port"
+              ]),
+              let inbounds = json["inbounds"] as? [[String: Any]],
+              inbounds.count == 1,
+              inbounds[0]["type"] as? String == "tun",
+              inbounds[0]["auto_route"] as? Bool == true,
+              inbounds[0]["strict_route"] as? Bool == true,
+              let route = json["route"] as? [String: Any],
+              route["final"] as? String == "proxy",
+              let dns = json["dns"] as? [String: Any],
+              dns["final"] as? String == "dns-remote"
+        else { return false }
+        return true
+    }
+
     private static func profileIsAllowed(_ config: String) -> Bool {
         guard let data = config.data(using: .utf8),
               let json = (try? JSONSerialization.jsonObject(with: data))
@@ -135,6 +168,9 @@ final class TwinConnectMacLibboxEngine {
         }
         if outbounds.count == 1 && outbounds.first?["type"] as? String == "snell" {
             return snellProfileAllowed(json)
+        }
+        if outbounds.count == 1 && outbounds.first?["type"] as? String == "socks" {
+            return socks5ProfileAllowed(json)
         }
         guard outbounds.count == 1,
               let outbound = outbounds.first,
@@ -184,7 +220,7 @@ final class TwinConnectMacLibboxEngine {
                   let settings = tunnel.protocolConfiguration
                     as? NETunnelProviderProtocol,
                   let code = settings.providerConfiguration?["protocol"] as? String,
-                  ["hysteria2", "tuic", "anytls", "naive", "shadowtls", "snell"].contains(code),
+                  ["hysteria2", "tuic", "anytls", "naive", "shadowtls", "snell", "socks5"].contains(code),
                   let reference = settings.passwordReference,
                   let config = Self.readProfile(reference),
                   Self.profileIsAllowed(config),
@@ -196,7 +232,8 @@ final class TwinConnectMacLibboxEngine {
                    outbounds.first?["type"] as? String == "shadowsocks" &&
                    outbounds.last?["type"] as? String == "shadowtls") :
                   (outbounds.count == 1 &&
-                   outbounds.first?["type"] as? String == code)) else {
+                   outbounds.first?["type"] as? String ==
+                      (code == "socks5" ? "socks" : code))) else {
                 completion(Self.failure("MACOS_LIBBOX_KEYCHAIN_PROFILE_MISSING"))
                 return
             }
