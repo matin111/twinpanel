@@ -53,7 +53,7 @@ export function SubscriptionsFullRuntimePage(){
   useEffect(()=>{
     const params=new URLSearchParams(window.location.search);
     const raw=params.get("focus");
-    const value=raw&&/^\\d+$/.test(raw)?Number(raw):0;
+    const value=raw&&/^[0-9]+$/.test(raw)?Number(raw):0;
     if(Number.isSafeInteger(value)&&value>0){
       // A payment deep link must show exactly this subscription, not any
       // other username or ID containing its digits.
