@@ -27,6 +27,12 @@ def patch_gradle() -> None:
     filename = ANDROID / "app" / "build.gradle.kts"
     current = filename.read_text(encoding="utf-8")
     if "com.wireguard.android:tunnel:1.0.20260102" in current:
+        awg_aar = NATIVE / "amneziawg-core" / "tunnel-release.aar"
+        if awg_aar.is_file() and 'libs/amneziawg-tunnel.aar' not in current:
+            raise RuntimeError(
+                "Android scaffold already patched without AWG; regenerate "
+                "the Flutter Android scaffold before staging the AWG AAR"
+            )
         return
     current = only_once(
         current,
@@ -151,21 +157,12 @@ def patch_manifest() -> None:
             '            </intent-filter>\n'
             '        </service>\n'
         )
-    # Keep the independently bundled AWG service even when WireGuard is
-    # already declared by a generated scaffold.
+    # Avoid duplicating the stock WireGuard service on a repeated install.
     if "com.wireguard.android.backend.GoBackend$VpnService" in current:
-        service = service.replace(
-            '\\n        <!-- The actual WireGuard GoBackend VpnService. '
-            'No fake local TUN service. -->\\n'
-            '        <service android:name="com.wireguard.android.backend.GoBackend$VpnService"\\n'
-            '            android:exported="false"\\n'
-            '            android:permission="android.permission.BIND_VPN_SERVICE">\\n'
-            '            <intent-filter>\\n'
-            '                <action android:name="android.net.VpnService" />\\n'
-            '            </intent-filter>\\n'
-            '        </service>\\n',
-            "",
-        )
+        start = service.find("        <!-- The actual WireGuard GoBackend VpnService.")
+        end = service.find("        </service>", start)
+        if start >= 0 and end >= 0:
+            service = service[:start] + service[end + len("        </service>"):]
     if 'android:name=".OpenConnectVpnService"' not in current:
         service += (
         '\n        <!-- Reserved Cisco / OpenConnect VpnService. The engine is '
