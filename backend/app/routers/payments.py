@@ -1028,6 +1028,17 @@ def admin_payment_intents(
         for order in db.query(StoreOrder).filter(StoreOrder.id.in_(order_ids)).all()
     }
 
+    subscription_ids = list({
+        int(order.subscription_id)
+        for order in orders.values()
+        if order.subscription_id and order.status == "fulfilled"
+    })
+    subscriptions = {
+        int(sub.id): sub
+        for sub in db.query(Subscription)
+        .filter(Subscription.id.in_(subscription_ids)).all()
+    } if subscription_ids else {}
+
     # Fetch only relevant notices, in one bounded query rather than an N+1
     # lookup. Match the immutable payment id, not merely the order id: one
     # order can have multiple payment attempts.
@@ -1069,9 +1080,11 @@ def admin_payment_intents(
                 delivery = "telegram_pending"
 
         item = intent_out(row)
+        account = subscriptions.get(account_id) if account_id else None
         item.update({
             "order_status": str(order.status) if order else None,
             "subscription_id": account_id,
+            "account_username": str(account.account_username or "") if account else None,
             "fulfillment_status": "created" if account_id else (
                 "provisioning" if order and order.status in {"paid", "provisioning"}
                 else "not_created"
