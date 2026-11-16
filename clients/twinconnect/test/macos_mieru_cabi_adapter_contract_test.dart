@@ -29,6 +29,14 @@ void main() {
     expect(adapter, contains('endpointPinnedOutsideTunnel'));
     expect(adapter, contains('coreOwnedByExtension'));
     expect(adapter, contains('deinit { stop() }'));
+    final candidate = File(
+      '../../.github/workflows/twinconnect-macos-mieru-core.yml',
+    ).readAsStringSync();
+    expect(candidate, contains('GOARCH="$arch" CGO_ENABLED=1'));
+    expect(candidate, contains('buildmode=c-shared'));
+    expect(candidate, contains('libtwinmieru.dylib'));
+    expect(candidate, contains('extension_frameworks='));
+    expect(candidate, contains('test ! -f "$app/Contents/Frameworks/libtwinmieru.dylib"'));
     expect(bridge, contains('"packetFlowBridgeReady": false'));
     expect(bridge, contains('"engineReady": false'));
     expect(provider, contains('MACOS_PROTOCOL_ENGINE_NOT_LINKED_'));
