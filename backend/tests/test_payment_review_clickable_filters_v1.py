@@ -40,6 +40,18 @@ class ClickableReviewFilterTests(TestCase):
         self.assertIn('/v1/payments/admin/intents/${row.id}/receipt', RUNTIME)
         self.assertIn('Authorization:`Bearer ${token}`', RUNTIME)
 
+    def test_recent_account_deliveries_refresh_without_spamming_user_lookup(self):
+        self.assertIn('const recentlyPending=purchases.some(row=>{', RUNTIME)
+        self.assertIn('orderStatus==="fulfilled"&&deliveryStatus==="telegram_sent"', RUNTIME)
+        self.assertIn('age<=40*60_000', RUNTIME)
+        self.assertIn('window.setInterval(()=>{', RUNTIME)
+        self.assertIn('},8000);', RUNTIME)
+        self.assertIn('document.visibilityState==="hidden"', RUNTIME)
+        self.assertIn('deliveryPollRunning.current', RUNTIME)
+        self.assertIn('void load(true,false)', RUNTIME)
+        self.assertIn('if(includeUsers)void adminApi.users()', RUNTIME)
+        self.assertIn('اکانت تحویل شد؛ آماده‌سازی پروتکل‌های باقی‌مانده ادامه دارد', RUNTIME)
+
     def test_approvals_are_not_affected_by_filter_changes(self):
         self.assertIn('adminApi.approvePayment(row.id)', RUNTIME)
         self.assertIn('parityApi.walletApprove(row.id)', RUNTIME)
