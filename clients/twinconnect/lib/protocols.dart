@@ -123,6 +123,18 @@ class VpnProtocols {
   }
 }
 
+
+/// Android-only visibility gate. These protocols have no verified device VPN
+/// transport in the current APK. Do not remove them from the panel, other
+/// platforms, subscriptions or server configuration.
+class AndroidProtocolVisibility {
+  static const unavailable = <String>{
+    'l2tp', 'mieru', 'trusttunnel', 'amneziawg', 'sudoku', 'naive',
+  };
+
+  static bool visible(String code) => !unavailable.contains(code);
+}
+
 class PanelProtocolStatus {
   const PanelProtocolStatus({
     required this.protocol,
