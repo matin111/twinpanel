@@ -51,7 +51,7 @@ func TwinMieruStart(raw *C.char, rawLength C.int32_t) C.int32_t {
 
     config := &pb.ClientConfig{}
     data := C.GoBytes(unsafe.Pointer(raw), C.int(rawLength))
-    if err := protojson.UnmarshalOptions{DiscardUnknown: false}.Unmarshal(data, config); err != nil {
+    if err := (protojson.UnmarshalOptions{DiscardUnknown: false}).Unmarshal(data, config); err != nil {
         return -3
     }
     // RPC/HTTP/background processes are not allowed within a PacketTunnel.
