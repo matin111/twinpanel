@@ -30,7 +30,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
                 if error != nil { self?.wireGuard = nil }
                 completionHandler(error)
             }
-        case "hysteria2", "tuic":
+        case "hysteria2", "tuic", "anytls":
             #if canImport(Libbox)
             let engine = TwinConnectMacLibboxEngine(tunnel: self)
             libbox = engine
