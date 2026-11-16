@@ -59,6 +59,8 @@ def patch_gradle() -> None:
         "android {\n"
         "    buildTypes {\n"
         '        getByName("release") {\n'
+        '            isMinifyEnabled = true\n'
+        '            isShrinkResources = true\n'
         '            proguardFiles("proguard-rules.pro")\n'
         "        }\n"
         "    }\n"

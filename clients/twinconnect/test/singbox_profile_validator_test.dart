@@ -327,6 +327,28 @@ void main() {
     }
   });
 
+
+  test('Modern TLS accepts panel-level SNI for numeric endpoints', () {
+    for (final protocol in ['hysteria2', 'tuic', 'anytls']) {
+      final parsed = SingBoxProfileValidator.validateOutbound(
+        protocolCode: protocol, item: {
+          'sni': 'www.example.org',
+          'outbound': {'type': protocol, 'server': '198.51.100.16',
+            'server_port': 443, 'tls': <String, dynamic>{}},
+        });
+      expect((parsed['tls'] as Map)['server_name'], 'www.example.org');
+      expect(parsed.containsKey('sni'), isFalse);
+    }
+  });
+
+  test('Modern TLS never infers certificate identity from a numeric IP', () {
+    expect(() => SingBoxProfileValidator.validateOutbound(
+      protocolCode: 'hysteria2', item: {
+        'outbound': {'type': 'hysteria2', 'server': '198.51.100.16',
+          'server_port': 443, 'tls': <String, dynamic>{}},
+      }), throwsFormatException);
+  });
+
   test('ShadowTLS detour cannot be flattened to a single node', () {
     expect(() => SingBoxProfileValidator.validateOutbound(
       protocolCode: 'shadowtls', item: {

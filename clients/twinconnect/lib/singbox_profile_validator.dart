@@ -247,10 +247,22 @@ class SingBoxProfileValidator {
           tls['disable_sni'] == true) {
         throw const FormatException('SINGBOX_TLS_UNSAFE');
       }
-      // Some panel profiles omit "enabled" but provide a valid TLS block.
-      // Make TLS explicit rather than accidentally dialing without TLS.
+      // Preserve the subscription's TLS identity while supporting payloads
+      // that place the authenticated hostname alongside the outbound.
+      final explicitSni = tls['server_name'] ?? object['sni'] ?? item['sni'];
+      if (explicitSni != null) {
+        if (explicitSni is! String || explicitSni.trim().isEmpty ||
+            explicitSni.length > 253 || explicitSni.contains(' ') ||
+            explicitSni.contains('/')) {
+          throw const FormatException('SINGBOX_TLS_IDENTITY_INVALID');
+        }
+        tls['server_name'] = explicitSni;
+      } else if (InternetAddress.tryParse(server) != null) {
+        throw const FormatException('SINGBOX_TLS_IDENTITY_MISSING');
+      }
       tls['enabled'] = true;
       object['tls'] = tls;
+      object.remove('sni');
     }
     // ShadowTLS detours cannot safely be flattened into one outbound.
     if (protocolCode == 'shadowtls') {
