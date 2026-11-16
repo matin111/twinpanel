@@ -1147,8 +1147,11 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
         chosen?.configRecordPresent == true;
     final xraySelected = chosen?.protocol.code == 'v2ray' &&
         chosen?.configRecordPresent == true;
+    // The catalog flag can lag behind native profiles returned by the
+    // session API. Let the user request their entitled AWG profile; the
+    // connect handler still requires an authorized node and valid config.
     final awgSelected = chosen?.protocol.code == 'amneziawg' &&
-        chosen?.configRecordPresent == true;
+        chosen?.selected == true;
     final modernSelected = chosen != null &&
         AndroidSingBoxTunnel.supported.contains(chosen.protocol.code) &&
         chosen.configRecordPresent;
@@ -1268,7 +1271,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
           Padding(
             padding: const EdgeInsets.only(bottom: 12),
             child: Text(
-              chosen?.configRecordPresent != true
+              chosen?.configRecordPresent != true && !awgSelected
                   ? s.pick('این پروتکل در اشتراک فعال نیست یا کانفیگ ندارد.',
                       'This protocol is unavailable or has no profile.')
                   : s.pick('موتور این پروتکل در اندروید هنوز آماده اتصال نیست.',
@@ -1306,7 +1309,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
                 : connected
                     ? s.pick('ابتدا تونل قبلی را قطع کنید', 'Disconnect active tunnel first')
                     : !canStartSelected
-                        ? chosen?.configRecordPresent != true
+                        ? chosen?.configRecordPresent != true && !awgSelected
                             ? s.pick('کانفیگ این پروتکل آماده نیست', 'Protocol profile unavailable')
                             : s.pick('موتور اتصال نصب نیست', 'Engine not installed')
                         : s.pick('اتصال سریع', 'Connect now')),
