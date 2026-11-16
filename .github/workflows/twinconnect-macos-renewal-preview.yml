@@ -102,6 +102,9 @@ jobs:
           # fixture. No production secrets are used or printed.
           dart run tool/macos_hysteria2_config_fixture.dart > "$RUNNER_TEMP/twinconnect-macos-hy2-synthetic.json"
           "$target/sing-box" check -c "$RUNNER_TEMP/twinconnect-macos-hy2-synthetic.json"
+          dart run tool/macos_tuic_config_fixture.dart > "$RUNNER_TEMP/twinconnect-macos-tuic-synthetic.json"
+          "$target/sing-box" check -c "$RUNNER_TEMP/twinconnect-macos-tuic-synthetic.json"
+          echo "Synthetic macOS TUIC + Hysteria2 profiles parsed by official sing-box"
           file "$target/sing-box" | grep -q arm64
       - name: Bundle pinned Xray/V2Ray transport binary
         shell: bash
