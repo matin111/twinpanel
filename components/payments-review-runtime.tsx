@@ -140,7 +140,7 @@ export function PaymentsReviewRuntime(){
       if(orderStatus==="fulfilled"&&deliveryStatus==="telegram_sent")return false;
       const raw=s(row.verified_at||row.receipt_submitted_at||row.created_at).replace(" ","T");
       if(!raw)return false;
-      const utc=/(?:Z|[+-]\\d{2}:?\\d{2})$/i.test(raw)?raw:raw+"Z";
+      const utc=/(?:Z|[+-]\d{2}:?\d{2})$/i.test(raw)?raw:raw+"Z";
       const age=Date.now()-Date.parse(utc);
       return Number.isFinite(age)&&age>=-120_000&&age<=40*60_000;
     });
