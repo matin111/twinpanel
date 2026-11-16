@@ -154,7 +154,7 @@ function CustomerWalletV2Body(){
           </>}
 
           {["pending_payment","rejected"].includes(active.status)&&<div className="customer-topup-fields">
-            {isCrypto?<label className="wide"><span>TXID</span><input dir="ltr" value={txid} onChange={e=>setTxid(e.target.value)} required/></label>:<>
+            {isCrypto?<label className="wide"><span>{pick("هش تراکنش (TXID)","Transaction hash (TXID)")}</span><input dir="ltr" value={txid} onChange={e=>setTxid(e.target.value)} placeholder={pick("هش تراکنش ترون را اینجا وارد کنید","Paste the Tron transaction hash here")} autoComplete="off" required/><small>{pick("بعد از انتقال ارز، هش تراکنش را از کیف پول خود کپی کنید و دکمه ثبت هش تراکنش را بزنید.","After sending the crypto, copy the transaction hash from your wallet and press Submit transaction hash.")}</small></label>:<>
               <label><span>{pick("۴ رقم آخر کارت","Last 4 digits")}</span><input dir="ltr" inputMode="numeric" maxLength={4} value={last4} onChange={e=>setLast4(e.target.value.replace(/\D/g,""))} required/></label>
               <label><span>{pick("کد پیگیری","Tracking code")}</span><input dir="ltr" value={tracking} onChange={e=>setTracking(e.target.value)} required/></label>
               <label><span>{pick("تاریخ انتقال","Transfer date")}</span><input dir="ltr" type="date" value={transferDate} onChange={e=>setTransferDate(e.target.value)} required/></label>
@@ -162,7 +162,7 @@ function CustomerWalletV2Body(){
             </>}
           </div>}
 
-          {["pending_payment","rejected"].includes(active.status)&&<button className="primary customer-wide-action" disabled={busy}>{busy?"…":pick("ثبت پرداخت","Submit payment")}</button>}
+          {["pending_payment","rejected"].includes(active.status)&&<button className="primary customer-wide-action" disabled={busy}>{busy?"…":isCrypto?pick("ثبت هش تراکنش (TXID)","Submit transaction hash (TXID)"):pick("ثبت اطلاعات پرداخت","Submit payment details")}</button>}
           {active.status==="awaiting_review"&&<div className="paymentStateOk"><b>{pick("در حال تأیید خودکار","Automatic verification in progress")}</b><small>{isCrypto?pick("شبکه هر چند ثانیه دوباره بررسی می‌شود.","The blockchain is checked again automatically every few seconds."):pick("با دریافت پیامک بانکی، شارژ خودکار انجام می‌شود.","The wallet will be credited when the bank SMS arrives.")}</small></div>}
           {active.status==="approved"&&<div className="runtime-success">{pick("این شارژ تأیید شده و به موجودی کیف پول اضافه شده است.","This top-up has been approved and credited.")}</div>}
         </form>}
