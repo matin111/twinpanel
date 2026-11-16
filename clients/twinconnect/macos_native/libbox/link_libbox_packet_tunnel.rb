@@ -34,6 +34,13 @@ ref = group.new_file(framework)
 ref.source_tree = '<absolute>'
 ref.last_known_file_type = 'wrapper.framework'
 target.frameworks_build_phase.add_file_reference(ref)
+# A successful Swift import is not enough for a dynamic framework: it must
+# also travel inside PacketTunnel.appex/Contents/Frameworks at runtime.
+embed = target.new_copy_files_build_phase('Embed Libbox Runtime')
+embed.dst_subfolder_spec = '10' # Frameworks
+embed.dst_path = ''
+embedded = embed.add_file_reference(ref)
+embedded.settings = { 'ATTRIBUTES' => ['CodeSignOnCopy', 'RemoveHeadersOnCopy'] }
 target.build_configurations.each do |configuration|
   settings = configuration.build_settings
   settings['MACOSX_DEPLOYMENT_TARGET'] = '13.0'
@@ -44,4 +51,4 @@ probe = group.new_file(File.join(root, 'macos_native/libbox/LibboxLinkProbe.swif
 probe.source_tree = '<absolute>'
 target.source_build_phase.add_file_reference(probe)
 project.save
-puts "Linked macOS arm64 Libbox framework slice: #{framework}"
+puts "Linked and embedded macOS arm64 Libbox runtime framework: #{framework}"
