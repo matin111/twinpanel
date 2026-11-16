@@ -27,7 +27,7 @@ void main() {
     expect(host, contains('outbound["insecure_concurrency"] as? Int == 0'));
     expect(host, contains('namespace + ":" + account + ":" + protocolCode'));
     expect(engine, contains('["hysteria2", "tuic", "anytls", "naive", "shadowtls", "snell", "socks5"]'));
-    expect(engine, contains('outbounds.first?["type"] as? String == code'));
+    expect(engine, contains('code == "socks5" ? "socks" : code'));
     expect(engine, contains('outbound["username"] as? String'));
     expect(controller, contains('SingBoxMacConfig.encodeNaiveForEphemeralTunnel'));
     expect(controller, contains("'macOSNaiveEngineStatus'"));
