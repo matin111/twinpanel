@@ -72,12 +72,12 @@ enum TwinConnectMacOSLibboxControl {
     /// Report Apple's real connection-manager state without inferring a
     /// Hysteria2 peer handshake, usable routing, or successful DNS.
     /// The response never includes account identifiers or VPN credentials.
-    static func status(_ result: @escaping FlutterResult) {
+    static func status(_ result: @escaping FlutterResult, protocolCode: String = "hysteria2") {
         NETunnelProviderManager.loadAllFromPreferences { managers, error in
             guard error == nil else {
                 result([
                     "contractVersion": 1,
-                    "protocol": "hysteria2",
+                    "protocol": protocolCode,
                     "state": "status_unavailable",
                     "osConnected": false,
                     "verified": false,
@@ -90,12 +90,12 @@ enum TwinConnectMacOSLibboxControl {
                     as? NETunnelProviderProtocol else { return false }
                 return config.providerBundleIdentifier == bundleID &&
                     config.providerConfiguration?["protocol"] as? String
-                        == "hysteria2"
+                        == protocolCode
             }
             guard let manager else {
                 result([
                     "contractVersion": 1,
-                    "protocol": "hysteria2",
+                    "protocol": protocolCode,
                     "state": "not_configured",
                     "osConnected": false,
                     "verified": false,
@@ -115,7 +115,7 @@ enum TwinConnectMacOSLibboxControl {
             }
             result([
                 "contractVersion": 1,
-                "protocol": "hysteria2",
+                "protocol": protocolCode,
                 "state": state,
                 "osConnected": manager.connection.status == .connected,
                 "verified": false,
@@ -125,20 +125,26 @@ enum TwinConnectMacOSLibboxControl {
     }
 
     static func start(_ args: Any?, backendLinked: Bool,
+                      protocolCode: String = "hysteria2",
                       result: @escaping FlutterResult) {
+        guard ["hysteria2", "tuic"].contains(protocolCode) else {
+            result(failure("MACOS_PROTOCOL_NOT_SUPPORTED"))
+            return
+        }
+        let errorPrefix = protocolCode == "tuic" ? "MACOS_TUIC" : "MACOS_HYSTERIA2"
         guard backendLinked else {
-            result(failure("MACOS_HYSTERIA2_PACKET_FLOW_BRIDGE_MISSING"))
+            result(failure(errorPrefix + "_PACKET_FLOW_BRIDGE_MISSING"))
             return
         }
         guard let input = args as? [String: Any],
-              input["protocol"] as? String == "hysteria2",
+              input["protocol"] as? String == protocolCode,
               let config = input["config"] as? String,
-              allowedConfig(config),
+              allowedConfig(config, protocolCode: protocolCode),
               let namespace = input["namespace"] as? String,
               (3...128).contains(namespace.count),
               let account = input["account"] as? String,
               (1...255).contains(account.count) else {
-            result(failure("MACOS_HYSTERIA2_PROFILE_INVALID"))
+            result(failure(errorPrefix + "_PROFILE_INVALID"))
             return
         }
         guard let group = Bundle.main.object(forInfoDictionaryKey:
@@ -167,10 +173,15 @@ enum TwinConnectMacOSLibboxControl {
                 return
             }
 
+            guard manager.connection.status == .disconnected ||
+                  manager.connection.status == .invalid else {
+                result(failure("MACOS_VPN_ALREADY_ACTIVE"))
+                return
+            }
             let keychain: [CFString: Any] = [
                 kSecClass: kSecClassGenericPassword,
                 kSecAttrService: keychainService,
-                kSecAttrAccount: namespace + ":" + account,
+                kSecAttrAccount: namespace + ":" + account + ":" + protocolCode,
                 kSecAttrAccessGroup: group
             ]
             // Never log the config, Keychain query or account credentials.
@@ -181,16 +192,16 @@ enum TwinConnectMacOSLibboxControl {
             var persistent: CFTypeRef?
             guard SecItemAdd(store as CFDictionary, &persistent) == errSecSuccess,
                   let reference = persistent as? Data else {
-                result(failure("MACOS_HYSTERIA2_KEYCHAIN_STORE_FAILED"))
+                result(failure(errorPrefix + "_KEYCHAIN_STORE_FAILED"))
                 return
             }
 
             let tunnel = NETunnelProviderProtocol()
             tunnel.providerBundleIdentifier = bundleID
-            tunnel.serverAddress = "TwinConnect Hysteria2"
+            tunnel.serverAddress = "TwinConnect " + protocolCode.uppercased()
             tunnel.passwordReference = reference
             tunnel.providerConfiguration = [
-                "protocol": "hysteria2",
+                "protocol": protocolCode,
                 "namespace": namespace
             ]
             manager.protocolConfiguration = tunnel
@@ -210,12 +221,12 @@ enum TwinConnectMacOSLibboxControl {
                         try manager.connection.startVPNTunnel()
                         result([
                             "contractVersion": 1,
-                            "protocol": "hysteria2",
+                            "protocol": protocolCode,
                             "state": "connecting",
                             "peerHandshakeVerified": false
                         ] as [String: Any])
                     } catch {
-                        result(failure("MACOS_HYSTERIA2_OS_START_REJECTED"))
+                        result(failure(errorPrefix + "_OS_START_REJECTED"))
                     }
                 }
             }
