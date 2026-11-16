@@ -4274,6 +4274,21 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
               'OPENVPN_ROUTE_FAILED' => tr(
                 'مسیر شبکه OpenVPN در ویندوز اعمال نشد.',
                 'Windows could not install the OpenVPN network route.'),
+              'OPENVPN_DEPENDENCY_MISSING' => tr(
+                'فایل یا کتابخانه موردنیاز OpenVPN در ویندوز نصب نیست.',
+                'A required OpenVPN DLL or runtime dependency is missing.'),
+              'OPENVPN_INVALID_BINARY_ARCHITECTURE' => tr(
+                'نسخه فایل اجرایی OpenVPN با معماری ویندوز سازگار نیست.',
+                'The OpenVPN executable is incompatible with this Windows architecture.'),
+              'OPENVPN_NATIVE_CRASH' => tr(
+                'موتور OpenVPN با خطای داخلی ویندوز متوقف شد.',
+                'OpenVPN crashed with a native Windows access violation.'),
+              'OPENVPN_DLL_INITIALIZATION_FAILED' => tr(
+                'کتابخانه‌های OpenVPN هنگام شروع بارگذاری نشدند.',
+                'OpenVPN could not initialize its native DLLs.'),
+              'OPENVPN_PROCESS_INTERRUPTED' => tr(
+                'اجرای OpenVPN توسط ویندوز یا یک برنامه دیگر متوقف شد.',
+                'OpenVPN was interrupted by Windows or another process.'),
               'OPENVPN_PROCESS_EXITED' => tr(
                 'موتور OpenVPN قبل از تأیید اتصال بسته شد.',
                 'OpenVPN exited before the connection was verified.'),
