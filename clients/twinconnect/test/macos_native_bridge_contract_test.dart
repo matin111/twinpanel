@@ -10,11 +10,14 @@ void main() {
     expect(swift, contains('case "getCapabilities":'));
     expect(swift, contains('case "getProtocolCapabilities":'));
     expect(swift, contains('case "macOSRuntimeStatus":'));
-    expect(swift, contains('"engineReady": false'));
-    expect(swift, contains('"fullTunnel": false'));
+    expect(swift, contains('"engineReady": libboxBackendReady()'));
+    expect(swift, contains('"fullTunnel": libboxBackendReady()'));
+    expect(swift, contains('#if TWINCONNECT_SIGNED_LIBBOX'));
+    expect(swift, contains('SecTaskCopyValueForEntitlement'));
+    expect(swift, contains('return false'));
     expect(swift, contains('"connected": false'));
     expect(swift, contains('"killSwitchEnforced": false'));
-    expect(swift, contains('"supportedCodes": [String]()'));
+    expect(swift, contains('"supportedCodes": libboxBackendReady()'));
     expect(swift, contains('MACOS_PACKET_TUNNEL_NOT_INSTALLED'));
     expect(swift, isNot(contains('result(true)')));
   });
