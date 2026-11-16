@@ -47,8 +47,12 @@ jobs:
           ANDROID_NDK_HOME: ${{ env.ANDROID_NDK_LATEST_HOME }}
         run: |
           set -euo pipefail
-          export ANDROID_NDK_HOME="${ANDROID_NDK_HOME:-${ANDROID_NDK_ROOT:-}}"
-          test -d "$ANDROID_NDK_HOME/toolchains/llvm"
+          if [[ ! -d "${ANDROID_NDK_HOME:-}/toolchains/llvm" ]]; then
+            sdk="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/opt/android-sdk}}"
+            ndk="$(find "$sdk/ndk" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | sort -V | tail -n 1)"
+            export ANDROID_NDK_HOME="$ndk"
+          fi
+          test -d "$ANDROID_NDK_HOME/toolchains/llvm" || { echo "Android NDK missing"; exit 1; }
           bash tools/build_mieru_android.sh
           for abi in arm64-v8a armeabi-v7a x86_64; do
             test -s "native/android/mieru-jni/$abi/libmieru.so"
