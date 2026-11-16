@@ -93,7 +93,7 @@ final class TwinConnectMacOSVPNBridge {
                 result([
                     "contractVersion": 1,
                     "supportedCodes": libboxBackendReady()
-                        ? ["hysteria2", "tuic", "anytls"] : [String]()
+                        ? ["hysteria2", "tuic", "anytls", "naive"] : [String]()
                 ] as [String: Any])
             case "macOSXrayEngineStatus":
                 result([
@@ -119,6 +119,19 @@ final class TwinConnectMacOSVPNBridge {
                         : (libboxInExtension()
                             ? "MACOS_HYSTERIA2_SIGNING_OR_ENTITLEMENT_MISSING"
                             : "MACOS_HYSTERIA2_PACKET_FLOW_BRIDGE_MISSING")
+                ] as [String: Any])
+            case "macOSNaiveEngineStatus":
+                result([
+                    "contractVersion": 1,
+                    "protocol": "naive",
+                    "inProcessLibboxBundled": libboxInExtension(),
+                    "packetFlowBridgeReady": libboxBackendReady(),
+                    "engineReady": libboxBackendReady(),
+                    "reason": libboxBackendReady()
+                        ? "MACOS_NAIVE_SIGNED_START_UNVERIFIED"
+                        : (libboxInExtension()
+                            ? "MACOS_NAIVE_SIGNING_OR_ENTITLEMENT_MISSING"
+                            : "MACOS_NAIVE_PACKET_FLOW_BRIDGE_MISSING")
                 ] as [String: Any])
             case "macOSAnyTlsEngineStatus":
                 result([
@@ -178,6 +191,12 @@ final class TwinConnectMacOSVPNBridge {
                     protocolCode: "anytls", result: result)
             case "getAnyTlsTunnelStatus":
                 TwinConnectMacOSLibboxControl.status(result, protocolCode: "anytls")
+            case "startNaive":
+                TwinConnectMacOSLibboxControl.start(
+                    call.arguments, backendLinked: libboxBackendReady(),
+                    protocolCode: "naive", result: result)
+            case "getNaiveTunnelStatus":
+                TwinConnectMacOSLibboxControl.status(result, protocolCode: "naive")
             case "stopTunnel":
                 TwinConnectMacOSVPNControl.stop(result)
             case "getTunnelStatus":
