@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.852",
-  "source_sha": "5329f1523d0f7f562c0fc6a03308f8ae0122856e",
+  "version": "1.1.0-rc.853",
+  "source_sha": "49bfe523965b0451eddc92f3112b0010fbee5fba",
   "notes": {
-    "fa": "اصلاح عنوان ثبت هش تراکنش (TXID) در پرداخت رمزارزی و شارژ کیف پول، هماهنگ‌سازی ربات، و رزرو تمدید با پلن متفاوت بدون تغییر پلن فعلی تا پایان حجم یا تاریخ.",
-    "en": "Clear crypto TXID submission controls across customer wallet, checkout and Telegram, plus deferred different-plan renewals until current quota or validity ends."
+    "fa": "پرداخت تمدید اشتراک از کیف پول در ربات تلگرام برای اشتراک معمولی و واردشده؛ تأیید موجودی و کسر یکتای مبلغ از کیف پول، رزرو تمدید بدون فعال‌سازی زودهنگام، و بهینه‌سازی سرعت ارتباط ربات با API از طریق اتصال HTTP پایدار.",
+    "en": "Telegram bot wallet checkout for normal/imported renewal orders with idempotent wallet debit and deferred activation; pooled persistent bot-to-API HTTP connections and slow request diagnostics."
   }
 }
