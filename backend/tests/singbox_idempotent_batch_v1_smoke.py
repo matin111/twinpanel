@@ -1,10 +1,11 @@
-import runpy
 """NOVA-inspired, original implementation: no-op sing-box batch contracts.
 
 This is dependency-free and executes the exact embedded remote Python mutation
 script on temporary configs, never against a live server.
 """
 from __future__ import annotations
+
+import runpy
 
 import ast
 import contextlib

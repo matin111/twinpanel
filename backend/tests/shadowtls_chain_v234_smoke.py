@@ -1,5 +1,6 @@
-import runpy
 from __future__ import annotations
+
+import runpy
 
 import ast
 import contextlib
