@@ -72,6 +72,24 @@ BOT_SECRET = _load_internal_secret()
 
 router = Router()
 
+# Reuse the loop-local HTTP pool for all bot-to-API calls. The previous
+# per-request AsyncClient performed a fresh TCP setup on every button press,
+# including multiple sequential calls in renewal and account views.
+_api_client: httpx.AsyncClient | None = None
+
+
+def create_bot_api_client() -> httpx.AsyncClient:
+    return httpx.AsyncClient(
+        timeout=httpx.Timeout(20.0, connect=3.0, pool=3.0),
+        limits=httpx.Limits(
+            max_connections=64,
+            max_keepalive_connections=24,
+            keepalive_expiry=30.0,
+        ),
+        trust_env=False if API_BASE.startswith("http://127.0.0.1:") else True,
+    )
+
+
 # TWINPANEL_MAIN_SHARED_LEARNING_V1
 register_learning_handlers(router, prefix="mlearn")
 
@@ -161,9 +179,18 @@ async def request(
             "X-Telegram-Bot-Secret"
         ] = BOT_SECRET
 
-    async with httpx.AsyncClient(
-        timeout=20.0
-    ) as client:
+    client = _api_client
+    if client is None:
+        # Support direct/unit calls outside main() without leaking a pool.
+        async with create_bot_api_client() as temporary:
+            response = await temporary.request(
+                method,
+                API_BASE + path,
+                headers=headers,
+                json=payload if files is None else None,
+                files=files,
+            )
+    else:
         response = await client.request(
             method,
             API_BASE + path,
@@ -2945,10 +2972,13 @@ async def _telegram_notification_worker(bot):
 
 
 async def main():
+    global _api_client
     if not BOT_SECRET:
         raise RuntimeError(
             "TWINPANEL_TELEGRAM_BOT_SECRET missing"
         )
+
+    _api_client = create_bot_api_client()
 
     bot = Bot(
         token=load_bot_token(),
@@ -3032,6 +3062,10 @@ async def main():
             await notify_task
         except asyncio.CancelledError:
             pass
+        finally:
+            if _api_client is not None:
+                await _api_client.aclose()
+                _api_client = None
 
 
 if __name__ == "__main__":
