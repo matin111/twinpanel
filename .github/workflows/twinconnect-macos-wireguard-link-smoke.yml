@@ -70,10 +70,18 @@ jobs:
           bash macos_native/build_wireguard_go.sh "$PWD/macos_native/vendor-wireguard-apple"
       - name: Compile linked macOS PacketTunnel (unsigned)
         run: |
-          set -o pipefail
-          xcodebuild -project macos/Runner.xcodeproj -target PacketTunnel \
+          set -euo pipefail
+          log="$RUNNER_TEMP/mac-wireguard-xcodebuild.log"
+          if ! xcodebuild -project macos/Runner.xcodeproj -target PacketTunnel \
             -configuration Release -sdk macosx -arch arm64 \
-             CODE_SIGNING_ALLOWED=NO build 2>&1 | tee "$RUNNER_TEMP/mac-wireguard-xcodebuild.log" | tail -90
+            CODE_SIGNING_ALLOWED=NO build > "$log" 2>&1; then
+            echo "====== Native compiler diagnostics ======"
+            grep -n -E -C 3 "error:|fatal error:|Undefined symbols|ld: |BUILD FAILED" "$log" | tail -170 || true
+            echo "====== Build log tail ======"
+            tail -40 "$log"
+            exit 1
+          fi
+          tail -35 "$log"
       - name: Validate compiled artifacts
         run: |
           test -s macos_native/build/wireguard/libwg-go.a
