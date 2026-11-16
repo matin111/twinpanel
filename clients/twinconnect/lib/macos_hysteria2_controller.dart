@@ -32,6 +32,41 @@ class MacHysteria2Controller {
     return Map.unmodifiable(result);
   }
 
+  /// Apple OS status only. Even when the OS says connected, this is NOT
+  /// evidence of a Hysteria2 handshake, traffic egress or DNS protection.
+  Future<Map<String, dynamic>> status() async {
+    if (!Platform.isMacOS) {
+      return const <String, dynamic>{
+        'contractVersion': 1,
+        'protocol': 'hysteria2',
+        'state': 'unavailable',
+        'osConnected': false,
+        'verified': false,
+        'peerHandshakeVerified': false,
+      };
+    }
+    final raw = await _channel.invokeMapMethod<String, dynamic>(
+      'getHysteria2TunnelStatus',
+    ).timeout(const Duration(seconds: 8));
+    const states = <String>{
+      'not_configured', 'status_unavailable', 'connecting',
+      'os_connected_unverified', 'reasserting', 'disconnecting',
+      'disconnected', 'invalid', 'unknown',
+    };
+    if (raw == null ||
+        raw['contractVersion'] != 1 ||
+        raw['protocol'] != 'hysteria2' ||
+        !states.contains(raw['state']) ||
+        raw['osConnected'] is! bool ||
+        raw['verified'] != false ||
+        raw['peerHandshakeVerified'] != false ||
+        (raw['osConnected'] == true &&
+            raw['state'] != 'os_connected_unverified')) {
+      throw const FormatException('MACOS_HYSTERIA2_OS_STATUS_INVALID');
+    }
+    return Map.unmodifiable(raw);
+  }
+
   Future<Map<String, dynamic>> start({
     required Map<String, dynamic> profile,
     required String namespace,
