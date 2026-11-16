@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.850",
-  "source_sha": "268174485845bf3c4d792778b2f587c7726e4dec",
+  "version": "1.1.0-rc.851",
+  "source_sha": "4e6206015b56762afb2fea7f92975fec41717275",
   "notes": {
-    "fa": "رفع قطع‌ووصلی OpenVPN هنگام اتصال هم‌زمان ویندوز و موبایل با یک اکانت: فعال‌سازی نشست‌های هم‌زمان روی سرور و در قالب نصب نود، حفظ مدیریت سقف اتصال از موتور سهمیه/نشست TwinPanel؛ بدون تغییر گواهی، سهمیه، اتصال پروتکل‌های دیگر.",
-    "en": "Fix OpenVPN simultaneous multi-device disconnects due to duplicate certificate CN by enabling duplicate-cn in node provisioning; quota runtime continues session-level device-limit enforcement. No changes to credentials, subscriptions or other protocols."
+    "fa": "نسخه رسمی از GitHub شامل اصلاح صفحه پرداخت‌ها، لینک مستقیم اکانت ساخته‌شده، نمایش شارژ کیف پول، تشخیص واقعی تحویل پیام تلگرام، تاریخچه اتصال و فیلتر دقیق اکانت در صفحه فعال اشتراک‌ها. حفظ تغییرات در آپدیت‌های بعدی از طریق سورس نسخه‌بندی‌شده.",
+    "en": "Official GitHub-built update preserving payment outcomes, wallet credits, real Telegram account delivery status, connection session history, and exact subscription filtering from payment links."
   }
 }
