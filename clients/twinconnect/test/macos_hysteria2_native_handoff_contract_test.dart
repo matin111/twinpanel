@@ -16,7 +16,7 @@ void main() {
     expect(host, contains('kSecAttrAccessGroup'));
     expect(host, contains('kSecReturnPersistentRef'));
     expect(host, contains('tunnel.passwordReference = reference'));
-    expect(host, contains('"protocol": "hysteria2"'));
+    expect(host, contains('"protocol": protocolCode'));
     expect(host, contains('"namespace": namespace'));
     expect(host, contains('MACOS_TENANT_PROFILE_CONFLICT'));
     expect(extension, contains('SecItemCopyMatching'));
