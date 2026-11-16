@@ -93,7 +93,7 @@ final class TwinConnectMacOSVPNBridge {
                 result([
                     "contractVersion": 1,
                     "supportedCodes": libboxBackendReady()
-                        ? ["hysteria2", "tuic", "anytls", "naive", "shadowtls", "snell"] : [String]()
+                        ? ["hysteria2", "tuic", "anytls", "naive", "shadowtls", "snell", "socks5"] : [String]()
                 ] as [String: Any])
             case "macOSXrayEngineStatus":
                 result([
@@ -132,6 +132,17 @@ final class TwinConnectMacOSVPNBridge {
                         : (libboxInExtension()
                             ? "MACOS_SHADOWTLS_SIGNING_OR_ENTITLEMENT_MISSING"
                             : "MACOS_SHADOWTLS_PACKET_FLOW_BRIDGE_MISSING")
+                ] as [String: Any])
+            case "macOSSocks5EngineStatus":
+                result([
+                    "contractVersion": 1,
+                    "protocol": "socks5",
+                    "inProcessLibboxBundled": libboxInExtension(),
+                    "packetFlowBridgeReady": libboxBackendReady(),
+                    "engineReady": libboxBackendReady(),
+                    "reason": libboxBackendReady()
+                        ? "MACOS_SOCKS5_SIGNED_START_UNVERIFIED"
+                        : "MACOS_SOCKS5_PACKET_FLOW_BRIDGE_MISSING"
                 ] as [String: Any])
             case "macOSSnellEngineStatus":
                 result([
@@ -221,6 +232,12 @@ final class TwinConnectMacOSVPNBridge {
                     protocolCode: "shadowtls", result: result)
             case "getShadowTlsTunnelStatus":
                 TwinConnectMacOSLibboxControl.status(result, protocolCode: "shadowtls")
+            case "startSocks5":
+                TwinConnectMacOSLibboxControl.start(
+                    call.arguments, backendLinked: libboxBackendReady(),
+                    protocolCode: "socks5", result: result)
+            case "getSocks5TunnelStatus":
+                TwinConnectMacOSLibboxControl.status(result, protocolCode: "socks5")
             case "startSnell":
                 TwinConnectMacOSLibboxControl.start(
                     call.arguments, backendLinked: libboxBackendReady(),
