@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.855",
-  "source_sha": "f27749e8384a872f190da5c4cd29399b9605e01f",
+  "version": "1.1.0-rc.856",
+  "source_sha": "a0adb9e725badb3dd3681eccff68e3b977c0ea1d",
   "notes": {
-    "fa": "اصلاح اعتبارسنجی TLS در Hysteria2 و TUIC و AnyTLS با گواهی CA معتبر و ترمیم خودکار کانفیگ‌های قدیمی بدون حذف اشتراک‌ها.",
-    "en": "Fix trusted CA TLS delivery for Hysteria2, TUIC and AnyTLS and reconcile legacy insecure profiles without deleting subscriptions."
+    "fa": "یکپارچه‌سازی متن و طراحی مسیرهای خرید و تمدید ربات تلگرام برای پرداخت کارت‌به‌کارت، رمزارز، TXID، رسید و کیف پول؛ همراه با حفظ اصلاحات TLS نسخه قبل.",
+    "en": "Unified concise Telegram purchase and renewal checkout copy for card, crypto/TXID, receipt, and wallet, preserving previous TLS fixes."
   }
 }
