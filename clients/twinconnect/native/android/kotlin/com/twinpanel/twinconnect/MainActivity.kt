@@ -154,16 +154,12 @@ class MainActivity : FlutterActivity() {
                                     "tunnelVerified" to false
                                 )
                             }
-                            "connect" -> {
-                                val config = call.argument<String>("config")
-                                    ?: throw IllegalArgumentException("AWG_PROFILE_MISSING")
-                                awgRuntime.getMethod(
-                                    "connect", Context::class.java, String::class.java
-                                ).invoke(instance, applicationContext, config)
+                            "connect" -> throw IllegalArgumentException("AWG_CONNECT_DISPATCH_ERROR")
+                            "disconnect" -> {
+                                @Suppress("UNCHECKED_CAST")
+                                (awgRuntime.getMethod("disconnect").invoke(instance)
+                                    as Map<String, Any>)
                             }
-                            "disconnect" -> awgRuntime.getMethod(
-                                "disconnect"
-                            ).invoke(instance)
                             else -> throw IllegalArgumentException("AWG_UNKNOWN_METHOD")
                         }
                     } catch (_: ReflectiveOperationException) {
@@ -337,7 +333,8 @@ class MainActivity : FlutterActivity() {
                     "AWG_DNS_MISSING", "AWG_DEFAULT_ROUTE_MISSING",
                     "AWG_CONFIG_PARSE_FAILED", "AWG_TUN_NOT_ESTABLISHED",
                     "AWG_ALREADY_CONNECTED", "OTHER_VPN_ACTIVE",
-                    "AWG_NATIVE_RUNTIME_FAILED", "AWG_UNKNOWN_METHOD"
+                    "AWG_NATIVE_RUNTIME_FAILED", "AWG_UNKNOWN_METHOD",
+                    "AWG_CONNECT_DISPATCH_ERROR"
                 )
                 val safeCode = error.message?.takeIf { accepted.contains(it) }
                     ?: "NATIVE_VPN_START_FAILED"
