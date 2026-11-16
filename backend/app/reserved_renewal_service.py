@@ -74,7 +74,9 @@ def reserve_renewal(db: Session, *, subscription_id: int, plan_id: int | None,
     # Different plans are purchased for the NEXT period. No plan, protocol,
     # credential, quota or node on the current subscription changes here.
     # At cutover the existing lifecycle provisions the destination plan.
-    if plan_id is not None:
+    if plan_id is not None and (
+        sub.plan_id is None or int(plan_id) != int(sub.plan_id)
+    ):
         from .models import Plan
         chosen = db.get(Plan, int(plan_id))
         if chosen is None:
