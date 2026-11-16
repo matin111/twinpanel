@@ -18,7 +18,7 @@ void main() {
     expect(policy, contains('NEDNSSettings'));
     expect(policy, contains('dns.matchDomains = [""]'));
     expect(policy, isNot(contains('setTunnelNetworkSettings(')));
-    expect(extension, contains('case "hysteria2", "tuic":'));
+    expect(extension, contains('case "hysteria2", "tuic", "anytls":'));
     expect(extension, contains('TwinConnectMacLibboxEngine(tunnel: self)'));
     expect(extension, contains('engine.start'));
     expect(extension, contains('MACOS_HYSTERIA2_PACKET_FLOW_BRIDGE_MISSING'));
