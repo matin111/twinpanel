@@ -177,6 +177,76 @@ class SingBoxMacConfig {
     return _envelope(outbound);
   }
 
+  /// NaiveProxy on macOS uses the official sing-box Cronet-enabled Libbox.
+  /// Preserve only reviewed fields; never accept TLS bypass or direct routes.
+  static Map<String, dynamic> composeNaive({
+    required Map<String, dynamic> item,
+  }) {
+    final candidate = SingBoxProfileValidator.validateOutbound(
+      protocolCode: 'naive', item: item,
+    );
+    final username = candidate['username'];
+    final password = candidate['password'];
+    if (username is! String || username.isEmpty || username.length > 1024 ||
+        password is! String || password.isEmpty || password.length > 4096) {
+      throw const FormatException('MAC_NAIVE_CREDENTIALS_INVALID');
+    }
+    final rawTls = candidate['tls'];
+    if (rawTls is! Map) {
+      throw const FormatException('MAC_NAIVE_TLS_REQUIRED');
+    }
+    final tls = Map<String, dynamic>.from(rawTls);
+    final server = candidate['server'] as String;
+    final sni = tls['server_name'] ?? server;
+    if (tls['enabled'] != true || tls['insecure'] == true ||
+        tls['disable_sni'] == true || tls['utls'] != null ||
+        tls['reality'] != null ||
+        sni is! String || sni.isEmpty || sni.length > 255 ||
+        sni.contains('/') || sni.contains(' ')) {
+      throw const FormatException('MAC_NAIVE_TLS_UNSAFE');
+    }
+    // Naive concurrency > 0 changes traffic-analysis resistance. Treat
+    // server-supplied overrides as unsafe instead of quietly enabling them.
+    final concurrent = candidate['insecure_concurrency'];
+    if (concurrent != null && concurrent != 0) {
+      throw const FormatException('MAC_NAIVE_CONCURRENCY_UNSAFE');
+    }
+    final quic = candidate['quic'];
+    final udpOverTcp = candidate['udp_over_tcp'];
+    if ((quic != null && quic is! bool) ||
+        (udpOverTcp != null && udpOverTcp is! bool)) {
+      throw const FormatException('MAC_NAIVE_TRANSPORT_INVALID');
+    }
+    // UDP support is available only if the actual server supports UoT and
+    // the panel explicitly advertises that setting; never invent it.
+    final congestion = candidate['quic_congestion_control'];
+    if (congestion != null && (quic != true ||
+        !const ['bbr', 'bbr2', 'cubic', 'reno'].contains(congestion))) {
+      throw const FormatException('MAC_NAIVE_QUIC_CONGESTION_INVALID');
+    }
+    final headers = candidate['extra_headers'];
+    if (headers != null && headers is Map && headers.isNotEmpty) {
+      throw const FormatException('MAC_NAIVE_CUSTOM_HEADERS_NOT_SUPPORTED');
+    }
+    final outbound = <String, dynamic>{
+      'type': 'naive',
+      'tag': 'proxy',
+      'server': server,
+      'server_port': candidate['server_port'],
+      'username': username,
+      'password': password,
+      'insecure_concurrency': 0,
+      if (quic == true) 'quic': true,
+      if (udpOverTcp == true) 'udp_over_tcp': true,
+      if (congestion != null) 'quic_congestion_control': congestion,
+      'tls': <String, dynamic>{
+        'enabled': true,
+        'server_name': sni,
+      },
+    };
+    return _envelope(outbound);
+  }
+
   static Map<String, dynamic> _envelope(Map<String, dynamic> outbound) {
     return <String, dynamic>{
       'log': <String, dynamic>{'level': 'error'},
@@ -236,4 +306,8 @@ class SingBoxMacConfig {
   static String encodeAnyTlsForEphemeralTunnel({
     required Map<String, dynamic> item,
   }) => jsonEncode(composeAnyTls(item: item));
+
+  static String encodeNaiveForEphemeralTunnel({
+    required Map<String, dynamic> item,
+  }) => jsonEncode(composeNaive(item: item));
 }
