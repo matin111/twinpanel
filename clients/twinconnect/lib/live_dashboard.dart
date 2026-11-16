@@ -47,6 +47,7 @@ import 'vpn_policy_store.dart';
 import 'global_guard_connection_gate.dart';
 import 'vpn_policy.dart';
 import 'windows_wireguard.dart';
+import 'windows_public_ip_probe.dart';
 import 'windows_amneziawg.dart';
 import 'tenant_models.dart';
 import 'brand_theme.dart';
@@ -805,28 +806,23 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     if (!mounted || !_vpnVerified || _networkRefreshing) return;
     _networkRefreshing = true;
     final epoch = _networkEpoch;
-    final client = HttpClient()..connectionTimeout = const Duration(seconds: 5);
     try {
       final clock = Stopwatch()..start();
-      final request = await client.getUrl(Uri.https('api.ipify.org', '/'));
-      final response = await request.close().timeout(const Duration(seconds: 7));
-      final ip = (await utf8.decoder.bind(response).join()).trim();
+      final ip = await WindowsPublicIpProbe.read();
       clock.stop();
-      if (response.statusCode != 200 ||
-          ip.length > 45 || InternetAddress.tryParse(ip) == null) {
-        throw const FormatException('PUBLIC_IP_UNAVAILABLE');
-      }
       if (!mounted || epoch != _networkEpoch || !_vpnVerified) return;
       setState(() {
         _publicIp = ip;
         _httpsLatencyMs = clock.elapsedMilliseconds;
       });
     } catch (_) {
-      if (mounted && epoch == _networkEpoch && _vpnVerified) {
-        setState(() { _publicIp = null; _httpsLatencyMs = null; });
+      // An HTTPS probe failure is NOT evidence that the WireGuard service
+      // disconnected. Retain a prior verified result for this same epoch.
+      if (mounted && epoch == _networkEpoch && _vpnVerified &&
+          _publicIp == null) {
+        setState(() { _httpsLatencyMs = null; });
       }
     } finally {
-      client.close(force: true);
       _networkRefreshing = false;
     }
   }
@@ -4101,7 +4097,10 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                     ? const Color(0xFF36E5BB) : _vpnBusy ? purple : sub,
               ),
               const SizedBox(width: 9),
-              txt((_modernUp || _vpnVerified)
+              txt(_vpnVerified && !_modernUp && _publicIp == null
+                  ? tr('هندشیک برقرار؛ اینترنت تأیید نشده',
+                      'Handshake verified; internet unverified')
+                  : (_modernUp || _vpnVerified)
                   ? tr('آنلاین هستید', 'You are online')
                   : _vpnBusy
                       ? tr('در حال اتصال...', 'Connecting...')
