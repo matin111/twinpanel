@@ -11,6 +11,9 @@ on:
       - 'clients/twinconnect/lib/macos_shadowtls_controller.dart'
       - 'clients/twinconnect/lib/macos_shadowtls_config.dart'
       - 'clients/twinconnect/lib/macos_snell_controller.dart'
+      - 'clients/twinconnect/lib/macos_socks5_controller.dart'
+      - 'clients/twinconnect/test/macos_socks5_native_test.dart'
+      - 'clients/twinconnect/tool/macos_socks5_config_fixture.dart'
       - 'clients/twinconnect/test/macos_snell_native_contract_test.dart'
       - 'clients/twinconnect/test/singbox_macos_snell_config_test.dart'
       - 'clients/twinconnect/lib/shadowtls_chain.dart'
@@ -47,7 +50,7 @@ jobs:
         run: |
           set -euo pipefail
           flutter pub get
-          flutter test test/macos_shadowtls_config_test.dart test/macos_shadowtls_native_contract_test.dart test/macos_snell_native_contract_test.dart test/singbox_macos_snell_config_test.dart
+          flutter test test/macos_shadowtls_config_test.dart test/macos_shadowtls_native_contract_test.dart test/macos_snell_native_contract_test.dart test/singbox_macos_snell_config_test.dart test/macos_socks5_native_test.dart
           dart run tool/macos_shadowtls_config_fixture.dart > "$RUNNER_TEMP/twinconnect-shadowtls-synthetic.json"
           test -s "$RUNNER_TEMP/twinconnect-shadowtls-synthetic.json"
           echo "ShadowTLS two-hop profile and native contract passed (offline only)"
@@ -167,7 +170,7 @@ jobs:
             echo 'App+PacketTunnel+Libbox: packaged and validated'
             echo 'Apple developer signing: NOT CONFIGURED'
             echo 'Network Extension provider usable: NO'
-            echo 'Hysteria2 / ShadowTLS / Snell VPN connection / egress / DNS: NOT VERIFIED'
+            echo 'Hysteria2 / ShadowTLS / Snell / SOCKS5 VPN connection / egress / DNS: NOT VERIFIED'
             echo 'For signing, rebuild on your provisioned Mac using macos_native/SIGNED_LIBBOX_TEST.md'
           } > build/macos/Build/Products/Release/MACOS-INTEGRATED-TEST-NOTES.txt
       - name: Package integrated app with symbolic links intact
