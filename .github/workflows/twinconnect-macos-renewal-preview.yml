@@ -99,6 +99,18 @@ jobs:
           chmod 755 "$target/sing-box"
           "$target/sing-box" check -c macos_native/hysteria2-config-check.json
           file "$target/sing-box" | grep -q arm64
+      - name: Bundle pinned Xray/V2Ray transport binary
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash macos_native/fetch_xray_macos.sh
+          app="build/macos/Build/Products/Release/twinconnect.app"
+          target="$app/Contents/Resources/TwinConnectEngines"
+          mkdir -p "$target"
+          cp macos_native/build/xray/arm64/xray "$target/xray"
+          chmod 755 "$target/xray"
+          "$target/xray" run -test -config macos_native/xray-config-check.json
+          file "$target/xray" | grep -q arm64
       - name: Verify Mac app bundle, native channel and architecture
         shell: bash
         run: |
@@ -110,6 +122,8 @@ jobs:
           test -d "$app/Contents/Frameworks/FlutterMacOS.framework"
           test -d "$app/Contents/Frameworks/App.framework"
           test -d "$app/Contents/PlugIns/PacketTunnel.appex"
+          test -x "$app/Contents/Resources/TwinConnectEngines/xray"
+          "$app/Contents/Resources/TwinConnectEngines/xray" version
           test -x "$app/Contents/Resources/TwinConnectEngines/sing-box"
           "$app/Contents/Resources/TwinConnectEngines/sing-box" version
           # Transport binary is packaged but no PacketTunnel -> sing-box
@@ -129,6 +143,8 @@ jobs:
             echo "Mac PacketTunnel extension: EMBEDDED, backend NOT LINKED"
             echo "Hysteria2 sing-box arm64: BUNDLED and offline config checked"
             echo "Hysteria2 packetFlow bridge: NOT IMPLEMENTED"
+            echo "Xray/V2Ray arm64: BUNDLED and offline config checked"
+            echo "Xray packetFlow bridge: NOT IMPLEMENTED"
             echo "Code signing/notarization: NOT a Developer ID release"
             echo "VPN connect/egress: NOT VERIFIED"
             echo "Built application: twinconnect.app"
