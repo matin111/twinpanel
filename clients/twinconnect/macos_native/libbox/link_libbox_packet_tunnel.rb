@@ -46,6 +46,14 @@ target.build_configurations.each do |configuration|
   settings['MACOSX_DEPLOYMENT_TARGET'] = '13.0'
   settings['FRAMEWORK_SEARCH_PATHS'] = ['$(inherited)', slice]
   settings['LIBRARY_SEARCH_PATHS'] = ['$(inherited)', slice]
+  # libbox's native macOS Go/C implementation references IOKit USB Host
+  # controls and SystemConfiguration proxy/dynamic store symbols.
+  # Explicitly link their Apple SDK frameworks into PacketTunnel.
+  settings['OTHER_LDFLAGS'] = [
+    '$(inherited)', '-framework', 'IOUSBHost',
+    '-framework', 'SystemConfiguration',
+    '-framework', 'IOKit'
+  ]
 end
 probe = group.new_file(File.join(root, 'macos_native/libbox/LibboxLinkProbe.swift'))
 probe.source_tree = '<absolute>'
