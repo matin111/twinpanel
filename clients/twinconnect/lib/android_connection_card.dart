@@ -1029,9 +1029,9 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
     }
     // Protocol selection happens on the Servers screen. Never silently
     // change the explicitly chosen protocol to WireGuard.
-    final requested = widget.selectedProtocolCode != null &&
-            AndroidProtocolVisibility.visible(widget.selectedProtocolCode!)
-        ? widget.selectedProtocolCode : null;
+    // Keep the explicit user choice even when its Android engine is not
+    // installed. Never silently substitute WireGuard or hide that choice.
+    final requested = widget.selectedProtocolCode;
     // Quick Connect chooses ONLY an entitled protocol with an installed,
     // native engine and an existing profile. Never default to Cisco merely
     // because it appears first in the subscription's catalog.
@@ -1058,7 +1058,8 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
     final connected = _up || _openVpnUp || _ciscoUp ||
         _xrayCoreUp || _singBoxProtocol != null;
     final protocolName = chosen?.protocol.name ??
-        (requested ?? s.pick('پروتکل آماده‌ای وجود ندارد', 'No ready protocol'));
+        (requested == null ? s.pick('پروتکل آماده‌ای وجود ندارد', 'No ready protocol')
+            : VpnProtocols.byCode(requested)?.name ?? requested);
     final activeProtocolCode = _xrayCoreUp ? 'v2ray' : _singBoxProtocol ??
         (_openVpnUp ? 'openvpn' : _ciscoUp ? 'cisco' :
             _up ? 'wireguard' : null);
@@ -1170,7 +1171,10 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
                   ? (_activeServerName == null
                       ? s.pick('مکان اتصال نامشخص است', 'Connected location unknown')
                       : _activeServerName!)
-                  : s.pick('هنوز به سروری متصل نیستید', 'No active server'),
+                  : widget.selectedNodeId != null
+                      ? s.pick('سرور انتخاب شده؛ هنوز متصل نیستید',
+                          'Server selected; not connected')
+                      : s.pick('هنوز به سروری متصل نیستید', 'No active server'),
               textAlign: TextAlign.center,
             ),
             if (connected && _activeServer != null) ...[
