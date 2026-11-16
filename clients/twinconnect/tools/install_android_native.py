@@ -138,14 +138,14 @@ def patch_manifest() -> None:
         'org.amnezia.awg.backend.GoBackend$VpnService' not in current
     ):
         service += (
-            '\\n        <!-- Official AmneziaWG GoBackend VPN service -->\\n'
-            '        <service android:name="org.amnezia.awg.backend.GoBackend$VpnService"\\n'
-            '            android:exported="false"\\n'
-            '            android:permission="android.permission.BIND_VPN_SERVICE">\\n'
-            '            <intent-filter>\\n'
-            '                <action android:name="android.net.VpnService" />\\n'
-            '            </intent-filter>\\n'
-            '        </service>\\n'
+            '\n        <!-- Official AmneziaWG GoBackend VPN service -->\n'
+            '        <service android:name="org.amnezia.awg.backend.GoBackend$VpnService"\n'
+            '            android:exported="false"\n'
+            '            android:permission="android.permission.BIND_VPN_SERVICE">\n'
+            '            <intent-filter>\n'
+            '                <action android:name="android.net.VpnService" />\n'
+            '            </intent-filter>\n'
+            '        </service>\n'
         )
     if 'android:name=".OpenConnectVpnService"' not in current:
         service += (
