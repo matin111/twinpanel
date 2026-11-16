@@ -63,6 +63,26 @@ jobs:
           name: twinconnect-mieru-android-core-binaries
           path: clients/twinconnect/native/android/mieru-jni/**/libmieru.so
           if-no-files-found: error
+      - name: Compile and stage official AmneziaWG AAR for the APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone https://github.com/amnezia-vpn/amneziawg-android.git /tmp/amneziawg-android
+          cd /tmp/amneziawg-android
+          git checkout --detach ff15093bf3856fea0947923474870b86efb682f0
+          git submodule update --init --recursive
+          chmod +x gradlew
+          ./gradlew :tunnel:assembleRelease --no-daemon
+          AAR=tunnel/build/outputs/aar/tunnel-release.aar
+          test -s "$AAR"
+          unzip -Z1 "$AAR" | grep -F 'jni/arm64-v8a/libwg-go.so'
+          mkdir -p "$GITHUB_WORKSPACE/clients/twinconnect/native/android/amneziawg-core"
+          cp "$AAR" "$GITHUB_WORKSPACE/clients/twinconnect/native/android/amneziawg-core/tunnel-release.aar"
+      - name: Verify staged AmneziaWG AAR
+        shell: bash
+        run: |
+          test -s native/android/amneziawg-core/tunnel-release.aar
+          unzip -Z1 native/android/amneziawg-core/tunnel-release.aar | grep -F 'classes.jar'
       - name: Generate Android scaffold
         run: flutter create --platforms=android --org com.twinpanel --project-name twinconnect .
       - name: Install native source, supplied icon and pinned WireGuard dependency
