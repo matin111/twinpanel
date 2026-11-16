@@ -7,7 +7,7 @@ import 'singbox_macos_config.dart';
 /// TUIC macOS host control. The native extension must be provisioned,
 /// signed, and enabled before this controller sends any sensitive profile.
 class MacTuicController {
-  const MacTUICController();
+  const MacTuicController();
 
   static const MethodChannel _channel =
       MethodChannel('com.twinpanel.twinconnect/vpn');
@@ -21,7 +21,7 @@ class MacTuicController {
       };
     }
     final result = await _channel.invokeMapMethod<String, dynamic>(
-      'macOSTUICEngineStatus',
+      'macOSTuicEngineStatus',
     ).timeout(const Duration(seconds: 8));
     if (result == null ||
         result['contractVersion'] != 1 ||
