@@ -1,0 +1,73 @@
+name: TwinConnect macOS Mieru In-Process Bridge Prototype
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'feat/twinconnect-macos-packet-tunnel-foundation-20261116'
+    paths:
+      - 'clients/twinconnect/macos_native/mieru/**'
+      - '.github/workflows/twinconnect-macos-mieru-inprocess.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: twinconnect-mieru-inprocess-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compile-native-mieru:
+    name: compile Mieru macOS C ABI (unlinked)
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.x'
+          cache: false
+      - name: Build in-process Mieru C ABI from official pinned source
+        shell: bash
+        run: |
+          set -euo pipefail
+          workspace="$(pwd)"
+          tmp="$(mktemp -d)"
+          trap 'rm -rf "$tmp"' EXIT
+          git clone --depth 1 --branch v3.39.0 \
+            https://github.com/enfein/mieru.git "$tmp/mieru"
+          cd "$tmp/mieru"
+          test "$(go list -m)" = "github.com/enfein/mieru/v3"
+          mkdir -p cmd/twinconnect_mieru
+          cp "$workspace/clients/twinconnect/macos_native/mieru/twin_mieru_cbridge.go" \
+            cmd/twinconnect_mieru/main.go
+          CGO_ENABLED=1 go build -trimpath -buildmode=c-shared \
+            -o "$workspace/twinconnect-mieru-inprocess.dylib" \
+            ./cmd/twinconnect_mieru
+          test -s "$workspace/twinconnect-mieru-inprocess.dylib"
+          test -s "$workspace/twinconnect-mieru-inprocess.h"
+          file "$workspace/twinconnect-mieru-inprocess.dylib" | grep -q Mach-O
+          nm -gU "$workspace/twinconnect-mieru-inprocess.dylib" | grep -q TwinMieruStart
+          nm -gU "$workspace/twinconnect-mieru-inprocess.dylib" | grep -q TwinMieruStop
+          nm -gU "$workspace/twinconnect-mieru-inprocess.dylib" | grep -q TwinMieruLocalReady
+          echo "C ABI compiled. NOT LINKED to PacketTunnel, VPN NOT VERIFIED."
+      - name: Prototype is not an app release
+        shell: bash
+        run: |
+          cat > MIERU-INPROCESS-STATUS.txt <<'EOF'
+          TwinConnect macOS Mieru C ABI prototype
+          Built from official Mieru v3.39.0 using c-shared.
+          NOT signed or embedded in PacketTunnel.
+          No validated runtime, peer handshake, TUN egress, DNS, IPv6, or leak proof.
+          Do not publish this prototype as a working VPN.
+          Note: Mieru is GPL-3.0 licensed; review distribution and source obligations.
+          EOF
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TwinConnect-macOS-Mieru-InProcess-Prototype-NOT-VPN
+          path: |
+            twinconnect-mieru-inprocess.dylib
+            twinconnect-mieru-inprocess.h
+            MIERU-INPROCESS-STATUS.txt
+          retention-days: 7
+          if-no-files-found: error
