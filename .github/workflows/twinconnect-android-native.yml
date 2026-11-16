@@ -68,26 +68,19 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - name: Compile and stage official AmneziaWG AAR for the APK
+      - name: Compile and stage isolated official AmneziaWG AAR
         shell: bash
+        env:
+          AWG_REVISION: ff15093bf3856fea0947923474870b86efb682f0
         run: |
           set -euo pipefail
-          # Multiple AmneziaWG steps may be present in the PR merge build.
-          # Use a unique checkout so a previous step cannot cause git exit 128.
-          upstream_dir="$(mktemp -d "${RUNNER_TEMP:-/tmp}/twinconnect-amneziawg.XXXXXXXX")"
-          trap 'rm -rf "$upstream_dir"' EXIT
-          git clone https://github.com/amnezia-vpn/amneziawg-android.git "$upstream_dir"
-          cd "$upstream_dir"
-          git checkout --detach ff15093bf3856fea0947923474870b86efb682f0
-          git submodule update --init --recursive
-          chmod +x gradlew
-          java -version
-          ./gradlew :tunnel:assembleRelease --no-daemon --stacktrace
-          AAR=tunnel/build/outputs/aar/tunnel-release.aar
-          test -s "$AAR"
-          unzip -Z1 "$AAR" | grep -F 'jni/arm64-v8a/libwg-go.so'
-          mkdir -p "$GITHUB_WORKSPACE/clients/twinconnect/native/android/amneziawg-core"
-          cp "$AAR" "$GITHUB_WORKSPACE/clients/twinconnect/native/android/amneziawg-core/tunnel-release.aar"
+          bash tools/build_amneziawg_android.sh
+          test -s native/android/amneziawg-core/tunnel-release.aar
+          unzip -Z1 native/android/amneziawg-core/tunnel-release.aar | grep -F 'jni/arm64-v8a/libawg-go.so'
+          if unzip -Z1 native/android/amneziawg-core/tunnel-release.aar | grep -E 'jni/.*/libwg-go.so'; then
+            echo "AWG native library collides with WireGuard" >&2
+            exit 1
+          fi
       - name: Verify staged AmneziaWG AAR
         shell: bash
         run: |
