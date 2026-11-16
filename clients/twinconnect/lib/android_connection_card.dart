@@ -530,8 +530,10 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
       final choices = profiles.items.where((item) {
         final id = item['node_id']?.toString();
         if (id == null || (selectedId != null && id != selectedId)) return false;
-        final node = inventory.where((n) => n.id == id).firstOrNull;
-        return inventory.isEmpty || node?.nodeOnline == true;
+        // Node health telemetry may be stale or unavailable on mobile.
+        // Authorization comes from the session-native profile endpoint,
+        // not the inventory's best-effort online indicator.
+        return true;
       }).toList(growable: false);
       if (choices.isEmpty) {
         throw const FormatException('CISCO_NO_AUTHORIZED_SERVER');
@@ -741,7 +743,11 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
         return inventory.isEmpty || node?.nodeOnline == true;
       }).toList(growable: false);
       if (items.isEmpty) {
-        throw const FormatException('AWG_NO_AUTHORIZED_SERVER');
+        throw FormatException(
+          selectedId == null
+              ? 'AWG_NO_NATIVE_PROFILE_RETURNED'
+              : 'AWG_SELECTED_SERVER_HAS_NO_PROFILE',
+        );
       }
       final item = items.first;
       await engine.connect(item);
