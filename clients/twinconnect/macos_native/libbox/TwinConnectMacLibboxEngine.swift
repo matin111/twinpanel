@@ -156,6 +156,51 @@ final class TwinConnectMacLibboxEngine {
         return true
     }
 
+    /// Preflight only for a future in-extension Mieru process. The Libbox
+    /// relay MUST NOT start before a signed, extension-owned Mieru core has
+    /// authenticated and pinned its egress endpoint outside the TUN.
+    /// This method is intentionally not used by start() until that bridge exists.
+    private static func mieruRelayProfileAllowed(_ json: [String: Any]) -> Bool {
+        guard let outbounds = json["outbounds"] as? [[String: Any]],
+              outbounds.count == 1, let outbound = outbounds.first,
+              Set(outbound.keys).isSubset(of: [
+                  "type", "tag", "server", "server_port", "version", "network"
+              ]),
+              outbound["type"] as? String == "socks",
+              outbound["tag"] as? String == "proxy",
+              outbound["server"] as? String == "127.0.0.1",
+              outbound["version"] as? String == "5",
+              outbound["network"] as? String == "tcp",
+              let port = outbound["server_port"] as? Int,
+              (1025...65535).contains(port),
+              let inbounds = json["inbounds"] as? [[String: Any]],
+              inbounds.count == 1,
+              inbounds[0]["type"] as? String == "tun",
+              inbounds[0]["auto_route"] as? Bool == true,
+              inbounds[0]["strict_route"] as? Bool == true,
+              inbounds[0]["dns_mode"] as? String == "hijack",
+              let route = json["route"] as? [String: Any],
+              route["final"] as? String == "proxy",
+              route["default_domain_resolver"] as? String == "dns-bootstrap",
+              let rules = route["rules"] as? [[String: Any]],
+              rules.count == 2,
+              rules[0]["port"] as? Int == 53,
+              rules[0]["action"] as? String == "hijack-dns",
+              rules[1]["ip_version"] as? Int == 6,
+              rules[1]["action"] as? String == "reject",
+              let dns = json["dns"] as? [String: Any],
+              dns["final"] as? String == "dns-remote",
+              let servers = dns["servers"] as? [[String: Any]],
+              servers.count == 2,
+              servers[0]["tag"] as? String == "dns-bootstrap",
+              servers[0]["type"] as? String == "local",
+              servers[1]["tag"] as? String == "dns-remote",
+              servers[1]["detour"] as? String == "proxy",
+              servers[1]["type"] as? String == "https"
+        else { return false }
+        return true
+    }
+
     private static func profileIsAllowed(_ config: String) -> Bool {
         guard let data = config.data(using: .utf8),
               let json = (try? JSONSerialization.jsonObject(with: data))
