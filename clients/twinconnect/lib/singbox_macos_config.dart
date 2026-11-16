@@ -247,6 +247,81 @@ class SingBoxMacConfig {
     return _envelope(outbound);
   }
 
+  /// Snell v4/v6 outbound. Never invent a server version or credentials.
+  /// This is offline configuration preparation, not a verified connection.
+  static Map<String, dynamic> composeSnell({
+    required Map<String, dynamic> item,
+  }) {
+    final candidate = SingBoxProfileValidator.validateOutbound(
+      protocolCode: 'snell', item: item,
+    );
+    final version = candidate['version'];
+    final psk = candidate['psk'];
+    if (version != 4 && version != 6) {
+      throw const FormatException('MAC_SNELL_VERSION_UNSUPPORTED');
+    }
+    if (psk is! String || psk.isEmpty ||
+        psk.length > 4096 ||
+        (version == 6 &&
+            (utf8.encode(psk).length < 12 || utf8.encode(psk).length > 255))) {
+      throw const FormatException('MAC_SNELL_PSK_INVALID');
+    }
+    const keys = {
+      'type', 'tag', 'server', 'server_port', 'version', 'psk',
+      'userkey', 'reuse', 'network', 'obfs_mode', 'obfs_host', 'mode',
+    };
+    if (candidate.keys.any((key) => !keys.contains(key))) {
+      throw const FormatException('MAC_SNELL_UNREVIEWED_FIELD');
+    }
+    final userkey = candidate['userkey'];
+    if (userkey != null &&
+        (userkey is! String || utf8.encode(userkey).length > 255)) {
+      throw const FormatException('MAC_SNELL_USERKEY_INVALID');
+    }
+    final reuse = candidate['reuse'];
+    final network = candidate['network'];
+    if ((reuse != null && reuse is! bool) ||
+        (network != null && network != 'tcp' && network != 'udp')) {
+      throw const FormatException('MAC_SNELL_TRANSPORT_INVALID');
+    }
+    final obfsMode = candidate['obfs_mode'];
+    final obfsHost = candidate['obfs_host'];
+    final mode = candidate['mode'];
+    if (version == 4) {
+      if (mode != null ||
+          (obfsMode != null && !const ['none', 'http'].contains(obfsMode)) ||
+          (obfsHost != null &&
+              (obfsMode != 'http' || obfsHost is! String ||
+               obfsHost.isEmpty || obfsHost.length > 255 ||
+               obfsHost.contains('/') || obfsHost.contains(' ')))) {
+        throw const FormatException('MAC_SNELL_OBFS_INVALID');
+      }
+    } else {
+      if (obfsMode != null || obfsHost != null ||
+          (mode != null && !const ['default', 'unshaped'].contains(mode))) {
+        throw const FormatException('MAC_SNELL_MODE_INVALID');
+      }
+    }
+    return _envelope(<String, dynamic>{
+      'type': 'snell',
+      'tag': 'proxy',
+      'server': candidate['server'],
+      'server_port': candidate['server_port'],
+      'version': version,
+      'psk': psk,
+      if (userkey != null) 'userkey': userkey,
+      if (reuse != null) 'reuse': reuse,
+      if (network != null) 'network': network,
+      if (version == 4 && obfsMode != null) 'obfs_mode': obfsMode,
+      if (version == 4 && obfsHost != null) 'obfs_host': obfsHost,
+      if (version == 6 && mode != null) 'mode': mode,
+    });
+  }
+
+  static String encodeSnellForEphemeralTunnel({
+    required Map<String, dynamic> item,
+  }) => jsonEncode(composeSnell(item: item));
+
   static Map<String, dynamic> _envelope(Map<String, dynamic> outbound) {
     return <String, dynamic>{
       'log': <String, dynamic>{'level': 'error'},
