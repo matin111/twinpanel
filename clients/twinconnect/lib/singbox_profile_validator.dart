@@ -246,7 +246,21 @@ class SingBoxProfileValidator {
       // Fail closed, but identify which panel setting is incompatible.
       // Never silently disable certificate verification or SNI.
       if (tls['insecure'] == true) {
-        throw const FormatException('SINGBOX_TLS_CERT_VERIFICATION_DISABLED');
+        // Older panel profiles may carry both a trusted CA and the obsolete
+        // insecure flag. Require explicit CA trust and a verifiable hostname
+        // before migrating this client-only flag to strict verification.
+        // Never accept a bare insecure profile or disable verification.
+        final certificate = tls['certificate'];
+        final name = tls['server_name'];
+        final hasTrust = certificate is String &&
+            certificate.contains('-----BEGIN CERTIFICATE-----') &&
+            certificate.contains('-----END CERTIFICATE-----');
+        final hasHostname = name is String && name.trim().isNotEmpty &&
+            !name.contains(' ') && !name.contains('/');
+        if (!hasTrust || !hasHostname) {
+          throw const FormatException('SINGBOX_TLS_CERT_VERIFICATION_DISABLED');
+        }
+        tls['insecure'] = false;
       }
       if (tls['disable_sni'] == true) {
         throw const FormatException('SINGBOX_TLS_SNI_DISABLED');

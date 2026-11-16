@@ -327,6 +327,26 @@ void main() {
     }
   });
 
+  test('legacy insecure flag is repaired only with explicit CA and SNI', () {
+    for (final protocol in ['hysteria2', 'tuic', 'anytls']) {
+      final tls = <String, dynamic>{
+        'enabled': true,
+        'insecure': true,
+        'server_name': 'vpn.example.org',
+        'certificate': '-----BEGIN CERTIFICATE-----\\nTEST\\n-----END CERTIFICATE-----',
+      };
+      final result = SingBoxProfileValidator.validateOutbound(
+        protocolCode: protocol,
+        item: {'outbound': {
+          'type': protocol, 'server': 'vpn.example.org',
+          'server_port': 443, 'tls': tls,
+        }},
+      );
+      expect((result['tls'] as Map)['insecure'], false);
+      expect(tls['insecure'], true);
+    }
+  });
+
   test('TLS policy reports the exact unsafe field without weakening trust', () {
     const cases = <String, String>{
       'insecure': 'SINGBOX_TLS_CERT_VERIFICATION_DISABLED',
@@ -364,3 +384,6 @@ void main() {
     ), throwsFormatException);
   });
 }
+
+// Regression: a legacy profile with explicit CA can be upgraded without
+// permitting certificate-verification bypass or modifying the original map.
