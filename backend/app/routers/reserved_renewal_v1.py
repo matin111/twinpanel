@@ -1,5 +1,6 @@
 """Admin-only interface to the common reserved renewal queue and history."""
 from datetime import datetime
+from typing import Literal
 import secrets
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -20,18 +21,48 @@ class ReserveRequest(BaseModel):
     traffic_gb: float = Field(ge=0, le=100000)
     duration_days: int = Field(ge=0, le=3650)
     request_id: str | None = Field(default=None, max_length=100)
+    mode: Literal["legacy", "custom", "plan"] = "legacy"
 
 @router.post("/{subscription_id}/reserve-renewal")
 def reserve_admin(subscription_id: int, payload: ReserveRequest, db: Session = Depends(get_db), admin: User = Depends(require_admin)):
     sub = db.get(Subscription, subscription_id)
     if sub is None:
         raise HTTPException(404, "اشتراک پیدا نشد")
-    plan = db.get(Plan, payload.plan_id) if payload.plan_id else (db.get(Plan, sub.plan_id) if sub.plan_id else None)
+    if payload.mode == "plan":
+        if not payload.plan_id:
+            raise HTTPException(422, "پلن تمدید را انتخاب کنید")
+        plan = db.get(Plan, payload.plan_id)
+        if plan is None:
+            raise HTTPException(404, "پلن تمدید پیدا نشد")
+        if not plan.is_active:
+            raise HTTPException(409, "پلن تمدید غیرفعال است")
+        if int(plan.traffic_gb or 0) <= 0 or int(plan.duration_days or 0) <= 0:
+            raise HTTPException(422, "پلن باید حجم و مدت مشخص داشته باشد")
+        next_plan_id = plan.id
+        next_plan_name = plan.name
+        traffic_bytes = int(plan.traffic_gb) * 1024**3
+        duration_days = int(plan.duration_days)
+    elif payload.mode == "custom":
+        # Do not show the previous plan name for a custom-sized renewal.
+        # Retain the running plan and protocol entitlements at cutover.
+        if payload.traffic_gb <= 0 or payload.duration_days <= 0:
+            raise HTTPException(422, "حجم و مدت تمدید دستی را مشخص کنید")
+        next_plan_id = None
+        next_plan_name = f"تمدید دستی · {payload.traffic_gb:g} گیگ · {payload.duration_days} روز"
+        traffic_bytes = int(payload.traffic_gb * 1024**3)
+        duration_days = payload.duration_days
+    else:
+        # Older admin clients retain their existing payload behavior.
+        plan = db.get(Plan, payload.plan_id) if payload.plan_id else (db.get(Plan, sub.plan_id) if sub.plan_id else None)
+        next_plan_id = payload.plan_id or sub.plan_id
+        next_plan_name = plan.name if plan else "تمدید دستی"
+        traffic_bytes = int(payload.traffic_gb * 1024**3)
+        duration_days = payload.duration_days
     record = reserve_renewal(
-        db, subscription_id=subscription_id, plan_id=payload.plan_id or sub.plan_id,
-        plan_name=plan.name if plan else "تمدید دستی",
-        traffic_bytes=int(payload.traffic_gb * 1024**3),
-        duration_days=payload.duration_days, source="admin",
+        db, subscription_id=subscription_id, plan_id=next_plan_id,
+        plan_name=next_plan_name,
+        traffic_bytes=traffic_bytes,
+        duration_days=duration_days, source="admin",
         reference=payload.request_id or secrets.token_urlsafe(24),
         actor=f"admin:{admin.id}")
     db.commit()
