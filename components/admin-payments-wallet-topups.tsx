@@ -32,6 +32,8 @@ type WalletTopup={
   wallet_credit_status?:string|null;
   credited_amount_toman?:number|null;
   wallet_user_id?:number|null;
+  wallet_type?:string|null;
+  reseller_id?:number|null;
   user?:{id?:number;email?:string|null;full_name?:string|null;phone?:string|null}|null;
 };
 
@@ -237,7 +239,7 @@ export function AdminPaymentsWalletTopups(){
               {row.txid&&<span className="wide">TXID: <b dir="ltr">{row.txid}</b></span>}
               {row.review_note&&<span className="wide">{pick("یادداشت","Note")}: <b>{row.review_note}</b></span>}
               <span className="wide" style={{display:"flex",flexWrap:"wrap",gap:10,alignItems:"center"}}>
-                <a className="mini-btn" href={`/admin/wallet?user=${row.user_id}`}>{pick("مشاهده کیف پول کاربر","View user's wallet")} #{row.user_id}</a>
+                <a className="mini-btn" href={row.wallet_type==="reseller"&&row.reseller_id?`/admin/resellers?focus=${row.reseller_id}`:`/admin/wallet?user=${row.user_id}`}>{row.wallet_type==="reseller"?pick("مشاهده کیف پول نماینده","View reseller wallet"):pick("مشاهده کیف پول کاربر","View user's wallet")} #{row.wallet_type==="reseller"&&row.reseller_id?row.reseller_id:row.user_id}</a>
                 {row.wallet_credit_status==="credited"&&row.credited_amount_toman!=null
                   ?<b style={{color:"var(--success, #5ee6a2)"}}>{pick("✓ مبلغ شارژشده","✓ Credited")}: {money(row.credited_amount_toman)}</b>
                   :row.status==="approved"
