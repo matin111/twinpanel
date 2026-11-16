@@ -621,7 +621,7 @@ def renewal_proof_keyboard(
         inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text=("📷 ارسال رسید پرداخت" if method == "card_to_card" else "✅ ثبت TXID پرداخت"),
+                    text=("📷 ارسال رسید پرداخت" if method == "card_to_card" else "🔗 ثبت هش تراکنش (TXID)"),
                     callback_data=(
                         f"renewproof:"
                         f"{intent_id}:"
@@ -2163,7 +2163,7 @@ async def renewal_proof_start(
     else:
         await state.set_state(RenewalPaymentState.proof)
         await callback.message.answer(
-            "TXID تراکنش USDT را ارسال کنید."
+            "🔗 هش تراکنش (TXID) را از بخش تاریخچه انتقال کیف پول خود کپی کرده و همین‌جا ارسال کنید.\nTXID همان شناسه تراکنش است، نه آدرس کیف پول یا شماره سفارش."
         )
 
 
