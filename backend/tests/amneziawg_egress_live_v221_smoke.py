@@ -47,7 +47,9 @@ def main() -> None:
     # Existing complete credentials from rc.220 must be repaired once without
     # regenerating their stored standalone identity.
     assert '"legacy_amneziawg_egress"' in reconcile
-    assert 'protocol not in {"naive", "amneziawg"}' in reconcile
+    # The legacy self-heal scanner now also includes other TLS protocols;
+    # AmneziaWG must remain present in that allowlist.
+    assert 'protocol not in {"naive", "amneziawg", "hysteria2", "tuic", "anytls"}' in reconcile
     assert 'item.get("egress_contract")' in reconcile
     assert "EGRESS_CONTRACT" in reconcile
     assert "_LEGACY_REPAIR_STATES" in reconcile
