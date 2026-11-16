@@ -200,18 +200,18 @@ jobs:
         env:
           TWINCONNECT_DIRECTORY_URLS: ${{ vars.TWINCONNECT_DIRECTORY_URLS || 'https://panel.matindnspro.sbs,https://167-104-219-168.sslip.io' }}
         run: |
-          flutter build apk --release --target-platform android-arm64 "--dart-define=TWINCONNECT_DIRECTORY_URLS=$TWINCONNECT_DIRECTORY_URLS" "--dart-define=TWINCONNECT_BUILD_ID=$GITHUB_SHA"
+          flutter build apk --release --split-per-abi --target-platform android-arm64 "--dart-define=TWINCONNECT_DIRECTORY_URLS=$TWINCONNECT_DIRECTORY_URLS" "--dart-define=TWINCONNECT_BUILD_ID=$GITHUB_SHA"
 
       - name: Report actual release APK size and native library footprint
         working-directory: clients/twinconnect
         shell: bash
         run: |
-          python3 tools/report_android_apk_size.py build/app/outputs/flutter-apk/app-release.apk
+          python3 tools/report_android_apk_size.py build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
 
       - name: Upload native Cisco experimental Android APK
         uses: actions/upload-artifact@v4
         with:
           name: twinconnect-android-arm64-native-openconnect-test-apk
-          path: clients/twinconnect/build/app/outputs/flutter-apk/app-release.apk
+          path: clients/twinconnect/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
           if-no-files-found: error
           retention-days: 3
