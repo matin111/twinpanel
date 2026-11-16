@@ -18,10 +18,16 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - uses: android-actions/setup-android@v3
       - name: Install pinned Android NDK and SDK
         run: |
-          sdkmanager --install "ndk;26.1.10909125" "platforms;android-36" "build-tools;36.0.0"
+          SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
+          SDKMANAGER="$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -x "$SDKMANAGER" ]; then
+            echo "Android SDK command-line tools missing at $SDKMANAGER" >&2
+            exit 1
+          fi
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+          "$SDKMANAGER" --sdk_root="$SDK_ROOT" --install "ndk;26.1.10909125" "platforms;android-36" "build-tools;36.0.0"
       - name: Fetch pinned upstream AmneziaWG source and submodules
         shell: bash
         run: |
