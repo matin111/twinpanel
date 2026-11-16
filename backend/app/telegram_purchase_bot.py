@@ -404,7 +404,7 @@ def proof_keyboard(
     if method_id == "card_to_card":
         action_text = "📷 ارسال رسید پرداخت"
     else:
-        action_text = "✅ ثبت TXID پرداخت"
+        action_text = "🔗 ثبت هش تراکنش (TXID)"
 
     return InlineKeyboardMarkup(
         inline_keyboard=[
@@ -1224,7 +1224,7 @@ def create_purchase_router(
                 )
 
             text += (
-                "\nپس از پرداخت، TXID تراکنش را ثبت کنید."
+                "\nپس از انتقال، هش تراکنش (TXID) را از تاریخچه کیف پول خود کپی کنید و روی دکمه «ثبت هش تراکنش (TXID)» بزنید.\nTXID با آدرس کیف پول و شماره سفارش متفاوت است."
             )
 
         await callback.message.edit_text(
@@ -1285,8 +1285,8 @@ def create_purchase_router(
         )
 
         await callback.message.answer(
-            "🔗 TXID تراکنش USDT "
-            "را ارسال کنید."
+            "🔗 هش تراکنش (TXID) را از تاریخچه انتقال کیف پول خود کپی کرده و ارسال کنید. "
+            "آدرس کیف پول یا شماره سفارش را نفرستید."
         )
 
     @router.message(
