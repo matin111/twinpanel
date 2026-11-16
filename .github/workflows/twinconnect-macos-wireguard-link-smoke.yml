@@ -62,6 +62,14 @@ jobs:
           assert '#include <sys/types.h>' not in h
           header.write_text(h.replace('#include "key.h"',
                                      '#include <sys/types.h>\\n#include "key.h"', 1))
+          # Avoid the overly generic KEY_H include guard colliding with
+          # Xcode 16's Darwin SDK headers when C modules are imported by Swift.
+          key = Path('macos_native/vendor-wireguard-apple/Sources/WireGuardKitC/key.h')
+          key_src = key.read_text()
+          assert '#ifndef KEY_H' in key_src and '#define KEY_H' in key_src
+          key_src = key_src.replace('#ifndef KEY_H', '#ifndef TWINCONNECT_WGK_KEY_H', 1)
+          key_src = key_src.replace('#define KEY_H', '#define TWINCONNECT_WGK_KEY_H', 1)
+          key.write_text(key_src)
           PY
       - name: Generate unsigned Mac project and native Packet Tunnel
         run: |
