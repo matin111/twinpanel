@@ -38,7 +38,7 @@ and Network Extension capability provisioned to both app and extension:
    test-only Swift condition:
 
    ```bash
-   xcodebuild -project macos/Runner.xcodeproj -scheme Runner \
+   xcodebuild -workspace macos/Runner.xcworkspace -scheme Runner \
      -configuration Debug -destination 'platform=macOS' \
      DEVELOPMENT_TEAM="$TWINCONNECT_APPLE_TEAM_ID" \
      SWIFT_ACTIVE_COMPILATION_CONDITIONS='TWINCONNECT_SIGNED_LIBBOX' \
