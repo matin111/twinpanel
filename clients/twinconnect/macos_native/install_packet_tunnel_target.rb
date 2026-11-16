@@ -32,7 +32,7 @@ extension.build_configurations.each do |configuration|
   settings['CODE_SIGN_STYLE'] = 'Automatic'
 end
 group = project.main_group.new_group('TwinConnect Mac PacketTunnel', '../macos_native')
-%w[PacketTunnelProvider.swift TwinConnectWireGuardEngine.swift].each do |file|
+%w[PacketTunnelProvider.swift TwinConnectWireGuardEngine.swift libbox/TwinConnectMacTunnelPolicy.swift].each do |file|
   ref = group.new_file(file)
   extension.source_build_phase.add_file_reference(ref)
 end
