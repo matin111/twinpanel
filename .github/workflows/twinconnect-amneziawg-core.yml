@@ -1,0 +1,51 @@
+name: TwinConnect AmneziaWG native core build
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feat/twinconnect-android-openvpn-core-20261115
+    paths:
+      - ".github/workflows/twinconnect-amneziawg-core.yml"
+
+jobs:
+  amneziawg-native-core:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - name: Install pinned Android NDK and SDK
+        run: |
+          sdkmanager --install "ndk;26.1.10909125" "platforms;android-36" "build-tools;36.0.0"
+      - name: Fetch pinned upstream AmneziaWG source and submodules
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone https://github.com/amnezia-vpn/amneziawg-android.git /tmp/amneziawg-android
+          cd /tmp/amneziawg-android
+          git checkout --detach ff15093bf3856fea0947923474870b86efb682f0
+          git submodule update --init --recursive
+      - name: Compile native AmneziaWG tunnel library
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd /tmp/amneziawg-android
+          chmod +x gradlew
+          ./gradlew :tunnel:assembleRelease --no-daemon --stacktrace
+          test -s tunnel/build/outputs/aar/tunnel-release.aar
+          unzip -l tunnel/build/outputs/aar/tunnel-release.aar | grep -E 'jni/.*/libwg-go.so|jni/.*/libwg.so'
+      - name: Stage compiled core
+        shell: bash
+        run: |
+          mkdir -p clients/twinconnect/native/android/amneziawg-core
+          cp /tmp/amneziawg-android/tunnel/build/outputs/aar/tunnel-release.aar clients/twinconnect/native/android/amneziawg-core/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: twinconnect-amneziawg-native-aar
+          path: clients/twinconnect/native/android/amneziawg-core/tunnel-release.aar
+          if-no-files-found: error
