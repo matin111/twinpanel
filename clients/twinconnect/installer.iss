@@ -29,6 +29,9 @@ PrivilegesRequired=admin
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 WizardStyle=modern
+SetupIconFile=branding\generated\twinconnect.ico
+WizardImageFile=branding\generated\setup_sidebar.bmp
+WizardSmallImageFile=branding\generated\setup_small.bmp
 UninstallDisplayIcon={app}\{#MyAppExeName}
 DisableProgramGroupPage=yes
 

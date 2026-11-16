@@ -3873,10 +3873,11 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           child: widget.brand.logoUrl != null &&
                   Uri.tryParse(widget.brand.logoUrl!)?.scheme == 'https'
             ? Image.network(widget.brand.logoUrl!, fit: BoxFit.contain,
-                errorBuilder: (_, __, ___) => const Icon(
-                  Icons.all_inclusive_rounded, color: Colors.white, size: 27))
-            : const Icon(Icons.all_inclusive_rounded,
-                color: Colors.white, size: 27),
+                errorBuilder: (_, __, ___) => Image.asset(
+                  'branding/twinconnect_approved_128.webp',
+                  fit: BoxFit.contain))
+            : Image.asset('branding/twinconnect_approved_128.webp',
+                fit: BoxFit.contain),
         ),
         if (wide) ...[
           const SizedBox(height: 9),

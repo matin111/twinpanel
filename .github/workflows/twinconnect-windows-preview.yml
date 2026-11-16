@@ -40,6 +40,17 @@ jobs:
           cache: false
       - name: Generate native Windows Flutter project
         run: flutter create --platforms=windows --org com.twinpanel --project-name twinconnect .
+      - name: Install approved TwinConnect EXE and Setup branding
+        shell: pwsh
+        run: |
+          python -m pip install Pillow==11.3.0
+          python tools/build_windows_brand_icons.py
+          if (!(Test-Path 'windows/runner/resources/app_icon.ico')) {
+            throw 'Approved TwinConnect EXE icon missing'
+          }
+          if (!(Test-Path 'branding/generated/twinconnect.ico')) {
+            throw 'Approved TwinConnect Setup icon missing'
+          }
       - name: Install fail-closed Windows VPN native bridge
         run: python tools/install_windows_native.py
       - name: Fetch Flutter dependencies
