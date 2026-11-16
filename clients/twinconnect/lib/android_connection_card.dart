@@ -1020,14 +1020,18 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
   Widget build(BuildContext context) {
     final s = AppStrings.of(context);
     final available = widget.catalog.entries
-        .where((entry) => entry.selected).toList(growable: false);
+        .where((entry) => entry.selected &&
+            AndroidProtocolVisibility.visible(entry.protocol.code))
+        .toList(growable: false);
     if (available.isEmpty) {
       return Text(s.pick('پروتکل فعالی برای این اشتراک وجود ندارد.',
           'No protocols enabled for this subscription.'));
     }
     // Protocol selection happens on the Servers screen. Never silently
     // change the explicitly chosen protocol to WireGuard.
-    final requested = widget.selectedProtocolCode;
+    final requested = widget.selectedProtocolCode != null &&
+            AndroidProtocolVisibility.visible(widget.selectedProtocolCode!)
+        ? widget.selectedProtocolCode : null;
     // Quick Connect chooses ONLY an entitled protocol with an installed,
     // native engine and an existing profile. Never default to Cisco merely
     // because it appears first in the subscription's catalog.
