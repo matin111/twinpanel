@@ -93,7 +93,7 @@ final class TwinConnectMacOSVPNBridge {
                 result([
                     "contractVersion": 1,
                     "supportedCodes": libboxBackendReady()
-                        ? ["hysteria2", "tuic", "anytls", "naive"] : [String]()
+                        ? ["hysteria2", "tuic", "anytls", "naive", "shadowtls"] : [String]()
                 ] as [String: Any])
             case "macOSXrayEngineStatus":
                 result([
@@ -119,6 +119,19 @@ final class TwinConnectMacOSVPNBridge {
                         : (libboxInExtension()
                             ? "MACOS_HYSTERIA2_SIGNING_OR_ENTITLEMENT_MISSING"
                             : "MACOS_HYSTERIA2_PACKET_FLOW_BRIDGE_MISSING")
+                ] as [String: Any])
+            case "macOSShadowTlsEngineStatus":
+                result([
+                    "contractVersion": 1,
+                    "protocol": "shadowtls",
+                    "inProcessLibboxBundled": libboxInExtension(),
+                    "packetFlowBridgeReady": libboxBackendReady(),
+                    "engineReady": libboxBackendReady(),
+                    "reason": libboxBackendReady()
+                        ? "MACOS_SHADOWTLS_SIGNED_START_UNVERIFIED"
+                        : (libboxInExtension()
+                            ? "MACOS_SHADOWTLS_SIGNING_OR_ENTITLEMENT_MISSING"
+                            : "MACOS_SHADOWTLS_PACKET_FLOW_BRIDGE_MISSING")
                 ] as [String: Any])
             case "macOSNaiveEngineStatus":
                 result([
@@ -191,6 +204,12 @@ final class TwinConnectMacOSVPNBridge {
                     protocolCode: "anytls", result: result)
             case "getAnyTlsTunnelStatus":
                 TwinConnectMacOSLibboxControl.status(result, protocolCode: "anytls")
+            case "startShadowTls":
+                TwinConnectMacOSLibboxControl.start(
+                    call.arguments, backendLinked: libboxBackendReady(),
+                    protocolCode: "shadowtls", result: result)
+            case "getShadowTlsTunnelStatus":
+                TwinConnectMacOSLibboxControl.status(result, protocolCode: "shadowtls")
             case "startNaive":
                 TwinConnectMacOSLibboxControl.start(
                     call.arguments, backendLinked: libboxBackendReady(),
