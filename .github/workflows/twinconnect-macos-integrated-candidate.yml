@@ -37,7 +37,8 @@ jobs:
         run: |
           set -euo pipefail
           python3 -m unittest -v macos_native/test_signed_macos_tooling.py
-          echo "Apple signing tests are offline; no certificate or real VPN used"
+          python3 -m unittest -v macos_native/test_hysteria2_network_evidence.py
+          echo "Apple signing and egress-evidence tests are offline; no real VPN used"
       - name: Restore pinned, previously verified Libbox for macOS
         uses: actions/download-artifact@v4
         with:
