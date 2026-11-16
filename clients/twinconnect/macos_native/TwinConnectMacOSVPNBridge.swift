@@ -138,6 +138,8 @@ final class TwinConnectMacOSVPNBridge {
             case "startHysteria2":
                 TwinConnectMacOSLibboxControl.start(
                     call.arguments, backendLinked: libboxBackendReady(), result: result)
+            case "getHysteria2TunnelStatus":
+                TwinConnectMacOSLibboxControl.status(result)
             case "stopTunnel":
                 TwinConnectMacOSVPNControl.stop(result)
             case "getTunnelStatus":
