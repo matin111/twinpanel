@@ -93,7 +93,7 @@ final class TwinConnectMacOSVPNBridge {
                 result([
                     "contractVersion": 1,
                     "supportedCodes": libboxBackendReady()
-                        ? ["hysteria2", "tuic", "anytls", "naive", "shadowtls"] : [String]()
+                        ? ["hysteria2", "tuic", "anytls", "naive", "shadowtls", "snell"] : [String]()
                 ] as [String: Any])
             case "macOSXrayEngineStatus":
                 result([
@@ -132,6 +132,17 @@ final class TwinConnectMacOSVPNBridge {
                         : (libboxInExtension()
                             ? "MACOS_SHADOWTLS_SIGNING_OR_ENTITLEMENT_MISSING"
                             : "MACOS_SHADOWTLS_PACKET_FLOW_BRIDGE_MISSING")
+                ] as [String: Any])
+            case "macOSSnellEngineStatus":
+                result([
+                    "contractVersion": 1,
+                    "protocol": "snell",
+                    "inProcessLibboxBundled": libboxInExtension(),
+                    "packetFlowBridgeReady": libboxBackendReady(),
+                    "engineReady": libboxBackendReady(),
+                    "reason": libboxBackendReady()
+                        ? "MACOS_SNELL_SIGNED_START_UNVERIFIED"
+                        : "MACOS_SNELL_PACKET_FLOW_BRIDGE_MISSING"
                 ] as [String: Any])
             case "macOSNaiveEngineStatus":
                 result([
@@ -210,6 +221,12 @@ final class TwinConnectMacOSVPNBridge {
                     protocolCode: "shadowtls", result: result)
             case "getShadowTlsTunnelStatus":
                 TwinConnectMacOSLibboxControl.status(result, protocolCode: "shadowtls")
+            case "startSnell":
+                TwinConnectMacOSLibboxControl.start(
+                    call.arguments, backendLinked: libboxBackendReady(),
+                    protocolCode: "snell", result: result)
+            case "getSnellTunnelStatus":
+                TwinConnectMacOSLibboxControl.status(result, protocolCode: "snell")
             case "startNaive":
                 TwinConnectMacOSLibboxControl.start(
                     call.arguments, backendLinked: libboxBackendReady(),
