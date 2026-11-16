@@ -13,10 +13,12 @@ os.environ.pop("TWINPANEL_EXTERNAL_HEAVY_RECONCILE", None)
 async def main() -> None:
     from app import node_subscription_convergence_v114 as convergence
     from app.services import customer_maintenance as maintenance
+    from app.routers.modern_legacy_reconcile_v1 import modern_legacy_reconcile_loop
     with open("/run/twinpanel-external-heavy-reconcile.lock", "a+") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         tasks = [asyncio.create_task(convergence._convergence_loop(), name="convergence"),
-                 asyncio.create_task(maintenance._quota_runtime_worker(), name="quota")]
+                 asyncio.create_task(maintenance._quota_runtime_worker(), name="quota"),
+                 asyncio.create_task(modern_legacy_reconcile_loop(), name="modern-legacy-tls-reconcile")]
         try:
             done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
             for t in done:
