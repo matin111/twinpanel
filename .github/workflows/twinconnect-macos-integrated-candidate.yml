@@ -104,7 +104,9 @@ jobs:
         run: |
           set -euo pipefail
           log="$RUNNER_TEMP/twinconnect-macos-signed-path-compile.log"
-          if ! xcodebuild -project macos/Runner.xcodeproj -target Runner \
+          # Flutter plugins are linked via Runner.xcworkspace; building the
+          # bare Xcode project leaves FlutterMacOS unavailable to SwiftPM deps.
+          if ! xcodebuild -workspace macos/Runner.xcworkspace -scheme Runner \
             -configuration Release -sdk macosx -arch arm64 \
             SWIFT_ACTIVE_COMPILATION_CONDITIONS=TWINCONNECT_SIGNED_LIBBOX \
             CODE_SIGNING_ALLOWED=NO build > "$log" 2>&1; then
