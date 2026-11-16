@@ -62,6 +62,7 @@ import 'macos_naive_controller.dart';
 import 'macos_shadowtls_controller.dart';
 import 'macos_snell_controller.dart';
 import 'macos_socks5_controller.dart';
+import 'macos_mieru_controller.dart';
 import 'country_flag.dart';
 import 'ambient_background.dart';
 import 'interactive_glass_card.dart';
@@ -135,6 +136,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   final MacShadowTlsController _macShadowTls = const MacShadowTlsController();
   final MacSnellController _macSnell = const MacSnellController();
   final MacSocks5Controller _macSocks5 = const MacSocks5Controller();
+  final MacMieruController _macMieru = const MacMieruController();
   Timer? _macOsStatusTimer;
   bool _macOsStatusRefreshing = false;
   String _macOsTunnelState = 'not_configured';
@@ -2969,9 +2971,21 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         return;
       }
       if (protocol == 'mieru') {
-        // Mieru requires its own native macOS core and packet-flow bridge.
-        // A bundled CLI or validated profile alone is not a VPN engine.
-        throw const FormatException('MACOS_MIERU_NATIVE_CORE_NOT_LINKED');
+        final entitled = widget.catalog?.entries.any((entry) =>
+            entry.protocol.code == 'mieru' && entry.selected &&
+            entry.configRecordPresent) ?? false;
+        if (!entitled) {
+          throw const FormatException('PROTOCOL_NOT_INCLUDED_IN_SUBSCRIPTION');
+        }
+        // Mieru requires its own signed in-process packet-flow bridge.
+        // The official standalone core may be bundled but cannot start
+        // a VPN until that bridge is installed and independently tested.
+        final installed = await _macMieru.installation();
+        if (installed['engineReady'] != true ||
+            installed['packetFlowBridgeReady'] != true) {
+          throw FormatException(installed['reason'] as String);
+        }
+        throw const FormatException('MACOS_MIERU_CONNECTION_NOT_VERIFIED');
       }
       if (protocol != 'wireguard') {
         throw const FormatException('MACOS_PROTOCOL_ENGINE_NOT_READY');
