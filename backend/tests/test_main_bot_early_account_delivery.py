@@ -1,3 +1,4 @@
+import inspect
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
@@ -35,6 +36,12 @@ def test_early_delivery_watcher_survives_slow_multinode_provisioning():
     # The watcher is canceled at job completion, but must outlive the observed
     # 106-second multi-protocol provisioning path.
     assert 120 <= EARLY_DELIVERY_TIMEOUT_SECONDS <= 300
+
+
+def test_slow_live_config_validation_does_not_block_api_loop():
+    source = inspect.getsource(service._queue_main_bot_when_first_credential_ready)
+    assert "await asyncio.to_thread(" in source
+    assert "_try_queue_early_delivery_with_fresh_session" in source
 
 
 def test_early_and_final_notifications_share_same_canonical_key():
