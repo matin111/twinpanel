@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:math';
 import 'package:flutter/services.dart';
 import 'openvpn_profile_validator.dart';
+import 'openvpn_startup_failure.dart';
 
 /// Manages OpenVPN Community on Windows separately from Cisco and sing-box.
 /// No private profile or daemon output is ever logged or exposed in the UI.
@@ -162,6 +163,7 @@ class WindowsOpenVpnTunnel {
       ]);
       final before = prerequisites[0] as String;
       final ready = Completer<void>();
+      String? startupFailure;
       phase = 'PROCESS_LAUNCH';
       final child = await Process.start(binary, [
         '--config', _config!.path,
@@ -175,11 +177,12 @@ class WindowsOpenVpnTunnel {
             final lower = line.toLowerCase();
             if (lower.contains('initialization sequence completed') &&
                 !ready.isCompleted) ready.complete();
-            if ((lower.contains('auth_failed') ||
-                 lower.contains('certificate verify failed') ||
-                 lower.contains('cannot open tun/tap')) &&
-                 !ready.isCompleted) {
-              ready.completeError(const FormatException('OPENVPN_ENGINE_START_FAILED'));
+            final reason = OpenVpnStartupFailure.classify(lower);
+            if (reason != null) startupFailure ??= reason;
+            if (reason != null &&
+                OpenVpnStartupFailure.isTerminal(reason) &&
+                !ready.isCompleted) {
+              ready.completeError(FormatException(reason));
             }
             // Raw stdout contains sensitive endpoints. Never log or return it.
           },
@@ -190,11 +193,17 @@ class WindowsOpenVpnTunnel {
           },
         );
       }
-      child.exitCode.then((_) {
+      child.exitCode.then((exitCode) async {
+        // Allow final stderr/stdout events to arrive before choosing a
+        // sanitized failure reason. Never include raw engine output in UI.
+        await Future<void>.delayed(const Duration(milliseconds: 200));
         _ready = false;
         _exitIp = null;
         if (!ready.isCompleted) {
-          ready.completeError(const FormatException('OPENVPN_PROCESS_EXITED'));
+          ready.completeError(FormatException(
+              startupFailure ??
+              OpenVpnStartupFailure.fromExitCode(exitCode) ??
+              'OPENVPN_PROCESS_EXITED'));
         }
         // Remove secrets when OpenVPN exits on its own, not just on Disconnect.
         unawaited(_cleanupIfExited());

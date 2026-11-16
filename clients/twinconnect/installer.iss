@@ -110,7 +110,7 @@ begin
       Inno Setup is already elevated: users need no separate installation. }
     OpenVpnBinary := ExpandConstant('{pf}\OpenVPN\bin\openvpn.exe');
     OpenVpnInstaller := ExpandConstant(
-      '{app}\prerequisites\OpenVPN-2.7.9-I001-amd64.msi');
+      '{app}\prerequisites\OpenVPN-2.7.9-I002-amd64.msi');
     if not FileExists(OpenVpnBinary) then
     begin
       if FileExists(OpenVpnInstaller) then
