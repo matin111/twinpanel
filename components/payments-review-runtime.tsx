@@ -410,7 +410,7 @@ export function PaymentsReviewRuntime(){
               <div style={{display:"grid",gap:6,minWidth:190,maxWidth:290}}>
                 {row.kind==="purchase"?(
                   row.subscriptionId?<>
-                    <a className="mini-btn" href={`/admin/subscriptions?focus=${row.subscriptionId}`}>
+                    <a className="mini-btn" href={`/admin/subscriptions?focus=${row.subscriptionId}&account=${encodeURIComponent(row.accountUsername||String(row.subscriptionId))}`}>
                       {pick("مشاهده اکانت ساخته‌شده","Open created account")} #{row.subscriptionId}
                     </a>
                     {row.accountUsername&&<small>{pick("نام کاربری","Username")}: <b dir="ltr">{row.accountUsername}</b></small>}
