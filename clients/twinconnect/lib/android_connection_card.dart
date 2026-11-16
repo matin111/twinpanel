@@ -1112,7 +1112,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
     // native engine and an existing profile. Never default to Cisco merely
     // because it appears first in the subscription's catalog.
     final readyOptions = available.where((entry) =>
-        entry.configRecordPresent &&
+        (entry.configRecordPresent || entry.protocol.code == 'amneziawg') &&
         (widget.native.supports(entry.protocol.code) ||
          AndroidSingBoxTunnel.supported.contains(entry.protocol.code) ||
        entry.protocol.code == 'amneziawg' ||
@@ -1133,11 +1133,12 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
     // The selected protocol and active transport are distinct. Selecting
     // OpenVPN/Hysteria2 never starts or disguises a WireGuard tunnel.
     final connected = _up || _openVpnUp || _ciscoUp ||
-        _xrayCoreUp || _singBoxProtocol != null;
+        _xrayCoreUp || _singBoxProtocol != null || _mieruUp;
     final protocolName = chosen?.protocol.name ??
         (requested == null ? s.pick('پروتکل آماده‌ای وجود ندارد', 'No ready protocol')
             : VpnProtocols.byCode(requested)?.name ?? requested);
-    final activeProtocolCode = _xrayCoreUp ? 'v2ray' : _singBoxProtocol ??
+    final activeProtocolCode = _mieruUp ? 'mieru' :
+        _xrayCoreUp ? 'v2ray' : _singBoxProtocol ??
         (_openVpnUp ? 'openvpn' : _ciscoUp ? 'cisco' :
             _up ? 'wireguard' : null);
     final selectedIsActive = activeProtocolCode != null &&
