@@ -19,14 +19,14 @@ void main() {
     expect(bridge, contains('case "macOSNaiveEngineStatus":'));
     expect(bridge, contains('case "startNaive":'));
     expect(bridge, contains('case "getNaiveTunnelStatus":'));
-    expect(bridge, contains('["hysteria2", "tuic", "anytls", "naive", "shadowtls"]'));
+    expect(bridge, contains('["hysteria2", "tuic", "anytls", "naive", "shadowtls", "snell", "snell"]'));
     expect(bridge, contains('libboxBackendReady()'));
-    expect(provider, contains('case "hysteria2", "tuic", "anytls", "naive", "shadowtls":'));
+    expect(provider, contains('case "hysteria2", "tuic", "anytls", "naive", "shadowtls", "snell", "snell":'));
     expect(host, contains('allowedConfig(config, protocolCode: protocolCode)'));
     expect(host, contains('protocolCode == "naive"'));
     expect(host, contains('outbound["insecure_concurrency"] as? Int == 0'));
     expect(host, contains('namespace + ":" + account + ":" + protocolCode'));
-    expect(engine, contains('["hysteria2", "tuic", "anytls", "naive", "shadowtls"]'));
+    expect(engine, contains('["hysteria2", "tuic", "anytls", "naive", "shadowtls", "snell", "snell"]'));
     expect(engine, contains('outbounds.first?["type"] as? String == code'));
     expect(engine, contains('outbound["username"] as? String'));
     expect(controller, contains('SingBoxMacConfig.encodeNaiveForEphemeralTunnel'));
@@ -39,7 +39,7 @@ void main() {
     expect(dashboard, contains('_macNaive.start('));
     expect(dashboard, contains("entry.protocol.code == protocol"));
     expect(dashboard, contains('matches.length != 1'));
-    expect(dashboard, contains("supportedCodes: {'hysteria2', 'tuic', 'anytls', 'naive', 'shadowtls'}"));
+    expect(dashboard, contains("supportedCodes: {'hysteria2', 'tuic', 'anytls', 'naive', 'shadowtls', 'snell'}"));
     expect(dashboard, contains('_vpnVerified = false'));
   });
 
