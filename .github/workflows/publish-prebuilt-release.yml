@@ -163,13 +163,17 @@ jobs:
             "backend/tests/test_payment_ready_delivery_reconcile_v1.py" \
             "backend/app/telegram_runtime_bot.py" \
             "backend/tests/test_payment_account_dispatch_proof_v1.py" \
-            "backend/tests/test_main_bot_early_account_delivery.py"; do
+            "backend/tests/test_main_bot_early_account_delivery.py" \
+            "backend/app/routers/modern_account_delivery_v1.py" \
+            "backend/tests/test_progressive_first_credential_commit_v1.py"; do
             test -s "publisher/$path" && test -s "source/$path"
             cmp -s "publisher/$path" "source/$path" || {
               echo "::error file=$path::Pinned release would erase payment account display or recovery"
               exit 1
             }
           done
+          grep -Fq 'PAYMENT_FIRST_VALID_CONFIG_COMMIT_V1' source/backend/app/routers/modern_account_delivery_v1.py
+          grep -Fq 'publish_first_credential=True' source/backend/app/routers/modern_account_delivery_v1.py
           grep -Fq 'EARLY_DELIVERY_TIMEOUT_SECONDS = 240.0' source/backend/app/services/payment_fulfillment_fast_path.py
           grep -Fq 'order.status not in {"provisioning", "fulfilled"}' source/backend/app/services/payment_fulfillment_fast_path.py
           grep -Fq 'account_setup_in_progress' source/backend/app/telegram_runtime_bot.py

@@ -516,6 +516,8 @@ async def _provision_new_singbox_node_batches(
     sub: Subscription,
     protocols: list[str],
     nodes: list[Node],
+    *,
+    publish_first_credential: bool = False,
 ) -> tuple[dict[str, list[dict[str, Any]]], list[dict[str, str]]] | None:
     """Provision a *new* account's sing-box protocols once per node.
 
@@ -538,6 +540,7 @@ async def _provision_new_singbox_node_batches(
     secrets = {p: _singbox_secret(ad, credentials[p], p, sub) for p in selected}
     items_by_protocol: dict[str, list[dict[str, Any]]] = {p: [] for p in selected}
     errors: list[dict[str, str]] = []
+    first_batch_published = False
 
     for node in nodes:
         ready = []
@@ -581,6 +584,7 @@ async def _provision_new_singbox_node_batches(
                         item, node=node, protocol=p, username=secrets[p].username
                     )
                 items_by_protocol[p].append(item)
+
         except asyncio.TimeoutError:
             for p in ready:
                 errors.append({
@@ -593,7 +597,25 @@ async def _provision_new_singbox_node_batches(
                     "protocol": p, "node": str(node.name),
                     "error": f"Sing-box node batch failed: {str(exc)[:700]}",
                 })
-
+        else:
+            # PAYMENT_FIRST_VALID_CONFIG_COMMIT_V1: make one fully generated
+            # batch immediately visible to the independent Telegram delivery
+            # watcher, rather than holding all credentials uncommitted while
+            # slower nodes continue. Only the fresh-account fast path opts in.
+            # Do not publish empty/failed credentials or change node configs.
+            if publish_first_credential and not first_batch_published:
+                for p in ready:
+                    items = items_by_protocol[p]
+                    if not items:
+                        continue
+                    cred = credentials[p]
+                    cred.username = _credential_identity(p, secrets[p])
+                    cred.secret_encrypted = ad._enc(secret_to_dict(secrets[p]))
+                    cred.config_text_encrypted = ad._enc(items)
+                    cred.is_active = True
+                db.commit()
+                first_batch_published = True
+    
     for p, items in items_by_protocol.items():
         if not items:
             continue
@@ -611,6 +633,7 @@ async def _provision_account_v1_locked(
     db: Session,
     *,
     prefer_new_singbox_batch: bool = False,
+    publish_first_credential: bool = False,
 ):
     from . import account_delivery as ad
 
@@ -662,6 +685,7 @@ async def _provision_account_v1_locked(
     results: list[dict[str, Any]] = []
     errors: list[dict[str, str]] = []
     pending_protocols: list[str] = []
+    first_credential_published = False
     # Central Exits are already reconciled by one node-level service-family
     # worker. Do not start a *second*, per-subscriber Sudoku listener here.
     # This guard is before both the serial and parallel modern account drivers.
@@ -677,10 +701,14 @@ async def _provision_account_v1_locked(
     if prefer_new_singbox_batch:
         batched = await _provision_new_singbox_node_batches(
             ad, db, sub, protocols, nodes,
+            publish_first_credential=publish_first_credential,
         )
         if batched is not None:
             grouped, grouped_errors = batched
             errors.extend(grouped_errors)
+            first_credential_published = bool(
+                publish_first_credential and any(grouped.values())
+            )
 
     for protocol in protocols:
         if protocol == "sudoku" and central_sudoku_owner:
@@ -739,6 +767,14 @@ async def _provision_account_v1_locked(
                     "items": items,
                 }
             )
+            # Commit the first *completed* credential before trying the next
+            # protocol. The remainder still commits as a single final update.
+            # This enables early account delivery even if the batch path was
+            # unavailable or did not yield usable node configs.
+            if publish_first_credential and not first_credential_published:
+                if cred.is_active and cred.config_text_encrypted:
+                    db.commit()
+                    first_credential_published = True
 
     db.commit()
 
@@ -838,6 +874,7 @@ async def provision_new_account_fast_v1(subscription_id: int, db: Session):
     try:
         return await _provision_account_v1_locked(
             subscription_id, db, prefer_new_singbox_batch=True,
+            publish_first_credential=True,
         )
     finally:
         guard.release()
