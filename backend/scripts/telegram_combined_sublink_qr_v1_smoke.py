@@ -9,7 +9,7 @@ shared = (APP / "telegram_subscription_qr_v1.py").read_text("utf-8")
 owned = (APP / "telegram_runtime_bot.py").read_text("utf-8")
 imported = (APP / "telegram_subscription_import_bot_v1.py").read_text("utf-8")
 account_lookup = (APP / "telegram_account_link_bot_original.py").read_text("utf-8")
-purchase_delivery = owned[owned.index('if (\n                    row.kind\n                    == "payment_approved"\n                ):'):]
+purchase_delivery = owned[owned.index("# TWINPANEL_MAIN_PAYMENT_DELIVERY_V2"):]
 
 for content in (shared, owned, imported, account_lookup):
     compile(content, "<telegram QR>", "exec")
@@ -26,7 +26,7 @@ assert "🔗 ساب‌لینک + QR Code" in imported
 assert "await send_subscription_link_and_qr(" in account_lookup
 assert "username=account_username" in account_lookup
 assert "await state.clear()" in account_lookup
-assert 'row.kind == "payment_approved"' in purchase_delivery
+assert '"payment_account_ready"' in owned and '"payment_approved"' in owned
 assert 'photo=subscription_qr_photo(subscription_link)' in purchase_delivery
 assert 'caption=text' in purchase_delivery
 assert 'await bot.send_photo(' in purchase_delivery
