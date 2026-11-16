@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.852",
+  "version": "1.1.0-rc.853",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-16T04:38:43Z",
+  "released_at": "2026-11-16T05:11:32Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "5329f1523d0f7f562c0fc6a03308f8ae0122856e",
+  "source_sha": "49bfe523965b0451eddc92f3112b0010fbee5fba",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.852/twinpanel-1.1.0-rc.852-linux-x86_64.tar.gz",
-    "sha256": "addc3aa2e2bb58a471af9b02c4598956c4453a3c66cd0d2d62e4d7539a6f9eee",
-    "size_bytes": 30952526
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.853/twinpanel-1.1.0-rc.853-linux-x86_64.tar.gz",
+    "sha256": "fd6a84b769c1c6ee5324d0c8f0e418f418b7e68e4d056beb7221b2c3aee2eb23",
+    "size_bytes": 30908765
   },
   "notes": {
-    "fa": "اصلاح عنوان ثبت هش تراکنش (TXID) در پرداخت رمزارزی و شارژ کیف پول، هماهنگ‌سازی ربات، و رزرو تمدید با پلن متفاوت بدون تغییر پلن فعلی تا پایان حجم یا تاریخ.",
-    "en": "Clear crypto TXID submission controls across customer wallet, checkout and Telegram, plus deferred different-plan renewals until current quota or validity ends."
+    "fa": "پرداخت تمدید اشتراک از کیف پول در ربات تلگرام برای اشتراک معمولی و واردشده؛ تأیید موجودی و کسر یکتای مبلغ از کیف پول، رزرو تمدید بدون فعال‌سازی زودهنگام، و بهینه‌سازی سرعت ارتباط ربات با API از طریق اتصال HTTP پایدار.",
+    "en": "Telegram bot wallet checkout for normal/imported renewal orders with idempotent wallet debit and deferred activation; pooled persistent bot-to-API HTTP connections and slow request diagnostics."
   }
 }
