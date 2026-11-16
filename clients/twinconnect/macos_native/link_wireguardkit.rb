@@ -9,12 +9,10 @@ extension = project.targets.find { |t| t.name == 'PacketTunnel' }
 raise 'PacketTunnel target not installed' unless extension
 raise 'WireGuardKit already linked' if extension.package_product_dependencies.any? { |p| p.product_name == 'WireGuardKit' }
 
-pkg = project.new(Xcodeproj::Project::Object::XCRemoteSwiftPackageReference)
-pkg.repositoryURL = 'https://github.com/WireGuard/wireguard-apple.git'
-pkg.requirement = {
-  'kind' => 'revision',
-  'revision' => '2fec12a6e1f6e3460b6ee483aa00ad29cddadab1'
-}
+pkg = project.new(Xcodeproj::Project::Object::XCLocalSwiftPackageReference)
+# Official upstream source is pinned and locally patched ONLY for SwiftPM
+# manifest compatibility. CI must verify commit SHA before using this path.
+pkg.relative_path = '../macos_native/vendor-wireguard-apple'
 project.root_object.package_references << pkg
 product = project.new(Xcodeproj::Project::Object::XCSwiftPackageProductDependency)
 product.product_name = 'WireGuardKit'
