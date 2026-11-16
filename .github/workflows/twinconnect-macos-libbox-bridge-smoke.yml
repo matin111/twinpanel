@@ -1,0 +1,59 @@
+name: TwinConnect macOS Libbox Framework Build
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'feat/twinconnect-macos-packet-tunnel-foundation-20261116'
+    paths:
+      - '.github/workflows/twinconnect-macos-libbox-bridge-smoke.yml'
+      - 'clients/twinconnect/macos_native/libbox/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: twinconnect-macos-libbox-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-libbox-macos:
+    runs-on: macos-15
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.5'
+          cache: false
+      - name: Build official in-process sing-box Libbox macOS framework
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild -version
+          go version
+          git clone --depth 1 --branch v1.14.4 https://github.com/SagerNet/sing-box.git "$RUNNER_TEMP/sing-box"
+          cd "$RUNNER_TEMP/sing-box"
+          test "$(git describe --tags --exact-match HEAD)" = "v1.14.4"
+          go install github.com/sagernet/gomobile/cmd/gomobile@v0.1.12
+          go install github.com/sagernet/gomobile/cmd/gobind@v0.1.12
+          "$(go env GOPATH)/bin/gomobile" init
+          go run ./cmd/internal/build_libbox -target apple -platform macos
+          test -d Libbox.xcframework
+          find Libbox.xcframework -maxdepth 3 -type f | head -30
+          plutil -lint Libbox.xcframework/Info.plist
+          test -s Libbox.xcframework/Info.plist
+          mkdir -p "$GITHUB_WORKSPACE/clients/twinconnect/macos_native/build/libbox"
+          ditto Libbox.xcframework "$GITHUB_WORKSPACE/clients/twinconnect/macos_native/build/libbox/Libbox.xcframework"
+      - name: Verify this is not a signed or connected VPN
+        shell: bash
+        run: |
+          test -d clients/twinconnect/macos_native/build/libbox/Libbox.xcframework
+          echo 'Libbox framework compile only: macOS PacketTunnel integration NOT yet implemented'
+          echo 'No entitlement, signed extension, VPN connection, DNS protection, handshake, or traffic claims'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TwinConnect-macOS-Libbox-Unsigned-Framework
+          path: clients/twinconnect/macos_native/build/libbox/Libbox.xcframework
+          retention-days: 7
+          if-no-files-found: error
