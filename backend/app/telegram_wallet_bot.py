@@ -87,7 +87,7 @@ def methods_keyboard(methods):
 
 
 def submit_keyboard(topup_id, method):
-    label = "📷 ارسال عکس رسید پرداخت" if method == "card_to_card" else "✅ ثبت TXID پرداخت"
+    label = "📷 ارسال عکس رسید پرداخت" if method == "card_to_card" else "🔗 ثبت هش تراکنش (TXID)"
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text=label, callback_data=f"wallet:submit:{topup_id}")],
         [InlineKeyboardButton(text="💰 کیف پول", callback_data="wallet:refresh")],
