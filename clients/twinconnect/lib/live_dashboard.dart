@@ -2800,9 +2800,10 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       final nodeId = decoded['node_id'];
       if (!mounted || revision != _selectionRevision ||
           key != _selectionPreferenceKey) return;
+      // A saved protocol remains the user's selection even while its
+      // native profile is unavailable. Readiness is checked at connect time.
       final entitled = widget.catalog!.entries.any((entry) =>
-          entry.protocol.code == protocol && entry.selected &&
-          entry.configRecordPresent);
+          entry.protocol.code == protocol && entry.selected);
       final protocolAllowed = protocol == 'all' || entitled;
       final nodes = widget.servers!.servers;
       final matching = nodeId is String
