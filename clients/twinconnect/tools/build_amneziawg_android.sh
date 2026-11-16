@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # Build the official AmneziaWG Android native tunnel AAR from source.
-# This does not install the AAR into the TwinConnect APK: the existing
-# WireGuard dependency exports the same libwg-go.so JNI filename.
+# Stages a JNI-isolated AAR for the Android installer.
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OUT="$ROOT/native/android/amneziawg-core"
@@ -17,6 +16,8 @@ if [[ ! -d "$SOURCE_DIR/.git" ]]; then
 fi
 git -C "$SOURCE_DIR" fetch origin "$REVISION"
 git -C "$SOURCE_DIR" checkout --detach "$REVISION"
+# Discard previous local loader/SONAME patches on repeated builds.
+git -C "$SOURCE_DIR" restore -- tunnel/src/main/java/org/amnezia/awg/backend/GoBackend.java tunnel/tools/libwg-go/Makefile
 # The upstream Gradle project requires a package name supplied externally.
 export ORG_GRADLE_PROJECT_amneziawgPackageName=org.amnezia.awg
 git -C "$SOURCE_DIR" submodule update --init --recursive
