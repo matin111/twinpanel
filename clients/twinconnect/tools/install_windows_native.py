@@ -544,17 +544,44 @@ def install() -> None:
         1,
     )
 
-    # Hide the native OS caption on every screen, including login. Retain
-    # WS_THICKFRAME for resize and standard WM_CLOSE destruction semantics.
+    # Remove the Windows non-client dark stripe, not just the title caption.
+    # Keep the native thick frame for actual edge/corner resize and preserve
+    # the normal WM_CLOSE cleanup path.
     frameless_marker = "  // TwinConnect: frameless Windows shell."
     if frameless_marker not in cpp:
         on_create_marker = "  RegisterPlugins(flutter_controller_->engine());"
         if cpp.count(on_create_marker) != 1:
             raise RuntimeError("Cannot safely locate Flutter window initialization")
-        native_shell = """  // TwinConnect: frameless Windows shell.
-  // The app renders compact window actions in its existing layout.
+        native_shell = """  // TwinConnect: frameless Windows shell with native edge resizing.
   HWND shell = GetHandle();
   if (shell) {
+    ::SetWindowSubclass(shell,
+        +[](HWND hwnd, UINT message, WPARAM wp, LPARAM lp,
+            UINT_PTR, DWORD_PTR) -> LRESULT {
+          if (message == WM_NCCALCSIZE && wp) return 0;
+          if (message == WM_NCHITTEST && !::IsZoomed(hwnd)) {
+            RECT rect = {};
+            if (::GetWindowRect(hwnd, &rect)) {
+              const int x = static_cast<short>(LOWORD(lp));
+              const int y = static_cast<short>(HIWORD(lp));
+              const int border = ::GetSystemMetrics(SM_CXSIZEFRAME) +
+                  ::GetSystemMetrics(SM_CXPADDEDBORDER);
+              const bool left = x < rect.left + border;
+              const bool right = x >= rect.right - border;
+              const bool top = y < rect.top + border;
+              const bool bottom = y >= rect.bottom - border;
+              if (top && left) return HTTOPLEFT;
+              if (top && right) return HTTOPRIGHT;
+              if (bottom && left) return HTBOTTOMLEFT;
+              if (bottom && right) return HTBOTTOMRIGHT;
+              if (left) return HTLEFT;
+              if (right) return HTRIGHT;
+              if (top) return HTTOP;
+              if (bottom) return HTBOTTOM;
+            }
+          }
+          return ::DefSubclassProc(hwnd, message, wp, lp);
+        }, 1, 0);
     const LONG_PTR style = ::GetWindowLongPtrW(shell, GWL_STYLE);
     ::SetWindowLongPtrW(shell, GWL_STYLE,
         style & ~(static_cast<LONG_PTR>(WS_CAPTION) |
@@ -566,6 +593,8 @@ def install() -> None:
 """
         cpp = cpp.replace(on_create_marker,
             on_create_marker + "\n" + native_shell, 1)
+        cpp = insert_once(cpp, '#include "flutter_window.h"',
+            '#include "flutter_window.h"\n#include <commctrl.h>')
 
     # Request elevation through the MSVC linker-generated manifest. Do not
     # insert trustInfo directly into runner.exe.manifest: the linker also
@@ -578,6 +607,9 @@ def install() -> None:
     if uac_line not in cmake:
         cmake += "\n# TwinConnect native VPN needs elevation for service management.\n" + uac_line + "\n"
     # Sudoku's private Windows user-SID ACL uses Advapi32 SDDL helpers.
+    subclass_link = "target_link_libraries(${BINARY_NAME} PRIVATE comctl32)"
+    if subclass_link not in cmake:
+        cmake += "\n# Windows non-client subclass for a seamless resizable frame.\n" + subclass_link + "\n"
     sudoku_link = "target_link_libraries(${BINARY_NAME} PRIVATE advapi32)"
     if sudoku_link not in cmake:
         cmake += "\n# Sudoku ephemeral private config ACL and process guard.\n" + sudoku_link + "\n"

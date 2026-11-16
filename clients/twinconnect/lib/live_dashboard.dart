@@ -4304,6 +4304,42 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
               'OPENVPN_ENGINE_START_FAILED' => tr(
                 'موتور OpenVPN هنگام شروع اتصال خطا داد.',
                 'OpenVPN failed during tunnel initialization.'),
+              'OPENVPN_AUTH_REJECTED' => tr(
+                'احراز هویت OpenVPN توسط سرور رد شد.',
+                'OpenVPN authentication was rejected by the server.'),
+              'OPENVPN_CERTIFICATE_REJECTED' => tr(
+                'اعتبار گواهی OpenVPN تأیید نشد.',
+                'OpenVPN certificate validation failed.'),
+              'OPENVPN_ADAPTER_UNAVAILABLE' => tr(
+                'آداپتور شبکه OpenVPN در ویندوز در دسترس نیست. نصب درایور را بررسی کنید.',
+                'OpenVPN network adapter is unavailable. Check the driver installation.'),
+              'OPENVPN_PERMISSION_DENIED' => tr(
+                'ویندوز اجازه اجرای کامل OpenVPN را نداد. برنامه را با دسترسی مدیر اجرا کنید.',
+                'Windows denied OpenVPN permissions. Run TwinConnect as Administrator.'),
+              'OPENVPN_OPTIONS_INVALID' => tr(
+                'موتور OpenVPN تنظیمات دریافتی را نپذیرفت.',
+                'OpenVPN rejected the supplied configuration options.'),
+              'OPENVPN_ENDPOINT_DNS_FAILED' => tr(
+                'نام دامنه سرور OpenVPN در ویندوز قابل شناسایی نیست.',
+                'Windows could not resolve the OpenVPN server hostname.'),
+              'OPENVPN_ROUTE_FAILED' => tr(
+                'مسیر شبکه OpenVPN در ویندوز اعمال نشد.',
+                'Windows could not install the OpenVPN network route.'),
+              'OPENVPN_DEPENDENCY_MISSING' => tr(
+                'فایل یا کتابخانه موردنیاز OpenVPN در ویندوز نصب نیست.',
+                'A required OpenVPN DLL or runtime dependency is missing.'),
+              'OPENVPN_INVALID_BINARY_ARCHITECTURE' => tr(
+                'نسخه فایل اجرایی OpenVPN با معماری ویندوز سازگار نیست.',
+                'The OpenVPN executable is incompatible with this Windows architecture.'),
+              'OPENVPN_NATIVE_CRASH' => tr(
+                'موتور OpenVPN با خطای داخلی ویندوز متوقف شد.',
+                'OpenVPN crashed with a native Windows access violation.'),
+              'OPENVPN_DLL_INITIALIZATION_FAILED' => tr(
+                'کتابخانه‌های OpenVPN هنگام شروع بارگذاری نشدند.',
+                'OpenVPN could not initialize its native DLLs.'),
+              'OPENVPN_PROCESS_INTERRUPTED' => tr(
+                'اجرای OpenVPN توسط ویندوز یا یک برنامه دیگر متوقف شد.',
+                'OpenVPN was interrupted by Windows or another process.'),
               'OPENVPN_PROCESS_EXITED' => tr(
                 'موتور OpenVPN قبل از تأیید اتصال بسته شد.',
                 'OpenVPN exited before the connection was verified.'),
