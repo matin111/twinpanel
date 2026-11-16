@@ -5,6 +5,9 @@ import NetworkExtension
 /// functioning protocol backend. All unsupported protocols fail closed.
 final class PacketTunnelProvider: NEPacketTunnelProvider {
     private var wireGuard: TwinConnectMacWireGuardEngine?
+    #if canImport(Libbox)
+    private var libbox: TwinConnectMacLibboxEngine?
+    #endif
 
     private func unavailable(_ reason: String) -> NSError {
         NSError(domain: "com.twinpanel.twinconnect.mac", code: 1001,
@@ -28,11 +31,16 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
                 completionHandler(error)
             }
         case "hysteria2":
-            // Compile and validate route/DNS policy without changing the
-            // operating system's network state. An unsigned preview has no
-            // Libbox PlatformInterface and no live packetFlow forwarding.
-            _ = TwinConnectMacTunnelPolicy.hysteria2Settings()
+            #if canImport(Libbox)
+            let engine = TwinConnectMacLibboxEngine(tunnel: self)
+            libbox = engine
+            engine.start { [weak self] error in
+                if error != nil { self?.libbox = nil }
+                completionHandler(error)
+            }
+            #else
             completionHandler(unavailable("MACOS_HYSTERIA2_PACKET_FLOW_BRIDGE_MISSING"))
+            #endif
         default:
             // OpenVPN, Cisco and Xray require separate native backends.
             // Never claim a successful connection without one.
@@ -42,13 +50,22 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
 
     override func stopTunnel(with reason: NEProviderStopReason,
                              completionHandler: @escaping () -> Void) {
-        guard let engine = wireGuard else {
-            completionHandler()
+        if let engine = wireGuard {
+            engine.stop { [weak self] in
+                self?.wireGuard = nil
+                completionHandler()
+            }
             return
         }
-        engine.stop { [weak self] in
-            self?.wireGuard = nil
-            completionHandler()
+        #if canImport(Libbox)
+        if let engine = libbox {
+            engine.stop { [weak self] in
+                self?.libbox = nil
+                completionHandler()
+            }
+            return
         }
+        #endif
+        completionHandler()
     }
 }
