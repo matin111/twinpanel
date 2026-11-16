@@ -75,6 +75,39 @@ def credential_state(credential: ProtocolCredential | None) -> str:
     return "partial"
 
 
+def _modern_tls_item_requires_repair(item: dict[str, Any], protocol: str) -> bool:
+    """Flag persisted insecure TLS profiles; do not silently weaken verification."""
+    import json
+
+    if not isinstance(item, dict):
+        return False
+    candidates = []
+    outbound = item.get("outbound")
+    if isinstance(outbound, dict):
+        candidates.append(outbound)
+    raw = item.get("config")
+    if isinstance(raw, str) and raw.strip():
+        try:
+            config = json.loads(raw)
+            if isinstance(config, dict):
+                candidates.extend(
+                    entry for entry in config.get("outbounds", [])
+                    if isinstance(entry, dict)
+                )
+        except (ValueError, TypeError):
+            pass
+    for candidate in candidates:
+        if str(candidate.get("type") or "").lower() != protocol:
+            continue
+        tls = candidate.get("tls")
+        if isinstance(tls, dict) and (
+            tls.get("insecure") is True
+            or not str(tls.get("certificate") or "").strip()
+        ):
+            return True
+    return False
+
+
 def _reconcile_credential_state(credential: ProtocolCredential | None) -> str:
     """Extend storage state with safe, identity-preserving legacy repairs."""
 
@@ -83,7 +116,7 @@ def _reconcile_credential_state(credential: ProtocolCredential | None) -> str:
         return state
 
     protocol = str(credential.protocol or "").strip().lower()
-    if protocol not in {"naive", "amneziawg"}:
+    if protocol not in {"naive", "amneziawg", "hysteria2", "tuic", "anytls"}:
         return state
 
     try:
@@ -106,6 +139,10 @@ def _reconcile_credential_state(credential: ProtocolCredential | None) -> str:
             items = [payload] if payload else []
     else:
         items = []
+
+    if protocol in {"hysteria2", "tuic", "anytls"}:
+        if any(_modern_tls_item_requires_repair(item, protocol) for item in items):
+            return "legacy_modern_tls_client"
 
     if protocol == "naive":
         try:
