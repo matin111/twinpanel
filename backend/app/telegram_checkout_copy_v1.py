@@ -79,3 +79,19 @@ def wallet_preview_text(order_id, amount, balance, renewal=False):
     else:
         text += "\n❌ موجودی کافی نیست؛ کیف پول را شارژ کنید."
     return text
+
+
+
+def wallet_success_text(order_id, renewal=False, fulfilled=False):
+    text = (
+        f"✅ <b>پرداخت {operation(renewal)} ثبت شد</b>\n\n"
+        f"🧾 سفارش: <b>#{int(order_id)}</b>\n"
+        "💰 مبلغ از کیف پول پرداخت شد.\n"
+    )
+    if renewal:
+        text += "🕒 تمدید برای دوره بعد رزرو شد."
+    elif fulfilled:
+        text += "📦 اشتراک شما آماده است."
+    else:
+        text += "📦 اشتراک در حال آماده‌سازی است."
+    return text
