@@ -60,6 +60,7 @@ import 'macos_tuic_controller.dart';
 import 'macos_anytls_controller.dart';
 import 'macos_naive_controller.dart';
 import 'macos_shadowtls_controller.dart';
+import 'macos_snell_controller.dart';
 import 'country_flag.dart';
 import 'ambient_background.dart';
 import 'interactive_glass_card.dart';
@@ -131,6 +132,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   final MacAnyTlsController _macAnyTls = const MacAnyTlsController();
   final MacNaiveController _macNaive = const MacNaiveController();
   final MacShadowTlsController _macShadowTls = const MacShadowTlsController();
+  final MacSnellController _macSnell = const MacSnellController();
   Timer? _macOsStatusTimer;
   bool _macOsStatusRefreshing = false;
   String _macOsTunnelState = 'not_configured';
@@ -2199,7 +2201,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       // ShadowTLS cannot be flattened into one outbound: validate the
       // subscription's two-stage Shadowsocks -> ShadowTLS chain before
       // stopping any existing connection. Other protocols are unchanged.
-      if (protocol == 'shadowtls') {
+      if (protocol == 'shadowtls' || protocol == 'snell') {
         ShadowTlsChain.fromItem(matches.single);
       }
       // When switching away from a working VPN, validate before stopping
@@ -2711,6 +2713,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       final anytls = await _macAnyTls.status();
       final naive = await _macNaive.status();
       final shadowtls = await _macShadowTls.status();
+      final snell = await _macSnell.status();
       if (!mounted) return;
       const active = <String>{
         'connecting', 'os_connected_unverified', 'reasserting', 'disconnecting',
@@ -2722,10 +2725,12 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           : active.contains(anytls['state']) ? anytls
           : active.contains(naive['state']) ? naive
           : active.contains(shadowtls['state']) ? shadowtls
+          : active.contains(snell['state']) ? snell
           : hy2['state'] != 'not_configured' ? hy2
           : tuic['state'] != 'not_configured' ? tuic
           : anytls['state'] != 'not_configured' ? anytls
-          : naive['state'] != 'not_configured' ? naive : shadowtls;
+          : naive['state'] != 'not_configured' ? naive
+          : shadowtls['state'] != 'not_configured' ? shadowtls : snell;
       final next = status['state'] as String;
       if (next != _macOsTunnelState) {
         setState(() {
@@ -2877,7 +2882,9 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                     ? await _macNaive.installation()
                     : protocol == 'shadowtls'
                         ? await _macShadowTls.installation()
-                        : await _macHysteria.installation();
+                        : protocol == 'snell'
+                            ? await _macSnell.installation()
+                            : await _macHysteria.installation();
         if (installed['engineReady'] != true ||
             installed['packetFlowBridgeReady'] != true ||
             installed['inProcessLibboxBundled'] != true) {
@@ -2893,7 +2900,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           sessionToken: widget.sessionToken,
           protocol: definition,
           native: const NativeProtocolReadiness(
-              supportedCodes: {'hysteria2', 'tuic', 'anytls', 'naive', 'shadowtls'}),
+              supportedCodes: {'hysteria2', 'tuic', 'anytls', 'naive', 'shadowtls', 'snell'}),
         );
         final matches = response.items.where(
           (item) => item['node_id']?.toString() == serverId,
@@ -2921,6 +2928,12 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           );
         } else if (protocol == 'shadowtls') {
           await _macShadowTls.start(
+            profile: matches.single,
+            namespace: widget.panel.namespace,
+            account: widget.username,
+          );
+        } else if (protocol == 'snell') {
+          await _macSnell.start(
             profile: matches.single,
             namespace: widget.panel.namespace,
             account: widget.username,
