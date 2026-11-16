@@ -40,6 +40,7 @@ _LEGACY_REPAIR_STATES = frozenset(
         "missing",
         "legacy_empty",
         "legacy_naive_client",
+        "legacy_modern_tls_client",
         "legacy_amneziawg_egress",
     }
 )
