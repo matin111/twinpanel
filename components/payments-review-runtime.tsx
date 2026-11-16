@@ -418,7 +418,9 @@ export function PaymentsReviewRuntime(){
                       ?pick("✓ پیام اطلاعات اکانت در تلگرام ارسال شد","✓ Account details sent via Telegram")
                       :row.deliveryStatus==="telegram_pending"
                         ?pick("◷ پیام تحویل در صف ارسال است","◷ Delivery message queued")
-                        :pick("⚠ ارسال اطلاعات اکانت ثبت نشده","⚠ Account delivery not recorded")}</small>
+                        :row.deliveryStatus==="telegram_early_confirmation"
+                          ?pick("⚠ فقط پیام تأیید پرداخت ارسال شده؛ تحویل اکانت تأیید نیست","⚠ Payment notice sent before account was ready; account delivery unverified")
+                          :pick("⚠ ارسال اطلاعات اکانت ثبت نشده","⚠ Account delivery not recorded")}</small>
                   </>:row.orderStatus==="fulfilled"
                     ?<small>{pick("⚠ سفارش تکمیل شده، اما اکانتی یافت نشد","⚠ Fulfilled order without an account")}</small>
                     :["approved","auto_verified","paid"].includes(status)
