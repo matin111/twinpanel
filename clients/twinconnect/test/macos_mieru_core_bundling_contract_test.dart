@@ -24,7 +24,7 @@ void main() {
     expect(dashboard, contains('PROTOCOL_NOT_INCLUDED_IN_SUBSCRIPTION'));
     expect(workflow, contains('lipo -create'));
     expect(workflow, contains('extension_engines='));
-    expect(workflow, contains('cmp "$destination/mieru" "$extension_engines/mieru"'));
+    expect(workflow, contains(r'cmp "$destination/mieru" "$extension_engines/mieru"'));
     expect(workflow, contains('TwinConnect-macOS-Mieru-UNSIGNED.zip'));
     expect(workflow, contains('TwinConnectProtocolBackendLinked'));
   });
