@@ -93,6 +93,26 @@ jobs:
           set -euo pipefail
           flutter build macos --release \
             --dart-define=TWINCONNECT_DIRECTORY_URL="$TWINCONNECT_DIRECTORY_URL"
+      - name: Compile signed-only Swift feature path without signing or enabling VPN
+        shell: bash
+        run: |
+          set -euo pipefail
+          log="$RUNNER_TEMP/twinconnect-macos-signed-path-compile.log"
+          if ! xcodebuild -project macos/Runner.xcodeproj -target Runner \
+            -configuration Release -sdk macosx -arch arm64 \
+            SWIFT_ACTIVE_COMPILATION_CONDITIONS=TWINCONNECT_SIGNED_LIBBOX \
+            CODE_SIGNING_ALLOWED=NO build > "$log" 2>&1; then
+            grep -nE -C 3 'error:|fatal error:|Undefined symbols|BUILD FAILED' "$log" | tail -110 || true
+            tail -45 "$log"
+            exit 1
+          fi
+          grep -q '\\*\\* BUILD SUCCEEDED \\*\\*' "$log"
+          # The signed-only code compiled, but marker and entitlements remain
+          # deliberately disabled for this unsigned CI artifact.
+          /usr/libexec/PlistBuddy -c 'Print TwinConnectProtocolBackendLinked' \
+            build/macos/Build/Products/Release/twinconnect.app/Contents/PlugIns/PacketTunnel.appex/Contents/Info.plist | grep -qx false
+          echo "Signed-only Swift code path: COMPILED WITHOUT Apple signing"
+          echo "VPN functionality: NOT VERIFIED"
       - name: Verify embedded Libbox framework, extension and unsigned guard
         shell: bash
         run: |
