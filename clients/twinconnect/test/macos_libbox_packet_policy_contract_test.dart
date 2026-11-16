@@ -18,7 +18,7 @@ void main() {
     expect(policy, contains('NEDNSSettings'));
     expect(policy, contains('dns.matchDomains = [""]'));
     expect(policy, isNot(contains('setTunnelNetworkSettings(')));
-    expect(extension, contains('case "hysteria2":'));
+    expect(extension, contains('case "hysteria2", "tuic":'));
     expect(extension, contains('TwinConnectMacLibboxEngine(tunnel: self)'));
     expect(extension, contains('engine.start'));
     expect(extension, contains('MACOS_HYSTERIA2_PACKET_FLOW_BRIDGE_MISSING'));
@@ -34,6 +34,6 @@ void main() {
     expect(engine, contains('LibboxNewCommandServer('));
     expect(engine, contains('startOrReloadService('));
     expect(engine, contains('kSecValuePersistentRef'));
-    expect(engine, contains('MACOS_HYSTERIA2_KEYCHAIN_PROFILE_MISSING'));
+    expect(engine, contains('MACOS_LIBBOX_KEYCHAIN_PROFILE_MISSING'));
   });
 }
