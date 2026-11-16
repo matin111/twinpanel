@@ -9,6 +9,8 @@ on:
       - 'clients/twinconnect/macos_native/**'
       - 'clients/twinconnect/lib/macos_hysteria2_controller.dart'
       - 'clients/twinconnect/lib/singbox_macos_config.dart'
+      - 'clients/twinconnect/lib/live_dashboard.dart'
+      - 'clients/twinconnect/test/macos_hysteria2_dashboard_lifecycle_contract_test.dart'
       - '.github/workflows/twinconnect-macos-integrated-candidate.yml'
 
 permissions:
