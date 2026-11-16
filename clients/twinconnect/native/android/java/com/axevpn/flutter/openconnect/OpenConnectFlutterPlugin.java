@@ -275,11 +275,12 @@ public class OpenConnectFlutterPlugin implements FlutterPlugin, ActivityAware, M
             updateStage("disconnecting");
             Intent serviceIntent = new Intent(context, AxeOpenConnectVpnService.class);
             serviceIntent.setAction(AxeOpenConnectVpnService.ACTION_DISCONNECT);
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(serviceIntent);
-            } else {
-                context.startService(serviceIntent);
-            }
+            // Disconnect does not create a foreground service: it only asks the
+            // already-running VPN service to tear down its tunnel and stop.
+            // startForegroundService() here caused Android's
+            // ForegroundServiceDidNotStartInTimeException because the
+            // DISCONNECT branch never calls startForeground().
+            context.startService(serviceIntent);
             updateStage("disconnected");
             result.success(null);
         } catch (Exception e) {
