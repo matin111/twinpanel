@@ -67,6 +67,36 @@ jobs:
           python3 publisher/scripts/verify_release_ui_parity.py \
             --source source --main publisher
 
+      - name: Preserve payment, wallet and Telegram delivery fixes in pinned release
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          # Only release the exact implementation that is present in main.
+          # A release pinned to older source must not silently replace the
+          # live fixes made for verified payments and account delivery.
+          for path in \
+            "backend/app/routers/payment_crypto_discount.py" \
+            "backend/app/routers/payments.py" \
+            "backend/app/routers/wallet_payment_v2.py" \
+            "components/payments-review-runtime.tsx" \
+            "components/admin-payments-wallet-topups.tsx" \
+            "components/subscriptions-full-runtime.tsx" \
+            "components/admin-wallet-v2.tsx" \
+            "components/admin-resellers-management-runtime.tsx"; do
+            test -s "source/$path" && test -s "publisher/$path" || {
+              echo "::error file=$path::Missing payment outcome file in release source"
+              exit 1
+            }
+            cmp -s "source/$path" "publisher/$path" || {
+              echo "::error file=$path::Pinned release would erase current payment account / wallet outcomes. Re-pin to the latest main."
+              exit 1
+            }
+          done
+          grep -q 'enriched_admin_payment_intents' source/backend/app/routers/payment_crypto_discount.py
+          grep -q 'telegram_early_confirmation' source/backend/app/routers/payments.py
+          grep -q 'wallet_credit_status' source/backend/app/routers/wallet_payment_v2.py
+          grep -q 'subscriptionId:number|null' source/components/payments-review-runtime.tsx
+
       - name: Protect nonblocking subscription creation in pinned release
         shell: bash
         run: |
@@ -787,6 +817,32 @@ jobs:
             "backend/tests/test_public_connection_audited_app_downloads_v821.py"; do
             cmp -s "source/$path" "publisher/$path" || {
               echo "::error file=$path::Download link source changed during build."
+              exit 1
+            }
+          done
+
+      - name: Recheck payment and delivery fixes before publishing artifact
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          # In parallel with the build another commit might update main.
+          # Fail closed rather than publish a stale account-delivery UI.
+          git -C publisher fetch origin main
+          for path in \
+            "backend/app/routers/payment_crypto_discount.py" \
+            "backend/app/routers/payments.py" \
+            "backend/app/routers/wallet_payment_v2.py" \
+            "components/payments-review-runtime.tsx" \
+            "components/admin-payments-wallet-topups.tsx" \
+            "components/subscriptions-full-runtime.tsx" \
+            "components/admin-wallet-v2.tsx" \
+            "components/admin-resellers-management-runtime.tsx"; do
+            cmp -s "source/$path" "publisher/$path" || {
+              echo "::error file=$path::Pinned release differs from verified payment outcome implementation"
+              exit 1
+            }
+            git -C publisher show "origin/main:$path" | cmp -s "source/$path" - || {
+              echo "::error file=$path::Main changed while building; refusing to publish stale payment UI"
               exit 1
             }
           done
