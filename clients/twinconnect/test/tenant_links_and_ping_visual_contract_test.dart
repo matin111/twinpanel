@@ -197,7 +197,9 @@ void main() {
     final native = File('native/android/kotlin/com/twinpanel/twinconnect/MainActivity.kt')
         .readAsStringSync();
     expect(android, contains("widget.catalog.entries"));
-    expect(android, contains(".where((entry) => entry.selected)"));
+    // Selection also excludes protocols intentionally hidden on Android.
+    expect(android, contains('.where((entry) => entry.selected &&'));
+    expect(android, contains('AndroidProtocolVisibility.visible('));
     final dashboard = File('lib/live_dashboard.dart').readAsStringSync();
     expect(dashboard, contains("Key('devProtocolFilters')"));
     expect(dashboard, contains("Key('androidChooseLocation')"));
