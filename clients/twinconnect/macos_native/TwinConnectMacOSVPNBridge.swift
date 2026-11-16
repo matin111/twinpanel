@@ -15,6 +15,17 @@ final class TwinConnectMacOSVPNBridge {
         return bundle
     }
 
+    private static func hysteriaEngineInstalled() -> Bool {
+        let root = Bundle.main.bundleURL.appendingPathComponent(
+            "Contents/Resources/TwinConnectEngines/sing-box")
+        guard FileManager.default.isExecutableFile(atPath: root.path) else {
+            return false
+        }
+        // A bundled binary is useful for profile preflight only. Native
+        // PacketTunnel packetFlow forwarding is a separate requirement.
+        return true
+    }
+
     private static func backendReady() -> Bool {
         // Additional signed entitlement and runtime checks are mandatory
         // before this can be used to enable actual connections.
@@ -47,6 +58,17 @@ final class TwinConnectMacOSVPNBridge {
                 result([
                     "contractVersion": 1,
                     "supportedCodes": [String]()
+                ] as [String: Any])
+            case "macOSHysteria2EngineStatus":
+                result([
+                    "contractVersion": 1,
+                    "protocol": "hysteria2",
+                    "binaryInstalled": hysteriaEngineInstalled(),
+                    "packetFlowBridgeReady": false,
+                    "engineReady": false,
+                    "reason": hysteriaEngineInstalled()
+                        ? "MACOS_HYSTERIA2_PACKET_FLOW_BRIDGE_MISSING"
+                        : "MACOS_HYSTERIA2_ENGINE_BINARY_MISSING"
                 ] as [String: Any])
             case "macOSRuntimeStatus":
                 let installed = extensionBundle() != nil
