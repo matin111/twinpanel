@@ -67,6 +67,28 @@ jobs:
           python3 publisher/scripts/verify_release_ui_parity.py \
             --source source --main publisher
 
+      - name: Preserve payment outcomes and direct account/wallet links in pinned release
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          # The currently published candidate can predate live payment
+          # delivery/status fixes. Never ship a pinned artifact that
+          # overwrites them with old frontend or API code.
+          for path in \
+            "backend/app/routers/payments.py" \
+            "backend/app/routers/wallet_payment_v2.py" \
+            "components/payments-review-runtime.tsx" \
+            "components/admin-payments-wallet-topups.tsx" \
+            "components/subscriptions-full-runtime.tsx" \
+            "components/admin-wallet-v2.tsx" \
+            "components/admin-resellers-management-runtime.tsx"; do
+            test -s "source/$path" && test -s "publisher/$path"
+            cmp -s "source/$path" "publisher/$path" || {
+              echo "::error file=$path::Pinned release would remove payment results and direct account/wallet links. Re-pin releases/candidate.json to current main before publishing."
+              exit 1
+            }
+          done
+
       - name: Protect nonblocking subscription creation in pinned release
         shell: bash
         run: |
@@ -787,6 +809,27 @@ jobs:
             "backend/tests/test_public_connection_audited_app_downloads_v821.py"; do
             cmp -s "source/$path" "publisher/$path" || {
               echo "::error file=$path::Download link source changed during build."
+              exit 1
+            }
+          done
+
+      - name: Recheck payment outcome and delivery links before release publication
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          # Main was refreshed after the package build. Recheck these exact
+          # files so a concurrent change cannot publish a stale payment UI.
+          for path in \
+            "backend/app/routers/payments.py" \
+            "backend/app/routers/wallet_payment_v2.py" \
+            "components/payments-review-runtime.tsx" \
+            "components/admin-payments-wallet-topups.tsx" \
+            "components/subscriptions-full-runtime.tsx" \
+            "components/admin-wallet-v2.tsx" \
+            "components/admin-resellers-management-runtime.tsx"; do
+            test -s "source/$path" && test -s "publisher/$path"
+            cmp -s "source/$path" "publisher/$path" || {
+              echo "::error file=$path::Payment outcome source changed during the release build. Rebuild from latest main."
               exit 1
             }
           done
