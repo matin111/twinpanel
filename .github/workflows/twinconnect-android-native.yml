@@ -1,6 +1,13 @@
 name: TwinConnect Android WireGuard Native Build
 
 on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feat/twinconnect-android-openvpn-core-20261115
+    paths:
+      - "clients/twinconnect/**"
+      - ".github/workflows/twinconnect-android-native.yml"
   pull_request:
     paths:
       - "clients/twinconnect/native/android/**"
