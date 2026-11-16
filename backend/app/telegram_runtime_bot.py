@@ -2486,7 +2486,7 @@ async def _telegram_notification_worker(bot):
 
                 if (
                     row.kind
-                    == "payment_approved"
+                    in {"payment_approved", "payment_account_ready"}
                 ):
                     username = str(
                         payload.get("username")
@@ -2872,7 +2872,7 @@ async def _telegram_notification_worker(bot):
                     # QR photo with the full account details in its caption.
                     # Other notification kinds remain ordinary text messages.
                     if (
-                        row.kind == "payment_approved"
+                        row.kind in {"payment_approved", "payment_account_ready"}
                         and subscription_link.startswith("https://")
                     ):
                         from .telegram_subscription_qr_v1 import (
@@ -2891,6 +2891,21 @@ async def _telegram_notification_worker(bot):
                             text=text,
                             reply_markup=keyboard,
                         )
+
+                    # Prove that the customer-facing account message had a
+                    # valid subscription link when Telegram accepted it.
+                    # A payment-only confirmation must never count as account delivery.
+                    if row.kind in {"payment_approved", "payment_account_ready"}:
+                        row.payload = {
+                            **(row.payload or {}),
+                            "account_delivery_sent": bool(
+                                sub_id and username and username != "-"
+                                and subscription_link.startswith("https://")
+                            ),
+                            "delivered_subscription_id": int(sub_id) if (
+                                sub_id and subscription_link.startswith("https://")
+                            ) else None,
+                        }
 
                     row.delivered_at = (
                         datetime.utcnow()
