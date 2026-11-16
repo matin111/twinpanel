@@ -1,0 +1,65 @@
+name: TwinConnect macOS WireGuardKit Native Link Smoke
+
+on:
+  push:
+    branches:
+      - 'feat/twinconnect-macos-packet-tunnel-foundation-20261116'
+    paths:
+      - 'clients/twinconnect/macos_native/**'
+      - '.github/workflows/twinconnect-macos-wireguard-link-smoke.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mac-wireguard-link-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  wireguard-macos-arm64:
+    runs-on: macos-15
+    timeout-minutes: 55
+    defaults:
+      run:
+        working-directory: clients/twinconnect
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: false
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.19.13'
+      - name: Check native tools
+        run: |
+          go version
+          xcodebuild -version
+          ruby --version
+          gem install xcodeproj --no-document
+      - name: Generate unsigned Mac project and native Packet Tunnel
+        run: |
+          flutter create --platforms=macos --org com.twinpanel --project-name twinconnect .
+          python3 macos_native/install_macos_bridge.py
+          ruby macos_native/install_packet_tunnel_target.rb
+          ruby macos_native/link_wireguardkit.rb
+      - name: Resolve pinned official WireGuardKit
+        run: |
+          xcodebuild -resolvePackageDependencies -project macos/Runner.xcodeproj -clonedSourcePackagesDirPath "$RUNNER_TEMP/WireGuardPackages"
+          test -f "$RUNNER_TEMP/WireGuardPackages/checkouts/wireguard-apple/Package.swift"
+      - name: Compile upstream wireguard-go bridge
+        run: |
+          bash macos_native/build_wireguard_go.sh "$RUNNER_TEMP/WireGuardPackages/checkouts/wireguard-apple"
+      - name: Compile linked macOS PacketTunnel (unsigned)
+        run: |
+          set -o pipefail
+          xcodebuild -project macos/Runner.xcodeproj -target PacketTunnel \
+            -configuration Release -sdk macosx -arch arm64 \
+            -clonedSourcePackagesDirPath "$RUNNER_TEMP/WireGuardPackages" \
+            CODE_SIGNING_ALLOWED=NO build 2>&1 | tee "$RUNNER_TEMP/mac-wireguard-xcodebuild.log" | tail -90
+      - name: Validate compiled artifacts
+        run: |
+          test -s macos_native/build/wireguard/libwg-go.a
+          echo "WireGuardKit linked: compile-only validation."
+          echo "Apple entitlement, VPN handshake and user traffic: NOT VERIFIED."
