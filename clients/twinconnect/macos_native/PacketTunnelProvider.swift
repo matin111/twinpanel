@@ -27,9 +27,15 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
                 if error != nil { self?.wireGuard = nil }
                 completionHandler(error)
             }
+        case "hysteria2":
+            // Compile and validate route/DNS policy without changing the
+            // operating system's network state. An unsigned preview has no
+            // Libbox PlatformInterface and no live packetFlow forwarding.
+            _ = TwinConnectMacTunnelPolicy.hysteria2Settings()
+            completionHandler(unavailable("MACOS_HYSTERIA2_PACKET_FLOW_BRIDGE_MISSING"))
         default:
-            // OpenVPN, Cisco, Xray and sing-box require separate native
-            // backends. Never claim a successful connection without one.
+            // OpenVPN, Cisco and Xray require separate native backends.
+            // Never claim a successful connection without one.
             completionHandler(unavailable("MACOS_PROTOCOL_ENGINE_NOT_LINKED_\(code)"))
         }
     }
