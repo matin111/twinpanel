@@ -120,8 +120,7 @@ class SingBoxMacConfig {
     return _envelope(outbound);
   }
 
-  /// AnyTLS 1.12+ shares Libbox's protected TUN and remote DNS path.
-  /// Only required connection fields and vetted idle-session settings survive.
+  /// AnyTLS 1.12+ uses the shared Libbox TUN with remote DNS.
   static Map<String, dynamic> composeAnyTls({
     required Map<String, dynamic> item,
   }) {
@@ -152,67 +151,7 @@ class SingBoxMacConfig {
     final interval = candidate['idle_session_check_interval'];
     final timeout = candidate['idle_session_timeout'];
     final minIdle = candidate['min_idle_session'];
-    final durationPattern = RegExp(r'^[1-9][0-9]{0,3}(s|m)
-    return <String, dynamic>{
-      'log': <String, dynamic>{'level': 'error'},
-      'dns': <String, dynamic>{
-        'servers': <Map<String, dynamic>>[
-          // Only the proxy endpoint gets local bootstrap DNS.
-          {'type': 'local', 'tag': 'dns-bootstrap'},
-          {
-            'type': 'https',
-            'tag': 'dns-remote',
-            'server': '1.1.1.1',
-            'server_port': 443,
-            'path': '/dns-query',
-            'tls': {'enabled': true, 'server_name': 'one.one.one.one'},
-            'detour': 'proxy',
-          },
-        ],
-        'final': 'dns-remote',
-        'strategy': 'ipv4_only',
-      },
-      'inbounds': <Map<String, dynamic>>[
-        <String, dynamic>{
-          'type': 'tun',
-          'tag': 'twinconnect-macos-tun',
-          'address': <String>['172.19.0.1/30', 'fdfe:dcba:9876::1/126'],
-          'mtu': 1400,
-          'auto_route': true,
-          // Route enforcement is performed by the signed extension once its
-          // platform interface is fully connected to the packet flow.
-          'strict_route': true,
-          'dns_mode': 'hijack',
-        }
-      ],
-      'outbounds': <Map<String, dynamic>>[outbound],
-      'route': <String, dynamic>{
-        'auto_detect_interface': true,
-        'default_domain_resolver': 'dns-bootstrap',
-        'final': 'proxy',
-        'rules': <Map<String, dynamic>>[
-          {'port': 53, 'action': 'hijack-dns'},
-          // Until native IPv6 forwarding and leak checks are verified,
-          // reject IPv6 explicitly instead of silently routing it direct.
-          {'ip_version': 6, 'action': 'reject'},
-        ],
-      },
-    };
-  }
-
-  static String encodeForEphemeralTunnel({
-    required Map<String, dynamic> item,
-  }) => jsonEncode(composeHysteria2(item: item));
-
-  static String encodeTuicForEphemeralTunnel({
-    required Map<String, dynamic> item,
-  }) => jsonEncode(composeTuic(item: item));
-
-  static String encodeAnyTlsForEphemeralTunnel({
-    required Map<String, dynamic> item,
-  }) => jsonEncode(composeAnyTls(item: item));
-}
-);
+    final durationPattern = RegExp(r'^[1-9][0-9]{0,3}(s|m)$');
     if ((interval != null &&
             (interval is! String || !durationPattern.hasMatch(interval))) ||
         (timeout != null &&
