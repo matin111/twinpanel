@@ -34,6 +34,20 @@ void main() {
         isNull);
   });
 
+  test('classifies well known Windows native OpenVPN exit codes', () {
+    expect(OpenVpnStartupFailure.fromExitCode(-1073741515),
+        'OPENVPN_DEPENDENCY_MISSING');
+    expect(OpenVpnStartupFailure.fromExitCode(0xC000007B),
+        'OPENVPN_INVALID_BINARY_ARCHITECTURE');
+    expect(OpenVpnStartupFailure.fromExitCode(0xC0000005),
+        'OPENVPN_NATIVE_CRASH');
+    expect(OpenVpnStartupFailure.fromExitCode(0xC0000142),
+        'OPENVPN_DLL_INITIALIZATION_FAILED');
+    expect(OpenVpnStartupFailure.fromExitCode(0xC000013A),
+        'OPENVPN_PROCESS_INTERRUPTED');
+    expect(OpenVpnStartupFailure.fromExitCode(1), isNull);
+  });
+
   test('fatal and retryable errors are distinguished', () {
     expect(OpenVpnStartupFailure.isTerminal('OPENVPN_AUTH_REJECTED'), isTrue);
     expect(OpenVpnStartupFailure.isTerminal('OPENVPN_ADAPTER_UNAVAILABLE'),
