@@ -49,7 +49,7 @@ final class TwinConnectMacLibboxEngine {
               outbounds.count == 1,
               let outbound = outbounds.first,
               let protocolCode = outbound["type"] as? String,
-              ["hysteria2", "tuic"].contains(protocolCode),
+              ["hysteria2", "tuic", "anytls"].contains(protocolCode),
               (protocolCode != "tuic" || (
                 (outbound["uuid"] as? String).map {
                     $0.range(of: "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", options: .regularExpression) != nil
@@ -84,7 +84,7 @@ final class TwinConnectMacLibboxEngine {
                   let settings = tunnel.protocolConfiguration
                     as? NETunnelProviderProtocol,
                   let code = settings.providerConfiguration?["protocol"] as? String,
-                  ["hysteria2", "tuic"].contains(code),
+                  ["hysteria2", "tuic", "anytls"].contains(code),
                   let reference = settings.passwordReference,
                   let config = Self.readProfile(reference),
                   Self.profileIsAllowed(config),
