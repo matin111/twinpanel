@@ -39,6 +39,33 @@ class MainActivity : FlutterActivity() {
             flutterEngine.dartExecutor.binaryMessenger,
             "com.twinpanel.twinconnect/vpn"
         )
+        // Mieru is not a VPN until its SOCKS engine and TUN forwarder are
+        // installed together. Never claim a successful connection based on
+        // a compiled executable or an open local SOCKS socket.
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            "com.twinpanel.twinconnect/mieru"
+        ).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "getCapabilities" -> result.success(
+                    mapOf(
+                        "contractVersion" to 1,
+                        "engineReady" to false,
+                        "tunnelVerified" to false,
+                        "reason" to "MIERU_TUN_BRIDGE_NOT_INSTALLED"
+                    )
+                )
+                "connect" -> result.error(
+                    "MIERU_TUN_BRIDGE_NOT_INSTALLED",
+                    "Mieru requires a native SOCKS engine and Android TUN forwarder",
+                    null
+                )
+                "disconnect" -> result.success(
+                    mapOf("connected" to false, "tunnelVerified" to false)
+                )
+                else -> result.notImplemented()
+            }
+        }
         channel.setMethodCallHandler { call, result ->
             when (call.method) {
                 "getCapabilities" -> onWorker(result) {
