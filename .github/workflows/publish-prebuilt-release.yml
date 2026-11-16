@@ -95,7 +95,7 @@ jobs:
           grep -q 'enriched_admin_payment_intents' source/backend/app/routers/payment_crypto_discount.py
           grep -q 'telegram_early_confirmation' source/backend/app/routers/payments.py
           grep -q 'wallet_credit_status' source/backend/app/routers/wallet_payment_v2.py
-          grep -q 'subscriptionId?' source/components/payments-review-runtime.tsx
+          grep -q 'subscriptionId:number|null' source/components/payments-review-runtime.tsx
 
       - name: Protect nonblocking subscription creation in pinned release
         shell: bash
