@@ -151,8 +151,21 @@ def patch_manifest() -> None:
             '            </intent-filter>\n'
             '        </service>\n'
         )
+    # Keep the independently bundled AWG service even when WireGuard is
+    # already declared by a generated scaffold.
     if "com.wireguard.android.backend.GoBackend$VpnService" in current:
-        service = ""
+        service = service.replace(
+            '\\n        <!-- The actual WireGuard GoBackend VpnService. '
+            'No fake local TUN service. -->\\n'
+            '        <service android:name="com.wireguard.android.backend.GoBackend$VpnService"\\n'
+            '            android:exported="false"\\n'
+            '            android:permission="android.permission.BIND_VPN_SERVICE">\\n'
+            '            <intent-filter>\\n'
+            '                <action android:name="android.net.VpnService" />\\n'
+            '            </intent-filter>\\n'
+            '        </service>\\n',
+            "",
+        )
     if 'android:name=".OpenConnectVpnService"' not in current:
         service += (
         '\n        <!-- Reserved Cisco / OpenConnect VpnService. The engine is '
