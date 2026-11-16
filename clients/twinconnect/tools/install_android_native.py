@@ -75,7 +75,7 @@ def patch_gradle() -> None:
         shutil.copy2(awg_aar, target)
         current += (
             "\n// Official AmneziaWG backend and JNI, built from pinned upstream source.\n"
-            'dependencies { implementation(files("libs/amneziawg-tunnel.aar")) }\\n'
+            'dependencies { implementation(files("libs/amneziawg-tunnel.aar")) }\n'
         )
     filename.write_text(current, encoding="utf-8")
     rules = ANDROID / "app" / "proguard-rules.pro"
