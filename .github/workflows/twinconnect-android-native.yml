@@ -72,8 +72,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          git clone https://github.com/amnezia-vpn/amneziawg-android.git /tmp/amneziawg-android
-          cd /tmp/amneziawg-android
+          # Multiple AmneziaWG steps may be present in the PR merge build.
+          # Use a unique checkout so a previous step cannot cause git exit 128.
+          upstream_dir="$(mktemp -d "${RUNNER_TEMP:-/tmp}/twinconnect-amneziawg.XXXXXXXX")"
+          trap 'rm -rf "$upstream_dir"' EXIT
+          git clone https://github.com/amnezia-vpn/amneziawg-android.git "$upstream_dir"
+          cd "$upstream_dir"
           git checkout --detach ff15093bf3856fea0947923474870b86efb682f0
           git submodule update --init --recursive
           chmod +x gradlew
@@ -153,7 +157,7 @@ jobs:
               print(f"{name}: {size / (1024 * 1024):.2f} MiB ({size} bytes)")
           PY
       - name: Upload Android device-specific release test APKs
-        if: ${{ always() }}
+        if: ${{ success() }}
         uses: actions/upload-artifact@v4
         with:
           name: twinconnect-android-native-multiprotocol-release-apks
