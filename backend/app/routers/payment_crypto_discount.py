@@ -14,7 +14,7 @@ from ..models import User
 from ..payment_models import PaymentIntent
 from ..runtime_settings_model import RuntimeSetting
 from ..store_models import StoreOrder
-from .payments import ACTIVE_STATUSES, PaymentSubmitIn
+from .payments import ACTIVE_STATUSES, PaymentSubmitIn, admin_payment_intents as enriched_admin_payment_intents
 from .payment_native_gateways import (
     CRYPTO_METHODS,
     IntentCreateIn,
@@ -315,5 +315,19 @@ def my_payment_intents_with_discount(
     dependencies=[Depends(require_admin)],
 )
 def admin_payment_intents_with_discount(db: Session = Depends(get_db)):
+    # This endpoint is registered before the legacy admin-intents routes.
+    # Starlette resolves the first matching route, so augment the active
+    # response here rather than enriching an unreachable duplicate endpoint.
+    # Preserve crypto-native fields and discounts from the v2 serializer.
     rows = admin_payment_intents_v2(db)
-    return [_decorate_payload(db, item) for item in rows]
+    enriched_by_id = {
+        int(item["id"]): item
+        for item in enriched_admin_payment_intents(db=db)
+    }
+    return [
+        _decorate_payload(
+            db,
+            {**item, **enriched_by_id.get(int(item["id"]), {})},
+        )
+        for item in rows
+    ]
