@@ -28,6 +28,7 @@ export function SubscriptionsFullRuntimePage(){
   const {pick}=useI18n();
   const [rows,setRows]=useState<RuntimeRow[]>([]);const [plans,setPlans]=useState<RuntimeRow[]>([]);const [users,setUsers]=useState<AdminUser[]>([]);const [nodes,setNodes]=useState<AdminNode[]>([]);
   const [selectedId,setSelectedId]=useState(0);const [info,setInfo]=useState<RuntimeRow|null>(null);const [q,setQ]=useState("");
+  const [linkedAccountId,setLinkedAccountId]=useState(0);
   const [loading,setLoading]=useState(true);const [busy,setBusy]=useState("");const [error,setError]=useState("");const [ok,setOk]=useState("");
   const [createOpen,setCreateOpen]=useState(false);const [editOpen,setEditOpen]=useState(false);const [showPassword,setShowPassword]=useState(false);
   const [bulkOpen,setBulkOpen]=useState(false);const [bulkOperation,setBulkOperation]=useState<BulkOperation>("add_traffic");const [bulkAmount,setBulkAmount]=useState("10");
@@ -39,14 +40,25 @@ export function SubscriptionsFullRuntimePage(){
     try{
       const [subs,p,u,ns]=await Promise.all([adminApi.subscriptionsV2(),adminApi.plans(),adminApi.users(),adminApi.nodes()]);
       setRows(subs);setPlans(p);setUsers(u);setNodes(ns);
-      setSelectedId(current=>current&&subs.some(x=>n(x.id)===current)?current:(subs[0]?n(subs[0].id):0));
+      setSelectedId(current=>{
+        const deepLink=Number(new URLSearchParams(window.location.search).get("focus")||0);
+        if(Number.isSafeInteger(deepLink)&&deepLink>0){
+          return subs.some(x=>n(x.id)===deepLink)?deepLink:0;
+        }
+        return current&&subs.some(x=>n(x.id)===current)?current:(subs[0]?n(subs[0].id):0);
+      });
     }catch(e){setError(e instanceof Error?e.message:String(e));}finally{setLoading(false);}
   };
   useEffect(()=>{void load();},[]);
   useEffect(()=>{
-    const value=Number(new URLSearchParams(window.location.search).get("focus")||0);
+    const params=new URLSearchParams(window.location.search);
+    const raw=params.get("focus");
+    const value=raw&&/^\\d+$/.test(raw)?Number(raw):0;
     if(Number.isSafeInteger(value)&&value>0){
-      setQ(String(value));
+      // A payment deep link must show exactly this subscription, not any
+      // other username or ID containing its digits.
+      setLinkedAccountId(value);
+      setQ(params.get("account")||String(value));
       setSelectedId(value);
     }
   },[]);
@@ -55,7 +67,7 @@ export function SubscriptionsFullRuntimePage(){
   const userMap=useMemo(()=>new Map(users.map(x=>[x.id,x])),[users]);
   const planMap=useMemo(()=>new Map(plans.map(x=>[n(x.id),x])),[plans]);
   const nodeMap=useMemo(()=>new Map(nodes.map(x=>[x.id,x])),[nodes]);
-  const filtered=useMemo(()=>{const needle=q.trim().toLowerCase();if(!needle)return rows;return rows.filter(row=>{const user=userMap.get(n(row.user_id));const plan=planMap.get(n(row.plan_id));return `${row.id??""} ${user?.full_name??""} ${user?.email??""} ${row.customer_name??""} ${row.customer_email??""} ${row.account_username??""} ${plan?.name??row.plan_name??""} ${row.status??""}`.toLowerCase().includes(needle);});},[rows,q,userMap,planMap]);
+  const filtered=useMemo(()=>{if(linkedAccountId>0)return rows.filter(row=>n(row.id)===linkedAccountId);const needle=q.trim().toLowerCase();if(!needle)return rows;return rows.filter(row=>{const user=userMap.get(n(row.user_id));const plan=planMap.get(n(row.plan_id));return `${row.id??""} ${user?.full_name??""} ${user?.email??""} ${row.customer_name??""} ${row.customer_email??""} ${row.account_username??""} ${plan?.name??row.plan_name??""} ${row.status??""}`.toLowerCase().includes(needle);});},[rows,q,linkedAccountId,userMap,planMap]);
 
   const loadConnection=async(id:number)=>{
     if(!id){setInfo(null);return;}
@@ -172,7 +184,7 @@ export function SubscriptionsFullRuntimePage(){
     {createOpen&&<Card className="runtime-editor"><form onSubmit={createSub}><div className="card-head"><div><b>{pick("ساخت اشتراک جدید","Create subscription")}</b><small>{pick("همان اطلاعات پایه پنل قدیمی","Same core account fields as the legacy panel")}</small></div><button type="button" className="mini-btn" onClick={()=>setCreateOpen(false)}>×</button></div><div className="setting-grid"><label className="field"><span>{pick("کاربر","User")}</span><select required value={create.user_id} onChange={e=>setCreate(v=>({...v,user_id:Number(e.target.value)}))}><option value={0}>{pick("انتخاب کاربر","Select user")}</option>{users.filter(x=>x.role!=="admin").map(x=><option key={x.id} value={x.id}>{x.full_name||x.email||`#${x.id}`}</option>)}</select></label><label className="field"><span>{pick("پلن","Plan")}</span><select required value={create.plan_id} onChange={e=>setCreate(v=>({...v,plan_id:Number(e.target.value)}))}><option value={0}>{pick("انتخاب پلن","Select plan")}</option>{plans.map(x=><option key={String(x.id)} value={n(x.id)}>{s(x.name)||`#${x.id}`}</option>)}</select></label><label className="field"><span>{pick("نام کاربری","Username")}</span><input dir="ltr" value={create.username} onChange={e=>setCreate(v=>({...v,username:e.target.value}))}/></label><label className="field"><span>{pick("رمز عبور","Password")}</span><input dir="ltr" value={create.password} onChange={e=>setCreate(v=>({...v,password:e.target.value}))}/></label><label className="field"><span>{pick("حجم GB","Traffic GB")}</span><input type="number" min={0} step="0.1" value={create.traffic_gb} onChange={e=>setCreate(v=>({...v,traffic_gb:e.target.value}))}/></label><label className="field"><span>{pick("مدت روز","Duration days")}</span><input type="number" min={1} value={create.duration_days} onChange={e=>setCreate(v=>({...v,duration_days:e.target.value}))}/></label></div><div className="protocol-toggle-grid">{protocolKeys.map(key=><label className="toggle module-toggle" key={key}><span>{protocolLabels[key]}</span><input type="checkbox" checked={create.protocols.includes(key)} onChange={e=>toggleProtocol(key,e.target.checked,p=>setCreate(v=>({...v,protocols:p})),create.protocols)}/><i/></label>)}</div><button className="primary" disabled={busy==="create"||!create.user_id||!create.plan_id||!create.protocols.length}>{busy==="create"?"…":pick("ساخت اشتراک","Create")}</button></form></Card>}
 
     <div className="subs-master-detail">
-      <Card className="subs-sidebar"><div className="card-head"><div><b>{pick("لیست اشتراک‌ها","Subscription list")}</b><small>{filtered.length.toLocaleString("fa-IR")}</small></div></div><label className="field"><span>{pick("جستجو","Search")}</span><input value={q} onChange={e=>setQ(e.target.value)} placeholder={pick("نام، ایمیل، نام کاربری، شناسه…","Name, email, username, ID…")}/></label><div className="subs-list">{filtered.map(row=>{const id=n(row.id),user=userMap.get(n(row.user_id)),plan=planMap.get(n(row.plan_id));return <button key={id} type="button" className={`subs-list-item ${selectedId===id?"active":""}`} onClick={()=>{setSelectedId(id);setEditOpen(false);}}><div><b>{s(row.account_username)||user?.full_name||user?.email||`#${id}`}</b><small>#{id} · {s(row.plan_name)||s(plan?.name)||`Plan #${row.plan_id}`}</small></div><Badge tone={statusTone(row.status)}>{s(row.status)||"—"}</Badge></button>})}{!filtered.length&&!loading&&<div className="runtime-empty">{pick("اشتراکی پیدا نشد","No subscriptions")}</div>}</div></Card>
+      <Card className="subs-sidebar"><div className="card-head"><div><b>{pick("لیست اشتراک‌ها","Subscription list")}</b><small>{filtered.length.toLocaleString("fa-IR")}</small></div></div><label className="field"><span>{pick("جستجو","Search")}</span><input value={q} onChange={e=>{setLinkedAccountId(0);setQ(e.target.value);}} placeholder={pick("نام، ایمیل، نام کاربری، شناسه…","Name, email, username, ID…")}/></label><div className="subs-list">{filtered.map(row=>{const id=n(row.id),user=userMap.get(n(row.user_id)),plan=planMap.get(n(row.plan_id));return <button key={id} type="button" className={`subs-list-item ${selectedId===id?"active":""}`} onClick={()=>{setSelectedId(id);setEditOpen(false);}}><div><b>{s(row.account_username)||user?.full_name||user?.email||`#${id}`}</b><small>#{id} · {s(row.plan_name)||s(plan?.name)||`Plan #${row.plan_id}`}</small></div><Badge tone={statusTone(row.status)}>{s(row.status)||"—"}</Badge></button>})}{!filtered.length&&!loading&&<div className="runtime-empty">{pick("اشتراکی پیدا نشد","No subscriptions")}</div>}</div></Card>
 
       <div className="subs-detail">{selected?<>
         <Card><div className="card-head"><div><b>{pick("جزئیات اشتراک","Subscription details")}</b><small>#{selectedId}</small></div><Badge tone={statusTone(selected.status)}>{s(selected.status)||"—"}</Badge></div><div className="subs-summary-grid"><div><span>{pick("کاربر","User")}</span><b>{userMap.get(n(selected.user_id))?.full_name||s(selected.customer_name)||userMap.get(n(selected.user_id))?.email||s(selected.customer_email)||`#${selected.user_id}`}</b></div><div><span>{pick("پلن","Plan")}</span><b>{s(selected.plan_name)||s(planMap.get(n(selected.plan_id))?.name)||`#${selected.plan_id}`}</b></div><div><span>{pick("نام کاربری","Username")}</span><b dir="ltr">{s(account?.username||selected.account_username)||"—"}</b></div><div><span>{pick("رمز عبور","Password")}</span><div className="secret-row"><b dir="ltr">{showPassword?s(account?.password)||"—":"••••••••"}</b><button className="mini-btn" onClick={()=>setShowPassword(v=>!v)}>{showPassword?"◉":"◎"}</button>{s(account?.password)&&<button className="mini-btn" onClick={()=>copy(s(account?.password))}>⧉</button>}</div></div><div><span>{pick("حجم کل","Traffic")}</span><b>{(n(selected.traffic_limit_bytes)/GB).toLocaleString("fa-IR",{maximumFractionDigits:2})} GB</b></div><div><span>{pick("مصرف","Used")}</span><b>{(n(selected.traffic_used_bytes)/GB).toLocaleString("fa-IR",{maximumFractionDigits:2})} GB</b></div><div><span>{pick("شروع","Starts")}</span><b>{date(selected.starts_at)}</b></div><div><span>{pick("انقضا","Expires")}</span><b>{date(selected.expires_at)}</b></div><div><span>{pick("پروتکل‌ها","Protocols")}</span><b>{strArr(selected.protocols).map(x=>protocolLabels[x]||x).join("، ")||"—"}</b></div><div><span>{pick("نودها","Nodes")}</span><b>{numArr(selected.node_ids).map(x=>nodeMap.get(x)?.name||`#${x}`).join("، ")||pick("سراسری","Global")}</b></div></div>
