@@ -18,14 +18,14 @@ void main() {
     expect(native, contains('case "startTuic":'));
     expect(native, contains('case "getTuicTunnelStatus":'));
     expect(native, contains('case "macOSTuicEngineStatus":'));
-    expect(native, contains('["hysteria2", "tuic"]'));
+    expect(native, contains('["hysteria2", "tuic", "anytls"]'));
     expect(native, contains('libboxBackendReady()'));
     expect(host, contains('allowedConfig(config, protocolCode: protocolCode)'));
     expect(host, contains('namespace + ":" + account + ":" + protocolCode'));
     expect(host, contains('outbound["zero_rtt_handshake"] as? Bool == false'));
-    expect(engine, contains('["hysteria2", "tuic"]'));
+    expect(engine, contains('["hysteria2", "tuic", "anytls"]'));
     expect(engine, contains('outbounds.first?["type"] as? String == code'));
-    expect(provider, contains('case "hysteria2", "tuic":'));
+    expect(provider, contains('case "hysteria2", "tuic", "anytls":'));
     expect(client, contains("SingBoxMacConfig.encodeTuicForEphemeralTunnel"));
     expect(client, contains("'startTuic'"));
     expect(client, contains("'getTuicTunnelStatus'"));
@@ -44,7 +44,7 @@ void main() {
     final mac = source.substring(begin, end);
     expect(mac, contains("VpnProtocols.byCode(protocol)"));
     expect(mac, contains('native: const NativeProtocolReadiness('));
-    expect(mac, contains("supportedCodes: {'hysteria2', 'tuic'}"));
+    expect(mac, contains("supportedCodes: {'hysteria2', 'tuic', 'anytls'}"));
     expect(mac, contains('profile: matches.single'));
     expect(mac, contains('_vpnVerified = false'));
   });
