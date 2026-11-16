@@ -42,7 +42,9 @@ void main() {
     expect(mac, contains('NativeVpnBridge.probe()'));
     expect(mac, contains('!capabilities.engineReady || !capabilities.fullTunnel'));
     expect(mac, contains('MACOS_PACKET_TUNNEL_NOT_INSTALLED'));
-    expect(mac, contains('MACOS_VPN_CONNECTOR_NOT_LINKED'));
+    expect(mac, contains('_macVpn.start('));
+    expect(mac, contains('ConnectionBootstrap(api: api).prepare('));
+    expect(mac, contains('MACOS_WIREGUARD_BACKEND_NOT_LINKED'));
     expect(mac, isNot(contains('_toggleVpn()')));
     expect(source, contains('Platform.isMacOS'));
     expect(source, contains('? _toggleMacVpn : (Platform.isWindows ? _toggleVpn : null)'));
