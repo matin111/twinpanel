@@ -14,7 +14,7 @@ enum TwinConnectMacOSLibboxControl {
     }
 
     private static func allowedConfig(_ text: String, protocolCode: String) -> Bool {
-        guard ["hysteria2", "tuic", "anytls"].contains(protocolCode) else { return false }
+        guard ["hysteria2", "tuic", "anytls", "naive"].contains(protocolCode) else { return false }
         guard (64...131072).contains(text.utf8.count),
               let data = text.data(using: .utf8),
               let raw = (try? JSONSerialization.jsonObject(with: data))
@@ -30,6 +30,21 @@ enum TwinConnectMacOSLibboxControl {
                 (outbound["uuid"] as? String).map {
                     $0.range(of: "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", options: .regularExpression) != nil
                 } == true && outbound["zero_rtt_handshake"] as? Bool == false
+              )),
+              (protocolCode != "naive" || (
+                (outbound["username"] as? String).map {
+                    !$0.isEmpty && $0.count <= 1024
+                } == true &&
+                outbound["insecure_concurrency"] as? Int == 0 &&
+                (outbound["quic"] == nil ||
+                    outbound["quic"] as? Bool == true) &&
+                (outbound["udp_over_tcp"] == nil ||
+                    outbound["udp_over_tcp"] as? Bool == true) &&
+                outbound["extra_headers"] == nil &&
+                (outbound["quic_congestion_control"] == nil ||
+                    (outbound["quic"] as? Bool == true &&
+                     ["bbr", "bbr2", "cubic", "reno"].contains(
+                         outbound["quic_congestion_control"] as? String ?? "")))
               )),
               let tls = outbound["tls"] as? [String: Any],
               (protocolCode != "anytls" || (
@@ -139,12 +154,13 @@ enum TwinConnectMacOSLibboxControl {
     static func start(_ args: Any?, backendLinked: Bool,
                       protocolCode: String = "hysteria2",
                       result: @escaping FlutterResult) {
-        guard ["hysteria2", "tuic", "anytls"].contains(protocolCode) else {
+        guard ["hysteria2", "tuic", "anytls", "naive"].contains(protocolCode) else {
             result(failure("MACOS_PROTOCOL_NOT_SUPPORTED"))
             return
         }
         let errorPrefix = protocolCode == "tuic" ? "MACOS_TUIC" :
-            (protocolCode == "anytls" ? "MACOS_ANYTLS" : "MACOS_HYSTERIA2")
+            (protocolCode == "anytls" ? "MACOS_ANYTLS" :
+             (protocolCode == "naive" ? "MACOS_NAIVE" : "MACOS_HYSTERIA2"))
         guard backendLinked else {
             result(failure(errorPrefix + "_PACKET_FLOW_BRIDGE_MISSING"))
             return
