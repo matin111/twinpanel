@@ -65,6 +65,27 @@ and Network Extension capability provisioned to both app and extension:
    state, handshake or endpoint reachability, IP change, packet counters,
    default route, DNS and IPv6. The verifier checks signing only.
 
+## NaiveProxy (Apple/macOS) compatibility
+
+NaiveProxy outbound is supported by sing-box **v1.14.4** only in builds
+compiled with `with_naive_outbound` and its Cronet dependency. The
+pinned official Apple `build_libbox` script enables this tag. The macOS
+preview CI also requires the `with_naive_outbound` tag in the official
+macOS CLI and verifies a synthetic Naive config with `sing-box check`.
+
+The Naive profile requires the subscription's real `username`,
+`password`, endpoint and validated TLS server name. Concurrent Naive
+sessions above zero, TLS verification bypass, and untrusted route/DNS
+overrides are rejected. QUIC and UDP-over-TCP are **not** invented: they
+are used only if explicitly present and valid in the provider's profile.
+A server that does not support UDP-over-TCP may not carry UDP traffic.
+A green parser or unsigned build does not prove a usable full VPN.
+
+Before marking Naive connected on an actual signed Mac, verify that
+the endpoint authenticates, TCP and UDP traffic behave according to
+the provisioned server's capabilities, the egress IP changes as
+expected, DNS does not leak, and disconnect does not leave direct traffic.
+
 ## Local network evidence (signed cloud Mac only)
 
 The following workflow records two local snapshots without uploading account
