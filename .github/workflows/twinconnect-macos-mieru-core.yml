@@ -1,0 +1,92 @@
+name: TwinConnect macOS Mieru Official Core Candidate
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'feat/twinconnect-macos-packet-tunnel-foundation-20261116'
+    paths:
+      - 'clients/twinconnect/lib/macos_mieru_profile.dart'
+      - 'clients/twinconnect/test/macos_mieru_profile_test.dart'
+      - '.github/workflows/twinconnect-macos-mieru-core.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: twinconnect-macos-mieru-core-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-official-core:
+    runs-on: macos-15
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: clients/twinconnect
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: false
+      - name: Validate Mieru profile adapter
+        shell: bash
+        run: |
+          set -euo pipefail
+          flutter pub get
+          flutter test test/macos_mieru_profile_test.dart
+          flutter test test/mieru_client_profile_test.dart
+      - name: Fetch official checksummed Mieru macOS cores
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=3.39.0
+          base="https://github.com/enfein/mieru/releases/download/v${version}"
+          mkdir -p build/macos_mieru_core
+          for arch in amd64 arm64; do
+            package="mieru_${version}_macos_${arch}.tar.gz"
+            mkdir -p "build/macos_mieru_core/${arch}"
+            curl --fail --location --retry 3 --silent --show-error \
+              "${base}/${package}" -o "build/macos_mieru_core/${package}"
+            curl --fail --location --retry 3 --silent --show-error \
+              "${base}/${package}.sha256.txt" -o "build/macos_mieru_core/${package}.sha256.txt"
+            (
+              cd build/macos_mieru_core
+              shasum --algorithm 256 --check "${package}.sha256.txt"
+            )
+            tar -xzf "build/macos_mieru_core/${package}" \
+              -C "build/macos_mieru_core/${arch}"
+            test -s "build/macos_mieru_core/${arch}/mieru"
+            chmod +x "build/macos_mieru_core/${arch}/mieru"
+            file "build/macos_mieru_core/${arch}/mieru" | grep -q Mach-O
+            actual=$(lipo -archs "build/macos_mieru_core/${arch}/mieru")
+            if test "${arch}" = arm64; then
+              echo "${actual}" | grep -qw arm64
+            else
+              echo "${actual}" | grep -qw x86_64
+            fi
+            "build/macos_mieru_core/${arch}/mieru" version
+          done
+      - name: Record unsigned non-VPN status
+        shell: bash
+        run: |
+          cat > build/macos_mieru_core/README.txt <<'EOF'
+          TwinConnect official Mieru macOS engine candidate, 3.39.0
+          Official upstream sha256 checks verified in workflow.
+          Both arm64 and Intel macOS binaries provided.
+          NOT installed in TwinConnect.app.
+          NOT code signed with Apple Developer identity.
+          NO PacketTunnel traffic bridge.
+          NO VPN connection, handshakes, egress, or DNS validation.
+          This is a standalone core artifact for future signed integration.
+          EOF
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TwinConnect-macOS-Mieru-Official-Cores-UNSIGNED
+          path: |
+            clients/twinconnect/build/macos_mieru_core/amd64/mieru
+            clients/twinconnect/build/macos_mieru_core/arm64/mieru
+            clients/twinconnect/build/macos_mieru_core/README.txt
+          retention-days: 14
+          if-no-files-found: error
