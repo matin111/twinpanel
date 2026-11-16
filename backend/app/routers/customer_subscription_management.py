@@ -361,10 +361,8 @@ def create_renewal_order(
             detail="پلن تمدید انتخاب‌شده فعال و قابل خرید نیست",
         )
 
-    # Until cross-plan protocol provisioning is safely implemented, reject
-    # incompatible renewals BEFORE creating or charging an order.
-    if sub.plan_id is None or int(plan.id) != int(sub.plan_id):
-        raise HTTPException(status_code=409, detail="تمدید با پلن متفاوت فعلاً پشتیبانی نمی‌شود")
+    # A different plan applies only when the existing subscription expires
+    # or runs out of traffic. Checkout creates a reserved future period.
     if sub.expires_at is None and int(sub.traffic_limit_bytes or 0) <= 0:
         raise HTTPException(status_code=409, detail="اشتراک نامحدود فعلی زمان پایان مشخصی برای تمدید ندارد")
 
