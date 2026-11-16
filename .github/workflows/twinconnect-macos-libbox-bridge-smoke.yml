@@ -45,11 +45,35 @@ jobs:
           test -s Libbox.xcframework/Info.plist
           mkdir -p "$GITHUB_WORKSPACE/clients/twinconnect/macos_native/build/libbox"
           ditto Libbox.xcframework "$GITHUB_WORKSPACE/clients/twinconnect/macos_native/build/libbox/Libbox.xcframework"
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: false
+      - name: Compile native Libbox inside macOS PacketTunnel (unsigned)
+        shell: bash
+        working-directory: clients/twinconnect
+        run: |
+          set -euo pipefail
+          gem install xcodeproj --no-document
+          flutter create --platforms=macos --org com.twinpanel --project-name twinconnect .
+          python3 macos_native/install_macos_bridge.py
+          ruby macos_native/install_packet_tunnel_target.rb
+          ruby macos_native/libbox/link_libbox_packet_tunnel.rb
+          log="$RUNNER_TEMP/twinconnect-libbox-extension.log"
+          if ! xcodebuild -project macos/Runner.xcodeproj -target PacketTunnel \
+            -configuration Release -sdk macosx -arch arm64 \
+            CODE_SIGNING_ALLOWED=NO build > "$log" 2>&1; then
+            grep -nE -C 3 'error:|fatal error:|Undefined symbols|BUILD FAILED' "$log" | tail -150 || true
+            tail -50 "$log"
+            exit 1
+          fi
+          tail -20 "$log"
+          echo 'Libbox in PacketTunnel compiles; packet-flow forwarding still NOT IMPLEMENTED'
       - name: Verify this is not a signed or connected VPN
         shell: bash
         run: |
           test -d clients/twinconnect/macos_native/build/libbox/Libbox.xcframework
-          echo 'Libbox framework compile only: macOS PacketTunnel integration NOT yet implemented'
+          echo 'Libbox framework linked to unsigned PacketTunnel target; native packet-flow implementation NOT yet present'
           echo 'No entitlement, signed extension, VPN connection, DNS protection, handshake, or traffic claims'
       - uses: actions/upload-artifact@v4
         with:
