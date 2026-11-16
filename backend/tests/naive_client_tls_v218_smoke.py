@@ -118,6 +118,16 @@ hysteria = client_outbound(
     port=443,
 )
 assert hysteria["tls"]["insecure"] is False
+# Regression: a verified profile must carry the node's trust anchor;
+# merely switching insecure to false leaves managed self-signed nodes broken.
+verified_hysteria = client_outbound(
+    node, hysteria_secret, hysteria_inbound,
+    server="203.0.113.10", port=443,
+    tls_certificate=naive_certificate,
+)
+assert verified_hysteria["tls"]["certificate"] == naive_certificate
+assert verified_hysteria["tls"]["server_name"] == "203.0.113.10"
+assert verified_hysteria["tls"]["insecure"] is False
 
 legacy_outbound = {
     "type": "naive",
