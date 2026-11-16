@@ -37,7 +37,7 @@ jobs:
           flutter pub get
           flutter test test/macos_mieru_profile_test.dart
           flutter test test/mieru_client_profile_test.dart
-      - name: Fetch official checksummed Mieru macOS cores
+      - name: Fetch and validate official macOS Mieru archives
         shell: bash
         run: |
           set -euo pipefail
@@ -46,27 +46,51 @@ jobs:
           mkdir -p build/macos_mieru_core
           for arch in amd64 arm64; do
             package="mieru_${version}_macos_${arch}.tar.gz"
-            mkdir -p "build/macos_mieru_core/${arch}"
-            curl --fail --location --retry 3 --silent --show-error \
-              "${base}/${package}" -o "build/macos_mieru_core/${package}"
-            curl --fail --location --retry 3 --silent --show-error \
-              "${base}/${package}.sha256.txt" -o "build/macos_mieru_core/${package}.sha256.txt"
-            (
-              cd build/macos_mieru_core
-              shasum --algorithm 256 --check "${package}.sha256.txt"
-            )
-            tar -xzf "build/macos_mieru_core/${package}" \
-              -C "build/macos_mieru_core/${arch}"
-            test -s "build/macos_mieru_core/${arch}/mieru"
-            chmod +x "build/macos_mieru_core/${arch}/mieru"
-            file "build/macos_mieru_core/${arch}/mieru" | grep -q Mach-O
-            actual=$(lipo -archs "build/macos_mieru_core/${arch}/mieru")
+            archive="build/macos_mieru_core/${package}"
+            hashfile="${archive}.sha256.txt"
+            target="build/macos_mieru_core/${arch}"
+            mkdir -p "${target}"
+            curl --fail --location --retry 4 --retry-all-errors \
+              --connect-timeout 20 --max-time 180 --silent --show-error \
+              "${base}/${package}" --output "${archive}"
+            curl --fail --location --retry 4 --retry-all-errors \
+              --connect-timeout 20 --max-time 60 --silent --show-error \
+              "${base}/${package}.sha256.txt" --output "${hashfile}"
+            # Upstream checksum text may use a different filename layout.
+            # Check the digest against the exact downloaded archive.
+            python3 - "${archive}" "${hashfile}" <<'PY'
+          import hashlib, pathlib, re, sys
+          archive = pathlib.Path(sys.argv[1])
+          supplied = pathlib.Path(sys.argv[2]).read_text().strip()
+          match = re.search(r"(?<![0-9a-fA-F])[0-9a-fA-F]{64}(?![0-9a-fA-F])", supplied)
+          if match is None:
+              raise SystemExit("Official SHA256 file did not contain a digest")
+          digest = hashlib.sha256(archive.read_bytes()).hexdigest()
+          if digest.lower() != match.group(0).lower():
+              raise SystemExit("Mieru official SHA256 mismatch")
+          print(f"Verified official SHA256 for {archive.name}")
+          PY
+            tar -tzf "${archive}" > "${target}/archive-manifest.txt"
+            # Do not assume a flat layout inside upstream tarball.
+            tar -xzf "${archive}" -C "${target}"
+            binary="$(find "${target}" -type f -name mieru -print -quit)"
+            test -n "${binary}" && test -s "${binary}" || {
+              echo "::error::Mieru executable absent in ${package}"
+              cat "${target}/archive-manifest.txt"
+              exit 1
+            }
+            if test "${binary}" != "${target}/mieru"; then
+              cp "${binary}" "${target}/mieru"
+            fi
+            chmod 755 "${target}/mieru"
+            file "${target}/mieru" | grep -q Mach-O
+            actual="$(lipo -archs "${target}/mieru")"
             if test "${arch}" = arm64; then
               echo "${actual}" | grep -qw arm64
             else
               echo "${actual}" | grep -qw x86_64
             fi
-            "build/macos_mieru_core/${arch}/mieru" version
+            "${target}/mieru" version
           done
       - name: Record unsigned non-VPN status
         shell: bash
