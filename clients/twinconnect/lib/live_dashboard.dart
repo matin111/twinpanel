@@ -54,6 +54,7 @@ import 'plan_classification.dart';
 import 'account_snapshot.dart';
 import 'native_vpn_bridge.dart';
 import 'ios_wireguard_controller.dart';
+import 'macos_wireguard_controller.dart';
 import 'country_flag.dart';
 import 'ambient_background.dart';
 import 'interactive_glass_card.dart';
@@ -119,6 +120,7 @@ class _DemoServer {
 class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   final WindowsWireGuardController _vpn = const WindowsWireGuardController();
   final IosWireGuardController _iosVpn = const IosWireGuardController();
+  final MacWireGuardController _macVpn = const MacWireGuardController();
   final WindowsAmneziaWgController _awg = const WindowsAmneziaWgController();
   late final WindowsSingBoxTunnel _modernTunnel = WindowsSingBoxTunnel(
     onUnexpectedExit: () {
@@ -2736,20 +2738,69 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     if (!Platform.isMacOS || _vpnBusy) return;
     setState(() { _vpnBusy = true; _vpnError = null; });
     try {
+      final status = await _macVpn.status();
+      if (const {'connecting', 'os_connected_unverified', 'reasserting'}
+          .contains(status['state'])) {
+        await _macVpn.stop();
+        if (mounted) setState(() {
+          _vpnUp = false;
+          _vpnVerified = false;
+          _activeNodeId = null;
+        });
+        return;
+      }
+      final protocol = _filter == 'all' ? 'wireguard' : _filter;
+      if (protocol != 'wireguard') {
+        throw const FormatException('MACOS_PROTOCOL_ENGINE_NOT_READY');
+      }
+      final serverId = _selectedServerId;
+      if (serverId == null) {
+        throw const FormatException('SELECT_WIREGUARD_SERVER');
+      }
+      // The macOS host bridge is independent of Windows protocol processes.
+      // An unsigned preview never asserts a working Network Extension.
       final capabilities = await NativeVpnBridge.probe();
       if (!capabilities.engineReady || !capabilities.fullTunnel) {
         throw const FormatException('MACOS_PACKET_TUNNEL_NOT_INSTALLED');
       }
+      final installed = await _macVpn.runtime();
+      if (installed['engineReady'] != true) {
+        throw FormatException(installed['reason'] is String
+            ? installed['reason'] as String : 'MACOS_WIREGUARD_BACKEND_NOT_LINKED');
+      }
+      final api = TenantApi.fromBuildConfig();
+      final checks = await Future.wait<Object>([
+        _vpnPolicy.load(widget.panel.namespace, widget.username),
+        api.loadSessionProtocolCatalog(
+            panel: widget.panel, sessionToken: widget.sessionToken),
+      ]);
+      final policy = checks[0] as VpnPolicy;
       final native = await NativeVpnBridge.protocolReadiness(
           validatedCapabilities: capabilities);
-      final selectedProtocol = _filter == 'all' ? null : _filter;
-      if (selectedProtocol == null || !_protocolEntitled(selectedProtocol) ||
-          !native.supports(selectedProtocol)) {
-        throw const FormatException('MACOS_PROTOCOL_ENGINE_NOT_READY');
-      }
-      // Do not report success until a correctly signed, fully functional
-      // Network Extension connects and verifies actual tunnel traffic.
-      throw const FormatException('MACOS_VPN_CONNECTOR_NOT_LINKED');
+      final candidate = await ConnectionBootstrap(api: api).prepare(
+        panel: widget.panel,
+        sessionToken: widget.sessionToken,
+        serverId: serverId,
+        protocolCode: 'wireguard',
+        policy: policy,
+        capabilities: capabilities,
+        nativeProtocols: native,
+        currentAttemptCatalog: Future<PanelProtocolCatalog>.value(
+            checks[1] as PanelProtocolCatalog),
+      );
+      final profile = WindowsWireGuardController.configForSingleNode(
+          candidate.profiles, serverId);
+      await _macVpn.start(
+        profile: profile.config,
+        namespace: widget.panel.namespace,
+        account: widget.username,
+      );
+      // OS acceptance does not prove a peer handshake or working Internet.
+      if (mounted) setState(() {
+        _vpnUp = false;
+        _vpnVerified = false;
+        _activeNodeId = serverId;
+      });
     } catch (error) {
       if (mounted) setState(() => _vpnError = _errorText(error));
     } finally {
