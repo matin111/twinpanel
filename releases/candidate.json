@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.860",
-  "source_sha": "fff4153a58c523b52686d5ee60e7b69ea32ff3ac",
+  "version": "1.1.0-rc.861",
+  "source_sha": "043fe9e3a37df823b97cb366e2d021ee0d75ed70",
   "notes": {
-    "fa": "تأیید واقعی ارسال اطلاعات اکانت و QR در ربات تلگرام؛ اصلاح نمایش وضعیت تحویل در پرداخت‌ها و ارسال نهایی یکتا برای سفارش‌هایی که پیام تأیید زودتر از تکمیل اکانت ارسال شده است.",
-    "en": "Record verified Telegram account QR dispatch, repair delivery-status evidence, and send a deduplicated final account message for early-confirmed purchases."
+    "fa": "افزایش سرعت تحویل اکانت در ربات پس از تأیید پرداخت با ارسال لینک و QR به محض آماده شدن اولین کانفیگ معتبر، بدون انتظار برای نصب همه پروتکل‌ها؛ رفع خطای مشاهده رسید در مدیریت ربات.",
+    "en": "Faster validated Telegram account link and QR delivery as soon as one live protocol is ready, with durable payment checks and off-loop readiness validation; restore admin receipt details."
   }
 }
