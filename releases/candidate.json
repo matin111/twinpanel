@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.859",
-  "source_sha": "be33d0460ab67b222d5646e17418b19a81ece7eb",
+  "version": "1.1.0-rc.860",
+  "source_sha": "fff4153a58c523b52686d5ee60e7b69ea32ff3ac",
   "notes": {
-    "fa": "رفع عدم نمایش اکانت ساخته‌شده در پرداخت‌ها و ترمیم سفارش‌های پرداخت‌شده‌ای که با وجود آماده‌بودن همه پروتکل‌ها در وضعیت ساخت باقی مانده‌اند؛ همراه با محافظ GitHub برای جلوگیری از بازگشت مشکل.",
-    "en": "Restore created-account links in admin payment review and reconcile verified ready purchases stuck in provisioning; enforce pinned-release regression protection."
+    "fa": "تأیید واقعی ارسال اطلاعات اکانت و QR در ربات تلگرام؛ اصلاح نمایش وضعیت تحویل در پرداخت‌ها و ارسال نهایی یکتا برای سفارش‌هایی که پیام تأیید زودتر از تکمیل اکانت ارسال شده است.",
+    "en": "Record verified Telegram account QR dispatch, repair delivery-status evidence, and send a deduplicated final account message for early-confirmed purchases."
   }
 }
