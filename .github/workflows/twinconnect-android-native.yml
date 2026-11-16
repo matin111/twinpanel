@@ -5,6 +5,7 @@ on:
     paths:
       - "clients/twinconnect/native/android/**"
       - "clients/twinconnect/tools/install_android_native.py"
+      - "clients/twinconnect/tools/build_mieru_android.sh"
       - "clients/twinconnect/lib/android_*.dart"
       - "clients/twinconnect/lib/main.dart"
       - "clients/twinconnect/lib/native_vpn_bridge.dart"
@@ -28,6 +29,29 @@ jobs:
         with:
           channel: stable
           cache: true
+      - name: Install Go toolchain for pinned Mieru core
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.x'
+      - name: Compile upstream Mieru for Android ABIs
+        shell: bash
+        env:
+          GO: go
+          ANDROID_NDK_HOME: ${{ env.ANDROID_NDK_LATEST_HOME }}
+        run: |
+          set -euo pipefail
+          export ANDROID_NDK_HOME="${ANDROID_NDK_HOME:-${ANDROID_NDK_ROOT:-}}"
+          test -d "$ANDROID_NDK_HOME/toolchains/llvm"
+          bash tools/build_mieru_android.sh
+          for abi in arm64-v8a armeabi-v7a x86_64; do
+            test -s "native/android/mieru-jni/$abi/libmieru.so"
+          done
+      - name: Upload compiled Mieru cores for native integration
+        uses: actions/upload-artifact@v4
+        with:
+          name: twinconnect-mieru-android-core-binaries
+          path: clients/twinconnect/native/android/mieru-jni/**/libmieru.so
+          if-no-files-found: error
       - name: Generate Android scaffold
         run: flutter create --platforms=android --org com.twinpanel --project-name twinconnect .
       - name: Install native source and pinned WireGuard dependency
