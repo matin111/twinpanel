@@ -188,7 +188,8 @@ enum TwinConnectMacOSLibboxControl {
     }
 
     private static func allowedConfig(_ text: String, protocolCode: String) -> Bool {
-        if protocolCode == "socks5" { return allowedSocks5Config(text) }        if protocolCode == "snell" { return allowedSnellConfig(text) }
+        if protocolCode == "socks5" { return allowedSocks5Config(text) }
+        if protocolCode == "snell" { return allowedSnellConfig(text) }
 
         if protocolCode == "shadowtls" { return allowedShadowTlsConfig(text) }
         guard ["hysteria2", "tuic", "anytls", "naive", "shadowtls", "snell", "socks5"].contains(protocolCode) else { return false }
