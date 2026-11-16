@@ -148,7 +148,7 @@ class DeferredRenewalTest(unittest.TestCase):
 
     def test_days_only_renewal_retains_quota_instead_of_unlimited(self):
         sub = self.subscription()
-        db = ReservationDB(sub, SimpleNamespace(duration_days=30))
+        db = ReservationDB(sub, SimpleNamespace(duration_days=30,is_active=True))
         row = service.reserve_renewal(
             db, subscription_id=22, plan_id=5, plan_name="original",
             traffic_bytes=0, duration_days=30, source="admin",
@@ -159,7 +159,7 @@ class DeferredRenewalTest(unittest.TestCase):
 
     def test_traffic_only_renewal_retains_plan_duration(self):
         sub = self.subscription()
-        db = ReservationDB(sub, SimpleNamespace(duration_days=45))
+        db = ReservationDB(sub, SimpleNamespace(duration_days=45,is_active=True))
         row = service.reserve_renewal(
             db, subscription_id=22, plan_id=5, plan_name="original",
             traffic_bytes=20 * 1024**3, duration_days=0,
