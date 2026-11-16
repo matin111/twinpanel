@@ -594,7 +594,7 @@ def install() -> None:
         cpp = cpp.replace(on_create_marker,
             on_create_marker + "\n" + native_shell, 1)
         cpp = insert_once(cpp, '#include "flutter_window.h"',
-            '#include "flutter_window.h"\\n#include <commctrl.h>')
+            '#include "flutter_window.h"\n#include <commctrl.h>')
 
     # Request elevation through the MSVC linker-generated manifest. Do not
     # insert trustInfo directly into runner.exe.manifest: the linker also
