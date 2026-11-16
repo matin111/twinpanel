@@ -34,7 +34,29 @@ enum TwinConnectMacOSLibboxControl {
               let route = raw["route"] as? [String: Any],
               route["final"] as? String == "proxy",
               let dns = raw["dns"] as? [String: Any],
-              dns["final"] as? String == "dns-remote"
+              dns["final"] as? String == "dns-remote",
+              let rules = route["rules"] as? [[String: Any]],
+              rules.count == 2,
+              rules[0]["port"] as? Int == 53,
+              rules[0]["action"] as? String == "hijack-dns",
+              rules[1]["ip_version"] as? Int == 6,
+              rules[1]["action"] as? String == "reject",
+              route["default_domain_resolver"] as? String == "dns-bootstrap",
+              inbounds[0]["auto_route"] as? Bool == true,
+              inbounds[0]["dns_mode"] as? String == "hijack",
+              inbounds[0]["mtu"] as? Int == 1400,
+              inbounds[0]["address"] as? [String] ==
+                  ["172.19.0.1/30", "fdfe:dcba:9876::1/126"],
+              let servers = dns["servers"] as? [[String: Any]],
+              servers.count == 2,
+              servers[0]["type"] as? String == "local",
+              servers[0]["tag"] as? String == "dns-bootstrap",
+              servers[1]["type"] as? String == "https",
+              servers[1]["detour"] as? String == "proxy",
+              servers[1]["tag"] as? String == "dns-remote",
+              let name = tls["server_name"] as? String,
+              !name.isEmpty,
+              outbound["detour"] == nil
         else { return false }
         return true
     }
