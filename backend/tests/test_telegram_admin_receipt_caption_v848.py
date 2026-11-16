@@ -58,6 +58,7 @@ class ReceiptCaptionTests(unittest.TestCase):
         bot = BOT.read_text(encoding="utf-8")
         self.assertIn("caption = format_admin_receipt(kind, receipt)", push)
         self.assertIn("caption = format_admin_receipt(kind, data)", bot)
+        self.assertIn("from .routers.telegram_admin_ops_v1 import format_admin_receipt", bot)
         self.assertIn('"parse_mode": "HTML"', push)
         self.assertIn("callback.message.edit_caption(", bot)
         self.assertIn("callback.message.edit_text(", bot)
