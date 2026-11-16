@@ -20,7 +20,7 @@ concurrency:
 jobs:
   build-official-core:
     runs-on: macos-15
-    timeout-minutes: 25
+    timeout-minutes: 50
     defaults:
       run:
         working-directory: clients/twinconnect
@@ -92,6 +92,44 @@ jobs:
             fi
             "${target}/mieru" version
           done
+      - name: Compile unsigned macOS app and packet tunnel scaffold
+        shell: bash
+        env:
+          TWINCONNECT_DIRECTORY_URL: ${{ vars.TWINCONNECT_DIRECTORY_URL || 'https://panel.matindnspro.sbs' }}
+        run: |
+          set -euo pipefail
+          gem install xcodeproj --no-document
+          flutter create --platforms=macos --org com.twinpanel --project-name twinconnect .
+          python3 macos_native/install_macos_bridge.py
+          ruby macos_native/install_packet_tunnel_target.rb
+          flutter build macos --release --dart-define=TWINCONNECT_DIRECTORY_URL="$TWINCONNECT_DIRECTORY_URL"
+          app="build/macos/Build/Products/Release/twinconnect.app"
+          test -x "$app/Contents/MacOS/twinconnect"
+          test -x "$app/Contents/PlugIns/PacketTunnel.appex/Contents/MacOS/PacketTunnel"
+          /usr/libexec/PlistBuddy -c 'Print TwinConnectProtocolBackendLinked' \
+            "$app/Contents/PlugIns/PacketTunnel.appex/Contents/Info.plist" | grep -qx false
+      - name: Bundle official Mieru core in unsigned macOS app
+        shell: bash
+        run: |
+          set -euo pipefail
+          app="build/macos/Build/Products/Release/twinconnect.app"
+          destination="$app/Contents/Resources/TwinConnectEngines"
+          mkdir -p "$destination"
+          # macOS distributes architecture-specific binaries. The Flutter
+          # binary in this unsigned artifact remains a CI-only preview.
+          lipo -create \
+            build/macos_mieru_core/amd64/mieru \
+            build/macos_mieru_core/arm64/mieru \
+            -output "$destination/mieru"
+          chmod 755 "$destination/mieru"
+          arches="$(lipo -archs "$destination/mieru")"
+          echo "$arches" | grep -qw x86_64
+          echo "$arches" | grep -qw arm64
+          file "$destination/mieru" | grep -q Mach-O
+          test -x "$destination/mieru"
+          # Bundled executable does NOT grant the PacketTunnel subprocess
+          # access or a working Mieru full-tunnel packet-flow bridge.
+          echo "Mieru official dual-arch core bundled, VPN NOT READY"
       - name: Record unsigned non-VPN status
         shell: bash
         run: |
@@ -99,12 +137,19 @@ jobs:
           TwinConnect official Mieru macOS engine candidate, 3.39.0
           Official upstream sha256 checks verified in workflow.
           Both arm64 and Intel macOS binaries provided.
-          NOT installed in TwinConnect.app.
+          Bundled in unsigned TwinConnect.app as Resources/TwinConnectEngines/mieru.
           NOT code signed with Apple Developer identity.
           NO PacketTunnel traffic bridge.
           NO VPN connection, handshakes, egress, or DNS validation.
           This is a standalone core artifact for future signed integration.
           EOF
+      - name: Package unsigned Mac app with official Mieru core
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd build/macos/Build/Products/Release
+          ditto -c -k --sequesterRsrc --keepParent twinconnect.app TwinConnect-macOS-Mieru-UNSIGNED.zip
+          shasum -a 256 TwinConnect-macOS-Mieru-UNSIGNED.zip > MIERU-APP-SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
           name: TwinConnect-macOS-Mieru-Official-Cores-UNSIGNED
@@ -112,5 +157,7 @@ jobs:
             clients/twinconnect/build/macos_mieru_core/amd64/mieru
             clients/twinconnect/build/macos_mieru_core/arm64/mieru
             clients/twinconnect/build/macos_mieru_core/README.txt
+            clients/twinconnect/build/macos/Build/Products/Release/TwinConnect-macOS-Mieru-UNSIGNED.zip
+            clients/twinconnect/build/macos/Build/Products/Release/MIERU-APP-SHA256SUMS.txt
           retention-days: 14
           if-no-files-found: error
