@@ -7,6 +7,10 @@ on:
       - 'feat/twinconnect-macos-packet-tunnel-foundation-20261116'
     paths:
       - 'clients/twinconnect/lib/macos_mieru_profile.dart'
+      - 'clients/twinconnect/lib/macos_mieru_controller.dart'
+      - 'clients/twinconnect/lib/live_dashboard.dart'
+      - 'clients/twinconnect/macos_native/TwinConnectMacOSVPNBridge.swift'
+      - 'clients/twinconnect/test/macos_mieru_core_bundling_contract_test.dart'
       - 'clients/twinconnect/test/macos_mieru_profile_test.dart'
       - '.github/workflows/twinconnect-macos-mieru-core.yml'
 
@@ -36,6 +40,7 @@ jobs:
           set -euo pipefail
           flutter pub get
           flutter test test/macos_mieru_profile_test.dart
+          flutter test test/macos_mieru_core_bundling_contract_test.dart
           flutter test test/mieru_client_profile_test.dart
       - name: Fetch and validate official macOS Mieru archives
         shell: bash
