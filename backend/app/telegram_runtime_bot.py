@@ -72,6 +72,24 @@ BOT_SECRET = _load_internal_secret()
 
 router = Router()
 
+# Reuse the loop-local HTTP pool for all bot-to-API calls. The previous
+# per-request AsyncClient performed a fresh TCP setup on every button press,
+# including multiple sequential calls in renewal and account views.
+_api_client: httpx.AsyncClient | None = None
+
+
+def create_bot_api_client() -> httpx.AsyncClient:
+    return httpx.AsyncClient(
+        timeout=httpx.Timeout(20.0, connect=3.0, pool=3.0),
+        limits=httpx.Limits(
+            max_connections=64,
+            max_keepalive_connections=24,
+            keepalive_expiry=30.0,
+        ),
+        trust_env=False if API_BASE.startswith("http://127.0.0.1:") else True,
+    )
+
+
 # TWINPANEL_MAIN_SHARED_LEARNING_V1
 register_learning_handlers(router, prefix="mlearn")
 
@@ -161,15 +179,37 @@ async def request(
             "X-Telegram-Bot-Secret"
         ] = BOT_SECRET
 
-    async with httpx.AsyncClient(
-        timeout=20.0
-    ) as client:
+    started_at = time.monotonic()
+    client = _api_client
+    if client is None:
+        # Support direct/unit calls outside main() without leaking a pool.
+        async with create_bot_api_client() as temporary:
+            response = await temporary.request(
+                method,
+                API_BASE + path,
+                headers=headers,
+                json=payload if files is None else None,
+                files=files,
+            )
+    else:
         response = await client.request(
             method,
             API_BASE + path,
             headers=headers,
             json=payload if files is None else None,
             files=files,
+        )
+
+    elapsed = time.monotonic() - started_at
+    if elapsed >= 0.75:
+        # Record only path + latency, never auth headers, body or credentials.
+        print(
+            "BOT_LOCAL_API_SLOW",
+            str(method).upper(),
+            str(path).split("?", 1)[0],
+            f"{elapsed:.3f}s",
+            f"HTTP_{response.status_code}",
+            flush=True,
         )
 
     try:
@@ -562,6 +602,12 @@ def renewal_payment_methods_keyboard(
             )
         ])
 
+    rows.append([
+        InlineKeyboardButton(
+            text="💰 پرداخت از کیف پول",
+            callback_data=f"renewwallet:preview:{int(order_id)}",
+        )
+    ])
     return InlineKeyboardMarkup(
         inline_keyboard=rows
     )
@@ -1833,10 +1879,7 @@ async def renewal_create_order(callback: CallbackQuery):
         )
         method_data = await request("GET", "/v1/payments/methods")
         methods = method_data.get("methods") or []
-        if not methods:
-            raise RuntimeError(
-                "روش پرداخت فعالی وجود ندارد؛ سفارش ثبت شده است"
-            )
+        # Wallet checkout is available even when card/crypto gateways are off.
     except Exception as exc:
         await callback.answer(str(exc)[:180], show_alert=True)
         return
@@ -1850,6 +1893,120 @@ async def renewal_create_order(callback: CallbackQuery):
         "روش پرداخت را انتخاب کنید:",
         reply_markup=renewal_payment_methods_keyboard(int(order["id"]), methods),
     )
+
+
+@router.callback_query(F.data.startswith("renewwallet:preview:"))
+async def renewal_wallet_preview(callback: CallbackQuery):
+    # Acknowledge immediately: external network calls must never keep
+    # Telegram's callback spinner active for their entire duration.
+    await callback.answer()
+    try:
+        order_id = int((callback.data or "").rsplit(":", 1)[-1])
+        token = await _telegram_session_token(callback.from_user.id)
+        orders, wallet = await asyncio.gather(
+            request("GET", "/v1/store/orders/me", token=token),
+            request("GET", "/v1/wallet/me", token=token),
+        )
+        order = next(
+            (item for item in orders if int(item.get("id") or 0) == order_id),
+            None,
+        )
+        if order is None:
+            raise RuntimeError("سفارش تمدید شما پیدا نشد")
+        if str(order.get("status") or "") != "pending_payment":
+            raise RuntimeError("سفارش در وضعیت قابل پرداخت نیست")
+        balance = int(wallet.get("balance_toman") or 0)
+        amount = int(order.get("amount_toman") or 0)
+        if amount <= 0:
+            raise RuntimeError("مبلغ سفارش معتبر نیست")
+        sufficient = balance >= amount
+        keyboard = [[InlineKeyboardButton(
+            text="✅ تأیید و پرداخت تمدید از کیف پول" if sufficient
+                 else "➕ افزایش موجودی کیف پول",
+            callback_data=f"renewwallet:confirm:{order_id}" if sufficient
+                          else "wallet:topup",
+        )], [InlineKeyboardButton(
+            text="⬅️ روش‌های پرداخت تمدید",
+            callback_data=f"renewwallet:back:{order_id}",
+        )]]
+        await callback.message.edit_text(
+            "💰 <b>پرداخت تمدید از کیف پول</b>\n\n"
+            f"🧾 سفارش: <b>#{order_id}</b>\n"
+            f"مبلغ تمدید: <b>{_fmt_money(amount)} تومان</b>\n"
+            f"موجودی کیف پول: <b>{_fmt_money(balance)} تومان</b>\n"
+            + (f"مانده پس از پرداخت: <b>{_fmt_money(balance-amount)} تومان</b>\n\n"
+               "با تأیید، مبلغ فقط یک‌بار کسر و تمدید برای دوره بعد رزرو می‌شود."
+               if sufficient else
+               "\nموجودی کافی نیست؛ ابتدا کیف پول را شارژ کنید."),
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard),
+        )
+    except Exception as exc:
+        await callback.message.answer(
+            "❌ " + escape(str(exc)[:180])
+        )
+
+
+@router.callback_query(F.data.startswith("renewwallet:back:"))
+async def renewal_wallet_back(callback: CallbackQuery):
+    await callback.answer()
+    try:
+        order_id = int((callback.data or "").rsplit(":", 1)[-1])
+        token = await _telegram_session_token(callback.from_user.id)
+        orders, method_data = await asyncio.gather(
+            request("GET", "/v1/store/orders/me", token=token),
+            request("GET", "/v1/payments/methods"),
+        )
+        order = next((x for x in orders if int(x.get("id") or 0)==order_id), None)
+        if not order or order.get("status") != "pending_payment":
+            raise RuntimeError("سفارش قابل پرداخت پیدا نشد")
+        await callback.message.edit_text(
+            "💳 <b>انتخاب روش پرداخت تمدید</b>",
+            reply_markup=renewal_payment_methods_keyboard(
+                order_id, method_data.get("methods") or [],
+            ),
+        )
+    except Exception as exc:
+        await callback.message.answer("❌ " + escape(str(exc)[:180]))
+
+
+@router.callback_query(F.data.startswith("renewwallet:confirm:"))
+async def renewal_wallet_confirm(callback: CallbackQuery):
+    await callback.answer()
+    try:
+        order_id = int((callback.data or "").rsplit(":", 1)[-1])
+        token = await _telegram_session_token(callback.from_user.id)
+        # Reuse the canonical atomic and idempotent wallet-payment endpoint.
+        # It locks the order and wallet, checks ownership, refuses a conflicting
+        # external payment and records one ledger debit per order.
+        result = await request(
+            "POST", f"/v1/wallet/orders/{order_id}/pay", token=token,
+        )
+        if not bool(result.get("ok")):
+            raise RuntimeError("پرداخت کیف پول تأیید نشد")
+        order = result.get("order") or {}
+        state = str(order.get("status") or "")
+        if state not in {"paid", "provisioning", "provision_failed", "fulfilled"}:
+            raise RuntimeError("پرداخت ثبت شد ولی وضعیت سفارش نیاز به بررسی دارد")
+        await callback.message.edit_text(
+            "✅ <b>پرداخت تمدید از کیف پول ثبت شد</b>\n\n"
+            f"🧾 شماره سفارش: <b>#{order_id}</b>\n"
+            "💰 مبلغ فقط یک‌بار از کیف پول کسر می‌شود.\n"
+            "🕒 تمدید برای دوره بعد رزرو می‌شود؛ اعتبار و پلن فعلی"
+            " تا پایان تاریخ یا حجم بدون تغییر می‌ماند.\n"
+            "در بخش اشتراک‌های من می‌توانید وضعیت تمدید را ببینید.",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(
+                    text="📦 اشتراک‌های من", callback_data="subs:list",
+                )],
+                [InlineKeyboardButton(
+                    text="🏠 منوی اصلی", callback_data="main:home",
+                )],
+            ]),
+        )
+    except Exception as exc:
+        await callback.message.answer(
+            "❌ پرداخت تمدید از کیف پول انجام نشد: " + escape(str(exc)[:180])
+        )
 
 
 @router.callback_query(
@@ -2828,10 +2985,13 @@ async def _telegram_notification_worker(bot):
 
 
 async def main():
+    global _api_client
     if not BOT_SECRET:
         raise RuntimeError(
             "TWINPANEL_TELEGRAM_BOT_SECRET missing"
         )
+
+    _api_client = create_bot_api_client()
 
     bot = Bot(
         token=load_bot_token(),
@@ -2915,6 +3075,10 @@ async def main():
             await notify_task
         except asyncio.CancelledError:
             pass
+        finally:
+            if _api_client is not None:
+                await _api_client.aclose()
+                _api_client = None
 
 
 if __name__ == "__main__":
