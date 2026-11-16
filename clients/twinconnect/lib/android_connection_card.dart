@@ -1041,10 +1041,14 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
          AndroidSingBoxTunnel.supported.contains(entry.protocol.code) ||
          entry.protocol.code == 'openvpn' ||
          entry.protocol.code == 'cisco')).toList(growable: false);
+    // A server selected without an explicit protocol must not silently
+    // fall back to WireGuard: that can display a different VPN than chosen.
     final chosen = requested != null
         ? available.where((e) => e.protocol.code == requested).firstOrNull
-        : readyOptions.where((e) => e.protocol.code == 'wireguard').firstOrNull ??
-            readyOptions.firstOrNull;
+        : widget.selectedNodeId != null
+            ? null
+            : readyOptions.where((e) => e.protocol.code == 'wireguard').firstOrNull ??
+                readyOptions.firstOrNull;
     final nativeReady = Platform.isAndroid &&
         widget.native.supports('wireguard') &&
         chosen?.protocol.code == 'wireguard' &&
