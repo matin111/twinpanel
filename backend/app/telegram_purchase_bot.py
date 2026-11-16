@@ -5,7 +5,7 @@ from html import escape
 from aiogram import F, Router
 
 from .telegram_navigation_v1 import show_navigation_page, acknowledge_navigation
-from .telegram_checkout_copy_v1 import (choose_payment_text, method_label, payment_detail_text, proof_prompt, proof_success, wallet_preview_text)
+from .telegram_checkout_copy_v1 import (choose_payment_text, method_label, payment_detail_text, proof_prompt, proof_success, wallet_preview_text, wallet_success_text)
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import (
@@ -1060,7 +1060,7 @@ def create_purchase_router(
         buttons = []
         if sufficient:
             buttons.append([InlineKeyboardButton(
-                text="✅ تأیید و پرداخت از کیف پول",
+                text="✅ تأیید پرداخت از کیف پول",
                 callback_data=f"shop:wallet:confirm:{order_id}",
             )])
         else:
@@ -1069,7 +1069,7 @@ def create_purchase_router(
                 callback_data="wallet:topup",
             )])
         buttons.append([InlineKeyboardButton(
-            text="⬅️ بازگشت به روش‌های پرداخت",
+            text="⬅️ روش‌های پرداخت",
             callback_data=f"shop:wallet:back:{order_id}",
         )])
         await callback.message.edit_text(
@@ -1111,19 +1111,7 @@ def create_purchase_router(
             return
         await callback.answer()
         order = result.get("order") or {}
-        if order.get("status") == "fulfilled":
-            description = (
-                "✅ <b>پرداخت با کیف پول موفق بود</b>\n\n"
-                f"🧾 سفارش: <b>#{order_id}</b>\n"
-                f"💰 مبلغ از کیف پول کسر شد.\n"
-                "🎉 اکانت ساخته شد؛ از بخش اشتراک‌های من دریافت کنید."
-            )
-        else:
-            description = (
-                "✅ <b>پرداخت ثبت شد</b>\n\n"
-                f"🧾 سفارش: <b>#{order_id}</b>\n"
-                "ساخت اکانت در حال تکمیل است. مبلغ دوباره کسر نمی‌شود."
-            )
+        description = wallet_success_text(order_id, fulfilled=order.get("status") == "fulfilled")
         await callback.message.edit_text(
             description,
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
