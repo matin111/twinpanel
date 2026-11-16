@@ -21,8 +21,8 @@ void main() {
     expect(bridge, contains('case "getAnyTlsTunnelStatus":'));
     expect(bridge, contains('"protocol": "anytls"'));
     expect(bridge, contains('libboxBackendReady()'));
-    expect(extension, contains('case "hysteria2", "tuic", "anytls", "naive":'));
-    expect(engine, contains('["hysteria2", "tuic", "anytls", "naive"]'));
+    expect(extension, contains('case "hysteria2", "tuic", "anytls", "naive", "shadowtls":'));
+    expect(engine, contains('["hysteria2", "tuic", "anytls", "naive", "shadowtls"]'));
     expect(engine, contains('outbounds.first?["type"] as? String == code'));
     expect(host, contains('allowedConfig(config, protocolCode: protocolCode)'));
     expect(host, contains('namespace + ":" + account + ":" + protocolCode'));
@@ -36,7 +36,7 @@ void main() {
     expect(dashboard, contains('_macAnyTls.start('));
     expect(dashboard, contains("entry.protocol.code == protocol"));
     expect(dashboard, contains('matches.length != 1'));
-    expect(dashboard, contains("supportedCodes: {'hysteria2', 'tuic', 'anytls', 'naive'}"));
+    expect(dashboard, contains("supportedCodes: {'hysteria2', 'tuic', 'anytls', 'naive', 'shadowtls'}"));
     expect(dashboard, contains('_vpnVerified = false'));
   });
 }
