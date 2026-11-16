@@ -55,10 +55,21 @@ void main() {
       'route': {'final': 'direct'},
       'inbounds': [{'type': 'mixed'}],
     });
-    final built = SingBoxMacConfig.composeHysteria2(item: injected);
-    final outbound = (built['outbounds'] as List).single as Map;
-    expect(outbound.containsKey('route'), false);
-    expect(outbound.containsKey('inbounds'), false);
+    // Shared validator rejects unauthorized app-level route and inbound
+    // settings, even when the native composer otherwise allowlists fields.
+    expect(
+      () => SingBoxMacConfig.composeHysteria2(item: injected),
+      throwsFormatException,
+    );
+    final safe = SingBoxMacConfig.composeHysteria2(item: item(outbound: {
+      'type': 'hysteria2',
+      'server': 'example.org',
+      'server_port': 443,
+      'password': 'synthetic',
+      'tls': {'enabled': true, 'server_name': 'example.org'},
+      'detour': 'direct',
+    }));
+    final outbound = (safe['outbounds'] as List).single as Map;
     expect(outbound.containsKey('detour'), false);
 
     for (final tls in [
