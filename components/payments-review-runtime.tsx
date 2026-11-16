@@ -414,6 +414,7 @@ export function PaymentsReviewRuntime(){
                       {pick("مشاهده اکانت ساخته‌شده","Open created account")} #{row.subscriptionId}
                     </a>
                     {row.accountUsername&&<small>{pick("نام کاربری","Username")}: <b dir="ltr">{row.accountUsername}</b></small>}
+                    {row.fulfillmentStatus==="created_pending_fulfillment"&&<small>{pick("◷ اکانت ساخته شده؛ تکمیل سفارش در حال بررسی است","◷ Account exists; final order reconciliation pending")}</small>}
                     <small>{row.deliveryStatus==="telegram_sent"
                       ?pick("✓ پیام اطلاعات اکانت در تلگرام ارسال شد","✓ Account details sent via Telegram")
                       :row.deliveryStatus==="telegram_pending"
