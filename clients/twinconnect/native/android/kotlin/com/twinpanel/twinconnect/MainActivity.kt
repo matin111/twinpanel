@@ -93,41 +93,61 @@ class MainActivity : FlutterActivity() {
                 else -> result.notImplemented()
             }
         }
-        // Dedicated AmneziaWG contract. Never alias it to stock WireGuard.
-        // The native service must exist in the APK before advertising support.
-        val awgServiceBundled = try {
-            Class.forName("org.amnezia.awg.backend.GoBackend\\$VpnService")
-            true
+        // AWG is an optional isolated AAR. Reflective dispatch keeps the
+        // standard WireGuard-only APK buildable when AWG is not staged.
+        val awgRuntime = try {
+            Class.forName("com.twinpanel.twinconnect.AmneziaWgRuntime")
         } catch (_: ClassNotFoundException) {
-            false
-        } catch (_: LinkageError) {
-            false
+            null
         }
         MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
             "com.twinpanel.twinconnect/amneziawg"
         ).setMethodCallHandler { call, result ->
-            when (call.method) {
-                "getCapabilities" -> result.success(
-                    mapOf(
-                        "contractVersion" to 1,
-                        "engineReady" to false,
-                        "vpnServiceReady" to awgServiceBundled,
-                        "tunnelVerified" to false,
-                        "reason" to if (awgServiceBundled)
-                            "AWG_NATIVE_RUNTIME_NOT_CONNECTED"
-                        else "AWG_NATIVE_BACKEND_NOT_BUNDLED"
-                    )
-                )
-                "connect" -> result.error(
-                    "AWG_NATIVE_BACKEND_NOT_BUNDLED",
-                    "AmneziaWG GoBackend and its native wg-go library must be bundled",
-                    null
-                )
-                "disconnect" -> result.success(
-                    mapOf("connected" to false, "tunnelVerified" to false)
-                )
-                else -> result.notImplemented()
+            onWorker(result) {
+                if (awgRuntime == null) {
+                    if (call.method == "getCapabilities") {
+                        mapOf(
+                            "contractVersion" to 1,
+                            "engineReady" to false,
+                            "vpnServiceReady" to false,
+                            "tunnelVerified" to false,
+                            "reason" to "AWG_NATIVE_BACKEND_NOT_BUNDLED"
+                        )
+                    } else {
+                        throw IllegalArgumentException("AWG_NATIVE_BACKEND_NOT_BUNDLED")
+                    }
+                } else {
+                    try {
+                        val instance = awgRuntime.getField("INSTANCE").get(null)
+                        when (call.method) {
+                            "getCapabilities" -> {
+                                val ready = awgRuntime.getMethod(
+                                    "initialize", Context::class.java
+                                ).invoke(instance, applicationContext) == true
+                                mapOf(
+                                    "contractVersion" to 1,
+                                    "engineReady" to ready,
+                                    "vpnServiceReady" to ready,
+                                    "tunnelVerified" to false
+                                )
+                            }
+                            "connect" -> {
+                                val config = call.argument<String>("config")
+                                    ?: throw IllegalArgumentException("AWG_PROFILE_MISSING")
+                                awgRuntime.getMethod(
+                                    "connect", Context::class.java, String::class.java
+                                ).invoke(instance, applicationContext, config)
+                            }
+                            "disconnect" -> awgRuntime.getMethod(
+                                "disconnect"
+                            ).invoke(instance)
+                            else -> throw IllegalArgumentException("AWG_UNKNOWN_METHOD")
+                        }
+                    } catch (_: ReflectiveOperationException) {
+                        throw IllegalArgumentException("AWG_NATIVE_RUNTIME_FAILED")
+                    }
+                }
             }
         }
         channel.setMethodCallHandler { call, result ->
