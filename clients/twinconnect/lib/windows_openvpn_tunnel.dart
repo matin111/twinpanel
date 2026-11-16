@@ -30,6 +30,21 @@ class WindowsOpenVpnTunnel {
   static Future<bool> enginePresent() async =>
       enginePath != null && await File(enginePath!).exists();
 
+  /// OpenVPN Community 2.7 Windows client, using stable TAP compatibility
+  /// rather than the automatically selected DCO kernel path.
+  static List<String> startupArguments({
+    required String configPath,
+    required int managementPort,
+    required String managementPasswordPath,
+  }) => [
+    '--config', configPath,
+    '--management', '127.0.0.1', managementPort.toString(),
+    managementPasswordPath,
+    '--disable-dco', '--auth-nocache', '--verb', '3',
+  ];
+
+
+
   static String secret() {
     final random = Random.secure();
     return base64UrlEncode(List<int>.generate(48, (_) => random.nextInt(256)))
@@ -165,14 +180,19 @@ class WindowsOpenVpnTunnel {
       final ready = Completer<void>();
       String? startupFailure;
       phase = 'PROCESS_LAUNCH';
-      final child = await Process.start(binary, [
-        '--config', _config!.path,
-        '--management', '127.0.0.1', _managementPort.toString(),
-        _password!.path, '--auth-nocache', '--verb', '3',
-      ], runInShell: false);
+      // OpenVPN 2.7 defaults to the Windows DCO driver. Some pre-existing
+      // installations have a mismatched/disabled DCO adapter and exit before
+      // the TLS handshake; use the vendor-supported TAP compatibility path.
+      // This changes only the local client driver, not the server profile.
+      final child = await Process.start(binary, startupArguments(
+        configPath: _config!.path,
+        managementPort: _managementPort!,
+        managementPasswordPath: _password!.path,
+      ), runInShell: false);
       _process = child;
       for (final output in [child.stdout, child.stderr]) {
-        output.transform(utf8.decoder).transform(const LineSplitter()).listen(
+        output.transform(const Utf8Decoder(allowMalformed: true))
+            .transform(const LineSplitter()).listen(
           (line) {
             final lower = line.toLowerCase();
             if (lower.contains('initialization sequence completed') &&
