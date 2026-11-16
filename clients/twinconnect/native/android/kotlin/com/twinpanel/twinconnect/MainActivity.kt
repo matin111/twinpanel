@@ -23,6 +23,7 @@ import java.util.concurrent.Executors
 class MainActivity : FlutterActivity() {
     private val executor: ExecutorService = Executors.newSingleThreadExecutor()
     private var pendingStart: PendingStart? = null
+    private var pendingAwgStart: Pair<String, MethodChannel.Result>? = null
 
     private data class PendingStart(
         val config: String,
@@ -104,7 +105,28 @@ class MainActivity : FlutterActivity() {
             flutterEngine.dartExecutor.binaryMessenger,
             "com.twinpanel.twinconnect/amneziawg"
         ).setMethodCallHandler { call, result ->
-            onWorker(result) {
+            if (call.method == "connect" && awgRuntime != null) {
+                val config = call.argument<String>("config")
+                if (config.isNullOrBlank()) {
+                    result.error("AWG_PROFILE_MISSING", "Missing VPN profile", null)
+                } else if (pendingAwgStart != null) {
+                    result.error("AWG_PERMISSION_PENDING", "VPN permission pending", null)
+                } else {
+                    val approval = VpnService.prepare(this)
+                    if (approval != null) {
+                        pendingAwgStart = Pair(config, result)
+                        try {
+                            @Suppress("DEPRECATION")
+                            startActivityForResult(approval, AWG_APPROVAL_REQUEST)
+                        } catch (_: Exception) {
+                            pendingAwgStart = null
+                            result.error("VPN_PERMISSION_FAILED", "Unable to request permission", null)
+                        }
+                    } else {
+                        launchAmneziaWg(awgRuntime, config, result)
+                    }
+                }
+            } else onWorker(result) {
                 if (awgRuntime == null) {
                     if (call.method == "getCapabilities") {
                         mapOf(
@@ -259,6 +281,24 @@ class MainActivity : FlutterActivity() {
         }
     }
 
+    private fun launchAmneziaWg(
+        runtime: Class<*>,
+        configuration: String,
+        result: MethodChannel.Result
+    ) {
+        onWorker(result) {
+            try {
+                val instance = runtime.getField("INSTANCE").get(null)
+                @Suppress("UNCHECKED_CAST")
+                runtime.getMethod(
+                    "connect", Context::class.java, String::class.java
+                ).invoke(instance, applicationContext, configuration) as Map<String, Any>
+            } catch (_: ReflectiveOperationException) {
+                throw IllegalArgumentException("AWG_NATIVE_START_FAILED")
+            }
+        }
+    }
+
     private fun launchWireGuard(
         configuration: String,
         policy: Map<String, Any?>,
@@ -289,7 +329,12 @@ class MainActivity : FlutterActivity() {
                     "AUTO_RECONNECT_NOT_VERIFIED", "OS_LOCKDOWN_NOT_ENABLED",
                     "TUNNEL_ALREADY_RUNNING", "TUNNEL_NOT_ESTABLISHED",
                     "WIREGUARD_CONFIG_PARSE_FAILED", "WIREGUARD_NATIVE_START_FAILED",
-                    "PROFILE_PURGE_FAILED"
+                    "PROFILE_PURGE_FAILED", "AWG_NATIVE_START_FAILED",
+                    "AWG_NATIVE_BACKEND_NOT_BUNDLED", "AWG_PROFILE_MISSING",
+                    "AWG_ENGINE_UNAVAILABLE", "AWG_PROFILE_INVALID",
+                    "AWG_DNS_MISSING", "AWG_DEFAULT_ROUTE_MISSING",
+                    "AWG_CONFIG_PARSE_FAILED", "AWG_TUN_NOT_ESTABLISHED",
+                    "AWG_ALREADY_CONNECTED", "OTHER_VPN_ACTIVE"
                 )
                 val safeCode = error.message?.takeIf { accepted.contains(it) }
                     ?: "NATIVE_VPN_START_FAILED"
@@ -305,6 +350,25 @@ class MainActivity : FlutterActivity() {
     @Deprecated("Deprecated by Android API; required for FlutterActivity's approval callback")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == AWG_APPROVAL_REQUEST) {
+            val request = pendingAwgStart ?: return
+            pendingAwgStart = null
+            if (resultCode == Activity.RESULT_OK) {
+                val runtime = try {
+                    Class.forName("com.twinpanel.twinconnect.AmneziaWgRuntime")
+                } catch (_: ClassNotFoundException) {
+                    null
+                }
+                if (runtime == null) {
+                    request.second.error("AWG_NATIVE_BACKEND_NOT_BUNDLED", "AWG engine missing", null)
+                } else {
+                    launchAmneziaWg(runtime, request.first, request.second)
+                }
+            } else {
+                request.second.error("VPN_PERMISSION_DENIED", "VPN permission not granted", null)
+            }
+            return
+        }
         if (requestCode != VPN_APPROVAL_REQUEST) return
         val request = pendingStart ?: return
         pendingStart = null
@@ -320,6 +384,8 @@ class MainActivity : FlutterActivity() {
             "VPN_REQUEST_CANCELLED", "VPN approval activity closed", null
         )
         pendingStart = null
+        pendingAwgStart?.second?.error("VPN_REQUEST_CANCELLED", "VPN approval activity closed", null)
+        pendingAwgStart = null
         executor.shutdown()
         // Do not tear down a VPN on ordinary UI destruction. The user's
         // explicit Disconnect and OS VPN revocation own that lifecycle.
@@ -328,5 +394,6 @@ class MainActivity : FlutterActivity() {
 
     companion object {
         private const val VPN_APPROVAL_REQUEST = 44011
+        private const val AWG_APPROVAL_REQUEST = 44012
     }
 }
