@@ -89,6 +89,40 @@ final class TwinConnectMacLibboxEngine {
         return true
     }
 
+    private static func snellProfileAllowed(_ json: [String: Any]) -> Bool {
+        guard let outbounds = json["outbounds"] as? [[String: Any]],
+              outbounds.count == 1, let outbound = outbounds.first,
+              outbound["type"] as? String == "snell",
+              outbound["tag"] as? String == "proxy",
+              let version = outbound["version"] as? Int,
+              [4, 6].contains(version),
+              let secret = outbound["psk"] as? String,
+              !secret.isEmpty, secret.utf8.count <= 4096,
+              (version != 6 || (12...255).contains(secret.utf8.count)),
+              let endpoint = outbound["server"] as? String,
+              !endpoint.isEmpty,
+              let port = outbound["server_port"] as? Int,
+              (1...65535).contains(port),
+              Set(outbound.keys).isSubset(of: [
+                  "type", "tag", "server", "server_port", "version",
+                  "psk", "userkey", "reuse", "network", "obfs_mode",
+                  "obfs_host", "mode"
+              ]),
+              (version != 4 || outbound["mode"] == nil),
+              (version != 6 || (outbound["obfs_mode"] == nil &&
+                   outbound["obfs_host"] == nil)),
+              let inbounds = json["inbounds"] as? [[String: Any]],
+              inbounds.count == 1,
+              inbounds[0]["type"] as? String == "tun",
+              inbounds[0]["auto_route"] as? Bool == true,
+              inbounds[0]["strict_route"] as? Bool == true,
+              let route = json["route"] as? [String: Any],
+              route["final"] as? String == "proxy",
+              let dns = json["dns"] as? [String: Any],
+              dns["final"] as? String == "dns-remote" else { return false }
+        return true
+    }
+
     private static func profileIsAllowed(_ config: String) -> Bool {
         guard let data = config.data(using: .utf8),
               let json = (try? JSONSerialization.jsonObject(with: data))
@@ -98,6 +132,9 @@ final class TwinConnectMacLibboxEngine {
         }
         if outbounds.count == 2 {
             return shadowTlsProfileAllowed(json)
+        }
+        if outbounds.count == 1 && outbounds.first?["type"] as? String == "snell" {
+            return snellProfileAllowed(json)
         }
         guard outbounds.count == 1,
               let outbound = outbounds.first,
@@ -147,7 +184,7 @@ final class TwinConnectMacLibboxEngine {
                   let settings = tunnel.protocolConfiguration
                     as? NETunnelProviderProtocol,
                   let code = settings.providerConfiguration?["protocol"] as? String,
-                  ["hysteria2", "tuic", "anytls", "naive", "shadowtls"].contains(code),
+                  ["hysteria2", "tuic", "anytls", "naive", "shadowtls", "snell"].contains(code),
                   let reference = settings.passwordReference,
                   let config = Self.readProfile(reference),
                   Self.profileIsAllowed(config),
