@@ -348,6 +348,8 @@ async def submit_wallet_topup_v2(
 
 @admin_router.get("/topups")
 def admin_wallet_topups_v2(db: Session = Depends(get_db)):
+    from ..customer_wallet_models import CustomerWalletTransaction
+
     rows = (
         db.query(CustomerWalletTopup)
         .filter(
@@ -359,16 +361,45 @@ def admin_wallet_topups_v2(db: Session = Depends(get_db)):
         .limit(500)
         .all()
     )
+    if not rows:
+        return []
 
+    # Confirm actual credit in the ledger; never equate a mere approval
+    # status with an increase of balance.
+    references = [f"wallet-topup:{int(row.id)}" for row in rows]
+    credits = {
+        str(tx.reference): int(tx.amount_toman or 0)
+        for tx in db.query(CustomerWalletTransaction)
+        .filter(
+            CustomerWalletTransaction.reference.in_(references),
+            CustomerWalletTransaction.kind == "topup",
+        )
+        .all()
+    }
+
+    users = {
+        int(user.id): user
+        for user in db.query(User)
+        .filter(User.id.in_({int(row.user_id) for row in rows}))
+        .all()
+    }
     result = []
     for row in rows:
         item = _topup_out(row)
-        user = db.get(User, row.user_id)
+        user = users.get(int(row.user_id))
         item["user"] = {
             "email": user.email,
             "full_name": user.full_name,
             "phone": user.phone,
         } if user else None
+        reference = f"wallet-topup:{int(row.id)}"
+        credit = credits.get(reference)
+        item["wallet_credit_status"] = (
+            "credited" if credit is not None
+            else "not_credited"
+        )
+        item["credited_amount_toman"] = credit
+        item["wallet_user_id"] = int(row.user_id)
         result.append(item)
 
     return result
