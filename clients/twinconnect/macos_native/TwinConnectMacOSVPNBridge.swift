@@ -15,6 +15,12 @@ final class TwinConnectMacOSVPNBridge {
         return bundle
     }
 
+    private static func xrayEngineInstalled() -> Bool {
+        let executable = Bundle.main.bundleURL.appendingPathComponent(
+            "Contents/Resources/TwinConnectEngines/xray")
+        return FileManager.default.isExecutableFile(atPath: executable.path)
+    }
+
     private static func hysteriaEngineInstalled() -> Bool {
         let root = Bundle.main.bundleURL.appendingPathComponent(
             "Contents/Resources/TwinConnectEngines/sing-box")
@@ -58,6 +64,17 @@ final class TwinConnectMacOSVPNBridge {
                 result([
                     "contractVersion": 1,
                     "supportedCodes": [String]()
+                ] as [String: Any])
+            case "macOSXrayEngineStatus":
+                result([
+                    "contractVersion": 1,
+                    "protocol": "v2ray",
+                    "binaryInstalled": xrayEngineInstalled(),
+                    "packetFlowBridgeReady": false,
+                    "engineReady": false,
+                    "reason": xrayEngineInstalled()
+                        ? "MACOS_XRAY_PACKET_FLOW_BRIDGE_MISSING"
+                        : "MACOS_XRAY_ENGINE_BINARY_MISSING"
                 ] as [String: Any])
             case "macOSHysteria2EngineStatus":
                 result([
