@@ -8,6 +8,9 @@ $headers = @{
   Accept = 'application/vnd.github+json'
   'User-Agent' = 'TwinConnect-Windows-Builder'
 }
+# Windows CI shares a public GitHub API IP. Authenticated reads avoid the
+# anonymous 60/hour ceiling; never print or persist the runner token.
+if ($env:GH_TOKEN) { $headers['Authorization'] = 'Bearer ' + $env:GH_TOKEN }
 $release = Invoke-RestMethod -Uri (
   'https://api.github.com/repos/amnezia-vpn/amneziawg-windows-client/releases/tags/' + $tag
 ) -Headers $headers -TimeoutSec 90
