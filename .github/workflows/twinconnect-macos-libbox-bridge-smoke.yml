@@ -59,6 +59,10 @@ jobs:
           python3 macos_native/install_macos_bridge.py
           ruby macos_native/install_packet_tunnel_target.rb
           ruby macos_native/libbox/link_libbox_packet_tunnel.rb
+          # Do not silently pass a link-only test with engine sources omitted.
+          for source in TwinConnectMacLibboxPlatform.swift TwinConnectMacLibboxEngine.swift; do
+            grep -q "$source" macos/Runner.xcodeproj/project.pbxproj
+          done
           log="$RUNNER_TEMP/twinconnect-libbox-extension.log"
           if ! xcodebuild -project macos/Runner.xcodeproj -target PacketTunnel \
             -configuration Release -sdk macosx -arch arm64 \
@@ -72,12 +76,12 @@ jobs:
           test -n "$embedded"
           test -e "$embedded/Libbox"
           echo "PacketTunnel runtime Libbox embedded: $embedded"
-          echo 'Libbox in PacketTunnel compiles; packet-flow forwarding still NOT IMPLEMENTED'
+          echo 'Libbox PlatformInterface and engine compiled; signed live traffic NOT VERIFIED'
       - name: Verify this is not a signed or connected VPN
         shell: bash
         run: |
           test -d clients/twinconnect/macos_native/build/libbox/Libbox.xcframework
-          echo 'Libbox framework linked to unsigned PacketTunnel target; native packet-flow implementation NOT yet present'
+          echo 'Unsigned Libbox PacketTunnel compiled; real signed runtime and egress NOT VERIFIED'
           echo 'No entitlement, signed extension, VPN connection, DNS protection, handshake, or traffic claims'
       - uses: actions/upload-artifact@v4
         with:
