@@ -87,6 +87,8 @@ export function LegacySubscriptionsRuntimePage(){
   const [error,setError]=useState("");
   const [ok,setOk]=useState("");
   const [query,setQuery]=useState("");
+  const [linkedAccountId,setLinkedAccountId]=useState(0);
+  const [paymentLinkInitialized,setPaymentLinkInitialized]=useState(false);
   const [page,setPage]=useState(0);
   const [matchedTotal,setMatchedTotal]=useState(0);
   const [globalStats,setGlobalStats]=useState({total:0,active:0,expired:0,suspended:0,online:0});
@@ -132,7 +134,25 @@ export function LegacySubscriptionsRuntimePage(){
   const [draft,setDraft]=useState<Draft>({user_id:0,plan_id:0,traffic_gb:"",duration_days:"",device_limit:"1",username:"",password:"",protocols:[]});
   const [editExpiry,setEditExpiry]=useState("");
 
+  useEffect(()=>{
+    // This is the actual subscriptions page used by /admin/subscriptions.
+    // Read the payment deep link before the first database search, rather
+    // than applying the link only in the unused subscriptions-full runtime.
+    const params=new URLSearchParams(window.location.search);
+    const raw=params.get("focus")||"";
+    const accountId=/^[0-9]+$/.test(raw)?Number(raw):0;
+    if(Number.isSafeInteger(accountId)&&accountId>0){
+      setLinkedAccountId(accountId);
+      setQuery((params.get("account")||String(accountId)).trim());
+      setPage(0);
+      setStatus("all");
+      setResellerFilterId(0);
+    }
+    setPaymentLinkInitialized(true);
+  },[]);
+
   const load=async(silent=false)=>{
+    if(!paymentLinkInitialized)return;
     const requestId=++listRequestId.current;
     if(!silent)setLoading(true);
     setError("");
@@ -141,6 +161,10 @@ export function LegacySubscriptionsRuntimePage(){
       if(requestId!==listRequestId.current)return;
       setRows(data.items);
       setMatchedTotal(data.total);
+      if(linkedAccountId>0){
+        const exact=data.items.find(item=>n(item.id)===linkedAccountId);
+        if(exact)setSelected(exact);
+      }
       setGlobalStats(data.stats);
       setSelected(current=>current?(data.items.find(item=>n(item.id)===n(current.id))||current):null);
     }catch(reason){
@@ -151,12 +175,13 @@ export function LegacySubscriptionsRuntimePage(){
   };
 
   useEffect(()=>{
+    if(!paymentLinkInitialized)return;
     const timer=window.setTimeout(()=>void load(),query.trim()?250:0);
     const interval=window.setInterval(()=>{
       if(document.visibilityState==="visible")void load(true);
     },45000);
     return()=>{window.clearTimeout(timer);window.clearInterval(interval);listRequestId.current+=1;};
-  },[page,query,status,resellerFilterId]);
+  },[page,query,status,resellerFilterId,paymentLinkInitialized,linkedAccountId]);
 
   useEffect(()=>{
     // Metadata is supplementary for create/edit forms and never blocks the list.
@@ -172,9 +197,11 @@ export function LegacySubscriptionsRuntimePage(){
   const planMap=useMemo(()=>new Map(plans.map(plan=>[n(plan.id),plan])),[plans]);
   const activePlan=planMap.get(draft.plan_id);
   // Search and status are applied by the database before pagination.
-  const filtered=rows;
+  const filtered=linkedAccountId>0
+    ?rows.filter(row=>n(row.id)===linkedAccountId)
+    :rows;
   const stats=globalStats;
-  const pageCount=Math.max(1,Math.ceil(matchedTotal/pageSize));
+  const pageCount=linkedAccountId>0?1:Math.max(1,Math.ceil(matchedTotal/pageSize));
   // Up to ten visible pages, sliding around the current page and clamped to bounds.
   const pageWindowStart=Math.max(0,Math.min(page-4,pageCount-10));
   const visiblePages=Array.from({length:Math.min(10,pageCount)},(_,index)=>pageWindowStart+index);
@@ -470,7 +497,7 @@ export function LegacySubscriptionsRuntimePage(){
     `}</style>
 
     <Card>
-      <div className="runtime-toolbar"><label>⌕ <input value={query} onChange={event=>{setQuery(event.target.value);setPage(0);}} placeholder={pick("نام، ایمیل، نام کاربری یا کد اشتراک…","Name, email, username or subscription code…")}/></label><select value={status} onChange={event=>{setStatus(event.target.value as typeof status);setPage(0);}}><option value="all">{pick("همه","All")}</option><option value="active">{pick("فعال","Active")}</option><option value="expired">{pick("منقضی","Expired")}</option><option value="suspended">{pick("معلق","Suspended")}</option><option value="online">{pick("آنلاین‌ها","Online now")}</option><option value="pending">{pick("در انتظار","Pending")}</option></select><select aria-label={pick("فیلتر نماینده","Filter by reseller")} value={resellerFilterId} onChange={event=>{setResellerFilterId(Number(event.target.value));setPage(0);}}><option value={0}>{pick("همه نمایندگی‌ها","All resellers")}</option><option value={-1}>{pick("بدون نماینده","No reseller")}</option>{transferResellers.map(reseller=><option key={n(reseller.id)} value={n(reseller.id)}>{s(reseller.name)||s(reseller.brand_name)||`#${reseller.id}`}</option>)}</select><button className="ghost" disabled={loading} onClick={()=>void load()}>{loading?"…":pick("بروزرسانی","Refresh")}</button></div>
+      <div className="runtime-toolbar"><label>⌕ <input value={query} onChange={event=>{setLinkedAccountId(0);setQuery(event.target.value);setPage(0);if(window.location.search.includes("focus=")){const url=new URL(window.location.href);url.searchParams.delete("focus");url.searchParams.delete("account");window.history.replaceState(null,"",url.pathname+url.search+url.hash);}}} placeholder={pick("نام، ایمیل، نام کاربری یا کد اشتراک…","Name, email, username or subscription code…")}/></label><select value={status} onChange={event=>{setStatus(event.target.value as typeof status);setPage(0);}}><option value="all">{pick("همه","All")}</option><option value="active">{pick("فعال","Active")}</option><option value="expired">{pick("منقضی","Expired")}</option><option value="suspended">{pick("معلق","Suspended")}</option><option value="online">{pick("آنلاین‌ها","Online now")}</option><option value="pending">{pick("در انتظار","Pending")}</option></select><select aria-label={pick("فیلتر نماینده","Filter by reseller")} value={resellerFilterId} onChange={event=>{setResellerFilterId(Number(event.target.value));setPage(0);}}><option value={0}>{pick("همه نمایندگی‌ها","All resellers")}</option><option value={-1}>{pick("بدون نماینده","No reseller")}</option>{transferResellers.map(reseller=><option key={n(reseller.id)} value={n(reseller.id)}>{s(reseller.name)||s(reseller.brand_name)||`#${reseller.id}`}</option>)}</select><button className="ghost" disabled={loading} onClick={()=>void load()}>{loading?"…":pick("بروزرسانی","Refresh")}</button></div>
       {loading&&rows.length===0?<div className="runtime-loading">…</div>:<div className="table"><table><thead><tr><th>{pick("کاربر","User")}</th><th>{pick("نماینده","Reseller")}</th><th>{pick("پلن","Plan")}</th><th>{pick("نام کاربری","Username")}</th><th>{pick("ترافیک","Traffic")}</th><th>{pick("ساخت","Created")}</th><th>{pick("انقضا","Expires")}</th><th>{pick("وضعیت","Status")}</th><th>{pick("عملیات","Actions")}</th></tr></thead><tbody>{filtered.map(item=>{const user=userMap.get(n(item.user_id));const plan=planMap.get(n(item.plan_id));return <tr key={n(item.id)}><td><div className="user-cell"><b>{user?.full_name||s(item.customer_name)||`#${item.user_id}`}</b><small dir="ltr">{user?.email||s(item.customer_email)||"—"}</small></div></td><td><div className="user-cell"><b>{s(item.reseller_name)||pick("مستقیم","Direct")}</b>{n(item.reseller_id)>0&&<small dir="ltr">#{n(item.reseller_id)}</small>}</div></td><td><div className="user-cell"><b>{s(item.plan_name)||s(plan?.name)||`#${item.plan_id}`}</b><small dir="ltr">MV-{n(item.id)}</small></div></td><td><div className="secret-row"><b dir="ltr">{s(item.account_username)||"—"}</b>{s(item.account_username)&&<button className="mini-btn" onClick={()=>copy(s(item.account_username))}>{pick("کپی","Copy")}</button>}</div></td><td>{trafficCell(item)}</td><td>{formatDate(item.created_at)}</td><td>{expiryCell(item)}</td><td><div className="subscription-live-statuses"><Badge tone={tone(item.status)}>{statusLabel(item.status)}</Badge><span className={`subscription-presence subscription-presence-${presenceKind(item)}`}>{presenceKind(item)==="online"?pick("● آنلاین","● Online"):presenceKind(item)==="offline"?pick("○ آفلاین","○ Offline"):pick("◌ نامشخص","◌ Unknown")}</span></div></td><td><div className="row-actions"><button className="danger" disabled={!!busy} onClick={()=>void remove(item)}>{pick("حذف","Delete")}</button><button disabled={!!busy} onClick={()=>void toggleStatus(item)}>{s(item.status).toLowerCase()==="active"?pick("تعلیق","Suspend"):pick("فعال‌سازی","Activate")}</button><button onClick={()=>openEdit(item)}>{pick("ویرایش","Edit")}</button><button type="button" className="ghost" disabled={!!busy} onClick={()=>{if(!busy){setError("");setOk("");setResetTarget(item);}}}>↻ {pick("ریست ترافیک","Reset traffic")}</button><button onClick={()=>openExtend(item)}>{pick("تمدید","Renew")}</button><button className="ghost" disabled={!!busy} onClick={()=>void openTransfer(item)}>{pick("انتقال اکانت","Transfer account")}</button><button className="primary-soft" onMouseEnter={()=>prefetchSubscriptionLink(item)} onFocus={()=>prefetchSubscriptionLink(item)} onClick={()=>void openSubscriptionLink(item)}>{pick("سابلینک","Sub-link")}</button><button type="button" className="ghost" data-testid="admin-app-delivery-action" onClick={()=>setAppDeliverySubscriptionId(n(item.id)||null)}>{pick("ورود اپ","App Login")}</button></div></td></tr>;})}</tbody></table>{filtered.length===0&&<div className="runtime-empty">{pick("اشتراکی پیدا نشد","No subscriptions found")}</div>}</div>}
 
       <div className="mobile-subscription-cards" aria-label={pick("فهرست اشتراک‌ها","Subscriptions list")}>
