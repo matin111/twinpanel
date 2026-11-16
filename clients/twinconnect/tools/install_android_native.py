@@ -74,7 +74,7 @@ def patch_gradle() -> None:
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(awg_aar, target)
         current += (
-            "\\n// Official AmneziaWG backend and JNI, built from pinned upstream source.\\n"
+            "\n// Official AmneziaWG backend and JNI, built from pinned upstream source.\n"
             'dependencies { implementation(files("libs/amneziawg-tunnel.aar")) }\\n'
         )
     filename.write_text(current, encoding="utf-8")
