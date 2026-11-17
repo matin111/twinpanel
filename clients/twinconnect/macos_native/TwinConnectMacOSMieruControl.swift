@@ -100,8 +100,10 @@ enum TwinConnectMacOSMieruControl {
                 return
             }
             let manager = (managers ?? []).first {
-                ($0.protocolConfiguration as? NETunnelProviderProtocol)?
-                    .providerBundleIdentifier == bundleID
+                guard let existing = $0.protocolConfiguration
+                    as? NETunnelProviderProtocol else { return false }
+                return existing.providerBundleIdentifier == bundleID &&
+                    existing.providerConfiguration?["protocol"] as? String == "mieru"
             } ?? NETunnelProviderManager()
             guard manager.connection.status == .disconnected ||
                     manager.connection.status == .invalid else {
