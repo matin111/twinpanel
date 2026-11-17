@@ -535,3 +535,54 @@ The France-origin stages (16, 32, 64 clients) respectively returned 529/576, 1,0
 The Iran-origin stages (16, 32, 64 clients) all returned every application echo across actual Rakhsh GRE and Shabdiz UDP lab carriers. The Iran-local ingress bypasses public inbound routing, isolating the international carrier path. These are directional, short trials, not proof of no loss for real customers.
 
 Both carriers still terminate on the same Iran/France host pair; real network/provider-independent failover, subscriber phone canaries, and long-duration performance tests remain outstanding. A 512-flow lab limit is not a verified commercial subscriber capacity. TCP-stream resume is not a WireGuard UDP resume mechanism. Data: results/2026-11-17-openvpn-buffer-udp-mux-capacity.json.
+
+
+### Third-country Turkey transit lab canary — 17 November 2026
+
+An **optional, disabled-by-default third UDP carrier** was added
+to the TwinTunnel mux. It sends path-3 authenticated HMAC frames
+Iran -> Turkey -> France, through fixed-destination source-IP-allowlisted
+relays on Turkey UDP/38831 and France UDP/38832. Default path 1
+(Rakhsh GRE) and path 2 (Shabdiz UDP) are unchanged.
+
+The relay is not a general-purpose UDP proxy. It recognizes mux frame
+shapes or the restricted test echo marker, keeps no VPN private keys,
+limits its flow cache to 512 and expires mappings. The end-to-end mux
+authenticates the HMAC tag; the relay itself relies on source IP
+allowlisting and frame structure validation, not HMAC verification.
+
+**Measured results:**
+- France -> Turkey -> France test echo: 40 of 40 packets returned.
+- Iran -> Turkey -> France -> Iran test echo while both direct lab
+  carriers were stopped: 75 of 80 returned; 5 missing.
+- Iran-origin continuous 480-packet UDP mux test: 480 of 480 returned,
+  p95 echo latency 362.13 ms, while both direct lab carriers were
+  stopped together for 8 seconds during the test.
+- Two actual temporary WireGuard clients on Iran had two valid
+  handshakes; the separate French kernel WireGuard test server received
+  294 decrypted packets / 37,480 bytes. Both direct lab carriers were
+  stopped for 8 seconds while the WireGuard test was transferring data.
+- Isolated actual OpenVPN UDP via France-origin hairpin ingress reached
+  the French server TUN with 77 of 80 numbered IP packets, with
+  one OpenVPN initialization and no inactivity restart. The fault
+  from 12:10:52 to 12:11:00 UTC only overlapped the last part of
+  the 16-second packet stream starting at 12:10:38 UTC. Therefore
+  OpenVPN UDP is **not yet demonstrated zero-loss**.
+
+**All tests were temporary.** The Iran GRE and Shabdiz-UDP lab
+services and the French isolated UDP echo service were restored.
+Temporary test VPN interfaces and Turkey/France public lab relay
+processes were removed/stopped. User VPN profiles, production ports,
+central customer identities and routes were unchanged.
+
+The Python relay is a laboratory canary, not a production-ready
+daemon. It requires substantial load, device, anti-replay, NAT
+rebinding, MTU, failover-latency, supervision and security validation.
+The three carriers still rely on the same Iranian and French
+endpoints, so neither node is redundant. **Do not activate this
+Python multiplexer for live subscriber traffic from deployment hooks.**
+
+Relevant scripts: udp_turkey_transit_relay.py,
+udp_three_path_fault_probe.py, udp_three_path_failover_runner.py,
+wg_turkey_failover_runner.sh. Numeric evidence:
+results/2026-11-17-turkey-transit-canary.json.
