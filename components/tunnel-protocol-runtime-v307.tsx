@@ -469,7 +469,7 @@ export function TunnelProtocolRuntimeV307(){
           {newEngine==="twintunnel_standby"&&<label className={styles.createField}>
             <span className={styles.createFieldTitle}>{pick("نود واسط (اختیاری)","Optional transit node")}</span>
             <select value={newBackupId} onChange={event=>setNewBackupId(Number(event.target.value))}>
-              <option value={0}>{pick("بدون نود سوم","No third node")}</option>{newBackupCandidates.map(node=><option key={node.id} value={node.id}>{node.name} · {node.public_ip}</option>}
+              <option value={0}>{pick("بدون نود سوم","No third node")}</option>{newBackupCandidates.map(node=><option key={node.id} value={node.id}>{node.name} · {node.public_ip}</option>)}
             </select>
             <small>{pick("کاربران روی TP27 باقی می‌مانند. موتور جدید صرفاً نصب آزمایشی می‌شود.","Subscribers remain on TP27; the new engine is staged only.")}</small>
           </label>}
