@@ -726,6 +726,12 @@ jobs:
             "backend/scripts/twinpanel_public_updater_v69.py" \
             "backend/tests/twintunnel_node_staging_v1_smoke.py" \
             "backend/tests/twintunnel_updater_staging_hook_v1_smoke.py" \
+            "backend/app/routers/twintunnel_install_v1.py" \
+            "backend/app/main.py" \
+            "backend/tests/twintunnel_admin_install_v1_smoke.py" \
+            "components/tunnel-protocol-runtime-v307.tsx" \
+            "components/tunnel-control-center-v1.tsx" \
+            "lib/twintunnel-install-api.ts" \
             "ops/twintunnel-lab/udp_multiuser_mux.py" \
             "ops/twintunnel-lab/udp_turkey_transit_relay.py" \
             "ops/twintunnel-lab/udp_three_path_fault_probe.py"; do
@@ -737,6 +743,7 @@ jobs:
           done
           python3 source/backend/tests/twintunnel_node_staging_v1_smoke.py
           python3 source/backend/tests/twintunnel_updater_staging_hook_v1_smoke.py
+          python3 source/backend/tests/twintunnel_admin_install_v1_smoke.py
           echo "TwinTunnel stage files and post-update hooks match main"
 
       - name: Build verified production package
