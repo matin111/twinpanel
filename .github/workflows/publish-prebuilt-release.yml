@@ -134,9 +134,9 @@ jobs:
         shell: bash
         run: |
           set -Eeuo pipefail
-          for path in \\
-            "backend/app/reserved_renewal_service.py" \\
-            "backend/app/renewal_service.py" \\
+          for path in \
+            "backend/app/reserved_renewal_service.py" \
+            "backend/app/renewal_service.py" \
             "backend/tests/test_reserved_renewal_v1.py"; do
             test -s "publisher/$path" && test -s "source/$path" || {
               echo "::error file=$path::Missing reserved-renewal implementation in candidate"
