@@ -10,13 +10,17 @@ void main() {
     final engine = File(
       'macos_native/libbox/TwinConnectMacLibboxEngine.swift',
     ).readAsStringSync();
-    expect(platform, contains('func reset()'));
+    expect(platform, contains('func reset(completion: @escaping () -> Void)'));
     expect(platform, contains('let hadSettings = settings != nil'));
-    expect(platform, contains('if hadSettings, let tunnel {'));
+    expect(platform, contains('guard hadSettings, let tunnel else {'));
     expect(platform, contains('tunnel.setTunnelNetworkSettings(nil)'));
     expect(platform, contains('MACOS_LIBBOX_TUN_DESCRIPTOR_UNAVAILABLE'));
     expect(platform, contains('settings = nil'));
-    expect(engine, contains('platform.reset()'));
+    expect(engine, contains('platform.reset(completion: completion)'));
     expect(engine, contains('try? server?.closeService()'));
+    expect(engine, contains('self.close(completion: completion)'));
+    expect(engine, contains('self.close {'));
+    expect(platform, contains('tunnel.setTunnelNetworkSettings(nil) { _ in'));
+    expect(platform, contains('completion()'));
   });
 }
