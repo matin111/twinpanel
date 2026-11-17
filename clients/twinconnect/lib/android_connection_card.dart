@@ -213,6 +213,11 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
         }
         return;
       }
+      // AmneziaWG uses its own native GoBackend, not the Sing-box engine.
+      // Never mark an AWG session stopped using Sing-box's status flag.
+      if (_singBoxProtocol == 'amneziawg') {
+        return;
+      }
       if (_singBoxProtocol != null) {
         final online = AndroidSingBoxTunnel.instance.isConnected;
         if (!mounted) return;
