@@ -1062,6 +1062,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
         if (!mounted) return;
         Map<String, dynamic> response;
         try {
+          await _releaseDisconnectedGuard();
           response = await _controller.connectWireGuard(
             node: node,
             policy: policy,
