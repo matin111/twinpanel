@@ -95,7 +95,7 @@ class ReceiveBatchTests(unittest.TestCase):
         self.assertEqual(self.m.stats["full_recv_batches"],0)
 
     def test_bounded_batch_preserves_other_sockets(self):
-        self.assertEqual(self.simulate(70),mux.MAX_RECV_BATCH)
+        self.assertEqual(self.simulate(150),mux.MAX_RECV_BATCH)
         self.assertEqual(len(self.received),mux.MAX_RECV_BATCH)
         self.assertEqual(self.m.stats["full_recv_batches"],1)
 
