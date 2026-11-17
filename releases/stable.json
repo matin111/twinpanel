@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.862",
+  "version": "1.1.0-rc.863",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-16T13:21:17Z",
+  "released_at": "2026-11-17T09:41:44Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "420c31b5ff4073d23b2b48b229e5eb1a67f5cbf6",
+  "source_sha": "bff2e2729a5b18cee73f0234132f56a220aeeced",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.862/twinpanel-1.1.0-rc.862-linux-x86_64.tar.gz",
-    "sha256": "2c48a322d61ed2c4fd5a0950894dbe7675e1ce5004e5ea726e18880a5025c755",
-    "size_bytes": 31054309
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.863/twinpanel-1.1.0-rc.863-linux-x86_64.tar.gz",
+    "sha256": "45c01b01ddae7a5e97f6661301e3062082423e20142684fab4bfb7cc2ce50036",
+    "size_bytes": 31151579
   },
   "notes": {
-    "fa": "تسریع تحویل اکانت به ربات با ثبت فوری اولین کانفیگ معتبر پس از ساخت اولین نود؛ ادامه ساخت بقیه پروتکل‌ها بدون انتظار کاربر، به‌روزرسانی خودکار وضعیت سفارش در پنل و محافظ انتشار GitHub برای حفظ تغییرات.",
-    "en": "Commit the first valid protocol config as soon as the first node is provisioned, enabling verified early Telegram delivery while other nodes/protocols continue; auto-refresh admin payment delivery status; protect release parity."
+    "fa": "اصلاح دائمی تمدید رزروی: فعال‌سازی خودکار اشتراک منقضی یا دارای حجم تمام‌شده پس از پرداخت، حفظ نام کاربری و کانفیگ‌های قبلی، جلوگیری از تغییر پروتکل‌ها در تمدید و محافظ انتشار نسخه‌های بعدی.",
+    "en": "Durable reserved-renewal fix: immediately activate already-due paid renewals, preserve VPN credentials and existing endpoint configurations, and enforce renewal regression guards on future releases."
   }
 }
