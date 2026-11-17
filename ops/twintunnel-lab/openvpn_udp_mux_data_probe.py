@@ -44,8 +44,8 @@ def main():
     args = parser.parse_args()
     if not 1 <= args.count <= 20000:
         parser.error("count must be 1..20000")
-    if not 0.002 <= args.interval <= 2.0:
-        parser.error("interval must be 0.002..2.0 seconds")
+    if not 0.0 <= args.interval <= 2.0:
+        parser.error("interval must be 0..2.0 seconds")
 
     existing = subprocess.run(
         ["ip", "route", "show", f"{TARGET}/32"],
@@ -53,6 +53,7 @@ def main():
     )
     if existing.stdout.strip():
         raise RuntimeError("ABORT: benchmark route already exists; not touching")
+    client_before = counter(TUN_CLIENT, "tx_packets")
     before = counter(TUN_SERVER, "rx_packets")
     before_bytes = counter(TUN_SERVER, "rx_bytes")
     sock_before = udp_socket_info(SERVER_PORT)
@@ -101,7 +102,7 @@ def main():
                     sent += 1
                 except OSError:
                     send_errors += 1
-                if args.interval:
+                if args.interval > 0:
                     time.sleep(args.interval)
         finally:
             sender.close()
@@ -117,6 +118,7 @@ def main():
                 r"ICMP echo request,\s+id\s+\d+,\s+seq\s+(\d+)", capout
             )
         ]
+        client_after = counter(TUN_CLIENT, "tx_packets")
         after = counter(TUN_SERVER, "rx_packets")
         after_bytes = counter(TUN_SERVER, "rx_bytes")
         sock_after = udp_socket_info(SERVER_PORT)
@@ -130,6 +132,7 @@ def main():
             f"delivered_capture={len(captured_seqs)}",
             f"unique_seq={len(set(captured_seqs))}",
             f"missing_seqs={sorted(set(range(1, args.count + 1))-set(captured_seqs))[:40]}",
+            f"client_tun_tx_packet_delta={client_after-client_before}",
             f"server_tun_rx_packet_delta={after-before}",
             f"server_tun_rx_byte_delta={after_bytes-before_bytes}",
             f"openvpn_udp_socket_rcvbuf={sock_after['rcvbuf']}",
@@ -139,7 +142,7 @@ def main():
             flush=True,
         )
         print("NOTE: raw ICMP echo requests target a nonresponding benchmark address; 0 replies are expected", flush=True)
-        if send_errors or len(set(captured_seqs)) != sent or (after - before) != sent:
+        if send_errors or (client_after-client_before) != sent or len(set(captured_seqs)) != sent or (after - before) != sent:
             print("ERROR: packet counts mismatch", flush=True)
             return 2
         if drop_delta not in (None, 0):
