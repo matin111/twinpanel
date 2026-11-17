@@ -62,7 +62,7 @@ void main() {
     expect(coordinator, contains('self.clearAfterApply(tunnel: tunnel)'));
     expect(coordinator, contains('self.finishStopWaiters()'));
     expect(coordinator, contains('self.phase = .active'));
-    expect(coordinator, contains('self.phase = .clearing'));
+    expect(coordinator, contains('phase = .clearing'));
     expect(coordinator, contains('ApplyFailure.stoppedWhileApplying'));
 
     expect(coordinator, contains('authenticatedCoreReady && libboxPacketFlowReady'));
