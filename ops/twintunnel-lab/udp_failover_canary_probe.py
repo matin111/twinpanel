@@ -16,7 +16,7 @@ sock.settimeout(0.18)
 start=time.monotonic()
 for n in range(COUNT):
     data=b"TTLB1TT-UDP-CANARY:"+n.to_bytes(4,"big")+(b"Z"*224)
-    try:sock.sendto(data,("127.0.0.1",37961));SENT+=1
+    try:sock.sendto(data,("127.0.0.1",int(os.environ.get("TT_CANARY_PORT","37961"))));SENT+=1
     except OSError:pass
     try:
         packet,_=sock.recvfrom(2000)
