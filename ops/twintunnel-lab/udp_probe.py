@@ -28,7 +28,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=37921)
-    parser.add_argument("--carrier", choices=["Shabdiz-GRE", "Shabdiz-TCP"], default="Shabdiz-GRE")
+    parser.add_argument("--carrier", choices=["Shabdiz-GRE", "Shabdiz-TCP", "Shabdiz-UDP"], default="Shabdiz-GRE")
     parser.add_argument("--count", type=int, default=20)
     parser.add_argument("--size", type=int, default=256)
     parser.add_argument("--timeout", type=float, default=1.5)
