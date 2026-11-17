@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.862",
-  "source_sha": "420c31b5ff4073d23b2b48b229e5eb1a67f5cbf6",
+  "version": "1.1.0-rc.863",
+  "source_sha": "f7d9a06bc586d0f808d24e006c2b3cb53a49f022",
   "notes": {
-    "fa": "تسریع تحویل اکانت به ربات با ثبت فوری اولین کانفیگ معتبر پس از ساخت اولین نود؛ ادامه ساخت بقیه پروتکل‌ها بدون انتظار کاربر، به‌روزرسانی خودکار وضعیت سفارش در پنل و محافظ انتشار GitHub برای حفظ تغییرات.",
-    "en": "Commit the first valid protocol config as soon as the first node is provisioned, enabling verified early Telegram delivery while other nodes/protocols continue; auto-refresh admin payment delivery status; protect release parity."
+    "fa": "اصلاح دائمی تمدید رزروی: فعال‌سازی خودکار اشتراک منقضی یا دارای حجم تمام‌شده پس از پرداخت، حفظ نام کاربری و کانفیگ‌های قبلی، جلوگیری از تغییر پروتکل‌ها در تمدید و محافظ انتشار نسخه‌های بعدی.",
+    "en": "Durable reserved-renewal fix: immediately activate already-due paid renewals, preserve VPN credentials and existing endpoint configurations, and enforce renewal regression guards on future releases."
   }
 }
