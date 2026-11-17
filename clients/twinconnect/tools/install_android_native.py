@@ -208,6 +208,19 @@ def patch_manifest() -> None:
     filename.write_text(current, encoding="utf-8")
 
 
+def stage_mieru_executables() -> None:
+    """Bundle pinned Android PIE Mieru executables, not a working VPN bridge."""
+    source = NATIVE / "mieru-jni"
+    destination = ANDROID / "app" / "src" / "main" / "jniLibs"
+    for abi in ("arm64-v8a", "armeabi-v7a", "x86_64"):
+        binary = source / abi / "libmieru.so"
+        if not binary.is_file() or binary.stat().st_size == 0:
+            raise RuntimeError(f"Missing Mieru Android executable for {abi}")
+        target = destination / abi
+        target.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(binary, target / "libmieru.so")
+
+
 def install_native_sources() -> None:
     package = ANDROID / "app" / "src" / "main" / "kotlin" / "com" / "twinpanel" / "twinconnect"
     if not package.is_dir():
@@ -275,6 +288,7 @@ def install_launcher_icon() -> None:
 
 def main() -> None:
     install_native_sources()
+    stage_mieru_executables()
     install_launcher_icon()
     patch_gradle()
     patch_manifest()
