@@ -190,32 +190,20 @@ class MainActivity : FlutterActivity() {
                         "osLockdown" to (if (WireGuardRuntime.isInterfaceUp())
                             WireGuardRuntime.isOsLockdownEnforced() else null),
                         "lockdownVerificationAvailable" to WireGuardRuntime.isInterfaceUp(),
-                        "otherVpnActive" to (hasActiveVpnTransport() && !AndroidTrafficGuardService.active)
+                        "otherVpnActive" to (hasActiveVpnTransport() && !AndroidTrafficGuardService.active),
+                        "singleTunnelKillSwitchAvailable" to false,
+                        "failClosedAcrossHandoff" to false
                     ))
                 }
                 "startDisconnectedTrafficGuard" -> {
-                    if (pendingGuardStart != null) {
-                        result.error("GUARD_PERMISSION_PENDING", "VPN approval pending", null)
-                    } else if (AndroidTrafficGuardService.active) {
-                        result.success(mapOf("requested" to true, "verified" to true))
-                    } else if (WireGuardRuntime.isInterfaceUp() || hasActiveVpnTransport()) {
-                        result.error("GUARD_TUNNEL_ACTIVE", "Cannot replace active VPN", null)
-                    } else {
-                        val approval = VpnService.prepare(this)
-                        if (approval != null) {
-                            pendingGuardStart = result
-                            try {
-                                @Suppress("DEPRECATION")
-                                startActivityForResult(approval, GUARD_APPROVAL_REQUEST)
-                            } catch (_: Exception) {
-                                pendingGuardStart = null
-                                result.error("GUARD_PERMISSION_FAILED", "VPN approval unavailable", null)
-                            }
-                        } else {
-                            ContextCompat.startForegroundService(this, Intent(this, AndroidTrafficGuardService::class.java))
-                            result.success(mapOf("requested" to true, "verified" to false))
-                        }
-                    }
+                    // A separate VpnService steals Android's single VPN slot from the
+                    // selected protocol. Do not offer a fake kill switch with an
+                    // unprotected handoff window or interrupt a healthy tunnel.
+                    result.error(
+                        "KILL_SWITCH_REQUIRES_SINGLE_TUN",
+                        "A fail-closed kill switch must be enforced by the active VPN engine or Android lockdown; a second VpnService is unsafe",
+                        null
+                    )
                 }
                 "stopDisconnectedTrafficGuard" -> {
                     startService(Intent(this, AndroidTrafficGuardService::class.java).apply {
