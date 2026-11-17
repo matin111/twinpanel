@@ -16,6 +16,7 @@ on:
       - 'clients/twinconnect/macos_native/mieru/**'
       - 'clients/twinconnect/macos_native/install_packet_tunnel_target.rb'
       - 'clients/twinconnect/test/macos_mieru_cabi_adapter_contract_test.dart'
+      - 'clients/twinconnect/test/macos_mieru_packet_tunnel_owner_contract_test.dart'
       - 'clients/twinconnect/test/macos_mieru_core_bundling_contract_test.dart'
       - 'clients/twinconnect/test/macos_mieru_profile_test.dart'
       - '.github/workflows/twinconnect-macos-mieru-core.yml'
@@ -52,6 +53,7 @@ jobs:
           flutter test test/macos_mieru_profile_test.dart
           flutter test test/macos_mieru_tun_relay_test.dart
           flutter test test/macos_mieru_cabi_adapter_contract_test.dart
+          flutter test test/macos_mieru_packet_tunnel_owner_contract_test.dart
           flutter test test/macos_mieru_inprocess_profile_test.dart
           flutter test test/macos_mieru_core_bundling_contract_test.dart
           flutter test test/mieru_client_profile_test.dart
