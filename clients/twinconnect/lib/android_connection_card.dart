@@ -83,6 +83,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
   int? _rxBytes, _txBytes;
   double? _downloadBps, _uploadBps;
   DateTime? _lastCountersAt;
+  DateTime? _connectedSince;
   String? _publicIp;
   int? _httpsLatencyMs;
   String? _httpsProbeError;
@@ -146,6 +147,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
     _downloadBps = null;
     _uploadBps = null;
     _lastCountersAt = null;
+    _connectedSince = null;
     _rxSamples.clear();
     _txSamples.clear();
     _handshake = false;
@@ -216,8 +218,37 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
       // AmneziaWG uses its own native GoBackend, not the Sing-box engine.
       // Never mark an AWG session stopped using Sing-box's status flag.
       if (_singBoxProtocol == 'amneziawg') {
-        // AWG is a separate GoBackend tunnel. Run the same real HTTPS/exit-IP
-        // verification used for other native transports, not Sing-box polling.
+        final state = await AndroidAmneziaWgTunnel.instance.status();
+        if (!mounted || _singBoxProtocol != 'amneziawg') return;
+        if (state['connected'] != true) {
+          setState(() {
+            _singBoxProtocol = null;
+            _clearTelemetry();
+            _errorCode = 'AWG_NATIVE_ENGINE_STOPPED';
+          });
+          return;
+        }
+        final rx = _counter(state['rxBytes']);
+        final tx = _counter(state['txBytes']);
+        final now = DateTime.now();
+        setState(() {
+          _handshake = state['peerHandshakeVerified'] == true;
+          if (rx != null && tx != null) {
+            final seconds = _lastCountersAt == null ? 0.0 :
+                now.difference(_lastCountersAt!).inMilliseconds / 1000.0;
+            if (seconds > 0.1 && _rxBytes != null && _txBytes != null) {
+              _downloadBps = rx >= _rxBytes! ? (rx - _rxBytes!) / seconds : null;
+              _uploadBps = tx >= _txBytes! ? (tx - _txBytes!) / seconds : null;
+            }
+            _rxBytes = rx;
+            _txBytes = tx;
+            _lastCountersAt = now;
+            _rxSamples.add(_downloadBps ?? 0);
+            _txSamples.add(_uploadBps ?? 0);
+            if (_rxSamples.length > 32) _rxSamples.removeAt(0);
+            if (_txSamples.length > 32) _txSamples.removeAt(0);
+          }
+        });
         _maybeCheckInternet();
         return;
       }
@@ -764,6 +795,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
       final id = item['node_id']?.toString();
       setState(() {
         _singBoxProtocol = 'amneziawg';
+        _connectedSince = DateTime.now();
         _activeServer = inventory.where((n) => n.id == id).firstOrNull;
         _activeServerName = _activeServer?.name ??
             item['server_name']?.toString() ??
@@ -1289,6 +1321,20 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
             ],
           ]),
         ),
+        if (connected && _connectedSince != null) ...[
+          const SizedBox(height: 8),
+          Text(
+            'Connection time: ${(() {
+              final seconds = DateTime.now().difference(_connectedSince!).inSeconds;
+              final hours = seconds ~/ 3600;
+              final minutes = (seconds % 3600) ~/ 60;
+              final remaining = seconds % 60;
+              return '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${remaining.toString().padLeft(2, '0')}';
+            })()}',
+            key: const Key('androidConnectionDuration'),
+            textAlign: TextAlign.center,
+          ),
+        ],
         const SizedBox(height: 15),
         if (!selectedIsActive && !canStartSelected)
           Padding(
