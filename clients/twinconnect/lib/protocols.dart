@@ -129,7 +129,7 @@ class VpnProtocols {
 /// platforms, subscriptions or server configuration.
 class AndroidProtocolVisibility {
   static const unavailable = <String>{
-    'l2tp', 'mieru', 'trusttunnel', 'amneziawg', 'sudoku', 'naive',
+    'l2tp', 'mieru', 'trusttunnel', 'sudoku', 'naive',
   };
 
   static bool visible(String code) => !unavailable.contains(code);
