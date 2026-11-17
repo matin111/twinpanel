@@ -398,6 +398,33 @@ export function TunnelProtocolRuntimeV307(){
           </div>
 
           <section className={styles.section}>
+            <div className={styles.sectionHead}>
+              <div><b>{pick("TwinTunnel سه‌مسیره","Three-path TwinTunnel")}</b><small>{pick("نصب روی نود ایران، خروجی و نود پشتیبان بدون تغییر ترافیک مشتریان","Stage on Iran, exit and backup without changing customer traffic")}</small></div>
+              <Badge tone={twinStatus?.status==="staged"&&!twinStatus.needs_update?"ok":"warn"}>{twinStatus?.status==="staged"&&!twinStatus.needs_update?pick("آماده آزمایش","Staged"):pick("نصب آزمایشی","Lab install")}</Badge>
+            </div>
+            <p>{pick("موتور روی سه نود با SHA-256 و تست رمزنگاری بررسی می‌شود. تا رفع افت بسته OpenVPN، فعال‌سازی مسیر Production مجاز نیست.","All three nodes undergo SHA-256 and codec checks. Production cutover stays locked pending OpenVPN packet-loss resolution.")}</p>
+            <div className={styles.managementActions}>
+              <label>
+                <span>{pick("نود واسط سوم","Independent backup node")}</span>
+                <select disabled={Boolean(busy)} value={selectedBackupId} onChange={event=>setTwinBackupId(Number(event.target.value))}>
+                  {backupCandidates.map(node=><option key={node.id} value={node.id}>{node.name} · {node.public_ip}</option>)}
+                </select>
+              </label>
+              <button type="button" className="primary-soft" disabled={Boolean(busy)||!selectedBackupId} onClick={()=>void runTwinTunnel("install")}>
+                {busy==="twintunnel-install"?"…":pick("نصب و تست TwinTunnel","Install and test TwinTunnel")}
+              </button>
+              <button type="button" className="ghost" disabled={Boolean(busy)||!selectedBackupId||twinStatus?.status!=="staged"} onClick={()=>void runTwinTunnel("verify")}>
+                {busy==="twintunnel-verify"?"…":pick("بررسی مجدد نصب","Recheck installation")}
+              </button>
+            </div>
+            {twinStatus?.status==="staged"&&<div className="table"><table><thead><tr><th>{pick("نود","Node")}</th><th>{pick("سلامت موتور","Engine check")}</th><th>{pick("نسخه","Revision")}</th></tr></thead><tbody>
+              {twinStatus.nodes.map(node=><tr key={node.node_id}><td>{node.name||"Node #"+node.node_id}</td><td><Badge tone={node.ok&&node.selftest==="ok"?"ok":"bad"}>{node.ok&&node.selftest==="ok"?"Verified":"Failed"}</Badge></td><td dir="ltr">{twinStatus.installed_revision||"—"}</td></tr>)}
+            </tbody></table></div>}
+            {twinStatus?.needs_update&&<p>{pick("نسخه جدیدتری منتشر شده؛ نصب و تست را مجدداً اجرا کن.","Newer engine revision available; rerun install and test.")}</p>}
+            <small>{pick("مسیر فعال مشتریان: ","Active subscriber transport: ")}<b dir="ltr">{String(selectedTunnel.active_transport||"tp27_fast")}</b> · {pick("TwinTunnel فقط آماده‌سازی شده؛ هنوز به کاربران متصل نیست.","TwinTunnel is staged only, not connected to subscribers.")}</small>
+          </section>
+
+          <section className={styles.section}>
             <div className={styles.sectionHead}><div><b>{pick("پروتکل‌های این Tunnel","Protocols on this tunnel")}</b><small>{pick(`Inventory واقعی Exit ${selectedExit?.name||`#${selectedTunnel.exit_node_id}`}`,`Live inventory from Exit ${selectedExit?.name||`#${selectedTunnel.exit_node_id}`}`)}</small></div><Badge tone={healthyProtocols===activeProtocols&&activeProtocols>0?"ok":"violet"}>{healthyProtocols}/{activeProtocols}</Badge></div>
             <div className={styles.tableWrap}><div className="table"><table><thead><tr><th>{pick("پروتکل","Protocol")}</th><th>{pick("نوع","Type")}</th><th>{pick("پورت","Port")}</th><th>Transport</th><th>{pick("وضعیت","Status")}</th><th>{pick("عملیات","Actions")}</th></tr></thead><tbody>
               {protocols.map(row=><tr key={row.id}><td><b>{row.name}</b><small style={{display:"block"}} dir="ltr">{row.protocol}</small></td><td>{row.kind==="classic"?pick("کلاسیک","Classic"):pick("مدرن","Modern")}</td><td dir="ltr">{row.portText}</td><td dir="ltr">{row.transport}</td><td><Badge tone={tone(row.status)}>{row.status}</Badge></td><td><div className="action-row">{row.kind==="classic"?<button type="button" className="primary-soft" disabled={Boolean(busy)} onClick={()=>installClassic(row)}>{busy===`classic-${row.protocol}`?"…":row.installed?pick("Repair / Health","Repair / Health"):pick("نصب","Install")}</button>:<><button type="button" className="primary-soft" disabled={Boolean(busy)||!row.installable} onClick={()=>installModern(row)}>{busy===`modern-install-${row.protocol}`?"…":row.installed?pick("اعمال / Repair","Apply / Repair"):pick("افزودن","Add")}</button>{row.installed&&row.installable&&<button type="button" className="danger" disabled={Boolean(busy)} onClick={()=>removeModern(row)}>{pick("حذف","Remove")}</button>}</>}</div></td></tr>)}
@@ -429,10 +456,29 @@ export function TunnelProtocolRuntimeV307(){
           </div>
           <div className={styles.createDivider}/>
           <div className={styles.createSectionLabel}><span className={styles.createIndex}>02</span>{pick("تنظیمات مسیر","Route settings")}</div>
+          <label className={styles.createField}>
+            <span className={styles.createFieldTitle}>{pick("نصب موتور تانل","Tunnel engine setup")}</span>
+            <select value={newEngine} onChange={event=>{
+              const mode=event.target.value as "tp27_fast"|"twintunnel_standby";
+              setNewEngine(mode);
+              if(mode==="twintunnel_standby")setDraft(value=>({...value,initial_transport:"tp27_fast"}));
+            }}>
+              <option value="tp27_fast">{pick("TP27 اصلی","Original TP27")}</option>
+              <option value="twintunnel_standby">{pick("TP27 + نصب آزمایشی TwinTunnel سه‌مسیره","TP27 + three-node TwinTunnel standby install")}</option>
+            </select>
+          </label>
+          {newEngine==="twintunnel_standby"&&<label className={styles.createField}>
+            <span className={styles.createFieldTitle}>{pick("نود پشتیبان","Independent backup node")}</span>
+            <select value={selectedNewBackupId} onChange={event=>setNewBackupId(Number(event.target.value))}>
+              {newBackupCandidates.map(node=><option key={node.id} value={node.id}>{node.name} · {node.public_ip}</option>)}
+            </select>
+            <small>{pick("کاربران روی TP27 باقی می‌مانند. موتور جدید صرفاً نصب آزمایشی می‌شود.","Subscribers remain on TP27; the new engine is staged only.")}</small>
+          </label>}
+
           <div className={styles.createSettingsGrid}>
             <label className={styles.createField}>
               <span className={styles.createFieldTitle}>{pick("مسیر اولیه","Initial transport")}</span>
-              <select value={draft.initial_transport} onChange={event=>setDraft(value=>({...value,initial_transport:event.target.value as InitialTransport}))}>
+              <select disabled={newEngine==="twintunnel_standby"} value={draft.initial_transport} onChange={event=>setDraft(value=>({...value,initial_transport:event.target.value as InitialTransport}))}>
                 <option value="tp27_fast">TP27 Fast</option>
                 <option value="spoof_wg">Spoof Tunnel</option>
               </select>
@@ -448,7 +494,7 @@ export function TunnelProtocolRuntimeV307(){
           </div>}
           <div className={styles.createFooter}>
             <button type="button" className={`ghost ${styles.createCancel}`} disabled={Boolean(busy)} onClick={()=>setCreateOpen(false)}>{pick("انصراف","Cancel")}</button>
-            <button type="submit" className={`primary ${styles.createSubmit}`} disabled={Boolean(busy)||!draft.iran_node_id||!draft.exit_node_id||(draft.initial_transport==="spoof_wg"&&(!draft.iran_spoof_ip.trim()||!draft.exit_spoof_ip.trim()))}><span aria-hidden="true">{busy==="create"?"◌":"↗"}</span>{busy==="create"?pick("در حال ساخت...","Creating..."):pick("ساخت و نصب مسیر","Create & install")}</button>
+            <button type="submit" className={`primary ${styles.createSubmit}`} disabled={Boolean(busy)||!draft.iran_node_id||!draft.exit_node_id||(newEngine==="twintunnel_standby"&&!selectedNewBackupId)||(draft.initial_transport==="spoof_wg"&&(!draft.iran_spoof_ip.trim()||!draft.exit_spoof_ip.trim()))}><span aria-hidden="true">{busy==="create"?"◌":"↗"}</span>{busy==="create"?pick("در حال ساخت...","Creating..."):pick("ساخت و نصب مسیر","Create & install")}</button>
           </div>
         </form>
       </Modal>}
