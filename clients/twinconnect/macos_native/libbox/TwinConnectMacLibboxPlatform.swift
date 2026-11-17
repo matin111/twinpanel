@@ -196,8 +196,11 @@ final class TwinConnectMacLibboxPlatform: NSObject,
     func includeAllNetworks() -> Bool { false }
 
     func clearDNSCache() {
-        guard let tunnel, let settings else { return }
-        tunnel.setTunnelNetworkSettings(settings) { _ in }
+        // Reapplying NEPacketTunnelNetworkSettings is NOT a DNS cache flush.
+        // It can re-install default routes after stop() has begun and cause
+        // DNS or traffic to remain trapped in a torn-down tunnel.
+        // macOS does not expose a safe per-extension system DNS cache flush
+        // through this Libbox callback. Leave OS routing unchanged.
     }
     func readWIFIState() -> LibboxWIFIState? { nil }
     func readWIFISSID() -> String? { nil }
