@@ -81,14 +81,18 @@ final class TwinConnectMacLibboxPlatform: NSObject,
             tunnel.setTunnelNetworkSettings(nil) { _ in }
             throw applyError
         }
+        // Commit the locally owned policy atomically with stop state.
+        // reset() may be running on the provider's shutdown callback.
         stateLock.lock()
         let stoppedDuringApply = stopped
+        if !stoppedDuringApply {
+            settings = candidate
+        }
         stateLock.unlock()
         guard !stoppedDuringApply else {
             tunnel.setTunnelNetworkSettings(nil) { _ in }
             throw Self.failure("MACOS_LIBBOX_TUN_STOPPED")
         }
-        settings = candidate
 
         // The official Apple sing-box platform adapter uses the packetFlow
         // descriptor and this libbox fallback. Neither is a synthetic socket.
@@ -98,7 +102,9 @@ final class TwinConnectMacLibboxPlatform: NSObject,
         guard descriptor >= 0 else {
             // A TUN interface without a usable descriptor must not leave
             // full-tunnel routes or DNS installed on the OS.
+            stateLock.lock()
             settings = nil
+            stateLock.unlock()
             tunnel.setTunnelNetworkSettings(nil) { _ in }
             throw Self.failure("MACOS_LIBBOX_TUN_DESCRIPTOR_UNAVAILABLE")
         }
@@ -272,11 +278,11 @@ final class TwinConnectMacLibboxPlatform: NSObject,
         stateLock.lock()
         stopped = true
         observedPath = nil
+        let hadSettings = settings != nil
+        settings = nil
         stateLock.unlock()
         monitor?.cancel()
         monitor = nil
-        let hadSettings = settings != nil
-        settings = nil
         guard hadSettings, let tunnel else {
             completion()
             return
