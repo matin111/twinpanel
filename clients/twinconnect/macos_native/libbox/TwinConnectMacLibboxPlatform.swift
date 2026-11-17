@@ -233,7 +233,14 @@ final class TwinConnectMacLibboxPlatform: NSObject,
         stateLock.unlock()
         monitor?.cancel()
         monitor = nil
+        // CloseService has stopped forwarding before reset is called.
+        // Explicitly release routes and DNS instead of retaining the
+        // OS-applied full-tunnel settings after the Libbox engine exits.
+        let hadSettings = settings != nil
         settings = nil
+        if hadSettings, let tunnel {
+            tunnel.setTunnelNetworkSettings(nil) { _ in }
+        }
     }
 }
 #endif
