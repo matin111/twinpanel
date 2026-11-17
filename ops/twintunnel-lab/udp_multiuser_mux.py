@@ -264,20 +264,24 @@ class Mux:
             self.stats["orphan_reply"] += 1
             return
         now = time.monotonic()
-        if not f.recv_window.accept(seq):
-            if f.recv_window.was_delivered(seq):
-                self.stats["duplicates_down"] += 1
-                self._ack_downstream(f,seq,now)
-            else:
-                self.stats["stale_down"] += 1
+        if f.recv_window.was_delivered(seq):
+            self.stats["duplicates_down"] += 1
+            self._ack_downstream(f,seq,now)
+            return
+        if f.recv_window.top >= 0 and f.recv_window.top-seq >= 512:
+            self.stats["stale_down"] += 1
             return
         f.updated = now
         try:
             self.listeners[service].sendto(payload, f.client)
-            self.stats["client_replies"] += 1
-            self._ack_downstream(f,seq,now)
         except OSError:
+            # Do not acknowledge a packet rejected by the local UDP socket.
+            # Retries must be able to deliver this sequence later.
             self.stats["client_send_error"] += 1
+            return
+        f.recv_window.accept(seq)
+        self.stats["client_replies"] += 1
+        self._ack_downstream(f,seq,now)
 
     def _ack_downstream(self,f,seq,now):
         """Acknowledge a delivered reply over both available authenticated paths."""
