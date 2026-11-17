@@ -48,7 +48,7 @@ class FrameTests(unittest.TestCase):
         self.assertTrue(r.accept(5000))
         self.assertFalse(r.accept(4000))
     def test_max_sessions(self):
-        self.assertEqual(mux.MAX_FLOWS,64)
+        self.assertEqual(mux.MAX_FLOWS,512)
     def test_binary_payload(self):
         payload=bytes(range(256))*4
         self.assertEqual(self.c.decode(self.c.encode(1,2,5,3,payload))[-1],payload)
@@ -213,6 +213,8 @@ class BidirectionalReliabilityTests(unittest.TestCase):
         self.m.codec=mux.Codec(b"K"*32)
         self.m.stats=collections.Counter()
         self.m.flows={}
+        self.m.pending_packets=0
+        self.m.pending_bytes=0
         class SocketRecorder:
             def __init__(self):self.sent=[]
             def send(self,data):
