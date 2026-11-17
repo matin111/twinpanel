@@ -112,6 +112,9 @@ jobs:
           test -f android/app/src/main/kotlin/com/twinpanel/twinconnect/OpenConnectVpnService.kt
           test -f android/app/src/main/kotlin/com/twinpanel/twinconnect/VpnTunnelOwnership.kt
           test -f android/app/src/main/kotlin/com/twinpanel/twinconnect/TunPacketGate.kt
+          test -f android/app/src/main/kotlin/com/twinpanel/twinconnect/SharedTunVpnService.kt
+          grep -F 'android:name=".SharedTunVpnService"' android/app/src/main/AndroidManifest.xml
+          grep -F 'interface PacketEngine' android/app/src/main/kotlin/com/twinpanel/twinconnect/SharedTunVpnService.kt
           grep -F 'route == PacketRoute.VPN_TUNNEL' android/app/src/main/kotlin/com/twinpanel/twinconnect/TunPacketGate.kt
           grep -F 'VpnTunnelOwnership.snapshot(' android/app/src/main/kotlin/com/twinpanel/twinconnect/MainActivity.kt
           if grep -F 'GUARD_APPROVAL_REQUEST' android/app/src/main/kotlin/com/twinpanel/twinconnect/MainActivity.kt; then
