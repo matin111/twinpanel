@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 """Parser tests: the dual-carrier canary must only accept valid lab probes."""
 import unittest
+import sys
+from pathlib import Path
+
+# This test lives in tests/; add its script parent without installing anything.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from udp_redundant_canary import PREFIX, parse_seq
 
 class TestRedundantCanaryParser(unittest.TestCase):
