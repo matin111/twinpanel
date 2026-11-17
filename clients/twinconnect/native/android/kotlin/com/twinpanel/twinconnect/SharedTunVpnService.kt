@@ -50,6 +50,7 @@ class SharedTunVpnService : VpnService() {
     private val gate = TunPacketGate()
     private val lock = Any()
     private var generation = 0L
+    @Volatile private var readerFailed = false
     @Volatile private var tun: ParcelFileDescriptor? = null
     @Volatile private var engine: PacketEngine? = null
     @Volatile private var reader: Thread? = null
@@ -66,6 +67,7 @@ class SharedTunVpnService : VpnService() {
         }
         if (tun != null) return START_STICKY
         stopping = false
+        readerFailed = false
         try {
             val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             if (Build.VERSION.SDK_INT >= 26) {
@@ -107,7 +109,7 @@ class SharedTunVpnService : VpnService() {
      */
     fun attach(next: PacketEngine) {
         synchronized(lock) {
-            check(tun != null && active === this) { "SHARED_TUN_NOT_ESTABLISHED" }
+            check(tun != null && active === this && !readerFailed) { "SHARED_TUN_NOT_ESTABLISHED" }
             gate.lostConnection()
             generation++
             engine?.stop()
@@ -169,6 +171,11 @@ class SharedTunVpnService : VpnService() {
                     }
                 }
             } catch (_: Exception) {
+                readerFailed = true
+                transportLost()
+            } finally {
+                // A dead packet reader cannot provide leak-safe forwarding.
+                readerFailed = true
                 transportLost()
             }
         }, "twinconnect-shared-tun")
