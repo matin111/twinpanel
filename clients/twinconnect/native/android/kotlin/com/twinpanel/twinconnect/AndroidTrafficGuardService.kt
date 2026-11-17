@@ -1,6 +1,11 @@
 package com.twinpanel.twinconnect
 
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.net.VpnService
 import android.os.ParcelFileDescriptor
 
@@ -24,6 +29,19 @@ class AndroidTrafficGuardService : VpnService() {
             return START_NOT_STICKY
         }
         try {
+            val notifications = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                notifications.createNotificationChannel(NotificationChannel(
+                    CHANNEL_ID, "VPN traffic protection", NotificationManager.IMPORTANCE_LOW
+                ))
+            }
+            val notification = Notification.Builder(this, CHANNEL_ID)
+                .setSmallIcon(android.R.drawable.ic_lock_lock)
+                .setContentTitle("TwinConnect Kill Switch")
+                .setContentText("Disconnected traffic is blocked")
+                .setOngoing(true)
+                .build()
+            startForeground(NOTIFICATION_ID, notification)
             established = false
             tun?.close()
             tun = Builder()
@@ -55,6 +73,7 @@ class AndroidTrafficGuardService : VpnService() {
         tun = null
         established = false
         active = false
+        stopForeground(STOP_FOREGROUND_REMOVE)
         super.onDestroy()
     }
 
@@ -63,10 +82,13 @@ class AndroidTrafficGuardService : VpnService() {
         tun = null
         established = false
         active = false
+        stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
     }
 
     companion object {
+        private const val CHANNEL_ID = "twinconnect_traffic_guard"
+        private const val NOTIFICATION_ID = 47031
         @Volatile var active: Boolean = false
             private set
         const val ACTION_STOP = "com.twinpanel.twinconnect.STOP_TRAFFIC_GUARD"
