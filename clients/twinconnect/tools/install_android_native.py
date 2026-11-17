@@ -288,7 +288,8 @@ def install_launcher_icon() -> None:
 
 def main() -> None:
     install_native_sources()
-    stage_mieru_executables()
+    # Mieru has no Android TUN bridge and is hidden from the app.
+    # Do not package its unused native executables into release APKs.
     install_launcher_icon()
     patch_gradle()
     patch_manifest()
