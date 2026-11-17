@@ -49,6 +49,7 @@ class SharedTunVpnService : VpnService() {
 
     private val gate = TunPacketGate()
     private val lock = Any()
+    private var generation = 0L
     @Volatile private var tun: ParcelFileDescriptor? = null
     @Volatile private var engine: PacketEngine? = null
     @Volatile private var reader: Thread? = null
@@ -108,9 +109,11 @@ class SharedTunVpnService : VpnService() {
         synchronized(lock) {
             check(tun != null && active === this) { "SHARED_TUN_NOT_ESTABLISHED" }
             gate.lostConnection()
+            generation++
             engine?.stop()
             engine = null
             gate.beginConnect(next.id)
+            val token = generation
             try {
                 next.start(object : SocketProtector {
                     override fun protect(socket: Socket) = this@SharedTunVpnService.protect(socket)
@@ -118,7 +121,8 @@ class SharedTunVpnService : VpnService() {
                 }, object : PacketSink {
                     override fun deliver(packet: ByteArray, length: Int) {
                         synchronized(lock) {
-                            if (engine !== next || !gate.allows(TunPacketGate.PacketRoute.VPN_TUNNEL)) return
+                            if (engine !== next || generation != token ||
+                                !gate.allows(TunPacketGate.PacketRoute.VPN_TUNNEL)) return
                             if (length <= 0 || length > packet.size) return
                             tun?.let { FileOutputStream(it.fileDescriptor).write(packet, 0, length) }
                         }
@@ -138,6 +142,7 @@ class SharedTunVpnService : VpnService() {
     fun transportLost() {
         synchronized(lock) {
             gate.lostConnection()
+            generation++
             engine?.stop()
             engine = null
         }
