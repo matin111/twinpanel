@@ -1135,8 +1135,10 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
     final connected = _up || _openVpnUp || _ciscoUp ||
         _xrayCoreUp || _singBoxProtocol != null || _mieruUp;
     final protocolName = chosen?.protocol.name ??
-        (requested == null ? s.pick('پروتکل آماده‌ای وجود ندارد', 'No ready protocol')
-            : VpnProtocols.byCode(requested)?.name ?? requested);
+        (requested == null
+            ? s.pick('پروتکل آماده‌ای وجود ندارد', 'No ready protocol')
+            : s.pick('پروتکل انتخاب‌شده در اشتراک مجاز نیست',
+                'Selected protocol is not enabled for this subscription'));
     final activeProtocolCode = _mieruUp ? 'mieru' :
         _xrayCoreUp ? 'v2ray' : _singBoxProtocol ??
         (_openVpnUp ? 'openvpn' : _ciscoUp ? 'cisco' :
