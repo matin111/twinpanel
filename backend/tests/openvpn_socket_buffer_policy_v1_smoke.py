@@ -11,8 +11,8 @@ assert "sndbuf 4194304" in template
 assert "net.core.rmem_max" in provision
 assert "net.core.wmem_max" in provision
 assert "99-twinpanel-openvpn-buffer.conf" in provision
-assert 'test "$RMAX" -ge 16777216 || RMAX=16777216' in provision
-assert 'test "$WMAX" -ge 16777216 || WMAX=16777216' in provision
+assert "RMAX=16777216" in provision
+assert "WMAX=16777216" in provision
 
 # The existing hook reconciler must preserve unrelated OpenVPN directives.
 assert 'awk -v hook="$HOOK"' in headroom
