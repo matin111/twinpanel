@@ -5,6 +5,7 @@ import NetworkExtension
 /// functioning protocol backend. All unsupported protocols fail closed.
 final class PacketTunnelProvider: NEPacketTunnelProvider {
     private var wireGuard: TwinConnectMacWireGuardEngine?
+    private var mieru: TwinConnectMacMieruTunnelEngine?
     #if canImport(Libbox)
     private var libbox: TwinConnectMacLibboxEngine?
     #endif
@@ -23,6 +24,13 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
         }
 
         switch code {
+        case "mieru":
+            let engine = TwinConnectMacMieruTunnelEngine(tunnel: self)
+            mieru = engine
+            engine.start { [weak self] error in
+                if error != nil { self?.mieru = nil }
+                completionHandler(error)
+            }
         case "wireguard":
             let engine = TwinConnectMacWireGuardEngine(provider: self)
             wireGuard = engine
@@ -50,6 +58,13 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
 
     override func stopTunnel(with reason: NEProviderStopReason,
                              completionHandler: @escaping () -> Void) {
+        if let engine = mieru {
+            engine.stop { [weak self] in
+                self?.mieru = nil
+                completionHandler()
+            }
+            return
+        }
         if let engine = wireGuard {
             engine.stop { [weak self] in
                 self?.wireGuard = nil
