@@ -329,6 +329,7 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
             ],
           )),
 
+        if (Platform.isWindows) ...[
         _glass(
           Row(children: [
             const Icon(Icons.shield_rounded, size: 25),
@@ -382,6 +383,7 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
             ),
           ]),
         ),
+        ],
         if (Platform.isWindows &&
             Platform.environment['TWINCONNECT_DISPOSABLE_VM'] == '1')
           _glass(Row(children: [
