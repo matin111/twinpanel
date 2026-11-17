@@ -115,6 +115,9 @@ final class TwinConnectMacOSVPNBridge {
                     "supportedCodes": libboxBackendReady()
                         ? ["hysteria2", "tuic", "anytls", "naive", "shadowtls", "snell", "socks5"] : [String]()
                 ] as [String: Any])
+            case "prepareMieru":
+                TwinConnectMacOSMieruControl.prepare(
+                    call.arguments, result: result)
             case "macOSMieruEngineStatus":
                 // The standalone Mieru executable is not a PacketTunnel
                 // traffic bridge. Never report VPN readiness from its presence.
