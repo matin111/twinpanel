@@ -32,7 +32,7 @@ def measure(carrier: str, rate: int, duration: int, size: int) -> dict:
         raise RuntimeError(f"{carrier} at {rate}Mbps failed with return code {result.returncode}: {result.stderr[-250:]}")
     value = json.loads(result.stdout.strip().splitlines()[-1])
     assert value["carrier"] == name and value["brand"] == "TwinTunnel"
-    return {"carrier": carrier, "target_mbps": rate, **value}
+    return {"carrier_id": carrier, "target_mbps": rate, **value}
 
 
 def main():
@@ -64,7 +64,7 @@ def main():
     print("RESULTS_FILE:", out, flush=True)
     for rate in rates:
         for carrier in args.carriers:
-            rows = [x for x in records if x["target_mbps"] == rate and x["carrier"] == carrier]
+            rows = [x for x in records if x["target_mbps"] == rate and x["carrier_id"] == carrier]
             loss = statistics.mean(x["loss_pct"] for x in rows)
             throughput = statistics.mean(x["echoed_mbps_at_test_rate"] for x in rows)
             rtt = statistics.mean(x["rtt_avg_ms"] for x in rows)
