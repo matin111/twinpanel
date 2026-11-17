@@ -20,7 +20,8 @@ def percentile(seq, pct):
     if not seq:
         return None
     values = sorted(seq)
-    return round(values[min(len(values) - 1, int((len(values) - 1) * pct))], 2)
+    from math import ceil
+    return round(values[max(0, min(len(values) - 1, ceil(len(values) * pct) - 1))], 2)
 
 
 def main():
