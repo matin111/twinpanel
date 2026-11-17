@@ -410,6 +410,34 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
                 icon: const Icon(Icons.settings_rounded),
                 label: Text(tr('تنظیم محافظت سیستمی', 'Configure system Kill Switch')),
               ),
+              TextButton.icon(
+                onPressed: () async {
+                  try {
+                    final result = await const MethodChannel(
+                      'com.twinpanel.twinconnect/vpn',
+                    ).invokeMapMethod<String, dynamic>('getVpnRegistrationStatus');
+                    if (!mounted) return;
+                    final discovered = result?['discoverable'] == true;
+                    final services = result?['registeredVpnServices'];
+                    final count = services is List ? services.length : 0;
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content: Text(discovered
+                          ? tr('سرویس VPN ثبت شده است (تعداد: $count).',
+                              'VPN service registered ($count found).')
+                          : tr('سرویس VPN در نسخه نصب‌شده شناسایی نشد.',
+                              'No discoverable VPN service in installed app.')),
+                    ));
+                  } on PlatformException catch (error) {
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content: Text('VPN registration: ${error.code}'),
+                    ));
+                  }
+                },
+                icon: const Icon(Icons.fact_check_outlined),
+                label: Text(tr('بررسی ثبت VPN در اندروید',
+                    'Check Android VPN registration')),
+              ),
               if (_androidKillRequested)
                 TextButton.icon(
                   onPressed: _androidKillBusy ? null : () => _setAndroidKill(false),
