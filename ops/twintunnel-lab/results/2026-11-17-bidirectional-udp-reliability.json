@@ -1,0 +1,123 @@
+{
+  "date": "2026-11-17",
+  "scope": "isolated Iran-France test environment; no customer route or VPN configuration changed",
+  "engines": {
+    "name": "TwinTunnel two-ended UDP multiplexer over separate Rakhsh GRE and Shabdiz-UDP lab carriers",
+    "both_carriers_same_host_pair": true,
+    "ingress_allowed_sources_are_test_only": true,
+    "client_flow_limit": 64,
+    "payload_limit_bytes": 1250,
+    "dedup_replay_window_packets": 512,
+    "recent_features": [
+      "bounded receive batching",
+      "socket-level buffers",
+      "HMAC-authenticated acknowledgements",
+      "at most two retries after initial send",
+      "pending queues capped at 256 per flow",
+      "upstream and downstream tested separately"
+    ],
+    "final_offline_unit_tests_passed": 26
+  },
+  "benchmark": {
+    "origin_france_before_retries": {
+      "concurrent_clients": 6,
+      "runs": 3,
+      "packets_sent": 720,
+      "echo_replies_collected": 684,
+      "loss_percent": 5,
+      "iran_ingress_packets": 690,
+      "france_target_packets": 690,
+      "iran_downstream_send_count": 685,
+      "note": "France-host hairpin ingress, not representative of independent real Iranian client"
+    },
+    "origin_iran_before_retries": {
+      "concurrent_clients": 6,
+      "runs": 3,
+      "packets_sent": 720,
+      "echo_replies_collected": 705,
+      "loss_percent": 2.08,
+      "iran_ingress_packets": 720,
+      "france_target_packets": 720,
+      "note": "All upstream packets reached the French echo; remaining measured loss was on return to Iran"
+    },
+    "origin_iran_with_downstream_ack": {
+      "concurrent_clients": 6,
+      "runs": 3,
+      "packets_sent": 720,
+      "echo_replies_collected": 720,
+      "loss_percent_in_these_trials": 0,
+      "downstream_acknowledged": 720,
+      "downstream_retry_rounds": 15,
+      "note": "Zero measured loss is limited to these short echo tests; retry may add latency/traffic and does not prove VPN application delivery"
+    }
+  },
+  "real_openvpn_udp": {
+    "downstream_ack_only_trial": {
+      "sent_tun_packets": 80,
+      "received_tun_packets": 76,
+      "unique_received": 76,
+      "missed_sequences": [
+        1,
+        23,
+        32,
+        69
+      ],
+      "initializations": 1,
+      "full_reconnects_observed": 0,
+      "limitation": "Fault injection not reliably overlapped timed data; treat as baseline failure observation."
+    },
+    "bidirectional_ack_timed_gre_failure": {
+      "fault_utc_start": "2026-11-17T10:34:44Z",
+      "fault_utc_end": "2026-11-17T10:34:53Z",
+      "probe_utc_start": "2026-11-17T10:34:34Z",
+      "probe_duration_seconds": 17.44,
+      "fault_overlapped_probe": true,
+      "sent_tun_packets": 80,
+      "received_tun_packets": 79,
+      "missing_sequences": [
+        78
+      ],
+      "initializations": 1,
+      "inactivity_restarts": 0,
+      "ingress_original_udp_datagrams": 92,
+      "ingress_upstream_acks_received": 92,
+      "foreign_udp_mux_server_packets": 92,
+      "interpretation": "Tunnel overlay delivered/authenticated all 92 encrypted UDP datagrams to the local forwarding socket, but one of 80 IP packets was absent from OpenVPN server TUN; full end-to-end reliability not achieved."
+    },
+    "original_france_echo_restored": true,
+    "test_tun_devices_removed": true
+  },
+  "real_wireguard": {
+    "client_location": "Iran (two temporary client interfaces)",
+    "vpn_server_location": "France (temporary kernel WireGuard interface)",
+    "peer_handshakes_valid": 2,
+    "fault_utc_start": "2026-11-17T10:36:49Z",
+    "fault_utc_end": "2026-11-17T10:36:57Z",
+    "backup_udp_active_during_gre_outage": true,
+    "vpn_server_tun_received_packets": 294,
+    "vpn_server_tun_received_bytes": 37480,
+    "encrypted_client_upload_bytes_per_peer": 18740,
+    "received_packet_loss_or_pause_calculated": false,
+    "client_temporary_interfaces_cleaned": true,
+    "france_original_wg_access0_preserved": true,
+    "france_lab_udp_echo_restored": true
+  },
+  "post_test": {
+    "iran_main_tunnels_active": true,
+    "france_original_shabdiz_labs_active": true,
+    "france_openvpn_production_services_active": true,
+    "iran_original_wireguard_interface": "tpsp53",
+    "france_original_wireguard_interface": "wg-access0",
+    "france_udp_mux_process_stopped": true,
+    "iran_udp_mux_process_stopped": true,
+    "iran_test_ports_37981_37982_free": true,
+    "temp_routes_removed": true
+  },
+  "not_yet_production_ready": [
+    "One OpenVPN UDP IP packet still missing in controlled 80-packet fault test",
+    "GRE and Shabdiz-UDP share the same underlying Iran-France endpoints",
+    "Need substantial sustained real-client load and real independent host/route failover",
+    "Engine limited to 64 flows and lacks dynamic quota/device/session/license integration",
+    "No validated NAT rebinding, MTU discovery or high-scale flow migration"
+  ]
+}

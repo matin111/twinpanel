@@ -1,0 +1,129 @@
+{
+  "date": "2026-11-17",
+  "scope": "Iran/France isolated lab, no customer traffic",
+  "implementation": {
+    "entry": "Iran 94.183.231.158 UDP ports 37981 and 37982 (France-only allowlist)",
+    "exit": "France 127.0.0.1 UDP port 37922 temporarily replaces existing lab echo",
+    "carriers": [
+      "GRE entry 127.0.0.1:37921",
+      "Shabdiz-UDP entry 127.0.0.1:37933"
+    ],
+    "features": [
+      "64-bit flow ids per user",
+      "stable per-user exit UDP socket",
+      "HMAC authenticated frames with 32-byte private lab key",
+      "512-packet replay window",
+      "duplicate transmissions over GRE and UDP",
+      "return paths per carrier",
+      "bounded two-service lab"
+    ],
+    "caps": {
+      "max_flows": 64,
+      "max_payload_bytes": 1250,
+      "flow_ttl_seconds": 120
+    },
+    "public_routes_changed": false,
+    "production_deployment": false
+  },
+  "results": [
+    {
+      "kind": "offline unit tests",
+      "passed": 13,
+      "failed": 0
+    },
+    {
+      "kind": "six concurrent UDP lab clients, original counting method",
+      "clients": 6,
+      "sent": 240,
+      "counted": 208,
+      "limitation": "original method discarded delayed/out-of-order responses"
+    },
+    {
+      "kind": "six concurrent UDP lab clients, corrected counting",
+      "clients": 6,
+      "sent": 240,
+      "received_unique": 226,
+      "missing": 14,
+      "missing_pct": 5.83,
+      "production_acceptable": false
+    },
+    {
+      "kind": "real WireGuard kernel client/server on France through Iran ingress",
+      "client_tx_bytes": 888,
+      "server_rx_bytes": 0,
+      "handshakes": 0,
+      "passed": false,
+      "cleanup_verified": true
+    }
+  ],
+  "blocker": "Iran management connector recovered at 09:36 UTC; no longer an active blocker. Real VPN lab successes do not establish production readiness.",
+  "restoration": {
+    "france_mux_test_process_stopped": true,
+    "france_original_lab_udp_echo_restored": true,
+    "france_production_openvpn_services_active": true,
+    "france_original_wireguard_interface_active": true,
+    "france_wireguard_test_interfaces_cleaned": true,
+    "france_temporary_routes_removed": true,
+    "iran_test_clients_removed": true,
+    "iran_client_temporary_routes_removed": true,
+    "iran_mux_test_ports_clear": true,
+    "iran_original_wireguard_interface_active": true,
+    "iran_gre_udp_lab_carriers_active": true,
+    "production_routes_modified": false
+  },
+  "limitations": [
+    "WireGuard failed to handshake",
+    "OpenVPN UDP not tested",
+    "all carriers share the same pair of hosts",
+    "no production-grade NAT/rekey, MTU, congestion, quotas, load testing",
+    "no safe customer roll-out"
+  ],
+  "followup_real_vpn_tests": {
+    "iran_connector": {
+      "offline_at": "2026-11-17T09:31:33Z",
+      "online_again_at": "2026-11-17T09:36:11Z"
+    },
+    "wireguard_foreign_hairpin_filter_diagnostic": {
+      "attempted_location": "WG client on France to Iran public UDP ingress",
+      "result": "France-side capture saw outgoing real WireGuard handshake packets; matched Iran-side capture saw zero real handshakes, while 8/8 synthetic 148-byte UDP control probes on same IP/port were observed.",
+      "inference": "Possible distinctive handshake filtering on France-to-Iran route, not confirmed as the cause of all failed WG connections.",
+      "applies_to_real_iranian_clients": "not necessarily"
+    },
+    "openvpn_udp": {
+      "time_utc": "2026-11-17T09:49:08Z–09:49:44Z",
+      "test_configuration": "France-only UDP OpenVPN client to Iran public ingress via two Rakhsh datagram carriers to France UDP OpenVPN server; separate test PKI.",
+      "tls_success": true,
+      "gre_lab_disabled_for_seconds": 6,
+      "backup_shabdiz_udp_active": true,
+      "sent_ip_test_packets": 80,
+      "captured_server_tun_packets": 80,
+      "unique_captured_sequences": 80,
+      "server_tun_rx_packet_delta": 80,
+      "server_tun_rx_byte_delta": 6720,
+      "full_client_openvpn_initializations": 1,
+      "inactivity_restarts": 0,
+      "timed_laboratory_pass": true,
+      "does_not_prove": "zero loss under sustained customer load or physical-path outages"
+    },
+    "wireguard_iran_clients": {
+      "time_utc": "2026-11-17T09:53:33Z–09:54:41Z",
+      "setup": "Two temporary kernel WireGuard clients on Iran host connect to Iran UDP ingress; temporary kernel WireGuard server stays on France.",
+      "production_wireguard_interfaces_unchanged": true,
+      "concurrent_authenticated_peers": 2,
+      "gre_lab_disabled_for_seconds": 8,
+      "backup_shabdiz_udp_active": true,
+      "france_server_wg_tun_rx_packets": 294,
+      "france_server_wg_tun_rx_bytes": 37480,
+      "france_server_encrypted_rx_bytes": 37480,
+      "france_server_encrypted_tx_bytes": 376,
+      "france_udp_mux_server_packets": 294,
+      "france_udp_mux_duplicate_up_packets": 118,
+      "result": "Authenticated WireGuard handshakes and decrypted data reached the French test server while GRE was intentionally stopped and restored.",
+      "limitations": "An exact sequence-by-sequence packet loss or latency metric during outage was not collected. Client report shell string interpolation bug caused exit=1 after traffic; cleanup trap ran, and issue subsequently fixed in script.",
+      "shell_report_bug_fixed": true
+    }
+  },
+  "production_ready": false,
+  "wireguard_success": "real dual-client authenticated lab success with tunnel data, not a production canary",
+  "openvpn_udp_success": "real one-client UDP lab data survived a short GRE outage (80/80)"
+}
