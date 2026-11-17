@@ -54,6 +54,17 @@ void main() {
         contains('mieru/TwinConnectMacMieruNetworkSettingsCoordinator.swift'));
     expect(coordinator, contains('setTunnelNetworkSettings(settings)'));
     expect(coordinator, contains('setTunnelNetworkSettings(nil)'));
+    // A delayed OS route-apply callback must never leave a live route
+    // behind after a user requests disconnect.
+    expect(coordinator, contains('case .applying, .clearing:'));
+    expect(coordinator, contains('self.stopWaiters.append(completion)'));
+    expect(coordinator, contains('if error != nil || self.cancelled'));
+    expect(coordinator, contains('self.clearAfterApply(tunnel: tunnel)'));
+    expect(coordinator, contains('self.finishStopWaiters()'));
+    expect(coordinator, contains('self.phase = .active'));
+    expect(coordinator, contains('self.phase = .clearing'));
+    expect(coordinator, contains('ApplyFailure.stoppedWhileApplying'));
+
     expect(coordinator, contains('authenticatedCoreReady && libboxPacketFlowReady'));
     expect(coordinator, contains('physicalEgressPinned'));
     expect(coordinator, contains('settings.ipv4Settings?.excludedRoutes?.count == 1'));
