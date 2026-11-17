@@ -181,6 +181,41 @@ class AckRetryTests(unittest.TestCase):
         self.assertEqual(len(a.sent),0)
         self.assertEqual(len(client.sent),0)
 
+    def test_failed_local_reply_remains_retryable_and_unacked(self):
+        class FailThenSend:
+            def __init__(self):
+                self.calls=0
+                self.delivered=[]
+            def sendto(self,data,addr):
+                self.calls+=1
+                if self.calls==1:
+                    raise OSError("temporary UDP client socket failure")
+                self.delivered.append((data,addr))
+                return len(data)
+        class AckRecorder:
+            def __init__(self):self.sent=[]
+            def send(self,data):self.sent.append(data);return len(data)
+        local=FailThenSend()
+        first=AckRecorder()
+        second=AckRecorder()
+        self.m.listeners={1:local}
+        self.m.backends={1:first,2:second}
+        f=mux.Flow(700,1,("127.0.0.1",34567))
+        self.m.flows[700]=f
+        packet=self.m.codec.encode(1,1,700,55,b"reply")
+        self.m._entry_reply(1,packet)
+        self.assertEqual(self.m.stats["client_send_error"],1)
+        self.assertFalse(f.recv_window.was_delivered(55))
+        self.assertFalse(first.sent)
+        self.assertFalse(second.sent)
+        self.m._entry_reply(1,packet)
+        self.assertTrue(f.recv_window.was_delivered(55))
+        self.assertEqual(len(local.delivered),1)
+        self.assertEqual(len(first.sent),1)
+        self.assertEqual(len(second.sent),1)
+        self.m._entry_reply(1,packet)
+        self.assertEqual(len(local.delivered),1)
+
     def test_delivered_reply_acknowledged_and_deduplicated(self):
         class Sink:
             def __init__(self):self.sent=[]
