@@ -29,6 +29,17 @@ void main() {
     expect(engine, contains('core["socks5ListenLAN"] as? Bool == false'));
     expect(engine, contains('outbounds[0]["server"] as? String == "127.0.0.1"'));
     expect(engine, contains('outbounds[0]["server_port"] as? Int == socksPort'));
+    final planner = File(
+      'macos_native/mieru/TwinConnectMacMieruEndpointRoute.swift',
+    ).readAsStringSync();
+    expect(installer, contains('mieru/TwinConnectMacMieruEndpointRoute.swift'));
+    expect(engine, contains('TwinConnectMacMieruEndpointRoute.plan('));
+    expect(engine, contains('MACOS_MIERU_ENDPOINT_ROUTE_INVALID'));
+    expect(planner, contains('NEIPv4Route('));
+    expect(planner, contains('subnetMask: "255.255.255.255"'));
+    expect(planner, contains('server["domainName"] as? String == ""'));
+    expect(planner, contains('endpointNotPublic'));
+    expect(File('macos_native/mieru/tests/main.swift').existsSync(), isTrue);
     expect(engine, contains('MACOS_MIERU_EGRESS_ROUTE_PIN_NOT_IMPLEMENTED'));
     expect(engine, contains('self?.core?.stop()'));
     expect(bridge, contains('"packetFlowBridgeReady": false'));
