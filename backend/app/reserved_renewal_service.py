@@ -141,8 +141,12 @@ def provision_reserved_plan_at_cutover(db: Session, sub: Subscription, plan_id: 
     return True, "ready"
 
 
-def activate_due_renewals(db: Session, limit: int = 100) -> int:
-    """Called on a short recurring worker tick; locks per-subscription against usage collectors."""
+def activate_due_renewals(db: Session, limit: int = 100, subscription_id: int | None = None) -> int:
+    """Activate due periods, optionally limited to one just-paid subscription.
+
+    Payment callers invoke this after committing the order. The periodic
+    worker remains a fallback for later expiry and transient payment failures.
+    """
     now = datetime.utcnow()
     # Select only expired or exhausted accounts. Taking an arbitrary first
     # page of queued orders starves every due account beyond that page.
@@ -151,6 +155,8 @@ def activate_due_renewals(db: Session, limit: int = 100) -> int:
         .join(Subscription, Subscription.id == PendingSubscriptionRenewal.subscription_id)
         .where(
             PendingSubscriptionRenewal.status == "queued",
+            *([PendingSubscriptionRenewal.subscription_id == int(subscription_id)]
+              if subscription_id is not None else []),
             or_(
                 Subscription.expires_at <= now,
                 and_(
