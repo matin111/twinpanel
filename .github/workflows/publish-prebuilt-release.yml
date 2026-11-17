@@ -713,6 +713,32 @@ jobs:
             source/backend/artifacts/badvpn-udpgw-linux-amd64.sha256
           test -s source/backend/artifacts/badvpn-COPYING
 
+      - name: Protect TwinTunnel all-node staging across future releases
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          # The release asset uses pinned source. Reject a stale candidate
+          # which would silently delete the GitHub-driven node staging hook.
+          git -C publisher fetch -q origin main
+          git -C publisher reset --hard origin/main
+          for path in \
+            "backend/scripts/twintunnel_stage_active_nodes_v1.py" \
+            "backend/scripts/twinpanel_public_updater_v69.py" \
+            "backend/tests/twintunnel_node_staging_v1_smoke.py" \
+            "backend/tests/twintunnel_updater_staging_hook_v1_smoke.py" \
+            "ops/twintunnel-lab/udp_multiuser_mux.py" \
+            "ops/twintunnel-lab/udp_turkey_transit_relay.py" \
+            "ops/twintunnel-lab/udp_three_path_fault_probe.py"; do
+            test -s "source/$path"
+            cmp -s "source/$path" "publisher/$path" || {
+              echo "::error file=$path::Pinned release lacks latest TwinTunnel node staging; re-pin to current main."
+              exit 1
+            }
+          done
+          python3 source/backend/tests/twintunnel_node_staging_v1_smoke.py
+          python3 source/backend/tests/twintunnel_updater_staging_hook_v1_smoke.py
+          echo "TwinTunnel stage files and post-update hooks match main"
+
       - name: Build verified production package
         id: package
         shell: bash
