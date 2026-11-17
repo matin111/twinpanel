@@ -100,5 +100,110 @@ class ReceiveBatchTests(unittest.TestCase):
         self.assertEqual(self.m.stats["full_recv_batches"],1)
 
 
+class AckRetryTests(unittest.TestCase):
+    def setUp(self):
+        self.m=mux.Mux.__new__(mux.Mux)
+        self.m.codec=mux.Codec(b"K"*32)
+        self.m.stats=collections.Counter()
+        self.m.flows={}
+
+    def test_ack_header_authenticated(self):
+        encoded=self.m.codec.encode(1|mux.ACK_FLAG,2,44,17,mux.ACK_PAYLOAD)
+        self.assertEqual(self.m.codec.decode(encoded),
+                         (129,2,44,17,mux.ACK_PAYLOAD))
+        self.assertIsNone(self.m.codec.decode(encoded[:-1]+bytes([encoded[-1]^7])))
+
+    def test_ack_clears_only_outstanding_reply(self):
+        flow=mux.Flow(44,1)
+        flow.pending_down[17]=(b"reply",10.0,1)
+        self.m.flows[44]=flow
+        encoded=self.m.codec.encode(129,1,44,17,mux.ACK_PAYLOAD)
+        self.m._exit_transport(encoded,("127.0.0.1",50505))
+        self.assertFalse(flow.pending_down)
+        self.assertEqual(self.m.stats["acks_received"],1)
+
+    def test_wrong_service_ack_rejected(self):
+        flow=mux.Flow(44,1)
+        flow.pending_down[17]=(b"reply",10.0,1)
+        self.m.flows[44]=flow
+        encoded=self.m.codec.encode(130,1,44,17,mux.ACK_PAYLOAD)
+        self.m._exit_transport(encoded,("127.0.0.1",50505))
+        self.assertIn(17,flow.pending_down)
+        self.assertEqual(self.m.stats["invalid_ack"],1)
+
+    def test_retry_is_bounded(self):
+        self.m.args=SimpleNamespace(role="exit")
+        class Sink:
+            def __init__(self):self.sent=[]
+            def sendto(self,frame,target):
+                self.sent.append((frame,target))
+                return len(frame)
+        sink=Sink()
+        self.m.listeners={0:sink}
+        flow=mux.Flow(44,1)
+        flow.paths={1:(("127.0.0.1",40001),100.0),
+                    2:(("127.0.0.1",40002),100.0)}
+        flow.pending_down[10]=(b"reply",100.0,0)
+        self.m.flows[44]=flow
+        self.m._retry_pending(100.10)
+        self.assertEqual(len(sink.sent),0)
+        self.m._retry_pending(100.26)
+        self.assertEqual(len(sink.sent),2)
+        self.m._retry_pending(100.55)
+        self.assertEqual(len(sink.sent),4)
+        self.m._retry_pending(100.85)
+        self.assertEqual(len(sink.sent),4)
+        self.assertEqual(self.m.stats["down_unacked"],1)
+        self.assertFalse(flow.pending_down)
+
+    def test_stale_packet_is_never_acknowledged(self):
+        class Sink:
+            def __init__(self):self.sent=[]
+            def sendto(self,frame,target):
+                self.sent.append((frame,target))
+                return len(frame)
+            def send(self,frame):
+                self.sent.append(frame)
+                return len(frame)
+        client=Sink()
+        a=Sink()
+        b=Sink()
+        self.m.listeners={1:client}
+        self.m.backends={1:a,2:b}
+        flow=mux.Flow(44,1,("127.0.0.1",12345))
+        flow.recv_window.accept(1000)
+        self.m.flows[44]=flow
+        stale=self.m.codec.encode(1,1,44,1,b"old reply")
+        self.m._entry_reply(1,stale)
+        self.assertEqual(self.m.stats["stale_down"],1)
+        self.assertEqual(len(a.sent),0)
+        self.assertEqual(len(client.sent),0)
+
+    def test_delivered_reply_acknowledged_and_deduplicated(self):
+        class Sink:
+            def __init__(self):self.sent=[]
+            def sendto(self,frame,target):
+                self.sent.append((frame,target))
+                return len(frame)
+            def send(self,frame):
+                self.sent.append(frame)
+                return len(frame)
+        client=Sink()
+        a=Sink()
+        b=Sink()
+        self.m.listeners={1:client}
+        self.m.backends={1:a,2:b}
+        flow=mux.Flow(44,1,("127.0.0.1",12345))
+        self.m.flows[44]=flow
+        p=self.m.codec.encode(1,1,44,17,b"reply")
+        self.m._entry_reply(1,p)
+        self.assertEqual(len(client.sent),1)
+        self.assertEqual(len(a.sent),1)
+        self.assertEqual(len(b.sent),1)
+        self.assertEqual(self.m.codec.decode(a.sent[0]),(129,1,44,17,mux.ACK_PAYLOAD))
+        self.m._entry_reply(1,p)
+        self.assertEqual(len(client.sent),1)
+
+
 if __name__=="__main__":
     unittest.main()
