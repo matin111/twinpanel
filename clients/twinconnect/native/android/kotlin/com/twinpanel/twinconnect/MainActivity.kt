@@ -25,6 +25,7 @@ class MainActivity : FlutterActivity() {
     private val executor: ExecutorService = Executors.newSingleThreadExecutor()
     private var pendingStart: PendingStart? = null
     private var pendingAwgStart: Pair<String, MethodChannel.Result>? = null
+    private var pendingGuardStart: MethodChannel.Result? = null
 
     private data class PendingStart(
         val config: String,
@@ -178,6 +179,33 @@ class MainActivity : FlutterActivity() {
         }
         channel.setMethodCallHandler { call, result ->
             when (call.method) {
+                "startDisconnectedTrafficGuard" -> {
+                    if (pendingGuardStart != null) {
+                        result.error("GUARD_PERMISSION_PENDING", "VPN approval pending", null)
+                    } else if (WireGuardRuntime.isInterfaceUp()) {
+                        result.error("GUARD_TUNNEL_ACTIVE", "Cannot replace active VPN", null)
+                    } else {
+                        val approval = VpnService.prepare(this)
+                        if (approval != null) {
+                            pendingGuardStart = result
+                            try {
+                                @Suppress("DEPRECATION")
+                                startActivityForResult(approval, GUARD_APPROVAL_REQUEST)
+                            } catch (_: Exception) {
+                                pendingGuardStart = null
+                                result.error("GUARD_PERMISSION_FAILED", "VPN approval unavailable", null)
+                            }
+                        } else {
+                            startService(Intent(this, AndroidTrafficGuardService::class.java))
+                            result.success(mapOf("requested" to true, "verified" to false))
+                        }
+                    }
+                }
+                "stopDisconnectedTrafficGuard" -> {
+                    startService(Intent(this, AndroidTrafficGuardService::class.java)
+                        .setAction(AndroidTrafficGuardService.ACTION_STOP))
+                    result.success(mapOf("stopRequested" to true))
+                }
                 "openAndroidVpnSettings" -> {
                     try {
                         startActivity(Intent(Settings.ACTION_VPN_SETTINGS))
@@ -391,6 +419,17 @@ class MainActivity : FlutterActivity() {
     @Deprecated("Deprecated by Android API; required for FlutterActivity's approval callback")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == GUARD_APPROVAL_REQUEST) {
+            val request = pendingGuardStart ?: return
+            pendingGuardStart = null
+            if (resultCode == Activity.RESULT_OK) {
+                startService(Intent(this, AndroidTrafficGuardService::class.java))
+                request.success(mapOf("requested" to true, "verified" to false))
+            } else {
+                request.error("VPN_PERMISSION_DENIED", "VPN permission not granted", null)
+            }
+            return
+        }
         if (requestCode == AWG_APPROVAL_REQUEST) {
             val request = pendingAwgStart ?: return
             pendingAwgStart = null
@@ -421,6 +460,8 @@ class MainActivity : FlutterActivity() {
     }
 
     override fun onDestroy() {
+        pendingGuardStart?.error("VPN_REQUEST_CANCELLED", "VPN approval activity closed", null)
+        pendingGuardStart = null
         pendingStart?.result?.error(
             "VPN_REQUEST_CANCELLED", "VPN approval activity closed", null
         )
@@ -436,5 +477,6 @@ class MainActivity : FlutterActivity() {
     companion object {
         private const val VPN_APPROVAL_REQUEST = 44011
         private const val AWG_APPROVAL_REQUEST = 44012
+        private const val GUARD_APPROVAL_REQUEST = 44013
     }
 }
