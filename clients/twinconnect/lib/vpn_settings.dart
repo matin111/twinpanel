@@ -39,6 +39,7 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
   bool _vmGuardBusy = false;
   bool _androidKillRequested = false;
   bool _androidKillBusy = false;
+  bool _androidVpnConflict = false;
   Timer? _androidGuardPoll;
 
   @override
@@ -93,9 +94,15 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
     try {
       final result = await const MethodChannel('com.twinpanel.twinconnect/vpn')
           .invokeMapMethod<String, dynamic>('getDisconnectedTrafficGuardStatus');
-      if (mounted) setState(() => _androidKillRequested = result?['active'] == true);
+      if (mounted) setState(() {
+        _androidKillRequested = result?['active'] == true;
+        _androidVpnConflict = result?['otherVpnActive'] == true;
+      });
     } on PlatformException {
-      if (mounted) setState(() => _androidKillRequested = false);
+      if (mounted) setState(() {
+        _androidKillRequested = false;
+        _androidVpnConflict = false;
+      });
     }
   }
 
@@ -362,13 +369,17 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
                 subtitle: Text(tr(
                   _androidKillRequested
                       ? 'تونل مسدودکننده فعال است؛ برای اتصال VPN باید متوقف شود'
-                      : 'محافظ قطع اتصال غیرفعال است؛ محافظت سراسری تضمین نمی‌شود',
+                      : _androidVpnConflict
+                          ? 'VPN فعال است؛ محافظ جداگانه نباید اتصال را قطع کند'
+                          : 'محافظ قطع اتصال غیرفعال است؛ محافظت سراسری تضمین نمی‌شود',
                   _androidKillRequested
                       ? 'Blocking tunnel active; stop before connecting VPN'
-                      : 'Disconnected guard inactive; system-wide protection not guaranteed',
+                      : _androidVpnConflict
+                          ? 'VPN active; guard must not replace the connection'
+                          : 'Disconnected guard inactive; system-wide protection not guaranteed',
                 )),
                 value: _androidKillRequested,
-                onChanged: _androidKillBusy ? null : _setAndroidKill,
+                onChanged: _androidKillBusy || _androidVpnConflict ? null : _setAndroidKill,
               ),
               TextButton.icon(
                 onPressed: _checking ? null : () async { await _check(); await _refreshAndroidGuard(); },
