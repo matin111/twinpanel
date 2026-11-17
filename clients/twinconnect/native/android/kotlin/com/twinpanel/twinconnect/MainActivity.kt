@@ -214,7 +214,9 @@ class MainActivity : FlutterActivity() {
                     }
                 }
                 "stopDisconnectedTrafficGuard" -> {
-                    stopService(Intent(this, AndroidTrafficGuardService::class.java))
+                    startService(Intent(this, AndroidTrafficGuardService::class.java).apply {
+                        action = AndroidTrafficGuardService.ACTION_STOP
+                    })
                     result.success(mapOf("stopRequested" to true))
                 }
                 "openAndroidVpnSettings" -> {
