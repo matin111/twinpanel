@@ -189,6 +189,14 @@ def patch_manifest() -> None:
         end = service.find("        </service>", start)
         if start >= 0 and end >= 0:
             service = service[:start] + service[end + len("        </service>"):]
+    # A partially patched scaffold may already contain this service.
+    # Never append a duplicate service declaration.
+    if 'android:name=".AndroidTrafficGuardService"' in current:
+        start = service.find('        <service android:name=".AndroidTrafficGuardService"')
+        end = service.find('        </service>', start)
+        if start >= 0 and end >= 0:
+            service = service[:start] + service[end + len('        </service>'):]
+
     if 'android:name=".OpenConnectVpnService"' not in current:
         service += (
         '\n        <!-- Reserved Cisco / OpenConnect VpnService. The engine is '
