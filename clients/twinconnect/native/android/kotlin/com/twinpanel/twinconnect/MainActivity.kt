@@ -7,6 +7,7 @@ import android.net.VpnService
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.Bundle
+import androidx.core.content.ContextCompat
 import android.provider.Settings
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -205,7 +206,7 @@ class MainActivity : FlutterActivity() {
                                 result.error("GUARD_PERMISSION_FAILED", "VPN approval unavailable", null)
                             }
                         } else {
-                            startService(Intent(this, AndroidTrafficGuardService::class.java))
+                            ContextCompat.startForegroundService(this, Intent(this, AndroidTrafficGuardService::class.java))
                             result.success(mapOf("requested" to true, "verified" to false))
                         }
                     }
@@ -431,7 +432,7 @@ class MainActivity : FlutterActivity() {
             val request = pendingGuardStart ?: return
             pendingGuardStart = null
             if (resultCode == Activity.RESULT_OK) {
-                startService(Intent(this, AndroidTrafficGuardService::class.java))
+                ContextCompat.startForegroundService(this, Intent(this, AndroidTrafficGuardService::class.java))
                 request.success(mapOf("requested" to true, "verified" to false))
             } else {
                 request.error("VPN_PERMISSION_DENIED", "VPN permission not granted", null)
