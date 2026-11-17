@@ -334,7 +334,7 @@ The experimental module udp_multiuser_mux.py has two roles:
 
 - Iran entry: 94.183.231.158:37981/UDP (WireGuard lab) and
   :37982/UDP (OpenVPN UDP lab), restricted to test clients from France.
-  **Iran does not run WireGuard or OpenVPN in this design.**
+  **Iran does not run a customer WireGuard or OpenVPN server in this design.** Two temporary kernel WireGuard clients were used on Iran for the subsequent lab validation and then deleted.
 - France exit: 127.0.0.1:37922/UDP, temporarily replacing only the
   *existing isolated lab UDP echo*. The original echo is restored on rollback.
 - Both ends share an independent, per-lab 256-bit HMAC secret stored
@@ -360,23 +360,16 @@ A **real WireGuard kernel client and kernel server on France** were then
 started with isolated fresh keys, dedicated interfaces, a temporary
 198.18.66.1/32 route, and Iran as the public UDP entry.
 The client emitted 888 bytes; the server received **0 bytes**, with
-**zero authenticated handshakes**. The WireGuard test FAILED.
+**zero authenticated handshakes**. This first France-origin WireGuard hairpin test FAILED. A separate Iran-origin test later succeeded (details below).
 Both WireGuard test interfaces and the temporary route were cleaned.
-Real OpenVPN UDP has not yet been tested through this new engine.
+At this stage, real OpenVPN UDP had not yet been tested. A later isolated real OpenVPN UDP test succeeded (details below).
 
-**Blocker:** Iran's Termalin management agent went offline at 09:31:33
-UTC on 17 November 2026. France can still ping the Iran host, but the
-Iran entry process cannot be safely inspected or stopped while the agent
-is offline. It was launched with a bounded 600-second lifetime.
+**Temporary blocker, resolved:** Iran's Termalin management agent went offline at 09:31:33 UTC on 17 November 2026. France could still ping Iran. The management connection recovered at 09:36:11 UTC, and the original 600-second lab process exited and released its public test ports.
 On France, the experimental UDP mux was stopped and the original
 twintunnel-lab-udp-echo.service was restored. The production
 OpenVPN services and original Rakhsh lab carriers remained active.
 
-**Before any customer use:** restore Iran management access, verify
-the temporary entry process has exited, diagnose the WireGuard
-handshake end-to-end at both hosts, implement real OpenVPN UDP tests,
-test carrier failure during persistent verified VPN data transfer,
-and perform multi-client/MTU/rebinding/load/latency testing.
+**Before any customer use:** run sustained real-VPN canaries, quantify jitter and individual missing sequences during repeated failovers, validate two-ended NAT rebinding and user session expiry, and perform multi-client/MTU/rebinding/load/latency testing.
 This code does not implement the production user quotas, device limits,
 license resolution, NAT rebinding, multi-node failover or link-quality
 control. It must NOT be added to customer start-up/deploy hooks.
@@ -386,3 +379,64 @@ udp_multiuser_mux.py, udp_mux_echo_targets.py,
 udp_mux_multi_client_probe.py, wg_multiuser_lab.sh,
 tests/test_udp_multiuser_mux.py, and
 results/2026-11-17-multiuser-udp-lab.json.
+
+
+### Live real-VPN data validation (later on 17 November 2026)
+
+**OpenVPN UDP actual session:** Temporary UDP OpenVPN client and server
+were both on France, but all encrypted UDP traffic passed through the
+Iran entry and separate Rakhsh GRE/UDP paths. OpenVPN TLS completed;
+during **80 ICMP packets** sent inside the VPN, the dedicated GRE lab
+was stopped for **6 seconds** and Shabdiz-UDP remained active.
+The French OpenVPN server TUN received **80/80 unique ICMP sequences**,
+with **+80 packets / +6720 bytes** in kernel counters.
+There was **one OpenVPN initialisation and zero inactivity-triggered
+restarts** during the controlled test. The probe deliberately targeted
+a nonresponding test IP, so ping replies are not a success criterion.
+See openvpn_udp_mux_orchestrator.py, openvpn_udp_mux_data_probe.py and
+the examples/openvpn-udp-*-lab.conf files. The orchestrator restores
+the original France lab UDP echo on exit.
+
+**WireGuard actual session:** The earlier France-origin WG hairpin test
+had no handshake. Packet capture showed outbound WireGuard handshakes
+on French eth0 and no matched handshakes at Iran in a separate capture,
+although 8 synthetic 148-byte UDP controls on the same port were seen.
+This raises, but does not prove, protocol-specific filtering on the
+France-to-Iran link. It does not establish what real clients in Iran see.
+
+A second test instead used **two ephemeral WireGuard clients on Iran**
+(no WireGuard customer server on Iran), connecting to a dedicated kernel
+WireGuard server on France. The two Iran clients used distinct public
+keys, distinct test IPs and separate UDP source flows. The dedicated
+Rakhsh GRE lab was intentionally stopped for **8 seconds** while both
+sent data and Shabdiz-UDP stayed active. The France WireGuard server
+reported **2 recent authenticated peer handshakes, 294 decrypted
+kernel TUN packets and 37,480 received TUN bytes**; the France UDP
+multiplexer also recorded 294 server-bound packets. It suppressed 118
+duplicate upstream copies. This confirms actual encrypted WireGuard
+traffic passes through the multiplexed underlay despite that particular
+GRE failure. It does **not** measure per-sequence loss or precise
+interruption time, and cannot promise permanent/zero-loss connections.
+
+There was a reporting-only bash variable interpolation bug in the
+original Iran WireGuard client test script after the traffic phase.
+Its EXIT trap cleaned both test interfaces and test routes. The script
+is corrected in the repository. The France server test orchestrator
+completed cleanly, restored twintunnel-lab-udp-echo.service and kept
+wg-access0 and main OpenVPN services untouched.
+
+New scripts: wg_mux_iran_clients.sh, wg_mux_france_server.sh,
+openvpn_udp_mux_orchestrator.py, openvpn_udp_mux_data_probe.py.
+All are **manual, time-bounded lab tools**. Never add them to
+production startup hooks or replace actual customer config endpoints.
+All main VPN configurations, licence data and user credentials
+remain unchanged.
+
+**Production gap:** The engine is a bounded Python proof of concept
+(64 flows, 1250-byte payloads, 120-second idle state).
+The corrected 6-client lab echo test previously observed
+5.83% missing responses within its deadline. Real OpenVPN UDP and
+WireGuard successes under a single short GRE fault do not replace
+multi-hour load testing, MTU discovery, multi-user replay and NAT rebinding
+security, dynamic routing/quality decisions, support for every customer
+node, and tested rollback of the actual customer connection path.
