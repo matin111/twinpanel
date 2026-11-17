@@ -36,6 +36,12 @@ class AndroidAmneziaWgTunnel {
     }
   }
 
+  Future<Map<String, dynamic>> status() async {
+    if (!Platform.isAndroid) return const {'connected': false};
+    final result = await _channel.invokeMapMethod<String, dynamic>('status');
+    return result ?? const {'connected': false};
+  }
+
   Future<void> disconnect() async {
     if (Platform.isAndroid) await _channel.invokeMethod<void>('disconnect');
   }
