@@ -230,20 +230,24 @@ final class TwinConnectMacLibboxPlatform: NSObject,
         throw Self.failure("MACOS_LIBBOX_USER_LOOKUP_UNSUPPORTED")
     }
 
-    func reset() {
+    /// The stop completion is not delivered until macOS acknowledges
+    /// removal of tunnel routes and DNS. Never report a completed shutdown
+    /// while setTunnelNetworkSettings(nil) is still in flight.
+    func reset(completion: @escaping () -> Void) {
         stateLock.lock()
         stopped = true
         observedPath = nil
         stateLock.unlock()
         monitor?.cancel()
         monitor = nil
-        // CloseService has stopped forwarding before reset is called.
-        // Explicitly release routes and DNS instead of retaining the
-        // OS-applied full-tunnel settings after the Libbox engine exits.
         let hadSettings = settings != nil
         settings = nil
-        if hadSettings, let tunnel {
-            tunnel.setTunnelNetworkSettings(nil) { _ in }
+        guard hadSettings, let tunnel else {
+            completion()
+            return
+        }
+        tunnel.setTunnelNetworkSettings(nil) { _ in
+            completion()
         }
     }
 }
