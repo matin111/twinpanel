@@ -1,0 +1,36 @@
+name: TwinTunnel All-Node Staging V1 Smoke
+
+on:
+  pull_request:
+    paths:
+      - "backend/scripts/twintunnel_stage_active_nodes_v1.py"
+      - "backend/tests/twintunnel_node_staging_v1_smoke.py"
+      - "ops/twintunnel-lab/**"
+      - ".github/workflows/twintunnel-all-node-staging-v1-smoke.yml"
+  push:
+    paths:
+      - "backend/scripts/twintunnel_stage_active_nodes_v1.py"
+      - "backend/tests/twintunnel_node_staging_v1_smoke.py"
+      - "ops/twintunnel-lab/**"
+      - ".github/workflows/twintunnel-all-node-staging-v1-smoke.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  verify-no-production-activation:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Validate stage and lab script compilation
+        run: |
+          python -m py_compile backend/scripts/twintunnel_stage_active_nodes_v1.py
+          python -m py_compile ops/twintunnel-lab/udp_multiuser_mux.py
+          python -m py_compile ops/twintunnel-lab/udp_turkey_transit_relay.py
+          python -m py_compile ops/twintunnel-lab/udp_three_path_fault_probe.py
+      - name: Validate staged file integrity and no activation
+        run: python backend/tests/twintunnel_node_staging_v1_smoke.py
