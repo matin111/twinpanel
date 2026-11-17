@@ -64,6 +64,10 @@ final class TwinConnectMacLibboxPlatform: NSObject,
             forKeyPath: "socket.fileDescriptor") as? Int32
             ?? LibboxGetTunnelFileDescriptor()
         guard descriptor >= 0 else {
+            // A TUN interface without a usable descriptor must not leave
+            // full-tunnel routes or DNS installed on the OS.
+            settings = nil
+            tunnel.setTunnelNetworkSettings(nil) { _ in }
             throw Self.failure("MACOS_LIBBOX_TUN_DESCRIPTOR_UNAVAILABLE")
         }
         ret0_.pointee = descriptor
