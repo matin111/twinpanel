@@ -1,0 +1,39 @@
+name: TwinTunnel Admin Installer V1 Smoke
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/routers/twintunnel_install_v1.py"
+      - "backend/app/main.py"
+      - "backend/scripts/twintunnel_stage_active_nodes_v1.py"
+      - "backend/tests/twintunnel_admin_install_v1_smoke.py"
+      - "components/tunnel-control-center-v1.tsx"
+      - "lib/twintunnel-install-api.ts"
+      - ".github/workflows/twintunnel-admin-installer-v1-smoke.yml"
+  push:
+    paths:
+      - "backend/app/routers/twintunnel_install_v1.py"
+      - "backend/app/main.py"
+      - "backend/scripts/twintunnel_stage_active_nodes_v1.py"
+      - "backend/tests/twintunnel_admin_install_v1_smoke.py"
+      - "components/tunnel-control-center-v1.tsx"
+      - "lib/twintunnel-install-api.ts"
+      - ".github/workflows/twintunnel-admin-installer-v1-smoke.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  standby-install-validation:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Validate API syntax and nonactivating installer policy
+        run: |
+          python3 -m py_compile backend/app/routers/twintunnel_install_v1.py
+          python3 -m py_compile backend/scripts/twintunnel_stage_active_nodes_v1.py
+          python3 backend/tests/twintunnel_admin_install_v1_smoke.py
