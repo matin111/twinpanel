@@ -290,6 +290,26 @@ enum TwinConnectMacOSLibboxControl {
                 ] as [String: Any])
                 return
             }
+            // Do not start a second protocol while another TwinConnect
+            // PacketTunnel is active or in the middle of connecting.
+            // A saved preference alone does not block a new connection.
+            let conflicting = (managers ?? []).contains { candidate in
+                guard let existing = candidate.protocolConfiguration
+                    as? NETunnelProviderProtocol,
+                    existing.providerBundleIdentifier == bundleID else {
+                    return false
+                }
+                switch candidate.connection.status {
+                case .connected, .connecting, .reasserting, .disconnecting:
+                    return true
+                default:
+                    return false
+                }
+            }
+            guard !conflicting else {
+                result(failure("MACOS_VPN_ALREADY_ACTIVE"))
+                return
+            }
             let manager = (managers ?? []).first { candidate in
                 guard let config = candidate.protocolConfiguration
                     as? NETunnelProviderProtocol else { return false }
