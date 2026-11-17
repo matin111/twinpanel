@@ -33,6 +33,13 @@ SERVICES = {1: 37981, 2: 37982}
 REPORT_INTERVAL = 5.0
 MAX_RECV_BATCH = 48
 KERNEL_UDP_BUFFER = 1024 * 1024
+ACK_FLAG = 0x80
+ACK_PAYLOAD = b"\x01"
+VALID_SERVICE_CODES = (1, 2, 129, 130)
+RETRY_INTERVAL = 0.24
+MAX_PENDING_PER_FLOW = 256
+MAX_RETRIES = 2
+ACK_RESEND_INTERVAL = 0.16
 
 
 class ReplayWindow:
@@ -60,7 +67,7 @@ class Codec:
         self.secret = secret
 
     def encode(self, service, path, flow, sequence, payload):
-        if service not in SERVICES or path not in (1, 2):
+        if service not in VALID_SERVICE_CODES or path not in (1, 2):
             raise ValueError("unsupported service/path")
         if not (0 < len(payload) <= MAX_PAYLOAD):
             raise ValueError("invalid data length")
@@ -76,7 +83,7 @@ class Codec:
         if not hmac.compare_digest(tag, expected):
             return None
         magic, service, path, flow, seq = HEADER.unpack(body[:HEADER.size])
-        if magic != MAGIC or service not in SERVICES or path not in (1,2):
+        if magic != MAGIC or service not in VALID_SERVICE_CODES or path not in (1,2):
             return None
         return service, path, flow, seq, body[HEADER.size:]
 
@@ -90,6 +97,8 @@ class Flow:
         self.seq_send = 0
         self.recv_window = ReplayWindow()
         self.paths = {}
+        self.pending_down = {} # sequence -> (payload, last_sent_at, retries)
+        self.recent_acks = {} # sequence -> last acknowledgement timestamp
         self.updated = time.monotonic()
 
     def next_seq(self):
@@ -198,15 +207,36 @@ class Mux:
         if f is None or f.service != service:
             self.stats["orphan_reply"] += 1
             return
+        now = time.monotonic()
         if not f.recv_window.accept(seq):
             self.stats["duplicates_down"] += 1
+            self._ack_downstream(f,seq,now)
             return
-        f.updated = time.monotonic()
+        f.updated = now
         try:
             self.listeners[service].sendto(payload, f.client)
             self.stats["client_replies"] += 1
+            self._ack_downstream(f,seq,now)
         except OSError:
             self.stats["client_send_error"] += 1
+
+    def _ack_downstream(self,f,seq,now):
+        """Acknowledge a delivered reply over both available authenticated paths."""
+        if now-f.recent_acks.get(seq,-100.0)<ACK_RESEND_INTERVAL:
+            return
+        f.recent_acks[seq]=now
+        if len(f.recent_acks)>MAX_PENDING_PER_FLOW*2:
+            for old_seq,ts in list(f.recent_acks.items()):
+                if now-ts>2.0:
+                    del f.recent_acks[old_seq]
+            if len(f.recent_acks)>MAX_PENDING_PER_FLOW*2:
+                f.recent_acks.clear()
+        for path,sock in self.backends.items():
+            try:
+                sock.send(self.codec.encode(f.service|ACK_FLAG,path,f.flow_id,seq,ACK_PAYLOAD))
+                self.stats["ack_sent_path_"+str(path)] += 1
+            except OSError:
+                self.stats["ack_send_error"] += 1
 
     def _exit_transport(self, data, source):
         # Preserve the old isolated GRE/UDP echo tests.
@@ -219,6 +249,18 @@ class Mux:
             self.stats["auth_rejected"] += 1
             return
         service, path, fid, seq, payload = frame
+        if service & ACK_FLAG:
+            base_service = service & ~ACK_FLAG
+            f = self.flows.get(fid)
+            if f is None or f.service != base_service or payload != ACK_PAYLOAD:
+                self.stats["invalid_ack"] += 1
+                return
+            f.paths[path] = (source,time.monotonic())
+            if f.pending_down.pop(seq,None) is not None:
+                self.stats["acks_received"] += 1
+            else:
+                self.stats["duplicate_or_late_ack"] += 1
+            return
         f = self.flows.get(fid)
         if f is None:
             f = self._new_flow(service, flow_id=fid)
@@ -243,6 +285,22 @@ class Mux:
         except OSError:
             self.stats["server_send_error"] += 1
 
+    def _send_downstream(self,f,seq,data,now,is_retry=False):
+        n = 0
+        for path,(remote,seen) in list(f.paths.items()):
+            if now - seen > PATH_TTL:
+                continue
+            try:
+                self.listeners[0].sendto(
+                    self.codec.encode(f.service,path,f.flow_id,seq,data),remote)
+                self.stats["down_sent_path_"+str(path)] += 1
+                n += 1
+            except OSError:
+                self.stats["return_send_error"] += 1
+        if is_retry and n:
+            self.stats["retry_rounds"] += 1
+        return n
+
     def _exit_target(self, fid, data):
         f = self.flows.get(fid)
         if f is None:
@@ -253,15 +311,26 @@ class Mux:
         now = time.monotonic()
         f.updated = now
         seq = f.next_seq()
-        for path,(remote,seen) in f.paths.items():
-            if now - seen > PATH_TTL:
-                continue
-            try:
-                self.listeners[0].sendto(
-                    self.codec.encode(f.service,path,fid,seq,data),remote)
-                self.stats["down_sent_path_"+str(path)] += 1
-            except OSError:
-                self.stats["return_send_error"] += 1
+        n = self._send_downstream(f,seq,data,now)
+        if n and len(f.pending_down)<MAX_PENDING_PER_FLOW:
+            f.pending_down[seq] = (data,now,0)
+        elif len(f.pending_down)>=MAX_PENDING_PER_FLOW:
+            self.stats["pending_overflow"] += 1
+
+    def _retry_pending(self,now):
+        """Retry only unacknowledged downstream packets, bounded by flow/time."""
+        if self.args.role!="exit":
+            return
+        for f in list(self.flows.values()):
+            for seq,(payload,last_sent,retries) in list(f.pending_down.items()):
+                if now-last_sent < RETRY_INTERVAL:
+                    continue
+                if retries>=MAX_RETRIES:
+                    del f.pending_down[seq]
+                    self.stats["down_unacked"] += 1
+                    continue
+                self._send_downstream(f,seq,payload,now,is_retry=True)
+                f.pending_down[seq] = (payload,now,retries+1)
 
     def _expire(self, now):
         for fid,f in list(self.flows.items()):
@@ -311,6 +380,7 @@ class Mux:
                 for key,_ in self.sel.select(timeout=0.05):
                     self._drain_ready_socket(key)
                 now=time.monotonic()
+                self._retry_pending(now)
                 if now-last_report>=REPORT_INTERVAL:
                     self._expire(now)
                     print("TT_MUX_STATS flows="+str(len(self.flows))+" "+str(dict(self.stats)),flush=True)
