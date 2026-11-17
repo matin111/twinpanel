@@ -59,12 +59,12 @@ async function request(path:string,method:"GET"|"POST"="GET",body?:object):Promi
 
 export const twinTunnelInstallApi={
   status:(tunnelId:number)=>request("/v1/tunnels/"+tunnelId+"/twintunnel-install"),
-  install:(tunnelId:number,backupNodeId:number)=>
+  install:(tunnelId:number,backupNodeId?:number)=>
     request("/v1/tunnels/"+tunnelId+"/twintunnel-install","POST",{
-      backup_node_id:backupNodeId,
+      backup_node_id:backupNodeId||null,
       mode:"install",
     }),
-  verify:(tunnelId:number,backupNodeId:number)=>
+  verify:(tunnelId:number,backupNodeId?:number)=>
     request("/v1/tunnels/"+tunnelId+"/twintunnel-install","POST",{
       backup_node_id:backupNodeId,
       mode:"verify",
