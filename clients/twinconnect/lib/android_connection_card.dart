@@ -545,14 +545,23 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
 
   /// Cisco uses its own engine and authenticated panel profile. Never hand
   /// Cisco credentials to WireGuard or download secrets before readiness.
-  // A disconnected-only blocking VpnService must relinquish VPN ownership
-  // before any protocol engine can establish its own tunnel.
+  // The legacy disconnected guard owns a *different* Android VpnService.
+  // Stopping it to start a protocol creates an unprotected handoff window.
+  // Refuse that handoff unless Android lockdown has been verified. Do not
+  // silently sacrifice fail-closed protection to make Connect appear to work.
   Future<void> _releaseDisconnectedGuard() async {
     if (!Platform.isAndroid) return;
     const channel = MethodChannel('com.twinpanel.twinconnect/vpn');
     final status = await channel.invokeMapMethod<String, dynamic>(
         'getDisconnectedTrafficGuardStatus');
-    if (status?['active'] != true) return;
+    if (status == null) {
+      throw StateError('KILL_SWITCH_STATUS_UNAVAILABLE');
+    }
+    if (status['active'] != true) return;
+    if (status['osLockdown'] != true ||
+        status['lockdownVerificationAvailable'] != true) {
+      throw StateError('KILL_SWITCH_UNSAFE_HANDOFF_BLOCKED');
+    }
     await channel.invokeMethod<dynamic>('stopDisconnectedTrafficGuard');
     for (var attempt = 0; attempt < 30; attempt++) {
       await Future<void>.delayed(const Duration(milliseconds: 100));
