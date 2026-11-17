@@ -1,0 +1,22 @@
+[Unit]
+Description=TwinTunnel Lab TCP Echo Target (loopback-only test)
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /opt/twintunnel-test/tcp_echo.py
+User=nobody
+Group=nogroup
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+RestrictAddressFamilies=AF_INET AF_UNIX
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=twintunnel-tcp-echo
+
+[Install]
+WantedBy=multi-user.target
