@@ -27,12 +27,13 @@ def main():
         while not stop[0] and time.monotonic()-started<args.duration:
             for key,_ in sel.select(timeout=0.12):
                 port=key.data
-                try:packet,src=key.fileobj.recvfrom(1600)
-                except BlockingIOError:continue
-                source_ports[port].add(src)
-                stats[port]+=1
-                try:key.fileobj.sendto(packet,src)
-                except OSError:stats["send_errors"]+=1
+                for _ in range(96):
+                    try:packet,src=key.fileobj.recvfrom(1600)
+                    except BlockingIOError:break
+                    source_ports[port].add(src)
+                    stats[port]+=1
+                    try:key.fileobj.sendto(packet,src)
+                    except OSError:stats["send_errors"]+=1
     finally:
         print("TT_MUX_ECHO_FINAL counts="+str(dict(stats))+
               " wg_unique_source_ports="+str(len(source_ports[37983]))+
