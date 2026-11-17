@@ -46,7 +46,7 @@ def run():
                 config = raw.replace("0.0.0.0:", "127.0.0.1:")
                 config = config.replace(
                     f'role = "{role}"',
-                    f'role = "{role}"\\nlink_policy = "spread"\\ncontrol_socket = "{root / (role + ".sock")}"',
+                    f'role = "{role}"\nlink_policy = "spread"\ncontrol_socket = "{root / (role + ".sock")}"',
                     1,
                 )
                 path = root / f"{role}.toml"
