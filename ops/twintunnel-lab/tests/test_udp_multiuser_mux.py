@@ -205,5 +205,91 @@ class AckRetryTests(unittest.TestCase):
         self.assertEqual(len(client.sent),1)
 
 
+class BidirectionalReliabilityTests(unittest.TestCase):
+    def setUp(self):
+        self.m=mux.Mux.__new__(mux.Mux)
+        self.m.codec=mux.Codec(b"K"*32)
+        self.m.stats=collections.Counter()
+        self.m.flows={}
+        class SocketRecorder:
+            def __init__(self):self.sent=[]
+            def send(self,data):
+                self.sent.append(data)
+                return len(data)
+            def sendto(self,data,addr):
+                self.sent.append((data,addr))
+                return len(data)
+        self.SocketRecorder=SocketRecorder
+
+    def test_upstream_ack_removes_pending_only_for_matching_service(self):
+        f=mux.Flow(444,1,("127.0.0.1",45678))
+        f.pending_up[31]=(b"payload",100.0,1)
+        self.m.flows[444]=f
+        encoded=self.m.codec.encode(129,1,444,31,mux.ACK_PAYLOAD)
+        self.m._entry_reply(1,encoded)
+        self.assertFalse(f.pending_up)
+        self.assertEqual(self.m.stats["up_acks_received"],1)
+
+    def test_wrong_service_upstream_ack_rejected(self):
+        f=mux.Flow(444,1)
+        f.pending_up[31]=(b"payload",100.0,1)
+        self.m.flows[444]=f
+        encoded=self.m.codec.encode(130,1,444,31,mux.ACK_PAYLOAD)
+        self.m._entry_reply(1,encoded)
+        self.assertIn(31,f.pending_up)
+        self.assertEqual(self.m.stats["invalid_up_ack"],1)
+
+    def test_upstream_retries_are_bounded(self):
+        self.m.args=SimpleNamespace(role="entry")
+        first=self.SocketRecorder()
+        second=self.SocketRecorder()
+        self.m.backends={1:first,2:second}
+        f=mux.Flow(777,2)
+        f.pending_up[19]=(b"upstream",100.0,0)
+        self.m.flows[777]=f
+        self.m._retry_pending(100.10)
+        self.assertFalse(first.sent)
+        self.m._retry_pending(100.26)
+        self.assertEqual(len(first.sent),1)
+        self.assertEqual(len(second.sent),1)
+        self.m._retry_pending(100.54)
+        self.assertEqual(len(first.sent),2)
+        self.m._retry_pending(100.85)
+        self.assertFalse(f.pending_up)
+        self.assertEqual(self.m.stats["up_unacked"],1)
+
+    def test_exit_acks_only_after_local_send_success(self):
+        sink=self.SocketRecorder()
+        exit_socket=self.SocketRecorder()
+        f=mux.Flow(555,1)
+        f.socket=exit_socket
+        self.m.flows[555]=f
+        self.m.listeners={0:sink}
+        data=self.m.codec.encode(1,1,555,4,b"udp-data")
+        self.m._exit_transport(data,("127.0.0.1",45678))
+        self.assertEqual(len(exit_socket.sent),1)
+        self.assertEqual(self.m.stats["server_packets"],1)
+        self.assertEqual(len(sink.sent),1)
+        self.assertEqual(self.m.codec.decode(sink.sent[0][0]),
+                         (129,1,555,4,mux.ACK_PAYLOAD))
+        self.m._exit_transport(data,("127.0.0.1",45678))
+        self.assertEqual(self.m.stats["duplicates_up"],1)
+        self.assertEqual(len(exit_socket.sent),1)
+
+    def test_failed_local_send_is_not_acked(self):
+        class Fail:
+            def send(self,data):raise OSError("test failure")
+        sink=self.SocketRecorder()
+        f=mux.Flow(555,1)
+        f.socket=Fail()
+        self.m.flows[555]=f
+        self.m.listeners={0:sink}
+        frame=self.m.codec.encode(1,1,555,8,b"udp-data")
+        self.m._exit_transport(frame,("127.0.0.1",45678))
+        self.assertEqual(self.m.stats["server_send_error"],1)
+        self.assertFalse(f.recv_window.was_delivered(8))
+        self.assertEqual(len(sink.sent),0)
+
+
 if __name__=="__main__":
     unittest.main()
