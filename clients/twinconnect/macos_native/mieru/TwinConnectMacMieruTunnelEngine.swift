@@ -95,11 +95,22 @@ final class TwinConnectMacMieruTunnelEngine {
                 completion(Self.failure("MACOS_MIERU_ENDPOINT_ROUTE_INVALID"))
                 return
             }
-            guard routePlan.excludedRoute.destinationAddress ==
-                    routePlan.endpoint,
-                  routePlan.excludedRoute.destinationSubnetMask ==
-                    "255.255.255.255" else {
+            let networkSettings: NEPacketTunnelNetworkSettings
+            do {
+                networkSettings = try TwinConnectMacMieruEndpointRoute
+                    .tunnelSettings(for: routePlan)
+            } catch {
                 completion(Self.failure("MACOS_MIERU_ENDPOINT_ROUTE_INVALID"))
+                return
+            }
+            guard networkSettings.tunnelRemoteAddress == routePlan.endpoint,
+                  networkSettings.ipv4Settings?.includedRoutes?.count == 1,
+                  networkSettings.ipv4Settings?.excludedRoutes?.count == 1,
+                  networkSettings.ipv4Settings?.excludedRoutes?.first?
+                    .destinationAddress == routePlan.endpoint,
+                  networkSettings.ipv6Settings?.includedRoutes?.count == 1,
+                  networkSettings.dnsSettings?.matchDomains == [""] else {
+                completion(Self.failure("MACOS_MIERU_NETWORK_POLICY_INVALID"))
                 return
             }
 
