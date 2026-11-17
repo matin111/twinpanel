@@ -111,7 +111,8 @@ def patch_manifest() -> None:
     filename = ANDROID / "app" / "src" / "main" / "AndroidManifest.xml"
     current = filename.read_text(encoding="utf-8")
     if ("com.wireguard.android.backend.GoBackend$VpnService" in current and
-            'android:name=".OpenConnectVpnService"' in current):
+            'android:name=".OpenConnectVpnService"' in current and
+            'android:name=".AndroidTrafficGuardService"' in current):
         return
     if '<manifest xmlns:android="http://schemas.android.com/apk/res/android">' not in current:
         raise RuntimeError("Unrecognized AndroidManifest.xml")
