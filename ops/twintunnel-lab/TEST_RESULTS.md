@@ -102,3 +102,52 @@ no production VPN MTU was modified.
   load-average); these echo results are not a peak-speed measurement.
 - A production decision requires low-loss multi-minute tests and a genuinely
   comparable existing-tunnel baseline; do not claim speed improvement yet.
+
+## Live repeat and topology audit — 17 November 2026, 06:24–06:28 UTC
+
+This follow-up used the **same isolated Iran ↔ France Rakhsh GRE lab**, and did not
+modify production VPN routes, firewall rules, client configurations, or tunnel services.
+
+### GRE-only repeated load (3 rounds, 900-byte UDP echo, 4 seconds per rate)
+
+Exact individual samples: [results/2026-11-17-gre-repeat-load.json](results/2026-11-17-gre-repeat-load.json).
+
+| Rate target | Mean echoed payload rate | Mean missing by probe deadline | Mean RTT of received replies |
+|---|---:|---:|---:|
+| 2 Mbps | 1.881 Mbps | 6.00% | 95.3 ms |
+| 5 Mbps | 4.392 Mbps | 12.16% | 851.3 ms |
+
+**Caution:** The UDP probe counts replies not received before its finite collection
+deadline as missing; this is **not proof that all such packets were lost on the wire**.
+At 5 Mbps, received-packet p95 RTT ranged ~1520–1554 ms, indicating severe queueing
+or service delay. A separate 5-Mbps run returned 4.159 Mbps, 16.82% missing,
+857.68 ms mean RTT.
+
+### Underlay path check
+
+- During that separate 5-Mbps GRE run, 14 concurrent direct ICMP requests from Iran
+  to the same France public host returned 13 replies (**7.14% loss**);
+  RTT of replies averaged **93.52 ms**.
+- Subsequent independent, 60-packet probes on the public endpoint pair showed
+  Iran → France **2/60 lost (3.33%)**, 91.43 ms mean received RTT;
+  France → Iran **4/60 lost (6.67%)**, 92.70 ms mean received RTT.
+- Direct ICMP is a **different packet type/protocol than GRE**; these samples suggest
+  underlay instability but do not attribute the application-level loss to any single cause.
+- During the concurrent run, France's cumulative `Udp:RcvbufErrors` counter was
+  **unchanged at 8946** across pre/post snapshots; earlier cumulative UDP buffer
+  errors existed, but cannot be attributed to this run without per-socket measurements.
+- The lab Rakhsh status had **one established lane, zero reconnects** over ~4h50m;
+  its displayed 0.0% link loss is not a substitute for independent echo metrics.
+
+### Production baseline topology mismatch
+
+The observed production VXLAN/GRE interfaces on the Iran host target **different
+remote endpoints** from the France host used for this TwinTunnel lab. Thus **there
+is no apples-to-apples current-tunnel vs TwinTunnel speed result**. Do not compare
+their unpaired speeds or infer user benefit from these samples.
+
+**Decision:** keep GRE in the isolated lab only; do **not** route customers over
+TwinTunnel or promote this carrier. Before a production trial, arrange access to
+a production peer endpoint for a safe parallel lab (or deploy an existing carrier
+to the same France endpoint) and benchmark both over equal endpoints, rates,
+payloads, and conditions, including CPU/queueing and longer-duration jitter/loss.
