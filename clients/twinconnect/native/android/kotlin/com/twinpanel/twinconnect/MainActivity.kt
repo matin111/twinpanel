@@ -192,6 +192,8 @@ class MainActivity : FlutterActivity() {
                 "startDisconnectedTrafficGuard" -> {
                     if (pendingGuardStart != null) {
                         result.error("GUARD_PERMISSION_PENDING", "VPN approval pending", null)
+                    } else if (AndroidTrafficGuardService.active) {
+                        result.success(mapOf("requested" to true, "verified" to true))
                     } else if (WireGuardRuntime.isInterfaceUp() || hasActiveVpnTransport()) {
                         result.error("GUARD_TUNNEL_ACTIVE", "Cannot replace active VPN", null)
                     } else {
@@ -431,11 +433,11 @@ class MainActivity : FlutterActivity() {
         if (requestCode == GUARD_APPROVAL_REQUEST) {
             val request = pendingGuardStart ?: return
             pendingGuardStart = null
-            if (resultCode == Activity.RESULT_OK) {
+            if (resultCode == Activity.RESULT_OK && !hasActiveVpnTransport()) {
                 ContextCompat.startForegroundService(this, Intent(this, AndroidTrafficGuardService::class.java))
                 request.success(mapOf("requested" to true, "verified" to false))
             } else {
-                request.error("VPN_PERMISSION_DENIED", "VPN permission not granted", null)
+                request.error("VPN_PERMISSION_DENIED_OR_CONFLICT", "VPN permission denied or another VPN became active", null)
             }
             return
         }
