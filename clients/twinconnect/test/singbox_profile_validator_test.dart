@@ -32,6 +32,7 @@ void main() {
           'psk': 'confidential',
           'version': 4,
         } else 'password': 'confidential',
+        if (entry.key == 'naive') 'username': 'synthetic',
         if (entry.key == 'socks5') ...{
           'username': 'synthetic',
           'version': '5',
