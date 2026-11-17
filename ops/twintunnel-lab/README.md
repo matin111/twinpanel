@@ -86,7 +86,7 @@ loopback UDP echo target; no existing VPN ports or customer routes are changed.
 
 All `entry-*.toml` and `exit-*.toml` configs contain generated individual
 Noise keys, and are **not committed to GitHub**. Generate them with
-`twintunnel-core init --tunnel-addr IRAN_PUBLIC_IP:37031 --carrier shabdiz-tcp
+`/opt/twintunnel-test/bin/twintunnel-core init --tunnel-addr IRAN_PUBLIC_IP:37031 --carrier shabdiz-tcp
 --forward 127.0.0.1:37931=127.0.0.1:37922/udp` for TCP, or switch to
 `shabdiz-udp`, port `37033`, forward `37933` for UDP. Distribute each
 half to its corresponding host as `/etc/twintunnel-test/entry-tcp.toml`,
@@ -131,3 +131,73 @@ service has been enabled at boot.
 ## Security and licensing
 
 Rakhsh is upstream **AGPL-3.0-only**. Preserve notices/source availability obligations for any distributed derivatives or network services, and do not represent this branding layer as original Rakhsh source. This lab uses a pinned public release, no source modifications, and private keys stored only on hosts.
+
+
+## Four-link Rakhsh stream lab (17 November 2026)
+
+**Separate from Shabdiz-GRE:** the existing Shabdiz datagram engine does not use
+the Rakhsh lane pool or TCP stream resumption. This new, isolated multi-link
+laboratory uses **Rakhsh stream mode** and does **not carry customer VPN traffic**.
+
+On Iran, `twintunnel-lab@entry-multilink.service` listens on four independent
+carrier sockets: **TCP/37041, TLS/37042, QUICv2 UDP/37043, WS/37044**.
+On France, `twintunnel-lab@exit-multilink.service` dials the same four.
+There are **four total lanes**, `link_policy = "spread"`, and
+`resume = true` with a 60-second grace period **on both ends**.
+The isolated TCP forward is Iran `127.0.0.1:37941` → France
+`127.0.0.1:37942`; `tcp_echo.py` listens only on French loopback.
+
+Generate a *fresh private pair*, never commit either half:
+```sh
+/opt/twintunnel-test/bin/twintunnel-core init --tunnel-addr IRAN_PUBLIC_IP:37041 --carrier tcp \
+  --link tls:37042 --link quicv2:37043 --link ws:37044 \
+  --lanes 4 --link-policy spread --resume --resume-grace 60 \
+  --forward 127.0.0.1:37941=127.0.0.1:37942
+```
+Use `control_socket = "/run/twintunnel-multilink-entry.sock"` on Iran
+and `control_socket = "/run/twintunnel-multilink-exit.sock"` on France;
+validate each half with `/opt/twintunnel-test/bin/twintunnel-core check -c <path>`.
+Secret TOML files remain `0600` under `/etc/twintunnel-test/`. The existing
+`twintunnel-lab@.service` template starts each new instance by config name.
+The TCP echo service is defined in
+`systemd/twintunnel-lab-tcp-echo.service`. Nothing was enabled at boot.
+
+### Verified on real Iran ↔ France hosts
+
+- Both Rakhsh instances reported **four established lanes**, one each over
+  TCP, TLS, QUICv2 and WS; TCP loopback echo data matched exactly.
+- At 07:32 UTC, while **8 long-lived TCP streams** were active, the **dedicated
+  lab TCP lane** (port 37041 only) was reset with `ss -K`. Rakhsh reported
+  two streams moving to another lane; **all 8/8 sockets completed, 760/760
+  echo blocks matched**; the exit recorded two retransmitted chunks.
+- At 07:33 UTC, while another eight streams were active, the isolated
+  **TCP and TLS lanes** (ports 37041 and 37042 only) were reset.
+  **All 8/8 streams and 760/760 blocks completed**; at least two streams were
+  observed moving to the surviving WS lane; remaining carriers recovered.
+- This proves **TCP stream integrity under these two controlled faults**,
+  not zero latency: observed per-block stalls reached ~1.56 seconds.
+  It does not prove behavior under a prolonged full outage.
+
+These are **different carriers to the same Iran / France endpoint pair**, not
+independent physical networks or redundant exit servers. If that path or an
+entire host fails, all four carriers may fail. `resume` does **not**
+cover UDP datagrams or L3 TUN, and stream carriers may be unsuitable for
+high-volume UDP VPN traffic. Do **not** migrate existing OpenVPN/WireGuard,
+IPsec, or any other customer route based on this stream-only test.
+
+For a repeatable test (normal operation, without forced faults):
+```sh
+python3 /opt/twintunnel-test/multilink_resume_probe.py
+```
+For diagnostics:
+```sh
+/opt/twintunnel-test/bin/twintunnel-core status --socket /run/twintunnel-multilink-entry.sock
+/opt/twintunnel-test/bin/twintunnel-core status --socket /run/twintunnel-multilink-exit.sock
+```
+**Fault injection is not an automated step**; it must target confirmed
+dedicated lab ports and must never select production sockets.
+
+Lab rollback: stop `twintunnel-lab@entry-multilink.service` (Iran) and
+`twintunnel-lab@exit-multilink.service` plus
+`twintunnel-lab-tcp-echo.service` (France). Leave existing GRE, VPN, nodes,
+DNS and client configurations untouched.
