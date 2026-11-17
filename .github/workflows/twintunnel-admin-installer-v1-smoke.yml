@@ -8,6 +8,7 @@ on:
       - "backend/scripts/twintunnel_stage_active_nodes_v1.py"
       - "backend/tests/twintunnel_admin_install_v1_smoke.py"
       - "components/tunnel-control-center-v1.tsx"
+      - "components/tunnel-protocol-runtime-v307.tsx"
       - "lib/twintunnel-install-api.ts"
       - ".github/workflows/twintunnel-admin-installer-v1-smoke.yml"
   push:
@@ -17,6 +18,7 @@ on:
       - "backend/scripts/twintunnel_stage_active_nodes_v1.py"
       - "backend/tests/twintunnel_admin_install_v1_smoke.py"
       - "components/tunnel-control-center-v1.tsx"
+      - "components/tunnel-protocol-runtime-v307.tsx"
       - "lib/twintunnel-install-api.ts"
       - ".github/workflows/twintunnel-admin-installer-v1-smoke.yml"
 
