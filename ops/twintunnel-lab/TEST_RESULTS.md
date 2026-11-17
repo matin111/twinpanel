@@ -15,6 +15,7 @@ Environment: isolated TwinTunnel (upstream Rakhsh v0.1.0), Shabdiz-GRE, public I
 |---|---:|---:|---:|---:|---:|
 | Auto pacing, 1 Mbps target, 4 seconds | 555 | 543 | 2.16% | 103.70 ms | 0.979 Mbps |
 | Auto pacing, 5 Mbps target, 4 seconds | 2777 | 2672 | 3.78% | 96.65 ms | 4.811 Mbps |
+| Auto pacing, 10 Mbps target, 5 seconds, 1100-byte payload | 5681 | 4973 | 12.46% | 548.23 ms | 8.754 Mbps |
 | Fixed 1000 pps, 1 Mbps target, 4 seconds | 555 | 548 | 1.26% | 108.73 ms | 0.988 Mbps |
 | Fixed 1000 pps, 5 Mbps target, 4 seconds | 2777 | 2665 | 4.03% | 97.29 ms | 4.798 Mbps |
 
@@ -22,7 +23,7 @@ Fixed 1000 pps did not clearly improve the higher-load test; **auto pacing was r
 
 ## Interpretation
 
-These results prove the independent GRE path works and can carry UDP echo traffic. They do **not** demonstrate that TwinTunnel is faster than the production tunnels. Some echo packets were lost at moderate test rates, and the direct ICMP baseline is not an apples-to-apples UDP throughput comparison.
+These results prove the independent GRE path works and can carry UDP echo traffic. They do **not** demonstrate that TwinTunnel is faster than the production tunnels. At the 10-Mbps echo load, packet loss rose above 12% and RTT worsened sharply, so this path **fails a production-quality test** at that rate. The direct ICMP baseline is not an apples-to-apples UDP throughput comparison.
 
 Follow-up comparison requires an equal-load, equal-endpoint throughput benchmark against existing tunnels and monitoring of retransmission, packet loss, queueing and CPU. Do **not** make this engine the default for users solely on the upstream published 213/100 Mbps figures.
 
