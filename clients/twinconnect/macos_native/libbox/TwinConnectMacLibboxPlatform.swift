@@ -29,9 +29,10 @@ final class TwinConnectMacLibboxPlatform: NSObject,
             userInfo: [NSLocalizedDescriptionKey: code])
     }
 
-    /// Libbox calls this on a worker thread. On macOS the packetFlow's TUN
-    /// descriptor can be retrieved after setTunnelNetworkSettings finishes;
-    /// the framework's fallback is checked if the packetFlow key is absent.
+    /// Libbox calls this on a worker thread. Never use an undocumented
+    /// packetFlow KVC key: a missing Objective-C key may raise an exception
+    /// and crash the entire PacketTunnel extension instead of failing safely.
+    /// Use Libbox's native tunnel-descriptor accessor only.
     func openTun(_ options: LibboxTunOptionsProtocol?,
                  ret0_: UnsafeMutablePointer<Int32>?) throws {
         guard let options, let ret0_, let tunnel,
@@ -94,11 +95,10 @@ final class TwinConnectMacLibboxPlatform: NSObject,
             throw Self.failure("MACOS_LIBBOX_TUN_STOPPED")
         }
 
-        // The official Apple sing-box platform adapter uses the packetFlow
-        // descriptor and this libbox fallback. Neither is a synthetic socket.
-        let descriptor = tunnel.packetFlow.value(
-            forKeyPath: "socket.fileDescriptor") as? Int32
-            ?? LibboxGetTunnelFileDescriptor()
+        // Never introspect NEPacketTunnelFlow via private KVC. The
+        // Libbox-provided descriptor is the only supported native handle
+        // in this adapter; unavailable means fail closed, not mock success.
+        let descriptor = LibboxGetTunnelFileDescriptor()
         guard descriptor >= 0 else {
             // A TUN interface without a usable descriptor must not leave
             // full-tunnel routes or DNS installed on the OS.
