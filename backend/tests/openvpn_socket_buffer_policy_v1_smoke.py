@@ -4,7 +4,8 @@ ROOT = Path(__file__).resolve().parents[1]
 provision = (ROOT / "app" / "routers" / "provision.py").read_text()
 headroom = (ROOT / "app" / "openvpn_fork_headroom_v101.py").read_text()
 
-template = provision.split("config = f'''", 1)[1].split("'''", 1)[0]
+openvpn_section = provision.split("async def install_openvpn", 1)[1]
+template = openvpn_section.split("config = f'''", 1)[1].split("'''", 1)[0]
 assert "rcvbuf 4194304" in template
 assert "sndbuf 4194304" in template
 assert "net.core.rmem_max" in provision
