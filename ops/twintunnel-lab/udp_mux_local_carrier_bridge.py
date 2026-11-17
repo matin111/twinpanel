@@ -37,20 +37,21 @@ def main():
             for key,_ in sel.select(.05):
                 path=key.data
                 sock=key.fileobj
-                try:data,source=sock.recvfrom(1600)
-                except BlockingIOError:continue
-                try:
-                    if source==exit_addr:
-                        target=last_client[path]
-                        if target is not None:
-                            sock.sendto(data,target)
-                            stats["returned"]+=1
-                    else:
-                        last_client[path]=source
-                        sock.sendto(data,exit_addr)
-                        stats["forwarded"]+=1
-                except OSError:
-                    stats["errors"]+=1
+                for _ in range(96):
+                    try:data,source=sock.recvfrom(1600)
+                    except BlockingIOError:break
+                    try:
+                        if source==exit_addr:
+                            target=last_client[path]
+                            if target is not None:
+                                sock.sendto(data,target)
+                                stats["returned"]+=1
+                        else:
+                            last_client[path]=source
+                            sock.sendto(data,exit_addr)
+                            stats["forwarded"]+=1
+                    except OSError:
+                        stats["errors"]+=1
     finally:
         print("TT_LOCAL_CARRIER_BRIDGE_FINAL "+str(stats),flush=True)
         for sock in sockets.values():sock.close()
