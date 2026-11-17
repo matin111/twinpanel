@@ -1,6 +1,6 @@
 {
   "version": "1.1.0-rc.863",
-  "source_sha": "f7d9a06bc586d0f808d24e006c2b3cb53a49f022",
+  "source_sha": "bff2e2729a5b18cee73f0234132f56a220aeeced",
   "notes": {
     "fa": "اصلاح دائمی تمدید رزروی: فعال‌سازی خودکار اشتراک منقضی یا دارای حجم تمام‌شده پس از پرداخت، حفظ نام کاربری و کانفیگ‌های قبلی، جلوگیری از تغییر پروتکل‌ها در تمدید و محافظ انتشار نسخه‌های بعدی.",
     "en": "Durable reserved-renewal fix: immediately activate already-due paid renewals, preserve VPN credentials and existing endpoint configurations, and enforce renewal regression guards on future releases."
