@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.864",
+  "version": "1.1.0-rc.865",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-17T18:35:06Z",
+  "released_at": "2026-11-17T19:58:49Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "58743a7b9ec558a669c88b0504671238c4636fcf",
+  "source_sha": "acdeee4a3fc06c358be34efc4dc5d30fc3c49017",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.864/twinpanel-1.1.0-rc.864-linux-x86_64.tar.gz",
-    "sha256": "49d0d6079229e596140b722a71b96e11f87618a7b551adbe04563727adb43b0f",
-    "size_bytes": 31213907
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.865/twinpanel-1.1.0-rc.865-linux-x86_64.tar.gz",
+    "sha256": "d1a888eb3d74d57029dd17d6baf923af0ffe35f1acedf351d40c636732a6853f",
+    "size_bytes": 31242338
   },
   "notes": {
-    "fa": "به‌روزرسانی پایدار زیرساخت TwinTunnel: توزیع خودکار نسخه دارای هش به همه نودهای آنلاین پس از آپدیت پنل، حفظ ۹ تانل فعال فعلی بدون تغییر مسیر مشتریان، محافظ انتشار در GitHub و اصلاح بافر OpenVPN. مسیر سه‌گانه ترکیه فقط در حالت آماده‌سازی آزمایشی باقی می‌ماند.",
-    "en": "Durable TwinTunnel infrastructure update: hash-verified automatic staging on every online node after a healthy panel upgrade; protects existing TP27 tunnels and customer routes, includes release guards and OpenVPN UDP socket headroom. Turkey multipath carrier remains lab-only and disabled."
+    "fa": "افزودن نصب و بررسی آزمایشی TwinTunnel سه‌مسیره مستقیماً در مدیریت و ساخت تانل. انتخاب نود واسط، اعتبارسنجی SHA-256 و موتور روی هر سه نود، حفظ گزارش نصب در آپدیت‌ها و محافظ GitHub برای حذف‌نشدن قابلیت. مسیر فعال کاربران TP27 بدون تغییر باقی می‌ماند؛ فعال‌سازی عمومی موتور تا پایان تست‌های واقعی OpenVPN قفل است.",
+    "en": "Admin three-node TwinTunnel standby installer: choose separate backup relay, stage and verify engine by SHA256 and codec selftests on Iran/exit/backup, persist per-pair state across releases and enforce future GitHub release guards. Existing TP27 live paths stay unchanged; production cutover is disabled pending real OpenVPN failover acceptance."
   }
 }
