@@ -31,7 +31,7 @@ PATH_TTL = 12.0
 PATHS = ((1, ("127.0.0.1", 37921)), (2, ("127.0.0.1", 37933)))
 SERVICES = {1: 37981, 2: 37982}
 REPORT_INTERVAL = 5.0
-MAX_RECV_BATCH = 48
+MAX_RECV_BATCH = 96
 KERNEL_UDP_BUFFER = 1024 * 1024
 ACK_FLAG = 0x80
 ACK_PAYLOAD = b"\x01"
@@ -483,7 +483,7 @@ class Mux:
                     print("TT_MUX_STATS flows="+str(len(self.flows))+" pending_packets="+str(self.pending_packets)+" pending_bytes="+str(self.pending_bytes)+" "+str(dict(self.stats)),flush=True)
                     last_report=now
         finally:
-            print("TT_MUX_FINAL flows="+str(len(self.flows))+" "+str(dict(self.stats)),flush=True)
+            print("TT_MUX_FINAL flows="+str(len(self.flows))+" pending_packets="+str(self.pending_packets)+" pending_bytes="+str(self.pending_bytes)+" "+str(dict(self.stats)),flush=True)
             self.sel.close()
             for f in self.flows.values():
                 if f.socket:
