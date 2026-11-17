@@ -216,6 +216,9 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
       // AmneziaWG uses its own native GoBackend, not the Sing-box engine.
       // Never mark an AWG session stopped using Sing-box's status flag.
       if (_singBoxProtocol == 'amneziawg') {
+        // AWG is a separate GoBackend tunnel. Run the same real HTTPS/exit-IP
+        // verification used for other native transports, not Sing-box polling.
+        _maybeCheckInternet();
         return;
       }
       if (_singBoxProtocol != null) {
@@ -337,6 +340,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
   bool get _activeVerifiedTransport =>
       (_up && _handshake) || _openVpnUp || _ciscoUp ||
       (_xrayCoreUp && AndroidXrayTunnel.instance.isConnected) ||
+      (_singBoxProtocol == 'amneziawg') ||
       (_singBoxProtocol != null && AndroidSingBoxTunnel.instance.isConnected);
 
   void _maybeCheckInternet() {
