@@ -4,6 +4,8 @@ import argparse
 import os
 import re
 import signal
+import socket
+import struct
 import subprocess
 import sys
 import tempfile
@@ -75,13 +77,34 @@ def main():
             raise RuntimeError("tcpdump exited before packet probe")
         print(f"PACKET_PROBE_READY count={args.count} interval={args.interval}", flush=True)
         start = time.monotonic()
-        ping = subprocess.run(
-            ["ping", "-n", "-I", TUN_CLIENT, "-c", str(args.count),
-             "-i", str(args.interval), "-w", str(max(30, int(args.count * args.interval + 15))),
-             TARGET],
-            capture_output=True, text=True,
-            timeout=max(45, int(args.count * args.interval + 35)),
-        )
+        sent = 0
+        send_errors = 0
+        ident = os.getpid() & 0xffff
+
+        def checksum(packet):
+            if len(packet) & 1:
+                packet += b"\x00"
+            total = sum(struct.unpack("!%dH" % (len(packet)//2), packet))
+            total = (total >> 16) + (total & 0xffff)
+            total += total >> 16
+            return (~total) & 0xffff
+
+        sender = socket.socket(socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_ICMP)
+        sender.setsockopt(socket.SOL_SOCKET, socket.SO_BINDTODEVICE, TUN_CLIENT.encode()+b"\x00")
+        try:
+            for sequence in range(1,args.count+1):
+                payload = b"TTPROBE01" + struct.pack("!I",sequence) + b"x"*48
+                header = struct.pack("!BBHHH",8,0,0,ident,sequence & 0xffff)
+                header = struct.pack("!BBHHH",8,0,checksum(header+payload),ident,sequence & 0xffff)
+                try:
+                    sender.sendto(header+payload,(TARGET,0))
+                    sent += 1
+                except OSError:
+                    send_errors += 1
+                if args.interval:
+                    time.sleep(args.interval)
+        finally:
+            sender.close()
         duration = round(time.monotonic() - start, 2)
         time.sleep(0.8)
         capture.send_signal(signal.SIGINT)
@@ -102,7 +125,8 @@ def main():
             drop_delta = sock_after["drops"] - sock_before["drops"]
         print(
             "PACKET_PROBE_RESULT",
-            f"sent={args.count}",
+            f"sent={sent}",
+            f"send_errors={send_errors}",
             f"delivered_capture={len(captured_seqs)}",
             f"unique_seq={len(set(captured_seqs))}",
             f"missing_seqs={sorted(set(range(1, args.count + 1))-set(captured_seqs))[:40]}",
@@ -115,7 +139,7 @@ def main():
             flush=True,
         )
         print("NOTE: ping targets a nonresponding benchmark address; 0 replies are expected", flush=True)
-        if len(set(captured_seqs)) != args.count or (after - before) != args.count:
+        if send_errors or len(set(captured_seqs)) != sent or (after - before) != sent:
             print("ERROR: packet counts mismatch", flush=True)
             return 2
         if drop_delta not in (None, 0):
