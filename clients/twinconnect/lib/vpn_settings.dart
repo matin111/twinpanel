@@ -368,26 +368,34 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
           _glass(Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              SwitchListTile.adaptive(
+              ListTile(
                 contentPadding: EdgeInsets.zero,
-                secondary: const Icon(Icons.shield_rounded),
+                leading: Icon(
+                  _androidOsLockdown ? Icons.verified_user_rounded
+                      : Icons.shield_outlined,
+                  color: _androidOsLockdown ? Colors.greenAccent : null,
+                ),
                 title: const Text('Kill Switch'),
                 subtitle: Text(tr(
                   _androidOsLockdown
-                      ? 'قفل شبکه اندروید توسط موتور فعال تأیید شد.'
-                      : !_androidLockdownVerifiable && _androidVpnConflict
-                          ? 'VPN متصل است، اما وضعیت قفل شبکه برای این موتور قابل تأیید نیست. تنظیمات VPN اندروید را بررسی کنید.'
-                          : 'برای محافظت واقعی، Always-on VPN و Block connections without VPN را در اندروید فعال کنید.',
+                      ? 'محافظت سیستمی توسط موتور فعال تأیید شد.'
+                      : _androidVpnConflict && !_androidLockdownVerifiable
+                          ? 'VPN متصل است؛ محافظت سیستمی این موتور قابل تأیید نیست.'
+                          : 'محافظت سراسری تأیید نشده است. برای فعال‌سازی، قفل شبکه اندروید را تنظیم کنید.',
                   _androidOsLockdown
-                      ? 'Android lockdown verified for the active engine.'
-                      : !_androidLockdownVerifiable && _androidVpnConflict
-                          ? 'VPN connected; lockdown cannot be verified for this engine. Check Android VPN settings.'
-                          : 'Enable Always-on VPN and Block connections without VPN in Android VPN settings.',
+                      ? 'System lockdown verified for the active VPN engine.'
+                      : _androidVpnConflict && !_androidLockdownVerifiable
+                          ? 'VPN connected; lockdown status cannot be verified for this engine.'
+                          : 'System-wide protection is unverified. Configure Android VPN lockdown.',
                 )),
-                value: _androidOsLockdown,
-                onChanged: _androidKillBusy ? null : (requested) async {
-                  // Android does not permit third-party apps to toggle OS lockdown.
-                  // Never start a competing VpnService or fake an enabled state.
+                trailing: Icon(
+                  _androidOsLockdown ? Icons.check_circle_rounded
+                      : Icons.warning_amber_rounded,
+                  color: _androidOsLockdown ? Colors.greenAccent : Colors.orangeAccent,
+                ),
+              ),
+              FilledButton.tonalIcon(
+                onPressed: () async {
                   try {
                     await const MethodChannel('com.twinpanel.twinconnect/vpn')
                         .invokeMethod<dynamic>('openAndroidVpnSettings');
@@ -399,6 +407,8 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
                   }
                   if (mounted) await _refreshAndroidGuard();
                 },
+                icon: const Icon(Icons.settings_rounded),
+                label: Text(tr('تنظیم محافظت سیستمی', 'Configure system Kill Switch')),
               ),
               if (_androidKillRequested)
                 TextButton.icon(
