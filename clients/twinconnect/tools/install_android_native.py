@@ -102,7 +102,7 @@ def patch_gradle() -> None:
             # MainActivity loads this class by its literal name via reflection.
             # R8 otherwise removes or renames it in release APKs, causing
             # AWG_NATIVE_ENGINE_UNAVAILABLE even when the AAR is present.
-            "-keep class com.twinpanel.twinconnect.AmneziaWgRuntime { *; }\\n"
+            "-keep class com.twinpanel.twinconnect.AmneziaWgRuntime { *; }\n"
 
         )
 
