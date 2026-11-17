@@ -6,6 +6,7 @@ import base64
 import re
 import urllib.request
 import os
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -182,6 +183,72 @@ def _install_rollback_unit_restore(core) -> None:
     core.rollback = rollback_with_unit_restore
 
 
+
+def _schedule_twintunnel_node_staging_v1(
+    release_root: Path = Path("/opt/twinpanel/current"),
+) -> bool:
+    """Stage GitHub-built lab code after update, without ever enabling VPN routing.
+
+    The release already passed its health checks. A staging failure cannot
+    roll back a healthy API/Web or restart any working customer tunnels.
+    A detached systemd service survives the oneshot updater's cgroup exit.
+    """
+    script = release_root / "backend/scripts/twintunnel_stage_active_nodes_v1.py"
+    source = release_root / "ops/twintunnel-lab"
+    artifacts = (
+        "udp_multiuser_mux.py",
+        "udp_turkey_transit_relay.py",
+        "udp_three_path_fault_probe.py",
+    )
+    if not script.is_file() or not all((source / f).is_file() for f in artifacts):
+        print("UPDATER_TWINTUNNEL_STAGE_SKIPPED source_not_in_release", flush=True)
+        return False
+    if not Path("/usr/bin/systemd-run").is_file():
+        print("UPDATER_TWINTUNNEL_STAGE_SKIPPED systemd_run_missing", flush=True)
+        return False
+    version_file = release_root / "VERSION"
+    version = version_file.read_text().strip() if version_file.is_file() else ""
+    if not re.fullmatch(r"[A-Za-z0-9._-]{1,64}", version):
+        print("UPDATER_TWINTUNNEL_STAGE_SKIPPED version_invalid", flush=True)
+        return False
+    command = [
+        "/usr/bin/systemd-run",
+        "--quiet",
+        "--collect",
+        "--unit=twinpanel-twintunnel-stage-" + version,
+        "--property=Type=exec",
+        "--property=EnvironmentFile=/etc/twinpanel/backend.env",
+        "--property=WorkingDirectory=/opt/twinpanel/current/backend",
+        "--property=TimeoutStartSec=900",
+        "--property=CPUWeight=50",
+        "--property=IOWeight=50",
+        "--setenv=PYTHONPATH=/opt/twinpanel/current/backend",
+        "/opt/twinpanel/venv/bin/python3",
+        str(script),
+        "--apply",
+        "--concurrency",
+        "2",
+    ]
+    try:
+        result = subprocess.run(
+            command, capture_output=True, text=True, timeout=16, check=False
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        print(
+            "UPDATER_TWINTUNNEL_STAGE_WARNING " + type(exc).__name__,
+            file=sys.stderr, flush=True,
+        )
+        return False
+    if result.returncode != 0:
+        print(
+            "UPDATER_TWINTUNNEL_STAGE_WARNING launch_failed rc=" +
+            str(result.returncode),
+            file=sys.stderr, flush=True,
+        )
+        return False
+    print("UPDATER_TWINTUNNEL_STAGE_SCHEDULED version=" + version, flush=True)
+    return True
+
 def main() -> int:
     core = _load_core()
     core.wait_for_healthy = lambda urls, expected_version, seconds=45: _staged_wait_for_healthy(
@@ -192,7 +259,17 @@ def main() -> int:
     )
     _install_rollback_unit_restore(core)
     try:
-        return int(core.main())
+        result = int(core.main())
+        if result == 0:
+            # Only after successful GitHub package activation and health checks.
+            try:
+                _schedule_twintunnel_node_staging_v1()
+            except Exception as exc:
+                print(
+                    "UPDATER_TWINTUNNEL_STAGE_WARNING " + type(exc).__name__,
+                    file=sys.stderr, flush=True,
+                )
+        return result
     except Exception as exc:
         core.save(state="failed", error=str(exc)[:1200])
         raise
