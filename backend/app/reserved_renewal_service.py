@@ -208,46 +208,11 @@ def activate_due_renewals(db: Session, limit: int = 100) -> int:
                     })
                     db.commit()
                     continue
-            if pending.plan_id is not None and (
-                sub.plan_id is None or int(pending.plan_id) != int(sub.plan_id)
-            ):
-                # This branch is reached ONLY once the old period has expired
-                # or its traffic is exhausted. Keep the reserved period intact
-                # unless the destination protocols are actually provisioned.
-                try:
-                    ready, reason = provision_reserved_plan_at_cutover(
-                        db, sub, int(pending.plan_id)
-                    )
-                except Exception as exc:
-                    db.rollback()
-                    # Fail closed: no period reset or paid-reservation consume.
-                    # An admin may requeue after inspecting provisioning logs.
-                    pending = db.get(PendingSubscriptionRenewal, pending.id)
-                    if pending is not None:
-                        pending.status = "blocked"
-                        history(db, sub_id, "renewal_blocked", pending.source, "system", {
-                            "renewal_id": pending.id,
-                            "reason": "destination_protocol_provision_error",
-                            "error_class": type(exc).__name__,
-                        })
-                        db.commit()
-                    continue
-                if not ready:
-                    pending.status = "blocked"
-                    history(db, sub_id, "renewal_blocked", pending.source, "system", {
-                        "renewal_id": pending.id, "reason": reason,
-                        "reserved_plan_id": pending.plan_id,
-                    })
-                    db.commit()
-                    continue
-                # The lifecycle committed the new plan/protocol state. Reload
-                # the subscription before resetting the new accounting cycle.
-                sub = db.execute(select(Subscription).where(
-                    Subscription.id == sub_id
-                ).with_for_update()).scalar_one()
-                pending = db.execute(select(PendingSubscriptionRenewal).where(
-                    PendingSubscriptionRenewal.id == pending.id
-                ).with_for_update()).scalar_one()
+            # A renewal extends an existing account: preserve protocol credentials,
+            # endpoint selections, UUIDs and config payloads on every plan change.
+            # Target plan metadata and the paid period are applied below, but
+            # provisioning belongs exclusively to account creation/admin edit.
+            # Do not block a paid renewal due to unrelated protocol failures.
             before = {"plan_id": sub.plan_id, "traffic_limit_bytes": int(sub.traffic_limit_bytes or 0),
                       "traffic_used_bytes": int(sub.traffic_used_bytes or 0),
                       "expires_at": sub.expires_at.isoformat() if sub.expires_at else None}
