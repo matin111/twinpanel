@@ -36,6 +36,7 @@ KERNEL_UDP_BUFFER = 1024 * 1024
 ACK_FLAG = 0x80
 ACK_PAYLOAD = b"\x01"
 VALID_SERVICE_CODES = (1, 2, 129, 130)
+VALID_PATHS = (1, 2, 3)
 RETRY_INTERVAL = 0.24
 MAX_PENDING_PER_FLOW = 64
 MAX_PENDING_PACKETS = 8192
@@ -75,7 +76,7 @@ class Codec:
         self.secret = secret
 
     def encode(self, service, path, flow, sequence, payload):
-        if service not in VALID_SERVICE_CODES or path not in (1, 2):
+        if service not in VALID_SERVICE_CODES or path not in VALID_PATHS:
             raise ValueError("unsupported service/path")
         if not (0 < len(payload) <= MAX_PAYLOAD):
             raise ValueError("invalid data length")
@@ -91,7 +92,7 @@ class Codec:
         if not hmac.compare_digest(tag, expected):
             return None
         magic, service, path, flow, seq = HEADER.unpack(body[:HEADER.size])
-        if magic != MAGIC or service not in VALID_SERVICE_CODES or path not in (1,2):
+        if magic != MAGIC or service not in VALID_SERVICE_CODES or path not in VALID_PATHS:
             return None
         return service, path, flow, seq, body[HEADER.size:]
 
@@ -151,10 +152,14 @@ class Mux:
             s.bind((self.args.bind_ip, port))
             self.listeners[service] = s
             self._register(s, "client", service)
-        path_destinations = (
+        path_destinations = [
             (1, ("127.0.0.1", self.args.path1_port)),
             (2, ("127.0.0.1", self.args.path2_port)),
-        )
+        ]
+        if self.args.path3_host:
+            path_destinations.append(
+                (3, (self.args.path3_host, self.args.path3_port))
+            )
         for path, dest in path_destinations:
             s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             s.connect(dest)
@@ -507,6 +512,8 @@ def main():
     p.add_argument("--duration",type=int,default=300)
     p.add_argument("--path1-port",type=int,default=37921)
     p.add_argument("--path2-port",type=int,default=37933)
+    p.add_argument("--path3-host",default="")
+    p.add_argument("--path3-port",type=int,default=38831)
     p.add_argument("--exit-bind-ip",default="127.0.0.1")
     p.add_argument("--exit-port",type=int,default=37922)
     args=p.parse_args()
