@@ -378,7 +378,7 @@ export function TunnelProtocolRuntimeV307(){
 
       {manageOpen&&selectedTunnel&&<Modal wide title={`Tunnel #${selectedTunnel.id}`} onClose={()=>!busy&&setManageOpen(false)}>
         <div className={styles.modalHead}>
-          <div className={styles.modalTitle}><div className={styles.modalTitleRow}><b>Tunnel #{selectedTunnel.id}</b><Badge tone={tone(selectedTunnel.status)}>{String(selectedTunnel.status||"—")}</Badge></div><small>{pick("مدیریت Pair، پروتکل‌ها و اتصال‌های عمومی","Pair, protocols and public connections management")}</small></div>
+          <div className={styles.modalTitle}><div className={styles.modalTitleRow}><b>Tunnel #{selectedTunnel.id}</b><Badge tone={tone(selectedTunnel.status)}>{String(selectedTunnel.status||"—")}</Badge></div></div>
           <button type="button" className="icon-button" disabled={Boolean(busy)} onClick={()=>setManageOpen(false)}>×</button>
         </div>
         <div className={styles.modalBody}>
@@ -399,10 +399,9 @@ export function TunnelProtocolRuntimeV307(){
 
           <section className={styles.section}>
             <div className={styles.sectionHead}>
-              <div><b>{pick("TwinTunnel سه‌مسیره","Three-path TwinTunnel")}</b><small>{pick("نصب روی نود ایران، خروجی و نود پشتیبان بدون تغییر ترافیک مشتریان","Stage on Iran, exit and backup without changing customer traffic")}</small></div>
+              <div><b>{pick("TwinTunnel سه‌مسیره","Three-path TwinTunnel")}</b></div>
               <Badge tone={twinStatus?.status==="staged"&&!twinStatus.needs_update?"ok":"warn"}>{twinStatus?.status==="staged"&&!twinStatus.needs_update?pick("آماده آزمایش","Staged"):pick("نصب آزمایشی","Lab install")}</Badge>
             </div>
-            <p>{pick("موتور روی سه نود با SHA-256 و تست رمزنگاری بررسی می‌شود. تا رفع افت بسته OpenVPN، فعال‌سازی مسیر Production مجاز نیست.","All three nodes undergo SHA-256 and codec checks. Production cutover stays locked pending OpenVPN packet-loss resolution.")}</p>
             <div className={styles.managementActions}>
               <label>
                 <span>{pick("نود واسط سوم","Independent backup node")}</span>
@@ -411,21 +410,20 @@ export function TunnelProtocolRuntimeV307(){
                 </select>
               </label>
               <button type="button" className="primary-soft" disabled={Boolean(busy)||!selectedBackupId} onClick={()=>void runTwinTunnel("install")}>
-                {busy==="twintunnel-install"?"…":pick("نصب و تست TwinTunnel","Install and test TwinTunnel")}
+                {busy==="twintunnel-install"?"…":pick("نصب و تست","Install & test")}
               </button>
               <button type="button" className="ghost" disabled={Boolean(busy)||!selectedBackupId||twinStatus?.status!=="staged"} onClick={()=>void runTwinTunnel("verify")}>
-                {busy==="twintunnel-verify"?"…":pick("بررسی مجدد نصب","Recheck installation")}
+                {busy==="twintunnel-verify"?"…":pick("بررسی مجدد","Recheck")}
               </button>
             </div>
             {twinStatus?.status==="staged"&&<div className="table"><table><thead><tr><th>{pick("نود","Node")}</th><th>{pick("سلامت موتور","Engine check")}</th><th>{pick("نسخه","Revision")}</th></tr></thead><tbody>
               {twinStatus.nodes.map(node=><tr key={node.node_id}><td>{node.name||"Node #"+node.node_id}</td><td><Badge tone={node.ok&&node.selftest==="ok"?"ok":"bad"}>{node.ok&&node.selftest==="ok"?"Verified":"Failed"}</Badge></td><td dir="ltr">{twinStatus.installed_revision||"—"}</td></tr>)}
             </tbody></table></div>}
             {twinStatus?.needs_update&&<p>{pick("نسخه جدیدتری منتشر شده؛ نصب و تست را مجدداً اجرا کن.","Newer engine revision available; rerun install and test.")}</p>}
-            <small>{pick("مسیر فعال مشتریان: ","Active subscriber transport: ")}<b dir="ltr">{String(selectedTunnel.active_transport||"tp27_fast")}</b> · {pick("TwinTunnel فقط آماده‌سازی شده؛ هنوز به کاربران متصل نیست.","TwinTunnel is staged only, not connected to subscribers.")}</small>
           </section>
 
           <section className={styles.section}>
-            <div className={styles.sectionHead}><div><b>{pick("پروتکل‌های این Tunnel","Protocols on this tunnel")}</b><small>{pick(`Inventory واقعی Exit ${selectedExit?.name||`#${selectedTunnel.exit_node_id}`}`,`Live inventory from Exit ${selectedExit?.name||`#${selectedTunnel.exit_node_id}`}`)}</small></div><Badge tone={healthyProtocols===activeProtocols&&activeProtocols>0?"ok":"violet"}>{healthyProtocols}/{activeProtocols}</Badge></div>
+            <div className={styles.sectionHead}><div><b>{pick("پروتکل‌های این Tunnel","Protocols on this tunnel")}</b></div><Badge tone={healthyProtocols===activeProtocols&&activeProtocols>0?"ok":"violet"}>{healthyProtocols}/{activeProtocols}</Badge></div>
             <div className={styles.tableWrap}><div className="table"><table><thead><tr><th>{pick("پروتکل","Protocol")}</th><th>{pick("نوع","Type")}</th><th>{pick("پورت","Port")}</th><th>Transport</th><th>{pick("وضعیت","Status")}</th><th>{pick("عملیات","Actions")}</th></tr></thead><tbody>
               {protocols.map(row=><tr key={row.id}><td><b>{row.name}</b><small style={{display:"block"}} dir="ltr">{row.protocol}</small></td><td>{row.kind==="classic"?pick("کلاسیک","Classic"):pick("مدرن","Modern")}</td><td dir="ltr">{row.portText}</td><td dir="ltr">{row.transport}</td><td><Badge tone={tone(row.status)}>{row.status}</Badge></td><td><div className="action-row">{row.kind==="classic"?<button type="button" className="primary-soft" disabled={Boolean(busy)} onClick={()=>installClassic(row)}>{busy===`classic-${row.protocol}`?"…":row.installed?pick("Repair / Health","Repair / Health"):pick("نصب","Install")}</button>:<><button type="button" className="primary-soft" disabled={Boolean(busy)||!row.installable} onClick={()=>installModern(row)}>{busy===`modern-install-${row.protocol}`?"…":row.installed?pick("اعمال / Repair","Apply / Repair"):pick("افزودن","Add")}</button>{row.installed&&row.installable&&<button type="button" className="danger" disabled={Boolean(busy)} onClick={()=>removeModern(row)}>{pick("حذف","Remove")}</button>}</>}</div></td></tr>)}
               {!loading&&protocols.length===0&&<tr><td colSpan={6}><div className="runtime-empty">{pick("Inventory پروتکل برای Exit این Tunnel خالی است.","Protocol inventory for this tunnel Exit is empty.")}</div></td></tr>}
