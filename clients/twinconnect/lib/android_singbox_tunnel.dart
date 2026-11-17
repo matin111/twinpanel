@@ -59,7 +59,7 @@ class AndroidSingBoxTunnel {
       protocolCode: protocol,
       item: profile,
     );
-    await _connectNative(jsonEncode(outbound));
+    await _connectNative(jsonEncode(outbound), protocol: protocol);
   }
 
   /// The bundled libbox supports VLESS over TCP TLS and WebSocket TLS.
@@ -79,7 +79,7 @@ class AndroidSingBoxTunnel {
     await _connectNative(uri.toString());
   }
 
-  Future<void> _connectNative(String config) async {
+  Future<void> _connectNative(String config, {String? protocol}) async {
     await initialize();
     // The plugin builds the local TUN/DNS/routing config; never accept
     // untrusted subscription-provided inbounds, routes or app settings.
@@ -105,11 +105,16 @@ class AndroidSingBoxTunnel {
         (stats) => _latestStats = stats,
         onError: (Object _) { _latestStats = null; },
       );
-    } catch (_) {
+    } catch (error) {
       await _statsSubscription?.cancel();
       _statsSubscription = null;
       _latestStats = null;
       try { await SingBox.instance.disconnect(); } catch (_) {}
+      if (protocol == 'naive' && error is! FormatException) {
+        // Preserve a non-secret, protocol-specific failure code; never
+        // expose raw libbox exceptions that may include account credentials.
+        throw const FormatException('NAIVE_NATIVE_TRANSPORT_FAILED');
+      }
       rethrow;
     } finally {
       // The plugin writes the last outbound in app-private plaintext files.
