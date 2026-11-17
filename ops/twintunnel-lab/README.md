@@ -73,6 +73,54 @@ systemctl stop twintunnel-lab@exit.service twintunnel-lab-udp-echo.service
 
 Do not `enable` or connect customer traffic until the GRE path and fallback carriers are measured. Only apply to production after a separate rollout/rollback plan.
 
+## Additional isolated carriers (17 November 2026)
+
+TwinTunnel's fallback tests use independent Rakhsh configs and the **same** France
+loopback UDP echo target; no existing VPN ports or customer routes are changed.
+
+| Carrier | Iran unit | France unit | Local Iran UDP probe | Transport |
+|---|---|---|---|---|
+| GRE (baseline) | `twintunnel-lab@entry.service` | `twintunnel-lab@exit.service` | `127.0.0.1:37921` | IP protocol 47 |
+| TCP (fallback experiment) | `twintunnel-lab@entry-tcp.service` | `twintunnel-lab@exit-tcp.service` | `127.0.0.1:37931` | TCP port 37031 on Iran |
+| UDP (fallback experiment) | `twintunnel-lab@entry-udp.service` | `twintunnel-lab@exit-udp.service` | `127.0.0.1:37933` | UDP port 37033 on Iran |
+
+All `entry-*.toml` and `exit-*.toml` configs contain generated individual
+Noise keys, and are **not committed to GitHub**. Generate them with
+`twintunnel-core init --tunnel-addr IRAN_PUBLIC_IP:37031 --carrier shabdiz-tcp
+--forward 127.0.0.1:37931=127.0.0.1:37922/udp` for TCP, or switch to
+`shabdiz-udp`, port `37033`, forward `37933` for UDP. Distribute each
+half to its corresponding host as `/etc/twintunnel-test/entry-tcp.toml`,
+`exit-tcp.toml`, etc. Set unique `control_socket` paths and validate
+with `twintunnel-core check -c` before starting.
+
+The TCP fallback connected but had ~37% UDP-echo loss at the 5-Mbps load
+and must **not** be automatically enabled for VPN users.
+
+### Reproducible bounded comparison
+
+On the Iran host, run only when the lab services are running:
+
+```sh
+python3 /opt/twintunnel-test/compare_carriers.py \
+  --rounds 2 --duration 4 --size 900 --carriers GRE UDP
+```
+
+This sends localhost-only UDP probes at 2 and 5 Mbps, reverses test order
+between rounds, prints loss/RTT/returned Mbps, and saves raw JSON under
+`/opt/twintunnel-test/results/`. The script limits burst durations and
+rates to avoid imposing significant load on a production machine. These
+are **echo measurements, not end-to-end throughput against current VPN**.
+
+To stop optional fallback services without affecting GRE:
+
+```sh
+systemctl stop twintunnel-lab@entry-tcp.service twintunnel-lab@entry-udp.service   # Iran
+systemctl stop twintunnel-lab@exit-tcp.service twintunnel-lab@exit-udp.service      # France
+```
+
+See [TEST_RESULTS.md](TEST_RESULTS.md) for observed numbers. No new fallback
+service has been enabled at boot.
+
 ## Acceptance criteria
 
 1. Both services are active and show a GRE session, not repeated connection failures.

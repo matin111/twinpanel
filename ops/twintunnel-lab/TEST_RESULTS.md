@@ -34,3 +34,71 @@ Follow-up comparison requires an equal-load, equal-endpoint throughput benchmark
 - Each daemon uses a dedicated control socket and no production ports, DNS, routes or firewall changes.
 - The Rakhsh binary matches the upstream SHA-256 pinned in the README.
 - No automatic start at boot has been enabled. Stop commands are in README.
+
+
+## Continued carrier comparison (17 November 2026)
+
+All three Rakhsh/Shabdiz carriers established a real session between the
+same Iran entry and France exit. All UDP echo endpoints bound only to loopback.
+The TCP and UDP fallbacks used their own secrets, systemd units, and transport
+ports, not the customer tunnel.
+
+### Initial equal-rate TCP versus GRE
+
+| Probe | TCP | GRE |
+|---|---:|---:|
+| 40 × 900-byte UDP echo, average RTT | 144.38 ms | 141.16 ms |
+| 1 Mbps, packet loss | 0% | 1.80% |
+| 1 Mbps, returned throughput | 1.001 Mbps | 0.983 Mbps |
+| 5 Mbps, packet loss | **36.59%** | 7.96% |
+| 5 Mbps, returned throughput | **3.171 Mbps** | 4.602 Mbps |
+| 5 Mbps, average RTT | **1757.58 ms** | 848.68 ms |
+
+Shabdiz-TCP demonstrated severe head-of-line delay at 5 Mbps UDP-echo load
+and is **not** selected for VPN datagram traffic.
+
+### UDP fallback and GRE, two order-reversed A/B rounds
+
+The repeatable, bounded `compare_carriers.py` script ran two rounds,
+reversing test order. Each run sent 900-byte echo packets for four seconds.
+The exact eight runs are in
+[results/2026-11-17-gre-udp.json](results/2026-11-17-gre-udp.json).
+
+| Target | Carrier | Average echoed rate | Mean loss | Mean RTT |
+|---|---|---:|---:|---:|
+| 2 Mbps | GRE | 1.984 Mbps | 0.86% | 104.8 ms |
+| 2 Mbps | UDP | 1.972 Mbps | 1.49% | 104.7 ms |
+| 5 Mbps | GRE | 4.815 Mbps | 3.71% | 246.2 ms |
+| 5 Mbps | UDP | 4.804 Mbps | 3.93% | 97.8 ms |
+
+The GRE mean RTT at 5 Mbps is dominated by **one unstable round**
+(98.22 ms versus 394.23 ms), so comparing only average RTT is misleading.
+UDP and GRE have comparable echo throughput within this small test sample,
+neither proving superiority over the established production tunnels.
+
+### GRE payload-size check (single run per configuration)
+
+| Rate | Payload | Echoed throughput | Loss | Mean RTT |
+|---|---|---:|---:|---:|
+| 5 Mbps | 900 bytes | 4.675 Mbps | 6.48% | 848.74 ms |
+| 5 Mbps | 1200 bytes | 4.799 Mbps | 4.03% | 179.25 ms |
+| 10 Mbps | 1200 bytes | 9.645 Mbps | 3.55% | 95.60 ms |
+| 10 Mbps | 900 bytes | 9.507 Mbps | 4.93% | 94.49 ms |
+
+Larger payloads reduced loss **in this one limited test** and may
+reduce packet-per-second pressure, but require repeated validation before
+MTU recommendations. The Rakhsh GRE payload MTU was 1427 bytes;
+no production VPN MTU was modified.
+
+### Current decision
+
+- **GRE remains the default lab carrier only**, with no customer traffic.
+- TCP fallback stopped after testing: unacceptable UDP latency/loss.
+- UDP fallback also stopped after comparison: not enough measurable
+  improvement to prefer it.
+- Production tunnel routes, protocol configuration, customer sessions, and
+  node configuration remain unchanged.
+- The France host was concurrently under load (16 logical CPUs, ~5–8
+  load-average); these echo results are not a peak-speed measurement.
+- A production decision requires low-loss multi-minute tests and a genuinely
+  comparable existing-tunnel baseline; do not claim speed improvement yet.
