@@ -52,6 +52,7 @@ class SharedTunVpnService : VpnService() {
     @Volatile private var tun: ParcelFileDescriptor? = null
     @Volatile private var engine: PacketEngine? = null
     @Volatile private var reader: Thread? = null
+    @Volatile private var stopping = false
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) {
@@ -63,6 +64,7 @@ class SharedTunVpnService : VpnService() {
             return START_NOT_STICKY
         }
         if (tun != null) return START_STICKY
+        stopping = false
         try {
             val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             if (Build.VERSION.SDK_INT >= 26) {
@@ -153,7 +155,8 @@ class SharedTunVpnService : VpnService() {
                         val current = engine
                         if (current != null && gate.allows(TunPacketGate.PacketRoute.VPN_TUNNEL)
                             && current.isReady()) {
-                            current.sendPacket(packet, length)
+                            val ownedPacket = packet.copyOf(length)
+                            current.sendPacket(ownedPacket, ownedPacket.size)
                         } else {
                             // Drop while disconnected. Do not forward outside TUN.
                             if (current != null && !current.isReady()) transportLost()
@@ -170,6 +173,8 @@ class SharedTunVpnService : VpnService() {
     }
 
     private fun shutdown() {
+        if (stopping) return
+        stopping = true
         transportLost()
         tun?.close()
         tun = null
