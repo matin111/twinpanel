@@ -16,6 +16,7 @@ import argparse
 import asyncio
 import hashlib
 import json
+import logging
 import os
 from pathlib import Path
 import re
@@ -166,6 +167,7 @@ async def stage_node(node_id: int, manifest: dict, root: Path, mode: str) -> dic
 
 
 async def execute(args) -> int:
+    logging.getLogger("asyncssh").setLevel(logging.WARNING)
     from app.database import SessionLocal
     root = (
         Path(args.source_root).resolve()
