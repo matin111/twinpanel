@@ -206,23 +206,30 @@ class MainActivity : FlutterActivity() {
                 "getDisconnectedTrafficGuardStatus" -> {
                     val wireGuardUp = WireGuardRuntime.isInterfaceUp()
                     val legacyGuardUp = AndroidTrafficGuardService.active
-                    val anyVpnUp = hasActiveVpnTransport()
-                    val verifiedLockdown = if (wireGuardUp)
-                        WireGuardRuntime.isOsLockdownEnforced() else null
+                    val manager = getSystemService(Context.CONNECTIVITY_SERVICE)
+                        as ConnectivityManager
+                    val ownership = VpnTunnelOwnership.snapshot(
+                        manager,
+                        legacyGuardUp,
+                        wireGuardUp,
+                        if (wireGuardUp) WireGuardRuntime.isOsLockdownEnforced() else null
+                    )
                     result.success(mapOf(
                         "active" to legacyGuardUp,
-                        "osLockdown" to verifiedLockdown,
+                        "osLockdown" to if (wireGuardUp) ownership.lockdownVerified else null,
                         "lockdownVerificationAvailable" to wireGuardUp,
-                        "otherVpnActive" to (anyVpnUp && !legacyGuardUp),
-                        // A running VPN is not evidence of leak prevention.
-                        // Only report protection when native lockdown is verified.
-                        "protectionVerified" to (verifiedLockdown == true),
+                        "otherVpnActive" to (ownership.vpnTransport && !legacyGuardUp),
+                        "protectionVerified" to ownership.trafficProtected,
                         "protectionMode" to when {
-                            verifiedLockdown == true -> "OS_LOCKDOWN_VERIFIED"
+                            ownership.lockdownVerified -> "OS_LOCKDOWN_VERIFIED"
                             legacyGuardUp -> "LEGACY_BLOCKING_TUN_UNSAFE_HANDOFF"
-                            anyVpnUp -> "ACTIVE_VPN_LOCKDOWN_UNVERIFIED"
+                            ownership.owner == VpnTunnelOwnership.Owner.UNKNOWN ->
+                                "VPN_OWNER_UNKNOWN_FAIL_CLOSED"
+                            ownership.vpnTransport -> "ACTIVE_VPN_LOCKDOWN_UNVERIFIED"
                             else -> "DISCONNECTED_UNPROTECTED"
                         },
+                        "tunnelOwner" to ownership.owner.name,
+                        "nativePacketGuardRequired" to ownership.requiresNativePacketGuard,
                         "singleTunnelKillSwitchAvailable" to false,
                         "failClosedAcrossHandoff" to false
                     ))
