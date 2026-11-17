@@ -51,6 +51,7 @@ from .routers.tunnel_managed import router as tunnel_managed_router
 from .routers.modern_transports import router as modern_transports_router
 from .routers.tunnel_selected_v358 import router as tunnel_selected_v358_router
 from .routers.tunnel_selected_jobs_v1 import router as tunnel_selected_jobs_v1_router  # TWINPANEL_SELECTED_INITIAL_TRANSPORT_V358
+from .routers.twintunnel_install_v1 import router as twintunnel_install_v1_router  # isolated 3-node install, no cutover
 from .routers.modern_protocol_admin_v3 import router as modern_protocol_admin_v3_router
 from .routers.node_protocol_operator_controls_v1 import router as node_protocol_operator_controls_v1_router
 from .routers.download_assets import admin_router as download_assets_admin_router, public_router as download_assets_public_router
@@ -398,6 +399,7 @@ app.include_router(tunnel_managed_router)
 app.include_router(modern_transports_router)
 app.include_router(tunnel_selected_v358_router)
 app.include_router(tunnel_selected_jobs_v1_router)
+app.include_router(twintunnel_install_v1_router)
 # Central admin user-management routes must win before the legacy admin router.
 # They hide reseller owners/customers while leaving reseller subscriptions visible.
 app.include_router(admin_user_isolation_router)
