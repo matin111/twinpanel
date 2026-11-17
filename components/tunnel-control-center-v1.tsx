@@ -308,7 +308,7 @@ export function TunnelControlCenterV1(){
               <div className={styles.createForm}>
                 <label><span>{pick("نود سوم (اختیاری)","Third node (optional)")}</span>
                   <select value={twinBackupId} onChange={event=>setTwinBackupId(Number(event.target.value))} disabled={Boolean(busy)}>
-                    <option value={0}>{pick("بدون نود سوم","No third node")}</option>{backupCandidates.map(node=><option key={node.id} value={node.id}>{nodeLabel(node,"#"+node.id)}</option>}
+                    <option value={0}>{pick("بدون نود سوم","No third node")}</option>{backupCandidates.map(node=><option key={node.id} value={node.id}>{nodeLabel(node,"#"+node.id)}</option>)}
                   </select>
                 </label>
                 <div className={styles.controlActions}>
@@ -380,7 +380,7 @@ export function TunnelControlCenterV1(){
           </select></label>
           {newEngine==="twintunnel_standby"&&<label><span>{pick("نود سوم (اختیاری)","Third node (optional)")}</span>
             <select value={newBackupId} onChange={event=>setNewBackupId(Number(event.target.value))}>
-              <option value={0}>{pick("بدون نود سوم","No third node")}</option>{newBackupCandidates.map(node=><option key={node.id} value={node.id}>{nodeLabel(node,"#"+node.id)}</option>}
+              <option value={0}>{pick("بدون نود سوم","No third node")}</option>{newBackupCandidates.map(node=><option key={node.id} value={node.id}>{nodeLabel(node,"#"+node.id)}</option>)}
             </select>
             <small>{pick("موتور جدید فقط آماده‌سازی می‌شود؛ قطع و وصل کاربران همچنان با TP27 اصلی مدیریت می‌شود.","The new engine is staged only; TP27 still manages live customer traffic.")}</small>
           </label>}
