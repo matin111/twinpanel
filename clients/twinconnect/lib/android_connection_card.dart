@@ -569,7 +569,6 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
     setState(() { _busy = true; _errorCode = null; });
     var stage = 'CISCO_NATIVE_ENGINE_UNAVAILABLE';
     try {
-      await _releaseDisconnectedGuard();
       // Missing native plugin fails before fetching private login material.
       await AndroidCiscoTunnel.instance.initialize();
       final policy = await _store.loadFailClosed(
@@ -603,6 +602,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
       // The vendored service rejects bad pins rather than bypassing TLS.
       AndroidCiscoTunnel.validatedServerTrust(profile);
       stage = 'CISCO_NATIVE_CONNECTION_FAILED';
+      await _releaseDisconnectedGuard();
       await AndroidCiscoTunnel.instance.connect(profile);
       if (!mounted) return;
       final id = item['node_id']?.toString();
@@ -646,7 +646,6 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
     setState(() { _busy = true; _errorCode = null; });
     var stage = 'OPENVPN_ENGINE_INIT_FAILED';
     try {
-      await _releaseDisconnectedGuard();
       // Do not bypass the policy gate used by the existing native transport.
       final policy = await _store.loadFailClosed(
         widget.panel.namespace, widget.username,
@@ -674,6 +673,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
       final id = item['node_id']?.toString();
       final server = inventory.where((n) => n.id == id).firstOrNull;
       stage = 'OPENVPN_NATIVE_CONNECT_FAILED';
+      await _releaseDisconnectedGuard();
       await AndroidOpenVpnTunnel.instance.connect(
         profile: item, name: server?.name ?? 'TwinConnect',
       );
@@ -722,7 +722,6 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
         _singBoxProtocol != null || _mieruUp) return;
     setState(() { _busy = true; _errorCode = null; });
     try {
-      await _releaseDisconnectedGuard();
       if (!await AndroidMieruTunnel.instance.engineReady) {
         throw const FormatException('MIERU_NATIVE_ENGINE_UNAVAILABLE');
       }
@@ -743,6 +742,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
       if (choices.isEmpty) {
         throw const FormatException('MIERU_NO_AUTHORIZED_SERVER');
       }
+      await _releaseDisconnectedGuard();
       await AndroidMieruTunnel.instance.connect(choices.first);
       if (!mounted) return;
       final id = choices.first['node_id']?.toString();
@@ -781,7 +781,6 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
         _singBoxProtocol != null || _mieruUp) return;
     setState(() { _busy = true; _errorCode = null; });
     try {
-      await _releaseDisconnectedGuard();
       final engine = AndroidAmneziaWgTunnel.instance;
       if (!await engine.engineReady) {
         throw const FormatException('AWG_NATIVE_ENGINE_UNAVAILABLE');
@@ -812,6 +811,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
         );
       }
       final item = items.first;
+      await _releaseDisconnectedGuard();
       await engine.connect(item);
       if (!mounted) return;
       final id = item['node_id']?.toString();
@@ -861,7 +861,6 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
     setState(() { _busy = true; _errorCode = null; });
     var stage = 'ENGINE_INIT';
     try {
-      await _releaseDisconnectedGuard();
       // Require real native initialization BEFORE asking for secrets.
       await AndroidSingBoxTunnel.instance.initialize();
       stage = 'PROFILE_FETCH';
@@ -887,6 +886,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
       }
       final item = choices.first;
       stage = 'NATIVE_CONNECT';
+      await _releaseDisconnectedGuard();
       await AndroidSingBoxTunnel.instance.connect(
         protocol: code, profile: item,
       );
@@ -930,7 +930,6 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
     setState(() { _busy = true; _errorCode = null; });
     var stage = 'ENGINE_INIT';
     try {
-      await _releaseDisconnectedGuard();
       // The native Xray runtime is independent of libbox. In particular,
       // failing to initialize an unrelated sing-box engine must never
       // prevent an authorized XHTTP Reality session from starting.
@@ -960,6 +959,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
       // Xray-core; TCP and WS TLS use libbox. Never substitute transports.
       final chosen = choices.first;
       stage = 'NATIVE_CONNECT';
+      await _releaseDisconnectedGuard();
       if (chosen.id == 'xhttp_reality') {
         await AndroidXrayTunnel.instance.connect(chosen);
       } else {
