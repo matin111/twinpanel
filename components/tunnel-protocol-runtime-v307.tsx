@@ -117,7 +117,7 @@ export function TunnelProtocolRuntimeV307(){
   const selectedIran=selectedTunnel?nodeMap.get(selectedTunnel.iran_node_id):undefined;
   const selectedExit=selectedTunnel?nodeMap.get(selectedTunnel.exit_node_id):undefined;
   const backupCandidates=readyExitNodes.filter(node=>node.id!==selectedTunnel?.exit_node_id);
-  const selectedBackupId=backupCandidates.some(node=>node.id===twinBackupId)?twinBackupId:backupCandidates[0]?.id||0;
+  const selectedBackupId=backupCandidates.some(node=>node.id===twinBackupId)?twinBackupId:0;
   const newBackupCandidates=readyExitNodes.filter(node=>node.id!==draft.exit_node_id);
   const selectedNewBackupId=newBackupCandidates.some(node=>node.id===newBackupId)?newBackupId:newBackupCandidates[0]?.id||0;
 
@@ -199,14 +199,14 @@ export function TunnelProtocolRuntimeV307(){
   };
 
   const runTwinTunnel=async(mode:"install"|"verify")=>{
-    if(!selectedTunnel||!selectedBackupId||busy)return;
+    if(!selectedTunnel||busy)return;
     setBusy("twintunnel-"+mode);setError("");setNotice("");
     try{
       const status=mode==="install"
         ?await twinTunnelInstallApi.install(selectedTunnel.id,selectedBackupId)
         :await twinTunnelInstallApi.verify(selectedTunnel.id,selectedBackupId);
       setTwinStatus(status);
-      setNotice(pick("موتور TwinTunnel روی سه نود آماده و بررسی شد. مسیر فعال کاربران بدون تغییر باقی ماند.","TwinTunnel staged and verified on three nodes; the active subscriber path was not changed."));
+      setNotice(pick("فایل‌های آزمایشی روی نودهای انتخابی بررسی شدند. ترانسپورت‌های چندگانه هنوز فعال نشده‌اند.","Staging files verified on selected nodes. Multi-carrier routing is not active."));
     }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
     finally{setBusy("");}
   };
@@ -399,23 +399,24 @@ export function TunnelProtocolRuntimeV307(){
 
           <section className={styles.section}>
             <div className={styles.sectionHead}>
-              <div><b>{pick("TwinTunnel سه‌مسیره","Three-path TwinTunnel")}</b></div>
+              <div><b>{pick("TwinTunnel · چند ترانسپورت","TwinTunnel · multiple transports")}</b></div>
               <Badge tone={twinStatus?.status==="staged"&&!twinStatus.needs_update?"ok":"warn"}>{twinStatus?.status==="staged"&&!twinStatus.needs_update?pick("آماده آزمایش","Staged"):pick("نصب آزمایشی","Lab install")}</Badge>
             </div>
             <div className={styles.managementActions}>
               <label>
-                <span>{pick("نود واسط سوم","Independent backup node")}</span>
-                <select disabled={Boolean(busy)} value={selectedBackupId} onChange={event=>setTwinBackupId(Number(event.target.value))}>
-                  {backupCandidates.map(node=><option key={node.id} value={node.id}>{node.name} · {node.public_ip}</option>)}
+                <span>{pick("نود سوم (اختیاری)","Third node (optional)")}</span>
+                <select disabled={Boolean(busy)} value={twinBackupId} onChange={event=>setTwinBackupId(Number(event.target.value))}>
+                  <option value={0}>{pick("بدون نود سوم · ایران و خروجی","No third node · entry and exit")}</option>{backupCandidates.map(node=><option key={node.id} value={node.id}>{node.name} · {node.public_ip}</option>)}
                 </select>
               </label>
-              <button type="button" className="primary-soft" disabled={Boolean(busy)||!selectedBackupId} onClick={()=>void runTwinTunnel("install")}>
+              <button type="button" className="primary-soft" disabled={Boolean(busy)} onClick={()=>void runTwinTunnel("install")}>
                 {busy==="twintunnel-install"?"…":pick("نصب و تست","Install & test")}
               </button>
-              <button type="button" className="ghost" disabled={Boolean(busy)||!selectedBackupId||twinStatus?.status!=="staged"} onClick={()=>void runTwinTunnel("verify")}>
+              <button type="button" className="ghost" disabled={Boolean(busy)||twinStatus?.status!=="staged"} onClick={()=>void runTwinTunnel("verify")}>
                 {busy==="twintunnel-verify"?"…":pick("بررسی مجدد","Recheck")}
               </button>
             </div>
+            <small>{pick("سه ترانسپورت مستقل بین ایران و خروجی هنوز در موتور عملیاتی نشده‌اند؛ نصب فعلی فقط آزمایشی است.","Three independent carriers between entry and exit are not yet operational; this is staging only.")}</small>
             {twinStatus?.status==="staged"&&<div className="table"><table><thead><tr><th>{pick("نود","Node")}</th><th>{pick("سلامت موتور","Engine check")}</th><th>{pick("نسخه","Revision")}</th></tr></thead><tbody>
               {twinStatus.nodes.map(node=><tr key={node.node_id}><td>{node.name||"Node #"+node.node_id}</td><td><Badge tone={node.ok&&node.selftest==="ok"?"ok":"bad"}>{node.ok&&node.selftest==="ok"?"Verified":"Failed"}</Badge></td><td dir="ltr">{twinStatus.installed_revision||"—"}</td></tr>)}
             </tbody></table></div>}
