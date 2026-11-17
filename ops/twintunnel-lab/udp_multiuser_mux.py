@@ -31,6 +31,8 @@ PATH_TTL = 12.0
 PATHS = ((1, ("127.0.0.1", 37921)), (2, ("127.0.0.1", 37933)))
 SERVICES = {1: 37981, 2: 37982}
 REPORT_INTERVAL = 5.0
+MAX_RECV_BATCH = 48
+KERNEL_UDP_BUFFER = 1024 * 1024
 
 
 class ReplayWindow:
@@ -115,6 +117,10 @@ class Mux:
             self._open_exit()
 
     def _register(self, sock, typ, ident):
+        # Per-process socket buffers, without changing host sysctls.
+        if typ != "target":
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, KERNEL_UDP_BUFFER)
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, KERNEL_UDP_BUFFER)
         sock.setblocking(False)
         self.sel.register(sock, selectors.EVENT_READ, (typ, ident))
 
@@ -272,25 +278,38 @@ class Mux:
     def stop(self,*_):
         self.running = False
 
+    def _drain_ready_socket(self, key):
+        """Drain a bounded burst from each ready socket while preserving fairness."""
+        typ, ident = key.data
+        processed = 0
+        for _ in range(MAX_RECV_BATCH):
+            try:
+                data, addr = key.fileobj.recvfrom(1600)
+            except BlockingIOError:
+                break
+            except OSError:
+                self.stats["read_error"] += 1
+                break
+            processed += 1
+            if typ=="client":
+                self._entry_client(ident,data,addr)
+            elif typ=="back":
+                self._entry_reply(ident,data)
+            elif typ=="transport":
+                self._exit_transport(data,addr)
+            elif typ=="target":
+                self._exit_target(ident,data)
+        if processed == MAX_RECV_BATCH:
+            self.stats["full_recv_batches"] += 1
+        return processed
+
     def run(self):
         print("TT_MUX_READY role="+self.args.role+" lab_only=true",flush=True)
         last_report=self.started
         try:
             while self.running and time.monotonic()-self.started<self.args.duration:
-                for key,_ in self.sel.select(timeout=0.1):
-                    typ, ident = key.data
-                    try:
-                        data, addr = key.fileobj.recvfrom(1600)
-                    except (OSError,BlockingIOError):
-                        continue
-                    if typ=="client":
-                        self._entry_client(ident,data,addr)
-                    elif typ=="back":
-                        self._entry_reply(ident,data)
-                    elif typ=="transport":
-                        self._exit_transport(data,addr)
-                    elif typ=="target":
-                        self._exit_target(ident,data)
+                for key,_ in self.sel.select(timeout=0.05):
+                    self._drain_ready_socket(key)
                 now=time.monotonic()
                 if now-last_report>=REPORT_INTERVAL:
                     self._expire(now)
