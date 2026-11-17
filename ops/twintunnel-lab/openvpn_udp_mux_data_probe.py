@@ -77,7 +77,8 @@ def main():
         start = time.monotonic()
         ping = subprocess.run(
             ["ping", "-n", "-I", TUN_CLIENT, "-c", str(args.count),
-             "-i", str(args.interval), "-W", "1", TARGET],
+             "-i", str(args.interval), "-w", str(max(30, int(args.count * args.interval + 15))),
+             TARGET],
             capture_output=True, text=True,
             timeout=max(45, int(args.count * args.interval + 35)),
         )
