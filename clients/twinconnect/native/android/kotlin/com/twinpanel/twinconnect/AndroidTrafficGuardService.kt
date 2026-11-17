@@ -35,7 +35,13 @@ class AndroidTrafficGuardService : VpnService() {
                     CHANNEL_ID, "VPN traffic protection", NotificationManager.IMPORTANCE_LOW
                 ))
             }
-            val notification = Notification.Builder(this, CHANNEL_ID)
+            val notificationBuilder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                Notification.Builder(this, CHANNEL_ID)
+            } else {
+                @Suppress("DEPRECATION")
+                Notification.Builder(this)
+            }
+            val notification = notificationBuilder
                 .setSmallIcon(android.R.drawable.ic_lock_lock)
                 .setContentTitle("TwinConnect Kill Switch")
                 .setContentText("Disconnected traffic is blocked")
@@ -61,7 +67,7 @@ class AndroidTrafficGuardService : VpnService() {
         } catch (_: Exception) {
             stopGuard()
         }
-        return START_NOT_STICKY
+        return START_STICKY
     }
 
     override fun onRevoke() {
@@ -73,7 +79,12 @@ class AndroidTrafficGuardService : VpnService() {
         tun = null
         established = false
         active = false
-        stopForeground(STOP_FOREGROUND_REMOVE)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            stopForeground(STOP_FOREGROUND_REMOVE)
+        } else {
+            @Suppress("DEPRECATION")
+            stopForeground(true)
+        }
         super.onDestroy()
     }
 
