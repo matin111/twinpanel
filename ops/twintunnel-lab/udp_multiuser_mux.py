@@ -25,7 +25,7 @@ MAGIC = b"TTMUXV01"
 HEADER = struct.Struct("!8sBBQQ")
 TAG_LEN = 16
 MAX_PAYLOAD = 1250
-MAX_FLOWS = 64
+MAX_FLOWS = 512
 TTL = 120.0
 PATH_TTL = 12.0
 PATHS = ((1, ("127.0.0.1", 37921)), (2, ("127.0.0.1", 37933)))
@@ -37,7 +37,9 @@ ACK_FLAG = 0x80
 ACK_PAYLOAD = b"\x01"
 VALID_SERVICE_CODES = (1, 2, 129, 130)
 RETRY_INTERVAL = 0.24
-MAX_PENDING_PER_FLOW = 256
+MAX_PENDING_PER_FLOW = 64
+MAX_PENDING_PACKETS = 8192
+MAX_PENDING_BYTES = 16 * 1024 * 1024
 MAX_RETRIES = 2
 ACK_RESEND_INTERVAL = 0.16
 
@@ -126,6 +128,8 @@ class Mux:
         self.backends = {}
         self.listeners = {}
         self.stats = collections.Counter()
+        self.pending_packets = 0
+        self.pending_bytes = 0
         self.running = True
         self.started = time.monotonic()
         if args.role == "entry":
@@ -147,7 +151,11 @@ class Mux:
             s.bind((self.args.bind_ip, port))
             self.listeners[service] = s
             self._register(s, "client", service)
-        for path, dest in PATHS:
+        path_destinations = (
+            (1, ("127.0.0.1", self.args.path1_port)),
+            (2, ("127.0.0.1", self.args.path2_port)),
+        )
+        for path, dest in path_destinations:
             s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             s.connect(dest)
             self.backends[path] = s
@@ -155,7 +163,7 @@ class Mux:
 
     def _open_exit(self):
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.bind(("127.0.0.1", 37922))
+        s.bind((self.args.exit_bind_ip, self.args.exit_port))
         self.listeners[0] = s
         self._register(s, "transport", 0)
         self.targets = {1: ("127.0.0.1", self.args.wg_target),
@@ -178,6 +186,25 @@ class Mux:
         self.stats["flows_created"] += 1
         return f
 
+    def _queue_pending(self,f,direction,seq,payload,now):
+        pending = f.pending_up if direction=="up" else f.pending_down
+        if (len(pending)>=MAX_PENDING_PER_FLOW
+                or self.pending_packets>=MAX_PENDING_PACKETS
+                or self.pending_bytes+len(payload)>MAX_PENDING_BYTES):
+            self.stats[direction+"_pending_overflow"] += 1
+            return False
+        pending[seq]=(payload,now,0)
+        self.pending_packets += 1
+        self.pending_bytes += len(payload)
+        return True
+
+    def _pop_pending(self,pending,seq):
+        item=pending.pop(seq,None)
+        if item is not None:
+            self.pending_packets=max(0,self.pending_packets-1)
+            self.pending_bytes=max(0,self.pending_bytes-len(item[0]))
+        return item
+
     def _entry_client(self, service, data, source):
         if source[0] != self.args.allow_source:
             self.stats["source_rejected"] += 1
@@ -197,10 +224,8 @@ class Mux:
         self.stats["client_packets"] += 1
         seq = f.next_seq()
         sent = self._send_upstream(f,seq,data)
-        if sent and len(f.pending_up)<MAX_PENDING_PER_FLOW:
-            f.pending_up[seq]=(data,now,0)
-        elif len(f.pending_up)>=MAX_PENDING_PER_FLOW:
-            self.stats["up_pending_overflow"] += 1
+        if sent:
+            self._queue_pending(f,"up",seq,data,now)
 
     def _send_upstream(self,f,seq,data,is_retry=False):
         sent=0
@@ -230,7 +255,7 @@ class Mux:
             if f is None or f.service != base or payload != ACK_PAYLOAD:
                 self.stats["invalid_up_ack"] += 1
                 return
-            if f.pending_up.pop(seq,None) is not None:
+            if self._pop_pending(f.pending_up,seq) is not None:
                 self.stats["up_acks_received"] += 1
             else:
                 self.stats["duplicate_or_late_up_ack"] += 1
@@ -290,7 +315,7 @@ class Mux:
                 self.stats["invalid_ack"] += 1
                 return
             f.paths[path] = (source,time.monotonic())
-            if f.pending_down.pop(seq,None) is not None:
+            if self._pop_pending(f.pending_down,seq) is not None:
                 self.stats["acks_received"] += 1
             else:
                 self.stats["duplicate_or_late_ack"] += 1
@@ -372,10 +397,8 @@ class Mux:
         f.updated = now
         seq = f.next_seq()
         n = self._send_downstream(f,seq,data,now)
-        if n and len(f.pending_down)<MAX_PENDING_PER_FLOW:
-            f.pending_down[seq] = (data,now,0)
-        elif len(f.pending_down)>=MAX_PENDING_PER_FLOW:
-            self.stats["pending_overflow"] += 1
+        if n:
+            self._queue_pending(f,"down",seq,data,now)
 
     def _retry_pending(self,now):
         """Two-direction bounded retries; no indefinite UDP packet queues."""
@@ -385,7 +408,7 @@ class Mux:
                     if now-last_sent < RETRY_INTERVAL:
                         continue
                     if retries>=MAX_RETRIES:
-                        del f.pending_down[seq]
+                        self._pop_pending(f.pending_down,seq)
                         self.stats["down_unacked"] += 1
                         continue
                     self._send_downstream(f,seq,payload,now,is_retry=True)
@@ -396,7 +419,7 @@ class Mux:
                     if now-last_sent < RETRY_INTERVAL:
                         continue
                     if retries>=MAX_RETRIES:
-                        del f.pending_up[seq]
+                        self._pop_pending(f.pending_up,seq)
                         self.stats["up_unacked"] += 1
                         continue
                     self._send_upstream(f,seq,payload,is_retry=True)
@@ -406,6 +429,10 @@ class Mux:
         for fid,f in list(self.flows.items()):
             if now - f.updated <= TTL:
                 continue
+            for seq in list(f.pending_up):
+                self._pop_pending(f.pending_up,seq)
+            for seq in list(f.pending_down):
+                self._pop_pending(f.pending_down,seq)
             if f.socket:
                 self.sel.unregister(f.socket)
                 f.socket.close()
@@ -453,7 +480,7 @@ class Mux:
                 self._retry_pending(now)
                 if now-last_report>=REPORT_INTERVAL:
                     self._expire(now)
-                    print("TT_MUX_STATS flows="+str(len(self.flows))+" "+str(dict(self.stats)),flush=True)
+                    print("TT_MUX_STATS flows="+str(len(self.flows))+" pending_packets="+str(self.pending_packets)+" pending_bytes="+str(self.pending_bytes)+" "+str(dict(self.stats)),flush=True)
                     last_report=now
         finally:
             print("TT_MUX_FINAL flows="+str(len(self.flows))+" "+str(dict(self.stats)),flush=True)
@@ -474,6 +501,10 @@ def main():
     p.add_argument("--wg-target",type=int,default=37983)
     p.add_argument("--ovpn-target",type=int,default=37984)
     p.add_argument("--duration",type=int,default=300)
+    p.add_argument("--path1-port",type=int,default=37921)
+    p.add_argument("--path2-port",type=int,default=37933)
+    p.add_argument("--exit-bind-ip",default="127.0.0.1")
+    p.add_argument("--exit-port",type=int,default=37922)
     args=p.parse_args()
     if not 10<=args.duration<=900:
         p.error("duration must be 10..900 seconds")
