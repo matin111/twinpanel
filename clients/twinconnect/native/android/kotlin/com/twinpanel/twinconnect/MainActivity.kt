@@ -154,6 +154,11 @@ class MainActivity : FlutterActivity() {
                                     "tunnelVerified" to false
                                 )
                             }
+                            "status" -> {
+                                @Suppress("UNCHECKED_CAST")
+                                (awgRuntime.getMethod("status").invoke(instance)
+                                    as Map<String, Any>)
+                            }
                             "connect" -> throw IllegalArgumentException("AWG_CONNECT_DISPATCH_ERROR")
                             "disconnect" -> {
                                 @Suppress("UNCHECKED_CAST")
