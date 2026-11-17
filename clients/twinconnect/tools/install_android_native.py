@@ -254,7 +254,7 @@ def install_native_sources() -> None:
             "'flutter create --platforms=android,ios,macos,windows "
             "--org com.twinpanel --project-name twinconnect .' first"
         )
-    for filename in ("MainActivity.kt", "WireGuardRuntime.kt", "OpenConnectVpnService.kt", "AndroidTrafficGuardService.kt", "VpnTunnelOwnership.kt"):
+    for filename in ("MainActivity.kt", "WireGuardRuntime.kt", "OpenConnectVpnService.kt", "AndroidTrafficGuardService.kt", "VpnTunnelOwnership.kt", "TunPacketGate.kt"):
         src = NATIVE / "kotlin" / "com" / "twinpanel" / "twinconnect" / filename
         if not src.is_file():
             raise RuntimeError(f"Missing tracked native source: {src}")
