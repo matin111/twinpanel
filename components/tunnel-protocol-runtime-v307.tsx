@@ -464,7 +464,7 @@ export function TunnelProtocolRuntimeV307(){
               if(mode==="twintunnel_standby")setDraft(value=>({...value,initial_transport:"tp27_fast"}));
             }}>
               <option value="tp27_fast">{pick("TP27 اصلی","Original TP27")}</option>
-              <option value="twintunnel_standby">{pick("TP27 + نصب آزمایشی TwinTunnel سه‌مسیره","TP27 + three-node TwinTunnel standby install")}</option>
+              <option value="twintunnel_standby">{pick("TwinTunnel سه‌مسیره","TwinTunnel · 3 paths")}</option>
             </select>
           </label>
           {newEngine==="twintunnel_standby"&&<label className={styles.createField}>
