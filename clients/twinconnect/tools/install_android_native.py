@@ -161,6 +161,7 @@ def patch_manifest() -> None:
     service += (
         '\n        <service android:name=".AndroidTrafficGuardService"\n'
         '            android:exported="false"\n'
+        '            android:foregroundServiceType="specialUse"\n'
         '            android:permission="android.permission.BIND_VPN_SERVICE">\n'
         '            <intent-filter>\n'
         '                <action android:name="android.net.VpnService" />\n'
