@@ -45,45 +45,42 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
   void initState() {
     super.initState();
     _check();
-    _loadAndroidKillPreference();
+    _refreshAndroidGuard();
   }
 
   Future<void> _loadAndroidKillPreference() async {
     if (!Platform.isAndroid) return;
-    final policy = await _policyStore.load(widget.tenant, widget.account);
-    if (mounted) setState(() => _androidKillRequested = policy.killSwitchRequested);
+    await _refreshAndroidGuard();
   }
 
   Future<void> _setAndroidKill(bool requested) async {
     if (_androidKillBusy) return;
     setState(() => _androidKillBusy = true);
     try {
-      final capabilities = await NativeVpnBridge.probe();
-      if (requested && !capabilities.killSwitchEnforced) {
-        await const MethodChannel('com.twinpanel.twinconnect/vpn')
-            .invokeMethod<void>('openAndroidVpnSettings');
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(AppStrings.of(context).pick(
-            'ابتدا Always-on VPN و Block connections without VPN را فعال کنید؛ سپس برگردید و دوباره کلید را روشن کنید.',
-            'Enable Always-on VPN and Block connections without VPN in Android settings, then return and retry.',
-          )),
-        ));
-        return;
+      const channel = MethodChannel('com.twinpanel.twinconnect/vpn');
+      if (requested) {
+        await channel.invokeMethod<dynamic>('startDisconnectedTrafficGuard');
+      } else {
+        await channel.invokeMethod<dynamic>('stopDisconnectedTrafficGuard');
       }
-      final current = await _policyStore.loadFailClosed(widget.tenant, widget.account);
-      final saved = await _policyStore.save(widget.tenant, widget.account,
-          current.copyWith(killSwitchRequested: requested));
-      if (!saved) throw StateError('VPN_POLICY_SAVE_FAILED');
-      if (mounted) setState(() => _androidKillRequested = requested);
-    } catch (_) {
+      await _refreshAndroidGuard();
+    } on PlatformException catch (error) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(AppStrings.of(context).pick(
-          'تغییر محافظت انجام نشد؛ وضعیت قبلی حفظ شد.',
-          'Protection was not changed; previous state retained.',
-        )),
+        content: Text('Kill Switch: ${error.code}'),
       ));
     } finally {
       if (mounted) setState(() => _androidKillBusy = false);
+    }
+  }
+
+  Future<void> _refreshAndroidGuard() async {
+    if (!Platform.isAndroid) return;
+    try {
+      final result = await const MethodChannel('com.twinpanel.twinconnect/vpn')
+          .invokeMapMethod<String, dynamic>('getDisconnectedTrafficGuardStatus');
+      if (mounted) setState(() => _androidKillRequested = result?['active'] == true);
+    } on PlatformException {
+      if (mounted) setState(() => _androidKillRequested = false);
     }
   }
 
@@ -348,18 +345,18 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
                 secondary: const Icon(Icons.shield_rounded),
                 title: const Text('Kill Switch'),
                 subtitle: Text(tr(
-                  _androidKillRequested && _capabilities.killSwitchEnforced
-                      ? 'محافظت سراسری اندروید تأیید شده'
-                      : 'فقط با تأیید محافظت سراسری اندروید روشن می‌شود',
-                  _androidKillRequested && _capabilities.killSwitchEnforced
-                      ? 'Android lockdown protection verified'
-                      : 'Requires verified Android OS lockdown',
+                  _androidKillRequested
+                      ? 'تونل مسدودکننده فعال است؛ برای اتصال VPN باید متوقف شود'
+                      : 'محافظ قطع اتصال غیرفعال است؛ محافظت سراسری تضمین نمی‌شود',
+                  _androidKillRequested
+                      ? 'Blocking tunnel active; stop before connecting VPN'
+                      : 'Disconnected guard inactive; system-wide protection not guaranteed',
                 )),
-                value: _androidKillRequested && _capabilities.killSwitchEnforced,
+                value: _androidKillRequested,
                 onChanged: _androidKillBusy ? null : _setAndroidKill,
               ),
               TextButton.icon(
-                onPressed: _checking ? null : _check,
+                onPressed: _checking ? null : () async { await _check(); await _refreshAndroidGuard(); },
                 icon: const Icon(Icons.refresh_rounded),
                 label: Text(tr('بررسی مجدد وضعیت محافظت',
                     'Refresh protection status')),
