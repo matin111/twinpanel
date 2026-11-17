@@ -1,0 +1,75 @@
+{
+  "date": "2026-11-17",
+  "scope": "Iran/France isolated lab, no customer traffic",
+  "implementation": {
+    "entry": "Iran 94.183.231.158 UDP ports 37981 and 37982 (France-only allowlist)",
+    "exit": "France 127.0.0.1 UDP port 37922 temporarily replaces existing lab echo",
+    "carriers": [
+      "GRE entry 127.0.0.1:37921",
+      "Shabdiz-UDP entry 127.0.0.1:37933"
+    ],
+    "features": [
+      "64-bit flow ids per user",
+      "stable per-user exit UDP socket",
+      "HMAC authenticated frames with 32-byte private lab key",
+      "512-packet replay window",
+      "duplicate transmissions over GRE and UDP",
+      "return paths per carrier",
+      "bounded two-service lab"
+    ],
+    "caps": {
+      "max_flows": 64,
+      "max_payload_bytes": 1250,
+      "flow_ttl_seconds": 120
+    },
+    "public_routes_changed": false,
+    "production_deployment": false
+  },
+  "results": [
+    {
+      "kind": "offline unit tests",
+      "passed": 13,
+      "failed": 0
+    },
+    {
+      "kind": "six concurrent UDP lab clients, original counting method",
+      "clients": 6,
+      "sent": 240,
+      "counted": 208,
+      "limitation": "original method discarded delayed/out-of-order responses"
+    },
+    {
+      "kind": "six concurrent UDP lab clients, corrected counting",
+      "clients": 6,
+      "sent": 240,
+      "received_unique": 226,
+      "missing": 14,
+      "missing_pct": 5.83,
+      "production_acceptable": false
+    },
+    {
+      "kind": "real WireGuard kernel client/server on France through Iran ingress",
+      "client_tx_bytes": 888,
+      "server_rx_bytes": 0,
+      "handshakes": 0,
+      "passed": false,
+      "cleanup_verified": true
+    }
+  ],
+  "blocker": "Iran Termalin connector offline since 2026-11-17T09:31:33Z; France still pings Iran; further inspection of Iran processes unavailable",
+  "restoration": {
+    "france_mux_stopped": true,
+    "original_lab_echo_restored": true,
+    "france_production_openvpn_services_active": true,
+    "wg_lab_interfaces_cleaned": true,
+    "wg_test_route_deleted": true,
+    "iran_600s_test_mux_current_status_unverified": true
+  },
+  "limitations": [
+    "WireGuard failed to handshake",
+    "OpenVPN UDP not tested",
+    "all carriers share the same pair of hosts",
+    "no production-grade NAT/rekey, MTU, congestion, quotas, load testing",
+    "no safe customer roll-out"
+  ]
+}
