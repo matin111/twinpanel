@@ -107,44 +107,49 @@ class DeferredRenewalTest(unittest.TestCase):
             provision.assert_not_called()
         self.assertEqual(sub.plan_id, 5)
 
-    def test_different_plan_provisions_at_expiry_then_resets_period(self):
-        sub = self.subscription(expires_at=datetime.utcnow()-timedelta(seconds=1))
+    def test_different_plan_renews_without_reprovisioning_or_rotating_credentials(self):
+        sub = self.subscription(
+            status=SubscriptionStatus.EXPIRED,
+            expires_at=datetime.utcnow() - timedelta(seconds=1),
+            plan_id=None,
+        )
         pending = self.pending()
         pending.plan_id = 10
-        db = FakeDB([Result(items=[22]), Result(value=sub), Result(value=pending),
-                     Result(value=sub), Result(value=pending)])
-        def provision(_db, item, plan_id):
-            self.assertEqual(item.plan_id, 5)
-            self.assertEqual(plan_id, 10)
-            item.plan_id = 10
-            return True, "ready"
-        with patch.object(service, "provision_reserved_plan_at_cutover", side_effect=provision), \
+        db = FakeDB([Result(items=[22]), Result(value=sub), Result(value=pending)])
+        previous_password = sub.account_password_encrypted
+        previous_username = sub.account_username
+        with patch.object(service, "provision_reserved_plan_at_cutover") as provision, \\
              patch.object(service, "reset_subscription_period_usage",
-                          side_effect=lambda db, item, **kw: setattr(item, "traffic_used_bytes", 0)), \
-             patch.object(service, "queue_subscription_enforcement"), \
+                          side_effect=lambda db, item, **kw: setattr(item, "traffic_used_bytes", 0)), \\
+             patch.object(service, "queue_subscription_enforcement") as enforce, \\
              patch.object(service, "history"):
             self.assertEqual(service.activate_due_renewals(db), 1)
+            provision.assert_not_called()
+            enforce.assert_called_once()
         self.assertEqual(sub.plan_id, 10)
-        self.assertEqual(sub.account_username, "untouched")
+        self.assertEqual(sub.status, SubscriptionStatus.ACTIVE)
+        self.assertEqual(sub.account_username, previous_username)
+        self.assertEqual(sub.account_password_encrypted, previous_password)
+        self.assertEqual(sub.traffic_used_bytes, 0)
         self.assertEqual(sub.traffic_limit_bytes, pending.traffic_bytes)
         self.assertEqual(pending.status, "activated")
 
-    def test_cross_plan_provision_failure_never_consumes_paid_cycle(self):
+    def test_cross_plan_provision_errors_cannot_block_paid_renewal(self):
         sub = self.subscription(traffic_used_bytes=10 * 1024**3)
         pending = self.pending()
         pending.plan_id = 10
         db = FakeDB([Result(items=[22]), Result(value=sub), Result(value=pending)])
         with patch.object(service, "provision_reserved_plan_at_cutover",
-                          return_value=(False, "target_plan_without_protocols")), \
-             patch.object(service, "reset_subscription_period_usage") as reset, \
-             patch.object(service, "queue_subscription_enforcement") as enforce, \
+                          side_effect=RuntimeError("node offline")) as provision, \\
+             patch.object(service, "reset_subscription_period_usage",
+                          side_effect=lambda db, item, **kw: setattr(item, "traffic_used_bytes", 0)), \\
+             patch.object(service, "queue_subscription_enforcement"), \\
              patch.object(service, "history"):
-            self.assertEqual(service.activate_due_renewals(db), 0)
-            reset.assert_not_called()
-            enforce.assert_not_called()
-        self.assertEqual(pending.status, "blocked")
-        self.assertEqual(sub.traffic_used_bytes, 10 * 1024**3)
-        self.assertEqual(sub.plan_id, 5)
+            self.assertEqual(service.activate_due_renewals(db), 1)
+            provision.assert_not_called()
+        self.assertEqual(pending.status, "activated")
+        self.assertEqual(sub.traffic_used_bytes, 0)
+        self.assertEqual(sub.plan_id, 10)
 
     def test_existing_plan_renewal_does_not_require_active_catalog_listing(self):
         sub = self.subscription()
