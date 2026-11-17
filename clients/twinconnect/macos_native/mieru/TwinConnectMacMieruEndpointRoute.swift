@@ -52,6 +52,45 @@ enum TwinConnectMacMieruEndpointRoute {
         return true
     }
 
+    /// Builds the exact macOS route policy for an already-pinned endpoint.
+    /// This method does not apply the policy. The signed PacketTunnel must
+    /// verify physical egress and start both engines atomically first.
+    static func tunnelSettings(for plan: Plan) throws
+        -> NEPacketTunnelNetworkSettings {
+        guard publicIPv4(plan.endpoint),
+              plan.excludedRoute.destinationAddress == plan.endpoint,
+              plan.excludedRoute.destinationSubnetMask ==
+                  "255.255.255.255" else {
+            throw ValidationError.endpointNotPinned
+        }
+
+        let settings = NEPacketTunnelNetworkSettings(
+            tunnelRemoteAddress: plan.endpoint)
+        settings.mtu = NSNumber(value: 1400)
+
+        let ipv4 = NEIPv4Settings(
+            addresses: ["172.19.0.1"],
+            subnetMasks: ["255.255.255.252"])
+        ipv4.includedRoutes = [NEIPv4Route.default()]
+        ipv4.excludedRoutes = [plan.excludedRoute]
+        settings.ipv4Settings = ipv4
+
+        // The relay rejects IPv6 until an independently verified
+        // IPv6-capable Mieru path exists; never bypass it via system routes.
+        let ipv6 = NEIPv6Settings(
+            addresses: ["fdfe:dcba:9876::1"],
+            networkPrefixLengths: [NSNumber(value: 126)])
+        ipv6.includedRoutes = [NEIPv6Route.default()]
+        ipv6.excludedRoutes = []
+        settings.ipv6Settings = ipv6
+
+        let dns = NEDNSSettings(servers: ["1.1.1.1", "1.0.0.1"])
+        dns.matchDomains = [""]
+        dns.matchDomainsNoSearch = true
+        settings.dnsSettings = dns
+        return settings
+    }
+
     static func plan(from core: [String: Any]) throws -> Plan {
         guard let profiles = core["profiles"] as? [[String: Any]],
               profiles.count == 1,
