@@ -11,11 +11,11 @@ import time
 
 TARGETS={1:("94.183.231.158",37981),2:("94.183.231.158",37982)}
 
-def client(service,index,count,interval):
+def client(service,index,count,interval,bind_ip):
     session=secrets.token_hex(6).encode("ascii")
     prefix=b"TT-MUX-CLIENT:"+bytes([service,index])+session
     s=socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
-    s.bind(("217.179.6.142",0))
+    s.bind((bind_ip,0))
     s.settimeout(.06)
     received={}
     timings={}
@@ -60,12 +60,13 @@ def main():
     p.add_argument("--clients-per-service",type=int,default=3)
     p.add_argument("--count",type=int,default=40)
     p.add_argument("--interval",type=float,default=.04)
+    p.add_argument("--bind-ip",default="217.179.6.142",choices=("217.179.6.142","94.183.231.158"))
     a=p.parse_args()
     if not 1<=a.clients_per_service<=8 or not 3<=a.count<=150:
         p.error("bounded test only")
     pairs=[(svc,i) for svc in (1,2) for i in range(a.clients_per_service)]
     with ThreadPoolExecutor(max_workers=len(pairs)) as pool:
-        rows=list(pool.map(lambda si:client(si[0],si[1],a.count,a.interval),pairs))
+        rows=list(pool.map(lambda si:client(si[0],si[1],a.count,a.interval,a.bind_ip),pairs))
     result={"clients":len(rows),"sent":sum(x["sent"] for x in rows),
             "received":sum(x["received"] for x in rows),"rows":rows}
     print("MULTIUSER_TEST_RESULT",json.dumps(result,separators=(",",":")),flush=True)
