@@ -78,8 +78,28 @@ final class TwinConnectMacMieruTunnelEngine {
                   configuration.providerConfiguration?["protocol"] as? String ==
                       "mieru",
                   let reference = configuration.passwordReference,
-                  Self.readBundle(reference) != nil else {
+                  let payload = Self.readBundle(reference),
+                  let coreConfig = payload["core"] as? [String: Any] else {
                 completion(Self.failure("MACOS_MIERU_KEYCHAIN_BUNDLE_INVALID"))
+                return
+            }
+
+            // Reject ambiguous domains, private endpoints or malformed ports.
+            // A validated /32 exclusion route still MUST be applied and
+            // verified by the signed Network Extension before starting Mieru.
+            let routePlan: TwinConnectMacMieruEndpointRoute.Plan
+            do {
+                routePlan = try TwinConnectMacMieruEndpointRoute.plan(
+                    from: coreConfig)
+            } catch {
+                completion(Self.failure("MACOS_MIERU_ENDPOINT_ROUTE_INVALID"))
+                return
+            }
+            guard routePlan.excludedRoute.destinationAddress ==
+                    routePlan.endpoint,
+                  routePlan.excludedRoute.destinationSubnetMask ==
+                    "255.255.255.255" else {
+                completion(Self.failure("MACOS_MIERU_ENDPOINT_ROUTE_INVALID"))
                 return
             }
 
