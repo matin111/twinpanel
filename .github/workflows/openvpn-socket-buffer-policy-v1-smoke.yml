@@ -1,0 +1,26 @@
+name: OpenVPN Socket Buffer Policy V1 Smoke
+
+on:
+  push:
+    paths:
+      - "backend/app/routers/provision.py"
+      - "backend/app/openvpn_fork_headroom_v101.py"
+      - "backend/tests/openvpn_socket_buffer_policy_v1_smoke.py"
+      - ".github/workflows/openvpn-socket-buffer-policy-v1-smoke.yml"
+  pull_request:
+    paths:
+      - "backend/app/routers/provision.py"
+      - "backend/app/openvpn_fork_headroom_v101.py"
+      - "backend/tests/openvpn_socket_buffer_policy_v1_smoke.py"
+      - ".github/workflows/openvpn-socket-buffer-policy-v1-smoke.yml"
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Validate OpenVPN buffer policy and config preservation
+        run: python backend/tests/openvpn_socket_buffer_policy_v1_smoke.py

@@ -62,7 +62,7 @@ def main():
     p.add_argument("--interval",type=float,default=.04)
     p.add_argument("--bind-ip",default="217.179.6.142",choices=("217.179.6.142","94.183.231.158"))
     a=p.parse_args()
-    if not 1<=a.clients_per_service<=8 or not 3<=a.count<=150:
+    if not 1<=a.clients_per_service<=32 or not 3<=a.count<=200:
         p.error("bounded test only")
     pairs=[(svc,i) for svc in (1,2) for i in range(a.clients_per_service)]
     with ThreadPoolExecutor(max_workers=len(pairs)) as pool:

@@ -48,7 +48,7 @@ class FrameTests(unittest.TestCase):
         self.assertTrue(r.accept(5000))
         self.assertFalse(r.accept(4000))
     def test_max_sessions(self):
-        self.assertEqual(mux.MAX_FLOWS,64)
+        self.assertEqual(mux.MAX_FLOWS,512)
     def test_binary_payload(self):
         payload=bytes(range(256))*4
         self.assertEqual(self.c.decode(self.c.encode(1,2,5,3,payload))[-1],payload)
@@ -95,7 +95,7 @@ class ReceiveBatchTests(unittest.TestCase):
         self.assertEqual(self.m.stats["full_recv_batches"],0)
 
     def test_bounded_batch_preserves_other_sockets(self):
-        self.assertEqual(self.simulate(70),mux.MAX_RECV_BATCH)
+        self.assertEqual(self.simulate(150),mux.MAX_RECV_BATCH)
         self.assertEqual(len(self.received),mux.MAX_RECV_BATCH)
         self.assertEqual(self.m.stats["full_recv_batches"],1)
 
@@ -106,6 +106,8 @@ class AckRetryTests(unittest.TestCase):
         self.m.codec=mux.Codec(b"K"*32)
         self.m.stats=collections.Counter()
         self.m.flows={}
+        self.m.pending_packets=0
+        self.m.pending_bytes=0
 
     def test_ack_header_authenticated(self):
         encoded=self.m.codec.encode(1|mux.ACK_FLAG,2,44,17,mux.ACK_PAYLOAD)
@@ -115,7 +117,7 @@ class AckRetryTests(unittest.TestCase):
 
     def test_ack_clears_only_outstanding_reply(self):
         flow=mux.Flow(44,1)
-        flow.pending_down[17]=(b"reply",10.0,1)
+        self.assertTrue(self.m._queue_pending(flow,"down",17,b"reply",10.0))
         self.m.flows[44]=flow
         encoded=self.m.codec.encode(129,1,44,17,mux.ACK_PAYLOAD)
         self.m._exit_transport(encoded,("127.0.0.1",50505))
@@ -143,7 +145,7 @@ class AckRetryTests(unittest.TestCase):
         flow=mux.Flow(44,1)
         flow.paths={1:(("127.0.0.1",40001),100.0),
                     2:(("127.0.0.1",40002),100.0)}
-        flow.pending_down[10]=(b"reply",100.0,0)
+        self.assertTrue(self.m._queue_pending(flow,"down",10,b"reply",100.0))
         self.m.flows[44]=flow
         self.m._retry_pending(100.10)
         self.assertEqual(len(sink.sent),0)
@@ -179,6 +181,41 @@ class AckRetryTests(unittest.TestCase):
         self.assertEqual(len(a.sent),0)
         self.assertEqual(len(client.sent),0)
 
+    def test_failed_local_reply_remains_retryable_and_unacked(self):
+        class FailThenSend:
+            def __init__(self):
+                self.calls=0
+                self.delivered=[]
+            def sendto(self,data,addr):
+                self.calls+=1
+                if self.calls==1:
+                    raise OSError("temporary UDP client socket failure")
+                self.delivered.append((data,addr))
+                return len(data)
+        class AckRecorder:
+            def __init__(self):self.sent=[]
+            def send(self,data):self.sent.append(data);return len(data)
+        local=FailThenSend()
+        first=AckRecorder()
+        second=AckRecorder()
+        self.m.listeners={1:local}
+        self.m.backends={1:first,2:second}
+        f=mux.Flow(700,1,("127.0.0.1",34567))
+        self.m.flows[700]=f
+        packet=self.m.codec.encode(1,1,700,55,b"reply")
+        self.m._entry_reply(1,packet)
+        self.assertEqual(self.m.stats["client_send_error"],1)
+        self.assertFalse(f.recv_window.was_delivered(55))
+        self.assertFalse(first.sent)
+        self.assertFalse(second.sent)
+        self.m._entry_reply(1,packet)
+        self.assertTrue(f.recv_window.was_delivered(55))
+        self.assertEqual(len(local.delivered),1)
+        self.assertEqual(len(first.sent),1)
+        self.assertEqual(len(second.sent),1)
+        self.m._entry_reply(1,packet)
+        self.assertEqual(len(local.delivered),1)
+
     def test_delivered_reply_acknowledged_and_deduplicated(self):
         class Sink:
             def __init__(self):self.sent=[]
@@ -211,6 +248,8 @@ class BidirectionalReliabilityTests(unittest.TestCase):
         self.m.codec=mux.Codec(b"K"*32)
         self.m.stats=collections.Counter()
         self.m.flows={}
+        self.m.pending_packets=0
+        self.m.pending_bytes=0
         class SocketRecorder:
             def __init__(self):self.sent=[]
             def send(self,data):
@@ -223,7 +262,7 @@ class BidirectionalReliabilityTests(unittest.TestCase):
 
     def test_upstream_ack_removes_pending_only_for_matching_service(self):
         f=mux.Flow(444,1,("127.0.0.1",45678))
-        f.pending_up[31]=(b"payload",100.0,1)
+        self.assertTrue(self.m._queue_pending(f,"up",31,b"payload",100.0))
         self.m.flows[444]=f
         encoded=self.m.codec.encode(129,1,444,31,mux.ACK_PAYLOAD)
         self.m._entry_reply(1,encoded)
@@ -245,7 +284,7 @@ class BidirectionalReliabilityTests(unittest.TestCase):
         second=self.SocketRecorder()
         self.m.backends={1:first,2:second}
         f=mux.Flow(777,2)
-        f.pending_up[19]=(b"upstream",100.0,0)
+        self.assertTrue(self.m._queue_pending(f,"up",19,b"upstream",100.0))
         self.m.flows[777]=f
         self.m._retry_pending(100.10)
         self.assertFalse(first.sent)
@@ -289,6 +328,59 @@ class BidirectionalReliabilityTests(unittest.TestCase):
         self.assertEqual(self.m.stats["server_send_error"],1)
         self.assertFalse(f.recv_window.was_delivered(8))
         self.assertEqual(len(sink.sent),0)
+
+
+class PendingBudgetTests(unittest.TestCase):
+    def setUp(self):
+        self.m=mux.Mux.__new__(mux.Mux)
+        self.m.stats=collections.Counter()
+        self.m.flows={}
+        self.m.clients={}
+        self.m.pending_packets=0
+        self.m.pending_bytes=0
+
+    def test_pending_accounting_and_global_caps(self):
+        f=mux.Flow(1,1)
+        self.assertTrue(self.m._queue_pending(f,"up",1,b"x"*128,10.0))
+        self.assertEqual(self.m.pending_packets,1)
+        self.assertEqual(self.m.pending_bytes,128)
+        self.assertIsNotNone(self.m._pop_pending(f.pending_up,1))
+        self.assertEqual(self.m.pending_packets,0)
+        self.assertEqual(self.m.pending_bytes,0)
+
+        self.m.pending_packets=mux.MAX_PENDING_PACKETS
+        self.assertFalse(self.m._queue_pending(f,"up",2,b"x",11.0))
+        self.assertEqual(self.m.stats["up_pending_overflow"],1)
+        self.m.pending_packets=0
+        self.m.pending_bytes=mux.MAX_PENDING_BYTES
+        self.assertFalse(self.m._queue_pending(f,"down",3,b"x",12.0))
+        self.assertEqual(self.m.stats["down_pending_overflow"],1)
+
+    def test_per_flow_pending_cap(self):
+        f=mux.Flow(2,1)
+        for seq in range(mux.MAX_PENDING_PER_FLOW):
+            self.assertTrue(self.m._queue_pending(f,"up",seq,b"x",float(seq)))
+        self.assertFalse(self.m._queue_pending(f,"up",999,b"x",100.0))
+        self.assertEqual(len(f.pending_up),mux.MAX_PENDING_PER_FLOW)
+        self.assertEqual(self.m.pending_packets,mux.MAX_PENDING_PER_FLOW)
+
+    def test_expiry_releases_pending_budget(self):
+        f=mux.Flow(3,1)
+        self.m.flows[3]=f
+        self.assertTrue(self.m._queue_pending(f,"up",1,b"abc",1.0))
+        self.assertTrue(self.m._queue_pending(f,"down",2,b"defg",1.0))
+        self.assertEqual((self.m.pending_packets,self.m.pending_bytes),(2,7))
+        f.updated=0.0
+        self.m._expire(mux.TTL+1.0)
+        self.assertFalse(self.m.flows)
+        self.assertEqual((self.m.pending_packets,self.m.pending_bytes),(0,0))
+
+    def test_512_flow_ceiling_is_enforced(self):
+        for index in range(mux.MAX_FLOWS):
+            self.assertIsNotNone(self.m._new_flow(1,("127.0.0.1",10000+index)))
+        self.assertEqual(len(self.m.flows),512)
+        self.assertIsNone(self.m._new_flow(1,("127.0.0.1",20000)))
+        self.assertEqual(self.m.stats["flow_limit"],1)
 
 
 if __name__=="__main__":

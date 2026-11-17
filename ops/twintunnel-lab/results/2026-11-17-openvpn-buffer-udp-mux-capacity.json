@@ -1,0 +1,133 @@
+{
+  "date": "2026-11-17",
+  "scope": "isolated lab + verified France production OpenVPN socket buffer correction; customer profiles and endpoint ports unchanged",
+  "openvpn_udp_socket_before": {
+    "port": 1194,
+    "socket_rcvbuf_bytes": 212992,
+    "accumulated_kernel_socket_drops_at_inspection": 8946
+  },
+  "openvpn_local_burst": {
+    "unbuffered": {
+      "sent": 20000,
+      "delivered": 16488,
+      "server_udp_socket_drop_delta": 700,
+      "client_tun_tx": 17188
+    },
+    "queue_only": {
+      "sent": 20000,
+      "delivered": 18695,
+      "server_udp_socket_drop_delta": 1305,
+      "client_tun_tx": 20000
+    },
+    "socket_buffers_with_client_queue": {
+      "sent": 20000,
+      "delivered": 20000,
+      "server_udp_socket_drop_delta": 0,
+      "client_tun_tx": 20000,
+      "client_tun_txqueuelen": 10000,
+      "socket_rcvbuf_bytes": 8388608
+    }
+  },
+  "production_openvpn_socket_after": {
+    "node": "France 217.179.6.142",
+    "service": "openvpn-server@twinpanel.service",
+    "port": 1194,
+    "config_directives": [
+      "rcvbuf 4194304",
+      "sndbuf 4194304"
+    ],
+    "kernel_socket_rcvbuf_bytes": 8388608,
+    "both_openvpn_services_active_after_restart": true,
+    "connected_sessions_at_restart": 0,
+    "customer_profiles_unchanged": true
+  },
+  "mux_software": {
+    "flow_limit": 512,
+    "pending_packets_per_flow": 64,
+    "global_pending_packet_limit": 8192,
+    "global_pending_bytes_limit": 16777216,
+    "offline_tests_passed_on_both_hosts": 31,
+    "downstream_ack_only_after_successful_socket_send": true,
+    "lab_only": true
+  },
+  "mux_france_local": {
+    "clients": 512,
+    "sent": 10240,
+    "received": 10240,
+    "duplicates": 0,
+    "missing": 0,
+    "p95_echo_ms": 184.4,
+    "duration_seconds": 3.98,
+    "caveat": "Same-host local carrier bridge, not actual international network or WireGuard/OpenVPN sessions"
+  },
+  "mux_france_origin": {
+    "origin": "France",
+    "entry": "Iran",
+    "exit": "France",
+    "carriers": [
+      "Rakhsh GRE",
+      "Shabdiz UDP"
+    ],
+    "stages": [
+      {
+        "clients": 16,
+        "sent": 576,
+        "received": 529
+      },
+      {
+        "clients": 32,
+        "sent": 1152,
+        "received": 1090
+      },
+      {
+        "clients": 64,
+        "sent": 2304,
+        "received": 1541
+      }
+    ],
+    "total_sent": 4032,
+    "total_received": 3160,
+    "loss_percent": 21.63,
+    "iran_entry_packets_received": 3186,
+    "iran_udp_listener_socket_drops_observed": 0,
+    "caveat": "France-to-Iran public ingress hairpin, not representative of an Iranian customer source"
+  },
+  "mux_iran_origin": {
+    "origin": "Iran",
+    "entry": "Iran local ingress",
+    "exit": "France",
+    "carriers": [
+      "Rakhsh GRE",
+      "Shabdiz UDP"
+    ],
+    "stages": [
+      {
+        "clients": 16,
+        "sent": 576,
+        "received": 576
+      },
+      {
+        "clients": 32,
+        "sent": 1152,
+        "received": 1152
+      },
+      {
+        "clients": 64,
+        "sent": 2304,
+        "received": 2304
+      }
+    ],
+    "total_sent": 4032,
+    "total_received": 4032,
+    "loss_percent": 0,
+    "source_allowlist_iran_explicitly_configured": true,
+    "caveat": "Local Iran-side ingress bypasses the public inbound path. One ACK expired despite every application echo returning."
+  },
+  "limitations": [
+    "No real mobile client trial",
+    "Same two hosts for both carriers",
+    "The 512-session result is a short local test, not a production capacity guarantee",
+    "No seamless failover or zero-loss claim",
+    "Do not enable experimental Python mux in production hooks"
+  ]
+}

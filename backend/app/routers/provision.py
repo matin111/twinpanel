@@ -725,6 +725,21 @@ async def stage_openvpn_central_identity(
 
 async def install_openvpn(conn, port: int, transport: str):
     await cmd(conn, "export DEBIAN_FRONTEND=noninteractive; apt-get install -y openvpn easy-rsa >/dev/null", timeout=600)
+    # Keep explicit per-socket OpenVPN buffers usable on fresh and existing nodes.
+    # Preserve a larger administrator-selected kernel cap instead of lowering it.
+    await cmd(
+        conn,
+        "set -eu; "
+        "RMAX=$(sysctl -n net.core.rmem_max); "
+        "WMAX=$(sysctl -n net.core.wmem_max); "
+        "test \"$RMAX\" -ge 16777216 || RMAX=16777216; "
+        "test \"$WMAX\" -ge 16777216 || WMAX=16777216; "
+        "install -d -m 0755 /etc/sysctl.d; "
+        "printf 'net.core.rmem_max=%s\\nnet.core.wmem_max=%s\\n' \"$RMAX\" \"$WMAX\" "
+        "> /etc/sysctl.d/99-twinpanel-openvpn-buffer.conf; "
+        "chmod 0644 /etc/sysctl.d/99-twinpanel-openvpn-buffer.conf; "
+        "sysctl -w net.core.rmem_max=\"$RMAX\" net.core.wmem_max=\"$WMAX\" >/dev/null",
+    )
     await cmd(conn, "mkdir -p /etc/openvpn/server /etc/openvpn/easy-rsa; test -f /etc/openvpn/easy-rsa/easyrsa || cp -a /usr/share/easy-rsa/* /etc/openvpn/easy-rsa/")
     await cmd(conn, "cd /etc/openvpn/easy-rsa && test -d pki || ./easyrsa init-pki >/dev/null")
     await cmd(conn, "cd /etc/openvpn/easy-rsa && test -f pki/ca.crt || EASYRSA_BATCH=1 EASYRSA_REQ_CN='TwinPanel CA' ./easyrsa build-ca nopass >/dev/null", timeout=300)
@@ -759,6 +774,8 @@ async def install_openvpn(conn, port: int, transport: str):
 
     config = f'''port {port}
 proto {proto}
+rcvbuf 4194304
+sndbuf 4194304
 dev tun
 ca /etc/openvpn/easy-rsa/pki/ca.crt
 cert /etc/openvpn/easy-rsa/pki/issued/server.crt
