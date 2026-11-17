@@ -104,7 +104,9 @@ class Flow:
         self.recv_window = ReplayWindow()
         self.paths = {}
         self.pending_down = {} # sequence -> (payload, last_sent_at, retries)
-        self.recent_acks = {} # sequence -> last acknowledgement timestamp
+        self.pending_up = {} # sequence -> (payload, last_sent_at, retries)
+        self.recent_acks = {} # downstream ack timestamp
+        self.recent_up_acks = {} # upstream ack timestamp
         self.updated = time.monotonic()
 
     def next_seq(self):
@@ -190,15 +192,28 @@ class Mux:
             if f is None:
                 return
             self.clients[key] = f
-        f.updated = time.monotonic()
+        now = time.monotonic()
+        f.updated = now
         self.stats["client_packets"] += 1
         seq = f.next_seq()
-        for path, sock in self.backends.items():
+        sent = self._send_upstream(f,seq,data)
+        if sent and len(f.pending_up)<MAX_PENDING_PER_FLOW:
+            f.pending_up[seq]=(data,now,0)
+        elif len(f.pending_up)>=MAX_PENDING_PER_FLOW:
+            self.stats["up_pending_overflow"] += 1
+
+    def _send_upstream(self,f,seq,data,is_retry=False):
+        sent=0
+        for path,sock in self.backends.items():
             try:
-                sock.send(self.codec.encode(service,path,f.flow_id,seq,data))
+                sock.send(self.codec.encode(f.service,path,f.flow_id,seq,data))
                 self.stats["up_sent_path_"+str(path)] += 1
+                sent+=1
             except (OSError,ValueError):
                 self.stats["path_send_error"] += 1
+        if is_retry and sent:
+            self.stats["up_retry_rounds"] += 1
+        return sent
 
     def _entry_reply(self, path, data):
         frame = self.codec.decode(data)
@@ -210,6 +225,16 @@ class Mux:
             self.stats["path_mismatch"] += 1
             return
         f = self.flows.get(fid)
+        if service & ACK_FLAG:
+            base = service & ~ACK_FLAG
+            if f is None or f.service != base or payload != ACK_PAYLOAD:
+                self.stats["invalid_up_ack"] += 1
+                return
+            if f.pending_up.pop(seq,None) is not None:
+                self.stats["up_acks_received"] += 1
+            else:
+                self.stats["duplicate_or_late_up_ack"] += 1
+            return
         if f is None or f.service != service:
             self.stats["orphan_reply"] += 1
             return
@@ -285,14 +310,40 @@ class Mux:
         now = time.monotonic()
         f.paths[path] = (source, now)
         f.updated = now
-        if not f.recv_window.accept(seq):
+        if f.recv_window.was_delivered(seq):
             self.stats["duplicates_up"] += 1
+            self._ack_upstream(f,seq,now)
+            return
+        if f.recv_window.top >= 0 and f.recv_window.top-seq >= 512:
+            self.stats["stale_up"] += 1
             return
         try:
             f.socket.send(payload)
+            f.recv_window.accept(seq)
             self.stats["server_packets"] += 1
+            self._ack_upstream(f,seq,now)
         except OSError:
             self.stats["server_send_error"] += 1
+
+    def _ack_upstream(self,f,seq,now):
+        if now-f.recent_up_acks.get(seq,-100.0)<ACK_RESEND_INTERVAL:
+            return
+        f.recent_up_acks[seq]=now
+        if len(f.recent_up_acks)>MAX_PENDING_PER_FLOW*2:
+            for old_seq,ts in list(f.recent_up_acks.items()):
+                if now-ts>2.0:
+                    del f.recent_up_acks[old_seq]
+            if len(f.recent_up_acks)>MAX_PENDING_PER_FLOW*2:
+                f.recent_up_acks.clear()
+        for path,(remote,seen) in list(f.paths.items()):
+            if now-seen > PATH_TTL:
+                continue
+            try:
+                self.listeners[0].sendto(
+                    self.codec.encode(f.service|ACK_FLAG,path,f.flow_id,seq,ACK_PAYLOAD),remote)
+                self.stats["up_ack_sent_path_"+str(path)] += 1
+            except OSError:
+                self.stats["up_ack_send_error"] += 1
 
     def _send_downstream(self,f,seq,data,now,is_retry=False):
         n = 0
@@ -327,19 +378,29 @@ class Mux:
             self.stats["pending_overflow"] += 1
 
     def _retry_pending(self,now):
-        """Retry only unacknowledged downstream packets, bounded by flow/time."""
-        if self.args.role!="exit":
-            return
-        for f in list(self.flows.values()):
-            for seq,(payload,last_sent,retries) in list(f.pending_down.items()):
-                if now-last_sent < RETRY_INTERVAL:
-                    continue
-                if retries>=MAX_RETRIES:
-                    del f.pending_down[seq]
-                    self.stats["down_unacked"] += 1
-                    continue
-                self._send_downstream(f,seq,payload,now,is_retry=True)
-                f.pending_down[seq] = (payload,now,retries+1)
+        """Two-direction bounded retries; no indefinite UDP packet queues."""
+        if self.args.role=="exit":
+            for f in list(self.flows.values()):
+                for seq,(payload,last_sent,retries) in list(f.pending_down.items()):
+                    if now-last_sent < RETRY_INTERVAL:
+                        continue
+                    if retries>=MAX_RETRIES:
+                        del f.pending_down[seq]
+                        self.stats["down_unacked"] += 1
+                        continue
+                    self._send_downstream(f,seq,payload,now,is_retry=True)
+                    f.pending_down[seq] = (payload,now,retries+1)
+        else:
+            for f in list(self.flows.values()):
+                for seq,(payload,last_sent,retries) in list(f.pending_up.items()):
+                    if now-last_sent < RETRY_INTERVAL:
+                        continue
+                    if retries>=MAX_RETRIES:
+                        del f.pending_up[seq]
+                        self.stats["up_unacked"] += 1
+                        continue
+                    self._send_upstream(f,seq,payload,is_retry=True)
+                    f.pending_up[seq] = (payload,now,retries+1)
 
     def _expire(self, now):
         for fid,f in list(self.flows.items()):
