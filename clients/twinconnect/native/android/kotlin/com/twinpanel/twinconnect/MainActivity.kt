@@ -179,6 +179,12 @@ class MainActivity : FlutterActivity() {
         }
         channel.setMethodCallHandler { call, result ->
             when (call.method) {
+                "getDisconnectedTrafficGuardStatus" -> {
+                    result.success(mapOf(
+                        "active" to AndroidTrafficGuardService.active,
+                        "osLockdown" to WireGuardRuntime.isOsLockdownEnforced()
+                    ))
+                }
                 "startDisconnectedTrafficGuard" -> {
                     if (pendingGuardStart != null) {
                         result.error("GUARD_PERMISSION_PENDING", "VPN approval pending", null)
@@ -202,8 +208,7 @@ class MainActivity : FlutterActivity() {
                     }
                 }
                 "stopDisconnectedTrafficGuard" -> {
-                    startService(Intent(this, AndroidTrafficGuardService::class.java)
-                        .setAction(AndroidTrafficGuardService.ACTION_STOP))
+                    stopService(Intent(this, AndroidTrafficGuardService::class.java))
                     result.success(mapOf("stopRequested" to true))
                 }
                 "openAndroidVpnSettings" -> {
