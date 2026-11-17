@@ -94,6 +94,19 @@ internal object AmneziaWgRuntime {
     }
 
     @Synchronized
+    fun status(): Map<String, Any> {
+        if (!isUp()) return mapOf("connected" to false)
+        val stats = backend!!.getStatistics(tunnel)
+        val handshakes = stats.peers().mapNotNull { stats.peer(it)?.latestHandshakeEpochMillis() }
+        return mapOf(
+            "connected" to true,
+            "rxBytes" to stats.totalRx(),
+            "txBytes" to stats.totalTx(),
+            "peerHandshakeVerified" to handshakes.any { it > 0L }
+        )
+    }
+
+    @Synchronized
     fun disconnect(): Map<String, Any> {
         if (isUp()) backend!!.setState(tunnel, Tunnel.State.DOWN, null)
         return mapOf("connected" to false, "tunnelVerified" to false)
