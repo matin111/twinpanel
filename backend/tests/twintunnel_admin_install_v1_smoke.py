@@ -86,7 +86,8 @@ def test_ui_clear_distinction_between_install_and_cutover():
     assert 'tp-selected-tunnel-standby-intent' in ACTIVE_UI
     assert 'BACKUP_NODE_MISSING' in ACTIVE_UI
     assert "TwinTunnel سه‌مسیره" in ACTIVE_UI
-    assert "not connected to subscribers" in ACTIVE_UI
+    assert 'pick("نصب آزمایشی","Lab install")' in ACTIVE_UI
+    assert "can_activate" not in ACTIVE_UI  # No production activation control is exposed
 
 
 if __name__=="__main__":
