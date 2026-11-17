@@ -59,6 +59,12 @@ class ReplayWindow:
         self.bits |= (1 << delta)
         return True
 
+    def was_delivered(self, sequence):
+        if self.top < 0 or sequence > self.top:
+            return False
+        delta = self.top - sequence
+        return delta < 512 and bool(self.bits & (1 << delta))
+
 
 class Codec:
     def __init__(self, secret):
@@ -209,8 +215,11 @@ class Mux:
             return
         now = time.monotonic()
         if not f.recv_window.accept(seq):
-            self.stats["duplicates_down"] += 1
-            self._ack_downstream(f,seq,now)
+            if f.recv_window.was_delivered(seq):
+                self.stats["duplicates_down"] += 1
+                self._ack_downstream(f,seq,now)
+            else:
+                self.stats["stale_down"] += 1
             return
         f.updated = now
         try:
