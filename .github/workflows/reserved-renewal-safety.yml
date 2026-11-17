@@ -3,7 +3,14 @@ name: Reserved Renewal Safety Tests
 on:
   push:
     branches:
+      - main
       - feature/reserved-renewal-history-v1
+    paths:
+      - "backend/app/reserved_renewal_*"
+      - "backend/app/renewal_service.py"
+      - "backend/app/routers/reserved_renewal_v1.py"
+      - "backend/tests/test_reserved_renewal_v1.py"
+      - ".github/workflows/reserved-renewal-safety.yml"
   pull_request:
     paths:
       - "backend/app/reserved_renewal_*"
