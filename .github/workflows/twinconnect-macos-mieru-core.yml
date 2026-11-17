@@ -112,6 +112,15 @@ jobs:
             fi
             "${target}/mieru" version
           done
+      - name: Verify native Mieru IPv4 endpoint and route exclusion planner
+        shell: bash
+        run: |
+          set -euo pipefail
+          swiftc \
+            macos_native/mieru/TwinConnectMacMieruEndpointRoute.swift \
+            macos_native/mieru/tests/main.swift \
+            -o "$RUNNER_TEMP/twinconnect-mieru-route-test"
+          "$RUNNER_TEMP/twinconnect-mieru-route-test"
       - name: Compile native in-process Mieru library for both Mac architectures
         shell: bash
         run: |
