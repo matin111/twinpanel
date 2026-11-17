@@ -26,7 +26,7 @@ for ABI in arm64-v8a armeabi-v7a x86_64; do
   mkdir -p "$OUT"
   (cd "$WORK/mieru" && GOOS=android GOARCH="$GOARCH" CGO_ENABLED=1 \
     CC="$TOOLCHAIN/$CLANG" "$GO" build -trimpath \
-    -ldflags="-s -w" -o "$OUT/libmieru.so" ./cmd/mieru)
+    -buildmode=pie -ldflags="-s -w" -o "$OUT/libmieru.so" ./cmd/mieru)
   file "$OUT/libmieru.so"
 done
 echo "Mieru Android binaries built; Android VpnService integration still required."
