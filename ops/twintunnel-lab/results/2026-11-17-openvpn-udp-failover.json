@@ -56,5 +56,22 @@
     "udp_lab_active_after_test": true,
     "gateway_auto_stopped": true,
     "udp_canary_limited_to_localhost": true
+  },
+  "udp_redundant_lab": {
+    "test_kind": "two-carrier duplicate-send echo only, not customer VPN datagrams",
+    "sent": 300,
+    "client_unique_replies_within_deadline": 298,
+    "client_missing_sequences": [
+      232,
+      299
+    ],
+    "client_missing_within_deadline_percent": 0.67,
+    "gateway_unique_late_replies_seen": 299,
+    "gateway_duplicate_replies_suppressed": 29,
+    "gre_cut_at_utc": "2026-11-17T09:10:58Z",
+    "gre_restored_at_utc": "2026-11-17T09:11:06Z",
+    "production_ready": false,
+    "note": "Client deadline shorter than gateway runtime; gateway saw one additional late reply. Single trial, not statistically controlled. Doubles transmitted datagrams; no VPN multi-user semantics.",
+    "selector_unit_tests_total_passed": 10
   }
 }
