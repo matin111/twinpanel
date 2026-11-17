@@ -38,7 +38,7 @@ if libbox_marker not in content:
     content = content.rstrip() + "\n\n" + libbox_marker + "\n" + libbox_control.read_text(encoding="utf-8")
 mieru_marker = "// TWINCONNECT_MACOS_MIERU_CONTROL_V1"
 if mieru_marker not in content:
-    content = content.rstrip() + "\\n\\n" + mieru_marker + "\\n" + mieru_control.read_text(encoding="utf-8")
+    content = content.rstrip() + "\n\n" + mieru_marker + "\n" + mieru_control.read_text(encoding="utf-8")
 window.write_text(content, encoding="utf-8")
 
 # App sandbox requires a client-network entitlement for license discovery,
