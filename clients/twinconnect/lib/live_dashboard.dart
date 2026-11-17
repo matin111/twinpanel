@@ -4247,7 +4247,10 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           for (final entry in <(String, String)>[
             ('all', tr('همه', 'All')),
             for (final entry in widget.catalog?.entries ?? const <PanelProtocolStatus>[])
-              if (entry.selected) (entry.protocol.code, entry.protocol.name),
+              if (entry.selected &&
+                  (!Platform.isAndroid ||
+                      AndroidProtocolVisibility.visible(entry.protocol.code)))
+                (entry.protocol.code, entry.protocol.name),
           ])
             ChoiceChip(
               key: Key('devFilter_${entry.$1}'),
