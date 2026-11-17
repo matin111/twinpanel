@@ -26,6 +26,7 @@ from sqlalchemy.orm import Session
 from ..database import SessionLocal, get_db
 from ..deps import require_admin
 from ..models import Node, NodeStatus, NodeType, Tunnel
+from ..services.twintunnel_carrier_plan_v1 import planned_status
 from .provision import ssh_connect_saved
 
 router = APIRouter(
@@ -207,6 +208,7 @@ def _view(tunnel_id: int, tunnel: Tunnel, manifest: dict, plan: dict | None) -> 
     return {
         "tunnel_id": tunnel_id,
         "engine": "twintunnel_udp_mux",
+        **planned_status(),
         "status": "staged" if ready else "not_staged",
         "revision": manifest["revision"],
         "installed_revision": plan.get("revision") if pair_matches else None,
