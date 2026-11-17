@@ -761,7 +761,10 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
       setState(() {
         _singBoxProtocol = 'amneziawg';
         _activeServer = inventory.where((n) => n.id == id).firstOrNull;
-        _activeServerName = _activeServer?.name;
+        _activeServerName = _activeServer?.name ??
+            item['server_name']?.toString() ??
+            item['node_name']?.toString() ??
+            (id == null ? null : 'Server $id');
       });
       _maybeCheckInternet();
     } on FormatException catch (error) {
@@ -1228,6 +1231,8 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
                           ? s.pick('دست‌دهی سرور تأیید شد؛ اینترنت هنوز تأیید نشده', 'Peer handshake verified; internet not yet verified')
                           : _openVpnUp
                               ? s.pick('تونل OpenVPN فعال است؛ اینترنت هنوز بررسی نشده', 'OpenVPN connected; internet not verified')
+                              : _singBoxProtocol == 'amneziawg'
+                                  ? s.pick('تونل AmneziaWG فعال است؛ اینترنت هنوز تأیید نشده', 'AmneziaWG active; internet route unverified')
                               : _singBoxProtocol != null
                                   ? s.pick('تونل Sing-box فعال است؛ مسیر اینترنت هنوز تأیید نشده', 'Sing-box active; internet route unverified')
                                   : connected
