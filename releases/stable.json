@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.865",
+  "version": "1.1.0-rc.866",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-17T19:58:49Z",
+  "released_at": "2026-11-17T23:06:00Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "acdeee4a3fc06c358be34efc4dc5d30fc3c49017",
+  "source_sha": "ca82f506a880faf6af47f334f0ac3ad3f453a6b9",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.865/twinpanel-1.1.0-rc.865-linux-x86_64.tar.gz",
-    "sha256": "d1a888eb3d74d57029dd17d6baf923af0ffe35f1acedf351d40c636732a6853f",
-    "size_bytes": 31242338
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.866/twinpanel-1.1.0-rc.866-linux-x86_64.tar.gz",
+    "sha256": "a3a34107ec5376b32cc46564b99ca9ff5d9631d680b244a3d3fed45a6c3d1a21",
+    "size_bytes": 31294524
   },
   "notes": {
-    "fa": "افزودن نصب و بررسی آزمایشی TwinTunnel سه‌مسیره مستقیماً در مدیریت و ساخت تانل. انتخاب نود واسط، اعتبارسنجی SHA-256 و موتور روی هر سه نود، حفظ گزارش نصب در آپدیت‌ها و محافظ GitHub برای حذف‌نشدن قابلیت. مسیر فعال کاربران TP27 بدون تغییر باقی می‌ماند؛ فعال‌سازی عمومی موتور تا پایان تست‌های واقعی OpenVPN قفل است.",
-    "en": "Admin three-node TwinTunnel standby installer: choose separate backup relay, stage and verify engine by SHA256 and codec selftests on Iran/exit/backup, persist per-pair state across releases and enforce future GitHub release guards. Existing TP27 live paths stay unchanged; production cutover is disabled pending real OpenVPN failover acceptance."
+    "fa": "ساده‌سازی پنجره مدیریت تانل: حذف متن‌های اضافی و تکراری، کوتاه‌کردن دکمه‌های نصب و بررسی TwinTunnel و حفظ کامل عملکرد فعلی تانل‌ها و سرویس‌ها.",
+    "en": "Compact tunnel-management modal: remove redundant explanatory copy, shorten TwinTunnel install/recheck labels, preserve all current tunnel and VPN behavior."
   }
 }
