@@ -185,7 +185,11 @@ class MainActivity : FlutterActivity() {
                 "getDisconnectedTrafficGuardStatus" -> {
                     result.success(mapOf(
                         "active" to AndroidTrafficGuardService.active,
-                        "osLockdown" to WireGuardRuntime.isOsLockdownEnforced(),
+                        // WireGuard's backend cannot verify lockdown for another VPN engine.
+                        // Unknown is not the same as disabled or protected.
+                        "osLockdown" to (if (WireGuardRuntime.isInterfaceUp())
+                            WireGuardRuntime.isOsLockdownEnforced() else null),
+                        "lockdownVerificationAvailable" to WireGuardRuntime.isInterfaceUp(),
                         "otherVpnActive" to (hasActiveVpnTransport() && !AndroidTrafficGuardService.active)
                     ))
                 }
