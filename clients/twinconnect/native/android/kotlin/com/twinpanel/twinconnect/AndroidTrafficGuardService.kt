@@ -12,6 +12,8 @@ import android.os.ParcelFileDescriptor
 class AndroidTrafficGuardService : VpnService() {
     private var tun: ParcelFileDescriptor? = null
 
+    @Volatile private var established = false
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) {
             stopGuard()
@@ -22,6 +24,7 @@ class AndroidTrafficGuardService : VpnService() {
             return START_NOT_STICKY
         }
         try {
+            established = false
             tun?.close()
             tun = Builder()
                 .setSession("TwinConnect traffic guard")
@@ -34,6 +37,8 @@ class AndroidTrafficGuardService : VpnService() {
                 .addDnsServer("fd00:253:254::1")
                 .setBlocking(true)
                 .establish()
+            established = tun != null
+            active = established
             if (tun == null) stopSelf()
         } catch (_: Exception) {
             stopGuard()
@@ -48,16 +53,22 @@ class AndroidTrafficGuardService : VpnService() {
     override fun onDestroy() {
         tun?.close()
         tun = null
+        established = false
+        active = false
         super.onDestroy()
     }
 
     private fun stopGuard() {
         tun?.close()
         tun = null
+        established = false
+        active = false
         stopSelf()
     }
 
     companion object {
+        @Volatile var active: Boolean = false
+            private set
         const val ACTION_STOP = "com.twinpanel.twinconnect.STOP_TRAFFIC_GUARD"
     }
 }
