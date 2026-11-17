@@ -4,6 +4,7 @@ import collections
 import importlib.util
 from pathlib import Path
 import unittest
+from types import SimpleNamespace
 
 script=Path(__file__).resolve().parents[1]/"udp_multiuser_mux.py"
 spec=importlib.util.spec_from_file_location("tt_udp_mux_module",script)
@@ -67,6 +68,37 @@ class FrameTests(unittest.TestCase):
         f2=m._new_flow(1,client=("217.179.6.142",5678))
         self.assertNotEqual(f1.flow_id,f2.flow_id)
         self.assertNotEqual(f1.client,f2.client)
+
+class ReceiveBatchTests(unittest.TestCase):
+    def setUp(self):
+        self.m=mux.Mux.__new__(mux.Mux)
+        self.m.stats=collections.Counter()
+        self.received=[]
+        self.m._entry_client=lambda service,data,addr:self.received.append((service,data,addr))
+
+    def simulate(self,count):
+        class Sock:
+            def __init__(self,n):
+                self.n=n
+                self.pos=0
+            def recvfrom(self,size):
+                if self.pos>=self.n:
+                    raise BlockingIOError()
+                self.pos+=1
+                return b"payload",("127.0.0.1",20000+self.pos)
+        key=SimpleNamespace(data=("client",1),fileobj=Sock(count))
+        return self.m._drain_ready_socket(key)
+
+    def test_read_all_available_packets(self):
+        self.assertEqual(self.simulate(10),10)
+        self.assertEqual(len(self.received),10)
+        self.assertEqual(self.m.stats["full_recv_batches"],0)
+
+    def test_bounded_batch_preserves_other_sockets(self):
+        self.assertEqual(self.simulate(70),mux.MAX_RECV_BATCH)
+        self.assertEqual(len(self.received),mux.MAX_RECV_BATCH)
+        self.assertEqual(self.m.stats["full_recv_batches"],1)
+
 
 if __name__=="__main__":
     unittest.main()
