@@ -118,10 +118,10 @@ class DeferredRenewalTest(unittest.TestCase):
         db = FakeDB([Result(items=[22]), Result(value=sub), Result(value=pending)])
         previous_password = sub.account_password_encrypted
         previous_username = sub.account_username
-        with patch.object(service, "provision_reserved_plan_at_cutover") as provision, \\
+        with patch.object(service, "provision_reserved_plan_at_cutover") as provision, \
              patch.object(service, "reset_subscription_period_usage",
-                          side_effect=lambda db, item, **kw: setattr(item, "traffic_used_bytes", 0)), \\
-             patch.object(service, "queue_subscription_enforcement") as enforce, \\
+                          side_effect=lambda db, item, **kw: setattr(item, "traffic_used_bytes", 0)), \
+             patch.object(service, "queue_subscription_enforcement") as enforce, \
              patch.object(service, "history"):
             self.assertEqual(service.activate_due_renewals(db), 1)
             provision.assert_not_called()
@@ -140,10 +140,10 @@ class DeferredRenewalTest(unittest.TestCase):
         pending.plan_id = 10
         db = FakeDB([Result(items=[22]), Result(value=sub), Result(value=pending)])
         with patch.object(service, "provision_reserved_plan_at_cutover",
-                          side_effect=RuntimeError("node offline")) as provision, \\
+                          side_effect=RuntimeError("node offline")) as provision, \
              patch.object(service, "reset_subscription_period_usage",
-                          side_effect=lambda db, item, **kw: setattr(item, "traffic_used_bytes", 0)), \\
-             patch.object(service, "queue_subscription_enforcement"), \\
+                          side_effect=lambda db, item, **kw: setattr(item, "traffic_used_bytes", 0)), \
+             patch.object(service, "queue_subscription_enforcement"), \
              patch.object(service, "history"):
             self.assertEqual(service.activate_due_renewals(db), 1)
             provision.assert_not_called()
