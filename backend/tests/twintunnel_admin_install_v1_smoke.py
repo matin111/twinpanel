@@ -11,7 +11,7 @@ CLIENT=(ROOT.parent/"lib/twintunnel-install-api.ts").read_text()
 def _view():
     tree=ast.parse(API)
     node=next(n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name=="_view")
-    namespace={}
+    namespace={"Tunnel": object}
     exec(compile(ast.Module(body=[node],type_ignores=[]),"install_view","exec"),namespace)
     return namespace["_view"]
 
