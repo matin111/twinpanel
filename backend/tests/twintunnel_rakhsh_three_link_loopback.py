@@ -47,7 +47,7 @@ def run():
                 sections[section].append(line)
         if not all(sections.values()):
             raise RuntimeError("Rakhsh init did not produce both configuration bodies")
-        raw_entry, raw_exit = ("\\n".join(sections[role]) for role in ("entry", "exit"))
+        raw_entry, raw_exit = ("\n".join(sections[role]) for role in ("entry", "exit"))
         procs = []
         try:
             for role, raw in (("entry", raw_entry), ("exit", raw_exit)):
