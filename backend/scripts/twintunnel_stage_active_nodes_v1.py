@@ -21,6 +21,7 @@ import os
 from pathlib import Path
 import re
 import shlex
+import secrets
 import sys
 import tempfile
 
@@ -117,7 +118,7 @@ async def stage_node(node_id: int, manifest: dict, root: Path, mode: str) -> dic
             async with conn.start_sftp_client() as sftp:
                 for filename in ARTIFACTS:
                     dst = folder + "/" + filename
-                    tmp = dst + ".upload"
+                    tmp = dst + ".upload." + secrets.token_hex(8)
                     await sftp.put(str(root / filename), tmp)
                     move = await conn.run(
                         "chmod 0644 " + shlex.quote(tmp)
@@ -130,7 +131,7 @@ async def stage_node(node_id: int, manifest: dict, root: Path, mode: str) -> dic
                 with tempfile.TemporaryDirectory(prefix="ttstage-") as d:
                     mp = Path(d) / "manifest.json"
                     mp.write_text(json.dumps(manifest, sort_keys=True) + "\n")
-                    tmp = folder + "/manifest.json.upload"
+                    tmp = folder + "/manifest.json.upload." + secrets.token_hex(8)
                     dst = folder + "/manifest.json"
                     await sftp.put(str(mp), tmp)
                     move = await conn.run(
