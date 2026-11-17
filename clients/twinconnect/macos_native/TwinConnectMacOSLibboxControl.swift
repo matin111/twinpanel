@@ -332,7 +332,7 @@ enum TwinConnectMacOSLibboxControl {
     static func start(_ args: Any?, backendLinked: Bool,
                       protocolCode: String = "hysteria2",
                       result: @escaping FlutterResult) {
-        guard ["hysteria2", "tuic", "anytls", "naive", "shadowtls"].contains(protocolCode) else {
+        guard ["hysteria2", "tuic", "anytls", "naive", "shadowtls", "snell", "socks5"].contains(protocolCode) else {
             result(failure("MACOS_PROTOCOL_NOT_SUPPORTED"))
             return
         }
@@ -340,7 +340,8 @@ enum TwinConnectMacOSLibboxControl {
             (protocolCode == "anytls" ? "MACOS_ANYTLS" :
              (protocolCode == "naive" ? "MACOS_NAIVE" :
              (protocolCode == "shadowtls" ? "MACOS_SHADOWTLS" :
-             (protocolCode == "snell" ? "MACOS_SNELL" : "MACOS_HYSTERIA2"))))
+             (protocolCode == "snell" ? "MACOS_SNELL" :
+             (protocolCode == "socks5" ? "MACOS_SOCKS5" : "MACOS_HYSTERIA2")))))
         guard backendLinked else {
             result(failure(errorPrefix + "_PACKET_FLOW_BRIDGE_MISSING"))
             return
@@ -370,9 +371,12 @@ enum TwinConnectMacOSLibboxControl {
                 result(failure("MACOS_VPN_PREFERENCES_LOAD_FAILED"))
                 return
             }
-            let manager = (managers ?? []).first {
-                ($0.protocolConfiguration as? NETunnelProviderProtocol)?
-                    .providerBundleIdentifier == bundleID
+            let manager = (managers ?? []).first { candidate in
+                guard let previous = candidate.protocolConfiguration
+                    as? NETunnelProviderProtocol else { return false }
+                return previous.providerBundleIdentifier == bundleID &&
+                    previous.providerConfiguration?["protocol"] as? String
+                        == protocolCode
             } ?? NETunnelProviderManager()
             if let previous = manager.protocolConfiguration
                 as? NETunnelProviderProtocol,
