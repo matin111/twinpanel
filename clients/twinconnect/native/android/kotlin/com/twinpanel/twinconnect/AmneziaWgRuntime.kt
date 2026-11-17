@@ -2,6 +2,7 @@ package com.twinpanel.twinconnect
 
 import android.content.Context
 import android.net.VpnService
+import org.amnezia.awg.backend.BackendException
 import org.amnezia.awg.backend.GoBackend
 import org.amnezia.awg.backend.Tunnel
 import org.amnezia.awg.config.Config
@@ -62,8 +63,25 @@ internal object AmneziaWgRuntime {
         }
         val state = try {
             backend!!.setState(tunnel, Tunnel.State.UP, config)
+        } catch (error: BackendException) {
+            // Official backend reasons identify the failing stage without
+            // exposing server addresses, profile content or private keys.
+            val code = when (error.reason) {
+                BackendException.Reason.VPN_NOT_AUTHORIZED -> "VPN_PERMISSION_REQUIRED"
+                BackendException.Reason.UNABLE_TO_START_VPN -> "AWG_VPN_SERVICE_TIMEOUT"
+                BackendException.Reason.TUN_CREATION_ERROR -> "AWG_TUN_CREATION_FAILED"
+                BackendException.Reason.GO_ACTIVATION_ERROR_CODE -> "AWG_GO_ACTIVATION_FAILED"
+                BackendException.Reason.DNS_RESOLUTION_FAILURE -> "AWG_ENDPOINT_DNS_FAILED"
+                BackendException.Reason.TUNNEL_MISSING_CONFIG -> "AWG_PROFILE_INVALID"
+                else -> "AWG_BACKEND_REJECTED"
+            }
+            throw IllegalArgumentException(code)
+        } catch (_: SecurityException) {
+            throw IllegalArgumentException("AWG_VPN_SECURITY_REJECTED")
+        } catch (_: LinkageError) {
+            throw IllegalArgumentException("AWG_NATIVE_LINK_FAILED")
         } catch (_: Exception) {
-            throw IllegalArgumentException("AWG_NATIVE_START_FAILED")
+            throw IllegalArgumentException("AWG_BACKEND_START_EXCEPTION")
         }
         require(state == Tunnel.State.UP && isUp()) { "AWG_TUN_NOT_ESTABLISHED" }
         return mapOf(
