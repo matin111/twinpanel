@@ -47,7 +47,20 @@ void main() {
     expect(planner, contains('endpointNotPublic'));
     expect(File('macos_native/mieru/tests/main.swift').existsSync(), isTrue);
     expect(engine, contains('MACOS_MIERU_EGRESS_ROUTE_PIN_NOT_IMPLEMENTED'));
-    expect(engine, contains('self?.core?.stop()'));
+    final coordinator = File(
+      'macos_native/mieru/TwinConnectMacMieruNetworkSettingsCoordinator.swift',
+    ).readAsStringSync();
+    expect(installer,
+        contains('mieru/TwinConnectMacMieruNetworkSettingsCoordinator.swift'));
+    expect(coordinator, contains('setTunnelNetworkSettings(settings)'));
+    expect(coordinator, contains('setTunnelNetworkSettings(nil)'));
+    expect(coordinator, contains('authenticatedCoreReady && libboxPacketFlowReady'));
+    expect(coordinator, contains('physicalEgressPinned'));
+    expect(coordinator, contains('settings.ipv4Settings?.excludedRoutes?.count == 1'));
+    expect(coordinator, contains('settings.ipv6Settings?.includedRoutes?.count == 1'));
+    expect(coordinator, contains('settings.dnsSettings?.matchDomains == [""]'));
+    expect(engine, contains('self.core?.stop()'));
+    expect(engine, contains('self.networkCoordinator.clear(completion: completion)'));
     expect(bridge, contains('"packetFlowBridgeReady": false'));
     expect(bridge, contains('"engineReady": false'));
   });
