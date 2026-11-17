@@ -11,8 +11,13 @@ final class TwinConnectMacMieruTunnelEngine {
     private let workQueue = DispatchQueue(
         label: "com.twinpanel.twinconnect.macos.mieru")
     private var core: TwinConnectMacMieruCore?
+    private let networkCoordinator: TwinConnectMacMieruNetworkSettingsCoordinator
 
-    init(tunnel: NEPacketTunnelProvider) { self.tunnel = tunnel }
+    init(tunnel: NEPacketTunnelProvider) {
+        self.tunnel = tunnel
+        self.networkCoordinator = TwinConnectMacMieruNetworkSettingsCoordinator(
+            tunnel: tunnel)
+    }
 
     private static func failure(_ reason: String) -> NSError {
         NSError(domain: "com.twinpanel.twinconnect.mieru", code: 2901,
@@ -126,9 +131,12 @@ final class TwinConnectMacMieruTunnelEngine {
 
     func stop(completion: @escaping () -> Void) {
         workQueue.async { [weak self] in
-            self?.core?.stop()
-            self?.core = nil
-            completion()
+            guard let self else { completion(); return }
+            // Stop the core and always clear any previously applied
+            // tunnel routes; do not leave a partial Mieru VPN active.
+            self.core?.stop()
+            self.core = nil
+            self.networkCoordinator.clear(completion: completion)
         }
     }
 }
