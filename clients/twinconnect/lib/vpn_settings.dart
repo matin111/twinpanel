@@ -41,6 +41,7 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
   bool _androidKillBusy = false;
   bool _androidVpnConflict = false;
   bool _androidOsLockdown = false;
+  bool _androidLockdownVerifiable = false;
   Timer? _androidGuardPoll;
 
   @override
@@ -99,12 +100,14 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
         _androidKillRequested = result?['active'] == true;
         _androidVpnConflict = result?['otherVpnActive'] == true;
         _androidOsLockdown = result?['osLockdown'] == true;
+        _androidLockdownVerifiable = result?['lockdownVerificationAvailable'] == true;
       });
     } on PlatformException {
       if (mounted) setState(() {
         _androidKillRequested = false;
         _androidVpnConflict = false;
         _androidOsLockdown = false;
+        _androidLockdownVerifiable = false;
       });
     }
   }
@@ -371,11 +374,15 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
                 title: const Text('Kill Switch'),
                 subtitle: Text(tr(
                   _androidOsLockdown
-                      ? 'قفل شبکه اندروید فعال است (تأیید موتور بومی).'
-                      : 'برای روشن‌کردن محافظت واقعی، Always-on VPN و Block connections without VPN را در اندروید فعال کنید.',
+                      ? 'قفل شبکه اندروید توسط موتور فعال تأیید شد.'
+                      : !_androidLockdownVerifiable && _androidVpnConflict
+                          ? 'VPN متصل است، اما وضعیت قفل شبکه برای این موتور قابل تأیید نیست. تنظیمات VPN اندروید را بررسی کنید.'
+                          : 'برای محافظت واقعی، Always-on VPN و Block connections without VPN را در اندروید فعال کنید.',
                   _androidOsLockdown
-                      ? 'Android lockdown verified by native engine.'
-                      : 'Enable Always-on VPN and Block connections without VPN in Android VPN settings.',
+                      ? 'Android lockdown verified for the active engine.'
+                      : !_androidLockdownVerifiable && _androidVpnConflict
+                          ? 'VPN connected; lockdown cannot be verified for this engine. Check Android VPN settings.'
+                          : 'Enable Always-on VPN and Block connections without VPN in Android VPN settings.',
                 )),
                 value: _androidOsLockdown,
                 onChanged: _androidKillBusy ? null : (requested) async {
