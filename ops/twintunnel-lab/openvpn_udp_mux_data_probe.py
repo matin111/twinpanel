@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """OpenVPN data-channel probe with bounded-rate stress and socket-drop telemetry."""
 import argparse
+import os
 import re
 import signal
 import subprocess
@@ -36,8 +37,8 @@ def udp_socket_info(port):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--count", type=int, default=80)
-    parser.add_argument("--interval", type=float, default=0.20)
+    parser.add_argument("--count", type=int, default=int(os.environ.get("TT_PROBE_COUNT", "80")))
+    parser.add_argument("--interval", type=float, default=float(os.environ.get("TT_PROBE_INTERVAL", "0.20")))
     args = parser.parse_args()
     if not 1 <= args.count <= 20000:
         parser.error("count must be 1..20000")
