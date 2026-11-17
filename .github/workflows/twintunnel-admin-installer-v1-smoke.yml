@@ -7,6 +7,8 @@ on:
       - "backend/app/main.py"
       - "backend/scripts/twintunnel_stage_active_nodes_v1.py"
       - "backend/tests/twintunnel_admin_install_v1_smoke.py"
+      - "backend/tests/twintunnel_three_carrier_plan_v1_smoke.py"
+      - "backend/app/services/twintunnel_carrier_plan_v1.py"
       - "components/tunnel-control-center-v1.tsx"
       - "components/tunnel-protocol-runtime-v307.tsx"
       - "lib/twintunnel-install-api.ts"
@@ -17,6 +19,8 @@ on:
       - "backend/app/main.py"
       - "backend/scripts/twintunnel_stage_active_nodes_v1.py"
       - "backend/tests/twintunnel_admin_install_v1_smoke.py"
+      - "backend/tests/twintunnel_three_carrier_plan_v1_smoke.py"
+      - "backend/app/services/twintunnel_carrier_plan_v1.py"
       - "components/tunnel-control-center-v1.tsx"
       - "components/tunnel-protocol-runtime-v307.tsx"
       - "lib/twintunnel-install-api.ts"
@@ -39,3 +43,4 @@ jobs:
           python3 -m py_compile backend/app/routers/twintunnel_install_v1.py
           python3 -m py_compile backend/scripts/twintunnel_stage_active_nodes_v1.py
           python3 backend/tests/twintunnel_admin_install_v1_smoke.py
+          python3 backend/tests/twintunnel_three_carrier_plan_v1_smoke.py
