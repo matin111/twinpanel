@@ -27,7 +27,9 @@ jobs:
             ops/twintunnel-lab/udp_mux_multi_client_probe.py \
             ops/twintunnel-lab/udp_mux_echo_targets.py \
             ops/twintunnel-lab/openvpn_udp_mux_orchestrator.py \
-            ops/twintunnel-lab/openvpn_udp_mux_data_probe.py
+            ops/twintunnel-lab/openvpn_udp_mux_data_probe.py \
+            ops/twintunnel-lab/udp_mux_benchmark_orchestrator.py \
+            ops/twintunnel-lab/udp_mux_iran_origin_target_runner.py
           bash -n ops/twintunnel-lab/wg_multiuser_lab.sh
           bash -n ops/twintunnel-lab/wg_mux_france_server.sh
           bash -n ops/twintunnel-lab/wg_mux_iran_clients.sh
