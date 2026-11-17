@@ -21,6 +21,7 @@ import {useI18n} from "../lib/i18n";
 import {Badge,Card,Shell,Stat} from "./ui";
 import {TunnelServerPairSelectorV293} from "./tunnel-server-pair-selector-v293";
 import {TunnelServiceConnectionsPanel} from "./tunnel-service-connections-panel";
+import {twinTunnelInstallApi,type TwinTunnelInstallStatus} from "../lib/twintunnel-install-api";
 import styles from "./tunnel-protocol-runtime-v307.module.css";
 
 // TWINPANEL_TUNNEL_MANAGEMENT_POPUP_V307
@@ -96,6 +97,10 @@ export function TunnelProtocolRuntimeV307(){
   const [search,setSearch]=useState("");
   const [createOpen,setCreateOpen]=useState(false);
   const [manageOpen,setManageOpen]=useState(false);
+  const [twinStatus,setTwinStatus]=useState<TwinTunnelInstallStatus|null>(null);
+  const [twinBackupId,setTwinBackupId]=useState(0);
+  const [newEngine,setNewEngine]=useState<"tp27_fast"|"twintunnel_standby">("tp27_fast");
+  const [newBackupId,setNewBackupId]=useState(0);
   const [draft,setDraft]=useState<Draft>({iran_node_id:0,exit_node_id:0,priority:100,initial_transport:"tp27_fast",iran_spoof_ip:"",exit_spoof_ip:""});
 
   const nodeMap=useMemo(()=>new Map(nodes.map(node=>[node.id,node])),[nodes]);
@@ -111,6 +116,10 @@ export function TunnelProtocolRuntimeV307(){
   const selectedTunnel=useMemo(()=>tunnels.find(row=>row.id===selectedId)||null,[tunnels,selectedId]);
   const selectedIran=selectedTunnel?nodeMap.get(selectedTunnel.iran_node_id):undefined;
   const selectedExit=selectedTunnel?nodeMap.get(selectedTunnel.exit_node_id):undefined;
+  const backupCandidates=readyExitNodes.filter(node=>node.id!==selectedTunnel?.exit_node_id);
+  const selectedBackupId=backupCandidates.some(node=>node.id===twinBackupId)?twinBackupId:backupCandidates[0]?.id||0;
+  const newBackupCandidates=readyExitNodes.filter(node=>node.id!==draft.exit_node_id);
+  const selectedNewBackupId=newBackupCandidates.some(node=>node.id===newBackupId)?newBackupId:newBackupCandidates[0]?.id||0;
 
   const filteredTunnels=useMemo(()=>{
     const q=search.trim().toLowerCase();
@@ -170,11 +179,36 @@ export function TunnelProtocolRuntimeV307(){
     return()=>{document.body.style.overflow=previous;window.removeEventListener("keydown",onKey);};
   },[manageOpen,createOpen,busy]);
   useEffect(()=>{if(manageOpen&&!selectedTunnel)setManageOpen(false);},[manageOpen,selectedTunnel]);
+  useEffect(()=>{
+    let cancelled=false;
+    setTwinStatus(null);
+    if(manageOpen&&selectedId){
+      void twinTunnelInstallApi.status(selectedId).then(status=>{
+        if(cancelled)return;
+        setTwinStatus(status);
+        if(status.backup_node_id)setTwinBackupId(status.backup_node_id);
+      }).catch(()=>{if(!cancelled)setTwinStatus(null);});
+    }
+    return()=>{cancelled=true;};
+  },[manageOpen,selectedId]);
 
   const run=async(key:string,message:string,action:()=>Promise<unknown>)=>{
     if(busy)return;
     setBusy(key);setError("");setNotice("");
     try{await action();setNotice(message);await load(true,selectedId);}catch(reason){setError(reason instanceof Error?reason.message:String(reason));}finally{setBusy("");}
+  };
+
+  const runTwinTunnel=async(mode:"install"|"verify")=>{
+    if(!selectedTunnel||!selectedBackupId||busy)return;
+    setBusy("twintunnel-"+mode);setError("");setNotice("");
+    try{
+      const status=mode==="install"
+        ?await twinTunnelInstallApi.install(selectedTunnel.id,selectedBackupId)
+        :await twinTunnelInstallApi.verify(selectedTunnel.id,selectedBackupId);
+      setTwinStatus(status);
+      setNotice(pick("موتور TwinTunnel روی سه نود آماده و بررسی شد. مسیر فعال کاربران بدون تغییر باقی ماند.","TwinTunnel staged and verified on three nodes; the active subscriber path was not changed."));
+    }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
+    finally{setBusy("");}
   };
 
   const installClassic=(row:ProtocolRow)=>{
