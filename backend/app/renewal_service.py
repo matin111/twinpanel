@@ -133,4 +133,18 @@ def fulfill_renewal_order(
     # This marks PAYMENT fulfillment, not activation of the reserved subscription.
     renewal.fulfilled_at = now
     db.commit()
+    # The account may have expired BEFORE the customer purchased this renewal.
+    # In that case activate immediately after payment is durably recorded;
+    # never touch an active account before its time or quota is exhausted.
+    # Any failure is retried by the existing 15-second renewal worker and
+    # must not undo a successfully fulfilled payment.
+    try:
+        from .reserved_renewal_service import activate_due_renewals
+        activate_due_renewals(db, subscription_id=int(sub.id))
+    except Exception:
+        import logging
+        logging.getLogger(__name__).exception(
+            "post_payment_reserved_renewal_activation_failed subscription_id=%s", sub.id
+        )
+        db.rollback()
     return True
