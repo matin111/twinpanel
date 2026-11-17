@@ -183,14 +183,25 @@ class MainActivity : FlutterActivity() {
         channel.setMethodCallHandler { call, result ->
             when (call.method) {
                 "getDisconnectedTrafficGuardStatus" -> {
+                    val wireGuardUp = WireGuardRuntime.isInterfaceUp()
+                    val legacyGuardUp = AndroidTrafficGuardService.active
+                    val anyVpnUp = hasActiveVpnTransport()
+                    val verifiedLockdown = if (wireGuardUp)
+                        WireGuardRuntime.isOsLockdownEnforced() else null
                     result.success(mapOf(
-                        "active" to AndroidTrafficGuardService.active,
-                        // WireGuard's backend cannot verify lockdown for another VPN engine.
-                        // Unknown is not the same as disabled or protected.
-                        "osLockdown" to (if (WireGuardRuntime.isInterfaceUp())
-                            WireGuardRuntime.isOsLockdownEnforced() else null),
-                        "lockdownVerificationAvailable" to WireGuardRuntime.isInterfaceUp(),
-                        "otherVpnActive" to (hasActiveVpnTransport() && !AndroidTrafficGuardService.active),
+                        "active" to legacyGuardUp,
+                        "osLockdown" to verifiedLockdown,
+                        "lockdownVerificationAvailable" to wireGuardUp,
+                        "otherVpnActive" to (anyVpnUp && !legacyGuardUp),
+                        // A running VPN is not evidence of leak prevention.
+                        // Only report protection when native lockdown is verified.
+                        "protectionVerified" to (verifiedLockdown == true),
+                        "protectionMode" to when {
+                            verifiedLockdown == true -> "OS_LOCKDOWN_VERIFIED"
+                            legacyGuardUp -> "LEGACY_BLOCKING_TUN_UNSAFE_HANDOFF"
+                            anyVpnUp -> "ACTIVE_VPN_LOCKDOWN_UNVERIFIED"
+                            else -> "DISCONNECTED_UNPROTECTED"
+                        },
                         "singleTunnelKillSwitchAvailable" to false,
                         "failClosedAcrossHandoff" to false
                     ))
