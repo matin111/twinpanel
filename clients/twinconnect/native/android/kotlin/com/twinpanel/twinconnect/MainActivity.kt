@@ -7,7 +7,6 @@ import android.net.VpnService
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.Bundle
-import androidx.core.content.ContextCompat
 import android.provider.Settings
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -28,7 +27,6 @@ class MainActivity : FlutterActivity() {
     private val executor: ExecutorService = Executors.newSingleThreadExecutor()
     private var pendingStart: PendingStart? = null
     private var pendingAwgStart: Pair<String, MethodChannel.Result>? = null
-    private var pendingGuardStart: MethodChannel.Result? = null
 
     private data class PendingStart(
         val config: String,
@@ -463,17 +461,6 @@ class MainActivity : FlutterActivity() {
     @Deprecated("Deprecated by Android API; required for FlutterActivity's approval callback")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == GUARD_APPROVAL_REQUEST) {
-            val request = pendingGuardStart ?: return
-            pendingGuardStart = null
-            if (resultCode == Activity.RESULT_OK && !hasActiveVpnTransport()) {
-                ContextCompat.startForegroundService(this, Intent(this, AndroidTrafficGuardService::class.java))
-                request.success(mapOf("requested" to true, "verified" to false))
-            } else {
-                request.error("VPN_PERMISSION_DENIED_OR_CONFLICT", "VPN permission denied or another VPN became active", null)
-            }
-            return
-        }
         if (requestCode == AWG_APPROVAL_REQUEST) {
             val request = pendingAwgStart ?: return
             pendingAwgStart = null
@@ -534,6 +521,5 @@ class MainActivity : FlutterActivity() {
     companion object {
         private const val VPN_APPROVAL_REQUEST = 44011
         private const val AWG_APPROVAL_REQUEST = 44012
-        private const val GUARD_APPROVAL_REQUEST = 44013
     }
 }
