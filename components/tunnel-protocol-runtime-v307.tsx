@@ -247,6 +247,21 @@ export function TunnelProtocolRuntimeV307(){
         const id=Number(job.result?.tunnel?.id||0);
         if(!id)throw new Error("TUNNEL_JOB_RESULT_MISSING");
         setCreateOpen(false);await load(true,id);setSelectedId(id);setManageOpen(true);
+        const intent=sessionStorage.getItem("tp-selected-tunnel-standby-intent");
+        sessionStorage.removeItem("tp-selected-tunnel-standby-intent");
+        if(intent){
+          try{
+            const backupId=Number(JSON.parse(intent)?.backup_node_id||0);
+            if(backupId<=0)throw new Error("BACKUP_NODE_MISSING");
+            setNotice(pick("تانل اصلی ایجاد شد. آماده‌سازی TwinTunnel روی سه نود آغاز شد.","Base tunnel created; staging TwinTunnel on three nodes."));
+            const status=await twinTunnelInstallApi.install(id,backupId);
+            setTwinStatus(status);setTwinBackupId(backupId);
+            setNotice(pick("تانل اصلی و نصب آزمایشی سه‌نودی TwinTunnel تأیید شدند. مسیر کاربران تغییر نکرد.","Base tunnel and three-node TwinTunnel staging verified. Customer routing unchanged."));
+          }catch(reason){
+            setNotice(pick("تانل TP27 ساخته شد، ولی آماده‌سازی TwinTunnel کامل نشد: ","TP27 tunnel created; TwinTunnel staging did not complete: ")+(reason instanceof Error?reason.message:String(reason)));
+          }
+          return;
+        }
         setNotice(pick(`Tunnel #${id} ساخته و تأیید شد.`,`Tunnel #${id} is ready.`));
         return;
       }
@@ -279,6 +294,7 @@ export function TunnelProtocolRuntimeV307(){
       setError(pick("برای ساخت Tunnel هر دو نود ایران و خارج باید Online و آماده باشند.","Both Iran and Exit nodes must be online and ready before creating a tunnel."));
       return;
     }
+    if(newEngine==="twintunnel_standby"&&!selectedNewBackupId){setError(pick("برای TwinTunnel باید یک نود پشتیبان آنلاین انتخاب شود.","Select an online backup node for TwinTunnel."));return;}
     if(draft.initial_transport==="spoof_wg"&&(!draft.iran_spoof_ip.trim()||!draft.exit_spoof_ip.trim())){
       setError(pick("برای Spoof Tunnel هر دو IP Spoof ایران و خارج الزامی است.","Both Iran and Exit spoof IPs are required for Spoof Tunnel."));
       return;
@@ -292,6 +308,8 @@ export function TunnelProtocolRuntimeV307(){
       const job=await modernRequest<{id:string}>("/v1/tunnels/create-selected/jobs",{method:"POST",body:JSON.stringify(payload)});
       if(!/^[0-9a-f]{32}$/.test(job.id))throw new Error("INVALID_TUNNEL_JOB_ID");
       sessionStorage.setItem("tp-selected-tunnel-job",job.id);
+      if(newEngine==="twintunnel_standby")sessionStorage.setItem("tp-selected-tunnel-standby-intent",JSON.stringify({backup_node_id:selectedNewBackupId}));
+      else sessionStorage.removeItem("tp-selected-tunnel-standby-intent");
       await pollTunnelCreation(job.id);
     }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}finally{setBusy("");}
   };
@@ -308,7 +326,7 @@ export function TunnelProtocolRuntimeV307(){
       setError(pick("برای ساخت Tunnel حداقل یک نود ایران و یک نود خارج Online لازم است.","At least one online Iran node and one online Exit node are required to create a tunnel."));
       return;
     }
-    setDraft({iran_node_id:iran.id,exit_node_id:exit.id,priority:100,initial_transport:"tp27_fast",iran_spoof_ip:"",exit_spoof_ip:""});setCreateOpen(true);
+    setDraft({iran_node_id:iran.id,exit_node_id:exit.id,priority:100,initial_transport:"tp27_fast",iran_spoof_ip:"",exit_spoof_ip:""});setNewEngine("tp27_fast");setNewBackupId(0);setCreateOpen(true);
   };
   const openManage=(id:number)=>{setSelectedId(id);setManageOpen(true);};
   const openFullProtocolManager=()=>{if(selectedTunnel&&typeof window!=="undefined")window.location.href=`/admin/modern-protocols?node=${selectedTunnel.exit_node_id}`;};
