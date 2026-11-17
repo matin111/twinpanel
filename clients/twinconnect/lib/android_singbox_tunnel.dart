@@ -28,6 +28,8 @@ class AndroidSingBoxTunnel {
 
   static const supported = <String>{
     'hysteria2', 'tuic', 'anytls', 'socks5', 'shadowtls', 'snell',
+    // Runtime verification is required before enabling Naive in the UI.
+    'naive',
   };
 
   Future<void> initialize() async {
