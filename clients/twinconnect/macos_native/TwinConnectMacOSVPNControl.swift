@@ -47,6 +47,23 @@ enum TwinConnectMacOSVPNControl {
                 result(failure("MACOS_VPN_PREFERENCES_LOAD_FAILED"))
                 return
             }
+            let conflicting = (managers ?? []).contains { candidate in
+                guard let config = candidate.protocolConfiguration
+                    as? NETunnelProviderProtocol,
+                    config.providerBundleIdentifier == providerBundle else {
+                    return false
+                }
+                switch candidate.connection.status {
+                case .connected, .connecting, .reasserting, .disconnecting:
+                    return true
+                default:
+                    return false
+                }
+            }
+            guard !conflicting else {
+                result(failure("MACOS_VPN_ALREADY_ACTIVE"))
+                return
+            }
             let selected = manager(managers ?? [])
             if let existing = selected.protocolConfiguration as? NETunnelProviderProtocol,
                let oldNamespace = existing.providerConfiguration?["namespace"] as? String,
