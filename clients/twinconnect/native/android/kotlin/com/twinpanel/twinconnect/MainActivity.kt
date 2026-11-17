@@ -182,6 +182,27 @@ class MainActivity : FlutterActivity() {
         }
         channel.setMethodCallHandler { call, result ->
             when (call.method) {
+                "getVpnRegistrationStatus" -> {
+                    // Diagnose whether Android can discover a VPN service from
+                    // the *installed* package; an in-app icon proves nothing.
+                    val intent = Intent(VpnService.SERVICE_INTERFACE).setPackage(packageName)
+                    val matches = packageManager.queryIntentServices(intent, 0)
+                    val services = matches.mapNotNull { it.serviceInfo }.map { info ->
+                        mapOf(
+                            "name" to info.name,
+                            "requiresVpnPermission" to
+                                (info.permission == android.Manifest.permission.BIND_VPN_SERVICE),
+                            "enabled" to info.enabled
+                        )
+                    }
+                    result.success(mapOf(
+                        "packageName" to packageName,
+                        "registeredVpnServices" to services,
+                        "discoverable" to services.any {
+                            it["requiresVpnPermission"] == true && it["enabled"] == true
+                        }
+                    ))
+                }
                 "getDisconnectedTrafficGuardStatus" -> {
                     val wireGuardUp = WireGuardRuntime.isInterfaceUp()
                     val legacyGuardUp = AndroidTrafficGuardService.active
