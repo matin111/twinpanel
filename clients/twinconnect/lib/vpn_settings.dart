@@ -295,6 +295,40 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _section(tr('امنیت سیستم', 'System security')),
+        if (Platform.isAndroid)
+          _glass(Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text('Android Kill Switch',
+                  style: Theme.of(context).textTheme.titleSmall),
+              const SizedBox(height: 8),
+              Text(tr(
+                'برای جلوگیری از نشت اینترنت هنگام قطع VPN، در تنظیمات اندروید TwinConnect را به‌عنوان VPN همیشگی انتخاب کنید و «مسدودکردن اتصال بدون VPN» را روشن کنید. این گزینه فقط توسط سیستم‌عامل فعال می‌شود.',
+                'In Android VPN settings, select TwinConnect as Always-on VPN and enable Block connections without VPN. Only Android can enforce this system-wide lockdown.',
+              )),
+              const SizedBox(height: 10),
+              FilledButton.icon(
+                onPressed: () async {
+                  try {
+                    await const MethodChannel('com.twinpanel.twinconnect/vpn')
+                        .invokeMethod<void>('openAndroidVpnSettings');
+                  } on PlatformException {
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(tr(
+                        'بازکردن تنظیمات VPN ممکن نشد',
+                        'Could not open Android VPN settings',
+                      ))),
+                    );
+                  }
+                },
+                icon: const Icon(Icons.shield_rounded),
+                label: Text(tr('فعال‌سازی در تنظیمات اندروید',
+                    'Enable in Android VPN settings')),
+              ),
+            ],
+          )),
+
         _glass(
           Row(children: [
             const Icon(Icons.shield_rounded, size: 25),
