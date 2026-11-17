@@ -213,15 +213,15 @@ loss of either node or the underlying physical path.
 ### OpenVPN TCP actual session (France → Iran → France)
 
 - An isolated OpenVPN 2.6.19 **TCP server** listens on French loopback
-  \`127.0.0.1:37942\` with a separate, short-lived PKI.
+  `127.0.0.1:37942` with a separate, short-lived PKI.
 - A test OpenVPN client on **France** dials the Iran-only lab ingress
-  \`94.183.231.158:37951\`; its TCP bytes are forwarded by
-  \`127.0.0.1:37941\` through Rakhsh's four carriers to the French server.
+  `94.183.231.158:37951`; its TCP bytes are forwarded by
+  `127.0.0.1:37941` through Rakhsh's four carriers to the French server.
 - **No OpenVPN process runs on Iran** for this test. Iran runs only the
   Rakhsh ingress/proxy; no customer OpenVPN credentials or configurations
   are used.
 - OpenVPN TLS negotiated successfully; both dedicated TUN interfaces
-  \`tunTTcl\` and \`tunTTsv\` came up with the test point-to-point addresses.
+  `tunTTcl` and `tunTTsv` came up with the test point-to-point addresses.
 - At **08:53:14 UTC** the dedicated TCP/37041, TLS/37042, and WS/37044
   *lab-only* lanes were reset, leaving QUICv2 alive. During the controlled
   80-packet OpenVPN data probe:
@@ -230,26 +230,26 @@ loss of either node or the underlying physical path.
   The test client recorded **one total OpenVPN initialization**, i.e. no
   full connection reestablishment in this test.
 - The ICMP payload targets an intentionally nonresponding documentation/
-  benchmark address \`198.18.254.254\`; the test concerns **delivery to
+  benchmark address `198.18.254.254`; the test concerns **delivery to
   the OpenVPN server's TUN**, not successful ICMP echo replies.
-  A scoped \`/32\` test route is created and removed by the script.
-- The original probe incorrectly searched for \`icmp seq\` whereas Linux
-  tcpdump outputs \`ICMP echo request, id ..., seq ...\`.
-  \`openvpn_data_failover_probe.py\` uses the corrected extraction and
+  A scoped `/32` test route is created and removed by the script.
+- The original probe incorrectly searched for `icmp seq` whereas Linux
+  tcpdump outputs `ICMP echo request, id ..., seq ...`.
+  `openvpn_data_failover_probe.py` uses the corrected extraction and
   requires both exact unique sequence and kernel counter totals.
 - The private test certificates and keys are **not in GitHub**.
   This temporary test certificate expires **19 November 2026**.
 
 ### UDP continuity experiment (GRE primary + Shabdiz-UDP backup)
 
-Rakhsh's \`shabdiz-*\` datagram transport does **not** participate in the
-stream multi-link lane pool or \`resume\`. Instead an isolated test-only
-selector \`udp_failover_gateway.py\` provides the single stable UDP
-frontend \`127.0.0.1:37961\`. It checks **two separate Rakhsh echo
-forwards**, GRE at \`127.0.0.1:37921\` and Shabdiz-UDP at
-\`127.0.0.1:37933\`, both ending at the France loopback lab echo
-\`127.0.0.1:37922\`. Health checks use the echo's strict
-\`TTLB1\` prefix, without changing the VPN services.
+Rakhsh's `shabdiz-*` datagram transport does **not** participate in the
+stream multi-link lane pool or `resume`. Instead an isolated test-only
+selector `udp_failover_gateway.py` provides the single stable UDP
+frontend `127.0.0.1:37961`. It checks **two separate Rakhsh echo
+forwards**, GRE at `127.0.0.1:37921` and Shabdiz-UDP at
+`127.0.0.1:37933`, both ending at the France loopback lab echo
+`127.0.0.1:37922`. Health checks use the echo's strict
+`TTLB1` prefix, without changing the VPN services.
 
 **Observed while sending 300 sequence-coded UDP packets:**
 - GRE was intentionally stopped at **09:02:58 UTC** and restored at
@@ -262,7 +262,7 @@ forwards**, GRE at \`127.0.0.1:37921\` and Shabdiz-UDP at
 - **300 sent, 290 unique replies, 10 missing, 3.33% missing**.
   Six consecutive missing sequences (29–34) straddled the path outage;
   additional individual missing sequences were 41, 153, 214, and 299.
-  The gateway reported \`no_path=0\`, but this must **not** be read as
+  The gateway reported `no_path=0`, but this must **not** be read as
   zero lost UDP packets.
 - Six unit tests for initial selection, failover, failback hysteresis and
   no-path handling passed.
@@ -282,12 +282,12 @@ At **3.33% lab loss**, this build must **not** be rolled out to users.
 
 To repeat the bounded *lab-only* UDP fault test, start the lab echo and
 both preexisting Rakhsh GRE and UDP carriers on each host, launch
-\`python3 /opt/twintunnel-test/udp_failover_gateway.py --duration 110\`
-on Iran and then run \`udp_failover_inject.sh\` on Iran.
+`python3 /opt/twintunnel-test/udp_failover_gateway.py --duration 110`
+on Iran and then run `udp_failover_inject.sh` on Iran.
 The script verifies the lab unit identity, stops only the dedicated
 GRE lab service while a 300-packet probe is underway, and restores it
 with an EXIT trap. It must **never** be directed at production tunnels.
 
 The test gateway is intentionally not enabled at boot; it stops after
-its bounded run. Do not expose \`37961\` publicly or attach any production
+its bounded run. Do not expose `37961` publicly or attach any production
 VPN protocol until the limitations above have been addressed.
