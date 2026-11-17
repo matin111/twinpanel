@@ -35,6 +35,12 @@ void main() {
     expect(installer, contains('mieru/TwinConnectMacMieruEndpointRoute.swift'));
     expect(engine, contains('TwinConnectMacMieruEndpointRoute.plan('));
     expect(engine, contains('MACOS_MIERU_ENDPOINT_ROUTE_INVALID'));
+    expect(planner, contains('static func tunnelSettings(for plan: Plan)'));
+    expect(planner, contains('ipv4.excludedRoutes = [plan.excludedRoute]'));
+    expect(planner, contains('ipv6.includedRoutes = [NEIPv6Route.default()]'));
+    expect(planner, contains('dns.matchDomains = [""]'));
+    expect(engine, contains('.tunnelSettings(for: routePlan)'));
+    expect(engine, contains('MACOS_MIERU_NETWORK_POLICY_INVALID'));
     expect(planner, contains('NEIPv4Route('));
     expect(planner, contains('subnetMask: "255.255.255.255"'));
     expect(planner, contains('server["domainName"] as? String == ""'));
