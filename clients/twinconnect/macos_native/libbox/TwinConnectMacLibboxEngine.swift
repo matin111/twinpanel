@@ -321,25 +321,31 @@ final class TwinConnectMacLibboxEngine {
                 // independent runtime verification on a signed Mac.
                 completion(nil)
             } catch {
-                self.close()
-                completion(error)
+                self.close {
+                    completion(error)
+                }
             }
         }
     }
 
     func stop(completion: @escaping () -> Void) {
         workQueue.async { [weak self] in
-            self?.close()
-            completion()
+            guard let self else {
+                completion()
+                return
+            }
+            self.close(completion: completion)
         }
     }
 
-    private func close() {
+    private func close(completion: @escaping () -> Void) {
         if started { try? server?.closeService() }
         server?.close()
         server = nil
         started = false
-        platform.reset()
+        // OS routing/DNS cleanup must finish before the provider reports
+        // stop completion or an aborted start returns its error.
+        platform.reset(completion: completion)
     }
 }
 #endif
