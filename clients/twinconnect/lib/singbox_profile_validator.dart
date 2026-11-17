@@ -295,8 +295,6 @@ class SingBoxProfileValidator {
            sni.contains(' ') || sni.contains('/'))) {
         throw const FormatException('NAIVE_TLS_SERVER_NAME_INVALID');
       }
-      // The Naive TLS adapter accepts no generic TLS enabled switch.
-      tls.remove('enabled');
       object['tls'] = tls;
     }
     // ShadowTLS detours cannot safely be flattened into one outbound.
