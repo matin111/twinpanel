@@ -1,0 +1,75 @@
+{
+  "date": "2026-11-17",
+  "topology": {
+    "iran": "94.183.231.158",
+    "turkey": "167.104.219.168",
+    "france": "217.179.6.142",
+    "third_path": "Iran -> Turkey UDP/38831 -> France UDP/38832 -> local UDP mux",
+    "other_paths": [
+      "Rakhsh GRE direct",
+      "Shabdiz-UDP direct"
+    ],
+    "lab_only": true
+  },
+  "tests": {
+    "france_via_turkey_echo": {
+      "sent": 40,
+      "received": 40
+    },
+    "iran_via_turkey_while_both_direct_carriers_stopped": {
+      "sent": 80,
+      "received": 75,
+      "missing": 5
+    },
+    "iran_mux_continuous_during_both_direct_carrier_outage": {
+      "sent": 480,
+      "received": 480,
+      "missing": 0,
+      "p95_ms": 362.13,
+      "duration_s": 24.61,
+      "direct_carriers_disabled_for_seconds": 8
+    },
+    "real_wireguard": {
+      "iran_test_clients": 2,
+      "authenticated_handshakes": 2,
+      "french_test_tun_received_packets": 294,
+      "french_test_tun_received_bytes": 37480,
+      "direct_lab_carriers_disabled_for_seconds": 8,
+      "device_and_routes_removed": true
+    },
+    "real_openvpn_udp": {
+      "test_client": "France (hairpin through Iran public ingress)",
+      "test_server": "France isolated OpenVPN UDP",
+      "sent_ipv4_tun": 80,
+      "delivered_ipv4_tun": 77,
+      "missing_sequences": [
+        20,
+        57,
+        79
+      ],
+      "full_initializations": 1,
+      "inactivity_restarts": 0,
+      "fault_start": "2026-11-17T12:10:52Z",
+      "fault_end": "2026-11-17T12:11:00Z",
+      "probe_start": "2026-11-17T12:10:38Z",
+      "note": "8-second fault overlaps only tail end of 16-second probe; packet loss remains"
+    },
+    "offline_unit_tests_passed": 37
+  },
+  "posttest": {
+    "all_temporary_udp_relays_stopped": true,
+    "iran_rakhsh_gre_lab_active": true,
+    "iran_shabdiz_udp_lab_active": true,
+    "france_udp_echo_restored": true,
+    "france_production_openvpn_services_active": true,
+    "wireguard_test_interfaces_removed": true,
+    "customer_routes_and_configs_unchanged": true
+  },
+  "production_ready": false,
+  "limitations": [
+    "Real OpenVPN hairpin lost 3/80 IP TUN packets",
+    "Not independently fault-tolerant to loss of Iran or France physical hosts",
+    "No real customer canary, congestion/MTU/NAT rebinding/multi-hour load test",
+    "Relay currently Python lab-only; no persisted production deployment"
+  ]
+}
