@@ -15,6 +15,16 @@ void main() {
     expect(platform, contains('guard hadSettings, let tunnel else {'));
     expect(platform, contains('tunnel.setTunnelNetworkSettings(nil)'));
     expect(platform, contains('MACOS_LIBBOX_TUN_DESCRIPTOR_UNAVAILABLE'));
+    expect(platform, contains('let applyLock = NSLock()'));
+    expect(platform, contains('var applyFinished = false'));
+    expect(platform, contains('var applyTimedOut = false'));
+    expect(platform, contains('let mustRollback = applyTimedOut'));
+    expect(platform, contains('if mustRollback {'));
+    expect(platform, contains('applyTimedOut = true'));
+    expect(platform, contains('if completedBeforeTimeout {'));
+    expect(platform, contains('MACOS_LIBBOX_TUN_NETWORK_SETTINGS_TIMEOUT'));
+    expect(platform, contains('let stoppedDuringApply = stopped'));
+    expect(platform, contains('guard !stoppedDuringApply else {'));
     expect(platform, contains('settings = nil'));
     expect(engine, contains('platform.reset(completion: completion)'));
     expect(engine, contains('try? server?.closeService()'));
