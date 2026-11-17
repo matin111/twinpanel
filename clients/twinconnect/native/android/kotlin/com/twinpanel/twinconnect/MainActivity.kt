@@ -4,6 +4,8 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.net.VpnService
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.os.Bundle
 import android.provider.Settings
 import io.flutter.embedding.android.FlutterActivity
@@ -188,7 +190,7 @@ class MainActivity : FlutterActivity() {
                 "startDisconnectedTrafficGuard" -> {
                     if (pendingGuardStart != null) {
                         result.error("GUARD_PERMISSION_PENDING", "VPN approval pending", null)
-                    } else if (WireGuardRuntime.isInterfaceUp()) {
+                    } else if (WireGuardRuntime.isInterfaceUp() || hasActiveVpnTransport()) {
                         result.error("GUARD_TUNNEL_ACTIVE", "Cannot replace active VPN", null)
                     } else {
                         val approval = VpnService.prepare(this)
@@ -461,6 +463,19 @@ class MainActivity : FlutterActivity() {
             launchWireGuard(request.config, request.policy, request.result)
         } else {
             request.result.error("VPN_PERMISSION_DENIED", "VPN permission not granted", null)
+        }
+    }
+
+    private fun hasActiveVpnTransport(): Boolean {
+        val connectivity = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        return try {
+            connectivity.allNetworks.any { network ->
+                connectivity.getNetworkCapabilities(network)
+                    ?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true
+            }
+        } catch (_: SecurityException) {
+            // If the OS denies inspection, never replace an unknown active VPN.
+            true
         }
     }
 
