@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -8,7 +9,6 @@ import 'brand_theme.dart';
 import 'interactive_glass_card.dart';
 import 'native_vpn_bridge.dart';
 import 'vpn_policy.dart';
-import 'vpn_policy_store.dart';
 import 'tenant_models.dart';
 
 /// One-page, fail-closed network settings. A saved preference is not proof of
@@ -39,18 +39,24 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
   bool _vmGuardBusy = false;
   bool _androidKillRequested = false;
   bool _androidKillBusy = false;
-  final _policyStore = const VpnPolicyStore();
+  Timer? _androidGuardPoll;
 
   @override
   void initState() {
     super.initState();
     _check();
     _refreshAndroidGuard();
+    if (Platform.isAndroid) {
+      _androidGuardPoll = Timer.periodic(const Duration(seconds: 3), (_) {
+        if (!_androidKillBusy) _refreshAndroidGuard();
+      });
+    }
   }
 
-  Future<void> _loadAndroidKillPreference() async {
-    if (!Platform.isAndroid) return;
-    await _refreshAndroidGuard();
+  @override
+  void dispose() {
+    _androidGuardPoll?.cancel();
+    super.dispose();
   }
 
   Future<void> _setAndroidKill(bool requested) async {
@@ -63,7 +69,16 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
       } else {
         await channel.invokeMethod<dynamic>('stopDisconnectedTrafficGuard');
       }
-      await _refreshAndroidGuard();
+      for (var attempt = 0; attempt < 12; attempt++) {
+        await Future<void>.delayed(const Duration(milliseconds: 250));
+        await _refreshAndroidGuard();
+        if (_androidKillRequested == requested) break;
+      }
+      if (_androidKillRequested != requested && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Kill Switch: service state not confirmed'),
+        ));
+      }
     } on PlatformException catch (error) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text('Kill Switch: ${error.code}'),
