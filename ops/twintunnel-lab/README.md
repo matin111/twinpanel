@@ -201,3 +201,126 @@ Lab rollback: stop `twintunnel-lab@entry-multilink.service` (Iran) and
 `twintunnel-lab@exit-multilink.service` plus
 `twintunnel-lab-tcp-echo.service` (France). Leave existing GRE, VPN, nodes,
 DNS and client configurations untouched.
+
+
+## 17 November 2026: real OpenVPN TCP over Multi-Link and UDP two-carrier canary
+
+**Scope:** This is still an isolated, temporary lab, not customer routing.
+The multi-link and two standalone Shabdiz datagram transports use the **same
+Iran/France host pair**; different carriers do not protect against the complete
+loss of either node or the underlying physical path.
+
+### OpenVPN TCP actual session (France → Iran → France)
+
+- An isolated OpenVPN 2.6.19 **TCP server** listens on French loopback
+  `127.0.0.1:37942` with a separate, short-lived PKI.
+- A test OpenVPN client on **France** dials the Iran-only lab ingress
+  `94.183.231.158:37951`; its TCP bytes are forwarded by
+  `127.0.0.1:37941` through Rakhsh's four carriers to the French server.
+- **No OpenVPN process runs on Iran** for this test. Iran runs only the
+  Rakhsh ingress/proxy; no customer OpenVPN credentials or configurations
+  are used.
+- OpenVPN TLS negotiated successfully; both dedicated TUN interfaces
+  `tunTTcl` and `tunTTsv` came up with the test point-to-point addresses.
+- At **08:53:14 UTC** the dedicated TCP/37041, TLS/37042, and WS/37044
+  *lab-only* lanes were reset, leaving QUICv2 alive. During the controlled
+  80-packet OpenVPN data probe:
+  **80 sent, 80 captured at the receiving TUN, 80 unique ICMP sequence
+  numbers, 0 missing; +80 packets / +6720 bytes in server-TUN counters.**
+  The test client recorded **one total OpenVPN initialization**, i.e. no
+  full connection reestablishment in this test.
+- The ICMP payload targets an intentionally nonresponding documentation/
+  benchmark address `198.18.254.254`; the test concerns **delivery to
+  the OpenVPN server's TUN**, not successful ICMP echo replies.
+  A scoped `/32` test route is created and removed by the script.
+- The original probe incorrectly searched for `icmp seq` whereas Linux
+  tcpdump outputs `ICMP echo request, id ..., seq ...`.
+  `openvpn_data_failover_probe.py` uses the corrected extraction and
+  requires both exact unique sequence and kernel counter totals.
+- The private test certificates and keys are **not in GitHub**.
+  This temporary test certificate expires **19 November 2026**.
+
+### UDP continuity experiment (GRE primary + Shabdiz-UDP backup)
+
+Rakhsh's `shabdiz-*` datagram transport does **not** participate in the
+stream multi-link lane pool or `resume`. Instead an isolated test-only
+selector `udp_failover_gateway.py` provides the single stable UDP
+frontend `127.0.0.1:37961`. It checks **two separate Rakhsh echo
+forwards**, GRE at `127.0.0.1:37921` and Shabdiz-UDP at
+`127.0.0.1:37933`, both ending at the France loopback lab echo
+`127.0.0.1:37922`. Health checks use the echo's strict
+`TTLB1` prefix, without changing the VPN services.
+
+**Observed while sending 300 sequence-coded UDP packets:**
+- GRE was intentionally stopped at **09:02:58 UTC** and restored at
+  **09:03:06 UTC**. Both are *existing lab services only*.
+- Gateway switched **GRE → UDP** at approximately **09:03:00 UTC**;
+  **UDP → GRE** at approximately **09:03:38 UTC**.
+- The GRE Shabdiz session did not finish reestablishing until about
+  **09:03:36 UTC**, despite the entry process being restarted at 09:03:06.
+  This prolonged recovery delays failback.
+- **300 sent, 290 unique replies, 10 missing, 3.33% missing**.
+  Six consecutive missing sequences (29–34) straddled the path outage;
+  additional individual missing sequences were 41, 153, 214, and 299.
+  The gateway reported `no_path=0`, but this must **not** be read as
+  zero lost UDP packets.
+- Six unit tests for initial selection, failover, failback hysteresis and
+  no-path handling passed.
+- Post-test GRE returned to **active** with a 10/10 direct echo check.
+  Existing French OpenVPN services remained active. The temporary
+  OpenVPN benchmark route was removed.
+
+The UDP selector deliberately supports only **one lab client** and
+depends on an **echo-capable lab target**; it is **not a production UDP
+multiplexer**, does not preserve arbitrary concurrent WireGuard/OpenVPN
+user sessions, and does not provide end-to-end packet integrity or
+retransmissions. Any real customer-grade solution needs an authenticated
+multi-user session map on both tunnel ends, a separate health target,
+flow affinity/return-path handling, good duplicate/sequence behavior,
+recovery and quality thresholds, and genuine client canary results.
+At **3.33% lab loss**, this build must **not** be rolled out to users.
+
+To repeat the bounded *lab-only* UDP fault test, start the lab echo and
+both preexisting Rakhsh GRE and UDP carriers on each host, launch
+`python3 /opt/twintunnel-test/udp_failover_gateway.py --duration 110`
+on Iran and then run `udp_failover_inject.sh` on Iran.
+The script verifies the lab unit identity, stops only the dedicated
+GRE lab service while a 300-packet probe is underway, and restores it
+with an EXIT trap. It must **never** be directed at production tunnels.
+
+The test gateway is intentionally not enabled at boot; it stops after
+its bounded run. Do not expose `37961` publicly or attach any production
+VPN protocol until the limitations above have been addressed.
+
+
+### Redundant UDP echo canary — separate verification, not VPN support
+
+`udp_redundant_canary.py` is a *second* localhost-only demonstration
+at `127.0.0.1:37962` that sends **each correctly tagged test packet**
+through both the GRE and UDP Rakhsh lab forwards, accepts the first
+response, and rejects later duplicates by its lab packet sequence number.
+It rejects packets without the dedicated `TTLB1TT-UDP-CANARY:` prefix
+and supports only one test client; **generic UDP VPN traffic is explicitly
+unsupported**. Re-run the test with `udp_redundant_inject.sh`; the same
+bounded GRE lab outage and restoration are applied.
+
+At **09:10:58 UTC** GRE was intentionally stopped while the canary sent,
+and it was restored at **09:11:06 UTC**. The canary sender recorded
+**300 sent, 298 unique replies within its deadline, 2 missing (0.67%)**,
+versus **290/300 (3.33% missing)** in the earlier active-only selector
+run. The two missing sequence numbers were `232` and `299`, not the
+earlier contiguous six-packet outage. The gateway itself later saw
+**299 unique echoes** and suppressed **29 duplicate replies**; one
+reply arrived after the client's deadline.
+
+This is *not* a statistically validated speed or reliability gain from
+one pair of runs. Replication approximately doubles outbound carrier
+datagrams, which may worsen bottlenecks and CPU load. Importantly it
+does **not** provide a production-ready authenticated/anti-replay-aware
+two-ended UDP session multiplexer, or promise that existing OpenVPN UDP
+or WireGuard clients will remain connected. Both carrier types still
+share the same Iran/France host and underlying Internet route.
+
+The standalone unit suite covers six route policy and four strict
+canary packet parser cases (**10/10 passed**). Every test is manually
+started, never boot-enabled, and excluded from customer routing.
