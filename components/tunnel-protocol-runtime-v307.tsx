@@ -416,6 +416,7 @@ export function TunnelProtocolRuntimeV307(){
               </button>
             </div>
             <small>{pick("سه ترانسپورت مستقل بین ایران و خروجی هنوز در موتور عملیاتی نشده‌اند؛ نصب فعلی فقط آزمایشی است.","Three independent carriers between entry and exit are not yet operational; this is staging only.")}</small>
+            <small>{pick("ترانسپورت‌های پیشنهادی: WSS / QUICv2 / KCP — هنوز نصب و فعال نشده‌اند.","Planned carriers: WSS / QUICv2 / KCP — not installed or active.")}</small>
             {twinStatus?.status==="staged"&&<div className="table"><table><thead><tr><th>{pick("نود","Node")}</th><th>{pick("سلامت موتور","Engine check")}</th><th>{pick("نسخه","Revision")}</th></tr></thead><tbody>
               {twinStatus.nodes.map(node=><tr key={node.node_id}><td>{node.name||"Node #"+node.node_id}</td><td><Badge tone={node.ok&&node.selftest==="ok"?"ok":"bad"}>{node.ok&&node.selftest==="ok"?"Verified":"Failed"}</Badge></td><td dir="ltr">{twinStatus.installed_revision||"—"}</td></tr>)}
             </tbody></table></div>}
