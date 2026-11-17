@@ -362,25 +362,41 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
           _glass(Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              SwitchListTile.adaptive(
+              ListTile(
                 contentPadding: EdgeInsets.zero,
-                secondary: const Icon(Icons.shield_rounded),
+                leading: const Icon(Icons.shield_rounded),
                 title: const Text('Kill Switch'),
                 subtitle: Text(tr(
-                  _androidKillRequested
-                      ? 'تونل مسدودکننده فعال است؛ برای اتصال VPN باید متوقف شود'
-                      : _androidVpnConflict
-                          ? 'VPN فعال است؛ محافظ جداگانه نباید اتصال را قطع کند'
-                          : 'محافظ قطع اتصال غیرفعال است؛ محافظت سراسری تضمین نمی‌شود',
-                  _androidKillRequested
-                      ? 'Blocking tunnel active; stop before connecting VPN'
-                      : _androidVpnConflict
-                          ? 'VPN active; guard must not replace the connection'
-                          : 'Disconnected guard inactive; system-wide protection not guaranteed',
+                  _androidVpnConflict
+                      ? 'VPN متصل است. برای محافظت بدون قطع اتصال، قفل شبکه اندروید را فعال کنید.'
+                      : _androidKillRequested
+                          ? 'تونل مسدودکننده قدیمی فعال است؛ برای اتصال مجدد باید متوقف شود.'
+                          : 'محافظت سراسری غیرفعال است. فعال‌سازی نیازمند تأیید در تنظیمات VPN اندروید است.',
+                  _androidVpnConflict
+                      ? 'VPN connected. Enable Android lockdown without replacing the active tunnel.'
+                      : _androidKillRequested
+                          ? 'Legacy blocking tunnel active; stop it before reconnecting.'
+                          : 'System-wide protection requires Android VPN lockdown approval.',
                 )),
-                value: _androidKillRequested,
-                onChanged: _androidKillBusy || _androidVpnConflict ? null : _setAndroidKill,
+                trailing: const Icon(Icons.open_in_new_rounded),
+                onTap: () async {
+                  try {
+                    await const MethodChannel('com.twinpanel.twinconnect/vpn')
+                        .invokeMethod<void>('openAndroidVpnSettings');
+                  } on PlatformException catch (error) {
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Android VPN settings: ${error.code}')),
+                    );
+                  }
+                },
               ),
+              if (_androidKillRequested)
+                TextButton.icon(
+                  onPressed: _androidKillBusy ? null : () => _setAndroidKill(false),
+                  icon: const Icon(Icons.stop_circle_outlined),
+                  label: Text(tr('توقف محافظ قدیمی', 'Stop legacy traffic guard')),
+                ),
               TextButton.icon(
                 onPressed: _checking ? null : () async { await _check(); await _refreshAndroidGuard(); },
                 icon: const Icon(Icons.refresh_rounded),
