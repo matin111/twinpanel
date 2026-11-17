@@ -34,12 +34,20 @@ def run():
             capture_output=True, text=True, timeout=15, check=True,
         )
         # Do not log or persist the generated token/static private keys.
-        parts = init.stdout.split("########## entry", 1)
-        if len(parts) != 2:
-            raise RuntimeError("Rakhsh init did not produce a matched pair")
-        raw_entry, divider, raw_exit = parts[1].partition("########## exit")
-        if not divider:
-            raise RuntimeError("Rakhsh init omitted the exit configuration")
+        sections = {"entry": [], "exit": []}
+        section = None
+        for line in init.stdout.splitlines():
+            if line.startswith("########## entry"):
+                section = "entry"
+                continue
+            if line.startswith("########## exit"):
+                section = "exit"
+                continue
+            if section is not None:
+                sections[section].append(line)
+        if not all(sections.values()):
+            raise RuntimeError("Rakhsh init did not produce both configuration bodies")
+        raw_entry, raw_exit = ("\\n".join(sections[role]) for role in ("entry", "exit"))
         procs = []
         try:
             for role, raw in (("entry", raw_entry), ("exit", raw_exit)):
