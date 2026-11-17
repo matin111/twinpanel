@@ -17,6 +17,14 @@ class FrameTests(unittest.TestCase):
     def test_authenticated_roundtrip(self):
         data=self.c.encode(1,1,123,7,b"wg-probe")
         self.assertEqual(self.c.decode(data),(1,1,123,7,b"wg-probe"))
+    def test_third_authenticated_path_roundtrip(self):
+        payload=b"third-turkey-carrier"
+        frame=self.c.encode(1,3,778,44,payload)
+        self.assertEqual(self.c.decode(frame),(1,3,778,44,payload))
+        tampered=bytearray(frame)
+        tampered[9]=2
+        self.assertIsNone(self.c.decode(bytes(tampered)))
+
     def test_wrong_tag(self):
         data=self.c.encode(2,2,12,10,b"test")
         self.assertIsNone(self.c.decode(data[:-1]+bytes([data[-1]^1])))
