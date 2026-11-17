@@ -17,11 +17,12 @@ import java.nio.charset.StandardCharsets
  */
 internal object WireGuardRuntime {
     private var backend: GoBackend? = null
+    private val lifecycleGate = TunPacketGate()
 
     private val tunnel = object : Tunnel {
         override fun getName(): String = "twinconnect"
         override fun onStateChange(newState: Tunnel.State) {
-            // Never record sensitive WireGuard configuration in logs.
+            if (newState != Tunnel.State.UP) lifecycleGate.lostConnection()
         }
     }
 
@@ -145,14 +146,19 @@ internal object WireGuardRuntime {
         } finally {
             bytes.fill(0)
         }
+        lifecycleGate.beginConnect("wireguard")
         val actualState = try {
             backend!!.setState(tunnel, Tunnel.State.UP, config)
         } catch (_: Exception) {
+            lifecycleGate.lostConnection()
             throw IllegalArgumentException("WIREGUARD_NATIVE_START_FAILED")
         }
-        require(actualState == Tunnel.State.UP && isInterfaceUp()) {
-            "TUNNEL_NOT_ESTABLISHED"
+        if (actualState != Tunnel.State.UP || !isInterfaceUp()) {
+            lifecycleGate.lostConnection()
+            throw IllegalArgumentException("TUNNEL_NOT_ESTABLISHED")
         }
+        // GoBackend owns packet forwarding: this is lifecycle state only.
+        lifecycleGate.verifiedConnected("wireguard")
         return mapOf(
             "state" to "interface_up",
             "protocol" to "wireguard",
@@ -163,6 +169,7 @@ internal object WireGuardRuntime {
 
     @Synchronized
     fun stop(): Map<String, Any> {
+        lifecycleGate.lostConnection()
         val existing = backend
         if (existing == null || !isInterfaceUp()) {
             return mapOf("state" to "down", "protocol" to "wireguard")
