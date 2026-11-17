@@ -1,0 +1,24 @@
+name: TwinTunnel UDP Mux Lab Smoke
+
+on:
+  pull_request:
+    paths:
+      - "ops/twintunnel-lab/udp_multiuser_mux.py"
+      - "ops/twintunnel-lab/tests/test_udp_multiuser_mux.py"
+      - ".github/workflows/twintunnel-udp-mux-lab-smoke.yml"
+  push:
+    paths:
+      - "ops/twintunnel-lab/udp_multiuser_mux.py"
+      - "ops/twintunnel-lab/tests/test_udp_multiuser_mux.py"
+      - ".github/workflows/twintunnel-udp-mux-lab-smoke.yml"
+
+jobs:
+  offline-unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Verify authenticated UDP mux, memory caps and replay safety
+        run: python -m unittest discover -s ops/twintunnel-lab/tests -p test_udp_multiuser_mux.py -v
