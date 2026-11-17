@@ -71,7 +71,10 @@ def main():
             time.sleep(.3)
         else:raise RuntimeError("OpenVPN client TLS handshake not completed")
         print("UDP_OPENVPN_TUNNEL_READY",flush=True)
-        print("UDP_OPENVPN_PROBE_START",flush=True)
+        # Allow the separate Iran fault injector to arm before the real data.
+        print("UDP_OPENVPN_PROBE_ARMED",flush=True)
+        time.sleep(12)
+        print("UDP_OPENVPN_PROBE_START_UTC="+time.strftime("%Y-%m-%dT%H:%M:%SZ",time.gmtime()),flush=True)
         probe=subprocess.run(
             [sys.executable,"-u",str(ROOT/"openvpn_udp_mux_data_probe.py")],
             capture_output=True,text=True,timeout=65,
