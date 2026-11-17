@@ -166,6 +166,20 @@ def patch_manifest() -> None:
         '                android:value="vpn" />\n'
         '        </service>\n'
     )
+    # Shared owner is opt-in only after a real PacketEngine adapter is wired.
+    # Registering it does not start it or replace existing working services.
+    service += (
+        '\n        <service android:name=".SharedTunVpnService"\n'
+        '            android:exported="false"\n'
+        '            android:foregroundServiceType="specialUse"\n'
+        '            android:permission="android.permission.BIND_VPN_SERVICE">\n'
+        '            <intent-filter>\n'
+        '                <action android:name="android.net.VpnService" />\n'
+        '            </intent-filter>\n'
+        '            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"\n'
+        '                android:value="vpn" />\n'
+        '        </service>\n'
+    )
     # Register the official AmneziaWG VPN service only when its native AAR
     # is bundled. Never alias it to the ordinary WireGuard VpnService.
     awg_aar = NATIVE / "amneziawg-core" / "tunnel-release.aar"
