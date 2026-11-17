@@ -135,10 +135,10 @@ def main():
             f"openvpn_udp_socket_rcvbuf={sock_after['rcvbuf']}",
             f"openvpn_udp_socket_drop_delta={drop_delta}",
             f"duration_s={duration}",
-            f"ping_exit={ping.returncode}",
+            f"raw_sender_errors={send_errors}",
             flush=True,
         )
-        print("NOTE: ping targets a nonresponding benchmark address; 0 replies are expected", flush=True)
+        print("NOTE: raw ICMP echo requests target a nonresponding benchmark address; 0 replies are expected", flush=True)
         if send_errors or len(set(captured_seqs)) != sent or (after - before) != sent:
             print("ERROR: packet counts mismatch", flush=True)
             return 2
