@@ -130,6 +130,28 @@ jobs:
           done
           python3 source/backend/tests/test_sudoku_shared_accounting_release_v1.py -v
 
+      - name: Prevent releases from reverting reserved renewal activation and configurations
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          for path in \\
+            "backend/app/reserved_renewal_service.py" \\
+            "backend/app/renewal_service.py" \\
+            "backend/tests/test_reserved_renewal_v1.py"; do
+            test -s "publisher/$path" && test -s "source/$path" || {
+              echo "::error file=$path::Missing reserved-renewal implementation in candidate"
+              exit 1
+            }
+            cmp -s "publisher/$path" "source/$path" || {
+              echo "::error file=$path::Pinned release would revert scheduled or immediate renewal fixes. Re-pin candidate to current main."
+              exit 1
+            }
+          done
+          grep -Fq 'activate_due_renewals(db, subscription_id=int(sub.id))' source/backend/app/renewal_service.py
+          grep -Fq 'subscription_id: int | None = None' source/backend/app/reserved_renewal_service.py
+          grep -Fq 'test_cross_plan_provision_errors_cannot_block_paid_renewal' source/backend/tests/test_reserved_renewal_v1.py
+          python3 -m py_compile source/backend/app/renewal_service.py source/backend/app/reserved_renewal_service.py source/backend/tests/test_reserved_renewal_v1.py
+
       - name: Protect admin manual renewal plan selection in published releases
         shell: bash
         run: |
