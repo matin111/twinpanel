@@ -440,3 +440,75 @@ WireGuard successes under a single short GRE fault do not replace
 multi-hour load testing, MTU discovery, multi-user replay and NAT rebinding
 security, dynamic routing/quality decisions, support for every customer
 node, and tested rollback of the actual customer connection path.
+
+
+### 17 November 2026 — bounded two-direction reliability follow-up
+
+The first multi-user echo baseline showed 5.00% response loss for
+720 transmissions by 6 simultaneous France-origin test clients
+(three 240-packet runs). Per-layer counts located 30 missing packets
+before the Iran ingress: 720 generated, 690 read at Iran, 690 reached
+France echo, 685 returned from Iran, 684 received before deadline.
+**This French-source hairpin setup is not representative of an
+independent Iranian subscriber's access route.**
+
+With 6 test clients originating **locally on the Iran host**, the
+same three-by-240-packet experiment saw 720/720 enter the Iran mux and
+720/720 reach France echo, but only 705/720 replies returned to clients
+(2.08% within-deadline loss). This localized loss to the foreign-to-Iran
+return path in that particular trial.
+
+The experimental UDP mux subsequently added **bounded authenticated
+ACK + retransmission** for each direction. The ACK is a separate,
+HMAC-protected frame identified by the high bit of the existing
+service-byte field. It does NOT alter end-user WireGuard or OpenVPN
+configs. ACKs must match both the flow ID and original service;
+stale/replayed frames cannot acknowledge packets that were never
+delivered to the ingress. Each flow caches at most 256 pending packets,
+with at most two additional attempts per packet at 240 ms intervals.
+Datagrams are deduplicated on receipt. There is no unbounded queue.
+
+With the downstream ACK mechanism, the Iran-origin echo benchmark
+recorded **720/720 replies (0% measured loss)**, versus 705/720
+before retransmission. France sent 15 additional retry rounds and
+received 720 distinct ACKs. This is only a short controlled test, not
+a guarantee of perfect uptime or loss-free OpenVPN/WireGuard.
+
+A real OpenVPN UDP TUN exercise with two-direction ACK and a
+GRE-only lab cut **during** the data probe began at 10:34:34 UTC;
+GRE was disabled from 10:34:44 to 10:34:53 UTC. The OpenVPN
+client did not fully reconnect (one initialisation, zero inactivity
+restarts), but the France server TUN saw **79/80** unique IPv4
+test packets. One numbered packet (78) was absent. All 92 encrypted
+VPN datagrams emitted by the client were ACKed at the tunnel ingress
+and counted as sent to the local French OpenVPN UDP socket; that is
+not equivalent to confirmed OpenVPN application-level receipt.
+**Therefore the engine does not yet provide a zero-loss end-to-end
+OpenVPN UDP guarantee.** A prior run with downstream-only retries
+delivered 76/80 TUN packets (without a reliably synchronized fault).
+
+The real two-client WireGuard test was also repeated against the
+two-direction engine. With GRE stopped from **10:36:49 to 10:36:57
+UTC**, both peers had authenticated handshakes, and the France
+kernel WireGuard TUN received **294 decrypted packets / 37,480
+bytes**. The old France echo service and original OpenVPN services
+were restored after tests, the real WireGuard interfaces remained
+untouched, and test sockets, TUNs and one-host routes were removed.
+
+The final lab suite now has **26 offline unit tests** across both
+hosts, covering receive batching, authenticated ACK frames, stale
+replay rejection, duplicate suppression, bounded retries, service
+isolation and failed local delivery handling.
+
+The two additional safe lab benchmark controllers are:
+udp_mux_benchmark_orchestrator.py and
+udp_mux_iran_origin_target_runner.py. Full numeric outcomes:
+results/2026-11-17-bidirectional-udp-reliability.json.
+
+**Do not install this experimental Python mux via production deploy
+hooks or route customer traffic to its ports.** It has a 64-flow and
+1250-byte frame limit, duplicated carrier bandwidth overhead,
+incomplete NAT rebinding/MTU/congestion behavior, and both Rakhsh
+underlays still terminate on the same Iran/France host pair.
+Actual high-availability across physical routes needs independent
+alternative hosts/paths, real subscriber canaries and sustained tests.
