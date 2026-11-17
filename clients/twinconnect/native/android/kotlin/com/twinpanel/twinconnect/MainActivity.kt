@@ -301,7 +301,11 @@ class MainActivity : FlutterActivity() {
                     "OTHER_VPN_ACTIVE", "AWG_ALREADY_CONNECTED",
                     "AWG_PROFILE_INVALID", "AWG_DNS_MISSING",
                     "AWG_DEFAULT_ROUTE_MISSING", "AWG_CONFIG_PARSE_FAILED",
-                    "AWG_NATIVE_START_FAILED", "AWG_TUN_NOT_ESTABLISHED"
+                    "AWG_NATIVE_START_FAILED", "AWG_TUN_NOT_ESTABLISHED",
+                    "AWG_VPN_SERVICE_TIMEOUT", "AWG_TUN_CREATION_FAILED",
+                    "AWG_GO_ACTIVATION_FAILED", "AWG_ENDPOINT_DNS_FAILED",
+                    "AWG_BACKEND_REJECTED", "AWG_BACKEND_START_EXCEPTION",
+                    "AWG_NATIVE_LINK_FAILED", "AWG_VPN_SECURITY_REJECTED"
                 )
                 val code = cause.message?.takeIf { it in safeCodes }
                     ?: when (cause) {
