@@ -291,8 +291,29 @@ class MainActivity : FlutterActivity() {
                 runtime.getMethod(
                     "connect", Context::class.java, String::class.java
                 ).invoke(instance, applicationContext, configuration) as Map<String, Any>
+            } catch (error: java.lang.reflect.InvocationTargetException) {
+                // Reflection wraps the runtime's policy and configuration errors.
+                // Preserve only allowlisted symbolic codes, never the exception
+                // text from the native backend (which may contain credentials).
+                val cause = error.targetException
+                val safeCodes = setOf(
+                    "AWG_ENGINE_UNAVAILABLE", "VPN_PERMISSION_REQUIRED",
+                    "OTHER_VPN_ACTIVE", "AWG_ALREADY_CONNECTED",
+                    "AWG_PROFILE_INVALID", "AWG_DNS_MISSING",
+                    "AWG_DEFAULT_ROUTE_MISSING", "AWG_CONFIG_PARSE_FAILED",
+                    "AWG_NATIVE_START_FAILED", "AWG_TUN_NOT_ESTABLISHED"
+                )
+                val code = cause.message?.takeIf { it in safeCodes }
+                    ?: when (cause) {
+                        is UnsatisfiedLinkError, is NoClassDefFoundError ->
+                            "AWG_NATIVE_LINK_FAILED"
+                        is SecurityException -> "AWG_VPN_SECURITY_REJECTED"
+                        is IllegalStateException -> "AWG_BACKEND_STATE_FAILED"
+                        else -> "AWG_BACKEND_START_EXCEPTION"
+                    }
+                throw IllegalArgumentException(code)
             } catch (_: ReflectiveOperationException) {
-                throw IllegalArgumentException("AWG_NATIVE_START_FAILED")
+                throw IllegalArgumentException("AWG_NATIVE_REFLECTION_FAILED")
             }
         }
     }
@@ -334,7 +355,9 @@ class MainActivity : FlutterActivity() {
                     "AWG_CONFIG_PARSE_FAILED", "AWG_TUN_NOT_ESTABLISHED",
                     "AWG_ALREADY_CONNECTED", "OTHER_VPN_ACTIVE",
                     "AWG_NATIVE_RUNTIME_FAILED", "AWG_UNKNOWN_METHOD",
-                    "AWG_CONNECT_DISPATCH_ERROR"
+                    "AWG_CONNECT_DISPATCH_ERROR", "AWG_NATIVE_LINK_FAILED",
+                    "AWG_VPN_SECURITY_REJECTED", "AWG_BACKEND_STATE_FAILED",
+                    "AWG_BACKEND_START_EXCEPTION", "AWG_NATIVE_REFLECTION_FAILED"
                 )
                 val safeCode = error.message?.takeIf { accepted.contains(it) }
                     ?: "NATIVE_VPN_START_FAILED"
