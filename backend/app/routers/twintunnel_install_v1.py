@@ -1,4 +1,4 @@
-"""TwinTunnel three-node installation from the admin tunnel control center.
+"""TwinTunnel two-endpoint staging from the admin tunnel control center.
 
 This installs and validates a versioned, disabled-by-default engine on the
 Iran, exit and optional backup nodes. It deliberately does not change any
@@ -43,7 +43,7 @@ CHECK_TIMEOUT = 18
 
 
 class TwinTunnelInstallIn(BaseModel):
-    backup_node_id: int = Field(gt=0)
+    backup_node_id: int | None = Field(default=None, gt=0)
     mode: Literal["install", "verify"] = "install"
 
 
@@ -199,7 +199,9 @@ def _view(tunnel_id: int, tunnel: Tunnel, manifest: dict, plan: dict | None) -> 
     ready = bool(
         pair_matches and plan.get("status") == "staged"
         and plan.get("revision") == manifest["revision"]
-        and len(plan.get("nodes", [])) >= 3
+        and len(plan.get("nodes", [])) == len(plan.get("node_ids") or [tunnel.iran_node_id, tunnel.exit_node_id, plan.get("backup_node_id")])
+        and set(n.get("node_id") for n in plan.get("nodes", [])) == set(plan.get("node_ids") or [tunnel.iran_node_id, tunnel.exit_node_id, plan.get("backup_node_id")])
+        and set(plan.get("node_ids") or [tunnel.iran_node_id, tunnel.exit_node_id, plan.get("backup_node_id")]) >= {int(tunnel.iran_node_id), int(tunnel.exit_node_id)}
         and all(n.get("ok") and n.get("selftest") == "ok" for n in plan["nodes"])
     )
     return {
@@ -240,8 +242,8 @@ async def install_twintunnel_standby(
     stager = _stager()
     manifest = stager.package_manifest(SOURCE)
     node_ids = [int(n.id) for n in nodes]
-    if len(node_ids) != 3 or len(set(node_ids)) != 3:
-        raise HTTPException(422, detail="Select 3 different nodes")
+    if len(node_ids) not in (2, 3) or len(set(node_ids)) != len(node_ids):
+        raise HTTPException(422, detail="Select two tunnel endpoints; optional third transit must be unique")
     # Transaction above is read-only; close before the slow remote SSH stage.
     db.rollback()
     fd = _lock(tunnel_id)
@@ -266,7 +268,7 @@ async def install_twintunnel_standby(
         results = await asyncio.gather(*(bounded(i) for i in node_ids))
         if not all(result.get("ok") for result in results):
             # No config or route can change on partial failure. Never mark
-            # the pair as staged until all three hashes and selftests pass.
+            # the pair as staged until every selected node passes.
             raise HTTPException(
                 502,
                 detail={
@@ -284,7 +286,8 @@ async def install_twintunnel_standby(
                 "tunnel_id": tunnel_id,
                 "iran_node_id": node_ids[0],
                 "exit_node_id": node_ids[1],
-                "backup_node_id": node_ids[2],
+                "backup_node_id": node_ids[2] if len(node_ids) == 3 else None,
+                "node_ids": node_ids,
                 "revision": manifest["revision"],
                 "status": "staged",
                 "staged_at": datetime.now(timezone.utc).isoformat(),
