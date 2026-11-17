@@ -291,3 +291,36 @@ with an EXIT trap. It must **never** be directed at production tunnels.
 The test gateway is intentionally not enabled at boot; it stops after
 its bounded run. Do not expose `37961` publicly or attach any production
 VPN protocol until the limitations above have been addressed.
+
+
+### Redundant UDP echo canary — separate verification, not VPN support
+
+`udp_redundant_canary.py` is a *second* localhost-only demonstration
+at `127.0.0.1:37962` that sends **each correctly tagged test packet**
+through both the GRE and UDP Rakhsh lab forwards, accepts the first
+response, and rejects later duplicates by its lab packet sequence number.
+It rejects packets without the dedicated `TTLB1TT-UDP-CANARY:` prefix
+and supports only one test client; **generic UDP VPN traffic is explicitly
+unsupported**. Re-run the test with `udp_redundant_inject.sh`; the same
+bounded GRE lab outage and restoration are applied.
+
+At **09:10:58 UTC** GRE was intentionally stopped while the canary sent,
+and it was restored at **09:11:06 UTC**. The canary sender recorded
+**300 sent, 298 unique replies within its deadline, 2 missing (0.67%)**,
+versus **290/300 (3.33% missing)** in the earlier active-only selector
+run. The two missing sequence numbers were `232` and `299`, not the
+earlier contiguous six-packet outage. The gateway itself later saw
+**299 unique echoes** and suppressed **29 duplicate replies**; one
+reply arrived after the client's deadline.
+
+This is *not* a statistically validated speed or reliability gain from
+one pair of runs. Replication approximately doubles outbound carrier
+datagrams, which may worsen bottlenecks and CPU load. Importantly it
+does **not** provide a production-ready authenticated/anti-replay-aware
+two-ended UDP session multiplexer, or promise that existing OpenVPN UDP
+or WireGuard clients will remain connected. Both carrier types still
+share the same Iran/France host and underlying Internet route.
+
+The standalone unit suite covers six route policy and four strict
+canary packet parser cases (**10/10 passed**). Every test is manually
+started, never boot-enabled, and excluded from customer routing.
