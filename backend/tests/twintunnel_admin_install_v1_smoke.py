@@ -12,7 +12,7 @@ CLIENT=(ROOT.parent/"lib/twintunnel-install-api.ts").read_text()
 def _view():
     tree=ast.parse(API)
     node=next(n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name=="_view")
-    namespace={"Tunnel": object}
+    namespace={"Tunnel": object, "planned_status": lambda: {"carrier_state": "not_installed", "traffic_activated": False}}
     exec(compile(ast.Module(body=[node],type_ignores=[]),"install_view","exec"),namespace)
     return namespace["_view"]
 
@@ -44,6 +44,8 @@ def test_three_node_success_remains_off_production():
     assert result["active_transport"]=="tp27_fast"
     assert result["backup_node_id"]==13
     assert result["deployment_mode"]=="isolated_stage_only"
+    assert result["carrier_state"]=="not_installed"
+    assert result["traffic_activated"] is False
 
 def test_two_node_stage_is_valid_and_off_production():
     pair={**PLAN,"backup_node_id":None,"node_ids":[2,6],"nodes":PLAN["nodes"][:2]}
