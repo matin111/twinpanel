@@ -213,6 +213,19 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   Future<void> _requireVerifiedGuardIfRequested() async {
     final policy = await _vpnPolicy.loadFailClosed(widget.panel.namespace, widget.username);
     if (!policy.killSwitchRequested) return;
+    if (Platform.isAndroid) {
+      // Never accept a requested kill switch based on a saved toggle alone.
+      // Only Android's verified OS lockdown is strong enough to protect a
+      // handoff between independently owned protocol VpnServices.
+      final status = await const MethodChannel('com.twinpanel.twinconnect/vpn')
+          .invokeMapMethod<String, dynamic>('getDisconnectedTrafficGuardStatus')
+          .timeout(const Duration(seconds: 5));
+      if (status?['protectionVerified'] != true ||
+          status?['osLockdown'] != true) {
+        throw const FormatException('ANDROID_KILL_SWITCH_NOT_VERIFIED');
+      }
+      return;
+    }
     if (!Platform.isWindows) {
       throw const FormatException('GLOBAL_KILL_SWITCH_UNSUPPORTED_PLATFORM');
     }
