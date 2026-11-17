@@ -5,6 +5,7 @@ import ast
 ROOT=Path(__file__).resolve().parents[1]
 API=(ROOT/"app/routers/twintunnel_install_v1.py").read_text()
 UI=(ROOT.parent/"components/tunnel-control-center-v1.tsx").read_text()
+ACTIVE_UI=(ROOT.parent/"components/tunnel-protocol-runtime-v307.tsx").read_text()
 MAIN=(ROOT/"app/main.py").read_text()
 CLIENT=(ROOT.parent/"lib/twintunnel-install-api.ts").read_text()
 
@@ -79,6 +80,14 @@ def test_ui_clear_distinction_between_install_and_cutover():
     assert "Production cutover remains locked" in UI
     assert 'getCustomerToken()' in CLIENT
     assert '"Authorization":"Bearer "+token' in CLIENT
+    assert "twintunnel_standby" in ACTIVE_UI
+    assert "twinTunnelInstallApi.install" in ACTIVE_UI
+    assert "twinTunnelInstallApi.verify" in ACTIVE_UI
+    assert 'tp-selected-tunnel-standby-intent' in ACTIVE_UI
+    assert 'BACKUP_NODE_MISSING' in ACTIVE_UI
+    assert "TwinTunnel سه‌مسیره" in ACTIVE_UI
+    assert "not connected to subscribers" in ACTIVE_UI
+
 
 if __name__=="__main__":
     test_three_node_success_remains_off_production()
