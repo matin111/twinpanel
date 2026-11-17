@@ -8,6 +8,7 @@ import android.content.Intent
 import android.os.Build
 import android.net.VpnService
 import android.os.ParcelFileDescriptor
+import java.io.FileInputStream
 
 /**
  * Disconnected-state fail-closed TUN: no packet forwarding, DNS or bypass.
@@ -16,6 +17,8 @@ import android.os.ParcelFileDescriptor
  */
 class AndroidTrafficGuardService : VpnService() {
     private var tun: ParcelFileDescriptor? = null
+    private val packetGate = TunPacketGate()
+    @Volatile private var drainThread: Thread? = null
 
     @Volatile private var established = false
 
@@ -63,11 +66,34 @@ class AndroidTrafficGuardService : VpnService() {
                 .establish()
             established = tun != null
             active = established
-            if (tun == null) stopSelf()
+            if (tun == null) stopSelf() else startDropLoop(tun!!)
         } catch (_: Exception) {
             stopGuard()
         }
         return START_STICKY
+    }
+
+    // Consume actual TUN ingress and discard every packet. No network egress.
+    // This legacy guard remains disabled for unsafe protocol handoffs.
+    private fun startDropLoop(descriptor: ParcelFileDescriptor) {
+        packetGate.lostConnection()
+        val worker = Thread({
+            try {
+                val input = FileInputStream(descriptor.fileDescriptor)
+                val packet = ByteArray(32768)
+                while (!Thread.currentThread().isInterrupted && active) {
+                    if (input.read(packet) < 0) break
+                    check(!packetGate.allows(TunPacketGate.PacketRoute.UNDERLYING_NETWORK))
+                }
+            } catch (_: Exception) {
+                // Closing TUN on shutdown interrupts the blocking read.
+            } finally {
+                packetGate.lostConnection()
+            }
+        }, "twinconnect-guard-drop")
+        worker.isDaemon = true
+        drainThread = worker
+        worker.start()
     }
 
     override fun onRevoke() {
@@ -75,8 +101,11 @@ class AndroidTrafficGuardService : VpnService() {
     }
 
     override fun onDestroy() {
+        packetGate.lostConnection()
         tun?.close()
         tun = null
+        drainThread?.interrupt()
+        drainThread = null
         established = false
         active = false
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
@@ -89,8 +118,11 @@ class AndroidTrafficGuardService : VpnService() {
     }
 
     private fun stopGuard() {
+        packetGate.lostConnection()
         tun?.close()
         tun = null
+        drainThread?.interrupt()
+        drainThread = null
         established = false
         active = false
         stopForeground(STOP_FOREGROUND_REMOVE)
