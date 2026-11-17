@@ -512,3 +512,26 @@ incomplete NAT rebinding/MTU/congestion behavior, and both Rakhsh
 underlays still terminate on the same Iran/France host pair.
 Actual high-availability across physical routes needs independent
 alternative hosts/paths, real subscriber canaries and sustained tests.
+
+
+## 17 Nov 2026: OpenVPN socket capacity and directional lab validation
+
+**Status: limited laboratory validation; do NOT deploy the Python UDP mux to customer ports.**
+
+France OpenVPN UDP/1194 had a 212,992-byte kernel receive socket buffer and 8,946 accumulated socket drops at inspection. A dedicated local OpenVPN UDP burst at 20,000 packets delivered 16,488 packets with the original unbuffered setup and the receiver logged 700 new drops. With 4 MiB configured socket buffers and an adequate lab-client TUN queue, the dedicated test returned 20,000/20,000 with zero new socket drops. This is a synthetic burst, not a sustained real-device benchmark.
+
+The live France TwinPanel OpenVPN UDP service had only rcvbuf and sndbuf directives (4,194,304 each) appended to its config; it was restarted only after checking zero live clients. Kernel-reported receive socket capacity rose to 8,388,608 bytes. The independent OpenVPN service and TwinPanel service both stayed active; no customer profiles, node addresses or ports changed. The installer now persists matching socket settings and non-decreasing kernel maximum socket buffers when reinstalling or provisioning OpenVPN.
+
+The experimental authenticated UDP mux now supports 512 simultaneous flow records, pending queues bounded at 64 datagrams per flow and 8,192 globally, with a 16 MiB queued-payload cap. A downstream packet is acknowledged only after the local UDP send succeeds. Its offline suite passed 31 tests on each endpoint.
+
+| Test scope | Peak test clients | Sent | Received | Missing |
+| --- | ---: | ---: | ---: | ---: |
+| Single-France-host UDP carrier bridge | 512 | 10,240 | 10,240 | 0 |
+| France-origin public ingress -> Iran -> Rakhsh -> France | 64 | 4,032 | 3,160 | 872 |
+| Iran-origin local ingress -> Rakhsh -> France -> Iran | 64 | 4,032 | 4,032 | 0 |
+
+The France-origin stages (16, 32, 64 clients) respectively returned 529/576, 1,090/1,152 and 1,541/2,304 datagrams. The Iran mux counted 3,186 of 4,032 public incoming packets; its UDP listener did not show socket-level drops when inspected. The public France-to-Iran hairpin is consequently a major failure contributor but is not representative of a domestic Iranian customer's path.
+
+The Iran-origin stages (16, 32, 64 clients) all returned every application echo across actual Rakhsh GRE and Shabdiz UDP lab carriers. The Iran-local ingress bypasses public inbound routing, isolating the international carrier path. These are directional, short trials, not proof of no loss for real customers.
+
+Both carriers still terminate on the same Iran/France host pair; real network/provider-independent failover, subscriber phone canaries, and long-duration performance tests remain outstanding. A 512-flow lab limit is not a verified commercial subscriber capacity. TCP-stream resume is not a WireGuard UDP resume mechanism. Data: results/2026-11-17-openvpn-buffer-udp-mux-capacity.json.
