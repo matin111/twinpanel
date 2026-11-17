@@ -10,6 +10,10 @@ void main() {
     final engine = File(
       'macos_native/libbox/TwinConnectMacLibboxEngine.swift',
     ).readAsStringSync();
+    final cacheCallback = platform.split('func clearDNSCache() {').last
+        .split('func readWIFIState()').first;
+    expect(cacheCallback, isNot(contains('setTunnelNetworkSettings(')));
+    expect(cacheCallback, isNot(contains('tunnel.setTunnelNetworkSettings(settings)')));
     expect(platform, contains('func reset(completion: @escaping () -> Void)'));
     expect(platform, contains('let hadSettings = settings != nil'));
     expect(platform, contains('guard hadSettings, let tunnel else {'));
