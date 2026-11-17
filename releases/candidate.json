@@ -1,6 +1,6 @@
 {
   "version": "1.1.0-rc.866",
-  "source_sha": "af9619ebcf2f63597b27c534724cd409ca774136",
+  "source_sha": "ca82f506a880faf6af47f334f0ac3ad3f453a6b9",
   "notes": {
     "fa": "ساده‌سازی پنجره مدیریت تانل: حذف متن‌های اضافی و تکراری، کوتاه‌کردن دکمه‌های نصب و بررسی TwinTunnel و حفظ کامل عملکرد فعلی تانل‌ها و سرویس‌ها.",
     "en": "Compact tunnel-management modal: remove redundant explanatory copy, shorten TwinTunnel install/recheck labels, preserve all current tunnel and VPN behavior."
