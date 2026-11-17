@@ -324,3 +324,65 @@ share the same Iran/France host and underlying Internet route.
 The standalone unit suite covers six route policy and four strict
 canary packet parser cases (**10/10 passed**). Every test is manually
 started, never boot-enabled, and excluded from customer routing.
+
+
+## 17 November 2026: authenticated two-ended multi-user UDP experiment
+
+**NOT PRODUCTION-READY. No customer VPN traffic or routing was changed.**
+
+The experimental module udp_multiuser_mux.py has two roles:
+
+- Iran entry: 94.183.231.158:37981/UDP (WireGuard lab) and
+  :37982/UDP (OpenVPN UDP lab), restricted to test clients from France.
+  **Iran does not run WireGuard or OpenVPN in this design.**
+- France exit: 127.0.0.1:37922/UDP, temporarily replacing only the
+  *existing isolated lab UDP echo*. The original echo is restored on rollback.
+- Both ends share an independent, per-lab 256-bit HMAC secret stored
+  in a 0600 file under /etc/twintunnel-test/udp-mux-key.hex.
+  The secret is NOT included in the repository.
+- The two preexisting Rakhsh datagram carriers are separate GRE and UDP
+  forwards. Each test payload is sent over both carriers, and verified
+  duplicates are suppressed. On France, every user flow has its own
+  stable UDP socket, so the server-facing source port does not change
+  merely because one Shabdiz carrier disappears.
+- Limitations: maximum 64 flows, maximum 1250-byte user payload, a
+  512-sequence replay window, 120-second idle expiry, no fragmentation,
+  only two fixed service destinations, and no multi-node orchestration.
+  This is an experimental implementation, not a generic UDP VPN proxy.
+
+**Test results:** 13/13 offline unit tests passed. Six independently
+identified clients concurrently exercised two UDP lab echo services.
+After fixing the probe to count out-of-order and delayed replies,
+**226/240 distinct responses arrived within the deadline** (14 missing,
+5.83% missing). This is insufficient for customer traffic.
+
+A **real WireGuard kernel client and kernel server on France** were then
+started with isolated fresh keys, dedicated interfaces, a temporary
+198.18.66.1/32 route, and Iran as the public UDP entry.
+The client emitted 888 bytes; the server received **0 bytes**, with
+**zero authenticated handshakes**. The WireGuard test FAILED.
+Both WireGuard test interfaces and the temporary route were cleaned.
+Real OpenVPN UDP has not yet been tested through this new engine.
+
+**Blocker:** Iran's Termalin management agent went offline at 09:31:33
+UTC on 17 November 2026. France can still ping the Iran host, but the
+Iran entry process cannot be safely inspected or stopped while the agent
+is offline. It was launched with a bounded 600-second lifetime.
+On France, the experimental UDP mux was stopped and the original
+twintunnel-lab-udp-echo.service was restored. The production
+OpenVPN services and original Rakhsh lab carriers remained active.
+
+**Before any customer use:** restore Iran management access, verify
+the temporary entry process has exited, diagnose the WireGuard
+handshake end-to-end at both hosts, implement real OpenVPN UDP tests,
+test carrier failure during persistent verified VPN data transfer,
+and perform multi-client/MTU/rebinding/load/latency testing.
+This code does not implement the production user quotas, device limits,
+license resolution, NAT rebinding, multi-node failover or link-quality
+control. It must NOT be added to customer start-up/deploy hooks.
+
+Repeatable non-production assets:
+udp_multiuser_mux.py, udp_mux_echo_targets.py,
+udp_mux_multi_client_probe.py, wg_multiuser_lab.sh,
+tests/test_udp_multiuser_mux.py, and
+results/2026-11-17-multiuser-udp-lab.json.
