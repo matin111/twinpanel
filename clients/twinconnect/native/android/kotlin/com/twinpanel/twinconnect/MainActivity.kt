@@ -184,7 +184,8 @@ class MainActivity : FlutterActivity() {
                 "getDisconnectedTrafficGuardStatus" -> {
                     result.success(mapOf(
                         "active" to AndroidTrafficGuardService.active,
-                        "osLockdown" to WireGuardRuntime.isOsLockdownEnforced()
+                        "osLockdown" to WireGuardRuntime.isOsLockdownEnforced(),
+                        "otherVpnActive" to (hasActiveVpnTransport() && !AndroidTrafficGuardService.active)
                     ))
                 }
                 "startDisconnectedTrafficGuard" -> {
