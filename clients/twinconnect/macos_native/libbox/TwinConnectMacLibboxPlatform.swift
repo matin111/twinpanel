@@ -47,15 +47,47 @@ final class TwinConnectMacLibboxPlatform: NSObject,
         let candidate = TwinConnectMacTunnelPolicy.hysteria2Settings()
         candidate.mtu = NSNumber(value: options.getMTU())
         let semaphore = DispatchSemaphore(value: 0)
+        // The OS can finish route installation AFTER our 15-second wait.
+        // A timed-out start must roll back that late installation instead of
+        // leaving a full-tunnel route active without a packet-flow engine.
+        let applyLock = NSLock()
         var applyError: Error?
+        var applyFinished = false
+        var applyTimedOut = false
         tunnel.setTunnelNetworkSettings(candidate) { error in
+            applyLock.lock()
             applyError = error
+            applyFinished = true
+            let mustRollback = applyTimedOut
+            applyLock.unlock()
+            if mustRollback {
+                tunnel.setTunnelNetworkSettings(nil) { _ in }
+            }
             semaphore.signal()
         }
         guard semaphore.wait(timeout: .now() + .seconds(15)) == .success else {
+            applyLock.lock()
+            applyTimedOut = true
+            let completedBeforeTimeout = applyFinished
+            applyLock.unlock()
+            // Exactly one side owns rollback: the timeout path if the
+            // callback already finished, otherwise the delayed callback.
+            if completedBeforeTimeout {
+                tunnel.setTunnelNetworkSettings(nil) { _ in }
+            }
             throw Self.failure("MACOS_LIBBOX_TUN_NETWORK_SETTINGS_TIMEOUT")
         }
-        if let applyError { throw applyError }
+        if let applyError {
+            tunnel.setTunnelNetworkSettings(nil) { _ in }
+            throw applyError
+        }
+        stateLock.lock()
+        let stoppedDuringApply = stopped
+        stateLock.unlock()
+        guard !stoppedDuringApply else {
+            tunnel.setTunnelNetworkSettings(nil) { _ in }
+            throw Self.failure("MACOS_LIBBOX_TUN_STOPPED")
+        }
         settings = candidate
 
         // The official Apple sing-box platform adapter uses the packetFlow
