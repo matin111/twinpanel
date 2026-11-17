@@ -86,7 +86,7 @@ loopback UDP echo target; no existing VPN ports or customer routes are changed.
 
 All `entry-*.toml` and `exit-*.toml` configs contain generated individual
 Noise keys, and are **not committed to GitHub**. Generate them with
-`twintunnel-core init --tunnel-addr IRAN_PUBLIC_IP:37031 --carrier shabdiz-tcp
+`/opt/twintunnel-test/bin/twintunnel-core init --tunnel-addr IRAN_PUBLIC_IP:37031 --carrier shabdiz-tcp
 --forward 127.0.0.1:37931=127.0.0.1:37922/udp` for TCP, or switch to
 `shabdiz-udp`, port `37033`, forward `37933` for UDP. Distribute each
 half to its corresponding host as `/etc/twintunnel-test/entry-tcp.toml`,
@@ -149,14 +149,14 @@ The isolated TCP forward is Iran `127.0.0.1:37941` → France
 
 Generate a *fresh private pair*, never commit either half:
 ```sh
-twintunnel-core init --tunnel-addr IRAN_PUBLIC_IP:37041 --carrier tcp \
+/opt/twintunnel-test/bin/twintunnel-core init --tunnel-addr IRAN_PUBLIC_IP:37041 --carrier tcp \
   --link tls:37042 --link quicv2:37043 --link ws:37044 \
   --lanes 4 --link-policy spread --resume --resume-grace 60 \
   --forward 127.0.0.1:37941=127.0.0.1:37942
 ```
 Use `control_socket = "/run/twintunnel-multilink-entry.sock"` on Iran
 and `control_socket = "/run/twintunnel-multilink-exit.sock"` on France;
-validate each half with `twintunnel-core check -c <path>`.
+validate each half with `/opt/twintunnel-test/bin/twintunnel-core check -c <path>`.
 Secret TOML files remain `0600` under `/etc/twintunnel-test/`. The existing
 `twintunnel-lab@.service` template starts each new instance by config name.
 The TCP echo service is defined in
@@ -191,8 +191,8 @@ python3 /opt/twintunnel-test/multilink_resume_probe.py
 ```
 For diagnostics:
 ```sh
-twintunnel-core status --socket /run/twintunnel-multilink-entry.sock
-twintunnel-core status --socket /run/twintunnel-multilink-exit.sock
+/opt/twintunnel-test/bin/twintunnel-core status --socket /run/twintunnel-multilink-entry.sock
+/opt/twintunnel-test/bin/twintunnel-core status --socket /run/twintunnel-multilink-exit.sock
 ```
 **Fault injection is not an automated step**; it must target confirmed
 dedicated lab ports and must never select production sockets.
