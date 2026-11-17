@@ -1,0 +1,60 @@
+{
+  "date": "2026-11-17",
+  "environment": {
+    "iran_lab": "srv25.vps.local",
+    "france_lab": "CLY984318",
+    "is_customer_routing": false
+  },
+  "openvpn_tcp": {
+    "test_kind": "France-only hairpin through Iran 4-carrier Rakhsh to France OpenVPN TCP",
+    "count_sent": 80,
+    "unique_rx_on_server_tun": 80,
+    "missing": [],
+    "rx_tun_packet_delta": 80,
+    "rx_tun_byte_delta": 6720,
+    "lab_carriers_reset": [
+      "TCP 37041",
+      "TLS 37042",
+      "WebSocket 37044"
+    ],
+    "surviving_carrier": "QUICv2 37043",
+    "full_openvpn_initializations": 1,
+    "passed": true,
+    "note": "80 ICMP echo requests received on server TUN; ping replies intentionally unavailable"
+  },
+  "udp_lab_failover": {
+    "test_kind": "single-client echo canary, not WireGuard/OpenVPN user transport",
+    "sent": 300,
+    "received_unique": 290,
+    "missing": [
+      29,
+      30,
+      31,
+      32,
+      33,
+      34,
+      41,
+      153,
+      214,
+      299
+    ],
+    "missing_percent": 3.33,
+    "gre_stopped_at_utc": "2026-11-17T09:02:58Z",
+    "gre_started_at_utc": "2026-11-17T09:03:06Z",
+    "shabdiz_gre_up_at_utc": "2026-11-17T09:03:36Z",
+    "gateway_failover_at_approx_utc": "2026-11-17T09:03:00Z",
+    "gateway_failback_at_approx_utc": "2026-11-17T09:03:38Z",
+    "gateway_no_path_drops": 0,
+    "production_ready": false,
+    "unit_tests_passed": 6
+  },
+  "rollback_and_safety": {
+    "production_routes_changed": false,
+    "production_clients_migrated": false,
+    "primary_openvpn_services_active_after_test": true,
+    "gre_lab_restored": true,
+    "udp_lab_active_after_test": true,
+    "gateway_auto_stopped": true,
+    "udp_canary_limited_to_localhost": true
+  }
+}
