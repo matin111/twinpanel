@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.863",
-  "source_sha": "bff2e2729a5b18cee73f0234132f56a220aeeced",
+  "version": "1.1.0-rc.864",
+  "source_sha": "58743a7b9ec558a669c88b0504671238c4636fcf",
   "notes": {
-    "fa": "اصلاح دائمی تمدید رزروی: فعال‌سازی خودکار اشتراک منقضی یا دارای حجم تمام‌شده پس از پرداخت، حفظ نام کاربری و کانفیگ‌های قبلی، جلوگیری از تغییر پروتکل‌ها در تمدید و محافظ انتشار نسخه‌های بعدی.",
-    "en": "Durable reserved-renewal fix: immediately activate already-due paid renewals, preserve VPN credentials and existing endpoint configurations, and enforce renewal regression guards on future releases."
+    "fa": "به‌روزرسانی پایدار زیرساخت TwinTunnel: توزیع خودکار نسخه دارای هش به همه نودهای آنلاین پس از آپدیت پنل، حفظ ۹ تانل فعال فعلی بدون تغییر مسیر مشتریان، محافظ انتشار در GitHub و اصلاح بافر OpenVPN. مسیر سه‌گانه ترکیه فقط در حالت آماده‌سازی آزمایشی باقی می‌ماند.",
+    "en": "Durable TwinTunnel infrastructure update: hash-verified automatic staging on every online node after a healthy panel upgrade; protects existing TP27 tunnels and customer routes, includes release guards and OpenVPN UDP socket headroom. Turkey multipath carrier remains lab-only and disabled."
   }
 }
