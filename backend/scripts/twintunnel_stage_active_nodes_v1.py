@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Stage versioned TwinTunnel lab source on EVERY endpoint of active TP27 tunnels.
+"""Stage TwinTunnel lab source on ALL online nodes, including active TP27 endpoints.
 
 The source of truth is the GitHub-built release's ops/twintunnel-lab directory.
 This installer is deliberately NON-ACTIVATING: no restart, firewall, routing,
@@ -51,7 +51,7 @@ def package_manifest(source_root: Path) -> dict:
 
 def active_endpoints(db):
     """Inventory comes from current active tunnels; never a stale hardcoded list."""
-    from app.models import Node, Tunnel
+    from app.models import Node, NodeStatus, Tunnel
     rows = (
         db.query(Tunnel)
         .filter(Tunnel.is_active.is_(True), Tunnel.active_transport == "tp27_fast")
@@ -60,15 +60,20 @@ def active_endpoints(db):
     )
     if len(rows) < MIN_ACTIVE_TUNNELS:
         raise RuntimeError("no_active_tp27_tunnels_abort")
-    ids = sorted({int(n) for t in rows for n in (t.iran_node_id, t.exit_node_id)})
+    active_tunnel_ids = {
+        int(n) for t in rows for n in (t.iran_node_id, t.exit_node_id)
+    }
+    # Every online node gets a staged package (including central/standalone
+    # nodes with no active tunnel yet), not just existing TP27 pair members.
     nodes = (
         db.query(Node)
-        .filter(Node.id.in_(ids), Node.retired_at.is_(None))
+        .filter(Node.retired_at.is_(None), Node.status == NodeStatus.ONLINE)
         .order_by(Node.id.asc())
         .all()
     )
-    if len(nodes) != len(ids):
-        raise RuntimeError("missing_tunnel_endpoint_aborts_staging")
+    ids = {int(n.id) for n in nodes}
+    if not active_tunnel_ids.issubset(ids):
+        raise RuntimeError("active_tunnel_endpoint_not_online_abort")
     summary = [
         {"tunnel": int(t.id), "iran_id": int(t.iran_node_id),
          "exit_id": int(t.exit_node_id), "transport": str(t.active_transport)}
