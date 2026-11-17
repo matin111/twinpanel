@@ -166,6 +166,8 @@ def patch_manifest() -> None:
         '            <intent-filter>\n'
         '                <action android:name="android.net.VpnService" />\n'
         '            </intent-filter>\n'
+        '            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"\n'
+        '                android:value="vpn" />\n'
         '        </service>\n'
     )
     # Register the official AmneziaWG VPN service only when its native AAR
