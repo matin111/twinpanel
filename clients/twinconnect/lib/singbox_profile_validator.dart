@@ -273,6 +273,32 @@ class SingBoxProfileValidator {
       tls['enabled'] = true;
       object['tls'] = tls;
     }
+    if (protocolCode == 'naive') {
+      // Cronet-backed Naive only supports a restricted TLS subset.
+      // Reject incompatible settings locally instead of returning an
+      // opaque native connection error or weakening certificate checks.
+      final user = object['username'];
+      final password = object['password'];
+      if (user is! String || user.isEmpty ||
+          password is! String || password.isEmpty) {
+        throw const FormatException('NAIVE_AUTH_MISSING');
+      }
+      final tls = Map<String, dynamic>.from(object['tls'] as Map);
+      const allowedTls = {'enabled', 'server_name', 'certificate', 'ech'};
+      if (tls.keys.any((key) => !allowedTls.contains(key)) ||
+          tls['enabled'] != true) {
+        throw const FormatException('NAIVE_TLS_OPTIONS_UNSUPPORTED');
+      }
+      final sni = tls['server_name'];
+      if (sni != null &&
+          (sni is! String || sni.trim().isEmpty ||
+           sni.contains(' ') || sni.contains('/'))) {
+        throw const FormatException('NAIVE_TLS_SERVER_NAME_INVALID');
+      }
+      // The Naive TLS adapter accepts no generic TLS enabled switch.
+      tls.remove('enabled');
+      object['tls'] = tls;
+    }
     // ShadowTLS detours cannot safely be flattened into one outbound.
     if (protocolCode == 'shadowtls') {
       throw const FormatException('SINGBOX_SHADOWTLS_CHAIN_REQUIRED');
