@@ -14,9 +14,12 @@ enum TwinConnectMacOSVPNControl {
     }
 
     private static func manager(_ items: [NETunnelProviderManager]) -> NETunnelProviderManager {
-        items.first {
-            ($0.protocolConfiguration as? NETunnelProviderProtocol)?
-                .providerBundleIdentifier == providerBundle
+        items.first { candidate in
+            guard let config = candidate.protocolConfiguration
+                as? NETunnelProviderProtocol else { return false }
+            return config.providerBundleIdentifier == providerBundle &&
+                config.providerConfiguration?["protocol"] as? String
+                    == "wireguard"
         } ?? NETunnelProviderManager()
     }
 
@@ -121,15 +124,28 @@ enum TwinConnectMacOSVPNControl {
                 result(failure("MACOS_VPN_PREFERENCES_LOAD_FAILED"))
                 return
             }
-            guard let selected = (managers ?? []).first(where: {
-                ($0.protocolConfiguration as? NETunnelProviderProtocol)?
-                    .providerBundleIdentifier == providerBundle
-            }) else {
-                result(["contractVersion": 1, "state": "disconnected"])
-                return
+            // Stop only connections that are actually in flight or active,
+            // never the first unrelated protocol preference in the array.
+            let active = (managers ?? []).filter { candidate in
+                guard let config = candidate.protocolConfiguration
+                    as? NETunnelProviderProtocol,
+                    config.providerBundleIdentifier == providerBundle else {
+                    return false
+                }
+                switch candidate.connection.status {
+                case .connected, .connecting, .reasserting:
+                    return true
+                default:
+                    return false
+                }
             }
-            selected.connection.stopVPNTunnel()
-            result(["contractVersion": 1, "state": "disconnecting"])
+            for selected in active {
+                selected.connection.stopVPNTunnel()
+            }
+            result([
+                "contractVersion": 1,
+                "state": active.isEmpty ? "disconnected" : "disconnecting"
+            ] as [String: Any])
         }
     }
 
@@ -140,10 +156,20 @@ enum TwinConnectMacOSVPNControl {
                         "verified": false])
                 return
             }
-            let selected = (managers ?? []).first {
-                ($0.protocolConfiguration as? NETunnelProviderProtocol)?
+            let candidates = (managers ?? []).filter { candidate in
+                (candidate.protocolConfiguration as? NETunnelProviderProtocol)?
                     .providerBundleIdentifier == providerBundle
             }
+            // Prefer the actual active tunnel instead of whichever saved
+            // protocol preference macOS happens to return first.
+            let selected = candidates.first { candidate in
+                switch candidate.connection.status {
+                case .connected, .connecting, .reasserting, .disconnecting:
+                    return true
+                default:
+                    return false
+                }
+            } ?? candidates.first
             let label: String
             switch selected?.connection.status {
             case .connected: label = "os_connected_unverified"
