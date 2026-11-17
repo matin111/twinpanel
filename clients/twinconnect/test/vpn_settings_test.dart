@@ -52,6 +52,7 @@ void main() {
       home: VpnSettingsScreen(tenant: '', account: ''),
     ));
     await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.byKey(const Key('vpnCapabilityRefresh')), 160, scrollable: find.byType(Scrollable).first);
     expect(find.byKey(const Key('vpnCapabilityRefresh')), findsOneWidget);
     expect(find.byKey(const Key('vpnDiagnosticsDisclosure')), findsOneWidget);
     // The passive diagnostic cards are lazily built by ExpansionTile;
@@ -72,6 +73,7 @@ void main() {
       home: VpnSettingsScreen(tenant: tenant, account: account),
     ));
     await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(find.byKey(const Key('vpnKillSwitch')), 160, scrollable: find.byType(Scrollable).first);
     final kill = tester.widget<Switch>(find.byKey(const Key('vpnKillSwitch')));
     expect(kill.onChanged, isNull);
     expect(kill.value, isFalse);
