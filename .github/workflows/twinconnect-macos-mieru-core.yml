@@ -124,6 +124,12 @@ jobs:
           mkdir -p cmd/twinconnect_mieru
           cp "$workspace/macos_native/mieru/twin_mieru_cbridge.go" \
             cmd/twinconnect_mieru/main.go
+          sdk="$(xcrun --sdk macosx --show-sdk-path)"
+          test -f "$sdk/usr/include/stdlib.h" || {
+            echo "::error::macOS SDK headers missing from $sdk"
+            exit 1
+          }
+          clang="$(xcrun --sdk macosx --find clang)"
           for arch in arm64 amd64; do
             case "$arch" in
               arm64) apple_arch=arm64 ;;
@@ -131,10 +137,14 @@ jobs:
             esac
             output="$workspace/build/macos_mieru_core/$arch/libtwinmieru.dylib"
             mkdir -p "$(dirname "$output")"
+            printf '#include <stdlib.h>\\nint main(void) { return 0; }\\n' | \
+              "$clang" -arch "$apple_arch" -isysroot "$sdk" \
+                -x c -fsyntax-only -
             GOOS=darwin GOARCH="$arch" CGO_ENABLED=1 \
-              CC="$(xcrun --find clang)" \
-              CGO_CFLAGS="-arch $apple_arch" \
-              CGO_LDFLAGS="-arch $apple_arch" \
+              SDKROOT="$sdk" CC="$clang" \
+              CGO_CFLAGS="-arch $apple_arch -isysroot $sdk" \
+              CGO_CPPFLAGS="-isysroot $sdk" \
+              CGO_LDFLAGS="-arch $apple_arch -isysroot $sdk" \
               go build -trimpath -buildmode=c-shared \
                 -o "$output" ./cmd/twinconnect_mieru
             test -s "$output"
