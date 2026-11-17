@@ -380,7 +380,7 @@ export function TunnelControlCenterV1(){
           <label><span>{pick("نود خروجی","Exit node")}</span><select value={draft.exit_node_id} onChange={event=>setDraft(value=>({...value,exit_node_id:Number(event.target.value)}))}>{exitNodes.map(node=><option key={node.id} value={node.id}>{nodeLabel(node,`#${node.id}`)} · {node.status||"—"}</option>)}</select></label>
           <label><span>{pick("روش نصب","Installation mode")}</span><select value={newEngine} onChange={event=>setNewEngine(event.target.value as "tp27_fast"|"twintunnel_standby")}>
             <option value="tp27_fast">{pick("TP27 اصلی","Standard TP27")}</option>
-            <option value="twintunnel_standby">{pick("TP27 + نصب آزمایشی TwinTunnel سه‌مسیره","TP27 + TwinTunnel 3-node standby installation")}</option>
+            <option value="twintunnel_standby">{pick("TwinTunnel سه‌مسیره","TwinTunnel · 3 paths")}</option>
           </select></label>
           {newEngine==="twintunnel_standby"&&<label><span>{pick("نود واسط پشتیبان","Third-country backup node")}</span>
             <select value={selectedNewBackupId} onChange={event=>setNewBackupId(Number(event.target.value))}>
