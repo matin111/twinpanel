@@ -21,6 +21,7 @@ import {useI18n} from "../lib/i18n";
 import {Badge,Card,Shell,Stat} from "./ui";
 import {TunnelServerPairSelectorV293} from "./tunnel-server-pair-selector-v293";
 import {TunnelServiceConnectionsPanel} from "./tunnel-service-connections-panel";
+import {twinTunnelInstallApi,type TwinTunnelInstallStatus} from "../lib/twintunnel-install-api";
 import styles from "./tunnel-protocol-runtime-v307.module.css";
 
 // TWINPANEL_TUNNEL_MANAGEMENT_POPUP_V307
@@ -96,6 +97,10 @@ export function TunnelProtocolRuntimeV307(){
   const [search,setSearch]=useState("");
   const [createOpen,setCreateOpen]=useState(false);
   const [manageOpen,setManageOpen]=useState(false);
+  const [twinStatus,setTwinStatus]=useState<TwinTunnelInstallStatus|null>(null);
+  const [twinBackupId,setTwinBackupId]=useState(0);
+  const [newEngine,setNewEngine]=useState<"tp27_fast"|"twintunnel_standby">("tp27_fast");
+  const [newBackupId,setNewBackupId]=useState(0);
   const [draft,setDraft]=useState<Draft>({iran_node_id:0,exit_node_id:0,priority:100,initial_transport:"tp27_fast",iran_spoof_ip:"",exit_spoof_ip:""});
 
   const nodeMap=useMemo(()=>new Map(nodes.map(node=>[node.id,node])),[nodes]);
@@ -111,6 +116,10 @@ export function TunnelProtocolRuntimeV307(){
   const selectedTunnel=useMemo(()=>tunnels.find(row=>row.id===selectedId)||null,[tunnels,selectedId]);
   const selectedIran=selectedTunnel?nodeMap.get(selectedTunnel.iran_node_id):undefined;
   const selectedExit=selectedTunnel?nodeMap.get(selectedTunnel.exit_node_id):undefined;
+  const backupCandidates=readyExitNodes.filter(node=>node.id!==selectedTunnel?.exit_node_id);
+  const selectedBackupId=backupCandidates.some(node=>node.id===twinBackupId)?twinBackupId:backupCandidates[0]?.id||0;
+  const newBackupCandidates=readyExitNodes.filter(node=>node.id!==draft.exit_node_id);
+  const selectedNewBackupId=newBackupCandidates.some(node=>node.id===newBackupId)?newBackupId:newBackupCandidates[0]?.id||0;
 
   const filteredTunnels=useMemo(()=>{
     const q=search.trim().toLowerCase();
@@ -170,11 +179,36 @@ export function TunnelProtocolRuntimeV307(){
     return()=>{document.body.style.overflow=previous;window.removeEventListener("keydown",onKey);};
   },[manageOpen,createOpen,busy]);
   useEffect(()=>{if(manageOpen&&!selectedTunnel)setManageOpen(false);},[manageOpen,selectedTunnel]);
+  useEffect(()=>{
+    let cancelled=false;
+    setTwinStatus(null);
+    if(manageOpen&&selectedId){
+      void twinTunnelInstallApi.status(selectedId).then(status=>{
+        if(cancelled)return;
+        setTwinStatus(status);
+        if(status.backup_node_id)setTwinBackupId(status.backup_node_id);
+      }).catch(()=>{if(!cancelled)setTwinStatus(null);});
+    }
+    return()=>{cancelled=true;};
+  },[manageOpen,selectedId]);
 
   const run=async(key:string,message:string,action:()=>Promise<unknown>)=>{
     if(busy)return;
     setBusy(key);setError("");setNotice("");
     try{await action();setNotice(message);await load(true,selectedId);}catch(reason){setError(reason instanceof Error?reason.message:String(reason));}finally{setBusy("");}
+  };
+
+  const runTwinTunnel=async(mode:"install"|"verify")=>{
+    if(!selectedTunnel||!selectedBackupId||busy)return;
+    setBusy("twintunnel-"+mode);setError("");setNotice("");
+    try{
+      const status=mode==="install"
+        ?await twinTunnelInstallApi.install(selectedTunnel.id,selectedBackupId)
+        :await twinTunnelInstallApi.verify(selectedTunnel.id,selectedBackupId);
+      setTwinStatus(status);
+      setNotice(pick("موتور TwinTunnel روی سه نود آماده و بررسی شد. مسیر فعال کاربران بدون تغییر باقی ماند.","TwinTunnel staged and verified on three nodes; the active subscriber path was not changed."));
+    }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
+    finally{setBusy("");}
   };
 
   const installClassic=(row:ProtocolRow)=>{
@@ -213,6 +247,21 @@ export function TunnelProtocolRuntimeV307(){
         const id=Number(job.result?.tunnel?.id||0);
         if(!id)throw new Error("TUNNEL_JOB_RESULT_MISSING");
         setCreateOpen(false);await load(true,id);setSelectedId(id);setManageOpen(true);
+        const intent=sessionStorage.getItem("tp-selected-tunnel-standby-intent");
+        sessionStorage.removeItem("tp-selected-tunnel-standby-intent");
+        if(intent){
+          try{
+            const backupId=Number(JSON.parse(intent)?.backup_node_id||0);
+            if(backupId<=0)throw new Error("BACKUP_NODE_MISSING");
+            setNotice(pick("تانل اصلی ایجاد شد. آماده‌سازی TwinTunnel روی سه نود آغاز شد.","Base tunnel created; staging TwinTunnel on three nodes."));
+            const status=await twinTunnelInstallApi.install(id,backupId);
+            setTwinStatus(status);setTwinBackupId(backupId);
+            setNotice(pick("تانل اصلی و نصب آزمایشی سه‌نودی TwinTunnel تأیید شدند. مسیر کاربران تغییر نکرد.","Base tunnel and three-node TwinTunnel staging verified. Customer routing unchanged."));
+          }catch(reason){
+            setNotice(pick("تانل TP27 ساخته شد، ولی آماده‌سازی TwinTunnel کامل نشد: ","TP27 tunnel created; TwinTunnel staging did not complete: ")+(reason instanceof Error?reason.message:String(reason)));
+          }
+          return;
+        }
         setNotice(pick(`Tunnel #${id} ساخته و تأیید شد.`,`Tunnel #${id} is ready.`));
         return;
       }
@@ -245,6 +294,7 @@ export function TunnelProtocolRuntimeV307(){
       setError(pick("برای ساخت Tunnel هر دو نود ایران و خارج باید Online و آماده باشند.","Both Iran and Exit nodes must be online and ready before creating a tunnel."));
       return;
     }
+    if(newEngine==="twintunnel_standby"&&!selectedNewBackupId){setError(pick("برای TwinTunnel باید یک نود پشتیبان آنلاین انتخاب شود.","Select an online backup node for TwinTunnel."));return;}
     if(draft.initial_transport==="spoof_wg"&&(!draft.iran_spoof_ip.trim()||!draft.exit_spoof_ip.trim())){
       setError(pick("برای Spoof Tunnel هر دو IP Spoof ایران و خارج الزامی است.","Both Iran and Exit spoof IPs are required for Spoof Tunnel."));
       return;
@@ -258,6 +308,8 @@ export function TunnelProtocolRuntimeV307(){
       const job=await modernRequest<{id:string}>("/v1/tunnels/create-selected/jobs",{method:"POST",body:JSON.stringify(payload)});
       if(!/^[0-9a-f]{32}$/.test(job.id))throw new Error("INVALID_TUNNEL_JOB_ID");
       sessionStorage.setItem("tp-selected-tunnel-job",job.id);
+      if(newEngine==="twintunnel_standby")sessionStorage.setItem("tp-selected-tunnel-standby-intent",JSON.stringify({backup_node_id:selectedNewBackupId}));
+      else sessionStorage.removeItem("tp-selected-tunnel-standby-intent");
       await pollTunnelCreation(job.id);
     }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}finally{setBusy("");}
   };
@@ -274,7 +326,7 @@ export function TunnelProtocolRuntimeV307(){
       setError(pick("برای ساخت Tunnel حداقل یک نود ایران و یک نود خارج Online لازم است.","At least one online Iran node and one online Exit node are required to create a tunnel."));
       return;
     }
-    setDraft({iran_node_id:iran.id,exit_node_id:exit.id,priority:100,initial_transport:"tp27_fast",iran_spoof_ip:"",exit_spoof_ip:""});setCreateOpen(true);
+    setDraft({iran_node_id:iran.id,exit_node_id:exit.id,priority:100,initial_transport:"tp27_fast",iran_spoof_ip:"",exit_spoof_ip:""});setNewEngine("tp27_fast");setNewBackupId(0);setCreateOpen(true);
   };
   const openManage=(id:number)=>{setSelectedId(id);setManageOpen(true);};
   const openFullProtocolManager=()=>{if(selectedTunnel&&typeof window!=="undefined")window.location.href=`/admin/modern-protocols?node=${selectedTunnel.exit_node_id}`;};
@@ -346,6 +398,33 @@ export function TunnelProtocolRuntimeV307(){
           </div>
 
           <section className={styles.section}>
+            <div className={styles.sectionHead}>
+              <div><b>{pick("TwinTunnel سه‌مسیره","Three-path TwinTunnel")}</b><small>{pick("نصب روی نود ایران، خروجی و نود پشتیبان بدون تغییر ترافیک مشتریان","Stage on Iran, exit and backup without changing customer traffic")}</small></div>
+              <Badge tone={twinStatus?.status==="staged"&&!twinStatus.needs_update?"ok":"warn"}>{twinStatus?.status==="staged"&&!twinStatus.needs_update?pick("آماده آزمایش","Staged"):pick("نصب آزمایشی","Lab install")}</Badge>
+            </div>
+            <p>{pick("موتور روی سه نود با SHA-256 و تست رمزنگاری بررسی می‌شود. تا رفع افت بسته OpenVPN، فعال‌سازی مسیر Production مجاز نیست.","All three nodes undergo SHA-256 and codec checks. Production cutover stays locked pending OpenVPN packet-loss resolution.")}</p>
+            <div className={styles.managementActions}>
+              <label>
+                <span>{pick("نود واسط سوم","Independent backup node")}</span>
+                <select disabled={Boolean(busy)} value={selectedBackupId} onChange={event=>setTwinBackupId(Number(event.target.value))}>
+                  {backupCandidates.map(node=><option key={node.id} value={node.id}>{node.name} · {node.public_ip}</option>)}
+                </select>
+              </label>
+              <button type="button" className="primary-soft" disabled={Boolean(busy)||!selectedBackupId} onClick={()=>void runTwinTunnel("install")}>
+                {busy==="twintunnel-install"?"…":pick("نصب و تست TwinTunnel","Install and test TwinTunnel")}
+              </button>
+              <button type="button" className="ghost" disabled={Boolean(busy)||!selectedBackupId||twinStatus?.status!=="staged"} onClick={()=>void runTwinTunnel("verify")}>
+                {busy==="twintunnel-verify"?"…":pick("بررسی مجدد نصب","Recheck installation")}
+              </button>
+            </div>
+            {twinStatus?.status==="staged"&&<div className="table"><table><thead><tr><th>{pick("نود","Node")}</th><th>{pick("سلامت موتور","Engine check")}</th><th>{pick("نسخه","Revision")}</th></tr></thead><tbody>
+              {twinStatus.nodes.map(node=><tr key={node.node_id}><td>{node.name||"Node #"+node.node_id}</td><td><Badge tone={node.ok&&node.selftest==="ok"?"ok":"bad"}>{node.ok&&node.selftest==="ok"?"Verified":"Failed"}</Badge></td><td dir="ltr">{twinStatus.installed_revision||"—"}</td></tr>)}
+            </tbody></table></div>}
+            {twinStatus?.needs_update&&<p>{pick("نسخه جدیدتری منتشر شده؛ نصب و تست را مجدداً اجرا کن.","Newer engine revision available; rerun install and test.")}</p>}
+            <small>{pick("مسیر فعال مشتریان: ","Active subscriber transport: ")}<b dir="ltr">{String(selectedTunnel.active_transport||"tp27_fast")}</b> · {pick("TwinTunnel فقط آماده‌سازی شده؛ هنوز به کاربران متصل نیست.","TwinTunnel is staged only, not connected to subscribers.")}</small>
+          </section>
+
+          <section className={styles.section}>
             <div className={styles.sectionHead}><div><b>{pick("پروتکل‌های این Tunnel","Protocols on this tunnel")}</b><small>{pick(`Inventory واقعی Exit ${selectedExit?.name||`#${selectedTunnel.exit_node_id}`}`,`Live inventory from Exit ${selectedExit?.name||`#${selectedTunnel.exit_node_id}`}`)}</small></div><Badge tone={healthyProtocols===activeProtocols&&activeProtocols>0?"ok":"violet"}>{healthyProtocols}/{activeProtocols}</Badge></div>
             <div className={styles.tableWrap}><div className="table"><table><thead><tr><th>{pick("پروتکل","Protocol")}</th><th>{pick("نوع","Type")}</th><th>{pick("پورت","Port")}</th><th>Transport</th><th>{pick("وضعیت","Status")}</th><th>{pick("عملیات","Actions")}</th></tr></thead><tbody>
               {protocols.map(row=><tr key={row.id}><td><b>{row.name}</b><small style={{display:"block"}} dir="ltr">{row.protocol}</small></td><td>{row.kind==="classic"?pick("کلاسیک","Classic"):pick("مدرن","Modern")}</td><td dir="ltr">{row.portText}</td><td dir="ltr">{row.transport}</td><td><Badge tone={tone(row.status)}>{row.status}</Badge></td><td><div className="action-row">{row.kind==="classic"?<button type="button" className="primary-soft" disabled={Boolean(busy)} onClick={()=>installClassic(row)}>{busy===`classic-${row.protocol}`?"…":row.installed?pick("Repair / Health","Repair / Health"):pick("نصب","Install")}</button>:<><button type="button" className="primary-soft" disabled={Boolean(busy)||!row.installable} onClick={()=>installModern(row)}>{busy===`modern-install-${row.protocol}`?"…":row.installed?pick("اعمال / Repair","Apply / Repair"):pick("افزودن","Add")}</button>{row.installed&&row.installable&&<button type="button" className="danger" disabled={Boolean(busy)} onClick={()=>removeModern(row)}>{pick("حذف","Remove")}</button>}</>}</div></td></tr>)}
@@ -377,10 +456,29 @@ export function TunnelProtocolRuntimeV307(){
           </div>
           <div className={styles.createDivider}/>
           <div className={styles.createSectionLabel}><span className={styles.createIndex}>02</span>{pick("تنظیمات مسیر","Route settings")}</div>
+          <label className={styles.createField}>
+            <span className={styles.createFieldTitle}>{pick("نصب موتور تانل","Tunnel engine setup")}</span>
+            <select value={newEngine} onChange={event=>{
+              const mode=event.target.value as "tp27_fast"|"twintunnel_standby";
+              setNewEngine(mode);
+              if(mode==="twintunnel_standby")setDraft(value=>({...value,initial_transport:"tp27_fast"}));
+            }}>
+              <option value="tp27_fast">{pick("TP27 اصلی","Original TP27")}</option>
+              <option value="twintunnel_standby">{pick("TP27 + نصب آزمایشی TwinTunnel سه‌مسیره","TP27 + three-node TwinTunnel standby install")}</option>
+            </select>
+          </label>
+          {newEngine==="twintunnel_standby"&&<label className={styles.createField}>
+            <span className={styles.createFieldTitle}>{pick("نود پشتیبان","Independent backup node")}</span>
+            <select value={selectedNewBackupId} onChange={event=>setNewBackupId(Number(event.target.value))}>
+              {newBackupCandidates.map(node=><option key={node.id} value={node.id}>{node.name} · {node.public_ip}</option>)}
+            </select>
+            <small>{pick("کاربران روی TP27 باقی می‌مانند. موتور جدید صرفاً نصب آزمایشی می‌شود.","Subscribers remain on TP27; the new engine is staged only.")}</small>
+          </label>}
+
           <div className={styles.createSettingsGrid}>
             <label className={styles.createField}>
               <span className={styles.createFieldTitle}>{pick("مسیر اولیه","Initial transport")}</span>
-              <select value={draft.initial_transport} onChange={event=>setDraft(value=>({...value,initial_transport:event.target.value as InitialTransport}))}>
+              <select disabled={newEngine==="twintunnel_standby"} value={draft.initial_transport} onChange={event=>setDraft(value=>({...value,initial_transport:event.target.value as InitialTransport}))}>
                 <option value="tp27_fast">TP27 Fast</option>
                 <option value="spoof_wg">Spoof Tunnel</option>
               </select>
@@ -396,7 +494,7 @@ export function TunnelProtocolRuntimeV307(){
           </div>}
           <div className={styles.createFooter}>
             <button type="button" className={`ghost ${styles.createCancel}`} disabled={Boolean(busy)} onClick={()=>setCreateOpen(false)}>{pick("انصراف","Cancel")}</button>
-            <button type="submit" className={`primary ${styles.createSubmit}`} disabled={Boolean(busy)||!draft.iran_node_id||!draft.exit_node_id||(draft.initial_transport==="spoof_wg"&&(!draft.iran_spoof_ip.trim()||!draft.exit_spoof_ip.trim()))}><span aria-hidden="true">{busy==="create"?"◌":"↗"}</span>{busy==="create"?pick("در حال ساخت...","Creating..."):pick("ساخت و نصب مسیر","Create & install")}</button>
+            <button type="submit" className={`primary ${styles.createSubmit}`} disabled={Boolean(busy)||!draft.iran_node_id||!draft.exit_node_id||(newEngine==="twintunnel_standby"&&!selectedNewBackupId)||(draft.initial_transport==="spoof_wg"&&(!draft.iran_spoof_ip.trim()||!draft.exit_spoof_ip.trim()))}><span aria-hidden="true">{busy==="create"?"◌":"↗"}</span>{busy==="create"?pick("در حال ساخت...","Creating..."):pick("ساخت و نصب مسیر","Create & install")}</button>
           </div>
         </form>
       </Modal>}
