@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 
 SOURCE = Path("components/tunnel-protocol-runtime-v307.tsx").read_text()
 
@@ -13,8 +14,8 @@ assert "!readyExitNodes.some(node=>node.id===draft.exit_node_id)" in SOURCE
 assert "const iran=readyIranNodes[0]" in SOURCE
 assert "const exit=readyExitNodes[0]" in SOURCE
 assert "readyIranNodes.length===0||readyExitNodes.length===0" in SOURCE
-assert ">{readyIranNodes.map(node=><option" in SOURCE
-assert ">{readyExitNodes.map(node=><option" in SOURCE
+assert re.search(r">\\s*\\{readyIranNodes\\.map\\(node=><option", SOURCE)
+assert re.search(r">\\s*\\{readyExitNodes\\.map\\(node=><option", SOURCE)
 assert ">{iranNodes.map(node=><option" not in SOURCE
 assert ">{exitNodes.map(node=><option" not in SOURCE
 assert '||iranNodes[0]' not in SOURCE
