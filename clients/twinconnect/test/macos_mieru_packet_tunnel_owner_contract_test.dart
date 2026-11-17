@@ -1,0 +1,37 @@
+import 'dart:io';
+
+import 'package:flutter_test/flutter_test.dart';
+
+void main() {
+  test('Mieru PacketTunnel owns a scoped profile and fails if egress pin absent', () {
+    final engine = File(
+      'macos_native/mieru/TwinConnectMacMieruTunnelEngine.swift',
+    ).readAsStringSync();
+    final provider = File(
+      'macos_native/PacketTunnelProvider.swift',
+    ).readAsStringSync();
+    final installer = File(
+      'macos_native/install_packet_tunnel_target.rb',
+    ).readAsStringSync();
+    final bridge = File(
+      'macos_native/TwinConnectMacOSVPNBridge.swift',
+    ).readAsStringSync();
+
+    expect(installer,
+        contains('mieru/TwinConnectMacMieruTunnelEngine.swift'));
+    expect(provider, contains('case "mieru":'));
+    expect(provider, contains('TwinConnectMacMieruTunnelEngine(tunnel: self)'));
+    expect(provider, contains('if let engine = mieru'));
+    expect(engine, contains('kSecValuePersistentRef'));
+    expect(engine, contains('kSecReturnData'));
+    expect(engine, contains('Set(object.keys) == Set(["core", "relay"])'));
+    expect(engine, contains('core["rpcPort"] as? Int == 0'));
+    expect(engine, contains('core["socks5ListenLAN"] as? Bool == false'));
+    expect(engine, contains('outbounds[0]["server"] as? String == "127.0.0.1"'));
+    expect(engine, contains('outbounds[0]["server_port"] as? Int == socksPort'));
+    expect(engine, contains('MACOS_MIERU_EGRESS_ROUTE_PIN_NOT_IMPLEMENTED'));
+    expect(engine, contains('self?.core?.stop()'));
+    expect(bridge, contains('"packetFlowBridgeReady": false'));
+    expect(bridge, contains('"engineReady": false'));
+  });
+}
