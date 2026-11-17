@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.VpnService
 import android.os.Bundle
+import android.provider.Settings
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodCall
@@ -177,6 +178,14 @@ class MainActivity : FlutterActivity() {
         }
         channel.setMethodCallHandler { call, result ->
             when (call.method) {
+                "openAndroidVpnSettings" -> {
+                    try {
+                        startActivity(Intent(Settings.ACTION_VPN_SETTINGS))
+                        result.success(mapOf("opened" to true))
+                    } catch (_: Exception) {
+                        result.error("ANDROID_VPN_SETTINGS_UNAVAILABLE", "Unable to open Android VPN settings", null)
+                    }
+                }
                 "getCapabilities" -> onWorker(result) {
                     val present = WireGuardRuntime.initialize(applicationContext)
                     mapOf(
