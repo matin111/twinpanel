@@ -5,12 +5,16 @@ on:
     paths:
       - "backend/scripts/twintunnel_stage_active_nodes_v1.py"
       - "backend/tests/twintunnel_node_staging_v1_smoke.py"
+      - "backend/scripts/twinpanel_public_updater_v69.py"
+      - "backend/tests/twintunnel_updater_staging_hook_v1_smoke.py"
       - "ops/twintunnel-lab/**"
       - ".github/workflows/twintunnel-all-node-staging-v1-smoke.yml"
   push:
     paths:
       - "backend/scripts/twintunnel_stage_active_nodes_v1.py"
       - "backend/tests/twintunnel_node_staging_v1_smoke.py"
+      - "backend/scripts/twinpanel_public_updater_v69.py"
+      - "backend/tests/twintunnel_updater_staging_hook_v1_smoke.py"
       - "ops/twintunnel-lab/**"
       - ".github/workflows/twintunnel-all-node-staging-v1-smoke.yml"
 
@@ -29,8 +33,11 @@ jobs:
       - name: Validate stage and lab script compilation
         run: |
           python -m py_compile backend/scripts/twintunnel_stage_active_nodes_v1.py
+          python -m py_compile backend/scripts/twinpanel_public_updater_v69.py
           python -m py_compile ops/twintunnel-lab/udp_multiuser_mux.py
           python -m py_compile ops/twintunnel-lab/udp_turkey_transit_relay.py
           python -m py_compile ops/twintunnel-lab/udp_three_path_fault_probe.py
       - name: Validate staged file integrity and no activation
-        run: python backend/tests/twintunnel_node_staging_v1_smoke.py
+        run: |
+          python backend/tests/twintunnel_node_staging_v1_smoke.py
+          python backend/tests/twintunnel_updater_staging_hook_v1_smoke.py
