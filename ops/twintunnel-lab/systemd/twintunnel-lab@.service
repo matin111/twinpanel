@@ -1,0 +1,29 @@
+[Unit]
+Description=TwinTunnel Lab / Rakhsh %i (isolated, no production routing)
+Documentation=https://github.com/CluvexStudio/rakhsh
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/opt/twintunnel-test/bin/twintunnel-core run -c /etc/twintunnel-test/%i.toml
+WorkingDirectory=/opt/twintunnel-test
+User=root
+Group=root
+UMask=0077
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=8s
+NoNewPrivileges=true
+CapabilityBoundingSet=CAP_NET_RAW
+AmbientCapabilities=CAP_NET_RAW
+ProtectHome=true
+ProtectSystem=full
+PrivateTmp=true
+LimitNOFILE=65536
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=twintunnel-lab-%i
+
+[Install]
+WantedBy=multi-user.target

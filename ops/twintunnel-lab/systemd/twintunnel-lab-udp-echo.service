@@ -1,0 +1,25 @@
+[Unit]
+Description=TwinTunnel Lab UDP echo target (loopback only)
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 -u /opt/twintunnel-test/udp_echo.py --host 127.0.0.1 --port 37922
+WorkingDirectory=/opt/twintunnel-test
+DynamicUser=yes
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+RestrictAddressFamilies=AF_INET AF_UNIX
+CapabilityBoundingSet=
+Restart=on-failure
+RestartSec=4s
+RuntimeMaxSec=2h
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=twintunnel-echo
+
+[Install]
+WantedBy=multi-user.target
