@@ -22,6 +22,10 @@ export type TwinTunnelInstallStatus={
   needs_update:boolean;
   backup_node_id?:number|null;
   nodes:TwinTunnelNodeCheck[];
+  carrier_plan?:Array<{carrier:string;port:number}>;
+  carrier_count?:number;
+  carrier_state?:"not_installed";
+  traffic_activated?:false;
   active_transport?:string|null;
   production_activated:false;
   can_activate:false;
