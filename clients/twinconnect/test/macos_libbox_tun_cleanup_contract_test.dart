@@ -28,6 +28,12 @@ void main() {
     expect(platform, contains('if completedBeforeTimeout {'));
     expect(platform, contains('MACOS_LIBBOX_TUN_NETWORK_SETTINGS_TIMEOUT'));
     expect(platform, contains('let stoppedDuringApply = stopped'));
+    // Stop state and local network-settings ownership share the same lock.
+    expect(platform, contains('if !stoppedDuringApply {'));
+    expect(platform, contains('settings = candidate'));
+    expect(platform, contains('let hadSettings = settings != nil'));
+    expect(platform, contains('stateLock.lock()'));
+    expect(platform, contains('stateLock.unlock()'));
     expect(platform, contains('guard !stoppedDuringApply else {'));
     expect(platform, contains('settings = nil'));
     expect(engine, contains('platform.reset(completion: completion)'));
