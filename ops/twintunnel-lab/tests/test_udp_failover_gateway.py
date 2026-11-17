@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 """Unit tests for the isolated TwinTunnel UDP carrier-selector policy."""
 import unittest
+import sys
+from pathlib import Path
+
+# This test lives in tests/; add its script parent without installing anything.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from udp_failover_gateway import Gateway
 
