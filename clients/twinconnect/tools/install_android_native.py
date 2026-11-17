@@ -149,6 +149,15 @@ def patch_manifest() -> None:
         '            </intent-filter>\n'
         '        </service>\n'
     )
+    service += (
+        '\n        <service android:name=".AndroidTrafficGuardService"\n'
+        '            android:exported="false"\n'
+        '            android:permission="android.permission.BIND_VPN_SERVICE">\n'
+        '            <intent-filter>\n'
+        '                <action android:name="android.net.VpnService" />\n'
+        '            </intent-filter>\n'
+        '        </service>\n'
+    )
     # Register the official AmneziaWG VPN service only when its native AAR
     # is bundled. Never alias it to the ordinary WireGuard VpnService.
     awg_aar = NATIVE / "amneziawg-core" / "tunnel-release.aar"
@@ -229,7 +238,7 @@ def install_native_sources() -> None:
             "'flutter create --platforms=android,ios,macos,windows "
             "--org com.twinpanel --project-name twinconnect .' first"
         )
-    for filename in ("MainActivity.kt", "WireGuardRuntime.kt", "OpenConnectVpnService.kt"):
+    for filename in ("MainActivity.kt", "WireGuardRuntime.kt", "OpenConnectVpnService.kt", "AndroidTrafficGuardService.kt"):
         src = NATIVE / "kotlin" / "com" / "twinpanel" / "twinconnect" / filename
         if not src.is_file():
             raise RuntimeError(f"Missing tracked native source: {src}")
