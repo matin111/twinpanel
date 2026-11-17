@@ -27,11 +27,23 @@ func expectValid(_ ip: String) {
     do {
         let plan = try TwinConnectMacMieruEndpointRoute.plan(
             from: endpoint(ip))
+        let settings = try TwinConnectMacMieruEndpointRoute
+            .tunnelSettings(for: plan)
         if plan.endpoint != ip ||
             plan.excludedRoute.destinationAddress != ip ||
             plan.excludedRoute.destinationSubnetMask !=
-                "255.255.255.255" {
-            fail("invalid /32 exclusion for \(ip)")
+                "255.255.255.255" ||
+            settings.tunnelRemoteAddress != ip ||
+            settings.ipv4Settings?.includedRoutes?.count != 1 ||
+            settings.ipv4Settings?.excludedRoutes?.count != 1 ||
+            settings.ipv4Settings?.excludedRoutes?.first?
+                .destinationAddress != ip ||
+            settings.ipv4Settings?.excludedRoutes?.first?
+                .destinationSubnetMask != "255.255.255.255" ||
+            settings.ipv6Settings?.includedRoutes?.count != 1 ||
+            settings.ipv6Settings?.excludedRoutes?.count != 0 ||
+            settings.dnsSettings?.matchDomains != [""] {
+            fail("invalid Network Extension route/DNS policy for \(ip)")
         }
     } catch {
         fail("rejected public endpoint \(ip)")
