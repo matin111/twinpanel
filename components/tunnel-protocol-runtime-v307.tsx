@@ -119,7 +119,7 @@ export function TunnelProtocolRuntimeV307(){
   const backupCandidates=readyExitNodes.filter(node=>node.id!==selectedTunnel?.exit_node_id);
   const selectedBackupId=backupCandidates.some(node=>node.id===twinBackupId)?twinBackupId:0;
   const newBackupCandidates=readyExitNodes.filter(node=>node.id!==draft.exit_node_id);
-  const selectedNewBackupId=newBackupCandidates.some(node=>node.id===newBackupId)?newBackupId:newBackupCandidates[0]?.id||0;
+  const selectedNewBackupId=newBackupCandidates.some(node=>node.id===newBackupId)?newBackupId:0;
 
   const filteredTunnels=useMemo(()=>{
     const q=search.trim().toLowerCase();
@@ -252,11 +252,11 @@ export function TunnelProtocolRuntimeV307(){
         if(intent){
           try{
             const backupId=Number(JSON.parse(intent)?.backup_node_id||0);
-            if(backupId<=0)throw new Error("BACKUP_NODE_MISSING");
-            setNotice(pick("تانل اصلی ایجاد شد. آماده‌سازی TwinTunnel روی سه نود آغاز شد.","Base tunnel created; staging TwinTunnel on three nodes."));
+            // Two nodes are sufficient for a staged pair; third is an optional relay.
+            setNotice(pick("تانل اصلی ساخته شد؛ بررسی فایل‌های آزمایشی روی نودها آغاز شد.","Base tunnel created; node staging checks started."));
             const status=await twinTunnelInstallApi.install(id,backupId);
             setTwinStatus(status);setTwinBackupId(backupId);
-            setNotice(pick("تانل اصلی و نصب آزمایشی سه‌نودی TwinTunnel تأیید شدند. مسیر کاربران تغییر نکرد.","Base tunnel and three-node TwinTunnel staging verified. Customer routing unchanged."));
+            setNotice(pick("فایل‌های آزمایشی آماده شدند. سه ترانسپورت هنوز پیاده‌سازی و فعال نشده‌اند.","Staging verified. Three independent carrier links are not deployed or active."));
           }catch(reason){
             setNotice(pick("تانل TP27 ساخته شد، ولی آماده‌سازی TwinTunnel کامل نشد: ","TP27 tunnel created; TwinTunnel staging did not complete: ")+(reason instanceof Error?reason.message:String(reason)));
           }
@@ -294,7 +294,6 @@ export function TunnelProtocolRuntimeV307(){
       setError(pick("برای ساخت Tunnel هر دو نود ایران و خارج باید Online و آماده باشند.","Both Iran and Exit nodes must be online and ready before creating a tunnel."));
       return;
     }
-    if(newEngine==="twintunnel_standby"&&!selectedNewBackupId){setError(pick("برای TwinTunnel باید یک نود پشتیبان آنلاین انتخاب شود.","Select an online backup node for TwinTunnel."));return;}
     if(draft.initial_transport==="spoof_wg"&&(!draft.iran_spoof_ip.trim()||!draft.exit_spoof_ip.trim())){
       setError(pick("برای Spoof Tunnel هر دو IP Spoof ایران و خارج الزامی است.","Both Iran and Exit spoof IPs are required for Spoof Tunnel."));
       return;
@@ -463,13 +462,13 @@ export function TunnelProtocolRuntimeV307(){
               if(mode==="twintunnel_standby")setDraft(value=>({...value,initial_transport:"tp27_fast"}));
             }}>
               <option value="tp27_fast">{pick("TP27 اصلی","Original TP27")}</option>
-              <option value="twintunnel_standby">{pick("TwinTunnel سه‌مسیره","TwinTunnel · 3 paths")}</option>
+              <option value="twintunnel_standby">{pick("TwinTunnel آزمایشی (دو نود)","TwinTunnel staging (two nodes)")}</option>
             </select>
           </label>
           {newEngine==="twintunnel_standby"&&<label className={styles.createField}>
-            <span className={styles.createFieldTitle}>{pick("نود پشتیبان","Independent backup node")}</span>
-            <select value={selectedNewBackupId} onChange={event=>setNewBackupId(Number(event.target.value))}>
-              {newBackupCandidates.map(node=><option key={node.id} value={node.id}>{node.name} · {node.public_ip}</option>)}
+            <span className={styles.createFieldTitle}>{pick("نود واسط (اختیاری)","Optional transit node")}</span>
+            <select value={newBackupId} onChange={event=>setNewBackupId(Number(event.target.value))}>
+              <option value={0}>{pick("بدون نود سوم","No third node")}</option>{newBackupCandidates.map(node=><option key={node.id} value={node.id}>{node.name} · {node.public_ip}</option>}
             </select>
             <small>{pick("کاربران روی TP27 باقی می‌مانند. موتور جدید صرفاً نصب آزمایشی می‌شود.","Subscribers remain on TP27; the new engine is staged only.")}</small>
           </label>}
@@ -493,7 +492,7 @@ export function TunnelProtocolRuntimeV307(){
           </div>}
           <div className={styles.createFooter}>
             <button type="button" className={`ghost ${styles.createCancel}`} disabled={Boolean(busy)} onClick={()=>setCreateOpen(false)}>{pick("انصراف","Cancel")}</button>
-            <button type="submit" className={`primary ${styles.createSubmit}`} disabled={Boolean(busy)||!draft.iran_node_id||!draft.exit_node_id||(newEngine==="twintunnel_standby"&&!selectedNewBackupId)||(draft.initial_transport==="spoof_wg"&&(!draft.iran_spoof_ip.trim()||!draft.exit_spoof_ip.trim()))}><span aria-hidden="true">{busy==="create"?"◌":"↗"}</span>{busy==="create"?pick("در حال ساخت...","Creating..."):pick("ساخت و نصب مسیر","Create & install")}</button>
+            <button type="submit" className={`primary ${styles.createSubmit}`} disabled={Boolean(busy)||!draft.iran_node_id||!draft.exit_node_id||(draft.initial_transport==="spoof_wg"&&(!draft.iran_spoof_ip.trim()||!draft.exit_spoof_ip.trim()))}><span aria-hidden="true">{busy==="create"?"◌":"↗"}</span>{busy==="create"?pick("در حال ساخت...","Creating..."):pick("ساخت و نصب مسیر","Create & install")}</button>
           </div>
         </form>
       </Modal>}
