@@ -40,6 +40,7 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
   bool _androidKillRequested = false;
   bool _androidKillBusy = false;
   bool _androidVpnConflict = false;
+  bool _androidOsLockdown = false;
   Timer? _androidGuardPoll;
 
   @override
@@ -97,11 +98,13 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
       if (mounted) setState(() {
         _androidKillRequested = result?['active'] == true;
         _androidVpnConflict = result?['otherVpnActive'] == true;
+        _androidOsLockdown = result?['osLockdown'] == true;
       });
     } on PlatformException {
       if (mounted) setState(() {
         _androidKillRequested = false;
         _androidVpnConflict = false;
+        _androidOsLockdown = false;
       });
     }
   }
@@ -362,33 +365,32 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
           _glass(Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              ListTile(
+              SwitchListTile.adaptive(
                 contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.shield_rounded),
+                secondary: const Icon(Icons.shield_rounded),
                 title: const Text('Kill Switch'),
                 subtitle: Text(tr(
-                  _androidVpnConflict
-                      ? 'VPN متصل است. برای محافظت بدون قطع اتصال، قفل شبکه اندروید را فعال کنید.'
-                      : _androidKillRequested
-                          ? 'تونل مسدودکننده قدیمی فعال است؛ برای اتصال مجدد باید متوقف شود.'
-                          : 'محافظت سراسری غیرفعال است. فعال‌سازی نیازمند تأیید در تنظیمات VPN اندروید است.',
-                  _androidVpnConflict
-                      ? 'VPN connected. Enable Android lockdown without replacing the active tunnel.'
-                      : _androidKillRequested
-                          ? 'Legacy blocking tunnel active; stop it before reconnecting.'
-                          : 'System-wide protection requires Android VPN lockdown approval.',
+                  _androidOsLockdown
+                      ? 'قفل شبکه اندروید فعال است (تأیید موتور بومی).'
+                      : 'برای روشن‌کردن محافظت واقعی، Always-on VPN و Block connections without VPN را در اندروید فعال کنید.',
+                  _androidOsLockdown
+                      ? 'Android lockdown verified by native engine.'
+                      : 'Enable Always-on VPN and Block connections without VPN in Android VPN settings.',
                 )),
-                trailing: const Icon(Icons.open_in_new_rounded),
-                onTap: () async {
+                value: _androidOsLockdown,
+                onChanged: _androidKillBusy ? null : (requested) async {
+                  // Android does not permit third-party apps to toggle OS lockdown.
+                  // Never start a competing VpnService or fake an enabled state.
                   try {
                     await const MethodChannel('com.twinpanel.twinconnect/vpn')
-                        .invokeMethod<void>('openAndroidVpnSettings');
+                        .invokeMethod<dynamic>('openAndroidVpnSettings');
                   } on PlatformException catch (error) {
                     if (!mounted) return;
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(content: Text('Android VPN settings: ${error.code}')),
                     );
                   }
+                  if (mounted) await _refreshAndroidGuard();
                 },
               ),
               if (_androidKillRequested)
