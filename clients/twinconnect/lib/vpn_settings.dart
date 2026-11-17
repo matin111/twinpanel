@@ -8,6 +8,7 @@ import 'brand_theme.dart';
 import 'interactive_glass_card.dart';
 import 'native_vpn_bridge.dart';
 import 'vpn_policy.dart';
+import 'vpn_policy_store.dart';
 import 'tenant_models.dart';
 
 /// One-page, fail-closed network settings. A saved preference is not proof of
@@ -36,11 +37,54 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
   Map<String, dynamic> _guard = const {};
   bool _checking = false;
   bool _vmGuardBusy = false;
+  bool _androidKillRequested = false;
+  bool _androidKillBusy = false;
+  final _policyStore = const VpnPolicyStore();
 
   @override
   void initState() {
     super.initState();
     _check();
+    _loadAndroidKillPreference();
+  }
+
+  Future<void> _loadAndroidKillPreference() async {
+    if (!Platform.isAndroid) return;
+    final policy = await _policyStore.load(widget.tenant, widget.account);
+    if (mounted) setState(() => _androidKillRequested = policy.killSwitchRequested);
+  }
+
+  Future<void> _setAndroidKill(bool requested) async {
+    if (_androidKillBusy) return;
+    setState(() => _androidKillBusy = true);
+    try {
+      final capabilities = await NativeVpnBridge.probe();
+      if (requested && !capabilities.killSwitchEnforced) {
+        await const MethodChannel('com.twinpanel.twinconnect/vpn')
+            .invokeMethod<void>('openAndroidVpnSettings');
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(AppStrings.of(context).pick(
+            'ابتدا Always-on VPN و Block connections without VPN را فعال کنید؛ سپس برگردید و دوباره کلید را روشن کنید.',
+            'Enable Always-on VPN and Block connections without VPN in Android settings, then return and retry.',
+          )),
+        ));
+        return;
+      }
+      final current = await _policyStore.loadFailClosed(widget.tenant, widget.account);
+      final saved = await _policyStore.save(widget.tenant, widget.account,
+          current.copyWith(killSwitchRequested: requested));
+      if (!saved) throw StateError('VPN_POLICY_SAVE_FAILED');
+      if (mounted) setState(() => _androidKillRequested = requested);
+    } catch (_) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(AppStrings.of(context).pick(
+          'تغییر محافظت انجام نشد؛ وضعیت قبلی حفظ شد.',
+          'Protection was not changed; previous state retained.',
+        )),
+      ));
+    } finally {
+      if (mounted) setState(() => _androidKillBusy = false);
+    }
   }
 
   Future<void> _check() async {
@@ -299,32 +343,26 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
           _glass(Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text('Android Kill Switch',
-                  style: Theme.of(context).textTheme.titleSmall),
-              const SizedBox(height: 8),
-              Text(tr(
-                'برای جلوگیری از نشت اینترنت هنگام قطع VPN، در تنظیمات اندروید TwinConnect را به‌عنوان VPN همیشگی انتخاب کنید و «مسدودکردن اتصال بدون VPN» را روشن کنید. این گزینه فقط توسط سیستم‌عامل فعال می‌شود.',
-                'In Android VPN settings, select TwinConnect as Always-on VPN and enable Block connections without VPN. Only Android can enforce this system-wide lockdown.',
-              )),
-              const SizedBox(height: 10),
-              FilledButton.icon(
-                onPressed: () async {
-                  try {
-                    await const MethodChannel('com.twinpanel.twinconnect/vpn')
-                        .invokeMethod<void>('openAndroidVpnSettings');
-                  } on PlatformException {
-                    if (!mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(tr(
-                        'بازکردن تنظیمات VPN ممکن نشد',
-                        'Could not open Android VPN settings',
-                      ))),
-                    );
-                  }
-                },
-                icon: const Icon(Icons.shield_rounded),
-                label: Text(tr('فعال‌سازی در تنظیمات اندروید',
-                    'Enable in Android VPN settings')),
+              SwitchListTile.adaptive(
+                contentPadding: EdgeInsets.zero,
+                secondary: const Icon(Icons.shield_rounded),
+                title: const Text('Kill Switch'),
+                subtitle: Text(tr(
+                  _androidKillRequested && _capabilities.killSwitchEnforced
+                      ? 'محافظت سراسری اندروید تأیید شده'
+                      : 'فقط با تأیید محافظت سراسری اندروید روشن می‌شود',
+                  _androidKillRequested && _capabilities.killSwitchEnforced
+                      ? 'Android lockdown protection verified'
+                      : 'Requires verified Android OS lockdown',
+                )),
+                value: _androidKillRequested && _capabilities.killSwitchEnforced,
+                onChanged: _androidKillBusy ? null : _setAndroidKill,
+              ),
+              TextButton.icon(
+                onPressed: _checking ? null : _check,
+                icon: const Icon(Icons.refresh_rounded),
+                label: Text(tr('بررسی مجدد وضعیت محافظت',
+                    'Refresh protection status')),
               ),
             ],
           )),
