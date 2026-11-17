@@ -124,6 +124,14 @@ def patch_manifest() -> None:
             '    <uses-permission android:name="android.permission.INTERNET" />',
             str(filename),
         )
+    if 'android.permission.ACCESS_NETWORK_STATE' not in current:
+        current = only_once(
+            current,
+            '<manifest xmlns:android="http://schemas.android.com/apk/res/android">',
+            '<manifest xmlns:android="http://schemas.android.com/apk/res/android">\n'
+            '    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />',
+            str(filename),
+        )
     match = re.search(r"<application\b[^>]*>", current, flags=re.DOTALL)
     if match is None:
         raise RuntimeError("Missing Android application manifest element")
