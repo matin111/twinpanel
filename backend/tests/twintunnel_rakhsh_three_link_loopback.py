@@ -69,6 +69,7 @@ def run():
                 log.close()
                 procs.append(proc)
             deadline = time.monotonic() + 15
+            last_status = None
             while time.monotonic() < deadline:
                 if any(p.poll() is not None for p in procs):
                     raise AssertionError("Rakhsh process exited during handshake")
@@ -78,13 +79,14 @@ def run():
                     if out.returncode == 0:
                         state = json.loads(out.stdout)
                         names = {link.get("label") for link in state.get("links", [])}
+                        last_status = (state.get("lanes_up"), sorted(str(n) for n in names))
                         if state.get("lanes_up") == 4 and {"wss", "quicv2", "kcp"} <= names:
                             print("TWINTUNNEL_RAKHSH_THREE_TRANSPORT_LOOPBACK_OK")
                             return
                 except (ValueError, subprocess.TimeoutExpired):
                     pass
                 time.sleep(0.25)
-            raise AssertionError("Three authenticated transports were not established")
+            raise AssertionError(f"Three authenticated transports were not established: {last_status}")
         finally:
             for p in procs:
                 if p.poll() is None:
