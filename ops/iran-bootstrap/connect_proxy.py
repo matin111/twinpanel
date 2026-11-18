@@ -16,8 +16,8 @@ import logging
 
 PANEL_HOST = "panel.matindnspro.sbs"
 PANEL_IP = "217.179.6.142"
-MAX_CONNECTIONS = 256
-MAX_PER_CLIENT = 8
+MAX_CONNECTIONS = 512
+MAX_PER_CLIENT = 32
 HEADER_TIMEOUT = 6
 UPSTREAM_TIMEOUT = 6
 IDLE_TIMEOUT = 90
@@ -118,7 +118,7 @@ async def run_gateway(host: str, port: int, upstream_ip: str = PANEL_IP,
                 active.pop(client_ip, None)
             slots.release()
 
-    server = await asyncio.start_server(handle, host, port, backlog=256,
+    server = await asyncio.start_server(handle, host, port, backlog=512,
                                         limit=HEADER_MAX)
     logger.info("CONNECT relay online port=%s allowed_host=%s", port, PANEL_HOST)
     async with server:
