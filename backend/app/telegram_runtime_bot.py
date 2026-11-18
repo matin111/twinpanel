@@ -2787,7 +2787,13 @@ async def _telegram_notification_worker(bot):
                         row.delivered_at = datetime.utcnow()
                         db.commit()
                         continue
-                    is_active = row.kind == "renewal_activated" or current_status == "activated"
+                    if row.kind == "renewal_reserved" and current_status == "activated":
+                        # The activation notice has its own idempotent event;
+                        # avoid a second or misleading reservation message.
+                        row.delivered_at = datetime.utcnow()
+                        db.commit()
+                        continue
+                    is_active = row.kind == "renewal_activated"
                     username = escape(str(payload.get("username") or "").strip() or "—")
                     plan = escape(str(payload.get("plan_name") or "اشتراک"))
                     gb = int(payload.get("traffic_bytes") or 0) / (1024 ** 3)
