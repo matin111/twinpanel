@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.867",
-  "source_sha": "7400ce682f7ad9156f017613e404f0603c9cb55d",
+  "version": "1.1.0-rc.868",
+  "source_sha": "957658a9e6dad607d69af344d475438510943a39",
   "notes": {
-    "fa": "اصلاح TwinTunnel آزمایشی برای دو نود ایران و خارج، حذف الزام نود سوم، معرفی طرح سه ترانسپورت WSS/QUICv2/KCP و تفکیک نصب فایل از فعال‌سازی. TP27 کاربران فعال بدون تغییر می‌ماند.",
-    "en": "TwinTunnel two-endpoint staged installation with optional third node, planned WSS/QUICv2/KCP carrier links and explicit inactive status. Existing TP27 customer routes remain unchanged."
+    "fa": "حذف واژه آزمایشی از عناوین و پیام‌های TwinTunnel در ساخت و مدیریت تانل، با حفظ نمایش واضح وضعیت غیرفعال مسیر جدید و بدون تغییر در مسیر TP27 مشتریان.",
+    "en": "Remove experimental wording from TwinTunnel creation and management UI, retain clear not-active routing status and unchanged customer TP27 paths."
   }
 }
