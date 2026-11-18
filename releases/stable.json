@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.872",
+  "version": "1.1.0-rc.873",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-18T06:20:16Z",
+  "released_at": "2026-11-18T09:33:22Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "65fde323f992b1d9729fe2fd2337cc3efc8d5e9a",
+  "source_sha": "e84a8069c469ba324feb73bf5916f2682474c28c",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.872/twinpanel-1.1.0-rc.872-linux-x86_64.tar.gz",
-    "sha256": "c6cc3213db02021cfbda6658a3385afbfb13cb171cb7aff7e700015c81e69842",
-    "size_bytes": 31253632
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.873/twinpanel-1.1.0-rc.873-linux-x86_64.tar.gz",
+    "sha256": "aa0ffb50e3f8febf236d3ba1276fb0ba669dd2454652a90569b7e8220dc7a039",
+    "size_bytes": 31259800
   },
   "notes": {
-    "fa": "رفع خطای SSH نود ایران در نصب TwinTunnel با حداکثر سه تلاش محدود، تشخیص خطاهای دسترسی غیرقابل‌تکرار، حفظ کامل تانل‌ها و مسیر کاربران.",
-    "en": "Harden TwinTunnel installation against transient SSH failures with three bounded retries, fail-fast on credential errors, preserve active routes."
+    "fa": "نمایش تمدیدهای رزروشده و فعال‌شده در اشتراک اصلی؛ جزئیات تمدید و حذف امن تمدید در انتظار با حفظ اشتراک، کانفیگ و سوابق.",
+    "en": "Show reserved and activated renewal details in the parent subscription, with safe cancellation of queued renewals while preserving subscription, configs and audit history."
   }
 }
