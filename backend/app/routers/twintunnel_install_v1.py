@@ -261,13 +261,13 @@ async def install_twintunnel_standby(
                 **stage,
                 **(await _engine_selfcheck(node_id, manifest["revision"])),
             }
-        # Bound concurrency prevents SSH saturation and maximizes fairness
-        # with normal customer tunnel maintenance.
-        semaphore = asyncio.Semaphore(2)
-        async def bounded(node_id: int):
-            async with semaphore:
-                return await one(node_id)
-        results = await asyncio.gather(*(bounded(i) for i in node_ids))
+        # The saved-SSH connector can reject simultaneous sessions to an
+        # Iran endpoint while accepting an individual connection. Serialize
+        # verification to avoid false 502s and unnecessary repeat uploads.
+        results = []
+        for node_id in node_ids:
+            result = await one(node_id)
+            results.append(result)
         if not all(result.get("ok") for result in results):
             # No config or route can change on partial failure. Never mark
             # the pair as staged until every selected node passes.
