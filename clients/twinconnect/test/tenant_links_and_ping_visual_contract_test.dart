@@ -346,7 +346,8 @@ void main() {
     expect(card, contains('NativeVpnBridge.requireAndroidCiscoSafeToConnect(policy)'));
     expect(bridge, contains('static void requireAndroidCiscoSafeToConnect(VpnPolicy policy)'));
     expect(bridge, isNot(contains('CISCO_SHARED_GUARD_NOT_IMPLEMENTED')));
-    expect(card, contains('_releaseDisconnectedGuard(allowSharedTun: true);\n      await AndroidCiscoTunnel.instance.connect(profile)'));
+    expect(card, contains('await AndroidCiscoTunnel.instance.connect(profile)'));
+    expect(card, contains('requireSharedGuard: policy.killSwitchRequested'));
     expect(card, contains('AndroidCiscoTunnel.instance.status()'));
     expect(cisco, contains('com.axevpn.flutter.openconnect/vpncontrol'));
     expect(cisco, contains("'servercert': pin"));
@@ -381,7 +382,7 @@ void main() {
     expect(shared, contains('ParcelFileDescriptor.dup(replacement.fileDescriptor)'));
     expect(shared, contains('val replacement = blockingTun()'));
     expect(shared, contains('CISCO_DISCONNECT_BLOCK_FAILED'));
-    expect(shared, contains('if (!persistentBlock && wireGuardHandle < 0) shutdown()'));
+    expect(shared, contains('if (!persistentBlock && wireGuardHandle < 0 && amneziaHandle < 0) shutdown()'));
     expect(installer, contains('"SharedOpenConnectEngine.java"'));
     expect(installer, isNot(contains('Independent pinned Cisco CSTP/TLS VpnService')));
     final startCisco = dashboard.indexOf('Future<void> _startCiscoTunnel(');
