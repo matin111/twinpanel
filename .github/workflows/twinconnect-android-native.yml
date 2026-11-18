@@ -12,6 +12,7 @@ on:
     paths:
       - "clients/twinconnect/native/android/**"
       - "clients/twinconnect/tools/install_android_native.py"
+      - "clients/twinconnect/tools/patch_shared_tun_android_plugins.py"
       - "clients/twinconnect/tools/build_mieru_android.sh"
       - "clients/twinconnect/lib/android_*.dart"
       - "clients/twinconnect/lib/main.dart"

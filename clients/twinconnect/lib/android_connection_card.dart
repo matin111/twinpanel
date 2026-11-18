@@ -22,6 +22,7 @@ import 'tenant_api.dart';
 import 'tenant_models.dart';
 import 'server_inventory.dart';
 import 'vpn_policy_store.dart';
+import 'vpn_policy.dart';
 import 'twinconnect_wave_indicator.dart';
 
 /// A real WireGuard-native Android action, never a fake Cisco proxy.

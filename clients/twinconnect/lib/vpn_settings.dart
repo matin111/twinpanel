@@ -389,15 +389,15 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
                       : _androidVpnConflict && !_androidLockdownVerifiable
                           ? 'موتور VPN مستقل دیگری فعال است؛ محافظ مشترک در دسترس نیست.'
                           : _androidSharedAwgReady
-                              ? 'با یک دکمه محافظ داخلی WireGuard، Cisco و AmneziaWG را روشن کنید.'
-                              : 'با یک دکمه محافظ داخلی WireGuard و Cisco را روشن کنید.',
+                              ? 'محافظ مشترک WireGuard، Cisco، AmneziaWG، Xray و پروتکل‌های sing-box را فعال کنید.'
+                              : 'محافظ مشترک WireGuard، Cisco، Xray و پروتکل‌های sing-box را فعال کنید.',
                   _androidKillRequested
                       ? 'Enabled: shared TUN blocks traffic on disconnect. Android lockdown is still needed for app termination.'
                       : _androidVpnConflict && !_androidLockdownVerifiable
                           ? 'An independent VPN engine is active; shared guard is unavailable.'
                           : _androidSharedAwgReady
-                              ? 'Enable WireGuard, Cisco and AmneziaWG in-app blocking with one switch.'
-                              : 'Enable WireGuard and Cisco in-app blocking with one switch.',
+                              ? 'One-switch shared TUN guard for WireGuard, Cisco, AmneziaWG, Xray and sing-box protocols.'
+                              : 'One-switch shared TUN guard for WireGuard, Cisco, Xray and sing-box protocols.',
                 )),
                 trailing: Switch.adaptive(
                   key: const Key('androidSharedKillSwitch'),
