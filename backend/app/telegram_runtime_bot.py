@@ -129,9 +129,6 @@ def main_keyboard():
                 KeyboardButton(
                     text="📚 آموزش"
                 ),
-                KeyboardButton(
-                    text="⬇️ دانلود برنامه"
-                ),
             ],
             [
                 # TWINPANEL_MAIN_ACCOUNT_BUTTON_V1
