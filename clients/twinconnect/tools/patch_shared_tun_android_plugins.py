@@ -83,7 +83,7 @@ def patch_singbox(root: Path) -> None:
         '            </intent-filter>\n            <meta-data\n'
         '                android:name="android.net.VpnService.SUPPORTS_ALWAYS_ON"\n'
         '                android:value="true" />',
-        '            <!-- TwinConnect's SharedTunVpnService is the sole OS-discoverable VPN. -->',
+        '            <!-- TwinConnect SharedTunVpnService is the sole OS-discoverable VPN. -->',
         manifest,
     )
     manifest.write_text(xml)
