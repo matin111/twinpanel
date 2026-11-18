@@ -33,7 +33,9 @@ jobs:
       - name: Generate native project scaffolds
         run: flutter create --platforms=android,ios,macos,windows --org com.twinpanel --project-name twinconnect .
       - name: Install reviewed Android WireGuard source
-        run: python tools/install_android_native.py
+        run: |
+          python -m pip install --user Pillow==11.3.0
+          python tools/install_android_native.py
       - name: Resolve packages
         run: flutter pub get
       - name: Analyze Dart
@@ -73,7 +75,9 @@ jobs:
         run: flutter create --platforms=android,ios,macos,windows --org com.twinpanel --project-name twinconnect .
       - name: Install Android native WireGuard
         if: matrix.platform == 'android'
-        run: python tools/install_android_native.py
+        run: |
+          python -m pip install --user Pillow==11.3.0
+          python tools/install_android_native.py
       - name: Validate central license directory before building platform binaries
         shell: bash
         run: |

@@ -244,6 +244,8 @@ class MainActivity : FlutterActivity() {
                 "startDisconnectedTrafficGuard" -> {
                     if (AndroidTrafficGuardService.active) {
                         result.error("LEGACY_GUARD_ACTIVE", "Stop legacy VPN guard first", null)
+                    } else if (SharedTunVpnService.active == null && hasActiveVpnTransport()) {
+                        result.error("OTHER_VPN_ACTIVE", "Another VPN currently owns Android routing", null)
                     } else if (pendingGuardStart != null) {
                         result.error("VPN_REQUEST_IN_PROGRESS", "VPN approval pending", null)
                     } else {
@@ -363,6 +365,10 @@ class MainActivity : FlutterActivity() {
                     }
                     if (pendingStart != null) {
                         result.error("VPN_REQUEST_IN_PROGRESS", "Approval already in progress", null)
+                        return@setMethodCallHandler
+                    }
+                    if (SharedTunVpnService.active == null && hasActiveVpnTransport()) {
+                        result.error("OTHER_VPN_ACTIVE", "Another VPN currently owns Android routing", null)
                         return@setMethodCallHandler
                     }
                     val launch = VpnService.prepare(this)
