@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.871",
-  "source_sha": "d87c48482d59a2a075b160247f71c9aa6a726c20",
+  "version": "1.1.0-rc.872",
+  "source_sha": "65fde323f992b1d9729fe2fd2337cc3efc8d5e9a",
   "notes": {
-    "fa": "رفع خطای موقتی نصب و بررسی TwinTunnel با اجرای ترتیبی SSH نودهای ایران و خارج، نمایش نود ناموفق و حفظ کامل مسیرهای فعال.",
-    "en": "Serialize TwinTunnel SSH stage and verification to avoid transient concurrent-node 502 failures, expose failing node details; no production route changes."
+    "fa": "رفع خطای SSH نود ایران در نصب TwinTunnel با حداکثر سه تلاش محدود، تشخیص خطاهای دسترسی غیرقابل‌تکرار، حفظ کامل تانل‌ها و مسیر کاربران.",
+    "en": "Harden TwinTunnel installation against transient SSH failures with three bounded retries, fail-fast on credential errors, preserve active routes."
   }
 }
