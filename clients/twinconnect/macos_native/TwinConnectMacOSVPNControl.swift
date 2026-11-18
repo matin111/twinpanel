@@ -106,6 +106,7 @@ enum TwinConnectMacOSVPNControl {
                 "protocol": "wireguard",
                 "namespace": namespace
             ]
+            TwinConnectMacOSKillSwitch.applySavedPolicy(settings, manager: selected)
             selected.protocolConfiguration = settings
             selected.localizedDescription = "TwinConnect"
             selected.isEnabled = true
@@ -200,6 +201,124 @@ enum TwinConnectMacOSVPNControl {
             }
             result(["contractVersion": 1, "state": label,
                     "verified": false] as [String: Any])
+        }
+    }
+}
+
+
+/// Apple-managed VPN routing protection; no PF firewall modifications.
+/// "Configured" is never synonymous with verified packet blocking.
+enum TwinConnectMacOSKillSwitch {
+    private static let preference = "twinconnect.macos.killSwitch.requested.v1"
+    private static let bundleID = "com.twinpanel.twinconnect.PacketTunnel"
+
+    static func applySavedPolicy(_ tunnel: NETunnelProviderProtocol,
+                                 manager: NETunnelProviderManager) {
+        let requested = UserDefaults.standard.bool(forKey: preference)
+        tunnel.includeAllNetworks = requested
+        tunnel.excludeLocalNetworks = false
+        manager.onDemandRules = requested ? [NEOnDemandRuleConnect()] : []
+        manager.isOnDemandEnabled = requested
+    }
+
+    static func status(_ result: @escaping FlutterResult) {
+        NETunnelProviderManager.loadAllFromPreferences { managers, error in
+            guard error == nil else {
+                result(["contractVersion": 1, "requested": false,
+                        "configured": false, "verified": false,
+                        "reason": "MACOS_KILLSWITCH_PREFERENCES_UNAVAILABLE"])
+                return
+            }
+            let candidates = (managers ?? []).filter {
+                ($0.protocolConfiguration as? NETunnelProviderProtocol)?
+                    .providerBundleIdentifier == bundleID
+            }
+            let requested = UserDefaults.standard.bool(forKey: preference)
+            let configured = !candidates.isEmpty && candidates.allSatisfy {
+                guard let p = $0.protocolConfiguration as? NETunnelProviderProtocol else {
+                    return false
+                }
+                return p.includeAllNetworks && $0.isOnDemandEnabled &&
+                    !($0.onDemandRules ?? []).isEmpty
+            }
+            result([
+                "contractVersion": 1,
+                "requested": requested,
+                "configured": requested && configured,
+                "verified": false,
+                "reason": "MACOS_KILLSWITCH_REQUIRES_SIGNED_EGRESS_TEST"
+            ] as [String: Any])
+        }
+    }
+
+    static func set(_ args: Any?, result: @escaping FlutterResult) {
+        guard let requested = (args as? [String: Any])?["enabled"] as? Bool else {
+            result(FlutterError(code: "MACOS_KILLSWITCH_ARGUMENT_INVALID",
+                                message: nil, details: nil))
+            return
+        }
+        NETunnelProviderManager.loadAllFromPreferences { managers, error in
+            guard error == nil else {
+                result(FlutterError(code: "MACOS_KILLSWITCH_PREFERENCES_UNAVAILABLE",
+                                    message: nil, details: nil))
+                return
+            }
+            let candidates = (managers ?? []).filter {
+                ($0.protocolConfiguration as? NETunnelProviderProtocol)?
+                    .providerBundleIdentifier == bundleID
+            }
+            // Never rewrite OS route controls underneath an active tunnel.
+            let busy = candidates.contains {
+                switch $0.connection.status {
+                case .connected, .connecting, .reasserting, .disconnecting:
+                    return true
+                default:
+                    return false
+                }
+            }
+            guard !busy else {
+                result(FlutterError(code: "MACOS_KILLSWITCH_DISCONNECT_FIRST",
+                                    message: nil, details: nil))
+                return
+            }
+            // In the absence of a provisioned VPN profile, retain the request
+            // but report that OS enforcement is NOT configured.
+            if candidates.isEmpty {
+                UserDefaults.standard.set(requested, forKey: preference)
+                result(["contractVersion": 1, "requested": requested,
+                        "configured": false, "verified": false] as [String: Any])
+                return
+            }
+            let group = DispatchGroup()
+            let lock = NSLock()
+            var failed = false
+            for manager in candidates {
+                guard let protocolConfig = manager.protocolConfiguration
+                    as? NETunnelProviderProtocol else { continue }
+                protocolConfig.includeAllNetworks = requested
+                protocolConfig.excludeLocalNetworks = false
+                manager.onDemandRules = requested ? [NEOnDemandRuleConnect()] : []
+                manager.isOnDemandEnabled = requested
+                group.enter()
+                manager.saveToPreferences { error in
+                    if error != nil {
+                        lock.lock()
+                        failed = true
+                        lock.unlock()
+                    }
+                    group.leave()
+                }
+            }
+            group.notify(queue: .main) {
+                guard !failed else {
+                    result(FlutterError(code: "MACOS_KILLSWITCH_SAVE_FAILED",
+                                        message: nil, details: nil))
+                    return
+                }
+                UserDefaults.standard.set(requested, forKey: preference)
+                result(["contractVersion": 1, "requested": requested,
+                        "configured": true, "verified": false] as [String: Any])
+            }
         }
     }
 }
