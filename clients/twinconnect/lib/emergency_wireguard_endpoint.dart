@@ -12,7 +12,9 @@ class EmergencyWireGuardEndpoint {
   const EmergencyWireGuardEndpoint._();
 
   static final _endpoint = RegExp(
-    r'^([ \t]*Endpoint[ \t]*=[ \t]*)([a-zA-Z0-9][a-zA-Z0-9.-]*)(:[0-9]{1,5})([ \t]*\r?)
+    r'^([ \t]*Endpoint[ \t]*=[ \t]*)([a-zA-Z0-9][a-zA-Z0-9.-]*)(:[0-9]{1,5})([ \t]*\r?)$',
+    multiLine: true,
+  );
 
   static Future<ClientProtocolProfiles> useDirectIpOnDnsFailure({
     required ClientProtocolProfiles profiles,
