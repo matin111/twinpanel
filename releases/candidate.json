@@ -1,6 +1,6 @@
 {
   "version": "1.1.0-rc.874",
-  "source_sha": "6be553324f8b520b193baadfa0da2e0627c56d12",
+  "source_sha": "2868e4cdd47f88d0b4eb25cb342af38381df1785",
   "notes": {
     "fa": "بازطراحی چیدمان دکمه‌های اشتراک و تاریخچه تمدید با کارت‌های خوانا و حذف نمایش کلیدهای خام دیتابیس.",
     "en": "Polished subscription action layout and renewal history cards; removed raw database metadata from the UI."
