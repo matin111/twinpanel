@@ -42,7 +42,7 @@ def patch_gradle() -> None:
         str(filename),
     )
     # OpenVPN's embedded process must be extracted from the APK at install time.
-    # The 2.x Flutter plugin manages the OpenVPN VpnService independently.
+    # Its patched ics-openvpn source borrows the shared Android VPN builder.
     current = only_once(
         current,
         "android {",
@@ -90,6 +90,22 @@ def patch_gradle() -> None:
             '\n// Independent AmneziaWG userspace engine.\n'
             'dependencies { implementation(files("libs/amneziawg-tunnel.aar")) }\n'
         )
+    filename.write_text(current, encoding="utf-8")
+
+
+def register_shared_openvpn_source_module() -> None:
+    """Compile the exact pinned OpenVPN source with a shared-TUN builder patch."""
+    filename = ANDROID / "settings.gradle.kts"
+    current = filename.read_text(encoding="utf-8")
+    if "// TwinConnect patched OpenVPN source module" in current:
+        return
+    if 'include(":app")' not in current:
+        raise RuntimeError("Unrecognized Flutter Gradle settings scaffold")
+    current += (
+        '\n// TwinConnect patched OpenVPN source module. Never use the upstream independent VpnService.\n'
+        'include(":openvpn_library")\n'
+        'project(":openvpn_library").projectDir = file("../.twinconnect-build/openvpn_library/vpnLib")\n'
+    )
     filename.write_text(current, encoding="utf-8")
     rules = ANDROID / "app" / "proguard-rules.pro"
     with rules.open("a", encoding="utf-8") as out:
@@ -328,6 +344,7 @@ def main() -> None:
     # Do not package its unused native executables into release APKs.
     install_launcher_icon()
     patch_gradle()
+    register_shared_openvpn_source_module()
     patch_manifest()
     print("Installed WireGuard JNI and Cisco engine on shared VPN/TUN owner.")
 

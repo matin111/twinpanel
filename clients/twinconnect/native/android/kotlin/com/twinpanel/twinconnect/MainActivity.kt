@@ -244,7 +244,7 @@ class MainActivity : FlutterActivity() {
                             shared?.externalTunnelProtocol() != null -> shared.externalTunnelProtocol()
                             else -> null
                         },
-                        "sharedTunSupportedProtocols" to (listOf("wireguard", "cisco", "singbox", "xray") +
+                        "sharedTunSupportedProtocols" to (listOf("wireguard", "cisco", "singbox", "xray", "openvpn") +
                             if (awgRuntime != null) listOf("amneziawg") else emptyList()),
                         "nativePacketGuardRequired" to ownership.requiresNativePacketGuard,
                         "singleTunnelKillSwitchAvailable" to true,

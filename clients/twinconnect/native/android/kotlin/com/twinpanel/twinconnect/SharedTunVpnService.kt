@@ -115,7 +115,9 @@ class SharedTunVpnService : VpnService() {
 
     /** Build in the sole VpnService, while the plugin configures its routes. */
     private fun borrowBuilder(engine: String): VpnService.Builder = synchronized(lock) {
-        check(engine == "singbox" || engine == "xray") { "EXTERNAL_ENGINE_UNKNOWN" }
+        check(engine == "singbox" || engine == "xray" || engine == "openvpn") {
+            "EXTERNAL_ENGINE_UNKNOWN"
+        }
         check(active === this && foregroundReady && !shuttingDown && tun != null) {
             "SHARED_TUN_NOT_READY"
         }

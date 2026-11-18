@@ -13,6 +13,7 @@ on:
       - "clients/twinconnect/native/android/**"
       - "clients/twinconnect/tools/install_android_native.py"
       - "clients/twinconnect/tools/patch_shared_tun_android_plugins.py"
+      - "clients/twinconnect/tools/stage_shared_openvpn_android.py"
       - "clients/twinconnect/tools/build_mieru_android.sh"
       - "clients/twinconnect/lib/android_*.dart"
       - "clients/twinconnect/lib/main.dart"
@@ -162,6 +163,8 @@ jobs:
         run: flutter pub get
       - name: Bind sing-box and Xray native plugins to SharedTunVpnService
         run: python tools/patch_shared_tun_android_plugins.py
+      - name: Stage pinned OpenVPN source with shared Android TUN
+        run: python tools/stage_shared_openvpn_android.py
       - name: Dart static analysis
         run: flutter analyze --no-fatal-infos
       - name: Dart tests

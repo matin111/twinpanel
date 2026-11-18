@@ -439,6 +439,26 @@ void main() {
     expect(card, contains('requireAndroidSharedTunSafeToConnect(policy)'));
   });
 
+  test('OpenVPN source is pinned and uses the same Android VPN owner', () {
+    final source = File('tools/stage_shared_openvpn_android.py')
+        .readAsStringSync();
+    final installer = File('tools/install_android_native.py')
+        .readAsStringSync();
+    final shared = File(
+      'native/android/kotlin/com/twinpanel/twinconnect/SharedTunVpnService.kt',
+    ).readAsStringSync();
+    final card = File('lib/android_connection_card.dart').readAsStringSync();
+    expect(source, contains('ccd61bc39bcb5b03281615ce669d2109557f6bd1'));
+    expect(source, contains('TWINCONNECT_SHARED_TUN_OPENVPN'));
+    expect(source, contains('"newExternalTunBuilder"'));
+    expect(source, contains('"externalTunEstablished"'));
+    expect(source, contains('"externalTunReleased"'));
+    expect(installer, contains('include(":openvpn_library")'));
+    expect(shared, contains('engine == "openvpn"'));
+    expect(card, contains('await AndroidOpenVpnTunnel.instance.connect('));
+    expect(card, contains('await _prepareSharedNativeEngine(policy);'));
+  });
+
   test('six dashboard locales and Arabic right-to-left are supported', () {
     final dashboard = File('lib/live_dashboard.dart').readAsStringSync();
     final localizer = File('lib/app_strings.dart').readAsStringSync();

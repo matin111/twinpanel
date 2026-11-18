@@ -105,6 +105,9 @@ jobs:
       - name: Bind Android native VPN owner
         if: matrix.platform == 'android'
         run: python tools/patch_shared_tun_android_plugins.py
+      - name: Stage Android OpenVPN source on the shared TUN
+        if: matrix.platform == 'android'
+        run: python tools/stage_shared_openvpn_android.py
       - name: Build Android (unsigned preview)
         if: matrix.platform == 'android'
         run: flutter build apk --release --dart-define=TWINCONNECT_DIRECTORY_URL=$TWINCONNECT_DIRECTORY_URL

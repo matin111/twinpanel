@@ -717,12 +717,11 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
     setState(() { _busy = true; _errorCode = null; });
     var stage = 'OPENVPN_ENGINE_INIT_FAILED';
     try {
-      // Do not bypass the policy gate used by the existing native transport.
+      // OpenVPN now borrows the same Builder as the disconnected guard.
       final policy = await _store.loadFailClosed(
         widget.panel.namespace, widget.username,
       );
-      final capabilities = await NativeVpnBridge.probe();
-      NativeVpnBridge.requireSafeToConnect(policy, capabilities);
+      NativeVpnBridge.requireAndroidSharedTunSafeToConnect(policy);
       await AndroidOpenVpnTunnel.instance.initialize();
       stage = 'OPENVPN_PROFILE_FETCH_FAILED';
       final profiles = await TenantApi.fromBuildConfig()
@@ -744,7 +743,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
       final id = item['node_id']?.toString();
       final server = inventory.where((n) => n.id == id).firstOrNull;
       stage = 'OPENVPN_NATIVE_CONNECT_FAILED';
-      await _releaseDisconnectedGuard();
+      await _prepareSharedNativeEngine(policy);
       await AndroidOpenVpnTunnel.instance.connect(
         profile: item, name: server?.name ?? 'TwinConnect',
       );
@@ -762,6 +761,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
           error is PlatformException ? error.code :
           error is TenantApiException ? error.message : stage);
     } finally {
+      if (!_openVpnUp) await _finishIdleSharedEngine();
       if (mounted) setState(() => _busy = false);
     }
   }
