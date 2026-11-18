@@ -206,7 +206,7 @@ export function TunnelProtocolRuntimeV307(){
         ?await twinTunnelInstallApi.install(selectedTunnel.id,selectedBackupId)
         :await twinTunnelInstallApi.verify(selectedTunnel.id,selectedBackupId);
       setTwinStatus(status);
-      setNotice(pick("فایل‌های آزمایشی روی نودهای انتخابی بررسی شدند. ترانسپورت‌های چندگانه هنوز فعال نشده‌اند.","Staging files verified on selected nodes. Multi-carrier routing is not active."));
+      setNotice(pick("فایل‌های موتور روی نودهای انتخابی بررسی شدند. ترانسپورت‌های چندگانه هنوز فعال نشده‌اند.","Staging files verified on selected nodes. Multi-carrier routing is not active."));
     }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
     finally{setBusy("");}
   };
@@ -253,10 +253,10 @@ export function TunnelProtocolRuntimeV307(){
           try{
             const backupId=Number(JSON.parse(intent)?.backup_node_id||0);
             // Two nodes are sufficient for a staged pair; third is an optional relay.
-            setNotice(pick("تانل اصلی ساخته شد؛ بررسی فایل‌های آزمایشی روی نودها آغاز شد.","Base tunnel created; node staging checks started."));
+            setNotice(pick("تانل اصلی ساخته شد؛ بررسی فایل‌های موتور روی نودها آغاز شد.","Base tunnel created; node staging checks started."));
             const status=await twinTunnelInstallApi.install(id,backupId);
             setTwinStatus(status);setTwinBackupId(backupId);
-            setNotice(pick("فایل‌های آزمایشی آماده شدند. سه ترانسپورت هنوز پیاده‌سازی و فعال نشده‌اند.","Staging verified. Three independent carrier links are not deployed or active."));
+            setNotice(pick("فایل‌های موتور آماده شدند. سه ترانسپورت هنوز پیاده‌سازی و فعال نشده‌اند.","Staging verified. Three independent carrier links are not deployed or active."));
           }catch(reason){
             setNotice(pick("تانل TP27 ساخته شد، ولی آماده‌سازی TwinTunnel کامل نشد: ","TP27 tunnel created; TwinTunnel staging did not complete: ")+(reason instanceof Error?reason.message:String(reason)));
           }
@@ -399,7 +399,7 @@ export function TunnelProtocolRuntimeV307(){
           <section className={styles.section}>
             <div className={styles.sectionHead}>
               <div><b>{pick("TwinTunnel · چند ترانسپورت","TwinTunnel · multiple transports")}</b></div>
-              <Badge tone={twinStatus?.status==="staged"&&!twinStatus.needs_update?"ok":"warn"}>{twinStatus?.status==="staged"&&!twinStatus.needs_update?pick("آماده آزمایش","Staged"):pick("نصب آزمایشی","Lab install")}</Badge>
+              <Badge tone={twinStatus?.status==="staged"&&!twinStatus.needs_update?"ok":"warn"}>{twinStatus?.status==="staged"&&!twinStatus.needs_update?pick("فایل‌ها آماده","Staged"):pick("آماده نصب","Lab install")}</Badge>
             </div>
             <div className={styles.managementActions}>
               <label>
@@ -415,7 +415,7 @@ export function TunnelProtocolRuntimeV307(){
                 {busy==="twintunnel-verify"?"…":pick("بررسی مجدد","Recheck")}
               </button>
             </div>
-            <small>{pick("سه ترانسپورت مستقل بین ایران و خروجی هنوز در موتور عملیاتی نشده‌اند؛ نصب فعلی فقط آزمایشی است.","Three independent carriers between entry and exit are not yet operational; this is staging only.")}</small>
+            <small>{pick("سه ترانسپورت مستقل بین ایران و خروجی هنوز در موتور عملیاتی نشده‌اند؛ فایل‌های موتور فقط آماده‌سازی شده‌اند و مسیر جدید فعال نیست.","Three independent carriers between entry and exit are not yet operational; this is staging only.")}</small>
             <small>{pick("ترانسپورت‌های پیشنهادی: WSS / QUICv2 / KCP — هنوز نصب و فعال نشده‌اند.","Planned carriers: WSS / QUICv2 / KCP — not installed or active.")}</small>
             {twinStatus?.status==="staged"&&<div className="table"><table><thead><tr><th>{pick("نود","Node")}</th><th>{pick("سلامت موتور","Engine check")}</th><th>{pick("نسخه","Revision")}</th></tr></thead><tbody>
               {twinStatus.nodes.map(node=><tr key={node.node_id}><td>{node.name||"Node #"+node.node_id}</td><td><Badge tone={node.ok&&node.selftest==="ok"?"ok":"bad"}>{node.ok&&node.selftest==="ok"?"Verified":"Failed"}</Badge></td><td dir="ltr">{twinStatus.installed_revision||"—"}</td></tr>)}
@@ -463,7 +463,7 @@ export function TunnelProtocolRuntimeV307(){
               if(mode==="twintunnel_standby")setDraft(value=>({...value,initial_transport:"tp27_fast"}));
             }}>
               <option value="tp27_fast">{pick("TP27 اصلی","Original TP27")}</option>
-              <option value="twintunnel_standby">{pick("TwinTunnel آزمایشی (دو نود)","TwinTunnel staging (two nodes)")}</option>
+              <option value="twintunnel_standby">{pick("TwinTunnel (دو نود)","TwinTunnel (two nodes)")}</option>
             </select>
           </label>
           {newEngine==="twintunnel_standby"&&<label className={styles.createField}>
@@ -471,7 +471,7 @@ export function TunnelProtocolRuntimeV307(){
             <select value={newBackupId} onChange={event=>setNewBackupId(Number(event.target.value))}>
               <option value={0}>{pick("بدون نود سوم","No third node")}</option>{newBackupCandidates.map(node=><option key={node.id} value={node.id}>{node.name} · {node.public_ip}</option>)}
             </select>
-            <small>{pick("کاربران روی TP27 باقی می‌مانند. موتور جدید صرفاً نصب آزمایشی می‌شود.","Subscribers remain on TP27; the new engine is staged only.")}</small>
+            <small>{pick("کاربران روی TP27 باقی می‌مانند. فایل‌های موتور جدید آماده می‌شوند؛ مسیر جدید فعال نمی‌شود.","Subscribers remain on TP27; the new engine is staged only.")}</small>
           </label>}
 
           <div className={styles.createSettingsGrid}>
