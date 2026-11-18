@@ -70,7 +70,7 @@ export const twinTunnelInstallApi={
     }),
   verify:(tunnelId:number,backupNodeId?:number)=>
     request("/v1/tunnels/"+tunnelId+"/twintunnel-install","POST",{
-      backup_node_id:backupNodeId,
+      backup_node_id:backupNodeId||null,
       mode:"verify",
     }),
 };
