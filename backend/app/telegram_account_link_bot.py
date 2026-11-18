@@ -72,11 +72,6 @@ def _main_menu_keyboard():
                     callback_data="mlearn:g:root",
                     style=styles.learning,
                 ),
-                inline_button(
-                    "⬇️ دانلود برنامه",
-                    callback_data="mlearn:d:root",
-                    style=styles.download,
-                ),
             ],
             [
                 inline_button(
