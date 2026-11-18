@@ -195,7 +195,7 @@ def create_guides_router():
             buttons.append([
                 InlineKeyboardButton(
                     text="📥 دانلود کانکشن هوشمند ویندوز",
-                    url="https://t.me/c/3948997062/3",
+                    url="https://t.me/twin_connect1/3",
                 ),
             ])
         buttons.append([
