@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.866",
-  "source_sha": "ca82f506a880faf6af47f334f0ac3ad3f453a6b9",
+  "version": "1.1.0-rc.867",
+  "source_sha": "7400ce682f7ad9156f017613e404f0603c9cb55d",
   "notes": {
-    "fa": "ساده‌سازی پنجره مدیریت تانل: حذف متن‌های اضافی و تکراری، کوتاه‌کردن دکمه‌های نصب و بررسی TwinTunnel و حفظ کامل عملکرد فعلی تانل‌ها و سرویس‌ها.",
-    "en": "Compact tunnel-management modal: remove redundant explanatory copy, shorten TwinTunnel install/recheck labels, preserve all current tunnel and VPN behavior."
+    "fa": "اصلاح TwinTunnel آزمایشی برای دو نود ایران و خارج، حذف الزام نود سوم، معرفی طرح سه ترانسپورت WSS/QUICv2/KCP و تفکیک نصب فایل از فعال‌سازی. TP27 کاربران فعال بدون تغییر می‌ماند.",
+    "en": "TwinTunnel two-endpoint staged installation with optional third node, planned WSS/QUICv2/KCP carrier links and explicit inactive status. Existing TP27 customer routes remain unchanged."
   }
 }
