@@ -131,6 +131,14 @@ jobs:
           test -f android/app/src/main/kotlin/com/twinpanel/twinconnect/TunPacketGate.kt
           test -f android/app/src/main/kotlin/com/twinpanel/twinconnect/SharedTunVpnService.kt
           grep -F 'android:name=".SharedTunVpnService"' android/app/src/main/AndroidManifest.xml
+          if grep -F 'android:name="com.axevpn.flutter.openconnect.AxeOpenConnectVpnService"' android/app/src/main/AndroidManifest.xml; then
+            echo "Legacy Cisco VpnService must not claim another Android VPN slot" >&2
+            exit 1
+          fi
+          test -f android/app/src/main/java/com/axevpn/flutter/openconnect/SharedOpenConnectEngine.java
+          grep -F 'new Intent(context, SharedTunVpnService.class)' android/app/src/main/java/com/axevpn/flutter/openconnect/OpenConnectFlutterPlugin.java
+          grep -F 'owner.establishCiscoTun(' android/app/src/main/java/com/axevpn/flutter/openconnect/SharedOpenConnectEngine.java
+          grep -F 'fun establishCiscoTun(' android/app/src/main/kotlin/com/twinpanel/twinconnect/SharedTunVpnService.kt
           grep -F 'fun startWireGuard(config: Config' android/app/src/main/kotlin/com/twinpanel/twinconnect/SharedTunVpnService.kt
           grep -F 'ParcelFileDescriptor.dup(replacement.fileDescriptor)' android/app/src/main/kotlin/com/twinpanel/twinconnect/SharedTunVpnService.kt
           grep -F 'WireGuardJni.turnOn(nativeFd, settings)' android/app/src/main/kotlin/com/twinpanel/twinconnect/SharedTunVpnService.kt

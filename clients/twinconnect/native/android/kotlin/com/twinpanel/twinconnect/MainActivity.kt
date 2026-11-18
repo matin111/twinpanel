@@ -236,8 +236,14 @@ class MainActivity : FlutterActivity() {
                             else -> "DISCONNECTED_UNPROTECTED"
                         },
                         "tunnelOwner" to if (shared != null) "SHARED_TUN" else ownership.owner.name,
+                        "sharedTunProtocol" to when {
+                            shared?.hasWireGuardTunnel() == true -> "wireguard"
+                            shared?.hasCiscoTunnel() == true -> "cisco"
+                            else -> null
+                        },
+                        "sharedTunSupportedProtocols" to listOf("wireguard", "cisco"),
                         "nativePacketGuardRequired" to ownership.requiresNativePacketGuard,
-                        "singleTunnelKillSwitchAvailable" to WireGuardRuntime.initialize(applicationContext),
+                        "singleTunnelKillSwitchAvailable" to true,
                         "failClosedAcrossHandoff" to sharedGuardUp
                     ))
                 }

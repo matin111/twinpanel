@@ -178,10 +178,9 @@ class NativeVpnBridge {
     }
   }
 
-  /// Cisco uses its own vetted libopenconnect VpnService, not GoBackend.
-  /// Do not prevent a Cisco connection merely because WireGuard's JNI is
-  /// missing or has crashed. Only policy features this Cisco TUN actually
-  /// enforces are accepted; the shared-TUN kill switch is not yet one of them.
+  /// Cisco uses pinned libopenconnect with SharedTunVpnService (not GoBackend).
+  /// It supports the in-process shared-TUN guard; other unsupported policy
+  /// features must still fail closed before loading credentials.
   static void requireAndroidCiscoSafeToConnect(VpnPolicy policy) {
     final problems = <String>[];
     if (platform != VpnPlatform.android) problems.add('ANDROID_ONLY');
@@ -193,9 +192,6 @@ class NativeVpnBridge {
     }
     if (policy.ipv6Mode != VpnIpv6Mode.tunnelOrBlock) {
       problems.add('IPV6_POLICY_NOT_SUPPORTED');
-    }
-    if (policy.killSwitchRequested) {
-      problems.add('CISCO_SHARED_GUARD_NOT_IMPLEMENTED');
     }
     if (policy.allowLan) problems.add('LAN_BYPASS_NOT_IMPLEMENTED');
     if (policy.autoConnect) problems.add('AUTOCONNECT_NOT_IMPLEMENTED');

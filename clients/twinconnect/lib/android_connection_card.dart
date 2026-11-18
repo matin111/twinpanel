@@ -589,7 +589,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
       final policy = await _store.loadFailClosed(
         widget.panel.namespace, widget.username,
       );
-      // Cisco's separate native TUN must not depend on WireGuard JNI health.
+      // Cisco shares the Android TUN owner, not WireGuard's native engine.
       NativeVpnBridge.requireAndroidCiscoSafeToConnect(policy);
       stage = 'CISCO_PROFILE_FETCH_FAILED';
       final profiles = await TenantApi.fromBuildConfig().loadSessionNativeProfiles(
@@ -617,7 +617,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
       // The vendored service rejects bad pins rather than bypassing TLS.
       AndroidCiscoTunnel.validatedServerTrust(profile);
       stage = 'CISCO_NATIVE_CONNECTION_FAILED';
-      await _releaseDisconnectedGuard();
+      await _releaseDisconnectedGuard(allowSharedTun: true);
       await AndroidCiscoTunnel.instance.connect(profile);
       if (!mounted) return;
       final id = item['node_id']?.toString();

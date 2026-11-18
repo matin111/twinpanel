@@ -383,13 +383,13 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
                   _androidKillRequested
                       ? 'فعال: تونل مشترک ترافیک را هنگام قطع اتصال مسدود می‌کند. برای خاموشی کامل برنامه، قفل شبکه اندروید لازم است.'
                       : _androidVpnConflict && !_androidLockdownVerifiable
-                          ? 'موتور VPN دیگری فعال است؛ محافظ مشترک WireGuard هنوز فعال نیست.'
-                          : 'با یک دکمه محافظ داخلی WireGuard را روشن کنید.',
+                          ? 'موتور VPN مستقل دیگری فعال است؛ محافظ مشترک در دسترس نیست.'
+                          : 'با یک دکمه محافظ داخلی WireGuard و Cisco را روشن کنید.',
                   _androidKillRequested
                       ? 'Enabled: shared TUN blocks traffic on disconnect. Android lockdown is still needed for app termination.'
                       : _androidVpnConflict && !_androidLockdownVerifiable
-                          ? 'Another VPN engine is active; shared WireGuard guard is not enabled.'
-                          : 'Enable WireGuard in-app traffic blocking with one switch.',
+                          ? 'An independent VPN engine is active; shared guard is unavailable.'
+                          : 'Enable WireGuard and Cisco in-app traffic blocking with one switch.',
                 )),
                 trailing: Switch.adaptive(
                   key: const Key('androidSharedKillSwitch'),

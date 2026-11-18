@@ -9,6 +9,7 @@ import android.content.IntentFilter;
 import android.net.VpnService;
 import android.os.Build;
 import android.util.Log;
+import com.twinpanel.twinconnect.SharedTunVpnService;
 
 import androidx.annotation.NonNull;
 
@@ -239,8 +240,10 @@ public class OpenConnectFlutterPlugin implements FlutterPlugin, ActivityAware, M
     private void startOpenConnectService() {
         updateStage("connecting");
         try {
-            Intent serviceIntent = new Intent(context, AxeOpenConnectVpnService.class);
-            serviceIntent.setAction(AxeOpenConnectVpnService.ACTION_CONNECT);
+            // Reuse Android's *existing* VPN owner. Never start the legacy
+            // AxeOpenConnectVpnService when a shared kill switch is armed.
+            Intent serviceIntent = new Intent(context, SharedTunVpnService.class);
+            serviceIntent.setAction(SharedTunVpnService.ACTION_CONNECT_CISCO);
             serviceIntent.putExtra(AxeOpenConnectVpnService.EXTRA_SERVER_URL,    pendingServerUrl);
             serviceIntent.putExtra(AxeOpenConnectVpnService.EXTRA_TUNNEL_NAME,   pendingName);
             serviceIntent.putExtra(AxeOpenConnectVpnService.EXTRA_USERNAME,      pendingUsername);
@@ -273,8 +276,8 @@ public class OpenConnectFlutterPlugin implements FlutterPlugin, ActivityAware, M
     private void handleDisconnect(@NonNull Result result) {
         try {
             updateStage("disconnecting");
-            Intent serviceIntent = new Intent(context, AxeOpenConnectVpnService.class);
-            serviceIntent.setAction(AxeOpenConnectVpnService.ACTION_DISCONNECT);
+            Intent serviceIntent = new Intent(context, SharedTunVpnService.class);
+            serviceIntent.setAction(SharedTunVpnService.ACTION_DISCONNECT_CISCO);
             // Disconnect does not create a foreground service: it only asks the
             // already-running VPN service to tear down its tunnel and stop.
             // startForegroundService() here caused Android's
@@ -315,3 +318,4 @@ public class OpenConnectFlutterPlugin implements FlutterPlugin, ActivityAware, M
         }
     }
 }
+

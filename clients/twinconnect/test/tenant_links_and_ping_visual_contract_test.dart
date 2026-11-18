@@ -330,7 +330,7 @@ void main() {
     expect(service, contains('broadcastStage("disconnected")'));
   });
 
-  test('Cisco Android uses an isolated engine, not a WireGuard tunnel', () {
+  test('Cisco Android uses shared TUN ownership without WireGuard JNI', () {
     final controller = File('lib/android_tunnel.dart').readAsStringSync();
     final card = File('lib/android_connection_card.dart').readAsStringSync();
     final native = File(
@@ -345,7 +345,8 @@ void main() {
     expect(card, contains('AndroidCiscoTunnel.instance.connect(profile)'));
     expect(card, contains('NativeVpnBridge.requireAndroidCiscoSafeToConnect(policy)'));
     expect(bridge, contains('static void requireAndroidCiscoSafeToConnect(VpnPolicy policy)'));
-    expect(bridge, contains("problems.add('CISCO_SHARED_GUARD_NOT_IMPLEMENTED')"));
+    expect(bridge, isNot(contains('CISCO_SHARED_GUARD_NOT_IMPLEMENTED')));
+    expect(card, contains('_releaseDisconnectedGuard(allowSharedTun: true);\n      await AndroidCiscoTunnel.instance.connect(profile)'));
     expect(card, contains('AndroidCiscoTunnel.instance.status()'));
     expect(cisco, contains('com.axevpn.flutter.openconnect/vpncontrol'));
     expect(cisco, contains("'servercert': pin"));
@@ -353,6 +354,37 @@ void main() {
     expect(cisco, contains('CISCO_SHA256_PIN_INVALID'));
     expect(native, contains('OpenConnectFlutterPlugin()'));
     expect(native, contains('listOf("wireguard")'));
+  });
+
+  test('Cisco and WireGuard use one Android VpnService for disconnect guard', () {
+    final shared = File(
+      'native/android/kotlin/com/twinpanel/twinconnect/SharedTunVpnService.kt',
+    ).readAsStringSync();
+    final plugin = File(
+      'native/android/java/com/axevpn/flutter/openconnect/OpenConnectFlutterPlugin.java',
+    ).readAsStringSync();
+    final adapter = File(
+      'native/android/java/com/axevpn/flutter/openconnect/SharedOpenConnectEngine.java',
+    ).readAsStringSync();
+    final installer = File('tools/install_android_native.py').readAsStringSync();
+    final dashboard = File('lib/live_dashboard.dart').readAsStringSync();
+    expect(plugin, contains('new Intent(context, SharedTunVpnService.class)'));
+    expect(plugin, contains('SharedTunVpnService.ACTION_CONNECT_CISCO'));
+    expect(plugin, contains('SharedTunVpnService.ACTION_DISCONNECT_CISCO'));
+    expect(plugin, isNot(contains('new Intent(context, AxeOpenConnectVpnService.class)')));
+    expect(adapter, contains('owner.establishCiscoTun('));
+    expect(adapter, contains('new NativeOpenConnectSession('));
+    expect(adapter, contains('owner.onCiscoEngineStopped(this)'));
+    expect(shared, contains('fun establishCiscoTun('));
+    expect(shared, contains('check(ciscoEngine == null) { "TUNNEL_ALREADY_RUNNING" }'));
+    expect(shared, contains('val previous = tun'));
+    expect(shared, contains('ParcelFileDescriptor.dup(replacement.fileDescriptor)'));
+    expect(shared, contains('if (!persistentBlock && wireGuardHandle < 0) shutdown()'));
+    expect(installer, contains('"SharedOpenConnectEngine.java"'));
+    expect(installer, isNot(contains('Independent pinned Cisco CSTP/TLS VpnService')));
+    final startCisco = dashboard.indexOf('Future<void> _startCiscoTunnel(');
+    expect(dashboard.substring(startCisco, startCisco + 220),
+        contains('_requireVerifiedGuardIfRequested(sharedWireGuard: true)'));
   });
 
   test('six dashboard locales and Arabic right-to-left are supported', () {

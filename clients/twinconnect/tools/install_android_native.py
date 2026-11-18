@@ -98,6 +98,7 @@ def patch_gradle() -> None:
             "-keep class org.infradead.libopenconnect.** { *; }\n"
             "-keep class com.axevpn.flutter.openconnect.NativeOpenConnectSession { *; }\n"
             "-keep class com.axevpn.flutter.openconnect.NativeOpenConnectSession$* { *; }\n"
+            "-keep class com.axevpn.flutter.openconnect.SharedOpenConnectEngine { *; }\n"
             "-keep class org.amnezia.awg.** { *; }\n"
             # MainActivity loads this class by its literal name via reflection.
             # R8 otherwise removes or renames it in release APKs, causing
@@ -235,17 +236,8 @@ def patch_manifest() -> None:
         '            </intent-filter>\n'
         '        </service>\n'
     )
-    if 'android:name="com.axevpn.flutter.openconnect.AxeOpenConnectVpnService"' not in current:
-        service += (
-            '\n        <!-- Independent pinned Cisco CSTP/TLS VpnService -->\n'
-            '        <service android:name="com.axevpn.flutter.openconnect.AxeOpenConnectVpnService"\n'
-            '            android:exported="false"\n'
-            '            android:foregroundServiceType="specialUse"\n'
-            '            android:permission="android.permission.BIND_VPN_SERVICE">\n'
-            '            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"\n'
-            '                android:value="vpn" />\n'
-            '        </service>\n'
-        )
+    # Cisco is hosted by SharedTunVpnService. Registering the old separate
+    # service would allow accidental second-owner routing takeovers.
     for permission in (
         "android.permission.FOREGROUND_SERVICE",
         "android.permission.FOREGROUND_SERVICE_SPECIAL_USE",
@@ -304,7 +296,7 @@ def install_native_sources() -> None:
     java_source = NATIVE / "java" / "com" / "axevpn" / "flutter" / "openconnect"
     java_package.mkdir(parents=True, exist_ok=True)
     for filename in ("AxeOpenConnectVpnService.java", "OpenConnectFlutterPlugin.java",
-                     "NativeOpenConnectSession.java"):
+                     "NativeOpenConnectSession.java", "SharedOpenConnectEngine.java"):
         src = java_source / filename
         if not src.is_file():
             raise RuntimeError(f"Missing Cisco native source: {src}")
@@ -348,7 +340,7 @@ def main() -> None:
     install_launcher_icon()
     patch_gradle()
     patch_manifest()
-    print("Installed WireGuard JNI and independent pinned Cisco CSTP/TLS VpnService.")
+    print("Installed WireGuard JNI and Cisco engine on shared VPN/TUN owner.")
 
 
 if __name__ == "__main__":

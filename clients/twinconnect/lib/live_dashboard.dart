@@ -230,8 +230,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       if (status?['osLockdown'] == true && status?['protectionVerified'] == true) {
         return;
       }
-      // Independent protocol services still require OS lockdown. Only
-      // WireGuard is currently migrated to the shared-FD native tunnel.
+      // Engines that still create a second VpnService require OS lockdown.
+      // Cisco and WireGuard can retain the shared-TUN guard across reconnects.
       if (!sharedWireGuard) {
         throw const FormatException('ANDROID_KILL_SWITCH_NOT_VERIFIED');
       }
@@ -960,7 +960,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     if (_vpnBusy) return;
     setState(() { _vpnBusy = true; _vpnError = null; });
     try {
-      await _requireVerifiedGuardIfRequested();
+      await _requireVerifiedGuardIfRequested(sharedWireGuard: true);
       if (_vpnUnmanaged) {
         throw const FormatException('UNMANAGED_WIREGUARD_SERVICE');
       }

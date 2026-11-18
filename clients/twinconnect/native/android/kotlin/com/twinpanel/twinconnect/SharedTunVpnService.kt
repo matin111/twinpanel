@@ -11,6 +11,7 @@ import android.net.VpnService
 import android.os.Build
 import android.os.ParcelFileDescriptor
 import android.util.Log
+import com.axevpn.flutter.openconnect.SharedOpenConnectEngine
 import com.wireguard.android.backend.GoBackend
 import com.wireguard.config.Config
 import java.lang.reflect.Method
@@ -34,6 +35,7 @@ class SharedTunVpnService : VpnService() {
     @Volatile private var persistentBlock = false
     @Volatile private var foregroundReady = false
     @Volatile private var shuttingDown = false
+    @Volatile private var ciscoEngine: SharedOpenConnectEngine? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) {
@@ -62,7 +64,17 @@ class SharedTunVpnService : VpnService() {
                 .setOngoing(true).build())
             foregroundReady = true
             active = this
-            if (intent?.action == ACTION_START_BLOCK) enableBlocking()
+            when (intent?.action) {
+                ACTION_START_BLOCK -> enableBlocking()
+                ACTION_CONNECT_CISCO -> try {
+                    connectCisco(intent)
+                } catch (_: IllegalStateException) {
+                    // Reject a second engine without terminating the first
+                    // engine or releasing Android's existing VPN route.
+                    SharedOpenConnectEngine.reject(this, "CISCO_SHARED_TUN_BUSY")
+                }
+                ACTION_DISCONNECT_CISCO -> disconnectCisco()
+            }
         } catch (_: Exception) {
             shutdown()
             return START_NOT_STICKY
@@ -93,9 +105,74 @@ class SharedTunVpnService : VpnService() {
         val shouldClose: Boolean
         synchronized(lock) {
             persistentBlock = false
-            shouldClose = wireGuardHandle < 0
+            shouldClose = wireGuardHandle < 0 && ciscoEngine == null
         }
         if (shouldClose) shutdown()
+    }
+
+    /** Cisco and WireGuard share this *same* VpnService and Android VPN slot. */
+    private fun connectCisco(intent: Intent) {
+        val engine = synchronized(lock) {
+            check(foregroundReady && !shuttingDown && active === this) {
+                "SHARED_TUN_NOT_READY"
+            }
+            check(wireGuardHandle < 0 && ciscoEngine == null) { "TUNNEL_ALREADY_RUNNING" }
+            SharedOpenConnectEngine(this).also { ciscoEngine = it }
+        }
+        Thread({ engine.connect(intent) }, "oc-shared-tun").start()
+    }
+
+    private fun disconnectCisco() {
+        val engine = ciscoEngine
+        if (engine == null) {
+            if (!persistentBlock && wireGuardHandle < 0) shutdown()
+        } else engine.stop()
+    }
+
+    /** Called by libopenconnect only after it authenticates and receives IPInfo. */
+    fun establishCiscoTun(
+        engine: SharedOpenConnectEngine,
+        name: String,
+        address: String,
+        prefix: Int,
+        mtu: Int,
+        dnsServers: List<String>,
+        ipv6Address: String?,
+        ipv6Prefix: Int
+    ): ParcelFileDescriptor = synchronized(lock) {
+        check(active === this && !shuttingDown && ciscoEngine === engine &&
+            wireGuardHandle < 0) { "SHARED_TUN_OWNER_CHANGED" }
+        check(VpnService.prepare(this) == null) { "VPN_PERMISSION_REQUIRED" }
+        check(dnsServers.isNotEmpty()) { "CISCO_DNS_MISSING" }
+        val builder = Builder().setSession(name)
+            .setBlocking(true)
+            .setMtu(mtu.coerceIn(1280, 1300))
+            .addAddress(address, prefix)
+            .addRoute("0.0.0.0", 0)
+        for (dns in dnsServers) builder.addDnsServer(dns)
+        // Capture *both* address families. IPv4-only Cisco gateways discard
+        // IPv6 inside TUN rather than letting it bypass the kill switch.
+        if (ipv6Address != null) builder.addAddress(ipv6Address, ipv6Prefix)
+        else builder.addAddress("fd00:253:253::1", 128)
+        builder.addRoute("::", 0)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) builder.setMetered(false)
+        val replacement = builder.establish()
+            ?: throw IllegalStateException("SHARED_TUN_ESTABLISH_FAILED")
+        val previous = tun
+        tun = replacement
+        previous?.close()
+        // Keep the owner FD. libopenconnect may close its *duplicate* on exit,
+        // leaving this service's routing slot alive as a blackhole.
+        ParcelFileDescriptor.dup(replacement.fileDescriptor)
+    }
+
+    fun onCiscoEngineStopped(engine: SharedOpenConnectEngine) {
+        val close = synchronized(lock) {
+            if (ciscoEngine !== engine) return
+            ciscoEngine = null
+            !persistentBlock && !shuttingDown
+        }
+        if (close) shutdown()
     }
 
     /** Actual ownership handoff: no GoBackend.setState or second VpnService. */
@@ -107,6 +184,7 @@ class SharedTunVpnService : VpnService() {
                 "SHARED_TUN_NOT_READY"
             }
             check(wireGuardHandle < 0) { "TUNNEL_ALREADY_RUNNING" }
+            check(ciscoEngine == null) { "TUNNEL_ALREADY_RUNNING" }
             check(VpnService.prepare(this) == null) { "VPN_PERMISSION_REQUIRED" }
             // Once this startup owns the routing transition, it is responsible
             // for tearing it down if native activation fails. A failed WG
@@ -203,9 +281,25 @@ class SharedTunVpnService : VpnService() {
     }
 
     fun hasWireGuardTunnel() = wireGuardHandle >= 0
+    fun hasCiscoTunnel() = ciscoEngine?.isConnected == true
     fun hasBlockingTun() = tun != null && persistentBlock
     fun hasTunnel() = tun != null
     fun isLockdownVerified(): Boolean = try { isLockdownEnabled } catch (_: Exception) { false }
+
+    /** Resolve Cisco outside VPN DNS when the guard already blackholes traffic. */
+    fun resolveCiscoGateway(hostname: String): String {
+        val manager = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        for (network in manager.allNetworks) {
+            val caps = manager.getNetworkCapabilities(network) ?: continue
+            if (caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN) ||
+                !caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) continue
+            val resolved = try { network.getAllByName(hostname).toList() }
+                catch (_: Exception) { emptyList() }
+            val address = resolved.firstOrNull { it is Inet4Address }
+            if (address?.hostAddress != null) return address.hostAddress!!
+        }
+        throw IllegalStateException("CISCO_GATEWAY_UNDERLAY_DNS_FAILED")
+    }
 
     fun wireGuardStats(): String? = synchronized(lock) {
         // wireguard-go keeps tunnel handles in a native map. A statistics read
@@ -263,9 +357,12 @@ class SharedTunVpnService : VpnService() {
     }
 
     private fun shutdown() {
+        var stoppedCisco: SharedOpenConnectEngine? = null
         synchronized(lock) {
             if (shuttingDown) return
             shuttingDown = true
+            stoppedCisco = ciscoEngine
+            ciscoEngine = null
             val handle = wireGuardHandle
             wireGuardHandle = -1
             if (handle >= 0) try { WireGuardJni.turnOff(handle) } catch (_: Exception) {}
@@ -275,6 +372,7 @@ class SharedTunVpnService : VpnService() {
             foregroundReady = false
             if (active === this) active = null
         }
+        stoppedCisco?.stop()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             stopForeground(STOP_FOREGROUND_REMOVE)
         } else {
@@ -296,6 +394,8 @@ class SharedTunVpnService : VpnService() {
 
     companion object {
         const val ACTION_START_BLOCK = "com.twinpanel.twinconnect.START_SHARED_BLOCK"
+        const val ACTION_CONNECT_CISCO = "com.twinpanel.twinconnect.CONNECT_SHARED_CISCO"
+        const val ACTION_DISCONNECT_CISCO = "com.twinpanel.twinconnect.DISCONNECT_SHARED_CISCO"
         const val ACTION_STOP = "com.twinpanel.twinconnect.STOP_SHARED_TUN"
         private const val CHANNEL = "twinconnect_shared_tun"
         private const val NOTIFICATION_ID = 47032

@@ -36,6 +36,7 @@ final class NativeOpenConnectSession extends LibOpenConnect {
     private final byte[] expectedPin;
     private final boolean spkiPin;
     private final String serverHost;
+    private String gatewayAddress;
     private ParcelFileDescriptor tun;
     private volatile boolean stopped;
 
@@ -64,6 +65,11 @@ final class NativeOpenConnectSession extends LibOpenConnect {
             throw new IllegalArgumentException("CISCO_CERT_PIN_INVALID");
         }
         if (expectedPin != null && expectedPin.length != 32) throw new IllegalArgumentException("CISCO_CERT_PIN_INVALID");
+    }
+
+    /** Use pre-resolved underlay IP while preserving the original TLS SNI/pin. */
+    void useUnderlayAddress(String address) {
+        gatewayAddress = address;
     }
 
     @Override public int onProcessAuthForm(AuthForm form) {
@@ -181,6 +187,10 @@ final class NativeOpenConnectSession extends LibOpenConnect {
             setReportedOS("android");
             // Do not disable peer certificate validation or leak credentials to logs.
             if (parseURL(serverUrl) != 0) throw new IllegalStateException("URL");
+            if (gatewayAddress != null) {
+                setSNI(serverHost);
+                setHostname(gatewayAddress);
+            }
             listener.stage("authenticating", "");
             failure = "CISCO_NATIVE_AUTH_FAILED";
             if (obtainCookie() != 0 || stopped) throw new IllegalStateException("AUTH");
@@ -242,3 +252,4 @@ final class NativeOpenConnectSession extends LibOpenConnect {
         cancel();
     }
 }
+
