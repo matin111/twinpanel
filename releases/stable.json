@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.879",
+  "version": "1.1.0-rc.880",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-18T11:17:41Z",
+  "released_at": "2026-11-18T11:39:39Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "b11fdd1017967809990f740ab0b7c0b6a889118c",
+  "source_sha": "19da693a2c09b0b736ebf50dde78e99fa04578ed",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.879/twinpanel-1.1.0-rc.879-linux-x86_64.tar.gz",
-    "sha256": "9597ec46486e39f5fc68671b2675017cb20d45c7943feb4c31504bb79b47c733",
-    "size_bytes": 31275087
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.880/twinpanel-1.1.0-rc.880-linux-x86_64.tar.gz",
+    "sha256": "441120dbedf492cbb44c4289d249655cfd205ed5ae6586fa376dc10ba5c54059",
+    "size_bytes": 31324846
   },
   "notes": {
-    "fa": "یکپارچه‌سازی آموزش و دریافت اپلیکیشن در ربات اصلی و نمایندگی؛ حذف دکمه دانلود جدا؛ نمایش برنامه‌هایی مانند Karing فقط یک‌بار به‌جای تفکیک پروتکل‌ها؛ افزودن TwinConnect ویندوز و لینک کانال اصلی.",
-    "en": "Unify app tutorials and downloads in main and reseller Telegram bots, remove separate downloads menu, deduplicate clients such as Karing across protocols and include Windows TwinConnect with the channel link."
+    "fa": "اصلاح لینک دانلود TwinConnect ویندوز در آموزش‌های ربات؛ جایگزینی لینک خصوصی با پیام عمومی https://t.me/twin_connect1/3",
+    "en": "Replace private TwinConnect Windows Telegram download link with the public channel post."
   }
 }
