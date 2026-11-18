@@ -55,6 +55,15 @@ async function request(path:string,method:"GET"|"POST"="GET",body?:object):Promi
       error=typeof detail==="string"?detail:
         detail&&typeof detail==="object"&&"message" in detail
           ?String((detail as {message:unknown}).message):error;
+      if(detail&&typeof detail==="object"&&"nodes" in detail){
+        const nodes=(detail as {nodes?:unknown}).nodes;
+        if(Array.isArray(nodes)){
+          const failed=nodes.filter((n):n is {node_id?:number;name?:string;error?:string;ok?:boolean}=>
+            Boolean(n)&&typeof n==="object"&&(n as {ok?:boolean}).ok===false);
+          if(failed.length)error+=" — "+failed.map(n=>
+            "Node #"+String(n.node_id||"?")+": "+String(n.error||"check failed").slice(0,80)).join("; ");
+        }
+      }
     }
     throw new Error(error);
   }
