@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.868",
-  "source_sha": "957658a9e6dad607d69af344d475438510943a39",
+  "version": "1.1.0-rc.869",
+  "source_sha": "ae171cdd79f825335d1b9dcac3e07738c646a882",
   "notes": {
-    "fa": "حذف واژه آزمایشی از عناوین و پیام‌های TwinTunnel در ساخت و مدیریت تانل، با حفظ نمایش واضح وضعیت غیرفعال مسیر جدید و بدون تغییر در مسیر TP27 مشتریان.",
-    "en": "Remove experimental wording from TwinTunnel creation and management UI, retain clear not-active routing status and unchanged customer TP27 paths."
+    "fa": "رفع تأخیر دانلود فایل‌های OpenVPN و WireGuard با استخراج فقط پروتکل درخواستی و حفظ محتوا، نام فایل، اعتبار اشتراک و مسیر اتصال قبلی.",
+    "en": "Speed up public OpenVPN and WireGuard profile downloads by retrieving only the requested protocol, preserving file content, names, subscription access checks, and existing tunnels."
   }
 }
