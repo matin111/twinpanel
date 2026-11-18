@@ -13,6 +13,7 @@ from .reserved_renewal_models import PendingSubscriptionRenewal, SubscriptionHis
 from .services.subscription_cycle_reset_v1 import reset_subscription_period_usage
 from .subscription_enforcement import queue_subscription_enforcement
 from .quota_models import QuotaUsageEvent, QuotaAuditLog
+from .telegram_notify_service import queue_telegram_notification
 
 def verified_quota_suspension(db: Session, subscription_id: int) -> bool:
     """Only auto-restore a suspended account when a quota event proves the cause.
@@ -106,6 +107,17 @@ def reserve_renewal(db: Session, *, subscription_id: int, plan_id: int | None,
         "renewal_id": item.id, "plan_id": plan_id, "plan_name": plan_name,
         "traffic_bytes": traffic_bytes, "duration_days": duration_days,
         "amount_toman": amount_toman, "reference": reference})
+    # Transactional outbox: commit with the renewal itself. An uncommitted or
+    # rolled-back purchase must never send a customer confirmation.
+    queue_telegram_notification(
+        db, user_id=int(sub.user_id), event_key=f"renewal-reserved:{int(item.id)}",
+        kind="renewal_reserved", payload={
+            "renewal_id": int(item.id), "subscription_id": int(sub.id),
+            "username": str(sub.account_username or ""),
+            "plan_name": str(plan_name or ""),
+            "traffic_bytes": int(traffic_bytes), "duration_days": int(duration_days),
+        },
+    )
     return item
 
 def provision_reserved_plan_at_cutover(db: Session, sub: Subscription, plan_id: int) -> tuple[bool, str]:
@@ -243,6 +255,17 @@ def activate_due_renewals(db: Session, limit: int = 100, subscription_id: int | 
                 "renewal_id": pending.id, "trigger": "time" if due_time else "quota",
                 "before": before, "new_traffic_bytes": pending.traffic_bytes,
                 "new_expires_at": sub.expires_at.isoformat() if sub.expires_at else None})
+            queue_telegram_notification(
+                db, user_id=int(sub.user_id), event_key=f"renewal-activated:{int(pending.id)}",
+                kind="renewal_activated", payload={
+                    "renewal_id": int(pending.id), "subscription_id": int(sub.id),
+                    "username": str(sub.account_username or ""),
+                    "plan_name": str(pending.plan_name or ""),
+                    "traffic_bytes": int(pending.traffic_bytes),
+                    "duration_days": int(pending.duration_days),
+                    "expires_at": sub.expires_at.isoformat() if sub.expires_at else None,
+                },
+            )
             db.commit()
             activated += 1
         except Exception:
