@@ -90,7 +90,6 @@ def _enriched_payload(db: Session, sub: Subscription) -> dict:
         {
             "creation_mode": "plan" if sub.plan_id is not None else "manual",
             "plan_name": plan.name if plan is not None else "دستی",
-            "renewal_summary": context["renewals"].get(int(sub.id)),
             "activation_duration_days": int(
                 sub.activation_duration_days
                 or (plan.duration_days if plan else 0)
@@ -274,6 +273,7 @@ def _enriched_payload_from_context(sub: Subscription, context: dict) -> dict:
                 "reseller_customer_user_id": None,
             }),
             "creation_mode": "plan" if sub.plan_id is not None else "manual",
+            "renewal_summary": context["renewals"].get(int(sub.id)),
             "plan_name": plan.name if plan is not None else "دستی",
             "activation_duration_days": int(
                 sub.activation_duration_days
