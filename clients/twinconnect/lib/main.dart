@@ -697,7 +697,19 @@ class _TwinConnectHomeState extends State<TwinConnectHome> with WidgetsBindingOb
       setState(() => _serverRefreshError = code);
     } on TimeoutException {
       if (!mounted || serial != _lookupSerial) return;
-      setState(() => _serverRefreshError = 'APP_PANEL_TIMEOUT');
+      final recovered = await const EmergencyConnectionCache().restoreAccess(
+        username: _confirmedUsername ?? '', panel: panel);
+      if (!mounted || serial != _lookupSerial) return;
+      if (recovered != null) {
+        setState(() {
+          _catalog = recovered.catalog;
+          _servers = recovered.inventory;
+          _emergencyMode = true;
+          _serverRefreshError = 'EMERGENCY_OFFLINE_MODE';
+        });
+      } else {
+        setState(() => _serverRefreshError = 'APP_PANEL_TIMEOUT');
+      }
     } catch (_) {
       if (!mounted || serial != _lookupSerial) return;
       setState(() => _serverRefreshError = 'SERVER_REFRESH_FAILED');
