@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.870",
-  "source_sha": "e00a80fe1df1f9adadb1393f48b8bc097bcab1ab",
+  "version": "1.1.0-rc.871",
+  "source_sha": "d87c48482d59a2a075b160247f71c9aa6a726c20",
   "notes": {
-    "fa": "رفع خطای 422 بررسی مجدد TwinTunnel با دو نود، ارسال صحیح نود سوم اختیاری به API بدون تغییر مسیرها و کانفیگ‌های فعال.",
-    "en": "Fix TwinTunnel two-node recheck HTTP 422 by normalizing the optional third node ID without changing active tunnels or VPN configs."
+    "fa": "رفع خطای موقتی نصب و بررسی TwinTunnel با اجرای ترتیبی SSH نودهای ایران و خارج، نمایش نود ناموفق و حفظ کامل مسیرهای فعال.",
+    "en": "Serialize TwinTunnel SSH stage and verification to avoid transient concurrent-node 502 failures, expose failing node details; no production route changes."
   }
 }
