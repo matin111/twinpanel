@@ -191,10 +191,12 @@ def patch_manifest() -> None:
         '                android:value="vpn" />\n'
         '        </service>\n'
     )
-    # WireGuard now transfers an actual TUN FD to libwg-go through this owner.
+    # Android Settings and the system need to discover/bind the sole exported VPN.
+    # BIND_VPN_SERVICE keeps third-party apps from invoking it.
+    # WireGuard transfers an actual TUN FD to libwg-go through this owner.
     service += (
         '\n        <service android:name=".SharedTunVpnService"\n'
-        '            android:exported="false"\n'
+        '            android:exported="true"\n'
         '            android:foregroundServiceType="specialUse"\n'
         '            android:permission="android.permission.BIND_VPN_SERVICE">\n'
         '            <intent-filter>\n'
