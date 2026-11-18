@@ -2484,6 +2484,24 @@ async def _telegram_notification_worker(bot):
 
                 payload = row.payload or {}
 
+                # Paid renewals get their own transactional outbox event.
+                # Do not send a second generic message claiming a newly
+                # activated account for a still-reserved renewal.
+                if row.kind == "payment_approved" and payload.get("order_id"):
+                    from .reserved_renewal_models import PendingSubscriptionRenewal
+                    from .telegram_notify_models import TelegramNotification as _TN
+                    order_key = f"store-order:{int(payload['order_id'])}"
+                    prior_renewal = db.query(PendingSubscriptionRenewal).filter(
+                        PendingSubscriptionRenewal.source_reference == order_key
+                    ).first()
+                    if prior_renewal and db.query(_TN.id).filter(
+                        _TN.event_key == f"renewal-reserved:{int(prior_renewal.id)}"
+                    ).first():
+                        row.delivered_at = datetime.utcnow()
+                        row.last_error = None
+                        db.commit()
+                        continue
+
                 if (
                     row.kind
                     in {"payment_approved", "payment_account_ready"}
@@ -2750,6 +2768,47 @@ async def _telegram_notification_worker(bot):
                     keyboard = InlineKeyboardMarkup(
                         inline_keyboard=buttons
                     )
+
+                elif row.kind in {"renewal_reserved", "renewal_activated"}:
+                    # A renewal is a new paid PERIOD for the existing account,
+                    # not a newly-created VPN connection. Keep the message short.
+                    from .reserved_renewal_models import PendingSubscriptionRenewal
+                    renewal_id = int(payload.get("renewal_id") or 0)
+                    renewal = db.get(PendingSubscriptionRenewal, renewal_id) if renewal_id else None
+                    if renewal is None or int(renewal.subscription_id) != int(payload.get("subscription_id") or 0):
+                        row.delivered_at = datetime.utcnow()
+                        row.last_error = "renewal_record_missing"
+                        db.commit()
+                        continue
+                    # If the next period activated before its queued notice
+                    # was delivered, do not tell the user it is still waiting.
+                    current_status = str(renewal.status or "")
+                    if current_status == "canceled" and row.kind == "renewal_reserved":
+                        row.delivered_at = datetime.utcnow()
+                        db.commit()
+                        continue
+                    is_active = row.kind == "renewal_activated" or current_status == "activated"
+                    username = escape(str(payload.get("username") or "").strip() or "—")
+                    plan = escape(str(payload.get("plan_name") or "اشتراک"))
+                    gb = int(payload.get("traffic_bytes") or 0) / (1024 ** 3)
+                    days = int(payload.get("duration_days") or 0)
+                    lines = [
+                        "✅ <b>تمدید اشتراک فعال شد</b>" if is_active
+                        else "✅ <b>تمدید اشتراک با موفقیت ثبت شد</b>",
+                        "",
+                        f"👤 اکانت: <code>{username}</code>",
+                        f"📦 پلن: <b>{plan}</b>",
+                        f"📊 حجم دوره جدید: <b>{gb:g} گیگابایت</b>",
+                        f"📅 مدت: <b>{days} روز</b>",
+                        "",
+                        "🟢 دوره جدید فعال است؛ کانفیگ‌ها و نام کاربری تغییر نکرده‌اند."
+                        if is_active else
+                        "🕒 تمدید برای دوره بعد رزرو شده و پس از اتمام حجم یا تاریخ دوره فعلی، خودکار فعال می‌شود.",
+                    ]
+                    text = "\\n".join(lines)
+                    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                        [InlineKeyboardButton(text="📦 اشتراک‌های من", callback_data="subs:list")]
+                    ])
 
                 elif (
                     row.kind
