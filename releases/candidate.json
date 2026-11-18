@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.869",
-  "source_sha": "ae171cdd79f825335d1b9dcac3e07738c646a882",
+  "version": "1.1.0-rc.870",
+  "source_sha": "e00a80fe1df1f9adadb1393f48b8bc097bcab1ab",
   "notes": {
-    "fa": "رفع تأخیر دانلود فایل‌های OpenVPN و WireGuard با استخراج فقط پروتکل درخواستی و حفظ محتوا، نام فایل، اعتبار اشتراک و مسیر اتصال قبلی.",
-    "en": "Speed up public OpenVPN and WireGuard profile downloads by retrieving only the requested protocol, preserving file content, names, subscription access checks, and existing tunnels."
+    "fa": "رفع خطای 422 بررسی مجدد TwinTunnel با دو نود، ارسال صحیح نود سوم اختیاری به API بدون تغییر مسیرها و کانفیگ‌های فعال.",
+    "en": "Fix TwinTunnel two-node recheck HTTP 422 by normalizing the optional third node ID without changing active tunnels or VPN configs."
   }
 }
