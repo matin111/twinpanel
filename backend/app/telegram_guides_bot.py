@@ -22,6 +22,12 @@ def guide_keyboard():
             ],
             [
                 InlineKeyboardButton(
+                    text="🪟 کانکشن هوشمند ویندوز",
+                    callback_data="guide:twinconnect_windows",
+                ),
+            ],
+            [
+                InlineKeyboardButton(
                     text="🪟 Windows",
                     callback_data="guide:windows",
                 ),
@@ -98,6 +104,15 @@ GUIDES={
         "OpenConnect مناسب هستند."
     ),
 
+    "twinconnect_windows":(
+        "🪟 <b>کانکشن هوشمند ویندوز | TwinConnect</b>\\n\\n"
+        "1️⃣ نسخه ویندوز را از کانال اصلی دریافت و نصب کنید.\\n"
+        "2️⃣ برنامه TwinConnect را باز کنید.\\n"
+        "3️⃣ با نام کاربری و رمز اپ هوشمند وارد شوید.\\n"
+        "4️⃣ سرور موردنظر را انتخاب کنید و «اتصال» را بزنید.\\n\\n"
+        "📥 برای دریافت نسخه ویندوز از دکمه زیر استفاده کنید."
+    ),
+
     "macos":(
         "💻 <b>اتصال در macOS</b>\n\n"
         "اطلاعات اتصال از همان اشتراک دریافت می‌شود. "
@@ -160,7 +175,7 @@ def create_guides_router():
             reply_markup=guide_keyboard(),
         )
 
-    @router.callback_query(F.data.startswith("guide:"))
+    @router.callback_query(F.data.startswith("guide:") & (F.data != "guide:list"))
     async def guide_detail(callback:CallbackQuery):
         key=callback.data.split(":",1)[1]
 
@@ -175,18 +190,23 @@ def create_guides_router():
 
         await callback.answer()
 
+        buttons=[]
+        if key=="twinconnect_windows":
+            buttons.append([
+                InlineKeyboardButton(
+                    text="📥 دانلود کانکشن هوشمند ویندوز",
+                    url="https://t.me/c/3948997062/3",
+                ),
+            ])
+        buttons.append([
+            InlineKeyboardButton(
+                text="⬅️ همه آموزش‌ها",
+                callback_data="guide:list",
+            ),
+        ])
         await callback.message.edit_text(
             text,
-            reply_markup=InlineKeyboardMarkup(
-                inline_keyboard=[
-                    [
-                        InlineKeyboardButton(
-                            text="⬅️ همه آموزش‌ها",
-                            callback_data="guide:list",
-                        )
-                    ]
-                ]
-            ),
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons),
         )
 
     @router.callback_query(F.data=="guide:list")
