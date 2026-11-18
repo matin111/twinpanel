@@ -34,7 +34,11 @@ void main() {
   test('WireGuard catalog overlaps local checks and is still authorized', () {
     final ui = File('lib/live_dashboard.dart').readAsStringSync();
     final bootstrap = File('lib/connection_bootstrap.dart').readAsStringSync();
-    expect(ui, contains('currentAttemptCatalog: Future<PanelProtocolCatalog>.value('));
+    // Concurrent catalog fetching remains fast; network-only outages yield
+    // null and are recovered by the bounded, previously verified peer vault.
+    expect(ui, contains('_catalogOrNetworkLoss(api)'));
+    expect(ui, contains('currentAttemptCatalog: checks[2] is PanelProtocolCatalog'));
+    expect(ui, contains('Future<PanelProtocolCatalog>.value('));
     expect(ui, contains('api.loadSessionProtocolCatalog('));
     expect(bootstrap, contains('currentAttemptCatalog ??'));
     expect(bootstrap, contains('catalog.namespace != panel.namespace'));
