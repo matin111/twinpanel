@@ -1,5 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:twinconnect/connection_bootstrap.dart';
+import 'package:twinconnect/emergency_connection_cache.dart';
+import 'package:twinconnect/account_snapshot.dart';
 import 'package:twinconnect/protocols.dart';
 import 'package:twinconnect/server_inventory.dart';
 import 'package:twinconnect/tenant_api.dart';
@@ -18,6 +20,8 @@ class FakePanel extends TenantApi {
   bool authorized = true;
   bool online = true;
   bool profileForNode = true;
+  bool networkUnavailable = false;
+  bool forbidden = false;
   int catalogCalls = 0;
   int serverCalls = 0;
   int profileCalls = 0;
@@ -27,6 +31,12 @@ class FakePanel extends TenantApi {
     required PanelDirectoryEntry panel, required String sessionToken,
   }) async {
     catalogCalls++;
+    if (networkUnavailable) {
+      throw const TenantApiException('NETWORK_UNAVAILABLE');
+    }
+    if (forbidden) {
+      throw const TenantApiException('APP_NOT_AUTHORIZED');
+    }
     return PanelProtocolCatalog.fromJson({
       'schema': 1, 'namespace': panel.namespace,
       'protocols': [
@@ -199,4 +209,66 @@ void main() {
           .having((e) => e.code, 'code', 'SERVER_PROFILE_MISSING')),
     );
   });
+  test('offline reuses a previously verified WireGuard peer, not a new one',
+      () async {
+    String? state;
+    final vault = EmergencyConnectionCache(
+      reader: () async => state,
+      writer: (raw) async { state = raw; },
+    );
+    final now = DateTime.now().toUtc();
+    await vault.saveVerified(
+      username: 'TPABCDEF_A_demo', panel: _panel,
+      server: AppServer.fromJson({
+        'id': '17', 'name': 'Germany', 'country_code': 'DE',
+        'node_online': true, 'latency_ms': null,
+      }),
+      profiles: ClientProtocolProfiles(
+        namespace: _panel.namespace,
+        protocol: VpnProtocols.byCode('wireguard')!,
+        items: [{'node_id': 17, 'config': '[Interface] test'}],
+      ),
+      account: AppAccountSnapshot(
+        namespace: _panel.namespace, trafficLimitBytes: 100,
+        trafficUsedBytes: 2, expiresAt: now.add(const Duration(days: 1)),
+        activationDurationDays: 30, status: 'active',
+      ),
+    );
+    final api = FakePanel()..networkUnavailable = true;
+    final candidate = await ConnectionBootstrap(
+        api: api, emergency: vault).prepare(
+      panel: _panel, sessionToken: _session,
+      username: 'TPABCDEF_A_demo',
+      serverId: '17', protocolCode: 'wireguard',
+      policy: const VpnPolicy(),
+      capabilities: _native, nativeProtocols: _ready,
+    );
+    expect(candidate.fromEmergencyCache, isTrue);
+    expect(candidate.profiles.items, hasLength(1));
+    expect(api.serverCalls, 0);
+    expect(api.profileCalls, 0);
+    await expectLater(ConnectionBootstrap(
+        api: api, emergency: vault).prepare(
+      panel: _panel, sessionToken: _session,
+      username: 'TPABCDEF_A_other',
+      serverId: '17', protocolCode: 'wireguard',
+      policy: const VpnPolicy(),
+      capabilities: _native, nativeProtocols: _ready,
+    ), throwsA(isA<ConnectionBootstrapException>()
+        .having((e) => e.code, 'code', 'EMERGENCY_PROFILE_NOT_AVAILABLE')));
+  });
+
+  test('authoritative forbidden response cannot fall back to cached peer',
+      () async {
+    final api = FakePanel()..forbidden = true;
+    await expectLater(ConnectionBootstrap(api: api).prepare(
+      panel: _panel, sessionToken: _session,
+      username: 'TPABCDEF_A_demo',
+      serverId: '17', protocolCode: 'wireguard',
+      policy: const VpnPolicy(),
+      capabilities: _native, nativeProtocols: _ready,
+    ), throwsA(isA<TenantApiException>()
+        .having((e) => e.message, 'message', 'APP_NOT_AUTHORIZED')));
+  });
+
 }
