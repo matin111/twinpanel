@@ -17,7 +17,7 @@
 
 # TwinPanel
 
-**TwinPanel is a self-hosted platform for VPN sales, subscription lifecycles, 16 VPN/proxy protocol families, node and tunnel operations, reseller commerce, wallets, and centrally managed client-app delivery.**
+**TwinPanel is a self-hosted VPN operations platform combining sales, 16 VPN/proxy protocol families, subscription and renewal management, reseller commerce, payments and wallets, multi-node infrastructure, tunnels, and branded client-app delivery.**
 
 Instead of running a separate billing panel, reseller system, Telegram sales bot, VPN node manager and tunnel monitor, TwinPanel brings the entire operational flow into one product:
 
@@ -41,12 +41,13 @@ TwinPanel is designed for real production operation: sales, customer delivery, q
 
 ## Recently added capabilities
 
-- **Reserved subscription renewals:** paid renewals queue until the previous period expires or its quota is exhausted, keeping the existing user credentials and connection profiles.
-- **Wallets and payment history:** customer and reseller balances, wallet-funded checkout/renewal flows, receipt review, and auditable transactions.
-- **Multi-brand TwinConnect integration:** centrally configured app branding, reseller-specific contact links, licensing and subscription-aware configuration delivery. Client engine availability still depends on the platform/build.
+- **Reserved subscription renewals:** paid renewals queue until the previous period expires or its quota is exhausted; eligible renewals activate on cutover without changing existing user credentials and connection profiles. The queue and activation history are visible in subscription management.
+- **Wallets and payment verification:** customer and reseller balances, wallet-funded checkout/renewal, receipt review, transaction history, and configurable SMS/crypto verification flows.
+- **Multi-brand TwinConnect integration:** central and reseller-specific app logo, colors, contacts, panel registration, and subscription-aware configuration delivery. Client engine availability still depends on the platform/build.
 - **16 managed VPN/proxy protocol families:** including authenticated SOCKS5, with per-node adapter readiness and plan-specific protocol access.
-- **Smarter infrastructure operations:** independent node provisioning, managed Iran/exit tunnels, outbound policies, health diagnostics and supported route-failover workflows.
-- **Richer sales operations:** plan categories, reseller traffic credit, configurable trials, subscription history, notifications and Telegram bot delivery.
+- **Smarter infrastructure operations:** independent node provisioning, managed Iran/exit tunnels, outbound policies, health diagnostics, supported route-failover workflows and DNS-based emergency access options.
+- **Richer sales and support operations:** plan categories, reseller traffic credit, Telegram broadcasts, account-delivery notifications, searchable admin activity history and subscription status indicators.
+- **Safer administration:** data-focused backups with optional Telegram delivery, guarded updates/rollback, operational diagnostics and an integrated license center.
 
 ## Key operational highlights
 
@@ -122,6 +123,7 @@ The Telegram sales system can operate as a complete sales and customer-delivery 
 - deliver connection information;
 - customer notifications;
 - subscription status, wallet-funded checkout and reserved renewal flows;
+- broadcasts to bot users, including a purchase action in supported messages;
 - configurable bot texts;
 - operational notifications;
 - integration with the same central subscription and quota model used by the web panel.
@@ -134,9 +136,10 @@ TwinPanel includes reseller workflows so operators can distribute services throu
 - reseller customers;
 - reseller-specific pricing and plan/protocol eligibility;
 - wallet and credit management;
-- traffic credit / allocation and volume-package workflows;
+- separately managed traffic credit / allocation and volume-package workflows;
 - subscription creation and renewal;
 - reseller Telegram bot support;
+- per-reseller TwinConnect branding and contact links;
 - centralized accounting and service ownership;
 - admin control over reseller activity.
 
@@ -147,12 +150,13 @@ Each customer can manage the services assigned to their account from a dedicated
 - active subscriptions;
 - service status;
 - expiration information;
-- traffic / quota information, renewal reservations and subscription history;
+- traffic / quota information, renewal reservations, activation status and subscription history;
 - connection profiles;
 - protocol-specific credentials;
 - client application guidance;
 - subscription and multi-link access where supported;
-- wallet transactions, supported renewals, support and client-app downloads.
+- wallet transactions, supported renewals, support and client-app downloads;
+- online/offline indicators where a live protocol session can be observed.
 
 # 16 VPN and proxy protocol families
 
@@ -223,6 +227,7 @@ TwinPanel separates the **control plane** from the **VPN dataplane** and support
 - protocol readiness;
 - hostname and runtime information;
 - provisioning over managed server connections;
+- node configuration and publication independent from tunnel readiness, with per-protocol installation status;
 - operational repair and recovery workflows.
 
 # Tunnel control plane
@@ -263,6 +268,17 @@ Tunnel capabilities include:
 
 This separation allows operators to repair or replace an Iran → Exit transport without rebuilding every customer account.
 
+# Emergency DNS access
+
+For highly restricted networks, TwinPanel has dedicated **NetMod DNS / DNSTT** and **DNS Emergency Iran Relay** management surfaces in addition to the normal VPN and tunnel control plane.
+
+- managed DNSTT and SSH endpoint setup on eligible nodes, with DNS record guidance and `nm-dns://` import links for NetMod;
+- install/repair, health checks, status and removal actions;
+- DNS resolver and MTU diagnostics/performance testing;
+- an Iran-side DNS ingress option that forwards to a configured Exit through an existing healthy tunnel.
+
+These are optional recovery paths: their availability depends on DNS reachability, node configuration and client support. They do not guarantee connectivity during a network shutdown.
+
 # Outbound and routing control
 
 TwinPanel includes a dedicated outbound control surface for deciding how protocol traffic leaves the infrastructure.
@@ -289,6 +305,7 @@ TwinPanel manages:
 - expiration and renewal;
 - reserved renewals applied after the prior period expires or quota is consumed, without rotating existing credentials;
 - subscription history and renewal audit trail;
+- visible pending/blocked renewal state, retry/cancel controls where allowed, and automatic activation when eligible;
 - traffic quotas;
 - protocol credentials bound to the subscription;
 - connection delivery;
@@ -304,7 +321,7 @@ The accounting layer is designed to keep traffic and subscription state centrali
 - append-only usage accounting model;
 - active session tracking;
 - quota-aware subscriptions;
-- protocol/device identity mapping;
+- protocol/credential identity mapping and configurable concurrent-session limits (not a guaranteed physical-device count on every protocol);
 - usage aggregation;
 - reseller-aware accounting;
 - traffic-limit enforcement hooks;
@@ -322,6 +339,7 @@ The administration dashboard provides a live operational view of the platform.
 - Controller CPU / RAM / disk / uptime;
 - protocol readiness across all 16 families;
 - pending renewals, wallet activity and payment-review status;
+- searchable history of manual administrator actions;
 - tunnel state;
 - infrastructure status;
 - revenue and sales indicators;
@@ -335,6 +353,7 @@ TwinPanel includes built-in operational communication surfaces.
 - support inbox;
 - customer support workflows;
 - admin notifications;
+- Telegram broadcast messaging and payment/renewal notifications;
 - read/unread state;
 - tunnel and infrastructure status notifications;
 - Telegram-related operational messaging.
@@ -363,7 +382,8 @@ Automatic rollback on failed health
 
 Operational tools include:
 
-- backup and restore;
+- data-only backup and restore for persistent panel records, including users, subscriptions, resellers, wallets and configuration records;
+- manual/scheduled backup jobs and optional Telegram ZIP delivery;
 - release status;
 - guarded updates;
 - atomic release activation;
@@ -372,6 +392,10 @@ Operational tools include:
 - repair actions;
 - logs and diagnostics;
 - terminal management through `twinpanel` / `tp`.
+
+# License and app directory
+
+The integrated License Center shows the panel's license/trial status, expiry, remaining time and current version. Administrators can activate a license and register or update the HTTPS panel address used by the centrally licensed TwinConnect app directory.
 
 # Admin surfaces
 
@@ -388,10 +412,12 @@ TwinPanel ships multiple product surfaces instead of one monolithic admin page:
 | **Protocols** | 16-family VPN/proxy control surface and runtime readiness |
 | **Tunnels** | Iran/Exit transport management |
 | **Outbounds** | Egress and per-protocol routing policy |
-| **Payments** | Payment, wallet, receipt review and transactions |
-| **Client App / Branding** | Central TwinConnect appearance, contacts and reseller identity |
+| **Payments** | Payment, wallet, receipt review, SMS/crypto verification and transactions |
+| **Client App / Branding** | TwinConnect logo, colors, contacts, panel directory and reseller identity |
+| **DNS Emergency** | NetMod DNS/DNSTT and Iran Relay installation, health and diagnostics |
+| **License Center** | License status, activation, expiry and app-panel registration |
 | **Support** | Support and communication workflows |
-| **System & Maintenance** | Settings, backup, security and Update Center |
+| **System & Maintenance** | Settings, searchable admin activity, backup, security and Update Center |
 
 # Architecture
 
