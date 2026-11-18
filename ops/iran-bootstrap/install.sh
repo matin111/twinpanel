@@ -21,8 +21,14 @@ install -m 0644 connect_proxy.py /usr/local/libexec/twinconnect_iran_connect_pro
 install -m 0644 twinconnect-iran-bootstrap-connect.service \
   /etc/systemd/system/twinconnect-iran-bootstrap-connect.service
 systemctl daemon-reload
-systemctl enable --now twinconnect-iran-bootstrap-connect
+systemctl enable twinconnect-iran-bootstrap-connect
+# Only restart this independent bootstrap service (never the VPN :443 service).
+systemctl restart twinconnect-iran-bootstrap-connect
 systemctl is-active --quiet twinconnect-iran-bootstrap-connect
+for retry in 1 2 3 4 5; do
+  if ss -ltnH 'sport = :80' | grep -q ':80'; then break; fi
+  sleep 1
+done
 
 # Validate using the host's own verified panel certificate, not a fake domain.
 curl --noproxy '' --silent --fail --show-error --max-time 12 \
