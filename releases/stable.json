@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.868",
+  "version": "1.1.0-rc.869",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-18T04:49:30Z",
+  "released_at": "2026-11-18T05:16:08Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "957658a9e6dad607d69af344d475438510943a39",
+  "source_sha": "ae171cdd79f825335d1b9dcac3e07738c646a882",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.868/twinpanel-1.1.0-rc.868-linux-x86_64.tar.gz",
-    "sha256": "b5663e4c0598855dfe70c60f4fd69786c380631e8e80e2d6274301cbeb097464",
-    "size_bytes": 31249731
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.869/twinpanel-1.1.0-rc.869-linux-x86_64.tar.gz",
+    "sha256": "55356a3b1a3d79d22e9136e0892744f6f7a2afa9a5ee67e60e0a637d16cb7650",
+    "size_bytes": 31251906
   },
   "notes": {
-    "fa": "حذف واژه آزمایشی از عناوین و پیام‌های TwinTunnel در ساخت و مدیریت تانل، با حفظ نمایش واضح وضعیت غیرفعال مسیر جدید و بدون تغییر در مسیر TP27 مشتریان.",
-    "en": "Remove experimental wording from TwinTunnel creation and management UI, retain clear not-active routing status and unchanged customer TP27 paths."
+    "fa": "رفع تأخیر دانلود فایل‌های OpenVPN و WireGuard با استخراج فقط پروتکل درخواستی و حفظ محتوا، نام فایل، اعتبار اشتراک و مسیر اتصال قبلی.",
+    "en": "Speed up public OpenVPN and WireGuard profile downloads by retrieving only the requested protocol, preserving file content, names, subscription access checks, and existing tunnels."
   }
 }
