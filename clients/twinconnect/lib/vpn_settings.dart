@@ -46,11 +46,8 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
   bool _vmGuardBusy = false;
   bool _androidKillRequested = false;
   bool _androidKillBusy = false;
-  bool _androidVpnConflict = false;
   bool _androidOsLockdown = false;
-  bool _androidLockdownVerifiable = false;
   bool _androidLegacyGuardUp = false;
-  bool _androidSharedAwgReady = false;
   Timer? _androidGuardPoll;
 
   @override
@@ -270,20 +267,13 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
         _androidGuardDetails = result ?? const {};
         _androidKillRequested = result?['sharedGuardEnabled'] == true;
         _androidLegacyGuardUp = result?['legacyGuardActive'] == true;
-        _androidSharedAwgReady =
-            (result?['sharedTunSupportedProtocols'] as List?)?.contains('amneziawg') == true;
-        _androidVpnConflict = result?['otherVpnActive'] == true;
         _androidOsLockdown = result?['osLockdown'] == true;
-        _androidLockdownVerifiable = result?['lockdownVerificationAvailable'] == true;
       });
     } on PlatformException {
       if (mounted) setState(() {
         _androidKillRequested = false;
         _androidLegacyGuardUp = false;
-        _androidSharedAwgReady = false;
-        _androidVpnConflict = false;
         _androidOsLockdown = false;
-        _androidLockdownVerifiable = false;
       });
     }
   }
@@ -611,62 +601,14 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
                   color: _androidKillRequested ? Colors.greenAccent : null,
                 ),
                 title: const Text('Kill Switch'),
-                subtitle: Text(tr(
-                  _androidKillRequested
-                      ? 'فعال: تونل مشترک ترافیک را هنگام قطع اتصال مسدود می‌کند. برای خاموشی کامل برنامه، قفل شبکه اندروید لازم است.'
-                      : _androidVpnConflict && !_androidLockdownVerifiable
-                          ? 'موتور VPN مستقل دیگری فعال است؛ محافظ مشترک در دسترس نیست.'
-                          : _androidSharedAwgReady
-                              ? 'محافظ مشترک WireGuard، Cisco، AmneziaWG، OpenVPN، Xray و پروتکل‌های sing-box را فعال کنید.'
-                              : 'محافظ مشترک WireGuard، Cisco، OpenVPN، Xray و پروتکل‌های sing-box را فعال کنید.',
-                  _androidKillRequested
-                      ? 'Enabled: shared TUN blocks traffic on disconnect. Android lockdown is still needed for app termination.'
-                      : _androidVpnConflict && !_androidLockdownVerifiable
-                          ? 'An independent VPN engine is active; shared guard is unavailable.'
-                          : _androidSharedAwgReady
-                              ? 'One-switch shared TUN guard for WireGuard, Cisco, AmneziaWG, OpenVPN, Xray and sing-box protocols.'
-                              : 'One-switch shared TUN guard for WireGuard, Cisco, OpenVPN, Xray and sing-box protocols.',
-                )),
+                subtitle: Text(_androidKillRequested
+                    ? tr('محافظت داخل برنامه فعال', 'In-app protection on')
+                    : tr('خاموش', 'Off')),
                 trailing: Switch.adaptive(
                   key: const Key('androidSharedKillSwitch'),
                   value: _androidKillRequested,
                   onChanged: _androidKillBusy || !_routingLoaded ? null : _setAndroidKill,
                 ),
-              ),
-              Text(
-                _androidOsLockdown
-                    ? tr('قفل شبکه اندروید نیز فعال است.', 'Android OS lockdown is also verified.')
-                    : tr('در صورت بسته‌شدن اجباری برنامه یا راه‌اندازی دوباره گوشی، محافظت داخلی تضمین‌شده نیست.',
-                        'The in-app guard cannot guarantee protection after force-stop, process death, or reboot.'),
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-              TextButton.icon(
-                onPressed: () async {
-                  try {
-                    final result = await const MethodChannel(
-                      'com.twinpanel.twinconnect/vpn',
-                    ).invokeMapMethod<String, dynamic>('getVpnRegistrationStatus');
-                    if (!mounted) return;
-                    final discovered = result?['discoverable'] == true;
-                    final services = result?['registeredVpnServices'];
-                    final count = services is List ? services.length : 0;
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                      content: Text(discovered
-                          ? tr('سرویس VPN ثبت شده است (تعداد: $count).',
-                              'VPN service registered ($count found).')
-                          : tr('سرویس VPN در نسخه نصب‌شده شناسایی نشد.',
-                              'No discoverable VPN service in installed app.')),
-                    ));
-                  } on PlatformException catch (error) {
-                    if (!mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                      content: Text('VPN registration: ${error.code}'),
-                    ));
-                  }
-                },
-                icon: const Icon(Icons.fact_check_outlined),
-                label: Text(tr('بررسی ثبت VPN در اندروید',
-                    'Check Android VPN registration')),
               ),
               if (_androidLegacyGuardUp)
                 TextButton.icon(
@@ -674,12 +616,6 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
                   icon: const Icon(Icons.stop_circle_outlined),
                   label: Text(tr('توقف محافظ قدیمی', 'Stop legacy traffic guard')),
                 ),
-              TextButton.icon(
-                onPressed: _checking ? null : () async { await _check(); await _refreshAndroidGuard(); },
-                icon: const Icon(Icons.refresh_rounded),
-                label: Text(tr('بررسی مجدد وضعیت محافظت',
-                    'Refresh protection status')),
-              ),
             ],
           )),
 
