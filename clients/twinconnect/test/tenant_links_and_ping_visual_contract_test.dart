@@ -308,6 +308,28 @@ void main() {
     expect(card, contains('_telemetryTimer?.cancel()'));
   });
 
+  test('failed WireGuard startup releases the VPN slot unless the guard is on', () {
+    final service = File(
+      'native/android/kotlin/com/twinpanel/twinconnect/SharedTunVpnService.kt',
+    ).readAsStringSync();
+    expect(service, contains('ownsFailedStart = true'));
+    expect(service, contains('if (!persistentBlock) shutdown()'));
+    expect(service, isNot(contains('if (!persistentBlock) persistentBlock = true')));
+    // wgGetConfig and wgTurnOff share the same lock: concurrent native map
+    // access while disconnecting must not cause a process-level Go crash.
+    expect(service, contains('fun wireGuardStats(): String? = synchronized(lock)'));
+    expect(service, contains('WireGuardJni.turnOff(handle)'));
+  });
+
+  test('OpenConnect keeps the native failure visible during shutdown', () {
+    final service = File(
+      'native/android/java/com/axevpn/flutter/openconnect/AxeOpenConnectVpnService.java',
+    ).readAsStringSync();
+    expect(service, contains('if (lastFailureCode != null && !lastFailureCode.isEmpty())'));
+    expect(service, contains('broadcastStage("error")'));
+    expect(service, contains('broadcastStage("disconnected")'));
+  });
+
   test('Cisco Android uses an isolated engine, not a WireGuard tunnel', () {
     final controller = File('lib/android_tunnel.dart').readAsStringSync();
     final card = File('lib/android_connection_card.dart').readAsStringSync();

@@ -10,6 +10,7 @@ import android.net.NetworkCapabilities
 import android.net.VpnService
 import android.os.Build
 import android.os.ParcelFileDescriptor
+import android.util.Log
 import com.wireguard.android.backend.GoBackend
 import com.wireguard.config.Config
 import java.lang.reflect.Method
@@ -99,12 +100,18 @@ class SharedTunVpnService : VpnService() {
 
     /** Actual ownership handoff: no GoBackend.setState or second VpnService. */
     fun startWireGuard(config: Config, keepBlockedOnDisconnect: Boolean) {
+        var ownsFailedStart = false
+        try {
         synchronized(lock) {
             check(foregroundReady && !shuttingDown && active === this) {
                 "SHARED_TUN_NOT_READY"
             }
             check(wireGuardHandle < 0) { "TUNNEL_ALREADY_RUNNING" }
             check(VpnService.prepare(this) == null) { "VPN_PERMISSION_REQUIRED" }
+            // Once this startup owns the routing transition, it is responsible
+            // for tearing it down if native activation fails. A failed WG
+            // attempt must never turn an OFF kill switch permanently ON.
+            ownsFailedStart = true
             // Never downgrade a guard already enabled using the settings button.
             persistentBlock = persistentBlock || keepBlockedOnDisconnect
             if (persistentBlock && tun == null) tun = blockingTun()
@@ -163,12 +170,25 @@ class SharedTunVpnService : VpnService() {
                     throw failure
                 }
             } catch (failure: Exception) {
-                // Keep the TUN established as a black hole on failure.
-                // No fallback route is installed by this service.
-                if (!persistentBlock) persistentBlock = true
                 throw failure
             }
         }
+        } catch (failure: Exception) {
+            if (ownsFailedStart) cleanupFailedWireGuardStart(failure.javaClass.simpleName)
+            throw failure
+        } catch (failure: LinkageError) {
+            if (ownsFailedStart) cleanupFailedWireGuardStart("NATIVE_LINKAGE")
+            throw failure
+        }
+    }
+
+    private fun cleanupFailedWireGuardStart(category: String) {
+        // Never log the profile, endpoint, peer keys, or native exception text.
+        Log.e("TwinConnectWireGuard", "WireGuard start failed: $category")
+        // If the user explicitly requested a disconnected guard, the owned
+        // TUN remains a black hole. Otherwise release Android's VPN slot so
+        // Cisco/OpenConnect and other engines can connect normally.
+        if (!persistentBlock) shutdown()
     }
 
     fun stopWireGuard() {
@@ -187,10 +207,13 @@ class SharedTunVpnService : VpnService() {
     fun hasTunnel() = tun != null
     fun isLockdownVerified(): Boolean = try { isLockdownEnabled } catch (_: Exception) { false }
 
-    fun wireGuardStats(): String? {
+    fun wireGuardStats(): String? = synchronized(lock) {
+        // wireguard-go keeps tunnel handles in a native map. A statistics read
+        // racing wgTurnOff() during disconnect/revoke can fatally crash the
+        // process. Serialize getConfig and turnOff on the same service lock.
         val handle = wireGuardHandle
-        return if (handle >= 0) try { WireGuardJni.getConfig(handle) }
-            catch (_: Exception) { null } else null
+        if (handle < 0) null else try { WireGuardJni.getConfig(handle) }
+            catch (_: Exception) { null }
     }
 
     private fun wireGuardUserspaceConfig(config: Config): String {

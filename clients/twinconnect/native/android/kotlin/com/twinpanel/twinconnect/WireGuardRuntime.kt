@@ -155,9 +155,16 @@ internal object WireGuardRuntime {
         }
         try {
             service.startWireGuard(config, policy["killSwitchRequested"] == true)
-        } catch (_: Exception) {
+        } catch (failure: Exception) {
             lifecycleGate.lostConnection()
-            throw IllegalArgumentException("WIREGUARD_NATIVE_START_FAILED")
+            val safeCodes = setOf(
+                "WIREGUARD_ENDPOINT_MISSING", "WIREGUARD_ENDPOINT_DNS_FAILED",
+                "SHARED_TUN_ESTABLISH_FAILED", "WIREGUARD_SOCKET_PROTECT_FAILED",
+                "WIREGUARD_NATIVE_START_FAILED", "VPN_PERMISSION_REQUIRED"
+            )
+            val safeCode = failure.message?.takeIf { it in safeCodes }
+                ?: "WIREGUARD_NATIVE_START_FAILED"
+            throw IllegalArgumentException(safeCode)
         } catch (_: LinkageError) {
             lifecycleGate.lostConnection()
             throw IllegalArgumentException("WIREGUARD_NATIVE_START_FAILED")

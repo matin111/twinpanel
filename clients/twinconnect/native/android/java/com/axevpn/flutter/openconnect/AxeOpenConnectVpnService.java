@@ -838,7 +838,15 @@ public class AxeOpenConnectVpnService extends VpnService {
             tunInterface = null;
         }
         try { stopForeground(true); } catch (Exception ignored) {}
-        broadcastStage("disconnected");
+        // A failed authentication/TLS/TUN startup is followed immediately by
+        // shutdown(). Do not overwrite the failure with "disconnected" before
+        // Flutter's polling loop has a chance to read it. Otherwise every
+        // error looks like a generic connection timeout.
+        if (lastFailureCode != null && !lastFailureCode.isEmpty()) {
+            broadcastStage("error");
+        } else {
+            broadcastStage("disconnected");
+        }
     }
 
     // ── Utilities ──────────────────────────────────────────────────────────────
