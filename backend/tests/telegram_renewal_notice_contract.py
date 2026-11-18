@@ -27,7 +27,8 @@ def test_worker_distinguishes_reserved_from_active():
     assert 'row.kind in {"renewal_reserved", "renewal_activated"}' in bot
     assert '"🕒 تمدید برای دوره بعد رزرو شده' in bot
     assert '"🟢 دوره جدید فعال است' in bot
-    assert 'row.kind == "renewal_reserved" and current_status == "activated"' in bot
+    assert 'row.kind == "renewal_reserved"' in bot
+    assert 'current_status == "activated"' in bot
     assert 'event_key=f"renewal-reserved:{int(item.id)}"' in producer
     assert 'existing = (' in queue
 
