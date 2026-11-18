@@ -97,7 +97,8 @@ def test_ui_clear_distinction_between_install_and_cutover():
     assert 'tp-selected-tunnel-standby-intent' in ACTIVE_UI
     assert 'No third node' in ACTIVE_UI
     assert "TwinTunnel · چند ترانسپورت" in ACTIVE_UI
-    assert 'pick("نصب آزمایشی","Lab install")' in ACTIVE_UI
+    assert 'pick("آماده نصب","Lab install")' in ACTIVE_UI
+    assert "آزمایشی" not in ACTIVE_UI and "آزمایشی" not in UI
     assert "can_activate" not in ACTIVE_UI  # No production activation control is exposed
 
 
