@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.872",
-  "source_sha": "65fde323f992b1d9729fe2fd2337cc3efc8d5e9a",
+  "version": "1.1.0-rc.873",
+  "source_sha": "718487247d2bf74c3bbc58c7d42442818b14d562",
   "notes": {
-    "fa": "رفع خطای SSH نود ایران در نصب TwinTunnel با حداکثر سه تلاش محدود، تشخیص خطاهای دسترسی غیرقابل‌تکرار، حفظ کامل تانل‌ها و مسیر کاربران.",
-    "en": "Harden TwinTunnel installation against transient SSH failures with three bounded retries, fail-fast on credential errors, preserve active routes."
+    "fa": "نمایش تمدیدهای رزروشده و فعال‌شده در اشتراک اصلی؛ جزئیات تمدید و حذف امن تمدید در انتظار با حفظ اشتراک، کانفیگ و سوابق.",
+    "en": "Show reserved and activated renewal details in the parent subscription, with safe cancellation of queued renewals while preserving subscription, configs and audit history."
   }
 }
