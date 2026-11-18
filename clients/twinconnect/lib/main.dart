@@ -25,6 +25,7 @@ import 'live_dashboard.dart';
 import 'frameless_window_controls.dart';
 import 'app_session_store.dart';
 import 'xray_inbound_secure_cache.dart';
+import 'emergency_connection_cache.dart';
 import 'account_snapshot.dart';
 import 'plan_classification.dart';
 
@@ -168,6 +169,7 @@ class _TwinConnectHomeState extends State<TwinConnectHome> with WidgetsBindingOb
   PanelProtocolCatalog? _catalog;
   AppServerInventory? _servers;
   bool _refreshingServers = false;
+  bool _emergencyMode = false;
   String? _serverRefreshError;
   NativeProtocolReadiness _nativeProtocols =
       const NativeProtocolReadiness(supportedCodes: {});
@@ -360,9 +362,21 @@ class _TwinConnectHomeState extends State<TwinConnectHome> with WidgetsBindingOb
           // Transient errors preserve the saved session.
         }
       }
-      // Never fabricate account/server permissions from locally cached data.
-      final catalog = await api.loadSessionProtocolCatalog(
-        panel: activePanel, sessionToken: accessToken);
+      // Recover an already verified WireGuard peer on this device only.
+      PanelProtocolCatalog catalog;
+      EmergencyCachedAccess? emergencyAccess;
+      try {
+        catalog = await api.loadSessionProtocolCatalog(
+          panel: activePanel, sessionToken: accessToken);
+      } catch (error) {
+        if (error is! TimeoutException &&
+            !(error is TenantApiException &&
+                error.message == 'NETWORK_UNAVAILABLE')) rethrow;
+        emergencyAccess = await const EmergencyConnectionCache().restoreAccess(
+          username: saved.username, panel: activePanel);
+        if (emergencyAccess == null) rethrow;
+        catalog = emergencyAccess.catalog;
+      }
       final native = await NativeVpnBridge.protocolReadiness();
       if (!mounted || serial != _lookupSerial) return;
       setState(() {
@@ -374,6 +388,10 @@ class _TwinConnectHomeState extends State<TwinConnectHome> with WidgetsBindingOb
         _sessionRefreshToken = refreshToken;
         _catalog = catalog;
         _nativeProtocols = native;
+        _servers = emergencyAccess?.inventory;
+        _emergencyMode = emergencyAccess != null;
+        _serverRefreshError = emergencyAccess != null
+            ? 'EMERGENCY_OFFLINE_MODE' : null;
       });
       try {
         await _sessionStore.save(username: saved.username,
@@ -444,6 +462,7 @@ class _TwinConnectHomeState extends State<TwinConnectHome> with WidgetsBindingOb
     // display cache must never prevent sign-out if OS vault I/O fails.
     try {
       await const XrayInboundSecureCache().clear();
+      await const EmergencyConnectionCache().clear();
     } catch (_) {}
     if (!mounted) return;
     setState(() {
@@ -454,6 +473,7 @@ class _TwinConnectHomeState extends State<TwinConnectHome> with WidgetsBindingOb
       _sessionRefreshToken = null;
       _catalog = null;
       _servers = null;
+      _emergencyMode = false;
       _plan = null;
       _account = null;
       _accountError = null;
@@ -488,6 +508,7 @@ class _TwinConnectHomeState extends State<TwinConnectHome> with WidgetsBindingOb
       _confirmedSessionToken = null;
       _catalog = null;
       _servers = null;
+      _emergencyMode = false;
       _plan = null;
       _account = null;
       _accountError = null;
@@ -502,7 +523,26 @@ class _TwinConnectHomeState extends State<TwinConnectHome> with WidgetsBindingOb
       final namespace = TenantIdentity.parseNamespace(username, '');
       final password = _password.text;
       final api = TenantApi.fromBuildConfig();
-      final panel = await api.resolve(namespace);
+      PanelDirectoryEntry panel;
+      try {
+        panel = await api.resolve(namespace);
+      } on TenantApiException catch (error) {
+        if (error.message != 'NETWORK_UNAVAILABLE') rethrow;
+        final previous = await _sessionStore.read();
+        if (previous == null || previous.username != username ||
+            previous.brand.namespace != namespace ||
+            previous.panelOrigin == null) rethrow;
+        // Panel login still authenticates the password over verified HTTPS.
+        panel = PanelDirectoryEntry(
+            namespace: namespace, apiOrigin: previous.panelOrigin!);
+      } on TimeoutException {
+        final previous = await _sessionStore.read();
+        if (previous == null || previous.username != username ||
+            previous.brand.namespace != namespace ||
+            previous.panelOrigin == null) rethrow;
+        panel = PanelDirectoryEntry(
+            namespace: namespace, apiOrigin: previous.panelOrigin!);
+      }
       final loggedIn = await api.login(
         panel: panel,
         username: username,
@@ -607,6 +647,8 @@ class _TwinConnectHomeState extends State<TwinConnectHome> with WidgetsBindingOb
       setState(() {
         _catalog = catalog;
         _servers = inventory;
+        _emergencyMode = false;
+        _serverRefreshError = null;
         _protocolCatalogUnavailable = false;
       });
     } on TenantApiException catch (error) {
@@ -625,7 +667,23 @@ class _TwinConnectHomeState extends State<TwinConnectHome> with WidgetsBindingOb
         'APP_LOGIN_LOCKED' => 'APP_PANEL_RATE_LIMITED',
         _ => 'SERVER_REFRESH_FAILED',
       };
-      setState(() => _serverRefreshError = code);
+      if (error.message == 'NETWORK_UNAVAILABLE') {
+        final recovered = await const EmergencyConnectionCache().restoreAccess(
+          username: _confirmedUsername ?? '', panel: panel);
+        if (!mounted || serial != _lookupSerial) return;
+        if (recovered != null) {
+          setState(() {
+            _catalog = recovered.catalog;
+            _servers = recovered.inventory;
+            _emergencyMode = true;
+            _serverRefreshError = 'EMERGENCY_OFFLINE_MODE';
+          });
+          return;
+        }
+      }
+      setState(() => _serverRefreshError =
+          _emergencyMode && code == 'APP_PANEL_NETWORK_UNAVAILABLE'
+              ? 'EMERGENCY_OFFLINE_MODE' : code);
     } on FormatException catch (error) {
       if (!mounted || serial != _lookupSerial) return;
       final code = switch (error.message) {
