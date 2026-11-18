@@ -286,10 +286,15 @@ void main() {
     final native = File(
       'native/android/kotlin/com/twinpanel/twinconnect/WireGuardRuntime.kt',
     ).readAsStringSync();
-    expect(native, contains('getStatistics(tunnel)'));
-    expect(native, contains('statistics.totalRx()'));
-    expect(native, contains('statistics.totalTx()'));
-    expect(native, contains('latestHandshakeEpochMillis()'));
+    final service = File(
+      'native/android/kotlin/com/twinpanel/twinconnect/SharedTunVpnService.kt',
+    ).readAsStringSync();
+    expect(service, contains('WireGuardJni.getConfig(handle)'));
+    expect(service, contains('WireGuardJni.turnOn(nativeFd, settings)'));
+    expect(native, contains('line.startsWith("rx_bytes=")'));
+    expect(native, contains('line.startsWith("tx_bytes=")'));
+    expect(native, contains('line.startsWith("last_handshake_time_sec=")'));
+    expect(native, contains('latestHandshakeEpochMillis'));
     expect(card, contains("status['rxBytes']"));
     expect(card, contains("status['txBytes']"));
     expect(card, contains("status['peerHandshakeVerified']"));
