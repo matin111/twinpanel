@@ -82,6 +82,12 @@ def history_page(subscription_id: int, limit: int = 50, offset: int = 0,
         PendingSubscriptionRenewal.subscription_id == subscription_id,
         PendingSubscriptionRenewal.status.in_(("queued", "blocked")))
         .order_by(PendingSubscriptionRenewal.id.asc())).scalars().all()
+    # Show every recorded renewal cycle, including activated and canceled.
+    # Only queued/blocked records remain cancellable; a consumed active
+    # period must never be silently undone or detached from accounting.
+    renewal_rows = db.execute(select(PendingSubscriptionRenewal).where(
+        PendingSubscriptionRenewal.subscription_id == subscription_id)
+        .order_by(PendingSubscriptionRenewal.id.desc()).limit(100)).scalars().all()
     # Retain existing audit records from older admin operations without
     # inventing snapshots or exposing credentials to the history popup.
     audit = db.execute(select(QuotaAuditLog).where(
@@ -99,10 +105,18 @@ def history_page(subscription_id: int, limit: int = 50, offset: int = 0,
         "created_at": record.created_at.isoformat()
     } for record in audit)
     merged.sort(key=lambda row: row["created_at"], reverse=True)
+    def renewal_item(item: PendingSubscriptionRenewal) -> dict:
+        return {
+            "id": item.id, "plan": item.plan_name,
+            "traffic_bytes": item.traffic_bytes, "duration_days": item.duration_days,
+            "status": item.status, "created_at": item.created_at.isoformat(),
+            "activated_at": item.activated_at.isoformat() if item.activated_at else None,
+            "amount_toman": item.amount_toman, "source": item.source,
+            "can_cancel": item.status in ("queued", "blocked"),
+        }
     return {"events": merged[:limit],
-            "queued": [{"id": item.id, "plan": item.plan_name, "traffic_bytes": item.traffic_bytes,
-                        "duration_days": item.duration_days, "status": item.status, "created_at": item.created_at.isoformat()}
-                       for item in queued]}
+            "renewals": [renewal_item(item) for item in renewal_rows],
+            "queued": [renewal_item(item) for item in queued]}
 
 @router.delete("/{subscription_id}/reserve-renewal/{renewal_id}")
 def cancel_reserved(subscription_id: int, renewal_id: int, db: Session = Depends(get_db), admin: User = Depends(require_admin)):
