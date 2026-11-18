@@ -176,6 +176,7 @@ jobs:
           set -euo pipefail
           cd clients/twinconnect
           flutter create --platforms=android --org com.twinpanel --project-name twinconnect .
+          python -m pip install --user Pillow==11.3.0
           python tools/install_android_native.py
           dest="android/app/src/main/jniLibs/arm64-v8a"
           mkdir -p "$dest"
