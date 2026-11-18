@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.879",
-  "source_sha": "b11fdd1017967809990f740ab0b7c0b6a889118c",
+  "version": "1.1.0-rc.880",
+  "source_sha": "19da693a2c09b0b736ebf50dde78e99fa04578ed",
   "notes": {
-    "fa": "یکپارچه‌سازی آموزش و دریافت اپلیکیشن در ربات اصلی و نمایندگی؛ حذف دکمه دانلود جدا؛ نمایش برنامه‌هایی مانند Karing فقط یک‌بار به‌جای تفکیک پروتکل‌ها؛ افزودن TwinConnect ویندوز و لینک کانال اصلی.",
-    "en": "Unify app tutorials and downloads in main and reseller Telegram bots, remove separate downloads menu, deduplicate clients such as Karing across protocols and include Windows TwinConnect with the channel link."
+    "fa": "اصلاح لینک دانلود TwinConnect ویندوز در آموزش‌های ربات؛ جایگزینی لینک خصوصی با پیام عمومی https://t.me/twin_connect1/3",
+    "en": "Replace private TwinConnect Windows Telegram download link with the public channel post."
   }
 }
