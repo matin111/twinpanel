@@ -38,9 +38,9 @@ def patch_singbox(root: Path) -> None:
         code,
         "        val builder = Builder()\n",
         "        // TWINCONNECT_SHARED_TUN_SINGBOX: instantiate the Builder in the sole VPN owner.\n"
-        f"        val builder = {BRIDGE}\n"
+        f"        val builder = ({BRIDGE}\n"
         '            .getMethod("newExternalTunBuilder", String::class.java)\n'
-        '            .invoke(null, "singbox") as VpnService.Builder\n',
+        '            .invoke(null, "singbox") as VpnService.Builder)\n',
         source,
     )
     code = replace_once(
