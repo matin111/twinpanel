@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'iran_bootstrap_route.dart';
+
 import 'tenant_models.dart';
 import 'protocols.dart';
 import 'server_inventory.dart';
@@ -259,6 +261,9 @@ class TenantApi {
     return profiles;
   }
 
+  /// All authenticated requests (directory, login, inventory and profiles)
+  /// use the same secure domestic bootstrap path when standard DNS/routing is
+  /// disrupted. A server 401/403/429 is authoritative, never retried.
   Future<Map<String, dynamic>> _requestJson(
     Uri url, {
     Map<String, dynamic>? payload,
@@ -268,8 +273,49 @@ class TenantApi {
     if (url.scheme != 'https') {
       throw const FormatException('INSECURE_CONNECTION');
     }
-    final client = HttpClient()
-      ..connectionTimeout = const Duration(seconds: 7);
+    Future<Map<String, dynamic>> request(InternetAddress? fixedIp) =>
+        _requestJsonOnce(url, payload: payload, bearerToken: bearerToken,
+            maxBytes: maxBytes, fixedIp: fixedIp);
+
+    try {
+      return await request(null);
+    } on SocketException {
+      // No authenticated server response: one bounded attempt via Iran.
+    } on TimeoutException {
+      // Missing DNS, failed TCP dial, or inaccessible panel.
+    } on TlsException {
+      // Iran DNS poisoning may target the primary IP. Emergency path MUST
+      // still validate a real certificate for the original HTTPS host.
+    } on HttpException {
+      // No valid HTTP response was received. Never retry an HTTP status.
+    }
+    final target = IranBootstrapRoute.targetFor(url);
+    if (target == null) {
+      throw const TenantApiException('NETWORK_UNAVAILABLE');
+    }
+    try {
+      return await request(target);
+    } on SocketException {
+      throw const TenantApiException('NETWORK_UNAVAILABLE');
+    } on TimeoutException {
+      throw const TenantApiException('NETWORK_UNAVAILABLE');
+    } on TlsException {
+      throw const TenantApiException('INVALID_TLS');
+    } on HttpException {
+      throw const TenantApiException('NETWORK_UNAVAILABLE');
+    }
+  }
+
+  Future<Map<String, dynamic>> _requestJsonOnce(
+    Uri url, {
+    Map<String, dynamic>? payload,
+    int maxBytes = 32768,
+    String? bearerToken,
+    InternetAddress? fixedIp,
+  }) async {
+    final client = fixedIp == null
+        ? (HttpClient()..connectionTimeout = const Duration(seconds: 7))
+        : IranBootstrapRoute.clientFor(url, fixedIp);
     try {
       final request = payload == null
           ? await client.getUrl(url).timeout(const Duration(seconds: 10))
@@ -298,13 +344,9 @@ class TenantApi {
           throw const TenantApiException('APP_LOGIN_LOCKED');
         }
         if (response.statusCode == HttpStatus.forbidden) {
-          throw const TenantApiException(
-            'APP_NOT_AUTHORIZED',
-          );
+          throw const TenantApiException('APP_NOT_AUTHORIZED');
         }
-        throw TenantApiException(
-          'SERVER_ERROR',
-        );
+        throw const TenantApiException('SERVER_ERROR');
       }
       final bytes = <int>[];
       await for (final chunk in response.timeout(const Duration(seconds: 15))) {
@@ -318,10 +360,6 @@ class TenantApi {
         throw const TenantApiException('INVALID_SERVER_RESPONSE');
       }
       return decoded;
-    } on SocketException {
-      throw const TenantApiException('NETWORK_UNAVAILABLE');
-    } on HandshakeException {
-      throw const TenantApiException('INVALID_TLS');
     } finally {
       client.close(force: true);
     }
