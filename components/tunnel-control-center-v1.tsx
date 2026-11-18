@@ -170,9 +170,9 @@ export function TunnelControlCenterV1(){
           setBusy("twin-create-stage");
           const stage=await twinTunnelInstallApi.install(id,selectedNewBackupId);
           setTwinStatus(stage);setTwinBackupId(selectedNewBackupId);
-          setNotice({tone:"ok",text:pick("فایل‌های آزمایشی TwinTunnel روی نودها اعتبارسنجی شدند؛ مسیر کاربران تغییر نکرد.","TwinTunnel staging files verified on selected nodes; customer paths unchanged.")});
+          setNotice({tone:"ok",text:pick("فایل‌های TwinTunnel روی نودها اعتبارسنجی شدند؛ مسیر کاربران تغییر نکرد.","TwinTunnel staging files verified on selected nodes; customer paths unchanged.")});
         }catch(error){
-          setNotice({tone:"warn",text:pick("تانل اصلی ساخته شد، ولی نصب آزمایشی TwinTunnel کامل نشد: ","Base tunnel created, but TwinTunnel staging failed: ")+(error instanceof Error?error.message:String(error))});
+          setNotice({tone:"warn",text:pick("تانل اصلی ساخته شد، ولی آماده‌سازی TwinTunnel کامل نشد: ","Base tunnel created, but TwinTunnel staging failed: ")+(error instanceof Error?error.message:String(error))});
         }
       }else{
         setNotice({tone:"ok",text:pick("Tunnel #"+id+" ساخته شد و Pair باز شد.","Tunnel #"+id+" created and opened.")});
@@ -221,7 +221,7 @@ export function TunnelControlCenterV1(){
     const key=mode==="install"?"twintunnel-stage":"twintunnel-verify";
     void run(key,
       mode==="install"
-        ?pick("فایل‌های آزمایشی نودها بررسی شدند؛ ترانسپورت‌های چندگانه هنوز فعال نشده‌اند.","Node staging verified; multi-carrier links are not yet active.")
+        ?pick("فایل‌های موتور روی نودها بررسی شدند؛ ترانسپورت‌های چندگانه هنوز فعال نشده‌اند.","Node staging verified; multi-carrier links are not yet active.")
         :pick("صحت فایل‌های موتور روی نودهای انتخابی تأیید شد.","Selected node engine files verified."),
       ()=>mode==="install"
         ?twinTunnelInstallApi.install(selectedId,selectedBackupId)
@@ -302,9 +302,9 @@ export function TunnelControlCenterV1(){
             <section className={styles.registryCard}>
               <div className={styles.sectionHead}>
                 <div><span>TwinTunnel</span><h3>{pick("آماده‌سازی دو نود","Stage two endpoints")}</h3></div>
-                <Badge tone={twinStatus?.status==="staged"&&!twinStatus.needs_update?"ok":"warn"}>{twinStatus?.status==="staged"&&!twinStatus.needs_update?pick("فایل‌ها آماده","Files staged"):pick("نصب آزمایشی","Lab-only install")}</Badge>
+                <Badge tone={twinStatus?.status==="staged"&&!twinStatus.needs_update?"ok":"warn"}>{twinStatus?.status==="staged"&&!twinStatus.needs_update?pick("فایل‌ها آماده","Files staged"):pick("آماده نصب","Lab-only install")}</Badge>
               </div>
-              <p className={styles.reason}>{pick("فقط فایل‌های آزمایشی روی نود ایران و خروجی بررسی می‌شوند. سه ترانسپورت مستقل هنوز به موتور عملیاتی متصل نشده‌اند.","Only stage test files on entry and exit; three independent carrier links are not yet connected to production.")}</p>
+              <p className={styles.reason}>{pick("فایل‌های موتور روی نود ایران و خروجی بررسی می‌شوند. سه ترانسپورت مستقل هنوز به موتور عملیاتی متصل نشده‌اند.","Only stage test files on entry and exit; three independent carrier links are not yet connected to production.")}</p>
               <div className={styles.createForm}>
                 <label><span>{pick("نود سوم (اختیاری)","Third node (optional)")}</span>
                   <select value={twinBackupId} onChange={event=>setTwinBackupId(Number(event.target.value))} disabled={Boolean(busy)}>
@@ -376,7 +376,7 @@ export function TunnelControlCenterV1(){
           <label><span>{pick("نود خروجی","Exit node")}</span><select value={draft.exit_node_id} onChange={event=>setDraft(value=>({...value,exit_node_id:Number(event.target.value)}))}>{exitNodes.map(node=><option key={node.id} value={node.id}>{nodeLabel(node,`#${node.id}`)} · {node.status||"—"}</option>)}</select></label>
           <label><span>{pick("روش نصب","Installation mode")}</span><select value={newEngine} onChange={event=>setNewEngine(event.target.value as "tp27_fast"|"twintunnel_standby")}>
             <option value="tp27_fast">{pick("TP27 اصلی","Standard TP27")}</option>
-            <option value="twintunnel_standby">{pick("TwinTunnel آزمایشی (دو نود)","TwinTunnel staging (two nodes)")}</option>
+            <option value="twintunnel_standby">{pick("TwinTunnel (دو نود)","TwinTunnel (two nodes)")}</option>
           </select></label>
           {newEngine==="twintunnel_standby"&&<label><span>{pick("نود سوم (اختیاری)","Third node (optional)")}</span>
             <select value={newBackupId} onChange={event=>setNewBackupId(Number(event.target.value))}>
