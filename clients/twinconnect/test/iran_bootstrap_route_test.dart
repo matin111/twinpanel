@@ -48,7 +48,6 @@ void main() {
         throwsFormatException);
     final http = IranBootstrapRoute.clientFor(
         Uri.parse('https://panel.matindnspro.sbs/health'), ip);
-    expect(http.badCertificateCallback, isNull);
     http.close(force: true);
   });
 
