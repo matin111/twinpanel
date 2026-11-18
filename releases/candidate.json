@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.878",
-  "source_sha": "76ee315ebba330e393b1bb9688af05bf787833c5",
+  "version": "1.1.0-rc.879",
+  "source_sha": "b11fdd1017967809990f740ab0b7c0b6a889118c",
   "notes": {
-    "fa": "افزودن آموزش کانکشن هوشمند TwinConnect ویندوز به منوی آموزش‌های ربات با دکمه دانلود مستقیم از کانال اصلی.",
-    "en": "Add TwinConnect Windows smart connection guide to Telegram bot tutorials with the official channel download message link."
+    "fa": "یکپارچه‌سازی آموزش و دریافت اپلیکیشن در ربات اصلی و نمایندگی؛ حذف دکمه دانلود جدا؛ نمایش برنامه‌هایی مانند Karing فقط یک‌بار به‌جای تفکیک پروتکل‌ها؛ افزودن TwinConnect ویندوز و لینک کانال اصلی.",
+    "en": "Unify app tutorials and downloads in main and reseller Telegram bots, remove separate downloads menu, deduplicate clients such as Karing across protocols and include Windows TwinConnect with the channel link."
   }
 }
