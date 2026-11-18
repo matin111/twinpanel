@@ -337,11 +337,15 @@ void main() {
       'native/android/kotlin/com/twinpanel/twinconnect/MainActivity.kt',
     ).readAsStringSync();
     final cisco = File('lib/android_cisco_tunnel.dart').readAsStringSync();
+    final bridge = File('lib/native_vpn_bridge.dart').readAsStringSync();
     expect(controller, contains("nativeProtocols.supports('cisco')"));
     expect(card, contains('CiscoOpenConnectProfile.fromItem(item)'));
     expect(card, contains('AndroidCiscoTunnel.validatedServerTrust(profile)'));
     expect(card, contains("loadSessionNativeProfiles("));
     expect(card, contains('AndroidCiscoTunnel.instance.connect(profile)'));
+    expect(card, contains('NativeVpnBridge.requireAndroidCiscoSafeToConnect(policy)'));
+    expect(bridge, contains('static void requireAndroidCiscoSafeToConnect(VpnPolicy policy)'));
+    expect(bridge, contains("problems.add('CISCO_SHARED_GUARD_NOT_IMPLEMENTED')"));
     expect(card, contains('AndroidCiscoTunnel.instance.status()'));
     expect(cisco, contains('com.axevpn.flutter.openconnect/vpncontrol'));
     expect(cisco, contains("'servercert': pin"));

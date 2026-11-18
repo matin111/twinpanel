@@ -589,8 +589,8 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
       final policy = await _store.loadFailClosed(
         widget.panel.namespace, widget.username,
       );
-      final capabilities = await NativeVpnBridge.probe();
-      NativeVpnBridge.requireSafeToConnect(policy, capabilities);
+      // Cisco's separate native TUN must not depend on WireGuard JNI health.
+      NativeVpnBridge.requireAndroidCiscoSafeToConnect(policy);
       stage = 'CISCO_PROFILE_FETCH_FAILED';
       final profiles = await TenantApi.fromBuildConfig().loadSessionNativeProfiles(
         panel: widget.panel,
