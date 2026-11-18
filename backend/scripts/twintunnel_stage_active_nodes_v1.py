@@ -88,19 +88,39 @@ async def stage_node(node_id: int, manifest: dict, root: Path, mode: str) -> dic
     from app.models import Node
     from app.routers.provision import ssh_connect_saved
 
-    with SessionLocal() as db:
-        node = db.query(Node).filter(Node.id == node_id).first()
-        if node is None:
-            return {"node_id": node_id, "ok": False, "error": "node_missing"}
-        name = str(node.name)
-        # Reuse the panel's existing saved keys; no credentials in logs/artifacts.
-        try:
-            conn = await ssh_connect_saved(
-                node, db, close_read_transaction_before_ssh=True
-            )
-        except Exception as exc:
-            return {"node_id": node_id, "name": name, "ok": False,
-                    "error": type(exc).__name__ + ":ssh_unavailable"}
+    # Short bounded retries only for transient saved-SSH connection failures.
+    # Each attempt uses a new short read-only database session, so a dropped
+    # connection cannot hold an ORM transaction or stale node/access record.
+    # Credential/key/permission failures must still be reported immediately.
+    conn = None
+    name = str(node_id)
+    for attempt in range(3):
+        with SessionLocal() as db:
+            node = db.query(Node).filter(Node.id == node_id).first()
+            if node is None:
+                return {"node_id": node_id, "ok": False, "error": "node_missing"}
+            name = str(node.name)
+            try:
+                conn = await ssh_connect_saved(
+                    node, db, close_read_transaction_before_ssh=True
+                )
+                break
+            except Exception as exc:
+                detail = str(getattr(exc, "detail", exc)).lower()
+                fatal = (
+                    getattr(exc, "status_code", None) == 409
+                    or any(term in detail for term in (
+                        "permission denied", "authentication failed",
+                        "publickey", "private key", "کلید دسترسی",
+                        "دسترسی امن این سرور ثبت نشده",
+                    ))
+                )
+                if fatal or attempt == 2:
+                    return {"node_id": node_id, "name": name, "ok": False,
+                            "error": type(exc).__name__ + ":ssh_unavailable",
+                            "ssh_attempts": attempt + 1}
+        await asyncio.sleep(attempt + 1)
+    assert conn is not None
 
     folder = STAGE_BASE + "/" + manifest["revision"]
     try:
