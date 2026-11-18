@@ -48,6 +48,29 @@ TwinPanel is designed for real production operation: sales, customer delivery, q
 - **Smarter infrastructure operations:** independent node provisioning, managed Iran/exit tunnels, outbound policies, health diagnostics and supported route-failover workflows.
 - **Richer sales operations:** plan categories, reseller traffic credit, configurable trials, subscription history, notifications and Telegram bot delivery.
 
+## Key operational highlights
+
+TwinPanel unifies customer and reseller sales, Telegram delivery, subscription accounting, multi-node VPN operations and client distribution. Key workflows include:
+
+- **Renewal continuity:** reserve a paid renewal until the current subscription expires or reaches its traffic limit, then activate it without changing the account's existing connection identity and profiles.
+- **Financial traceability:** customer/reseller wallets, receipt verification, payment and renewal history, plus administrator adjustment history.
+- **Operations and resilience:** node provisioning and repair, protocol readiness, tunnel and outbound route management, DNS emergency paths, health checks and monitoring.
+- **Automation and support:** Telegram purchase/delivery/notifications, broadcast messaging, support workflows and data backup/recovery.
+- **Reseller and license administration:** plan entitlements, traffic credit, reseller branding and centralized license management.
+
+## TwinConnect — Smart VPN Client
+
+**TwinConnect is the companion smart connection app for TwinPanel**, designed to present eligible servers and protocol profiles from a single subscription backend rather than requiring customers to manage each configuration manually.
+
+- **Platform roadmap:** Windows, Android, macOS and iOS. Release availability and supported connection engines vary by operating system and build; do not assume feature parity.
+- **Smart connection experience:** Quick Connect, explicit server/protocol selection, remembered selection, country grouping and connection state.
+- **Connection visibility:** server latency, public IP, session duration, traffic rates and subscription status where supported.
+- **Subscription-aware delivery:** only entitled plan categories and valid server profiles should appear; show quota, expiry, device allowance and reserved renewals where available.
+- **Security and network controls:** Kill Switch, per-app Split Tunneling, DNS diagnostics and emergency connectivity paths, subject to platform support and verified implementation.
+- **Multi-brand distribution:** reseller-specific logo, theme and support/renewal contacts controlled from TwinPanel.
+
+**Important:** A protocol listed in TwinPanel is not necessarily a working native engine in every TwinConnect build. Connection, Kill Switch and Split Tunneling support must be validated per platform before a release is described as stable.
+
 ## Quick install
 
 Run the official public installer on a clean Ubuntu 22.04 or 24.04 server:
