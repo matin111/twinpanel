@@ -437,6 +437,7 @@ enum TwinConnectMacOSLibboxControl {
                 "protocol": protocolCode,
                 "namespace": namespace
             ]
+            TwinConnectMacOSKillSwitch.applySavedPolicy(tunnel, manager: manager)
             manager.protocolConfiguration = tunnel
             manager.localizedDescription = "TwinConnect"
             manager.isEnabled = true
