@@ -9,7 +9,8 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..openvpn_profile_delivery_guard_v1 import validate_openvpn_profile
-from .account_delivery import _public_payload, _subscription_from_share_token
+from .account_delivery import _stored_info, _subscription_from_share_token
+from ..openvpn_profile_delivery_guard_v1 import disambiguate_openvpn_filenames
 
 
 router = APIRouter(tags=["public-connection-files-v9"])
@@ -26,7 +27,20 @@ def _active_payload(token: str, db: Session) -> dict[str, Any]:
     status = str(getattr(sub.status, "value", sub.status)).strip().lower()
     if status != "active":
         raise HTTPException(status_code=403, detail="اشتراک فعال نیست")
-    return _public_payload(db, sub)
+    # Avoid projecting all protocol credentials and QR data for a single file.
+    protocol = db.info.get("_tp_download_only_protocol_v1")
+    previous = db.info.get("_tp_public_feed_only_protocol")
+    try:
+        db.info["_tp_public_feed_only_protocol"] = protocol
+        payload = _stored_info(db, sub)
+        if protocol == "openvpn":
+            disambiguate_openvpn_filenames(payload)
+        return payload
+    finally:
+        if previous is None:
+            db.info.pop("_tp_public_feed_only_protocol", None)
+        else:
+            db.info["_tp_public_feed_only_protocol"] = previous
 
 
 def _items_for_protocol(payload: dict[str, Any], protocol: str) -> list[dict[str, Any]]:
@@ -80,7 +94,11 @@ def public_connection_file_v9(
     if item_index < 0:
         raise HTTPException(status_code=404, detail="فایل پیدا نشد")
 
-    payload = _active_payload(token, db)
+    db.info["_tp_download_only_protocol_v1"] = protocol
+    try:
+        payload = _active_payload(token, db)
+    finally:
+        db.info.pop("_tp_download_only_protocol_v1", None)
     items = _items_for_protocol(payload, protocol)
     if item_index >= len(items):
         raise HTTPException(status_code=404, detail="فایل پیدا نشد")
