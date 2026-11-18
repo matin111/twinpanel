@@ -42,6 +42,7 @@ import 'l2tp_profile.dart';
 import 'openvpn_profile_validator.dart';
 import 'cisco_openconnect_profile.dart';
 import 'connection_bootstrap.dart';
+import 'emergency_connection_cache.dart';
 import 'tenant_api.dart';
 import 'vpn_policy_store.dart';
 import 'global_guard_connection_gate.dart';
@@ -294,6 +295,50 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     _txHistory.add(txRate);
     if (_rxHistory.length > 24) _rxHistory.removeAt(0);
     if (_txHistory.length > 24) _txHistory.removeAt(0);
+  }
+
+  // Keep online preflight concurrent; only a transport outage is recoverable.
+  Future<PanelProtocolCatalog?> _catalogOrNetworkLoss(TenantApi api) async {
+    try {
+      return await api.loadSessionProtocolCatalog(
+          panel: widget.panel, sessionToken: widget.sessionToken);
+    } on TenantApiException catch (error) {
+      if (error.message != 'NETWORK_UNAVAILABLE') rethrow;
+      return null;
+    } on TimeoutException {
+      return null;
+    }
+  }
+
+  ConnectionCandidate? _pendingEmergencyCandidate;
+  bool _savingEmergencyCandidate = false;
+
+  Future<void> _persistVerifiedEmergencyCandidate() async {
+    final candidate = _pendingEmergencyCandidate;
+    if (candidate == null || _savingEmergencyCandidate ||
+        candidate.fromEmergencyCache || !_vpnVerified ||
+        _activeNodeId != candidate.server.id) return;
+    _savingEmergencyCandidate = true;
+    try {
+      // Record a fresh account state only after native WireGuard handshake.
+      final account = await TenantApi.fromBuildConfig().loadSessionAccount(
+        panel: widget.panel, sessionToken: widget.sessionToken);
+      if (!mounted || !_vpnVerified || _activeNodeId != candidate.server.id) {
+        return;
+      }
+      await const EmergencyConnectionCache().saveVerified(
+        username: widget.username, panel: widget.panel,
+        server: candidate.server, profiles: candidate.profiles,
+        account: account,
+      );
+      if (identical(_pendingEmergencyCandidate, candidate)) {
+        _pendingEmergencyCandidate = null;
+      }
+    } catch (_) {
+      // A failed panel/vault fetch must not interrupt the active tunnel.
+    } finally {
+      _savingEmergencyCandidate = false;
+    }
   }
 
   String? _vpnError;
@@ -2379,19 +2424,17 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       return;
     }
 
+    _pendingEmergencyCandidate = null;
     // Validate the target and obtain only its authorized profile BEFORE
     // removing the working tunnel. A failed preflight keeps it running.
     setState(() { _vpnBusy = true; _vpnError = null; });
     try {
       await _requireVerifiedGuardIfRequested();
       final api = TenantApi.fromBuildConfig();
-      final checks = await Future.wait<Object>([
+      final checks = await Future.wait<Object?>([
         _vpnPolicy.load(widget.panel.namespace, widget.username),
         NativeVpnBridge.probe(),
-        // The same fresh authenticated catalog is reused by bootstrap.
-        // No extra catalog request is made after native readiness.
-        api.loadSessionProtocolCatalog(
-          panel: widget.panel, sessionToken: widget.sessionToken),
+        _catalogOrNetworkLoss(api),
       ]);
       final policy = checks[0] as VpnPolicy;
       final capabilities = checks[1] as NativeVpnCapabilities;
@@ -2401,13 +2444,16 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       final candidate = await ConnectionBootstrap(api: api).prepare(
         panel: widget.panel,
         sessionToken: widget.sessionToken,
+        username: widget.username,
         serverId: targetId,
         protocolCode: 'wireguard',
         policy: policy,
         capabilities: capabilities,
         nativeProtocols: native,
-        currentAttemptCatalog: Future<PanelProtocolCatalog>.value(
-            checks[2] as PanelProtocolCatalog),
+        currentAttemptCatalog: checks[2] is PanelProtocolCatalog
+            ? Future<PanelProtocolCatalog>.value(
+                checks[2] as PanelProtocolCatalog)
+            : null,
       );
       final node = WindowsWireGuardController.configForSingleNode(
           candidate.profiles, targetId);
@@ -2460,6 +2506,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           _resetNetworkStats();
         });
       }
+      _pendingEmergencyCandidate = candidate.fromEmergencyCache ? null : candidate;
       final started = await _vpn.start(
         node: node,
         policy: policy,
@@ -2482,6 +2529,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         _activeNodeId = targetId;
       });
       if (_vpnUp) _startNetworkStats();
+      if (_vpnVerified) unawaited(_persistVerifiedEmergencyCandidate());
     } catch (error) {
       if (mounted) setState(() => _vpnError = _errorText(error));
     } finally {
@@ -2715,6 +2763,9 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       if (_awgServiceUp && _networkTimer == null) _startNetworkStats();
       if (nextUp && (!wasUp || _networkTimer == null)) _startNetworkStats();
       if (nextUp && nextVerified && _publicIp == null) _readNetworkStats();
+      if (nextVerified && _pendingEmergencyCandidate != null) {
+        unawaited(_persistVerifiedEmergencyCandidate());
+      }
       // Native feature probe is expensive; do not repeat it every 12 seconds.
       if (_lastNativeReadyCheck == null ||
           DateTime.now().difference(_lastNativeReadyCheck!) >
@@ -2822,8 +2873,6 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       final api = TenantApi.fromBuildConfig();
       final checks = await Future.wait<Object>([
         _vpnPolicy.load(widget.panel.namespace, widget.username),
-        api.loadSessionProtocolCatalog(
-            panel: widget.panel, sessionToken: widget.sessionToken),
       ]);
       final policy = checks[0] as VpnPolicy;
       final native = await NativeVpnBridge.protocolReadiness(
@@ -2831,13 +2880,12 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       final candidate = await ConnectionBootstrap(api: api).prepare(
         panel: widget.panel,
         sessionToken: widget.sessionToken,
+        username: widget.username,
         serverId: serverId,
         protocolCode: 'wireguard',
         policy: policy,
         capabilities: capabilities,
         nativeProtocols: native,
-        currentAttemptCatalog: Future<PanelProtocolCatalog>.value(
-            checks[1] as PanelProtocolCatalog),
       );
       final profile = WindowsWireGuardController.configForSingleNode(
           candidate.profiles, serverId);
@@ -2891,8 +2939,6 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       final checks = await Future.wait<Object>([
         _vpnPolicy.load(widget.panel.namespace, widget.username),
         NativeVpnBridge.probe(),
-        api.loadSessionProtocolCatalog(
-            panel: widget.panel, sessionToken: widget.sessionToken),
       ]);
       final policy = checks[0] as VpnPolicy;
       final capabilities = checks[1] as NativeVpnCapabilities;
@@ -2901,13 +2947,12 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       final candidate = await ConnectionBootstrap(api: api).prepare(
         panel: widget.panel,
         sessionToken: widget.sessionToken,
+        username: widget.username,
         serverId: serverId,
         protocolCode: 'wireguard',
         policy: policy,
         capabilities: capabilities,
         nativeProtocols: native,
-        currentAttemptCatalog: Future<PanelProtocolCatalog>.value(
-            checks[2] as PanelProtocolCatalog),
       );
       final profile = WindowsWireGuardController.configForSingleNode(
           candidate.profiles, serverId);
@@ -2932,6 +2977,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
 
   Future<void> _toggleVpn() async {
     if (_vpnBusy || !Platform.isWindows) return;
+    _pendingEmergencyCandidate = null;
     if (_modernUp || _awgServiceUp || _modernTunnel.isRunning || _xrayProxy.isRunning || _sudokuProxy.isRunning ||
         _ciscoTunnel.isRunning || _openVpnTunnel.hasChild ||
         _l2tpTunnel.hasChild) {
@@ -3037,11 +3083,10 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         // Probe both concurrently, then reuse the SAME native capability
         // snapshot for the mandatory per-protocol readiness gate.
         final api = TenantApi.fromBuildConfig();
-        final checks = await Future.wait<Object>([
+        final checks = await Future.wait<Object?>([
           _vpnPolicy.load(widget.panel.namespace, widget.username),
           NativeVpnBridge.probe(),
-          api.loadSessionProtocolCatalog(
-            panel: widget.panel, sessionToken: widget.sessionToken),
+          _catalogOrNetworkLoss(api),
         ]);
         final policy = checks[0] as VpnPolicy;
         final capabilities = checks[1] as NativeVpnCapabilities;
@@ -3051,16 +3096,20 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         final candidate = await ConnectionBootstrap(api: api).prepare(
           panel: widget.panel,
           sessionToken: widget.sessionToken,
+          username: widget.username,
           serverId: selectedId,
           protocolCode: 'wireguard',
           policy: policy,
           capabilities: capabilities,
           nativeProtocols: native,
-          currentAttemptCatalog: Future<PanelProtocolCatalog>.value(
-              checks[2] as PanelProtocolCatalog),
+          currentAttemptCatalog: checks[2] is PanelProtocolCatalog
+              ? Future<PanelProtocolCatalog>.value(
+                  checks[2] as PanelProtocolCatalog)
+              : null,
         );
         final node = WindowsWireGuardController.configForSingleNode(
             candidate.profiles, selectedId);
+        _pendingEmergencyCandidate = candidate.fromEmergencyCache ? null : candidate;
         final status = await _vpn.start(
           node: node, policy: policy, capabilities: capabilities,
           nativeProtocols: native,
@@ -3076,6 +3125,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           _activeNodeId = selectedId;
         });
         if (_vpnUp) _startNetworkStats();
+        if (_vpnVerified) unawaited(_persistVerifiedEmergencyCandidate());
       }
     } catch (error) {
       if (mounted) {
@@ -5158,6 +5208,9 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                   'APP_PANEL_TLS_FAILURE' => tr(
                     'اتصال امن TLS به پنل ناموفق بود.',
                     'Secure TLS connection to the panel failed.'),
+                  'EMERGENCY_OFFLINE_MODE' => tr(
+                    'حالت اضطراری: فقط سرور WireGuard تأییدشده قبلی، حداکثر ۶ ساعت.',
+                    'Emergency mode: previously verified WireGuard only, for up to 6 hours.'),
                   'APP_PANEL_NETWORK_UNAVAILABLE' => tr(
                     'ارتباط شبکه با پنل برقرار نشد.',
                     'Could not reach the panel over the network.'),
