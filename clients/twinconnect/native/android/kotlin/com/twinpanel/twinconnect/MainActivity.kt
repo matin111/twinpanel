@@ -238,10 +238,12 @@ class MainActivity : FlutterActivity() {
                         "tunnelOwner" to if (shared != null) "SHARED_TUN" else ownership.owner.name,
                         "sharedTunProtocol" to when {
                             shared?.hasWireGuardTunnel() == true -> "wireguard"
+                            shared?.hasAmneziaWgTunnel() == true -> "amneziawg"
                             shared?.hasCiscoTunnel() == true -> "cisco"
                             else -> null
                         },
-                        "sharedTunSupportedProtocols" to listOf("wireguard", "cisco"),
+                        "sharedTunSupportedProtocols" to (listOf("wireguard", "cisco") +
+                            if (awgRuntime != null) listOf("amneziawg") else emptyList()),
                         "nativePacketGuardRequired" to ownership.requiresNativePacketGuard,
                         "singleTunnelKillSwitchAvailable" to true,
                         "failClosedAcrossHandoff" to sharedGuardUp
@@ -424,6 +426,8 @@ class MainActivity : FlutterActivity() {
                     "AWG_NATIVE_START_FAILED", "AWG_TUN_NOT_ESTABLISHED",
                     "AWG_VPN_SERVICE_TIMEOUT", "AWG_TUN_CREATION_FAILED",
                     "AWG_GO_ACTIVATION_FAILED", "AWG_ENDPOINT_DNS_FAILED",
+                    "AWG_ENDPOINT_MISSING", "AWG_SOCKET_PROTECT_FAILED",
+                    "SHARED_TUN_NOT_READY", "SHARED_TUN_ESTABLISH_FAILED",
                     "AWG_BACKEND_REJECTED", "AWG_BACKEND_START_EXCEPTION",
                     "AWG_NATIVE_LINK_FAILED", "AWG_VPN_SECURITY_REJECTED"
                 )
@@ -501,6 +505,8 @@ class MainActivity : FlutterActivity() {
                     "AWG_ENGINE_UNAVAILABLE", "AWG_PROFILE_INVALID",
                     "AWG_DNS_MISSING", "AWG_DEFAULT_ROUTE_MISSING",
                     "AWG_CONFIG_PARSE_FAILED", "AWG_TUN_NOT_ESTABLISHED",
+                    "AWG_ENDPOINT_MISSING", "AWG_ENDPOINT_DNS_FAILED",
+                    "AWG_SOCKET_PROTECT_FAILED", "AWG_GO_ACTIVATION_FAILED",
                     "AWG_ALREADY_CONNECTED", "OTHER_VPN_ACTIVE",
                     "AWG_NATIVE_RUNTIME_FAILED", "AWG_UNKNOWN_METHOD",
                     "AWG_CONNECT_DISPATCH_ERROR", "AWG_NATIVE_LINK_FAILED",

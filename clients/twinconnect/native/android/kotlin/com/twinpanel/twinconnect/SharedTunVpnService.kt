@@ -16,6 +16,7 @@ import com.wireguard.android.backend.GoBackend
 import com.wireguard.config.Config
 import java.lang.reflect.Method
 import java.net.Inet4Address
+import java.net.InetAddress
 
 /**
  * Sole VpnService for the shared native-TUN architecture.
@@ -32,6 +33,9 @@ class SharedTunVpnService : VpnService() {
     private val lock = Any()
     @Volatile private var tun: ParcelFileDescriptor? = null
     @Volatile private var wireGuardHandle = -1
+    @Volatile private var amneziaHandle = -1
+    private var amneziaTurnOff: ((Int) -> Unit)? = null
+    private var amneziaGetStats: ((Int) -> String?)? = null
     @Volatile private var persistentBlock = false
     @Volatile private var foregroundReady = false
     @Volatile private var shuttingDown = false
@@ -105,7 +109,7 @@ class SharedTunVpnService : VpnService() {
         val shouldClose: Boolean
         synchronized(lock) {
             persistentBlock = false
-            shouldClose = wireGuardHandle < 0 && ciscoEngine == null
+            shouldClose = wireGuardHandle < 0 && amneziaHandle < 0 && ciscoEngine == null
         }
         if (shouldClose) shutdown()
     }
@@ -116,7 +120,9 @@ class SharedTunVpnService : VpnService() {
             check(foregroundReady && !shuttingDown && active === this) {
                 "SHARED_TUN_NOT_READY"
             }
-            check(wireGuardHandle < 0 && ciscoEngine == null) { "TUNNEL_ALREADY_RUNNING" }
+            check(wireGuardHandle < 0 && amneziaHandle < 0 && ciscoEngine == null) {
+                "TUNNEL_ALREADY_RUNNING"
+            }
             SharedOpenConnectEngine(this).also { ciscoEngine = it }
         }
         Thread({ engine.connect(intent) }, "oc-shared-tun").start()
@@ -143,7 +149,7 @@ class SharedTunVpnService : VpnService() {
             current
         }
         if (engine == null) {
-            if (!persistentBlock && wireGuardHandle < 0) shutdown()
+            if (!persistentBlock && wireGuardHandle < 0 && amneziaHandle < 0) shutdown()
         } else engine.stop()
     }
 
@@ -159,7 +165,7 @@ class SharedTunVpnService : VpnService() {
         ipv6Prefix: Int
     ): ParcelFileDescriptor = synchronized(lock) {
         check(active === this && !shuttingDown && ciscoEngine === engine &&
-            wireGuardHandle < 0) { "SHARED_TUN_OWNER_CHANGED" }
+            wireGuardHandle < 0 && amneziaHandle < 0) { "SHARED_TUN_OWNER_CHANGED" }
         check(VpnService.prepare(this) == null) { "VPN_PERMISSION_REQUIRED" }
         check(dnsServers.isNotEmpty()) { "CISCO_DNS_MISSING" }
         val builder = Builder().setSession(name)
@@ -202,6 +208,7 @@ class SharedTunVpnService : VpnService() {
                 "SHARED_TUN_NOT_READY"
             }
             check(wireGuardHandle < 0) { "TUNNEL_ALREADY_RUNNING" }
+            check(amneziaHandle < 0) { "TUNNEL_ALREADY_RUNNING" }
             check(ciscoEngine == null) { "TUNNEL_ALREADY_RUNNING" }
             check(VpnService.prepare(this) == null) { "VPN_PERMISSION_REQUIRED" }
             // Once this startup owns the routing transition, it is responsible
@@ -293,12 +300,108 @@ class SharedTunVpnService : VpnService() {
             val handle = wireGuardHandle
             wireGuardHandle = -1
             if (handle >= 0) WireGuardJni.turnOff(handle)
-            close = !persistentBlock
+            close = !persistentBlock && handle >= 0 &&
+                amneziaHandle < 0 && ciscoEngine == null
         }
         if (close) shutdown()
     }
 
+    /** AmneziaWG uses its *own* native obfuscation core, but this VPN owner. */
+    fun startAmneziaWg(
+        addresses: List<Pair<InetAddress, Int>>,
+        dnsServers: List<InetAddress>,
+        searchDomains: List<String>,
+        mtu: Int,
+        settings: String,
+        keepBlockedOnDisconnect: Boolean,
+        turnOn: (Int, String) -> Int,
+        turnOff: (Int) -> Unit,
+        getSockets: (Int) -> Pair<Int, Int>,
+        getStats: (Int) -> String?
+    ) {
+        var ownsFailedStart = false
+        try {
+            synchronized(lock) {
+                check(foregroundReady && !shuttingDown && active === this) {
+                    "SHARED_TUN_NOT_READY"
+                }
+                check(wireGuardHandle < 0 && amneziaHandle < 0 && ciscoEngine == null) {
+                    "TUNNEL_ALREADY_RUNNING"
+                }
+                check(VpnService.prepare(this) == null) { "VPN_PERMISSION_REQUIRED" }
+                check(addresses.isNotEmpty() && dnsServers.isNotEmpty()) { "AWG_PROFILE_INVALID" }
+                ownsFailedStart = true
+                persistentBlock = persistentBlock || keepBlockedOnDisconnect
+                if (persistentBlock && tun == null) tun = blockingTun()
+                val builder = Builder().setSession("TwinConnect AmneziaWG")
+                    .setBlocking(true).setMtu(mtu.coerceIn(1280, 9000))
+                for ((address, prefix) in addresses) builder.addAddress(address, prefix)
+                if (addresses.none { it.first.address.size == 16 }) {
+                    builder.addAddress("fd00:253:253::1", 128)
+                }
+                for (dns in dnsServers) builder.addDnsServer(dns.hostAddress!!)
+                for (domain in searchDomains) builder.addSearchDomain(domain)
+                builder.addRoute("0.0.0.0", 0).addRoute("::", 0)
+                val replacement = builder.establish()
+                    ?: throw IllegalStateException("SHARED_TUN_ESTABLISH_FAILED")
+                val previous = tun
+                tun = replacement
+                previous?.close()
+                val nativeFd = ParcelFileDescriptor.dup(replacement.fileDescriptor).detachFd()
+                val handle = try {
+                    turnOn(nativeFd, settings)
+                } catch (failure: Exception) {
+                    try { ParcelFileDescriptor.adoptFd(nativeFd).close() } catch (_: Exception) {}
+                    throw failure
+                }
+                check(handle >= 0) { "AWG_GO_ACTIVATION_FAILED" }
+                try {
+                    val (socket4, socket6) = getSockets(handle)
+                    check((socket4 < 0 || protect(socket4)) &&
+                        (socket6 < 0 || protect(socket6))) { "AWG_SOCKET_PROTECT_FAILED" }
+                    amneziaTurnOff = turnOff
+                    amneziaGetStats = getStats
+                    amneziaHandle = handle
+                } catch (failure: Exception) {
+                    turnOff(handle)
+                    throw failure
+                }
+            }
+        } catch (failure: Exception) {
+            if (ownsFailedStart) {
+                Log.e("TwinSharedAWG", "AWG native start failed: ${failure.javaClass.simpleName}")
+                if (!persistentBlock) shutdown()
+            }
+            throw failure
+        } catch (failure: LinkageError) {
+            if (ownsFailedStart && !persistentBlock) shutdown()
+            throw failure
+        }
+    }
+
+    fun stopAmneziaWg() {
+        val close: Boolean
+        synchronized(lock) {
+            val handle = amneziaHandle
+            amneziaHandle = -1
+            val stop = amneziaTurnOff
+            amneziaTurnOff = null
+            amneziaGetStats = null
+            if (handle >= 0) try { stop?.invoke(handle) } catch (_: Exception) {}
+            close = !persistentBlock && handle >= 0 &&
+                wireGuardHandle < 0 && ciscoEngine == null
+        }
+        if (close) shutdown()
+    }
+
+    fun amneziaStats(): String? = synchronized(lock) {
+        val handle = amneziaHandle
+        if (handle < 0) null else try { amneziaGetStats?.invoke(handle) }
+            catch (_: Exception) { null }
+    }
+
     fun hasWireGuardTunnel() = wireGuardHandle >= 0
+    fun hasAmneziaWgTunnel() = amneziaHandle >= 0
     fun hasCiscoTunnel() = ciscoEngine?.isConnected == true
     fun hasBlockingTun() = tun != null && persistentBlock
     fun hasTunnel() = tun != null
@@ -317,6 +420,27 @@ class SharedTunVpnService : VpnService() {
             if (address?.hostAddress != null) return address.hostAddress!!
         }
         throw IllegalStateException("CISCO_GATEWAY_UNDERLAY_DNS_FAILED")
+    }
+
+    /** Resolve AWG peers on a physical Network, even with blackhole DNS active. */
+    fun resolveAwgGateway(hostname: String): String {
+        val manager = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        for (network in manager.allNetworks) {
+            val caps = manager.getNetworkCapabilities(network) ?: continue
+            if (caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN) ||
+                !caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) continue
+            val resolved = try { network.getAllByName(hostname).toList() }
+                catch (_: Exception) { emptyList() }
+            val address = resolved.firstOrNull { it is Inet4Address }
+                ?: resolved.firstOrNull()
+            if (address?.hostAddress != null) return address.hostAddress!!
+        }
+        throw IllegalStateException("AWG_ENDPOINT_DNS_FAILED")
+    }
+
+    fun shutdownIfIdle() = synchronized(lock) {
+        if (!persistentBlock && wireGuardHandle < 0 && amneziaHandle < 0 &&
+            ciscoEngine == null) shutdown()
     }
 
     fun wireGuardStats(): String? = synchronized(lock) {
@@ -384,6 +508,12 @@ class SharedTunVpnService : VpnService() {
             val handle = wireGuardHandle
             wireGuardHandle = -1
             if (handle >= 0) try { WireGuardJni.turnOff(handle) } catch (_: Exception) {}
+            val awgHandle = amneziaHandle
+            amneziaHandle = -1
+            val stopAwg = amneziaTurnOff
+            amneziaTurnOff = null
+            amneziaGetStats = null
+            if (awgHandle >= 0) try { stopAwg?.invoke(awgHandle) } catch (_: Exception) {}
             tun?.close()
             tun = null
             persistentBlock = false

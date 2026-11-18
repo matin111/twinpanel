@@ -43,6 +43,7 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
   bool _androidOsLockdown = false;
   bool _androidLockdownVerifiable = false;
   bool _androidLegacyGuardUp = false;
+  bool _androidSharedAwgReady = false;
   Timer? _androidGuardPoll;
 
   @override
@@ -100,6 +101,8 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
       if (mounted) setState(() {
         _androidKillRequested = result?['sharedGuardEnabled'] == true;
         _androidLegacyGuardUp = result?['legacyGuardActive'] == true;
+        _androidSharedAwgReady =
+            (result?['sharedTunSupportedProtocols'] as List?)?.contains('amneziawg') == true;
         _androidVpnConflict = result?['otherVpnActive'] == true;
         _androidOsLockdown = result?['osLockdown'] == true;
         _androidLockdownVerifiable = result?['lockdownVerificationAvailable'] == true;
@@ -108,6 +111,7 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
       if (mounted) setState(() {
         _androidKillRequested = false;
         _androidLegacyGuardUp = false;
+        _androidSharedAwgReady = false;
         _androidVpnConflict = false;
         _androidOsLockdown = false;
         _androidLockdownVerifiable = false;
@@ -384,12 +388,16 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
                       ? 'فعال: تونل مشترک ترافیک را هنگام قطع اتصال مسدود می‌کند. برای خاموشی کامل برنامه، قفل شبکه اندروید لازم است.'
                       : _androidVpnConflict && !_androidLockdownVerifiable
                           ? 'موتور VPN مستقل دیگری فعال است؛ محافظ مشترک در دسترس نیست.'
-                          : 'با یک دکمه محافظ داخلی WireGuard و Cisco را روشن کنید.',
+                          : _androidSharedAwgReady
+                              ? 'با یک دکمه محافظ داخلی WireGuard، Cisco و AmneziaWG را روشن کنید.'
+                              : 'با یک دکمه محافظ داخلی WireGuard و Cisco را روشن کنید.',
                   _androidKillRequested
                       ? 'Enabled: shared TUN blocks traffic on disconnect. Android lockdown is still needed for app termination.'
                       : _androidVpnConflict && !_androidLockdownVerifiable
                           ? 'An independent VPN engine is active; shared guard is unavailable.'
-                          : 'Enable WireGuard and Cisco in-app traffic blocking with one switch.',
+                          : _androidSharedAwgReady
+                              ? 'Enable WireGuard, Cisco and AmneziaWG in-app blocking with one switch.'
+                              : 'Enable WireGuard and Cisco in-app blocking with one switch.',
                 )),
                 trailing: Switch.adaptive(
                   key: const Key('androidSharedKillSwitch'),

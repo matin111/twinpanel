@@ -70,12 +70,24 @@ PY
 # filenames. The patched GoBackend loader resolves libawg-go.so while the
 # existing WireGuard backend continues to resolve its own libwg-go.so.
 python3 - "$AAR" "$OUT/tunnel-release.aar" <<'PY'
-import sys, zipfile
+import sys, zipfile, re
 src, dst = sys.argv[1:]
 with zipfile.ZipFile(src) as source, zipfile.ZipFile(dst, "w") as target:
     for item in source.infolist():
         data = source.read(item.filename)
         name = item.filename
+        if name == "AndroidManifest.xml":
+            # The AAR's manifest would merge in a second independent Android
+            # VPN service, even if the host manifest never mentions it.
+            # TwinConnect loads AWG's pinned JNI directly via SharedTunVpnService.
+            xml = data.decode("utf-8")
+            pattern = (r'\s*<service\b[^>]*android:name="'
+                       r'org\.amnezia\.awg\.backend\.GoBackend\$VpnService"'
+                       r'[^>]*>.*?</service>')
+            xml, removed = re.subn(pattern, "", xml, flags=re.DOTALL)
+            if removed != 1:
+                raise SystemExit("Expected one upstream AWG VpnService manifest entry")
+            data = xml.encode("utf-8")
         # GoBackend uses libawg-go.so. The upstream AAR also contains
         # libwg-quick.so for the unused WgQuickBackend; stock WireGuard
         # already supplies that exact JNI name. Never bundle two copies.
@@ -94,7 +106,10 @@ with zipfile.ZipFile(dst) as staged:
     assert not any(n.endswith("/libwg-go.so") for n in names)
     assert not any(n.endswith("/libwg-quick.so") for n in names)
     assert not any(n.endswith("/libwg.so") for n in names)
+    assert b'org.amnezia.awg.backend.GoBackend$VpnService' not in staged.read(
+        'AndroidManifest.xml'), 'Staged AWG AAR still registers a second VPN'
 print("AWG native loader isolated from stock WireGuard JNI name")
 PY
 echo "Staged collision-free AWG AAR: $OUT/tunnel-release.aar"
 echo "AWG AAR staged. The installer integrates it when present; device verification is still required."
+

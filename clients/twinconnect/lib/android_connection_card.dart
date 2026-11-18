@@ -549,9 +549,32 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
   // Stopping it to start a protocol creates an unprotected handoff window.
   // Refuse that handoff unless Android lockdown has been verified. Do not
   // silently sacrifice fail-closed protection to make Connect appear to work.
-  Future<void> _releaseDisconnectedGuard({bool allowSharedTun = false}) async {
+  Future<void> _releaseDisconnectedGuard({
+    bool allowSharedTun = false,
+    bool requireSharedGuard = false,
+  }) async {
     if (!Platform.isAndroid) return;
     const channel = MethodChannel('com.twinpanel.twinconnect/vpn');
+    if (requireSharedGuard) {
+      if (!allowSharedTun) throw StateError('SHARED_TUN_REQUIRED');
+      final current = await channel.invokeMapMethod<String, dynamic>(
+          'getDisconnectedTrafficGuardStatus');
+      if (current?['sharedGuardEnabled'] != true) {
+        await channel.invokeMethod<dynamic>('startDisconnectedTrafficGuard');
+      }
+      var verified = false;
+      for (var attempt = 0; attempt < 30; attempt++) {
+        final state = await channel.invokeMapMethod<String, dynamic>(
+            'getDisconnectedTrafficGuardStatus');
+        if (state?['sharedGuardEnabled'] == true &&
+            state?['sharedTunOwner'] == true) {
+          verified = true;
+          break;
+        }
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+      }
+      if (!verified) throw StateError('ANDROID_KILL_SWITCH_NOT_VERIFIED');
+    }
     final status = await channel.invokeMapMethod<String, dynamic>(
         'getDisconnectedTrafficGuardStatus');
     if (status == null) {
@@ -617,7 +640,8 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
       // The vendored service rejects bad pins rather than bypassing TLS.
       AndroidCiscoTunnel.validatedServerTrust(profile);
       stage = 'CISCO_NATIVE_CONNECTION_FAILED';
-      await _releaseDisconnectedGuard(allowSharedTun: true);
+      await _releaseDisconnectedGuard(
+        allowSharedTun: true, requireSharedGuard: policy.killSwitchRequested);
       await AndroidCiscoTunnel.instance.connect(profile);
       if (!mounted) return;
       final id = item['node_id']?.toString();
@@ -796,6 +820,10 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
         _singBoxProtocol != null || _mieruUp) return;
     setState(() { _busy = true; _errorCode = null; });
     try {
+      final policy = await _store.loadFailClosed(
+        widget.panel.namespace, widget.username,
+      );
+      NativeVpnBridge.requireAndroidAmneziaWgSafeToConnect(policy);
       final engine = AndroidAmneziaWgTunnel.instance;
       if (!await engine.engineReady) {
         throw const FormatException('AWG_NATIVE_ENGINE_UNAVAILABLE');
@@ -826,7 +854,8 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
         );
       }
       final item = items.first;
-      await _releaseDisconnectedGuard();
+      await _releaseDisconnectedGuard(
+        allowSharedTun: true, requireSharedGuard: policy.killSwitchRequested);
       await engine.connect(item);
       if (!mounted) return;
       final id = item['node_id']?.toString();

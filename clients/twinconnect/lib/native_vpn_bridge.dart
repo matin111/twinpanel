@@ -201,6 +201,16 @@ class NativeVpnBridge {
     }
   }
 
+  /// AWG has different native cryptography from WireGuard, but the same
+  /// shared-TUN full-device routing and disconnected-traffic guard policy.
+  static void requireAndroidAmneziaWgSafeToConnect(VpnPolicy policy) {
+    try {
+      requireAndroidCiscoSafeToConnect(policy);
+    } on StateError {
+      throw StateError('AWG_POLICY_NOT_SUPPORTED');
+    }
+  }
+
   /// Future engines must call this gate before requesting a connection.
   ///
   /// Saving a policy NEVER invokes or connects a native VPN tunnel.

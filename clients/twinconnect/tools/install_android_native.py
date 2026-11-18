@@ -197,19 +197,8 @@ def patch_manifest() -> None:
         '                android:value="vpn" />\n'
         '        </service>\n'
     )
-    # Register the official AmneziaWG VPN service only when its native AAR
-    # is bundled. Never alias it to the ordinary WireGuard VpnService.
-    awg_aar = NATIVE / "amneziawg-core" / "tunnel-release.aar"
-    if awg_aar.is_file() and 'org.amnezia.awg.backend.GoBackend$VpnService' not in current:
-        service += (
-            '\n        <service android:name="org.amnezia.awg.backend.GoBackend$VpnService"\n'
-            '            android:exported="false"\n'
-            '            android:permission="android.permission.BIND_VPN_SERVICE">\n'
-            '            <intent-filter>\n'
-            '                <action android:name="android.net.VpnService" />\n'
-            '            </intent-filter>\n'
-            '        </service>\n'
-        )
+    # AmneziaWG native JNI is hosted by SharedTunVpnService. Do NOT register
+    # the upstream GoBackend$VpnService: it would take a second Android slot.
     # Avoid duplicating the stock WireGuard service on a repeated install.
     if "com.wireguard.android.backend.GoBackend$VpnService" in current:
         start = service.find("        <!-- The actual WireGuard GoBackend VpnService.")

@@ -389,6 +389,27 @@ void main() {
         contains('_requireVerifiedGuardIfRequested(sharedWireGuard: true)'));
   });
 
+  test('AmneziaWG uses its own JNI engine on the shared TUN', () {
+    final runtime = File(
+      'native/android/kotlin/com/twinpanel/twinconnect/AmneziaWgRuntime.kt',
+    ).readAsStringSync();
+    final shared = File(
+      'native/android/kotlin/com/twinpanel/twinconnect/SharedTunVpnService.kt',
+    ).readAsStringSync();
+    final installer = File('tools/install_android_native.py').readAsStringSync();
+    final card = File('lib/android_connection_card.dart').readAsStringSync();
+    expect(runtime, contains('service.startAmneziaWg('));
+    expect(runtime, contains('AmneziaNative.awgTurnOn('));
+    expect(runtime, contains('toAwgUserspaceString()'));
+    expect(runtime, isNot(contains('backend!!.setState(')));
+    expect(shared, contains('fun startAmneziaWg('));
+    expect(shared, contains('fun stopAmneziaWg()'));
+    expect(shared, contains('fun amneziaStats(): String? = synchronized(lock)'));
+    expect(installer, contains('Do NOT register'));
+    expect(card, contains('requireAndroidAmneziaWgSafeToConnect(policy)'));
+    expect(card, contains('allowSharedTun: true, requireSharedGuard: policy.killSwitchRequested'));
+  });
+
   test('six dashboard locales and Arabic right-to-left are supported', () {
     final dashboard = File('lib/live_dashboard.dart').readAsStringSync();
     final localizer = File('lib/app_strings.dart').readAsStringSync();
