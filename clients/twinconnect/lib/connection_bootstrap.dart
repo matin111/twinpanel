@@ -1,3 +1,6 @@
+import 'dart:async' show TimeoutException;
+
+import 'emergency_connection_cache.dart';
 import 'protocols.dart';
 import 'server_inventory.dart';
 import 'tenant_api.dart';
@@ -10,9 +13,11 @@ import 'cisco_openconnect_profile.dart';
 /// A validated, subscription-scoped connection candidate. These checks do
 /// not start a VPN tunnel and must never be shown as "connected".
 class ConnectionBootstrap {
-  const ConnectionBootstrap({required this.api});
+  const ConnectionBootstrap({required this.api,
+      this.emergency = const EmergencyConnectionCache()});
 
   final TenantApi api;
+  final EmergencyConnectionCache emergency;
 
   /// Fail closed before fetching any credential-bearing profile.
   /// This intentionally re-reads entitlements immediately before a connect
@@ -20,6 +25,7 @@ class ConnectionBootstrap {
   Future<ConnectionCandidate> prepare({
     required PanelDirectoryEntry panel,
     required String sessionToken,
+    String? username,
     required String serverId,
     required String protocolCode,
     required VpnPolicy policy,
@@ -49,6 +55,7 @@ class ConnectionBootstrap {
     // Refresh the entitlement gate before asking for any node metadata.
     // Revoked plans must NOT cause a speculative server lookup, even when
     // such a request would not include connection secrets.
+    try {
     final catalog = await (currentAttemptCatalog ??
         api.loadSessionProtocolCatalog(
           panel: panel, sessionToken: sessionToken));
@@ -130,6 +137,35 @@ class ConnectionBootstrap {
         items: List.unmodifiable(nodeItems),
       ),
     );
+    } on TenantApiException catch (error) {
+      // Only genuine network loss is eligible. Explicit denial (401/403),
+      // invalid TLS, server errors or changed permissions MUST NOT fall back.
+      if (error.message != 'NETWORK_UNAVAILABLE') rethrow;
+      return _prepareEmergency(username, panel, serverId, definition);
+    } on TimeoutException {
+      return _prepareEmergency(username, panel, serverId, definition);
+    }
+  }
+
+  Future<ConnectionCandidate> _prepareEmergency(
+      String? username, PanelDirectoryEntry panel, String serverId,
+      VpnProtocolDefinition protocol) async {
+    if (username == null || username.isEmpty || protocol.code != 'wireguard') {
+      throw const ConnectionBootstrapException('EMERGENCY_PROFILE_NOT_AVAILABLE');
+    }
+    final record = await emergency.match(
+      username: username, panel: panel,
+      serverId: serverId, protocolCode: protocol.code,
+    );
+    if (record == null) {
+      throw const ConnectionBootstrapException('EMERGENCY_PROFILE_NOT_AVAILABLE');
+    }
+    // This candidate still goes through normal native policy/readiness gates,
+    // then through the native peer handshake. It is never a "connected" flag.
+    return ConnectionCandidate(
+      server: record.server, protocol: protocol,
+      profiles: record.profiles, fromEmergencyCache: true,
+    );
   }
 }
 
@@ -138,10 +174,12 @@ class ConnectionCandidate {
     required this.server,
     required this.protocol,
     required this.profiles,
+    this.fromEmergencyCache = false,
   });
   final AppServer server;
   final VpnProtocolDefinition protocol;
   final ClientProtocolProfiles profiles;
+  final bool fromEmergencyCache;
 }
 
 class ConnectionBootstrapException implements Exception {
