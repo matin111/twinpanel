@@ -40,6 +40,7 @@ class SharedTunVpnService : VpnService() {
     @Volatile private var foregroundReady = false
     @Volatile private var shuttingDown = false
     @Volatile private var ciscoEngine: SharedOpenConnectEngine? = null
+    @Volatile private var externalOwner: String? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) {
@@ -70,6 +71,7 @@ class SharedTunVpnService : VpnService() {
             active = this
             when (intent?.action) {
                 ACTION_START_BLOCK -> enableBlocking()
+                ACTION_PREPARE_EXTERNAL -> prepareExternalTun()
                 ACTION_CONNECT_CISCO -> try {
                     connectCisco(intent)
                 } catch (_: IllegalStateException) {
@@ -105,11 +107,59 @@ class SharedTunVpnService : VpnService() {
         }
     }
 
+    /** Pre-install a blackhole before a separate protocol core starts. */
+    private fun prepareExternalTun() = synchronized(lock) {
+        check(foregroundReady && !shuttingDown) { "SHARED_TUN_NOT_READY" }
+        if (tun == null) tun = blockingTun()
+    }
+
+    /** Build in the sole VpnService, while the plugin configures its routes. */
+    private fun borrowBuilder(engine: String): VpnService.Builder = synchronized(lock) {
+        check(engine == "singbox" || engine == "xray") { "EXTERNAL_ENGINE_UNKNOWN" }
+        check(active === this && foregroundReady && !shuttingDown && tun != null) {
+            "SHARED_TUN_NOT_READY"
+        }
+        check(wireGuardHandle < 0 && amneziaHandle < 0 && ciscoEngine == null &&
+            (externalOwner == null || externalOwner == engine)) { "SHARED_TUN_BUSY" }
+        externalOwner = engine
+        Builder()
+    }
+
+    private fun adoptExternalTun(engine: String, descriptor: ParcelFileDescriptor) = synchronized(lock) {
+        check(active === this && !shuttingDown && externalOwner == engine) {
+            "SHARED_TUN_OWNER_CHANGED"
+        }
+        val ownerCopy = ParcelFileDescriptor.dup(descriptor.fileDescriptor)
+        val previous = tun
+        tun = ownerCopy
+        previous?.close()
+    }
+
+    private fun releaseExternalTun(engine: String) {
+        var shouldShutdown = false
+        synchronized(lock) {
+            if (externalOwner != engine || shuttingDown) return
+            externalOwner = null
+            if (persistentBlock) {
+                try {
+                    val blackhole = blockingTun()
+                    val old = tun
+                    tun = blackhole
+                    old?.close()
+                } catch (_: Exception) {
+                    Log.e("TwinSharedTun", "EXTERNAL_GUARD_RESTORE_FAILED")
+                }
+            } else shouldShutdown = true
+        }
+        if (shouldShutdown) shutdownIfIdle()
+    }
+
     fun disableBlocking() {
         val shouldClose: Boolean
         synchronized(lock) {
             persistentBlock = false
-            shouldClose = wireGuardHandle < 0 && amneziaHandle < 0 && ciscoEngine == null
+            shouldClose = wireGuardHandle < 0 && amneziaHandle < 0 &&
+                ciscoEngine == null && externalOwner == null
         }
         if (shouldClose) shutdown()
     }
@@ -120,7 +170,8 @@ class SharedTunVpnService : VpnService() {
             check(foregroundReady && !shuttingDown && active === this) {
                 "SHARED_TUN_NOT_READY"
             }
-            check(wireGuardHandle < 0 && amneziaHandle < 0 && ciscoEngine == null) {
+            check(wireGuardHandle < 0 && amneziaHandle < 0 &&
+                ciscoEngine == null && externalOwner == null) {
                 "TUNNEL_ALREADY_RUNNING"
             }
             SharedOpenConnectEngine(this).also { ciscoEngine = it }
@@ -149,7 +200,8 @@ class SharedTunVpnService : VpnService() {
             current
         }
         if (engine == null) {
-            if (!persistentBlock && wireGuardHandle < 0 && amneziaHandle < 0) shutdown()
+            if (!persistentBlock && wireGuardHandle < 0 && amneziaHandle < 0 &&
+                externalOwner == null) shutdown()
         } else engine.stop()
     }
 
@@ -165,7 +217,8 @@ class SharedTunVpnService : VpnService() {
         ipv6Prefix: Int
     ): ParcelFileDescriptor = synchronized(lock) {
         check(active === this && !shuttingDown && ciscoEngine === engine &&
-            wireGuardHandle < 0 && amneziaHandle < 0) { "SHARED_TUN_OWNER_CHANGED" }
+            wireGuardHandle < 0 && amneziaHandle < 0 && externalOwner == null) {
+            "SHARED_TUN_OWNER_CHANGED" }
         check(VpnService.prepare(this) == null) { "VPN_PERMISSION_REQUIRED" }
         check(dnsServers.isNotEmpty()) { "CISCO_DNS_MISSING" }
         val builder = Builder().setSession(name)
@@ -209,7 +262,7 @@ class SharedTunVpnService : VpnService() {
             }
             check(wireGuardHandle < 0) { "TUNNEL_ALREADY_RUNNING" }
             check(amneziaHandle < 0) { "TUNNEL_ALREADY_RUNNING" }
-            check(ciscoEngine == null) { "TUNNEL_ALREADY_RUNNING" }
+            check(ciscoEngine == null && externalOwner == null) { "TUNNEL_ALREADY_RUNNING" }
             check(VpnService.prepare(this) == null) { "VPN_PERMISSION_REQUIRED" }
             // Once this startup owns the routing transition, it is responsible
             // for tearing it down if native activation fails. A failed WG
@@ -301,7 +354,7 @@ class SharedTunVpnService : VpnService() {
             wireGuardHandle = -1
             if (handle >= 0) WireGuardJni.turnOff(handle)
             close = !persistentBlock && handle >= 0 &&
-                amneziaHandle < 0 && ciscoEngine == null
+                amneziaHandle < 0 && ciscoEngine == null && externalOwner == null
         }
         if (close) shutdown()
     }
@@ -325,7 +378,8 @@ class SharedTunVpnService : VpnService() {
                 check(foregroundReady && !shuttingDown && active === this) {
                     "SHARED_TUN_NOT_READY"
                 }
-                check(wireGuardHandle < 0 && amneziaHandle < 0 && ciscoEngine == null) {
+                check(wireGuardHandle < 0 && amneziaHandle < 0 &&
+                    ciscoEngine == null && externalOwner == null) {
                     "TUNNEL_ALREADY_RUNNING"
                 }
                 check(VpnService.prepare(this) == null) { "VPN_PERMISSION_REQUIRED" }
@@ -389,7 +443,7 @@ class SharedTunVpnService : VpnService() {
             amneziaGetStats = null
             if (handle >= 0) try { stop?.invoke(handle) } catch (_: Exception) {}
             close = !persistentBlock && handle >= 0 &&
-                wireGuardHandle < 0 && ciscoEngine == null
+                wireGuardHandle < 0 && ciscoEngine == null && externalOwner == null
         }
         if (close) shutdown()
     }
@@ -403,6 +457,7 @@ class SharedTunVpnService : VpnService() {
     fun hasWireGuardTunnel() = wireGuardHandle >= 0
     fun hasAmneziaWgTunnel() = amneziaHandle >= 0
     fun hasCiscoTunnel() = ciscoEngine?.isConnected == true
+    fun externalTunnelProtocol() = externalOwner
     fun hasBlockingTun() = tun != null && persistentBlock
     fun hasTunnel() = tun != null
     fun isLockdownVerified(): Boolean = try { isLockdownEnabled } catch (_: Exception) { false }
@@ -440,7 +495,7 @@ class SharedTunVpnService : VpnService() {
 
     fun shutdownIfIdle() = synchronized(lock) {
         if (!persistentBlock && wireGuardHandle < 0 && amneziaHandle < 0 &&
-            ciscoEngine == null) shutdown()
+            ciscoEngine == null && externalOwner == null) shutdown()
     }
 
     fun wireGuardStats(): String? = synchronized(lock) {
@@ -505,6 +560,7 @@ class SharedTunVpnService : VpnService() {
             shuttingDown = true
             stoppedCisco = ciscoEngine
             ciscoEngine = null
+            externalOwner = null
             val handle = wireGuardHandle
             wireGuardHandle = -1
             if (handle >= 0) try { WireGuardJni.turnOff(handle) } catch (_: Exception) {}
@@ -542,6 +598,7 @@ class SharedTunVpnService : VpnService() {
 
     companion object {
         const val ACTION_START_BLOCK = "com.twinpanel.twinconnect.START_SHARED_BLOCK"
+        const val ACTION_PREPARE_EXTERNAL = "com.twinpanel.twinconnect.PREPARE_EXTERNAL"
         const val ACTION_CONNECT_CISCO = "com.twinpanel.twinconnect.CONNECT_SHARED_CISCO"
         const val ACTION_DISCONNECT_CISCO = "com.twinpanel.twinconnect.DISCONNECT_SHARED_CISCO"
         const val ACTION_STOP = "com.twinpanel.twinconnect.STOP_SHARED_TUN"
@@ -549,6 +606,17 @@ class SharedTunVpnService : VpnService() {
         private const val NOTIFICATION_ID = 47032
         @Volatile var active: SharedTunVpnService? = null
             private set
+
+        /** Stable reflective ABI used by the pinned external Flutter plugins. */
+        @JvmStatic fun newExternalTunBuilder(engine: String): VpnService.Builder =
+            (active ?: error("SHARED_TUN_NOT_READY")).borrowBuilder(engine)
+
+        @JvmStatic fun externalTunEstablished(engine: String, descriptor: ParcelFileDescriptor) =
+            (active ?: error("SHARED_TUN_NOT_READY")).adoptExternalTun(engine, descriptor)
+
+        @JvmStatic fun externalTunReleased(engine: String) {
+            active?.releaseExternalTun(engine)
+        }
     }
 }
 

@@ -601,6 +601,37 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
     throw StateError('TRAFFIC_GUARD_RELEASE_TIMEOUT');
   }
 
+  /// sing-box and Xray execute different native cores, but their TUN Builders
+  /// are supplied by SharedTunVpnService. Permission must be granted and the
+  /// blackhole installed before either core can start forwarding packets.
+  Future<void> _prepareSharedNativeEngine(VpnPolicy policy) async {
+    NativeVpnBridge.requireAndroidSharedTunSafeToConnect(policy);
+    if (policy.killSwitchRequested) {
+      await _releaseDisconnectedGuard(
+        allowSharedTun: true, requireSharedGuard: true);
+      return;
+    }
+    const channel = MethodChannel('com.twinpanel.twinconnect/vpn');
+    await channel.invokeMethod<dynamic>('prepareSharedTunEngine');
+    for (var attempt = 0; attempt < 30; attempt++) {
+      final state = await channel.invokeMapMethod<String, dynamic>(
+          'getDisconnectedTrafficGuardStatus');
+      if (state?['sharedTunOwner'] == true) return;
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    }
+    throw StateError('SHARED_TUN_PREPARE_TIMEOUT');
+  }
+
+  Future<void> _finishIdleSharedEngine() async {
+    if (!Platform.isAndroid) return;
+    try {
+      await const MethodChannel('com.twinpanel.twinconnect/vpn')
+          .invokeMethod<dynamic>('finishSharedTunEngine');
+    } catch (_) {
+      // The native owner is the authority; never override a running session.
+    }
+  }
+
   Future<void> _connectCisco() async {
     if (_busy || _up || _openVpnUp || _ciscoUp ||
         _singBoxProtocol != null || !Platform.isAndroid) return;
@@ -907,6 +938,10 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
     try {
       // Require real native initialization BEFORE asking for secrets.
       await AndroidSingBoxTunnel.instance.initialize();
+      final policy = await _store.loadFailClosed(
+        widget.panel.namespace, widget.username,
+      );
+      NativeVpnBridge.requireAndroidSharedTunSafeToConnect(policy);
       stage = 'PROFILE_FETCH';
       final profiles = await TenantApi.fromBuildConfig()
           .loadSessionNativeProfiles(
@@ -930,7 +965,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
       }
       final item = choices.first;
       stage = 'NATIVE_CONNECT';
-      await _releaseDisconnectedGuard();
+      await _prepareSharedNativeEngine(policy);
       await AndroidSingBoxTunnel.instance.connect(
         protocol: code, profile: item,
       );
@@ -957,6 +992,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
           'SINGBOX_NATIVE_CONNECT_FAILED';
       if (mounted) setState(() => _errorCode = code);
     } finally {
+      if (_singBoxProtocol == null) await _finishIdleSharedEngine();
       if (mounted) setState(() => _busy = false);
     }
   }
@@ -974,6 +1010,10 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
     setState(() { _busy = true; _errorCode = null; });
     var stage = 'ENGINE_INIT';
     try {
+      final policy = await _store.loadFailClosed(
+        widget.panel.namespace, widget.username,
+      );
+      NativeVpnBridge.requireAndroidSharedTunSafeToConnect(policy);
       // The native Xray runtime is independent of libbox. In particular,
       // failing to initialize an unrelated sing-box engine must never
       // prevent an authorized XHTTP Reality session from starting.
@@ -1003,7 +1043,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
       // Xray-core; TCP and WS TLS use libbox. Never substitute transports.
       final chosen = choices.first;
       stage = 'NATIVE_CONNECT';
-      await _releaseDisconnectedGuard();
+      await _prepareSharedNativeEngine(policy);
       if (chosen.id == 'xhttp_reality') {
         await AndroidXrayTunnel.instance.connect(chosen);
       } else {
@@ -1034,6 +1074,9 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
           'XRAY_NATIVE_CONNECT_FAILED';
       if (mounted) setState(() => _errorCode = errorCode);
     } finally {
+      if (!_xrayCoreUp && _singBoxProtocol == null) {
+        await _finishIdleSharedEngine();
+      }
       if (mounted) setState(() => _busy = false);
     }
   }

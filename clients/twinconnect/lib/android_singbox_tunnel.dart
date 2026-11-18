@@ -7,8 +7,9 @@ import 'package:flutter/services.dart';
 
 import 'singbox_profile_validator.dart';
 
-/// Independent Android VpnService engine for the supported sing-box family.
-/// This is never routed through WireGuard's native MethodChannel.
+/// Independent sing-box *protocol core*, using TwinConnect's shared Android
+/// VpnService.Builder/TUN rather than launching its own VPN routing owner.
+/// It never routes sing-box credentials through WireGuard's native engine.
 /// Only authenticated panel-issued native outbound JSON is accepted.
 class AndroidSingBoxTunnel {
   AndroidSingBoxTunnel._();
@@ -146,3 +147,4 @@ class AndroidSingBoxTunnel {
     _lastVerifiedLatencyMs = null;
   }
 }
+

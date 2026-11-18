@@ -38,6 +38,8 @@ jobs:
           python tools/install_android_native.py
       - name: Resolve packages
         run: flutter pub get
+      - name: Bind Android plugin TUN builders to SharedTunVpnService
+        run: python tools/patch_shared_tun_android_plugins.py
       - name: Analyze Dart
         run: flutter analyze --no-fatal-infos
       - name: Unit and widget tests
@@ -97,6 +99,12 @@ jobs:
               raise SystemExit("Customer panel cannot be used as central bootstrap")
           print("Central license lookup verified for platform preview")
           PY
+      - name: Resolve Android native plugin packages
+        if: matrix.platform == 'android'
+        run: flutter pub get
+      - name: Bind Android native VPN owner
+        if: matrix.platform == 'android'
+        run: python tools/patch_shared_tun_android_plugins.py
       - name: Build Android (unsigned preview)
         if: matrix.platform == 'android'
         run: flutter build apk --release --dart-define=TWINCONNECT_DIRECTORY_URL=$TWINCONNECT_DIRECTORY_URL

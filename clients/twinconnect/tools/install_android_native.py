@@ -161,25 +161,15 @@ def patch_manifest() -> None:
         match = re.search(r"<application\b[^>]*>", current, flags=re.DOTALL)
         if match is None:
             raise RuntimeError("Unable to set Android backup policy")
-    service = (
-        '\n        <!-- The actual WireGuard GoBackend VpnService. '
-        'No fake local TUN service. -->\n'
-        '        <service android:name="com.wireguard.android.backend.GoBackend$VpnService"\n'
-        '            android:exported="false"\n'
-        '            android:permission="android.permission.BIND_VPN_SERVICE">\n'
-        '            <intent-filter>\n'
-        '                <action android:name="android.net.VpnService" />\n'
-        '            </intent-filter>\n'
-        '        </service>\n'
-    )
+    # The upstream GoBackend service must never be OS-discoverable: the
+    # bundled wireguard-go JNI is called with the shared owner's TUN FD.
+    service = ""
     service += (
         '\n        <service android:name=".AndroidTrafficGuardService"\n'
         '            android:exported="false"\n'
         '            android:foregroundServiceType="specialUse"\n'
         '            android:permission="android.permission.BIND_VPN_SERVICE">\n'
-        '            <intent-filter>\n'
-        '                <action android:name="android.net.VpnService" />\n'
-        '            </intent-filter>\n'
+        '            <!-- Legacy guard has no discoverable Android VPN slot. -->\n'
         '            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"\n'
         '                android:value="vpn" />\n'
         '        </service>\n'
@@ -199,12 +189,12 @@ def patch_manifest() -> None:
     )
     # AmneziaWG native JNI is hosted by SharedTunVpnService. Do NOT register
     # the upstream GoBackend$VpnService: it would take a second Android slot.
-    # Avoid duplicating the stock WireGuard service on a repeated install.
-    if "com.wireguard.android.backend.GoBackend$VpnService" in current:
-        start = service.find("        <!-- The actual WireGuard GoBackend VpnService.")
-        end = service.find("        </service>", start)
-        if start >= 0 and end >= 0:
-            service = service[:start] + service[end + len("        </service>"):]
+    # Older hand-edited app manifests may still contain this independent
+    # service. Remove only that exact service entry; keep other app content.
+    current = re.sub(
+        r'<service\s+android:name="com\.wireguard\.android\.backend\.GoBackend\$VpnService"'
+        r'[^>]*>.*?</service>\s*', "", current, flags=re.DOTALL,
+    )
     # A partially patched scaffold may already contain this service.
     # Never append a duplicate service declaration.
     if 'android:name=".AndroidTrafficGuardService"' in current:
@@ -220,9 +210,7 @@ def patch_manifest() -> None:
         '        <service android:name=".OpenConnectVpnService"\n'
         '            android:exported="false"\n'
         '            android:permission="android.permission.BIND_VPN_SERVICE">\n'
-        '            <intent-filter>\n'
-        '                <action android:name="android.net.VpnService" />\n'
-        '            </intent-filter>\n'
+        '            <!-- Cisco is executed by SharedTunVpnService only. -->\n'
         '        </service>\n'
     )
     # Cisco is hosted by SharedTunVpnService. Registering the old separate
@@ -240,6 +228,18 @@ def patch_manifest() -> None:
             match = re.search(r"<application\b[^>]*>", current, flags=re.DOTALL)
             if match is None:
                 raise RuntimeError("Missing Android application")
+    # Override an upstream WireGuard AAR manifest merger contribution too.
+    # Without this tools:node override the legacy GoBackend service could
+    # reappear in the installed APK even though it is absent from our code.
+    current = current.replace(
+        'xmlns:android="http://schemas.android.com/apk/res/android"',
+        'xmlns:android="http://schemas.android.com/apk/res/android" '
+        'xmlns:tools="http://schemas.android.com/tools"', 1,
+    )
+    service += (
+        '\n        <service android:name="com.wireguard.android.backend.GoBackend$VpnService"'
+        ' tools:node="remove" />\n'
+    )
     current = current[:match.end()] + service + current[match.end():]
     filename.write_text(current, encoding="utf-8")
 

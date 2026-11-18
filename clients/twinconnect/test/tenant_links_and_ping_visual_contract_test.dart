@@ -377,12 +377,12 @@ void main() {
     expect(adapter, contains('new NativeOpenConnectSession('));
     expect(adapter, contains('owner.onCiscoEngineStopped(this)'));
     expect(shared, contains('fun establishCiscoTun('));
-    expect(shared, contains('check(ciscoEngine == null) { "TUNNEL_ALREADY_RUNNING" }'));
+    expect(shared, contains('check(ciscoEngine == null && externalOwner == null) { "TUNNEL_ALREADY_RUNNING" }'));
     expect(shared, contains('val previous = tun'));
     expect(shared, contains('ParcelFileDescriptor.dup(replacement.fileDescriptor)'));
     expect(shared, contains('val replacement = blockingTun()'));
     expect(shared, contains('CISCO_DISCONNECT_BLOCK_FAILED'));
-    expect(shared, contains('if (!persistentBlock && wireGuardHandle < 0 && amneziaHandle < 0) shutdown()'));
+    expect(shared, contains('if (!persistentBlock && wireGuardHandle < 0 && amneziaHandle < 0 &&'));
     expect(installer, contains('"SharedOpenConnectEngine.java"'));
     expect(installer, isNot(contains('Independent pinned Cisco CSTP/TLS VpnService')));
     final startCisco = dashboard.indexOf('Future<void> _startCiscoTunnel(');
@@ -409,6 +409,34 @@ void main() {
     expect(installer, contains('Do NOT register'));
     expect(card, contains('requireAndroidAmneziaWgSafeToConnect(policy)'));
     expect(card, contains('allowSharedTun: true, requireSharedGuard: policy.killSwitchRequested'));
+  });
+
+  test('Xray and sing-box borrow one Android VPN builder and restore guard', () {
+    final service = File(
+      'native/android/kotlin/com/twinpanel/twinconnect/SharedTunVpnService.kt',
+    ).readAsStringSync();
+    final native = File(
+      'native/android/kotlin/com/twinpanel/twinconnect/MainActivity.kt',
+    ).readAsStringSync();
+    final patcher = File('tools/patch_shared_tun_android_plugins.py')
+        .readAsStringSync();
+    final card = File('lib/android_connection_card.dart').readAsStringSync();
+    expect(service, contains('fun newExternalTunBuilder(engine: String)'));
+    expect(service, contains('fun externalTunEstablished(engine: String'));
+    expect(service, contains('fun externalTunReleased(engine: String)'));
+    expect(service, contains('val blackhole = blockingTun()'));
+    expect(service, contains('externalOwner == null'));
+    expect(native, contains('"prepareSharedTunEngine"'));
+    expect(native, contains('"finishSharedTunEngine"'));
+    expect(native, contains('"singbox", "xray"'));
+    expect(patcher, contains('TWINCONNECT_SHARED_TUN_SINGBOX'));
+    expect(patcher, contains('TWINCONNECT_SHARED_TUN_XRAY'));
+    expect(patcher, contains('"newExternalTunBuilder"'));
+    expect(patcher, contains('"externalTunEstablished"'));
+    expect(patcher, contains('"externalTunReleased"'));
+    expect(patcher, contains('android:process=":RunSoLibXrayDaemon"'));
+    expect(card, contains('await _prepareSharedNativeEngine(policy);'));
+    expect(card, contains('requireAndroidSharedTunSafeToConnect(policy)'));
   });
 
   test('six dashboard locales and Arabic right-to-left are supported', () {

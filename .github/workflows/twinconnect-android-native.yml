@@ -159,6 +159,8 @@ jobs:
           grep -F 'OPENCONNECT_CORE_NOT_INSTALLED' lib/android_tunnel.dart
       - name: Fetch packages
         run: flutter pub get
+      - name: Bind sing-box and Xray native plugins to SharedTunVpnService
+        run: python tools/patch_shared_tun_android_plugins.py
       - name: Dart static analysis
         run: flutter analyze --no-fatal-infos
       - name: Dart tests

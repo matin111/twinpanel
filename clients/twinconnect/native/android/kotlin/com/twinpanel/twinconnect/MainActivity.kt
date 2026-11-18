@@ -29,6 +29,7 @@ class MainActivity : FlutterActivity() {
     private var pendingStart: PendingStart? = null
     private var pendingAwgStart: Pair<String, MethodChannel.Result>? = null
     private var pendingGuardStart: MethodChannel.Result? = null
+    private var pendingExternalStart: MethodChannel.Result? = null
 
     private data class PendingStart(
         val config: String,
@@ -240,9 +241,10 @@ class MainActivity : FlutterActivity() {
                             shared?.hasWireGuardTunnel() == true -> "wireguard"
                             shared?.hasAmneziaWgTunnel() == true -> "amneziawg"
                             shared?.hasCiscoTunnel() == true -> "cisco"
+                            shared?.externalTunnelProtocol() != null -> shared.externalTunnelProtocol()
                             else -> null
                         },
-                        "sharedTunSupportedProtocols" to (listOf("wireguard", "cisco") +
+                        "sharedTunSupportedProtocols" to (listOf("wireguard", "cisco", "singbox", "xray") +
                             if (awgRuntime != null) listOf("amneziawg") else emptyList()),
                         "nativePacketGuardRequired" to ownership.requiresNativePacketGuard,
                         "singleTunnelKillSwitchAvailable" to true,
@@ -271,6 +273,32 @@ class MainActivity : FlutterActivity() {
                             launchSharedGuard(result)
                         }
                     }
+                }
+                "prepareSharedTunEngine" -> {
+                    if (AndroidTrafficGuardService.active) {
+                        result.error("LEGACY_GUARD_ACTIVE", "Stop legacy guard before native connection", null)
+                    } else if (SharedTunVpnService.active == null && hasActiveVpnTransport()) {
+                        result.error("OTHER_VPN_ACTIVE", "Another VPN owns Android routing", null)
+                    } else if (pendingExternalStart != null || pendingGuardStart != null) {
+                        result.error("VPN_REQUEST_IN_PROGRESS", "VPN approval pending", null)
+                    } else {
+                        val approval = VpnService.prepare(this)
+                        if (approval == null) launchSharedExternal(result)
+                        else {
+                            pendingExternalStart = result
+                            try {
+                                @Suppress("DEPRECATION")
+                                startActivityForResult(approval, EXTERNAL_APPROVAL_REQUEST)
+                            } catch (_: Exception) {
+                                pendingExternalStart = null
+                                result.error("VPN_PERMISSION_FAILED", "Unable to request permission", null)
+                            }
+                        }
+                    }
+                }
+                "finishSharedTunEngine" -> {
+                    SharedTunVpnService.active?.shutdownIfIdle()
+                    result.success(mapOf("releaseRequested" to true))
                 }
                 "stopDisconnectedTrafficGuard" -> {
                     SharedTunVpnService.active?.disableBlocking()
@@ -478,6 +506,21 @@ class MainActivity : FlutterActivity() {
         }
     }
 
+    private fun launchSharedExternal(result: MethodChannel.Result) {
+        try {
+            if (SharedTunVpnService.active == null) {
+                val intent = Intent(this, SharedTunVpnService::class.java).apply {
+                    action = SharedTunVpnService.ACTION_PREPARE_EXTERNAL
+                }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(intent)
+                else startService(intent)
+            }
+            result.success(mapOf("startRequested" to true))
+        } catch (_: Exception) {
+            result.error("SHARED_TUN_NOT_READY", "Unable to prepare VPN owner", null)
+        }
+    }
+
     private fun onWorker(
         result: MethodChannel.Result,
         work: () -> Map<String, Any>
@@ -534,6 +577,13 @@ class MainActivity : FlutterActivity() {
             else request.error("VPN_PERMISSION_DENIED", "VPN permission not granted", null)
             return
         }
+        if (requestCode == EXTERNAL_APPROVAL_REQUEST) {
+            val request = pendingExternalStart ?: return
+            pendingExternalStart = null
+            if (resultCode == Activity.RESULT_OK) launchSharedExternal(request)
+            else request.error("VPN_PERMISSION_DENIED", "VPN permission not granted", null)
+            return
+        }
         if (requestCode == AWG_APPROVAL_REQUEST) {
             val request = pendingAwgStart ?: return
             pendingAwgStart = null
@@ -579,6 +629,8 @@ class MainActivity : FlutterActivity() {
     override fun onDestroy() {
         pendingGuardStart?.error("VPN_REQUEST_CANCELLED", "VPN approval activity closed", null)
         pendingGuardStart = null
+        pendingExternalStart?.error("VPN_REQUEST_CANCELLED", "VPN approval activity closed", null)
+        pendingExternalStart = null
         pendingStart?.result?.error(
             "VPN_REQUEST_CANCELLED", "VPN approval activity closed", null
         )
@@ -595,5 +647,6 @@ class MainActivity : FlutterActivity() {
         private const val VPN_APPROVAL_REQUEST = 44011
         private const val AWG_APPROVAL_REQUEST = 44012
         private const val GUARD_APPROVAL_REQUEST = 44013
+        private const val EXTERNAL_APPROVAL_REQUEST = 44014
     }
 }

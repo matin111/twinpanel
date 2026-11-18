@@ -201,6 +201,13 @@ class NativeVpnBridge {
     }
   }
 
+  /// Shared full-device TUN contract enforced by all non-WireGuard cores.
+  /// Per-app routing, bypass and unverified reconnect cannot silently weaken
+  /// the one-button packet guard.
+  static void requireAndroidSharedTunSafeToConnect(VpnPolicy policy) {
+    requireAndroidCiscoSafeToConnect(policy);
+  }
+
   /// AWG has different native cryptography from WireGuard, but the same
   /// shared-TUN full-device routing and disconnected-traffic guard policy.
   static void requireAndroidAmneziaWgSafeToConnect(VpnPolicy policy) {
