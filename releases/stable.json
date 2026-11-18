@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.877",
+  "version": "1.1.0-rc.878",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-18T11:01:36Z",
+  "released_at": "2026-11-18T11:12:26Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "3235cfe45b7099ca66448e33d8ef43667545a116",
+  "source_sha": "76ee315ebba330e393b1bb9688af05bf787833c5",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.877/twinpanel-1.1.0-rc.877-linux-x86_64.tar.gz",
-    "sha256": "ac2fe71dceac53190929ca975499cee08ce865900ced48be7284d090bf9ac8d6",
-    "size_bytes": 31268777
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.878/twinpanel-1.1.0-rc.878-linux-x86_64.tar.gz",
+    "sha256": "712bffb7ae08cd354cf843dfbdd6b8d496c87d6a707f578ab164249a36d49420",
+    "size_bytes": 31321627
   },
   "notes": {
-    "fa": "ارسال خودکار تأیید تمدید رزرو‌شده و فعال‌شده از طریق ربات تلگرام برای سایت، ربات و پنل؛ جلوگیری از پیام اشتباه فعال‌سازی اشتراک جدید و حفظ کانفیگ‌ها.",
-    "en": "Send transactional Telegram notices when renewals are reserved and activated across bot, website and admin; prevent incorrect new-account activation messages."
+    "fa": "افزودن آموزش کانکشن هوشمند TwinConnect ویندوز به منوی آموزش‌های ربات با دکمه دانلود مستقیم از کانال اصلی.",
+    "en": "Add TwinConnect Windows smart connection guide to Telegram bot tutorials with the official channel download message link."
   }
 }
