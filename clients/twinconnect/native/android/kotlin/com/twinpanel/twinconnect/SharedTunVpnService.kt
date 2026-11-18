@@ -50,6 +50,7 @@ class SharedTunVpnService : VpnService() {
     private val gate = TunPacketGate()
     private val lock = Any()
     private var generation = 0L
+    private var output: FileOutputStream? = null
     @Volatile private var readerFailed = false
     @Volatile private var tun: ParcelFileDescriptor? = null
     @Volatile private var engine: PacketEngine? = null
@@ -94,6 +95,7 @@ class SharedTunVpnService : VpnService() {
                 .addDnsServer("fd00:253:253::1")
                 .setBlocking(true)
                 .establish() ?: throw IllegalStateException("SHARED_TUN_ESTABLISH_FAILED")
+            output = FileOutputStream(tun!!.fileDescriptor)
             active = this
             startReader(tun!!)
         } catch (_: Exception) {
@@ -126,7 +128,7 @@ class SharedTunVpnService : VpnService() {
                             if (engine !== next || generation != token ||
                                 !gate.allows(TunPacketGate.PacketRoute.VPN_TUNNEL)) return
                             if (length <= 0 || length > packet.size) return
-                            tun?.let { FileOutputStream(it.fileDescriptor).write(packet, 0, length) }
+                            output?.write(packet, 0, length)
                         }
                     }
                 })
@@ -135,6 +137,8 @@ class SharedTunVpnService : VpnService() {
                 gate.verifiedConnected(next.id)
             } catch (failure: Exception) {
                 gate.lostConnection()
+                generation++
+                engine = null
                 next.stop()
                 throw failure
             }
@@ -188,6 +192,9 @@ class SharedTunVpnService : VpnService() {
         if (stopping) return
         stopping = true
         transportLost()
+        // FileOutputStream shares the TUN descriptor; close it only on shutdown.
+        output?.close()
+        output = null
         tun?.close()
         tun = null
         reader?.interrupt()
