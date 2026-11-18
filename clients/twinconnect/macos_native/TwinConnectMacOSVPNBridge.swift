@@ -109,6 +109,10 @@ final class TwinConnectMacOSVPNBridge {
                     "autoReconnect": false,
                     "managedDevice": false,
                 ] as [String: Any])
+            case "getMacKillSwitchStatus":
+                TwinConnectMacOSKillSwitch.status(result)
+            case "setMacKillSwitch":
+                TwinConnectMacOSKillSwitch.set(call.arguments, result: result)
             case "getProtocolCapabilities":
                 result([
                     "contractVersion": 1,
