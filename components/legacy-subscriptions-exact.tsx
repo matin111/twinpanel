@@ -527,7 +527,7 @@ export function LegacySubscriptionsRuntimePage(){
               <span className="mobile-subscription-plan">{s(item.plan_name)||s(plan?.name)||pick("پلن دستی","Manual plan")}</span>
               <span dir="ltr">MV-{n(item.id)}</span>
               <span>{s(item.reseller_name)||pick("کاربر مستقیم","Direct customer")}</span>
-              {item.renewal_summary&&<span className="subscription-renewal-flag">{pick("تمدید","Renewal")}: {n((item.renewal_summary as RuntimeRow).pending_count)>0?pick("رزرو شده","Reserved"):s(((item.renewal_summary as RuntimeRow).last as RuntimeRow|undefined)?.status)==="activated"?pick("فعال شده","Activated"):pick("سابقه تمدید","Renewal history")}</span>}
+              {Boolean(item.renewal_summary)&&<span className="subscription-renewal-flag">{pick("تمدید","Renewal")}: {n((item.renewal_summary as RuntimeRow).pending_count)>0?pick("رزرو شده","Reserved"):s(((item.renewal_summary as RuntimeRow).last as RuntimeRow|undefined)?.status)==="activated"?pick("فعال شده","Activated"):pick("سابقه تمدید","Renewal history")}</span>}
               <span dir="auto" className="mobile-subscription-contact">{user?.email||s(item.customer_email)||"—"}</span>
             </div>
             <div className="mobile-subscription-usage">
