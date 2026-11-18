@@ -5,57 +5,34 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.net.VpnService
 import android.os.Build
 import android.os.ParcelFileDescriptor
-import java.io.FileInputStream
-import java.io.FileOutputStream
-import java.net.DatagramSocket
-import java.net.Socket
+import com.wireguard.android.backend.GoBackend
+import com.wireguard.config.Config
+import java.lang.reflect.Method
+import java.net.Inet4Address
 
 /**
- * Single Android VPN owner for engines adapted to [PacketEngine].
+ * Sole VpnService for the shared native-TUN architecture.
  *
- * IMPORTANT: Legacy WireGuard GoBackend, OpenVPN and OpenConnect plugins do
- * not implement this contract yet. They must NOT be started alongside this
- * service; doing so would steal Android's VPN slot.
+ * Android owns the routing decision. A configured TUN with no running engine
+ * is a black hole; no packet is copied to an ordinary device socket. WireGuard
+ * receives a duplicated TUN FD and reads/writes IP packets itself. The primary
+ * FD is retained so disconnect does not relinquish Android's VPN routing slot.
  *
- * The shared TUN stays established when a transport fails. Its ingress loop
- * drops packets while the engine is not verified, preventing an application
- * fallback socket from receiving cleartext packets through this service.
- * Android OS lockdown is still needed for process death/revoke protection.
+ * This provides an in-process disconnect guard, NOT Android's system lockdown:
+ * force-stop, process death, revocation, and reboot need OS lockdown.
  */
 class SharedTunVpnService : VpnService() {
-    interface PacketEngine {
-        val id: String
-        /** Called only with an active VPN owner; engine owns NO VpnService. */
-        fun start(underlying: SocketProtector, sink: PacketSink)
-        /** Encrypted transport must be ready before returning true. */
-        fun isReady(): Boolean
-        /** Consume a full IP packet, never send it over an unprotected socket. */
-        fun sendPacket(packet: ByteArray, length: Int)
-        fun stop()
-    }
-
-    interface SocketProtector {
-        fun protect(socket: Socket): Boolean
-        fun protect(socket: DatagramSocket): Boolean
-    }
-
-    interface PacketSink {
-        /** Receive decrypted IP packets from the engine, write to TUN only. */
-        fun deliver(packet: ByteArray, length: Int)
-    }
-
-    private val gate = TunPacketGate()
     private val lock = Any()
-    private var generation = 0L
-    private var output: FileOutputStream? = null
-    @Volatile private var readerFailed = false
     @Volatile private var tun: ParcelFileDescriptor? = null
-    @Volatile private var engine: PacketEngine? = null
-    @Volatile private var reader: Thread? = null
-    @Volatile private var stopping = false
+    @Volatile private var wireGuardHandle = -1
+    @Volatile private var persistentBlock = false
+    @Volatile private var foregroundReady = false
+    @Volatile private var shuttingDown = false
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) {
@@ -66,16 +43,13 @@ class SharedTunVpnService : VpnService() {
             shutdown()
             return START_NOT_STICKY
         }
-        if (tun != null) return START_STICKY
-        stopping = false
-        readerFailed = false
         try {
-            val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            if (Build.VERSION.SDK_INT >= 26) {
-                nm.createNotificationChannel(NotificationChannel(
+            val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                manager.createNotificationChannel(NotificationChannel(
                     CHANNEL, "TwinConnect VPN", NotificationManager.IMPORTANCE_LOW))
             }
-            val notification = if (Build.VERSION.SDK_INT >= 26)
+            val notification = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
                 Notification.Builder(this, CHANNEL) else {
                 @Suppress("DEPRECATION")
                 Notification.Builder(this)
@@ -85,19 +59,9 @@ class SharedTunVpnService : VpnService() {
                 .setContentTitle("TwinConnect VPN")
                 .setContentText("Protected tunnel")
                 .setOngoing(true).build())
-            tun = Builder().setSession("TwinConnect shared tunnel")
-                .setMtu(1280)
-                .addAddress("10.253.253.1", 32)
-                .addRoute("0.0.0.0", 0)
-                .addAddress("fd00:253:253::1", 128)
-                .addRoute("::", 0)
-                .addDnsServer("10.253.253.1")
-                .addDnsServer("fd00:253:253::1")
-                .setBlocking(true)
-                .establish() ?: throw IllegalStateException("SHARED_TUN_ESTABLISH_FAILED")
-            output = FileOutputStream(tun!!.fileDescriptor)
+            foregroundReady = true
             active = this
-            startReader(tun!!)
+            if (intent?.action == ACTION_START_BLOCK) enableBlocking()
         } catch (_: Exception) {
             shutdown()
             return START_NOT_STICKY
@@ -105,101 +69,190 @@ class SharedTunVpnService : VpnService() {
         return START_STICKY
     }
 
-    /**
-     * Engine registration is deliberately explicit: no engine can install
-     * another VpnService or bypass the packet gate through this API.
-     */
-    fun attach(next: PacketEngine) {
+    private fun blockingTun(): ParcelFileDescriptor = Builder()
+        .setSession("TwinConnect disconnect guard")
+        .setBlocking(true)
+        .setMtu(1280)
+        .addAddress("10.253.253.1", 32)
+        .addRoute("0.0.0.0", 0)
+        .addAddress("fd00:253:253::1", 128)
+        .addRoute("::", 0)
+        .addDnsServer("10.253.253.1")
+        .establish() ?: throw IllegalStateException("SHARED_TUN_ESTABLISH_FAILED")
+
+    fun enableBlocking() {
         synchronized(lock) {
-            check(tun != null && active === this && !readerFailed) { "SHARED_TUN_NOT_ESTABLISHED" }
-            gate.lostConnection()
-            generation++
-            engine?.stop()
-            engine = null
-            gate.beginConnect(next.id)
-            val token = generation
+            check(foregroundReady && !shuttingDown) { "SHARED_TUN_NOT_READY" }
+            persistentBlock = true
+            if (tun == null) tun = blockingTun()
+        }
+    }
+
+    fun disableBlocking() {
+        val shouldClose: Boolean
+        synchronized(lock) {
+            persistentBlock = false
+            shouldClose = wireGuardHandle < 0
+        }
+        if (shouldClose) shutdown()
+    }
+
+    /** Actual ownership handoff: no GoBackend.setState or second VpnService. */
+    fun startWireGuard(config: Config, keepBlockedOnDisconnect: Boolean) {
+        synchronized(lock) {
+            check(foregroundReady && !shuttingDown && active === this) {
+                "SHARED_TUN_NOT_READY"
+            }
+            check(wireGuardHandle < 0) { "TUNNEL_ALREADY_RUNNING" }
+            check(VpnService.prepare(this) == null) { "VPN_PERMISSION_REQUIRED" }
+            // Never downgrade a guard already enabled using the settings button.
+            persistentBlock = persistentBlock || keepBlockedOnDisconnect
+            if (persistentBlock && tun == null) tun = blockingTun()
+            // Resolve ONLY the VPN peer endpoint on an underlying Network.
+            // Default DNS could already be blackholed by the active guard.
+            // Never bind the entire process to that underlying network.
+            val settings = wireGuardUserspaceConfig(config)
+            val builder = Builder().setSession("TwinConnect WireGuard")
+                .setBlocking(true)
+                .setMtu(config.`interface`.mtu.orElse(1280))
+            for (address in config.`interface`.addresses) {
+                builder.addAddress(address.address, address.mask)
+            }
+            if (config.`interface`.addresses.none { it.address.address.size == 16 }) {
+                // A full IPv6 route into an IPv4-only peer must fail closed.
+                builder.addAddress("fd00:253:253::1", 128)
+            }
+            for (dns in config.`interface`.dnsServers) {
+                builder.addDnsServer(dns.hostAddress!!)
+            }
+            for (domain in config.`interface`.dnsSearchDomains) builder.addSearchDomain(domain)
+            // Route BOTH families, independent of a peer's AllowedIPs layout.
+            builder.addRoute("0.0.0.0", 0).addRoute("::", 0)
+            val replacement = builder.establish()
+                ?: throw IllegalStateException("SHARED_TUN_ESTABLISH_FAILED")
+            val previous = tun
+            tun = replacement
+            previous?.close()
+
+            // GoBackend's JNI is package-private in practice (private Java
+            // methods). Reflection is scoped to the app-bundled WireGuard AAR.
+            // The bridge never instantiates GoBackend.VpnService.
             try {
-                next.start(object : SocketProtector {
-                    override fun protect(socket: Socket) = this@SharedTunVpnService.protect(socket)
-                    override fun protect(socket: DatagramSocket) = this@SharedTunVpnService.protect(socket)
-                }, object : PacketSink {
-                    override fun deliver(packet: ByteArray, length: Int) {
-                        synchronized(lock) {
-                            if (engine !== next || generation != token ||
-                                !gate.allows(TunPacketGate.PacketRoute.VPN_TUNNEL)) return
-                            if (length <= 0 || length > packet.size) return
-                            output?.write(packet, 0, length)
-                        }
+                GoBackend(applicationContext) // loads the pinned libwg-go
+                val copied = ParcelFileDescriptor.dup(replacement.fileDescriptor)
+                val nativeFd = copied.detachFd()
+                val handle = try {
+                    WireGuardJni.turnOn(nativeFd, settings)
+                } catch (failure: Exception) {
+                    // JNI takes ownership of the fd only if successfully called.
+                    // On invocation errors close the detached copy defensively.
+                    try { ParcelFileDescriptor.adoptFd(nativeFd).close() } catch (_: Exception) {}
+                    throw failure
+                }
+                if (handle < 0) throw IllegalStateException("WIREGUARD_NATIVE_START_FAILED")
+                try {
+                    val ipv4 = WireGuardJni.socketV4(handle)
+                    val ipv6 = WireGuardJni.socketV6(handle)
+                    if ((ipv4 >= 0 && !protect(ipv4)) ||
+                        (ipv6 >= 0 && !protect(ipv6))) {
+                        throw IllegalStateException("WIREGUARD_SOCKET_PROTECT_FAILED")
                     }
-                })
-                check(next.isReady()) { "ENGINE_NOT_READY" }
-                engine = next
-                gate.verifiedConnected(next.id)
+                    wireGuardHandle = handle
+                } catch (failure: Exception) {
+                    WireGuardJni.turnOff(handle)
+                    throw failure
+                }
             } catch (failure: Exception) {
-                gate.lostConnection()
-                generation++
-                engine = null
-                next.stop()
+                // Keep the TUN established as a black hole on failure.
+                // No fallback route is installed by this service.
+                if (!persistentBlock) persistentBlock = true
                 throw failure
             }
         }
     }
 
-    fun transportLost() {
+    fun stopWireGuard() {
+        val close: Boolean
         synchronized(lock) {
-            gate.lostConnection()
-            generation++
-            engine?.stop()
-            engine = null
+            val handle = wireGuardHandle
+            wireGuardHandle = -1
+            if (handle >= 0) WireGuardJni.turnOff(handle)
+            close = !persistentBlock
         }
+        if (close) shutdown()
     }
 
-    private fun startReader(fd: ParcelFileDescriptor) {
-        val thread = Thread({
-            try {
-                val input = FileInputStream(fd.fileDescriptor)
-                val packet = ByteArray(32768)
-                while (!Thread.currentThread().isInterrupted && tun === fd) {
-                    val length = input.read(packet)
-                    if (length < 0) break
-                    synchronized(lock) {
-                        val current = engine
-                        if (current != null && gate.allows(TunPacketGate.PacketRoute.VPN_TUNNEL)
-                            && current.isReady()) {
-                            val ownedPacket = packet.copyOf(length)
-                            current.sendPacket(ownedPacket, ownedPacket.size)
-                        } else {
-                            // Drop while disconnected. Do not forward outside TUN.
-                            if (current != null && !current.isReady()) transportLost()
-                        }
-                    }
+    fun hasWireGuardTunnel() = wireGuardHandle >= 0
+    fun hasBlockingTun() = tun != null && persistentBlock
+    fun hasTunnel() = tun != null
+    fun isLockdownVerified(): Boolean = try { isLockdownEnabled } catch (_: Exception) { false }
+
+    fun wireGuardStats(): String? {
+        val handle = wireGuardHandle
+        return if (handle >= 0) try { WireGuardJni.getConfig(handle) }
+            catch (_: Exception) { null } else null
+    }
+
+    private fun wireGuardUserspaceConfig(config: Config): String {
+        check(config.peers.isNotEmpty()) { "WIREGUARD_ENDPOINT_MISSING" }
+        val manager = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val underlays = manager.allNetworks.filter { network ->
+            val capabilities = manager.getNetworkCapabilities(network)
+            capabilities != null &&
+                !capabilities.hasTransport(NetworkCapabilities.TRANSPORT_VPN) &&
+                capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+        }
+        val settings = StringBuilder(config.`interface`.toWgUserspaceString())
+        settings.append("replace_peers=true\n")
+        for (peer in config.peers) {
+            val endpoint = peer.endpoint.orElse(null)
+                ?: throw IllegalStateException("WIREGUARD_ENDPOINT_MISSING")
+            var target: String? = null
+            for (network in underlays) {
+                val resolved = try {
+                    network.getAllByName(endpoint.host).toList()
+                } catch (_: Exception) {
+                    emptyList()
                 }
-            } catch (_: Exception) {
-                readerFailed = true
-                transportLost()
-            } finally {
-                // A dead packet reader cannot provide leak-safe forwarding.
-                readerFailed = true
-                transportLost()
+                val address = resolved.firstOrNull { it is Inet4Address }
+                    ?: resolved.firstOrNull()
+                if (address != null) {
+                    val ip = address.hostAddress ?: continue
+                    val host = if (ip.contains(':')) "[$ip]" else ip
+                    target = "$host:${endpoint.port}"
+                    break
+                }
             }
-        }, "twinconnect-shared-tun")
-        thread.isDaemon = true
-        reader = thread
-        thread.start()
+            check(target != null) { "WIREGUARD_ENDPOINT_DNS_FAILED" }
+            settings.append("public_key=").append(peer.publicKey.toHex()).append('\n')
+            for (allowed in peer.allowedIps) {
+                settings.append("allowed_ip=").append(allowed).append('\n')
+            }
+            settings.append("endpoint=").append(target).append('\n')
+            peer.persistentKeepalive.ifPresent {
+                settings.append("persistent_keepalive_interval=").append(it).append('\n')
+            }
+            peer.preSharedKey.ifPresent {
+                settings.append("preshared_key=").append(it.toHex()).append('\n')
+            }
+        }
+        return settings.toString()
     }
 
     private fun shutdown() {
-        if (stopping) return
-        stopping = true
-        transportLost()
-        // FileOutputStream shares the TUN descriptor; close it only on shutdown.
-        output?.close()
-        output = null
-        tun?.close()
-        tun = null
-        reader?.interrupt()
-        reader = null
-        if (active === this) active = null
+        synchronized(lock) {
+            if (shuttingDown) return
+            shuttingDown = true
+            val handle = wireGuardHandle
+            wireGuardHandle = -1
+            if (handle >= 0) try { WireGuardJni.turnOff(handle) } catch (_: Exception) {}
+            tun?.close()
+            tun = null
+            persistentBlock = false
+            foregroundReady = false
+            if (active === this) active = null
+        }
+        stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
     }
 
@@ -214,10 +267,30 @@ class SharedTunVpnService : VpnService() {
     }
 
     companion object {
+        const val ACTION_START_BLOCK = "com.twinpanel.twinconnect.START_SHARED_BLOCK"
         const val ACTION_STOP = "com.twinpanel.twinconnect.STOP_SHARED_TUN"
         private const val CHANNEL = "twinconnect_shared_tun"
         private const val NOTIFICATION_ID = 47032
         @Volatile var active: SharedTunVpnService? = null
             private set
     }
+}
+
+/** Native ABI exported by the pinned official wireguard-go AAR. */
+private object WireGuardJni {
+    private val intType = Int::class.javaPrimitiveType!!
+    private fun function(name: String, vararg parameters: Class<*>): Method =
+        GoBackend::class.java.getDeclaredMethod(name, *parameters).apply { isAccessible = true }
+
+    fun turnOn(fd: Int, settings: String): Int = function(
+        "wgTurnOn", String::class.java, intType, String::class.java
+    ).invoke(null, "twinconnect", fd, settings) as Int
+
+    fun turnOff(handle: Int) {
+        function("wgTurnOff", intType).invoke(null, handle)
+    }
+
+    fun socketV4(handle: Int): Int = function("wgGetSocketV4", intType).invoke(null, handle) as Int
+    fun socketV6(handle: Int): Int = function("wgGetSocketV6", intType).invoke(null, handle) as Int
+    fun getConfig(handle: Int): String? = function("wgGetConfig", intType).invoke(null, handle) as? String
 }

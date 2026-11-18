@@ -7,6 +7,7 @@ import android.net.VpnService
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.Bundle
+import android.os.Build
 import android.provider.Settings
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -27,6 +28,7 @@ class MainActivity : FlutterActivity() {
     private val executor: ExecutorService = Executors.newSingleThreadExecutor()
     private var pendingStart: PendingStart? = null
     private var pendingAwgStart: Pair<String, MethodChannel.Result>? = null
+    private var pendingGuardStart: MethodChannel.Result? = null
 
     private data class PendingStart(
         val config: String,
@@ -204,6 +206,9 @@ class MainActivity : FlutterActivity() {
                 "getDisconnectedTrafficGuardStatus" -> {
                     val wireGuardUp = WireGuardRuntime.isInterfaceUp()
                     val legacyGuardUp = AndroidTrafficGuardService.active
+                    val shared = SharedTunVpnService.active
+                    val sharedGuardUp = shared?.hasBlockingTun() == true
+                    val osLockdown = shared?.isLockdownVerified() == true
                     val manager = getSystemService(Context.CONNECTIVITY_SERVICE)
                         as ConnectivityManager
                     val ownership = VpnTunnelOwnership.snapshot(
@@ -213,36 +218,52 @@ class MainActivity : FlutterActivity() {
                         if (wireGuardUp) WireGuardRuntime.isOsLockdownEnforced() else null
                     )
                     result.success(mapOf(
-                        "active" to legacyGuardUp,
-                        "osLockdown" to if (wireGuardUp) ownership.lockdownVerified else null,
-                        "lockdownVerificationAvailable" to wireGuardUp,
-                        "otherVpnActive" to (ownership.vpnTransport && !legacyGuardUp),
-                        "protectionVerified" to ownership.trafficProtected,
+                        "active" to (sharedGuardUp || legacyGuardUp),
+                        "sharedTunOwner" to (shared?.hasTunnel() == true),
+                        "sharedGuardEnabled" to sharedGuardUp,
+                        "legacyGuardActive" to legacyGuardUp,
+                        "osLockdown" to if (shared != null) osLockdown else null,
+                        "lockdownVerificationAvailable" to (shared != null),
+                        "otherVpnActive" to (ownership.vpnTransport && !legacyGuardUp && shared == null),
+                        "protectionVerified" to (sharedGuardUp || ownership.trafficProtected),
                         "protectionMode" to when {
-                            ownership.lockdownVerified -> "OS_LOCKDOWN_VERIFIED"
+                            osLockdown -> "OS_LOCKDOWN_VERIFIED"
+                            sharedGuardUp -> "IN_APP_SHARED_TUN"
                             legacyGuardUp -> "LEGACY_BLOCKING_TUN_UNSAFE_HANDOFF"
                             ownership.owner == VpnTunnelOwnership.Owner.UNKNOWN ->
                                 "VPN_OWNER_UNKNOWN_FAIL_CLOSED"
                             ownership.vpnTransport -> "ACTIVE_VPN_LOCKDOWN_UNVERIFIED"
                             else -> "DISCONNECTED_UNPROTECTED"
                         },
-                        "tunnelOwner" to ownership.owner.name,
+                        "tunnelOwner" to if (shared != null) "SHARED_TUN" else ownership.owner.name,
                         "nativePacketGuardRequired" to ownership.requiresNativePacketGuard,
-                        "singleTunnelKillSwitchAvailable" to false,
-                        "failClosedAcrossHandoff" to false
+                        "singleTunnelKillSwitchAvailable" to WireGuardRuntime.initialize(applicationContext),
+                        "failClosedAcrossHandoff" to sharedGuardUp
                     ))
                 }
                 "startDisconnectedTrafficGuard" -> {
-                    // A separate VpnService steals Android's single VPN slot from the
-                    // selected protocol. Do not offer a fake kill switch with an
-                    // unprotected handoff window or interrupt a healthy tunnel.
-                    result.error(
-                        "KILL_SWITCH_REQUIRES_SINGLE_TUN",
-                        "A fail-closed kill switch must be enforced by the active VPN engine or Android lockdown; a second VpnService is unsafe",
-                        null
-                    )
+                    if (AndroidTrafficGuardService.active) {
+                        result.error("LEGACY_GUARD_ACTIVE", "Stop legacy VPN guard first", null)
+                    } else if (pendingGuardStart != null) {
+                        result.error("VPN_REQUEST_IN_PROGRESS", "VPN approval pending", null)
+                    } else {
+                        val approval = VpnService.prepare(this)
+                        if (approval != null) {
+                            pendingGuardStart = result
+                            try {
+                                @Suppress("DEPRECATION")
+                                startActivityForResult(approval, GUARD_APPROVAL_REQUEST)
+                            } catch (_: Exception) {
+                                pendingGuardStart = null
+                                result.error("VPN_PERMISSION_FAILED", "Unable to request permission", null)
+                            }
+                        } else {
+                            launchSharedGuard(result)
+                        }
+                    }
                 }
                 "stopDisconnectedTrafficGuard" -> {
+                    SharedTunVpnService.active?.disableBlocking()
                     startService(Intent(this, AndroidTrafficGuardService::class.java).apply {
                         action = AndroidTrafficGuardService.ACTION_STOP
                     })
@@ -264,7 +285,10 @@ class MainActivity : FlutterActivity() {
                         "fullTunnel" to present,
                         "includeApps" to false,
                         "excludeApps" to false,
-                        "killSwitchEnforced" to (present && WireGuardRuntime.isOsLockdownEnforced()),
+                        "killSwitchAvailable" to present,
+                        "killSwitchEnforced" to
+                            (SharedTunVpnService.active?.hasBlockingTun() == true ||
+                                WireGuardRuntime.isOsLockdownEnforced()),
                         // These indicate native, profile-validated capability,
                         // NOT a claim that DNS/IPv6 protection is now active.
                         "dnsGuard" to present,
@@ -416,6 +440,28 @@ class MainActivity : FlutterActivity() {
         }
     }
 
+    private fun launchSharedGuard(result: MethodChannel.Result) {
+        try {
+            val alreadyRunning = SharedTunVpnService.active
+            if (alreadyRunning != null) {
+                alreadyRunning.enableBlocking()
+            } else {
+                val intent = Intent(this, SharedTunVpnService::class.java).apply {
+                    action = SharedTunVpnService.ACTION_START_BLOCK
+                }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    startForegroundService(intent)
+                } else {
+                    startService(intent)
+                }
+            }
+            // The actual TUN state is reported by the follow-up status poll.
+            result.success(mapOf("startRequested" to true))
+        } catch (_: Exception) {
+            result.error("SHARED_TUN_NOT_READY", "Unable to start VPN guard", null)
+        }
+    }
+
     private fun onWorker(
         result: MethodChannel.Result,
         work: () -> Map<String, Any>
@@ -461,6 +507,13 @@ class MainActivity : FlutterActivity() {
     @Deprecated("Deprecated by Android API; required for FlutterActivity's approval callback")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == GUARD_APPROVAL_REQUEST) {
+            val request = pendingGuardStart ?: return
+            pendingGuardStart = null
+            if (resultCode == Activity.RESULT_OK) launchSharedGuard(request)
+            else request.error("VPN_PERMISSION_DENIED", "VPN permission not granted", null)
+            return
+        }
         if (requestCode == AWG_APPROVAL_REQUEST) {
             val request = pendingAwgStart ?: return
             pendingAwgStart = null
@@ -521,5 +574,6 @@ class MainActivity : FlutterActivity() {
     companion object {
         private const val VPN_APPROVAL_REQUEST = 44011
         private const val AWG_APPROVAL_REQUEST = 44012
+        private const val GUARD_APPROVAL_REQUEST = 44013
     }
 }

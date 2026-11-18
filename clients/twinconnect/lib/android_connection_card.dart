@@ -549,13 +549,19 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
   // Stopping it to start a protocol creates an unprotected handoff window.
   // Refuse that handoff unless Android lockdown has been verified. Do not
   // silently sacrifice fail-closed protection to make Connect appear to work.
-  Future<void> _releaseDisconnectedGuard() async {
+  Future<void> _releaseDisconnectedGuard({bool allowSharedTun = false}) async {
     if (!Platform.isAndroid) return;
     const channel = MethodChannel('com.twinpanel.twinconnect/vpn');
     final status = await channel.invokeMapMethod<String, dynamic>(
         'getDisconnectedTrafficGuardStatus');
     if (status == null) {
       throw StateError('KILL_SWITCH_STATUS_UNAVAILABLE');
+    }
+    // SharedTunVpnService is already the selected WireGuard owner and must
+    // remain running. Only the retired second-VPN guard needs a handoff.
+    if (status['sharedTunOwner'] == true) {
+      if (allowSharedTun) return;
+      throw StateError('SHARED_TUN_ENGINE_MIGRATION_REQUIRED');
     }
     if (status['active'] != true) return;
     if (status['osLockdown'] != true ||
@@ -1071,7 +1077,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
         if (!mounted) return;
         Map<String, dynamic> response;
         try {
-          await _releaseDisconnectedGuard();
+          await _releaseDisconnectedGuard(allowSharedTun: true);
           response = await _controller.connectWireGuard(
             node: node,
             policy: policy,

@@ -103,6 +103,10 @@ def patch_gradle() -> None:
             # R8 otherwise removes or renames it in release APKs, causing
             # AWG_NATIVE_ENGINE_UNAVAILABLE even when the AAR is present.
             "-keep class com.twinpanel.twinconnect.AmneziaWgRuntime { *; }\n"
+            # SharedTunVpnService invokes the pinned wireguard-go JNI methods
+            # reflectively. Release R8 must preserve these exact native names.
+            "-keep class com.wireguard.android.backend.GoBackend { *; }\n"
+            "-keep class com.twinpanel.twinconnect.SharedTunVpnService { *; }\n"
 
         )
 
@@ -128,6 +132,19 @@ def patch_manifest() -> None:
             '    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />',
             str(filename),
         )
+    # SharedTunVpnService starts foreground immediately after VPN approval.
+    for permission in (
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_SPECIAL_USE",
+    ):
+        if f'android:name="{permission}"' not in current:
+            current = only_once(
+                current,
+                '<manifest xmlns:android="http://schemas.android.com/apk/res/android">',
+                '<manifest xmlns:android="http://schemas.android.com/apk/res/android">\n'
+                f'    <uses-permission android:name="{permission}" />',
+                str(filename),
+            )
     match = re.search(r"<application\b[^>]*>", current, flags=re.DOTALL)
     if match is None:
         raise RuntimeError("Missing Android application manifest element")
@@ -166,8 +183,7 @@ def patch_manifest() -> None:
         '                android:value="vpn" />\n'
         '        </service>\n'
     )
-    # Shared owner is opt-in only after a real PacketEngine adapter is wired.
-    # Registering it does not start it or replace existing working services.
+    # WireGuard now transfers an actual TUN FD to libwg-go through this owner.
     service += (
         '\n        <service android:name=".SharedTunVpnService"\n'
         '            android:exported="false"\n'

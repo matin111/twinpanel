@@ -1,9 +1,10 @@
 package com.twinpanel.twinconnect
 
 import android.content.Context
+import android.content.Intent
 import android.net.VpnService
+import android.os.Build
 import com.wireguard.android.backend.GoBackend
-import com.wireguard.android.backend.Tunnel
 import com.wireguard.config.Config
 import java.io.ByteArrayInputStream
 import java.nio.charset.StandardCharsets
@@ -16,21 +17,17 @@ import java.nio.charset.StandardCharsets
  * separately observed statistics before claiming internet connectivity.
  */
 internal object WireGuardRuntime {
-    private var backend: GoBackend? = null
+    private var libraryLoaded = false
     private val lifecycleGate = TunPacketGate()
-
-    private val tunnel = object : Tunnel {
-        override fun getName(): String = "twinconnect"
-        override fun onStateChange(newState: Tunnel.State) {
-            if (newState != Tunnel.State.UP) lifecycleGate.lostConnection()
-        }
-    }
 
     @Synchronized
     fun initialize(context: Context): Boolean {
-        if (backend != null) return true
+        if (libraryLoaded) return true
         return try {
-            backend = GoBackend(context.applicationContext)
+            // Loads libwg-go; we intentionally never call GoBackend.setState,
+            // since that starts its own VpnService and steals the VPN slot.
+            GoBackend(context.applicationContext)
+            libraryLoaded = true
             true
         } catch (_: Exception) {
             false
@@ -41,20 +38,12 @@ internal object WireGuardRuntime {
 
     @Synchronized
     fun isInterfaceUp(): Boolean {
-        return try {
-            backend?.getState(tunnel) == Tunnel.State.UP
-        } catch (_: Exception) {
-            false
-        }
+        return SharedTunVpnService.active?.hasWireGuardTunnel() == true
     }
 
     @Synchronized
     fun isOsLockdownEnforced(): Boolean {
-        return try {
-            backend?.isLockdownEnabled == true
-        } catch (_: Exception) {
-            false
-        }
+        return SharedTunVpnService.active?.isLockdownVerified() == true
     }
 
     private fun hasSetting(raw: String, name: String): Boolean =
@@ -128,9 +117,8 @@ internal object WireGuardRuntime {
         require(policy["allowLan"] != true) { "LAN_BYPASS_NOT_IMPLEMENTED" }
         require(policy["autoConnect"] != true) { "AUTOCONNECT_NOT_IMPLEMENTED" }
         require(policy["autoReconnect"] != true) { "AUTO_RECONNECT_NOT_VERIFIED" }
-        if (policy["killSwitchRequested"] == true) {
-            require(isOsLockdownEnforced()) { "OS_LOCKDOWN_NOT_ENABLED" }
-        }
+        // In-app Kill Switch is implemented by retaining the SAME TUN when
+        // the WireGuard transport stops, without OS settings navigation.
         val protectedProfile = protectIpv6Route(configText)
         validateStrictProfile(protectedProfile)
         require(!isInterfaceUp()) { "TUNNEL_ALREADY_RUNNING" }
@@ -147,34 +135,53 @@ internal object WireGuardRuntime {
             bytes.fill(0)
         }
         lifecycleGate.beginConnect("wireguard")
-        val actualState = try {
-            backend!!.setState(tunnel, Tunnel.State.UP, config)
+        val service = try {
+            val intent = Intent(context, SharedTunVpnService::class.java)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                context.startForegroundService(intent)
+            } else {
+                context.startService(intent)
+            }
+            var ready: SharedTunVpnService? = null
+            for (attempt in 0 until 100) {
+                ready = SharedTunVpnService.active
+                if (ready != null) break
+                Thread.sleep(50)
+            }
+            ready ?: throw IllegalStateException("SHARED_TUN_NOT_READY")
+        } catch (_: Exception) {
+            lifecycleGate.lostConnection()
+            throw IllegalArgumentException("SHARED_TUN_NOT_READY")
+        }
+        try {
+            service.startWireGuard(config, policy["killSwitchRequested"] == true)
         } catch (_: Exception) {
             lifecycleGate.lostConnection()
             throw IllegalArgumentException("WIREGUARD_NATIVE_START_FAILED")
+        } catch (_: LinkageError) {
+            lifecycleGate.lostConnection()
+            throw IllegalArgumentException("WIREGUARD_NATIVE_START_FAILED")
         }
-        if (actualState != Tunnel.State.UP || !isInterfaceUp()) {
+        if (!isInterfaceUp()) {
             lifecycleGate.lostConnection()
             throw IllegalArgumentException("TUNNEL_NOT_ESTABLISHED")
         }
-        // GoBackend owns packet forwarding: this is lifecycle state only.
+        // wireguard-go owns packet forwarding on the shared service's TUN FD.
         lifecycleGate.verifiedConnected("wireguard")
         return mapOf(
             "state" to "interface_up",
             "protocol" to "wireguard",
             "peerHandshakeVerified" to false,
-            "killSwitchEnforced" to isOsLockdownEnforced()
+            "killSwitchEnforced" to (service.hasBlockingTun() || isOsLockdownEnforced()),
+            "killSwitchMode" to if (service.hasBlockingTun()) "IN_APP_SHARED_TUN"
+                else if (isOsLockdownEnforced()) "OS_LOCKDOWN_VERIFIED" else "OFF"
         )
     }
 
     @Synchronized
     fun stop(): Map<String, Any> {
         lifecycleGate.lostConnection()
-        val existing = backend
-        if (existing == null || !isInterfaceUp()) {
-            return mapOf("state" to "down", "protocol" to "wireguard")
-        }
-        existing.setState(tunnel, Tunnel.State.DOWN, null)
+        SharedTunVpnService.active?.stopWireGuard()
         return mapOf("state" to "down", "protocol" to "wireguard")
     }
 
@@ -190,16 +197,37 @@ internal object WireGuardRuntime {
         var tx: Long? = null
         var latestHandshake: Long? = null
         if (up) {
-            try {
-                val statistics = backend!!.getStatistics(tunnel)
-                rx = statistics.totalRx()
-                tx = statistics.totalTx()
-                val timestamps = statistics.peers().mapNotNull {
-                    statistics.peer(it)?.latestHandshakeEpochMillis()
-                }.filter { it > 0L }
-                latestHandshake = timestamps.maxOrNull()
-            } catch (_: Exception) {
-                // Interface may be up while counters cannot be read.
+            // wgGetConfig returns sensitive device configuration; only extract
+            // numeric counters. Never log or surface the returned string.
+            val stats = SharedTunVpnService.active?.wireGuardStats()
+            if (stats != null) {
+                rx = 0L
+                tx = 0L
+                var handshakeSec = 0L
+                var handshakeNsec = 0L
+                for (line in stats.lineSequence()) {
+                    when {
+                        line.startsWith("rx_bytes=") ->
+                            rx = rx!! + (line.substringAfter('=').toLongOrNull() ?: 0L)
+                        line.startsWith("tx_bytes=") ->
+                            tx = tx!! + (line.substringAfter('=').toLongOrNull() ?: 0L)
+                        line.startsWith("last_handshake_time_sec=") -> {
+                            if (handshakeSec > 0L) {
+                                val stamp = handshakeSec * 1000L + handshakeNsec / 1000000L
+                                latestHandshake = maxOf(latestHandshake ?: 0L, stamp)
+                            }
+                            handshakeSec = line.substringAfter('=').toLongOrNull() ?: 0L
+                            handshakeNsec = 0L
+                        }
+                        line.startsWith("last_handshake_time_nsec=") -> {
+                            handshakeNsec = line.substringAfter('=').toLongOrNull() ?: 0L
+                        }
+                    }
+                }
+                if (handshakeSec > 0L) {
+                    val stamp = handshakeSec * 1000L + handshakeNsec / 1000000L
+                    latestHandshake = maxOf(latestHandshake ?: 0L, stamp)
+                }
             }
         }
         val now = System.currentTimeMillis()
@@ -210,7 +238,11 @@ internal object WireGuardRuntime {
             "protocol" to "wireguard",
             "state" to if (up) "interface_up" else "down",
             "peerHandshakeVerified" to freshHandshake,
-            "killSwitchEnforced" to isOsLockdownEnforced()
+            "killSwitchEnforced" to
+                (SharedTunVpnService.active?.hasBlockingTun() == true || isOsLockdownEnforced()),
+            "killSwitchMode" to if (SharedTunVpnService.active?.hasBlockingTun() == true)
+                "IN_APP_SHARED_TUN" else if (isOsLockdownEnforced())
+                "OS_LOCKDOWN_VERIFIED" else "OFF"
         )
         if (rx != null) result["rxBytes"] = rx
         if (tx != null) result["txBytes"] = tx

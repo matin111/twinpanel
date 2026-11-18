@@ -42,6 +42,7 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
   bool _androidVpnConflict = false;
   bool _androidOsLockdown = false;
   bool _androidLockdownVerifiable = false;
+  bool _androidLegacyGuardUp = false;
   Timer? _androidGuardPoll;
 
   @override
@@ -97,7 +98,8 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
       final result = await const MethodChannel('com.twinpanel.twinconnect/vpn')
           .invokeMapMethod<String, dynamic>('getDisconnectedTrafficGuardStatus');
       if (mounted) setState(() {
-        _androidKillRequested = result?['active'] == true;
+        _androidKillRequested = result?['sharedGuardEnabled'] == true;
+        _androidLegacyGuardUp = result?['legacyGuardActive'] == true;
         _androidVpnConflict = result?['otherVpnActive'] == true;
         _androidOsLockdown = result?['osLockdown'] == true;
         _androidLockdownVerifiable = result?['lockdownVerificationAvailable'] == true;
@@ -105,6 +107,7 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
     } on PlatformException {
       if (mounted) setState(() {
         _androidKillRequested = false;
+        _androidLegacyGuardUp = false;
         _androidVpnConflict = false;
         _androidOsLockdown = false;
         _androidLockdownVerifiable = false;
@@ -371,44 +374,35 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: Icon(
-                  _androidOsLockdown ? Icons.verified_user_rounded
+                  _androidKillRequested ? Icons.verified_user_rounded
                       : Icons.shield_outlined,
-                  color: _androidOsLockdown ? Colors.greenAccent : null,
+                  color: _androidKillRequested ? Colors.greenAccent : null,
                 ),
                 title: const Text('Kill Switch'),
                 subtitle: Text(tr(
-                  _androidOsLockdown
-                      ? 'محافظت سیستمی توسط موتور فعال تأیید شد.'
+                  _androidKillRequested
+                      ? 'فعال: تونل مشترک ترافیک را هنگام قطع اتصال مسدود می‌کند. برای خاموشی کامل برنامه، قفل شبکه اندروید لازم است.'
                       : _androidVpnConflict && !_androidLockdownVerifiable
-                          ? 'VPN متصل است؛ محافظت سیستمی این موتور قابل تأیید نیست.'
-                          : 'محافظت سراسری تأیید نشده است. برای فعال‌سازی، قفل شبکه اندروید را تنظیم کنید.',
-                  _androidOsLockdown
-                      ? 'System lockdown verified for the active VPN engine.'
+                          ? 'موتور VPN دیگری فعال است؛ محافظ مشترک WireGuard هنوز فعال نیست.'
+                          : 'با یک دکمه محافظ داخلی WireGuard را روشن کنید.',
+                  _androidKillRequested
+                      ? 'Enabled: shared TUN blocks traffic on disconnect. Android lockdown is still needed for app termination.'
                       : _androidVpnConflict && !_androidLockdownVerifiable
-                          ? 'VPN connected; lockdown status cannot be verified for this engine.'
-                          : 'System-wide protection is unverified. Configure Android VPN lockdown.',
+                          ? 'Another VPN engine is active; shared WireGuard guard is not enabled.'
+                          : 'Enable WireGuard in-app traffic blocking with one switch.',
                 )),
-                trailing: Icon(
-                  _androidOsLockdown ? Icons.check_circle_rounded
-                      : Icons.warning_amber_rounded,
-                  color: _androidOsLockdown ? Colors.greenAccent : Colors.orangeAccent,
+                trailing: Switch.adaptive(
+                  key: const Key('androidSharedKillSwitch'),
+                  value: _androidKillRequested,
+                  onChanged: _androidKillBusy ? null : _setAndroidKill,
                 ),
               ),
-              FilledButton.tonalIcon(
-                onPressed: () async {
-                  try {
-                    await const MethodChannel('com.twinpanel.twinconnect/vpn')
-                        .invokeMethod<dynamic>('openAndroidVpnSettings');
-                  } on PlatformException catch (error) {
-                    if (!mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Android VPN settings: ${error.code}')),
-                    );
-                  }
-                  if (mounted) await _refreshAndroidGuard();
-                },
-                icon: const Icon(Icons.settings_rounded),
-                label: Text(tr('تنظیم محافظت سیستمی', 'Configure system Kill Switch')),
+              Text(
+                _androidOsLockdown
+                    ? tr('قفل شبکه اندروید نیز فعال است.', 'Android OS lockdown is also verified.')
+                    : tr('در صورت بسته‌شدن اجباری برنامه یا راه‌اندازی دوباره گوشی، محافظت داخلی تضمین‌شده نیست.',
+                        'The in-app guard cannot guarantee protection after force-stop, process death, or reboot.'),
+                style: Theme.of(context).textTheme.bodySmall,
               ),
               TextButton.icon(
                 onPressed: () async {
@@ -438,7 +432,7 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
                 label: Text(tr('بررسی ثبت VPN در اندروید',
                     'Check Android VPN registration')),
               ),
-              if (_androidKillRequested)
+              if (_androidLegacyGuardUp)
                 TextButton.icon(
                   onPressed: _androidKillBusy ? null : () => _setAndroidKill(false),
                   icon: const Icon(Icons.stop_circle_outlined),

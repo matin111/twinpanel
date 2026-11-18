@@ -210,21 +210,42 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   /// Every protocol switch passes this gate BEFORE interrupting an existing
   /// tunnel. The guard remains active when a VPN disconnects; we must never
   /// disarm it just because a transport process is stopped.
-  Future<void> _requireVerifiedGuardIfRequested() async {
+  Future<void> _requireVerifiedGuardIfRequested({bool sharedWireGuard = false}) async {
     final policy = await _vpnPolicy.loadFailClosed(widget.panel.namespace, widget.username);
-    if (!policy.killSwitchRequested) return;
-    if (Platform.isAndroid) {
-      // Never accept a requested kill switch based on a saved toggle alone.
-      // Only Android's verified OS lockdown is strong enough to protect a
-      // handoff between independently owned protocol VpnServices.
-      final status = await const MethodChannel('com.twinpanel.twinconnect/vpn')
-          .invokeMapMethod<String, dynamic>('getDisconnectedTrafficGuardStatus')
-          .timeout(const Duration(seconds: 5));
-      if (status?['protectionVerified'] != true ||
-          status?['osLockdown'] != true) {
-        throw const FormatException('ANDROID_KILL_SWITCH_NOT_VERIFIED');
+    if (!policy.killSwitchRequested) {
+      if (Platform.isAndroid && !sharedWireGuard) {
+        final state = await const MethodChannel('com.twinpanel.twinconnect/vpn')
+            .invokeMapMethod<String, dynamic>('getDisconnectedTrafficGuardStatus');
+        if (state?['sharedTunOwner'] == true) {
+          throw const FormatException('SHARED_TUN_ENGINE_MIGRATION_REQUIRED');
+        }
       }
       return;
+    }
+    if (Platform.isAndroid) {
+      const channel = MethodChannel('com.twinpanel.twinconnect/vpn');
+      var status = await channel
+          .invokeMapMethod<String, dynamic>('getDisconnectedTrafficGuardStatus')
+          .timeout(const Duration(seconds: 5));
+      if (status?['osLockdown'] == true && status?['protectionVerified'] == true) {
+        return;
+      }
+      // Independent protocol services still require OS lockdown. Only
+      // WireGuard is currently migrated to the shared-FD native tunnel.
+      if (!sharedWireGuard) {
+        throw const FormatException('ANDROID_KILL_SWITCH_NOT_VERIFIED');
+      }
+      if (status?['sharedGuardEnabled'] == true &&
+          status?['sharedTunOwner'] == true) return;
+      await channel.invokeMethod<dynamic>('startDisconnectedTrafficGuard');
+      for (var attempt = 0; attempt < 30; attempt++) {
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+        status = await channel.invokeMapMethod<String, dynamic>(
+            'getDisconnectedTrafficGuardStatus');
+        if (status?['sharedGuardEnabled'] == true &&
+            status?['sharedTunOwner'] == true) return;
+      }
+      throw const FormatException('ANDROID_KILL_SWITCH_NOT_VERIFIED');
     }
     if (!Platform.isWindows) {
       throw const FormatException('GLOBAL_KILL_SWITCH_UNSUPPORTED_PLATFORM');
@@ -2169,7 +2190,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     // removing the working tunnel. A failed preflight keeps it running.
     setState(() { _vpnBusy = true; _vpnError = null; });
     try {
-      await _requireVerifiedGuardIfRequested();
+      await _requireVerifiedGuardIfRequested(sharedWireGuard: true);
       final api = TenantApi.fromBuildConfig();
       final checks = await Future.wait<Object>([
         _vpnPolicy.load(widget.panel.namespace, widget.username),
@@ -2565,9 +2586,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           _resetNetworkStats();
         });
       } else {
-        // Allow disconnect at any time, but never start a new WireGuard
-        // session while requested OS-wide protection is unverified.
-        await _requireVerifiedGuardIfRequested();
+        // Start the shared TUN guard when WireGuard protection is requested.
+        await _requireVerifiedGuardIfRequested(sharedWireGuard: true);
         if (_autoFastest) {
           if (_filter != 'wireguard') {
             throw const FormatException('SELECT_PROTOCOL_FOR_FASTEST');
