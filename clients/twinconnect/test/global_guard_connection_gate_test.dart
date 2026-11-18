@@ -69,7 +69,10 @@ void main() {
       final start = dashboard.indexOf('Future<void> $name(');
       expect(start, greaterThanOrEqualTo(0), reason: 'Missing $name');
       final segment = dashboard.substring(start, start + 520);
-      expect(segment, contains('await _requireVerifiedGuardIfRequested();'),
+      final expectedGuard = name == '_startCiscoTunnel'
+          ? 'await _requireVerifiedGuardIfRequested(sharedWireGuard: true);'
+          : 'await _requireVerifiedGuardIfRequested();';
+      expect(segment, contains(expectedGuard),
           reason: '$name must fail closed before its first native action');
     }
     final wireguard = dashboard.indexOf(

@@ -117,7 +117,10 @@ public final class SharedOpenConnectEngine {
             }, user, pass, pin, url);
             if (underlayAddress != null) next.useUnderlayAddress(underlayAddress);
             session = next;
-            if (stopped) next.stopSession();
+            if (stopped) {
+                next.stopSession();
+                next.destroy();
+            }
             else next.start(url);
         } catch (LinkageError linkError) {
             reject(owner, "CISCO_NATIVE_ENGINE_UNAVAILABLE");
