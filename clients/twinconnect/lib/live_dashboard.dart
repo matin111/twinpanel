@@ -6,7 +6,7 @@ import 'dart:io' show Platform, HttpClient, InternetAddress, Process, ProcessExc
 import 'dart:convert' show utf8, base64Url, jsonEncode, jsonDecode;
 import 'dart:async' show Timer, TimeoutException, unawaited;
 
-import 'package:flutter/services.dart' show PlatformException;
+import 'package:flutter/services.dart' show PlatformException, MethodChannel;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:flutter/material.dart';
