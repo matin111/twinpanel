@@ -105,6 +105,12 @@ def test_ui_clear_distinction_between_install_and_cutover():
     assert "آزمایشی" not in ACTIVE_UI and "آزمایشی" not in UI
     assert 'backup_node_id:backupNodeId||null' in CLIENT  # install + verify both normalize optional node
     assert CLIENT.count('backup_node_id:backupNodeId||null') == 2
+    assert 'for attempt in range(3)' in API
+    assert 'await asyncio.sleep(attempt + 1)' in API
+    stager=(ROOT/"scripts/twintunnel_stage_active_nodes_v1.py").read_text()
+    assert 'for attempt in range(3)' in stager
+    assert 'ssh_attempts' in stager
+    assert 'for node_id in node_ids:' in API
     assert "can_activate" not in ACTIVE_UI  # No production activation control is exposed
 
 
