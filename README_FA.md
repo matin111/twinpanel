@@ -293,8 +293,6 @@ Internet
 - TP27
 - VXLAN
 - Spoof WG
-- SSH TUN
-- Backhaul
 - Transportهای مدیریت‌شده دیگر در Runtime
 
 ---
