@@ -31,6 +31,7 @@ from ..subscription_override_models import (
     unlimited_without_expiry,
 )
 from ..subscription_plan_schema import ensure_subscription_plan_schema
+from ..reserved_renewal_models import PendingSubscriptionRenewal
 from .account_delivery import public_router as account_delivery_public_router, _share_url
 from .migration_center_v1 import router as migration_center_v1_router
 from .migration_center_v2 import (
@@ -89,6 +90,7 @@ def _enriched_payload(db: Session, sub: Subscription) -> dict:
         {
             "creation_mode": "plan" if sub.plan_id is not None else "manual",
             "plan_name": plan.name if plan is not None else "دستی",
+            "renewal_summary": context["renewals"].get(int(sub.id)),
             "activation_duration_days": int(
                 sub.activation_duration_days
                 or (plan.duration_days if plan else 0)
@@ -124,6 +126,7 @@ def _bulk_admin_list_context(db: Session, rows: list[Subscription]) -> dict:
             "node_ids": {},
             "protocols": {},
             "resellers": {},
+            "renewals": {},
         }
 
     subscription_ids = [int(sub.id) for sub in rows]
@@ -185,6 +188,31 @@ def _bulk_admin_list_context(db: Session, rows: list[Subscription]) -> dict:
             .all()
         )
     }
+    # Batch renewal summaries for visible subscriptions only; the main account
+    # remains a single subscription, never duplicate it for reserved periods.
+    renewal_rows = (
+        db.query(PendingSubscriptionRenewal)
+        .filter(PendingSubscriptionRenewal.subscription_id.in_(subscription_ids))
+        .order_by(PendingSubscriptionRenewal.id.desc())
+        .all()
+    )
+    renewals: dict[int, dict] = {}
+    for renewal in renewal_rows:
+        sid = int(renewal.subscription_id)
+        entry = renewals.setdefault(sid, {"pending_count": 0, "last": None})
+        if entry["last"] is None:
+            entry["last"] = {
+                "id": int(renewal.id),
+                "status": str(renewal.status),
+                "plan": str(renewal.plan_name),
+                "traffic_bytes": int(renewal.traffic_bytes),
+                "duration_days": int(renewal.duration_days),
+                "created_at": renewal.created_at.isoformat(),
+                "activated_at": renewal.activated_at.isoformat() if renewal.activated_at else None,
+            }
+        if renewal.status in ("queued", "blocked"):
+            entry["pending_count"] += 1
+
     return {
         "users": users,
         "plans": plans,
@@ -192,6 +220,7 @@ def _bulk_admin_list_context(db: Session, rows: list[Subscription]) -> dict:
         "node_ids": dict(node_ids),
         "protocols": dict(protocols),
         "resellers": reseller_links,
+        "renewals": renewals,
     }
 
 
