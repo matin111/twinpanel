@@ -502,7 +502,7 @@ APPS["windows"].insert(0, {
     "title": "TwinConnect",
     "protocol": "کانکشن هوشمند",
     "image": None,
-    "download": "https://t.me/c/3948997062/3",
+    "download": "https://t.me/twin_connect1/3",
 })
 _group_apps_by_title()
 
