@@ -163,16 +163,35 @@ assert relay.flow_key(frame) == ("mux",901)
 print("TT_ENGINE_SELFTEST_OK")
 """ % folder
     command = "python3 - <<'PY_TWIN_ENGINE'\n" + script + "\nPY_TWIN_ENGINE"
-    with SessionLocal() as db:
-        node = db.get(Node, node_id)
-        if node is None:
-            return {"node_id": node_id, "ok": False, "error": "node_missing"}
-        try:
-            conn = await ssh_connect_saved(
-                node, db, close_read_transaction_before_ssh=True
-            )
-        except Exception as exc:
-            return {"node_id": node_id, "ok": False, "error": type(exc).__name__ + ":ssh"}
+    # Retry transient session-open failures only. Never retry bad credentials or
+    # missing persisted access; all attempts remain read-only.
+    conn = None
+    for attempt in range(3):
+        with SessionLocal() as db:
+            node = db.get(Node, node_id)
+            if node is None:
+                return {"node_id": node_id, "ok": False, "error": "node_missing"}
+            try:
+                conn = await ssh_connect_saved(
+                    node, db, close_read_transaction_before_ssh=True
+                )
+                break
+            except Exception as exc:
+                detail = str(getattr(exc, "detail", exc)).lower()
+                fatal = (
+                    getattr(exc, "status_code", None) == 409
+                    or any(term in detail for term in (
+                        "permission denied", "authentication failed",
+                        "publickey", "private key", "کلید دسترسی",
+                        "دسترسی امن این سرور ثبت نشده",
+                    ))
+                )
+                if fatal or attempt == 2:
+                    return {"node_id": node_id, "ok": False,
+                            "error": type(exc).__name__ + ":ssh",
+                            "ssh_attempts": attempt + 1}
+        await asyncio.sleep(attempt + 1)
+    assert conn is not None
     try:
         result = await asyncio.wait_for(
             conn.run(command, check=False, timeout=CHECK_TIMEOUT),
