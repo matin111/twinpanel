@@ -1,6 +1,6 @@
 {
   "version": "1.1.0-rc.873",
-  "source_sha": "a49e0ea9b0e5f64fb0806f87304335a1c11295cf",
+  "source_sha": "e84a8069c469ba324feb73bf5916f2682474c28c",
   "notes": {
     "fa": "نمایش تمدیدهای رزروشده و فعال‌شده در اشتراک اصلی؛ جزئیات تمدید و حذف امن تمدید در انتظار با حفظ اشتراک، کانفیگ و سوابق.",
     "en": "Show reserved and activated renewal details in the parent subscription, with safe cancellation of queued renewals while preserving subscription, configs and audit history."
