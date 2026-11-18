@@ -22,6 +22,10 @@ export type TwinTunnelInstallStatus={
   needs_update:boolean;
   backup_node_id?:number|null;
   nodes:TwinTunnelNodeCheck[];
+  carrier_plan?:Array<{carrier:string;port:number}>;
+  carrier_count?:number;
+  carrier_state?:"not_installed";
+  traffic_activated?:false;
   active_transport?:string|null;
   production_activated:false;
   can_activate:false;
@@ -59,12 +63,12 @@ async function request(path:string,method:"GET"|"POST"="GET",body?:object):Promi
 
 export const twinTunnelInstallApi={
   status:(tunnelId:number)=>request("/v1/tunnels/"+tunnelId+"/twintunnel-install"),
-  install:(tunnelId:number,backupNodeId:number)=>
+  install:(tunnelId:number,backupNodeId?:number)=>
     request("/v1/tunnels/"+tunnelId+"/twintunnel-install","POST",{
-      backup_node_id:backupNodeId,
+      backup_node_id:backupNodeId||null,
       mode:"install",
     }),
-  verify:(tunnelId:number,backupNodeId:number)=>
+  verify:(tunnelId:number,backupNodeId?:number)=>
     request("/v1/tunnels/"+tunnelId+"/twintunnel-install","POST",{
       backup_node_id:backupNodeId,
       mode:"verify",

@@ -7,6 +7,9 @@ on:
       - "backend/app/main.py"
       - "backend/scripts/twintunnel_stage_active_nodes_v1.py"
       - "backend/tests/twintunnel_admin_install_v1_smoke.py"
+      - "backend/tests/twintunnel_three_carrier_plan_v1_smoke.py"
+      - "backend/tests/twintunnel_rakhsh_three_link_loopback.py"
+      - "backend/app/services/twintunnel_carrier_plan_v1.py"
       - "components/tunnel-control-center-v1.tsx"
       - "components/tunnel-protocol-runtime-v307.tsx"
       - "lib/twintunnel-install-api.ts"
@@ -17,6 +20,9 @@ on:
       - "backend/app/main.py"
       - "backend/scripts/twintunnel_stage_active_nodes_v1.py"
       - "backend/tests/twintunnel_admin_install_v1_smoke.py"
+      - "backend/tests/twintunnel_three_carrier_plan_v1_smoke.py"
+      - "backend/tests/twintunnel_rakhsh_three_link_loopback.py"
+      - "backend/app/services/twintunnel_carrier_plan_v1.py"
       - "components/tunnel-control-center-v1.tsx"
       - "components/tunnel-protocol-runtime-v307.tsx"
       - "lib/twintunnel-install-api.ts"
@@ -39,3 +45,13 @@ jobs:
           python3 -m py_compile backend/app/routers/twintunnel_install_v1.py
           python3 -m py_compile backend/scripts/twintunnel_stage_active_nodes_v1.py
           python3 backend/tests/twintunnel_admin_install_v1_smoke.py
+          python3 backend/tests/twintunnel_three_carrier_plan_v1_smoke.py
+      - name: Verify actual Rakhsh three-carrier authentication on loopback
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          URL=https://github.com/CluvexStudio/rakhsh/releases/download/v0.1.0/rakhsh-x86_64-unknown-linux-musl
+          curl -fLSs --retry 3 -o /tmp/twintunnel-rakhsh-test "$URL"
+          echo 'bdfbf8d346925545d23c202699c535d5a5fd94b3106f42666e04aeb52023e226  /tmp/twintunnel-rakhsh-test' | sha256sum -c -
+          chmod 700 /tmp/twintunnel-rakhsh-test
+          RAKHSH_BIN=/tmp/twintunnel-rakhsh-test python3 backend/tests/twintunnel_rakhsh_three_link_loopback.py

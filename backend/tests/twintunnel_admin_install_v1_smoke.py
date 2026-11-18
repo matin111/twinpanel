@@ -1,4 +1,4 @@
-"""Offline safety and state-model tests for 3-node TwinTunnel admin installer."""
+"""Offline safety tests for optional transit and isolated two-endpoint staging."""
 from pathlib import Path
 import ast
 
@@ -12,7 +12,7 @@ CLIENT=(ROOT.parent/"lib/twintunnel-install-api.ts").read_text()
 def _view():
     tree=ast.parse(API)
     node=next(n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name=="_view")
-    namespace={"Tunnel": object}
+    namespace={"Tunnel": object, "planned_status": lambda: {"carrier_state": "not_installed", "traffic_activated": False}}
     exec(compile(ast.Module(body=[node],type_ignores=[]),"install_view","exec"),namespace)
     return namespace["_view"]
 
@@ -44,6 +44,17 @@ def test_three_node_success_remains_off_production():
     assert result["active_transport"]=="tp27_fast"
     assert result["backup_node_id"]==13
     assert result["deployment_mode"]=="isolated_stage_only"
+    assert result["carrier_state"]=="not_installed"
+    assert result["traffic_activated"] is False
+
+def test_two_node_stage_is_valid_and_off_production():
+    pair={**PLAN,"backup_node_id":None,"node_ids":[2,6],"nodes":PLAN["nodes"][:2]}
+    state=_view()(42,Tunnel(),MANIFEST,pair)
+    assert state["status"]=="staged"
+    assert state["backup_node_id"] is None
+    assert state["can_activate"] is False
+    assert state["production_activated"] is False
+
 
 def test_partial_or_stale_stage_cannot_be_ready():
     view=_view()
@@ -57,8 +68,8 @@ def test_partial_or_stale_stage_cannot_be_ready():
 def test_endpoints_are_admin_guarded_and_nonactivating():
     assert 'dependencies=[Depends(require_admin)]' in API
     assert '/{tunnel_id}/twintunnel-install' in API
-    assert 'backup_node_id: int = Field(gt=0)' in API
-    assert 'len(set(node_ids)) != 3' in API
+    assert 'backup_node_id: int | None = Field(default=None, gt=0)' in API
+    assert 'len(node_ids) not in (2, 3)' in API
     assert 'NodeStatus.ONLINE' in API and 'NodeType.EXIT' in API
     assert 'fcntl.LOCK_NB' in API
     assert 'close_read_transaction_before_ssh=True' in API
@@ -76,7 +87,7 @@ def test_ui_clear_distinction_between_install_and_cutover():
     assert "twintunnel_standby" in UI
     assert 'twinTunnelInstallApi.install' in UI
     assert 'twinTunnelInstallApi.verify' in UI
-    assert 'TwinTunnel · 3 paths' in UI
+    assert 'TwinTunnel' in UI
     assert "Production cutover remains locked" in UI
     assert 'getCustomerToken()' in CLIENT
     assert '"Authorization":"Bearer "+token' in CLIENT
@@ -84,14 +95,15 @@ def test_ui_clear_distinction_between_install_and_cutover():
     assert "twinTunnelInstallApi.install" in ACTIVE_UI
     assert "twinTunnelInstallApi.verify" in ACTIVE_UI
     assert 'tp-selected-tunnel-standby-intent' in ACTIVE_UI
-    assert 'BACKUP_NODE_MISSING' in ACTIVE_UI
-    assert "TwinTunnel سه‌مسیره" in ACTIVE_UI
+    assert 'No third node' in ACTIVE_UI
+    assert "TwinTunnel · چند ترانسپورت" in ACTIVE_UI
     assert 'pick("نصب آزمایشی","Lab install")' in ACTIVE_UI
     assert "can_activate" not in ACTIVE_UI  # No production activation control is exposed
 
 
 if __name__=="__main__":
     test_three_node_success_remains_off_production()
+    test_two_node_stage_is_valid_and_off_production()
     test_partial_or_stale_stage_cannot_be_ready()
     test_endpoints_are_admin_guarded_and_nonactivating()
     test_ui_clear_distinction_between_install_and_cutover()
