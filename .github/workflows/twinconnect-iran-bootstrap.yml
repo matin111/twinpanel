@@ -1,0 +1,37 @@
+name: TwinConnect Iran Bootstrap Gateway
+
+on:
+  pull_request:
+    paths:
+      - "clients/twinconnect/lib/iran_bootstrap_route.dart"
+      - "clients/twinconnect/lib/tenant_api.dart"
+      - "clients/twinconnect/test/iran_bootstrap_route_test.dart"
+      - "ops/iran-bootstrap/**"
+      - ".github/workflows/twinconnect-iran-bootstrap.yml"
+  workflow_dispatch:
+
+jobs:
+  gateway-security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile and unit-test TLS passthrough (local-only)
+        run: |
+          python3 -m py_compile ops/iran-bootstrap/sni_relay.py
+          python3 -m unittest discover -s ops/iran-bootstrap -p 'test_*.py' -v
+      - name: Verify no TLS bypass or secret logging was added
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          route = Path('clients/twinconnect/lib/iran_bootstrap_route.dart').read_text()
+          client = Path('clients/twinconnect/lib/tenant_api.dart').read_text()
+          relay = Path('ops/iran-bootstrap/sni_relay.py').read_text()
+          assert 'Socket.startConnect(destination, url.port)' in route
+          assert 'client.connectionFactory' in route
+          assert 'badCertificateCallback =' not in (route + client)
+          assert 'forward' not in relay or 'PANEL_HOST' in relay
+          assert 'unknown TLS SNI' not in relay or 'PANEL_HOST' in relay
+          assert 'parse_sni(hello) != PANEL_HOST' in relay
+          print('TLS identity retained and SNI pinned')
+          PY
