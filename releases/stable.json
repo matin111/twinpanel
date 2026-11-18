@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.869",
+  "version": "1.1.0-rc.870",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-18T05:16:08Z",
+  "released_at": "2026-11-18T05:29:15Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "ae171cdd79f825335d1b9dcac3e07738c646a882",
+  "source_sha": "e00a80fe1df1f9adadb1393f48b8bc097bcab1ab",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.869/twinpanel-1.1.0-rc.869-linux-x86_64.tar.gz",
-    "sha256": "55356a3b1a3d79d22e9136e0892744f6f7a2afa9a5ee67e60e0a637d16cb7650",
-    "size_bytes": 31251906
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.870/twinpanel-1.1.0-rc.870-linux-x86_64.tar.gz",
+    "sha256": "a87dd8e69e41a438aeb564618576420103befd68ee4ffbcfefa4cc32e984c805",
+    "size_bytes": 31251477
   },
   "notes": {
-    "fa": "رفع تأخیر دانلود فایل‌های OpenVPN و WireGuard با استخراج فقط پروتکل درخواستی و حفظ محتوا، نام فایل، اعتبار اشتراک و مسیر اتصال قبلی.",
-    "en": "Speed up public OpenVPN and WireGuard profile downloads by retrieving only the requested protocol, preserving file content, names, subscription access checks, and existing tunnels."
+    "fa": "رفع خطای 422 بررسی مجدد TwinTunnel با دو نود، ارسال صحیح نود سوم اختیاری به API بدون تغییر مسیرها و کانفیگ‌های فعال.",
+    "en": "Fix TwinTunnel two-node recheck HTTP 422 by normalizing the optional third node ID without changing active tunnels or VPN configs."
   }
 }
