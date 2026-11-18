@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import re
 import shutil
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -256,7 +257,13 @@ def patch_manifest() -> None:
         '\n        <service android:name="com.wireguard.android.backend.GoBackend$VpnService"'
         ' tools:node="remove" />\n'
     )
+    # The xmlns:tools insertion changes offsets before <application>.
+    # Recompute the match or the service block corrupts the opening tag.
+    match = re.search(r"<application\b[^>]*>", current, flags=re.DOTALL)
+    if match is None:
+        raise RuntimeError("Missing Android application after manifest namespace patch")
     current = current[:match.end()] + service + current[match.end():]
+    ET.fromstring(current)  # Fail before Gradle on malformed merged host XML.
     filename.write_text(current, encoding="utf-8")
 
 
