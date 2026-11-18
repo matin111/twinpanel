@@ -46,6 +46,24 @@ class IranBootstrapRoute {
   static InternetAddress? targetFor(Uri url) =>
       supports(url) ? parsePublicIpv4(configuredIpv4) : null;
 
+  /// Port 80 is free on the Iran node and does not interrupt the existing
+  /// VPN/TLS multiplexer on :443. HTTP CONNECT transports *opaque HTTPS*;
+  /// credentials are never sent in cleartext to the Iranian hop.
+  static HttpClient proxyFor(Uri requestUrl, InternetAddress domesticIp) {
+    if (!supports(requestUrl) ||
+        parsePublicIpv4(domesticIp.address) == null) {
+      throw const FormatException('UNTRUSTED_IRAN_BOOTSTRAP_ROUTE');
+    }
+    return HttpClient()
+      ..connectionTimeout = const Duration(seconds: 6)
+      ..findProxy = (Uri url) {
+        if (!supports(url)) {
+          throw const FormatException('UNTRUSTED_IRAN_BOOTSTRAP_ROUTE');
+        }
+        return 'PROXY ${domesticIp.address}:80';
+      };
+  }
+
   /// HttpClient performs TLS over the returned TCP socket and validates the
   /// certificate against the ORIGINAL request URL hostname. Never change the
   /// request URL to https://<IP>/ or disable bad-certificate verification.
