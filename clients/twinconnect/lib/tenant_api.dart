@@ -261,9 +261,10 @@ class TenantApi {
     return profiles;
   }
 
-  /// All authenticated requests (directory, login, inventory and profiles)
-  /// use the same secure domestic bootstrap path when standard DNS/routing is
-  /// disrupted. A server 401/403/429 is authoritative, never retried.
+  // Reuse a successful domestic route for subsequent protocol/profile fetches
+  // during the same disruption, instead of adding a DNS timeout each time.
+  static DateTime? _domesticPreferredUntil;
+
   Future<Map<String, dynamic>> _requestJson(
     Uri url, {
     Map<String, dynamic>? payload,
@@ -273,37 +274,67 @@ class TenantApi {
     if (url.scheme != 'https') {
       throw const FormatException('INSECURE_CONNECTION');
     }
-    Future<Map<String, dynamic>> request(InternetAddress? fixedIp) =>
+    Future<Map<String, dynamic>> request(
+        {InternetAddress? fixedIp, bool viaDomesticProxy = false}) =>
         _requestJsonOnce(url, payload: payload, bearerToken: bearerToken,
-            maxBytes: maxBytes, fixedIp: fixedIp);
+            maxBytes: maxBytes, fixedIp: fixedIp,
+            viaDomesticProxy: viaDomesticProxy);
+
+    // Both gateways retain the original HTTPS host, SNI and certificate.
+    // No status response (401/403/429 or plan denial) is ever retried.
+    Future<Map<String, dynamic>> domestic(InternetAddress ip) async {
+      bool tlsRejected = false;
+      for (final throughProxy in [true, false]) {
+        try {
+          return await request(
+              fixedIp: ip, viaDomesticProxy: throughProxy);
+        } on SocketException {
+          // Fall through to the other domestic route.
+        } on TimeoutException {
+          // Fall through to the other domestic route.
+        } on TlsException {
+          tlsRejected = true;
+        } on HttpException {
+          // No upstream authenticated response, try the alternative hop.
+        }
+      }
+      throw TenantApiException(tlsRejected ? 'INVALID_TLS' : 'NETWORK_UNAVAILABLE');
+    }
+
+    final ip = IranBootstrapRoute.targetFor(url);
+    final now = DateTime.now().toUtc();
+    final preferred = _domesticPreferredUntil;
+    if (ip != null && preferred != null && now.isBefore(preferred)) {
+      try {
+        return await domestic(ip);
+      } on TenantApiException catch (error) {
+        if (error.message != 'NETWORK_UNAVAILABLE' &&
+            error.message != 'INVALID_TLS') rethrow;
+        // Iran gateway failed; allow the normal verified origin to recover.
+      }
+    }
 
     try {
-      return await request(null);
+      final response = await request();
+      _domesticPreferredUntil = null;
+      return response;
     } on SocketException {
-      // No authenticated server response: one bounded attempt via Iran.
+      // DNS/routing failure before a trustworthy HTTP response.
     } on TimeoutException {
-      // Missing DNS, failed TCP dial, or inaccessible panel.
+      // Missing DNS or a stalled international route.
     } on TlsException {
-      // Iran DNS poisoning may target the primary IP. Emergency path MUST
-      // still validate a real certificate for the original HTTPS host.
+      // Tampered DNS may route the main hostname to a false certificate.
     } on HttpException {
-      // No valid HTTP response was received. Never retry an HTTP status.
+      // A valid server status is NOT an HttpException (handled in request).
     }
-    final target = IranBootstrapRoute.targetFor(url);
-    if (target == null) {
-      throw const TenantApiException('NETWORK_UNAVAILABLE');
-    }
-    try {
-      return await request(target);
-    } on SocketException {
-      throw const TenantApiException('NETWORK_UNAVAILABLE');
-    } on TimeoutException {
-      throw const TenantApiException('NETWORK_UNAVAILABLE');
-    } on TlsException {
-      throw const TenantApiException('INVALID_TLS');
-    } on HttpException {
+
+    if (ip == null) {
       throw const TenantApiException('NETWORK_UNAVAILABLE');
     }
+    final response = await domestic(ip);
+    _domesticPreferredUntil = DateTime.now().toUtc().add(
+        const Duration(minutes: 10));
+    return response;
   }
 
   Future<Map<String, dynamic>> _requestJsonOnce(
@@ -312,10 +343,13 @@ class TenantApi {
     int maxBytes = 32768,
     String? bearerToken,
     InternetAddress? fixedIp,
+    bool viaDomesticProxy = false,
   }) async {
     final client = fixedIp == null
         ? (HttpClient()..connectionTimeout = const Duration(seconds: 7))
-        : IranBootstrapRoute.clientFor(url, fixedIp);
+        : viaDomesticProxy
+            ? IranBootstrapRoute.proxyFor(url, fixedIp)
+            : IranBootstrapRoute.clientFor(url, fixedIp);
     try {
       final request = payload == null
           ? await client.getUrl(url).timeout(const Duration(seconds: 10))
