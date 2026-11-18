@@ -168,7 +168,6 @@ def _styled_main_keyboard() -> ReplyKeyboardMarkup:
             ],
             [
                 keyboard_button("📚 آموزش", styles.learning),
-                keyboard_button("⬇️ دانلود برنامه", styles.download),
             ],
             [
                 keyboard_button("🎫 پشتیبانی", styles.support),
