@@ -210,6 +210,14 @@ jobs:
               size = apk.stat().st_size
               print(f"{name}: {size / (1024 * 1024):.2f} MiB ({size} bytes)")
           PY
+      - name: Verify merged APK contains exactly one system-visible VPN owner
+        shell: bash
+        run: |
+          python -m unittest discover -s tools -p 'test_verify_shared_tun_apk.py' -v
+          python tools/verify_shared_tun_apk.py \
+            build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk \
+            build/app/outputs/flutter-apk/app-arm64-v8a-release.apk \
+            build/app/outputs/flutter-apk/app-x86_64-release.apk
       - name: Upload Android device-specific release test APKs
         if: ${{ success() }}
         uses: actions/upload-artifact@v4
