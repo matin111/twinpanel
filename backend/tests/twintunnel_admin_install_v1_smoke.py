@@ -81,6 +81,10 @@ def test_endpoints_are_admin_guarded_and_nonactivating():
     assert "iptables" not in API
     assert "active_transport =" not in API
     assert 'production_activated": False' in API
+    assert 'for node_id in node_ids:' in API
+    assert 'results.append(result)' in API
+    assert 'asyncio.gather(*(bounded(i) for i in node_ids))' not in API
+    assert '"nodes" in detail' in CLIENT
     assert 'app.include_router(twintunnel_install_v1_router)' in MAIN
 
 def test_ui_clear_distinction_between_install_and_cutover():
