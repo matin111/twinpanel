@@ -107,13 +107,13 @@
   </g>
 
   <text x="54" y="212" fill="#ffffff" font-size="36" font-family="Arial, Helvetica, sans-serif" font-weight="800">One control plane.</text>
-  <text x="54" y="250" fill="#38bdf8" font-size="36" font-family="Arial, Helvetica, sans-serif" font-weight="800">Fifteen protocols.</text>
+  <text x="54" y="250" fill="#38bdf8" font-size="36" font-family="Arial, Helvetica, sans-serif" font-weight="800">Sixteen protocols.</text>
   <text x="54" y="286" fill="#8ea2bb" font-size="15" font-family="Arial, Helvetica, sans-serif">Self-hosted VPN sales, subscriptions, nodes,</text>
   <text x="54" y="309" fill="#8ea2bb" font-size="15" font-family="Arial, Helvetica, sans-serif">tunnels, reseller operations and delivery.</text>
 
   <g font-family="Arial, Helvetica, sans-serif" font-size="11" font-weight="700">
     <rect x="54" y="337" width="95" height="28" rx="8" fill="#0b2238" stroke="#1d8fff"/>
-    <text x="101" y="355" text-anchor="middle" fill="#7fdfff">15 Protocols</text>
+    <text x="101" y="355" text-anchor="middle" fill="#7fdfff">16 Protocols</text>
     <rect x="158" y="337" width="93" height="28" rx="8" fill="#0d1b2b" stroke="#2d465f"/>
     <text x="204" y="355" text-anchor="middle" fill="#c2cfde">Persian RTL</text>
     <rect x="260" y="337" width="62" height="28" rx="8" fill="#0d1b2b" stroke="#2d465f"/>

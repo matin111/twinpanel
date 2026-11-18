@@ -11,13 +11,13 @@
   <img alt="FastAPI" src="https://img.shields.io/badge/FastAPI-Production-009688?logo=fastapi&logoColor=white" />
   <img alt="Next.js" src="https://img.shields.io/badge/Next.js-15-black?logo=next.js&logoColor=white" />
   <img alt="Ubuntu" src="https://img.shields.io/badge/Ubuntu-22.04%20%7C%2024.04-E95420?logo=ubuntu&logoColor=white" />
-  <img alt="Protocols" src="https://img.shields.io/badge/VPN%20Protocols-15-7C3AED" />
+  <img alt="Protocols" src="https://img.shields.io/badge/VPN%20%2B%20Proxy-16%20Protocols-7C3AED" />
   <img alt="RTL" src="https://img.shields.io/badge/UI-Persian%20RTL%20%2B%20English-7C3AED" />
 </p>
 
 # TwinPanel
 
-**TwinPanel is a self-hosted VPN sales, subscription, protocol, node and tunnel control plane built for operators who want the complete business and network stack under their own control.**
+**TwinPanel is a self-hosted platform for VPN sales, subscription lifecycles, 16 VPN/proxy protocol families, node and tunnel operations, reseller commerce, wallets, and centrally managed client-app delivery.**
 
 Instead of running a separate billing panel, reseller system, Telegram sales bot, VPN node manager and tunnel monitor, TwinPanel brings the entire operational flow into one product:
 
@@ -28,7 +28,7 @@ Customer / Reseller / Telegram Bot / Web Store
                     ↓
             Credential Delivery
                     ↓
-          15 VPN Protocols
+       16 VPN / Proxy Protocols
                     ↓
         Iran / Relay / Exit Nodes
                     ↓
@@ -38,6 +38,15 @@ Customer / Reseller / Telegram Bot / Web Store
 ```
 
 TwinPanel is designed for real production operation: sales, customer delivery, quota accounting, multi-node infrastructure, tunnel health, failover, monitoring, support, backup, updates and day-to-day administration are managed from the same control plane.
+
+## Recently added capabilities
+
+- **Reserved subscription renewals:** paid renewals queue until the previous period expires or its quota is exhausted, keeping the existing user credentials and connection profiles.
+- **Wallets and payment history:** customer and reseller balances, wallet-funded checkout/renewal flows, receipt review, and auditable transactions.
+- **Multi-brand TwinConnect integration:** centrally configured app branding, reseller-specific contact links, licensing and subscription-aware configuration delivery. Client engine availability still depends on the platform/build.
+- **16 managed VPN/proxy protocol families:** including authenticated SOCKS5, with per-node adapter readiness and plan-specific protocol access.
+- **Smarter infrastructure operations:** independent node provisioning, managed Iran/exit tunnels, outbound policies, health diagnostics and supported route-failover workflows.
+- **Richer sales operations:** plan categories, reseller traffic credit, configurable trials, subscription history, notifications and Telegram bot delivery.
 
 ## Quick install
 
@@ -68,13 +77,13 @@ tp
 TwinPanel includes a customer-facing sales flow for turning plans into active VPN subscriptions.
 
 - public storefront;
-- configurable plans and durations;
+- configurable plans, plan categories, protocol entitlements and durations;
 - traffic / volume limits;
 - fixed-IP and regular service models;
 - discounts and promotional flows;
 - checkout and payment handling;
 - payment receipt workflows;
-- customer account creation and subscription delivery;
+- customer account creation, subscription delivery and renewal reservation;
 - automatic access to connection information after successful activation;
 - customer-facing tutorials and client-download guidance;
 - Persian RTL and English LTR interfaces;
@@ -89,7 +98,7 @@ The Telegram sales system can operate as a complete sales and customer-delivery 
 - payment and receipt flows;
 - deliver connection information;
 - customer notifications;
-- subscription status and renewal flows;
+- subscription status, wallet-funded checkout and reserved renewal flows;
 - configurable bot texts;
 - operational notifications;
 - integration with the same central subscription and quota model used by the web panel.
@@ -100,9 +109,9 @@ TwinPanel includes reseller workflows so operators can distribute services throu
 
 - reseller accounts;
 - reseller customers;
-- reseller-specific pricing;
+- reseller-specific pricing and plan/protocol eligibility;
 - wallet and credit management;
-- traffic credit / allocation;
+- traffic credit / allocation and volume-package workflows;
 - subscription creation and renewal;
 - reseller Telegram bot support;
 - centralized accounting and service ownership;
@@ -115,15 +124,16 @@ Each customer can manage the services assigned to their account from a dedicated
 - active subscriptions;
 - service status;
 - expiration information;
-- traffic / quota information;
+- traffic / quota information, renewal reservations and subscription history;
 - connection profiles;
 - protocol-specific credentials;
 - client application guidance;
-- subscription and multi-link access where supported.
+- subscription and multi-link access where supported;
+- wallet transactions, supported renewals, support and client-app downloads.
 
-# 15 VPN protocols
+# 16 VPN and proxy protocol families
 
-TwinPanel manages **15 protocol families** from one control surface.
+TwinPanel manages **16 VPN and proxy protocol families** from one control surface. Availability depends on the node runtime, subscription plan and client integration.
 
 ## Classic protocols
 
@@ -150,16 +160,21 @@ TwinPanel manages **15 protocol families** from one control surface.
 | **AmneziaWG** | WireGuard-derived obfuscated VPN transport |
 | **Sudoku** | Modern protocol integration managed by TwinPanel |
 
+## Direct proxy
+
+| Protocol | Purpose |
+|---|---|
+| **SOCKS5** | Authenticated TCP proxy for supported apps; SOCKS5 itself does not encrypt traffic |
+
 The protocol control surface exposes runtime readiness instead of pretending that an unavailable adapter is healthy. Protocol state, configuration and node capability are tracked centrally.
 
 ## Xray / V2Ray transport profiles
 
 TwinPanel also supports managed Xray/V2Ray profile variants such as:
 
-- WebSocket + TLS;
-- XHTTP + REALITY;
-- gRPC + REALITY;
-- HTTPUpgrade + TLS;
+- VLESS over TCP + TLS;
+- VLESS over WebSocket + TLS;
+- VLESS over XHTTP + REALITY;
 - managed domains and TLS preparation;
 - grouped customer configuration delivery;
 - multi-server subscription presentation.
@@ -249,6 +264,8 @@ TwinPanel manages:
 - pending / active / suspended / expired / canceled states;
 - start-on-first-use workflows where configured;
 - expiration and renewal;
+- reserved renewals applied after the prior period expires or quota is consumed, without rotating existing credentials;
+- subscription history and renewal audit trail;
 - traffic quotas;
 - protocol credentials bound to the subscription;
 - connection delivery;
@@ -280,7 +297,8 @@ The administration dashboard provides a live operational view of the platform.
 - online sessions;
 - node health;
 - Controller CPU / RAM / disk / uptime;
-- protocol health across all 15 protocols;
+- protocol readiness across all 16 families;
+- pending renewals, wallet activity and payment-review status;
 - tunnel state;
 - infrastructure status;
 - revenue and sales indicators;
@@ -340,14 +358,15 @@ TwinPanel ships multiple product surfaces instead of one monolithic admin page:
 |---|---|
 | **Admin Dashboard** | Platform-wide status and operational overview |
 | **Users** | Customer accounts and access state |
-| **Subscriptions** | Lifecycle, quota, expiration and delivery |
+| **Subscriptions** | Lifecycle, quota, reserved renewal queue, history and delivery |
 | **Plans / Store** | Commercial products and public sales |
-| **Resellers** | Seller accounts, pricing and credit |
+| **Resellers** | Seller accounts, plan access, pricing, wallet and volume credit |
 | **Nodes** | Infrastructure servers and protocol runtime |
-| **Protocols** | 15-protocol control surface |
+| **Protocols** | 16-family VPN/proxy control surface and runtime readiness |
 | **Tunnels** | Iran/Exit transport management |
 | **Outbounds** | Egress and per-protocol routing policy |
-| **Payments** | Payment and receipt operations |
+| **Payments** | Payment, wallet, receipt review and transactions |
+| **Client App / Branding** | Central TwinConnect appearance, contacts and reseller identity |
 | **Support** | Support and communication workflows |
 | **System & Maintenance** | Settings, backup, security and Update Center |
 
@@ -380,7 +399,7 @@ TwinPanel ships multiple product surfaces instead of one monolithic admin page:
                  │                                      │                  │
                  │                                 Iran / Exit ───── Transport
                  │                                      │                  │
-                 └────────────── 15 VPN Protocols ──────┴────── Outbound ──┘
+                 └────────────── 16 VPN/Proxy Protocols ──────┴────── Outbound ──┘
                                                                 │
                                                              Internet
 ```
