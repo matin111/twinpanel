@@ -124,7 +124,7 @@ jobs:
       - name: Verify explicit VPN permission and native service
         shell: bash
         run: |
-          grep -F 'GoBackend$VpnService' android/app/src/main/AndroidManifest.xml
+          grep -F 'android:name="com.wireguard.android.backend.GoBackend$VpnService" tools:node="remove"' android/app/src/main/AndroidManifest.xml
           grep -F 'android:allowBackup="false"' android/app/src/main/AndroidManifest.xml
           grep -F 'android:fullBackupContent="false"' android/app/src/main/AndroidManifest.xml
           grep -F '.OpenConnectVpnService' android/app/src/main/AndroidManifest.xml

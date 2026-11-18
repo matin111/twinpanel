@@ -41,6 +41,7 @@ class SharedTunVpnService : VpnService() {
     @Volatile private var shuttingDown = false
     @Volatile private var ciscoEngine: SharedOpenConnectEngine? = null
     @Volatile private var externalOwner: String? = null
+    @Volatile private var externalTunEstablished = false
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) {
@@ -123,7 +124,10 @@ class SharedTunVpnService : VpnService() {
         }
         check(wireGuardHandle < 0 && amneziaHandle < 0 && ciscoEngine == null &&
             (externalOwner == null || externalOwner == engine)) { "SHARED_TUN_BUSY" }
-        externalOwner = engine
+        if (externalOwner == null) {
+            externalOwner = engine
+            externalTunEstablished = false
+        }
         Builder()
     }
 
@@ -134,6 +138,7 @@ class SharedTunVpnService : VpnService() {
         val ownerCopy = ParcelFileDescriptor.dup(descriptor.fileDescriptor)
         val previous = tun
         tun = ownerCopy
+        externalTunEstablished = true
         previous?.close()
     }
 
@@ -142,6 +147,7 @@ class SharedTunVpnService : VpnService() {
         synchronized(lock) {
             if (externalOwner != engine || shuttingDown) return
             externalOwner = null
+            externalTunEstablished = false
             if (persistentBlock) {
                 try {
                     val blackhole = blockingTun()
@@ -496,6 +502,10 @@ class SharedTunVpnService : VpnService() {
     }
 
     fun shutdownIfIdle() = synchronized(lock) {
+        // A plugin may fail while configuring its borrowed Builder, before it
+        // ever establishes a TUN. Clear that abandoned reservation on the
+        // explicit Dart failure-cleanup path, without touching live engines.
+        if (externalOwner != null && !externalTunEstablished) externalOwner = null
         if (!persistentBlock && wireGuardHandle < 0 && amneziaHandle < 0 &&
             ciscoEngine == null && externalOwner == null) shutdown()
     }
@@ -563,6 +573,7 @@ class SharedTunVpnService : VpnService() {
             stoppedCisco = ciscoEngine
             ciscoEngine = null
             externalOwner = null
+            externalTunEstablished = false
             val handle = wireGuardHandle
             wireGuardHandle = -1
             if (handle >= 0) try { WireGuardJni.turnOff(handle) } catch (_: Exception) {}

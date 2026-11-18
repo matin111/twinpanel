@@ -6,8 +6,9 @@ import 'package:flutter_vless/flutter_vless.dart';
 import 'xray_inbound_profiles.dart';
 
 /// Embedded Android Xray runtime specifically for VLESS/XHTTP Reality.
-/// Native Xray owns its own Android VpnService. Never share the old libbox
-/// TUN with this runtime or treat a socket-open event as VPN verification.
+/// Native Xray uses its own cryptographic core, but its Android TUN Builder is
+/// provided by TwinConnect's SharedTunVpnService. A socket-open event alone
+/// is never treated as verified VPN connectivity.
 class AndroidXrayTunnel {
   AndroidXrayTunnel._() {
     _runtime = FlutterVless(onStatusChanged: (status) {
@@ -100,3 +101,4 @@ class AndroidXrayTunnel {
     }
   }
 }
+
