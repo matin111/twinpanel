@@ -2805,7 +2805,7 @@ async def _telegram_notification_worker(bot):
                         if is_active else
                         "🕒 تمدید برای دوره بعد رزرو شده و پس از اتمام حجم یا تاریخ دوره فعلی، خودکار فعال می‌شود.",
                     ]
-                    text = "\\n".join(lines)
+                    text = "\n".join(lines)
                     keyboard = InlineKeyboardMarkup(inline_keyboard=[
                         [InlineKeyboardButton(text="📦 اشتراک‌های من", callback_data="subs:list")]
                     ])
