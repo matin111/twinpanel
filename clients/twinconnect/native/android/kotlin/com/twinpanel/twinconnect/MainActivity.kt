@@ -4,7 +4,11 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.net.VpnService
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.os.Bundle
+import android.os.Build
+import android.provider.Settings
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodCall
@@ -23,6 +27,9 @@ import java.util.concurrent.Executors
 class MainActivity : FlutterActivity() {
     private val executor: ExecutorService = Executors.newSingleThreadExecutor()
     private var pendingStart: PendingStart? = null
+    private var pendingAwgStart: Pair<String, MethodChannel.Result>? = null
+    private var pendingGuardStart: MethodChannel.Result? = null
+    private var pendingExternalStart: MethodChannel.Result? = null
 
     private data class PendingStart(
         val config: String,
@@ -32,21 +39,344 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        // The upstream package auto-registers only its OpenVPN plugin.
+        // Register the independent CSTP/Cisco Android plugin explicitly.
+        flutterEngine.plugins.add(com.axevpn.flutter.openconnect.OpenConnectFlutterPlugin())
         val channel = MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
             "com.twinpanel.twinconnect/vpn"
         )
+        // Mieru is not a VPN until its SOCKS engine and TUN forwarder are
+        // installed together. Never claim a successful connection based on
+        // a compiled executable or an open local SOCKS socket.
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            "com.twinpanel.twinconnect/mieru"
+        ).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "getCapabilities" -> result.success(
+                    mapOf(
+                        "contractVersion" to 1,
+                        "engineReady" to false,
+                        "tunnelVerified" to false,
+                        "reason" to "MIERU_TUN_BRIDGE_NOT_INSTALLED"
+                    )
+                )
+                "connect" -> result.error(
+                    "MIERU_TUN_BRIDGE_NOT_INSTALLED",
+                    "Mieru requires a native SOCKS engine and Android TUN forwarder",
+                    null
+                )
+                "disconnect" -> result.success(
+                    mapOf("connected" to false, "tunnelVerified" to false)
+                )
+                else -> result.notImplemented()
+            }
+        }
+        // Fail closed until the Rust TrustTunnel engine and TUN forwarder are
+        // actually bundled. A SOCKS listener alone is not a device VPN.
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            "com.twinpanel.twinconnect/trusttunnel"
+        ).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "getCapabilities" -> result.success(
+                    mapOf(
+                        "contractVersion" to 1,
+                        "engineReady" to false,
+                        "vpnServiceReady" to false,
+                        "tunnelVerified" to false,
+                        "reason" to "TRUSTTUNNEL_NATIVE_ENGINE_NOT_INSTALLED"
+                    )
+                )
+                "connect" -> result.error(
+                    "TRUSTTUNNEL_NATIVE_ENGINE_NOT_INSTALLED",
+                    "Rust TrustTunnel client and Android TUN bridge are required",
+                    null
+                )
+                "disconnect" -> result.success(
+                    mapOf("connected" to false, "tunnelVerified" to false)
+                )
+                else -> result.notImplemented()
+            }
+        }
+        // AWG is an optional isolated AAR. Reflective dispatch keeps the
+        // standard WireGuard-only APK buildable when AWG is not staged.
+        val awgRuntime = try {
+            Class.forName("com.twinpanel.twinconnect.AmneziaWgRuntime")
+        } catch (_: ClassNotFoundException) {
+            null
+        }
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            "com.twinpanel.twinconnect/amneziawg"
+        ).setMethodCallHandler { call, result ->
+            if (call.method == "connect" && awgRuntime != null) {
+                val config = call.argument<String>("config")
+                if (config.isNullOrBlank()) {
+                    result.error("AWG_PROFILE_MISSING", "Missing VPN profile", null)
+                } else if (pendingAwgStart != null) {
+                    result.error("AWG_PERMISSION_PENDING", "VPN permission pending", null)
+                } else {
+                    val approval = VpnService.prepare(this)
+                    if (approval != null) {
+                        pendingAwgStart = Pair(config, result)
+                        try {
+                            @Suppress("DEPRECATION")
+                            startActivityForResult(approval, AWG_APPROVAL_REQUEST)
+                        } catch (_: Exception) {
+                            pendingAwgStart = null
+                            result.error("VPN_PERMISSION_FAILED", "Unable to request permission", null)
+                        }
+                    } else {
+                        launchAmneziaWg(awgRuntime, config, result)
+                    }
+                }
+            } else onWorker(result) {
+                if (awgRuntime == null) {
+                    if (call.method == "getCapabilities") {
+                        mapOf(
+                            "contractVersion" to 1,
+                            "engineReady" to false,
+                            "vpnServiceReady" to false,
+                            "tunnelVerified" to false,
+                            "reason" to "AWG_NATIVE_BACKEND_NOT_BUNDLED"
+                        )
+                    } else {
+                        throw IllegalArgumentException("AWG_NATIVE_BACKEND_NOT_BUNDLED")
+                    }
+                } else {
+                    try {
+                        val instance = awgRuntime.getField("INSTANCE").get(null)
+                        when (call.method) {
+                            "getCapabilities" -> {
+                                val ready = awgRuntime.getMethod(
+                                    "initialize", Context::class.java
+                                ).invoke(instance, applicationContext) == true
+                                mapOf(
+                                    "contractVersion" to 1,
+                                    "engineReady" to ready,
+                                    "vpnServiceReady" to ready,
+                                    "tunnelVerified" to false
+                                )
+                            }
+                            "status" -> {
+                                @Suppress("UNCHECKED_CAST")
+                                (awgRuntime.getMethod("status").invoke(instance)
+                                    as Map<String, Any>)
+                            }
+                            "connect" -> throw IllegalArgumentException("AWG_CONNECT_DISPATCH_ERROR")
+                            "disconnect" -> {
+                                @Suppress("UNCHECKED_CAST")
+                                (awgRuntime.getMethod("disconnect").invoke(instance)
+                                    as Map<String, Any>)
+                            }
+                            else -> throw IllegalArgumentException("AWG_UNKNOWN_METHOD")
+                        }
+                    } catch (_: ReflectiveOperationException) {
+                        throw IllegalArgumentException("AWG_NATIVE_RUNTIME_FAILED")
+                    } catch (_: LinkageError) {
+                        throw IllegalArgumentException("AWG_NATIVE_RUNTIME_FAILED")
+                    }
+                }
+            }
+        }
         channel.setMethodCallHandler { call, result ->
             when (call.method) {
+                "getVpnRegistrationStatus" -> {
+                    // Diagnose whether Android can discover a VPN service from
+                    // the *installed* package; an in-app icon proves nothing.
+                    val intent = Intent(VpnService.SERVICE_INTERFACE).setPackage(packageName)
+                    val matches = packageManager.queryIntentServices(intent, 0)
+                    val services = matches.mapNotNull { it.serviceInfo }.map { info ->
+                        mapOf(
+                            "name" to info.name,
+                            "requiresVpnPermission" to
+                                (info.permission == android.Manifest.permission.BIND_VPN_SERVICE),
+                            "enabled" to info.enabled
+                        )
+                    }
+                    result.success(mapOf(
+                        "packageName" to packageName,
+                        "registeredVpnServices" to services,
+                        "discoverable" to services.any {
+                            it["requiresVpnPermission"] == true && it["enabled"] == true
+                        }
+                    ))
+                }
+                "getDisconnectedTrafficGuardStatus" -> {
+                    val wireGuardUp = WireGuardRuntime.isInterfaceUp()
+                    val legacyGuardUp = AndroidTrafficGuardService.active
+                    val shared = SharedTunVpnService.active
+                    val sharedGuardUp = shared?.hasBlockingTun() == true
+                    val osLockdown = shared?.isLockdownVerified() == true
+                    val manager = getSystemService(Context.CONNECTIVITY_SERVICE)
+                        as ConnectivityManager
+                    val ownership = VpnTunnelOwnership.snapshot(
+                        manager,
+                        legacyGuardUp,
+                        wireGuardUp,
+                        if (wireGuardUp) WireGuardRuntime.isOsLockdownEnforced() else null
+                    )
+                    result.success(mapOf(
+                        "active" to (sharedGuardUp || legacyGuardUp),
+                        "sharedTunOwner" to (shared?.hasTunnel() == true),
+                        "appRoutingMode" to SharedTunVpnService.configuredRoutingMode(),
+                        "sharedGuardEnabled" to sharedGuardUp,
+                        "legacyGuardActive" to legacyGuardUp,
+                        "osLockdown" to if (shared != null) osLockdown else null,
+                        "lockdownVerificationAvailable" to (shared != null),
+                        "otherVpnActive" to (ownership.vpnTransport && !legacyGuardUp && shared == null),
+                        "protectionVerified" to (sharedGuardUp || ownership.trafficProtected),
+                        "protectionMode" to when {
+                            osLockdown -> "OS_LOCKDOWN_VERIFIED"
+                            sharedGuardUp -> "IN_APP_SHARED_TUN"
+                            legacyGuardUp -> "LEGACY_BLOCKING_TUN_UNSAFE_HANDOFF"
+                            ownership.owner == VpnTunnelOwnership.Owner.UNKNOWN ->
+                                "VPN_OWNER_UNKNOWN_FAIL_CLOSED"
+                            ownership.vpnTransport -> "ACTIVE_VPN_LOCKDOWN_UNVERIFIED"
+                            else -> "DISCONNECTED_UNPROTECTED"
+                        },
+                        "tunnelOwner" to if (shared != null) "SHARED_TUN" else ownership.owner.name,
+                        "sharedTunProtocol" to when {
+                            shared?.hasWireGuardTunnel() == true -> "wireguard"
+                            shared?.hasAmneziaWgTunnel() == true -> "amneziawg"
+                            shared?.hasCiscoTunnel() == true -> "cisco"
+                            shared?.externalTunnelProtocol() != null -> shared.externalTunnelProtocol()
+                            else -> null
+                        },
+                        "sharedTunSupportedProtocols" to (listOf("wireguard", "cisco", "singbox", "xray", "openvpn") +
+                            if (awgRuntime != null) listOf("amneziawg") else emptyList()),
+                        "nativePacketGuardRequired" to ownership.requiresNativePacketGuard,
+                        "singleTunnelKillSwitchAvailable" to true,
+                        "failClosedAcrossHandoff" to sharedGuardUp
+                    ))
+                }
+                "startDisconnectedTrafficGuard" -> {
+                    if (AndroidTrafficGuardService.active) {
+                        result.error("LEGACY_GUARD_ACTIVE", "Stop legacy VPN guard first", null)
+                    } else if (SharedTunVpnService.active == null && hasActiveVpnTransport()) {
+                        result.error("OTHER_VPN_ACTIVE", "Another VPN currently owns Android routing", null)
+                    } else if (pendingGuardStart != null) {
+                        result.error("VPN_REQUEST_IN_PROGRESS", "VPN approval pending", null)
+                    } else {
+                        val approval = VpnService.prepare(this)
+                        if (approval != null) {
+                            pendingGuardStart = result
+                            try {
+                                @Suppress("DEPRECATION")
+                                startActivityForResult(approval, GUARD_APPROVAL_REQUEST)
+                            } catch (_: Exception) {
+                                pendingGuardStart = null
+                                result.error("VPN_PERMISSION_FAILED", "Unable to request permission", null)
+                            }
+                        } else {
+                            launchSharedGuard(result)
+                        }
+                    }
+                }
+                "prepareSharedTunEngine" -> {
+                    if (AndroidTrafficGuardService.active) {
+                        result.error("LEGACY_GUARD_ACTIVE", "Stop legacy guard before native connection", null)
+                    } else if (SharedTunVpnService.active == null && hasActiveVpnTransport()) {
+                        result.error("OTHER_VPN_ACTIVE", "Another VPN owns Android routing", null)
+                    } else if (pendingExternalStart != null || pendingGuardStart != null) {
+                        result.error("VPN_REQUEST_IN_PROGRESS", "VPN approval pending", null)
+                    } else {
+                        val approval = VpnService.prepare(this)
+                        if (approval == null) launchSharedExternal(result)
+                        else {
+                            pendingExternalStart = result
+                            try {
+                                @Suppress("DEPRECATION")
+                                startActivityForResult(approval, EXTERNAL_APPROVAL_REQUEST)
+                            } catch (_: Exception) {
+                                pendingExternalStart = null
+                                result.error("VPN_PERMISSION_FAILED", "Unable to request permission", null)
+                            }
+                        }
+                    }
+                }
+                "finishSharedTunEngine" -> {
+                    SharedTunVpnService.active?.shutdownIfIdle()
+                    result.success(mapOf("releaseRequested" to true))
+                }
+                "stopDisconnectedTrafficGuard" -> {
+                    SharedTunVpnService.active?.disableBlocking()
+                    startService(Intent(this, AndroidTrafficGuardService::class.java).apply {
+                        action = AndroidTrafficGuardService.ACTION_STOP
+                    })
+                    result.success(mapOf("stopRequested" to true))
+                }
+                "openAndroidVpnSettings" -> {
+                    try {
+                        startActivity(Intent(Settings.ACTION_VPN_SETTINGS))
+                        result.success(mapOf("opened" to true))
+                    } catch (_: Exception) {
+                        result.error("ANDROID_VPN_SETTINGS_UNAVAILABLE", "Unable to open Android VPN settings", null)
+                    }
+                }
+                "getAndroidVpnNetworkDiagnostics" -> onWorker(result) {
+                    val manager = getSystemService(Context.CONNECTIVITY_SERVICE)
+                        as ConnectivityManager
+                    val vpn = manager.allNetworks.firstOrNull { network ->
+                        manager.getNetworkCapabilities(network)?.hasTransport(
+                            NetworkCapabilities.TRANSPORT_VPN) == true
+                    }
+                    val caps = vpn?.let { manager.getNetworkCapabilities(it) }
+                    val links = vpn?.let { manager.getLinkProperties(it) }
+                    val routes = links?.routes ?: emptyList()
+                    mapOf(
+                        "contractVersion" to 1,
+                        "vpnTransportActive" to (vpn != null),
+                        "vpnDefaultIpv4" to routes.any { route ->
+                            route.isDefaultRoute &&
+                            route.destination.address is java.net.Inet4Address
+                        },
+                        "vpnDefaultIpv6" to routes.any { route ->
+                            route.isDefaultRoute &&
+                            route.destination.address is java.net.Inet6Address
+                        },
+                        "vpnDnsCount" to (links?.dnsServers?.size ?: 0),
+                        "networkValidated" to (caps?.hasCapability(
+                            NetworkCapabilities.NET_CAPABILITY_VALIDATED) == true)
+                    )
+                }
+                "listLaunchableApps" -> onWorker(result) {
+                    val manager = packageManager
+                    val launcher = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+                    @Suppress("DEPRECATION")
+                    val activities = manager.queryIntentActivities(launcher, 0)
+                    val apps = activities.mapNotNull { entry ->
+                        val id = entry.activityInfo?.packageName ?: return@mapNotNull null
+                        if (id == packageName) return@mapNotNull null
+                        mapOf(
+                            "packageName" to id,
+                            "label" to entry.loadLabel(manager).toString().take(80)
+                        )
+                    }.distinctBy { it["packageName"] }
+                        .sortedBy { it["label"]?.lowercase() }
+                    mapOf("apps" to apps, "contractVersion" to 1)
+                }
+                "configureAppRouting" -> onWorker(result) {
+                    val mode = call.argument<String>("routingMode") ?: "fullTunnel"
+                    val ids = call.argument<List<String>>("appIds") ?: emptyList()
+                    SharedTunVpnService.configureAppRouting(applicationContext, mode, ids)
+                    mapOf("routingMode" to SharedTunVpnService.configuredRoutingMode(),
+                        "appliedOnNextTunnel" to true)
+                }
                 "getCapabilities" -> onWorker(result) {
                     val present = WireGuardRuntime.initialize(applicationContext)
                     mapOf(
                         "contractVersion" to 1,
                         "engineReady" to present,
                         "fullTunnel" to present,
-                        "includeApps" to false,
-                        "excludeApps" to false,
-                        "killSwitchEnforced" to (present && WireGuardRuntime.isOsLockdownEnforced()),
+                        "includeApps" to present,
+                        "excludeApps" to present,
+                        "killSwitchAvailable" to present,
+                        "killSwitchEnforced" to
+                            (SharedTunVpnService.active?.hasBlockingTun() == true ||
+                                WireGuardRuntime.isOsLockdownEnforced()),
                         // These indicate native, profile-validated capability,
                         // NOT a claim that DNS/IPv6 protection is now active.
                         "dnsGuard" to present,
@@ -123,6 +453,10 @@ class MainActivity : FlutterActivity() {
                         result.error("VPN_REQUEST_IN_PROGRESS", "Approval already in progress", null)
                         return@setMethodCallHandler
                     }
+                    if (SharedTunVpnService.active == null && hasActiveVpnTransport()) {
+                        result.error("OTHER_VPN_ACTIVE", "Another VPN currently owns Android routing", null)
+                        return@setMethodCallHandler
+                    }
                     val launch = VpnService.prepare(this)
                     if (launch == null) {
                         launchWireGuard(configuration, policy, result)
@@ -145,6 +479,51 @@ class MainActivity : FlutterActivity() {
         }
     }
 
+    private fun launchAmneziaWg(
+        runtime: Class<*>,
+        configuration: String,
+        result: MethodChannel.Result
+    ) {
+        onWorker(result) {
+            try {
+                val instance = runtime.getField("INSTANCE").get(null)
+                @Suppress("UNCHECKED_CAST")
+                runtime.getMethod(
+                    "connect", Context::class.java, String::class.java
+                ).invoke(instance, applicationContext, configuration) as Map<String, Any>
+            } catch (error: java.lang.reflect.InvocationTargetException) {
+                // Reflection wraps the runtime's policy and configuration errors.
+                // Preserve only allowlisted symbolic codes, never the exception
+                // text from the native backend (which may contain credentials).
+                val cause = error.targetException
+                val safeCodes = setOf(
+                    "AWG_ENGINE_UNAVAILABLE", "VPN_PERMISSION_REQUIRED",
+                    "OTHER_VPN_ACTIVE", "AWG_ALREADY_CONNECTED",
+                    "AWG_PROFILE_INVALID", "AWG_DNS_MISSING",
+                    "AWG_DEFAULT_ROUTE_MISSING", "AWG_CONFIG_PARSE_FAILED",
+                    "AWG_NATIVE_START_FAILED", "AWG_TUN_NOT_ESTABLISHED",
+                    "AWG_VPN_SERVICE_TIMEOUT", "AWG_TUN_CREATION_FAILED",
+                    "AWG_GO_ACTIVATION_FAILED", "AWG_ENDPOINT_DNS_FAILED",
+                    "AWG_ENDPOINT_MISSING", "AWG_SOCKET_PROTECT_FAILED",
+                    "SHARED_TUN_NOT_READY", "SHARED_TUN_ESTABLISH_FAILED",
+                    "AWG_BACKEND_REJECTED", "AWG_BACKEND_START_EXCEPTION",
+                    "AWG_NATIVE_LINK_FAILED", "AWG_VPN_SECURITY_REJECTED"
+                )
+                val code = cause.message?.takeIf { it in safeCodes }
+                    ?: when (cause) {
+                        is UnsatisfiedLinkError, is NoClassDefFoundError ->
+                            "AWG_NATIVE_LINK_FAILED"
+                        is SecurityException -> "AWG_VPN_SECURITY_REJECTED"
+                        is IllegalStateException -> "AWG_BACKEND_STATE_FAILED"
+                        else -> "AWG_BACKEND_START_EXCEPTION"
+                    }
+                throw IllegalArgumentException(code)
+            } catch (_: ReflectiveOperationException) {
+                throw IllegalArgumentException("AWG_NATIVE_REFLECTION_FAILED")
+            }
+        }
+    }
+
     private fun launchWireGuard(
         configuration: String,
         policy: Map<String, Any?>,
@@ -152,6 +531,43 @@ class MainActivity : FlutterActivity() {
     ) {
         onWorker(result) {
             WireGuardRuntime.start(applicationContext, configuration, policy)
+        }
+    }
+
+    private fun launchSharedGuard(result: MethodChannel.Result) {
+        try {
+            val alreadyRunning = SharedTunVpnService.active
+            if (alreadyRunning != null) {
+                alreadyRunning.enableBlocking()
+            } else {
+                val intent = Intent(this, SharedTunVpnService::class.java).apply {
+                    action = SharedTunVpnService.ACTION_START_BLOCK
+                }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    startForegroundService(intent)
+                } else {
+                    startService(intent)
+                }
+            }
+            // The actual TUN state is reported by the follow-up status poll.
+            result.success(mapOf("startRequested" to true))
+        } catch (_: Exception) {
+            result.error("SHARED_TUN_NOT_READY", "Unable to start VPN guard", null)
+        }
+    }
+
+    private fun launchSharedExternal(result: MethodChannel.Result) {
+        try {
+            if (SharedTunVpnService.active == null) {
+                val intent = Intent(this, SharedTunVpnService::class.java).apply {
+                    action = SharedTunVpnService.ACTION_PREPARE_EXTERNAL
+                }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(intent)
+                else startService(intent)
+            }
+            result.success(mapOf("startRequested" to true))
+        } catch (_: Exception) {
+            result.error("SHARED_TUN_NOT_READY", "Unable to prepare VPN owner", null)
         }
     }
 
@@ -175,7 +591,23 @@ class MainActivity : FlutterActivity() {
                     "AUTO_RECONNECT_NOT_VERIFIED", "OS_LOCKDOWN_NOT_ENABLED",
                     "TUNNEL_ALREADY_RUNNING", "TUNNEL_NOT_ESTABLISHED",
                     "WIREGUARD_CONFIG_PARSE_FAILED", "WIREGUARD_NATIVE_START_FAILED",
-                    "PROFILE_PURGE_FAILED"
+                    "WIREGUARD_ENDPOINT_MISSING", "WIREGUARD_ENDPOINT_DNS_FAILED",
+                    "SHARED_TUN_ESTABLISH_FAILED", "WIREGUARD_SOCKET_PROTECT_FAILED",
+                    "PROFILE_PURGE_FAILED", "AWG_NATIVE_START_FAILED",
+                    "AWG_NATIVE_BACKEND_NOT_BUNDLED", "AWG_PROFILE_MISSING",
+                    "AWG_ENGINE_UNAVAILABLE", "AWG_PROFILE_INVALID",
+                    "AWG_DNS_MISSING", "AWG_DEFAULT_ROUTE_MISSING",
+                    "AWG_CONFIG_PARSE_FAILED", "AWG_TUN_NOT_ESTABLISHED",
+                    "AWG_ENDPOINT_MISSING", "AWG_ENDPOINT_DNS_FAILED",
+                    "AWG_SOCKET_PROTECT_FAILED", "AWG_GO_ACTIVATION_FAILED",
+                    "AWG_ALREADY_CONNECTED", "OTHER_VPN_ACTIVE",
+                    "APP_ROUTING_MODE_INVALID", "APP_ROUTING_PACKAGES_INVALID",
+                    "APP_ROUTING_PACKAGES_REQUIRED", "APP_ROUTING_PACKAGE_MISSING",
+                    "APP_ROUTING_TUN_BUSY", "SPLIT_TUNNEL_GUARD_CONFLICT",
+                    "AWG_NATIVE_RUNTIME_FAILED", "AWG_UNKNOWN_METHOD",
+                    "AWG_CONNECT_DISPATCH_ERROR", "AWG_NATIVE_LINK_FAILED",
+                    "AWG_VPN_SECURITY_REJECTED", "AWG_BACKEND_STATE_FAILED",
+                    "AWG_BACKEND_START_EXCEPTION", "AWG_NATIVE_REFLECTION_FAILED"
                 )
                 val safeCode = error.message?.takeIf { accepted.contains(it) }
                     ?: "NATIVE_VPN_START_FAILED"
@@ -191,6 +623,39 @@ class MainActivity : FlutterActivity() {
     @Deprecated("Deprecated by Android API; required for FlutterActivity's approval callback")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == GUARD_APPROVAL_REQUEST) {
+            val request = pendingGuardStart ?: return
+            pendingGuardStart = null
+            if (resultCode == Activity.RESULT_OK) launchSharedGuard(request)
+            else request.error("VPN_PERMISSION_DENIED", "VPN permission not granted", null)
+            return
+        }
+        if (requestCode == EXTERNAL_APPROVAL_REQUEST) {
+            val request = pendingExternalStart ?: return
+            pendingExternalStart = null
+            if (resultCode == Activity.RESULT_OK) launchSharedExternal(request)
+            else request.error("VPN_PERMISSION_DENIED", "VPN permission not granted", null)
+            return
+        }
+        if (requestCode == AWG_APPROVAL_REQUEST) {
+            val request = pendingAwgStart ?: return
+            pendingAwgStart = null
+            if (resultCode == Activity.RESULT_OK) {
+                val runtime = try {
+                    Class.forName("com.twinpanel.twinconnect.AmneziaWgRuntime")
+                } catch (_: ClassNotFoundException) {
+                    null
+                }
+                if (runtime == null) {
+                    request.second.error("AWG_NATIVE_BACKEND_NOT_BUNDLED", "AWG engine missing", null)
+                } else {
+                    launchAmneziaWg(runtime, request.first, request.second)
+                }
+            } else {
+                request.second.error("VPN_PERMISSION_DENIED", "VPN permission not granted", null)
+            }
+            return
+        }
         if (requestCode != VPN_APPROVAL_REQUEST) return
         val request = pendingStart ?: return
         pendingStart = null
@@ -201,11 +666,30 @@ class MainActivity : FlutterActivity() {
         }
     }
 
+    private fun hasActiveVpnTransport(): Boolean {
+        val connectivity = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        return try {
+            connectivity.allNetworks.any { network ->
+                connectivity.getNetworkCapabilities(network)
+                    ?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true
+            }
+        } catch (_: SecurityException) {
+            // If the OS denies inspection, never replace an unknown active VPN.
+            true
+        }
+    }
+
     override fun onDestroy() {
+        pendingGuardStart?.error("VPN_REQUEST_CANCELLED", "VPN approval activity closed", null)
+        pendingGuardStart = null
+        pendingExternalStart?.error("VPN_REQUEST_CANCELLED", "VPN approval activity closed", null)
+        pendingExternalStart = null
         pendingStart?.result?.error(
             "VPN_REQUEST_CANCELLED", "VPN approval activity closed", null
         )
         pendingStart = null
+        pendingAwgStart?.second?.error("VPN_REQUEST_CANCELLED", "VPN approval activity closed", null)
+        pendingAwgStart = null
         executor.shutdown()
         // Do not tear down a VPN on ordinary UI destruction. The user's
         // explicit Disconnect and OS VPN revocation own that lifecycle.
@@ -214,5 +698,8 @@ class MainActivity : FlutterActivity() {
 
     companion object {
         private const val VPN_APPROVAL_REQUEST = 44011
+        private const val AWG_APPROVAL_REQUEST = 44012
+        private const val GUARD_APPROVAL_REQUEST = 44013
+        private const val EXTERNAL_APPROVAL_REQUEST = 44014
     }
 }

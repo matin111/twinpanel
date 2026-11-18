@@ -1,10 +1,20 @@
 name: TwinConnect Android WireGuard Native Build
 
 on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feat/twinconnect-android-openvpn-core-20261115
+    paths:
+      - "clients/twinconnect/**"
+      - ".github/workflows/twinconnect-android-native.yml"
   pull_request:
     paths:
       - "clients/twinconnect/native/android/**"
       - "clients/twinconnect/tools/install_android_native.py"
+      - "clients/twinconnect/tools/patch_shared_tun_android_plugins.py"
+      - "clients/twinconnect/tools/stage_shared_openvpn_android.py"
+      - "clients/twinconnect/tools/build_mieru_android.sh"
       - "clients/twinconnect/lib/android_*.dart"
       - "clients/twinconnect/lib/main.dart"
       - "clients/twinconnect/lib/native_vpn_bridge.dart"
@@ -13,7 +23,15 @@ on:
       - ".github/workflows/twinconnect-android-native.yml"
 
 jobs:
+  # Compile the real pinned OpenConnect JNI core in the SAME workflow run.
+  # The general release must never ship a Cisco button without libopenconnect.
+  openconnect-arm64:
+    uses: ./.github/workflows/twinconnect-openconnect-native-core.yml
+    with:
+      core_only: true
+
   android-wireguard:
+    needs: openconnect-arm64
     runs-on: ubuntu-latest
     timeout-minutes: 35
     env:
@@ -28,22 +46,125 @@ jobs:
         with:
           channel: stable
           cache: true
+      - name: Install Go toolchain for pinned Mieru core
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.x'
+      - name: Compile upstream Mieru for Android ABIs
+        shell: bash
+        env:
+          GO: go
+          ANDROID_NDK_HOME: ${{ env.ANDROID_NDK_LATEST_HOME }}
+        run: |
+          set -euo pipefail
+          if [[ ! -d "${ANDROID_NDK_HOME:-}/toolchains/llvm" ]]; then
+            sdk="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/opt/android-sdk}}"
+            ndk="$(find "$sdk/ndk" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | sort -V | tail -n 1)"
+            export ANDROID_NDK_HOME="$ndk"
+          fi
+          test -d "$ANDROID_NDK_HOME/toolchains/llvm" || { echo "Android NDK missing"; exit 1; }
+          bash tools/build_mieru_android.sh
+          for abi in arm64-v8a armeabi-v7a x86_64; do
+            test -s "native/android/mieru-jni/$abi/libmieru.so"
+          done
+      - name: Upload compiled Mieru cores for native integration
+        uses: actions/upload-artifact@v4
+        with:
+          name: twinconnect-mieru-android-core-binaries
+          path: clients/twinconnect/native/android/mieru-jni/**/libmieru.so
+          if-no-files-found: error
+      - name: Use Java 17 for upstream AmneziaWG Gradle
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Compile and stage isolated official AmneziaWG AAR
+        shell: bash
+        env:
+          AWG_REVISION: ff15093bf3856fea0947923474870b86efb682f0
+        run: |
+          set -euo pipefail
+          bash tools/build_amneziawg_android.sh
+          test -s native/android/amneziawg-core/tunnel-release.aar
+          unzip -Z1 native/android/amneziawg-core/tunnel-release.aar | grep -F 'jni/arm64-v8a/libawg-go.so'
+          if unzip -Z1 native/android/amneziawg-core/tunnel-release.aar | grep -E 'jni/.*/libwg-go.so'; then
+            echo "AWG native library collides with WireGuard" >&2
+            exit 1
+          fi
+      - name: Verify staged AmneziaWG AAR
+        shell: bash
+        run: |
+          test -s native/android/amneziawg-core/tunnel-release.aar
+          unzip -Z1 native/android/amneziawg-core/tunnel-release.aar | grep -F 'classes.jar'
+      - name: Use Java 21 for Flutter Android Gradle and Lint
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Verify Android build JDK
+        shell: bash
+        run: |
+          java -version
+          test "$(java -XshowSettings:properties -version 2>&1 | sed -n 's/^[[:space:]]*java.specification.version = //p' | head -n1)" = "21"
       - name: Generate Android scaffold
         run: flutter create --platforms=android --org com.twinpanel --project-name twinconnect .
-      - name: Install native source and pinned WireGuard dependency
-        run: python tools/install_android_native.py
+      - name: Install native source, supplied icon and pinned WireGuard dependency
+        run: |
+          python -m pip install --user Pillow==11.3.0
+          python tools/install_android_native.py
+      - name: Bundle pinned native Cisco / OpenConnect core for arm64
+        uses: actions/download-artifact@v4
+        with:
+          name: openconnect-arm64-native-core-experimental
+          path: clients/twinconnect/android/app/src/main/jniLibs/arm64-v8a
+      - name: Verify Cisco JNI is present before publishing APKs
+        run: |
+          test -s android/app/src/main/jniLibs/arm64-v8a/libopenconnect.so
+          test -s android/app/src/main/jniLibs/arm64-v8a/libstoken.so
       - name: Verify explicit VPN permission and native service
         shell: bash
         run: |
-          grep -F 'GoBackend$VpnService' android/app/src/main/AndroidManifest.xml
+          grep -F 'android:name="com.wireguard.android.backend.GoBackend$VpnService" tools:node="remove"' android/app/src/main/AndroidManifest.xml
           grep -F 'android:allowBackup="false"' android/app/src/main/AndroidManifest.xml
           grep -F 'android:fullBackupContent="false"' android/app/src/main/AndroidManifest.xml
           grep -F '.OpenConnectVpnService' android/app/src/main/AndroidManifest.xml
           test -f android/app/src/main/kotlin/com/twinpanel/twinconnect/OpenConnectVpnService.kt
+          test -f android/app/src/main/kotlin/com/twinpanel/twinconnect/VpnTunnelOwnership.kt
+          test -f android/app/src/main/kotlin/com/twinpanel/twinconnect/TunPacketGate.kt
+          test -f android/app/src/main/kotlin/com/twinpanel/twinconnect/SharedTunVpnService.kt
+          grep -F 'android:name=".SharedTunVpnService"' android/app/src/main/AndroidManifest.xml
+          if grep -F 'android:name="com.axevpn.flutter.openconnect.AxeOpenConnectVpnService"' android/app/src/main/AndroidManifest.xml; then
+            echo "Legacy Cisco VpnService must not claim another Android VPN slot" >&2
+            exit 1
+          fi
+          if grep -F 'android:name="org.amnezia.awg.backend.GoBackend$VpnService"' android/app/src/main/AndroidManifest.xml; then
+            echo "Native AmneziaWG must share the existing Android VPN owner" >&2
+            exit 1
+          fi
+          grep -F 'fun startAmneziaWg(' android/app/src/main/kotlin/com/twinpanel/twinconnect/SharedTunVpnService.kt
+          grep -F 'service.startAmneziaWg(' android/app/src/main/kotlin/com/twinpanel/twinconnect/AmneziaWgRuntime.kt
+          test -f android/app/src/main/java/com/axevpn/flutter/openconnect/SharedOpenConnectEngine.java
+          grep -F 'new Intent(context, SharedTunVpnService.class)' android/app/src/main/java/com/axevpn/flutter/openconnect/OpenConnectFlutterPlugin.java
+          grep -F 'owner.establishCiscoTun(' android/app/src/main/java/com/axevpn/flutter/openconnect/SharedOpenConnectEngine.java
+          grep -F 'fun establishCiscoTun(' android/app/src/main/kotlin/com/twinpanel/twinconnect/SharedTunVpnService.kt
+          grep -F 'fun startWireGuard(config: Config' android/app/src/main/kotlin/com/twinpanel/twinconnect/SharedTunVpnService.kt
+          grep -F 'ParcelFileDescriptor.dup(replacement.fileDescriptor)' android/app/src/main/kotlin/com/twinpanel/twinconnect/SharedTunVpnService.kt
+          grep -F 'WireGuardJni.turnOn(nativeFd, settings)' android/app/src/main/kotlin/com/twinpanel/twinconnect/SharedTunVpnService.kt
+          grep -F 'route == PacketRoute.VPN_TUNNEL' android/app/src/main/kotlin/com/twinpanel/twinconnect/TunPacketGate.kt
+          grep -F 'VpnTunnelOwnership.snapshot(' android/app/src/main/kotlin/com/twinpanel/twinconnect/MainActivity.kt
+          grep -F 'SharedTunVpnService.ACTION_START_BLOCK' android/app/src/main/kotlin/com/twinpanel/twinconnect/MainActivity.kt
+          if grep -F 'backend!!.setState(' android/app/src/main/kotlin/com/twinpanel/twinconnect/WireGuardRuntime.kt; then
+            echo "Legacy independent GoBackend VPN service must not own WireGuard TUN" >&2
+            exit 1
+          fi
           grep -F 'com.wireguard.android:tunnel:1.0.20260102' android/app/build.gradle.kts
           grep -F 'OPENCONNECT_CORE_NOT_INSTALLED' lib/android_tunnel.dart
       - name: Fetch packages
         run: flutter pub get
+      - name: Bind sing-box and Xray native plugins to SharedTunVpnService
+        run: python tools/patch_shared_tun_android_plugins.py
+      - name: Stage pinned OpenVPN source with shared Android TUN
+        run: python tools/stage_shared_openvpn_android.py
       - name: Dart static analysis
         run: flutter analyze --no-fatal-infos
       - name: Dart tests
@@ -89,8 +210,16 @@ jobs:
               size = apk.stat().st_size
               print(f"{name}: {size / (1024 * 1024):.2f} MiB ({size} bytes)")
           PY
+      - name: Verify merged APK contains exactly one system-visible VPN owner
+        shell: bash
+        run: |
+          python -m unittest discover -s tools -p 'test_verify_shared_tun_apk.py' -v
+          python tools/verify_shared_tun_apk.py \
+            build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk \
+            build/app/outputs/flutter-apk/app-arm64-v8a-release.apk \
+            build/app/outputs/flutter-apk/app-x86_64-release.apk
       - name: Upload Android device-specific release test APKs
-        if: ${{ always() }}
+        if: ${{ success() }}
         uses: actions/upload-artifact@v4
         with:
           name: twinconnect-android-native-multiprotocol-release-apks

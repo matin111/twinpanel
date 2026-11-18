@@ -1,0 +1,924 @@
+// Based on axevpn_flutter (GPL-3.0), adapted for TwinConnect.
+// Security: SHA-256 certificate pin REQUIRED, fail closed on TLS errors.
+package com.axevpn.flutter.openconnect;
+
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.content.Context;
+import android.content.Intent;
+import android.net.VpnService;
+import android.os.Build;
+import android.os.IBinder;
+import android.os.ParcelFileDescriptor;
+import android.util.Log;
+
+import androidx.core.app.NotificationCompat;
+
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.InetAddress;
+import java.net.URLEncoder;
+import java.security.MessageDigest;
+import java.security.SecureRandom;
+import java.security.cert.X509Certificate;
+import java.util.Arrays;
+import java.util.Locale;
+import java.util.concurrent.atomic.AtomicLong;
+
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLSocket;
+import javax.net.ssl.SSLParameters;
+import javax.net.ssl.SSLSocketFactory;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509TrustManager;
+
+/**
+ * Android VpnService — pure-Java Cisco AnyConnect/OpenConnect SSL VPN client.
+ *
+ * Protocol (CSTP over TLS):
+ *  1. POST /+webvpn+/index.html  – username/password authentication
+ *  2. CONNECT /CSCOSSLC/tunnel  – open CSTP data channel
+ *  3. Parse X-CSTP-* response headers for VPN IP config
+ *  4. Establish TUN interface; forward packets via 8-byte CSTP framing
+ *
+ * No native binary required — runs entirely in the Java sandbox.
+ *
+ * Version: 3.0.0
+ */
+public class AxeOpenConnectVpnService extends VpnService {
+
+    private static final String TAG = "AxeOpenConnect";
+    private static final int NOTIFICATION_ID = 9002;
+    private static final String CHANNEL_ID = "axevpn_oc_channel";
+
+    // CSTP packet types (byte [6] of the 8-byte STF header: 'S','T','F',0x01,lenH,lenL,type,0x00)
+    private static final int CSTP_DATA       = 0x00;
+    private static final int CSTP_DPD_REQ    = 0x03;
+    private static final int CSTP_DPD_RESP   = 0x04;
+    private static final int CSTP_KEEPALIVE  = 0x07; // server keepalive — no response needed
+    private static final int CSTP_DISCONNECT = 0x09; // server-initiated disconnect
+    private static final int CSTP_HDR        = 8;    // header size in bytes
+    // STF sync: 'S'(0x53) 'T'(0x54) 'F'(0x46) 0x01
+    private static final byte[] CSTP_SYNC = {0x53, 0x54, 0x46, 0x01};
+
+    public static final String ACTION_CONNECT    = "com.axevpn.flutter.openconnect.CONNECT";
+    public static final String ACTION_DISCONNECT = "com.axevpn.flutter.openconnect.DISCONNECT";
+
+    /** True while the VPN tunnel is active. Read by OpenConnectFlutterPlugin on re-init. */
+    public static volatile boolean isRunning = false;
+    // Non-sensitive diagnostic category. Never broadcast credentials or URLs.
+    public static volatile String lastFailureCode = "";
+    // The address assigned by the authenticated gateway, never a public IP.
+    public static volatile String assignedVpnIpv4 = "";
+    public static final AtomicLong bytesReceived = new AtomicLong();
+    public static final AtomicLong bytesSent = new AtomicLong();
+
+    public static final String EXTRA_SERVER_URL    = "server_url";
+    public static final String EXTRA_TUNNEL_NAME   = "tunnel_name";
+    public static final String EXTRA_USERNAME      = "username";
+    public static final String EXTRA_PASSWORD      = "password";
+    public static final String EXTRA_AUTH_GROUP    = "auth_group";
+    public static final String EXTRA_SERVERCERT    = "servercert";
+    public static final String EXTRA_CERT_PATH     = "cert_path";
+    public static final String EXTRA_CERT_PASSWORD = "cert_password";
+    public static final String EXTRA_CA_PATH       = "ca_path";
+
+    /** Broadcast sent to OpenConnectFlutterPlugin on every stage change. */
+    public static final String BROADCAST_STAGE = "com.axevpn.flutter.openconnect.STAGE";
+    public static final String EXTRA_STAGE     = "stage";
+
+    private ParcelFileDescriptor tunInterface;
+    private volatile boolean     running      = false;
+    private SSLSocket            tunnelSocket;
+    private volatile NativeOpenConnectSession nativeSession;
+
+    // ── Lifecycle ──────────────────────────────────────────────────────────────
+
+    @Override
+    public int onStartCommand(Intent intent, int flags, int startId) {
+        final String action = intent == null ? null : intent.getAction();
+        Log.d(TAG, "onStartCommand: action=" + action);
+        if (!ACTION_CONNECT.equals(action)) {
+            // A DISCONNECT or null restart is never a foreground-service launch.
+            // The plugin dispatches disconnect with startService(), not
+            // startForegroundService(). Do not keep a stale VPN alive.
+            if (ACTION_DISCONNECT.equals(action)) shutdown();
+            stopSelf(startId);
+            return START_NOT_STICKY;
+        }
+
+        // Android requires foreground promotion immediately after a
+        // startForegroundService() launch, including malformed connect intents.
+        // Do not read credentials or perform I/O before this call.
+        try {
+            final String name = intent.getStringExtra(EXTRA_TUNNEL_NAME);
+            final Notification notification = buildNotification(
+                    name != null ? name : "OpenConnect VPN");
+            if (Build.VERSION.SDK_INT >= 34) {
+                startForeground(NOTIFICATION_ID, notification,
+                        android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE);
+            } else {
+                startForeground(NOTIFICATION_ID, notification);
+            }
+        } catch (RuntimeException foregroundError) {
+            Log.e(TAG, "Cisco foreground VPN service could not start", foregroundError);
+            lastFailureCode = "CISCO_FOREGROUND_SERVICE_FAILED";
+            broadcastStage("error");
+            stopSelf(startId);
+            return START_NOT_STICKY;
+        }
+
+        final String serverUrl = intent.getStringExtra(EXTRA_SERVER_URL);
+        final String username = intent.getStringExtra(EXTRA_USERNAME);
+        final String password = intent.getStringExtra(EXTRA_PASSWORD);
+        if (serverUrl == null || serverUrl.isEmpty() ||
+                username == null || username.isEmpty() || password == null) {
+            lastFailureCode = "CISCO_AUTH_INIT_CONTEXT_MISSING";
+            broadcastStage("error");
+            stopSelf(startId);
+            return START_NOT_STICKY;
+        }
+        final String name = intent.getStringExtra(EXTRA_TUNNEL_NAME);
+        final String servercert = intent.getStringExtra(EXTRA_SERVERCERT);
+        new Thread(() -> connectWithNativeCore(serverUrl, name, username,
+                password, servercert), "oc-native-connect").start();
+        return START_NOT_STICKY;
+    }
+
+    @Override
+    public void onRevoke() { shutdown(); stopSelf(); super.onRevoke(); }
+
+    @Override
+    public IBinder onBind(Intent intent) {
+        // VpnService must expose its platform binder for Android VPN lifecycle.
+        return super.onBind(intent);
+    }
+
+    // The bundled JNI core replaces the custom CSTP authentication/packet path.
+    // On ABI/library mismatch fail closed rather than invoking the old engine.
+    private void connectWithNativeCore(String url, String name, String username,
+                                       String password, String pin) {
+        lastFailureCode = "";
+        broadcastStage("preparing");
+        try {
+            System.loadLibrary("stoken");
+            System.loadLibrary("openconnect");
+            NativeOpenConnectSession session = new NativeOpenConnectSession(
+                    this, new NativeOpenConnectSession.Listener() {
+                @Override public void stage(String stage, String error) {
+                    if (error != null && !error.isEmpty()) lastFailureCode = error;
+                    if ("connected".equals(stage)) {
+                        running = true;
+                        isRunning = true;
+                        bytesReceived.set(0);
+                        bytesSent.set(0);
+                    }
+                    broadcastStage(stage);
+                }
+
+                @Override public ParcelFileDescriptor establish(
+                        org.infradead.libopenconnect.LibOpenConnect.IPInfo ip) {
+                    try {
+                        if (ip.addr == null || ip.netmask == null || ip.DNS == null
+                                || ip.DNS.isEmpty()) return null;
+                        int prefix = maskToPrefix(ip.netmask);
+                        Builder builder = new Builder()
+                                .setSession(name == null ? "TwinConnect Cisco" : name)
+                                // Mobile outer paths (Wi-Fi/LTE and tunneled
+                                // gateways) can have a lower effective PMTU.
+                                // Large TLS records otherwise hang while tiny
+                                // ICMP packets succeed. Cap only the Android
+                                // TUN MTU; do not modify the server's MTU.
+                                .setMtu(Math.max(1280,
+                                        Math.min(1300, ip.MTU > 0 ? ip.MTU : 1300)))
+                                .addAddress(ip.addr, prefix)
+                                .addRoute("0.0.0.0", 0);
+                        for (String dns : ip.DNS) {
+                            builder.addDnsServer(dns);
+                        }
+                        // Android blocks an address family if the VPN has no
+                        // address, DNS or route for it. Never advertise an
+                        // IPv6 default route unless the gateway assigned a
+                        // usable IPv6 address: that would capture IPv6 traffic
+                        // into an IPv4-only tunnel, blackholing HTTPS.
+                        // Keep IPv6 blocked rather than allowing a cleartext
+                        // bypass on IPv4-only gateways.
+                        if (ip.netmask6 != null && ip.netmask6.contains("/")) {
+                            String[] ipv6 = ip.netmask6.split("/", 2);
+                            builder.addAddress(ipv6[0], Integer.parseInt(ipv6[1]));
+                            builder.addRoute("::", 0);
+                        }
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                            builder.setMetered(false);
+                        }
+                        tunInterface = builder.establish();
+                        assignedVpnIpv4 = tunInterface != null ? ip.addr : "";
+                        return tunInterface;
+                    } catch (Exception ex) {
+                        Log.e(TAG, "Native VPN interface setup failed", ex);
+                        return null;
+                    }
+                }
+
+                @Override public void traffic(long rx, long tx) {
+                    bytesReceived.set(Math.max(0, rx));
+                    bytesSent.set(Math.max(0, tx));
+                }
+            }, username, password, pin, url);
+            nativeSession = session;
+            session.start(url);
+        } catch (LinkageError error) {
+            Log.e(TAG, "Cisco JNI linking failed", error);
+            lastFailureCode = "CISCO_NATIVE_ENGINE_UNAVAILABLE";
+            broadcastStage("error");
+        } catch (Exception error) {
+            Log.e(TAG, "Cisco native bridge failed", error);
+            lastFailureCode = "CISCO_NATIVE_START_FAILED";
+            broadcastStage("error");
+        } finally {
+            nativeSession = null;
+            shutdown();
+            stopSelf();
+        }
+    }
+
+    // ── Connection flow ────────────────────────────────────────────────────────
+
+    private void connectToServer(String serverUrl, String name, String username,
+                                  String password, String authGroup, String servercert) {
+        lastFailureCode = "";
+        broadcastStage("preparing");
+        String failureStage = "CISCO_TLS_OR_SOCKET_FAILED";
+        SSLSocket authSock = null;
+        SSLSocket tunSock  = null;
+        try {
+            // ── Parse host:port from URL ──
+            String host;
+            int    port;
+            String work = serverUrl;
+            if (work.startsWith("https://")) work = work.substring(8);
+            else if (work.startsWith("http://")) work = work.substring(7);
+            int slash = work.indexOf('/');
+            String hostPort = slash >= 0 ? work.substring(0, slash) : work;
+            int colon = hostPort.lastIndexOf(':');
+            if (colon >= 0) {
+                host = hostPort.substring(0, colon);
+                port = Integer.parseInt(hostPort.substring(colon + 1));
+            } else {
+                host = hostPort;
+                port = 443;
+            }
+
+            SSLSocketFactory ssf = buildSslSocketFactory(servercert);
+
+            // Start a Cisco/ocserv authentication session before POST /auth.
+            // The server issues webvpncontext in response to config-auth init.
+            // Never send account credentials before obtaining that context.
+            broadcastStage("authenticating");
+            failureStage = "CISCO_AUTH_INIT_FAILED";
+            authSock = connectProtectedTls(ssf, host, port, servercert);
+            String body0 = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
+                    + "<config-auth client=\"vpn\" type=\"init\">"
+                    + "<version who=\"vpn\">v5.01</version></config-auth>";
+            String authInitRequest = "POST / HTTP/1.1\r\n"
+                    + "Host: " + host + "\r\n"
+                    + "User-Agent: OpenConnect TwinConnect/1.0\r\n"
+                    + "Content-Type: text/xml\r\n"
+                    + "Content-Length: " + body0.getBytes("UTF-8").length + "\r\n"
+                    + "Connection: close\r\n\r\n" + body0;
+            OutputStream initOutput = authSock.getOutputStream();
+            initOutput.write(authInitRequest.getBytes("UTF-8"));
+            initOutput.flush();
+            String initCookies = parseAuthCookie(authSock.getInputStream());
+            safeClose(authSock);
+            authSock = null;
+            if (initCookies == null || !initCookies.contains("webvpncontext=")) {
+                lastFailureCode = "CISCO_AUTH_INIT_CONTEXT_MISSING";
+                broadcastStage("denied");
+                stopSelf();
+                return;
+            }
+
+            // Submit username within the server-issued session.
+            failureStage = "CISCO_AUTH_USERNAME_EXCHANGE_FAILED";
+            authSock = connectProtectedTls(ssf, host, port, servercert);
+            String body1 = "username=" + URLEncoder.encode(username, "UTF-8");
+            if (authGroup != null && !authGroup.isEmpty())
+                body1 += "&group_list=" + URLEncoder.encode(authGroup, "UTF-8");
+
+            String authReq1 = "POST /auth HTTP/1.1\r\n"
+                    + "Host: " + host + "\r\n"
+                    + "Cookie: " + initCookies + "\r\n"
+                    + "User-Agent: AnyConnect Android 4.10.04065\r\n"
+                    + "X-AnyConnect-Platform: android\r\n"
+                    + "Content-Type: application/x-www-form-urlencoded\r\n"
+                    + "Content-Length: " + body1.getBytes("UTF-8").length + "\r\n"
+                    + "Connection: close\r\n\r\n"
+                    + body1;
+
+            OutputStream authOs1 = authSock.getOutputStream();
+            authOs1.write(authReq1.getBytes("UTF-8"));
+            authOs1.flush();
+
+            String contextCookie = parseAuthCookie(authSock.getInputStream());
+            safeClose(authSock);
+            authSock = null;
+
+            if (contextCookie == null || contextCookie.isEmpty()) {
+                Log.e(TAG, "Authentication step 1 failed — no context cookie received");
+                if (lastFailureCode.isEmpty()) lastFailureCode = "CISCO_AUTH_CONTEXT_REJECTED";
+                broadcastStage("denied");
+                stopSelf();
+                return;
+            }
+
+            // Follow the challenge with the password under the new context.
+            failureStage = "CISCO_AUTH_PASSWORD_EXCHANGE_FAILED";
+            authSock = connectProtectedTls(ssf, host, port, servercert);
+
+            String body2 = "password=" + URLEncoder.encode(password, "UTF-8");
+            String authReq2 = "POST /auth HTTP/1.1\r\n"
+                    + "Host: " + host + "\r\n"
+                    + "User-Agent: AnyConnect Android 4.10.04065\r\n"
+                    + "X-AnyConnect-Platform: android\r\n"
+                    + "Cookie: " + contextCookie + "\r\n"
+                    + "Content-Type: application/x-www-form-urlencoded\r\n"
+                    + "Content-Length: " + body2.getBytes("UTF-8").length + "\r\n"
+                    + "Connection: close\r\n\r\n"
+                    + body2;
+
+            OutputStream authOs2 = authSock.getOutputStream();
+            authOs2.write(authReq2.getBytes("UTF-8"));
+            authOs2.flush();
+
+            String sessionCookie = parseAuthCookie(authSock.getInputStream());
+            safeClose(authSock);
+            authSock = null;
+
+            // ocserv CONNECT needs ONLY the webvpn= cookie — strip webvpncontext and webvpnc
+            // A failed login also returns HTTP 200 with webvpncontext= only, so we must
+            // explicitly verify a webvpn= session cookie was issued (auth succeeded).
+            String sessionCookieFull = sessionCookie;
+            sessionCookie = null;
+            if (sessionCookieFull != null) {
+                for (String part : sessionCookieFull.split("; ")) {
+                    if (part.startsWith("webvpn=")) { // exact prefix — not webvpnc= or webvpncontext=
+                        sessionCookie = part;
+                        break;
+                    }
+                }
+            }
+
+            if (sessionCookie == null || sessionCookie.isEmpty()) {
+                Log.e(TAG, "Authentication step 2 failed — no webvpn= session cookie (wrong password or server rejected login)");
+                if (lastFailureCode.isEmpty()) lastFailureCode = "CISCO_AUTH_SESSION_REJECTED";
+                broadcastStage("denied");
+                stopSelf();
+                return;
+            }
+
+            // ── Phase 2: Open CSTP tunnel ──
+            broadcastStage("connecting");
+            failureStage = "CISCO_CSTP_HANDSHAKE_FAILED";
+            tunSock = connectProtectedTls(ssf, host, port, servercert);
+
+            String connectReq = "CONNECT /CSCOSSLC/tunnel HTTP/1.1\r\n"
+                    + "Host: " + host + "\r\n"
+                    + "Cookie: " + sessionCookie + "\r\n"
+                    + "X-CSTP-Version: 1\r\n"
+                    + "X-CSTP-Hostname: android-axevpn\r\n"
+                    + "X-CSTP-Accept-Encoding: identity\r\n"
+                    + "X-CSTP-MTU: 1500\r\n"
+                    + "X-CSTP-Address-Type: IPv4\r\n"
+                    + "X-CSTP-Default-Domain: \r\n"
+                    + "\r\n";
+
+            OutputStream tos = tunSock.getOutputStream();
+            tos.write(connectReq.getBytes("UTF-8"));
+            tos.flush();
+
+            VpnTunnelConfig cfg = parseTunnelHeaders(tunSock.getInputStream());
+            if (cfg == null) {
+                Log.e(TAG, "Tunnel setup failed — no VPN config in CONNECT response");
+                lastFailureCode = "CISCO_CSTP_CONFIG_MISSING";
+                broadcastStage("error");
+                safeClose(tunSock);
+                stopSelf();
+                return;
+            }
+
+            // ── Phase 3: TUN interface ──
+            failureStage = "CISCO_TUN_INTERFACE_FAILED";
+            tunInterface = buildVpnInterface(cfg, name);
+            if (tunInterface == null) {
+                Log.e(TAG, "TUN interface build failed");
+                lastFailureCode = "CISCO_TUN_INTERFACE_FAILED";
+                broadcastStage("error");
+                safeClose(tunSock);
+                stopSelf();
+                return;
+            }
+
+            // ── Phase 4: Forward packets ──
+            this.tunnelSocket = tunSock;
+            running = true;
+            bytesReceived.set(0);
+            bytesSent.set(0);
+            isRunning = true;
+            // startForeground() was already called in onStartCommand().
+            lastFailureCode = "";
+            broadcastStage("connected");
+            forwardPackets(tunSock.getInputStream(), tos, cfg.mtu > 0 ? cfg.mtu : 1406);
+
+        } catch (Exception e) {
+            // Only expose safe error categories; never expose credentials.
+            Log.e(TAG, "Connection error", e);
+            if (e instanceof javax.net.ssl.SSLHandshakeException ||
+                e instanceof javax.net.ssl.SSLPeerUnverifiedException) {
+                lastFailureCode = "CISCO_TLS_HANDSHAKE_FAILED";
+            } else if (e instanceof java.net.SocketTimeoutException) {
+                lastFailureCode = "CISCO_SOCKET_TIMEOUT";
+            } else if (e instanceof java.net.UnknownHostException) {
+                lastFailureCode = "CISCO_DNS_RESOLUTION_FAILED";
+            } else if (e instanceof java.net.ConnectException) {
+                lastFailureCode = "CISCO_GATEWAY_UNREACHABLE";
+            } else if (e instanceof java.io.EOFException) {
+                lastFailureCode = "CISCO_AUTH_RESPONSE_INCOMPLETE";
+            } else if (e instanceof java.io.IOException &&
+                       "CISCO_SOCKET_PROTECTION_FAILED".equals(e.getMessage())) {
+                lastFailureCode = "CISCO_SOCKET_PROTECTION_FAILED";
+            } else if (e instanceof javax.net.ssl.SSLException) {
+                lastFailureCode = "CISCO_TLS_HANDSHAKE_FAILED";
+            } else if (e instanceof java.net.SocketException) {
+                lastFailureCode = "CISCO_SOCKET_IO_FAILED";
+            } else if (e instanceof IllegalArgumentException &&
+                       "CISCO_CERT_PIN_INVALID".equals(e.getMessage())) {
+                lastFailureCode = "CISCO_CERT_PIN_INVALID";
+            } else if (lastFailureCode.isEmpty()) {
+                lastFailureCode = failureStage;
+            }
+            broadcastStage("error");
+        } finally {
+            safeClose(authSock);
+            safeClose(tunSock);
+            shutdown();
+            stopSelf();
+        }
+    }
+
+    // ── SSL socket factory (with optional SHA-256 certificate pinning) ──────────
+
+    private SSLSocketFactory buildSslSocketFactory(final String servercert) {
+        final byte[] pin = parseCertPin(servercert);
+        if (pin == null) {
+            if (servercert != null && !servercert.isEmpty()) {
+                throw new IllegalArgumentException("CISCO_CERT_PIN_INVALID");
+            }
+            // Default Android platform CA trust when no explicit pin is set.
+            // Socket hostname verification is enabled before TLS handshake.
+            return (SSLSocketFactory) SSLSocketFactory.getDefault();
+        }
+        TrustManager[] tms = new TrustManager[]{new X509TrustManager() {
+            @Override public void checkClientTrusted(X509Certificate[] c, String a) {}
+            @Override
+            public void checkServerTrusted(X509Certificate[] chain, String authType)
+                    throws java.security.cert.CertificateException {
+                if (pin == null) throw new java.security.cert.CertificateException("CISCO_CERT_PIN_INVALID");
+                for (X509Certificate cert : chain) {
+                    try {
+                        MessageDigest md = MessageDigest.getInstance("SHA-256");
+                        // Try SPKI (public key) hash — matches pin-sha256: format
+                        byte[] spkiHash = md.digest(cert.getPublicKey().getEncoded());
+                        if (Arrays.equals(spkiHash, pin)) return;
+                        // Also try full certificate hash — matches hex fingerprint format
+                        md.reset();
+                        byte[] certHash = md.digest(cert.getEncoded());
+                        if (Arrays.equals(certHash, pin)) return;
+                    } catch (Exception e) {
+                        throw new java.security.cert.CertificateException(e);
+                    }
+                }
+                throw new java.security.cert.CertificateException("Certificate pin mismatch");
+            }
+            @Override public X509Certificate[] getAcceptedIssuers() { return new X509Certificate[0]; }
+        }};
+        try {
+            SSLContext ctx = SSLContext.getInstance("TLS");
+            ctx.init(null, tms, new SecureRandom());
+            return ctx.getSocketFactory();
+        } catch (Exception e) {
+            Log.e(TAG, "Pinned TLS initialization failed", e);
+            throw new IllegalStateException("CISCO_TLS_PIN_ENGINE_FAILED", e);
+        }
+    }
+
+    /** Protect the underlying TCP socket BEFORE connecting to the gateway.
+     * Protecting an already-connected TLS socket is too late during reconnect,
+     * and can accidentally route the VPN control channel through its own TUN.
+     */
+    private SSLSocket connectProtectedTls(
+            SSLSocketFactory factory, String host, int port, String pin)
+            throws IOException {
+        // An InetSocketAddress(host, port) attempts only one selected IP.
+        // Some Android networks resolve AAAA before A even when IPv6 is
+        // unreachable. Try all resolved addresses, but *never* retry after
+        // certificate validation fails. Each socket is protected before TCP.
+        final InetAddress[] addresses = InetAddress.getAllByName(host);
+        IOException connectError = null;
+        for (InetAddress address : addresses) {
+            java.net.Socket base = new java.net.Socket();
+            try {
+                if (!protect(base)) {
+                    throw new IOException("CISCO_SOCKET_PROTECTION_FAILED");
+                }
+                base.connect(new java.net.InetSocketAddress(address, port), 6000);
+            } catch (IOException error) {
+                try { base.close(); } catch (IOException ignored) {}
+                // VPN permission errors are not an address-family problem.
+                if ("CISCO_SOCKET_PROTECTION_FAILED".equals(error.getMessage())) {
+                    throw error;
+                }
+                connectError = error;
+                continue;
+            }
+            try {
+                // Preserve original DNS hostname for SNI and TLS validation,
+                // rather than treating the selected IP as the certificate name.
+                SSLSocket tls = (SSLSocket) factory.createSocket(base, host, port, true);
+                tls.setSoTimeout(12000);
+                requireVerifiedHost(tls, pin);
+                tls.startHandshake();
+                return tls;
+            } catch (IOException | RuntimeException error) {
+                try { base.close(); } catch (IOException ignored) {}
+                throw error; // Fail closed on TLS/certificate verification.
+            }
+        }
+        if (connectError != null) throw connectError;
+        throw new java.net.UnknownHostException("CISCO_GATEWAY_DNS_EMPTY");
+    }
+
+    /** Enforce DNS/IP hostname verification for CA-trusted (unpinned) TLS. */
+    private void requireVerifiedHost(SSLSocket socket, String pin) {
+        if (pin == null || pin.isEmpty()) {
+            SSLParameters parameters = socket.getSSLParameters();
+            parameters.setEndpointIdentificationAlgorithm("HTTPS");
+            socket.setSSLParameters(parameters);
+        }
+    }
+
+    /** Parse pin-sha256:BASE64 or 64-hex-char fingerprint → raw bytes, or null. */
+    private byte[] parseCertPin(String servercert) {
+        if (servercert == null || servercert.isEmpty()) return null;
+        try {
+            if (servercert.startsWith("pin-sha256:"))
+                return android.util.Base64.decode(servercert.substring(11), android.util.Base64.DEFAULT);
+            String hex = servercert.replace(":", "").replace(" ", "");
+            if (hex.length() == 64) {
+                byte[] b = new byte[32];
+                for (int i = 0; i < 32; i++)
+                    b[i] = (byte) Integer.parseInt(hex.substring(i * 2, i * 2 + 2), 16);
+                return b;
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Invalid server certificate pin");
+        }
+        return null;
+    }
+
+    // ── Auth response ──────────────────────────────────────────────────────────
+
+    /** Read HTTP response from auth POST; return concatenated session cookies or null. */
+    private String parseAuthCookie(InputStream is) throws IOException {
+        String statusLine = readLine(is);
+        if (statusLine == null) return null;
+        int code = -1;
+        String[] parts = statusLine.split(" ", 3);
+        if (parts.length >= 2) { try { code = Integer.parseInt(parts[1].trim()); } catch (Exception ignored) {} }
+        if (code != 200) {
+            // We need response headers only. Never block consuming a
+            // keep-alive body when the server rejects the request.
+            Log.e(TAG, "Auth HTTP " + code);
+            return null;
+        }
+
+        StringBuilder cookies = new StringBuilder();
+        boolean xmlChallenge = false;
+        String line;
+        while ((line = readLine(is)) != null && !line.isEmpty()) {
+            if (line.toLowerCase(Locale.US).startsWith("content-type:") &&
+                line.toLowerCase(Locale.US).contains("xml")) {
+                xmlChallenge = true;
+            }
+            if (line.toLowerCase(Locale.US).startsWith("set-cookie:")) {
+                String cookie = line.substring(11).trim();
+                int sc = cookie.indexOf(';');
+                if (sc >= 0) cookie = cookie.substring(0, sc).trim();
+                // Skip empty-value cookies (e.g. clearing cookies like webvpnc=)
+                int eq = cookie.indexOf('=');
+                if (eq < 0 || cookie.substring(eq + 1).isEmpty()) continue;
+                if (cookies.length() > 0) cookies.append("; ");
+                cookies.append(cookie);
+            }
+        }
+        // Session cookies are in headers; consuming the response body
+        // can block on keep-alive and incorrectly fail a valid auth-init.
+        if (cookies.length() == 0 && xmlChallenge) {
+            // This custom client cannot process standard config-auth forms.
+            // Do not retry credentials blindly.
+            lastFailureCode = "CISCO_AUTH_XML_CHALLENGE_UNSUPPORTED";
+        }
+        return cookies.length() > 0 ? cookies.toString() : null;
+    }
+
+    // ── Tunnel CONNECT response ────────────────────────────────────────────────
+
+    private static class VpnTunnelConfig {
+        String address;
+        String netmask = "255.255.0.0";
+        int    prefix  = 16;
+        String dns;
+        String dns2;
+        int    mtu     = 1406;
+    }
+
+    private VpnTunnelConfig parseTunnelHeaders(InputStream is) throws IOException {
+        String status = readLine(is);
+        if (status == null || !status.contains("200")) {
+            Log.e(TAG, "CONNECT failed: " + status);
+            drainAll(is);
+            return null;
+        }
+        VpnTunnelConfig cfg = new VpnTunnelConfig();
+        String line;
+        while ((line = readLine(is)) != null && !line.isEmpty()) {
+            Log.d(TAG, "tunnel hdr: [" + line + "]");
+            String lower = line.toLowerCase(Locale.US);
+            if (lower.startsWith("x-cstp-address:"))
+                cfg.address = line.substring(15).trim();
+            else if (lower.startsWith("x-cstp-netmask:")) {
+                cfg.netmask = line.substring(15).trim();
+                cfg.prefix  = maskToPrefix(cfg.netmask);
+            } else if (lower.startsWith("x-cstp-dns:")) {
+                if (cfg.dns == null) cfg.dns = line.substring(11).trim();
+                else                 cfg.dns2 = line.substring(11).trim();
+            } else if (lower.startsWith("x-cstp-mtu:")) {
+                try { cfg.mtu = Integer.parseInt(line.substring(11).trim()); } catch (Exception ignored) {}
+            }
+        }
+        if (cfg.address == null || cfg.address.isEmpty()) {
+            Log.e(TAG, "No X-CSTP-Address in response"); return null;
+        }
+        return cfg;
+    }
+
+    private int maskToPrefix(String mask) {
+        try {
+            byte[] b = InetAddress.getByName(mask).getAddress();
+            int p = 0; for (byte x : b) p += Integer.bitCount(x & 0xFF);
+            return p;
+        } catch (Exception e) { return 24; }
+    }
+
+    // ── TUN interface ──────────────────────────────────────────────────────────
+
+    private ParcelFileDescriptor buildVpnInterface(VpnTunnelConfig cfg, String name) {
+        try {
+            // The control socket was individually protected with VpnService.protect().
+            // Never bypass the TwinConnect app: HTTPS reachability probes MUST
+            // traverse the same VPN routing as user applications.
+            if (cfg.dns == null && cfg.dns2 == null) {
+                throw new IllegalStateException("CISCO_DNS_MISSING");
+            }
+            Builder b = new Builder();
+            b.setSession(name != null ? name : "TwinConnect Cisco")
+             .setMtu(cfg.mtu)
+             .addAddress(cfg.address, cfg.prefix)
+             .addRoute("0.0.0.0", 0)
+             // CSTP backend currently provides IPv4 only. Capture and
+             // blackhole IPv6 rather than allowing a cleartext IPv6 bypass.
+             .addRoute("::", 0);
+            if (cfg.dns != null) b.addDnsServer(cfg.dns);
+            if (cfg.dns2 != null) b.addDnsServer(cfg.dns2);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) b.setMetered(false);
+            return b.establish();
+        } catch (Exception e) {
+            Log.e(TAG, "TUN build failed", e); return null;
+        }
+    }
+
+    // ── CSTP packet forwarding ─────────────────────────────────────────────────
+    //
+    // CSTP data packet layout (8-byte header):
+    //   [0] 0x00  [1] 0x00  [2] len_hi  [3] len_lo  [4] type  [5][6][7] 0x00
+    //
+    private void forwardPackets(InputStream sockIn, OutputStream sockOut, int mtu) {
+        // TUN → socket thread
+        Thread tunToSock = new Thread(() -> {
+            byte[] pkt = new byte[mtu];
+            byte[] frm = new byte[mtu + CSTP_HDR];
+            // establish() opens the TUN fd with O_NONBLOCK. Use Os.poll() to block
+            // until a packet is available so we don't busy-spin or exit prematurely.
+            android.system.StructPollfd[] pollFds = {new android.system.StructPollfd()};
+            pollFds[0].fd = tunInterface.getFileDescriptor();
+            pollFds[0].events = (short) android.system.OsConstants.POLLIN;
+            try (FileInputStream fis = new FileInputStream(tunInterface.getFileDescriptor())) {
+                while (running) {
+                    try {
+                        android.system.Os.poll(pollFds, 500);
+                    } catch (android.system.ErrnoException e) {
+                        if (e.errno == android.system.OsConstants.EINTR) continue;
+                        Log.e(TAG, "TUN poll error, errno=" + e.errno); break;
+                    }
+                    if ((pollFds[0].revents & android.system.OsConstants.POLLIN) == 0) continue;
+                    int n = fis.read(pkt, 0, mtu);
+                    if (n < 0) {
+                        Log.e(TAG, "TUN→socket: TUN fd read returned " + n + ", exiting");
+                        break;
+                    }
+                    if (n == 0) continue;
+                    // Build outgoing STF frame: sync[0-3], lenH[4], lenL[5], type[6], reserved[7]
+                    frm[0] = CSTP_SYNC[0]; frm[1] = CSTP_SYNC[1];
+                    frm[2] = CSTP_SYNC[2]; frm[3] = CSTP_SYNC[3];
+                    frm[4] = (byte) (n >> 8); frm[5] = (byte) (n & 0xFF);
+                    frm[6] = CSTP_DATA;    frm[7] = 0;
+                    System.arraycopy(pkt, 0, frm, CSTP_HDR, n);
+                    synchronized (sockOut) {
+                        sockOut.write(frm, 0, CSTP_HDR + n);
+                        sockOut.flush();
+                        bytesSent.addAndGet(n);
+                    }
+                }
+            } catch (Exception e) {
+                if (running) Log.e(TAG, "TUN→socket error", e);
+            }
+            running = false;
+        }, "oc-tun-to-sock");
+
+            // Socket → TUN thread
+        Thread sockToTun = new Thread(() -> {
+            byte[] hdr  = new byte[CSTP_HDR];
+            // Pre-built DPD response frame with correct STF sync
+            byte[] dpdResp = {CSTP_SYNC[0], CSTP_SYNC[1], CSTP_SYNC[2], CSTP_SYNC[3],
+                              0x00, 0x00, (byte) CSTP_DPD_RESP, 0x00};
+            try (FileOutputStream fos = new FileOutputStream(tunInterface.getFileDescriptor())) {
+                while (running) {
+                    if (!readFully(sockIn, hdr, CSTP_HDR)) {
+                        Log.e(TAG, "socket\u2192TUN: EOF reading CSTP header (server closed connection)");
+                        break;
+                    }
+                    // Validate CSTP sync bytes and dump raw header for diagnostics
+                    if (hdr[0] != CSTP_SYNC[0] || hdr[1] != CSTP_SYNC[1]
+                            || hdr[2] != CSTP_SYNC[2] || hdr[3] != CSTP_SYNC[3]) {
+                        Log.e(TAG, String.format(
+                                "Invalid STF sync: %02x %02x %02x %02x — stream misaligned",
+                                hdr[0]&0xFF, hdr[1]&0xFF, hdr[2]&0xFF, hdr[3]&0xFF));
+                        break;
+                    }
+                    // Real STF header: sync[0-3], lenH[4], lenL[5], type[6], reserved[7]
+                    int dataLen = ((hdr[4] & 0xFF) << 8) | (hdr[5] & 0xFF);
+                    int type    = hdr[6] & 0xFF;
+                    if (dataLen > 65535) {
+                        Log.e(TAG, "Bogus CSTP length " + dataLen); break;
+                    }
+                    byte[] data = new byte[dataLen];
+                    if (dataLen > 0 && !readFully(sockIn, data, dataLen)) {
+                        Log.e(TAG, "socket\u2192TUN: EOF reading CSTP data (expected " + dataLen + " bytes)");
+                        break;
+                    }
+                    switch (type) {
+                        case CSTP_DATA:
+                            fos.write(data);
+                            bytesReceived.addAndGet(data.length);
+                            break;
+                        case CSTP_DPD_REQ:
+                            synchronized (sockOut) {
+                                sockOut.write(dpdResp);
+                                sockOut.flush();
+                            }
+                            break;
+                        case CSTP_DISCONNECT:
+                            Log.i(TAG, "Server requested disconnect");
+                            running = false;
+                            break;
+                        default:
+                            Log.w(TAG, "Unknown CSTP type " + type + ", skipping");
+                            break;
+                    }
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "socket\u2192TUN error", e);
+            }
+            running = false;
+        }, "oc-sock-to-tun");
+
+        tunToSock.start();
+        sockToTun.start();
+        try { sockToTun.join(); } catch (InterruptedException ignored) {}
+        running = false;
+        try { tunToSock.join(2000); } catch (InterruptedException ignored) {}
+    }
+
+    // ── Teardown ───────────────────────────────────────────────────────────────
+
+    private void shutdown() {
+        assignedVpnIpv4 = "";
+        NativeOpenConnectSession session = nativeSession;
+        if (session != null) session.stopSession();
+        running = false;
+        isRunning = false;
+        safeClose(tunnelSocket);
+        tunnelSocket = null;
+        if (tunInterface != null) {
+            try { tunInterface.close(); } catch (Exception ignored) {}
+            tunInterface = null;
+        }
+        try { stopForeground(true); } catch (Exception ignored) {}
+        // A failed authentication/TLS/TUN startup is followed immediately by
+        // shutdown(). Do not overwrite the failure with "disconnected" before
+        // Flutter's polling loop has a chance to read it. Otherwise every
+        // error looks like a generic connection timeout.
+        if (lastFailureCode != null && !lastFailureCode.isEmpty()) {
+            broadcastStage("error");
+        } else {
+            broadcastStage("disconnected");
+        }
+    }
+
+    // ── Utilities ──────────────────────────────────────────────────────────────
+
+    private String readLine(InputStream is) throws IOException {
+        StringBuilder sb = new StringBuilder();
+        int c;
+        while ((c = is.read()) >= 0) {
+            if (c == '\r') { is.read(); return sb.toString(); }
+            if (c == '\n') return sb.toString();
+            sb.append((char) c);
+        }
+        return sb.length() > 0 ? sb.toString() : null;
+    }
+
+    private boolean readFully(InputStream is, byte[] buf, int len) throws IOException {
+        int off = 0;
+        while (off < len) {
+            int n = is.read(buf, off, len - off);
+            if (n < 0) return false;
+            off += n;
+        }
+        return true;
+    }
+
+    private void drainAll(InputStream is) {
+        try { byte[] b = new byte[512]; is.read(b); } catch (Exception ignored) {}
+    }
+
+    private void safeClose(SSLSocket s) {
+        if (s != null) try { s.close(); } catch (Exception ignored) {}
+    }
+
+    private void broadcastStage(String stage) {
+        Log.d(TAG, "broadcastStage: " + stage);
+        Intent i = new Intent(BROADCAST_STAGE);
+        i.putExtra(EXTRA_STAGE, stage);
+        // setPackage() is required on Android 14+ so the broadcast reaches
+        // a RECEIVER_NOT_EXPORTED receiver registered in the same app.
+        i.setPackage(getPackageName());
+        sendBroadcast(i);
+    }
+
+    // ── Notification ──────────────────────────────────────────────────────────
+
+    private Notification buildNotification(String tunnelName) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel ch = new NotificationChannel(
+                    CHANNEL_ID,
+                    "TwinConnect VPN",
+                    NotificationManager.IMPORTANCE_LOW);
+            ch.setDescription("Active Cisco VPN connection");
+            ((NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE))
+                    .createNotificationChannel(ch);
+        }
+
+        // Disconnect action – fires ACTION_DISCONNECT back to this service.
+        Intent disconnectIntent = new Intent(this, AxeOpenConnectVpnService.class);
+        disconnectIntent.setAction(ACTION_DISCONNECT);
+        int piFlags = android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M
+                ? android.app.PendingIntent.FLAG_IMMUTABLE | android.app.PendingIntent.FLAG_UPDATE_CURRENT
+                : android.app.PendingIntent.FLAG_UPDATE_CURRENT;
+        android.app.PendingIntent disconnectPi =
+                android.app.PendingIntent.getService(this, 0, disconnectIntent, piFlags);
+
+        return new NotificationCompat.Builder(this, CHANNEL_ID)
+                .setContentTitle("TwinConnect Cisco connected")
+                .setContentText(tunnelName)
+                .setSmallIcon(android.R.drawable.ic_lock_lock)
+                .setPriority(NotificationCompat.PRIORITY_LOW)
+                .setOngoing(true)
+                .addAction(0, "Disconnect", disconnectPi)
+                .build();
+    }
+}

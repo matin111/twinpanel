@@ -24,4 +24,4 @@ jobs:
         run: |
           python -m py_compile backend/app/singbox_subscription_accounts.py backend/tests/singbox_idempotent_batch_v1_smoke.py
       - name: Exercise batch idempotency and rollback boundaries
-        run: python backend/tests/singbox_idempotent_batch_v1_smoke.py
+        run: PYTHONPATH=backend python backend/tests/singbox_idempotent_batch_v1_smoke.py

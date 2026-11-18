@@ -1,0 +1,232 @@
+name: TwinConnect OpenConnect Native Core (experimental)
+
+on:
+  workflow_call:
+    inputs:
+      core_only:
+        type: boolean
+        required: false
+        default: false
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/twinconnect-openconnect-native-core.yml'
+      - 'clients/twinconnect/native/android/**'
+      - 'clients/twinconnect/tools/install_android_native.py'
+      - 'clients/twinconnect/lib/android_cisco_tunnel.dart'
+
+permissions:
+  contents: read
+
+jobs:
+  native-openconnect-arm64:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Checkout TwinPanel
+        uses: actions/checkout@v4
+
+      - name: Locate Android SDK command-line tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
+          test -n "${SDK_ROOT}"
+          SDKMANAGER="${SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager"
+          if [[ ! -x "${SDKMANAGER}" ]]; then
+            SDKMANAGER="$(find "${SDK_ROOT}/cmdline-tools" -type f -name sdkmanager -print -quit 2>/dev/null || true)"
+          fi
+          test -n "${SDKMANAGER}" && test -x "${SDKMANAGER}"
+          echo "SDKMANAGER=${SDKMANAGER}" >> "${GITHUB_ENV}"
+          "${SDKMANAGER}" --version
+
+      - name: Install Android NDK
+        run: |
+          yes | "${SDKMANAGER}" --licenses >/dev/null || true
+          "${SDKMANAGER}" --install "ndk;27.2.12479018"
+
+      - name: Install native build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y autoconf automake libtool pkg-config gettext autopoint             bison flex make gcc g++ cmake ninja-build libxml2-dev libgmp-dev             libgnutls28-dev zlib1g-dev liblzma-dev
+
+      - name: Fetch pinned GPLv2 OpenConnect Android source
+        run: |
+          git clone --no-checkout https://github.com/pengyue-polaron/oconnect-android.git upstream
+          cd upstream
+          git checkout --detach 8cc4fa6c0027e9021e81127b6980a6b352af1368
+          git submodule update --init --recursive
+          git status --porcelain
+
+      - name: Fix upstream cross-compiler sysroot for modern NDK
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          paths = [
+              Path("upstream/external/Makefile"),
+              Path("upstream/external/openconnect/android/Makefile"),
+          ]
+          for path in paths:
+              source = path.read_text()
+              old = "--sysroot=$(OC_SYSROOT)/.."
+              if path.name == "Makefile" and path.parent.name == "external":
+                  old = "--sysroot=$(call get_oc_sysroot,$(1))/.."
+              if old not in source:
+                  raise SystemExit(f"Unexpected upstream toolchain layout in {path}")
+              source = source.replace(old, "--sysroot=$(TOOLCHAIN)/sysroot")
+              path.write_text(source)
+              print(f"Patched NDK sysroot in {path}")
+
+          # Nettle must link against the freshly built target GMP, not
+          # the host installation. Otherwise hogweed support is disabled.
+          nettle_makefile = Path("upstream/external/openconnect/android/Makefile")
+          source = nettle_makefile.read_text()
+          original = "cd $(NETTLE_BUILD) && ../../$(NETTLE_SRC)/configure $(CONFIGURE_ARGS)"
+          patched = (
+              'cd $(NETTLE_BUILD) && ../../$(NETTLE_SRC)/configure $(CONFIGURE_ARGS) '
+              'CPPFLAGS="-I$(OC_SYSROOT)/include" '
+              'LDFLAGS="-L$(OC_SYSROOT)/lib"'
+          )
+          if source.count(original) != 1:
+              raise SystemExit("Unexpected Nettle configure recipe")
+          source = source.replace(original, patched)
+          nettle_makefile.write_text(source)
+          print("Patched target GMP include and library search paths for Nettle")
+
+          # GnuTLS independently checks for -lgmp after detecting hogweed.
+          # Use the target GMP archive from the local cross-build sysroot.
+          source = nettle_makefile.read_text()
+          original = 'cd $(GNUTLS_BUILD) && ../../$(GNUTLS_SRC)/configure $(CONFIGURE_ARGS) \\'
+          patched = (
+              'cd $(GNUTLS_BUILD) && ../../$(GNUTLS_SRC)/configure $(CONFIGURE_ARGS) \\'
+              '\n\t\tCPPFLAGS="-I$(OC_SYSROOT)/include" \\'
+              '\n\t\tLDFLAGS="-L$(OC_SYSROOT)/lib" \\'
+          )
+          if source.count(original) != 1:
+              raise SystemExit("Unexpected GnuTLS configure recipe")
+          nettle_makefile.write_text(source.replace(original, patched))
+          print("Patched GnuTLS target GMP link search path")
+
+          # cURL's configure link test uses static target crypto libs.
+          # Those libraries live in the Android OpenConnect sysroot, not
+          # in the default NDK sysroot library search directories.
+          external_makefile = Path("upstream/external/Makefile")
+          source = external_makefile.read_text()
+          old_curl = 'LDFLAGS="-fPIE -pie $(ANDROID_LDFLAGS)"'
+          new_curl = 'LDFLAGS="-fPIE -pie -L$(call get_oc_sysroot,$*)/lib $(ANDROID_LDFLAGS)"'
+          if source.count(old_curl) != 1:
+              raise SystemExit("Unexpected upstream curl linker flags")
+          external_makefile.write_text(source.replace(old_curl, new_curl))
+          print("Added Android target crypto library path to cURL link tests")
+          PY
+
+      - name: Build actual libopenconnect for arm64
+        run: |
+          # Do not override PREFIX globally: the GMP cross-compiler setup
+          # depends on upstream's own per-library sysroot prefixes.
+          # LZ4's nested "make install" otherwise writes to /usr/local/bin.
+          ANDROID_SYSROOT="${GITHUB_WORKSPACE}/upstream/external/openconnect/android/aarch64-linux-android/sysroot/usr"
+          # IMPORTANT: never create ANDROID_SYSROOT before the upstream make.
+          # Its sysroot target initializes NDK headers and applies the pinned
+          # 00-time.h.patch for Android API < 35 / mktime_z.
+          test ! -e "${ANDROID_SYSROOT}" || { echo "Unexpected precreated sysroot"; exit 1; }
+          make -C upstream/external install-arch-arm64 \
+            ANDROID_NDK="${ANDROID_HOME}/ndk/27.2.12479018" \
+            BINDIR="${ANDROID_SYSROOT}/bin"
+          test -s upstream/app/src/main/jniLibs/arm64-v8a/libopenconnect.so
+          readelf -h upstream/app/src/main/jniLibs/arm64-v8a/libopenconnect.so | grep -q AArch64
+
+      - name: Diagnose native configure and compile failures
+        if: failure()
+        shell: bash
+        run: |
+          for file in upstream/external/arm64/build-curl/config.log upstream/external/openconnect/android/aarch64-linux-android/gnutls/config.log; do
+            if [[ -f "${file}" ]]; then
+              echo "::group::${file} (last 180 lines)"
+              tail -n 180 "${file}"
+              echo "::endgroup::"
+            fi
+          done
+
+      - name: Upload native core for subsequent integration testing
+        uses: actions/upload-artifact@v4
+        with:
+          name: openconnect-arm64-native-core-experimental
+          path: upstream/app/src/main/jniLibs/arm64-v8a/
+          if-no-files-found: error
+          retention-days: 3
+
+      - name: Use JDK 21 for Android Gradle and Lint
+        if: ${{ !inputs.core_only }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Setup Flutter for experimental native Cisco APK
+        if: ${{ !inputs.core_only }}
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Verify Gradle Java runtime supports Java 21 APIs
+        if: ${{ !inputs.core_only }}
+        shell: bash
+        run: |
+          java -version
+          test "$(java -XshowSettings:properties -version 2>&1 | sed -n 's/.*java.specification.version = //p' | head -1)" = "21"
+          echo "JAVA_HOME=${JAVA_HOME}"
+
+      - name: Generate experimental Android scaffold and include native core
+        if: ${{ !inputs.core_only }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd clients/twinconnect
+          flutter create --platforms=android --org com.twinpanel --project-name twinconnect .
+          python -m pip install --user Pillow==11.3.0
+          python tools/install_android_native.py
+          dest="android/app/src/main/jniLibs/arm64-v8a"
+          mkdir -p "$dest"
+          cp "$GITHUB_WORKSPACE"/upstream/app/src/main/jniLibs/arm64-v8a/*.so "$dest/"
+          test -s "$dest/libopenconnect.so"
+          test -s "$dest/libstoken.so"
+          test -s android/app/src/main/java/org/infradead/libopenconnect/LibOpenConnect.java
+          test -s android/app/src/main/java/com/axevpn/flutter/openconnect/NativeOpenConnectSession.java
+          grep -F -- '-keep class org.infradead.libopenconnect.** { *; }' android/app/proguard-rules.pro
+          grep -F -- '-keep class com.axevpn.flutter.openconnect.NativeOpenConnectSession { *; }' android/app/proguard-rules.pro
+          grep -F 'proguardFiles("proguard-rules.pro")' android/app/build.gradle.kts
+
+      - name: Validate experimental Android native integration
+        if: ${{ !inputs.core_only }}
+        working-directory: clients/twinconnect
+        run: |
+          flutter pub get
+          flutter analyze --no-fatal-infos
+          flutter test --reporter expanded
+
+      - name: Build experimental arm64 native Cisco APK
+        if: ${{ !inputs.core_only }}
+        working-directory: clients/twinconnect
+        env:
+          TWINCONNECT_DIRECTORY_URLS: ${{ vars.TWINCONNECT_DIRECTORY_URLS || 'https://panel.matindnspro.sbs,https://167-104-219-168.sslip.io' }}
+        run: |
+          flutter build apk --release --split-per-abi --target-platform android-arm64 "--dart-define=TWINCONNECT_DIRECTORY_URLS=$TWINCONNECT_DIRECTORY_URLS" "--dart-define=TWINCONNECT_BUILD_ID=$GITHUB_SHA"
+
+      - name: Report actual release APK size and native library footprint
+        if: ${{ !inputs.core_only }}
+        working-directory: clients/twinconnect
+        shell: bash
+        run: |
+          python3 tools/report_android_apk_size.py build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+
+      - name: Upload native Cisco experimental Android APK
+        if: ${{ !inputs.core_only }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: twinconnect-android-arm64-native-openconnect-test-apk
+          path: clients/twinconnect/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+          if-no-files-found: error
+          retention-days: 3

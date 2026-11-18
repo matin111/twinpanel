@@ -9,7 +9,12 @@ import 'package:flutter/services.dart';
 import 'android_connection_strings.dart';
 import 'android_tunnel.dart';
 import 'android_singbox_tunnel.dart';
+import 'android_mieru_tunnel.dart';
+import 'android_amneziawg_tunnel.dart';
+import 'android_xray_tunnel.dart';
+import 'android_openvpn_tunnel.dart';
 import 'cisco_openconnect_profile.dart';
+import 'android_cisco_tunnel.dart';
 import 'app_strings.dart';
 import 'native_vpn_bridge.dart';
 import 'protocols.dart';
@@ -17,6 +22,7 @@ import 'tenant_api.dart';
 import 'tenant_models.dart';
 import 'server_inventory.dart';
 import 'vpn_policy_store.dart';
+import 'vpn_policy.dart';
 import 'twinconnect_wave_indicator.dart';
 
 /// A real WireGuard-native Android action, never a fake Cisco proxy.
@@ -32,6 +38,7 @@ class AndroidConnectionCard extends StatefulWidget {
     required this.native,
     this.selectedNodeId,
     this.selectedProtocolCode,
+    this.selectedInboundId,
     this.servers,
     this.subscriptionContent,
     super.key,
@@ -46,6 +53,7 @@ class AndroidConnectionCard extends StatefulWidget {
   final String? selectedNodeId;
   /// The server screen owns protocol selection, not the connect screen.
   final String? selectedProtocolCode;
+  final String? selectedInboundId;
   final AppServerInventory? servers;
   final Widget? subscriptionContent;
 
@@ -60,8 +68,11 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
   bool _busy = false;
   bool _up = false;
   bool _ciscoUp = false;
+  bool _openVpnUp = false;
+  bool _xrayCoreUp = false;
   String? _singBoxProtocol;
-  bool _singBoxVerified = false;
+  bool _mieruUp = false;
+  bool _mieruEngineReady = false;
   String? _errorCode;
   AppServer? _activeServer;
   String? _activeServerName;
@@ -73,18 +84,43 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
   int? _rxBytes, _txBytes;
   double? _downloadBps, _uploadBps;
   DateTime? _lastCountersAt;
+  DateTime? _connectedSince;
   String? _publicIp;
   int? _httpsLatencyMs;
+  String? _httpsProbeError;
   bool _checkingInternet = false;
   DateTime? _lastInternetCheck;
+  int _networkProbeGeneration = 0;
 
   @override
   void initState() {
     super.initState();
+    _restoreNativeXraySession();
+    unawaited(_refreshMieruCapability());
     unawaited(_refresh());
     _telemetryTimer = Timer.periodic(const Duration(seconds: 2), (_) {
       unawaited(_refresh());
     });
+  }
+
+  @override
+  void didUpdateWidget(covariant AndroidConnectionCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Node inventory may arrive after the view is first mounted.
+    if (oldWidget.servers != widget.servers) {
+      _restoreNativeXraySession();
+    }
+  }
+
+  void _restoreNativeXraySession() {
+    final native = AndroidXrayTunnel.instance;
+    final nodeId = native.activeNodeId;
+    if (!native.isConnected || nodeId == null) return;
+    final node = widget.servers?.servers
+        .where((server) => server.id == nodeId).firstOrNull;
+    _xrayCoreUp = true;
+    _activeServer = node;
+    _activeServerName = node?.name;
   }
 
   @override
@@ -106,17 +142,19 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
   }
 
   void _clearTelemetry() {
+    _networkProbeGeneration++;
     _rxBytes = null;
     _txBytes = null;
     _downloadBps = null;
     _uploadBps = null;
     _lastCountersAt = null;
+    _connectedSince = null;
     _rxSamples.clear();
     _txSamples.clear();
     _handshake = false;
-    _singBoxVerified = false;
     _publicIp = null;
     _httpsLatencyMs = null;
+    _httpsProbeError = null;
     _lastInternetCheck = null;
     _activeServer = null;
     _activeServerName = null;
@@ -126,24 +164,148 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
     if (!Platform.isAndroid || _polling) return;
     _polling = true;
     try {
+      if (_openVpnUp) {
+        final online = AndroidOpenVpnTunnel.instance.isConnected;
+        if (!mounted) return;
+        if (!online) {
+          setState(() {
+            _openVpnUp = false;
+            _clearTelemetry();
+            _errorCode = 'OPENVPN_ENGINE_STOPPED';
+          });
+        } else {
+          _maybeCheckInternet();
+          final counters = await AndroidOpenVpnTunnel.instance.counters();
+          if (!mounted) return;
+          final rx = counters.$1, tx = counters.$2;
+          final now = DateTime.now();
+          setState(() {
+            if (rx != null && tx != null) {
+              final seconds = _lastCountersAt == null ? 0.0 :
+                  now.difference(_lastCountersAt!).inMilliseconds / 1000.0;
+              if (seconds > 0.1 && _rxBytes != null && _txBytes != null) {
+                _downloadBps = rx >= _rxBytes! ? (rx - _rxBytes!) / seconds : null;
+                _uploadBps = tx >= _txBytes! ? (tx - _txBytes!) / seconds : null;
+              }
+              _rxBytes = rx; _txBytes = tx; _lastCountersAt = now;
+            }
+          });
+        }
+        return;
+      }
+      if (_xrayCoreUp) {
+        final core = AndroidXrayTunnel.instance;
+        if (!core.isConnected) {
+          if (mounted) setState(() {
+            _xrayCoreUp = false;
+            _clearTelemetry();
+            _errorCode = 'XRAY_NATIVE_ENGINE_STOPPED';
+          });
+        } else if (mounted) {
+          setState(() {
+            _downloadBps = core.downloadBps;
+            _uploadBps = core.uploadBps;
+            _rxBytes = core.receivedBytes;
+            _txBytes = core.sentBytes;
+            _rxSamples.add(_downloadBps ?? 0);
+            _txSamples.add(_uploadBps ?? 0);
+            if (_rxSamples.length > 32) _rxSamples.removeAt(0);
+            if (_txSamples.length > 32) _txSamples.removeAt(0);
+          });
+          _maybeCheckInternet();
+        }
+        return;
+      }
+      // AmneziaWG uses its own native GoBackend, not the Sing-box engine.
+      // Never mark an AWG session stopped using Sing-box's status flag.
+      if (_singBoxProtocol == 'amneziawg') {
+        final state = await AndroidAmneziaWgTunnel.instance.status();
+        if (!mounted || _singBoxProtocol != 'amneziawg') return;
+        if (state['connected'] != true) {
+          setState(() {
+            _singBoxProtocol = null;
+            _clearTelemetry();
+            _errorCode = 'AWG_NATIVE_ENGINE_STOPPED';
+          });
+          return;
+        }
+        final rx = _counter(state['rxBytes']);
+        final tx = _counter(state['txBytes']);
+        final now = DateTime.now();
+        setState(() {
+          _handshake = state['peerHandshakeVerified'] == true;
+          if (rx != null && tx != null) {
+            final seconds = _lastCountersAt == null ? 0.0 :
+                now.difference(_lastCountersAt!).inMilliseconds / 1000.0;
+            if (seconds > 0.1 && _rxBytes != null && _txBytes != null) {
+              _downloadBps = rx >= _rxBytes! ? (rx - _rxBytes!) / seconds : null;
+              _uploadBps = tx >= _txBytes! ? (tx - _txBytes!) / seconds : null;
+            }
+            _rxBytes = rx;
+            _txBytes = tx;
+            _lastCountersAt = now;
+            _rxSamples.add(_downloadBps ?? 0);
+            _txSamples.add(_uploadBps ?? 0);
+            if (_rxSamples.length > 32) _rxSamples.removeAt(0);
+            if (_txSamples.length > 32) _txSamples.removeAt(0);
+          }
+        });
+        _maybeCheckInternet();
+        return;
+      }
       if (_singBoxProtocol != null) {
         final online = AndroidSingBoxTunnel.instance.isConnected;
         if (!mounted) return;
         if (!online) setState(() {
           _singBoxProtocol = null;
           _clearTelemetry();
+          _errorCode = 'SINGBOX_ENGINE_STOPPED';
         });
+        if (online) {
+          final core = AndroidSingBoxTunnel.instance;
+          setState(() {
+            _downloadBps = core.downloadBps;
+            _uploadBps = core.uploadBps;
+            _rxBytes = core.receivedBytes;
+            _txBytes = core.sentBytes;
+            _rxSamples.add(_downloadBps ?? 0);
+            _txSamples.add(_uploadBps ?? 0);
+            if (_rxSamples.length > 32) _rxSamples.removeAt(0);
+            if (_txSamples.length > 32) _txSamples.removeAt(0);
+          });
+          _maybeCheckInternet();
+        }
         return;
       }
       if (_ciscoUp) {
-        final status = await _controller.ciscoStatus();
+        final status = await AndroidCiscoTunnel.instance.status();
         if (!mounted) return;
-        if (status['state'] != 'interface_up' ||
-            status['trafficRoutingVerified'] != true) {
+        if (!status.connected) {
           setState(() {
             _ciscoUp = false;
             _clearTelemetry();
+            _errorCode = 'CISCO_NATIVE_ENGINE_STOPPED';
           });
+        } else {
+          final now = DateTime.now();
+          final rx = status.rx, tx = status.tx;
+          setState(() {
+            if (rx != null && tx != null) {
+              final previous = _lastCountersAt;
+              final elapsed = previous == null ? 0 :
+                  now.difference(previous).inMilliseconds / 1000.0;
+              if (elapsed > 0.1 && _rxBytes != null && _txBytes != null) {
+                _downloadBps = rx >= _rxBytes! ? (rx - _rxBytes!) / elapsed : null;
+                _uploadBps = tx >= _txBytes! ? (tx - _txBytes!) / elapsed : null;
+              }
+              _rxBytes = rx; _txBytes = tx; _lastCountersAt = now;
+              _rxSamples.add(_downloadBps ?? 0);
+              _txSamples.add(_uploadBps ?? 0);
+              if (_rxSamples.length > 32) _rxSamples.removeAt(0);
+              if (_txSamples.length > 32) _txSamples.removeAt(0);
+            }
+          });
+          _maybeCheckInternet();
         }
         return;
       }
@@ -189,65 +351,127 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
           _httpsLatencyMs = null;
         }
       });
-      if (up && _handshake &&
-          !_checkingInternet && (_lastInternetCheck == null ||
-          now.difference(_lastInternetCheck!) > const Duration(seconds: 12))) {
-        unawaited(_checkInternet());
-      }
+      if (up && _handshake) _maybeCheckInternet();
     } catch (_) {
       if (mounted) setState(() {
-        _up = false;
-        _clearTelemetry();
+        if (_openVpnUp || _singBoxProtocol != null || _xrayCoreUp || _ciscoUp) {
+          // A telemetry error must not silently tear down another VPN engine.
+          _errorCode = 'VPN_TELEMETRY_UNAVAILABLE';
+        } else {
+          _up = false;
+          _clearTelemetry();
+        }
       });
     } finally {
       _polling = false;
     }
   }
 
-  /// Probe two independent HTTPS IP services. A failed ipify request alone
-  /// must not be mistaken for an offline VPN. Responses are treated as a
-  /// network reachability signal ONLY when the native peer handshake is fresh.
-  /// Never disable TLS verification or send credentials to probe providers.
+  /// Independent HTTPS egress checks. The measured time is HTTPS response
+  /// latency, not ICMP ping or the VPN gateway round-trip time.
+  bool get _activeVerifiedTransport =>
+      (_up && _handshake) || _openVpnUp || _ciscoUp ||
+      (_xrayCoreUp && AndroidXrayTunnel.instance.isConnected) ||
+      (_singBoxProtocol == 'amneziawg') ||
+      (_singBoxProtocol != null && AndroidSingBoxTunnel.instance.isConnected);
+
+  void _maybeCheckInternet() {
+    final now = DateTime.now();
+    if (_checkingInternet || !_activeVerifiedTransport ||
+        (_lastInternetCheck != null &&
+          now.difference(_lastInternetCheck!) < const Duration(seconds: 12))) {
+      return;
+    }
+    unawaited(_checkInternet());
+  }
+
+  /// HTTPS reachability and exit IP must come from genuine Internet
+  /// requests through the active Android VPN, never the tunnel's local IP.
+  /// Use the platform TLS stack; avoid a custom connectionFactory because it
+  /// can defeat Android's standard routing/proxy behavior on some devices.
+  Future<({String? ip, int? latencyMs, String? error})> _probeHttps(
+      String host, String path, {bool cloudflareTrace = false}) async {
+    final client = HttpClient()
+      ..connectionTimeout = const Duration(seconds: 5)
+      ..findProxy = (_) => 'DIRECT';
+    try {
+      final watch = Stopwatch()..start();
+      final request = await client.getUrl(Uri.https(host, path))
+          .timeout(const Duration(seconds: 8));
+      request.headers.set(HttpHeaders.acceptHeader, 'text/plain');
+      final response = await request.close().timeout(
+          const Duration(seconds: 8));
+      watch.stop();
+      final latency = watch.elapsedMilliseconds.clamp(1, 60000);
+      if (response.statusCode == HttpStatus.noContent) {
+        return (ip: null, latencyMs: latency, error: null);
+      }
+      if (response.statusCode != HttpStatus.ok) {
+        return (ip: null, latencyMs: null, error: 'HTTPS_HTTP_STATUS');
+      }
+      final body = await utf8.decoder.bind(response).join().timeout(
+          const Duration(seconds: 6));
+      if (body.length > 4096) {
+        return (ip: null, latencyMs: latency, error: 'IP_RESPONSE_INVALID');
+      }
+      final candidate = cloudflareTrace
+          ? RegExp(r'^ip=([^\r\n]+)', multiLine: true).firstMatch(body)?.group(1)
+          : body.trim();
+      final parsed = candidate == null
+          ? null : InternetAddress.tryParse(candidate);
+      // Successful HTTPS and valid public-IP extraction are independent.
+      return (ip: parsed?.address, latencyMs: latency, error: null);
+    } on TimeoutException {
+      return (ip: null, latencyMs: null, error: 'HTTPS_TIMEOUT');
+    } on HandshakeException {
+      return (ip: null, latencyMs: null, error: 'HTTPS_TLS_FAILED');
+    } on SocketException {
+      return (ip: null, latencyMs: null, error: 'HTTPS_SOCKET_FAILED');
+    } catch (_) {
+      return (ip: null, latencyMs: null, error: 'HTTPS_PROBE_FAILED');
+    } finally {
+      client.close(force: true);
+    }
+  }
+
   Future<void> _checkInternet() async {
     if (_checkingInternet) return;
     _checkingInternet = true;
+    final generation = _networkProbeGeneration;
     _lastInternetCheck = DateTime.now();
-    String? verifiedIp;
-    int? latencyMs;
-    for (final provider in const ['api.ipify.org', 'icanhazip.com']) {
-      final client = HttpClient()
-        ..connectionTimeout = const Duration(seconds: 4);
-      try {
-        final watch = Stopwatch()..start();
-        final request = await client
-            .getUrl(Uri.https(provider, '/'))
-            .timeout(const Duration(seconds: 5));
-        final response = await request.close()
-            .timeout(const Duration(seconds: 6));
-        if (response.statusCode != HttpStatus.ok) continue;
-        final result = (await utf8.decoder.bind(response)
-            .join().timeout(const Duration(seconds: 6))).trim();
-        watch.stop();
-        if (result.length <= 64 && InternetAddress.tryParse(result) != null) {
-          verifiedIp = result;
-          latencyMs = watch.elapsedMilliseconds;
-          break;
+    try {
+      // Independent real exit-IP providers. DNS resolution failures on an
+      // IPv4-only Cisco tunnel cannot hide a working literal-IP HTTPS probe.
+      final probes = await Future.wait([
+        _probeHttps('1.1.1.1', '/cdn-cgi/trace', cloudflareTrace: true),
+        _probeHttps('api.ipify.org', '/'),
+        _probeHttps('icanhazip.com', '/'),
+        _probeHttps('www.cloudflare.com', '/cdn-cgi/trace',
+            cloudflareTrace: true),
+        _probeHttps('www.google.com', '/generate_204'),
+      ]);
+      String? ip;
+      int? latency;
+      String? failure;
+      for (final result in probes) {
+        ip ??= result.ip;
+        if (result.latencyMs != null &&
+            (latency == null || result.latencyMs! < latency)) {
+          latency = result.latencyMs;
         }
-      } catch (_) {
-        // Try the other provider; no trust or connectivity inference here.
-      } finally {
-        client.close(force: true);
+        failure ??= result.error;
       }
+      if (mounted && generation == _networkProbeGeneration) {
+        setState(() {
+          _publicIp = _activeVerifiedTransport ? ip : null;
+          _httpsLatencyMs = _activeVerifiedTransport ? latency : null;
+          _httpsProbeError = !_activeVerifiedTransport || latency != null
+              ? null : (failure ?? 'HTTPS_UNREACHABLE');
+        });
+      }
+    } finally {
+      _checkingInternet = false;
     }
-    if (mounted) {
-      // The peer handshake is mandatory. An IP response alone does not
-      // establish that the intended VPN transport is carrying user traffic.
-      setState(() {
-        _publicIp = _up && _handshake ? verifiedIp : null;
-        _httpsLatencyMs = _up && _handshake ? latencyMs : null;
-      });
-    }
-    _checkingInternet = false;
   }
 
   String _nativeError(Object error) {
@@ -322,56 +546,152 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
 
   /// Cisco uses its own engine and authenticated panel profile. Never hand
   /// Cisco credentials to WireGuard or download secrets before readiness.
-  Future<void> _connectCisco() async {
-    if (_busy || _up || _ciscoUp || !Platform.isAndroid ||
-        !widget.native.supports('cisco')) return;
-    setState(() {
-      _busy = true;
-      _errorCode = null;
-    });
+  // The legacy disconnected guard owns a *different* Android VpnService.
+  // Stopping it to start a protocol creates an unprotected handoff window.
+  // Refuse that handoff unless Android lockdown has been verified. Do not
+  // silently sacrifice fail-closed protection to make Connect appear to work.
+  Future<void> _releaseDisconnectedGuard({
+    bool allowSharedTun = false,
+    bool requireSharedGuard = false,
+  }) async {
+    if (!Platform.isAndroid) return;
+    const channel = MethodChannel('com.twinpanel.twinconnect/vpn');
+    if (requireSharedGuard) {
+      if (!allowSharedTun) throw StateError('SHARED_TUN_REQUIRED');
+      final current = await channel.invokeMapMethod<String, dynamic>(
+          'getDisconnectedTrafficGuardStatus');
+      if (current?['sharedGuardEnabled'] != true) {
+        await channel.invokeMethod<dynamic>('startDisconnectedTrafficGuard');
+      }
+      var verified = false;
+      for (var attempt = 0; attempt < 30; attempt++) {
+        final state = await channel.invokeMapMethod<String, dynamic>(
+            'getDisconnectedTrafficGuardStatus');
+        if (state?['sharedGuardEnabled'] == true &&
+            state?['sharedTunOwner'] == true) {
+          verified = true;
+          break;
+        }
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+      }
+      if (!verified) throw StateError('ANDROID_KILL_SWITCH_NOT_VERIFIED');
+    }
+    final status = await channel.invokeMapMethod<String, dynamic>(
+        'getDisconnectedTrafficGuardStatus');
+    if (status == null) {
+      throw StateError('KILL_SWITCH_STATUS_UNAVAILABLE');
+    }
+    // SharedTunVpnService is already the selected WireGuard owner and must
+    // remain running. Only the retired second-VPN guard needs a handoff.
+    if (status['sharedTunOwner'] == true) {
+      if (allowSharedTun) return;
+      throw StateError('SHARED_TUN_ENGINE_MIGRATION_REQUIRED');
+    }
+    if (status['active'] != true) return;
+    if (status['osLockdown'] != true ||
+        status['lockdownVerificationAvailable'] != true) {
+      throw StateError('KILL_SWITCH_UNSAFE_HANDOFF_BLOCKED');
+    }
+    await channel.invokeMethod<dynamic>('stopDisconnectedTrafficGuard');
+    for (var attempt = 0; attempt < 30; attempt++) {
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      final next = await channel.invokeMapMethod<String, dynamic>(
+          'getDisconnectedTrafficGuardStatus');
+      if (next?['active'] != true) return;
+    }
+    throw StateError('TRAFFIC_GUARD_RELEASE_TIMEOUT');
+  }
+
+  /// sing-box and Xray execute different native cores, but their TUN Builders
+  /// are supplied by SharedTunVpnService. Permission must be granted and the
+  /// blackhole installed before either core can start forwarding packets.
+  Future<void> _prepareSharedNativeEngine(VpnPolicy policy) async {
+    NativeVpnBridge.requireAndroidSharedTunSafeToConnect(policy);
+    await NativeVpnBridge.configureAndroidAppRouting(policy);
+    if (policy.killSwitchRequested) {
+      await _releaseDisconnectedGuard(
+        allowSharedTun: true, requireSharedGuard: true);
+      return;
+    }
+    const channel = MethodChannel('com.twinpanel.twinconnect/vpn');
+    await channel.invokeMethod<dynamic>('prepareSharedTunEngine');
+    for (var attempt = 0; attempt < 30; attempt++) {
+      final state = await channel.invokeMapMethod<String, dynamic>(
+          'getDisconnectedTrafficGuardStatus');
+      if (state?['sharedTunOwner'] == true) return;
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    }
+    throw StateError('SHARED_TUN_PREPARE_TIMEOUT');
+  }
+
+  Future<void> _finishIdleSharedEngine() async {
+    if (!Platform.isAndroid) return;
     try {
-      final profiles = await TenantApi.fromBuildConfig()
-          .loadSessionNativeProfiles(
-            panel: widget.panel,
-            sessionToken: widget.sessionToken,
-            protocol: VpnProtocols.byCode('cisco')!,
-            native: widget.native,
-          );
-      final selectedId = widget.selectedNodeId;
+      await const MethodChannel('com.twinpanel.twinconnect/vpn')
+          .invokeMethod<dynamic>('finishSharedTunEngine');
+    } catch (_) {
+      // The native owner is the authority; never override a running session.
+    }
+  }
+
+  Future<void> _connectCisco() async {
+    if (_busy || _up || _openVpnUp || _ciscoUp ||
+        _singBoxProtocol != null || !Platform.isAndroid) return;
+    setState(() { _busy = true; _errorCode = null; });
+    var stage = 'CISCO_NATIVE_ENGINE_UNAVAILABLE';
+    try {
+      // Missing native plugin fails before fetching private login material.
+      await AndroidCiscoTunnel.instance.initialize();
+      final policy = await _store.loadFailClosed(
+        widget.panel.namespace, widget.username,
+      );
+      // Cisco shares the Android TUN owner, not WireGuard's native engine.
+      NativeVpnBridge.requireAndroidCiscoSafeToConnect(policy);
+      await NativeVpnBridge.configureAndroidAppRouting(policy);
+      stage = 'CISCO_PROFILE_FETCH_FAILED';
+      final profiles = await TenantApi.fromBuildConfig().loadSessionNativeProfiles(
+        panel: widget.panel,
+        sessionToken: widget.sessionToken,
+        protocol: VpnProtocols.byCode('cisco')!,
+        native: const NativeProtocolReadiness(supportedCodes: {'cisco'}),
+      );
       final inventory = widget.servers?.servers ?? const <AppServer>[];
+      final selectedId = widget.selectedNodeId;
       final choices = profiles.items.where((item) {
         final id = item['node_id']?.toString();
-        if (id == null || (selectedId != null && selectedId != id)) {
-          return false;
-        }
-        final match = inventory.where((node) => node.id == id).firstOrNull;
-        return inventory.isEmpty || match?.nodeOnline == true;
+        if (id == null || (selectedId != null && id != selectedId)) return false;
+        // Node health telemetry may be stale or unavailable on mobile.
+        // Authorization comes from the session-native profile endpoint,
+        // not the inventory's best-effort online indicator.
+        return true;
       }).toList(growable: false);
       if (choices.isEmpty) {
         throw const FormatException('CISCO_NO_AUTHORIZED_SERVER');
       }
       final item = choices.first;
       final profile = CiscoOpenConnectProfile.fromItem(item);
-      final response = await _controller.connectCisco(
-        profile: profile,
-        nativeProtocols: widget.native,
-      );
+      // Use system CA+hostname validation or an explicit SHA-256 certificate pin.
+      // The vendored service rejects bad pins rather than bypassing TLS.
+      AndroidCiscoTunnel.validatedServerTrust(profile);
+      stage = 'CISCO_NATIVE_CONNECTION_FAILED';
+      await _releaseDisconnectedGuard(
+        allowSharedTun: true, requireSharedGuard: policy.killSwitchRequested);
+      await AndroidCiscoTunnel.instance.connect(profile);
       if (!mounted) return;
-      if (response['state'] != 'interface_up' ||
-          response['trafficRoutingVerified'] != true) {
-        throw const FormatException('CISCO_NATIVE_TUNNEL_UNVERIFIED');
-      }
       final id = item['node_id']?.toString();
       setState(() {
         _ciscoUp = true;
-        _activeServer = inventory.where((node) => node.id == id).firstOrNull;
+        _activeServer = inventory.where((n) => n.id == id).firstOrNull;
         _activeServerName = _activeServer?.name ??
             (item['node'] is String ? item['node'] as String : null);
       });
+      _maybeCheckInternet();
     } on FormatException catch (error) {
       if (mounted) setState(() => _errorCode = error.message);
     } catch (error) {
-      if (mounted) setState(() => _errorCode = _nativeError(error));
+      if (mounted) setState(() => _errorCode =
+          error is PlatformException ? error.code :
+          error is TenantApiException ? error.message : stage);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -381,26 +701,251 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
     if (_busy || !_ciscoUp) return;
     setState(() => _busy = true);
     try {
-      await _controller.stopCisco();
+      await AndroidCiscoTunnel.instance.disconnect();
       if (mounted) setState(() {
         _ciscoUp = false;
         _clearTelemetry();
       });
+    } catch (_) {
+      if (mounted) setState(() => _errorCode = 'CISCO_DISCONNECT_FAILED');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _connectOpenVpn() async {
+    if (_busy || _up || _openVpnUp || _ciscoUp ||
+        _singBoxProtocol != null || !Platform.isAndroid) return;
+    setState(() { _busy = true; _errorCode = null; });
+    var stage = 'OPENVPN_ENGINE_INIT_FAILED';
+    try {
+      // OpenVPN now borrows the same Builder as the disconnected guard.
+      final policy = await _store.loadFailClosed(
+        widget.panel.namespace, widget.username,
+      );
+      NativeVpnBridge.requireAndroidSharedTunSafeToConnect(policy);
+      await AndroidOpenVpnTunnel.instance.initialize();
+      stage = 'OPENVPN_PROFILE_FETCH_FAILED';
+      final profiles = await TenantApi.fromBuildConfig()
+          .loadSessionNativeProfiles(
+            panel: widget.panel, sessionToken: widget.sessionToken,
+            protocol: VpnProtocols.byCode('openvpn')!,
+            native: const NativeProtocolReadiness(supportedCodes: {'openvpn'}),
+          );
+      final inventory = widget.servers?.servers ?? const <AppServer>[];
+      final selectedId = widget.selectedNodeId;
+      final choices = profiles.items.where((item) {
+        final id = item['node_id']?.toString();
+        if (id == null || (selectedId != null && id != selectedId)) return false;
+        final node = inventory.where((n) => n.id == id).firstOrNull;
+        return inventory.isEmpty || node?.nodeOnline == true;
+      }).toList(growable: false);
+      if (choices.isEmpty) throw const FormatException('OPENVPN_NO_AUTHORIZED_SERVER');
+      final item = choices.first;
+      final id = item['node_id']?.toString();
+      final server = inventory.where((n) => n.id == id).firstOrNull;
+      stage = 'OPENVPN_NATIVE_CONNECT_FAILED';
+      await _prepareSharedNativeEngine(policy);
+      await AndroidOpenVpnTunnel.instance.connect(
+        profile: item, name: server?.name ?? 'TwinConnect',
+      );
+      if (!mounted) return;
+      setState(() {
+        _openVpnUp = true;
+        _activeServer = server;
+        _activeServerName = server?.name ??
+            (item['node'] is String ? item['node'] as String : null);
+      });
+    } on FormatException catch (error) {
+      if (mounted) setState(() => _errorCode = error.message);
     } catch (error) {
-      if (mounted) setState(() => _errorCode = _nativeError(error));
+      if (mounted) setState(() => _errorCode =
+          error is PlatformException ? error.code :
+          error is TenantApiException ? error.message : stage);
+    } finally {
+      if (!_openVpnUp) await _finishIdleSharedEngine();
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _disconnectOpenVpn() async {
+    if (_busy || !_openVpnUp) return;
+    setState(() => _busy = true);
+    try {
+      await AndroidOpenVpnTunnel.instance.disconnect();
+      if (mounted) setState(() {
+        _openVpnUp = false; _clearTelemetry();
+      });
+    } catch (_) {
+      if (mounted) setState(() => _errorCode = 'OPENVPN_DISCONNECT_FAILED');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _refreshMieruCapability() async {
+    final ready = await AndroidMieruTunnel.instance.engineReady;
+    if (mounted && _mieruEngineReady != ready) {
+      setState(() => _mieruEngineReady = ready);
+    }
+  }
+
+  Future<void> _connectMieru() async {
+    if (_busy || _up || _openVpnUp || _ciscoUp || _xrayCoreUp ||
+        _singBoxProtocol != null || _mieruUp) return;
+    setState(() { _busy = true; _errorCode = null; });
+    try {
+      if (!await AndroidMieruTunnel.instance.engineReady) {
+        throw const FormatException('MIERU_NATIVE_ENGINE_UNAVAILABLE');
+      }
+      final profiles = await TenantApi.fromBuildConfig().loadSessionNativeProfiles(
+        panel: widget.panel,
+        sessionToken: widget.sessionToken,
+        protocol: VpnProtocols.byCode('mieru')!,
+        native: const NativeProtocolReadiness(supportedCodes: {'mieru'}),
+      );
+      final inventory = widget.servers?.servers ?? const <AppServer>[];
+      final selectedId = widget.selectedNodeId;
+      final choices = profiles.items.where((item) {
+        final id = item['node_id']?.toString();
+        if (id == null || (selectedId != null && id != selectedId)) return false;
+        final node = inventory.where((n) => n.id == id).firstOrNull;
+        return inventory.isEmpty || node?.nodeOnline == true;
+      }).toList(growable: false);
+      if (choices.isEmpty) {
+        throw const FormatException('MIERU_NO_AUTHORIZED_SERVER');
+      }
+      await _releaseDisconnectedGuard();
+      await AndroidMieruTunnel.instance.connect(choices.first);
+      if (!mounted) return;
+      final id = choices.first['node_id']?.toString();
+      setState(() {
+        _mieruUp = true;
+        _activeServer = inventory.where((n) => n.id == id).firstOrNull;
+        _activeServerName = _activeServer?.name;
+      });
+      _maybeCheckInternet();
+    } on FormatException catch (error) {
+      if (mounted) setState(() => _errorCode = error.message);
+    } catch (error) {
+      if (mounted) setState(() => _errorCode =
+          error is PlatformException ? error.code :
+          error is TenantApiException ? error.message : 'MIERU_CONNECT_FAILED');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _disconnectMieru() async {
+    if (_busy || !_mieruUp) return;
+    setState(() => _busy = true);
+    try {
+      await AndroidMieruTunnel.instance.disconnect();
+      if (mounted) setState(() { _mieruUp = false; _clearTelemetry(); });
+    } catch (_) {
+      if (mounted) setState(() => _errorCode = 'MIERU_DISCONNECT_FAILED');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _connectAmneziaWg() async {
+    if (_busy || _up || _openVpnUp || _ciscoUp || _xrayCoreUp ||
+        _singBoxProtocol != null || _mieruUp) return;
+    setState(() { _busy = true; _errorCode = null; });
+    try {
+      final policy = await _store.loadFailClosed(
+        widget.panel.namespace, widget.username,
+      );
+      NativeVpnBridge.requireAndroidAmneziaWgSafeToConnect(policy);
+      await NativeVpnBridge.configureAndroidAppRouting(policy);
+      final engine = AndroidAmneziaWgTunnel.instance;
+      if (!await engine.engineReady) {
+        throw const FormatException('AWG_NATIVE_ENGINE_UNAVAILABLE');
+      }
+      final profiles = await TenantApi.fromBuildConfig()
+          .loadSessionNativeProfiles(
+            panel: widget.panel,
+            sessionToken: widget.sessionToken,
+            protocol: VpnProtocols.byCode('amneziawg')!,
+            native: const NativeProtocolReadiness(
+                supportedCodes: {'amneziawg'}),
+          );
+      final selectedId = widget.selectedNodeId;
+      final inventory = widget.servers?.servers ?? const <AppServer>[];
+      final items = profiles.items.where((item) {
+        final id = item['node_id']?.toString();
+        if (id == null || (selectedId != null && selectedId != id)) {
+          return false;
+        }
+        final node = inventory.where((n) => n.id == id).firstOrNull;
+        return inventory.isEmpty || node?.nodeOnline == true;
+      }).toList(growable: false);
+      if (items.isEmpty) {
+        throw FormatException(
+          selectedId == null
+              ? 'AWG_NO_NATIVE_PROFILE_RETURNED'
+              : 'AWG_SELECTED_SERVER_HAS_NO_PROFILE',
+        );
+      }
+      final item = items.first;
+      await _releaseDisconnectedGuard(
+        allowSharedTun: true, requireSharedGuard: policy.killSwitchRequested);
+      await engine.connect(item);
+      if (!mounted) return;
+      final id = item['node_id']?.toString();
+      setState(() {
+        _singBoxProtocol = 'amneziawg';
+        _connectedSince = DateTime.now();
+        _activeServer = inventory.where((n) => n.id == id).firstOrNull;
+        _activeServerName = _activeServer?.name ??
+            item['server_name']?.toString() ??
+            item['node_name']?.toString() ??
+            (id == null ? null : 'Server $id');
+      });
+      _maybeCheckInternet();
+    } on FormatException catch (error) {
+      if (mounted) setState(() => _errorCode = error.message);
+    } on PlatformException catch (error) {
+      if (mounted) setState(() => _errorCode = error.code);
+    } catch (_) {
+      if (mounted) setState(() => _errorCode = 'AWG_NATIVE_CONNECT_FAILED');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _disconnectAmneziaWg() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      await AndroidAmneziaWgTunnel.instance.disconnect();
+      if (mounted) setState(() {
+        _singBoxProtocol = null;
+        _activeServer = null;
+        _activeServerName = null;
+        _clearTelemetry();
+      });
+    } on PlatformException catch (error) {
+      if (mounted) setState(() => _errorCode = error.code);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
   }
 
   Future<void> _connectModern(String code) async {
-    if (_busy || _up || _ciscoUp || _singBoxProtocol != null ||
+    if (_busy || _up || _openVpnUp || _ciscoUp || _xrayCoreUp ||
+        _singBoxProtocol != null ||
         !AndroidSingBoxTunnel.supported.contains(code)) return;
     setState(() { _busy = true; _errorCode = null; });
     var stage = 'ENGINE_INIT';
     try {
       // Require real native initialization BEFORE asking for secrets.
       await AndroidSingBoxTunnel.instance.initialize();
+      final policy = await _store.loadFailClosed(
+        widget.panel.namespace, widget.username,
+      );
+      NativeVpnBridge.requireAndroidSharedTunSafeToConnect(policy);
       stage = 'PROFILE_FETCH';
       final profiles = await TenantApi.fromBuildConfig()
           .loadSessionNativeProfiles(
@@ -424,6 +969,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
       }
       final item = choices.first;
       stage = 'NATIVE_CONNECT';
+      await _prepareSharedNativeEngine(policy);
       await AndroidSingBoxTunnel.instance.connect(
         protocol: code, profile: item,
       );
@@ -431,12 +977,13 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
       final id = item['node_id']?.toString();
       setState(() {
         _singBoxProtocol = code;
-        _singBoxVerified = true;
-        _httpsLatencyMs = AndroidSingBoxTunnel.instance.verifiedLatencyMs;
+        // Outbound ping is not an independent Android VPN reachability test.
+        _httpsLatencyMs = null;
         _activeServer = inventory.where((n) => n.id == id).firstOrNull;
         _activeServerName = _activeServer?.name ??
             (item['node'] is String ? item['node'] as String : null);
       });
+      _maybeCheckInternet();
     } on FormatException catch (error) {
       if (mounted) setState(() => _errorCode = error.message);
     } catch (error) {
@@ -449,21 +996,111 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
           'SINGBOX_NATIVE_CONNECT_FAILED';
       if (mounted) setState(() => _errorCode = code);
     } finally {
+      if (_singBoxProtocol == null) await _finishIdleSharedEngine();
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _connectXray() async {
+    if (_busy || _up || _openVpnUp || _ciscoUp || _singBoxProtocol != null ||
+        _xrayCoreUp || !Platform.isAndroid) return;
+    final entitled = widget.catalog.entries.any((entry) =>
+        entry.protocol.code == 'v2ray' && entry.selected &&
+        entry.configRecordPresent);
+    if (!entitled) {
+      setState(() => _errorCode = 'XRAY_NOT_INCLUDED_IN_SUBSCRIPTION');
+      return;
+    }
+    setState(() { _busy = true; _errorCode = null; });
+    var stage = 'ENGINE_INIT';
+    try {
+      final policy = await _store.loadFailClosed(
+        widget.panel.namespace, widget.username,
+      );
+      NativeVpnBridge.requireAndroidSharedTunSafeToConnect(policy);
+      // The native Xray runtime is independent of libbox. In particular,
+      // failing to initialize an unrelated sing-box engine must never
+      // prevent an authorized XHTTP Reality session from starting.
+      stage = 'PROFILE_FETCH';
+      final response = await TenantApi.fromBuildConfig()
+          .loadSessionNativeProfiles(
+            panel: widget.panel,
+            sessionToken: widget.sessionToken,
+            protocol: VpnProtocols.byCode('v2ray')!,
+            native: const NativeProtocolReadiness(
+                supportedCodes: {'v2ray'}),
+          );
+      final authorizedNodes =
+          widget.servers?.servers.map((n) => n.id).toSet() ?? <String>{};
+      final choices = response.xrayServerGroups
+          .where((g) => authorizedNodes.contains(g.serverId) &&
+              (widget.selectedNodeId == null ||
+                  g.serverId == widget.selectedNodeId))
+          .expand((g) => g.inbounds)
+          .where((inbound) => widget.selectedInboundId == null ||
+              inbound.id == widget.selectedInboundId)
+          .toList(growable: false);
+      if (choices.isEmpty) {
+        throw const FormatException('XRAY_INBOUND_NOT_AVAILABLE');
+      }
+      // Honor the exact selected inbound. XHTTP Reality uses embedded
+      // Xray-core; TCP and WS TLS use libbox. Never substitute transports.
+      final chosen = choices.first;
+      stage = 'NATIVE_CONNECT';
+      await _prepareSharedNativeEngine(policy);
+      if (chosen.id == 'xhttp_reality') {
+        await AndroidXrayTunnel.instance.connect(chosen);
+      } else {
+        await AndroidSingBoxTunnel.instance.connectVlessUri(chosen.uri);
+      }
+      if (!mounted) return;
+      final node = widget.servers!.servers
+          .where((n) => n.id == chosen.serverId).firstOrNull;
+      setState(() {
+        if (chosen.id == 'xhttp_reality') {
+          _xrayCoreUp = true;
+        } else {
+          _singBoxProtocol = 'v2ray';
+        }
+        _activeServer = node;
+        _activeServerName = node?.name;
+        _httpsLatencyMs = null;
+        _publicIp = null;
+      });
+      _maybeCheckInternet();
+    } on FormatException catch (error) {
+      if (mounted) setState(() => _errorCode = error.message);
+    } catch (error) {
+      final errorCode = error is TenantApiException ? error.message :
+          error is PlatformException ? error.code :
+          stage == 'ENGINE_INIT' ? 'SINGBOX_ENGINE_INIT_FAILED' :
+          stage == 'PROFILE_FETCH' ? 'XRAY_PROFILE_FETCH_FAILED' :
+          'XRAY_NATIVE_CONNECT_FAILED';
+      if (mounted) setState(() => _errorCode = errorCode);
+    } finally {
+      if (!_xrayCoreUp && _singBoxProtocol == null) {
+        await _finishIdleSharedEngine();
+      }
       if (mounted) setState(() => _busy = false);
     }
   }
 
   Future<void> _disconnectModern() async {
-    if (_busy || _singBoxProtocol == null) return;
+    if (_busy || (_singBoxProtocol == null && !_xrayCoreUp)) return;
     setState(() => _busy = true);
     try {
-      await AndroidSingBoxTunnel.instance.disconnect();
+      if (_xrayCoreUp) {
+        await AndroidXrayTunnel.instance.disconnect();
+      } else {
+        await AndroidSingBoxTunnel.instance.disconnect();
+      }
       if (mounted) setState(() {
+        _xrayCoreUp = false;
         _singBoxProtocol = null;
         _clearTelemetry();
       });
     } catch (_) {
-      if (mounted) setState(() => _errorCode = 'SINGBOX_DISCONNECT_FAILED');
+      if (mounted) setState(() => _errorCode = 'VPN_DISCONNECT_FAILED');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -491,6 +1128,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
         VpnProtocols.byCode('wireguard')!,
         widget.native,
       );
+      await NativeVpnBridge.configureAndroidAppRouting(policy);
       // Fetch secrets only AFTER the native engine/policy guard passes.
       final profiles = await TenantApi.fromBuildConfig().loadSessionNativeProfiles(
         panel: widget.panel,
@@ -516,6 +1154,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
         if (!mounted) return;
         Map<String, dynamic> response;
         try {
+          await _releaseDisconnectedGuard(allowSharedTun: true);
           response = await _controller.connectWireGuard(
             node: node,
             policy: policy,
@@ -618,50 +1257,80 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
   Widget build(BuildContext context) {
     final s = AppStrings.of(context);
     final available = widget.catalog.entries
-        .where((entry) => entry.selected).toList(growable: false);
+        .where((entry) => entry.selected &&
+            AndroidProtocolVisibility.visible(entry.protocol.code))
+        .toList(growable: false);
     if (available.isEmpty) {
       return Text(s.pick('پروتکل فعالی برای این اشتراک وجود ندارد.',
           'No protocols enabled for this subscription.'));
     }
     // Protocol selection happens on the Servers screen. Never silently
     // change the explicitly chosen protocol to WireGuard.
+    // Keep the explicit user choice even when its Android engine is not
+    // installed. Never silently substitute WireGuard or hide that choice.
     final requested = widget.selectedProtocolCode;
     // Quick Connect chooses ONLY an entitled protocol with an installed,
     // native engine and an existing profile. Never default to Cisco merely
     // because it appears first in the subscription's catalog.
     final readyOptions = available.where((entry) =>
-        entry.configRecordPresent &&
+        (entry.configRecordPresent || entry.protocol.code == 'amneziawg') &&
         (widget.native.supports(entry.protocol.code) ||
-         AndroidSingBoxTunnel.supported.contains(entry.protocol.code))).toList(growable: false);
+         AndroidSingBoxTunnel.supported.contains(entry.protocol.code) ||
+       entry.protocol.code == 'amneziawg' ||
+         entry.protocol.code == 'openvpn' ||
+         entry.protocol.code == 'cisco')).toList(growable: false);
+    // A server selected without an explicit protocol must not silently
+    // fall back to WireGuard: that can display a different VPN than chosen.
     final chosen = requested != null
         ? available.where((e) => e.protocol.code == requested).firstOrNull
-        : readyOptions.where((e) => e.protocol.code == 'wireguard').firstOrNull ??
-            readyOptions.firstOrNull;
+        : widget.selectedNodeId != null
+            ? null
+            : readyOptions.where((e) => e.protocol.code == 'wireguard').firstOrNull ??
+                readyOptions.firstOrNull;
     final nativeReady = Platform.isAndroid &&
         widget.native.supports('wireguard') &&
         chosen?.protocol.code == 'wireguard' &&
         chosen?.configRecordPresent == true;
     // The selected protocol and active transport are distinct. Selecting
     // OpenVPN/Hysteria2 never starts or disguises a WireGuard tunnel.
-    final connected = _up || _ciscoUp || _singBoxProtocol != null;
+    final connected = _up || _openVpnUp || _ciscoUp ||
+        _xrayCoreUp || _singBoxProtocol != null || _mieruUp;
     final protocolName = chosen?.protocol.name ??
-        (requested ?? s.pick('پروتکل آماده‌ای وجود ندارد', 'No ready protocol'));
-    final activeProtocolCode = _singBoxProtocol ??
-        (_ciscoUp ? 'cisco' : _up ? 'wireguard' : null);
+        (requested == null
+            ? s.pick('پروتکل آماده‌ای وجود ندارد', 'No ready protocol')
+            : s.pick('پروتکل انتخاب‌شده در اشتراک مجاز نیست',
+                'Selected protocol is not enabled for this subscription'));
+    final activeProtocolCode = _mieruUp ? 'mieru' :
+        _xrayCoreUp ? 'v2ray' : _singBoxProtocol ??
+        (_openVpnUp ? 'openvpn' : _ciscoUp ? 'cisco' :
+            _up ? 'wireguard' : null);
     final selectedIsActive = activeProtocolCode != null &&
         chosen?.protocol.code == activeProtocolCode;
-    final internetVerified = _ciscoUp || _singBoxVerified ||
-        (_up && _handshake && _publicIp != null);
+    final internetVerified = _activeVerifiedTransport && _publicIp != null;
     // A sing-box start acknowledgement is not proof of internet access.
     final ciscoSelected = chosen?.protocol.code == 'cisco';
-    final ciscoReady = ciscoSelected &&
-        widget.native.supports('cisco') &&
+    // Cisco runs through an independent installed Flutter VpnService plugin.
+    // The actual plugin is initialized before fetching credentials.
+    final ciscoReady = Platform.isAndroid && ciscoSelected &&
         chosen?.configRecordPresent == true;
+    final openVpnSelected = chosen?.protocol.code == 'openvpn' &&
+        chosen?.configRecordPresent == true;
+    final xraySelected = chosen?.protocol.code == 'v2ray' &&
+        chosen?.configRecordPresent == true;
+    // The catalog flag can lag behind native profiles returned by the
+    // session API. Let the user request their entitled AWG profile; the
+    // connect handler still requires an authorized node and valid config.
+    final awgSelected = chosen?.protocol.code == 'amneziawg' &&
+        chosen?.selected == true;
     final modernSelected = chosen != null &&
         AndroidSingBoxTunnel.supported.contains(chosen.protocol.code) &&
         chosen.configRecordPresent;
-    final canStartSelected = ciscoSelected ? ciscoReady :
-        modernSelected || nativeReady;
+    final mieruSelected = chosen?.protocol.code == 'mieru' &&
+        chosen?.configRecordPresent == true;
+    final canStartSelected = awgSelected ? true :
+        mieruSelected ? _mieruEngineReady :
+        ciscoSelected ? ciscoReady :
+        xraySelected || openVpnSelected || modernSelected || nativeReady;
     // An interface without a peer handshake is NOT a successful VPN.
     // Reserve the connected green treatment for verified transport.
     final accent = internetVerified ? const Color(0xFF35D9AE)
@@ -710,12 +1379,18 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
               _busy
                   ? s.pick('در حال اتصال...', 'Connecting...')
                   : internetVerified
-                      ? s.pick('اینترنت VPN تأیید شد', 'VPN internet reachable')
+                      ? s.pick('اینترنت در زمان اتصال در دسترس است', 'Internet reachable while VPN active')
                       : _up && _handshake
                           ? s.pick('دست‌دهی سرور تأیید شد؛ اینترنت هنوز تأیید نشده', 'Peer handshake verified; internet not yet verified')
-                          : connected
-                              ? s.pick('تونل فعال است، اما اتصال به سرور تأیید نشده', 'Tunnel interface up; server connection unverified')
-                              : s.pick('آفلاین هستید', 'You are offline'),
+                          : _openVpnUp
+                              ? s.pick('تونل OpenVPN فعال است؛ اینترنت هنوز بررسی نشده', 'OpenVPN connected; internet not verified')
+                              : _singBoxProtocol == 'amneziawg'
+                                  ? s.pick('تونل AmneziaWG فعال است؛ اینترنت هنوز تأیید نشده', 'AmneziaWG active; internet route unverified')
+                              : _singBoxProtocol != null
+                                  ? s.pick('تونل Sing-box فعال است؛ مسیر اینترنت هنوز تأیید نشده', 'Sing-box active; internet route unverified')
+                                  : connected
+                                      ? s.pick('تونل فعال است، اما اتصال به سرور تأیید نشده', 'Tunnel interface up; server connection unverified')
+                                      : s.pick('آفلاین هستید', 'You are offline'),
               textAlign: TextAlign.center,
               style: TextStyle(color: accent, fontWeight: FontWeight.w700),
             ),
@@ -725,7 +1400,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
         Center(
           child: TwinConnectWaveIndicator(
             key: const Key('androidSharedConnectionDataFabric'),
-            connected: connected && _handshake,
+            connected: _activeVerifiedTransport,
             connecting: _busy,
             dark: Theme.of(context).brightness == Brightness.dark,
             rxSamples: List<double>.unmodifiable(_rxSamples),
@@ -745,7 +1420,10 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
                   ? (_activeServerName == null
                       ? s.pick('مکان اتصال نامشخص است', 'Connected location unknown')
                       : _activeServerName!)
-                  : s.pick('هنوز به سروری متصل نیستید', 'No active server'),
+                  : widget.selectedNodeId != null
+                      ? s.pick('سرور انتخاب شده؛ هنوز متصل نیستید',
+                          'Server selected; not connected')
+                      : s.pick('هنوز به سروری متصل نیستید', 'No active server'),
               textAlign: TextAlign.center,
             ),
             if (connected && _activeServer != null) ...[
@@ -760,12 +1438,26 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
             ],
           ]),
         ),
+        if (connected && _connectedSince != null) ...[
+          const SizedBox(height: 8),
+          Text(
+            'Connection time: ${(() {
+              final seconds = DateTime.now().difference(_connectedSince!).inSeconds;
+              final hours = seconds ~/ 3600;
+              final minutes = (seconds % 3600) ~/ 60;
+              final remaining = seconds % 60;
+              return '${hours.toString().padLeft(2, '0')}:${minutes.toString().padLeft(2, '0')}:${remaining.toString().padLeft(2, '0')}';
+            })()}',
+            key: const Key('androidConnectionDuration'),
+            textAlign: TextAlign.center,
+          ),
+        ],
         const SizedBox(height: 15),
         if (!selectedIsActive && !canStartSelected)
           Padding(
             padding: const EdgeInsets.only(bottom: 12),
             child: Text(
-              chosen?.configRecordPresent != true
+              chosen?.configRecordPresent != true && !awgSelected
                   ? s.pick('این پروتکل در اشتراک فعال نیست یا کانفیگ ندارد.',
                       'This protocol is unavailable or has no profile.')
                   : s.pick('موتور این پروتکل در اندروید هنوز آماده اتصال نیست.',
@@ -783,11 +1475,18 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
                 borderRadius: BorderRadius.circular(18)),
             ),
             onPressed: _busy ? null
-                : selectedIsActive ? (_singBoxProtocol != null ? _disconnectModern :
+                : selectedIsActive ? (_singBoxProtocol == 'amneziawg' ? _disconnectAmneziaWg :
+                    _mieruUp ? _disconnectMieru :
+                    _xrayCoreUp || _singBoxProtocol != null ? _disconnectModern :
+                    _openVpnUp ? _disconnectOpenVpn :
                     _ciscoUp ? _disconnectCisco : _disconnect)
                 : connected ? null
                 : canStartSelected
-                    ? (modernSelected ? () => _connectModern(chosen.protocol.code) :
+                    ? (awgSelected ? _connectAmneziaWg :
+                       mieruSelected ? _connectMieru :
+                       xraySelected ? _connectXray :
+                       modernSelected ? () => _connectModern(chosen.protocol.code) :
+                       openVpnSelected ? _connectOpenVpn :
                        ciscoSelected ? _connectCisco : _connect) : null,
             icon: Icon(selectedIsActive ? Icons.stop_rounded :
                 Icons.bolt_rounded),
@@ -796,7 +1495,9 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
                 : connected
                     ? s.pick('ابتدا تونل قبلی را قطع کنید', 'Disconnect active tunnel first')
                     : !canStartSelected
-                        ? s.pick('موتور اتصال نصب نیست', 'Engine not installed')
+                        ? chosen?.configRecordPresent != true && !awgSelected
+                            ? s.pick('کانفیگ این پروتکل آماده نیست', 'Protocol profile unavailable')
+                            : s.pick('موتور اتصال نصب نیست', 'Engine not installed')
                         : s.pick('اتصال سریع', 'Connect now')),
           ),
         ),
@@ -804,7 +1505,8 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
           const SizedBox(height: 10),
           Text(
             s.pick('تونل فعال جداگانه: ', 'Separate active tunnel: ') +
-                (_singBoxProtocol ?? (_ciscoUp ? 'Cisco / OpenConnect' : 'WireGuard')),
+                ((_xrayCoreUp ? 'V2Ray / Xray' : _singBoxProtocol) ?? (_openVpnUp ? 'OpenVPN' :
+                    _ciscoUp ? 'Cisco / OpenConnect' : 'WireGuard')),
             key: const Key('androidSeparateActiveProtocol'),
             textAlign: TextAlign.center,
             style: TextStyle(color: accent),
@@ -812,7 +1514,9 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
           const SizedBox(height: 8),
           OutlinedButton.icon(
             key: const Key('androidDisconnectPreviousTunnel'),
-            onPressed: _busy ? null : _singBoxProtocol != null ? _disconnectModern :
+            onPressed: _busy ? null : _singBoxProtocol == 'amneziawg' ? _disconnectAmneziaWg :
+                _xrayCoreUp || _singBoxProtocol != null ? _disconnectModern :
+                _openVpnUp ? _disconnectOpenVpn :
                 _ciscoUp ? _disconnectCisco : _disconnect,
             icon: const Icon(Icons.stop_circle_outlined),
             label: Text(s.pick('قطع تونل قبلی', 'Disconnect previous tunnel')),
@@ -842,12 +1546,21 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
                 style: Theme.of(context).textTheme.titleMedium),
               const SizedBox(height: 10),
               Text(!connected ? s.pick('تونل غیرفعال است', 'Tunnel disconnected')
+                  : !selectedIsActive
+                      ? s.pick('یک تونل دیگر فعال است؛ پروتکل انتخاب‌شده متصل نیست.',
+                          'A different VPN tunnel is active; the selected protocol is not connected.')
                   : internetVerified
-                      ? s.pick('دسترسی اینترنت از VPN تأیید شد.', 'Internet reachable through VPN.')
-                      : _up && _handshake
-                          ? s.pick('دست‌دهی انجام شده اما اینترنت هنوز تأیید نشده.', 'Peer handshake received; VPN internet not yet verified.')
-                          : s.pick('رابط VPN فعال است اما هنوز پاسخ سرور دریافت نشده است. ممکن است اینترنت کار نکند.',
-                              'VPN interface is up but no server handshake has been verified. Internet may not work.')),
+                      ? s.pick('دسترسی HTTPS برقرار است؛ مسیر VPN هنوز مستقل تأیید نشده.', 'HTTPS reachable; VPN routing not independently verified.')
+                      : _ciscoUp
+                          ? s.pick('تونل Cisco فعال است؛ دسترسی اینترنت هنوز با HTTPS تأیید نشده است.',
+                              'Cisco tunnel is active; HTTPS internet access is not yet verified.')
+                          : _openVpnUp || _xrayCoreUp || _singBoxProtocol != null
+                              ? s.pick('تونل فعال است؛ دسترسی اینترنت هنوز با HTTPS تأیید نشده است.',
+                                  'VPN tunnel is active; HTTPS internet access is not yet verified.')
+                              : _up && _handshake
+                                  ? s.pick('دست‌دهی انجام شده اما اینترنت هنوز تأیید نشده.', 'Peer handshake received; VPN internet not yet verified.')
+                                  : s.pick('رابط VPN فعال است اما هنوز پاسخ سرور دریافت نشده است. ممکن است اینترنت کار نکند.',
+                                      'VPN interface is up but no server handshake has been verified. Internet may not work.')),
               if (_up && !_handshake) ...[
                 const SizedBox(height: 8),
                 SelectableText(
@@ -859,10 +1572,13 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
               ],
               const SizedBox(height: 12),
               Row(children: [
-                Expanded(child: _metric(context, Icons.public, 'IP', _publicIp ?? '—')),
+                Expanded(child: _metric(context, Icons.public,
+                    s.pick('IP عمومی', 'Public IP'), _publicIp ?? '—')),
                 const SizedBox(width: 8),
                 Expanded(child: _metric(context, Icons.bolt, 'HTTPS',
-                    _httpsLatencyMs == null ? '—' : '${_httpsLatencyMs} ms')),
+                    _httpsLatencyMs == null
+                        ? (_httpsProbeError ?? '—')
+                        : '${_httpsLatencyMs} ms')),
               ]),
               const SizedBox(height: 8),
               Row(children: [

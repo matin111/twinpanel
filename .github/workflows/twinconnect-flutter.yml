@@ -33,9 +33,13 @@ jobs:
       - name: Generate native project scaffolds
         run: flutter create --platforms=android,ios,macos,windows --org com.twinpanel --project-name twinconnect .
       - name: Install reviewed Android WireGuard source
-        run: python tools/install_android_native.py
+        run: |
+          python -m pip install --user Pillow==11.3.0
+          python tools/install_android_native.py
       - name: Resolve packages
         run: flutter pub get
+      - name: Bind Android plugin TUN builders to SharedTunVpnService
+        run: python tools/patch_shared_tun_android_plugins.py
       - name: Analyze Dart
         run: flutter analyze --no-fatal-infos
       - name: Unit and widget tests
@@ -73,7 +77,9 @@ jobs:
         run: flutter create --platforms=android,ios,macos,windows --org com.twinpanel --project-name twinconnect .
       - name: Install Android native WireGuard
         if: matrix.platform == 'android'
-        run: python tools/install_android_native.py
+        run: |
+          python -m pip install --user Pillow==11.3.0
+          python tools/install_android_native.py
       - name: Validate central license directory before building platform binaries
         shell: bash
         run: |
@@ -93,6 +99,15 @@ jobs:
               raise SystemExit("Customer panel cannot be used as central bootstrap")
           print("Central license lookup verified for platform preview")
           PY
+      - name: Resolve Android native plugin packages
+        if: matrix.platform == 'android'
+        run: flutter pub get
+      - name: Bind Android native VPN owner
+        if: matrix.platform == 'android'
+        run: python tools/patch_shared_tun_android_plugins.py
+      - name: Stage Android OpenVPN source on the shared TUN
+        if: matrix.platform == 'android'
+        run: python tools/stage_shared_openvpn_android.py
       - name: Build Android (unsigned preview)
         if: matrix.platform == 'android'
         run: flutter build apk --release --dart-define=TWINCONNECT_DIRECTORY_URL=$TWINCONNECT_DIRECTORY_URL

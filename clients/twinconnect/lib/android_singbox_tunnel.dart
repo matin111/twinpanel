@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -6,8 +7,9 @@ import 'package:flutter/services.dart';
 
 import 'singbox_profile_validator.dart';
 
-/// Independent Android VpnService engine for the supported sing-box family.
-/// This is never routed through WireGuard's native MethodChannel.
+/// Independent sing-box *protocol core*, using TwinConnect's shared Android
+/// VpnService.Builder/TUN rather than launching its own VPN routing owner.
+/// It never routes sing-box credentials through WireGuard's native engine.
 /// Only authenticated panel-issued native outbound JSON is accepted.
 class AndroidSingBoxTunnel {
   AndroidSingBoxTunnel._();
@@ -18,9 +20,17 @@ class AndroidSingBoxTunnel {
       MethodChannel('com.twinpanel.twinconnect/vpn');
   int? _lastVerifiedLatencyMs;
   int? get verifiedLatencyMs => _lastVerifiedLatencyMs;
+  StreamSubscription<SingBoxConnectionStats>? _statsSubscription;
+  SingBoxConnectionStats? _latestStats;
+  double? get downloadBps => _latestStats?.downloadSpeed.toDouble();
+  double? get uploadBps => _latestStats?.uploadSpeed.toDouble();
+  int? get receivedBytes => _latestStats?.downloadTotal;
+  int? get sentBytes => _latestStats?.uploadTotal;
 
   static const supported = <String>{
-    'hysteria2', 'tuic', 'anytls', 'socks5',
+    'hysteria2', 'tuic', 'anytls', 'socks5', 'shadowtls', 'snell',
+    // Runtime verification is required before enabling Naive in the UI.
+    'naive',
   };
 
   Future<void> initialize() async {
@@ -41,17 +51,46 @@ class AndroidSingBoxTunnel {
     if (!supported.contains(protocol)) {
       throw const FormatException('SINGBOX_PROTOCOL_UNSUPPORTED');
     }
+    if (protocol == 'shadowtls') {
+      final chain = SingBoxProfileValidator.validateShadowTlsChain(profile);
+      await _connectNative(jsonEncode(chain));
+      return;
+    }
     final outbound = SingBoxProfileValidator.validateOutbound(
       protocolCode: protocol,
       item: profile,
     );
+    await _connectNative(jsonEncode(outbound), protocol: protocol);
+  }
+
+  /// The bundled libbox supports VLESS over TCP TLS and WebSocket TLS.
+  /// The panel-signed VLESS URI is used exactly as supplied; never transform
+  /// XHTTP Reality into a different transport or weaken TLS verification.
+  Future<void> connectVlessUri(Uri uri) async {
+    if (!Platform.isAndroid || uri.scheme != 'vless' ||
+        uri.userInfo.isEmpty || uri.host.isEmpty || !uri.hasPort ||
+        uri.port <= 0 || uri.port > 65535) {
+      throw const FormatException('XRAY_URI_INVALID');
+    }
+    final transport = uri.queryParameters['type'];
+    final security = uri.queryParameters['security'];
+    if (security != 'tls' || (transport != 'tcp' && transport != 'ws')) {
+      throw const FormatException('XRAY_ANDROID_TRANSPORT_UNSUPPORTED');
+    }
+    await _connectNative(uri.toString());
+  }
+
+  Future<void> _connectNative(String config, {String? protocol}) async {
     await initialize();
     // The plugin builds the local TUN/DNS/routing config; never accept
     // untrusted subscription-provided inbounds, routes or app settings.
     // Do not persist profiles in TwinConnect's own preferences.
     var verifiedLatency = 0;
+    await _statsSubscription?.cancel();
+    _statsSubscription = null;
+    _latestStats = null;
     try {
-      await SingBox.instance.connect(jsonEncode(outbound));
+      await SingBox.instance.connect(config);
       if (SingBox.instance.status != SingBoxConnectionStatus.connected) {
         throw const FormatException('SINGBOX_TUNNEL_NOT_VERIFIED');
       }
@@ -63,8 +102,20 @@ class AndroidSingBoxTunnel {
         throw const FormatException('SINGBOX_OUTBOUND_UNREACHABLE');
       }
       verifiedLatency = result.ping;
-    } catch (_) {
+      _statsSubscription = SingBox.instance.watchConnectionStats().listen(
+        (stats) => _latestStats = stats,
+        onError: (Object _) { _latestStats = null; },
+      );
+    } catch (error) {
+      await _statsSubscription?.cancel();
+      _statsSubscription = null;
+      _latestStats = null;
       try { await SingBox.instance.disconnect(); } catch (_) {}
+      if (protocol == 'naive' && error is! FormatException) {
+        // Preserve a non-secret, protocol-specific failure code; never
+        // expose raw libbox exceptions that may include account credentials.
+        throw const FormatException('NAIVE_NATIVE_TRANSPORT_FAILED');
+      }
       rethrow;
     } finally {
       // The plugin writes the last outbound in app-private plaintext files.
@@ -89,7 +140,11 @@ class AndroidSingBoxTunnel {
 
   Future<void> disconnect() async {
     if (!_initialized) return;
+    await _statsSubscription?.cancel();
+    _statsSubscription = null;
+    _latestStats = null;
     await SingBox.instance.disconnect();
     _lastVerifiedLatencyMs = null;
   }
 }
+

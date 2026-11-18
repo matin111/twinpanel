@@ -215,7 +215,10 @@ class TenantApi {
       panel.apiOrigin.resolve('/v1/central-app/session/profiles'),
       payload: {'protocol': protocol.code},
       bearerToken: sessionToken,
-      maxBytes: 1024 * 1024,
+      // Modern profiles can include a PEM CA for each authorized node.
+      // A one-megabyte response cap rejects otherwise successful 200 OK
+      // responses before the client can parse the profile.
+      maxBytes: 4 * 1024 * 1024,
     );
     final profiles = ClientProtocolProfiles.fromJson(data);
     if (profiles.namespace != panel.namespace ||

@@ -3,8 +3,8 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 /// An aurora-style, live network fabric driven by observed RX and TX samples.
-/// No synthetic transfer rates: ambient motion only runs for a verified tunnel
-/// with measured traffic, and the disconnected appearance remains completely still.
+/// No synthetic transfer rates: ambient motion reflects tunnel state,
+/// while actual received/transmitted samples drive speed figures.
 class TwinConnectWaveIndicator extends StatefulWidget {
   const TwinConnectWaveIndicator({
     super.key,
@@ -32,10 +32,10 @@ class _TwinConnectWaveIndicatorState extends State<TwinConnectWaveIndicator>
     vsync: this,
     duration: const Duration(milliseconds: 3600),
   );
-  bool get _trafficPresent =>
-      widget.rxSamples.any((v) => v.isFinite && v > 0) ||
-      widget.txSamples.any((v) => v.isFinite && v > 0);
-  bool get _animate => widget.connected && _trafficPresent;
+  // Ambient optical movement represents an active tunnel, not byte counts.
+  // Measured RX/TX still exclusively determines the speed figures elsewhere.
+  // OpenVPN can establish a VPN before its first traffic-counter sample.
+  bool get _animate => widget.connected || widget.connecting;
 
   @override
   void initState() {
@@ -155,8 +155,7 @@ class _NetworkFabricPainter extends CustomPainter {
         math.max(m, v.isFinite && v > 0 ? v : 0.0));
     final maxTx = tx.fold<double>(0, (m, v) =>
         math.max(m, v.isFinite && v > 0 ? v : 0.0));
-    final realActivity = maxRx > 0 || maxTx > 0;
-    final active = connected && realActivity;
+    final active = connected;
     final luminous = connected || connecting;
     if (luminous) {
       canvas.drawCircle(center, size.height * .54,

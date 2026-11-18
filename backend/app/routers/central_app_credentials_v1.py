@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import SQLAlchemyError
 
 from ..central_app_credentials import (
     app_delivery_payload, authenticate_app, rotate_app_credentials,
@@ -20,6 +21,7 @@ from ..central_app_identity import central_app_entitled, installation_namespace,
 from ..database import get_db
 from ..deps import get_current_user, require_admin, require_reseller
 from ..models import Subscription, User, Node, SubscriptionNode, NodeStatus, Plan
+from ..node_connection_settings_models_v1 import NodeProtocolAppliedEndpoint
 from ..models_reseller import Reseller, ResellerSubscription
 from ..plan_category_models import PlanCategoryAssignment
 from ..system_release import ensure_installation_id
@@ -239,6 +241,30 @@ def session_servers(
         .limit(500)
         .all()
     )
+    # Only confirmed, applied endpoints of already authorized nodes.
+    # Port numbers are public listener metadata, never credentials.
+    allowed_ids = [node.id for node in nodes]
+    ports_by_node: dict[int, dict[str, int]] = {}
+    if allowed_ids:
+        try:
+            endpoints = (
+                db.query(NodeProtocolAppliedEndpoint)
+                .filter(NodeProtocolAppliedEndpoint.node_id.in_(allowed_ids),
+                        NodeProtocolAppliedEndpoint.is_applied.is_(True),
+                        NodeProtocolAppliedEndpoint.applied_confirmed_at.isnot(None))
+                .all()
+            )
+        except SQLAlchemyError:
+            # Older installations may not yet have the additive metadata
+            # table. Never break the authenticated server inventory.
+            db.rollback()
+            endpoints = []
+        for endpoint in endpoints:
+            if (endpoint.port is not None and 1 <= endpoint.port <= 65535 and
+                    endpoint.protocol in {"cisco", "openvpn", "wireguard",
+                        "v2ray", "hysteria2", "anytls", "shadowtls",
+                        "naive", "snell", "mieru", "tuic"}):
+                ports_by_node.setdefault(endpoint.node_id, {})[endpoint.protocol] = endpoint.port
     return JSONResponse({
         "schema": 1,
         "namespace": subscription_app_namespace(db, sub),
@@ -252,6 +278,7 @@ def session_servers(
                 # used only for client-side ICMP reachability checks.
                 # Never reveal agent_url, private hostnames or credentials.
                 "probe_ip": _public_node_probe_ip(node.public_ip),
+                "probe_ports": ports_by_node.get(node.id, {}),
                 "latency_ms": None,
             }
             for node in nodes

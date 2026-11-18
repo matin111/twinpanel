@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 
 /// The sing-box family uses one engine process. Profiles may be native
@@ -28,6 +29,117 @@ class SingBoxProfileValidator {
 
   /// Only JSON-native outbounds are accepted. No credentials or entire
   /// serialized payloads appear in thrown exceptions.
+  /// A ShadowTLS client needs an authenticated inner Shadowsocks outbound
+  /// detoured through one ShadowTLS wrapper. Do not execute panel-provided
+  /// inbound, DNS, routes, selectors, experimental settings, or extra outbounds.
+  /// Return only the two validated outbounds in deterministic order, so the
+  /// sing_box plugin selects the real Shadowsocks proxy as its first server.
+  /// Keep the authenticated inner Shadowsocks stream paired with exactly
+  /// one ShadowTLS detour. Other app-level routes/DNS/inbounds are discarded.
+  static List<Map<String, dynamic>> validateShadowTlsChain(
+      Map<String, dynamic> item) {
+    dynamic candidate = item['config'] ?? item['singbox_outbound'] ??
+        item['outbound'];
+    if (candidate == null && item['outbounds'] is List) {
+      candidate = {'outbounds': item['outbounds']};
+    }
+    if (candidate is String) {
+      if (candidate.length > 131072) {
+        throw const FormatException('SHADOWTLS_CONFIG_TOO_LARGE');
+      }
+      try {
+        candidate = jsonDecode(candidate);
+      } catch (_) {
+        throw const FormatException('SHADOWTLS_CONFIG_INVALID');
+      }
+    }
+    if (candidate is! Map || candidate['outbounds'] is! List) {
+      throw const FormatException('SHADOWTLS_CHAIN_REQUIRED');
+    }
+    final all = candidate['outbounds'] as List;
+    if (all.length > 16) {
+      throw const FormatException('SHADOWTLS_CHAIN_AMBIGUOUS');
+    }
+    final wrappers = all.whereType<Map>()
+        .where((out) => out['type'] == 'shadowtls').toList();
+    final shadowsocks = all.whereType<Map>()
+        .where((out) => out['type'] == 'shadowsocks').toList();
+    if (wrappers.length != 1 || shadowsocks.length != 1) {
+      throw const FormatException('SHADOWTLS_CHAIN_AMBIGUOUS');
+    }
+    final wrapper = Map<String, dynamic>.from(wrappers.single);
+    final inner = Map<String, dynamic>.from(shadowsocks.single);
+    final wrapperTag = wrapper['tag'];
+    if (wrapperTag is! String || wrapperTag.isEmpty ||
+        inner['detour'] != wrapperTag || wrapperTag == inner['tag']) {
+      throw const FormatException('SHADOWTLS_DETOUR_INVALID');
+    }
+    final version = wrapper['version'];
+    if (version is! int || version < 1 || version > 3) {
+      throw const FormatException('SHADOWTLS_VERSION_UNSUPPORTED');
+    }
+    if (version >= 2 &&
+        (wrapper['password'] is! String ||
+            (wrapper['password'] as String).isEmpty)) {
+      throw const FormatException('SHADOWTLS_PASSWORD_MISSING');
+    }
+    final host = wrapper['server'];
+    final port = wrapper['server_port'];
+    if (host is! String || host.isEmpty || host.length > 255 ||
+        host.contains(' ') || host.contains('/') ||
+        port is! int || port < 1 || port > 65535) {
+      throw const FormatException('SHADOWTLS_ENDPOINT_INVALID');
+    }
+
+    // A valid sing-box ShadowTLS outbound has a TLS object, but does not
+    // require explicit "enabled" or "server_name". Legacy panel payloads
+    // can provide SNI alongside the wrapper instead. Keep full certificate
+    // verification; never set insecure=true or disable SNI.
+    final rawTls = wrapper['tls'];
+    if (rawTls != null && rawTls is! Map) {
+      throw const FormatException('SHADOWTLS_TLS_INVALID');
+    }
+    final tls = rawTls == null
+        ? <String, dynamic>{}
+        : Map<String, dynamic>.from(rawTls);
+    if (tls['enabled'] == false || tls['insecure'] == true ||
+        tls['disable_sni'] == true) {
+      throw const FormatException('SHADOWTLS_TLS_INVALID');
+    }
+    final explicitSni = tls['server_name'] ?? wrapper['sni'] ?? item['sni'];
+    if (explicitSni != null) {
+      if (explicitSni is! String || explicitSni.trim().isEmpty ||
+          explicitSni.length > 253 || explicitSni.contains(' ') ||
+          explicitSni.contains('/')) {
+        throw const FormatException('SHADOWTLS_TLS_INVALID');
+      }
+      tls['server_name'] = explicitSni;
+    } else if (InternetAddress.tryParse(host) != null) {
+      // The IP does not identify the certificate's cover hostname.
+      // Never synthesize a false SNI to make this validation pass.
+      throw const FormatException('SHADOWTLS_TLS_INVALID');
+    }
+    tls['enabled'] = true;
+    wrapper['tls'] = tls;
+    wrapper.remove('sni');
+
+    if (inner['method'] is! String ||
+        (inner['method'] as String).isEmpty ||
+        inner['password'] is! String ||
+        (inner['password'] as String).isEmpty) {
+      throw const FormatException('SHADOWTLS_INNER_INVALID');
+    }
+    for (final outbound in [wrapper, inner]) {
+      if (outbound.keys.any((key) => const {
+        'inbounds', 'outbounds', 'dns', 'route', 'experimental',
+        'log', 'selector', 'rules', 'default',
+      }.contains(key))) {
+        throw const FormatException('SHADOWTLS_UNTRUSTED_APP_CONFIG');
+      }
+    }
+    return [inner, wrapper];
+  }
+
   static Map<String, dynamic> validateOutbound({
     required String protocolCode,
     required Map<String, dynamic> item,
@@ -82,6 +194,28 @@ class SingBoxProfileValidator {
         port is! int || port < 1 || port > 65535) {
       throw const FormatException('SINGBOX_ENDPOINT_INVALID');
     }
+    if (protocolCode == 'snell') {
+      // sing-box 1.14 implements Snell v4 TCP and v6, but not the
+      // Snell v5 QUIC proxy. Never silently choose a different version.
+      final version = object['version'];
+      if (version != 4 && version != 6) {
+        throw const FormatException('SNELL_VERSION_UNSUPPORTED');
+      }
+      final psk = object['psk'];
+      if (psk is! String || psk.isEmpty ||
+          (version == 6 &&
+              (utf8.encode(psk).length < 12 ||
+               utf8.encode(psk).length > 255))) {
+        throw const FormatException('SNELL_PSK_REQUIRED');
+      }
+      if (object['password'] != null) {
+        throw const FormatException('SNELL_WRONG_CREDENTIAL_FIELD');
+      }
+      final network = object['network'];
+      if (network != null && network != 'tcp' && network != 'udp') {
+        throw const FormatException('SNELL_NETWORK_UNSUPPORTED');
+      }
+    }
     if (protocolCode == 'socks5') {
       // Do not quietly downgrade the entitled SOCKS5 account to SOCKS4
       // or attempt an unauthenticated session with incomplete credentials.
@@ -102,10 +236,66 @@ class SingBoxProfileValidator {
         throw const FormatException('SOCKS5_TCP_TRANSPORT_REQUIRED');
       }
     }
-    if ((protocolCode == 'hysteria2' || protocolCode == 'tuic' ||
-         protocolCode == 'anytls' || protocolCode == 'naive') &&
-        object['tls'] is! Map) {
-      throw const FormatException('SINGBOX_TLS_REQUIRED');
+    if (protocolCode == 'hysteria2' || protocolCode == 'tuic' ||
+        protocolCode == 'anytls' || protocolCode == 'naive') {
+      final rawTls = object['tls'];
+      if (rawTls is! Map) {
+        throw const FormatException('SINGBOX_TLS_REQUIRED');
+      }
+      final tls = Map<String, dynamic>.from(rawTls);
+      // Fail closed, but identify which panel setting is incompatible.
+      // Never silently disable certificate verification or SNI.
+      if (tls['insecure'] == true) {
+        // Older panel profiles may carry both a trusted CA and the obsolete
+        // insecure flag. Require explicit CA trust and a verifiable hostname
+        // before migrating this client-only flag to strict verification.
+        // Never accept a bare insecure profile or disable verification.
+        final certificate = tls['certificate'];
+        final name = tls['server_name'];
+        final hasTrust = certificate is String &&
+            certificate.contains('-----BEGIN CERTIFICATE-----') &&
+            certificate.contains('-----END CERTIFICATE-----');
+        final hasHostname = name is String && name.trim().isNotEmpty &&
+            !name.contains(' ') && !name.contains('/');
+        if (!hasTrust || !hasHostname) {
+          throw const FormatException('SINGBOX_TLS_CERT_VERIFICATION_DISABLED');
+        }
+        tls['insecure'] = false;
+      }
+      if (tls['disable_sni'] == true) {
+        throw const FormatException('SINGBOX_TLS_SNI_DISABLED');
+      }
+      if (tls['enabled'] == false) {
+        throw const FormatException('SINGBOX_TLS_DISABLED');
+      }
+      // Some panel profiles omit "enabled" but provide a valid TLS block.
+      // Make TLS explicit rather than accidentally dialing without TLS.
+      tls['enabled'] = true;
+      object['tls'] = tls;
+    }
+    if (protocolCode == 'naive') {
+      // Cronet-backed Naive only supports a restricted TLS subset.
+      // Reject incompatible settings locally instead of returning an
+      // opaque native connection error or weakening certificate checks.
+      final user = object['username'];
+      final password = object['password'];
+      if (user is! String || user.isEmpty ||
+          password is! String || password.isEmpty) {
+        throw const FormatException('NAIVE_AUTH_MISSING');
+      }
+      final tls = Map<String, dynamic>.from(object['tls'] as Map);
+      const allowedTls = {'enabled', 'server_name', 'certificate', 'ech'};
+      if (tls.keys.any((key) => !allowedTls.contains(key)) ||
+          tls['enabled'] != true) {
+        throw const FormatException('NAIVE_TLS_OPTIONS_UNSUPPORTED');
+      }
+      final sni = tls['server_name'];
+      if (sni != null &&
+          (sni is! String || sni.trim().isEmpty ||
+           sni.contains(' ') || sni.contains('/'))) {
+        throw const FormatException('NAIVE_TLS_SERVER_NAME_INVALID');
+      }
+      object['tls'] = tls;
     }
     // ShadowTLS detours cannot safely be flattened into one outbound.
     if (protocolCode == 'shadowtls') {

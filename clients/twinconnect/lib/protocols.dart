@@ -123,6 +123,18 @@ class VpnProtocols {
   }
 }
 
+
+/// Android-only visibility gate. These protocols have no verified device VPN
+/// transport in the current APK. Do not remove them from the panel, other
+/// platforms, subscriptions or server configuration.
+class AndroidProtocolVisibility {
+  static const unavailable = <String>{
+    'l2tp', 'mieru', 'trusttunnel', 'sudoku', 'naive',
+  };
+
+  static bool visible(String code) => !unavailable.contains(code);
+}
+
 class PanelProtocolStatus {
   const PanelProtocolStatus({
     required this.protocol,
@@ -169,7 +181,7 @@ class PanelProtocolCatalog {
       throw const FormatException('INVALID_PROTOCOL_CATALOG');
     }
     final rows = input['protocols'] as List<dynamic>;
-    if (rows.length != VpnProtocols.all.length) {
+    if (rows.isEmpty || rows.length > VpnProtocols.all.length) {
       throw const FormatException('INCOMPLETE_PROTOCOL_CATALOG');
     }
     final parsed = <String, PanelProtocolStatus>{};
@@ -183,13 +195,20 @@ class PanelProtocolCatalog {
       }
       parsed[status.protocol.code] = status;
     }
-    if (parsed.length != VpnProtocols.all.length) {
+    // Some panel installations return a sparse authenticated catalogue:
+    // only the exact protocols granted to this account (e.g. V2Ray and
+    // Hysteria2). A sparse response is valid ONLY when every returned entry
+    // is explicitly selected. Missing protocols are never made selectable.
+    // Full catalogues may include unselected entries for availability UI.
+    if (parsed.length != VpnProtocols.all.length &&
+        parsed.values.any((entry) => !entry.selected)) {
       throw const FormatException('INCOMPLETE_PROTOCOL_CATALOG');
     }
     return PanelProtocolCatalog(
       namespace: (input['namespace'] as String).toUpperCase(),
       entries: [
-        for (final def in VpnProtocols.all) parsed[def.code]!,
+        for (final def in VpnProtocols.all)
+          if (parsed.containsKey(def.code)) parsed[def.code]!,
       ],
     );
   }

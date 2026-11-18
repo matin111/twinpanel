@@ -17,7 +17,7 @@ class XrayInboundLatency {
     XrayInboundProfile profile, {
     Duration timeout = const Duration(milliseconds: 1800),
   }) async {
-    if (!Platform.isWindows || profile.uri.port <= 0) return null;
+    if ((!Platform.isWindows && !Platform.isAndroid) || profile.uri.port <= 0) return null;
     final clock = Stopwatch()..start();
     Socket? socket;
     try {

@@ -5,6 +5,8 @@ script on temporary configs, never against a live server.
 """
 from __future__ import annotations
 
+import runpy
+
 import ast
 import contextlib
 import io
@@ -41,7 +43,7 @@ tags = {p: "twinpanel-" + p + "-in" for p in protocols}
 
 def generate(path: Path, state: Path):
     ns = {
-        "parallel_user_sync_script": __import__("app.services.shadowtls_2022_identity_v1",fromlist=["parallel_user_sync_script"]).parallel_user_sync_script,
+        "parallel_user_sync_script": runpy.run_path(str(ROOT / "backend" / "app" / "services" / "shadowtls_2022_identity_v1.py"))["parallel_user_sync_script"],
         "json": json, "CONFIG_PATH": str(path), "STATE_PATH": str(state),
         "SINGBOX_PROTOCOLS": set(protocols), "TAGS": tags,
         "REVOCATION_SENTINEL": "__twinpanel_revoked__",

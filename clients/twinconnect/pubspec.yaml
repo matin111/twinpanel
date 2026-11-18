@@ -18,6 +18,10 @@ dependencies:
   country_flags: 4.1.2
   # Native Android VpnService + libbox for Hysteria2/TUIC/AnyTLS/SOCKS5.
   sing_box: 1.0.0
+  # Bundled Xray-core Android VpnService for VLESS/XHTTP Reality.
+  flutter_vless: 1.1.7
+  # Embedded Android OpenVPN 2.x engine; GPLv3 distribution obligations apply.
+  openvpn_flutter: 2.0.0
 
 dev_dependencies:
   flutter_test:

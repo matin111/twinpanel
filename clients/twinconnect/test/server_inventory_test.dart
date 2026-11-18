@@ -32,6 +32,25 @@ void main() {
         isNull);
   });
 
+  test('accepts only safe protocol listener ports for authorized node', () {
+    const row = {
+      'id': '42', 'name': 'Turkey', 'country_code': 'TR',
+      'node_online': true, 'latency_ms': null,
+      'probe_ip': '8.8.8.8',
+      'probe_ports': {
+        'cisco': 4443, 'openvpn': 1194,
+        'invalid': -1, 'bad port': 443, 'wireguard': 65536,
+      },
+    };
+    final parsed = AppServer.fromJson(row);
+    expect(parsed.probePorts['cisco'], 4443);
+    expect(parsed.probePorts['openvpn'], 1194);
+    expect(parsed.probePorts.containsKey('invalid'), isFalse);
+    expect(parsed.probePorts.containsKey('bad port'), isFalse);
+    expect(parsed.probePorts.containsKey('wireguard'), isFalse);
+    expect(() => parsed.probePorts['cisco'] = 443, throwsUnsupportedError);
+  });
+
   test('rejects duplicate or invented latency', () {
     const row = {
       'id': '2', 'name': 'Germany', 'country_code': 'DE',

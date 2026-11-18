@@ -2,11 +2,11 @@ import 'twin_language_picker.dart';
 import 'app_strings.dart';
 import 'twinconnect_wave_indicator.dart';
 import 'dart:ui' show ImageFilter, FontFeature;
-import 'dart:io' show Platform, HttpClient, InternetAddress, Process, ProcessException, FileSystemException, SocketException, HttpException;
-import 'dart:convert' show utf8;
+import 'dart:io' show Platform, HttpClient, InternetAddress, Process, ProcessException, FileSystemException, SocketException, HttpException, Socket;
+import 'dart:convert' show utf8, base64Url, jsonEncode, jsonDecode;
 import 'dart:async' show Timer, TimeoutException, unawaited;
 
-import 'package:flutter/services.dart' show PlatformException;
+import 'package:flutter/services.dart' show PlatformException, MethodChannel;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:flutter/material.dart';
@@ -210,9 +210,43 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   /// Every protocol switch passes this gate BEFORE interrupting an existing
   /// tunnel. The guard remains active when a VPN disconnects; we must never
   /// disarm it just because a transport process is stopped.
-  Future<void> _requireVerifiedGuardIfRequested() async {
+  Future<void> _requireVerifiedGuardIfRequested({bool sharedWireGuard = false}) async {
     final policy = await _vpnPolicy.loadFailClosed(widget.panel.namespace, widget.username);
-    if (!policy.killSwitchRequested) return;
+    if (!policy.killSwitchRequested) {
+      if (Platform.isAndroid && !sharedWireGuard) {
+        final state = await const MethodChannel('com.twinpanel.twinconnect/vpn')
+            .invokeMapMethod<String, dynamic>('getDisconnectedTrafficGuardStatus');
+        if (state?['sharedTunOwner'] == true) {
+          throw const FormatException('SHARED_TUN_ENGINE_MIGRATION_REQUIRED');
+        }
+      }
+      return;
+    }
+    if (Platform.isAndroid) {
+      const channel = MethodChannel('com.twinpanel.twinconnect/vpn');
+      var status = await channel
+          .invokeMapMethod<String, dynamic>('getDisconnectedTrafficGuardStatus')
+          .timeout(const Duration(seconds: 5));
+      if (status?['osLockdown'] == true && status?['protectionVerified'] == true) {
+        return;
+      }
+      // Engines that still create a second VpnService require OS lockdown.
+      // Cisco and WireGuard can retain the shared-TUN guard across reconnects.
+      if (!sharedWireGuard) {
+        throw const FormatException('ANDROID_KILL_SWITCH_NOT_VERIFIED');
+      }
+      if (status?['sharedGuardEnabled'] == true &&
+          status?['sharedTunOwner'] == true) return;
+      await channel.invokeMethod<dynamic>('startDisconnectedTrafficGuard');
+      for (var attempt = 0; attempt < 30; attempt++) {
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+        status = await channel.invokeMapMethod<String, dynamic>(
+            'getDisconnectedTrafficGuardStatus');
+        if (status?['sharedGuardEnabled'] == true &&
+            status?['sharedTunOwner'] == true) return;
+      }
+      throw const FormatException('ANDROID_KILL_SWITCH_NOT_VERIFIED');
+    }
     if (!Platform.isWindows) {
       throw const FormatException('GLOBAL_KILL_SWITCH_UNSUPPORTED_PLATFORM');
     }
@@ -386,8 +420,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
 
   Future<void> _probeNode(int index) async {
     final nodes = widget.servers?.servers;
-    if (!Platform.isWindows || nodes == null || index < 0 ||
-        index >= nodes.length) { return; }
+    if ((!Platform.isWindows && !Platform.isAndroid) ||
+        nodes == null || index < 0 || index >= nodes.length) { return; }
     final node = nodes[index];
     if (_pingingNodes.contains(node.id)) { return; }
     if (node.probeIp == null) {
@@ -402,6 +436,58 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     String? error;
     try {
       final clock = Stopwatch()..start();
+      if (Platform.isAndroid) {
+        // Android does not have Windows PING.EXE. Probe the real assigned
+        // numeric address with one platform ICMP echo; never invent an RTT.
+        try {
+          final response = await Process.run(
+            '/system/bin/ping',
+            ['-c', '1', '-W', '2', node.probeIp!],
+            runInShell: false,
+          ).timeout(const Duration(seconds: 4));
+          clock.stop();
+          if (response.exitCode == 0) {
+            final match = RegExp(r'time\s*[=<]\s*([0-9]+(?:\.[0-9]+)?)\s*ms',
+              caseSensitive: false).firstMatch(response.stdout.toString());
+            if (match != null) {
+              latency = double.parse(match.group(1)!).ceil().clamp(1, 60000);
+            } else {
+              latency = clock.elapsedMilliseconds.clamp(1, 60000);
+              error = 'APPROXIMATE_RTT';
+            }
+          } else {
+            error = 'ICMP_TIMEOUT_OR_BLOCKED';
+          }
+        } catch (_) {
+          error = 'ICMP_TIMEOUT_OR_BLOCKED';
+        }
+        // Test an actual applied listener, never assume every node uses 443.
+        // ICMP and TCP are distinct; no success is fabricated.
+        const tcpProtocols = <String>{
+          'cisco', 'openvpn', 'v2ray', 'anytls', 'naive', 'snell',
+        };
+        final selectedPort = tcpProtocols.contains(_filter)
+            ? node.probePorts[_filter]
+            : _filter == 'all'
+                ? node.probePorts['cisco'] ?? node.probePorts['openvpn']
+                : null;
+        if (latency == null && selectedPort != null) {
+          final tcpClock = Stopwatch()..start();
+          try {
+            final socket = await Socket.connect(
+              node.probeIp!, selectedPort,
+              timeout: const Duration(milliseconds: 1800),
+            );
+            tcpClock.stop();
+            socket.destroy();
+            latency = tcpClock.elapsedMilliseconds.clamp(1, 60000);
+            error = 'TCP_CONNECT_RTT';
+          } catch (_) {
+            error = 'ICMP_TIMEOUT_OR_BLOCKED';
+          }
+        }
+        return;
+      }
       final windowsRoot = Platform.environment['SystemRoot'];
       if (windowsRoot == null || windowsRoot.isEmpty) {
         error = 'PING_PROGRAM_UNAVAILABLE';
@@ -786,20 +872,37 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         }
         if (!healthy && _modernProtocol == 'cisco') {
           _modernHealthFailures++;
-          if (!_ciscoTunnel.isRunning || _modernHealthFailures >= 2) {
+          // An HTTPS public-IP probe can time out or be rate-limited while
+          // the OpenConnect child and Windows tunnel remain alive. Do not
+          // falsely mark that live tunnel as disconnected or allow a second
+          // connection on top of it. Clear the *verified egress* separately.
+          if (!_ciscoTunnel.isRunning) {
             _modernHealthTimer?.cancel();
+            _stopModernTrafficMonitoring();
             setState(() {
               _modernUp = false;
               _publicIp = null;
-              _vpnError = _ciscoTunnel.isRunning
-                  ? 'CISCO_HEALTH_DEGRADED' : 'CISCO_PROCESS_EXITED';
+              _vpnError = 'CISCO_PROCESS_EXITED';
             });
-            return;
+          } else if (_modernHealthFailures >= 2) {
+            setState(() {
+              _publicIp = null;
+              _vpnError = 'CISCO_HEALTH_DEGRADED';
+            });
           }
+          return;
         }
         if (healthy) {
           _modernHealthFailures = 0;
-          if (_vpnError == 'SINGBOX_TUN_HEALTH_DEGRADED') {
+          if (_modernProtocol == 'cisco') {
+            if (_vpnError == 'CISCO_HEALTH_DEGRADED' ||
+                _publicIp != _ciscoTunnel.exitIp) {
+              setState(() {
+                _publicIp = _ciscoTunnel.exitIp;
+                if (_vpnError == 'CISCO_HEALTH_DEGRADED') _vpnError = null;
+              });
+            }
+          } else if (_vpnError == 'SINGBOX_TUN_HEALTH_DEGRADED') {
             setState(() => _vpnError = null);
           }
         } else {
@@ -857,7 +960,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     if (_vpnBusy) return;
     setState(() { _vpnBusy = true; _vpnError = null; });
     try {
-      await _requireVerifiedGuardIfRequested();
+      await _requireVerifiedGuardIfRequested(sharedWireGuard: true);
       if (_vpnUnmanaged) {
         throw const FormatException('UNMANAGED_WIREGUARD_SERVICE');
       }
@@ -2019,6 +2122,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       _autoFastest = false;
       if (!busy) _vpnError = null;
     });
+    if (Platform.isAndroid) unawaited(_saveSelection());
     if (busy) {
       ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(
         content: Text(tr('سرور انتخاب شد؛ عملیات قبلی هنوز در حال اجراست.',
@@ -2086,7 +2190,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     // removing the working tunnel. A failed preflight keeps it running.
     setState(() { _vpnBusy = true; _vpnError = null; });
     try {
-      await _requireVerifiedGuardIfRequested();
+      await _requireVerifiedGuardIfRequested(sharedWireGuard: true);
       final api = TenantApi.fromBuildConfig();
       final checks = await Future.wait<Object>([
         _vpnPolicy.load(widget.panel.namespace, widget.username),
@@ -2245,6 +2349,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     });
     _dark = true; // Premium dark canvas is the only supported app appearance.
     _restoreAppearance();
+    unawaited(_restoreSelection());
     _refreshNativeReadiness();
     _refreshVpnStatus();
     unawaited(_restoreCachedXrayInbounds());
@@ -2264,6 +2369,12 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         oldWidget.panel.apiOrigin != widget.panel.apiOrigin) {
       _socks5AssignedNodeIds = null;
       _socks5NodesError = null;
+      _selectionRevision++;
+      _selectionRestored = false;
+      _filter = 'all';
+      _selected = 0;
+      _androidExplicitNodeSelected = false;
+      unawaited(_restoreSelection());
       // No in-memory Xray credentials may cross tenants or accounts.
       _xrayGroups = const [];
       _xrayGroupsLoaded = false;
@@ -2274,14 +2385,40 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       unawaited(_restoreCachedXrayInbounds());
     } else if (oldWidget.servers != widget.servers ||
         oldWidget.catalog != widget.catalog) {
+      // A plan/category change can revoke a previously selected protocol.
+      // Never retain a filter that this subscription no longer authorizes.
+      if (oldWidget.catalog != widget.catalog && widget.catalog != null &&
+          _filter != 'all' &&
+          !widget.catalog!.entries.any((entry) =>
+              entry.selected && entry.protocol.code == _filter)) {
+        _filter = 'all';
+        _autoFastest = false;
+      }
       // The first session inventory often arrives after the dashboard
       // initializes; retry restore once authorized nodes become available.
       _xrayGroups = _assignedXrayGroups(_xrayGroups);
+      if (!_selectionRestored) unawaited(_restoreSelection());
       if (_xrayGroups.isEmpty && !_xrayGroupsLoaded) {
         unawaited(_restoreCachedXrayInbounds());
       }
     }
     if (oldWidget.servers != widget.servers) {
+      // Server lists may be reordered during refresh. Preserve the exact
+      // selected server ID instead of accidentally switching by list index.
+      if (_androidExplicitNodeSelected && oldWidget.servers != null) {
+        final previous = oldWidget.servers!.servers;
+        if (_selected >= 0 && _selected < previous.length) {
+          final selectedId = previous[_selected].id;
+          final refreshed = widget.servers?.servers ?? const <AppServer>[];
+          final newIndex = refreshed.indexWhere((n) => n.id == selectedId);
+          if (newIndex >= 0) {
+            _selected = newIndex;
+          } else if (widget.servers != null) {
+            _androidExplicitNodeSelected = false;
+            _selected = 0;
+          }
+        }
+      }
       final ids = widget.servers?.servers.map((node) => node.id).toSet()
           ?? <String>{};
       _nodePings.removeWhere((id, value) => !ids.contains(id));
@@ -2449,9 +2586,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
           _resetNetworkStats();
         });
       } else {
-        // Allow disconnect at any time, but never start a new WireGuard
-        // session while requested OS-wide protection is unverified.
-        await _requireVerifiedGuardIfRequested();
+        // Start the shared TUN guard when WireGuard protection is requested.
+        await _requireVerifiedGuardIfRequested(sharedWireGuard: true);
         if (_autoFastest) {
           if (_filter != 'wireguard') {
             throw const FormatException('SELECT_PROTOCOL_FOR_FASTEST');
@@ -2649,6 +2785,78 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   String _search = '';
   int _selected = 0;
   bool _androidExplicitNodeSelected = false;
+
+  // Persist only UI selections; never cached VPN secrets or connectivity.
+  static const _selectionPreferencePrefix = 'twinconnect_selection_v1_';
+  bool _selectionRestored = false;
+  int _selectionRevision = 0;
+
+  String get _selectionPreferenceKey => _selectionPreferencePrefix +
+      base64Url.encode(utf8.encode([
+        widget.panel.namespace,
+        widget.panel.apiOrigin,
+        widget.username,
+      ].join('|')));
+
+  Future<void> _saveSelection() async {
+    if (!Platform.isAndroid) return;
+    _selectionRevision++;
+    final key = _selectionPreferenceKey;
+    final value = jsonEncode({
+      'protocol': _filter,
+      'node_id': _androidExplicitNodeSelected ? _selectedServerId : null,
+    });
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(key, value);
+    } catch (_) {
+      // A storage failure must not interrupt an active connection.
+    }
+  }
+
+  Future<void> _restoreSelection() async {
+    if (!Platform.isAndroid || _selectionRestored ||
+        widget.catalog == null || widget.servers == null) return;
+    final revision = _selectionRevision;
+    final key = _selectionPreferenceKey;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(key);
+      if (raw == null) {
+        if (mounted && revision == _selectionRevision &&
+            key == _selectionPreferenceKey) _selectionRestored = true;
+        return;
+      }
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map) return;
+      final protocol = decoded['protocol'];
+      final nodeId = decoded['node_id'];
+      if (!mounted || revision != _selectionRevision ||
+          key != _selectionPreferenceKey) return;
+      // A saved protocol remains the user's selection even while its
+      // native profile is unavailable. Readiness is checked at connect time.
+      final entitled = widget.catalog!.entries.any((entry) =>
+          entry.protocol.code == protocol && entry.selected);
+      final protocolAllowed = protocol == 'all' || entitled;
+      final nodes = widget.servers!.servers;
+      final matching = nodeId is String
+          ? nodes.indexWhere((node) => node.id == nodeId) : -1;
+      setState(() {
+        _filter = protocolAllowed && protocol is String ? protocol : 'all';
+        if (matching >= 0) {
+          _selected = matching;
+          _androidExplicitNodeSelected = true;
+        } else {
+          _selected = 0;
+          _androidExplicitNodeSelected = false;
+        }
+        _selectionRestored = true;
+      });
+    } catch (_) {
+      if (mounted && revision == _selectionRevision &&
+          key == _selectionPreferenceKey) _selectionRestored = true;
+    }
+  }
   final Set<int> _favorites = <int>{};
   // User-facing Xray inbounds remain distinct choices. Last validated
   // entries are stored in OS-encrypted short-lived display cache only.
@@ -2694,7 +2902,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
   bool _xrayPingAllBusy = false;
 
   Future<void> _probeXrayInbound(XrayInboundProfile inbound) async {
-    if (!Platform.isWindows || !mounted) return;
+    if ((!Platform.isWindows && !Platform.isAndroid) || !mounted) return;
     final key = XrayInboundLatency.key(inbound);
     if (_xrayInboundsProbing.contains(key)) return;
     setState(() => _xrayInboundsProbing.add(key));
@@ -3879,6 +4087,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                     'Ping test failed.'),
                   'APPROXIMATE_RTT' => tr('زمان تقریبی شامل سربار اجرای Ping',
                     'Approximate timing including ping startup overhead'),
+                  'TCP_CONNECT_RTT' => tr('زمان اتصال TCP به پورت واقعی سرویس؛ پینگ ICMP نیست.',
+                    'TCP connection to the configured service port, not ICMP.'),
                   _ => tr('پینگ سرور', 'Server ping'),
                 },
                 child: Text(
@@ -3889,7 +4099,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                     : ServerLatency.label(
                         _latencyFor(widget.servers!.servers[index]),
                         approximate: _nodePingErrors[
-                          widget.servers!.servers[index].id] == 'APPROXIMATE_RTT'),
+                          widget.servers!.servers[index].id] == 'APPROXIMATE_RTT' ||
+                        _nodePingErrors[widget.servers!.servers[index].id] == 'TCP_CONNECT_RTT'),
                   style: TextStyle(
                     fontSize: 11, fontWeight: FontWeight.w700,
                     color: ServerLatency.color(
@@ -3945,12 +4156,19 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                   _selected = index;
                   _selectedXrayNodeId = nodeId;
                   _selectedXrayInboundId = inbound.id;
+                  _androidExplicitNodeSelected = Platform.isAndroid;
                   _filter = 'v2ray';
                   _page = 'home';
                   _autoFastest = false;
                   _vpnError = null;
                 });
-                _startXrayTunnel(nodeId, inboundId: inbound.id);
+                if (Platform.isWindows) {
+                  _startXrayTunnel(nodeId, inboundId: inbound.id);
+                } else if (Platform.isAndroid) {
+                  // The Android card starts the native VLESS engine when
+                  // Connect is pressed; do not call Windows-only launcher.
+                  unawaited(_saveSelection());
+                }
               },
               child: Padding(
                 padding: const EdgeInsets.symmetric(
@@ -4013,8 +4231,9 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
       );
     }
 
-    // All 16 chips remain visible. Admin-selected protocols will replace
-    // the preview's complete catalog after an authenticated panel session.
+    // Only the current authenticated subscription's permitted protocols
+    // belong in the server filters. Never expose the fixed 16-item contract
+    // as an account-specific list.
     Widget fastestServerControl() => Container(
       key: const Key('liveAutoFastestServer'),
       padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
@@ -4060,7 +4279,11 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
         children: [
           for (final entry in <(String, String)>[
             ('all', tr('همه', 'All')),
-            for (final p in VpnProtocols.all) (p.code, p.name),
+            for (final entry in widget.catalog?.entries ?? const <PanelProtocolStatus>[])
+              if (entry.selected &&
+                  (!Platform.isAndroid ||
+                      AndroidProtocolVisibility.visible(entry.protocol.code)))
+                (entry.protocol.code, entry.protocol.name),
           ])
             ChoiceChip(
               key: Key('devFilter_${entry.$1}'),
@@ -4080,6 +4303,7 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                   _filter = entry.$1;
                   _autoFastest = false;
                 });
+                if (Platform.isAndroid) unawaited(_saveSelection());
                 if (entry.$1 == 'v2ray') _loadXrayGroups();
                 if (entry.$1 == 'socks5') {
                   unawaited(_refreshSocks5AvailableNodes());
@@ -4521,6 +4745,60 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
     // Main connection page: compact, real subscription lifecycle details.
     // The account page still owns the full breakdown and edit/refresh actions.
     // A missing snapshot displays dashes, never fictitious quota/dates.
+    Widget reservedRenewalNotice(ReservedRenewalSnapshot renewal,
+        {required bool compact}) {
+      final accent = renewal.needsReview
+          ? const Color(0xFFFFB878) : purple;
+      final description = renewal.needsReview
+          ? tr('تمدید نیازمند بررسی است؛ اعتبار دوره بعد مصرف نشده است.',
+               'Renewal needs review; the next period has not been used.')
+          : tr('با پایان حجم یا تاریخ فعلی، دوره بعد خودکار فعال می‌شود.',
+               'The next period activates after current quota or expiry ends.');
+      return Container(
+        key: Key(compact ? 'liveHomeReservedRenewal' : 'accountReservedRenewal'),
+        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 12),
+        decoration: BoxDecoration(
+          color: accent.withValues(alpha: _dark ? .12 : .06),
+          borderRadius: BorderRadius.circular(15),
+          border: Border.all(color: accent.withValues(alpha: .32)),
+        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min, children: [
+            Row(children: [
+              Icon(renewal.needsReview ? Icons.info_outline_rounded
+                  : Icons.event_repeat_rounded, color: accent, size: 18),
+              const SizedBox(width: 7),
+              Expanded(child: Text(
+                renewal.needsReview
+                    ? tr('تمدید نیازمند بررسی', 'Renewal needs review')
+                    : tr('تمدید رزرو شده', 'Reserved renewal'),
+                style: TextStyle(color: ink, fontWeight: FontWeight.w800,
+                    fontSize: compact ? 11 : 14))),
+            ]),
+            const SizedBox(height: 7),
+            Text(renewal.planName,
+                maxLines: 2, overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: ink, fontWeight: FontWeight.w700,
+                    fontSize: compact ? 11 : 13)),
+            const SizedBox(height: 4),
+            Text(
+              '${_formatBytes(renewal.trafficBytes)} · ${renewal.durationDays} '
+              + tr('روز', 'days'),
+              style: TextStyle(color: ink, fontWeight: FontWeight.w600,
+                  fontSize: compact ? 10 : 12)),
+            const SizedBox(height: 6),
+            Text(description, style: TextStyle(color: sub,
+                fontSize: compact ? 10 : 12)),
+            if (!compact) ...[
+              const SizedBox(height: 6),
+              Text(tr('ثبت تمدید: ', 'Reserved on: ')
+                  + renewal.reservedAt.toLocal().toIso8601String().split('T').first,
+                style: TextStyle(color: sub, fontSize: 11)),
+            ],
+          ]),
+      );
+    }
+
     Widget homeSubscriptionSummary() {
       final account = widget.account;
       final used = account?.trafficUsedBytes ?? 0;
@@ -4659,6 +4937,10 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                 tr('زمان باقی‌مانده', 'Time remaining'),
                 daysLabel, cyan)),
             ]),
+            if (account?.reservedRenewal != null) ...[
+              const SizedBox(height: 8),
+              reservedRenewalNotice(account!.reservedRenewal!, compact: true),
+            ],
             if (widget.accountError != null) ...[
               const SizedBox(height: 6),
               Text(tr('اطلاعات حساب در دسترس نیست؛ تازه‌سازی کنید.',
@@ -4694,6 +4976,8 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
                     // Preserve the actual choice, even when its Android
                     // engine is unavailable; never substitute WireGuard.
                     selectedProtocolCode: _filter == 'all' ? null : _filter,
+                    selectedInboundId: _filter == 'v2ray'
+                        ? _selectedXrayInboundId : null,
                     selectedNodeId: _androidExplicitNodeSelected
                         ? _selectedServerId : null,
                     subscriptionContent: Container(
@@ -4914,6 +5198,10 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
             ]),
           ),
           const SizedBox(height: 15),
+          if (current?.reservedRenewal != null) ...[
+            reservedRenewalNotice(current!.reservedRenewal!, compact: false),
+            const SizedBox(height: 15),
+          ],
           glassCard(
             key: const Key('accountTrafficCard'),
             radius: 24,
@@ -5105,7 +5393,24 @@ class _TwinConnectLiveDashboardState extends State<TwinConnectLiveDashboard> {
             children: [
               Center(child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 1000),
-                child: AnimatedSwitcher(
+                // Keep Android connection state mounted across tab changes.
+                // Tabs must not implicitly disconnect or reset an active VPN.
+                child: Platform.isAndroid
+                    ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Offstage(
+                            offstage: _page != 'home',
+                            child: home(),
+                          ),
+                          if (_page != 'home')
+                            KeyedSubtree(
+                              key: ValueKey<String>(_page),
+                              child: content(),
+                            ),
+                        ],
+                      )
+                    : AnimatedSwitcher(
                   key: const Key('devPageTransition'),
                   duration: const Duration(milliseconds: 360),
                   reverseDuration: const Duration(milliseconds: 210),

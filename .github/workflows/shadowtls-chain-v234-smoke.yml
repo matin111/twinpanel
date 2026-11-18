@@ -31,4 +31,4 @@ jobs:
             backend/app/singbox_subscription_accounts.py \
             backend/tests/shadowtls_chain_v234_smoke.py
       - name: Run ShadowTLS chain smoke
-        run: python backend/tests/shadowtls_chain_v234_smoke.py
+        run: PYTHONPATH=backend python backend/tests/shadowtls_chain_v234_smoke.py

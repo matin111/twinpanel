@@ -122,6 +122,9 @@ class VpnPolicy {
   List<String> draftProblems(VpnPlatform platform, {bool managedDevice = false}) {
     final issues = <String>[];
     final selectedMode = routingMode != VpnRoutingMode.fullTunnel;
+    if (selectedMode && killSwitchRequested) {
+      issues.add('SPLIT_TUNNEL_GUARD_CONFLICT');
+    }
     if (selectedMode) {
       if (platform != VpnPlatform.android &&
           platform != VpnPlatform.windows && !managedDevice) {
@@ -153,8 +156,8 @@ class VpnPolicy {
     return issues;
   }
 
-  /// Never report protection as active based on a saved toggle.
-  /// Only platform-level verified capabilities can authorize future connect.
+  /// Availability allows initiating a protected connection. Enforcement is
+  /// reported independently, only after the native TUN actually exists.
   List<String> connectionProblems(NativeVpnCapabilities native) {
     final issues = draftProblems(native.platform, managedDevice: native.managedDevice);
     if (!native.engineReady) issues.add('ENGINE_NOT_READY');
@@ -167,7 +170,8 @@ class VpnPolicy {
         !native.excludeApps) {
       issues.add('EXCLUDE_APPS_UNSUPPORTED');
     }
-    if (killSwitchRequested && !native.killSwitchEnforced) {
+    if (killSwitchRequested &&
+        !native.killSwitchAvailable && !native.killSwitchEnforced) {
       issues.add('KILL_SWITCH_NOT_ENFORCED');
     }
     if (dnsMode == VpnDnsMode.protected && !native.dnsGuard) {
@@ -196,6 +200,7 @@ class NativeVpnCapabilities {
     this.fullTunnel = false,
     this.includeApps = false,
     this.excludeApps = false,
+    this.killSwitchAvailable = false,
     this.killSwitchEnforced = false,
     this.dnsGuard = false,
     this.ipv6Guard = false,
@@ -210,6 +215,8 @@ class NativeVpnCapabilities {
   final bool fullTunnel;
   final bool includeApps;
   final bool excludeApps;
+  /// A native TUN owner can establish a fail-closed guard on connect.
+  final bool killSwitchAvailable;
   /// True only after native OS lockdown/filter enforcement is confirmed.
   final bool killSwitchEnforced;
   final bool dnsGuard;
@@ -245,6 +252,7 @@ class NativeVpnCapabilities {
           (platform == VpnPlatform.android ||
               platform == VpnPlatform.windows ||
               managed),
+      killSwitchAvailable: flag('killSwitchAvailable'),
       killSwitchEnforced: flag('killSwitchEnforced'),
       dnsGuard: flag('dnsGuard'),
       ipv6Guard: flag('ipv6Guard'),

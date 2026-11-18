@@ -40,15 +40,15 @@ void main() {
     expect(dashboard, isNot(contains("tr('دست‌دهی با سرور تأیید شد', 'Server handshake verified')")));
   });
 
-  test('connection fabric animates only on verified traffic', () {
+  test('connection fabric moves for active connection without fabricating throughput', () {
     final wave = File('lib/twinconnect_wave_indicator.dart').readAsStringSync();
     final dashboard = File('lib/live_dashboard.dart').readAsStringSync();
     expect(wave, contains('if (_animate)'));
     expect(wave, contains('if (!_animate && _motion.isAnimating)'));
     expect(dashboard, contains('connected: _verifiedConnectionActive'));
     expect(dashboard, contains("Key('liveConnectionDataFabric')"));
-    expect(wave, contains('widget.connected && _trafficPresent'));
-    expect(wave, contains('maxRx > 0 || maxTx > 0'));
+    expect(wave, contains('bool get _animate => widget.connected || widget.connecting;'));
+    expect(wave, contains('final active = connected;'));
     expect(wave, isNot(contains('Icons.lock_rounded')));
     expect(dashboard, contains("Key('liveRefreshTunnelStatus')"));
   });
@@ -156,7 +156,8 @@ void main() {
     expect(card, contains("final protocolName = chosen?.protocol.name"));
     expect(card, contains("Key('androidSeparateActiveProtocol')"));
     expect(card, contains("Key('androidDisconnectPreviousTunnel')"));
-    expect(card, contains("final internetVerified = _ciscoUp ||"));
+    expect(card, contains('final internetVerified = _activeVerifiedTransport && _publicIp != null;'));
+    expect(card, contains('Internet reachable while VPN active'));
     expect(card, contains("Key('androidNoHandshakeDiagnostic')"));
     expect(card, contains('WG_INTERFACE_UP_NO_HANDSHAKE'));
     expect(card, contains('Tunnel interface up; server connection unverified'));
@@ -177,7 +178,7 @@ void main() {
       expect(modern, contains("'$code'"));
     }
     expect(modern, contains('SingBoxProfileValidator.validateOutbound('));
-    expect(modern, contains('SingBox.instance.connect(jsonEncode(outbound))'));
+    expect(modern, contains('SingBox.instance.connect(config)'));
     expect(card, contains('Future<void> _connectModern('));
     expect(card, contains('Future<void> _disconnectModern()'));
     expect(card, contains('loadSessionNativeProfiles('));
@@ -196,7 +197,9 @@ void main() {
     final native = File('native/android/kotlin/com/twinpanel/twinconnect/MainActivity.kt')
         .readAsStringSync();
     expect(android, contains("widget.catalog.entries"));
-    expect(android, contains(".where((entry) => entry.selected)"));
+    // Selection also excludes protocols intentionally hidden on Android.
+    expect(android, contains('.where((entry) => entry.selected &&'));
+    expect(android, contains('AndroidProtocolVisibility.visible('));
     final dashboard = File('lib/live_dashboard.dart').readAsStringSync();
     expect(dashboard, contains("Key('devProtocolFilters')"));
     expect(dashboard, contains("Key('androidChooseLocation')"));
@@ -250,11 +253,18 @@ void main() {
     expect(dashboard, contains('servers: widget.servers'));
   });
 
-  test('Android HTTPS probe has a TLS fallback and requires peer handshake', () {
+  test('Android HTTPS probe requires live transport and never disables TLS', () {
     final card = File('lib/android_connection_card.dart').readAsStringSync();
-    expect(card, contains("'api.ipify.org', 'icanhazip.com'"));
-    expect(card, contains('Uri.https(provider,'));
-    expect(card, contains('_up && _handshake ? verifiedIp : null'));
+    expect(card, contains("_probeHttps('api.ipify.org', '/')"));
+    expect(card, contains("_probeHttps('icanhazip.com', '/')"));
+    expect(card, contains("_probeHttps('www.cloudflare.com', '/cdn-cgi/trace'"));
+    expect(card, contains('Uri.https(host, path)'));
+    expect(card, contains('Future.wait(['));
+    expect(card, contains('(_up && _handshake) || _openVpnUp || _ciscoUp ||'));
+    expect(card, contains('_activeVerifiedTransport ? ip : null'));
+    expect(card, contains('_activeVerifiedTransport ? latency : null'));
+    expect(card, contains('generation == _networkProbeGeneration'));
+    expect(card, contains('VPN routing not independently verified'));
     expect(card, isNot(contains('badCertificateCallback')));
   });
 
@@ -276,38 +286,177 @@ void main() {
     final native = File(
       'native/android/kotlin/com/twinpanel/twinconnect/WireGuardRuntime.kt',
     ).readAsStringSync();
-    expect(native, contains('getStatistics(tunnel)'));
-    expect(native, contains('statistics.totalRx()'));
-    expect(native, contains('statistics.totalTx()'));
-    expect(native, contains('latestHandshakeEpochMillis()'));
+    final service = File(
+      'native/android/kotlin/com/twinpanel/twinconnect/SharedTunVpnService.kt',
+    ).readAsStringSync();
+    expect(service, contains('WireGuardJni.getConfig(handle)'));
+    expect(service, contains('WireGuardJni.turnOn(nativeFd, settings)'));
+    expect(native, contains('line.startsWith("rx_bytes=")'));
+    expect(native, contains('line.startsWith("tx_bytes=")'));
+    expect(native, contains('line.startsWith("last_handshake_time_sec=")'));
+    expect(native, contains('latestHandshakeEpochMillis'));
     expect(card, contains("status['rxBytes']"));
     expect(card, contains("status['txBytes']"));
     expect(card, contains("status['peerHandshakeVerified']"));
-    expect(card, contains("Uri.https(provider, '/')"));
-    expect(card, contains("'api.ipify.org', 'icanhazip.com'"));
+    expect(card, contains('Uri.https(host, path)'));
+    expect(card, contains("_probeHttps('api.ipify.org', '/')"));
+    expect(card, contains("_probeHttps('icanhazip.com', '/')"));
+    expect(card, contains("_probeHttps('www.cloudflare.com', '/cdn-cgi/trace'"));
     expect(card, contains("_speed(_downloadBps)"));
     expect(card, contains("_speed(_uploadBps)"));
     expect(card, contains("Icons.bolt, 'HTTPS'"));
     expect(card, contains('_telemetryTimer?.cancel()'));
   });
 
-  test('Cisco Android uses an isolated engine, not a WireGuard tunnel', () {
+  test('failed WireGuard startup releases the VPN slot unless the guard is on', () {
+    final service = File(
+      'native/android/kotlin/com/twinpanel/twinconnect/SharedTunVpnService.kt',
+    ).readAsStringSync();
+    expect(service, contains('ownsFailedStart = true'));
+    expect(service, contains('if (!persistentBlock) shutdown()'));
+    expect(service, isNot(contains('if (!persistentBlock) persistentBlock = true')));
+    // wgGetConfig and wgTurnOff share the same lock: concurrent native map
+    // access while disconnecting must not cause a process-level Go crash.
+    expect(service, contains('fun wireGuardStats(): String? = synchronized(lock)'));
+    expect(service, contains('WireGuardJni.turnOff(handle)'));
+  });
+
+  test('OpenConnect keeps the native failure visible during shutdown', () {
+    final service = File(
+      'native/android/java/com/axevpn/flutter/openconnect/AxeOpenConnectVpnService.java',
+    ).readAsStringSync();
+    expect(service, contains('if (lastFailureCode != null && !lastFailureCode.isEmpty())'));
+    expect(service, contains('broadcastStage("error")'));
+    expect(service, contains('broadcastStage("disconnected")'));
+  });
+
+  test('Cisco Android uses shared TUN ownership without WireGuard JNI', () {
     final controller = File('lib/android_tunnel.dart').readAsStringSync();
     final card = File('lib/android_connection_card.dart').readAsStringSync();
     final native = File(
       'native/android/kotlin/com/twinpanel/twinconnect/MainActivity.kt',
     ).readAsStringSync();
+    final cisco = File('lib/android_cisco_tunnel.dart').readAsStringSync();
+    final bridge = File('lib/native_vpn_bridge.dart').readAsStringSync();
     expect(controller, contains("nativeProtocols.supports('cisco')"));
-    expect(controller, contains("'startOpenConnect'"));
-    expect(controller, contains("'stopOpenConnect'"));
-    expect(controller, contains("'getOpenConnectStatus'"));
-    expect(controller, contains("'trafficRoutingVerified'"));
     expect(card, contains('CiscoOpenConnectProfile.fromItem(item)'));
+    expect(card, contains('AndroidCiscoTunnel.validatedServerTrust(profile)'));
     expect(card, contains("loadSessionNativeProfiles("));
-    expect(card, contains("_controller.connectCisco("));
-    expect(card, contains("_controller.ciscoStatus()"));
-    expect(native, contains('"OPENCONNECT_CORE_NOT_INSTALLED"'));
+    expect(card, contains('AndroidCiscoTunnel.instance.connect(profile)'));
+    expect(card, contains('NativeVpnBridge.requireAndroidCiscoSafeToConnect(policy)'));
+    expect(bridge, contains('static void requireAndroidCiscoSafeToConnect(VpnPolicy policy)'));
+    expect(bridge, isNot(contains('CISCO_SHARED_GUARD_NOT_IMPLEMENTED')));
+    expect(card, contains('await AndroidCiscoTunnel.instance.connect(profile)'));
+    expect(card, contains('requireSharedGuard: policy.killSwitchRequested'));
+    expect(card, contains('AndroidCiscoTunnel.instance.status()'));
+    expect(cisco, contains('com.axevpn.flutter.openconnect/vpncontrol'));
+    expect(cisco, contains("'servercert': pin"));
+    expect(cisco, contains("'isRunning'"));
+    expect(cisco, contains('CISCO_SHA256_PIN_INVALID'));
+    expect(native, contains('OpenConnectFlutterPlugin()'));
     expect(native, contains('listOf("wireguard")'));
+  });
+
+  test('Cisco and WireGuard use one Android VpnService for disconnect guard', () {
+    final shared = File(
+      'native/android/kotlin/com/twinpanel/twinconnect/SharedTunVpnService.kt',
+    ).readAsStringSync();
+    final plugin = File(
+      'native/android/java/com/axevpn/flutter/openconnect/OpenConnectFlutterPlugin.java',
+    ).readAsStringSync();
+    final adapter = File(
+      'native/android/java/com/axevpn/flutter/openconnect/SharedOpenConnectEngine.java',
+    ).readAsStringSync();
+    final installer = File('tools/install_android_native.py').readAsStringSync();
+    final dashboard = File('lib/live_dashboard.dart').readAsStringSync();
+    expect(plugin, contains('new Intent(context, SharedTunVpnService.class)'));
+    expect(plugin, contains('SharedTunVpnService.ACTION_CONNECT_CISCO'));
+    expect(plugin, contains('SharedTunVpnService.ACTION_DISCONNECT_CISCO'));
+    expect(plugin, isNot(contains('new Intent(context, AxeOpenConnectVpnService.class)')));
+    expect(adapter, contains('owner.establishCiscoTun('));
+    expect(adapter, contains('new NativeOpenConnectSession('));
+    expect(adapter, contains('owner.onCiscoEngineStopped(this)'));
+    expect(shared, contains('fun establishCiscoTun('));
+    expect(shared, contains('check(ciscoEngine == null && externalOwner == null) { "TUNNEL_ALREADY_RUNNING" }'));
+    expect(shared, contains('val previous = tun'));
+    expect(shared, contains('ParcelFileDescriptor.dup(replacement.fileDescriptor)'));
+    expect(shared, contains('val replacement = blockingTun()'));
+    expect(shared, contains('CISCO_DISCONNECT_BLOCK_FAILED'));
+    expect(shared, contains('if (!persistentBlock && wireGuardHandle < 0 && amneziaHandle < 0 &&'));
+    expect(installer, contains('"SharedOpenConnectEngine.java"'));
+    expect(installer, isNot(contains('Independent pinned Cisco CSTP/TLS VpnService')));
+    final startCisco = dashboard.indexOf('Future<void> _startCiscoTunnel(');
+    expect(dashboard.substring(startCisco, startCisco + 220),
+        contains('_requireVerifiedGuardIfRequested(sharedWireGuard: true)'));
+  });
+
+  test('AmneziaWG uses its own JNI engine on the shared TUN', () {
+    final runtime = File(
+      'native/android/kotlin/com/twinpanel/twinconnect/AmneziaWgRuntime.kt',
+    ).readAsStringSync();
+    final shared = File(
+      'native/android/kotlin/com/twinpanel/twinconnect/SharedTunVpnService.kt',
+    ).readAsStringSync();
+    final installer = File('tools/install_android_native.py').readAsStringSync();
+    final card = File('lib/android_connection_card.dart').readAsStringSync();
+    expect(runtime, contains('service.startAmneziaWg('));
+    expect(runtime, contains('AmneziaNative.awgTurnOn('));
+    expect(runtime, contains('toAwgUserspaceString()'));
+    expect(runtime, isNot(contains('backend!!.setState(')));
+    expect(shared, contains('fun startAmneziaWg('));
+    expect(shared, contains('fun stopAmneziaWg()'));
+    expect(shared, contains('fun amneziaStats(): String? = synchronized(lock)'));
+    expect(installer, contains('Do NOT register'));
+    expect(card, contains('requireAndroidAmneziaWgSafeToConnect(policy)'));
+    expect(card, contains('allowSharedTun: true, requireSharedGuard: policy.killSwitchRequested'));
+  });
+
+  test('Xray and sing-box borrow one Android VPN builder and restore guard', () {
+    final service = File(
+      'native/android/kotlin/com/twinpanel/twinconnect/SharedTunVpnService.kt',
+    ).readAsStringSync();
+    final native = File(
+      'native/android/kotlin/com/twinpanel/twinconnect/MainActivity.kt',
+    ).readAsStringSync();
+    final patcher = File('tools/patch_shared_tun_android_plugins.py')
+        .readAsStringSync();
+    final card = File('lib/android_connection_card.dart').readAsStringSync();
+    expect(service, contains('fun newExternalTunBuilder(engine: String)'));
+    expect(service, contains('fun externalTunEstablished(engine: String'));
+    expect(service, contains('fun externalTunReleased(engine: String)'));
+    expect(service, contains('val blackhole = blockingTun()'));
+    expect(service, contains('externalOwner == null'));
+    expect(native, contains('"prepareSharedTunEngine"'));
+    expect(native, contains('"finishSharedTunEngine"'));
+    expect(native, contains('"singbox", "xray"'));
+    expect(patcher, contains('TWINCONNECT_SHARED_TUN_SINGBOX'));
+    expect(patcher, contains('TWINCONNECT_SHARED_TUN_XRAY'));
+    expect(patcher, contains('"newExternalTunBuilder"'));
+    expect(patcher, contains('"externalTunEstablished"'));
+    expect(patcher, contains('"externalTunReleased"'));
+    expect(patcher, contains('android:process=":RunSoLibXrayDaemon"'));
+    expect(card, contains('await _prepareSharedNativeEngine(policy);'));
+    expect(card, contains('requireAndroidSharedTunSafeToConnect(policy)'));
+  });
+
+  test('OpenVPN source is pinned and uses the same Android VPN owner', () {
+    final source = File('tools/stage_shared_openvpn_android.py')
+        .readAsStringSync();
+    final installer = File('tools/install_android_native.py')
+        .readAsStringSync();
+    final shared = File(
+      'native/android/kotlin/com/twinpanel/twinconnect/SharedTunVpnService.kt',
+    ).readAsStringSync();
+    final card = File('lib/android_connection_card.dart').readAsStringSync();
+    expect(source, contains('ccd61bc39bcb5b03281615ce669d2109557f6bd1'));
+    expect(source, contains('TWINCONNECT_SHARED_TUN_OPENVPN'));
+    expect(source, contains('"newExternalTunBuilder"'));
+    expect(source, contains('"externalTunEstablished"'));
+    expect(source, contains('"externalTunReleased"'));
+    expect(installer, contains('include(":openvpn_library")'));
+    expect(shared, contains('engine == "openvpn"'));
+    expect(card, contains('await AndroidOpenVpnTunnel.instance.connect('));
+    expect(card, contains('await _prepareSharedNativeEngine(policy);'));
   });
 
   test('six dashboard locales and Arabic right-to-left are supported', () {
@@ -335,6 +484,16 @@ void main() {
     expect(ambient, contains('for (var i = 0; i < 13; i++)'));
     expect(ambient, contains('dark ? .10 : .075'));
     expect(theme, contains('Color(0xFFF3F7F8), 0.97'));
+  });
+
+  test('Android server ping probes numeric inventory IP without Windows-only gate', () {
+    final dashboard = File('lib/live_dashboard.dart').readAsStringSync();
+    expect(dashboard, contains('(!Platform.isWindows && !Platform.isAndroid)'));
+    expect(dashboard, contains("'/system/bin/ping'"));
+    expect(dashboard, contains('Socket.connect('));
+    expect(dashboard, contains("'TCP_CONNECT_RTT'"));
+    expect(dashboard, contains("Key('probeNode_"));
+    expect(dashboard, contains('TCP connection to the configured service port, not ICMP.'));
   });
 
   test('all server ping actions use lightning instead of the old network icon', () {
