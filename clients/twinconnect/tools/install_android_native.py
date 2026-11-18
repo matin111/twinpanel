@@ -150,6 +150,20 @@ def patch_manifest() -> None:
             '    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />',
             str(filename),
         )
+    # Show only user-launchable installed apps in Split Tunneling. Do not
+    # request QUERY_ALL_PACKAGES; Android 11+ package visibility stays narrow.
+    if "<queries>" not in current:
+        current = current.replace(
+            "<application",
+            "    <queries>\n"
+            "        <intent>\n"
+            '            <action android:name="android.intent.action.MAIN" />\n'
+            '            <category android:name="android.intent.category.LAUNCHER" />\n'
+            "        </intent>\n"
+            "    </queries>\n"
+            "    <application",
+            1,
+        )
     # SharedTunVpnService starts foreground immediately after VPN approval.
     for permission in (
         "android.permission.FOREGROUND_SERVICE",

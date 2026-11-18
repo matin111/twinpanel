@@ -607,6 +607,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
   /// blackhole installed before either core can start forwarding packets.
   Future<void> _prepareSharedNativeEngine(VpnPolicy policy) async {
     NativeVpnBridge.requireAndroidSharedTunSafeToConnect(policy);
+    await NativeVpnBridge.configureAndroidAppRouting(policy);
     if (policy.killSwitchRequested) {
       await _releaseDisconnectedGuard(
         allowSharedTun: true, requireSharedGuard: true);
@@ -646,6 +647,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
       );
       // Cisco shares the Android TUN owner, not WireGuard's native engine.
       NativeVpnBridge.requireAndroidCiscoSafeToConnect(policy);
+      await NativeVpnBridge.configureAndroidAppRouting(policy);
       stage = 'CISCO_PROFILE_FETCH_FAILED';
       final profiles = await TenantApi.fromBuildConfig().loadSessionNativeProfiles(
         panel: widget.panel,
@@ -856,6 +858,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
         widget.panel.namespace, widget.username,
       );
       NativeVpnBridge.requireAndroidAmneziaWgSafeToConnect(policy);
+      await NativeVpnBridge.configureAndroidAppRouting(policy);
       final engine = AndroidAmneziaWgTunnel.instance;
       if (!await engine.engineReady) {
         throw const FormatException('AWG_NATIVE_ENGINE_UNAVAILABLE');
@@ -1125,6 +1128,7 @@ class _AndroidConnectionCardState extends State<AndroidConnectionCard> {
         VpnProtocols.byCode('wireguard')!,
         widget.native,
       );
+      await NativeVpnBridge.configureAndroidAppRouting(policy);
       // Fetch secrets only AFTER the native engine/policy guard passes.
       final profiles = await TenantApi.fromBuildConfig().loadSessionNativeProfiles(
         panel: widget.panel,

@@ -221,6 +221,7 @@ class MainActivity : FlutterActivity() {
                     result.success(mapOf(
                         "active" to (sharedGuardUp || legacyGuardUp),
                         "sharedTunOwner" to (shared?.hasTunnel() == true),
+                        "appRoutingMode" to SharedTunVpnService.configuredRoutingMode(),
                         "sharedGuardEnabled" to sharedGuardUp,
                         "legacyGuardActive" to legacyGuardUp,
                         "osLockdown" to if (shared != null) osLockdown else null,
@@ -315,14 +316,63 @@ class MainActivity : FlutterActivity() {
                         result.error("ANDROID_VPN_SETTINGS_UNAVAILABLE", "Unable to open Android VPN settings", null)
                     }
                 }
+                "getAndroidVpnNetworkDiagnostics" -> onWorker(result) {
+                    val manager = getSystemService(Context.CONNECTIVITY_SERVICE)
+                        as ConnectivityManager
+                    val vpn = manager.allNetworks.firstOrNull { network ->
+                        manager.getNetworkCapabilities(network)?.hasTransport(
+                            NetworkCapabilities.TRANSPORT_VPN) == true
+                    }
+                    val caps = vpn?.let { manager.getNetworkCapabilities(it) }
+                    val links = vpn?.let { manager.getLinkProperties(it) }
+                    val routes = links?.routes ?: emptyList()
+                    mapOf(
+                        "contractVersion" to 1,
+                        "vpnTransportActive" to (vpn != null),
+                        "vpnDefaultIpv4" to routes.any { route ->
+                            route.isDefaultRoute &&
+                            route.destination.address is java.net.Inet4Address
+                        },
+                        "vpnDefaultIpv6" to routes.any { route ->
+                            route.isDefaultRoute &&
+                            route.destination.address is java.net.Inet6Address
+                        },
+                        "vpnDnsCount" to (links?.dnsServers?.size ?: 0),
+                        "networkValidated" to (caps?.hasCapability(
+                            NetworkCapabilities.NET_CAPABILITY_VALIDATED) == true)
+                    )
+                }
+                "listLaunchableApps" -> onWorker(result) {
+                    val manager = packageManager
+                    val launcher = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+                    @Suppress("DEPRECATION")
+                    val activities = manager.queryIntentActivities(launcher, 0)
+                    val apps = activities.mapNotNull { entry ->
+                        val id = entry.activityInfo?.packageName ?: return@mapNotNull null
+                        if (id == packageName) return@mapNotNull null
+                        mapOf(
+                            "packageName" to id,
+                            "label" to entry.loadLabel(manager).toString().take(80)
+                        )
+                    }.distinctBy { it["packageName"] }
+                        .sortedBy { it["label"]?.lowercase() }
+                    mapOf("apps" to apps, "contractVersion" to 1)
+                }
+                "configureAppRouting" -> onWorker(result) {
+                    val mode = call.argument<String>("routingMode") ?: "fullTunnel"
+                    val ids = call.argument<List<String>>("appIds") ?: emptyList()
+                    SharedTunVpnService.configureAppRouting(applicationContext, mode, ids)
+                    mapOf("routingMode" to SharedTunVpnService.configuredRoutingMode(),
+                        "appliedOnNextTunnel" to true)
+                }
                 "getCapabilities" -> onWorker(result) {
                     val present = WireGuardRuntime.initialize(applicationContext)
                     mapOf(
                         "contractVersion" to 1,
                         "engineReady" to present,
                         "fullTunnel" to present,
-                        "includeApps" to false,
-                        "excludeApps" to false,
+                        "includeApps" to present,
+                        "excludeApps" to present,
                         "killSwitchAvailable" to present,
                         "killSwitchEnforced" to
                             (SharedTunVpnService.active?.hasBlockingTun() == true ||
@@ -551,6 +601,9 @@ class MainActivity : FlutterActivity() {
                     "AWG_ENDPOINT_MISSING", "AWG_ENDPOINT_DNS_FAILED",
                     "AWG_SOCKET_PROTECT_FAILED", "AWG_GO_ACTIVATION_FAILED",
                     "AWG_ALREADY_CONNECTED", "OTHER_VPN_ACTIVE",
+                    "APP_ROUTING_MODE_INVALID", "APP_ROUTING_PACKAGES_INVALID",
+                    "APP_ROUTING_PACKAGES_REQUIRED", "APP_ROUTING_PACKAGE_MISSING",
+                    "APP_ROUTING_TUN_BUSY", "SPLIT_TUNNEL_GUARD_CONFLICT",
                     "AWG_NATIVE_RUNTIME_FAILED", "AWG_UNKNOWN_METHOD",
                     "AWG_CONNECT_DISPATCH_ERROR", "AWG_NATIVE_LINK_FAILED",
                     "AWG_VPN_SECURITY_REJECTED", "AWG_BACKEND_STATE_FAILED",

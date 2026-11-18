@@ -122,6 +122,9 @@ class VpnPolicy {
   List<String> draftProblems(VpnPlatform platform, {bool managedDevice = false}) {
     final issues = <String>[];
     final selectedMode = routingMode != VpnRoutingMode.fullTunnel;
+    if (selectedMode && killSwitchRequested) {
+      issues.add('SPLIT_TUNNEL_GUARD_CONFLICT');
+    }
     if (selectedMode) {
       if (platform != VpnPlatform.android &&
           platform != VpnPlatform.windows && !managedDevice) {

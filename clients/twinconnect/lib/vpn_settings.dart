@@ -9,6 +9,7 @@ import 'brand_theme.dart';
 import 'interactive_glass_card.dart';
 import 'native_vpn_bridge.dart';
 import 'vpn_policy.dart';
+import 'vpn_policy_store.dart';
 import 'tenant_models.dart';
 
 /// One-page, fail-closed network settings. A saved preference is not proof of
@@ -35,6 +36,12 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
   NativeVpnCapabilities _capabilities =
       NativeVpnCapabilities.unavailable(NativeVpnBridge.platform);
   Map<String, dynamic> _guard = const {};
+  Map<String, dynamic> _androidGuardDetails = const {};
+  Map<String, dynamic> _androidNetworkDetails = const {};
+  final VpnPolicyStore _policyStore = const VpnPolicyStore();
+  VpnPolicy _routingPolicy = const VpnPolicy();
+  bool _routingSaving = false;
+  bool _routingLoaded = false;
   bool _checking = false;
   bool _vmGuardBusy = false;
   bool _androidKillRequested = false;
@@ -50,10 +57,15 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
   void initState() {
     super.initState();
     _check();
+    _loadRoutingPolicy();
     _refreshAndroidGuard();
+    _refreshAndroidNetworkDiagnostics();
     if (Platform.isAndroid) {
       _androidGuardPoll = Timer.periodic(const Duration(seconds: 3), (_) {
-        if (!_androidKillBusy) _refreshAndroidGuard();
+        if (!_androidKillBusy) {
+          _refreshAndroidGuard();
+          _refreshAndroidNetworkDiagnostics();
+        }
       });
     }
   }
@@ -64,12 +76,30 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
     super.dispose();
   }
 
+  Future<void> _loadRoutingPolicy() async {
+    final policy = await _policyStore.load(widget.tenant, widget.account);
+    if (mounted) setState(() {
+      _routingPolicy = policy;
+      _routingLoaded = true;
+    });
+  }
+
   Future<void> _setAndroidKill(bool requested) async {
-    if (_androidKillBusy) return;
+    if (_androidKillBusy || !_routingLoaded) return;
+    final previous = _routingPolicy;
+    if (requested && previous.routingMode != VpnRoutingMode.fullTunnel) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(AppStrings.of(context).pick(
+          'برای محافظت کامل ابتدا حالت «تمام دستگاه» را انتخاب کنید.',
+          'Choose Entire device before enabling Kill Switch.')),
+      ));
+      return;
+    }
     setState(() => _androidKillBusy = true);
     try {
       const channel = MethodChannel('com.twinpanel.twinconnect/vpn');
       if (requested) {
+        await NativeVpnBridge.configureAndroidAppRouting(previous);
         await channel.invokeMethod<dynamic>('startDisconnectedTrafficGuard');
       } else {
         await channel.invokeMethod<dynamic>('stopDisconnectedTrafficGuard');
@@ -79,17 +109,155 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
         await _refreshAndroidGuard();
         if (_androidKillRequested == requested) break;
       }
-      if (_androidKillRequested != requested && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Kill Switch: service state not confirmed'),
-        ));
+      if (_androidKillRequested != requested) {
+        throw StateError('KILL_SWITCH_NOT_VERIFIED');
       }
+      final updated = previous.copyWith(killSwitchRequested: requested);
+      if (!await _policyStore.save(widget.tenant, widget.account, updated)) {
+        throw StateError('KILL_SWITCH_PREFERENCE_NOT_SAVED');
+      }
+      if (mounted) setState(() => _routingPolicy = updated);
     } on PlatformException catch (error) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Kill Switch: ${error.code}'),
+        content: Text('Kill Switch: ' + error.code),
+      ));
+    } catch (_) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Kill Switch: state or policy not confirmed'),
       ));
     } finally {
       if (mounted) setState(() => _androidKillBusy = false);
+    }
+  }
+
+  Future<void> _selectRouting(VpnRoutingMode mode) async {
+    if (!Platform.isAndroid || _routingSaving || !_routingLoaded) return;
+    if (mode != VpnRoutingMode.fullTunnel && _androidKillRequested) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(AppStrings.of(context).pick(
+          'برای تفکیک برنامه‌ها ابتدا Kill Switch را خاموش کنید.',
+          'Turn off Kill Switch before enabling split tunneling.')),
+      ));
+      return;
+    }
+    List<String> selected = const [];
+    if (mode != VpnRoutingMode.fullTunnel) {
+      try {
+        const native = MethodChannel('com.twinpanel.twinconnect/vpn');
+        final result = await native.invokeMapMethod<String, dynamic>('listLaunchableApps');
+        final raw = result?['apps'];
+        if (raw is! List) throw StateError('APP_LIST_UNAVAILABLE');
+        final apps = <(String, String)>[];
+        for (final row in raw) {
+          if (row is! Map) continue;
+          final id = row['packageName'];
+          final label = row['label'];
+          if (id is String && label is String && id.isNotEmpty) {
+            apps.add((id, label));
+          }
+        }
+        if (!mounted) return;
+        if (apps.isEmpty) throw StateError('APP_LIST_EMPTY');
+        final chosen = _routingPolicy.routingMode == mode
+            ? _routingPolicy.appIds.toSet() : <String>{};
+        var search = '';
+        final picked = await showDialog<Set<String>>(
+          context: context,
+          builder: (ctx) => StatefulBuilder(
+            builder: (ctx, update) {
+              final filtered = apps.where((item) =>
+                  item.$2.toLowerCase().contains(search.toLowerCase()) ||
+                  item.$1.toLowerCase().contains(search.toLowerCase())
+              ).toList(growable: false);
+              return AlertDialog(
+                title: Text(AppStrings.of(ctx).pick(
+                    'انتخاب برنامه‌ها', 'Select apps')),
+                content: SizedBox(
+                  width: 430,
+                  height: 400,
+                  child: Column(children: [
+                    TextField(
+                      onChanged: (value) => update(() => search = value),
+                      decoration: InputDecoration(
+                        prefixIcon: const Icon(Icons.search),
+                        hintText: AppStrings.of(ctx).pick('جستجوی برنامه', 'Search apps'),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Expanded(child: ListView.builder(
+                      itemCount: filtered.length,
+                      itemBuilder: (ctx, index) {
+                        final row = filtered[index];
+                        return CheckboxListTile(
+                          dense: true,
+                          title: Text(row.$2, maxLines: 1,
+                              overflow: TextOverflow.ellipsis),
+                          subtitle: Text(row.$1, maxLines: 1,
+                              overflow: TextOverflow.ellipsis),
+                          value: chosen.contains(row.$1),
+                          onChanged: (checked) => update(() {
+                            if (checked == true) {
+                              if (chosen.length < 100) chosen.add(row.$1);
+                            } else {
+                              chosen.remove(row.$1);
+                            }
+                          }),
+                        );
+                      },
+                    )),
+                  ]),
+                ),
+                actions: [
+                  TextButton(onPressed: () => Navigator.pop(ctx),
+                    child: Text(AppStrings.of(ctx).pick('انصراف', 'Cancel'))),
+                  FilledButton(
+                    onPressed: chosen.isEmpty ? null :
+                        () => Navigator.pop(ctx, chosen),
+                    child: Text(AppStrings.of(ctx).pick('ذخیره', 'Save')),
+                  ),
+                ],
+              );
+            },
+          ),
+        );
+        if (picked == null || picked.isEmpty || !mounted) return;
+        selected = picked.toList()..sort();
+      } catch (_) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Installed-app picker unavailable'),
+        ));
+        return;
+      }
+    }
+    final updated = _routingPolicy.copyWith(
+      routingMode: mode,
+      appIds: selected,
+    );
+    if (updated.draftProblems(VpnPlatform.android).isNotEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('App routing policy is invalid'),
+      ));
+      return;
+    }
+    setState(() => _routingSaving = true);
+    try {
+      if (!await _policyStore.save(widget.tenant, widget.account, updated)) {
+        throw StateError('APP_ROUTING_SAVE_FAILED');
+      }
+      if (!mounted) return;
+      setState(() => _routingPolicy = updated);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(AppStrings.of(context).pick(
+          'ذخیره شد؛ تنظیمات پس از اتصال مجدد VPN اعمال می‌شود.',
+          'Saved. Reconnect VPN to apply app routing.')),
+      ));
+    } catch (_) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Unable to save app routing'),
+      ));
+    } finally {
+      if (mounted) setState(() => _routingSaving = false);
     }
   }
 
@@ -99,6 +267,7 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
       final result = await const MethodChannel('com.twinpanel.twinconnect/vpn')
           .invokeMapMethod<String, dynamic>('getDisconnectedTrafficGuardStatus');
       if (mounted) setState(() {
+        _androidGuardDetails = result ?? const {};
         _androidKillRequested = result?['sharedGuardEnabled'] == true;
         _androidLegacyGuardUp = result?['legacyGuardActive'] == true;
         _androidSharedAwgReady =
@@ -116,6 +285,19 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
         _androidOsLockdown = false;
         _androidLockdownVerifiable = false;
       });
+    }
+  }
+
+  Future<void> _refreshAndroidNetworkDiagnostics() async {
+    if (!Platform.isAndroid) return;
+    try {
+      final status = await const MethodChannel('com.twinpanel.twinconnect/vpn')
+          .invokeMapMethod<String, dynamic>('getAndroidVpnNetworkDiagnostics');
+      if (mounted && status?['contractVersion'] == 1) {
+        setState(() => _androidNetworkDetails = status!);
+      }
+    } on PlatformException {
+      if (mounted) setState(() => _androidNetworkDetails = const {});
     }
   }
 
@@ -149,17 +331,54 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
   Future<void> _copyDiagnostics() async {
     final diagnosticText = <String>[
       'TwinConnect network diagnostics',
-      'platform: ${NativeVpnBridge.platform.name}',
-      'vpn_engine_ready: ${_capabilities.engineReady}',
-      'full_tunnel_supported: ${_capabilities.fullTunnel}',
-      'wfp_available: ${_guard['wfpAvailable'] == true}',
-      'guard_service_installed: ${_guard['serviceInstalled'] == true}',
-      'guard_armed_verified: $_guardActive',
-      'dns_engine_support: ${_capabilities.dnsGuard}',
-      'ipv6_engine_support: ${_capabilities.ipv6Guard}',
-      'guard_reason: ${_guard['reason'] ?? 'UNKNOWN'}',
-    ].join('\n');
-    await Clipboard.setData(ClipboardData(text: diagnosticText));
+      'platform: ' + NativeVpnBridge.platform.name,
+    ];
+    if (Platform.isAndroid) {
+      await _refreshAndroidGuard();
+      await _refreshAndroidNetworkDiagnostics();
+      var registration = 'UNKNOWN';
+      try {
+        final raw = await const MethodChannel('com.twinpanel.twinconnect/vpn')
+            .invokeMapMethod<String, dynamic>('getVpnRegistrationStatus');
+        registration = raw?['discoverable'] == true ? 'YES' : 'NO';
+      } catch (_) {}
+      diagnosticText.addAll([
+        'shared_vpn_registration: ' + registration,
+        'vpn_transport_active: ' +
+            (_androidNetworkDetails['vpnTransportActive'] == true).toString(),
+        'shared_tun_owner: ' +
+            (_androidGuardDetails['sharedTunOwner'] == true).toString(),
+        'shared_tun_protocol: ' +
+            (_androidGuardDetails['sharedTunProtocol']?.toString() ?? 'NONE'),
+        'selected_app_routing: ' + _routingPolicy.routingMode.name,
+        'selected_app_count: ' + _routingPolicy.appIds.length.toString(),
+        'native_app_routing: ' +
+            (_androidGuardDetails['appRoutingMode']?.toString() ?? 'UNKNOWN'),
+        'kill_switch_shared_guard: ' + _androidKillRequested.toString(),
+        'android_os_lockdown: ' + _androidOsLockdown.toString(),
+        'vpn_default_route_ipv4: ' +
+            (_androidNetworkDetails['vpnDefaultIpv4'] == true).toString(),
+        'vpn_default_route_ipv6: ' +
+            (_androidNetworkDetails['vpnDefaultIpv6'] == true).toString(),
+        'vpn_dns_server_count: ' +
+            (_androidNetworkDetails['vpnDnsCount']?.toString() ?? 'UNKNOWN'),
+        'network_validated: ' +
+            (_androidNetworkDetails['networkValidated'] == true).toString(),
+        'dns_leak_test_performed: false',
+      ]);
+    } else {
+      diagnosticText.addAll([
+        'vpn_engine_ready: ' + _capabilities.engineReady.toString(),
+        'full_tunnel_supported: ' + _capabilities.fullTunnel.toString(),
+        'wfp_available: ' + (_guard['wfpAvailable'] == true).toString(),
+        'guard_service_installed: ' + (_guard['serviceInstalled'] == true).toString(),
+        'guard_armed_verified: ' + _guardActive.toString(),
+        'dns_engine_support: ' + _capabilities.dnsGuard.toString(),
+        'ipv6_engine_support: ' + _capabilities.ipv6Guard.toString(),
+        'guard_reason: ' + (_guard['reason']?.toString() ?? 'UNKNOWN'),
+      ]);
+    }
+    await Clipboard.setData(ClipboardData(text: diagnosticText.join('\n')));
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(AppStrings.of(context).pick(
@@ -307,19 +526,28 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
     required bool selected,
     required bool enabled,
     required Key key,
-  }) => Row(key: key, children: [
-    Icon(selected ? Icons.radio_button_checked_rounded
-                  : Icons.radio_button_unchecked_rounded,
-      color: selected ? Theme.of(context).colorScheme.primary
-          : Theme.of(context).disabledColor, size: 20),
-    const SizedBox(width: 12),
-    Expanded(child: Text(label, style: TextStyle(
-      fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-      color: enabled ? null : Theme.of(context).disabledColor,
-    ))),
-    _help(label, help),
-    if (!enabled) const Icon(Icons.lock_outline_rounded, size: 17),
-  ]);
+    VoidCallback? onTap,
+  }) => InkWell(
+    key: key,
+    borderRadius: BorderRadius.circular(14),
+    onTap: enabled ? onTap : null,
+    child: Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(children: [
+        Icon(selected ? Icons.radio_button_checked_rounded
+                      : Icons.radio_button_unchecked_rounded,
+          color: selected ? Theme.of(context).colorScheme.primary
+              : Theme.of(context).disabledColor, size: 20),
+        const SizedBox(width: 12),
+        Expanded(child: Text(label, style: TextStyle(
+          fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+          color: enabled ? null : Theme.of(context).disabledColor,
+        ))),
+        _help(label, help),
+        if (!enabled) const Icon(Icons.lock_outline_rounded, size: 17),
+      ]),
+    ),
+  );
 
   Widget _statusItem({
     required String title,
@@ -402,7 +630,7 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
                 trailing: Switch.adaptive(
                   key: const Key('androidSharedKillSwitch'),
                   value: _androidKillRequested,
-                  onChanged: _androidKillBusy ? null : _setAndroidKill,
+                  onChanged: _androidKillBusy || !_routingLoaded ? null : _setAndroidKill,
                 ),
               ),
               Text(
@@ -560,14 +788,14 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
             children: [
               Text(tr('Proxy / System Proxy', 'Proxy / System Proxy'),
                   style: const TextStyle(fontWeight: FontWeight.w700)),
-              Text(tr('موتور تغییر مسیر پروکسی هنوز متصل نیست',
-                      'Proxy switching engine not integrated'),
+              Text(tr('پروکسی سراسری نیازمند مدیریت دستگاه است',
+                      'System-wide proxy requires device management'),
                   style: Theme.of(context).textTheme.bodySmall),
             ],
           )),
           _help('Proxy', tr(
-            'حالت پروکسی فقط برنامه‌هایی را پوشش می‌دهد که از SOCKS یا پروکسی سیستم پیروی می‌کنند. با VPN کل سیستم تفاوت دارد؛ هنوز امکان تغییر امن حالت از این بخش فراهم نشده است.',
-            'A local SOCKS/system proxy only covers proxy-aware apps. Safe mode switching is not yet integrated.',
+            'برنامه عادی اندروید نمی‌تواند پروکسی سراسری سایر برنامه‌ها را بدون دسترسی مالک دستگاه تغییر دهد. این بخش عمداً غیرفعال است تا تنظیمی ظاهری به‌جای اتصال واقعی نشان داده نشود.',
+            'A normal Android app cannot set the device-wide proxy for other apps without device-owner access. This mode remains disabled rather than pretending to switch routing.',
           )),
           const Icon(Icons.lock_outline_rounded),
         ]), key: const Key('vpnProxyModeUnavailable')),
@@ -577,32 +805,46 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
           children: [
             _routingOption(
               label: tr('تمام دستگاه', 'Entire device'),
-              selected: true,
+              selected: !Platform.isAndroid ||
+                  _routingPolicy.routingMode == VpnRoutingMode.fullTunnel,
               enabled: true,
-              help: tr('در وضعیت فعلی تمام ترافیک دستگاه از VPN عبور می‌کند؛ البته با توجه به محدودیت پروتکل و تنظیمات شبکه.',
+              onTap: Platform.isAndroid ? () => _selectRouting(VpnRoutingMode.fullTunnel) : null,
+              help: tr('در حالت تمام دستگاه، ترافیک برنامه‌های مجاز از VPN عبور می‌کند؛ البته با توجه به محدودیت پروتکل و تنظیمات شبکه.',
                   'Currently routes device traffic via VPN, subject to the protocol and OS routing capabilities.'),
               key: const Key('vpnRoutingFullTunnel'),
             ),
             Divider(height: 12, color: Theme.of(context).dividerColor),
             _routingOption(
               label: tr('فقط برنامه‌های انتخابی', 'Only selected apps'),
-              selected: false,
-              enabled: false,
-              help: tr('این حالت تنها پس از اضافه‌شدن فیلتر واقعی بسته‌های برنامه‌ها و انتخاب برنامه‌های نصب‌شده فعال می‌شود.',
-                  'Requires a verified per-app packet routing implementation and an installed-app picker.'),
+              selected: Platform.isAndroid &&
+                  _routingPolicy.routingMode == VpnRoutingMode.onlySelectedApps,
+              enabled: Platform.isAndroid && _routingLoaded && !_androidKillRequested && !_routingSaving,
+              onTap: () => _selectRouting(VpnRoutingMode.onlySelectedApps),
+              help: tr('برنامه‌های انتخابی از VPN استفاده می‌کنند و سایر برنامه‌ها مستقیم به اینترنت متصل می‌شوند. Kill Switch باید خاموش باشد.',
+                  'Selected apps use the VPN; other apps connect directly. Kill Switch must be off.'),
               key: const Key('vpnRoutingIncludeApps'),
             ),
             Divider(height: 12, color: Theme.of(context).dividerColor),
             _routingOption(
               label: tr('همه به‌جز برنامه‌های انتخابی', 'Exclude selected apps'),
-              selected: false,
-              enabled: false,
-              help: tr('برای عبور مستقیم برنامه‌های مشخص باید قوانین واقعی سیستم‌عامل ساخته و تست شوند.',
-                  'Requires verified OS routing rules for applications excluded from the VPN.'),
+              selected: Platform.isAndroid &&
+                  _routingPolicy.routingMode == VpnRoutingMode.excludeSelectedApps,
+              enabled: Platform.isAndroid && _routingLoaded && !_androidKillRequested && !_routingSaving,
+              onTap: () => _selectRouting(VpnRoutingMode.excludeSelectedApps),
+              help: tr('برنامه‌های انتخابی از VPN استثنا می‌شوند و مستقیم به اینترنت می‌روند. Kill Switch باید خاموش باشد.',
+                  'Selected apps bypass the VPN and connect directly. Kill Switch must be off.'),
               key: const Key('vpnRoutingExcludeApps'),
             ),
           ],
         ), key: const Key('vpnSplitTunnelCard')),
+        if (Platform.isAndroid && _routingPolicy.routingMode != VpnRoutingMode.fullTunnel)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text(tr(
+              'انتخاب‌شده: ${_routingPolicy.appIds.length} برنامه • پس از اتصال مجدد اعمال می‌شود',
+              'Selected: ${_routingPolicy.appIds.length} apps • applies after reconnect',
+            ), style: Theme.of(context).textTheme.bodySmall),
+          ),
         const SizedBox(height: 11),
         _glass(ExpansionTile(
           key: const Key('vpnDiagnosticsDisclosure'),
@@ -634,6 +876,46 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
                 'Engine readiness does not prove an active VPN connection.'),
             ),
             const SizedBox(height: 6),
+            if (Platform.isAndroid) ...[
+              _statusItem(
+                key: const Key('vpnAndroidTransportStatus'),
+                title: tr('تونل فعال اندروید', 'Android VPN transport'),
+                value: _androidNetworkDetails['vpnTransportActive'] == true
+                    ? tr('رابط VPN فعال', 'VPN interface active')
+                    : tr('تونل فعالی شناسایی نشد', 'No active VPN interface'),
+                ready: _androidNetworkDetails['vpnTransportActive'] == true,
+                icon: Icons.route_rounded,
+                help: tr('وجود رابط VPN به تنهایی به معنای اتصال موفق به سرور نیست.',
+                    'A VPN interface is not proof of a working encrypted server session.'),
+              ),
+              const SizedBox(height: 6),
+              _statusItem(
+                key: const Key('vpnAndroidGuardStatus'),
+                title: 'Kill Switch',
+                value: _androidOsLockdown
+                    ? tr('قفل شبکه سیستم فعال', 'Android OS lockdown verified')
+                    : _androidKillRequested
+                        ? tr('مسدودسازی درون برنامه فعال', 'In-app blocking active')
+                        : tr('خاموش', 'Disabled'),
+                ready: _androidKillRequested || _androidOsLockdown,
+                icon: Icons.shield_outlined,
+                help: tr('این بخش وضعیت محافظت را نشان می‌دهد؛ برای تست نشت واقعی باید تست جداگانه انجام شود.',
+                    'This is protection state, not a network leak test.'),
+              ),
+              const SizedBox(height: 6),
+              _statusItem(
+                key: const Key('vpnAndroidRoutingStatus'),
+                title: tr('مسیر برنامه‌ها', 'App routing'),
+                value: _androidGuardDetails['appRoutingMode']?.toString() ??
+                    tr('در انتظار اتصال', 'Pending next connection'),
+                ready: _androidGuardDetails['appRoutingMode'] ==
+                    _routingPolicy.routingMode.name,
+                icon: Icons.apps_rounded,
+                help: tr('فیلتر برنامه‌ها هنگام اتصال مجدد روی سرویس VPN اعمال می‌شود.',
+                    'Per-app filters are applied when the VPN tunnel is re-established.'),
+              ),
+              const SizedBox(height: 6),
+            ] else ...[
             _statusItem(
               key: const Key('vpnWfpStatus'),
               title: tr('Windows Filtering Platform', 'Windows Filtering Platform'),
@@ -645,12 +927,21 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
                 'WFP availability is not proof that system traffic is blocked.'),
             ),
             const SizedBox(height: 6),
+            ],
             _statusItem(
               key: const Key('vpnDnsGuard'),
               title: 'DNS',
-              value: _capabilities.dnsGuard ? tr('پشتیبانی موتور', 'Engine supported')
-                  : tr('تأیید نشده', 'Unverified'),
-              ready: _capabilities.dnsGuard,
+              value: Platform.isAndroid
+                  ? (_androidNetworkDetails['vpnDnsCount'] is int &&
+                      (_androidNetworkDetails['vpnDnsCount'] as int) > 0
+                      ? tr('DNS روی رابط VPN ثبت شد', 'VPN DNS configured')
+                      : tr('ثبت DNS تأیید نشد', 'VPN DNS unverified'))
+                  : (_capabilities.dnsGuard ? tr('پشتیبانی موتور', 'Engine supported')
+                      : tr('تأیید نشده', 'Unverified')),
+              ready: Platform.isAndroid
+                  ? (_androidNetworkDetails['vpnDnsCount'] is int &&
+                      (_androidNetworkDetails['vpnDnsCount'] as int) > 0)
+                  : _capabilities.dnsGuard,
               icon: Icons.dns_rounded,
               help: tr('وضعیت قابلیت موتور است، نه نتیجه تست نشت DNS.',
                 'Engine capability is not a DNS leak test.'),
@@ -659,9 +950,15 @@ class _VpnSettingsScreenState extends State<VpnSettingsScreen> {
             _statusItem(
               key: const Key('vpnIpv6Guard'),
               title: 'IPv6',
-              value: _capabilities.ipv6Guard ? tr('پشتیبانی موتور', 'Engine supported')
-                  : tr('تأیید نشده', 'Unverified'),
-              ready: _capabilities.ipv6Guard,
+              value: Platform.isAndroid
+                  ? (_androidNetworkDetails['vpnDefaultIpv6'] == true
+                      ? tr('مسیر IPv6 داخل VPN', 'IPv6 VPN route present')
+                      : tr('مسیر IPv6 تأیید نشد', 'IPv6 VPN route unverified'))
+                  : (_capabilities.ipv6Guard ? tr('پشتیبانی موتور', 'Engine supported')
+                      : tr('تأیید نشده', 'Unverified')),
+              ready: Platform.isAndroid
+                  ? _androidNetworkDetails['vpnDefaultIpv6'] == true
+                  : _capabilities.ipv6Guard,
               icon: Icons.lan_rounded,
               help: tr('وضعیت قابلیت موتور است، نه نتیجه تست نشت IPv6.',
                 'Engine capability is not an IPv6 leak test.'),

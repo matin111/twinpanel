@@ -178,15 +178,39 @@ class NativeVpnBridge {
     }
   }
 
+  /// Applies an account-scoped policy to the NEXT Android VpnService.Builder.
+  /// A native acknowledgement is mandatory; this never changes live routes.
+  static Future<void> configureAndroidAppRouting(VpnPolicy policy) async {
+    if (platform != VpnPlatform.android) return;
+    if (policy.routingMode != VpnRoutingMode.fullTunnel &&
+        policy.killSwitchRequested) {
+      throw StateError('SPLIT_TUNNEL_GUARD_CONFLICT');
+    }
+    final response = await _channel.invokeMapMethod<String, dynamic>(
+      'configureAppRouting',
+      {
+        'routingMode': policy.routingMode.name,
+        'appIds': policy.appIds,
+      },
+    );
+    if (response?['routingMode'] != policy.routingMode.name ||
+        response?['appliedOnNextTunnel'] != true) {
+      throw StateError('APP_ROUTING_NOT_CONFIRMED');
+    }
+  }
+
   /// Cisco uses pinned libopenconnect with SharedTunVpnService (not GoBackend).
   /// It supports the in-process shared-TUN guard; other unsupported policy
   /// features must still fail closed before loading credentials.
   static void requireAndroidCiscoSafeToConnect(VpnPolicy policy) {
     final problems = <String>[];
     if (platform != VpnPlatform.android) problems.add('ANDROID_ONLY');
-    if (policy.routingMode != VpnRoutingMode.fullTunnel) {
-      problems.add('PER_APP_ROUTING_NOT_IMPLEMENTED');
+    if (policy.routingMode != VpnRoutingMode.fullTunnel &&
+        policy.killSwitchRequested) {
+      problems.add('SPLIT_TUNNEL_GUARD_CONFLICT');
     }
+    if (policy.routingMode != VpnRoutingMode.fullTunnel &&
+        policy.appIds.isEmpty) problems.add('NO_SELECTED_APPS');
     if (policy.dnsMode != VpnDnsMode.protected) {
       problems.add('DNS_POLICY_NOT_SUPPORTED');
     }

@@ -103,6 +103,7 @@ class SharedTunVpnService : VpnService() {
     fun enableBlocking() {
         synchronized(lock) {
             check(foregroundReady && !shuttingDown) { "SHARED_TUN_NOT_READY" }
+            check(appRouting.mode == "fullTunnel") { "SPLIT_TUNNEL_GUARD_CONFLICT" }
             persistentBlock = true
             if (tun == null) tun = blockingTun()
         }
@@ -112,6 +113,31 @@ class SharedTunVpnService : VpnService() {
     private fun prepareExternalTun() = synchronized(lock) {
         check(foregroundReady && !shuttingDown) { "SHARED_TUN_NOT_READY" }
         if (tun == null) tun = blockingTun()
+    }
+
+    /**
+     * The OS enforces per-app VPN routing on this sole Builder. A saved UI
+     * preference cannot change routes until a NEW tunnel is established.
+     * When Kill Switch is on, global blocking always takes precedence.
+     */
+    private fun routingBuilder(builder: VpnService.Builder): VpnService.Builder {
+        val selected = appRouting
+        when (selected.mode) {
+            "onlySelectedApps" -> {
+                (selected.packages + packageName).distinct().forEach {
+                    builder.addAllowedApplication(it)
+                }
+            }
+            "excludeSelectedApps" -> selected.packages.forEach {
+                builder.addDisallowedApplication(it)
+            }
+        }
+        return builder
+    }
+
+    private fun routingCanChange(): Boolean = synchronized(lock) {
+        wireGuardHandle < 0 && amneziaHandle < 0 &&
+            ciscoEngine == null && externalOwner == null
     }
 
     /** Build in the sole VpnService, while the plugin configures its routes. */
@@ -128,7 +154,7 @@ class SharedTunVpnService : VpnService() {
             externalOwner = engine
             externalTunEstablished = false
         }
-        Builder()
+        routingBuilder(Builder())
     }
 
     private fun adoptExternalTun(engine: String, descriptor: ParcelFileDescriptor) = synchronized(lock) {
@@ -229,7 +255,7 @@ class SharedTunVpnService : VpnService() {
             "SHARED_TUN_OWNER_CHANGED" }
         check(VpnService.prepare(this) == null) { "VPN_PERMISSION_REQUIRED" }
         check(dnsServers.isNotEmpty()) { "CISCO_DNS_MISSING" }
-        val builder = Builder().setSession(name)
+        val builder = routingBuilder(Builder().setSession(name))
             .setBlocking(true)
             .setMtu(mtu.coerceIn(1280, 1300))
             .addAddress(address, prefix)
@@ -283,7 +309,7 @@ class SharedTunVpnService : VpnService() {
             // Default DNS could already be blackholed by the active guard.
             // Never bind the entire process to that underlying network.
             val settings = wireGuardUserspaceConfig(config)
-            val builder = Builder().setSession("TwinConnect WireGuard")
+            val builder = routingBuilder(Builder().setSession("TwinConnect WireGuard"))
                 .setBlocking(true)
                 .setMtu(config.`interface`.mtu.orElse(1280))
             for (address in config.`interface`.addresses) {
@@ -395,7 +421,7 @@ class SharedTunVpnService : VpnService() {
                 ownsFailedStart = true
                 persistentBlock = persistentBlock || keepBlockedOnDisconnect
                 if (persistentBlock && tun == null) tun = blockingTun()
-                val builder = Builder().setSession("TwinConnect AmneziaWG")
+                val builder = routingBuilder(Builder().setSession("TwinConnect AmneziaWG"))
                     .setBlocking(true).setMtu(mtu.coerceIn(1280, 9000))
                 for ((address, prefix) in addresses) builder.addAddress(address, prefix)
                 if (addresses.none { it.first.address.size == 16 }) {
@@ -619,6 +645,41 @@ class SharedTunVpnService : VpnService() {
         private const val NOTIFICATION_ID = 47032
         @Volatile var active: SharedTunVpnService? = null
             private set
+
+        private data class AppRouting(val mode: String, val packages: List<String>)
+        @Volatile private var appRouting = AppRouting("fullTunnel", emptyList())
+
+        /** Configure only while idle; validate installed packages before saving. */
+        @JvmStatic fun configureAppRouting(context: Context, mode: String, packages: List<String>) {
+            require(mode in setOf("fullTunnel", "onlySelectedApps", "excludeSelectedApps")) {
+                "APP_ROUTING_MODE_INVALID"
+            }
+            require(packages.size <= 100 && packages.distinct().size == packages.size) {
+                "APP_ROUTING_PACKAGES_INVALID"
+            }
+            require(mode == "fullTunnel" || packages.isNotEmpty()) {
+                "APP_ROUTING_PACKAGES_REQUIRED"
+            }
+            require(packages.none { it.isBlank() || it != it.trim() ||
+                it.length > 240 || it.contains('\n') || it.contains('\r') ||
+                it == context.packageName }) { "APP_ROUTING_PACKAGES_INVALID" }
+            val owner = active
+            val unchanged = appRouting.mode == mode &&
+                appRouting.packages == (if (mode == "fullTunnel") emptyList() else packages)
+            require(owner?.routingCanChange() != false || unchanged) { "APP_ROUTING_TUN_BUSY" }
+            require(mode == "fullTunnel" || owner?.hasBlockingTun() != true) {
+                "SPLIT_TUNNEL_GUARD_CONFLICT"
+            }
+            if (mode != "fullTunnel") for (id in packages) {
+                try { context.packageManager.getPackageInfo(id, 0) }
+                catch (_: android.content.pm.PackageManager.NameNotFoundException) {
+                    throw IllegalArgumentException("APP_ROUTING_PACKAGE_MISSING")
+                }
+            }
+            appRouting = AppRouting(mode, if (mode == "fullTunnel") emptyList() else packages.toList())
+        }
+
+        @JvmStatic fun configuredRoutingMode(): String = appRouting.mode
 
         /** Stable reflective ABI used by the pinned external Flutter plugins. */
         @JvmStatic fun newExternalTunBuilder(engine: String): VpnService.Builder =
