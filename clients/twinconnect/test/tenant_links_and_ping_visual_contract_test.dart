@@ -379,6 +379,8 @@ void main() {
     expect(shared, contains('check(ciscoEngine == null) { "TUNNEL_ALREADY_RUNNING" }'));
     expect(shared, contains('val previous = tun'));
     expect(shared, contains('ParcelFileDescriptor.dup(replacement.fileDescriptor)'));
+    expect(shared, contains('val replacement = blockingTun()'));
+    expect(shared, contains('CISCO_DISCONNECT_BLOCK_FAILED'));
     expect(shared, contains('if (!persistentBlock && wireGuardHandle < 0) shutdown()'));
     expect(installer, contains('"SharedOpenConnectEngine.java"'));
     expect(installer, isNot(contains('Independent pinned Cisco CSTP/TLS VpnService')));

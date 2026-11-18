@@ -123,7 +123,25 @@ class SharedTunVpnService : VpnService() {
     }
 
     private fun disconnectCisco() {
-        val engine = ciscoEngine
+        val engine = synchronized(lock) {
+            val current = ciscoEngine
+            if (current != null && persistentBlock && tun != null) {
+                try {
+                    // Take routing away from the native transport *before*
+                    // cancellation. Even a slow TLS/DTLS shutdown must not
+                    // keep forwarding packets after Disconnect was requested.
+                    val replacement = blockingTun()
+                    val previous = tun
+                    tun = replacement
+                    previous?.close()
+                } catch (_: Exception) {
+                    // Keep the existing captured route until the native
+                    // transport exits; never release the VPN slot here.
+                    Log.e("TwinSharedCisco", "CISCO_DISCONNECT_BLOCK_FAILED")
+                }
+            }
+            current
+        }
         if (engine == null) {
             if (!persistentBlock && wireGuardHandle < 0) shutdown()
         } else engine.stop()
