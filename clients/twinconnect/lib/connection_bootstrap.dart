@@ -1,6 +1,7 @@
 import 'dart:async' show TimeoutException;
 
 import 'emergency_connection_cache.dart';
+import 'emergency_wireguard_endpoint.dart';
 import 'protocols.dart';
 import 'server_inventory.dart';
 import 'tenant_api.dart';
@@ -162,9 +163,11 @@ class ConnectionBootstrap {
     }
     // This candidate still goes through normal native policy/readiness gates,
     // then through the native peer handshake. It is never a "connected" flag.
+    final routed = await EmergencyWireGuardEndpoint.useDirectIpOnDnsFailure(
+      profiles: record.profiles, server: record.server);
     return ConnectionCandidate(
       server: record.server, protocol: protocol,
-      profiles: record.profiles, fromEmergencyCache: true,
+      profiles: routed, fromEmergencyCache: true,
     );
   }
 }
