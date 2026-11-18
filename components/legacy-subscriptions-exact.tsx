@@ -555,6 +555,563 @@ export function LegacySubscriptionsRuntimePage(){
         })}
         {!loading&&filtered.length===0&&<div className="runtime-empty">{pick("اشتراکی پیدا نشد","No subscriptions found")}</div>}
       </div>
+"use client";
+
+import {FormEvent,useEffect,useMemo,useRef,useState} from "react";
+import {QRCodeSVG} from "qrcode.react";
+import {Badge,Card,Shell,Stat} from "./ui";
+import {SubscriptionLinkDeliveryModal} from "./subscription-link-delivery-modal";
+import {AppCredentialDeliveryCard} from "./app-credential-delivery-card";
+import {adminApi,AdminNode,AdminUser,RuntimeRow} from "../lib/admin-api";
+import {legacyAdminApi} from "../lib/legacy-admin-api";
+import {useI18n} from "../lib/i18n";
+
+const GB=1024**3;
+const classicProtocolKeys=["cisco","openvpn","wireguard","l2tp","v2ray"] as const;
+const modernProtocolKeys=["hysteria2","tuic","anytls","naive","shadowtls","snell","mieru","trusttunnel","amneziawg","sudoku","socks5"] as const;
+const protocolKeys=[...classicProtocolKeys,...modernProtocolKeys] as const;
+const classicProtocolSet=new Set<string>(classicProtocolKeys);
+const protocolLabels:Record<string,string>={
+  cisco:"Cisco / OpenConnect",
+  openvpn:"OpenVPN",
+  wireguard:"WireGuard",
+  l2tp:"L2TP / IPsec",
+  v2ray:"V2Ray / Xray",
+  hysteria2:"Hysteria2",
+  tuic:"TUIC",
+  anytls:"AnyTLS",
+  naive:"NaiveProxy",
+  shadowtls:"ShadowTLS",
+  snell:"Snell",
+  mieru:"Mieru",
+  trusttunnel:"TrustTunnel",
+  amneziawg:"AmneziaWG",
+  sudoku:"Sudoku",
+  socks5:"SOCKS5 Proxy"
+};
+
+const s=(value:unknown)=>String(value??"");
+const n=(value:unknown)=>{const out=Number(value??0);return Number.isFinite(out)?out:0;};
+const list=(value:unknown):RuntimeRow[]=>Array.isArray(value)?value.filter(item=>item&&typeof item==="object") as RuntimeRow[]:value&&typeof value==="object"?[value as RuntimeRow]:[];
+const strings=(value:unknown)=>Array.isArray(value)?value.map(String):[];
+const formatDate=(value:unknown)=>{if(!value)return "—";const date=new Date(String(value));return Number.isNaN(date.getTime())?String(value):date.toLocaleDateString("fa-IR",{year:"numeric",month:"short",day:"numeric"});};
+const formatBytes=(value:unknown)=>`${(n(value)/GB).toLocaleString("fa-IR",{maximumFractionDigits:1})} GB`;
+const tone=(value:unknown):"ok"|"warn"|"bad"|"violet"=>{const key=s(value).toLowerCase();return key==="active"?"ok":["expired","canceled"].includes(key)?"bad":"warn";};
+const statusLabel=(value:unknown)=>{const key=s(value).toLowerCase();return key==="active"?"فعال":key==="pending"?"در انتظار":key==="expired"?"منقضی":key==="suspended"?"معلق":key==="canceled"?"لغوشده":s(value)||"نامشخص";};
+// Network presence is different from account entitlement ("فعال"). The backend
+// uses the same verified live snapshot for the 39-online KPI, filter and rows.
+const presenceKind=(row:RuntimeRow):"online"|"offline"|"unknown"=>{
+  const state=s(row.presence_state).toLowerCase();
+  return state==="online"?"online":state==="offline"?"offline":"unknown";
+};
+
+const optionalPositive=(value:string)=>{const clean=value.trim();if(!clean)return undefined;const out=Number(clean);return Number.isFinite(out)&&out>0?out:undefined;};
+const planProtocols=(plan:RuntimeRow|undefined)=>{
+  if(!plan)return [];
+  const explicit=strings(plan.protocols).filter(key=>protocolKeys.includes(key as typeof protocolKeys[number]));
+  return explicit.length?explicit:classicProtocolKeys.filter(key=>Boolean(plan[`enable_${key}`]));
+};
+const planTraffic=(plan:RuntimeRow|undefined)=>n(plan?.traffic_gb)>0?String(n(plan?.traffic_gb)):"";
+const planDuration=(plan:RuntimeRow|undefined)=>n(plan?.duration_days)>0?String(Math.trunc(n(plan?.duration_days))):"";
+
+function copy(value:string){if(value)void navigator.clipboard.writeText(value);}
+function absoluteLink(value:string){if(!value)return "";if(/^https?:\/\//i.test(value))return value;if(typeof window!=="undefined")return new URL(value,window.location.origin).toString();return value;}
+function downloadText(filename:string,content:string){const blob=new Blob([content],{type:"text/plain;charset=utf-8"});const url=URL.createObjectURL(blob);const anchor=document.createElement("a");anchor.href=url;anchor.download=filename||"config.txt";anchor.click();URL.revokeObjectURL(url);}
+
+function Notice({error,ok}:{error:string;ok:string}){return <>{error&&<div className="runtime-error">{error}</div>}{ok&&<div className="runtime-success">{ok}</div>}</>;}
+
+function Modal({title,sub,onClose,children,wide=false}:{title:string;sub?:string;onClose:()=>void;children:React.ReactNode;wide?:boolean}){
+  return <div className="runtime-modal" role="dialog" aria-modal="true">
+    <button className="runtime-modal-bg" aria-label="close" onClick={onClose}/>
+    <div className={`runtime-modal-card ${wide?"manage-card":""}`}>
+      <div className="card-head"><div><b>{title}</b>{sub&&<small>{sub}</small>}</div><button type="button" className="icon-button" onClick={onClose}>×</button></div>
+      {children}
+    </div>
+  </div>;
+}
+
+type ModalKind="create"|"edit"|"extend"|"connect"|"history"|null;
+type Draft={user_id:number;plan_id:number;traffic_gb:string;duration_days:string;device_limit:string;username:string;password:string;protocols:string[]};
+
+export function LegacySubscriptionsRuntimePage(){
+  const {pick}=useI18n();
+  const [rows,setRows]=useState<RuntimeRow[]>([]);
+  const [users,setUsers]=useState<AdminUser[]>([]);
+  const [plans,setPlans]=useState<RuntimeRow[]>([]);
+  const [nodes,setNodes]=useState<AdminNode[]>([]);
+  const [loading,setLoading]=useState(true);
+  const [busy,setBusy]=useState("");
+  const [error,setError]=useState("");
+  const [ok,setOk]=useState("");
+  const [query,setQuery]=useState("");
+  const [linkedAccountId,setLinkedAccountId]=useState(0);
+  const [paymentLinkInitialized,setPaymentLinkInitialized]=useState(false);
+  const [page,setPage]=useState(0);
+  const [matchedTotal,setMatchedTotal]=useState(0);
+  const [globalStats,setGlobalStats]=useState({total:0,active:0,expired:0,suspended:0,online:0});
+  const pageSize=40;
+  const listRequestId=useRef(0);
+  const [status,setStatus]=useState<"all"|"active"|"expired"|"suspended"|"pending"|"online">("all");
+  const [modal,setModal]=useState<ModalKind>(null);
+  const [selected,setSelected]=useState<RuntimeRow|null>(null);
+  const [connection,setConnection]=useState<RuntimeRow|null>(null);
+  const [activeProtocol,setActiveProtocol]=useState("cisco");
+  const [showPassword,setShowPassword]=useState(false);
+  const [userSearch,setUserSearch]=useState("");
+  const [extendDays,setExtendDays]=useState(30);
+  const [extendTraffic,setExtendTraffic]=useState(10);
+  const [extendMode,setExtendMode]=useState<"custom"|"plan">("custom");
+  const [extendPlanId,setExtendPlanId]=useState(0);
+  const [renewalHistory,setRenewalHistory]=useState<{events:Array<{id:number;type:string;source:string;actor:string;details:Record<string,unknown>;created_at:string}>;renewals:Array<{id:number;plan:string;traffic_bytes:number;duration_days:number;status:string;created_at:string;activated_at?:string|null;can_cancel:boolean;amount_toman?:number|null;source:string}>;queued:Array<{id:number;plan:string;traffic_bytes:number;duration_days:number;status:string;created_at:string}>}|null>(null);
+  const [editResetUsage,setEditResetUsage]=useState(false);
+  const [resetTarget,setResetTarget]=useState<RuntimeRow|null>(null);
+  const [extendResetUsage,setExtendResetUsage]=useState(false);
+  const [extendResetDate,setExtendResetDate]=useState(false);
+  const [appDeliverySubscriptionId,setAppDeliverySubscriptionId]=useState<number|null>(null);
+  const [linkModalId,setLinkModalId]=useState<number|null>(null);
+  const [linkModalLink,setLinkModalLink]=useState("");
+  const [linkModalLoading,setLinkModalLoading]=useState(false);
+  const [linkModalError,setLinkModalError] = useState("");
+  const [transferOpen,setTransferOpen]=useState(false);
+  const [transferMode,setTransferMode]=useState<"user"|"reseller">("reseller");
+  const [transferUserId,setTransferUserId]=useState(0);
+  const [transferUserSearch,setTransferUserSearch]=useState("");
+  const [transferUserMatches,setTransferUserMatches]=useState<AdminUser[]>([]);
+  const [resellerFilterId,setResellerFilterId]=useState(0);
+  const [transferResellers,setTransferResellers]=useState<RuntimeRow[]>([]);
+  const [transferCustomers,setTransferCustomers]=useState<Array<{id:number;name:string;email?:string|null;is_owner:boolean}>>([]);
+  const [transferResellerId,setTransferResellerId]=useState(0);
+  const [transferCustomerId,setTransferCustomerId]=useState(0);
+  const [transferCustomerSearch,setTransferCustomerSearch]=useState("");
+  const [transferLoading,setTransferLoading]=useState(false);
+  // Share URLs are stable for a subscription; cache and dedupe requests so
+  // opening the modal does not wait for heavyweight connection-info/provisioning.
+  const linkCache=useRef(new Map<number,string>());
+  const linkPending=useRef(new Map<number,Promise<string>>());
+  const linkRequestGeneration=useRef(0);
+
+  const [draft,setDraft]=useState<Draft>({user_id:0,plan_id:0,traffic_gb:"",duration_days:"",device_limit:"1",username:"",password:"",protocols:[]});
+  const [editExpiry,setEditExpiry]=useState("");
+
+  useEffect(()=>{
+    // This is the actual subscriptions page used by /admin/subscriptions.
+    // Read the payment deep link before the first database search, rather
+    // than applying the link only in the unused subscriptions-full runtime.
+    const params=new URLSearchParams(window.location.search);
+    const raw=params.get("focus")||"";
+    const accountId=/^[0-9]+$/.test(raw)?Number(raw):0;
+    if(Number.isSafeInteger(accountId)&&accountId>0){
+      setLinkedAccountId(accountId);
+      setQuery((params.get("account")||String(accountId)).trim());
+      setPage(0);
+      setStatus("all");
+      setResellerFilterId(0);
+    }
+    setPaymentLinkInitialized(true);
+  },[]);
+
+  const load=async(silent=false)=>{
+    if(!paymentLinkInitialized)return;
+    const requestId=++listRequestId.current;
+    if(!silent)setLoading(true);
+    setError("");
+    try{
+      const data=await adminApi.subscriptionsPageV3({limit:pageSize,offset:page*pageSize,q:query.trim(),status,reseller_id:resellerFilterId});
+      if(requestId!==listRequestId.current)return;
+      setRows(data.items);
+      setMatchedTotal(data.total);
+      if(linkedAccountId>0){
+        const exact=data.items.find(item=>n(item.id)===linkedAccountId);
+        if(exact)setSelected(exact);
+      }
+      setGlobalStats(data.stats);
+      setSelected(current=>current?(data.items.find(item=>n(item.id)===n(current.id))||current):null);
+    }catch(reason){
+      if(requestId===listRequestId.current)setError(reason instanceof Error?reason.message:String(reason));
+    }finally{
+      if(requestId===listRequestId.current&&!silent)setLoading(false);
+    }
+  };
+
+  useEffect(()=>{
+    if(!paymentLinkInitialized)return;
+    const timer=window.setTimeout(()=>void load(),query.trim()?250:0);
+    const interval=window.setInterval(()=>{
+      if(document.visibilityState==="visible")void load(true);
+    },45000);
+    return()=>{window.clearTimeout(timer);window.clearInterval(interval);listRequestId.current+=1;};
+  },[page,query,status,resellerFilterId,paymentLinkInitialized,linkedAccountId]);
+
+  useEffect(()=>{
+    // Metadata is supplementary for create/edit forms and never blocks the list.
+    let live=true;
+    void adminApi.users().then(value=>{if(live)setUsers(value);}).catch(()=>{});
+    void adminApi.plans().then(value=>{if(live)setPlans(value);}).catch(()=>{});
+    void adminApi.nodes().then(value=>{if(live)setNodes(value);}).catch(()=>{});
+    void adminApi.resellersForTransfer().then(value=>{if(live)setTransferResellers(value);}).catch(()=>{});
+    return()=>{live=false;};
+  },[]);
+
+  const userMap=useMemo(()=>new Map(users.map(user=>[user.id,user])),[users]);
+  const planMap=useMemo(()=>new Map(plans.map(plan=>[n(plan.id),plan])),[plans]);
+  const activePlan=planMap.get(draft.plan_id);
+  // Search and status are applied by the database before pagination.
+  const filtered=linkedAccountId>0
+    ?rows.filter(row=>n(row.id)===linkedAccountId)
+    :rows;
+  const stats=globalStats;
+  const pageCount=linkedAccountId>0?1:Math.max(1,Math.ceil(matchedTotal/pageSize));
+  // Up to ten visible pages, sliding around the current page and clamped to bounds.
+  const pageWindowStart=Math.max(0,Math.min(page-4,pageCount-10));
+  const visiblePages=Array.from({length:Math.min(10,pageCount)},(_,index)=>pageWindowStart+index);
+  const changePage=(next:number)=>{
+    if(loading||next<0||next>=pageCount||next===page)return;
+    setPage(next);
+  };
+
+  const act=async(key:string,label:string,fn:()=>Promise<unknown>,close=false)=>{
+    if(busy)return;setBusy(key);setError("");setOk("");
+    try{await fn();setOk(label);if(close&&key==="edit"){setModal(null);void load(true);}else{await load(true);if(close)setModal(null);}}catch(reason){setError(reason instanceof Error?reason.message:String(reason));}finally{setBusy("");}
+  };
+
+  const planDraft=(plan:RuntimeRow|undefined)=>({
+    plan_id:n(plan?.id),
+    traffic_gb:planTraffic(plan),
+    duration_days:planDuration(plan),
+    device_limit:String(Math.max(1,n(plan?.device_limit)||1)),
+    protocols:planProtocols(plan)
+  });
+
+  const openCreate=()=>{
+    const plan=plans.find(item=>item.is_active!==false)||plans[0];
+    const user=users.find(item=>item.role!=="admin"&&item.is_active!==false)||users.find(item=>item.role!=="admin");
+    setDraft({user_id:user?.id||0,...planDraft(plan),username:"",password:""});
+    setUserSearch("");setSelected(null);setConnection(null);setModal("create");
+  };
+
+  const choosePlan=(id:number)=>{
+    const plan=plans.find(item=>n(item.id)===id);
+    setDraft(current=>({...current,...planDraft(plan),plan_id:id}));
+  };
+
+  const createSubscription=(event:FormEvent)=>{
+    event.preventDefault();
+    if(!draft.user_id||!draft.plan_id){setError(pick("کاربر و پلن را انتخاب کنید","Select user and plan"));return;}
+    const traffic=optionalPositive(draft.traffic_gb);const duration=optionalPositive(draft.duration_days);const device=Math.max(1,Math.trunc(optionalPositive(draft.device_limit)||1));
+    void act("create",pick("اشتراک ساخته و اکانت صادر شد","Subscription created and account provisioned"),async()=>{
+      await adminApi.createSubscriptionV2({user_id:draft.user_id,plan_id:draft.plan_id,node_ids:[],protocols:draft.protocols,...(traffic!==undefined?{traffic_gb:traffic}:{}),duration_days:Math.trunc(duration??0),device_limit:device,...(draft.username.trim()?{username:draft.username.trim()}:{}),...(draft.password.trim()?{password:draft.password.trim()}:{})});
+    },true);
+  };
+
+  const openEdit=(item:RuntimeRow)=>{
+    setSelected(item);setConnection(null);const limit=n(item.traffic_limit_gb)||(n(item.traffic_limit_bytes)/GB);
+    setDraft({user_id:n(item.user_id),plan_id:n(item.plan_id),traffic_gb:limit>0?String(limit):"",duration_days:n(item.activation_duration_days)>0?String(n(item.activation_duration_days)):"",device_limit:String(item.device_limit!==undefined&&item.device_limit!==null?n(item.device_limit):n(planMap.get(n(item.plan_id))?.device_limit)||1),username:s(item.account_username),password:"",protocols:strings(item.protocols)});
+    setEditExpiry(item.expires_at?String(item.expires_at).slice(0,10):"");
+    setEditResetUsage(false);
+    setModal("edit");
+  };
+
+  const confirmUsageReset=()=>{
+    if(!resetTarget||busy)return;
+    const subscriptionId=n(resetTarget.id);
+    if(!subscriptionId)return;
+    void act(
+      "reset-usage",
+      pick("حجم مصرفی اشتراک صفر شد؛ حجم کل و تاریخ انقضا تغییر نکردند","Subscription usage was reset; total quota and expiry were unchanged"),
+      async()=>{
+        await legacyAdminApi.resetSubscriptionUsage(subscriptionId);
+        setResetTarget(null);
+      },
+    );
+  };
+
+  const saveEdit=(event:FormEvent)=>{
+    event.preventDefault();if(!selected)return;
+    if(editResetUsage&&!window.confirm(pick("مصرف ثبت‌شده اشتراک صفر شود؟ سوابق حسابداری برای جلوگیری از ثبت دوباره مصرف حفظ می‌شوند.","Reset this subscription's billed usage to zero? Historical accounting remains for replay protection.")))return;
+    const traffic=optionalPositive(draft.traffic_gb);
+    const originalDays=n(selected.activation_duration_days)>0?String(Math.trunc(n(selected.activation_duration_days))):"";
+    const durationChanged=draft.duration_days.trim()!==originalDays;
+    void act("edit",pick("تنظیمات ذخیره شد؛ همگام‌سازی کانفیگ‌ها در صف است","Settings saved; config sync queued"),()=>adminApi.editSubscription(n(selected.id),{
+      plan_id:draft.plan_id||null,
+      traffic_gb:traffic??0,
+      reset_usage:editResetUsage,
+      device_limit:Math.max(0,Math.min(1000,Math.trunc(Number(draft.device_limit)||0))),
+      ...(durationChanged?{duration_days:Math.max(0,Math.min(3650,Math.trunc(Number(draft.duration_days)||0)))}:{}),
+      ...(editExpiry&&editExpiry!==String(selected.expires_at||"").slice(0,10)?{expires_at:new Date(editExpiry+"T23:59:59").toISOString()}:{}),
+      node_ids:[],
+      protocols:draft.protocols,
+      account_username:draft.username.trim()||undefined,
+      account_password:draft.password.trim()||undefined,
+    }),true);
+  };
+  const openTransfer=async(item:RuntimeRow)=>{
+    setSelected(item);setTransferOpen(true);setTransferLoading(true);
+    setTransferMode("reseller");setTransferUserId(0);setTransferUserSearch("");
+    setTransferResellerId(0);setTransferCustomerId(0);setTransferCustomerSearch("");setTransferCustomers([]);setError("");
+    try{
+      const resellers=await adminApi.resellersForTransfer();
+      setTransferResellers(resellers);
+    }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
+    finally{setTransferLoading(false);}
+  };
+
+  useEffect(()=>{
+    if(!transferOpen||transferMode!=="user")return;
+    let live=true;
+    const timer=window.setTimeout(()=>{
+      void adminApi.usersFastPage({limit:50,offset:0,q:transferUserSearch.trim()})
+        .then(result=>{if(live)setTransferUserMatches(result.items.filter(user=>user.role!=="admin"&&user.is_active!==false));})
+        .catch(reason=>{if(live)setError(reason instanceof Error?reason.message:String(reason));});
+    },transferUserSearch.trim()?300:0);
+    return()=>{live=false;window.clearTimeout(timer);};
+  },[transferOpen,transferMode,transferUserSearch]);
+  const selectTransferReseller=async(id:number)=>{
+    setTransferResellerId(id);setTransferCustomerId(0);setTransferCustomerSearch("");setTransferCustomers([]);
+    if(!id)return;
+    setTransferLoading(true);setError("");
+    try{
+      const customers=await adminApi.resellerTransferCustomers(id);
+      setTransferCustomers(customers);
+      const own=customers.find(customer=>!customer.is_owner&&customer.id===n(selected?.user_id));
+      if(own)setTransferCustomerId(own.id);
+    }catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
+    finally{setTransferLoading(false);}
+  };
+  useEffect(()=>{
+    if(!transferOpen||transferMode!=="reseller"||!transferResellerId)return;
+    let live=true;
+    const timer=window.setTimeout(()=>{
+      void adminApi.resellerTransferCustomers(transferResellerId,transferCustomerSearch.trim())
+        .then(customers=>{if(live)setTransferCustomers(customers);})
+        .catch(reason=>{if(live)setError(reason instanceof Error?reason.message:String(reason));});
+    },transferCustomerSearch.trim()?300:0);
+    return()=>{live=false;window.clearTimeout(timer);};
+  },[transferOpen,transferMode,transferResellerId,transferCustomerSearch]);
+  const submitTransfer=()=>{
+    if(!selected)return;
+    if(transferMode==="user"){
+      if(!transferUserId)return;
+      const user=transferUserMatches.find(item=>item.id===transferUserId);
+      if(!window.confirm(pick(`مالکیت اشتراک MV-${n(selected.id)} به «${user?.full_name||user?.email||transferUserId}» منتقل شود؟ دسترسی نماینده قبلی قطع می‌شود ولی کانفیگ تغییر نمی‌کند.`,`Transfer ownership of MV-${n(selected.id)} to ${user?.full_name||user?.email||transferUserId}? Previous reseller management is detached; VPN configs stay unchanged.`)))return;
+      void act("transfer",pick("مالکیت اکانت به کاربر منتقل شد","Subscription ownership transferred"),async()=>{
+        await adminApi.transferSubscriptionToUser(n(selected.id),transferUserId);
+        setTransferOpen(false);
+      });
+      return;
+    }
+    if(!transferResellerId||!transferCustomerId)return;
+    const reseller=transferResellers.find(row=>n(row.id)===transferResellerId);
+    if(!window.confirm(pick(`مالکیت اشتراک MV-${n(selected.id)} به مشتری انتخاب‌شده و مدیریت آن به نمایندگی «${s(reseller?.name)}» منتقل شود؟ کانفیگ و شناسه اشتراک تغییر نمی‌کنند.`,`Transfer ownership and management of MV-${n(selected.id)} to reseller ${s(reseller?.name)} and its selected customer? VPN configuration stays unchanged.`)))return;
+    void act("transfer",pick("مالکیت و مدیریت اشتراک منتقل شد","Subscription ownership and management transferred"),async()=>{
+      await adminApi.transferSubscriptionToReseller(n(selected.id),transferResellerId,transferCustomerId);
+      setTransferOpen(false);
+    });
+  };
+  const openExtend=(item:RuntimeRow)=>{setSelected(item);setExtendMode("custom");setExtendPlanId(0);setExtendDays(30);setExtendTraffic(10);setExtendResetUsage(false);setExtendResetDate(false);setModal("extend");};
+  const chooseRenewalPlan=(id:number)=>{
+    setExtendPlanId(id);
+    const chosen=planMap.get(id);
+    if(chosen){setExtendTraffic(n(chosen.traffic_gb));setExtendDays(n(chosen.duration_days));}
+  };
+  const saveExtend=()=>{
+    if(!selected||extendTraffic<=0||extendDays<=0||(extendMode==="plan"&&!extendPlanId))return;
+    void act("extend",pick("تمدید برای دوره بعد ثبت شد","Renewal queued for the next period"),()=>legacyAdminApi.reserveSubscriptionRenewal(n(selected.id),{
+      mode:extendMode,traffic_gb:extendTraffic,duration_days:extendDays,
+      ...(extendMode==="plan"?{plan_id:extendPlanId}:{}),
+    }),true);
+  };
+  const openHistory=async(item:RuntimeRow)=>{
+    setSelected(item);setRenewalHistory(null);setModal("history");setError("");
+    try{setRenewalHistory(await legacyAdminApi.subscriptionHistory(n(item.id)));}
+    catch(reason){setError(reason instanceof Error?reason.message:String(reason));}
+  };
+  const toggleStatus=async(item:RuntimeRow)=>{const activate=s(item.status).toLowerCase()!=="active";await act(`status-${item.id}`,activate?pick("اشتراک فعال شد","Subscription activated"):pick("اشتراک معلق شد","Subscription suspended"),()=>adminApi.setSubscriptionActive(n(item.id),activate));};
+  const remove=async(item:RuntimeRow)=>{
+    const id=n(item.id);if(id<=0)return;
+    const user=userMap.get(n(item.user_id));
+    if(!window.confirm(pick(`اشتراک ${user?.full_name||user?.email||`#${item.id}`} حذف شود؟ این عملیات قابل بازگشت نیست.`,`Delete subscription #${item.id}? This cannot be undone.`)))return;
+    const snapshot=rows;
+    setError("");setOk("");
+    setRows(current=>current.filter(row=>n(row.id)!==id));
+    setSelected(current=>n(current?.id)===id?null:current);
+    try{
+      await adminApi.deleteSubscription(id);
+      setOk(pick("اشتراک حذف شد","Subscription deleted"));
+    }catch(reason){
+      setRows(snapshot);
+      setError(reason instanceof Error?reason.message:String(reason));
+      void load(true);
+    }
+  };
+
+  const loadConnection=async(item:RuntimeRow)=>{setSelected(item);setConnection(null);setModal("connect");setBusy("connection");setError("");try{const data=await adminApi.subscriptionConnectionInfo(n(item.id));setConnection(data);const first=(Array.isArray(data.credentials)?data.credentials:[])[0] as RuntimeRow|undefined;setActiveProtocol(s(first?.protocol)||"cisco");}catch(reason){setError(reason instanceof Error?reason.message:String(reason));}finally{setBusy("");}};
+  const getSubscriptionShareLink=(id:number):Promise<string>=>{
+    const cached=linkCache.current.get(id);
+    if(cached)return Promise.resolve(cached);
+    const inFlight=linkPending.current.get(id);
+    if(inFlight)return inFlight;
+    const request=adminApi.subscriptionShareLink(id).catch(async(reason)=>{
+      // Only old installations with a missing route use the legacy endpoint.
+      // Never turn a transient error into an expensive provisioning request.
+      const message=reason instanceof Error?reason.message:String(reason);
+      if(!/(not found|api error 404)/i.test(message))throw reason;
+      const fallback=await adminApi.subscriptionConnectionInfo(id);
+      return {subscription_link:s(fallback.subscription_link)};
+    }).then(data=>{
+      const url=s(data.subscription_link);
+      if(!url)throw new Error("Subscription link is not available");
+      linkCache.current.set(id,url);
+      return url;
+    }).finally(()=>{linkPending.current.delete(id);});
+    linkPending.current.set(id,request);
+    return request;
+  };
+  const prefetchSubscriptionLink=(item:RuntimeRow)=>{
+    const id=n(item.id);
+    if(id&&!linkCache.current.has(id))void getSubscriptionShareLink(id).catch(()=>{});
+  };
+  const openSubscriptionLink=async(item:RuntimeRow)=>{
+    const id=n(item.id);if(!id)return;
+    const generation=++linkRequestGeneration.current;
+    const cached=linkCache.current.get(id)||s(item.subscription_link);
+    setLinkModalId(id);
+    setLinkModalLink(cached);
+    setLinkModalLoading(!cached);
+    setLinkModalError("");
+    if(cached)return;
+    try{
+      const url=await getSubscriptionShareLink(id);
+      if(linkRequestGeneration.current===generation)setLinkModalLink(url);
+    }catch(reason){
+      if(linkRequestGeneration.current===generation)setLinkModalError(reason instanceof Error?reason.message:String(reason));
+    }finally{
+      if(linkRequestGeneration.current===generation)setLinkModalLoading(false);
+    }
+  };
+  const closeSubscriptionLink=()=>{linkRequestGeneration.current+=1;setLinkModalId(null);setLinkModalLink("");setLinkModalLoading(false);setLinkModalError("");};
+  const provision=async()=>{if(!selected)return;setBusy("provision");setError("");try{await adminApi.provisionSubscription(n(selected.id));setConnection(await adminApi.subscriptionConnectionInfo(n(selected.id)));setOk(pick("اطلاعات اتصال ساخته شد","Connection info provisioned"));}catch(reason){setError(reason instanceof Error?reason.message:String(reason));}finally{setBusy("");}};
+  const refreshPasswords=async()=>{if(!selected)return;setBusy("passwords");setError("");try{await adminApi.refreshSubscriptionPasswords(n(selected.id));setConnection(await adminApi.subscriptionConnectionInfo(n(selected.id)));setOk(pick("رمز Cisco/L2TP بازسازی شد","Cisco/L2TP password refreshed"));}catch(reason){setError(reason instanceof Error?reason.message:String(reason));}finally{setBusy("");}};
+
+  const userMatches=users.filter(user=>user.role!=="admin"&&(!userSearch.trim()||`${user.full_name||""} ${user.email||""} ${user.phone||""}`.toLowerCase().includes(userSearch.trim().toLowerCase()))).slice(0,30);
+  const credentials=connection&&Array.isArray(connection.credentials)?connection.credentials as RuntimeRow[]:[];
+  const account=connection&&connection.account&&typeof connection.account==="object"?connection.account as RuntimeRow:null;
+  const shareLink=absoluteLink(s(connection?.subscription_link));
+  const selectedCredential=credentials.find(item=>s(item.protocol)===activeProtocol)||credentials[0]||null;
+  const selectedItems=selectedCredential?list(selectedCredential.items):[];
+
+  const trafficCell=(item:RuntimeRow)=>{
+    const limit=n(item.traffic_limit_bytes),used=n(item.traffic_used_bytes);
+    const percent=limit>0?Math.max(0,Math.min(100,(used/limit)*100)):0;
+    return <div className="user-cell" style={{display:"grid",gap:7,width:"100%",minWidth:0}}>
+      <b dir="ltr" style={{fontVariantNumeric:"tabular-nums",fontSize:13,whiteSpace:"nowrap"}}>{formatBytes(used)} / {limit>0?formatBytes(limit):pick("نامحدود","Unlimited")}</b>
+      <div role="progressbar" aria-label={pick("میزان مصرف اشتراک","Subscription usage")} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(percent)} style={{height:7,borderRadius:999,overflow:"hidden",background:"rgba(126,148,201,.2)",width:"100%"}}>
+        <i style={{display:"block",height:"100%",borderRadius:999,width:`${percent}%`,background:percent>=90?"#ef6464":"linear-gradient(90deg,#407cf6,#a460ff)",transition:"width .3s ease"}}/>
+      </div>
+      <small style={{fontVariantNumeric:"tabular-nums"}}>{limit>0?`${Math.round(percent).toLocaleString("fa-IR")}٪`:"∞"}</small>
+    </div>;
+  };
+  const expiryCell=(item:RuntimeRow)=>{
+    if(item.expires_at){
+      const expires=new Date(String(item.expires_at));
+      const remaining=Number.isFinite(expires.getTime())?Math.max(0,Math.ceil((expires.getTime()-Date.now())/86400000)):null;
+      return <div className="user-cell"><b>{formatDate(item.expires_at)}</b>{remaining!==null&&<small>{remaining>0?pick(`${remaining.toLocaleString("fa-IR")} روز باقی‌مانده`,`${remaining} days remaining`):pick("منقضی شده","Expired")}</small>}</div>;
+    }
+    const days=n(item.activation_duration_days)||n(planMap.get(n(item.plan_id))?.duration_days);
+    if(item.duration_unlimited===true||days<=0)return pick("نامحدود","Unlimited");
+    return <div className="user-cell"><b>{pick(`${days.toLocaleString("fa-IR")} روز`,`${days} days`)}</b><small>{pick("از اولین اتصال","From first connection")}</small></div>;
+  };
+
+  return <Shell active="/admin/subscriptions"><div className="page legacy-subscriptions-page">
+    <div className="page-head"><div><h1>{pick("اشتراک‌ها","Subscriptions")}</h1><small>{pick("مدیریت اشتراک، تمدید، وضعیت و سابلینک","Subscriptions, renewals, status and public links")}</small></div><button className="primary" onClick={openCreate}>＋ {pick("اشتراک جدید","New subscription")}</button></div>
+    <Notice error={error} ok={ok}/>
+
+    <div className="stats dashboard-stats subscription-stat-filters" aria-label={pick("فیلتر اشتراک‌ها بر اساس وضعیت","Filter subscriptions by status")}>
+      {([
+        ["all",pick("کل اشتراک‌ها","Total subscriptions"),stats.total],
+        ["active",pick("اشتراک‌های فعال","Active subscriptions"),stats.active],
+        ["expired",pick("منقضی","Expired"),stats.expired],
+        ["suspended",pick("معلق","Suspended"),stats.suspended],
+        ["online",pick("آنلاین‌ها","Online now"),stats.online??0],
+      ] as const).map(([key,label,count])=>(
+        <button
+          key={key}
+          type="button"
+          className={`subscription-stat-filter ${status===key?"is-selected":""}`}
+          aria-pressed={status===key}
+          title={pick(`نمایش ${label}`,`Show ${label.toLowerCase()}`)}
+          onClick={()=>{setStatus(key);setPage(0);}}
+        >
+          <Stat label={label} value={count.toLocaleString("fa-IR")}/>
+        </button>
+      ))}
+    </div>
+    <style>{`
+      .subscription-live-statuses{display:flex;align-items:center;justify-content:flex-start;gap:6px;flex-wrap:wrap}
+      .subscription-presence{display:inline-flex;align-items:center;justify-content:center;border:1px solid transparent;border-radius:7px;padding:4px 7px;font-size:11px;font-weight:700;white-space:nowrap;line-height:1.3}
+      .subscription-presence-online{color:#69e5b2;border-color:rgba(52,211,153,.29);background:rgba(16,185,129,.1)}
+      .subscription-presence-offline{color:#aeb8ca;border-color:rgba(148,163,184,.21);background:rgba(148,163,184,.07)}
+      .subscription-presence-unknown{color:#e8bc75;border-color:rgba(245,158,11,.22);background:rgba(245,158,11,.09)}
+      .subscription-stat-filters{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
+      .subscription-stat-filter{border:2px solid transparent;border-radius:18px;background:transparent;padding:0;color:inherit;text-align:inherit;cursor:pointer;min-width:0;transition:border-color .2s,transform .2s}
+      .subscription-stat-filter:hover{transform:translateY(-2px);border-color:rgba(59,130,246,.45)}
+      .subscription-stat-filter.is-selected{border-color:#3b82f6}
+      .subscription-stat-filter:focus-visible{outline:3px solid #60a5fa;outline-offset:2px}
+      .subscription-stat-filter .stat{height:100%;margin:0}
+      @media(max-width:850px){.subscription-stat-filters{grid-template-columns:repeat(2,minmax(0,1fr))}}
+      @media(max-width:420px){.subscription-stat-filters{grid-template-columns:1fr}}
+    `}</style>
+
+    <Card>
+      <div className="runtime-toolbar"><label>⌕ <input value={query} onChange={event=>{setLinkedAccountId(0);setQuery(event.target.value);setPage(0);if(window.location.search.includes("focus=")){const url=new URL(window.location.href);url.searchParams.delete("focus");url.searchParams.delete("account");window.history.replaceState(null,"",url.pathname+url.search+url.hash);}}} placeholder={pick("نام، ایمیل، نام کاربری یا کد اشتراک…","Name, email, username or subscription code…")}/></label><select value={status} onChange={event=>{setStatus(event.target.value as typeof status);setPage(0);}}><option value="all">{pick("همه","All")}</option><option value="active">{pick("فعال","Active")}</option><option value="expired">{pick("منقضی","Expired")}</option><option value="suspended">{pick("معلق","Suspended")}</option><option value="online">{pick("آنلاین‌ها","Online now")}</option><option value="pending">{pick("در انتظار","Pending")}</option></select><select aria-label={pick("فیلتر نماینده","Filter by reseller")} value={resellerFilterId} onChange={event=>{setResellerFilterId(Number(event.target.value));setPage(0);}}><option value={0}>{pick("همه نمایندگی‌ها","All resellers")}</option><option value={-1}>{pick("بدون نماینده","No reseller")}</option>{transferResellers.map(reseller=><option key={n(reseller.id)} value={n(reseller.id)}>{s(reseller.name)||s(reseller.brand_name)||`#${reseller.id}`}</option>)}</select><button className="ghost" disabled={loading} onClick={()=>void load()}>{loading?"…":pick("بروزرسانی","Refresh")}</button></div>
+      {loading&&rows.length===0?<div className="runtime-loading">…</div>:<div className="table"><table><thead><tr><th>{pick("کاربر","User")}</th><th>{pick("نماینده","Reseller")}</th><th>{pick("پلن","Plan")}</th><th>{pick("نام کاربری","Username")}</th><th>{pick("ترافیک","Traffic")}</th><th>{pick("ساخت","Created")}</th><th>{pick("انقضا","Expires")}</th><th>{pick("وضعیت","Status")}</th><th>{pick("عملیات","Actions")}</th></tr></thead><tbody>{filtered.map(item=>{const user=userMap.get(n(item.user_id));const plan=planMap.get(n(item.plan_id));return <tr key={n(item.id)}><td><div className="user-cell"><b>{user?.full_name||s(item.customer_name)||`#${item.user_id}`}</b><small dir="ltr">{user?.email||s(item.customer_email)||"—"}</small></div></td><td><div className="user-cell"><b>{s(item.reseller_name)||pick("مستقیم","Direct")}</b>{n(item.reseller_id)>0&&<small dir="ltr">#{n(item.reseller_id)}</small>}</div></td><td><div className="user-cell"><b>{s(item.plan_name)||s(plan?.name)||`#${item.plan_id}`}</b><small dir="ltr">MV-{n(item.id)}</small></div></td><td><div className="secret-row"><b dir="ltr">{s(item.account_username)||"—"}</b>{s(item.account_username)&&<button className="mini-btn" onClick={()=>copy(s(item.account_username))}>{pick("کپی","Copy")}</button>}</div></td><td>{trafficCell(item)}</td><td>{formatDate(item.created_at)}</td><td>{expiryCell(item)}</td><td><div className="subscription-live-statuses"><Badge tone={tone(item.status)}>{statusLabel(item.status)}</Badge><span className={`subscription-presence subscription-presence-${presenceKind(item)}`}>{presenceKind(item)==="online"?pick("● آنلاین","● Online"):presenceKind(item)==="offline"?pick("○ آفلاین","○ Offline"):pick("◌ نامشخص","◌ Unknown")}</span></div></td><td><div className="row-actions"><button className="danger" disabled={!!busy} onClick={()=>void remove(item)}>{pick("حذف","Delete")}</button><button disabled={!!busy} onClick={()=>void toggleStatus(item)}>{s(item.status).toLowerCase()==="active"?pick("تعلیق","Suspend"):pick("فعال‌سازی","Activate")}</button><button onClick={()=>openEdit(item)}>{pick("ویرایش","Edit")}</button><button type="button" className="ghost" disabled={!!busy} onClick={()=>{if(!busy){setError("");setOk("");setResetTarget(item);}}}>↻ {pick("ریست ترافیک","Reset traffic")}</button><button onClick={()=>openExtend(item)}>{pick("تمدید","Renew")}</button><button type="button" className="ghost" onClick={()=>void openHistory(item)}>{pick("مشاهده تمدیدها","View renewals")}</button><button className="ghost" disabled={!!busy} onClick={()=>void openTransfer(item)}>{pick("انتقال اکانت","Transfer account")}</button><button className="primary-soft" onMouseEnter={()=>prefetchSubscriptionLink(item)} onFocus={()=>prefetchSubscriptionLink(item)} onClick={()=>void openSubscriptionLink(item)}>{pick("سابلینک","Sub-link")}</button><button type="button" className="ghost" data-testid="admin-app-delivery-action" onClick={()=>setAppDeliverySubscriptionId(n(item.id)||null)}>{pick("ورود اپ","App Login")}</button></div></td></tr>;})}</tbody></table>{filtered.length===0&&<div className="runtime-empty">{pick("اشتراکی پیدا نشد","No subscriptions found")}</div>}</div>}
+
+      <div className="mobile-subscription-cards" aria-label={pick("فهرست اشتراک‌ها","Subscriptions list")}>
+        {filtered.map(item=>{
+          const user=userMap.get(n(item.user_id));
+          const plan=planMap.get(n(item.plan_id));
+          return <article className="mobile-subscription-card" data-subscription-id={n(item.id)} key={n(item.id)}>
+            <div className="mobile-subscription-card-head">
+              <div className="mobile-subscription-user">
+                <span className="mobile-subscription-avatar" aria-hidden="true">◉</span>
+                <div className="mobile-subscription-identities">
+                  <b dir="auto">{s(item.account_username)||user?.full_name||s(item.customer_name)||`#${item.user_id}`}</b>
+                  <small>{user?.full_name||s(item.customer_name)||pick("کاربر","Customer")}</small>
+                </div>
+              </div>
+              <div className="subscription-live-statuses"><Badge tone={tone(item.status)}>{statusLabel(item.status)}</Badge><span className={`subscription-presence subscription-presence-${presenceKind(item)}`}>{presenceKind(item)==="online"?pick("● آنلاین","● Online"):presenceKind(item)==="offline"?pick("○ آفلاین","○ Offline"):pick("◌ نامشخص","◌ Unknown")}</span></div>
+            </div>
+            <div className="mobile-subscription-meta">
+              <span className="mobile-subscription-plan">{s(item.plan_name)||s(plan?.name)||pick("پلن دستی","Manual plan")}</span>
+              <span dir="ltr">MV-{n(item.id)}</span>
+              <span>{s(item.reseller_name)||pick("کاربر مستقیم","Direct customer")}</span>
+              {Boolean(item.renewal_summary)&&<span className="subscription-renewal-flag">{pick("تمدید","Renewal")}: {n((item.renewal_summary as RuntimeRow).pending_count)>0?pick("رزرو شده","Reserved"):s(((item.renewal_summary as RuntimeRow).last as RuntimeRow|undefined)?.status)==="activated"?pick("فعال شده","Activated"):pick("سابقه تمدید","Renewal history")}</span>}
+              <span dir="auto" className="mobile-subscription-contact">{user?.email||s(item.customer_email)||"—"}</span>
+            </div>
+            <div className="mobile-subscription-usage">
+              <div><small>{pick("حجم","Traffic")}</small>{trafficCell(item)}</div>
+              <div><small>{pick("انقضا","Expiry")}</small>{expiryCell(item)}</div>
+            </div>
+            <div className="mobile-subscription-actions">
+              <button type="button" className="mobile-action mobile-action-renew" disabled={!!busy} onClick={()=>openExtend(item)}>▣ {pick("تمدید","Renew")}</button>
+              <button type="button" className="mobile-action mobile-action-edit" disabled={!!busy} onClick={()=>openEdit(item)}>✎ {pick("ویرایش","Edit")}</button>
+              <button type="button" className="mobile-action mobile-action-reset" disabled={!!busy} onClick={()=>{if(!busy){setError("");setOk("");setResetTarget(item);}}}>↻ {pick("ریست","Reset")}</button>
+              <button type="button" className="mobile-action mobile-action-renewal-history" onClick={()=>void openHistory(item)}>{pick("مشاهده تمدیدها","View renewals")}{n((item.renewal_summary as RuntimeRow|undefined)?.pending_count)>0?" ("+n((item.renewal_summary as RuntimeRow).pending_count)+")":""}</button>
+              <button type="button" className="mobile-action mobile-action-connect" onMouseEnter={()=>prefetchSubscriptionLink(item)} onFocus={()=>prefetchSubscriptionLink(item)} onClick={()=>void openSubscriptionLink(item)}>↗ {pick("اتصال","Connect")}</button>
+            </div>
+            <details className="mobile-subscription-more">
+              <summary>{pick("عملیات بیشتر","More actions")} <span aria-hidden="true">⋯</span></summary>
+              <div className="mobile-subscription-more-actions">
+                <button type="button" className={s(item.status).toLowerCase()==="active"?"mobile-more-suspend":"mobile-more-activate"} disabled={!!busy} onClick={()=>void toggleStatus(item)}>{s(item.status).toLowerCase()==="active"?pick("تعلیق","Suspend"):pick("فعال‌سازی","Activate")}</button>
+                <button type="button" className="mobile-more-transfer" onClick={()=>void openHistory(item)}>{pick("تاریخچه","History")}</button>
+                <button type="button" className="mobile-more-transfer" disabled={!!busy} onClick={()=>void openTransfer(item)}>{pick("انتقال اکانت","Transfer account")}</button>
+                <button type="button" className="mobile-more-app" onClick={()=>setAppDeliverySubscriptionId(n(item.id)||null)}>{pick("ورود اپ","App Login")}</button>
+                <button type="button" className="danger mobile-more-delete" disabled={!!busy} onClick={()=>void remove(item)}>{pick("حذف","Delete")}</button>
+              </div>
+            </details>
+          </article>;
+        })}
+        {!loading&&filtered.length===0&&<div className="runtime-empty">{pick("اشتراکی پیدا نشد","No subscriptions found")}</div>}
+      </div>
       <style>{`
         .legacy-subscriptions-page .runtime-toolbar+.table{display:none}
         .legacy-subscriptions-page .mobile-subscription-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:15px;direction:rtl}
@@ -721,7 +1278,29 @@ export function LegacySubscriptionsRuntimePage(){
         .subscription-page-number:disabled{cursor:wait;opacity:.65}
         .subscription-page-ellipsis{padding:0 3px;color:var(--muted,#94a3b8)}
         @media(max-width:700px){.subscription-page-navigation{gap:4px}.subscription-page-number{min-width:30px;height:32px;padding:0 5px}}
-      `}</style>
+  .legacy-subscriptions-page .mobile-subscription-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-top:14px;padding-top:12px;border-top:1px solid rgba(148,163,184,.16)}
+          .legacy-subscriptions-page .mobile-action{min-height:44px;border-radius:12px;font-size:12px;letter-spacing:0;box-shadow:inset 0 1px 0 rgba(255,255,255,.08);transition:transform .16s ease,filter .16s ease}
+          .legacy-subscriptions-page .mobile-action:hover{filter:brightness(1.12);transform:translateY(-1px)}
+          .legacy-subscriptions-page .mobile-action-renewal-history{background:linear-gradient(135deg,#45358e,#29245b);border-color:#8875ed;color:#eeeaff}
+          .legacy-subscriptions-page .mobile-action-connect{grid-column:1/-1;min-height:46px}
+          .legacy-subscriptions-page .mobile-subscription-more{margin-top:12px;padding:10px 12px;border:1px solid rgba(137,157,204,.2);border-radius:12px;background:rgba(12,20,37,.42)}
+          .legacy-subscriptions-page .mobile-subscription-more summary{font-weight:700}
+          .legacy-subscriptions-page .mobile-subscription-more-actions{gap:9px}
+          .renewal-timeline{display:grid;gap:12px;margin-top:12px}
+          .renewal-event-card{padding:16px;border:1px solid rgba(129,147,190,.22);border-radius:16px;background:linear-gradient(145deg,rgba(32,45,72,.82),rgba(13,21,38,.96));box-shadow:0 8px 22px rgba(0,0,0,.12)}
+          .renewal-event-top{display:flex;align-items:center;gap:11px;min-width:0}
+          .renewal-event-mark{width:36px;height:36px;flex:0 0 36px;display:grid;place-items:center;border-radius:11px;background:rgba(103,91,220,.2);color:#c8baff;font-size:19px;font-weight:800}
+          .renewal-event-heading{display:grid;gap:4px;min-width:0;flex:1}.renewal-event-heading b{font-size:13px}.renewal-event-heading small,.renewal-event-footer{color:#91a2c1;font-size:11px}
+          .renewal-event-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-top:14px}
+          .renewal-event-field{display:grid;gap:5px;padding:10px 12px;border:1px solid rgba(129,147,190,.14);border-radius:11px;background:rgba(5,12,25,.24);min-width:0}
+          .renewal-event-field small{font-size:10px;color:#91a2c1}.renewal-event-field b{font-size:12px;overflow-wrap:anywhere}
+          .renewal-event-footer{margin-top:12px;padding-top:10px;border-top:1px solid rgba(129,147,190,.14)}
+          .runtime-modal-card .renewal-event-card button{min-height:38px}
+          html[data-theme="light"] .renewal-event-card{background:linear-gradient(145deg,#fff,#f5f7ff);border-color:#dce3f1;color:#263550}
+          html[data-theme="light"] .renewal-event-field{background:#f6f8fc;border-color:#e2e8f2}
+          html[data-theme="light"] .renewal-event-heading small,html[data-theme="light"] .renewal-event-footer,html[data-theme="light"] .renewal-event-field small{color:#65748e}
+          @media(max-width:420px){.renewal-event-fields{grid-template-columns:1fr}.renewal-event-top .badge{font-size:10px;padding:4px 6px}}
+              `}</style>
     </div>
 
     {resetTarget&&<Modal
@@ -872,11 +1451,7 @@ export function LegacySubscriptionsRuntimePage(){
           {item.status==="blocked"&&<button type="button" className="ghost" disabled={!!busy} onClick={()=>void act("retry-renewal",pick("تمدید به صف برگشت","Renewal requeued"),async()=>{await legacyAdminApi.retryReservedRenewal(n(selected.id),item.id);setRenewalHistory(await legacyAdminApi.subscriptionHistory(n(selected.id)));await load(true);})}>{pick("بررسی مجدد","Retry")}</button>}
           {item.can_cancel&&<button type="button" className="danger" disabled={!!busy} onClick={()=>{if(window.confirm(pick("تمدید رزرو شده از اکانت اصلی حذف شود؟ اشتراک و کانفیگ‌ها بدون تغییر می‌مانند.","Remove this reserved renewal? The original account and configurations will not change.")))void act("cancel-renewal",pick("تمدید از اکانت جدا شد","Renewal detached from account"),async()=>{await legacyAdminApi.cancelReservedRenewal(n(selected.id),item.id);setRenewalHistory(await legacyAdminApi.subscriptionHistory(n(selected.id)));await load(true);});}}>{pick("حذف تمدید","Remove renewal")}</button>}
         </div>)}
-        {renewalHistory.events.length===0?<div className="runtime-empty">{pick("سابقه‌ای ثبت نشده است؛ عملیات قدیمی قابل بازسازی نیستند.","No recorded events; older actions cannot be reconstructed.")}</div>:renewalHistory.events.map(event=><div className="setting-box" key={event.id} style={{marginBottom:10}}>
-          <div className="card-head"><b>{event.type==="renewal_queued"?pick("تمدید ثبت شد","Renewal queued"):event.type==="renewal_activated"?pick("تمدید فعال شد","Renewal activated"):event.type==="renewal_canceled"?pick("تمدید لغو شد","Renewal canceled"):event.type}</b><small>{formatDate(event.created_at)}</small></div>
-          <small>{event.source} · {event.actor}</small>
-          <div style={{marginTop:8,whiteSpace:"pre-wrap",fontSize:12}}>{Object.entries(event.details||{}).filter(([key])=>!key.toLowerCase().includes("password")).map(([key,value])=>`${key}: ${typeof value==="object"?JSON.stringify(value):String(value)}`).join(" · ")}</div>
-        </div>)}
+        {renewalHistory.events.length===0?<div className="runtime-empty">{pick("سابقه‌ای ثبت نشده است؛ عملیات قدیمی قابل بازسازی نیستند.","No recorded events; older actions cannot be reconstructed.")}</div>:<div className="renewal-timeline">{renewalHistory.events.map(event=>{const title=event.type==="renewal_queued"?pick("تمدید ثبت شد","Renewal requested"):event.type==="renewal_activated"?pick("تمدید فعال شد","Renewal activated"):event.type==="renewal_canceled"?pick("تمدید لغو شد","Renewal canceled"):event.type==="subscription_usage_period_reset"?pick("دوره مصرف بازنشانی شد","Usage period reset"):pick("رویداد اشتراک","Subscription event");const d=event.details||{};const fields=[["plan_name",pick("پلن","Plan"),String(d.plan_name||"")],["traffic_bytes",pick("حجم","Traffic"),d.traffic_bytes?formatBytes(d.traffic_bytes):""],["duration_days",pick("مدت","Duration"),d.duration_days?`${n(d.duration_days).toLocaleString("fa-IR")} ${pick("روز","days")}`:""],["amount_toman",pick("مبلغ","Amount"),d.amount_toman?`${n(d.amount_toman).toLocaleString("fa-IR")} ${pick("تومان","Toman")}`:""],["origin",pick("منبع عملیات","Source"),String(d.origin||"")]].filter(([,label,value])=>Boolean(value));return <article className="renewal-event-card" key={event.id}><div className="renewal-event-top"><div className="renewal-event-mark">{event.type==="renewal_activated"?"✓":event.type==="renewal_canceled"?"×":"↻"}</div><div className="renewal-event-heading"><b>{title}</b><small>{formatDate(event.created_at)}</small></div><Badge tone={event.type==="renewal_activated"?"ok":event.type==="renewal_canceled"?"bad":"warn"}>{event.type==="renewal_activated"?pick("انجام شد","Completed"):event.type==="renewal_canceled"?pick("لغو شد","Canceled"):pick("ثبت شده","Recorded")}</Badge></div>{fields.length>0&&<div className="renewal-event-fields">{fields.map(([key,label,value])=><div className="renewal-event-field" key={key}><small>{label}</small><b>{value}</b></div>)}</div>}<div className="renewal-event-footer">{pick("ثبت‌کننده","By")}: {event.actor||"—"}</div></article>;})}</div>}
       </>}
     </Modal>}
     {modal==="connect"&&selected&&<Modal title={pick("اطلاعات اتصال","Connection information")} sub={`MV-${n(selected.id)}`} onClose={()=>setModal(null)} wide>
