@@ -255,8 +255,6 @@ Tunnel capabilities include:
 - TP27 transport integration;
 - VXLAN-based transport paths;
 - Spoof WG / WireGuard-derived transport paths;
-- SSH TUN transport;
-- Backhaul transport integration;
 - transport health monitoring;
 - latency and availability status;
 - tunnel heartbeat;
