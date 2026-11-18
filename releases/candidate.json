@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.876",
-  "source_sha": "1520053efc8b115b564d28401807cd8c818efb1f",
+  "version": "1.1.0-rc.877",
+  "source_sha": "3235cfe45b7099ca66448e33d8ef43667545a116",
   "notes": {
-    "fa": "چینش منظم دکمه‌های اشتراک، کارت‌های گرافیکی تمدید و تاریخچه خوانا؛ متادیتای خام دیتابیس نمایش داده نمی‌شود.",
-    "en": "Organized subscription actions, redesigned renewal cards and readable history; raw database metadata is hidden."
+    "fa": "ارسال خودکار تأیید تمدید رزرو‌شده و فعال‌شده از طریق ربات تلگرام برای سایت، ربات و پنل؛ جلوگیری از پیام اشتباه فعال‌سازی اشتراک جدید و حفظ کانفیگ‌ها.",
+    "en": "Send transactional Telegram notices when renewals are reserved and activated across bot, website and admin; prevent incorrect new-account activation messages."
   }
 }
