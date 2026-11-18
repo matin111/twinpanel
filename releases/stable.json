@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.873",
+  "version": "1.1.0-rc.876",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-18T09:33:22Z",
+  "released_at": "2026-11-18T09:50:34Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "e84a8069c469ba324feb73bf5916f2682474c28c",
+  "source_sha": "1520053efc8b115b564d28401807cd8c818efb1f",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.873/twinpanel-1.1.0-rc.873-linux-x86_64.tar.gz",
-    "sha256": "aa0ffb50e3f8febf236d3ba1276fb0ba669dd2454652a90569b7e8220dc7a039",
-    "size_bytes": 31259800
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.876/twinpanel-1.1.0-rc.876-linux-x86_64.tar.gz",
+    "sha256": "fbfc8c5a020ec6cc7551eb0f6755f49af6576f5bf81001a73255039917993251",
+    "size_bytes": 31267895
   },
   "notes": {
-    "fa": "نمایش تمدیدهای رزروشده و فعال‌شده در اشتراک اصلی؛ جزئیات تمدید و حذف امن تمدید در انتظار با حفظ اشتراک، کانفیگ و سوابق.",
-    "en": "Show reserved and activated renewal details in the parent subscription, with safe cancellation of queued renewals while preserving subscription, configs and audit history."
+    "fa": "چینش منظم دکمه‌های اشتراک، کارت‌های گرافیکی تمدید و تاریخچه خوانا؛ متادیتای خام دیتابیس نمایش داده نمی‌شود.",
+    "en": "Organized subscription actions, redesigned renewal cards and readable history; raw database metadata is hidden."
   }
 }
