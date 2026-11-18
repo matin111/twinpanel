@@ -114,11 +114,14 @@ jobs:
           test -f android/app/src/main/kotlin/com/twinpanel/twinconnect/TunPacketGate.kt
           test -f android/app/src/main/kotlin/com/twinpanel/twinconnect/SharedTunVpnService.kt
           grep -F 'android:name=".SharedTunVpnService"' android/app/src/main/AndroidManifest.xml
-          grep -F 'interface PacketEngine' android/app/src/main/kotlin/com/twinpanel/twinconnect/SharedTunVpnService.kt
+          grep -F 'fun startWireGuard(config: Config' android/app/src/main/kotlin/com/twinpanel/twinconnect/SharedTunVpnService.kt
+          grep -F 'ParcelFileDescriptor.dup(replacement.fileDescriptor)' android/app/src/main/kotlin/com/twinpanel/twinconnect/SharedTunVpnService.kt
+          grep -F 'WireGuardJni.turnOn(nativeFd, settings)' android/app/src/main/kotlin/com/twinpanel/twinconnect/SharedTunVpnService.kt
           grep -F 'route == PacketRoute.VPN_TUNNEL' android/app/src/main/kotlin/com/twinpanel/twinconnect/TunPacketGate.kt
           grep -F 'VpnTunnelOwnership.snapshot(' android/app/src/main/kotlin/com/twinpanel/twinconnect/MainActivity.kt
-          if grep -F 'GUARD_APPROVAL_REQUEST' android/app/src/main/kotlin/com/twinpanel/twinconnect/MainActivity.kt; then
-            echo "Unsafe second-VPN approval flow must not be bundled" >&2
+          grep -F 'SharedTunVpnService.ACTION_START_BLOCK' android/app/src/main/kotlin/com/twinpanel/twinconnect/MainActivity.kt
+          if grep -F 'backend!!.setState(' android/app/src/main/kotlin/com/twinpanel/twinconnect/WireGuardRuntime.kt; then
+            echo "Legacy independent GoBackend VPN service must not own WireGuard TUN" >&2
             exit 1
           fi
           grep -F 'com.wireguard.android:tunnel:1.0.20260102' android/app/build.gradle.kts
