@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.870",
+  "version": "1.1.0-rc.871",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-18T05:29:15Z",
+  "released_at": "2026-11-18T05:52:44Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "e00a80fe1df1f9adadb1393f48b8bc097bcab1ab",
+  "source_sha": "d87c48482d59a2a075b160247f71c9aa6a726c20",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.870/twinpanel-1.1.0-rc.870-linux-x86_64.tar.gz",
-    "sha256": "a87dd8e69e41a438aeb564618576420103befd68ee4ffbcfefa4cc32e984c805",
-    "size_bytes": 31251477
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.871/twinpanel-1.1.0-rc.871-linux-x86_64.tar.gz",
+    "sha256": "4c398a1c632d4b3b8ea8e65433390a3c0aa23e60a60ffbd85dbe5ac82ba21b1e",
+    "size_bytes": 31305854
   },
   "notes": {
-    "fa": "رفع خطای 422 بررسی مجدد TwinTunnel با دو نود، ارسال صحیح نود سوم اختیاری به API بدون تغییر مسیرها و کانفیگ‌های فعال.",
-    "en": "Fix TwinTunnel two-node recheck HTTP 422 by normalizing the optional third node ID without changing active tunnels or VPN configs."
+    "fa": "رفع خطای موقتی نصب و بررسی TwinTunnel با اجرای ترتیبی SSH نودهای ایران و خارج، نمایش نود ناموفق و حفظ کامل مسیرهای فعال.",
+    "en": "Serialize TwinTunnel SSH stage and verification to avoid transient concurrent-node 502 failures, expose failing node details; no production route changes."
   }
 }
