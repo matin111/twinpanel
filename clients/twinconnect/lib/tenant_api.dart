@@ -1,5 +1,8 @@
+import 'dart:async' show TimeoutException;
 import 'dart:convert';
 import 'dart:io';
+
+import 'iran_bootstrap_route.dart';
 
 import 'tenant_models.dart';
 import 'protocols.dart';
@@ -259,6 +262,10 @@ class TenantApi {
     return profiles;
   }
 
+  // Reuse a successful domestic route for subsequent protocol/profile fetches
+  // during the same disruption, instead of adding a DNS timeout each time.
+  static DateTime? _domesticPreferredUntil;
+
   Future<Map<String, dynamic>> _requestJson(
     Uri url, {
     Map<String, dynamic>? payload,
@@ -268,8 +275,82 @@ class TenantApi {
     if (url.scheme != 'https') {
       throw const FormatException('INSECURE_CONNECTION');
     }
-    final client = HttpClient()
-      ..connectionTimeout = const Duration(seconds: 7);
+    Future<Map<String, dynamic>> request(
+        {InternetAddress? fixedIp, bool viaDomesticProxy = false}) =>
+        _requestJsonOnce(url, payload: payload, bearerToken: bearerToken,
+            maxBytes: maxBytes, fixedIp: fixedIp,
+            viaDomesticProxy: viaDomesticProxy);
+
+    // Both gateways retain the original HTTPS host, SNI and certificate.
+    // No status response (401/403/429 or plan denial) is ever retried.
+    Future<Map<String, dynamic>> domestic(InternetAddress ip) async {
+      bool tlsRejected = false;
+      for (final throughProxy in [true, false]) {
+        try {
+          return await request(
+              fixedIp: ip, viaDomesticProxy: throughProxy);
+        } on SocketException {
+          // Fall through to the other domestic route.
+        } on TimeoutException {
+          // Fall through to the other domestic route.
+        } on TlsException {
+          tlsRejected = true;
+        } on HttpException {
+          // No upstream authenticated response, try the alternative hop.
+        }
+      }
+      throw TenantApiException(tlsRejected ? 'INVALID_TLS' : 'NETWORK_UNAVAILABLE');
+    }
+
+    final ip = IranBootstrapRoute.targetFor(url);
+    final now = DateTime.now().toUtc();
+    final preferred = _domesticPreferredUntil;
+    if (ip != null && preferred != null && now.isBefore(preferred)) {
+      try {
+        return await domestic(ip);
+      } on TenantApiException catch (error) {
+        if (error.message != 'NETWORK_UNAVAILABLE' &&
+            error.message != 'INVALID_TLS') rethrow;
+        // Iran gateway failed; allow the normal verified origin to recover.
+      }
+    }
+
+    try {
+      final response = await request();
+      _domesticPreferredUntil = null;
+      return response;
+    } on SocketException {
+      // DNS/routing failure before a trustworthy HTTP response.
+    } on TimeoutException {
+      // Missing DNS or a stalled international route.
+    } on TlsException {
+      // Tampered DNS may route the main hostname to a false certificate.
+    } on HttpException {
+      // A valid server status is NOT an HttpException (handled in request).
+    }
+
+    if (ip == null) {
+      throw const TenantApiException('NETWORK_UNAVAILABLE');
+    }
+    final response = await domestic(ip);
+    _domesticPreferredUntil = DateTime.now().toUtc().add(
+        const Duration(minutes: 10));
+    return response;
+  }
+
+  Future<Map<String, dynamic>> _requestJsonOnce(
+    Uri url, {
+    Map<String, dynamic>? payload,
+    int maxBytes = 32768,
+    String? bearerToken,
+    InternetAddress? fixedIp,
+    bool viaDomesticProxy = false,
+  }) async {
+    final client = fixedIp == null
+        ? (HttpClient()..connectionTimeout = const Duration(seconds: 7))
+        : viaDomesticProxy
+            ? IranBootstrapRoute.proxyFor(url, fixedIp)
+            : IranBootstrapRoute.clientFor(url, fixedIp);
     try {
       final request = payload == null
           ? await client.getUrl(url).timeout(const Duration(seconds: 10))
@@ -298,13 +379,9 @@ class TenantApi {
           throw const TenantApiException('APP_LOGIN_LOCKED');
         }
         if (response.statusCode == HttpStatus.forbidden) {
-          throw const TenantApiException(
-            'APP_NOT_AUTHORIZED',
-          );
+          throw const TenantApiException('APP_NOT_AUTHORIZED');
         }
-        throw TenantApiException(
-          'SERVER_ERROR',
-        );
+        throw const TenantApiException('SERVER_ERROR');
       }
       final bytes = <int>[];
       await for (final chunk in response.timeout(const Duration(seconds: 15))) {
@@ -318,10 +395,6 @@ class TenantApi {
         throw const TenantApiException('INVALID_SERVER_RESPONSE');
       }
       return decoded;
-    } on SocketException {
-      throw const TenantApiException('NETWORK_UNAVAILABLE');
-    } on HandshakeException {
-      throw const TenantApiException('INVALID_TLS');
     } finally {
       client.close(force: true);
     }
