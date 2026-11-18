@@ -99,6 +99,8 @@ def test_ui_clear_distinction_between_install_and_cutover():
     assert "TwinTunnel · چند ترانسپورت" in ACTIVE_UI
     assert 'pick("آماده نصب","Lab install")' in ACTIVE_UI
     assert "آزمایشی" not in ACTIVE_UI and "آزمایشی" not in UI
+    assert 'backup_node_id:backupNodeId||null' in CLIENT  # install + verify both normalize optional node
+    assert CLIENT.count('backup_node_id:backupNodeId||null') == 2
     assert "can_activate" not in ACTIVE_UI  # No production activation control is exposed
 
 
