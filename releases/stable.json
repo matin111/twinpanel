@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-19T05:08:59Z",
+  "released_at": "2026-11-19T05:15:09Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "66bd15fc5de510cc7f6f4a100f8503c105e8bf40",
+  "source_sha": "34a8250116002dd72ee4a18ef07a8d45949847fe",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.1/twinpanel-1.1.1-linux-x86_64.tar.gz",
-    "sha256": "52ab687b7a754eda4a3f213bb7d9bce8cea90e9a660912a5936258dfb15fc013",
-    "size_bytes": 31373730
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.2/twinpanel-1.1.2-linux-x86_64.tar.gz",
+    "sha256": "b939475d0bd91b3a6da86d8911a776357b15871e7cf95c5e15dc2427e82a7b6c",
+    "size_bytes": 31375211
   },
   "notes": {
-    "fa": "ویرایشگر حرفه‌ای و امن وبلاگ با پیش‌نمایش زنده، اندازه و رنگ متن، لینک و لنگر داخلی، جدول، فهرست، تصویر و چیدمان؛ رابط ترمینال جدید، سریع‌تر و اصلاح وضعیت Web؛ ارتقای سازگار با داده‌های موجود.",
-    "en": "Professional safe blog editor with live preview, font size/color, links and anchors, tables, lists, images and alignment; refreshed faster terminal menu and accurate Web status; compatible update preserving existing data."
+    "fa": "اصلاح کامل رنگ بخش عملیات بیشتر اشتراک‌ها در حالت روشن، با پس‌زمینه روشن، نوشته‌های خوانا و هماهنگی دکمه‌ها. شامل ویرایشگر حرفه‌ای امن وبلاگ و منوی جدید ترمینال از نسخه 1.1.1 و ارتقای سازگار با داده‌های موجود.",
+    "en": "Fixed the expanded subscription action surface in light theme with a bright background and accessible text contrast. Includes the safe professional blog editor and refreshed terminal menu from 1.1.1, preserving existing data during upgrades."
   }
 }
