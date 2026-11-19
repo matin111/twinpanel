@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Fail-closed validation of a locally developer-signed macOS TwinConnect app.
 
-Inspect the *installed build artifact* (app/extension/framework), not only
+Inspect the *installed build artifact* (app/extension/static linkage), not only
 source .entitlements files. This does not start a VPN or verify live traffic.
 Run on an Apple-provisioned cloud Mac AFTER building the signed candidate.
 """
@@ -74,6 +74,17 @@ def effective_entitlements(path: Path) -> dict:
     return entitlements
 
 
+def static_libbox_symbols_present(nm_output: str) -> bool:
+    """Both Go binding exports must live inside the signed extension binary."""
+    required = ("_LibboxSetup", "_LibboxNewCommandServer")
+    exported = set()
+    for line in nm_output.splitlines():
+        parts = line.split()
+        if len(parts) >= 2:
+            exported.add(parts[-1])
+    return all(symbol in exported for symbol in required)
+
+
 def main() -> None:
     if sys.platform != "darwin":
         fail("must execute on macOS")
@@ -84,10 +95,17 @@ def main() -> None:
     if not app.is_dir() or app.suffix != ".app":
         fail("application bundle not found")
     extension = app / "Contents/PlugIns/PacketTunnel.appex"
-    libbox = extension / "Contents/Frameworks/Libbox.framework"
-    executable = libbox / "Libbox"
+    executable = extension / "Contents/MacOS/PacketTunnel"
     if not extension.is_dir() or not executable.is_file():
-        fail("embedded PacketTunnel/Libbox executable missing")
+        fail("PacketTunnel extension executable missing")
+    if (extension / "Contents/Frameworks/Libbox.framework").exists():
+        fail("unexpected dynamic Libbox embed; use a static Go archive")
+    # A load command is not expected for a statically linked Go archive.
+    # Requiring actual exported Libbox symbols prevents a signed bundle
+    # marker from being mistaken for proof that the backend was linked.
+    symbols = run("nm", "-g", str(executable)).decode("utf-8", "replace")
+    if not static_libbox_symbols_present(symbols):
+        fail("PacketTunnel executable missing static Libbox binding symbols")
 
     app_info = plist(app / "Contents/Info.plist")
     extension_info = plist(extension / "Contents/Info.plist")
@@ -103,9 +121,9 @@ def main() -> None:
     ):
         fail("missing or malformed shared Keychain group")
 
-    teams = [signature_team(path) for path in (app, extension, libbox)]
+    teams = [signature_team(path) for path in (app, extension)]
     if len(set(teams)) != 1:
-        fail("app, extension and framework have different signing teams")
+        fail("app and PacketTunnel extension have different signing teams")
     team = teams[0]
     if group != f"{team}.com.twinpanel.twinconnect.shared":
         fail("Keychain group doesn't match Apple signing Team ID")
@@ -125,7 +143,7 @@ def main() -> None:
 
     print("SIGNED_MAC_BUNDLE_CHECK_PASSED")
     print("APPLE_TEAM_PROVISIONED=YES")
-    print("PACKET_TUNNEL_AND_LIBBOX_EMBEDDED=YES")
+    print("PACKET_TUNNEL_STATIC_LIBBOX_LINKED=YES")
     print("NETWORK_EXTENSION_AND_KEYCHAIN_ENTITLED=YES")
     print("LIVE_TUNNEL_HANDSHAKE_IP_AND_DNS=NOT_VERIFIED")
 
