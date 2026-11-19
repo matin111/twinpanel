@@ -2,6 +2,7 @@
 """Offline tests for signing preparation. Dummy Team IDs, no Apple secrets."""
 from __future__ import annotations
 
+import importlib.util
 import os
 import plistlib
 import shutil
@@ -13,6 +14,13 @@ from pathlib import Path
 
 
 SCRIPT = Path(__file__).parent / "prepare_signed_macos_candidate.py"
+VERIFIER_SCRIPT = Path(__file__).parent / "verify_signed_macos_bundle.py"
+VERIFIER_SPEC = importlib.util.spec_from_file_location(
+    "twinconnect_signed_mac_verifier", VERIFIER_SCRIPT
+)
+assert VERIFIER_SPEC is not None and VERIFIER_SPEC.loader is not None
+VERIFIER = importlib.util.module_from_spec(VERIFIER_SPEC)
+VERIFIER_SPEC.loader.exec_module(VERIFIER)
 TEAM = "ABCDEFGHIJ"
 GROUP = TEAM + ".com.twinpanel.twinconnect.shared"
 
@@ -59,6 +67,24 @@ class SignedMacTestCandidate(unittest.TestCase):
     def read(path: Path) -> dict:
         with path.open("rb") as handle:
             return plistlib.load(handle)
+
+    def test_signed_bundle_verifier_requires_real_static_libbox_symbols(self) -> None:
+        exported = (
+            "000000010187e9c0 T _LibboxNewCommandServer\\n"
+            "0000000101881930 T _LibboxSetup\\n"
+            "0000000103e5d268 S _OBJC_CLASS_$_LibboxCommandServer\\n"
+        )
+        self.assertTrue(VERIFIER.static_libbox_symbols_present(exported))
+        self.assertFalse(VERIFIER.static_libbox_symbols_present(
+            "0000000101881930 T _LibboxSetup\\n"
+        ))
+        self.assertFalse(VERIFIER.static_libbox_symbols_present(
+            "000000010187e9c0 T _LibboxNewCommandServerExtra\\n"
+            "0000000101881930 T _LibboxSetup\\n"
+        ))
+        self.assertFalse(VERIFIER.static_libbox_symbols_present(
+            "go.o: static archive (not a PacketTunnel linker symbol)"
+        ))
 
     def test_rejects_no_opt_in_even_when_team_is_set(self) -> None:
         output = self.execute(team=TEAM)
