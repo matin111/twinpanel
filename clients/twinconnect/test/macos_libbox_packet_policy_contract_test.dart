@@ -21,8 +21,12 @@ void main() {
     expect(extension, contains('case "hysteria2", "tuic", "anytls", "naive", "shadowtls", "snell", "socks5":'));
     expect(extension, contains('TwinConnectMacLibboxEngine(tunnel: self)'));
     expect(extension, contains('engine.start'));
-    expect(extension, contains('MACOS_HYSTERIA2_PACKET_FLOW_BRIDGE_MISSING'));
-    expect(extension, contains('MACOS_HYSTERIA2_PACKET_FLOW_BRIDGE_MISSING'));
+    // The old Hysteria2-only bridge placeholder was replaced by the
+    // shared Libbox engine. If the Libbox module is absent, the extension
+    // must still fail closed for each of the seven supported profiles.
+    expect(extension, contains('#if canImport(Libbox)'));
+    expect(extension, contains('MACOS_LIBBOX_BACKEND_NOT_LINKED_'));
+    expect(extension, contains('completionHandler(unavailable('));
     expect(installer, contains('libbox/TwinConnectMacTunnelPolicy.swift'));
     expect(installer, contains('libbox/TwinConnectMacLibboxPlatform.swift'));
     expect(installer, contains('libbox/TwinConnectMacLibboxEngine.swift'));
