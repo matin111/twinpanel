@@ -1,4 +1,26 @@
 /* Subscription action palette: light mode only. Dark mode keeps its existing colors. */
+/* The expanded admin card used to retain a dark translucent background even
+ * when the buttons themselves had switched to the light palette. */
+html[data-theme="light"] .legacy-subscriptions-page .mobile-subscription-more {
+  background:linear-gradient(155deg,#fff 0%,#f5f8ff 100%);
+  border:1px solid #d6e0f0;
+  color:#334660;
+  box-shadow:0 2px 8px rgba(43,67,113,.055),inset 0 1px 0 #fff;
+}
+html[data-theme="light"] .legacy-subscriptions-page .mobile-subscription-more[open] {
+  background:linear-gradient(160deg,#fff 0%,#f4f7fe 100%);
+  border-color:#b8cbed;
+  box-shadow:0 8px 20px rgba(48,69,119,.085),inset 0 1px 0 #fff;
+}
+html[data-theme="light"] .legacy-subscriptions-page .mobile-subscription-more > summary {
+  color:#334b6d;
+}
+html[data-theme="light"] .legacy-subscriptions-page .mobile-subscription-more > summary:hover {
+  color:#4f39a4;
+}
+html[data-theme="light"] .legacy-subscriptions-page .mobile-subscription-more-actions {
+  background:transparent;
+}
 html[data-theme="light"] .legacy-subscriptions-page .mobile-subscription-actions .mobile-action,
 html[data-theme="light"] .legacy-subscriptions-page .mobile-subscription-more-actions button,
 html[data-theme="light"] .reseller-subscriptions-parity .sub-action,
