@@ -37,6 +37,7 @@ if startup_marker not in content:
         "    " + startup_marker + "\n"
         "    guard let metal = MTLCreateSystemDefaultDevice(),\n"
         "          metal.makeCommandQueue() != nil else {\n"
+        "      NSLog(\"TwinConnect: Metal device/queue unavailable; showing native AppKit compatibility screen\")\n"
         "      let originalFrame = self.frame\n"
         "      self.contentViewController = TwinConnectMacOSMetalFallback()\n"
         "      self.setFrame(originalFrame, display: true)\n"
