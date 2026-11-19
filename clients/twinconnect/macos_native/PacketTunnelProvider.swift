@@ -47,7 +47,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
                 completionHandler(error)
             }
             #else
-            completionHandler(unavailable("MACOS_HYSTERIA2_PACKET_FLOW_BRIDGE_MISSING"))
+            completionHandler(unavailable("MACOS_LIBBOX_BACKEND_NOT_LINKED_\(code.uppercased())"))
             #endif
         default:
             // OpenVPN, Cisco and Xray require separate native backends.
