@@ -134,11 +134,12 @@ python3 -m unittest macos_native/test_preflight_macos.py
 ```
 
 A Mac can compile `Runner` and `Libbox.xcframework` successfully yet be
-**unable to render Flutter** if no usable Metal device is exposed by its GPU
-or VM. Runtime messages such as `Could not acquire Metal device` and
-`Unable to create FlutterView` indicate a **host graphics limitation**,
-not a missing Dart asset; rebuilding Flutter does not enable Metal. A GUI
-preview must be tested on a host with a working `MTLDevice`.
+**unable to render Flutter**, particularly in some remote and virtualized graphics environments. Runtime messages such as `Could not acquire Metal device` and
+`Unable to create FlutterView` show Flutter engine graphics initialization
+failed; this does not establish whether Swift Metal API access works in the
+same session. A positive Swift Metal probe **does not prove** the Runner can
+render. Investigate the VM display/graphics path and Runner context before
+asserting that host Metal is absent. A GUI preview must be validated by actual Runner rendering, not by a probe alone.
 
 `xcodebuild ... CODE_SIGNING_ALLOWED=NO` is a **compile-only check**. The
 generated unsigned app may not run a PacketTunnel extension. A development
