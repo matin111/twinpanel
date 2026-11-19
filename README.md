@@ -32,8 +32,9 @@
     </td>
     <td align="center" width="50%">
       <h3>🤖 Android</h3>
-      <p><strong>Android client</strong> · Public download link being added</p>
-      <img src="https://img.shields.io/badge/Android-Download_Link_Soon-16A34A?style=for-the-badge&logo=android&logoColor=white" alt="Android download link coming soon" />
+      <p><strong>Available now</strong> · Android 1.0.0 · ARM64 APK</p>
+      <a href="https://github.com/matin111/twinpanel/releases/tag/twinconnect-android-v1.0.0"><img src="https://img.shields.io/badge/Android-Download_v1.0.0-16A34A?style=for-the-badge&logo=android&logoColor=white" alt="Download TwinConnect for Android" /></a>
+      <p><a href="https://github.com/matin111/twinpanel/releases/download/twinconnect-android-v1.0.0/app-arm64-v8a-release.apk">Direct APK download (arm64-v8a)</a></p>
     </td>
   </tr>
   <tr>
