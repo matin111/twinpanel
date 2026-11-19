@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.2",
+  "version": "1.1.3",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-19T05:15:09Z",
+  "released_at": "2026-11-19T05:21:45Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "34a8250116002dd72ee4a18ef07a8d45949847fe",
+  "source_sha": "238b2b9709e6e195fceb77321b35e4717ed435e4",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.2/twinpanel-1.1.2-linux-x86_64.tar.gz",
-    "sha256": "b939475d0bd91b3a6da86d8911a776357b15871e7cf95c5e15dc2427e82a7b6c",
-    "size_bytes": 31375211
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.3/twinpanel-1.1.3-linux-x86_64.tar.gz",
+    "sha256": "2a9096576f6ae2fc0ae46ac8609ab3ad137b8c385f647e6ba447973878598157",
+    "size_bytes": 31340415
   },
   "notes": {
-    "fa": "اصلاح کامل رنگ بخش عملیات بیشتر اشتراک‌ها در حالت روشن، با پس‌زمینه روشن، نوشته‌های خوانا و هماهنگی دکمه‌ها. شامل ویرایشگر حرفه‌ای امن وبلاگ و منوی جدید ترمینال از نسخه 1.1.1 و ارتقای سازگار با داده‌های موجود.",
-    "en": "Fixed the expanded subscription action surface in light theme with a bright background and accessible text contrast. Includes the safe professional blog editor and refreshed terminal menu from 1.1.1, preserving existing data during upgrades."
+    "fa": "اصلاح منوی آموزش و برنامه‌ها در ربات اصلی و نمایندگی: حذف شلوغی، نمایش برنامه‌های اصلی به‌جای پروتکل‌ها، انتقال گزینه‌های تخصصی به «سایر برنامه‌ها» و حفظ لینک‌های عمومی TwinConnect ویندوز و اندروید. شامل اصلاحات نسخه‌های قبلی.",
+    "en": "Ship compact app-first Telegram tutorials in the official prebuilt release, keeping specialist clients under More and preserving public TwinConnect downloads and earlier fixes."
   }
 }
