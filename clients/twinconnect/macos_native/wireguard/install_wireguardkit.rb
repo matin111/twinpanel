@@ -32,8 +32,8 @@ extension = project.targets.find { |t| t.name == 'PacketTunnel' }
 app = project.targets.find { |t| t.name == 'Runner' }
 abort('PacketTunnel and Runner targets must be installed first') unless extension && app
 
-# The relative path is resolved from macos/Runner.xcodeproj.
-relative_path = '../../macos_native/build/wireguard-apple'
+# Xcode resolves the local package relative to the macos/ project directory.
+relative_path = '../macos_native/build/wireguard-apple'
 references = project.root_object.package_references
 package = references.find do |ref|
   ref.isa == 'XCLocalSwiftPackageReference' && ref.relative_path == relative_path
