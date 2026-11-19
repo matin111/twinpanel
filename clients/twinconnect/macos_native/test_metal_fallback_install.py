@@ -1,0 +1,117 @@
+#!/usr/bin/env python3
+"""Offline contract tests: macOS must show AppKit before creating FlutterView."""
+from __future__ import annotations
+
+import plistlib
+import shutil
+import subprocess
+import sys
+import tempfile
+import unittest
+from pathlib import Path
+
+SOURCE = Path(__file__).resolve().parent
+NATIVE_FILES = (
+    "install_macos_bridge.py",
+    "TwinConnectMacOSVPNBridge.swift",
+    "TwinConnectMacOSVPNControl.swift",
+    "TwinConnectMacOSLibboxControl.swift",
+    "TwinConnectMacOSMieruControl.swift",
+    "TwinConnectMacOSMetalFallback.swift",
+)
+
+MAIN_WINDOW = """import Cocoa
+import FlutterMacOS
+
+class MainFlutterWindow: NSWindow {
+  override func awakeFromNib() {
+    let flutterViewController = FlutterViewController()
+    let windowFrame = self.frame
+    self.contentViewController = flutterViewController
+    self.setFrame(windowFrame, display: true)
+    RegisterGeneratedPlugins(registry: flutterViewController)
+    super.awakeFromNib()
+  }
+}
+"""
+
+
+class MetalFallbackInstallTests(unittest.TestCase):
+    def setUp(self) -> None:
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        self.root = Path(temp.name)
+        native = self.root / "macos_native"
+        runner = self.root / "macos/Runner"
+        native.mkdir(parents=True)
+        runner.mkdir(parents=True)
+        for name in NATIVE_FILES:
+            shutil.copy2(SOURCE / name, native / name)
+        self.window = runner / "MainFlutterWindow.swift"
+        self.window.write_text(MAIN_WINDOW, encoding="utf-8")
+        for name in ("DebugProfile.entitlements", "Release.entitlements"):
+            (runner / name).write_bytes(plistlib.dumps({
+                "com.apple.security.app-sandbox": True
+            }))
+
+    def install(self) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            [sys.executable, str(self.root / "macos_native/install_macos_bridge.py")],
+            capture_output=True, text=True, check=False
+        )
+
+    def test_metal_guard_before_flutter_view_is_idempotent(self) -> None:
+        first = self.install()
+        self.assertEqual(first.returncode, 0, first.stderr)
+        generated = self.window.read_text(encoding="utf-8")
+        self.assertEqual(generated.count("import Metal"), 1)
+        self.assertEqual(
+            generated.count("// TWINCONNECT_MACOS_METAL_PREFLIGHT_V1"), 1
+        )
+        self.assertEqual(
+            generated.count("// TWINCONNECT_MACOS_METAL_FALLBACK_V1"), 1
+        )
+        self.assertLess(
+            generated.index("MTLCreateSystemDefaultDevice()"),
+            generated.index("FlutterViewController()")
+        )
+        self.assertIn("metal.makeCommandQueue() != nil else", generated)
+        self.assertIn(
+            "self.contentViewController = TwinConnectMacOSMetalFallback()",
+            generated
+        )
+        self.assertIn("VPN connection is unavailable in this mode", generated)
+        self.assertIn("TwinConnectMacOSVPNBridge.register(", generated)
+        self.assertIn("RegisterGeneratedPlugins(registry: flutterViewController)",
+                      generated)
+        again = self.install()
+        self.assertEqual(again.returncode, 0, again.stderr)
+        self.assertEqual(self.window.read_text(encoding="utf-8"), generated)
+        for name in ("DebugProfile.entitlements", "Release.entitlements"):
+            with (self.root / "macos/Runner" / name).open("rb") as handle:
+                settings = plistlib.load(handle)
+            self.assertTrue(settings["com.apple.security.network.client"])
+
+    def test_unknown_flutter_window_template_aborts_without_changes(self) -> None:
+        self.window.write_text(
+            MAIN_WINDOW.replace(
+                "let flutterViewController = FlutterViewController()",
+                "let controller = OtherFlutterView()"
+            ), encoding="utf-8"
+        )
+        original = self.window.read_text(encoding="utf-8")
+        result = self.install()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Unexpected macOS Flutter window startup", result.stderr)
+        self.assertEqual(self.window.read_text(encoding="utf-8"), original)
+
+    def test_missing_fallback_code_aborts_without_changes(self) -> None:
+        (self.root / "macos_native/TwinConnectMacOSMetalFallback.swift").unlink()
+        original = self.window.read_text(encoding="utf-8")
+        result = self.install()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(self.window.read_text(encoding="utf-8"), original)
+
+
+if __name__ == "__main__":
+    unittest.main()
