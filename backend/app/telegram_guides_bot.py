@@ -22,8 +22,16 @@ def guide_keyboard():
             ],
             [
                 InlineKeyboardButton(
-                    text="🪟 کانکشن هوشمند ویندوز",
+                    text="🔴 کانکشن هوشمند اندروید",
+                    callback_data="guide:twinconnect_android",
+                    style="danger",
+                ),
+            ],
+            [
+                InlineKeyboardButton(
+                    text="🔴 کانکشن هوشمند ویندوز",
                     callback_data="guide:twinconnect_windows",
+                    style="danger",
                 ),
             ],
             [
@@ -102,6 +110,14 @@ GUIDES={
         "4️⃣ لینک/کانفیگ اشتراک را Import کنید.\n\n"
         "برای استفاده روزمره OpenVPN، WireGuard و "
         "OpenConnect مناسب هستند."
+    ),
+
+    "twinconnect_android":(
+        "📱 <b>کانکشن هوشمند اندروید | TwinConnect</b>\n\n"
+        "1️⃣ نسخه مناسب اندروید را از کانال اصلی دریافت و نصب کنید.\n"
+        "2️⃣ TwinConnect را باز کنید و با نام کاربری و رمز مخصوص اپ وارد شوید.\n"
+        "3️⃣ سرور موردنظر را انتخاب کرده و «اتصال» را بزنید.\n"
+        "4️⃣ برای تازه‌سازی فهرست سرورها از Refresh استفاده کنید."
     ),
 
     "twinconnect_windows":(
@@ -191,11 +207,15 @@ def create_guides_router():
         await callback.answer()
 
         buttons=[]
-        if key=="twinconnect_windows":
+        if key in {"twinconnect_windows", "twinconnect_android"}:
+            is_android = key=="twinconnect_android"
             buttons.append([
                 InlineKeyboardButton(
-                    text="📥 دانلود کانکشن هوشمند ویندوز",
-                    url="https://t.me/twin_connect1/3",
+                    text=("🔴 دریافت TwinConnect اندروید" if is_android
+                          else "🔴 دریافت TwinConnect ویندوز"),
+                    url=("https://t.me/twin_connect1/4" if is_android
+                         else "https://t.me/twin_connect1/3"),
+                    style="danger",
                 ),
             ])
         buttons.append([
