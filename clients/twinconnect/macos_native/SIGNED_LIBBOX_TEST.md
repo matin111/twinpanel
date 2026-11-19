@@ -120,3 +120,34 @@ The signed-build flag never enables itself in ordinary unsigned previews.
 A working macOS extension, accepted OS startup, and a verified Hysteria2
 peer handshake are three separate states. The current implementation makes
 no claim that the last two have passed.
+
+## Preflight before spending time on a cloud macOS host
+
+Run this read-only diagnostic **before** building Flutter or provisioning the
+PacketTunnel extension:
+
+```bash
+cd clients/twinconnect
+python3 macos_native/preflight_macos.py
+python3 macos_native/preflight_macos.py --json
+python3 -m unittest macos_native/test_preflight_macos.py
+```
+
+A Mac can compile `Runner` and `Libbox.xcframework` successfully yet be
+**unable to render Flutter** if no usable Metal device is exposed by its GPU
+or VM. Runtime messages such as `Could not acquire Metal device` and
+`Unable to create FlutterView` indicate a **host graphics limitation**,
+not a missing Dart asset; rebuilding Flutter does not enable Metal. A GUI
+preview must be tested on a host with a working `MTLDevice`.
+
+`xcodebuild ... CODE_SIGNING_ALLOWED=NO` is a **compile-only check**. The
+generated unsigned app may not run a PacketTunnel extension. A development
+certificate alone is insufficient: the app and extension both require
+effective Network Extension provisioning, signing, and actual OS permission.
+Do not conflate successful code compilation, an accepted tunnel start, and
+confirmed encrypted network egress. Keep the fail-closed VPN behavior.
+
+The preflight checks only the host. It deliberately does not read profiles,
+VPN credentials, Apple Team IDs, certificates, or customer data. If signing
+identities exist, it reports only their count; it cannot certify entitlement
+approval or successful VPN traffic.
