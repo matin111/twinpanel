@@ -25,6 +25,22 @@ raise 'Libbox module map missing' unless
   File.file?(File.join(framework, 'Modules/module.modulemap')) ||
   File.file?(File.join(framework, 'Versions/A/Modules/module.modulemap'))
 
+# Apple's runtime loader must resolve the framework inside PacketTunnel.appex,
+# not a machine-specific Xcode DerivedData path. Correct only the generated
+# local XCFramework binary, before Xcode copies/signs the extension bundle.
+framework_binary = File.join(framework, 'Versions/A/Libbox')
+abort('Libbox dynamic library missing') unless File.file?(framework_binary)
+portable_id = '@rpath/Libbox.framework/Versions/A/Libbox'
+existing_id_output = IO.popen(['xcrun', 'otool', '-D', framework_binary], &:read)
+abort('Unable to read Libbox dylib install name') unless $?.success?
+existing_id = existing_id_output.lines.map(&:strip).reject(&:empty?)[1]
+abort('Libbox is missing LC_ID_DYLIB') unless existing_id
+unless existing_id == portable_id
+  abort('Failed to set portable Libbox install name') unless
+    system('xcrun', 'install_name_tool', '-id', portable_id, framework_binary)
+  puts "Adjusted local Libbox install name: #{portable_id}"
+end
+
 project = Xcodeproj::Project.open(project_file)
 target = project.targets.find { |t| t.name == 'PacketTunnel' }
 raise 'PacketTunnel extension missing' unless target
@@ -91,12 +107,11 @@ target.build_configurations.each do |configuration|
   ]
   # libbox's native macOS Go/C implementation references IOKit USB Host
   # controls and SystemConfiguration proxy/dynamic store symbols.
-  # Pass ld's -needed_framework through clang using -Wl; clang itself\n  # rejects -needed_framework as an unknown driver argument.\n  # Force a load command for Libbox even when Swift link-time optimizations
-  # or -dead_strip_dylibs see no imported symbols. A successful framework
-  # copy/import alone is not proof that the extension links the runtime.
-  # Keep the Apple SDK frameworks linked normally.
+  # Force-link the concrete dylib rather than depending on framework name
+  # lookup or Swift's imported-symbol reachability. The binary's LC_ID_DYLIB
+  # is portable (@rpath), so the resulting LC_LOAD_DYLIB must also be portable.
   settings['OTHER_LDFLAGS'] = [
-    '$(inherited)', '-Wl,-needed_framework,Libbox',
+    '$(inherited)', "-Wl,-needed_library,#{framework_binary}",
     '-framework', 'IOUSBHost',
     '-framework', 'SystemConfiguration',
     '-framework', 'IOKit'
