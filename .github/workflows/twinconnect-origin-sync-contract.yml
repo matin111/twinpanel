@@ -1,0 +1,34 @@
+name: TwinConnect Secure Origin Sync
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/app/services/central_app_origin_sync.py'
+      - 'backend/app/routers/central_app_v1.py'
+      - 'backend/app/routers/domains.py'
+      - 'backend/tests/test_twinconnect_origin_sync_contract.py'
+      - '.github/workflows/twinconnect-origin-sync-contract.yml'
+  pull_request:
+    paths:
+      - 'backend/app/services/central_app_origin_sync.py'
+      - 'backend/app/routers/central_app_v1.py'
+      - 'backend/app/routers/domains.py'
+      - 'backend/tests/test_twinconnect_origin_sync_contract.py'
+      - '.github/workflows/twinconnect-origin-sync-contract.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  origin-sync-contract:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile origin sync and domain routes
+        run: python -m py_compile backend/app/services/central_app_origin_sync.py backend/app/routers/domains.py backend/app/routers/central_app_v1.py
+      - name: Run offline origin sync contracts
+        run: python -m unittest discover -s backend/tests -p 'test_twinconnect_origin_sync_contract.py' -v

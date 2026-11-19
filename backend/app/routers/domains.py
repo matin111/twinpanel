@@ -7,6 +7,7 @@ from ..services.domain_frontdoor_nginx_v1 import (
 )
 from ..services.domain_ssl_runtime_v1 import issue_ssl
 from ..services.domain_router import resolve_domain_route
+from ..services.central_app_origin_sync import sync_app_origin_safely
 import subprocess
 import os
 import re
@@ -326,6 +327,9 @@ def update_domain(
 
     db.commit()
     db.refresh(item)
+    if item.domain_type == DomainType.API and item.ssl_status == SSLStatus.ACTIVE:
+        # No change to VPN configuration; a failed vendor probe retains old URL.
+        sync_app_origin_safely(db, force=True)
 
     return item
 
@@ -424,8 +428,13 @@ def request_ssl(
 
             db.commit()
             db.refresh(item)
+            origin_sync = (
+                sync_app_origin_safely(db, force=True)
+                if item.domain_type == DomainType.API else None
+            )
 
             return {
+                "origin_sync": origin_sync,
                 "ok": True,
                 "domain": item.domain,
                 "ssl_status": item.ssl_status,

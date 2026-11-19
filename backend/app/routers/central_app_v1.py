@@ -12,7 +12,7 @@ from datetime import datetime
 from urllib.parse import urlsplit
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -25,6 +25,7 @@ from ..central_app_identity import (
 )
 from ..central_app_models import CentralAppContact
 from ..central_app_appearance import resolve_appearance
+from ..services.central_app_origin_sync import sync_app_origin_background
 from ..database import get_db
 from ..deps import require_admin, require_reseller
 from ..models_reseller import Reseller, ResellerSubscription
@@ -37,6 +38,15 @@ from ..central_app_protocols import protocol_catalog, normalize_protocol
 from ..subscription_renewal_status_v1 import next_reserved_renewal
 
 router = APIRouter(prefix="/v1/central-app", tags=["central-app"])
+
+@router.get("/public/directory-proof")
+def public_directory_proof():
+    """Public, non-secret ownership proof used for HTTPS origin migration."""
+    return {
+        "service": "twinpanel-central-app",
+        "namespace": installation_namespace(ensure_installation_id()),
+    }
+
 _COLOR = re.compile(r"^#[0-9A-Fa-f]{6}$")
 
 
@@ -116,10 +126,13 @@ def _save_contact(db: Session, reseller_id: int, payload: ContactIn) -> dict:
 
 @router.get("/admin/info")
 def admin_client_info(
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     _=Depends(require_admin),
 ):
     namespace = app_directory_namespace(ensure_installation_id())
+    if central_app_entitled():
+        background_tasks.add_task(sync_app_origin_background)
     return {
         "namespace": namespace,
         "app_enabled": central_app_entitled(),
