@@ -98,6 +98,22 @@ extension.build_configurations.each do |configuration|
   settings['LIBRARY_SEARCH_PATHS'] = (current + needed).uniq
 end
 
+# The official wg-quick convenience initializer lives in Shared/Model,
+# outside the WireGuardKit SwiftPM target. Compile it in the extension.
+parser_file = File.join(root, 'macos_native/wireguard/TwinConnectWgQuickConfig.swift')
+abort('TwinConnect wg-quick parser missing') unless File.file?(parser_file)
+source_phase = extension.source_build_phase
+already_added = source_phase.files_references.any? do |ref|
+  ref && (ref.real_path.to_s == parser_file rescue false)
+end
+unless already_added
+  group = project.main_group.find_subpath('TwinConnect WireGuard', true)
+  group.set_source_tree('<group>')
+  parser_ref = group.new_file(parser_file)
+  parser_ref.source_tree = '<absolute>'
+  source_phase.add_file_reference(parser_ref)
+end
+
 project.save
 puts 'WireGuardKit local source prepared (Swift tools 5.5) and registered.'
 puts 'WireGuardGoBridgemacOS uses official Go bridge Makefile.'
