@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-19T02:54:40Z",
+  "released_at": "2026-11-19T05:08:59Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "a4128f4c5e3b8c5f66d5eeacc79d7b77d33511ec",
+  "source_sha": "66bd15fc5de510cc7f6f4a100f8503c105e8bf40",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0/twinpanel-1.1.0-linux-x86_64.tar.gz",
-    "sha256": "1c0c89e649d0b48c4f87c1c1d46c84c9349af255948d258a4cf6c94f90bb9abe",
-    "size_bytes": 31344792
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.1/twinpanel-1.1.1-linux-x86_64.tar.gz",
+    "sha256": "52ab687b7a754eda4a3f213bb7d9bce8cea90e9a660912a5936258dfb15fc013",
+    "size_bytes": 31373730
   },
   "notes": {
-    "fa": "شروع انتشار رسمی TwinPanel با نسخه 1.1.0؛ حفظ قابلیت ارتقا از نسخه‌های آزمایشی پیشین و پشتیبانی از TwinConnect.",
-    "en": "Start official TwinPanel 1.1.0 releases; retain upgrade compatibility with prior release candidates and TwinConnect support."
+    "fa": "ویرایشگر حرفه‌ای و امن وبلاگ با پیش‌نمایش زنده، اندازه و رنگ متن، لینک و لنگر داخلی، جدول، فهرست، تصویر و چیدمان؛ رابط ترمینال جدید، سریع‌تر و اصلاح وضعیت Web؛ ارتقای سازگار با داده‌های موجود.",
+    "en": "Professional safe blog editor with live preview, font size/color, links and anchors, tables, lists, images and alignment; refreshed faster terminal menu and accurate Web status; compatible update preserving existing data."
   }
 }
