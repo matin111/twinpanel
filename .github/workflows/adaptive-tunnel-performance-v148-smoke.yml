@@ -67,8 +67,12 @@ jobs:
           ).read_text()
 
           prefix = "1.1.0-rc."
-          assert version.startswith(prefix), version
-          assert int(version[len(prefix):]) >= 148, version
+          if version.startswith(prefix):
+              assert int(version[len(prefix):]) >= 148, version
+          else:
+              # Stable versions supersede the old release-candidate numbering.
+              stable = tuple(int(part) for part in version.split("."))
+              assert stable >= (1, 1, 0), version
 
           required_adaptive = [
               "TWINPANEL_ADAPTIVE_TUNNEL_PERFORMANCE_V148",
