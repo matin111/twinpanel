@@ -5,8 +5,15 @@ sing-box command launched from a sandboxed Flutter Runner.
 
 * Compile and verify upstream `Libbox.xcframework` for macOS using
   `twinconnect-macos-libbox-bridge-smoke.yml`.
-* Link this framework to the **PacketTunnel** extension target, not merely
-  the host application.
+* Link the macOS Libbox **static framework archive** into the **PacketTunnel**
+  executable, not merely the host app. Official gomobile produces an
+  architecture-specific static archive (including a `go.o` object inside
+  `Libbox.framework/Libbox`); do **not** embed it as a runtime dylib.
+  `otool -L PacketTunnel` therefore must **not** be used as proof of Libbox
+  static linkage. Inspect `nm -g PacketTunnel` for the imported Libbox
+  Objective-C/Go symbols (for example `_LibboxSetup` or
+  `_OBJC_CLASS_$_Libbox...`), and separately validate signed egress.
+  Do not run `install_name_tool` on the Go archive.
 * Adapt `Libbox.PlatformInterface` and the required TUN descriptors,
   lifecycle, DNS, and default network monitoring to Apple's
   `NEPacketTunnelFlow`, as supported by libbox's Apple platform binding.
