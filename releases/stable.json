@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.3",
+  "version": "1.1.4",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-19T05:21:45Z",
+  "released_at": "2026-11-19T05:48:09Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "238b2b9709e6e195fceb77321b35e4717ed435e4",
+  "source_sha": "ef956dde5553d0563d431b51f4ea509b69de638f",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.3/twinpanel-1.1.3-linux-x86_64.tar.gz",
-    "sha256": "2a9096576f6ae2fc0ae46ac8609ab3ad137b8c385f647e6ba447973878598157",
-    "size_bytes": 31340415
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.4/twinpanel-1.1.4-linux-x86_64.tar.gz",
+    "sha256": "f98f56dff924519c062f308040c3b0d25d275cb74420b9e8bb2052c97f468b00",
+    "size_bytes": 31342683
   },
   "notes": {
-    "fa": "اصلاح منوی آموزش و برنامه‌ها در ربات اصلی و نمایندگی: حذف شلوغی، نمایش برنامه‌های اصلی به‌جای پروتکل‌ها، انتقال گزینه‌های تخصصی به «سایر برنامه‌ها» و حفظ لینک‌های عمومی TwinConnect ویندوز و اندروید. شامل اصلاحات نسخه‌های قبلی.",
-    "en": "Ship compact app-first Telegram tutorials in the official prebuilt release, keeping specialist clients under More and preserving public TwinConnect downloads and earlier fixes."
+    "fa": "دریافت سریع ساب‌لینک و QR در ربات «اکانت‌های من» با API احرازشده و سبک، بدون تغییر کانفیگ‌ها و لایسنس‌ها؛ ساخت QR بدون مسدودکردن ربات. اصلاح رنگ و جایگاه کادر اطلاعات نمودار آمار فروش در لایت‌مود. حفظ امکانات نسخه 1.1.3.",
+    "en": "Fast authenticated subscription link and QR delivery from Telegram My Accounts without reloading protocol configs; non-blocking QR generation. Fixed sales analytics tooltip colors and clipping in light mode. All 1.1.3 features retained."
   }
 }
