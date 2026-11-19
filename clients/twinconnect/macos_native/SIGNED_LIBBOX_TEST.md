@@ -45,11 +45,14 @@ and Network Extension capability provisioned to both app and extension:
      CODE_SIGNING_ALLOWED=YES build
    ```
 
-6. Verify that the built application, embedded PacketTunnel.appex,
-   and Libbox.framework are signed with the **same real Apple Team**, that the
-   extension backend marker is enabled, and that the **effective** (signed)
-   Network Extension and Keychain entitlements match. The verification command
-   fails closed with an actionable reason:
+6. Verify that the built application and PacketTunnel.appex are
+   signed with the **same real Apple Team**, that the extension's **static**
+   Libbox binding exports are present in its executable, the opt-in backend
+   marker is enabled, and that the **effective** (signed) Network Extension
+   and Keychain entitlements match. A gomobile Go archive is linked into the
+   extension rather than embedded as `Contents/Frameworks/Libbox.framework`;
+   no separate Libbox framework signing or `otool -L` entry is expected.
+   The verification command fails closed with an actionable reason:
 
    ```bash
    python3 macos_native/verify_signed_macos_bundle.py \
