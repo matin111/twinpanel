@@ -436,7 +436,7 @@ _APP_TUTORIALS = {
         "5️⃣ اتصال را فعال کنید. فقط کانفیگ‌های سازگار با نسخه برنامه قابل استفاده‌اند."
     ),
     "TwinConnect": (
-        "1️⃣ نسخه ویندوز TwinConnect را از کانال اصلی دریافت و نصب کنید.\n"
+        "1️⃣ نسخه مناسب دستگاه را از کانال اصلی دریافت و نصب کنید.\n"
         "2️⃣ برنامه را باز کنید و با نام کاربری و رمز مخصوص اپ وارد شوید.\n"
         "3️⃣ سرور موردنظر را انتخاب و اتصال را فعال کنید.\n"
         "4️⃣ برای دریافت سرورهای جدید از Refresh استفاده کنید."
@@ -496,6 +496,14 @@ def _group_apps_by_title() -> None:
                 value["download"] = item["download"]
         APPS[os_key] = list(grouped.values())
 
+# Android and Windows use separate official public channel posts.
+APPS["android"].insert(0, {
+    "key": "twinconnect_android",
+    "title": "TwinConnect",
+    "protocol": "کانکشن هوشمند",
+    "image": None,
+    "download": "https://t.me/twin_connect1/4",
+})
 # Windows smart client uses the already published channel message.
 APPS["windows"].insert(0, {
     "key": "twinconnect_windows",
@@ -556,12 +564,14 @@ def _apps_keyboard(
         rows.append([
             InlineKeyboardButton(
                 text=(
-                    f"{item['title']}"
+                    "🔴 TwinConnect" if item["title"] == "TwinConnect"
+                    else f"{item['title']}"
                 ),
                 callback_data=(
                     f"{prefix}:{mode}:item:"
                     f"{os_key}:{item['key']}"
                 ),
+                **({"style": "danger"} if item["title"] == "TwinConnect" else {}),
             )
         ])
 
@@ -602,8 +612,12 @@ def _detail_keyboard(
     if item.get("download"):
         rows.append([
             InlineKeyboardButton(
-                text="🔗 دریافت برنامه",
+                text=(
+                    "🔴 دریافت TwinConnect" if item["title"] == "TwinConnect"
+                    else "🔗 دریافت برنامه"
+                ),
                 url=item["download"],
+                **({"style": "danger"} if item["title"] == "TwinConnect" else {}),
             )
         ])
 
