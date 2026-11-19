@@ -43,10 +43,17 @@ final class TwinConnectMacOSVPNBridge {
     }
 
     private static func libboxInExtension() -> Bool {
-        guard let bundle = extensionBundle() else { return false }
-        let path = bundle.bundleURL.appendingPathComponent(
-            "Contents/Frameworks/Libbox.framework/Libbox")
-        return FileManager.default.fileExists(atPath: path.path)
+        // Upstream gomobile ships Libbox as a static Go archive. Its code is
+        // linked into PacketTunnel's executable, not copied to Frameworks.
+        // The marker is opt-in for a provisioned signed candidate only; the
+        // offline bundle verifier separately checks real Libbox symbols.
+        guard let bundle = extensionBundle(),
+              bundle.object(forInfoDictionaryKey:
+                  "TwinConnectProtocolBackendLinked") as? Bool == true,
+              let executable = bundle.executableURL else {
+            return false
+        }
+        return FileManager.default.isExecutableFile(atPath: executable.path)
     }
 
     private static func hysteriaEngineInstalled() -> Bool {
