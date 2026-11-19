@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.0-rc.881",
+  "version": "1.1.0",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-19T01:37:54Z",
+  "released_at": "2026-11-19T02:54:40Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "f8da25be79564f50abdfb4a39039e767e39abf0a",
+  "source_sha": "a4128f4c5e3b8c5f66d5eeacc79d7b77d33511ec",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0-rc.881/twinpanel-1.1.0-rc.881-linux-x86_64.tar.gz",
-    "sha256": "b85df26b197bdcd954f5a5cc8c56417c0133fb13be807651bdca98eef89dd036",
-    "size_bytes": 31286410
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.0/twinpanel-1.1.0-linux-x86_64.tar.gz",
+    "sha256": "1c0c89e649d0b48c4f87c1c1d46c84c9349af255948d258a4cf6c94f90bb9abe",
+    "size_bytes": 31344792
   },
   "notes": {
-    "fa": "افزودن TwinConnect اندروید به آموزش و دانلود ربات با لینک عمومی https://t.me/twin_connect1/4 و قرمز کردن دکمه‌های TwinConnect ویندوز و اندروید.",
-    "en": "Add TwinConnect Android bot tutorial with public download post; make Android and Windows TwinConnect selection and download buttons red."
+    "fa": "شروع انتشار رسمی TwinPanel با نسخه 1.1.0؛ حفظ قابلیت ارتقا از نسخه‌های آزمایشی پیشین و پشتیبانی از TwinConnect.",
+    "en": "Start official TwinPanel 1.1.0 releases; retain upgrade compatibility with prior release candidates and TwinConnect support."
   }
 }
