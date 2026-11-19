@@ -564,7 +564,7 @@ def _apps_keyboard(
         rows.append([
             InlineKeyboardButton(
                 text=(
-                    "🔴 TwinConnect" if item["title"] == "TwinConnect"
+                    ("🔴 کانکشن هوشمند اندروید" if os_key == "android" else "🔴 کانکشن هوشمند ویندوز") if item["title"] == "TwinConnect"
                     else f"{item['title']}"
                 ),
                 callback_data=(
@@ -613,7 +613,7 @@ def _detail_keyboard(
         rows.append([
             InlineKeyboardButton(
                 text=(
-                    "🔴 دریافت TwinConnect" if item["title"] == "TwinConnect"
+                    ("🔴 دریافت کانکشن هوشمند اندروید" if os_key == "android" else "🔴 دریافت کانکشن هوشمند ویندوز") if item["title"] == "TwinConnect"
                     else "🔗 دریافت برنامه"
                 ),
                 url=item["download"],
