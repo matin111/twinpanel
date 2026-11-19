@@ -41,6 +41,13 @@ jobs:
       - name: Compile backend Python
         run: python -m compileall -q backend/app
 
+      - name: Install discount test dependencies
+        run: python -m pip install --disable-pip-version-check -r backend/requirements.txt
+
+      - name: Test discount plan scope and redemption
+        working-directory: backend
+        run: python -m unittest discover -s tests -p 'test_admin_discount_plan_scope_v1.py' -v
+
       - name: Validate fast Telegram link delivery and sales tooltip themes
         run: python3 backend/tests/test_telegram_link_delivery_fast_path_v1.py -v
 

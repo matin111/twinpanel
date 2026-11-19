@@ -5,7 +5,7 @@ from fastapi import (
     Depends,
     HTTPException,
 )
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, PositiveInt
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -21,8 +21,9 @@ from ..discount_service import (
     evaluate_discount,
     normalize_discount_code,
 )
-from ..models import User
+from ..models import Plan, User
 from ..models_reseller import Reseller
+from ..reseller_owned_plans import INTERNAL_PLAN_PREFIX
 
 
 router = APIRouter(
@@ -60,7 +61,7 @@ class DiscountIn(BaseModel):
 
     applies_to: str = "both"
 
-    plan_ids: list[int] = Field(
+    plan_ids: list[PositiveInt] = Field(
         default_factory=list,
     )
 
@@ -182,6 +183,22 @@ def save_discount(
 ):
     validate_payload(payload)
 
+    # Validate before mutating any existing discount. An empty list means all plans.
+    plan_ids = list(dict.fromkeys(payload.plan_ids))
+    if row.owner_type == "central" and plan_ids:
+        valid_ids = {
+            int(plan_id)
+            for (plan_id,) in db.query(Plan.id).filter(
+                Plan.id.in_(plan_ids),
+                ~Plan.name.startswith(INTERNAL_PLAN_PREFIX),
+            ).all()
+        }
+        if valid_ids != set(plan_ids):
+            raise HTTPException(
+                status_code=422,
+                detail="یک یا چند پلن انتخاب‌شده معتبر نیستند",
+            )
+
     row.code = normalize_discount_code(
         payload.code
     )
@@ -210,13 +227,7 @@ def save_discount(
 
     row.applies_to = payload.applies_to
 
-    row.plan_ids = list(
-        dict.fromkeys(
-            int(x)
-            for x in payload.plan_ids
-            if int(x) > 0
-        )
-    )
+    row.plan_ids = plan_ids
 
     row.usage_limit_total = (
         payload.usage_limit_total
