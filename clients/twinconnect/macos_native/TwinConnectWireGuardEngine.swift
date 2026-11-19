@@ -38,8 +38,19 @@ final class TwinConnectMacWireGuardEngine {
         }
         let created = WireGuardAdapter(with: provider) { _, _ in }
         adapter = created
-        created.start(tunnelConfiguration: tunnel) { error in
-            completion(error)
+        created.start(tunnelConfiguration: tunnel) { [weak self] error in
+            guard let error else {
+                completion(nil)
+                return
+            }
+            // A failed start may have already allocated a userspace backend.
+            // Tear it down before allowing NetworkExtension to retry.
+            created.stop { _ in
+                if self?.adapter === created {
+                    self?.adapter = nil
+                }
+                completion(error)
+            }
         }
     }
 
