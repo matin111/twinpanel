@@ -2,23 +2,23 @@
   "schema": 3,
   "product": "TwinPanel",
   "channel": "stable",
-  "version": "1.1.4",
+  "version": "1.1.5",
   "installable": true,
   "published": true,
-  "released_at": "2026-11-19T05:48:09Z",
+  "released_at": "2026-11-19T08:32:48Z",
   "repository_url": "https://github.com/matin111/twinpanel.git",
-  "source_sha": "ef956dde5553d0563d431b51f4ea509b69de638f",
+  "source_sha": "17a1477023dcc2e897fc27d7e9aacc91a75299de",
   "github_url": "https://github.com/matin111/twinpanel",
   "license_required": false,
   "artifact": {
     "format": "twinpanel-prebuilt-v1",
     "arch": "x86_64",
-    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.4/twinpanel-1.1.4-linux-x86_64.tar.gz",
-    "sha256": "f98f56dff924519c062f308040c3b0d25d275cb74420b9e8bb2052c97f468b00",
-    "size_bytes": 31342683
+    "url": "https://github.com/matin111/twinpanel/releases/download/v1.1.5/twinpanel-1.1.5-linux-x86_64.tar.gz",
+    "sha256": "c417f0d73d9e09fec4a6e8d53350a47305f027438c2ffc185cf3e53103163e5e",
+    "size_bytes": 31351182
   },
   "notes": {
-    "fa": "دریافت سریع ساب‌لینک و QR در ربات «اکانت‌های من» با API احرازشده و سبک، بدون تغییر کانفیگ‌ها و لایسنس‌ها؛ ساخت QR بدون مسدودکردن ربات. اصلاح رنگ و جایگاه کادر اطلاعات نمودار آمار فروش در لایت‌مود. حفظ امکانات نسخه 1.1.3.",
-    "en": "Fast authenticated subscription link and QR delivery from Telegram My Accounts without reloading protocol configs; non-blocking QR generation. Fixed sales analytics tooltip colors and clipping in light mode. All 1.1.3 features retained."
+    "fa": "افزودن انتخاب یک یا چند پلن مجاز هنگام ساخت و ویرایش کد تخفیف، همراه جست‌وجو و انتخاب گروهی. نمایش پلن‌های مجاز در جدول؛ اعتبارسنجی شناسهٔ پلن در API و جلوگیری از اعمال کد روی پلن‌های خارج از محدوده. تمام امکانات و اصلاحات نسخه 1.1.4 حفظ شده‌اند.",
+    "en": "Select eligible plans for each discount code, with multi-select, search, bulk selection and edit support. Show plan eligibility in the admin list; reject invalid plan IDs and enforce the allowed-plan scope during redemption. All v1.1.4 features preserved."
   }
 }
