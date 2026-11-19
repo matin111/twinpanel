@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0-rc.880",
-  "source_sha": "19da693a2c09b0b736ebf50dde78e99fa04578ed",
+  "version": "1.1.0-rc.881",
+  "source_sha": "f8da25be79564f50abdfb4a39039e767e39abf0a",
   "notes": {
-    "fa": "اصلاح لینک دانلود TwinConnect ویندوز در آموزش‌های ربات؛ جایگزینی لینک خصوصی با پیام عمومی https://t.me/twin_connect1/3",
-    "en": "Replace private TwinConnect Windows Telegram download link with the public channel post."
+    "fa": "افزودن TwinConnect اندروید به آموزش و دانلود ربات با لینک عمومی https://t.me/twin_connect1/4 و قرمز کردن دکمه‌های TwinConnect ویندوز و اندروید.",
+    "en": "Add TwinConnect Android bot tutorial with public download post; make Android and Windows TwinConnect selection and download buttons red."
   }
 }
