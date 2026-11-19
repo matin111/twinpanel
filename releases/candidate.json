@@ -1,8 +1,8 @@
 {
-  "version": "1.1.1",
-  "source_sha": "66bd15fc5de510cc7f6f4a100f8503c105e8bf40",
+  "version": "1.1.2",
+  "source_sha": "34a8250116002dd72ee4a18ef07a8d45949847fe",
   "notes": {
-    "fa": "ویرایشگر حرفه‌ای و امن وبلاگ با پیش‌نمایش زنده، اندازه و رنگ متن، لینک و لنگر داخلی، جدول، فهرست، تصویر و چیدمان؛ رابط ترمینال جدید، سریع‌تر و اصلاح وضعیت Web؛ ارتقای سازگار با داده‌های موجود.",
-    "en": "Professional safe blog editor with live preview, font size/color, links and anchors, tables, lists, images and alignment; refreshed faster terminal menu and accurate Web status; compatible update preserving existing data."
+    "fa": "اصلاح کامل رنگ بخش عملیات بیشتر اشتراک‌ها در حالت روشن، با پس‌زمینه روشن، نوشته‌های خوانا و هماهنگی دکمه‌ها. شامل ویرایشگر حرفه‌ای امن وبلاگ و منوی جدید ترمینال از نسخه 1.1.1 و ارتقای سازگار با داده‌های موجود.",
+    "en": "Fixed the expanded subscription action surface in light theme with a bright background and accessible text contrast. Includes the safe professional blog editor and refreshed terminal menu from 1.1.1, preserving existing data during upgrades."
   }
 }
