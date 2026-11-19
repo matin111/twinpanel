@@ -14,6 +14,11 @@ void main() {
     expect(swift, contains('"fullTunnel": libboxBackendReady()'));
     expect(swift, contains('#if TWINCONNECT_SIGNED_LIBBOX'));
     expect(swift, contains('SecTaskCopyValueForEntitlement'));
+    // gomobile's Libbox is statically linked into PacketTunnel. A separate
+    // dylib under Frameworks must not be required for signed readiness.
+    expect(swift, contains('bundle.executableURL'));
+    expect(swift, contains('TwinConnectProtocolBackendLinked'));
+    expect(swift, isNot(contains('Contents/Frameworks/Libbox.framework/Libbox')));
     expect(swift, contains('return false'));
     expect(swift, contains('"connected": false'));
     expect(swift, contains('"killSwitchEnforced": false'));
