@@ -19,6 +19,12 @@
 
 **TwinPanel is a self-hosted VPN operations platform combining sales, 16 VPN/proxy protocol families, subscription and renewal management, reseller commerce, payments and wallets, multi-node infrastructure, tunnels, and branded client-app delivery.**
 
+## TwinConnect download & license
+
+- 🪟 **[Download TwinConnect for Windows (0.1.0 Beta)](https://github.com/matin111/twinpanel/releases/tag/twinconnect-windows-v0.1.0-beta.1)** — the official Windows x64 installer is available in this GitHub release.
+- 🔐 **[Get a TwinPanel license via Telegram (@TwinPanelbot)](https://t.me/TwinPanelbot)** — choose a **license with TwinConnect app access** to use the app; a standard panel-only license does not enable TwinConnect.
+
+
 Instead of running a separate billing panel, reseller system, Telegram sales bot, VPN node manager and tunnel monitor, TwinPanel brings the entire operational flow into one product:
 
 ```text
