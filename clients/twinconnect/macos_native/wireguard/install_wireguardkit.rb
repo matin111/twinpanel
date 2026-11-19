@@ -50,17 +50,17 @@ end
 # https://github.com/WireGuard/wireguard-apple#wireguardkit-integration
 bridge = project.targets.find { |target| target.name == 'WireGuardGoBridgemacOS' }
 unless bridge
-  bridge = project.new(Xcodeproj::Project::Object::PBXLegacyTarget)
-  bridge.name = 'WireGuardGoBridgemacOS'
-  bridge.build_tool_path = '/usr/bin/make'
-  bridge.build_arguments_string = ''
-  bridge.build_working_directory =
-    '${BUILD_DIR%Build/*}SourcePackages/checkouts/wireguard-apple/Sources/WireGuardKitGo'
-  bridge.pass_build_settings_in_environment = '1'
-  %w[Debug Profile Release].each do |name|
-    config = bridge.add_build_configuration(name, :release)
-    config.build_settings['SDKROOT'] = 'macosx'
-  end
+  # PBXLegacyTarget needs a build_configuration_list before
+  # add_build_configuration can be called. Use the official helper, which
+  # creates and registers both the target and its configuration list.
+  working_dir = '${BUILD_DIR%Build/*}SourcePackages/checkouts/wireguard-apple/Sources/WireGuardKitGo'
+  bridge = Xcodeproj::Project::ProjectHelper.new_legacy_target(
+    project, 'WireGuardGoBridgemacOS', '/usr/bin/make',
+    '$(ACTION)', working_dir, '1'
+  )
+end
+bridge.build_configurations.each do |config|
+  config.build_settings['SDKROOT'] = 'macosx'
 end
 extension.add_dependency(bridge) unless extension.dependencies.any? do |dependency|
   dependency.target == bridge
