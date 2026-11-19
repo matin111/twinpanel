@@ -19,11 +19,42 @@
 
 **TwinPanel is a self-hosted VPN operations platform combining sales, 16 VPN/proxy protocol families, subscription and renewal management, reseller commerce, payments and wallets, multi-node infrastructure, tunnels, and branded client-app delivery.**
 
-## TwinConnect download & license
+## ⚡ TwinConnect — Download & activate
 
-- 🪟 **[Download TwinConnect for Windows (0.1.0 Beta)](https://github.com/matin111/twinpanel/releases/tag/twinconnect-windows-v0.1.0-beta.1)** — the official Windows x64 installer is available in this GitHub release.
-- 🔐 **[Get a TwinPanel license via Telegram (@TwinPanelbot)](https://t.me/TwinPanelbot)** — choose a **license with TwinConnect app access** to use the app; a standard panel-only license does not enable TwinConnect.
+<p align="center">The smart VPN companion for TwinPanel. One account, eligible servers and a simpler connection experience.</p>
 
+<table>
+  <tr>
+    <td align="center" width="50%">
+      <h3>🪟 Windows</h3>
+      <p><strong>Available now</strong> · 64-bit installer · Beta 0.1.0</p>
+      <a href="https://github.com/matin111/twinpanel/releases/tag/twinconnect-windows-v0.1.0-beta.1"><img src="https://img.shields.io/badge/Windows_x64-Download_Beta-2563EB?style=for-the-badge&logo=windows11&logoColor=white" alt="Download TwinConnect for Windows" /></a>
+    </td>
+    <td align="center" width="50%">
+      <h3>🤖 Android</h3>
+      <p><strong>Android client</strong> · Public download link being added</p>
+      <img src="https://img.shields.io/badge/Android-Download_Link_Soon-16A34A?style=for-the-badge&logo=android&logoColor=white" alt="Android download link coming soon" />
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <h3>🍎 macOS</h3>
+      <p>Desktop release planned for a future update</p>
+      <img src="https://img.shields.io/badge/macOS-Coming_Soon-64748B?style=for-the-badge&logo=apple&logoColor=white" alt="macOS coming soon" />
+    </td>
+    <td align="center">
+      <h3>📱 iPhone / iOS</h3>
+      <p>iOS release planned for a future update</p>
+      <img src="https://img.shields.io/badge/iOS-Coming_Soon-64748B?style=for-the-badge&logo=apple&logoColor=white" alt="iOS coming soon" />
+    </td>
+  </tr>
+</table>
+
+<p align="center">
+  <a href="https://t.me/TwinPanelbot"><img src="https://img.shields.io/badge/Telegram-Get_a_License-0EA5E9?style=for-the-badge&logo=telegram&logoColor=white" alt="Get TwinPanel license in Telegram" /></a>
+</p>
+
+> 🔐 **License required:** TwinConnect works only with a **TwinPanel license that includes app access**. A standard panel-only license does not activate the app. Select the app-enabled license in [@TwinPanelbot](https://t.me/TwinPanelbot).
 
 Instead of running a separate billing panel, reseller system, Telegram sales bot, VPN node manager and tunnel monitor, TwinPanel brings the entire operational flow into one product:
 

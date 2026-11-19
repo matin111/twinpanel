@@ -8,11 +8,42 @@
 
 **TwinPanel یک پلتفرم Self-Hosted برای فروش و عملیات VPN است؛ با ۱۶ خانواده پروتکل VPN/Proxy، مدیریت اشتراک و تمدید رزروی، ربات تلگرام، پرداخت و کیف پول، نمایندگی، اپ هوشمند چندبرندی، مدیریت نود و تانل، مسیر اضطراری DNS، مانیتورینگ و آپدیت امن.**
 
-## دانلود اپ هوشمند و دریافت لایسنس
+## ⚡ دانلود و فعال‌سازی اپ هوشمند TwinConnect
 
-- 🪟 **[دانلود TwinConnect برای ویندوز (نسخه آزمایشی 0.1.0)](https://github.com/matin111/twinpanel/releases/tag/twinconnect-windows-v0.1.0-beta.1)** — فایل نصب ویندوز ۶۴بیتی در بخش دانلود نسخهٔ گیت‌هاب قرار دارد.
-- 🔐 **[دریافت لایسنس TwinPanel از ربات تلگرام (@TwinPanelbot)](https://t.me/TwinPanelbot)** — برای استفاده از اپ، **لایسنس همراه اپ هوشمند** را انتخاب کنید؛ لایسنس معمولی پنل، دسترسی TwinConnect را فعال نمی‌کند.
+<p align="center">اتصال هوشمند به سرورها و پروتکل‌های مجاز اشتراک، با مدیریت یکپارچه از طریق TwinPanel.</p>
 
+<table dir="rtl">
+  <tr>
+    <td align="center" width="50%">
+      <h3>🪟 ویندوز (Windows)</h3>
+      <p><strong>قابل دانلود</strong> · نصب‌کننده ۶۴بیتی · نسخه آزمایشی 0.1.0</p>
+      <a href="https://github.com/matin111/twinpanel/releases/tag/twinconnect-windows-v0.1.0-beta.1"><img src="https://img.shields.io/badge/Windows_x64-Download_Beta-2563EB?style=for-the-badge&logo=windows11&logoColor=white" alt="دانلود اپ TwinConnect برای ویندوز" /></a>
+    </td>
+    <td align="center" width="50%">
+      <h3>🤖 اندروید (Android)</h3>
+      <p><strong>نسخه اندروید</strong> · لینک دانلود عمومی به‌زودی اضافه می‌شود</p>
+      <img src="https://img.shields.io/badge/Android-Download_Link_Soon-16A34A?style=for-the-badge&logo=android&logoColor=white" alt="لینک دانلود اندروید به‌زودی" />
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <h3>🍎 مک (macOS)</h3>
+      <p>انتشار نسخه مک در آینده نزدیک</p>
+      <img src="https://img.shields.io/badge/macOS-Coming_Soon-64748B?style=for-the-badge&logo=apple&logoColor=white" alt="نسخه مک به‌زودی" />
+    </td>
+    <td align="center">
+      <h3>📱 آیفون (iOS)</h3>
+      <p>انتشار نسخه آیفون در آینده نزدیک</p>
+      <img src="https://img.shields.io/badge/iOS-Coming_Soon-64748B?style=for-the-badge&logo=apple&logoColor=white" alt="نسخه آیفون به‌زودی" />
+    </td>
+  </tr>
+</table>
+
+<p align="center">
+  <a href="https://t.me/TwinPanelbot"><img src="https://img.shields.io/badge/Telegram-Get_a_License-0EA5E9?style=for-the-badge&logo=telegram&logoColor=white" alt="دریافت لایسنس TwinPanel از ربات تلگرام" /></a>
+</p>
+
+> 🔐 **لایسنس اپ الزامی است:** برای ورود و استفاده از TwinConnect باید از [ربات @TwinPanelbot](https://t.me/TwinPanelbot) **لایسنس همراه اپ هوشمند** تهیه کنید. لایسنس معمولی پنل، اپ را فعال نمی‌کند.
 
 هدف TwinPanel این است که اپراتور مجبور نباشد برای فروش، مدیریت کاربران، ربات تلگرام، پروتکل‌ها، سرورها و تانل‌ها چند سیستم جداگانه داشته باشد.
 
