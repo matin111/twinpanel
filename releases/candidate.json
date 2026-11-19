@@ -1,8 +1,8 @@
 {
-  "version": "1.1.0",
-  "source_sha": "a4128f4c5e3b8c5f66d5eeacc79d7b77d33511ec",
+  "version": "1.1.1",
+  "source_sha": "66bd15fc5de510cc7f6f4a100f8503c105e8bf40",
   "notes": {
-    "fa": "شروع انتشار رسمی TwinPanel با نسخه 1.1.0؛ حفظ قابلیت ارتقا از نسخه‌های آزمایشی پیشین و پشتیبانی از TwinConnect.",
-    "en": "Start official TwinPanel 1.1.0 releases; retain upgrade compatibility with prior release candidates and TwinConnect support."
+    "fa": "ویرایشگر حرفه‌ای و امن وبلاگ با پیش‌نمایش زنده، اندازه و رنگ متن، لینک و لنگر داخلی، جدول، فهرست، تصویر و چیدمان؛ رابط ترمینال جدید، سریع‌تر و اصلاح وضعیت Web؛ ارتقای سازگار با داده‌های موجود.",
+    "en": "Professional safe blog editor with live preview, font size/color, links and anchors, tables, lists, images and alignment; refreshed faster terminal menu and accurate Web status; compatible update preserving existing data."
   }
 }
