@@ -83,9 +83,12 @@ target.build_configurations.each do |configuration|
   ]
   # libbox's native macOS Go/C implementation references IOKit USB Host
   # controls and SystemConfiguration proxy/dynamic store symbols.
-  # Explicitly link their Apple SDK frameworks into PacketTunnel.
+  # Force a load command for Libbox even when Swift link-time optimizations
+  # or -dead_strip_dylibs see no imported symbols. A successful framework
+  # copy/import alone is not proof that the extension links the runtime.
+  # Keep the Apple SDK frameworks linked normally.
   settings['OTHER_LDFLAGS'] = [
-    '$(inherited)', '-framework', 'Libbox',
+    '$(inherited)', '-needed_framework', 'Libbox',
     '-framework', 'IOUSBHost',
     '-framework', 'SystemConfiguration',
     '-framework', 'IOKit'
