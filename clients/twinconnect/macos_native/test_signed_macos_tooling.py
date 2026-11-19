@@ -70,17 +70,17 @@ class SignedMacTestCandidate(unittest.TestCase):
 
     def test_signed_bundle_verifier_requires_real_static_libbox_symbols(self) -> None:
         exported = (
-            "000000010187e9c0 T _LibboxNewCommandServer\\n"
-            "0000000101881930 T _LibboxSetup\\n"
-            "0000000103e5d268 S _OBJC_CLASS_$_LibboxCommandServer\\n"
+            "000000010187e9c0 T _LibboxNewCommandServer\n"
+            "0000000101881930 T _LibboxSetup\n"
+            "0000000103e5d268 S _OBJC_CLASS_$_LibboxCommandServer\n"
         )
         self.assertTrue(VERIFIER.static_libbox_symbols_present(exported))
         self.assertFalse(VERIFIER.static_libbox_symbols_present(
-            "0000000101881930 T _LibboxSetup\\n"
+            "0000000101881930 T _LibboxSetup\n"
         ))
         self.assertFalse(VERIFIER.static_libbox_symbols_present(
-            "000000010187e9c0 T _LibboxNewCommandServerExtra\\n"
-            "0000000101881930 T _LibboxSetup\\n"
+            "000000010187e9c0 T _LibboxNewCommandServerExtra\n"
+            "0000000101881930 T _LibboxSetup\n"
         ))
         self.assertFalse(VERIFIER.static_libbox_symbols_present(
             "go.o: static archive (not a PacketTunnel linker symbol)"
