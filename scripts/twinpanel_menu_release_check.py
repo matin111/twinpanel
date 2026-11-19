@@ -11,8 +11,8 @@ from __future__ import annotations
 import json
 import os
 import re
+import subprocess
 import sys
-import urllib.request
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -24,7 +24,7 @@ LEGACY_RAW_MANIFEST = (
 )
 DEFAULT_VERSION_FILE = "/opt/twinpanel/current/VERSION"
 MAX_MANIFEST_BYTES = 131_072
-HTTP_TIMEOUT_SECONDS = 2.0
+HTTP_TIMEOUT_SECONDS = 2.5
 
 
 def version_key(value: str) -> tuple[int, int, int, int, int]:
@@ -52,16 +52,25 @@ def preferred_urls(configured: str) -> list[str]:
     return [configured]
 
 
-def fetch_manifest(url: str, opener=urllib.request.urlopen) -> dict:
+def fetch_manifest(url: str, runner=subprocess.run) -> dict:
     parsed = urlsplit(url)
     if parsed.scheme not in ("http", "https") or not parsed.netloc:
         raise ValueError("invalid release feed address")
-    req = urllib.request.Request(
-        url,
-        headers={"Accept": "application/json", "User-Agent": "TwinPanel-CLI/1"},
+    result = runner(
+        [
+            "curl", "--fail", "--silent", "--location", "--retry", "0",
+            "--proto", "=http,https", "--proto-redir", "=http,https",
+            "--connect-timeout", "1", "--max-time", str(HTTP_TIMEOUT_SECONDS),
+            "--max-filesize", str(MAX_MANIFEST_BYTES),
+            "--header", "Accept: application/json", url,
+        ],
+        capture_output=True,
+        timeout=HTTP_TIMEOUT_SECONDS + 1.0,
+        check=False,
     )
-    with opener(req, timeout=HTTP_TIMEOUT_SECONDS) as response:
-        raw = response.read(MAX_MANIFEST_BYTES + 1)
+    if result.returncode != 0:
+        raise OSError("release feed temporarily unreachable")
+    raw = result.stdout
     if len(raw) > MAX_MANIFEST_BYTES:
         raise ValueError("release feed is too large")
     data = json.loads(raw.decode("utf-8"))
@@ -72,13 +81,13 @@ def fetch_manifest(url: str, opener=urllib.request.urlopen) -> dict:
     return data
 
 
-def check_release(current: str, configured: str, opener=urllib.request.urlopen) -> tuple[str | None, str]:
+def check_release(current: str, configured: str, runner=subprocess.run) -> tuple[str | None, str]:
     for url in preferred_urls(configured.strip()):
         try:
-            data = fetch_manifest(url, opener=opener)
+            data = fetch_manifest(url, runner=runner)
             latest = str(data["version"]).strip()
             return latest, ("AVAILABLE" if version_key(latest) > version_key(current) else "up to date")
-        except (OSError, ValueError, UnicodeError, json.JSONDecodeError):
+        except (OSError, ValueError, UnicodeError, subprocess.SubprocessError):
             continue
     return None, "check unavailable"
 
