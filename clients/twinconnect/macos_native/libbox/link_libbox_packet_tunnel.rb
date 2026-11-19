@@ -25,20 +25,23 @@ raise 'Libbox module map missing' unless
   File.file?(File.join(framework, 'Modules/module.modulemap')) ||
   File.file?(File.join(framework, 'Versions/A/Modules/module.modulemap'))
 
-# Apple's runtime loader must resolve the framework inside PacketTunnel.appex,
-# not a machine-specific Xcode DerivedData path. Correct only the generated
-# local XCFramework binary, before Xcode copies/signs the extension bundle.
+# Go-generated Libbox binaries may contain Go object/string tables that
+# Apple's install_name_tool cannot safely rewrite. Never mutate a supplied
+# XCFramework in-place: installer reruns must be non-destructive.
+# Report its LC_ID_DYLIB for packaging diagnostics instead. An absolute
+# install name is not release-safe even when the unsigned build succeeds.
 framework_binary = File.join(framework, 'Versions/A/Libbox')
-abort('Libbox dynamic library missing') unless File.file?(framework_binary)
-portable_id = '@rpath/Libbox.framework/Versions/A/Libbox'
-existing_id_output = IO.popen(['xcrun', 'otool', '-D', framework_binary], &:read)
-abort('Unable to read Libbox dylib install name') unless $?.success?
-existing_id = existing_id_output.lines.map(&:strip).reject(&:empty?)[1]
-abort('Libbox is missing LC_ID_DYLIB') unless existing_id
-unless existing_id == portable_id
-  abort('Failed to set portable Libbox install name') unless
-    system('xcrun', 'install_name_tool', '-id', portable_id, framework_binary)
-  puts "Adjusted local Libbox install name: #{portable_id}"
+abort('Libbox binary missing') unless File.file?(framework_binary)
+id_output = IO.popen(['xcrun', 'otool', '-D', framework_binary], err: [:child, :out], &:read)
+abort("Could not inspect Libbox install name: #{id_output}") unless $?.success?
+install_name = id_output.lines.map(&:strip).reject(&:empty?)[1]
+abort('Libbox LC_ID_DYLIB missing') unless install_name
+portable_name = '@rpath/Libbox.framework/Versions/A/Libbox'
+if install_name != portable_name
+  warn "WARNING: Libbox install name is not portable: #{install_name}"
+  warn "WARNING: This is a compile-only candidate. Rebuild Libbox with a " \
+       "portable LC_ID_DYLIB before signed distribution; do not use " \
+       "install_name_tool on the Go-built binary."
 end
 
 project = Xcodeproj::Project.open(project_file)
@@ -107,9 +110,9 @@ target.build_configurations.each do |configuration|
   ]
   # libbox's native macOS Go/C implementation references IOKit USB Host
   # controls and SystemConfiguration proxy/dynamic store symbols.
-  # Force-link the concrete dylib rather than depending on framework name
-  # lookup or Swift's imported-symbol reachability. The binary's LC_ID_DYLIB
-  # is portable (@rpath), so the resulting LC_LOAD_DYLIB must also be portable.
+  # Ask ld to retain the concrete dylib even when Swift symbols are stripped.
+  # This is link diagnostics only: check the actual LC_LOAD_DYLIB with otool.
+  # An absolute LC_ID_DYLIB in the Go-built source still blocks distribution.
   settings['OTHER_LDFLAGS'] = [
     '$(inherited)', "-Wl,-needed_library,#{framework_binary}",
     '-framework', 'IOUSBHost',
@@ -118,4 +121,5 @@ target.build_configurations.each do |configuration|
   ]
 end
 project.save
-puts "Linked and embedded macOS arm64 Libbox runtime framework: #{framework}"
+puts "Prepared and embedded macOS Libbox candidate: #{framework}"
+puts 'Verify Xcode link and LC_LOAD_DYLIB with otool; live VPN remains unverified.'
