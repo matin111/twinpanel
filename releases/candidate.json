@@ -1,8 +1,8 @@
 {
-  "version": "1.1.5",
-  "source_sha": "17a1477023dcc2e897fc27d7e9aacc91a75299de",
+  "version": "1.1.6",
+  "source_sha": "42af0a22fba307c1915ef0a0b830199df891ea7c",
   "notes": {
-    "fa": "افزودن انتخاب یک یا چند پلن مجاز هنگام ساخت و ویرایش کد تخفیف، همراه جست‌وجو و انتخاب گروهی. نمایش پلن‌های مجاز در جدول؛ اعتبارسنجی شناسهٔ پلن در API و جلوگیری از اعمال کد روی پلن‌های خارج از محدوده. تمام امکانات و اصلاحات نسخه 1.1.4 حفظ شده‌اند.",
-    "en": "Select eligible plans for each discount code, with multi-select, search, bulk selection and edit support. Show plan eligibility in the admin list; reject invalid plan IDs and enforce the allowed-plan scope during redemption. All v1.1.4 features preserved."
+    "fa": "بهبود خطای ارتباط در صفحه کدهای تخفیف: نمایش پیام خطای واقعی در پنجره ساخت، حفظ همه فیلدها و پلن‌های انتخاب‌شده در صورت عدم اتصال، امکان تلاش مجدد دستی، تکرار امن دریافت فهرست‌ها و جلوگیری از نمایش آمار صفر گمراه‌کننده. تمام قابلیت‌های نسخه 1.1.5 محفوظ است.",
+    "en": "Improved discount-code network failure UX: errors appear inside the editor, all fields and selected plans remain intact after a failed request, manual retry is supported, read-only list fetches retry safely and failed lists no longer show misleading zero counts. All v1.1.5 functionality is preserved."
   }
 }
