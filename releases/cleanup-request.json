@@ -1,6 +1,1 @@
-{
-  "target": "v1.1.0",
-  "remove": "old-twinpanel-rc-releases-only",
-  "preserve": "all-twinconnect-releases",
-  "confirmed": true
-}
+{"target":"v1.1.0","remove":"old-twinpanel-rc-releases-only","preserve":"all-twinconnect-releases","confirmed":true}
