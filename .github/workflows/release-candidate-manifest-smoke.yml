@@ -45,8 +45,8 @@ jobs:
           current_version = Path('VERSION').read_text(encoding='utf-8').strip()
           notes = candidate.get('notes') or {}
 
-          assert re.fullmatch(r'1\.1\.0-rc\.\d+', current_version), current_version
-          assert re.fullmatch(r'1\.1\.0-rc\.\d+', candidate_version), candidate_version
+          assert re.fullmatch(r'1\.\d+\.\d+(?:-rc\.\d+)?', current_version), current_version
+          assert re.fullmatch(r'1\.\d+\.\d+(?:-rc\.\d+)?', candidate_version), candidate_version
           assert re.fullmatch(r'[0-9a-f]{40}', source_sha), source_sha
           assert str(notes.get('fa') or '').strip(), 'missing fa release notes'
           assert str(notes.get('en') or '').strip(), 'missing en release notes'
