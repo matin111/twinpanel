@@ -553,14 +553,44 @@ def _platform_keyboard(
     )
 
 
+# Only useful, platform-relevant apps appear on the primary screen.
+# Specialized alternatives stay accessible without forcing a button per
+# protocol. Never suggest desktop-incompatible applications.
+_PRIMARY_APP_TITLES = {
+    "android": ("TwinConnect", "Karing", "Hiddify", "OpenVPN Connect", "WireGuard", "OpenConnect", "AmneziaWG"),
+    "ios": ("Karing", "Hiddify", "OpenVPN Connect", "WireGuard", "Cisco Secure Client", "AmneziaWG"),
+    "windows": ("TwinConnect", "Hiddify", "v2rayN", "OpenVPN Connect", "WireGuard", "OpenConnect", "AmneziaWG"),
+    "macos": ("Karing", "Hiddify", "OpenVPN Connect", "WireGuard", "OpenConnect", "AmneziaWG"),
+    "linux": ("Hiddify", "OpenVPN", "WireGuard", "OpenConnect", "AmneziaWG"),
+}
+_UNSUPPORTED_APP_TITLES = {
+    "android": {"Surge (فقط iOS / macOS)"},
+    "windows": {"Surge (فقط iOS / macOS)"},
+    "linux": {"Surge (فقط iOS / macOS)", "v2rayN"},
+}
+
+def _visible_apps(os_key: str, *, more: bool = False) -> list[dict]:
+    available = [
+        item for item in APPS.get(os_key, [])
+        if item["title"] not in _UNSUPPORTED_APP_TITLES.get(os_key, set())
+        and item["title"] != "کلاینت اختصاصی"
+    ]
+    primary = _PRIMARY_APP_TITLES.get(os_key, ())
+    if more:
+        return [item for item in available if item["title"] not in primary]
+    return [next(item for item in available if item["title"] == title)
+            for title in primary if any(item["title"] == title for item in available)]
+
 def _apps_keyboard(
     prefix: str,
     mode: str,
     os_key: str,
+    *,
+    more: bool = False,
 ) -> InlineKeyboardMarkup:
     rows = []
 
-    for item in APPS.get(os_key, []):
+    for item in _visible_apps(os_key, more=more):
         rows.append([
             InlineKeyboardButton(
                 text=(
@@ -572,6 +602,21 @@ def _apps_keyboard(
                     f"{os_key}:{item['key']}"
                 ),
                 **({"style": "danger"} if item["title"] == "TwinConnect" else {}),
+            )
+        ])
+
+    if not more and _visible_apps(os_key, more=True):
+        rows.append([
+            InlineKeyboardButton(
+                text="📂 سایر برنامه‌ها",
+                callback_data=f"{prefix}:{mode}:more:{os_key}",
+            )
+        ])
+    if more:
+        rows.append([
+            InlineKeyboardButton(
+                text="↩️ برنامه‌های اصلی",
+                callback_data=f"{prefix}:{mode}:os:{os_key}",
             )
         ])
 
@@ -884,6 +929,18 @@ def register_learning_handlers(
                     mode,
                     os_key,
                 ),
+            )
+            return
+
+        if action == "more" and len(parts) == 4:
+            os_key = parts[3]
+            if os_key not in PLATFORMS:
+                await callback.message.answer("سیستم‌عامل پیدا نشد.")
+                return
+            await callback.message.answer(
+                "📂 <b>سایر برنامه‌های " + PLATFORMS[os_key] + "</b>\\n\\n"
+                "فقط در صورت نیاز به برنامه تخصصی از این فهرست استفاده کنید.",
+                reply_markup=_apps_keyboard(prefix, mode, os_key, more=True),
             )
             return
 
