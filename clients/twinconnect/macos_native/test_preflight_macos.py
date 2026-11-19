@@ -42,8 +42,18 @@ class PreflightTests(unittest.TestCase):
              mock.patch.object(preflight, "xcode_status", return_value=(True, "Xcode 16.2")), \
              mock.patch.object(preflight, "signing_status", return_value=(True, "one identity")):
             result = preflight.check_host()
-        self.assertFalse(result["gui_ready"])
+        self.assertIsNone(result["gui_ready"])
+        self.assertFalse(result["metal_api_ready"])
         self.assertTrue(result["signed_vpn_build_ready"])
+
+    def test_metal_available_does_not_imply_flutter_gui_ready(self):
+        with mock.patch.object(preflight.platform, "system", return_value="Darwin"), \
+             mock.patch.object(preflight, "metal_available", return_value=(True, "device and queue")), \
+             mock.patch.object(preflight, "xcode_status", return_value=(False, "Xcode 15.4")), \
+             mock.patch.object(preflight, "signing_status", return_value=(False, "no identity")):
+            result = preflight.check_host()
+        self.assertTrue(result["metal_api_ready"])
+        self.assertIsNone(result["gui_ready"])
 
     def test_non_macos_host_safe(self):
         with mock.patch.object(preflight.platform, "system", return_value="Linux"):
