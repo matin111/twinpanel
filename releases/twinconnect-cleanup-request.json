@@ -1,9 +1,0 @@
-{
-  "keep": [
-    "twinconnect-android-v1.0.0",
-    "twinconnect-windows-v0.1.0-beta.1"
-  ],
-  "remove": "all-other-twinconnect-releases-only",
-  "preserve_git_tags": true,
-  "confirmed": true
-}
