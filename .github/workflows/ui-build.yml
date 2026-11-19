@@ -40,3 +40,8 @@ jobs:
 
       - name: Compile backend Python
         run: python -m compileall -q backend/app
+
+      - name: Validate fast terminal menu and Web slot handling
+        run: |
+          bash -n scripts/twinpanel-menu.sh
+          python3 -m unittest discover -s tests -p 'test_twinpanel_menu_release_check.py'

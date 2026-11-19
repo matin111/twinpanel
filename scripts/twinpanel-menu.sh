@@ -57,6 +57,24 @@ unit_state(){
   systemctl is-active "$unit" 2>/dev/null || true
 }
 
+# Modern releases run Web in one of the pinned blue/green slot services.
+# Pick the active slot first; old installations still use twinpanel-web.
+web_unit(){
+  local slot unit
+  slot="twinpanel-web-slot@${WEB_PORT:-3000}.service"
+  for unit in "$slot" "twinpanel-web-slot@3000.service" "twinpanel-web-slot@3001.service" "twinpanel-web.service"; do
+    if [[ "$(unit_state "$unit")" == "active" ]]; then
+      printf '%s' "$unit"
+      return
+    fi
+  done
+  if unit_exists "$slot"; then
+    printf '%s' "$slot"
+  else
+    printf '%s' 'twinpanel-web.service'
+  fi
+}
+
 state_badge(){
   local state="$1"
   case "$state" in
@@ -114,7 +132,7 @@ header(){
   [[ -t 1 ]] && clear 2>/dev/null || true
   version="$(version_value)"
   api_state="$(unit_state twinpanel-api.service)"
-  web_state="$(unit_state twinpanel-web.service)"
+  web_state="$(unit_state "$(web_unit)")"
 
   brand
   printf '  %b[TWINPANEL]%b  %bSelf-Hosted VPN Control Plane%b\n\n' \
@@ -241,7 +259,7 @@ show_unit(){
 
 show_service_table(){
   show_unit twinpanel-api.service
-  show_unit twinpanel-web.service
+  show_unit "$(web_unit)"
   show_unit twinpanel-updater.service
   show_unit twinpanel-backup.timer
   show_unit twinpanel-reseller-bots.service
@@ -281,7 +299,7 @@ restart_nginx(){
 restart_panel_now(){
   echo
   restart_unit twinpanel-api.service || true
-  restart_unit twinpanel-web.service || true
+  restart_unit "$(web_unit)" || true
   restart_nginx || true
 }
 
@@ -317,7 +335,7 @@ status_menu(){
   echo
   printf '  %bCore services%b\n' "$C_CYAN" "$C_RESET"
   show_unit twinpanel-api.service
-  show_unit twinpanel-web.service
+  show_unit "$(web_unit)"
   show_unit nginx.service
   show_unit postgresql.service
   show_unit redis-server.service
@@ -349,7 +367,7 @@ services_menu(){
     case "$CHOICE" in
       1) restart_panel_now; pause ;;
       2) restart_unit twinpanel-api.service || true; pause ;;
-      3) restart_unit twinpanel-web.service || true; pause ;;
+      3) restart_unit "$(web_unit)" || true; pause ;;
       4) restart_nginx || true; pause ;;
       5) echo; show_service_table; pause ;;
       0) return ;;
@@ -462,7 +480,23 @@ protocol_menu(){
 }
 
 update_summary(){
-  run_backend -c 'from app.system_release import release_status; s=release_status(refresh_license_state=False); print("  Current :",s.get("current_version") or "unknown"); print("  Latest  :",s.get("latest_version") or "unknown"); print("  Update  :","AVAILABLE" if s.get("update_available") else "up to date"); e=s.get("manifest_error"); print("  Error   :",e) if e else None' || true
+  # The full app package initializes VPN runtime patches during import.
+  # Use a bounded standalone, read-only manifest check for the terminal menu.
+  # Actual update requests continue through app.system_release.
+  local probe="$ROOT/scripts/twinpanel_menu_release_check.py"
+  if [[ ! -r "$probe" ]]; then
+    echo "  Update  : release checker is not installed"
+    return
+  fi
+  (
+    set -a
+    if [[ -r "$BACKEND_ENV" ]]; then
+      # shellcheck disable=SC1090
+      source "$BACKEND_ENV"
+    fi
+    set +a
+    "$PY" "$probe" "$ROOT/VERSION"
+  ) || echo "  Update  : release check unavailable"
 }
 
 update_state_summary(){
@@ -614,7 +648,7 @@ logs_menu(){
     pick || return
     case "$CHOICE" in
       1) journal_unit twinpanel-api.service; pause ;;
-      2) journal_unit twinpanel-web.service; pause ;;
+      2) journal_unit "$(web_unit)"; pause ;;
       3) journal_unit twinpanel-updater.service; pause ;;
       4) journal_unit twinpanel-backup.service; pause ;;
       5) journal_unit twinpanel-reseller-bots.service; pause ;;
@@ -693,4 +727,5 @@ main_menu(){
   done
 }
 
+runtime_ports
 main_menu
