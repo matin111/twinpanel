@@ -61,6 +61,7 @@ MAX_TEMPLATE_COUNT = 32
 MAX_TEMPLATE_FIELDS = 256
 MAX_TEMPLATE_DEPTH = 5
 MAX_TEMPLATE_STRING = 5000
+MAX_NOVA_BLOG_BODY = 30000  # Only the article body may exceed normal settings bounds.
 MAX_TEMPLATE_LIST = 96
 _DROP = object()
 
@@ -118,7 +119,7 @@ def _normalize(raw: Any) -> dict[str, Any]:
     return result
 
 
-def _clean_template_value(value: Any, depth: int = 0) -> Any:
+def _clean_template_value(value: Any, depth: int = 0, context: str = "") -> Any:
     if depth > MAX_TEMPLATE_DEPTH:
         return _DROP
     if value is None:
@@ -130,11 +131,11 @@ def _clean_template_value(value: Any, depth: int = 0) -> Any:
     if isinstance(value, float):
         return value if math.isfinite(value) else _DROP
     if isinstance(value, str):
-        return value[:MAX_TEMPLATE_STRING]
+        return value[:MAX_NOVA_BLOG_BODY if context == "nova_blog_body" else MAX_TEMPLATE_STRING]
     if isinstance(value, list):
         result: list[Any] = []
         for item in value[:MAX_TEMPLATE_LIST]:
-            cleaned = _clean_template_value(item, depth + 1)
+            cleaned = _clean_template_value(item, depth + 1, "nova_blog_entry" if context == "nova_articles" else "")
             if cleaned is not _DROP:
                 result.append(cleaned)
         return result
@@ -144,7 +145,8 @@ def _clean_template_value(value: Any, depth: int = 0) -> Any:
             key = str(raw_key)
             if not OPTION_KEY_RE.fullmatch(key):
                 continue
-            cleaned = _clean_template_value(raw_value, depth + 1)
+            child_context = "nova_blog_body" if context == "nova_blog_entry" and key == "body" else "nova_articles" if key == "nova_articles" else ""
+            cleaned = _clean_template_value(raw_value, depth + 1, child_context)
             if cleaned is not _DROP:
                 result[key] = cleaned
         return result

@@ -1,0 +1,30 @@
+.frame{--be-border:rgba(129,146,190,.32);--be-surface:rgba(91,103,150,.07);--be-text:inherit;border:1px solid var(--be-border);border-radius:17px;overflow:hidden;min-width:0;background:var(--blog-panel,#17213b);color:var(--blog-title,#f3f3ff);font-size:14px;box-shadow:0 12px 28px rgba(8,12,35,.08)}
+.topline{display:flex;justify-content:space-between;gap:14px;align-items:center;flex-wrap:wrap;padding:14px 17px;background:linear-gradient(110deg,rgba(116,83,245,.16),rgba(32,168,212,.07));border-bottom:1px solid var(--be-border)}
+.topline>div:first-child{display:flex;flex-wrap:wrap;align-items:center;gap:12px}.topline strong{font-size:16px}.topline span{font-size:12px;color:var(--blog-muted,#aab7d4)}
+.viewTabs{display:flex;align-items:center;gap:4px;border:1px solid var(--be-border);border-radius:11px;padding:4px;background:var(--be-surface)}
+.viewTabs button{border:0;border-radius:8px;background:transparent;color:inherit;padding:7px 10px;cursor:pointer;font:inherit;font-size:12px;font-weight:700}
+.viewTabs button[aria-pressed=true]{background:#6951d8;color:#fff;box-shadow:0 3px 10px #6b55e44d}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:12px 14px;background:var(--blog-toolbar,#151c34);border-bottom:1px solid var(--be-border)}
+.group{display:flex;gap:4px;flex-wrap:wrap;align-items:center;padding-inline-end:9px;border-inline-end:1px solid var(--be-border)}.group:last-child{border:0;padding:0}
+.group button,.group select{width:auto;min-width:34px;min-height:35px;max-width:100%;padding:5px 9px;border:1px solid transparent;border-radius:8px;background:transparent;color:var(--blog-title,#f0f0ff);font-size:12px;cursor:pointer;font-family:inherit}
+.group button:hover,.group select:hover{background:rgba(127,117,228,.17);border-color:rgba(127,117,228,.35)}
+.group button:focus-visible,.group select:focus-visible,.viewTabs button:focus-visible{outline:2px solid #9183ff}
+.group select{border-color:var(--be-border);background:var(--blog-field,#0b1227);color:var(--blog-field-text,#fff);min-width:97px}
+.group button:disabled,.group select:disabled{opacity:.55;cursor:wait}
+.popup{display:flex;flex-wrap:wrap;align-items:end;gap:9px;padding:12px 15px;background:rgba(116,86,218,.10);border-bottom:1px solid var(--be-border)}
+.popup label{flex:1 1 180px;display:flex;flex-direction:column;gap:5px;font-size:12px}
+.popup input{background:var(--blog-field,#0b1227);color:var(--blog-field-text,#fff);border:1px solid var(--be-border);border-radius:8px;padding:8px 10px;min-width:0;width:100%}
+.popup button{padding:9px 12px;border-radius:9px;border:1px solid #8b7df0;background:rgba(109,80,199,.18);color:inherit;cursor:pointer}
+.error{color:#f15b7d;padding:9px 15px;font-size:12px}
+.workarea{display:grid;grid-template-columns:minmax(0,1fr);min-height:440px;max-width:100%;background:var(--blog-panel,#17213b)}
+.split{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+.editArea,.previewArea{padding:15px;min-width:0;overflow:auto}.editArea{border-inline-end:1px solid var(--be-border);display:flex;flex-direction:column;gap:9px}
+.editArea>label{display:block!important;font-size:12px;font-weight:800;color:var(--blog-muted,#aac)}
+.editArea textarea{display:block;width:100%;resize:vertical;min-width:0;min-height:385px;flex:1;border:1px solid var(--be-border);background:var(--blog-field,#10172b);color:var(--blog-field-text,#fff);padding:16px;border-radius:11px;font-size:15px;line-height:2.1;white-space:pre-wrap;direction:rtl;tab-size:2}
+.editArea textarea:focus{outline:2px solid #8e79ff;outline-offset:1px}
+.help{color:var(--blog-muted,#b1c1d9);font-size:11px;line-height:1.8}
+.previewArea{min-height:385px;max-height:800px;overflow-y:auto;overflow-wrap:anywhere;background:var(--blog-preview,#111c32);padding:18px 22px}
+.previewHeader{font-size:11px;font-weight:800;letter-spacing:.15px;color:var(--blog-muted,#b2bad1);padding-bottom:14px;margin-bottom:16px;border-bottom:1px solid var(--be-border)}
+.empty{opacity:.6;line-height:2.1}.footer{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:11px 17px;font-size:12px;color:var(--blog-muted,#b1bed4);border-top:1px solid var(--be-border);background:var(--be-surface)}
+@media(max-width:1100px){.split{grid-template-columns:minmax(0,1fr)}.split .editArea{border-inline-end:0;border-bottom:1px solid var(--be-border)}.split .previewArea{max-height:450px}}
+@media(max-width:700px){.topline{padding:11px}.toolbar{padding:9px}.group{padding-inline-end:5px}.previewArea,.editArea{padding:12px}.viewTabs button{padding:7px 6px}.footer{font-size:11px}}

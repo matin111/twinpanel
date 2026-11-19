@@ -22,7 +22,7 @@ export const NOVA_ARTICLES:NovaArticle[]=[
 export function novaArticle(slug:string){return NOVA_ARTICLES.find(article=>article.slug===slug)||null;}
 
 /** Articles saved by the Nova blog editor in storefront template settings.
- * The editor stores text, not HTML; everything is rendered as React text. */
+ * The editor stores safe, structured text markup rather than HTML. */
 export type NovaBlogEntry={
  coverImage?:string;
  slug:string;
@@ -65,7 +65,7 @@ export function cleanNovaBlogEntries(value:unknown):NovaBlogEntry[]{
   seen.add(slug);
   output.push({
     slug,title:title.slice(0,180),description:description.slice(0,400),coverImage,
-    body:body.slice(0,5000),
+    body:body.slice(0,30000),
     updated:/^\d{4}-\d{2}-\d{2}$/.test(String(entry.updated||""))?String(entry.updated):"2026-11-05",
     published:entry.published===true,
   });

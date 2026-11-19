@@ -499,6 +499,13 @@ jobs:
         with:
           node-version: '22.13.0'
 
+      - name: Verify safe rich blog editor and storage compatibility
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          node source/tests/test_nova_blog_rich_text.mjs
+          python3 source/backend/tests/test_nova_blog_format_storage_contract.py -v
+
       - name: Install frontend dependencies
         working-directory: source
         shell: bash

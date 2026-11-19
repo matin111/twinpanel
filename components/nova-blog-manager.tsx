@@ -4,6 +4,8 @@ import {useEffect,useRef,useState} from "react";
 import {Shell} from "./ui";
 import {NOVA_ARTICLES,novaEditableEntries,novaBlogImageMarker,parseNovaBlogImageMarker,safeNovaBlogImage,type NovaBlogEntry} from "../lib/nova-articles";
 import {loadAdminStoreTemplateSettings,saveNovaBlogArticles,uploadStoreTemplateMedia} from "../lib/store-template-settings-api";
+import {NOVA_BLOG_BODY_LIMIT} from "../lib/nova-blog-rich-text";
+import {NovaBlogFormatEditor} from "./nova-blog-format-editor";
 import styles from "./nova-blog-manager.module.css";
 
 const TEMPLATE="nova-multipage-2027";
@@ -78,7 +80,7 @@ export function NovaBlogManager(){
   const body=current.body.trim();
   if(uploading){setError("آپلود تصویر هنوز تمام نشده است.");return;}
   if(!slug||!title||!body){setError("عنوان، شناسه لاتین مقاله و متن مقاله الزامی هستند.");return;}
-  if(body.length>5000){setError("متن هر مقاله حداکثر ۵۰۰۰ کاراکتر است.");return;}
+  if(body.length>NOVA_BLOG_BODY_LIMIT){setError("متن هر مقاله حداکثر ۳۰ هزار کاراکتر است.");return;}
   if(entries.some(x=>x.slug===slug&&x.slug!==originalSlug)){setError("این شناسه مقاله قبلاً استفاده شده است.");return;}
   const updated={...current,slug,title,body,description:current.description.trim(),updated:new Date().toISOString().slice(0,10)};
   const next=entries.filter(x=>x.slug!==originalSlug).concat(updated);
@@ -115,9 +117,9 @@ export function NovaBlogManager(){
       <input ref={coverInputRef} aria-label="بارگذاری تصویر شاخص" type="file" accept="image/jpeg,image/png,image/webp" className={styles.hiddenFile} onChange={e=>{const file=e.currentTarget.files?.[0];e.currentTarget.value="";void uploadImage(file,"cover");}}/>
     </div>
     {safeNovaBlogImage(current.coverImage)&&<div className={styles.coverPreview}><img src={current.coverImage} alt="تصویر شاخص مقاله" loading="lazy"/><button type="button" onClick={()=>setCurrent(x=>({...x,coverImage:""}))}>حذف تصویر شاخص</button></div>}
-    <label>متن مقاله<textarea ref={bodyRef} rows={15} maxLength={5000} value={current.body} onChange={e=>setCurrent(x=>({...x,body:e.target.value}))} placeholder="متن مقاله را بنویسید؛ نشانگر را در محل موردنظر قرار دهید و دکمه افزودن عکس داخل متن را بزنید."/></label>
+    <NovaBlogFormatEditor body={current.body} onChange={body=>setCurrent(x=>({...x,body}))} textareaRef={bodyRef} disabled={busy||uploading!==null}/>
     {current.body.split(/\n\s*\n/).map((block,index)=>({index,image:parseNovaBlogImageMarker(block)})).filter(x=>x.image).length>0&&<div className={styles.inlinePreview}><b>تصاویر داخل این مقاله</b>{current.body.split(/\n\s*\n/).map((block,index)=>({index,image:parseNovaBlogImageMarker(block)})).filter(x=>x.image).map(x=><img key={x.index} src={x.image!.src} alt={x.image!.alt} loading="lazy" title={x.image!.alt}/>)}</div>}
-    <div className={styles.caption}>متن امن و عکس‌های بارگذاری‌شده (بدون HTML) · {current.body.length.toLocaleString("fa-IR")} از ۵۰۰۰ کاراکتر</div>
+    <div className={styles.caption}>پشتیبانی از اندازه و رنگ متن، تیتر، لینک امن، لنگر داخلی، جدول، فهرست، چیدمان و تصویر؛ پیش‌نمایش بدون اجرای HTML.</div>
     <label className={styles.publish}><input type="checkbox" checked={current.published} onChange={e=>setCurrent(x=>({...x,published:e.target.checked}))}/> انتشار در سایت (در صورت خاموش بودن، پیش‌نویس باقی می‌ماند)</label>
     <div className={styles.actions}><button type="button" className="primary" disabled={busy||loading||uploading!==null} onClick={()=>void save()}>{busy?"در حال ذخیره…":"ذخیره مقاله"}</button>
     {originalSlug&&<button type="button" className="ghost" disabled={busy} onClick={()=>void remove()}>حذف مقاله</button>}
