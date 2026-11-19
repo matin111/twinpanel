@@ -4,6 +4,8 @@
 # parent folder to -F does not make its embedded Swift/Clang module visible.
 require 'xcodeproj'
 require 'xcodeproj/plist'
+require 'open3'
+require 'tmpdir'
 root = File.expand_path('../..', __dir__)
 project_file = File.join(root, 'macos/Runner.xcodeproj')
 xcframework = File.join(root, 'macos_native/build/libbox/Libbox.xcframework')
@@ -25,24 +27,30 @@ raise 'Libbox module map missing' unless
   File.file?(File.join(framework, 'Modules/module.modulemap')) ||
   File.file?(File.join(framework, 'Versions/A/Modules/module.modulemap'))
 
-# Go-generated Libbox binaries may contain Go object/string tables that
-# Apple's install_name_tool cannot safely rewrite. Never mutate a supplied
-# XCFramework in-place: installer reruns must be non-destructive.
-# Report its LC_ID_DYLIB for packaging diagnostics instead. An absolute
-# install name is not release-safe even when the unsigned build succeeds.
+# The upstream sing-box gomobile Apple binding is a *static* framework:
+# its framework executable contains a fat ar archive (with go.o members).
+# A static library has no LC_ID_DYLIB and never appears in otool -L on
+# PacketTunnel. Inspect an architecture-thinned slice instead of misreading
+# otool -D output from archive members as a dynamic install name.
 framework_binary = File.join(framework, 'Versions/A/Libbox')
-abort('Libbox binary missing') unless File.file?(framework_binary)
-id_output = IO.popen(['xcrun', 'otool', '-D', framework_binary], err: [:child, :out], &:read)
-abort("Could not inspect Libbox install name: #{id_output}") unless $?.success?
-install_name = id_output.lines.map(&:strip).reject(&:empty?)[1]
-abort('Libbox LC_ID_DYLIB missing') unless install_name
-portable_name = '@rpath/Libbox.framework/Versions/A/Libbox'
-if install_name != portable_name
-  warn "WARNING: Libbox install name is not portable: #{install_name}"
-  warn "WARNING: This is a compile-only candidate. Rebuild Libbox with a " \
-       "portable LC_ID_DYLIB before signed distribution; do not use " \
-       "install_name_tool on the Go-built binary."
+raise 'Libbox static framework binary missing' unless File.file?(framework_binary)
+arch_output, arch_status = Open3.capture2('xcrun', 'lipo', '-archs', framework_binary)
+raise 'Unable to inspect Libbox CPU architectures' unless arch_status.success?
+archs = arch_output.split
+host_arch = `uname -m`.strip
+raise "Libbox missing host architecture #{host_arch}: #{archs.join(', ')}" unless
+  archs.include?(host_arch)
+Dir.mktmpdir('twinconnect-libbox-inspect') do |dir|
+  thin = File.join(dir, 'libbox-arch.a')
+  raise 'Cannot inspect Libbox architecture slice' unless
+    system('xcrun', 'lipo', '-thin', host_arch,
+           framework_binary, '-output', thin)
+  members, ar_status = Open3.capture2('xcrun', 'ar', '-t', thin)
+  unless ar_status.success? && members.lines.any? { |name| name.strip == 'go.o' }
+    raise 'Libbox is not the expected Go static archive; refusing dynamic-link assumptions'
+  end
 end
+puts "Verified static Libbox framework (#{archs.join(', ')}; go.o archive)"
 
 project = Xcodeproj::Project.open(project_file)
 target = project.targets.find { |t| t.name == 'PacketTunnel' }
@@ -50,9 +58,10 @@ raise 'PacketTunnel extension missing' unless target
 group = project.main_group.find_subpath('TwinConnect Native Libbox', true)
 group.set_source_tree('<group>')
 
-# Re-running the installer must not create multiple build tasks that copy
-# Libbox.framework to the same PacketTunnel.app extension destination.
-# Remove only installer-owned Libbox entries, preserving other dependencies.
+# Remove previous installer-owned link/copy entries. This is a static
+# framework: it belongs in Link Binary With Libraries, NOT in
+# PacketTunnel.appex/Contents/Frameworks. Embedding it duplicates the
+# entire Go runtime and does not create a dynamic load command.
 libbox_entry = lambda do |build_file|
   reference = build_file.file_ref
   reference && (reference.path.to_s.end_with?('/Libbox.framework') ||
@@ -60,16 +69,9 @@ libbox_entry = lambda do |build_file|
 end
 
 target.frameworks_build_phase.files.select(&libbox_entry).each(&:remove_from_project)
-embed_phases = target.copy_files_build_phases.select do |phase|
+target.copy_files_build_phases.select do |phase|
   phase.name == 'Embed Libbox Runtime'
-end
-embed_phases.each do |phase|
-  phase.files.select(&libbox_entry).each(&:remove_from_project)
-end
-embed = embed_phases.shift || target.new_copy_files_build_phase('Embed Libbox Runtime')
-embed_phases.each(&:remove_from_project)
-embed.dst_subfolder_spec = '10' # Frameworks
-embed.dst_path = ''
+end.each(&:remove_from_project)
 
 ref = group.files.find { |entry| entry.path == framework }
 unless ref
@@ -78,8 +80,6 @@ unless ref
 end
 ref.last_known_file_type = 'wrapper.framework'
 target.frameworks_build_phase.add_file_reference(ref)
-embedded = embed.add_file_reference(ref)
-embedded.settings = { 'ATTRIBUTES' => ['CodeSignOnCopy', 'RemoveHeadersOnCopy'] }
 
 probe_path = File.join(root, 'macos_native/libbox/LibboxLinkProbe.swift')
 # Some generated Xcode projects store the reference as a relative path,
@@ -108,18 +108,18 @@ target.build_configurations.each do |configuration|
   settings['LD_RUNPATH_SEARCH_PATHS'] = [
     '$(inherited)', '@executable_path/../Frameworks'
   ]
-  # libbox's native macOS Go/C implementation references IOKit USB Host
-  # controls and SystemConfiguration proxy/dynamic store symbols.
-  # Ask ld to retain the concrete dylib even when Swift symbols are stripped.
-  # This is link diagnostics only: check the actual LC_LOAD_DYLIB with otool.
-  # An absolute LC_ID_DYLIB in the Go-built source still blocks distribution.
+  # The Go binding is a static archive. Linking the framework resolves
+  # ObjC/Go symbols into PacketTunnel itself (no otool -L entry). Do not
+  # use -needed_library, -needed_framework, or install_name_tool here.
+  # Its macOS code also needs these Apple SDK frameworks.
   settings['OTHER_LDFLAGS'] = [
-    '$(inherited)', "-Wl,-needed_library,#{framework_binary}",
+    '$(inherited)', '-framework', 'Libbox',
     '-framework', 'IOUSBHost',
     '-framework', 'SystemConfiguration',
     '-framework', 'IOKit'
   ]
 end
 project.save
-puts "Prepared and embedded macOS Libbox candidate: #{framework}"
-puts 'Verify Xcode link and LC_LOAD_DYLIB with otool; live VPN remains unverified.'
+puts "Linked static macOS Libbox into PacketTunnel target: #{framework}"
+puts 'Static library: verify ObjC/Go symbols with nm, not otool -L.'
+puts 'Unsigned compile is NOT a verified live VPN.'
