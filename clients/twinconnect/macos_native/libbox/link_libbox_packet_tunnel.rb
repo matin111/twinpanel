@@ -63,14 +63,22 @@ embedded = embed.add_file_reference(ref)
 embedded.settings = { 'ATTRIBUTES' => ['CodeSignOnCopy', 'RemoveHeadersOnCopy'] }
 
 probe_path = File.join(root, 'macos_native/libbox/LibboxLinkProbe.swift')
+# Some generated Xcode projects store the reference as a relative path,
+# and older installer runs may have created multiple references to this file.
+# Match the leaf name (only inside PacketTunnel's Compile Sources phase) so
+# a rerun removes every duplicate build file, regardless of reference style.
 target.source_build_phase.files.select do |build_file|
-  build_file.file_ref && build_file.file_ref.path == probe_path
+  reference = build_file.file_ref
+  reference && File.basename(reference.path.to_s) == 'LibboxLinkProbe.swift'
 end.each(&:remove_from_project)
-probe = group.files.find { |entry| entry.path == probe_path }
+probe = group.files.find do |entry|
+  File.basename(entry.path.to_s) == 'LibboxLinkProbe.swift'
+end
 unless probe
   probe = group.new_file(probe_path)
-  probe.source_tree = '<absolute>'
 end
+probe.source_tree = '<absolute>'
+probe.path = probe_path
 target.source_build_phase.add_file_reference(probe)
 
 target.build_configurations.each do |configuration|
@@ -83,12 +91,12 @@ target.build_configurations.each do |configuration|
   ]
   # libbox's native macOS Go/C implementation references IOKit USB Host
   # controls and SystemConfiguration proxy/dynamic store symbols.
-  # Force a load command for Libbox even when Swift link-time optimizations
+  # Pass ld's -needed_framework through clang using -Wl; clang itself\n  # rejects -needed_framework as an unknown driver argument.\n  # Force a load command for Libbox even when Swift link-time optimizations
   # or -dead_strip_dylibs see no imported symbols. A successful framework
   # copy/import alone is not proof that the extension links the runtime.
   # Keep the Apple SDK frameworks linked normally.
   settings['OTHER_LDFLAGS'] = [
-    '$(inherited)', '-needed_framework', 'Libbox',
+    '$(inherited)', '-Wl,-needed_framework,Libbox',
     '-framework', 'IOUSBHost',
     '-framework', 'SystemConfiguration',
     '-framework', 'IOKit'
