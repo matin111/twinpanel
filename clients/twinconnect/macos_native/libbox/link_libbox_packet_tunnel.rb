@@ -30,17 +30,49 @@ target = project.targets.find { |t| t.name == 'PacketTunnel' }
 raise 'PacketTunnel extension missing' unless target
 group = project.main_group.find_subpath('TwinConnect Native Libbox', true)
 group.set_source_tree('<group>')
-ref = group.new_file(framework)
-ref.source_tree = '<absolute>'
-ref.last_known_file_type = 'wrapper.framework'
-target.frameworks_build_phase.add_file_reference(ref)
-# A successful Swift import is not enough for a dynamic framework: it must
-# also travel inside PacketTunnel.appex/Contents/Frameworks at runtime.
-embed = target.new_copy_files_build_phase('Embed Libbox Runtime')
+
+# Re-running the installer must not create multiple build tasks that copy
+# Libbox.framework to the same PacketTunnel.app extension destination.
+# Remove only installer-owned Libbox entries, preserving other dependencies.
+libbox_entry = lambda do |build_file|
+  reference = build_file.file_ref
+  reference && (reference.path.to_s.end_with?('/Libbox.framework') ||
+    reference.path.to_s == 'Libbox.framework')
+end
+
+target.frameworks_build_phase.files.select(&libbox_entry).each(&:remove_from_project)
+embed_phases = target.copy_files_build_phases.select do |phase|
+  phase.name == 'Embed Libbox Runtime'
+end
+embed_phases.each do |phase|
+  phase.files.select(&libbox_entry).each(&:remove_from_project)
+end
+embed = embed_phases.shift || target.new_copy_files_build_phase('Embed Libbox Runtime')
+embed_phases.each(&:remove_from_project)
 embed.dst_subfolder_spec = '10' # Frameworks
 embed.dst_path = ''
+
+ref = group.files.find { |entry| entry.path == framework }
+unless ref
+  ref = group.new_file(framework)
+  ref.source_tree = '<absolute>'
+end
+ref.last_known_file_type = 'wrapper.framework'
+target.frameworks_build_phase.add_file_reference(ref)
 embedded = embed.add_file_reference(ref)
 embedded.settings = { 'ATTRIBUTES' => ['CodeSignOnCopy', 'RemoveHeadersOnCopy'] }
+
+probe_path = File.join(root, 'macos_native/libbox/LibboxLinkProbe.swift')
+target.source_build_phase.files.select do |build_file|
+  build_file.file_ref && build_file.file_ref.path == probe_path
+end.each(&:remove_from_project)
+probe = group.files.find { |entry| entry.path == probe_path }
+unless probe
+  probe = group.new_file(probe_path)
+  probe.source_tree = '<absolute>'
+end
+target.source_build_phase.add_file_reference(probe)
+
 target.build_configurations.each do |configuration|
   settings = configuration.build_settings
   settings['MACOSX_DEPLOYMENT_TARGET'] = '13.0'
@@ -59,8 +91,5 @@ target.build_configurations.each do |configuration|
     '-framework', 'IOKit'
   ]
 end
-probe = group.new_file(File.join(root, 'macos_native/libbox/LibboxLinkProbe.swift'))
-probe.source_tree = '<absolute>'
-target.source_build_phase.add_file_reference(probe)
 project.save
 puts "Linked and embedded macOS arm64 Libbox runtime framework: #{framework}"
