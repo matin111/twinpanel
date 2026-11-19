@@ -1,0 +1,48 @@
+name: Prune Obsolete TwinPanel Releases
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'releases/cleanup-request.json'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: twinpanel-one-time-release-cleanup
+  cancel-in-progress: false
+
+jobs:
+  prune-rc-releases:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify explicit cleanup request
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          request=json.loads(Path('releases/cleanup-request.json').read_text())
+          assert request == {
+              'target': 'v1.1.0',
+              'remove': 'old-twinpanel-rc-releases-only',
+              'preserve': 'all-twinconnect-releases',
+              'confirmed': True,
+          }, request
+          print('EXPLICIT_CLEANUP_REQUEST_OK')
+          PY
+      - name: Confirm stable release, rename it, and remove obsolete RC releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CONFIRM_RELEASE_CLEANUP: v1.1.0-only
+        run: python3 scripts/prune_legacy_twinpanel_releases.py
+      - name: Preserve inventory of removed release metadata
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: removed-twinpanel-rc-release-inventory
+          path: old-twinpanel-release-inventory.json
+          if-no-files-found: ignore
