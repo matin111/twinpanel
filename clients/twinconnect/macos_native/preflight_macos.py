@@ -29,19 +29,20 @@ def command_output(*args: str, timeout: int = 25) -> tuple[int, str]:
 
 
 def metal_available() -> tuple[bool, str]:
-    """Check for a usable MTLDevice, not just a reported graphics adapter."""
+    """Check Metal API device and command queue; Flutter rendering is separate."""
     swift = shutil.which("swift") or "/usr/bin/swift"
     code = (
         'import Metal; '
-        'if let device = MTLCreateSystemDefaultDevice() { '
+        'if let device = MTLCreateSystemDefaultDevice(), '
+        'device.makeCommandQueue() != nil { '
         'print("TWINCONNECT_METAL_AVAILABLE") '
         '} else { print("TWINCONNECT_METAL_UNAVAILABLE") }'
     )
     status, output = command_output(swift, "-e", code, timeout=65)
     if status == 0 and "TWINCONNECT_METAL_AVAILABLE" in output:
-        return True, "Metal device available"
+        return True, "Metal device and command queue available to Swift process; Flutter render NOT verified"
     if status == 0 and "TWINCONNECT_METAL_UNAVAILABLE" in output:
-        return False, "No usable Metal device: Flutter macOS GUI cannot render here"
+        return False, "No Metal device/command queue in Swift process; Flutter GUI may fail"
     return False, "Could not verify Metal availability: " + output[-300:]
 
 
@@ -88,10 +89,10 @@ def check_host() -> dict[str, object]:
     }
     return {
         "host": "macOS",
-        "gui_ready": metal_ok,
+        "gui_ready": None,  # Unknown until the actual Flutter Runner renders successfully.\n        "metal_api_ready": metal_ok,
         "signed_vpn_build_ready": xcode_ok and sign_ok,
         "checks": checks,
-        "note": "A valid packet-tunnel-provider entitlement and live VPN traffic are not verified by this script.",
+        "note": "Metal API availability does not prove Flutter Runner rendering. Valid packet-tunnel-provider entitlement and live VPN traffic are not verified.",
     }
 
 
@@ -108,8 +109,10 @@ def main() -> int:
             print(f"[{'OK' if value['ok'] else 'BLOCKED'}] {name}: {value['detail']}")
         if result.get("note"):
             print(result["note"])
-        if not result["gui_ready"]:
-            print("GUI testing requires a Mac exposing a real Metal device; rebuilding Flutter will not fix this.")
+        if not result.get("metal_api_ready"):
+            print("No Metal API device/queue was detected; native Flutter GUI rendering is likely blocked.")
+        else:
+            print("Metal API works in Swift; if Flutter still reports no MTLDevice, inspect the Runner execution context and renderer.")
         if not result["signed_vpn_build_ready"]:
             print("Signed PacketTunnel testing needs Xcode 16+ and an entitled Apple signing identity.")
     return 0  # Diagnostic report: blocked hosts are not a script execution error.
