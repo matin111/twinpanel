@@ -1,7 +1,6 @@
 // AppKit-only fallback for a macOS host without a Metal device/command queue.
 // This view does NOT launch Flutter, request secrets, or claim VPN connectivity.
 import Cocoa
-import Metal
 
 final class TwinConnectMacOSMetalFallback: NSViewController {
     private let diagnostic = [
