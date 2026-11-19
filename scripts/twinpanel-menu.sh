@@ -22,6 +22,12 @@ if [[ -t 1 && -z "${NO_COLOR:-}" ]]; then
   C_RED='\033[1;31m'
   C_WHITE='\033[1;37m'
   C_WHITE_BG='\033[107m'
+  C_LOGO_CYAN='\033[48;5;45m'
+  C_LOGO_BLUE='\033[48;5;39m'
+  C_LOGO_INDIGO='\033[48;5;63m'
+  C_LOGO_VIOLET='\033[48;5;99m'
+  C_LOGO_PURPLE='\033[48;5;135m'
+  C_LOGO_PINK='\033[48;5;169m'
   C_DIM='\033[2m'
   C_RESET='\033[0m'
 else
@@ -34,6 +40,12 @@ else
   C_RED=''
   C_WHITE=''
   C_WHITE_BG=''
+  C_LOGO_CYAN=''
+  C_LOGO_BLUE=''
+  C_LOGO_INDIGO=''
+  C_LOGO_VIOLET=''
+  C_LOGO_PURPLE=''
+  C_LOGO_PINK=''
   C_DIM=''
   C_RESET=''
 fi
@@ -87,15 +99,21 @@ state_badge(){
 }
 
 brand_row(){
-  local glyph cell i
+  local glyph cell i index=0 shade
+  local -a shades=(
+    "$C_LOGO_CYAN" "$C_LOGO_CYAN" "$C_LOGO_BLUE"
+    "$C_LOGO_INDIGO" "$C_LOGO_INDIGO" "$C_LOGO_VIOLET"
+    "$C_LOGO_VIOLET" "$C_LOGO_PURPLE" "$C_LOGO_PINK"
+  )
 
   printf '  '
   for glyph in "$@"; do
+    shade="${shades[index]:-}"
     for ((i=0; i<${#glyph}; i++)); do
       cell="${glyph:i:1}"
       if [[ "$cell" == "1" ]]; then
-        if [[ -n "$C_WHITE_BG" ]]; then
-          printf '%b %b' "$C_WHITE_BG" "$C_RESET"
+        if [[ -n "$shade" ]]; then
+          printf '%b %b' "$shade" "$C_RESET"
         else
           printf '#'
         fi
@@ -104,19 +122,20 @@ brand_row(){
       fi
     done
     printf '  '
+    ((index+=1))
   done
   printf '\n'
 }
 
 brand(){
   printf '\n'
-  brand_row '11111' '11011' '11111' '11001' '11110' '01110' '11001' '11111' '11000'
-  brand_row '01100' '11011' '01110' '11001' '11001' '11011' '11001' '11000' '11000'
-  brand_row '01100' '11011' '01110' '10101' '11001' '11011' '10101' '11000' '11000'
-  brand_row '01100' '11111' '01110' '10101' '11110' '11111' '10101' '11110' '11000'
-  brand_row '01100' '11011' '01110' '10011' '11000' '11011' '10011' '11000' '11000'
-  brand_row '01100' '11011' '01110' '10011' '11000' '11011' '10011' '11000' '11000'
-  brand_row '01100' '11011' '11111' '10001' '11000' '11011' '10001' '11111' '11111'
+  brand_row '11111' '10001' '11111' '10001' '11110' '01110' '10001' '11111' '10000'
+  brand_row '00100' '10001' '00100' '11001' '10001' '10001' '11001' '10000' '10000'
+  brand_row '00100' '10001' '00100' '10101' '10001' '10001' '10101' '10000' '10000'
+  brand_row '00100' '10101' '00100' '10011' '11110' '11111' '10011' '11110' '10000'
+  brand_row '00100' '10101' '00100' '10001' '10000' '10001' '10001' '10000' '10000'
+  brand_row '00100' '10101' '00100' '10001' '10000' '10001' '10001' '10000' '10000'
+  brand_row '00100' '01010' '11111' '10001' '10000' '10001' '10001' '11111' '11111'
   printf '\n'
 }
 
@@ -135,8 +154,10 @@ header(){
   web_state="$(unit_state "$(web_unit)")"
 
   brand
-  printf '  %b[TWINPANEL]%b  %bSelf-Hosted VPN Control Plane%b\n\n' \
-    "$C_MAGENTA" "$C_RESET" "$C_CYAN" "$C_RESET"
+  printf '  %bTWINPANEL%b  %b/  VPN OPERATIONS CENTER%b\n' \
+    "$C_WHITE" "$C_RESET" "$C_CYAN" "$C_RESET"
+  printf '  %bSales  /  Subscriptions  /  Nodes  /  Connections%b\n\n' \
+    "$C_DIM" "$C_RESET"
   printf '  %bo%b API %s   %b|%b   %bo%b WEB %s   %b|%b   %bv%s%b\n' \
     "$C_GREEN" "$C_RESET" "$(state_badge "$api_state")" \
     "$C_DIM" "$C_RESET" \
@@ -144,7 +165,7 @@ header(){
     "$C_DIM" "$C_RESET" "$C_BLUE" "$version" "$C_RESET"
   separator
   if [[ "$title" != "Quick actions" ]]; then
-    printf '  %b%s%b\n' "$C_WHITE" "$title" "$C_RESET"
+    printf '  %b>>%b  %b%s%b\n' "$C_CYAN" "$C_RESET" "$C_WHITE" "$title" "$C_RESET"
     separator
   fi
   printf '\n'
@@ -729,3 +750,4 @@ main_menu(){
 
 runtime_ports
 main_menu
+

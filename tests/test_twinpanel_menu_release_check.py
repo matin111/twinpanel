@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import re
 import subprocess
 import sys
 import unittest
@@ -63,6 +64,32 @@ class FastReleaseCheckTests(unittest.TestCase):
             return subprocess.CompletedProcess(args, 0, b" " * (release.MAX_MANIFEST_BYTES + 10))
 
         self.assertEqual(release.check_release("1.1.0", "", oversized), (None, "check unavailable"))
+
+
+class TerminalBrandTests(unittest.TestCase):
+    def test_large_banner_spells_twinpanel(self):
+        menu = SOURCE.with_name("twinpanel-menu.sh")
+        if not menu.is_file():
+            menu = SOURCE.with_name("twinpanel-menu.patched.sh")
+        script = menu.read_text(encoding="utf-8")
+        brand = re.search(r"^brand\(\)\{\n(.*?)^\}", script, flags=re.M | re.S)
+        self.assertIsNotNone(brand)
+        rows = re.findall(r"^\s*brand_row (.*)$", brand.group(1), flags=re.M)
+        self.assertEqual(len(rows), 7)
+        columns = [re.findall(r"'([01]{5})'", row) for row in rows]
+        self.assertTrue(all(len(row) == 9 for row in columns))
+        letters = ["".join(columns[row][col] for row in range(7)) for col in range(9)]
+        expected = {
+            "T": "11111001000010000100001000010000100",
+            "W": "10001100011000110101101011010101010",
+            "I": "11111001000010000100001000010011111",
+            "N": "10001110011010110011100011000110001",
+            "P": "11110100011000111110100001000010000",
+            "A": "01110100011000111111100011000110001",
+            "E": "11111100001000011110100001000011111",
+            "L": "10000100001000010000100001000011111",
+        }
+        self.assertEqual(letters, [expected[ch] for ch in "TWINPANEL"])
 
 
 if __name__ == "__main__":
