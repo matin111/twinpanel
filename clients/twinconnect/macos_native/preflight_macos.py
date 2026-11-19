@@ -89,7 +89,8 @@ def check_host() -> dict[str, object]:
     }
     return {
         "host": "macOS",
-        "gui_ready": None,  # Unknown until the actual Flutter Runner renders successfully.\n        "metal_api_ready": metal_ok,
+        "gui_ready": None,  # Unknown until actual Flutter Runner renders successfully.
+        "metal_api_ready": metal_ok,
         "signed_vpn_build_ready": xcode_ok and sign_ok,
         "checks": checks,
         "note": "Metal API availability does not prove Flutter Runner rendering. Valid packet-tunnel-provider entitlement and live VPN traffic are not verified.",
