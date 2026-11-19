@@ -90,7 +90,7 @@ def main() -> None:
             for release in old
         ], file, indent=2)
     api("PATCH", f"releases/{stable['id']}",
-        {"name": "TwinPanel v1.1.0 — شروع"})
+        {"name": "TwinPanel v1.1.0 - شروع"})
     for index, release in enumerate(old, 1):
         try:
             api("DELETE", f"releases/{release['id']}")
