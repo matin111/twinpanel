@@ -1,8 +1,8 @@
 {
-  "version": "1.1.2",
-  "source_sha": "34a8250116002dd72ee4a18ef07a8d45949847fe",
+  "version": "1.1.3",
+  "source_sha": "238b2b9709e6e195fceb77321b35e4717ed435e4",
   "notes": {
-    "fa": "اصلاح کامل رنگ بخش عملیات بیشتر اشتراک‌ها در حالت روشن، با پس‌زمینه روشن، نوشته‌های خوانا و هماهنگی دکمه‌ها. شامل ویرایشگر حرفه‌ای امن وبلاگ و منوی جدید ترمینال از نسخه 1.1.1 و ارتقای سازگار با داده‌های موجود.",
-    "en": "Fixed the expanded subscription action surface in light theme with a bright background and accessible text contrast. Includes the safe professional blog editor and refreshed terminal menu from 1.1.1, preserving existing data during upgrades."
+    "fa": "اصلاح منوی آموزش و برنامه‌ها در ربات اصلی و نمایندگی: حذف شلوغی، نمایش برنامه‌های اصلی به‌جای پروتکل‌ها، انتقال گزینه‌های تخصصی به «سایر برنامه‌ها» و حفظ لینک‌های عمومی TwinConnect ویندوز و اندروید. شامل اصلاحات نسخه‌های قبلی.",
+    "en": "Ship compact app-first Telegram tutorials in the official prebuilt release, keeping specialist clients under More and preserving public TwinConnect downloads and earlier fixes."
   }
 }
