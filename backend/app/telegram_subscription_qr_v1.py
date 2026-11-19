@@ -1,6 +1,7 @@
 """Send one Telegram photo containing the subscription QR and its copyable link."""
 from __future__ import annotations
 
+import asyncio
 from html import escape
 from io import BytesIO
 from urllib.parse import urlsplit
@@ -35,7 +36,9 @@ async def send_subscription_link_and_qr(message, link: str, *, username: str = "
     value = str(link or "").strip()
     if not value:
         raise ValueError("لینک اتصال هنوز آماده نیست")
-    photo = subscription_qr_photo(value)
+    # Pillow/PNG encoding is synchronous; keep the Telegram bot event loop
+    # responsive when several customers request their QR at the same time.
+    photo = await asyncio.to_thread(subscription_qr_photo, value)
     label = escape(str(username or "اکانت"))
     caption = (
         "🔗 <b>ساب‌لینک و QR Code اکانت</b>\n\n"

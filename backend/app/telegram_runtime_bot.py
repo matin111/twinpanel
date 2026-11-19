@@ -1701,7 +1701,7 @@ async def subscription_connection(
             "GET",
             (
                 "/v1/customer/subscriptions/"
-                f"{sub_id}/connection-info"
+                f"{sub_id}/link-delivery"
             ),
             token=token,
         )

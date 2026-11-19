@@ -2106,6 +2106,34 @@ def _stored_info(
 
 
 
+@customer_router.get("/{subscription_id}/link-delivery")
+def customer_link_delivery(
+    subscription_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Fast authenticated Telegram delivery: share link, not VPN credentials.
+
+    The full connection-info endpoint decrypts every protocol, checks live
+    nodes and can self-heal L2TP. None of those operations is required to
+    send an already-issued subscription URL and its QR code.
+    """
+    sub = db.get(Subscription, subscription_id)
+    if not sub or sub.user_id != user.id:
+        raise HTTPException(status_code=404, detail="اشتراک پیدا نشد")
+
+    status_value = getattr(sub.status, "value", str(sub.status))
+    if status_value != "active":
+        raise HTTPException(status_code=403, detail="اشتراک فعال نیست")
+    if sub.expires_at and sub.expires_at <= datetime.utcnow():
+        raise HTTPException(status_code=403, detail="اشتراک منقضی شده است")
+
+    return {
+        "subscription_link": _share_url(db, sub),
+        "account_username": sub.account_username,
+    }
+
+
 @customer_router.get("/{subscription_id}/connection-info")
 async def customer_connection_info(
     subscription_id: int,

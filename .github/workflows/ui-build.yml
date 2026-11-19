@@ -41,6 +41,9 @@ jobs:
       - name: Compile backend Python
         run: python -m compileall -q backend/app
 
+      - name: Validate fast Telegram link delivery and sales tooltip themes
+        run: python3 backend/tests/test_telegram_link_delivery_fast_path_v1.py -v
+
       - name: Validate fast terminal menu and Web slot handling
         run: |
           bash -n scripts/twinpanel-menu.sh

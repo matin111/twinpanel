@@ -179,7 +179,7 @@ function SalesAnalyticsContent({scope}:{scope:"admin"|"reseller"}){
           })}
         </svg>:<div className="sales-empty">{loading?pick("در حال دریافت نمودار...","Loading chart..."):pick("برای این بازه فروش تأییدشده‌ای ثبت نشده است","No confirmed sales in this period")}</div>}
 
-        {activePoint&&<div className="sales-tooltip" style={{left:`${Math.min(88,Math.max(12,(activePoint.x/chart.width)*100))}%`,top:`${Math.max(8,(activePoint.y/chart.height)*100-4)}%`}}>
+        {activePoint&&<div className={`sales-tooltip ${activePoint.y/chart.height<0.47?"below":""}`} style={{left:`clamp(110px, ${(activePoint.x/chart.width)*100}%, calc(100% - 110px))`,top:`${Math.max(6,(activePoint.y/chart.height)*100)}%`}}>
           <small>{periodLabel(activePoint.row,range)}</small>
           <b>{money(activePoint.row.revenue_toman)}</b>
           {scope==="admin"&&<>
@@ -244,7 +244,11 @@ function SalesAnalyticsContent({scope}:{scope:"admin"|"reseller"}){
       .sales-chart-line.subscription{stroke:#8b5cf6}.sales-chart-line.wallet{stroke:#10b981;filter:drop-shadow(0 7px 10px rgba(16,185,129,.16))}
       .sales-chart-point{fill:#8b5cf6;stroke:#fff;stroke-width:2;transition:r .12s ease}
       .sales-chart-point.subscription{fill:#8b5cf6}.sales-chart-point.wallet{fill:#10b981}.sales-chart-point.active{stroke-width:3}
-      .sales-tooltip{position:absolute;transform:translate(-50%,-100%);pointer-events:none;z-index:4;display:grid;gap:4px;min-width:185px;padding:10px 12px;border-radius:12px;background:rgba(22,17,36,.95);color:#fff;box-shadow:0 14px 35px rgba(0,0,0,.22);font-size:11px}
+      .sales-tooltip{position:absolute;transform:translate(-50%,calc(-100% - 10px));pointer-events:none;z-index:4;display:grid;gap:4px;min-width:185px;max-width:calc(100% - 16px);padding:10px 12px;border-radius:12px;background:rgba(22,17,36,.95);color:#fff;box-shadow:0 14px 35px rgba(0,0,0,.22);font-size:11px}
+      .sales-tooltip.below{transform:translate(-50%,10px)}
+      :global(html[data-theme="light"]) .sales-tooltip{background:linear-gradient(150deg,#fff,#f6f8ff);color:#23324b;border:1px solid #d9e2f1;box-shadow:0 12px 26px rgba(45,62,108,.15)}
+      :global(html[data-theme="light"]) .sales-tooltip small{opacity:.7}
+      :global(html[data-theme="light"]) .sales-tooltip span{opacity:.86}
       .sales-tooltip small{opacity:.65}.sales-tooltip b{font-size:13px}.sales-tooltip span{opacity:.72}.tooltip-source{display:flex;align-items:center;gap:6px}.tooltip-source i{width:7px;height:7px;border-radius:50%;display:block;flex:0 0 auto}.tooltip-source.subscription i{background:#8b5cf6}.tooltip-source.wallet i{background:#10b981}
       .sales-empty{height:300px;display:grid;place-items:center;opacity:.55;font-size:13px}.sales-empty.small{height:auto;min-height:100px}
       .sales-bottom-grid{display:grid;grid-template-columns:1fr;gap:14px}
