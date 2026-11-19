@@ -211,8 +211,8 @@ def create_guides_router():
             is_android = key=="twinconnect_android"
             buttons.append([
                 InlineKeyboardButton(
-                    text=("🔴 دریافت TwinConnect اندروید" if is_android
-                          else "🔴 دریافت TwinConnect ویندوز"),
+                    text=("🔴 دریافت کانکشن هوشمند اندروید" if is_android
+                          else "🔴 دریافت کانکشن هوشمند ویندوز"),
                     url=("https://t.me/twin_connect1/4" if is_android
                          else "https://t.me/twin_connect1/3"),
                     style="danger",
