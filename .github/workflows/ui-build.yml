@@ -46,6 +46,10 @@ jobs:
 
       - name: Test discount plan scope and redemption
         working-directory: backend
+        env:
+          APP_SECRET_KEY: ci-discount-plan-scope-nonproduction-key
+          DATABASE_URL: sqlite:///./discount-plan-scope-ci.sqlite3
+          NODE_AGENT_SHARED_SECRET: ci-discount-plan-scope-node-key
         run: python -m unittest discover -s tests -p 'test_admin_discount_plan_scope_v1.py' -v
 
       - name: Validate fast Telegram link delivery and sales tooltip themes
