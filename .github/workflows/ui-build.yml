@@ -52,6 +52,9 @@ jobs:
           NODE_AGENT_SHARED_SECRET: ci-discount-plan-scope-node-key
         run: python -m unittest discover -s tests -p 'test_admin_discount_plan_scope_v1.py' -v
 
+      - name: Verify discount network failure feedback
+        run: python backend/tests/test_admin_discount_network_feedback_v1.py -v
+
       - name: Validate fast Telegram link delivery and sales tooltip themes
         run: python3 backend/tests/test_telegram_link_delivery_fast_path_v1.py -v
 
