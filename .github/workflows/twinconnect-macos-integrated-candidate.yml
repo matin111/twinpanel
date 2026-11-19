@@ -144,19 +144,20 @@ jobs:
             build/macos/Build/Products/Release/twinconnect.app/Contents/PlugIns/PacketTunnel.appex/Contents/Info.plist | grep -qx false
           echo "Signed-only Swift code path: COMPILED WITHOUT Apple signing"
           echo "VPN functionality: NOT VERIFIED"
-      - name: Verify embedded Libbox framework, extension and unsigned guard
+      - name: Verify statically linked Libbox symbols and unsigned extension guard
         shell: bash
         run: |
           set -euo pipefail
           app="build/macos/Build/Products/Release/twinconnect.app"
           appex="$app/Contents/PlugIns/PacketTunnel.appex"
-          libbox="$appex/Contents/Frameworks/Libbox.framework"
           test -x "$app/Contents/MacOS/twinconnect"
           test -x "$appex/Contents/MacOS/PacketTunnel"
-          test -s "$libbox/Versions/A/Libbox"
-          test -s "$libbox/Libbox"
-          test -L "$libbox/Versions/Current"
-          file "$libbox/Libbox" | grep -q Mach-O
+          # Go/gomobile's macOS Libbox.framework contains a static ar archive.
+          # Static linkage belongs in the PacketTunnel executable; do not
+          # mistake the absence of otool -L entries for an unlinked library.
+          test ! -e "$appex/Contents/Frameworks/Libbox.framework"
+          nm -g "$appex/Contents/MacOS/PacketTunnel" > "$RUNNER_TEMP/packet-tunnel-static-symbols.txt"
+          grep -E '(_LibboxSetup|_LibboxNewCommandServer|OBJC_CLASS_.*Libbox)' "$RUNNER_TEMP/packet-tunnel-static-symbols.txt"
           /usr/libexec/PlistBuddy -c 'Print TwinConnectProtocolBackendLinked' "$appex/Contents/Info.plist" | grep -qx false
           plutil -lint "$appex/Contents/Info.plist"
           # An unsigned candidate cannot be mistaken for a functional VPN.
@@ -167,7 +168,7 @@ jobs:
           {
             echo 'TWINCONNECT MACOS LIBBOX INTEGRATED CANDIDATE'
             echo "Source commit: $GITHUB_SHA"
-            echo 'App+PacketTunnel+Libbox: packaged and validated'
+            echo 'App+PacketTunnel+statically linked Libbox: packaged and validated'
             echo 'Apple developer signing: NOT CONFIGURED'
             echo 'Network Extension provider usable: NO'
             echo 'Hysteria2 / ShadowTLS / Snell / SOCKS5 VPN connection / egress / DNS: NOT VERIFIED'
