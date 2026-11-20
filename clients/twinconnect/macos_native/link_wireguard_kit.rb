@@ -28,24 +28,63 @@ extension = project.targets.find { |t| t.name == 'PacketTunnel' }
 abort 'ERROR: PacketTunnel target missing; run install_packet_tunnel_target.rb first' unless extension
 abort 'ERROR: installed xcodeproj gem does not support local Swift packages' unless defined?(Xcodeproj::Project::Object::XCLocalSwiftPackageReference)
 relative = '../.dart_tool/twinconnect-wireguard-apple'
-package = project.root_object.package_references.find do |p|
-  p.isa == 'XCLocalSwiftPackageReference' && p.relative_path == relative
+packages = project.root_object.package_references.select do |p|
+  p.isa == 'XCLocalSwiftPackageReference'
 end
+own = packages.find { |p| p.relative_path == relative }
+# This project may already contain a WireGuardKit checkout in
+# macos_native/build/wireguard-apple. Reuse it rather than introducing a
+# second package with the same exported product name.
+existing = packages.find do |p|
+  next false if p == own
+  path = File.expand_path(p.relative_path.to_s, File.dirname(project_path))
+  File.file?(File.join(path, 'Package.swift')) &&
+    File.read(File.join(path, 'Package.swift')).include?('name: "WireGuardKit"')
+end
+package = existing || own
 unless package
   package = project.new(Xcodeproj::Project::Object::XCLocalSwiftPackageReference)
   package.relative_path = relative
   project.root_object.package_references << package
 end
-unless extension.package_product_dependencies.any? { |p| p.product_name == 'WireGuardKit' }
+if existing
+  existing_manifest = File.expand_path(
+    File.join(existing.relative_path, 'Package.swift'), File.dirname(project_path)
+  )
+  text = File.read(existing_manifest)
+  if text.start_with?("// swift-tools-version:5.3\\n")
+    File.write(existing_manifest, text.sub(
+      "// swift-tools-version:5.3\\n", "// swift-tools-version:5.7\\n"
+    ))
+    puts "Prepared existing WireGuardKit manifest: #{existing_manifest}"
+  end
+  if own && own != existing
+    project.root_object.package_references.delete(own)
+    puts "Removed duplicate WireGuardKit package reference: #{relative}"
+  end
+end
+products = extension.package_product_dependencies.select { |p| p.product_name == 'WireGuardKit' }
+product = products.first
+unless product
   product = project.new(Xcodeproj::Project::Object::XCSwiftPackageProductDependency)
   product.product_name = 'WireGuardKit'
-  product.package = package
   extension.package_product_dependencies << product
-  phase = extension.frameworks_build_phase
+end
+product.package = package
+products.drop(1).each do |duplicate|
+  extension.frameworks_build_phase.files.select { |f| f.product_ref == duplicate }.each do |f|
+    extension.frameworks_build_phase.files.delete(f)
+    f.remove_from_project
+  end
+  extension.package_product_dependencies.delete(duplicate)
+  duplicate.remove_from_project
+end
+unless extension.frameworks_build_phase.files.any? { |f| f.product_ref == product }
   build_file = project.new(Xcodeproj::Project::Object::PBXBuildFile)
   build_file.product_ref = product
-  phase.files << build_file
+  extension.frameworks_build_phase.files << build_file
 end
+puts "Using WireGuardKit package reference: #{package.relative_path}"
 # Keep archive linker flags explicitly scoped to the extension, not Runner.
 extension.build_configurations.each do |configuration|
   settings = configuration.build_settings
