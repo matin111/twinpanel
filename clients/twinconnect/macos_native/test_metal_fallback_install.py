@@ -121,7 +121,7 @@ class MetalFallbackInstallTests(unittest.TestCase):
         self.assertIn("TwinNativeNetworkFabric", generated)
         self.assertNotIn("TwinNativePowerRing", generated)
         self.assertIn('pair.distribution = .fillEqually', generated)
-        self.assertIn('workspace.addArrangedSubview(pair)', generated)
+        self.assertIn('addPage(pair)', generated)
         self.assertIn('if availableWidth >= 790', generated)
         self.assertIn('sidebar.widthAnchor.constraint(equalToConstant: 258)', generated)
         self.assertIn('Connect now', generated)
