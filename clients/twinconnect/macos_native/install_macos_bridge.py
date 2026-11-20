@@ -91,9 +91,18 @@ content += "\n\n// TWINCONNECT_MACOS_NATIVE_DIRECTORY_V1\n" + native_directory.r
 content += "\n\n// TWINCONNECT_MACOS_NATIVE_DASHBOARD_V1\n" + native_dashboard.read_text(encoding="utf-8")
 window.write_text(content, encoding="utf-8")
 
-# Use the same default directory origin as macOS integrated CI. Operators can
-# set the build-time env var to match their Flutter --dart-define value.
-directory_origin = os.environ.get("TWINCONNECT_DIRECTORY_URL", "https://panel.matindnspro.sbs").strip()
+# Refreshing source code must NOT silently change an existing panel origin.
+# An explicit build environment setting takes precedence; otherwise preserve
+# the HTTPS directory that was already installed on this cloud Mac.
+app_info_path = root / "macos/Runner/Info.plist"
+if not app_info_path.is_file():
+    raise SystemExit("macOS Runner Info.plist not found")
+with app_info_path.open("rb") as handle:
+    previous_info = plistlib.load(handle)
+previous_origin = previous_info.get("TwinConnectDirectoryURL")
+if not isinstance(previous_origin, str) or not previous_origin.strip():
+    previous_origin = "https://panel.matindnspro.sbs"
+directory_origin = os.environ.get("TWINCONNECT_DIRECTORY_URL", previous_origin).strip()
 parsed = urlsplit(directory_origin)
 if (parsed.scheme != "https" or not parsed.hostname or
         parsed.username or parsed.password or parsed.query or parsed.fragment or
