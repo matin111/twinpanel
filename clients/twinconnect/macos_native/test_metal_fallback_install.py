@@ -131,7 +131,7 @@ class MetalFallbackInstallTests(unittest.TestCase):
         self.assertIn("pingText(server)", generated)
         self.assertIn("pingColor(server)", generated)
         self.assertIn("pingDetails(selected)", generated)
-        self.assertIn("No public ping address supplied by the panel", generated)
+        self.assertIn("No public probe address supplied by the panel", generated)
         self.assertNotIn('action: #selector(unavailableConnect(_:)), mutedButton: true)\\n        ping.isEnabled = false', generated)
         self.assertIn("protocolChips()", generated)
         self.assertIn("selectProtocolChip(_ sender: NSButton)", generated)
