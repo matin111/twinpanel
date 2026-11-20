@@ -300,7 +300,7 @@ class MetalFallbackInstallTests(unittest.TestCase):
             connect,
         )
         self.assertIn(
-            "proxyTools.widthAnchor.constraint(equalTo: main.widthAnchor)",
+            'action: #selector(unavailableConnect(_:)), primary: true',
             connect,
         )
         self.assertNotIn('compactMetric("Public IP", value: "—")', connect)
@@ -358,6 +358,40 @@ class MetalFallbackInstallTests(unittest.TestCase):
                       section)
         self.assertNotIn('systemPreferences', section)
 
+    def test_connect_button_never_launches_diagnostic_proxy(self) -> None:
+        source = (SOURCE / "TwinConnectMacOSNativeDashboard.swift").read_text(
+            encoding="utf-8"
+        )
+        connect = source.split("    private func connectPage() -> NSView {", 1)[1].split(
+            "    private func networkMetric(", 1
+        )[0]
+        settings = source.split("    private func settingsPage() -> NSView {", 1)[1].split(
+            "    private func expiryText(", 1
+        )[0]
+        self.assertIn('"ϟ    Connect now     ›"', connect)
+        self.assertIn('action: #selector(unavailableConnect(_:)), primary: true',
+                      connect)
+        self.assertNotIn('#selector(primaryProxyAction(_:))', connect)
+        self.assertNotIn('#selector(stopLocalProxyNow(_:))', connect)
+        self.assertIn('button("Test Hysteria2 SOCKS"', settings)
+        self.assertIn('#selector(primaryProxyAction(_:))', settings)
+        self.assertIn('button("■  Stop local proxy"', settings)
+        self.assertIn('#selector(stopLocalProxyNow(_:))', settings)
+
+    def test_glass_panels_use_separate_windows_like_styles(self) -> None:
+        source = (SOURCE / "TwinConnectMacOSNativeDashboard.swift").read_text(
+            encoding="utf-8"
+        )
+        for token in (
+            'enum Style { case panel, inset, metric, sidebar }',
+            'private let upperEdge = CAGradientLayer()',
+            'box.apply(style)',
+            'side.apply(.sidebar)',
+            'return card([items], radius: 20, padding: 14, style: .inset)',
+            'let panel = card([content], radius: 17, padding: 14, style: .metric)',
+        ):
+            self.assertIn(token, source)
+
     def test_emergency_stop_and_offline_animation_are_safe(self) -> None:
         source = (SOURCE / "TwinConnectMacOSNativeDashboard.swift").read_text(
             encoding="utf-8"
@@ -365,7 +399,7 @@ class MetalFallbackInstallTests(unittest.TestCase):
         for token in (
             'var tunnelConnected = false',
             'guard tunnelConnected else { return }',
-            '"■  Stop proxy"',
+            '"■  Stop local proxy"',
             '#selector(stopLocalProxyNow(_:))',
             'private func stopLocalProxyNow',
             'self.runLocalManager(["stop"], root: root)',
@@ -427,7 +461,7 @@ class MetalFallbackInstallTests(unittest.TestCase):
             'let iconName: String',
             'selected ? "✓" : "›"',
             'pingDetails(server)',
-            'Local proxy test only · VPN offline',
+            '"ϟ    Connect now     ›"',
             'pill("Disconnected", color: muted)',
             'networkMetric("Public IP", value: "—")',
             'networkMetric("Download", value: "—"',
