@@ -411,6 +411,19 @@ class MetalFallbackInstallTests(unittest.TestCase):
             self.assertIn(token, source)
         self.assertNotIn("legacyViolet() migration to teal", source)
 
+    def test_status_pills_use_the_same_tenant_glass_as_cards(self) -> None:
+        source = (SOURCE / "TwinConnectMacOSNativeDashboard.swift").read_text(
+            encoding="utf-8"
+        )
+        pill = source.split("    private func pill(", 1)[1].split(
+            "    private func button(", 1
+        )[0]
+        self.assertIn('let background = TwinNativeGlassCard(frame: .zero)',
+                      pill)
+        self.assertIn('background.apply(.inset, accent: color ?? tint()', pill)
+        self.assertIn('surface: panelCardColor()', pill)
+        self.assertNotIn('let background = NSView()', pill)
+
     def test_windows_background_is_cinematic_and_metal_free(self) -> None:
         source = (SOURCE / "TwinConnectMacOSNativeDashboard.swift").read_text(
             encoding="utf-8"
