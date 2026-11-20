@@ -159,7 +159,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                        spacing: CGFloat = 13) -> NSStackView {
         let result = NSStackView()
         result.orientation = axis
-        result.alignment = axis == .vertical ? .width : .centerY
+        result.alignment = axis == .vertical ? .leading : .centerY
         result.spacing = spacing
         result.translatesAutoresizingMaskIntoConstraints = false
         return result
@@ -193,7 +193,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         let column = stack(spacing: 13)
         // Let every glass panel fill the available width; plain NSView
         // children have no intrinsic width and otherwise disappear.
-        column.alignment = .width
+        column.alignment = .leading
         for child in children {
             column.addArrangedSubview(child)
             // In AppKit a child NSView without an intrinsic width can shrink
@@ -345,7 +345,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         let workspace = stack(spacing: 17)
         // A vertical NSStackView with .leading alignment gives its NSView
         // cards no full-width constraint. They can collapse to zero width.
-        workspace.alignment = .width
+        workspace.alignment = .leading
         let heading = stack(.horizontal, spacing: 12)
         heading.alignment = .centerY
         let titles = ["Quick connect", "Locations", "Settings", "My account"]
@@ -356,10 +356,17 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         heading.addArrangedSubview(pill("● Offline", color: muted))
         workspace.addArrangedSubview(heading)
         heading.widthAnchor.constraint(equalTo: workspace.widthAnchor).isActive = true
+        // NSStackView's .width alignment equalizes widths without fixing
+        // horizontal origins. That caused Locations, Settings, and Account
+        // panels to collect along the right edge of the macOS viewport.
+        // Anchor every page to the leading edge and the full content width.
+        func addPage(_ page: NSView) {
+            workspace.addArrangedSubview(page)
+            page.widthAnchor.constraint(equalTo: workspace.widthAnchor)
+                .isActive = true
+        }
         switch tab {
         case 0:
-            // The shared Flutter desktop layout uses two equally weighted
-            // connection/network cards when the usable main column is >=740.
             let availableWidth = nativeContentWidth - 258 - 48
             if availableWidth >= 790 {
                 let pair = stack(.horizontal, spacing: 14)
@@ -371,15 +378,14 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                 pair.addArrangedSubview(network)
                 network.heightAnchor.constraint(equalTo: connection.heightAnchor)
                     .isActive = true
-                workspace.addArrangedSubview(pair)
-                pair.widthAnchor.constraint(equalTo: workspace.widthAnchor).isActive = true
+                addPage(pair)
             } else {
-                workspace.addArrangedSubview(connectPage())
-                workspace.addArrangedSubview(networkStatusPage())
+                addPage(connectPage())
+                addPage(networkStatusPage())
             }
-        case 1: workspace.addArrangedSubview(locationsPage())
-        case 2: workspace.addArrangedSubview(settingsPage())
-        default: workspace.addArrangedSubview(accountPage())
+        case 1: addPage(locationsPage())
+        case 2: addPage(settingsPage())
+        default: addPage(accountPage())
         }
         // Technical diagnostics belong in Settings, not in the user-facing
         // page canvas. The shell mirrors the clean Windows dashboard.
@@ -533,7 +539,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
 
     private func connectPage() -> NSView {
         let main = stack(spacing: 11)
-        main.alignment = .width
+        main.alignment = .leading
 
         let offlineRow = stack(.horizontal, spacing: 8)
         let leadingSpace = NSView()
@@ -594,7 +600,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     private func networkMetric(_ title: String, value: String,
                                subtitle: String = "") -> NSView {
         let content = stack(spacing: 13)
-        content.alignment = .width
+        content.alignment = .leading
         content.addArrangedSubview(text(title, size: 11,
                                        weight: .semibold, color: muted))
         content.addArrangedSubview(text(value, size: 22, weight: .bold))
@@ -608,7 +614,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
 
     private func networkStatusPage() -> NSView {
         let content = stack(spacing: 16)
-        content.alignment = .width
+        content.alignment = .leading
         let header = stack(.horizontal, spacing: 9)
         header.addArrangedSubview(text("Network status", size: 17,
                                        weight: .semibold))
@@ -671,7 +677,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         let options = [("All", Optional<String>.none)] +
             list.map { ($0.name, Optional($0.code)) }
         let group = stack(spacing: 7)
-        group.alignment = .width
+        group.alignment = .leading
         // Use the same horizontal, wrapping protocol pills as Flutter.
         // Fit by actual label width, not arbitrary protocol counts per row.
         let width = max(430, nativeContentWidth - 258 - 102)
@@ -710,7 +716,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     // alone never guarantees a protocol-specific connection profile.
     private func locationsPage() -> NSView {
         let wrapper = stack(spacing: 14)
-        wrapper.alignment = .width
+        wrapper.alignment = .leading
 
         let searchRow = stack(.horizontal, spacing: 10)
         searchRow.alignment = .centerY
@@ -769,7 +775,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             let items = grouped[code] ?? []
             let expanded = expandedCountries.contains(code)
             let group = stack(spacing: 10)
-            group.alignment = .width
+            group.alignment = .leading
             let header = button(
                 flag(code) + "    " + countryName(code) + "     " +
                 String(items.count) + (items.count == 1 ? " server" : " servers") +
@@ -847,7 +853,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
 
     private func settingsPage() -> NSView {
         let section = stack(spacing: 12)
-        section.alignment = .width
+        section.alignment = .leading
         section.addArrangedSubview(text("Connection & privacy",
                                         size: 18, weight: .semibold))
         // Render disabled state rather than non-functional toggles. These
@@ -915,7 +921,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     private func reservedRenewalCard(_ renewal: TwinMacReservedRenewal,
                                      compact: Bool) -> NSView {
         let fields = stack(spacing: 7)
-        fields.alignment = .width
+        fields.alignment = .leading
         fields.addArrangedSubview(text(
             renewal.needsReview ? "◷  Renewal needs review" :
                                   "▣  Reserved renewal",
@@ -944,7 +950,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
 
     private func accountPage() -> NSView {
         let content = stack(spacing: 14)
-        content.alignment = .width
+        content.alignment = .leading
         let account = snapshot?.account
 
         let hero = stack(.horizontal, spacing: 15)
@@ -965,7 +971,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         ])
         hero.addArrangedSubview(emblem)
         let identity = stack(spacing: 7)
-        identity.alignment = .width
+        identity.alignment = .leading
         let username = text(accountSession?.username ?? "—", size: 16,
                             weight: .semibold)
         username.lineBreakMode = .byTruncatingMiddle
@@ -984,7 +990,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         }
 
         let usage = stack(spacing: 14)
-        usage.alignment = .width
+        usage.alignment = .leading
         let head = stack(.horizontal, spacing: 8)
         head.addArrangedSubview(text("◉  Data usage", size: 15, weight: .semibold))
         let gap = NSView()
@@ -1068,7 +1074,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
 
     private func homeSubscriptionSummary() -> NSView {
         let items = stack(spacing: 8)
-        items.alignment = .width
+        items.alignment = .leading
         let header = stack(.horizontal, spacing: 9)
         header.addArrangedSubview(text("✓  Subscription details",
                                        size: 12, weight: .semibold))
