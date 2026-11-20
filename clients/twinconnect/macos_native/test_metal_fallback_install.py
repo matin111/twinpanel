@@ -382,6 +382,55 @@ class MetalFallbackInstallTests(unittest.TestCase):
         self.assertIn('button("■  Stop local proxy"', settings)
         self.assertIn('#selector(stopLocalProxyNow(_:))', settings)
 
+    def test_tenant_colors_are_applied_to_every_glass_surface(self) -> None:
+        source = (SOURCE / "TwinConnectMacOSNativeDashboard.swift").read_text(
+            encoding="utf-8"
+        )
+        directory = (SOURCE / "TwinConnectMacOSNativeDirectory.swift").read_text(
+            encoding="utf-8"
+        )
+        for token in (
+            'let backgroundHex: String?',
+            'let cardHex: String?',
+            'brand["background_color"] as? String',
+            'brand["card_color"] as? String',
+            'brand["primary_color"]',
+        ):
+            self.assertIn(token, directory)
+        for token in (
+            'private func panelBackgroundColor() -> NSColor?',
+            'private func panelCardColor() -> NSColor?',
+            'return panelHexColor(accountSession?.accentHex) ?? teal',
+            'box.apply(style, accent: tint(),',
+            'side.apply(.sidebar, accent: tint(),',
+            'background: panelBackgroundColor(), surface: panelCardColor()',
+            'let brand = tint()',
+            'control.setAccentGradient(upper.withAlphaComponent(0.90)',
+            'enum Style: Equatable { case panel, inset, metric, sidebar }',
+        ):
+            self.assertIn(token, source)
+        self.assertNotIn("legacyViolet() migration to teal", source)
+
+    def test_windows_background_is_cinematic_and_metal_free(self) -> None:
+        source = (SOURCE / "TwinConnectMacOSNativeDashboard.swift").read_text(
+            encoding="utf-8"
+        )
+        backdrop = source.split(
+            "private final class TwinNativeBackdrop: NSView {", 1
+        )[1].split("private final class TwinNativePremiumButton:", 1)[0]
+        for token in (
+            'private func radialLight(',
+            'CGGradient(',
+            'context.drawRadialGradient(',
+            'radialLight(ctx,',
+            'for index in 0..<11',
+            'for index in 0..<26',
+            'glow.withAlphaComponent(',
+        ):
+            self.assertIn(token, backdrop)
+        self.assertNotIn('MTLCreateSystemDefaultDevice', backdrop)
+        self.assertNotIn('URLSession', backdrop)
+
     def test_glass_panels_use_separate_windows_like_styles(self) -> None:
         source = (SOURCE / "TwinConnectMacOSNativeDashboard.swift").read_text(
             encoding="utf-8"
