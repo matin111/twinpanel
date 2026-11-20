@@ -514,6 +514,36 @@ class MetalFallbackInstallTests(unittest.TestCase):
         self.assertIn("link.setAccentGradient(", sidebar)
         self.assertNotIn("-> NSButton {\n        let control = TwinNativePremiumButton", source)
 
+    def test_dashboard_glass_is_bright_and_location_bar_does_not_expand(self) -> None:
+        source = (SOURCE / "TwinConnectMacOSNativeDashboard.swift").read_text(
+            encoding="utf-8"
+        )
+        glass = source.split("private final class TwinNativeGlassCard: NSView {", 1)[1].split(
+            "private final class TwinNativeNetworkFabric:", 1
+        )[0]
+        status = source.split("    private func networkStatusPage() -> NSView {", 1)[1].split(
+            "    // Prefer a fresh local ICMP", 1
+        )[0]
+        for token in (
+            'blur.material = .sidebar',
+            'style == .sidebar ? 0.66 : 0.54',
+            'tone.withAlphaComponent(0.28).cgColor',
+            'lower.withAlphaComponent(0.43).cgColor',
+        ):
+            self.assertIn(token, glass)
+        self.assertNotIn('blur.material = .hudWindow', glass)
+        self.assertIn(
+            'locationCard.heightAnchor.constraint(equalToConstant: 55)',
+            status,
+        )
+        self.assertIn(
+            'flexibleBottom.setContentHuggingPriority(.defaultLow, for: .vertical)',
+            status,
+        )
+        self.assertIn('box.layer?.borderWidth = style == .panel ? 0.8 : 0.45',
+                      source)
+        self.assertIn('style == .panel ? 0.10 : 0.025', source)
+
     def test_appkit_glass_uses_real_blur_and_transparent_overlays(self) -> None:
         source = (SOURCE / "TwinConnectMacOSNativeDashboard.swift").read_text(
             encoding="utf-8"
@@ -523,15 +553,15 @@ class MetalFallbackInstallTests(unittest.TestCase):
         )[0]
         for token in (
             "private let blur = NSVisualEffectView(frame: .zero)",
-            "blur.material = .hudWindow",
+            "blur.material = .sidebar",
             "blur.blendingMode = .withinWindow",
             "blur.state = .active",
             "tintOverlay.layer?.addSublayer(glassGradient)",
             "blur.layer?.masksToBounds = true",
             "tintOverlay.layer?.masksToBounds = true",
-            "upper.withAlphaComponent(0.53).cgColor",
-            "tone.withAlphaComponent(0.36).cgColor",
-            "lower.withAlphaComponent(0.59).cgColor",
+            "upper.withAlphaComponent(topAlpha).cgColor",
+            "tone.withAlphaComponent(0.28).cgColor",
+            "lower.withAlphaComponent(0.43).cgColor",
         ):
             self.assertIn(token, glass)
 
