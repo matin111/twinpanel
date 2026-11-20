@@ -30,35 +30,30 @@ private final class TwinNativeBackdrop: NSView {
     }
 }
 
-private final class TwinNativePowerRing: NSView {
-    override var isFlipped: Bool { false }
+// Replicates the *disconnected* state of the shared Flutter
+// TwinConnectWaveIndicator. No fake activity or synthetic RX/TX animation.
+private final class TwinNativeNetworkFabric: NSView {
+    override var isOpaque: Bool { false }
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
-        let r = min(bounds.width, bounds.height) * 0.42
-        let center = NSPoint(x: bounds.midX, y: bounds.midY)
-        let outer = NSBezierPath(ovalIn: NSRect(
-            x: center.x - r, y: center.y - r,
-            width: r * 2, height: r * 2
-        ))
-        NSColor(calibratedRed: 0.27, green: 0.43, blue: 0.50, alpha: 0.22).setFill()
-        outer.fill()
-        NSColor(calibratedRed: 0.47, green: 0.72, blue: 0.76, alpha: 0.38).setStroke()
-        outer.lineWidth = 1.7
-        outer.stroke()
-        let arc = NSBezierPath()
-        arc.appendArc(withCenter: center, radius: r * 0.68,
-                      startAngle: 47, endAngle: 312, clockwise: true)
-        arc.lineCapStyle = .round
-        arc.lineWidth = 8
-        NSColor(calibratedRed: 0.43, green: 0.72, blue: 0.75, alpha: 0.90).setStroke()
-        arc.stroke()
-        let stem = NSBezierPath()
-        stem.move(to: NSPoint(x: center.x, y: center.y + r * 0.83))
-        stem.line(to: NSPoint(x: center.x, y: center.y + r * 0.08))
-        stem.lineCapStyle = .round
-        stem.lineWidth = 8
-        NSColor(calibratedRed: 0.67, green: 0.88, blue: 0.86, alpha: 0.96).setStroke()
-        stem.stroke()
+        let rect = bounds.insetBy(dx: 1.5, dy: 1.5)
+        let outline = NSBezierPath(roundedRect: rect, xRadius: 25, yRadius: 25)
+        NSGradient(colors: [
+            NSColor(calibratedRed: 0.063, green: 0.118, blue: 0.165, alpha: 1),
+            NSColor(calibratedRed: 0.09, green: 0.208, blue: 0.263, alpha: 1),
+            NSColor(calibratedRed: 0.067, green: 0.149, blue: 0.196, alpha: 1)
+        ])?.draw(in: outline, angle: -40)
+        outline.lineWidth = 1
+        NSColor(calibratedRed: 0.54, green: 0.82, blue: 0.84,
+                alpha: 0.28).setStroke()
+        outline.stroke()
+        let line = NSBezierPath()
+        line.move(to: CGPoint(x: rect.minX + rect.width * 0.065, y: rect.midY))
+        line.line(to: CGPoint(x: rect.minX + rect.width * 0.935, y: rect.midY))
+        line.lineWidth = 1
+        NSColor(calibratedRed: 0.52, green: 0.78, blue: 0.92,
+                alpha: 0.13).setStroke()
+        line.stroke()
     }
 }
 
@@ -310,8 +305,21 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             size: 13, color: muted))
         switch tab {
         case 0:
-            workspace.addArrangedSubview(connectPage())
-            workspace.addArrangedSubview(networkStatusPage())
+            // The shared Flutter desktop layout uses two equally weighted
+            // connection/network cards when the usable main column is >=740.
+            let availableWidth = (view.window?.contentView?.bounds.width ?? 1100) - 234 - 48
+            if availableWidth >= 740 {
+                let pair = stack(.horizontal, spacing: 14)
+                pair.alignment = .top
+                pair.distribution = .fillEqually
+                pair.addArrangedSubview(connectPage())
+                pair.addArrangedSubview(networkStatusPage())
+                workspace.addArrangedSubview(pair)
+                pair.widthAnchor.constraint(equalTo: workspace.widthAnchor).isActive = true
+            } else {
+                workspace.addArrangedSubview(connectPage())
+                workspace.addArrangedSubview(networkStatusPage())
+            }
         case 1: workspace.addArrangedSubview(locationsPage())
         case 2: workspace.addArrangedSubview(settingsPage())
         default: workspace.addArrangedSubview(accountPage())
@@ -405,78 +413,33 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     }
 
     private func connectPage() -> NSView {
-        let content = stack(spacing: 13)
-        content.alignment = .width
-        let centered = stack(spacing: 9)
-        centered.alignment = .centerX
-        let offline = pill("●  You are offline", color: muted)
-        centered.addArrangedSubview(offline)
-        let emblem = TwinNativePowerRing(frame:
-            NSRect(x: 0, y: 0, width: 160, height: 160))
-        emblem.translatesAutoresizingMaskIntoConstraints = false
-        emblem.widthAnchor.constraint(equalToConstant: 160).isActive = true
-        emblem.heightAnchor.constraint(equalToConstant: 160).isActive = true
-        centered.addArrangedSubview(emblem)
-        centered.addArrangedSubview(text("Secure connection", size: 21,
-                                        weight: .bold))
-        centered.addArrangedSubview(text(
-            "Choose your server and protocol below", color: muted))
-        content.addArrangedSubview(centered)
+        let content = stack(spacing: 12)
+        content.alignment = .centerX
+        content.addArrangedSubview(pill("⏻  You are offline", color: muted))
 
-        let action = button("⏻   Connect", action: #selector(unavailableConnect(_:)),
-                            primary: true)
-        action.isEnabled = false
-        action.heightAnchor.constraint(equalToConstant: 50).isActive = true
-        content.addArrangedSubview(action)
-        action.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
+        let fabric = TwinNativeNetworkFabric(frame:
+            NSRect(x: 0, y: 0, width: 342, height: 178))
+        fabric.translatesAutoresizingMaskIntoConstraints = false
+        fabric.widthAnchor.constraint(equalToConstant: 342).isActive = true
+        fabric.heightAnchor.constraint(equalToConstant: 178).isActive = true
+        content.addArrangedSubview(fabric)
+
+        // Exact Windows call-to-action hierarchy. The button stays disabled
+        // until an Apple-signed PacketTunnel is proven ready.
+        let connectButton = button("⚡    Connect now    ›",
+            action: #selector(unavailableConnect(_:)), primary: true)
+        connectButton.isEnabled = false
+        connectButton.widthAnchor.constraint(equalToConstant: 266).isActive = true
+        connectButton.heightAnchor.constraint(equalToConstant: 59).isActive = true
+        content.addArrangedSubview(connectButton)
+
+        let subscription = homeSubscriptionSummary()
+        content.addArrangedSubview(subscription)
+        subscription.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
         content.addArrangedSubview(text(
-            "VPN unavailable: a signed Apple Network Extension is required.",
-            size: 11, color: amber))
-        content.addArrangedSubview(separator())
-        let selection = stack(.horizontal, spacing: 15)
-        selection.addArrangedSubview(text("Location: " +
-            (snapshot?.servers.first { $0.id == activeServer }?.name ?? "Not selected"),
-            size: 12, color: muted))
-        selection.addArrangedSubview(text("Protocol: " +
-            (snapshot?.protocols.first { $0.code == activeProtocol }?.name ??
-                "Not selected"), size: 12, color: muted))
-        content.addArrangedSubview(selection)
-        let pickers = stack(.horizontal, spacing: 18)
-        let locationPicker = NSPopUpButton(frame: .zero, pullsDown: false)
-        locationPicker.addItem(withTitle: "Select location")
-        for item in snapshot?.servers ?? [] {
-            locationPicker.addItem(withTitle: flag(item.country) + "  " + item.name)
-            locationPicker.lastItem?.representedObject = item.id
-        }
-        if let selected = activeServer,
-           let match = locationPicker.itemArray.first(where: {
-               ($0.representedObject as? String) == selected
-           }) {
-            locationPicker.select(match)
-        }
-        locationPicker.target = self
-        locationPicker.action = #selector(changeQuickServer(_:))
-        locationPicker.widthAnchor.constraint(equalToConstant: 220).isActive = true
-        let protocolPicker = NSPopUpButton(frame: .zero, pullsDown: false)
-        protocolPicker.addItem(withTitle: "Select protocol")
-        for item in snapshot?.protocols ?? [] {
-            protocolPicker.addItem(withTitle: item.name)
-            protocolPicker.lastItem?.representedObject = item.code
-        }
-        if let selected = activeProtocol,
-           let match = protocolPicker.itemArray.first(where: {
-               ($0.representedObject as? String) == selected
-           }) {
-            protocolPicker.select(match)
-        }
-        protocolPicker.target = self
-        protocolPicker.action = #selector(changeQuickProtocol(_:))
-        protocolPicker.widthAnchor.constraint(equalToConstant: 190).isActive = true
-        pickers.addArrangedSubview(locationPicker)
-        pickers.addArrangedSubview(protocolPicker)
-        content.addArrangedSubview(pickers)
-        content.addArrangedSubview(homeSubscriptionSummary())
-        return card([content], radius: 28, padding: 23)
+            "A signed macOS Packet Tunnel is required to connect.",
+            size: 10, color: amber))
+        return card([content], radius: 28, padding: 17)
     }
 
     // Layout parity with Flutter's independent "Network status" panel.
@@ -669,8 +632,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     private func homeSubscriptionSummary() -> NSView {
         let items = stack(spacing: 9)
         items.alignment = .width
-        items.addArrangedSubview(text("Subscription details",
-                                      size: 17, weight: .semibold))
+        items.addArrangedSubview(text("✓  Subscription details",
+                                      size: 13, weight: .semibold))
         if let data = snapshot {
             if let account = data.account {
                 let used = ByteCountFormatter.string(fromByteCount:
@@ -690,7 +653,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                     progress.doubleValue = Double(percent)
                     progress.style = .bar
                     progress.translatesAutoresizingMaskIntoConstraints = false
-                    progress.widthAnchor.constraint(equalToConstant: 370).isActive = true
+                    progress.widthAnchor.constraint(equalTo: items.widthAnchor).isActive = true
                     items.addArrangedSubview(progress)
                 }
                 let expiry = account.expiresAt.map {
