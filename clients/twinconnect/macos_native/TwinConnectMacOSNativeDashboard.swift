@@ -839,12 +839,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         // selection appears below so no text obscures the network strands.
         main.addArrangedSubview(fabric)
         fabric.widthAnchor.constraint(equalTo: main.widthAnchor).isActive = true
-        let previewServer = snapshot?.servers.first { $0.id == activeServer }
-        let preview = previewServer.map {
-            flag($0.country) + "  " + countryName($0.country) +
-            "  ·  " + (activeProtocol ?? "Choose protocol")
-        } ?? "Select a server and protocol in Locations"
-        main.addArrangedSubview(text(preview, size: 11, color: muted))
+        // Windows places the selected location only in Network Status,
+        // not as a second caption underneath the hero illustration.
 
         let buttonRow = stack(.horizontal, spacing: 0)
         let leftGap = NSView()
@@ -1820,20 +1816,35 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                                             size: 12, weight: .semibold))
         usage.addArrangedSubview(usageHeading)
         usageHeading.widthAnchor.constraint(equalTo: usage.widthAnchor).isActive = true
-        let progress = NSProgressIndicator()
-        progress.isIndeterminate = false
-        progress.minValue = 0
-        progress.maxValue = 100
+        // Thin custom usage rail matches Windows. Values still come
+        // exclusively from the panel; unlimited never implies a full bar.
+        let track = NSView()
+        track.translatesAutoresizingMaskIntoConstraints = false
+        track.wantsLayer = true
+        track.layer?.cornerRadius = 3
+        track.layer?.backgroundColor = sea.withAlphaComponent(0.20).cgColor
+        track.heightAnchor.constraint(equalToConstant: 5).isActive = true
+        usage.addArrangedSubview(track)
+        track.widthAnchor.constraint(equalTo: usage.widthAnchor).isActive = true
         if let account = account, account.limitBytes > 0 {
-            progress.doubleValue = max(0, min(100,
-                Double(account.usedBytes) / Double(account.limitBytes) * 100))
-        } else {
-            progress.doubleValue = 0
+            let fraction = max(0, min(1,
+                CGFloat(account.usedBytes) / CGFloat(account.limitBytes)))
+            if fraction > 0 {
+                let filled = NSView()
+                filled.translatesAutoresizingMaskIntoConstraints = false
+                filled.wantsLayer = true
+                filled.layer?.cornerRadius = 3
+                filled.layer?.backgroundColor = sea.withAlphaComponent(0.88).cgColor
+                track.addSubview(filled)
+                NSLayoutConstraint.activate([
+                    filled.leadingAnchor.constraint(equalTo: track.leadingAnchor),
+                    filled.topAnchor.constraint(equalTo: track.topAnchor),
+                    filled.bottomAnchor.constraint(equalTo: track.bottomAnchor),
+                    filled.widthAnchor.constraint(equalTo: track.widthAnchor,
+                                                 multiplier: fraction)
+                ])
+            }
         }
-        progress.style = .bar
-        progress.translatesAutoresizingMaskIntoConstraints = false
-        usage.addArrangedSubview(progress)
-        progress.widthAnchor.constraint(equalTo: usage.widthAnchor).isActive = true
         let remaining: String
         if let account = account {
             remaining = account.limitBytes == 0 ? "Unlimited" :
