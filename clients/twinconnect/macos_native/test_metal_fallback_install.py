@@ -206,6 +206,17 @@ class MetalFallbackInstallTests(unittest.TestCase):
                 settings = plistlib.load(handle)
             self.assertTrue(settings["com.apple.security.network.client"])
 
+    def test_appkit_hysteria_keeps_authenticated_ca_without_tls_bypass(self) -> None:
+        source = (self.root / "macos_native/TwinConnectMacOSNativeDirectory.swift").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn('tls["certificate"]', source)
+        self.assertIn('tls["certificate_public_key_sha256"]', source)
+        self.assertIn('tlsSettings["certificate"] = lines', source)
+        self.assertIn('tlsSettings["certificate_public_key_sha256"] = pins', source)
+        self.assertIn('tls["certificate_path"] != nil', source)
+        self.assertIn('tls["insecure"] as? Bool != true', source)
+
     def test_refreshes_modified_appkit_source_without_duplicate_swift_types(self) -> None:
         self.assertEqual(self.install().returncode, 0)
         dashboard_path = self.root / "macos_native/TwinConnectMacOSNativeDashboard.swift"
