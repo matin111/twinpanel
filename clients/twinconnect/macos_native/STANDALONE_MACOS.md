@@ -5,6 +5,45 @@ Apple's Network Extension. It does not create a system VPN, configure DNS,
 install routes, or activate Kill Switch. Never label it as connected until a
 real SOCKS/HTTP request through the proxy succeeds.
 
+
+## TwinConnect Flutter login -> panel -> local proxy (development)
+
+The macOS Flutter connection page now has a dedicated
+`MacStandaloneConnectionCard` rather than rendering the Windows card.
+It uses the already authenticated TwinPanel session to retrieve a **fresh**
+protocol entitlement list, assigned server inventory and that exact node's
+native profile. This is a separate development-only local SOCKS egress test;
+it does not change the account, server routing, gateway or DNS.
+
+The first in-app implementation covers `hysteria2`, `tuic`, `anytls`,
+`naive`, `snell`, and `socks5`. V2Ray/Xray requires explicit inbound
+variant selection; ShadowTLS requires a validated two-outbound chain.
+Other engines remain unintegrated in the in-app test rather than
+being falsely shown as connected.
+
+The proxy runner expects binaries installed under
+`~/twinpanel/clients/twinconnect/macos_native/build` on the development Mac.
+It prepares a credential-bearing temporary config in a private system
+temporary directory, starts only the matching preinstalled binary, makes
+one HTTPS SOCKS request, and stops the process and deletes the temporary
+config. Proxy egress success does **not** mean system VPN or Kill Switch
+coverage. This Flutter path requires a working Flutter macOS renderer;
+the separate AppKit fallback used by Metal-less cloud Macs is read-only.
+macOS sandbox restrictions may prevent process spawning, which is shown
+as an error rather than a fake successful connection.
+
+To check the new Flutter code on the Mac:
+
+```sh
+cd ~/twinpanel/clients/twinconnect
+flutter pub get
+flutter test test/macos_standalone_panel_profile_test.dart
+flutter test test/macos_standalone_ui_contract_test.dart
+dart analyze lib/macos_standalone_panel_profile.dart \
+  lib/macos_standalone_proxy_runtime.dart \
+  lib/macos_standalone_connection_card.dart
+```
+
 ## What is implemented
 
 The central registry tracks 15 protocol codes:
