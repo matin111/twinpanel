@@ -206,6 +206,26 @@ class MetalFallbackInstallTests(unittest.TestCase):
                 settings = plistlib.load(handle)
             self.assertTrue(settings["com.apple.security.network.client"])
 
+    def test_server_directory_uses_real_ping_and_selection_cards(self) -> None:
+        source = (SOURCE / "TwinConnectMacOSNativeDashboard.swift").read_text(
+            encoding="utf-8"
+        )
+        directory = source.split(
+            "    private func locationsPage() -> NSView {", 1
+        )[1].split("    private func createTable() -> NSView {", 1)[0]
+        for token in (
+            '"Server locations"', '"Search by server or country"',
+            '"PROTOCOLS"', '"ICMP LATENCY"', '"✓  Selected"',
+            'server.online', 'pingText(server)', 'pingColor(server)',
+            'pingDetails(server)', 'pingOneServer(_:)',
+            'selectLocationServer(_:)', 'toggleLocationCountry(_:)',
+            'activeServer == server.id', 'probeIP != nil',
+            'locationRowIDs = visible.map { $0.id }',
+        ):
+            self.assertIn(token, directory)
+        self.assertNotIn('pingMs = 100', directory)
+        self.assertNotIn('server.id.hashValue', directory)
+
     def test_appkit_hysteria_keeps_authenticated_ca_without_tls_bypass(self) -> None:
         source = (self.root / "macos_native/TwinConnectMacOSNativeDirectory.swift").read_text(
             encoding="utf-8"
