@@ -534,7 +534,11 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         scroll.translatesAutoresizingMaskIntoConstraints = false
         scroll.drawsBackground = false
         scroll.hasVerticalScroller = true
-        scroll.autohidesScrollers = true
+        // On Catalina remote desktops, overlay scrollbars and trackpad
+        // gestures can hide the only indication that content continues.
+        scroll.autohidesScrollers = false
+        scroll.verticalScrollElasticity = .allowed
+        scroll.hasHorizontalScroller = false
         scroll.borderType = .noBorder
 
         let document = TwinNativeFlippedDocument()
@@ -551,6 +555,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                                               constant: -18)
         ])
         scroll.documentView = document
+        scroll.contentView.scroll(to: .zero)
         root.addSubview(scroll)
         NSLayoutConstraint.activate([
             scroll.leadingAnchor.constraint(equalTo: sidebar.trailingAnchor),
@@ -562,6 +567,12 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             document.heightAnchor.constraint(greaterThanOrEqualTo:
                                              scroll.contentView.heightAnchor)
         ])
+        // Force the document to lay out its full natural height rather than
+        // treating the visible clip as the entire page. No off-screen cards
+        // should be unreachable by the mouse wheel or scrollbar.
+        workspace.setContentHuggingPriority(.required, for: .vertical)
+        document.layoutSubtreeIfNeeded()
+        scroll.reflectScrolledClipView(scroll.contentView)
     }
 
     // Native vector glyphs keep the Windows icon language sharp on Retina
