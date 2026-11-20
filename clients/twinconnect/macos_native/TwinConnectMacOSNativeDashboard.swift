@@ -938,35 +938,52 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     // Locations follow Flutter's Search -> protocol chips -> country accordion.
     // All data is scoped to the authenticated panel session. Node inventory
     // alone never guarantees a protocol-specific connection profile.
+    // The country accordion is the real interactive server directory.
+    // Compact, clearly selected rows; latency means ICMP only, not VPN health.
     private func locationsPage() -> NSView {
-        let wrapper = stack(spacing: 14)
+        let wrapper = stack(spacing: 16)
         wrapper.alignment = .leading
+
+        let heading = stack(.horizontal, spacing: 12)
+        heading.addArrangedSubview(text("Server locations", size: 23, weight: .bold))
+        let spacer = NSView()
+        spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        heading.addArrangedSubview(spacer)
+        let refresh = button("↻  Refresh", action: #selector(refresh(_:)),
+                             mutedButton: true)
+        refresh.heightAnchor.constraint(equalToConstant: 34).isActive = true
+        heading.addArrangedSubview(refresh)
+        wrapper.addArrangedSubview(heading)
+        heading.widthAnchor.constraint(equalTo: wrapper.widthAnchor).isActive = true
+        wrapper.addArrangedSubview(text(
+            "Choose a location and protocol. Ping is measured from this Mac.",
+            size: 12, color: muted))
 
         let searchRow = stack(.horizontal, spacing: 10)
         searchRow.alignment = .centerY
         let search = NSSearchField()
-        search.placeholderString = "Search servers"
+        search.placeholderString = "Search by server or country"
         search.stringValue = locationSearch
         search.sendsWholeSearchString = true
         search.sendsSearchStringImmediately = false
-        search.toolTip = "Press Return to filter by name or country"
+        search.toolTip = "Press Return to filter available locations"
         search.target = self
         search.action = #selector(searchLocations(_:))
         search.translatesAutoresizingMaskIntoConstraints = false
-        search.heightAnchor.constraint(equalToConstant: 40).isActive = true
+        search.heightAnchor.constraint(equalToConstant: 42).isActive = true
         searchRow.addArrangedSubview(search)
-        searchRow.addArrangedSubview(button("↻", action: #selector(refresh(_:))))
+        let pingAll = button(pingAllBusy ? "Measuring…" : "↻  Ping all",
+                             action: #selector(pingAllServers(_:)),
+                             mutedButton: true)
+        pingAll.isEnabled = !pingAllBusy && !(snapshot?.servers.isEmpty ?? true)
+        pingAll.toolTip = "Measure real ICMP latency to authorized public probe addresses"
+        pingAll.heightAnchor.constraint(equalToConstant: 40).isActive = true
+        searchRow.addArrangedSubview(pingAll)
         wrapper.addArrangedSubview(searchRow)
         searchRow.widthAnchor.constraint(equalTo: wrapper.widthAnchor).isActive = true
 
-        let ping = button(pingAllBusy ? "⚡  Testing server ping…" :
-                "⚡  Ping all servers",
-                action: #selector(pingAllServers(_:)), mutedButton: true)
-        ping.isEnabled = !pingAllBusy && !(snapshot?.servers.isEmpty ?? true)
-        ping.toolTip = "Send one ICMP echo to each public server probe IP"
-        ping.heightAnchor.constraint(equalToConstant: 32).isActive = true
-        wrapper.addArrangedSubview(ping)
-        ping.widthAnchor.constraint(equalTo: wrapper.widthAnchor).isActive = true
+        let protocolsTitle = text("PROTOCOLS", size: 11, weight: .bold, color: muted)
+        wrapper.addArrangedSubview(protocolsTitle)
         let chips = protocolChips()
         wrapper.addArrangedSubview(chips)
         chips.widthAnchor.constraint(equalTo: wrapper.widthAnchor).isActive = true
@@ -985,6 +1002,10 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         locationCountryIDs = codes
         locationRowIDs = visible.map { $0.id }
 
+        let count = visible.count
+        wrapper.addArrangedSubview(text(
+            String(codes.count) + " COUNTRIES  ·  " + String(count) + " SERVERS",
+            size: 11, weight: .semibold, color: sea))
         if codes.isEmpty {
             let message: String
             if let issue = snapshot?.errors["servers"] {
@@ -996,67 +1017,113 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                 message = "Loading assigned locations…"
             }
             let placeholder = card([text(message, color: muted)],
-                                   radius: 17, padding: 17)
+                                   radius: 17, padding: 19)
             wrapper.addArrangedSubview(placeholder)
             placeholder.widthAnchor.constraint(equalTo: wrapper.widthAnchor).isActive = true
         }
-        for (index, code) in codes.enumerated() {
-            let items = grouped[code] ?? []
+
+        for (countryIndex, code) in codes.enumerated() {
+            let items = (grouped[code] ?? []).sorted {
+                $0.name.localizedStandardCompare($1.name) == .orderedAscending
+            }
             let expanded = expandedCountries.contains(code)
-            let group = stack(spacing: 10)
+            let selectedHere = items.contains { $0.id == activeServer }
+            let group = stack(spacing: 12)
             group.alignment = .leading
+
             let header = button(
-                flag(code) + "    " + countryName(code) + "     " +
-                String(items.count) + (items.count == 1 ? " server" : " servers") +
-                (expanded ? "    ⌃" : "    ⌄"),
-                action: #selector(toggleLocationCountry(_:)), tag: index)
+                flag(code) + "   " + countryName(code) +
+                "     ·     " + String(items.count) +
+                (items.count == 1 ? " server" : " servers") +
+                (selectedHere ? "     ✓ Selected" : "") +
+                (expanded ? "       ⌃" : "       ⌄"),
+                action: #selector(toggleLocationCountry(_:)), tag: countryIndex,
+                primary: false, mutedButton: true)
             header.alignment = .left
-            header.heightAnchor.constraint(equalToConstant: 49).isActive = true
+            header.font = NSFont.systemFont(ofSize: 14, weight: .semibold)
+            header.heightAnchor.constraint(equalToConstant: 54).isActive = true
+            header.layer?.cornerRadius = 14
+            header.layer?.borderColor = (selectedHere ? sea : tint())
+                .withAlphaComponent(selectedHere ? 0.65 : 0.18).cgColor
             group.addArrangedSubview(header)
             header.widthAnchor.constraint(equalTo: group.widthAnchor).isActive = true
+
             if expanded {
                 for server in items {
-                    let index = locationRowIDs.firstIndex(of: server.id) ?? -1
-                    let indicator = server.online ? "● Online" : "○ Offline"
-                    let line = (activeServer == server.id ? "✓ " : "  ") +
-                        server.name + "    " + indicator
-                    let choose = button(line,
-                        action: #selector(selectLocationServer(_:)),
-                        tag: index, primary: activeServer == server.id,
-                        mutedButton: activeServer != server.id)
-                    choose.alignment = .left
-                    choose.heightAnchor.constraint(equalToConstant: 43).isActive = true
-                    choose.setContentHuggingPriority(.defaultLow, for: .horizontal)
+                    let serverIndex = locationRowIDs.firstIndex(of: server.id) ?? -1
+                    let selected = activeServer == server.id
+                    let stateColor = server.online ? sea : muted
 
-                    let pingLabel = text(pingText(server), size: 11,
-                                         weight: .semibold, color: pingColor(server))
-                    pingLabel.toolTip = pingDetails(server)
-                    pingLabel.widthAnchor.constraint(equalToConstant: 76).isActive = true
+                    let info = stack(spacing: 6)
+                    info.alignment = .leading
+                    let name = text(server.name, size: 14, weight: .semibold)
+                    name.lineBreakMode = .byTruncatingTail
+                    name.maximumNumberOfLines = 1
+                    name.toolTip = server.name
+                    info.addArrangedSubview(name)
+                    info.addArrangedSubview(text(
+                        (server.online ? "● Online" : "○ Offline") +
+                        "   ·   " + countryName(code),
+                        size: 11, weight: .medium, color: stateColor))
+
+                    let stats = stack(spacing: 4)
+                    stats.alignment = .trailing
+                    let ping = text(pingText(server), size: 14,
+                                    weight: .bold, color: pingColor(server))
+                    ping.alignment = .right
+                    ping.toolTip = pingDetails(server)
+                    stats.addArrangedSubview(ping)
+                    let pingCaption = text("ICMP LATENCY", size: 9,
+                                           weight: .medium, color: muted)
+                    pingCaption.alignment = .right
+                    stats.addArrangedSubview(pingCaption)
+
+                    let select = button(selected ? "✓  Selected" : "Select",
+                        action: #selector(selectLocationServer(_:)),
+                        tag: serverIndex, primary: selected,
+                        mutedButton: !selected)
+                    select.widthAnchor.constraint(equalToConstant: 106).isActive = true
+                    select.heightAnchor.constraint(equalToConstant: 36).isActive = true
+                    select.layer?.cornerRadius = 11
+
                     let probe = button(nodePingBusy.contains(server.id) ? "…" : "↻",
                                        action: #selector(pingOneServer(_:)),
-                                       tag: index, mutedButton: true)
-                    probe.widthAnchor.constraint(equalToConstant: 40).isActive = true
-                    probe.heightAnchor.constraint(equalToConstant: 35).isActive = true
-                    probe.isEnabled = !pingAllBusy &&
-                        !nodePingBusy.contains(server.id) && server.probeIP != nil
+                                       tag: serverIndex, mutedButton: true)
+                    probe.widthAnchor.constraint(equalToConstant: 36).isActive = true
+                    probe.heightAnchor.constraint(equalToConstant: 36).isActive = true
                     probe.toolTip = server.probeIP == nil ?
                         "No public probe address supplied by the panel" :
-                        "Ping this server from your Mac"
-                    let serverRow = stack(.horizontal, spacing: 9)
-                    serverRow.alignment = .centerY
-                    serverRow.addArrangedSubview(choose)
-                    serverRow.addArrangedSubview(pingLabel)
-                    serverRow.addArrangedSubview(probe)
-                    group.addArrangedSubview(serverRow)
-                    serverRow.widthAnchor.constraint(equalTo: group.widthAnchor)
-                        .isActive = true
+                        "Measure this server's ICMP latency"
+                    probe.isEnabled = !pingAllBusy &&
+                        !nodePingBusy.contains(server.id) && server.probeIP != nil
+
+                    let row = stack(.horizontal, spacing: 13)
+                    row.alignment = .centerY
+                    row.addArrangedSubview(info)
+                    info.setContentHuggingPriority(.defaultLow, for: .horizontal)
+                    row.addArrangedSubview(stats)
+                    row.addArrangedSubview(probe)
+                    row.addArrangedSubview(select)
+
+                    let tile = card([row], radius: 15, padding: 14)
+                    tile.wantsLayer = true
+                    tile.layer?.backgroundColor = (selected ?
+                        tint().withAlphaComponent(0.25) :
+                        NSColor(calibratedRed: 0.13, green: 0.21,
+                                blue: 0.26, alpha: 0.88)).cgColor
+                    tile.layer?.borderColor = (selected ? sea : tint())
+                        .withAlphaComponent(selected ? 0.72 : 0.16).cgColor
+                    tile.layer?.borderWidth = selected ? 1.5 : 1
+                    group.addArrangedSubview(tile)
+                    tile.widthAnchor.constraint(equalTo: group.widthAnchor).isActive = true
                 }
             }
-            let row = card([group], radius: 17, padding: 11)
-            wrapper.addArrangedSubview(row)
-            row.widthAnchor.constraint(equalTo: wrapper.widthAnchor).isActive = true
+
+            let section = card([group], radius: 19, padding: 12)
+            wrapper.addArrangedSubview(section)
+            section.widthAnchor.constraint(equalTo: wrapper.widthAnchor).isActive = true
         }
-        return card([wrapper], radius: 23, padding: 19)
+        return card([wrapper], radius: 23, padding: 20)
     }
 
     private func createTable() -> NSView {
