@@ -327,6 +327,19 @@ class MetalFallbackInstallTests(unittest.TestCase):
         self.assertIn('networkMetric("Public IP", value: "—")', source)
         self.assertNotIn('pill("Tunnel active", color: sea)', source)
 
+    def test_hysteria_app_lifetime_watchdog_is_always_enabled(self) -> None:
+        source = (SOURCE / "TwinConnectMacOSNativeDashboard.swift").read_text(
+            encoding="utf-8"
+        )
+        section = source.split(
+            "    private func oneShotHysteria2Probe(_ config: Data) -> String {", 1
+        )[1].split("    private func safeManagerReason", 1)[0]
+        self.assertIn('"start", "hysteria2", file.path, "--owner-pid"', section)
+        self.assertIn('String(ProcessInfo.processInfo.processIdentifier)', section)
+        self.assertIn('let stopped = runLocalManager(["stop"], root: root)',
+                      section)
+        self.assertNotIn('systemPreferences', section)
+
     def test_emergency_stop_and_offline_animation_are_safe(self) -> None:
         source = (SOURCE / "TwinConnectMacOSNativeDashboard.swift").read_text(
             encoding="utf-8"
