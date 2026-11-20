@@ -717,6 +717,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         let search = NSSearchField()
         search.placeholderString = "Search servers"
         search.stringValue = locationSearch
+        search.sendsWholeSearchString = true
+        search.sendsSearchStringImmediately = false
         search.toolTip = "Press Return to filter by name or country"
         search.target = self
         search.action = #selector(searchLocations(_:))
@@ -1261,6 +1263,16 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                 return
             }
             self.snapshot = data
+            if data.sectionsLoaded.contains("protocols"),
+               let selected = self.activeProtocol,
+               !data.protocols.contains(where: { $0.code == selected }) {
+                self.activeProtocol = nil
+            }
+            if data.sectionsLoaded.contains("servers"),
+               let selected = self.activeServer,
+               !data.servers.contains(where: { $0.id == selected }) {
+                self.activeServer = nil
+            }
             self.busy = !data.isComplete
             let count = data.sectionsLoaded.count
             if data.isComplete {
