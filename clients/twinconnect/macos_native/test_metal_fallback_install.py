@@ -435,12 +435,15 @@ class MetalFallbackInstallTests(unittest.TestCase):
             'private func radialLight(',
             'CGGradient(',
             'context.drawRadialGradient(',
-            'radialLight(ctx,',
-            'for index in 0..<11',
-            'for index in 0..<26',
-            'glow.withAlphaComponent(',
+            'radialLight(context,',
+            'for index in 0..<7',
+            'for index in 0..<13',
+            'frost.withAlphaComponent(',
         ):
             self.assertIn(token, backdrop)
+        self.assertIn('let origin = CGPoint(x: w * 0.87, y: h * 0.52)', backdrop)
+        self.assertIn('for index in 0..<4', backdrop)
+        self.assertIn('tint: accent, opacity: 0.50', backdrop)
         self.assertNotIn('MTLCreateSystemDefaultDevice', backdrop)
         self.assertNotIn('URLSession', backdrop)
 
