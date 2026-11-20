@@ -151,7 +151,9 @@ class MetalFallbackInstallTests(unittest.TestCase):
         self.assertIn('addPage(pair)', generated)
         self.assertIn('if availableWidth >= 790', generated)
         self.assertIn('sidebar.widthAnchor.constraint(equalToConstant: 258)', generated)
-        self.assertIn('Connect now', generated)
+        self.assertIn('Test Hysteria2 proxy', generated)
+        self.assertIn('primaryProxyAction(_ sender: NSButton)', generated)
+        self.assertIn('prepareLocalHysteria2', generated)
         # Regression: a login must show the AppKit dashboard even if
         # subscription refresh fails or takes time. Layout must not collapse.
         self.assertIn("sidebar.translatesAutoresizingMaskIntoConstraints = false", generated)
