@@ -29,10 +29,23 @@ else
   printf '%s\n' 'FAIL no usable code signing identity in keychain'
   fail=1
 fi
-if grep -q 'return false' macos_native/TwinConnectMacOSVPNBridge.swift &&
-   grep -A3 'func wireGuardBackendReady()' macos_native/TwinConnectMacOSVPNBridge.swift | grep -q 'return false'; then
-  printf '%s\n' 'FAIL WireGuardKitGo backend readiness is explicitly disabled'
+if grep -q 'TWINCONNECT_SIGNED_WIREGUARD' macos_native/TwinConnectMacOSVPNBridge.swift; then
+  printf '%s\n' 'INFO WireGuard startup is gated behind signed PacketTunnel entitlement verification'
+fi
+if ! grep -A1 'TwinConnectWireGuardBackendLinked' macos_native/PacketTunnel-Info.plist | grep -q '<true/>'; then
+  printf '%s\n' 'FAIL signed WireGuard backend marker is not enabled in PacketTunnel bundle'
   fail=1
+fi
+found_extension="$(find "$HOME/Library/Developer/Xcode/DerivedData" -path '*/Build/Products/Debug/*.app/Contents/PlugIns/PacketTunnel.appex/Contents/MacOS/PacketTunnel' -type f -print -quit 2>/dev/null)"
+if [ -n "$found_extension" ]; then
+  if nm -g "$found_extension" 2>/dev/null | grep -q '_wgTurnOn'; then
+    printf '%s\n' 'PASS built PacketTunnel includes native WireGuard Go symbols'
+  else
+    printf '%s\n' 'FAIL built PacketTunnel does not include WireGuard Go symbols'
+    fail=1
+  fi
+else
+  printf '%s\n' 'INFO built PacketTunnel executable was not found in Xcode DerivedData'
 fi
 if [ -d macos/Flutter/ephemeral ]; then
   printf '%s\n' 'INFO Flutter macOS generated files are present'
