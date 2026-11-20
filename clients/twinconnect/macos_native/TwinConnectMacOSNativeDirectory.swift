@@ -64,14 +64,21 @@ enum TwinMacNativePing {
         }
         let task = Process()
         task.executableURL = URL(fileURLWithPath: binary)
-        // Darwin ping -W is a bounded reply wait in milliseconds.
-        // Disable hostname lookups; never invoke a shell.
-        task.arguments = ["-n", "-c", "1", "-W", "1500", safeIP]
+        // macOS ping's -W is milliseconds, but macOS ping6 uses -W
+        // for an unrelated legacy IPv6 query: never pass 1500 to ping6.
+        // Use a bounded asynchronous watchdog for both variants.
+        // Numeric destination only; never invoke a shell.
+        task.arguments = isV6 ? ["-n", "-c", "1", safeIP] :
+            ["-n", "-c", "1", "-W", "1500", safeIP]
         let output = Pipe()
         task.standardOutput = output
         task.standardError = output
         do {
             try task.run()
+            DispatchQueue.global(qos: .utility).asyncAfter(
+                deadline: .now() + .seconds(4)) {
+                if task.isRunning { task.terminate() }
+            }
             task.waitUntilExit()
         } catch {
             return TwinMacNativePingResult(measuredMs: nil,
