@@ -211,9 +211,10 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                          .font: NSFont.systemFont(ofSize: 13,
                                                  weight: .semibold)]
         )
-        control.isEnabled = !busy
+        // Navigation stays usable while the account API is refreshing.
+        control.isEnabled = true
         control.translatesAutoresizingMaskIntoConstraints = false
-        control.heightAnchor.constraint(greaterThanOrEqualToConstant: 39)
+        control.heightAnchor.constraint(greaterThanOrEqualToConstant: 30)
             .isActive = true
         return control
     }
@@ -333,8 +334,12 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                 let pair = stack(.horizontal, spacing: 14)
                 pair.alignment = .top
                 pair.distribution = .fillEqually
-                pair.addArrangedSubview(connectPage())
-                pair.addArrangedSubview(networkStatusPage())
+                let connection = connectPage()
+                let network = networkStatusPage()
+                pair.addArrangedSubview(connection)
+                pair.addArrangedSubview(network)
+                network.heightAnchor.constraint(equalTo: connection.heightAnchor)
+                    .isActive = true
                 workspace.addArrangedSubview(pair)
                 pair.widthAnchor.constraint(equalTo: workspace.widthAnchor).isActive = true
             } else {
