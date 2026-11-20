@@ -52,13 +52,65 @@ private final class TwinNativeNetworkFabric: NSView {
         NSColor(calibratedRed: 0.54, green: 0.82, blue: 0.84,
                 alpha: 0.28).setStroke()
         outline.stroke()
-        let line = NSBezierPath()
-        line.move(to: CGPoint(x: rect.minX + rect.width * 0.065, y: rect.midY))
-        line.line(to: CGPoint(x: rect.minX + rect.width * 0.935, y: rect.midY))
-        line.lineWidth = 1
-        NSColor(calibratedRed: 0.52, green: 0.78, blue: 0.92,
-                alpha: 0.13).setStroke()
-        line.stroke()
+        // Retina vector network strands modeled after the Windows dashboard.
+        // Purely decorative; the actual VPN status is never inferred from them.
+        let cx = rect.midX
+        let cy = rect.midY
+        let center = CGPoint(x: cx, y: cy)
+        for radius in [CGFloat(24), 40, 63] {
+            let ring = NSBezierPath(ovalIn: NSRect(
+                x: cx - radius, y: cy - radius,
+                width: radius * 2, height: radius * 2))
+            NSColor(calibratedRed: 0.30, green: 0.82, blue: 0.83,
+                    alpha: 0.10).setStroke()
+            ring.lineWidth = 1
+            ring.stroke()
+        }
+        for index in 0..<17 {
+            let t = CGFloat(index) / 16
+            let spread = (t - 0.5) * min(rect.height * 0.66, 105)
+            for side: CGFloat in [-1, 1] {
+                let path = NSBezierPath()
+                let edgeX = cx + side * rect.width * 0.43
+                path.move(to: CGPoint(x: cx + side * 13, y: cy + spread * 0.13))
+                path.curve(to: CGPoint(x: edgeX, y: cy + spread),
+                           controlPoint1: CGPoint(x: cx + side * rect.width * 0.20,
+                                                  y: cy + spread * 0.25),
+                           controlPoint2: CGPoint(x: cx + side * rect.width * 0.31,
+                                                  y: cy + spread * 0.92))
+                path.lineWidth = index.isMultiple(of: 4) ? 1.35 : 0.65
+                NSColor(calibratedRed: 0.24, green: 0.88, blue: 0.83,
+                        alpha: index.isMultiple(of: 4) ? 0.63 : 0.27).setStroke()
+                path.stroke()
+            }
+        }
+        for (x, y, radius) in [
+            (-0.41, 0.00, 3.8), (-0.31, 0.12, 2.9), (-0.19, -0.12, 2.3),
+            (0.19, 0.08, 2.6), (0.31, -0.16, 2.7), (0.41, 0.00, 3.8)
+        ] {
+            let dot = NSBezierPath(ovalIn: NSRect(
+                x: cx + CGFloat(x) * rect.width - CGFloat(radius),
+                y: cy + CGFloat(y) * rect.height - CGFloat(radius),
+                width: CGFloat(radius) * 2, height: CGFloat(radius) * 2))
+            NSColor(calibratedRed: 0.35, green: 0.96, blue: 0.84,
+                    alpha: 0.90).setFill()
+            dot.fill()
+        }
+        let centerBody = NSBezierPath(roundedRect: NSRect(
+            x: center.x - 19, y: center.y - 25, width: 38, height: 50),
+            xRadius: 13, yRadius: 13)
+        NSColor(calibratedRed: 0.04, green: 0.20, blue: 0.25, alpha: 1).setFill()
+        centerBody.fill()
+        centerBody.lineWidth = 1.6
+        NSColor(calibratedRed: 0.34, green: 0.94, blue: 0.82, alpha: 0.87).setStroke()
+        centerBody.stroke()
+        for delta in [-8.0, 0.0, 8.0] {
+            let dash = NSBezierPath()
+            dash.move(to: CGPoint(x: cx - 8, y: cy + CGFloat(delta)))
+            dash.line(to: CGPoint(x: cx + 8, y: cy + CGFloat(delta)))
+            dash.lineWidth = 1.25
+            dash.stroke()
+        }
     }
 }
 
@@ -663,34 +715,16 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         fabric.heightAnchor.constraint(equalToConstant: 165).isActive = true
         // The old backdrop was an empty rectangle. This status overlay is
         // explicitly a selectable local proxy test, not a connected VPN.
-        let fabricInfo = stack(spacing: 9)
-        fabricInfo.alignment = .centerX
-        let heroIcon = text("◎", size: 33, weight: .light, color: sea)
-        heroIcon.alignment = .center
-        fabricInfo.addArrangedSubview(heroIcon)
-        let heroTitle = text("LOCAL PROXY TEST", size: 13,
-                             weight: .bold, color: .white)
-        heroTitle.alignment = .center
-        fabricInfo.addArrangedSubview(heroTitle)
-        let previewServer = snapshot?.servers.first { $0.id == activeServer }
-        let preview = previewServer.map {
-            flag($0.country) + " " + countryName($0.country) +
-            "  ·  " + (activeProtocol ?? "Choose protocol")
-        } ?? "Choose a server in Locations"
-        let heroSubtitle = text(preview, size: 11, color: muted)
-        heroSubtitle.alignment = .center
-        fabricInfo.addArrangedSubview(heroSubtitle)
-        fabric.addSubview(fabricInfo)
-        NSLayoutConstraint.activate([
-            fabricInfo.centerXAnchor.constraint(equalTo: fabric.centerXAnchor),
-            fabricInfo.centerYAnchor.constraint(equalTo: fabric.centerYAnchor),
-            fabricInfo.leadingAnchor.constraint(
-                greaterThanOrEqualTo: fabric.leadingAnchor, constant: 12),
-            fabricInfo.trailingAnchor.constraint(
-                lessThanOrEqualTo: fabric.trailingAnchor, constant: -12)
-        ])
+        // The vector illustration itself remains in the hero; the current
+        // selection appears below so no text obscures the network strands.
         main.addArrangedSubview(fabric)
         fabric.widthAnchor.constraint(equalTo: main.widthAnchor).isActive = true
+        let previewServer = snapshot?.servers.first { $0.id == activeServer }
+        let preview = previewServer.map {
+            flag($0.country) + "  " + countryName($0.country) +
+            "  ·  " + (activeProtocol ?? "Choose protocol")
+        } ?? "Select a server and protocol in Locations"
+        main.addArrangedSubview(text(preview, size: 11, color: muted))
 
         let buttonRow = stack(.horizontal, spacing: 0)
         let leftGap = NSView()
