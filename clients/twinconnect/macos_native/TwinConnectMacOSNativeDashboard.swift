@@ -222,8 +222,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         return root
     }
 
-    private func inputField(_ placeholder: String, password: Bool) -> NSTextField {
-        let field: NSTextField = password ? NSSecureTextField() : NSTextField()
+    private func styleInputField<T: NSTextField>(_ field: T, placeholder: String) -> T {
         field.placeholderString = placeholder
         field.focusRingType = .exterior
         field.isBezeled = false
@@ -249,10 +248,10 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                                   size: 13, color: muted))
 
         let nameTitle = text("Username", size: 13, weight: .semibold)
-        let username = inputField("Enter app username", password: false)
+        let username = styleInputField(NSTextField(), placeholder: "Enter app username")
         usernameField = username
         let secretTitle = text("Password", size: 13, weight: .semibold)
-        let password = inputField("Enter password", password: true)
+        let password = styleInputField(NSSecureTextField(), placeholder: "Enter password")
         passwordField = password
         let fields = stack(spacing: 8)
         for field in [nameTitle, username, secretTitle, password] {
