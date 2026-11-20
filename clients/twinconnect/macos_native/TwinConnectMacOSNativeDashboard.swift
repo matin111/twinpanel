@@ -9,90 +9,104 @@ private final class TwinNativeFlippedDocument: NSView {
 }
 
 private final class TwinNativeBackdrop: NSView {
-    // A resolution-independent illustrated background: no Metal, remote
-    // image, or external asset is needed on Catalina cloud Macs.
+    // Retina vector artwork inspired by the Windows spatial atmosphere.
+    // Drawn on CPU: supported on the Metal-less Catalina test machine.
+    // All highlights derive from the authenticated panel theme.
     var base = NSColor(calibratedRed: 0.032, green: 0.11, blue: 0.145, alpha: 1)
     var glow = NSColor(calibratedRed: 0.10, green: 0.47, blue: 0.55, alpha: 1)
 
     private func radialLight(_ context: CGContext, center: CGPoint,
                              radius: CGFloat, tint: NSColor, opacity: CGFloat) {
         let clear = tint.withAlphaComponent(0).cgColor
-        let strong = tint.withAlphaComponent(opacity).cgColor
         guard let gradient = CGGradient(
             colorsSpace: CGColorSpaceCreateDeviceRGB(),
-            colors: [strong, tint.withAlphaComponent(opacity * 0.38).cgColor,
+            colors: [tint.withAlphaComponent(opacity).cgColor,
+                     tint.withAlphaComponent(opacity * 0.42).cgColor,
                      clear] as CFArray,
-            locations: [0, 0.47, 1]
+            locations: [0, 0.35, 1]
         ) else { return }
         context.drawRadialGradient(
             gradient, startCenter: center, startRadius: 0,
             endCenter: center, endRadius: radius,
-            options: [.drawsBeforeStartLocation, .drawsAfterEndLocation]
-        )
+            options: [.drawsAfterEndLocation])
     }
 
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
         let area = bounds
+        let w = area.width
+        let h = area.height
+        let accent = glow
+        let frost = accent.blended(withFraction: 0.57, of: .white) ?? accent
+        let shade = base.blended(withFraction: 0.40, of: .black) ?? base
+
+        // Deep architectural backdrop rather than flat aqua wallpaper.
         NSGradient(colors: [
-            base,
-            base.blended(withFraction: 0.20, of: glow) ?? base,
-            base.blended(withFraction: 0.08, of: .black) ?? base
-        ])?.draw(in: area, angle: -32)
+            shade, base,
+            base.blended(withFraction: 0.16, of: accent) ?? base,
+            shade
+        ])?.draw(in: area, angle: 138)
 
-        // Three muted pools of branded light give the same cinematic depth
-        // as the Windows artwork without flattening the foreground cards.
-        if let ctx = NSGraphicsContext.current?.cgContext {
-            ctx.saveGState()
-            radialLight(ctx,
-                center: CGPoint(x: area.width * 0.79, y: area.height * 0.89),
-                radius: max(area.width, area.height) * 0.64,
-                tint: glow, opacity: 0.29)
-            radialLight(ctx,
-                center: CGPoint(x: area.width * 0.19, y: area.height * 0.11),
-                radius: max(area.width, area.height) * 0.49,
-                tint: glow, opacity: 0.16)
-            radialLight(ctx,
-                center: CGPoint(x: area.width * 0.52, y: area.height * 0.49),
-                radius: max(area.width, area.height) * 0.35,
-                tint: glow.blended(withFraction: 0.25, of: .white) ?? glow,
-                opacity: 0.075)
-            ctx.restoreGState()
+        if let context = NSGraphicsContext.current?.cgContext {
+            context.saveGState()
+            // Off-canvas light shafts give believable dimensional depth.
+            radialLight(context,
+                center: CGPoint(x: w * 0.74, y: h * 1.02),
+                radius: max(w, h) * 0.67,
+                tint: accent, opacity: 0.50)
+            radialLight(context,
+                center: CGPoint(x: w * 1.03, y: h * 0.28),
+                radius: max(w, h) * 0.48,
+                tint: frost, opacity: 0.19)
+            radialLight(context,
+                center: CGPoint(x: w * 0.25, y: h * -0.18),
+                radius: max(w, h) * 0.52,
+                tint: accent, opacity: 0.20)
+            context.restoreGState()
         }
 
-        // Fine orbital contours are intentionally sparse and low contrast.
-        for index in 0..<11 {
-            let t = CGFloat(index) / 10
-            let path = NSBezierPath()
-            path.move(to: CGPoint(x: -area.width * 0.04,
-                                  y: area.height * (0.22 + t * 0.64)))
-            path.curve(
-                to: CGPoint(x: area.width * 1.08,
-                            y: area.height * (0.16 + t * 0.77)),
-                controlPoint1: CGPoint(x: area.width * 0.28,
-                                      y: area.height * (0.46 + t * 0.39)),
-                controlPoint2: CGPoint(x: area.width * 0.71,
-                                      y: area.height * (0.06 + t * 0.87))
-            )
-            path.lineWidth = index.isMultiple(of: 4) ? 1.05 : 0.55
-            glow.withAlphaComponent(
-                index.isMultiple(of: 4) ? 0.125 : 0.058
-            ).setStroke()
-            path.stroke()
+        // An asymmetric luminous orbital feature sits mostly behind the
+        // content, with enough of its sweep visible in the page margins.
+        let origin = CGPoint(x: w * 0.87, y: h * 0.52)
+        for index in 0..<7 {
+            let expansion = CGFloat(index) * 31
+            let ellipse = NSBezierPath(ovalIn: NSRect(
+                x: origin.x - (w * 0.28 + expansion),
+                y: origin.y - (h * 0.47 + expansion * 0.76),
+                width: (w * 0.28 + expansion) * 2,
+                height: (h * 0.47 + expansion * 0.76) * 2))
+            ellipse.lineWidth = index == 0 ? 1.5 : 0.65
+            frost.withAlphaComponent(index == 0 ? 0.20 : 0.075)
+                .setStroke()
+            ellipse.stroke()
         }
 
-        // A small constellation texture remains stable on every repaint.
-        for index in 0..<26 {
-            let x = CGFloat((index * 97 + 23) % 263) / 263
-            let y = CGFloat((index * 71 + 41) % 239) / 239
-            let radius: CGFloat = index.isMultiple(of: 5) ? 1.25 : 0.7
-            let dot = NSBezierPath(ovalIn: NSRect(
-                x: area.width * x - radius,
-                y: area.height * y - radius,
+        // A second broad ribbon curves across the canvas; it avoids the
+        // sharp repeated waves that made the first design look dated.
+        for index in 0..<4 {
+            let offset = CGFloat(index) * 29
+            let ribbon = NSBezierPath()
+            ribbon.move(to: CGPoint(x: -w * 0.15, y: h * 0.12 + offset))
+            ribbon.curve(to: CGPoint(x: w * 1.13, y: h * 0.78 + offset),
+                         controlPoint1: CGPoint(x: w * 0.31, y: h * 0.59 + offset),
+                         controlPoint2: CGPoint(x: w * 0.56, y: -h * 0.19 + offset))
+            ribbon.lineWidth = index == 0 ? 1.25 : 0.75
+            accent.withAlphaComponent(index == 0 ? 0.17 : 0.065)
+                .setStroke()
+            ribbon.stroke()
+        }
+
+        // Small, restrained specular accents—not a starfield texture.
+        for index in 0..<13 {
+            let x = CGFloat((index * 83 + 47) % 241) / 241
+            let y = CGFloat((index * 61 + 19) % 229) / 229
+            let radius: CGFloat = index.isMultiple(of: 4) ? 1.25 : 0.65
+            let sparkle = NSBezierPath(ovalIn: NSRect(
+                x: w * x - radius, y: h * y - radius,
                 width: radius * 2, height: radius * 2))
-            glow.withAlphaComponent(index.isMultiple(of: 5) ? 0.20 : 0.11)
+            frost.withAlphaComponent(index.isMultiple(of: 4) ? 0.33 : 0.12)
                 .setFill()
-            dot.fill()
+            sparkle.fill()
         }
     }
 }
