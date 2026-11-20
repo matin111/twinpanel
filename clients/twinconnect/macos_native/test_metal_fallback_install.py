@@ -238,7 +238,7 @@ class MetalFallbackInstallTests(unittest.TestCase):
             '"All protocols (" + String(list.count)',
             'private final class TwinNativeNetworkFabric: NSView',
             'let centerBody = NSBezierPath(roundedRect:',
-            'previewServer = snapshot?.servers.first',
+            '// Windows places the selected location only in Network Status,',
         ):
             self.assertIn(token, source)
         self.assertIn('pingDetails(server)', source)
@@ -306,6 +306,23 @@ class MetalFallbackInstallTests(unittest.TestCase):
         self.assertNotIn('compactMetric("Public IP", value: "—")', connect)
         self.assertIn("usageCard.widthAnchor.constraint(equalTo: items.widthAnchor)",
                       source)
+
+    def test_windows_subscription_uses_real_quota_thin_usage_rail(self) -> None:
+        source = (SOURCE / "TwinConnectMacOSNativeDashboard.swift").read_text(
+            encoding="utf-8"
+        )
+        body = source.split(
+            "    private func homeSubscriptionSummary() -> NSView {", 1
+        )[1].split("    private func filteredServers()", 1)[0]
+        for token in (
+            'track.heightAnchor.constraint(equalToConstant: 5)',
+            'account.limitBytes > 0',
+            'CGFloat(account.usedBytes) / CGFloat(account.limitBytes)',
+            'filled.widthAnchor.constraint(equalTo: track.widthAnchor,',
+            'usageCard.widthAnchor.constraint(equalTo: items.widthAnchor)',
+        ):
+            self.assertIn(token, body)
+        self.assertNotIn('NSProgressIndicator()', body)
 
     def test_premium_glass_cards_and_gradient_buttons_use_live_appkit_layout(self) -> None:
         source = (SOURCE / "TwinConnectMacOSNativeDashboard.swift").read_text(
