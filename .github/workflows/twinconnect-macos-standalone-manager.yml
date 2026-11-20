@@ -8,6 +8,8 @@ on:
       - 'clients/twinconnect/macos_native/standalone_connection_manager.py'
       - 'clients/twinconnect/macos_native/test_standalone_connection_manager.py'
       - 'clients/twinconnect/macos_native/install_standalone_engines.sh'
+      - 'clients/twinconnect/macos_native/prepare_standalone_profile.py'
+      - 'clients/twinconnect/macos_native/test_prepare_standalone_profile.py'
       - '.github/workflows/twinconnect-macos-standalone-manager.yml'
   workflow_dispatch:
 
@@ -24,5 +26,6 @@ jobs:
         run: |
           bash -n clients/twinconnect/macos_native/install_standalone_engines.sh
           python3 -m unittest -v clients/twinconnect/macos_native/test_standalone_connection_manager.py
+          python3 -m unittest -v clients/twinconnect/macos_native/test_prepare_standalone_profile.py
           python3 clients/twinconnect/macos_native/standalone_connection_manager.py list
           echo "No VPN system routes, DNS or Apple signing was changed."
