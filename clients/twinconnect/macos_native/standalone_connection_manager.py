@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import ipaddress
 import os
 from pathlib import Path
 import signal
@@ -24,7 +25,7 @@ PROTOCOLS = (
     "snell", "socks5", "mieru", "trusttunnel",
 )
 # Separate engines can be integrated later; never claim they are implemented.
-SINGBOX = {"hysteria2", "tuic", "anytls", "shadowtls", "snell", "socks5"}
+SINGBOX = {"hysteria2", "tuic", "anytls", "naive", "shadowtls", "snell", "socks5"}
 EXECUTABLE = {**{p: "sing-box" for p in SINGBOX}, "v2ray": "xray"}
 ARCH = "amd64" if os.uname().machine == "x86_64" else "arm64"
 
@@ -175,6 +176,56 @@ def status() -> dict:
             "proxy": f"127.0.0.1:{item.get('port')}"}
 
 
+
+def probe(expected_ip: str | None = None) -> dict:
+    """Verify a real HTTPS request through the managed local SOCKS proxy.
+
+    Success proves proxy egress only; it does not assert system-wide tunneling.
+    Requiring expected_ip avoids mistaking an unintended direct route for the
+    intended VPN endpoint.
+    """
+    item = read_state()
+    if not item or not process_matches(item):
+        fail("ENGINE_NOT_RUNNING")
+    if expected_ip is not None:
+        try:
+            expected_ip = str(ipaddress.ip_address(expected_ip))
+        except ValueError:
+            fail("EXPECTED_IP_INVALID")
+    port = item.get("port")
+    if type(port) is not int or not 1024 <= port <= 65535:
+        fail("PROXY_PORT_INVALID")
+    try:
+        response = subprocess.run([
+            "/usr/bin/curl", "-4", "--silent", "--show-error", "--fail",
+            "--connect-timeout", "5", "--max-time", "15",
+            "--proxy", f"socks5h://127.0.0.1:{port}",
+            "--noproxy", "",
+            "https://api.ipify.org"
+        ], capture_output=True, text=True, timeout=18, check=False)
+    except (OSError, subprocess.TimeoutExpired):
+        fail("PROXY_EGRESS_REQUEST_FAILED")
+    if response.returncode != 0:
+        fail("PROXY_EGRESS_REQUEST_FAILED")
+    try:
+        ip = ipaddress.ip_address(response.stdout.strip())
+    except ValueError:
+        fail("PROXY_EGRESS_INVALID_IP_RESPONSE")
+    if ip.version != 4:
+        fail("PROXY_EGRESS_UNEXPECTED_ADDRESS_FAMILY")
+    matched = expected_ip is not None and str(ip) == expected_ip
+    return {
+        "state": "egress_verified" if matched else
+                 "egress_ip_mismatch" if expected_ip is not None else
+                 "proxy_egress_reachable",
+        "protocol": item["protocol"], "egress_ip": str(ip),
+        "expected_egress_ip": expected_ip,
+        "verified_expected_egress": matched,
+        "system_wide_vpn": False,
+        "note": "Only this SOCKS proxy HTTPS request was tested; other apps and DNS are not tunneled",
+    }
+
+
 def stop() -> dict:
     item = read_state()
     if item and process_matches(item):
@@ -201,6 +252,8 @@ def main() -> int:
     sub.add_parser("list")
     sub.add_parser("status")
     sub.add_parser("stop")
+    check = sub.add_parser("probe")
+    check.add_argument("--expected-ip", default=None)
     run = sub.add_parser("start")
     run.add_argument("protocol", choices=PROTOCOLS)
     run.add_argument("config", type=Path)
@@ -209,6 +262,7 @@ def main() -> int:
         result = (list_protocols() if args.action == "list" else
                   status() if args.action == "status" else
                   stop() if args.action == "stop" else
+                  probe(args.expected_ip) if args.action == "probe" else
                   start(args.protocol, args.config))
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return 0
