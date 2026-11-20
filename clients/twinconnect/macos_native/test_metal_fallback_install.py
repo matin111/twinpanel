@@ -300,9 +300,10 @@ class MetalFallbackInstallTests(unittest.TestCase):
             connect,
         )
         self.assertIn(
-            "changeSelection.widthAnchor.constraint(equalTo: main.widthAnchor)",
+            "proxyTools.widthAnchor.constraint(equalTo: main.widthAnchor)",
             connect,
         )
+        self.assertNotIn('compactMetric("Public IP", value: "—")', connect)
         self.assertIn("usageCard.widthAnchor.constraint(equalTo: items.widthAnchor)",
                       source)
 
@@ -347,7 +348,7 @@ class MetalFallbackInstallTests(unittest.TestCase):
         for token in (
             'var tunnelConnected = false',
             'guard tunnelConnected else { return }',
-            '"■  Stop local proxy"',
+            '"■  Stop proxy"',
             '#selector(stopLocalProxyNow(_:))',
             'private func stopLocalProxyNow',
             'self.runLocalManager(["stop"], root: root)',
@@ -355,6 +356,26 @@ class MetalFallbackInstallTests(unittest.TestCase):
         ):
             self.assertIn(token, source)
         self.assertNotIn('fabric.tunnelConnected = true', source)
+
+    def test_quick_connect_scrolling_and_reference_geometry(self) -> None:
+        source = (SOURCE / "TwinConnectMacOSNativeDashboard.swift").read_text(
+            encoding="utf-8"
+        )
+        shell = source.split("    private func buildShell(in root: NSView) {", 1)[1].split(
+            "    // Native vector glyphs", 1
+        )[0]
+        for token in (
+            "root.addSubview(heading)",
+            "scroll.topAnchor.constraint(equalTo: heading.bottomAnchor,",
+            "scroll.autohidesScrollers = false",
+            "scroll.hasVerticalScroller = true",
+            "scroll.contentView.scroll(to: .zero)",
+            "workspace.setContentHuggingPriority(.required, for: .vertical)",
+            "document.heightAnchor.constraint(greaterThanOrEqualTo:",
+        ):
+            self.assertIn(token, shell)
+        self.assertNotIn("heading.addArrangedSubview(pill", shell)
+        self.assertNotIn("workspace.addArrangedSubview(heading)", shell)
 
     def test_windows_visual_parity_has_vector_hero_and_real_network_state(self) -> None:
         source = (SOURCE / "TwinConnectMacOSNativeDashboard.swift").read_text(
@@ -369,7 +390,7 @@ class MetalFallbackInstallTests(unittest.TestCase):
             'let iconName: String',
             'selected ? "✓" : "›"',
             'pingDetails(server)',
-            'Proxy test only — system VPN, Kill Switch and DNS protection remain OFF.',
+            'Local proxy test only · VPN offline',
             'pill("Disconnected", color: muted)',
             'networkMetric("Public IP", value: "—")',
             'networkMetric("Download", value: "—"',
