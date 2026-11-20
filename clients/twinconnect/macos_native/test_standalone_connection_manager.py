@@ -152,5 +152,47 @@ class StandaloneManagerTests(unittest.TestCase):
         self.assertNotIn("secret-value", reason)
 
 
+    def test_diagnosis_prefers_remote_auth_over_generic_quic(self):
+        logfile = self.root / "engine.log"
+        logfile.write_text("private-password=secret_value\nQUIC authentication failed\n")
+        with mock.patch.object(manager, "STATE", self.root):
+            reason = manager.engine_failure_category()
+        self.assertEqual(reason, "HYSTERIA2_REMOTE_AUTH_REJECTED")
+        self.assertNotIn("secret_value", reason)
+
+    def test_diagnosis_classifies_refused_and_cert_errors(self):
+        logfile = self.root / "engine.log"
+        with mock.patch.object(manager, "STATE", self.root):
+            logfile.write_text("connect: connection refused\n")
+            self.assertEqual(manager.engine_failure_category(),
+                             "ENGINE_REMOTE_CONNECTION_REFUSED")
+            logfile.write_text("tls: x509: certificate signed by unknown authority\n")
+            self.assertEqual(manager.engine_failure_category(),
+                             "ENGINE_REMOTE_TLS_CERTIFICATE_FAILURE")
+
+    def test_start_truncates_stale_engine_log(self):
+        log = self.root / "engine.log"
+        log.write_text("STALE_SECRET_OLD_QUIC_TIMEOUT")
+        cfg = self.config({
+            "inbounds": [{"type": "mixed", "listen": "127.0.0.1",
+                          "listen_port": 17890}],
+            "outbounds": [{"type": "hysteria2", "tag": "proxy"}]
+        })
+        fake_executable = self.root / "sing-box"
+        fake_executable.write_text("")
+        fake_proc = mock.Mock()
+        fake_proc.pid = 123456
+        fake_proc.poll.return_value = None
+        with mock.patch.object(manager, "STATE", self.root), \
+             mock.patch.object(manager, "binary_for", return_value=fake_executable), \
+             mock.patch.object(manager, "read_state", return_value=None), \
+             mock.patch.object(manager.subprocess, "Popen", return_value=fake_proc), \
+             mock.patch.object(manager.time, "sleep"), \
+             mock.patch.object(manager, "save_state"):
+            result = manager.start("hysteria2", cfg)
+        self.assertEqual(result["state"], "process_running_unverified")
+        self.assertEqual(log.read_text(), "")
+
+
 if __name__ == "__main__":
     unittest.main()
