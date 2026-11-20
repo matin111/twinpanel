@@ -1808,11 +1808,18 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
               json["state"] as? String == "proxy_egress_reachable",
               let address = json["egress_ip"] as? String
         else {
-            let code = safeManagerReason(response.2)
-            let reason = code == "UNKNOWN_PROXY_FAILURE" ?
-                safeManagerReason(runLocalManager(["diagnose"], root: root).1) :
-                code
-            return "Hysteria2 test failed: " + reason + " (VPN offline)"
+            let curlReason = safeManagerReason(response.2)
+            let engineReason = safeManagerReason(
+                runLocalManager(["diagnose"], root: root).1
+            )
+            // SOCKS error 97 often means the outgoing Hysteria2 stream was
+            // rejected, NOT that the local SOCKS handshake is malformed.
+            // Expose both independent, redacted findings.
+            let detail = engineReason == "ENGINE_FAILURE_NOT_CLASSIFIED" ||
+                         engineReason == "UNKNOWN_PROXY_FAILURE" ||
+                         engineReason == "ENGINE_LOG_UNAVAILABLE" ?
+                curlReason : curlReason + " · " + engineReason
+            return "Hysteria2 test failed: " + detail + " (VPN offline)"
         }
         return "Proxied HTTPS exit: " + address + " (not a system VPN)"
     }
