@@ -65,7 +65,13 @@ class MacStandaloneProxyRuntime {
       // Drain logs but never expose credentials, command lines or profiles.
       engine.stdout.listen((_) {});
       engine.stderr.listen((_) {});
-      await Future<void>.delayed(const Duration(milliseconds: 900));
+      final earlyExit = await Future.any<bool>([
+        engine.exitCode.then((_) => true),
+        Future<bool>.delayed(const Duration(milliseconds: 900), () => false),
+      ]);
+      if (earlyExit) {
+        throw const FormatException('MAC_STANDALONE_ENGINE_EXITED_EARLY');
+      }
       final curl = await Process.run(curlExecutable, [
         '-4', '--silent', '--show-error', '--fail',
         '--connect-timeout', '5', '--max-time', '14',
@@ -92,16 +98,15 @@ class MacStandaloneProxyRuntime {
       throw const FormatException('MAC_STANDALONE_PROXY_TIMEOUT');
     } finally {
       engine?.kill(ProcessSignal.sigterm);
-      if (privateDirectory != null) {
-        try {
+      try {
+        if (privateDirectory != null) {
           await privateDirectory.delete(recursive: true);
-        } on FileSystemException {
-          // No credential-bearing file may be silently assumed removed:
-          // callers must show a cleanup error if deletion failed.
-          throw const FormatException('MAC_STANDALONE_PRIVATE_FILE_CLEANUP_FAILED');
         }
+      } on FileSystemException {
+        throw const FormatException('MAC_STANDALONE_PRIVATE_FILE_CLEANUP_FAILED');
+      } finally {
+        _busy = false;
       }
-      _busy = false;
     }
   }
 }
