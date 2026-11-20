@@ -470,12 +470,21 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             sea.withAlphaComponent(0.82).cgColor :
             NSColor(calibratedRed: 0.51, green: 0.77,
                     blue: 0.83, alpha: 0.40).cgColor
-        if primary {
-            control.setAccentGradient(
-                tint().blended(withFraction: 0.18, of: .white) ?? tint(),
-                NSColor(calibratedRed: 0.21, green: 0.58,
-                        blue: 0.58, alpha: 1))
-        }
+        // Every clickable surface is glass, and all chroma comes from the
+        // authenticated panel brand rather than a hard-coded cyan scheme.
+        let brand = tint()
+        let upper = primary ?
+            (brand.blended(withFraction: 0.23, of: .white) ?? brand) :
+            (NSColor(calibratedRed: 0.15, green: 0.25, blue: 0.30, alpha: 1)
+                .blended(withFraction: 0.32, of: brand) ?? brand)
+        let lower = primary ?
+            (brand.blended(withFraction: 0.18, of: .black) ?? brand) :
+            (NSColor(calibratedRed: 0.09, green: 0.17, blue: 0.22, alpha: 1)
+                .blended(withFraction: 0.22, of: brand) ?? brand)
+        control.setAccentGradient(upper.withAlphaComponent(0.90),
+                                  lower.withAlphaComponent(0.82))
+        control.layer?.borderColor = brand.withAlphaComponent(
+            primary ? 0.74 : 0.38).cgColor
         control.attributedTitle = NSAttributedString(
             string: title,
             attributes: [.foregroundColor: color,
@@ -854,13 +863,15 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             control.layer?.borderWidth = 1
             if tab == index {
                 control.setAccentGradient(
-                    NSColor(calibratedRed: 0.31, green: 0.73, blue: 0.82, alpha: 1),
-                    NSColor(calibratedRed: 0.22, green: 0.57, blue: 0.61, alpha: 1))
+                    tint().blended(withFraction: 0.26, of: .white) ?? tint(),
+                    tint().blended(withFraction: 0.16, of: .black) ?? tint())
                 control.layer?.borderColor = sea.withAlphaComponent(0.83).cgColor
             } else {
                 control.setAccentGradient(
-                    NSColor(calibratedRed: 0.17, green: 0.34, blue: 0.40, alpha: 1),
-                    NSColor(calibratedRed: 0.11, green: 0.27, blue: 0.32, alpha: 1))
+                    NSColor(calibratedRed: 0.14, green: 0.25, blue: 0.30, alpha: 1)
+                        .blended(withFraction: 0.30, of: tint()) ?? tint(),
+                    NSColor(calibratedRed: 0.09, green: 0.17, blue: 0.21, alpha: 1)
+                        .blended(withFraction: 0.19, of: tint()) ?? tint())
                 control.layer?.borderColor = sea.withAlphaComponent(0.36).cgColor
             }
             content.addArrangedSubview(control)
@@ -884,8 +895,10 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             link.layer?.cornerRadius = 12
             link.layer?.borderColor = sea.withAlphaComponent(0.35).cgColor
             link.setAccentGradient(
-                NSColor(calibratedRed: 0.19, green: 0.38, blue: 0.44, alpha: 1),
-                NSColor(calibratedRed: 0.12, green: 0.29, blue: 0.34, alpha: 1))
+                NSColor(calibratedRed: 0.15, green: 0.27, blue: 0.32, alpha: 1)
+                    .blended(withFraction: 0.32, of: tint()) ?? tint(),
+                NSColor(calibratedRed: 0.09, green: 0.19, blue: 0.23, alpha: 1)
+                    .blended(withFraction: 0.20, of: tint()) ?? tint())
             quick.addArrangedSubview(link)
         }
         if accountSession?.supportURL != nil ||
