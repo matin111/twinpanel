@@ -34,6 +34,7 @@ end
 # Keep archive linker flags explicitly scoped to the extension, not Runner.
 extension.build_configurations.each do |configuration|
   settings = configuration.build_settings
+  settings['MACOSX_DEPLOYMENT_TARGET'] = '12.0' # upstream WireGuardKit minimum macOS
   paths = Array(settings['LIBRARY_SEARCH_PATHS'])
   paths = ['$(inherited)'] if paths.empty?
   lib_path = '$(PROJECT_DIR)/../.dart_tool/twinconnect-wireguard-build/lib'
