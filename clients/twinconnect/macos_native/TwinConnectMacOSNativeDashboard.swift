@@ -309,7 +309,9 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             accountSession?.brandName ?? "TwinConnect",
             size: 13, color: muted))
         switch tab {
-        case 0: workspace.addArrangedSubview(connectPage())
+        case 0:
+            workspace.addArrangedSubview(connectPage())
+            workspace.addArrangedSubview(networkStatusPage())
         case 1: workspace.addArrangedSubview(locationsPage())
         case 2: workspace.addArrangedSubview(settingsPage())
         default: workspace.addArrangedSubview(accountPage())
@@ -431,17 +433,6 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             "VPN unavailable: a signed Apple Network Extension is required.",
             size: 11, color: amber))
         content.addArrangedSubview(separator())
-        let stats = stack(.horizontal, spacing: 18)
-        for (title, value) in [
-            ("PUBLIC IP", "Not connected"), ("PING", "—"),
-            ("DOWNLOAD", "0 B/s"), ("UPLOAD", "0 B/s")
-        ] {
-            let part = stack(spacing: 5)
-            part.addArrangedSubview(text(title, size: 10, color: muted))
-            part.addArrangedSubview(text(value, size: 12, weight: .semibold))
-            stats.addArrangedSubview(part)
-        }
-        content.addArrangedSubview(stats)
         let selection = stack(.horizontal, spacing: 15)
         selection.addArrangedSubview(text("Location: " +
             (snapshot?.servers.first { $0.id == activeServer }?.name ?? "Not selected"),
@@ -486,6 +477,51 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         content.addArrangedSubview(pickers)
         content.addArrangedSubview(homeSubscriptionSummary())
         return card([content], radius: 28, padding: 23)
+    }
+
+    // Layout parity with Flutter's independent "Network status" panel.
+    // No traffic totals, IP or ping are fabricated in unsigned AppKit mode.
+    private func networkStatusPage() -> NSView {
+        let content = stack(spacing: 13)
+        content.alignment = .width
+        let header = stack(.horizontal, spacing: 12)
+        header.addArrangedSubview(text("Network status", size: 17,
+                                       weight: .semibold))
+        header.addArrangedSubview(pill("Disconnected", color: muted))
+        content.addArrangedSubview(header)
+        content.addArrangedSubview(separator())
+        content.addArrangedSubview(text("Connected for   00:00:00",
+                                       color: muted))
+
+        let metrics = stack(.horizontal, spacing: 13)
+        let selected = snapshot?.servers.first { $0.id == activeServer }
+        let reportedPing = selected?.latencyMs.map { String($0) + " ms (panel)" }
+            ?? "—"
+        for (title, value) in [
+            ("Server ping", reportedPing),
+            ("Public IP", "—")
+        ] {
+            let metric = stack(spacing: 8)
+            metric.addArrangedSubview(text(title, size: 11, color: muted))
+            metric.addArrangedSubview(text(value, size: 17, weight: .bold))
+            metrics.addArrangedSubview(card([metric], radius: 17, padding: 15))
+        }
+        content.addArrangedSubview(metrics)
+
+        let traffic = stack(.horizontal, spacing: 13)
+        for (title, value) in [
+            ("↓ Download", "—"), ("↑ Upload", "—")
+        ] {
+            let metric = stack(spacing: 8)
+            metric.addArrangedSubview(text(title, size: 11, color: muted))
+            metric.addArrangedSubview(text(value, size: 17, weight: .bold))
+            traffic.addArrangedSubview(card([metric], radius: 17, padding: 15))
+        }
+        content.addArrangedSubview(traffic)
+        content.addArrangedSubview(text(
+            "No VPN interface or verified network traffic in native graphics mode.",
+            size: 11, color: amber))
+        return card([content], radius: 23, padding: 20)
     }
 
     private func locationsPage() -> NSView {
