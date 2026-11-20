@@ -35,11 +35,15 @@ struct TwinMacNativeAccount {
 }
 
 struct TwinMacNativeSnapshot {
+    // A failed panel subrequest must not erase successfully loaded data.
     let protocols: [TwinMacNativeProtocol]
     let servers: [TwinMacNativeServer]
-    let account: TwinMacNativeAccount
-    let planName: String
-    let deviceLimit: Int
+    let account: TwinMacNativeAccount?
+    let planName: String?
+    let deviceLimit: Int?
+    let sectionsLoaded: Set<String>
+    let errors: [String: String]
+    let isComplete: Bool
 }
 
 enum TwinMacNativeError: LocalizedError {
@@ -235,124 +239,195 @@ final class TwinConnectMacOSNativeDirectory: NSObject, URLSessionTaskDelegate {
         }
     }
 
+    // Each endpoint is independent, as in the shared Flutter client.
+    // Never gate the server inventory behind /session/plan (404 is possible
+    // for historical subscriptions) or hide good account data after a bad
+    // protocol response. This method never requests private VPN profiles.
     func loadSnapshot(_ session: TwinMacNativeSession,
-                      completion: @escaping (Result<TwinMacNativeSnapshot, Error>) -> Void) {
+                      onUpdate: @escaping (TwinMacNativeSnapshot) -> Void) {
         let panel = session.apiOrigin
         let token = session.accessToken
+        var protocols = [TwinMacNativeProtocol]()
+        var servers = [TwinMacNativeServer]()
+        var account: TwinMacNativeAccount?
+        var planName: String?
+        var deviceLimit: Int?
+        var allowed: Set<String>?
+        var verifiedPlan = false
+        var loaded = Set<String>()
+        var errors = [String: String]()
+        var settled = 0
+
+        func publish(_ section: String, failure: String? = nil) {
+            settled += 1
+            if let error = failure { errors[section] = error }
+            else { loaded.insert(section) }
+            let filtered: [TwinMacNativeProtocol]
+            if verifiedPlan {
+                let kind = (planName ?? "").lowercased()
+                filtered = protocols.filter { row in
+                    let vitory = kind.contains("vitory") ||
+                        kind.contains("v2ray") || kind.contains("ویتوری")
+                    return (!vitory || row.code == "v2ray" ||
+                            row.code == "hysteria2") &&
+                        (allowed?.contains(row.code) ?? true)
+                }
+            } else {
+                // The session catalogue is visible for diagnosis, but
+                // plan entitlement is not verified and VPN is unavailable.
+                filtered = protocols
+            }
+            onUpdate(TwinMacNativeSnapshot(
+                protocols: filtered, servers: servers, account: account,
+                planName: planName, deviceLimit: deviceLimit,
+                sectionsLoaded: loaded, errors: errors,
+                isComplete: settled == 4
+            ))
+        }
+
         request(endpoint(panel, "v1/central-app/session/protocols"),
                 payload: nil, bearer: token) { [weak self] result in
             guard let self = self else { return }
-            guard case .success(let catalog) = result else {
-                if case .failure(let error) = result { completion(.failure(error)) }
-                return
-            }
-            guard self.validEnvelope(catalog, session.namespace),
-                  let entries = catalog["protocols"] as? [[String: Any]],
-                  entries.count <= 16 else {
-                completion(.failure(TwinMacNativeError.failure("INVALID_PROTOCOL_CATALOG")))
-                return
-            }
-            var selected = [TwinMacNativeProtocol]()
-            var seen = Set<String>()
-            for entry in entries {
-                guard let code = entry["code"] as? String,
-                      let name = self.canonicalNames[code],
-                      seen.insert(code).inserted else {
-                    completion(.failure(TwinMacNativeError.failure("INVALID_PROTOCOL_CATALOG")))
+            switch result {
+            case .failure(let error):
+                publish("protocols", failure: error.localizedDescription)
+            case .success(let catalog):
+                guard self.validEnvelope(catalog, session.namespace),
+                      let entries = catalog["protocols"] as? [[String: Any]],
+                      entries.count <= 16 else {
+                    publish("protocols", failure: "INVALID_PROTOCOL_CATALOG")
                     return
                 }
-                if entry["selected"] as? Bool == true {
-                    selected.append(TwinMacNativeProtocol(
-                        code: code, name: name,
-                        configured: entry["config_record_present"] as? Bool == true
-                    ))
+                var seen = Set<String>()
+                var selected = [TwinMacNativeProtocol]()
+                for entry in entries {
+                    guard let code = entry["code"] as? String,
+                          let name = self.canonicalNames[code],
+                          seen.insert(code).inserted else {
+                        publish("protocols", failure: "INVALID_PROTOCOL_CATALOG")
+                        return
+                    }
+                    if entry["selected"] as? Bool == true {
+                        selected.append(TwinMacNativeProtocol(
+                            code: code, name: name,
+                            configured: entry["config_record_present"] as? Bool == true
+                        ))
+                    }
                 }
+                protocols = selected
+                publish("protocols")
             }
-            self.request(self.endpoint(panel, "v1/central-app/session/plan"),
-                         payload: nil, bearer: token) { planResult in
-                guard case .success(let plan) = planResult,
-                      self.validEnvelope(plan, session.namespace),
+        }
+
+        request(endpoint(panel, "v1/central-app/session/plan"),
+                payload: nil, bearer: token) { [weak self] result in
+            guard let self = self else { return }
+            switch result {
+            case .failure(let error):
+                publish("plan", failure: error.localizedDescription)
+            case .success(let plan):
+                guard self.validEnvelope(plan, session.namespace),
                       let category = plan["subscription_type"] as? String,
-                      let deviceLimit = plan["device_limit"] as? Int,
-                      deviceLimit >= 0,
-                      let _ = plan["plan_id"] as? Int else {
-                    completion(.failure(TwinMacNativeError.failure("PLAN_UNAVAILABLE")))
+                      !category.isEmpty, category.count <= 120,
+                      let limit = plan["device_limit"] as? Int, limit >= 0,
+                      let planId = plan["plan_id"] as? Int, planId >= 0 else {
+                    publish("plan", failure: "INVALID_PLAN_CLASSIFICATION")
                     return
                 }
-                if let allowed = plan["allowed_protocols"] {
-                    guard let codes = allowed as? [String],
+                if let rawAllowed = plan["allowed_protocols"] {
+                    guard let codes = rawAllowed as? [String],
                           codes.count <= 16,
                           codes.allSatisfy({ self.canonicalNames[$0] != nil }) else {
-                        completion(.failure(TwinMacNativeError.failure("INVALID_PLAN_PROTOCOLS")))
+                        publish("plan", failure: "INVALID_PLAN_PROTOCOLS")
                         return
                     }
-                    let whitelist = Set(codes)
-                    selected = selected.filter { whitelist.contains($0.code) }
+                    allowed = Set(codes)
                 }
-                let type = category.lowercased()
-                if type.contains("vitory") || type.contains("v2ray") ||
-                    type.contains("ویتوری") {
-                    selected = selected.filter {
-                        $0.code == "v2ray" || $0.code == "hysteria2"
-                    }
+                planName = category
+                deviceLimit = limit
+                verifiedPlan = true
+                publish("plan")
+            }
+        }
+
+        request(endpoint(panel, "v1/central-app/session/servers"),
+                payload: nil, bearer: token, maxBytes: 128 * 1024) { [weak self] result in
+            guard let self = self else { return }
+            switch result {
+            case .failure(let error):
+                publish("servers", failure: error.localizedDescription)
+            case .success(let raw):
+                guard self.validEnvelope(raw, session.namespace),
+                      let rows = raw["servers"] as? [[String: Any]],
+                      rows.count <= 500 else {
+                    publish("servers", failure: "INVALID_SERVER_INVENTORY")
+                    return
                 }
-                self.request(self.endpoint(panel, "v1/central-app/session/servers"),
-                             payload: nil, bearer: token, maxBytes: 128 * 1024) { serverResult in
-                    guard case .success(let raw) = serverResult,
-                          self.validEnvelope(raw, session.namespace),
-                          let rows = raw["servers"] as? [[String: Any]],
-                          rows.count <= 500 else {
-                        completion(.failure(TwinMacNativeError.failure("SERVER_INVENTORY_UNAVAILABLE")))
+                var nodes = [TwinMacNativeServer]()
+                var ids = Set<String>()
+                for row in rows {
+                    guard let id = row["id"] as? String,
+                          id.range(of: "^[0-9]{1,20}$",
+                                   options: .regularExpression) != nil,
+                          ids.insert(id).inserted,
+                          let name = row["name"] as? String,
+                          !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                          name.count <= 120,
+                          let country = row["country_code"] as? String,
+                          !country.isEmpty, country.count <= 8,
+                          let online = row["node_online"] as? Bool else {
+                        publish("servers", failure: "INVALID_SERVER_INVENTORY")
                         return
                     }
-                    var nodes = [TwinMacNativeServer]()
-                    var ids = Set<String>()
-                    for row in rows {
-                        guard let id = row["id"] as? String,
-                              id.range(of: "^[0-9]{1,20}$",
-                                       options: .regularExpression) != nil,
-                              ids.insert(id).inserted,
-                              let name = row["name"] as? String,
-                              !name.isEmpty, name.count <= 120,
-                              let country = row["country_code"] as? String,
-                              !country.isEmpty, country.count <= 8,
-                              let online = row["node_online"] as? Bool else {
-                            completion(.failure(TwinMacNativeError.failure("INVALID_SERVER_INVENTORY")))
-                            return
-                        }
-                        let rawLatency = row["latency_ms"] as? Int
-                        let latency = rawLatency.flatMap { (1...60000).contains($0) ? $0 : nil }
-                        nodes.append(TwinMacNativeServer(id: id, name: name,
-                             country: country, online: online, latencyMs: latency))
+                    let rawLatency = row["latency_ms"] as? Int
+                    if let value = rawLatency, !(1...60000).contains(value) {
+                        publish("servers", failure: "INVALID_SERVER_INVENTORY")
+                        return
                     }
-                    self.request(self.endpoint(panel, "v1/central-app/session/account"),
-                                 payload: nil, bearer: token) { accountResult in
-                        guard case .success(let account) = accountResult,
-                              self.validEnvelope(account, session.namespace),
-                              let used = account["traffic_used_bytes"] as? NSNumber,
-                              let limit = account["traffic_limit_bytes"] as? NSNumber,
-                              used.int64Value >= 0, limit.int64Value >= 0,
-                              let status = account["status"] as? String else {
-                            completion(.failure(TwinMacNativeError.failure("ACCOUNT_UNAVAILABLE")))
-                            return
-                        }
-                        var expiry: Date?
-                        if let dateText = account["expires_at"] as? String {
-                            expiry = ISO8601DateFormatter().date(from: dateText)
-                            if expiry == nil {
-                                completion(.failure(TwinMacNativeError.failure("INVALID_ACCOUNT_EXPIRY")))
-                                return
-                            }
-                        }
-                        completion(.success(TwinMacNativeSnapshot(
-                            protocols: selected, servers: nodes,
-                            account: TwinMacNativeAccount(status: status,
-                               usedBytes: used.int64Value, limitBytes: limit.int64Value,
-                               expiresAt: expiry),
-                            planName: category, deviceLimit: deviceLimit
-                        )))
+                    nodes.append(TwinMacNativeServer(
+                        id: id, name: name, country: country, online: online,
+                        latencyMs: rawLatency
+                    ))
+                }
+                servers = nodes
+                publish("servers")
+            }
+        }
+
+        request(endpoint(panel, "v1/central-app/session/account"),
+                payload: nil, bearer: token) { [weak self] result in
+            guard let self = self else { return }
+            switch result {
+            case .failure(let error):
+                publish("account", failure: error.localizedDescription)
+            case .success(let raw):
+                guard self.validEnvelope(raw, session.namespace),
+                      let used = raw["traffic_used_bytes"] as? NSNumber,
+                      let limit = raw["traffic_limit_bytes"] as? NSNumber,
+                      used.int64Value >= 0, limit.int64Value >= 0,
+                      let status = raw["status"] as? String else {
+                    publish("account", failure: "INVALID_ACCOUNT_SNAPSHOT")
+                    return
+                }
+                var expiry: Date?
+                if let dateText = raw["expires_at"] as? String {
+                    let parser = ISO8601DateFormatter()
+                    parser.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+                    expiry = parser.date(from: dateText)
+                    if expiry == nil {
+                        parser.formatOptions = [.withInternetDateTime]
+                        expiry = parser.date(from: dateText)
+                    }
+                    if expiry == nil {
+                        publish("account", failure: "INVALID_ACCOUNT_EXPIRY")
+                        return
                     }
                 }
+                account = TwinMacNativeAccount(
+                    status: status, usedBytes: used.int64Value,
+                    limitBytes: limit.int64Value, expiresAt: expiry
+                )
+                publish("account")
             }
         }
     }
