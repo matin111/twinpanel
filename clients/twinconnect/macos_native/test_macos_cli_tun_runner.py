@@ -71,6 +71,14 @@ class MacOSCLITunRunnerTests(unittest.TestCase):
         self.assertIn('"auto_route": false', native)
         self.assertIn('"auto_redirect": false', native)
 
+    def test_app_primary_button_only_validates_unrouted_tun(self):
+        native = (Path(__file__).resolve().parent /
+                  "TwinConnectMacOSNativeDashboard.swift").read_text(encoding="utf-8")
+        self.assertIn("directory.prepareUnroutedHysteria2TUN(session, serverID: serverID)", native)
+        self.assertIn('task.arguments = ["check", "-c", configURL.path]', native)
+        self.assertIn("VPN offline; privileged engine not started.", native)
+        self.assertNotIn('task.arguments = ["run", "-c", configURL.path]', native)
+
     def test_remote_access_blocks_before_child_process(self):
         with mock.patch.object(runner.os, "geteuid", return_value=0), \
              mock.patch.dict(runner.os.environ, {"SSH_CONNECTION": "remote"}, clear=True), \
