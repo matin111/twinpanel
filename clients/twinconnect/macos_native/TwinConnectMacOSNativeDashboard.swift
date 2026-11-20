@@ -69,7 +69,7 @@ private final class TwinNativeNetworkFabric: NSView {
         for index in 0..<17 {
             let t = CGFloat(index) / 16
             let spread = (t - 0.5) * min(rect.height * 0.66, 105)
-            for side: CGFloat in [-1, 1] {
+            for side in [CGFloat(-1), CGFloat(1)] {
                 let path = NSBezierPath()
                 let edgeX = cx + side * rect.width * 0.43
                 path.move(to: CGPoint(x: cx + side * 13, y: cy + spread * 0.13))
@@ -249,9 +249,15 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         box.translatesAutoresizingMaskIntoConstraints = false
         box.wantsLayer = true
         box.layer?.cornerRadius = radius
-        box.layer?.backgroundColor = panelColor.cgColor
+        box.layer?.backgroundColor = NSColor(
+            calibratedRed: 0.105, green: 0.193, blue: 0.237,
+            alpha: 0.94).cgColor
         box.layer?.borderWidth = 1
-        box.layer?.borderColor = tint().withAlphaComponent(0.22).cgColor
+        box.layer?.borderColor = sea.withAlphaComponent(0.35).cgColor
+        box.layer?.shadowColor = NSColor.black.cgColor
+        box.layer?.shadowOpacity = 0.13
+        box.layer?.shadowRadius = 12
+        box.layer?.shadowOffset = CGSize(width: 0, height: -3)
         let column = stack(spacing: 13)
         // Let every glass panel fill the available width; plain NSView
         // children have no intrinsic width and otherwise disappear.
@@ -292,17 +298,22 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         control.tag = tag
         control.font = NSFont.systemFont(ofSize: 13, weight: .semibold)
         control.wantsLayer = true
-        control.layer?.cornerRadius = 13
+        control.layer?.cornerRadius = 14
         control.layer?.borderWidth = 1
-        let color = primary ? tint() : NSColor(calibratedWhite: 0.86, alpha: 1)
+        let color = primary ? NSColor.white :
+            NSColor(calibratedWhite: 0.94, alpha: 1)
         let background = primary
-            ? tint().withAlphaComponent(0.87)
-            : tint().withAlphaComponent(mutedButton ? 0.08 : 0.15)
+            ? tint().withAlphaComponent(0.86)
+            : NSColor(calibratedRed: 0.16, green: 0.29,
+                      blue: 0.34, alpha: mutedButton ? 0.72 : 0.91)
         control.layer?.backgroundColor = background.cgColor
-        control.layer?.borderColor = tint().withAlphaComponent(0.33).cgColor
+        control.layer?.borderColor = primary ?
+            sea.withAlphaComponent(0.82).cgColor :
+            NSColor(calibratedRed: 0.51, green: 0.77,
+                    blue: 0.83, alpha: 0.40).cgColor
         control.attributedTitle = NSAttributedString(
             string: title,
-            attributes: [.foregroundColor: primary ? NSColor.white : color,
+            attributes: [.foregroundColor: color,
                          .font: NSFont.systemFont(ofSize: 13,
                                                  weight: .semibold)]
         )
@@ -583,8 +594,9 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         side.translatesAutoresizingMaskIntoConstraints = false
         side.wantsLayer = true
         // Flutter shares its ambient gradient with the side navigation.
-        side.layer?.backgroundColor = base.withAlphaComponent(0.12).cgColor
-        side.layer?.borderColor = tint().withAlphaComponent(0.18).cgColor
+        side.layer?.backgroundColor = NSColor(calibratedRed: 0.062,
+            green: 0.139, blue: 0.17, alpha: 0.80).cgColor
+        side.layer?.borderColor = sea.withAlphaComponent(0.26).cgColor
         side.layer?.borderWidth = 1
 
         let content = stack(spacing: 12)
@@ -645,6 +657,10 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             control.contentTintColor = tab == index ? NSColor.white : sea
             control.alignment = .left
             control.heightAnchor.constraint(equalToConstant: 54).isActive = true
+            control.layer?.cornerRadius = 17
+            control.layer?.borderColor = tab == index ?
+                sea.withAlphaComponent(0.85).cgColor :
+                sea.withAlphaComponent(0.32).cgColor
             content.addArrangedSubview(control)
             control.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
         }
@@ -662,7 +678,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             link.imagePosition = .imageAbove
             link.imageScaling = .scaleProportionallyDown
             link.contentTintColor = sea
-            link.heightAnchor.constraint(equalToConstant: 51).isActive = true
+            link.heightAnchor.constraint(equalToConstant: 56).isActive = true
+            link.layer?.cornerRadius = 11
             quick.addArrangedSubview(link)
         }
         if accountSession?.supportURL != nil ||
