@@ -6,6 +6,18 @@ install routes, or activate Kill Switch. Never label it as connected until a
 real SOCKS/HTTP request through the proxy succeeds.
 
 
+## AppKit Hysteria2 failure diagnostics
+
+When a proxied HTTPS request fails, Quick Connect now displays a **fixed,
+redacted diagnostic code**, e.g. `PROXY_OR_REMOTE_TIMEOUT`,
+`PROXY_TCP_UNREACHABLE`, or `PROXY_SOCKS_HANDSHAKE_FAILED` instead
+of an uninformative generic failure. Engine failures may be classified
+without printing remote addresses or passwords. The standalone CLI also
+supports `python3 macos_native/standalone_connection_manager.py diagnose`.
+Do not paste raw `engine.log` into chat or an issue; it can contain private
+connection details. These codes are diagnostics, not proof of successful
+handshake or VPN protection.
+
 ## AppKit cloud Mac: real Hysteria2 proxy test from selected account/server
 
 The native Metal-free AppKit Locations screen receives live, authenticated
