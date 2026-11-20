@@ -913,14 +913,25 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             subtitleText.toolTip = subtitle
             content.addArrangedSubview(subtitleText)
         }
-        let panel = card([content], radius: 17, padding: 16)
-        panel.heightAnchor.constraint(greaterThanOrEqualToConstant: 131)
+        if title == "Download" || title == "Upload" {
+            // A neutral divider represents unavailable traffic while offline,
+            // never a fabricated chart or session throughput.
+            let idleLine = NSView()
+            idleLine.translatesAutoresizingMaskIntoConstraints = false
+            idleLine.wantsLayer = true
+            idleLine.layer?.backgroundColor = sea.withAlphaComponent(0.28).cgColor
+            idleLine.heightAnchor.constraint(equalToConstant: 1).isActive = true
+            content.addArrangedSubview(idleLine)
+            idleLine.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
+        }
+        let panel = card([content], radius: 17, padding: 14)
+        panel.heightAnchor.constraint(greaterThanOrEqualToConstant: 137)
             .isActive = true
         return panel
     }
 
     private func networkStatusPage() -> NSView {
-        let content = stack(spacing: 16)
+        let content = stack(spacing: 17)
         content.alignment = .leading
         let header = stack(.horizontal, spacing: 9)
         header.addArrangedSubview(text("Network status", size: 17,
@@ -932,11 +943,22 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         content.addArrangedSubview(header)
         header.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
 
-        let divider = separator()
-        content.addArrangedSubview(divider)
-        divider.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
-        content.addArrangedSubview(text("◷  Connected for    00:00:00",
+        // Windows layout: timing and manual refresh share a single row.
+        // The timer remains at zero until a real PacketTunnel is connected.
+        let timing = stack(.horizontal, spacing: 8)
+        timing.addArrangedSubview(text("◷  Connected for    00:00:00",
                                        size: 12, color: muted))
+        let timingSpace = NSView()
+        timingSpace.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        timing.addArrangedSubview(timingSpace)
+        let timingRefresh = button("↻", action: #selector(refresh(_:)),
+                                   mutedButton: true)
+        timingRefresh.widthAnchor.constraint(equalToConstant: 35).isActive = true
+        timingRefresh.heightAnchor.constraint(equalToConstant: 32).isActive = true
+        timingRefresh.toolTip = "Refresh actual subscription and ping status"
+        timing.addArrangedSubview(timingRefresh)
+        content.addArrangedSubview(timing)
+        timing.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
 
         let selected = snapshot?.servers.first { $0.id == activeServer }
         let reportedPing = pingText(selected)
