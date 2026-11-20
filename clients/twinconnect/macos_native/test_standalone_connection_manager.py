@@ -96,7 +96,7 @@ class StandaloneManagerTests(unittest.TestCase):
 
     def test_probe_verified_egress(self):
         record = {"protocol": "v2ray", "port": 10808, "pid": 42}
-        result = subprocess.CompletedProcess([], 0, "203.0.113.12\\n", "")
+        result = subprocess.CompletedProcess([], 0, "203.0.113.12\n", "")
         with mock.patch.object(manager, "read_state", return_value=record), \
              mock.patch.object(manager, "process_matches", return_value=True), \
              mock.patch.object(manager.subprocess, "run", return_value=result) as run:
@@ -114,7 +114,7 @@ class StandaloneManagerTests(unittest.TestCase):
 
     def test_probe_ip_mismatch_is_not_verified(self):
         record = {"protocol": "naive", "port": 10810, "pid": 42}
-        result = subprocess.CompletedProcess([], 0, "203.0.113.13\\n", "")
+        result = subprocess.CompletedProcess([], 0, "203.0.113.13\n", "")
         with mock.patch.object(manager, "read_state", return_value=record), \
              mock.patch.object(manager, "process_matches", return_value=True), \
              mock.patch.object(manager.subprocess, "run", return_value=result):
