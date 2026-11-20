@@ -35,6 +35,32 @@ private final class TwinNativeBackdrop: NSView {
     }
 }
 
+// Uses Core Animation's vector gradient, not a raster image or Metal shader.
+// Keeps the Windows-style translucent depth on macOS cloud hosts without Metal.
+private final class TwinNativeGlassCard: NSView {
+    private let glassGradient = CAGradientLayer()
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        wantsLayer = true
+        glassGradient.colors = [
+            NSColor(calibratedRed: 0.12, green: 0.26, blue: 0.32,
+                    alpha: 0.96).cgColor,
+            NSColor(calibratedRed: 0.085, green: 0.175, blue: 0.22,
+                    alpha: 0.95).cgColor
+        ]
+        glassGradient.startPoint = CGPoint(x: 0.0, y: 1.0)
+        glassGradient.endPoint = CGPoint(x: 1.0, y: 0.0)
+        glassGradient.cornerRadius = 20
+        layer?.insertSublayer(glassGradient, at: 0)
+    }
+    required init?(coder: NSCoder) { return nil }
+    override func layout() {
+        super.layout()
+        glassGradient.frame = bounds
+        glassGradient.cornerRadius = layer?.cornerRadius ?? 20
+    }
+}
+
 // Replicates the *disconnected* state of the shared Flutter
 // TwinConnectWaveIndicator. No fake activity or synthetic RX/TX animation.
 private final class TwinNativeNetworkFabric: NSView {
@@ -245,13 +271,10 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
 
     private func card(_ children: [NSView], radius: CGFloat = 22,
                       padding: CGFloat = 21) -> NSView {
-        let box = NSView()
+        let box = TwinNativeGlassCard(frame: .zero)
         box.translatesAutoresizingMaskIntoConstraints = false
         box.wantsLayer = true
         box.layer?.cornerRadius = radius
-        box.layer?.backgroundColor = NSColor(
-            calibratedRed: 0.105, green: 0.193, blue: 0.237,
-            alpha: 0.94).cgColor
         box.layer?.borderWidth = 1
         box.layer?.borderColor = sea.withAlphaComponent(0.35).cgColor
         box.layer?.shadowColor = NSColor.black.cgColor
@@ -336,7 +359,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
 
     private func build() -> NSView {
         let root = TwinNativeBackdrop(frame:
-            NSRect(x: 0, y: 0, width: 1100, height: 730))
+            NSRect(x: 0, y: 0, width: 1150, height: 750))
         root.base = base
         root.glow = tint()
         if accountSession == nil {
@@ -417,7 +440,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             sidebar.bottomAnchor.constraint(equalTo: root.bottomAnchor),
             sidebar.widthAnchor.constraint(equalToConstant: 258)
         ])
-        let workspace = stack(spacing: 17)
+        let workspace = stack(spacing: 18)
         // A vertical NSStackView with .leading alignment gives its NSView
         // cards no full-width constraint. They can collapse to zero width.
         workspace.alignment = .leading
