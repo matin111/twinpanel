@@ -776,11 +776,40 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         let identity = card([summary], radius: 18, padding: 12)
         content.addArrangedSubview(identity)
         identity.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
-        let logout = button("Sign out", action: #selector(signOut(_:)),
-                            mutedButton: true)
-        logout.alignment = .left
-        content.addArrangedSubview(logout)
-        logout.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
+        // Match Windows: language control and settings gear live below
+        // the signed-in identity; sign-out is in Account, not the sidebar.
+        let languageRow = stack(.horizontal, spacing: 0)
+        let languageLeft = NSView()
+        let languageRight = NSView()
+        languageRow.addArrangedSubview(languageLeft)
+        let languageButton = button("◎   EN   ⌄",
+                                    action: #selector(openLanguageSettings(_:)),
+                                    mutedButton: true)
+        languageButton.toolTip = "Language preferences (English is available)"
+        languageButton.widthAnchor.constraint(equalToConstant: 118).isActive = true
+        languageButton.heightAnchor.constraint(equalToConstant: 38).isActive = true
+        languageRow.addArrangedSubview(languageButton)
+        languageRow.addArrangedSubview(languageRight)
+        languageLeft.widthAnchor.constraint(equalTo: languageRight.widthAnchor)
+            .isActive = true
+        content.addArrangedSubview(languageRow)
+        languageRow.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
+
+        let settingsRow = stack(.horizontal, spacing: 0)
+        let settingsLeft = NSView()
+        let settingsRight = NSView()
+        settingsRow.addArrangedSubview(settingsLeft)
+        let gear = button("⚙", action: #selector(openLanguageSettings(_:)),
+                          mutedButton: true)
+        gear.widthAnchor.constraint(equalToConstant: 39).isActive = true
+        gear.heightAnchor.constraint(equalToConstant: 34).isActive = true
+        gear.toolTip = "Settings"
+        settingsRow.addArrangedSubview(gear)
+        settingsRow.addArrangedSubview(settingsRight)
+        settingsLeft.widthAnchor.constraint(equalTo: settingsRight.widthAnchor)
+            .isActive = true
+        content.addArrangedSubview(settingsRow)
+        settingsRow.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
         spaced(side, content, inset: 17)
         return side
     }
@@ -1734,6 +1763,11 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                                     action: #selector(refresh(_:)))
         content.addArrangedSubview(refreshButton)
         refreshButton.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
+        let signOutButton = button("Sign out", action: #selector(signOut(_:)),
+                                   mutedButton: true)
+        signOutButton.heightAnchor.constraint(equalToConstant: 42).isActive = true
+        content.addArrangedSubview(signOutButton)
+        signOutButton.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
         return content
     }
 
@@ -2054,6 +2088,11 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
 
     @objc private func showLocations(_ sender: NSButton) {
         tab = 1
+        view = build()
+    }
+
+    @objc private func openLanguageSettings(_ sender: NSButton) {
+        tab = 2
         view = build()
     }
 
