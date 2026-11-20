@@ -390,7 +390,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         side.layer?.borderWidth = 1
 
         let content = stack(spacing: 12)
-        content.alignment = .width
+        content.alignment = .leading
         let logo = NSView()
         logo.wantsLayer = true
         logo.layer?.cornerRadius = 13
@@ -407,10 +407,21 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             infinity.centerXAnchor.constraint(equalTo: logo.centerXAnchor),
             infinity.centerYAnchor.constraint(equalTo: logo.centerYAnchor)
         ])
-        content.addArrangedSubview(logo)
-        content.addArrangedSubview(text(accountSession?.brandName ?? "TwinConnect",
-                                        size: 17, weight: .bold))
-        content.setCustomSpacing(35, after: logo)
+        let logoRow = stack(.horizontal, spacing: 0)
+        let startSpace = NSView()
+        let endSpace = NSView()
+        logoRow.addArrangedSubview(startSpace)
+        logoRow.addArrangedSubview(logo)
+        logoRow.addArrangedSubview(endSpace)
+        startSpace.widthAnchor.constraint(equalTo: endSpace.widthAnchor).isActive = true
+        content.addArrangedSubview(logoRow)
+        logoRow.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
+        let brand = text(accountSession?.brandName ?? "TwinConnect",
+                         size: 17, weight: .bold)
+        brand.alignment = .center
+        content.addArrangedSubview(brand)
+        brand.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
+        content.setCustomSpacing(31, after: brand)
 
         let navs = [
             ("⚡", "Quick connect"), ("◎", "Locations"),
@@ -438,7 +449,9 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         }
         if accountSession?.supportURL != nil ||
            accountSession?.renewalURL != nil {
-            content.addArrangedSubview(card([quick], radius: 14, padding: 7))
+            let links = card([quick], radius: 14, padding: 7)
+            content.addArrangedSubview(links)
+            links.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
         }
 
         // Keep account details at the bottom, like the Windows sidebar.
@@ -450,9 +463,14 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         summary.addArrangedSubview(text(accountSession?.username ?? "",
                                         size: 11, weight: .semibold))
         summary.addArrangedSubview(text("Signed in", size: 10, color: muted))
-        content.addArrangedSubview(card([summary], radius: 18, padding: 12))
-        content.addArrangedSubview(button("Sign out", action: #selector(signOut(_:)),
-                                         mutedButton: true))
+        let identity = card([summary], radius: 18, padding: 12)
+        content.addArrangedSubview(identity)
+        identity.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
+        let logout = button("Sign out", action: #selector(signOut(_:)),
+                            mutedButton: true)
+        logout.alignment = .left
+        content.addArrangedSubview(logout)
+        logout.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
         spaced(side, content, inset: 17)
         return side
     }
@@ -755,35 +773,75 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         return scroller
     }
 
+    private func settingRow(_ title: String, subtitle: String,
+                            state: String, tone: NSColor? = nil) -> NSView {
+        let row = stack(.horizontal, spacing: 12)
+        let info = stack(spacing: 5)
+        info.addArrangedSubview(text(title, size: 13, weight: .semibold))
+        info.addArrangedSubview(text(subtitle, size: 11, color: muted))
+        row.addArrangedSubview(info)
+        let spacer = NSView()
+        spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        row.addArrangedSubview(spacer)
+        row.addArrangedSubview(pill(state, color: tone ?? muted))
+        return card([row], radius: 16, padding: 15)
+    }
+
     private func settingsPage() -> NSView {
-        let group = stack(spacing: 15)
-        group.alignment = .width
-        group.addArrangedSubview(text("Preferences",
-                                       size: 20, weight: .bold))
-        group.addArrangedSubview(text(
-            "Native macOS appearance  •  Secure HTTPS directory",
-            size: 13, color: muted))
-        group.addArrangedSubview(separator())
-        group.addArrangedSubview(text(
-            "Kill Switch • Split Tunneling • DNS",
-            size: 15, weight: .semibold))
-        group.addArrangedSubview(text(
-            "These controls remain unavailable until the native tunnel is signed " +
-            "and verified. No unprotected toggle is presented as working.",
-            size: 12, color: muted))
-        group.addArrangedSubview(pill("Connection protection: not verified",
-                                       color: amber))
-        group.addArrangedSubview(button("Copy diagnostics",
-                                        action: #selector(copyDiagnostics(_:))))
-        if accountSession?.supportURL != nil {
-            group.addArrangedSubview(button("Support",
-                                            action: #selector(openSupport(_:))))
-        }
-        if accountSession?.renewalURL != nil {
-            group.addArrangedSubview(button("Renew subscription",
-                                            action: #selector(openRenewal(_:))))
-        }
-        return card([group])
+        let section = stack(spacing: 12)
+        section.alignment = .width
+        section.addArrangedSubview(text("Connection & privacy",
+                                        size: 18, weight: .semibold))
+        // Render disabled state rather than non-functional toggles. These
+        // settings are controlled by the actual tunnel runtime when signed.
+        section.addArrangedSubview(settingRow(
+            "◈  Kill Switch",
+            subtitle: "Block unprotected traffic when the VPN disconnects",
+            state: "Unavailable", tone: amber))
+        section.addArrangedSubview(settingRow(
+            "≡  Split Tunneling",
+            subtitle: "Choose which apps use the secure connection",
+            state: "Unavailable", tone: amber))
+        section.addArrangedSubview(settingRow(
+            "◉  DNS protection",
+            subtitle: "Secure resolver and DNS leak protection",
+            state: "Unavailable", tone: amber))
+        section.addArrangedSubview(settingRow(
+            "↻  Auto reconnect",
+            subtitle: "Restore a connection if its network path changes",
+            state: "Unavailable", tone: amber))
+
+        section.addArrangedSubview(text("Application", size: 18,
+                                        weight: .semibold))
+        section.addArrangedSubview(settingRow(
+            "◎  App language", subtitle: "English",
+            state: "EN"))
+        section.addArrangedSubview(settingRow(
+            "◉  Appearance", subtitle: "TwinConnect dark glass",
+            state: "Dark"))
+
+        let actions = stack(.horizontal, spacing: 10)
+        actions.distribution = .fillEqually
+        actions.addArrangedSubview(button("↻  Refresh servers & account",
+            action: #selector(refresh(_:)), primary: true))
+        actions.addArrangedSubview(button("Copy diagnostics",
+            action: #selector(copyDiagnostics(_:)), mutedButton: true))
+        section.addArrangedSubview(actions)
+        actions.widthAnchor.constraint(equalTo: section.widthAnchor).isActive = true
+
+        let detail = snapshot?.errors.keys.sorted().map { name in
+            name + ": " + (snapshot?.errors[name] ?? "unavailable")
+        }.joined(separator: " · ") ?? ""
+        let count = snapshot?.sectionsLoaded.count ?? 0
+        section.addArrangedSubview(text(
+            "Panel information: " + String(count) + "/4 sections loaded" +
+                (detail.isEmpty ? "" : " · " + detail),
+            size: 11, color: detail.isEmpty ? muted : amber))
+        section.addArrangedSubview(text(
+            "VPN controls require a verified Packet Tunnel. This preview " +
+            "does not claim a working VPN connection.",
+            size: 11, color: muted))
+        return section
     }
 
     private func expiryText(_ account: TwinMacNativeAccount?) -> String {
