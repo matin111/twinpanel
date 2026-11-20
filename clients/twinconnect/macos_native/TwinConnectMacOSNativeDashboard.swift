@@ -3,6 +3,10 @@
 // strictly keeping VPN unavailable until a signed and verified PacketTunnel.
 import Cocoa
 
+private final class TwinNativeFlippedDocument: NSView {
+    override var isFlipped: Bool { true }
+}
+
 private final class TwinNativeBackdrop: NSView {
     var base = NSColor(calibratedRed: 0.059, green: 0.091, blue: 0.125, alpha: 1)
     var glow = NSColor(calibratedRed: 0.32, green: 0.55, blue: 0.64, alpha: 1)
@@ -111,6 +115,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         label.textColor = color ?? NSColor(calibratedWhite: 0.96, alpha: 1)
         label.lineBreakMode = .byWordWrapping
         label.maximumNumberOfLines = 0
+        label.alignment = .left
+        label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         return label
     }
 
@@ -118,7 +124,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                        spacing: CGFloat = 13) -> NSStackView {
         let result = NSStackView()
         result.orientation = axis
-        result.alignment = axis == .vertical ? .leading : .centerY
+        result.alignment = axis == .vertical ? .width : .centerY
         result.spacing = spacing
         result.translatesAutoresizingMaskIntoConstraints = false
         return result
@@ -153,7 +159,12 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         // Let every glass panel fill the available width; plain NSView
         // children have no intrinsic width and otherwise disappear.
         column.alignment = .width
-        for child in children { column.addArrangedSubview(child) }
+        for child in children {
+            column.addArrangedSubview(child)
+            // In AppKit a child NSView without an intrinsic width can shrink
+            // to its title: every panel uses the full width of its column.
+            child.widthAnchor.constraint(equalTo: column.widthAnchor).isActive = true
+        }
         spaced(box, column, inset: padding)
         return box
     }
@@ -300,13 +311,15 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         // cards no full-width constraint. They can collapse to zero width.
         workspace.alignment = .width
         let heading = stack(.horizontal, spacing: 12)
-        let titles = ["Quick connect", "Locations", "Settings", "Account"]
-        heading.addArrangedSubview(text(titles[tab], size: 26, weight: .bold))
+        heading.alignment = .centerY
+        let titles = ["Quick connect", "Locations", "Settings", "My account"]
+        heading.addArrangedSubview(text(titles[tab], size: 25, weight: .bold))
+        let headerSpace = NSView()
+        headerSpace.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        heading.addArrangedSubview(headerSpace)
         heading.addArrangedSubview(pill("● Offline", color: muted))
         workspace.addArrangedSubview(heading)
-        workspace.addArrangedSubview(text(
-            accountSession?.brandName ?? "TwinConnect",
-            size: 13, color: muted))
+        heading.widthAnchor.constraint(equalTo: workspace.widthAnchor).isActive = true
         switch tab {
         case 0:
             // The shared Flutter desktop layout uses two equally weighted
@@ -328,12 +341,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         case 2: workspace.addArrangedSubview(settingsPage())
         default: workspace.addArrangedSubview(accountPage())
         }
-        if !status.isEmpty {
-            workspace.addArrangedSubview(text(status, size: 11, color: muted))
-        }
-        workspace.addArrangedSubview(text(
-            "Native macOS • panel data is read-only • VPN requires signed PacketTunnel",
-            size: 11, color: muted))
+        // Technical diagnostics belong in Settings, not in the user-facing
+        // page canvas. The shell mirrors the clean Windows dashboard.
         // Keep the dashboard visible even before the account snapshot arrives
         // or when its contents exceed the macOS window height.
         let scroll = NSScrollView()
@@ -343,7 +352,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         scroll.autohidesScrollers = true
         scroll.borderType = .noBorder
 
-        let document = NSView()
+        let document = TwinNativeFlippedDocument()
         document.translatesAutoresizingMaskIntoConstraints = false
         document.addSubview(workspace)
         NSLayoutConstraint.activate([
