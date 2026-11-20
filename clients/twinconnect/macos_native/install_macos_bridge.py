@@ -36,6 +36,15 @@ startup_anchor = "let flutterViewController = FlutterViewController()"
 startup_marker = "// TWINCONNECT_MACOS_METAL_PREFLIGHT_V1"
 if content.count(startup_anchor) != 1:
     raise SystemExit("Unexpected macOS Flutter window startup; aborting")
+if startup_marker in content and "self.titleVisibility = .hidden" not in content:
+    old_branch = "      self.contentViewController = TwinConnectMacOSMetalFallback()"
+    if content.count(old_branch) != 1:
+        raise SystemExit("Unexpected existing native window branch; aborting")
+    content = content.replace(
+        old_branch,
+        "      self.titleVisibility = .hidden\n" + old_branch,
+        1,
+    )
 if startup_marker not in content:
     guard = (
         "    " + startup_marker + "\n"
@@ -43,6 +52,7 @@ if startup_marker not in content:
         "          metal.makeCommandQueue() != nil else {\n"
         "      NSLog(\"TwinConnect: Metal device/queue unavailable; showing native AppKit compatibility screen\")\n"
         "      let originalFrame = self.frame\n"
+        "      self.titleVisibility = .hidden\n"
         "      self.contentViewController = TwinConnectMacOSMetalFallback()\n"
         "      self.setFrame(originalFrame, display: true)\n"
         "      super.awakeFromNib()\n"
