@@ -949,10 +949,25 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         else if title.contains("IP") { iconName = "◎" }
         else if title.contains("Download") { iconName = "↓" }
         else { iconName = "↑" }
-        let heading = stack(.horizontal, spacing: 8)
-        let symbol = text(iconName, size: 17, weight: .bold, color: sea)
-        heading.addArrangedSubview(symbol)
-        heading.addArrangedSubview(text(title, size: 11,
+        let heading = stack(.horizontal, spacing: 9)
+        let iconPlate = NSView()
+        iconPlate.wantsLayer = true
+        iconPlate.layer?.cornerRadius = 9
+        iconPlate.layer?.backgroundColor = sea.withAlphaComponent(0.19).cgColor
+        iconPlate.layer?.borderColor = sea.withAlphaComponent(0.34).cgColor
+        iconPlate.layer?.borderWidth = 1
+        iconPlate.translatesAutoresizingMaskIntoConstraints = false
+        iconPlate.widthAnchor.constraint(equalToConstant: 30).isActive = true
+        iconPlate.heightAnchor.constraint(equalToConstant: 30).isActive = true
+        let symbol = text(iconName, size: 19, weight: .semibold, color: sea)
+        symbol.translatesAutoresizingMaskIntoConstraints = false
+        iconPlate.addSubview(symbol)
+        NSLayoutConstraint.activate([
+            symbol.centerXAnchor.constraint(equalTo: iconPlate.centerXAnchor),
+            symbol.centerYAnchor.constraint(equalTo: iconPlate.centerYAnchor)
+        ])
+        heading.addArrangedSubview(iconPlate)
+        heading.addArrangedSubview(text(title, size: 12,
                                        weight: .medium, color: muted))
         content.addArrangedSubview(heading)
         let number = text(value, size: 23, weight: .bold,
@@ -1038,12 +1053,21 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         let location = selected.map {
             flag($0.country) + "  " + countryName($0.country)
         } ?? "Select location"
-        let change = button(location + "     ·     Locations   ›",
+        let locationRow = stack(.horizontal, spacing: 9)
+        locationRow.addArrangedSubview(text(location, size: 13, weight: .semibold))
+        let locationSpacer = NSView()
+        locationSpacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        locationRow.addArrangedSubview(locationSpacer)
+        let change = button("Locations  ›",
             action: #selector(showLocations(_:)), mutedButton: true)
-        change.alignment = .left
-        change.heightAnchor.constraint(equalToConstant: 45).isActive = true
-        content.addArrangedSubview(change)
-        change.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
+        change.heightAnchor.constraint(equalToConstant: 38).isActive = true
+        change.widthAnchor.constraint(equalToConstant: 118).isActive = true
+        locationRow.addArrangedSubview(change)
+        let locationCard = card([locationRow], radius: 13, padding: 8,
+                                style: .inset)
+        content.addArrangedSubview(locationCard)
+        locationCard.widthAnchor.constraint(equalTo: content.widthAnchor)
+            .isActive = true
 
         // Offline mode never fabricates session bytes, handshakes or an IP.
         return card([content], radius: 25, padding: 20, style: .panel)
