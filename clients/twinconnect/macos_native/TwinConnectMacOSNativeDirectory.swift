@@ -685,6 +685,46 @@ final class TwinConnectMacOSNativeDirectory: NSObject, URLSessionTaskDelegate {
         }
     }
 
+    // Prepare an un-routed TUN configuration from the already reviewed,
+    // account-entitled Hysteria2 outbound. This does NOT start a VPN.
+    // Keeping auto_route false is essential on remote/cloud macOS hosts.
+    func prepareUnroutedHysteria2TUN(_ session: TwinMacNativeSession,
+                                    serverID: String,
+                                    completion: @escaping (Result<Data, Error>) -> Void) {
+        prepareLocalHysteria2(session, serverID: serverID) { result in
+            switch result {
+            case .failure(let error):
+                completion(.failure(error))
+            case .success(let proxyConfig):
+                guard let object = try? JSONSerialization.jsonObject(with: proxyConfig),
+                      var config = object as? [String: Any],
+                      let outbound = (config["outbounds"] as? [[String: Any]])?.first,
+                      outbound["type"] as? String == "hysteria2",
+                      outbound["tag"] as? String == "proxy" else {
+                    completion(.failure(TwinMacNativeError.failure("TUN_PROFILE_INVALID")))
+                    return
+                }
+                // This interface cannot capture system traffic until explicit
+                // privileged routing is added with a recoverable console.
+                config["inbounds"] = [[
+                    "type": "tun", "tag": "twin-tun",
+                    "interface_name": "twinconnect-test",
+                    "address": ["172.19.254.1/30"],
+                    "auto_route": false,
+                    "auto_redirect": false,
+                    "strict_route": false,
+                    "stack": "system"
+                ]]
+                guard let encoded = try? JSONSerialization.data(withJSONObject: config)
+                else {
+                    completion(.failure(TwinMacNativeError.failure("TUN_CONFIG_ENCODING_FAILED")))
+                    return
+                }
+                completion(.success(encoded))
+            }
+        }
+    }
+
     private func localHysteria2Config(_ item: [String: Any]) -> Data? {
         var value: Any? = item["outbound"] ?? item["singbox_outbound"] ?? item["config"]
         if let text = value as? String, let data = text.data(using: .utf8) {
