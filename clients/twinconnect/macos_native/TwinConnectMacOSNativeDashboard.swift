@@ -630,52 +630,87 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         return card([group])
     }
 
+    private func compactMetric(_ title: String, value: String) -> NSView {
+        let metric = stack(spacing: 5)
+        metric.addArrangedSubview(text(title, size: 10, color: muted))
+        metric.addArrangedSubview(text(value, size: 12, weight: .bold))
+        return card([metric], radius: 13, padding: 10)
+    }
+
     private func homeSubscriptionSummary() -> NSView {
-        let items = stack(spacing: 9)
+        let items = stack(spacing: 8)
         items.alignment = .width
-        items.addArrangedSubview(text("✓  Subscription details",
-                                      size: 13, weight: .semibold))
-        if let data = snapshot {
-            if let account = data.account {
-                let used = ByteCountFormatter.string(fromByteCount:
-                    account.usedBytes, countStyle: .file)
-                let quota = account.limitBytes == 0 ? "Unlimited" :
-                    ByteCountFormatter.string(fromByteCount:
-                        account.limitBytes, countStyle: .file)
-                items.addArrangedSubview(text("Data usage: " + used + " / " + quota,
-                                              size: 13))
-                if account.limitBytes > 0 {
-                    let percent = min(100, Int(Double(account.usedBytes) /
-                        Double(account.limitBytes) * 100))
-                    let progress = NSProgressIndicator()
-                    progress.isIndeterminate = false
-                    progress.minValue = 0
-                    progress.maxValue = 100
-                    progress.doubleValue = Double(percent)
-                    progress.style = .bar
-                    progress.translatesAutoresizingMaskIntoConstraints = false
-                    progress.widthAnchor.constraint(equalTo: items.widthAnchor).isActive = true
-                    items.addArrangedSubview(progress)
-                }
-                let expiry = account.expiresAt.map {
-                    DateFormatter.localizedString(from: $0, dateStyle: .medium,
-                                                  timeStyle: .none)
-                } ?? "No fixed expiry"
-                items.addArrangedSubview(text("Expires: " + expiry, color: muted))
-            } else {
-                items.addArrangedSubview(text(
-                    "Account: " + (data.errors["account"] ?? "Loading…"),
-                    size: 12, color: amber))
-            }
-            items.addArrangedSubview(text(
-                "Plan: " + (data.planName ?? "Not available") +
-                "  •  Devices: " +
-                (data.deviceLimit.map { String($0) } ?? "—"), color: muted))
+        let header = stack(.horizontal, spacing: 9)
+        header.addArrangedSubview(text("✓  Subscription details",
+                                       size: 12, weight: .semibold))
+        header.addArrangedSubview(button("↻",
+                                         action: #selector(refresh(_:)), mutedButton: true))
+        items.addArrangedSubview(header)
+
+        let account = snapshot?.account
+        let used = account.map {
+            ByteCountFormatter.string(fromByteCount: $0.usedBytes, countStyle: .file)
+        } ?? "—"
+        let quota = account.map {
+            $0.limitBytes == 0 ? "Unlimited" :
+                ByteCountFormatter.string(fromByteCount: $0.limitBytes,
+                                          countStyle: .file)
+        } ?? "—"
+        let usage = stack(spacing: 7)
+        usage.addArrangedSubview(text("Data usage     " + used + " / " + quota,
+                                      size: 11))
+        let progress = NSProgressIndicator()
+        progress.isIndeterminate = false
+        progress.minValue = 0
+        progress.maxValue = 100
+        if let account = account, account.limitBytes > 0 {
+            progress.doubleValue = max(0, min(100,
+                Double(account.usedBytes) / Double(account.limitBytes) * 100))
         } else {
-            items.addArrangedSubview(text("Loading account information from the panel…",
-                                          color: muted))
+            progress.doubleValue = 0
         }
-        return card([items], radius: 20, padding: 17)
+        progress.style = .bar
+        progress.translatesAutoresizingMaskIntoConstraints = false
+        usage.addArrangedSubview(progress)
+        progress.widthAnchor.constraint(equalTo: usage.widthAnchor).isActive = true
+        let remaining: String
+        if let account = account {
+            remaining = account.limitBytes == 0 ? "Unlimited" :
+                ByteCountFormatter.string(fromByteCount: max(0,
+                    account.limitBytes - account.usedBytes), countStyle: .file)
+        } else {
+            remaining = "—"
+        }
+        usage.addArrangedSubview(text("Remaining: " + remaining,
+                                      size: 10, color: sea))
+        items.addArrangedSubview(card([usage], radius: 13, padding: 10))
+
+        let expiry = account?.expiresAt.map {
+            DateFormatter.localizedString(from: $0, dateStyle: .medium,
+                                          timeStyle: .none)
+        } ?? "—"
+        let days: String
+        if let date = account?.expiresAt {
+            let remaining = date.timeIntervalSinceNow
+            days = remaining < 0 ? "Expired" :
+                String(Int(ceil(remaining / 86400))) + " days"
+        } else if account != nil {
+            days = "Unlimited / not started"
+        } else {
+            days = "—"
+        }
+        let chips = stack(.horizontal, spacing: 8)
+        chips.distribution = .fillEqually
+        chips.addArrangedSubview(compactMetric("Expiry date", value: expiry))
+        chips.addArrangedSubview(compactMetric("Time remaining", value: days))
+        items.addArrangedSubview(chips)
+        chips.widthAnchor.constraint(equalTo: items.widthAnchor).isActive = true
+
+        if let error = snapshot?.errors["account"] {
+            items.addArrangedSubview(text("Account: " + error,
+                                          size: 10, color: amber))
+        }
+        return card([items], radius: 20, padding: 12)
     }
 
     private func filteredServers() -> [TwinMacNativeServer] {
