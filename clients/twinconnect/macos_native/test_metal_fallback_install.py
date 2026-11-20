@@ -83,14 +83,20 @@ class MetalFallbackInstallTests(unittest.TestCase):
             "self.contentViewController = TwinConnectMacOSMetalFallback()",
             generated
         )
-        self.assertIn("VPN connection is unavailable in this mode", generated)
+        self.assertIn("VPN unavailable: a signed Apple Network Extension is required", generated)
         self.assertIn("TWINCONNECT_MACOS_NATIVE_DIRECTORY_V1", generated)
         self.assertIn("TWINCONNECT_MACOS_NATIVE_DASHBOARD_V1", generated)
         self.assertIn("v1/central-app/public/login", generated)
         self.assertIn("v1/central-app/session/servers", generated)
         self.assertIn("v1/central-app/session/protocols", generated)
         self.assertIn("v1/central-app/session/plan", generated)
-        self.assertIn("VPN connection is not available", generated)
+        self.assertIn("Quick connect", generated)
+        self.assertIn("Locations", generated)
+        self.assertIn("Settings", generated)
+        self.assertIn("Account", generated)
+        self.assertIn("TwinNativePowerRing", generated)
+        self.assertIn("NSGradient(colors:", generated)
+        self.assertIn("VPN connection remains unavailable", generated)
         self.assertNotIn("startVPNTunnel(", generated.split("// TWINCONNECT_MACOS_METAL_FALLBACK_V1", 1)[-1])
         self.assertIn("TwinConnectMacOSVPNBridge.register(", generated)
         self.assertIn("RegisterGeneratedPlugins(registry: flutterViewController)",
