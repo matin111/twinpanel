@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 
 import 'macos_standalone_panel_profile.dart';
 import 'macos_standalone_proxy_runtime.dart';
-import 'protocols.dart';
 import 'server_inventory.dart';
 import 'tenant_api.dart';
 import 'tenant_models.dart';
@@ -139,15 +138,18 @@ class _MacStandaloneConnectionCardState
       }
       final engineRoot = Directory(
           '$home/twinpanel/clients/twinconnect/macos_native/build');
-      final arch = Platform.version.contains('arm64') ? 'arm64' :
-          'amd64'; // Runtime detects architecture again on launch.
+      final archResult = await Process.run('/usr/bin/uname', ['-m'])
+          .timeout(const Duration(seconds: 4));
+      if (archResult.exitCode != 0) {
+        throw const FormatException('MAC_STANDALONE_ARCH_UNAVAILABLE');
+      }
+      final arch = archResult.stdout.toString().trim() == 'x86_64'
+          ? 'amd64' : 'arm64';
       final executableName = code == 'v2ray' ? 'xray' : 'sing-box';
       final group = executableName == 'xray' ? 'xray' : 'singbox';
       final executable = File(
           '${engineRoot.path}/$group/$arch/$executableName');
-      // Check actual Intel binary here; the runtime does the definitive check.
-      final found = executable.existsSync() ||
-          File('${engineRoot.path}/$group/arm64/$executableName').existsSync();
+      final found = executable.existsSync();
       if (!found) {
         throw const FormatException('MAC_STANDALONE_ENGINE_NOT_INSTALLED');
       }
