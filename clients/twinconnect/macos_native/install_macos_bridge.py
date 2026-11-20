@@ -6,7 +6,9 @@ macOS project, never Windows/iOS sources or existing subscription data.
 from __future__ import annotations
 
 from pathlib import Path
+import os
 import plistlib
+from urllib.parse import urlsplit
 
 root = Path(__file__).resolve().parents[1]
 window = root / "macos/Runner/MainFlutterWindow.swift"
@@ -15,7 +17,9 @@ control = root / "macos_native/TwinConnectMacOSVPNControl.swift"
 libbox_control = root / "macos_native/TwinConnectMacOSLibboxControl.swift"
 mieru_control = root / "macos_native/TwinConnectMacOSMieruControl.swift"
 metal_fallback = root / "macos_native/TwinConnectMacOSMetalFallback.swift"
-if not window.is_file() or not native.is_file() or not control.is_file() or not libbox_control.is_file() or not mieru_control.is_file() or not metal_fallback.is_file():
+native_directory = root / "macos_native/TwinConnectMacOSNativeDirectory.swift"
+native_dashboard = root / "macos_native/TwinConnectMacOSNativeDashboard.swift"
+if not window.is_file() or not native.is_file() or not control.is_file() or not libbox_control.is_file() or not mieru_control.is_file() or not metal_fallback.is_file() or not native_directory.is_file() or not native_dashboard.is_file():
     raise SystemExit("macOS Flutter project / native bridge not found")
 
 content = window.read_text(encoding="utf-8")
@@ -68,9 +72,32 @@ mieru_marker = "// TWINCONNECT_MACOS_MIERU_CONTROL_V1"
 if mieru_marker not in content:
     content = content.rstrip() + "\n\n" + mieru_marker + "\n" + mieru_control.read_text(encoding="utf-8")
 fallback_marker = "// TWINCONNECT_MACOS_METAL_FALLBACK_V1"
-if fallback_marker not in content:
-    content = content.rstrip() + "\n\n" + fallback_marker + "\n" + metal_fallback.read_text(encoding="utf-8")
+# Refresh the installer-owned tail on each run. Existing generated projects
+# may still contain the diagnostics-only class from an earlier preview.
+# Do not leave stale types behind or append duplicates.
+content = content.split(fallback_marker, 1)[0].rstrip()
+content += "\n\n" + fallback_marker + "\n" + metal_fallback.read_text(encoding="utf-8")
+content += "\n\n// TWINCONNECT_MACOS_NATIVE_DIRECTORY_V1\n" + native_directory.read_text(encoding="utf-8")
+content += "\n\n// TWINCONNECT_MACOS_NATIVE_DASHBOARD_V1\n" + native_dashboard.read_text(encoding="utf-8")
 window.write_text(content, encoding="utf-8")
+
+# Use the same default directory origin as macOS integrated CI. Operators can
+# set the build-time env var to match their Flutter --dart-define value.
+directory_origin = os.environ.get("TWINCONNECT_DIRECTORY_URL", "https://panel.matindnspro.sbs").strip()
+parsed = urlsplit(directory_origin)
+if (parsed.scheme != "https" or not parsed.hostname or
+        parsed.username or parsed.password or parsed.query or parsed.fragment or
+        parsed.path not in ("", "/") or parsed.port not in (None, 443) or
+        "." not in parsed.hostname):
+    raise SystemExit("NATIVE_DIRECTORY_INVALID_HTTPS_ORIGIN")
+app_info_path = root / "macos/Runner/Info.plist"
+if not app_info_path.is_file():
+    raise SystemExit("macOS Runner Info.plist not found")
+with app_info_path.open("rb") as handle:
+    app_info = plistlib.load(handle)
+app_info["TwinConnectDirectoryURL"] = directory_origin.rstrip("/")
+with app_info_path.open("wb") as handle:
+    plistlib.dump(app_info, handle, sort_keys=False)
 
 # App sandbox requires a client-network entitlement for license discovery,
 # panel login, subscription requests, and HTTPS status checks.
