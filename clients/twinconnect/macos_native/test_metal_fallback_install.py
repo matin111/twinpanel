@@ -436,6 +436,22 @@ class MetalFallbackInstallTests(unittest.TestCase):
             self.assertIn(token, source)
         self.assertNotIn('fabric.tunnelConnected = true', source)
 
+    def test_sidebar_gradient_button_factory_retains_concrete_swift_type(self) -> None:
+        source = (SOURCE / "TwinConnectMacOSNativeDashboard.swift").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn(
+            "-> TwinNativePremiumButton {\n"
+            "        let control = TwinNativePremiumButton(title: title,",
+            source,
+        )
+        sidebar = source.split("    private func buildSidebar() -> NSView {", 1)[1].split(
+            "    private func connectPage() -> NSView {", 1
+        )[0]
+        self.assertIn("control.setAccentGradient(", sidebar)
+        self.assertIn("link.setAccentGradient(", sidebar)
+        self.assertNotIn("-> NSButton {\n        let control = TwinNativePremiumButton", source)
+
     def test_sidebar_matches_windows_navigation_and_country_flag(self) -> None:
         source = (SOURCE / "TwinConnectMacOSNativeDashboard.swift").read_text(
             encoding="utf-8"
