@@ -240,9 +240,10 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     }
 
     private func buildLogin(in root: NSView) {
-        // Match the shared minimal sign-in contract: username, password,
-        // one action. No brand, greeting, decorative text or app title.
+        // Match the shared login: a simple welcome heading, username,
+        // password and one action. No brand or extra explanatory copy.
         let form = stack(spacing: 15)
+        form.addArrangedSubview(text("Welcome back", size: 27, weight: .bold))
         let username = styleInputField(NSTextField(), placeholder: "Username")
         usernameField = username
         let password = styleInputField(NSSecureTextField(), placeholder: "Password")
