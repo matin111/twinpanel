@@ -8,6 +8,21 @@ source = File.join(root, '.dart_tool/twinconnect-wireguard-apple')
 archive = File.join(root, '.dart_tool/twinconnect-wireguard-build/lib/libwg-go.a')
 abort 'ERROR: build libwg-go.a first' unless File.size?(archive)
 abort 'ERROR: prepare upstream WireGuardKit source first' unless File.file?(File.join(source, 'Package.swift'))
+manifest = File.join(source, 'Package.swift')
+manifest_text = File.read(manifest)
+# The upstream manifest declares swift-tools-version 5.3 but uses
+# .macOS(.v12) and .iOS(.v15), which are unavailable in that manifest API.
+# Patch ONLY the downloaded, ignored local checkout; never rewrite upstream.
+if manifest_text.start_with?("// swift-tools-version:5.3\n")
+  File.write(manifest, manifest_text.sub(
+    "// swift-tools-version:5.3\n", "// swift-tools-version:5.7\n"
+  ))
+  puts 'Prepared local WireGuardKit Package.swift for macOS 12/iOS 15 (Swift tools 5.7)'
+elsif manifest_text.match?(/\A\/\/ swift-tools-version:5\.(?:7|8|9|10)\b/)
+  puts 'WireGuardKit Swift tools manifest already supports deployment platform versions'
+else
+  abort "ERROR: unexpected upstream Swift tools manifest. Inspect #{manifest}"
+end
 project = Xcodeproj::Project.open(project_path)
 extension = project.targets.find { |t| t.name == 'PacketTunnel' }
 abort 'ERROR: PacketTunnel target missing; run install_packet_tunnel_target.rb first' unless extension
