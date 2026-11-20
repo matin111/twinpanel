@@ -240,54 +240,44 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     }
 
     private func buildLogin(in root: NSView) {
-        // Same pre-auth privacy as Flutter: no TwinConnect/reseller branding.
-        let form = stack(spacing: 16)
-        form.addArrangedSubview(pill("◆", color: sea))
-        form.addArrangedSubview(text("Welcome back", size: 29, weight: .bold))
-        form.addArrangedSubview(text("Sign in with your TwinConnect app credentials",
-                                  size: 13, color: muted))
-
-        let nameTitle = text("Username", size: 13, weight: .semibold)
-        let username = styleInputField(NSTextField(), placeholder: "Enter app username")
+        // Match the shared minimal sign-in contract: username, password,
+        // one action. No brand, greeting, decorative text or app title.
+        let form = stack(spacing: 15)
+        let username = styleInputField(NSTextField(), placeholder: "Username")
         usernameField = username
-        let secretTitle = text("Password", size: 13, weight: .semibold)
-        let password = styleInputField(NSSecureTextField(), placeholder: "Enter password")
+        let password = styleInputField(NSSecureTextField(), placeholder: "Password")
         passwordField = password
-        let fields = stack(spacing: 8)
-        for field in [nameTitle, username, secretTitle, password] {
-            fields.addArrangedSubview(field)
-        }
-        fields.setCustomSpacing(18, after: username)
-        form.addArrangedSubview(fields)
-        username.widthAnchor.constraint(equalTo: fields.widthAnchor).isActive = true
-        password.widthAnchor.constraint(equalTo: fields.widthAnchor).isActive = true
-        fields.widthAnchor.constraint(equalTo: form.widthAnchor).isActive = true
+        form.addArrangedSubview(username)
+        form.addArrangedSubview(password)
 
         let enter = button(busy ? "Signing in…" : "Sign in",
                            action: #selector(signIn(_:)), primary: true)
         form.addArrangedSubview(enter)
-        enter.widthAnchor.constraint(equalTo: form.widthAnchor).isActive = true
         enter.heightAnchor.constraint(equalToConstant: 51).isActive = true
+        // AppKit NSStackView uses intrinsic-width hugging by default.
+        // Explicitly stretch all controls across the centered login card.
+        username.widthAnchor.constraint(equalTo: form.widthAnchor).isActive = true
+        password.widthAnchor.constraint(equalTo: form.widthAnchor).isActive = true
+        enter.widthAnchor.constraint(equalTo: form.widthAnchor).isActive = true
 
-        form.addArrangedSubview(separator())
-        form.addArrangedSubview(text("Secure app login • Encrypted HTTPS",
-                                  size: 11, color: muted))
+        // Authentication errors are actionable and never silently swallowed.
         if !status.isEmpty {
             form.addArrangedSubview(text(status, size: 12,
                                        color: status.hasPrefix("Sign-in failed")
                                        ? amber : muted))
         }
 
-        let glass = card([form], radius: 28, padding: 31)
+        let glass = card([form], radius: 26, padding: 30)
         root.addSubview(glass)
         NSLayoutConstraint.activate([
             glass.centerXAnchor.constraint(equalTo: root.centerXAnchor),
             glass.centerYAnchor.constraint(equalTo: root.centerYAnchor),
-            glass.widthAnchor.constraint(equalToConstant: 505),
+            glass.widthAnchor.constraint(equalToConstant: 440),
             glass.leadingAnchor.constraint(greaterThanOrEqualTo:
                 root.leadingAnchor, constant: 20),
             glass.trailingAnchor.constraint(lessThanOrEqualTo:
                 root.trailingAnchor, constant: -20),
+            form.widthAnchor.constraint(equalTo: glass.widthAnchor, constant: -60)
         ])
     }
 
