@@ -614,6 +614,132 @@ final class TwinConnectMacOSNativeDirectory: NSObject, URLSessionTaskDelegate {
         }
     }
 
+
+    // Strict on-demand native AppKit profile fetch. No full-tunnel claim.
+    // Always request current entitlement and inventory before credentials.
+    // Only Hysteria2 is enabled until each other outbound has a reviewed
+    // config conversion and real transport test.
+    func prepareLocalHysteria2(_ session: TwinMacNativeSession,
+                               serverID: String,
+                               completion: @escaping (Result<Data, Error>) -> Void) {
+        guard serverID.range(of: "^[0-9]{1,20}$", options: .regularExpression) != nil
+        else {
+            completion(.failure(TwinMacNativeError.failure("INVALID_SERVER_ID")))
+            return
+        }
+        let panel = session.apiOrigin
+        let token = session.accessToken
+        request(endpoint(panel, "v1/central-app/session/protocols"),
+                payload: nil, bearer: token) { [weak self] response in
+            guard let self = self else { return }
+            guard case .success(let catalog) = response,
+                  self.validEnvelope(catalog, session.namespace),
+                  let rows = catalog["protocols"] as? [[String: Any]],
+                  rows.count <= 16,
+                  rows.filter({ ($0["code"] as? String) == "hysteria2" &&
+                                ($0["selected"] as? Bool) == true &&
+                                ($0["config_record_present"] as? Bool) == true }).count == 1
+            else {
+                completion(.failure(TwinMacNativeError.failure("PROTOCOL_NOT_ALLOWED")))
+                return
+            }
+            self.request(self.endpoint(panel, "v1/central-app/session/servers"),
+                         payload: nil, bearer: token, maxBytes: 131072) { inventory in
+                guard case .success(let nodes) = inventory,
+                      self.validEnvelope(nodes, session.namespace),
+                      let all = nodes["servers"] as? [[String: Any]],
+                      all.filter({ ($0["id"] as? String) == serverID }).count == 1
+                else {
+                    completion(.failure(TwinMacNativeError.failure("SERVER_NOT_ALLOWED")))
+                    return
+                }
+                self.request(self.endpoint(panel, "v1/central-app/session/profiles"),
+                             payload: ["protocol": "hysteria2"], bearer: token,
+                             maxBytes: 1048576) { profiles in
+                    guard case .success(let response) = profiles,
+                          self.validEnvelope(response, session.namespace),
+                          (response["protocol"] as? String) == "hysteria2",
+                          let items = response["items"] as? [[String: Any]]
+                    else {
+                        completion(.failure(TwinMacNativeError.failure("PROFILE_UNAVAILABLE")))
+                        return
+                    }
+                    let candidates = items.filter { item in
+                        if let id = item["node_id"] as? String { return id == serverID }
+                        if let id = item["node_id"] as? Int { return String(id) == serverID }
+                        return false
+                    }
+                    guard candidates.count == 1,
+                          let config = self.localHysteria2Config(candidates[0])
+                    else {
+                        completion(.failure(TwinMacNativeError.failure("HYSTERIA2_PROFILE_INVALID")))
+                        return
+                    }
+                    completion(.success(config))
+                }
+            }
+        }
+    }
+
+    private func localHysteria2Config(_ item: [String: Any]) -> Data? {
+        var value: Any? = item["outbound"] ?? item["singbox_outbound"] ?? item["config"]
+        if let text = value as? String, let data = text.data(using: .utf8) {
+            value = try? JSONSerialization.jsonObject(with: data)
+        }
+        guard let outbound = value as? [String: Any],
+              outbound["type"] as? String == "hysteria2",
+              let host = outbound["server"] as? String,
+              !host.isEmpty, host.count <= 255,
+              !host.contains("/"), !host.contains(" "),
+              let port = outbound["server_port"] as? Int,
+              (1...65535).contains(port),
+              let password = outbound["password"] as? String,
+              !password.isEmpty, password.count <= 4096,
+              let tls = outbound["tls"] as? [String: Any],
+              tls["enabled"] as? Bool == true,
+              tls["insecure"] as? Bool != true,
+              tls["disable_sni"] as? Bool != true,
+              tls["utls"] == nil,
+              tls["reality"] == nil,
+              outbound["detour"] == nil,
+              outbound["dialer"] == nil,
+              outbound["inbounds"] == nil,
+              outbound["route"] == nil,
+              outbound["dns"] == nil
+        else { return nil }
+
+        // Construct allowlisted outbound only: panel cannot inject routes,
+        // local listeners, arbitrary commands or certificate bypass.
+        var reviewed: [String: Any] = [
+            "type": "hysteria2", "tag": "proxy",
+            "server": host, "server_port": port,
+            "password": password,
+            "tls": ["enabled": true,
+                    "server_name": (tls["server_name"] as? String) ?? host]
+        ]
+        if let obfs = outbound["obfs"] as? [String: Any],
+           obfs["type"] as? String == "salamander",
+           let key = obfs["password"] as? String, !key.isEmpty {
+            reviewed["obfs"] = ["type": "salamander", "password": key]
+        } else if outbound["obfs"] != nil { return nil }
+        for key in ["up_mbps", "down_mbps"] {
+            if let rate = outbound[key] as? Int {
+                guard (1...100000).contains(rate) else { return nil }
+                reviewed[key] = rate
+            } else if outbound[key] != nil { return nil }
+        }
+        let result: [String: Any] = [
+            "log": ["level": "error"],
+            "inbounds": [[
+                "type": "mixed", "tag": "local-proxy",
+                "listen": "127.0.0.1", "listen_port": 17089
+            ]],
+            "outbounds": [reviewed],
+            "route": ["final": "proxy"],
+        ]
+        return try? JSONSerialization.data(withJSONObject: result)
+    }
+
     private func validEnvelope(_ object: [String: Any], _ namespace: String) -> Bool {
         return (object["schema"] as? Int) == 1 &&
             (object["namespace"] as? String)?.uppercased() == namespace
