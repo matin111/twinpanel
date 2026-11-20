@@ -11,7 +11,9 @@ void main() {
         .readAsStringSync();
     expect(adapter, contains('import WireGuardKit'));
     expect(adapter, contains('WireGuardAdapter(with: provider)'));
-    expect(adapter, contains('fromWgQuickConfig'));
+    expect(adapter, contains('TwinConnectWgQuickParser.parse(text)'));
+    expect(adapter, contains('TunnelConfiguration(name: "TwinConnect", interface: interface, peers: peers)'));
+    expect(adapter, contains('case invalidProfile'));
     expect(adapter, contains('kSecValuePersistentRef'));
     expect(adapter, contains('MacWireGuardError.backendNotLinked'));
     expect(extension, contains('case "wireguard"'));
