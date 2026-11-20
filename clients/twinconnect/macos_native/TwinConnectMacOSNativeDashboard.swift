@@ -434,6 +434,94 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         ])
     }
 
+    // Native vector glyphs keep the Windows icon language sharp on Retina
+    // and on Catalina, where SF Symbols systemSymbolName is unavailable.
+    // 0 bolt, 1 location, 2 settings, 3 account, 4 support,
+    // 5 renewal, 6 website.
+    private func sidebarIcon(_ kind: Int) -> NSImage {
+        let output = NSImage(size: NSSize(width: 19, height: 19),
+                             flipped: false) { rect in
+            let unit = rect.width / 20
+            func pt(_ x: CGFloat, _ y: CGFloat) -> NSPoint {
+                NSPoint(x: x * unit, y: y * unit)
+            }
+            let path = NSBezierPath()
+            path.lineWidth = 1.7 * unit
+            path.lineCapStyle = .round
+            path.lineJoinStyle = .round
+            switch kind {
+            case 0:
+                path.move(to: pt(11, 18))
+                path.line(to: pt(5, 9))
+                path.line(to: pt(10, 9))
+                path.line(to: pt(8, 2))
+                path.line(to: pt(16, 12))
+                path.line(to: pt(11, 12))
+                path.close()
+            case 1:
+                path.move(to: pt(10, 2))
+                path.curve(to: pt(4, 11), controlPoint1: pt(7, 6),
+                          controlPoint2: pt(4, 8))
+                path.curve(to: pt(16, 11), controlPoint1: pt(4, 19),
+                          controlPoint2: pt(16, 19))
+                path.curve(to: pt(10, 2), controlPoint1: pt(16, 8),
+                          controlPoint2: pt(13, 6))
+                path.appendOval(in: NSRect(x: 8 * unit, y: 10 * unit,
+                                          width: 4 * unit, height: 4 * unit))
+            case 2:
+                path.appendOval(in: NSRect(x: 7 * unit, y: 7 * unit,
+                                          width: 6 * unit, height: 6 * unit))
+                for index in 0..<8 {
+                    let angle = CGFloat(index) * .pi / 4
+                    path.move(to: pt(10 + cos(angle) * 6,
+                                     10 + sin(angle) * 6))
+                    path.line(to: pt(10 + cos(angle) * 9,
+                                     10 + sin(angle) * 9))
+                }
+            case 3:
+                path.appendOval(in: NSRect(x: 7 * unit, y: 11 * unit,
+                                          width: 6 * unit, height: 6 * unit))
+                path.move(to: pt(3, 3))
+                path.curve(to: pt(17, 3), controlPoint1: pt(2, 12),
+                          controlPoint2: pt(18, 12))
+            case 4:
+                path.move(to: pt(3, 9))
+                path.curve(to: pt(17, 9), controlPoint1: pt(2, 20),
+                          controlPoint2: pt(18, 20))
+                path.move(to: pt(3, 10))
+                path.line(to: pt(3, 5))
+                path.line(to: pt(6, 5))
+                path.line(to: pt(6, 11))
+                path.move(to: pt(17, 10))
+                path.line(to: pt(17, 5))
+                path.line(to: pt(14, 5))
+                path.line(to: pt(14, 11))
+            case 5:
+                path.move(to: pt(16, 12))
+                path.curve(to: pt(5, 6), controlPoint1: pt(18, 5),
+                          controlPoint2: pt(9, 2))
+                path.move(to: pt(5, 6))
+                path.line(to: pt(5, 11))
+                path.line(to: pt(10, 11))
+                path.move(to: pt(4, 9))
+                path.curve(to: pt(15, 14), controlPoint1: pt(2, 16),
+                          controlPoint2: pt(11, 18))
+            default:
+                path.appendOval(in: NSRect(x: 2 * unit, y: 2 * unit,
+                                          width: 16 * unit, height: 16 * unit))
+                path.appendOval(in: NSRect(x: 7 * unit, y: 2 * unit,
+                                          width: 6 * unit, height: 16 * unit))
+                path.move(to: pt(2, 10))
+                path.line(to: pt(18, 10))
+            }
+            NSColor.white.setStroke()
+            path.stroke()
+            return true
+        }
+        output.isTemplate = true
+        return output
+    }
+
     private func buildSidebar() -> NSView {
         let side = NSView()
         side.translatesAutoresizingMaskIntoConstraints = false
@@ -490,14 +578,15 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         brand.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
         content.setCustomSpacing(31, after: brand)
 
-        let navs = [
-            ("⚡", "Quick connect"), ("◎", "Locations"),
-            ("⚙", "Settings"), ("◉", "Account")
-        ]
-        for (index, entry) in navs.enumerated() {
-            let control = button(entry.0 + "    " + entry.1,
+        let navs = ["Quick connect", "Locations", "Settings", "Account"]
+        for (index, label) in navs.enumerated() {
+            let control = button("    " + label,
                 action: #selector(changeTab(_:)), tag: index,
                 primary: tab == index, mutedButton: true)
+            control.image = sidebarIcon(index)
+            control.imagePosition = .imageLeft
+            control.imageScaling = .scaleProportionallyDown
+            control.contentTintColor = tab == index ? NSColor.white : sea
             control.alignment = .left
             control.heightAnchor.constraint(equalToConstant: 54).isActive = true
             content.addArrangedSubview(control)
@@ -506,17 +595,19 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
 
         let quick = stack(.horizontal, spacing: 5)
         quick.distribution = .fillEqually
-        if accountSession?.supportURL != nil {
-            quick.addArrangedSubview(button("Support",
-                action: #selector(openSupport(_:)), mutedButton: true))
-        }
-        if accountSession?.renewalURL != nil {
-            quick.addArrangedSubview(button("Renew",
-                action: #selector(openRenewal(_:)), mutedButton: true))
-        }
-        if accountSession?.websiteURL != nil {
-            quick.addArrangedSubview(button("Website",
-                action: #selector(openWebsite(_:)), mutedButton: true))
+        let linkDefinitions: [(String, Int, Selector, URL?)] = [
+            ("Support", 4, #selector(openSupport(_:)), accountSession?.supportURL),
+            ("Renew", 5, #selector(openRenewal(_:)), accountSession?.renewalURL),
+            ("Website", 6, #selector(openWebsite(_:)), accountSession?.websiteURL)
+        ]
+        for (title, kind, action, target) in linkDefinitions where target != nil {
+            let link = button(title, action: action, mutedButton: true)
+            link.image = sidebarIcon(kind)
+            link.imagePosition = .imageAbove
+            link.imageScaling = .scaleProportionallyDown
+            link.contentTintColor = sea
+            link.heightAnchor.constraint(equalToConstant: 51).isActive = true
+            quick.addArrangedSubview(link)
         }
         if accountSession?.supportURL != nil ||
            accountSession?.renewalURL != nil ||
