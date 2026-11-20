@@ -828,6 +828,15 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         leftGap.widthAnchor.constraint(equalTo: rightGap.widthAnchor).isActive = true
         main.addArrangedSubview(buttonRow)
         buttonRow.widthAnchor.constraint(equalTo: main.widthAnchor).isActive = true
+        // Always expose an explicit stop control, including while a probe
+        // is still running. It only stops this app's verified local process.
+        let stopProxy = button("■  Stop local proxy",
+                               action: #selector(stopLocalProxyNow(_:)),
+                               mutedButton: true)
+        stopProxy.heightAnchor.constraint(equalToConstant: 35).isActive = true
+        stopProxy.toolTip = "Stop this app's managed local SOCKS process; does not alter network settings."
+        main.addArrangedSubview(stopProxy)
+        stopProxy.widthAnchor.constraint(equalTo: main.widthAnchor).isActive = true
         main.addArrangedSubview(text(
             "Proxy test only — system VPN, Kill Switch and DNS protection remain OFF.",
             size: 11, color: amber))
@@ -2069,6 +2078,24 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         if list.indices.contains(row) { activeServer = list[row].id }
     }
 
+
+    @objc private func stopLocalProxyNow(_ sender: NSButton) {
+        // Never block the AppKit main thread while waiting for the engine.
+        // The manager validates the PID and confirms exit before clearing state.
+        let root = NSHomeDirectory() + "/twinpanel/clients/twinconnect"
+        sender.isEnabled = false
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard let self = self else { return }
+            let result = self.runLocalManager(["stop"], root: root)
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                self.localProxyStatus = result.0 == 0 ?
+                    "Local proxy stopped. System VPN remains offline." :
+                    "Local proxy stop failed: " + self.safeManagerReason(result.2)
+                self.view = self.build()
+            }
+        }
+    }
 
     @objc private func primaryProxyAction(_ sender: NSButton) {
         guard accountSession != nil, !localProxyBusy else { return }
