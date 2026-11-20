@@ -270,5 +270,55 @@ class StandaloneManagerTests(unittest.TestCase):
         kill.assert_not_called()
 
 
+    def test_watchdog_stops_engine_when_app_process_exits(self):
+        record = {"pid": 4412, "owner_pid": 1309, "owner_started": "birth1"}
+        with mock.patch.object(manager, "read_state", return_value=record), \
+             mock.patch.object(manager, "process_matches", return_value=True), \
+             mock.patch.object(manager, "process_start_signature",
+                               return_value=None), \
+             mock.patch.object(manager, "stop",
+                               return_value={"state": "stopped"}) as stop:
+            result = manager.watch_owner(1309, 4412, "birth1")
+        self.assertEqual(result["state"], "stopped")
+        stop.assert_called_once()
+
+    def test_watchdog_never_stops_replaced_engine(self):
+        record = {"pid": 991, "owner_pid": 1309, "owner_started": "birth1"}
+        with mock.patch.object(manager, "read_state", return_value=record), \
+             mock.patch.object(manager, "stop") as stop:
+            result = manager.watch_owner(1309, 4412, "birth1")
+        self.assertEqual(result["state"], "watcher_finished")
+        stop.assert_not_called()
+
+    def test_watchdog_pid_reuse_must_not_count_as_live_owner(self):
+        record = {"pid": 4412, "owner_pid": 1309, "owner_started": "birth1"}
+        with mock.patch.object(manager, "read_state", return_value=record), \
+             mock.patch.object(manager, "process_matches", return_value=True), \
+             mock.patch.object(manager, "process_start_signature",
+                               return_value="different_birth"), \
+             mock.patch.object(manager, "stop",
+                               return_value={"state": "stopped"}) as stop:
+            self.assertEqual(
+                manager.watch_owner(1309, 4412, "birth1")["state"], "stopped"
+            )
+        stop.assert_called_once()
+
+    def test_start_requires_alive_owner_when_owner_supplied(self):
+        cfg = self.config({
+            "inbounds": [{"type": "mixed", "listen": "127.0.0.1",
+                          "listen_port": 18001}],
+            "outbounds": [{"type": "hysteria2"}]
+        })
+        with mock.patch.object(manager, "binary_for",
+                               return_value=self.root / "sing-box"), \
+             mock.patch.object(manager, "read_state", return_value=None), \
+             mock.patch.object(manager, "process_start_signature",
+                               return_value=None), \
+             mock.patch.object(manager.subprocess, "Popen") as spawned:
+            with self.assertRaisesRegex(ValueError, "PROXY_OWNER_NOT_RUNNING"):
+                manager.start("hysteria2", cfg, 1234)
+        spawned.assert_not_called()
+
+
 if __name__ == "__main__":
     unittest.main()
