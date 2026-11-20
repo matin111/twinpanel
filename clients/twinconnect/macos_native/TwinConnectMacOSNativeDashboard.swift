@@ -786,53 +786,161 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         return card([group])
     }
 
-    private func accountPage() -> NSView {
-        let group = stack(spacing: 13)
-        group.alignment = .width
-        group.addArrangedSubview(text("Your subscription",
-                                       size: 20, weight: .bold))
-        group.addArrangedSubview(pill(snapshot?.account?.status ?? "Account not loaded",
-                                       color: muted))
-        group.addArrangedSubview(text("User: " +
-            (accountSession?.username ?? ""), color: muted))
-        if let data = snapshot {
-            group.addArrangedSubview(separator())
-            group.addArrangedSubview(text("Plan: " + (data.planName ?? "Not available")))
-            group.addArrangedSubview(text("Device limit: " +
-                (data.deviceLimit.map { String($0) } ?? "—")))
-            if let account = data.account {
-                let used = ByteCountFormatter.string(fromByteCount:
-                    account.usedBytes, countStyle: .file)
-                let limit = account.limitBytes == 0 ? "Unlimited" :
-                    ByteCountFormatter.string(fromByteCount:
-                        account.limitBytes, countStyle: .file)
-                let expiry = account.expiresAt.map {
-                    DateFormatter.localizedString(from: $0, dateStyle: .medium,
-                                                  timeStyle: .none)
-                } ?? "No fixed expiry"
-                group.addArrangedSubview(text("Traffic: " + used + " / " + limit))
-                group.addArrangedSubview(text("Expires: " + expiry))
-            } else {
-                group.addArrangedSubview(text("Account: " +
-                    (data.errors["account"] ?? "Loading…"), color: amber))
-            }
-            if data.sectionsLoaded.contains("protocols") {
-                group.addArrangedSubview(text("Reported protocols: " +
-                    String(data.protocols.count) +
-                    (data.sectionsLoaded.contains("plan") ? "" : " • plan not verified"),
-                    color: muted))
-            }
-            if data.sectionsLoaded.contains("servers") {
-                group.addArrangedSubview(text("Assigned servers: " +
-                    String(data.servers.count), color: muted))
-            }
-        } else {
-            group.addArrangedSubview(text("Loading live account details…",
-                                           color: muted))
+    private func expiryText(_ account: TwinMacNativeAccount?) -> String {
+        guard let account = account else { return "—" }
+        if let expiry = account.expiresAt {
+            return DateFormatter.localizedString(from: expiry, dateStyle: .medium,
+                                                 timeStyle: .none)
         }
-        group.addArrangedSubview(button("↻ Refresh account",
-                                        action: #selector(refresh(_:))))
-        return card([group])
+        return (account.activationDurationDays ?? 0) > 0 ?
+            "After first connection" : "Unlimited"
+    }
+
+    private func reservedRenewalCard(_ renewal: TwinMacReservedRenewal,
+                                     compact: Bool) -> NSView {
+        let fields = stack(spacing: 7)
+        fields.alignment = .width
+        fields.addArrangedSubview(text(
+            renewal.needsReview ? "◷  Renewal needs review" :
+                                  "▣  Reserved renewal",
+            size: compact ? 12 : 15, weight: .bold,
+            color: renewal.needsReview ? amber : sea))
+        fields.addArrangedSubview(text(renewal.planName,
+                                      size: compact ? 11 : 13, weight: .semibold))
+        let capacity = ByteCountFormatter.string(fromByteCount:
+            renewal.trafficBytes, countStyle: .file)
+        fields.addArrangedSubview(text(
+            capacity + "  •  " + String(renewal.durationDays) + " days",
+            size: compact ? 11 : 12))
+        fields.addArrangedSubview(text(
+            renewal.needsReview ?
+                "Pending review. The next period has not been applied." :
+                "Next period activates after current quota or expiry ends.",
+            size: 10, color: muted))
+        if !compact {
+            let recorded = DateFormatter.localizedString(
+                from: renewal.reservedAt, dateStyle: .medium, timeStyle: .none)
+            fields.addArrangedSubview(text("Reserved on: " + recorded,
+                                          size: 10, color: muted))
+        }
+        return card([fields], radius: 16, padding: compact ? 12 : 17)
+    }
+
+    private func accountPage() -> NSView {
+        let content = stack(spacing: 14)
+        content.alignment = .width
+        let account = snapshot?.account
+
+        let hero = stack(.horizontal, spacing: 15)
+        hero.alignment = .centerY
+        let emblem = NSView()
+        emblem.wantsLayer = true
+        emblem.layer?.cornerRadius = 18
+        emblem.layer?.backgroundColor = tint().withAlphaComponent(0.60).cgColor
+        emblem.translatesAutoresizingMaskIntoConstraints = false
+        emblem.widthAnchor.constraint(equalToConstant: 62).isActive = true
+        emblem.heightAnchor.constraint(equalToConstant: 62).isActive = true
+        let shield = text("◇", size: 34, weight: .bold)
+        shield.translatesAutoresizingMaskIntoConstraints = false
+        emblem.addSubview(shield)
+        NSLayoutConstraint.activate([
+            shield.centerXAnchor.constraint(equalTo: emblem.centerXAnchor),
+            shield.centerYAnchor.constraint(equalTo: emblem.centerYAnchor)
+        ])
+        hero.addArrangedSubview(emblem)
+        let identity = stack(spacing: 7)
+        identity.alignment = .width
+        let username = text(accountSession?.username ?? "—", size: 16,
+                            weight: .semibold)
+        username.lineBreakMode = .byTruncatingMiddle
+        username.maximumNumberOfLines = 1
+        identity.addArrangedSubview(username)
+        let accountState = account?.status.lowercased() == "active" ?
+            "◆  Active subscription" : (account?.status ?? "Loading account…")
+        identity.addArrangedSubview(text(accountState, size: 12, color: sea))
+        hero.addArrangedSubview(identity)
+        content.addArrangedSubview(card([hero], radius: 23, padding: 19))
+
+        if let reserved = account?.reservedRenewal {
+            content.addArrangedSubview(text("Reserved renewal list",
+                                          size: 13, weight: .bold))
+            content.addArrangedSubview(reservedRenewalCard(reserved, compact: false))
+        }
+
+        let usage = stack(spacing: 14)
+        usage.alignment = .width
+        let head = stack(.horizontal, spacing: 8)
+        head.addArrangedSubview(text("◉  Data usage", size: 15, weight: .semibold))
+        let gap = NSView()
+        gap.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        head.addArrangedSubview(gap)
+        if let account = account, account.limitBytes == 0 {
+            head.addArrangedSubview(pill("Unlimited", color: sea))
+        }
+        usage.addArrangedSubview(head)
+        head.widthAnchor.constraint(equalTo: usage.widthAnchor).isActive = true
+
+        let used = account.map {
+            ByteCountFormatter.string(fromByteCount: $0.usedBytes,
+                                      countStyle: .file)
+        } ?? "—"
+        let limit = account.map {
+            $0.limitBytes == 0 ? "Unlimited" :
+                ByteCountFormatter.string(fromByteCount: $0.limitBytes,
+                                          countStyle: .file)
+        } ?? "—"
+        let totals = stack(.horizontal, spacing: 9)
+        totals.addArrangedSubview(text(used, size: 31, weight: .bold))
+        totals.addArrangedSubview(text("/ " + limit, size: 17,
+                                      weight: .semibold,
+                                      color: account?.limitBytes == 0 ? sea : muted))
+        usage.addArrangedSubview(totals)
+        let remaining: String
+        if let account = account {
+            remaining = account.limitBytes == 0 ? "Unlimited" :
+                ByteCountFormatter.string(fromByteCount: max(0,
+                    account.limitBytes - account.usedBytes), countStyle: .file)
+        } else {
+            remaining = "—"
+        }
+        usage.addArrangedSubview(text("Remaining: " + remaining, color: muted))
+        let meter = NSProgressIndicator()
+        meter.style = .bar
+        meter.isIndeterminate = false
+        meter.minValue = 0
+        meter.maxValue = 100
+        if let account = account, account.limitBytes > 0 {
+            meter.doubleValue = min(100,
+                Double(account.usedBytes) / Double(account.limitBytes) * 100)
+        }
+        meter.translatesAutoresizingMaskIntoConstraints = false
+        usage.addArrangedSubview(meter)
+        meter.widthAnchor.constraint(equalTo: usage.widthAnchor).isActive = true
+        usage.addArrangedSubview(text(
+            account == nil ? "Fetching current usage from your panel" :
+            account!.limitBytes == 0 ? "No traffic cap" :
+                String(format: "%.1f%% used", meter.doubleValue),
+            size: 11, color: muted))
+        content.addArrangedSubview(card([usage], radius: 23, padding: 20))
+
+        let metrics = stack(.horizontal, spacing: 12)
+        metrics.distribution = .fillEqually
+        metrics.addArrangedSubview(networkMetric("▣  Expires on",
+            value: expiryText(account)))
+        let devices = snapshot?.deviceLimit.map {
+            $0 == 0 ? "Unlimited" : String($0)
+        } ?? "—"
+        metrics.addArrangedSubview(networkMetric("▣  Device limit", value: devices))
+        content.addArrangedSubview(metrics)
+        metrics.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
+
+        if let details = snapshot?.errors["account"] {
+            content.addArrangedSubview(text("Account unavailable: " + details,
+                                          size: 12, color: amber))
+        }
+        content.addArrangedSubview(button("↻  Refresh account",
+                                          action: #selector(refresh(_:))))
+        return content
     }
 
     private func compactMetric(_ title: String, value: String) -> NSView {
@@ -910,6 +1018,9 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         chips.addArrangedSubview(compactMetric("Time remaining", value: days))
         items.addArrangedSubview(chips)
         chips.widthAnchor.constraint(equalTo: items.widthAnchor).isActive = true
+        if let reserved = account?.reservedRenewal {
+            items.addArrangedSubview(reservedRenewalCard(reserved, compact: true))
+        }
 
         if let error = snapshot?.errors["account"] {
             items.addArrangedSubview(text("Account: " + error,
