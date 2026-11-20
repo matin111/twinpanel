@@ -1793,7 +1793,11 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             "start", "hysteria2", file.path
         ], root: root)
         guard started.0 == 0 else {
-            return "Proxy startup failed (see local engine log)"
+            let diagnosis = runLocalManager(["diagnose"], root: root)
+            let cause = safeManagerReason(diagnosis.1)
+            return "Proxy startup failed: " + (
+                cause == "UNKNOWN_PROXY_FAILURE" ? safeManagerReason(started.2) : cause
+            )
         }
         defer { _ = runLocalManager(["stop"], root: root) }
         let response = runLocalManager(["probe"], root: root)
@@ -1804,28 +1808,48 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
               json["state"] as? String == "proxy_egress_reachable",
               let address = json["egress_ip"] as? String
         else {
-            return "Hysteria2 proxy test failed; VPN remains offline"
+            let code = safeManagerReason(response.2)
+            let reason = code == "UNKNOWN_PROXY_FAILURE" ?
+                safeManagerReason(runLocalManager(["diagnose"], root: root).1) :
+                code
+            return "Hysteria2 test failed: " + reason + " (VPN offline)"
         }
         return "Proxied HTTPS exit: " + address + " (not a system VPN)"
     }
 
-    private func runLocalManager(_ args: [String], root: String) -> (Int32, String) {
+    private func safeManagerReason(_ output: String) -> String {
+        guard let data = output.data(using: .utf8),
+              let json = (try? JSONSerialization.jsonObject(with: data))
+                  as? [String: Any],
+              let reason = json["reason"] as? String,
+              reason.range(of: "^[A-Z][A-Z0-9_]{2,79}$",
+                           options: .regularExpression) != nil else {
+            return "UNKNOWN_PROXY_FAILURE"
+        }
+        return reason
+    }
+
+    private func runLocalManager(_ args: [String], root: String)
+        -> (Int32, String, String) {
         let program = Process()
         program.executableURL = URL(fileURLWithPath: "/usr/bin/python3")
         program.arguments = [
             root + "/macos_native/standalone_connection_manager.py"
         ] + args
         let output = Pipe()
+        let errors = Pipe()
         program.standardOutput = output
-        program.standardError = Pipe() // Never show credentials or errors in UI
+        program.standardError = errors
         do {
             try program.run()
             program.waitUntilExit()
-            let bytes = output.fileHandleForReading.readDataToEndOfFile()
+            let stdout = output.fileHandleForReading.readDataToEndOfFile()
+            let stderr = errors.fileHandleForReading.readDataToEndOfFile()
             return (program.terminationStatus,
-                    String(data: bytes, encoding: .utf8) ?? "")
+                    String(data: stdout, encoding: .utf8) ?? "",
+                    String(data: stderr, encoding: .utf8) ?? "")
         } catch {
-            return (-1, "")
+            return (-1, "", "")
         }
     }
 
