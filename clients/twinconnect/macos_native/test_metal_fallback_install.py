@@ -320,7 +320,7 @@ class MetalFallbackInstallTests(unittest.TestCase):
             "let box = TwinNativeGlassCard(frame: .zero)",
             "let control = TwinNativePremiumButton(title: title",
             "control.setAccentGradient(",
-            "control.layer?.shadowOpacity = 0.17",
+            "connect.layer?.shadowOpacity = 0.17",
         ):
             self.assertIn(token, source)
         self.assertIn('pill("Disconnected", color: muted)', source)
