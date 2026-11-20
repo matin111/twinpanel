@@ -742,7 +742,9 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         ping.heightAnchor.constraint(equalToConstant: 32).isActive = true
         wrapper.addArrangedSubview(ping)
         ping.widthAnchor.constraint(equalTo: wrapper.widthAnchor).isActive = true
-        wrapper.addArrangedSubview(protocolChips())
+        let chips = protocolChips()
+        wrapper.addArrangedSubview(chips)
+        chips.widthAnchor.constraint(equalTo: wrapper.widthAnchor).isActive = true
 
         let visible = (snapshot?.servers ?? []).filter { server in
             if locationSearch.isEmpty { return true }
@@ -768,8 +770,10 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             } else {
                 message = "Loading assigned locations…"
             }
-            wrapper.addArrangedSubview(card([text(message, color: muted)],
-                                             radius: 17, padding: 17))
+            let placeholder = card([text(message, color: muted)],
+                                   radius: 17, padding: 17)
+            wrapper.addArrangedSubview(placeholder)
+            placeholder.widthAnchor.constraint(equalTo: wrapper.widthAnchor).isActive = true
         }
         for (index, code) in codes.enumerated() {
             let items = grouped[code] ?? []
@@ -802,7 +806,9 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                     choose.widthAnchor.constraint(equalTo: group.widthAnchor).isActive = true
                 }
             }
-            wrapper.addArrangedSubview(card([group], radius: 17, padding: 11))
+            let row = card([group], radius: 17, padding: 11)
+            wrapper.addArrangedSubview(row)
+            row.widthAnchor.constraint(equalTo: wrapper.widthAnchor).isActive = true
         }
         return card([wrapper], radius: 23, padding: 19)
     }
@@ -858,31 +864,42 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                                         size: 18, weight: .semibold))
         // Render disabled state rather than non-functional toggles. These
         // settings are controlled by the actual tunnel runtime when signed.
-        section.addArrangedSubview(settingRow(
+        let killSwitch = settingRow(
             "◈  Kill Switch",
             subtitle: "Block unprotected traffic when the VPN disconnects",
-            state: "Unavailable", tone: amber))
-        section.addArrangedSubview(settingRow(
+            state: "Unavailable", tone: amber)
+        section.addArrangedSubview(killSwitch)
+        killSwitch.widthAnchor.constraint(equalTo: section.widthAnchor).isActive = true
+        let splitTunneling = settingRow(
             "≡  Split Tunneling",
             subtitle: "Choose which apps use the secure connection",
-            state: "Unavailable", tone: amber))
-        section.addArrangedSubview(settingRow(
+            state: "Unavailable", tone: amber)
+        section.addArrangedSubview(splitTunneling)
+        splitTunneling.widthAnchor.constraint(equalTo: section.widthAnchor).isActive = true
+        let dns = settingRow(
             "◉  DNS protection",
             subtitle: "Secure resolver and DNS leak protection",
-            state: "Unavailable", tone: amber))
-        section.addArrangedSubview(settingRow(
+            state: "Unavailable", tone: amber)
+        section.addArrangedSubview(dns)
+        dns.widthAnchor.constraint(equalTo: section.widthAnchor).isActive = true
+        let reconnect = settingRow(
             "↻  Auto reconnect",
             subtitle: "Restore a connection if its network path changes",
-            state: "Unavailable", tone: amber))
+            state: "Unavailable", tone: amber)
+        section.addArrangedSubview(reconnect)
+        reconnect.widthAnchor.constraint(equalTo: section.widthAnchor).isActive = true
 
         section.addArrangedSubview(text("Application", size: 18,
                                         weight: .semibold))
-        section.addArrangedSubview(settingRow(
-            "◎  App language", subtitle: "English",
-            state: "EN"))
-        section.addArrangedSubview(settingRow(
-            "◉  Appearance", subtitle: "TwinConnect dark glass",
-            state: "Dark"))
+        let language = settingRow("◎  App language", subtitle: "English",
+                                  state: "EN")
+        section.addArrangedSubview(language)
+        language.widthAnchor.constraint(equalTo: section.widthAnchor).isActive = true
+        let appearance = settingRow("◉  Appearance",
+                                    subtitle: "TwinConnect dark glass",
+                                    state: "Dark")
+        section.addArrangedSubview(appearance)
+        appearance.widthAnchor.constraint(equalTo: section.widthAnchor).isActive = true
 
         let actions = stack(.horizontal, spacing: 10)
         actions.distribution = .fillEqually
@@ -981,12 +998,16 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             "◆  Active subscription" : (account?.status ?? "Loading account…")
         identity.addArrangedSubview(text(accountState, size: 12, color: sea))
         hero.addArrangedSubview(identity)
-        content.addArrangedSubview(card([hero], radius: 23, padding: 19))
+        let heroCard = card([hero], radius: 23, padding: 19)
+        content.addArrangedSubview(heroCard)
+        heroCard.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
 
         if let reserved = account?.reservedRenewal {
             content.addArrangedSubview(text("Reserved renewal list",
                                           size: 13, weight: .bold))
-            content.addArrangedSubview(reservedRenewalCard(reserved, compact: false))
+            let reservedCard = reservedRenewalCard(reserved, compact: false)
+            content.addArrangedSubview(reservedCard)
+            reservedCard.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
         }
 
         let usage = stack(spacing: 14)
@@ -1043,7 +1064,9 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             account!.limitBytes == 0 ? "No traffic cap" :
                 String(format: "%.1f%% used", meter.doubleValue),
             size: 11, color: muted))
-        content.addArrangedSubview(card([usage], radius: 23, padding: 20))
+        let usageCard = card([usage], radius: 23, padding: 20)
+        content.addArrangedSubview(usageCard)
+        usageCard.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
 
         let metrics = stack(.horizontal, spacing: 12)
         metrics.distribution = .fillEqually
@@ -1060,8 +1083,10 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             content.addArrangedSubview(text("Account unavailable: " + details,
                                           size: 12, color: amber))
         }
-        content.addArrangedSubview(button("↻  Refresh account",
-                                          action: #selector(refresh(_:))))
+        let refreshButton = button("↻  Refresh account",
+                                    action: #selector(refresh(_:)))
+        content.addArrangedSubview(refreshButton)
+        refreshButton.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
         return content
     }
 
@@ -1118,7 +1143,9 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         }
         usage.addArrangedSubview(text("Remaining: " + remaining,
                                       size: 10, color: sea))
-        items.addArrangedSubview(card([usage], radius: 13, padding: 10))
+        let usageCard = card([usage], radius: 13, padding: 10)
+        items.addArrangedSubview(usageCard)
+        usageCard.widthAnchor.constraint(equalTo: items.widthAnchor).isActive = true
 
         let expiry = account?.expiresAt.map {
             DateFormatter.localizedString(from: $0, dateStyle: .medium,
@@ -1141,7 +1168,9 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         items.addArrangedSubview(chips)
         chips.widthAnchor.constraint(equalTo: items.widthAnchor).isActive = true
         if let reserved = account?.reservedRenewal {
-            items.addArrangedSubview(reservedRenewalCard(reserved, compact: true))
+            let reservedCard = reservedRenewalCard(reserved, compact: true)
+            items.addArrangedSubview(reservedCard)
+            reservedCard.widthAnchor.constraint(equalTo: items.widthAnchor).isActive = true
         }
 
         if let error = snapshot?.errors["account"] {
