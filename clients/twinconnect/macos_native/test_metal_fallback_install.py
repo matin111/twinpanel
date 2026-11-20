@@ -357,6 +357,26 @@ class MetalFallbackInstallTests(unittest.TestCase):
             self.assertIn(token, source)
         self.assertNotIn('fabric.tunnelConnected = true', source)
 
+    def test_windows_sidebar_language_and_account_logout(self) -> None:
+        source = (SOURCE / "TwinConnectMacOSNativeDashboard.swift").read_text(
+            encoding="utf-8"
+        )
+        side = source.split("    private func buildSidebar() -> NSView {", 1)[1].split(
+            "    private func connectPage() -> NSView {", 1
+        )[0]
+        for token in (
+            'button("◎   EN   ⌄"',
+            'button("⚙", action: #selector(openLanguageSettings(_:))',
+            'languageRow.widthAnchor.constraint(equalTo: content.widthAnchor)',
+            'settingsRow.widthAnchor.constraint(equalTo: content.widthAnchor)',
+        ):
+            self.assertIn(token, side)
+        self.assertNotIn('button("Sign out"', side)
+        account = source.split("    private func accountPage() -> NSView {", 1)[1].split(
+            "    private func compactMetric(", 1
+        )[0]
+        self.assertIn('button("Sign out", action: #selector(signOut(_:))', account)
+
     def test_quick_connect_scrolling_and_reference_geometry(self) -> None:
         source = (SOURCE / "TwinConnectMacOSNativeDashboard.swift").read_text(
             encoding="utf-8"
