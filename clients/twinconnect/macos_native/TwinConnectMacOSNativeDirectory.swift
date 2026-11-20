@@ -11,6 +11,8 @@ struct TwinMacNativeSession {
     let accentHex: String
     let supportURL: URL?
     let renewalURL: URL?
+    let websiteURL: URL?
+    let logoURL: URL?
 }
 
 struct TwinMacNativeProtocol {
@@ -244,12 +246,40 @@ final class TwinConnectMacOSNativeDirectory: NSObject, URLSessionTaskDelegate {
                             brandName: name.isEmpty ? "TwinConnect" : name,
                             accentHex: accent,
                             supportURL: self.publicURL(brand["telegram_url"] ?? brand["website_url"]),
-                            renewalURL: self.publicURL(brand["renewal_url"])
+                            renewalURL: self.publicURL(brand["renewal_url"]),
+                            websiteURL: self.publicURL(brand["website_url"]),
+                            logoURL: self.publicURL(brand["logo_url"])
                         )))
                     }
                 }
             }
         }
+    }
+
+    // Load only tenant-provided public branding over the same ephemeral
+    // redirect-refusing HTTPS transport. Never include app tokens here.
+    func loadBrandLogo(_ session: TwinMacNativeSession,
+                       completion: @escaping (Data?) -> Void) {
+        guard let url = session.logoURL else {
+            DispatchQueue.main.async { completion(nil) }
+            return
+        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        transport.dataTask(with: request) { data, response, error in
+            let mime = (response as? HTTPURLResponse)?
+                .value(forHTTPHeaderField: "Content-Type")?
+                .lowercased() ?? ""
+            let accepted = mime.hasPrefix("image/png") ||
+                mime.hasPrefix("image/jpeg") ||
+                mime.hasPrefix("image/webp")
+            let imageData: Data? = error == nil &&
+                (response as? HTTPURLResponse)?.statusCode == 200 &&
+                accepted && (data?.count ?? 0) <= 1_048_576 ?
+                    data : nil
+            DispatchQueue.main.async { completion(imageData) }
+        }.resume()
     }
 
     // Each endpoint is independent, as in the shared Flutter client.
