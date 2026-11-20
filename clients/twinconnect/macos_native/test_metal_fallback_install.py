@@ -449,10 +449,10 @@ class MetalFallbackInstallTests(unittest.TestCase):
             encoding="utf-8"
         )
         for token in (
-            'enum Style { case panel, inset, metric, sidebar }',
+            'enum Style: Equatable { case panel, inset, metric, sidebar }',
             'private let upperEdge = CAGradientLayer()',
-            'box.apply(style)',
-            'side.apply(.sidebar)',
+            'box.apply(style, accent: tint(),',
+            'side.apply(.sidebar, accent: tint(),',
             'return card([items], radius: 20, padding: 14, style: .inset)',
             'let panel = card([content], radius: 17, padding: 14, style: .metric)',
         ):
