@@ -784,7 +784,11 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         }
 
 
-        main.addArrangedSubview(homeSubscriptionSummary())
+        // NSStackView with .leading alignment does not automatically
+        // stretch this nested account card. Pin it to the full hero width.
+        let subscription = homeSubscriptionSummary()
+        main.addArrangedSubview(subscription)
+        subscription.widthAnchor.constraint(equalTo: main.widthAnchor).isActive = true
 
         let selectedServer = snapshot?.servers.first { $0.id == activeServer }
         let location = selectedServer.map {
@@ -801,8 +805,11 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         footer.addArrangedSubview(compactMetric("Protocol", value: protocolName))
         main.addArrangedSubview(footer)
         footer.widthAnchor.constraint(equalTo: main.widthAnchor).isActive = true
-        main.addArrangedSubview(button("Change location or protocol   ›",
-            action: #selector(showLocations(_:)), mutedButton: true))
+        let changeSelection = button("Change location or protocol   ›",
+            action: #selector(showLocations(_:)), mutedButton: true)
+        changeSelection.heightAnchor.constraint(equalToConstant: 42).isActive = true
+        main.addArrangedSubview(changeSelection)
+        changeSelection.widthAnchor.constraint(equalTo: main.widthAnchor).isActive = true
         return card([main], radius: 27, padding: 17)
     }
 
@@ -1664,6 +1671,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                                           countStyle: .file)
         } ?? "—"
         let usage = stack(spacing: 7)
+        usage.alignment = .leading
         let usageHeading = stack(.horizontal, spacing: 8)
         usageHeading.addArrangedSubview(text("◌  Data usage", size: 11,
                                              color: muted))
