@@ -1,6 +1,105 @@
 // Native, Metal-independent TwinConnect directory and account snapshot.
 // Matches the tenant API contract; secrets live in memory only, never logs or defaults.
 import Foundation
+import Darwin
+
+struct TwinMacNativePingResult {
+    let measuredMs: Int?
+    let errorCode: String?
+}
+
+// ICMP probe semantics match the Windows client: one reply to the public
+// literal probe_ip supplied by the *authenticated subscription panel*.
+// Never probe hostnames, private/local networks, or arbitrary user input.
+// This is a network diagnostic, NOT evidence of a connected VPN tunnel.
+enum TwinMacNativePing {
+    static func validatedPublicIP(_ address: String) -> String? {
+        guard !address.isEmpty, address.count <= 64,
+              address == address.trimmingCharacters(in: .whitespacesAndNewlines),
+              !address.contains("%") else { return nil }
+        var ipv4 = in_addr()
+        let isV4 = address.withCString { inet_pton(AF_INET, $0, &ipv4) } == 1
+        if isV4 {
+            let parts = address.split(separator: ".").compactMap { UInt8($0) }
+            guard parts.count == 4 else { return nil }
+            let a = parts[0], b = parts[1], c = parts[2]
+            guard a > 0, a != 10, a != 127, a < 224,
+                  !(a == 169 && b == 254),
+                  !(a == 172 && (16...31).contains(b)),
+                  !(a == 192 && b == 168),
+                  !(a == 100 && (64...127).contains(b)),
+                  !(a == 198 && (b == 18 || b == 19)),
+                  !(a == 192 && b == 0 && c == 0) else { return nil }
+            return address
+        }
+        var ipv6 = in6_addr()
+        guard address.withCString({ inet_pton(AF_INET6, $0, &ipv6) }) == 1 else {
+            return nil
+        }
+        let bytes = withUnsafeBytes(of: &ipv6) { Array($0) }
+        // Public global-unicast IPv6 only (2000::/3). Excludes loopback,
+        // link-local, unique-local, multicast and IPv4-mapped addresses.
+        guard bytes.count == 16, (bytes[0] & 0xE0) == 0x20 else { return nil }
+        return address
+    }
+
+    static func probe(_ publicIP: String?,
+                      completion: @escaping (TwinMacNativePingResult) -> Void) {
+        DispatchQueue.global(qos: .utility).async {
+            let result = measure(publicIP)
+            DispatchQueue.main.async { completion(result) }
+        }
+    }
+
+    private static func measure(_ address: String?) -> TwinMacNativePingResult {
+        guard let ip = address, let safeIP = validatedPublicIP(ip) else {
+            return TwinMacNativePingResult(measuredMs: nil,
+                                           errorCode: "NO_PROBE_ADDRESS")
+        }
+        let isV6 = safeIP.contains(":")
+        let binary = isV6 ? "/sbin/ping6" : "/sbin/ping"
+        guard FileManager.default.isExecutableFile(atPath: binary) else {
+            return TwinMacNativePingResult(measuredMs: nil,
+                                           errorCode: "PING_PROGRAM_UNAVAILABLE")
+        }
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: binary)
+        // Darwin ping -W is a bounded reply wait in milliseconds.
+        // Disable hostname lookups; never invoke a shell.
+        task.arguments = ["-n", "-c", "1", "-W", "1500", safeIP]
+        let output = Pipe()
+        task.standardOutput = output
+        task.standardError = output
+        do {
+            try task.run()
+            task.waitUntilExit()
+        } catch {
+            return TwinMacNativePingResult(measuredMs: nil,
+                                           errorCode: "PING_PROGRAM_UNAVAILABLE")
+        }
+        guard task.terminationStatus == 0 else {
+            return TwinMacNativePingResult(measuredMs: nil,
+                                           errorCode: "ICMP_TIMEOUT_OR_BLOCKED")
+        }
+        let data = output.fileHandleForReading.readDataToEndOfFile()
+        let response = String(decoding: data, as: UTF8.self)
+        // Read ICMP RTT from the actual response, not process startup time.
+        let pattern = #"time\s*[=<]\s*([0-9]+(?:\.[0-9]+)?)\s*ms"#
+        guard let matcher = try? NSRegularExpression(
+            pattern: pattern, options: [.caseInsensitive]),
+              let result = matcher.firstMatch(in: response,
+                                               range: NSRange(response.startIndex...,
+                                                              in: response)),
+              let range = Range(result.range(at: 1), in: response),
+              let milliseconds = Double(response[range]),
+              milliseconds.isFinite, (0...60000).contains(milliseconds) else {
+            return TwinMacNativePingResult(measuredMs: nil,
+                                           errorCode: "PING_REPLY_UNPARSEABLE")
+        }
+        return TwinMacNativePingResult(measuredMs: max(1, Int(ceil(milliseconds))),
+                                       errorCode: nil)
+    }
+}
 
 struct TwinMacNativeSession {
     let namespace: String
@@ -27,6 +126,8 @@ struct TwinMacNativeServer {
     let country: String
     let online: Bool
     let latencyMs: Int?
+    // Validated public IP only, used for a one-reply ICMP diagnostic.
+    let probeIP: String?
 }
 
 // Mirrors the already defined Flutter ReservedRenewalSnapshot JSON contract.
@@ -427,9 +528,11 @@ final class TwinConnectMacOSNativeDirectory: NSObject, URLSessionTaskDelegate {
                         publish("servers", failure: "INVALID_SERVER_INVENTORY")
                         return
                     }
+                    let probeIP = (row["probe_ip"] as? String)
+                        .flatMap { TwinMacNativePing.validatedPublicIP($0) }
                     nodes.append(TwinMacNativeServer(
                         id: id, name: name, country: country, online: online,
-                        latencyMs: rawLatency
+                        latencyMs: rawLatency, probeIP: probeIP
                     ))
                 }
                 servers = nodes
