@@ -867,13 +867,17 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     }
 
     private func buildSidebar() -> NSView {
-        let side = TwinNativeGlassCard(frame: .zero)
-        side.apply(.sidebar, accent: tint(),
-                   background: panelBackgroundColor(), surface: panelCardColor())
+        // One continuous Windows-style canvas spans BOTH the navigation
+        // and content. Do not install a second full-height tinted glass card
+        // over the sidebar: it creates a hard vertical seam and hides the
+        // branded radial artwork beneath it.
+        let side = NSView(frame: .zero)
         side.translatesAutoresizingMaskIntoConstraints = false
         side.wantsLayer = true
-        side.layer?.borderColor = tint().withAlphaComponent(0.22).cgColor
-        side.layer?.borderWidth = 0.6
+        side.layer?.backgroundColor = NSColor.clear.cgColor
+        side.layer?.borderWidth = 0
+        // Individual navigation controls stay glass. The sidebar itself
+        // intentionally paints nothing, exposing TwinNativeBackdrop below.
 
         let content = stack(spacing: 12)
         content.alignment = .leading
