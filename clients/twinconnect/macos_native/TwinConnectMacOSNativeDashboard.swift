@@ -472,11 +472,11 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                 path.appendOval(in: NSRect(x: 7 * unit, y: 7 * unit,
                                           width: 6 * unit, height: 6 * unit))
                 for index in 0..<8 {
-                    let angle = CGFloat(index) * .pi / 4
-                    path.move(to: pt(10 + cos(angle) * 6,
-                                     10 + sin(angle) * 6))
-                    path.line(to: pt(10 + cos(angle) * 9,
-                                     10 + sin(angle) * 9))
+                    let angle = Double(index) * Double.pi / 4
+                    let dx = CGFloat(cos(angle))
+                    let dy = CGFloat(sin(angle))
+                    path.move(to: pt(10 + dx * 6, 10 + dy * 6))
+                    path.line(to: pt(10 + dx * 9, 10 + dy * 9))
                 }
             case 3:
                 path.appendOval(in: NSRect(x: 7 * unit, y: 11 * unit,
