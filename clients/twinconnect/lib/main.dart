@@ -15,6 +15,7 @@ import 'protocol_strings.dart';
 import 'native_vpn_bridge.dart';
 import 'android_connection_card.dart';
 import 'windows_connection_card.dart';
+import 'macos_standalone_connection_card.dart';
 import 'vpn_settings.dart';
 import 'vpn_strings.dart';
 import 'server_inventory.dart';
@@ -785,7 +786,16 @@ class _TwinConnectHomeState extends State<TwinConnectHome> with WidgetsBindingOb
                     catalog: _catalog!,
                     native: _nativeProtocols,
                   ),
-                if (Theme.of(context).platform != TargetPlatform.android &&
+                if (Theme.of(context).platform == TargetPlatform.macOS &&
+                    _servers != null)
+                  MacStandaloneConnectionCard(
+                    key: ValueKey('macos_${_confirmedUsername!}'),
+                    panel: _confirmedPanel!,
+                    sessionToken: _confirmedSessionToken!,
+                    catalog: _catalog!,
+                    servers: _servers!,
+                  ),
+                if (Theme.of(context).platform == TargetPlatform.windows &&
                     _servers != null)
                   WindowsConnectionCard(
                     key: ValueKey('windows_${_confirmedUsername!}'),
