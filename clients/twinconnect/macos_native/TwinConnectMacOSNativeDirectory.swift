@@ -717,6 +717,46 @@ final class TwinConnectMacOSNativeDirectory: NSObject, URLSessionTaskDelegate {
             "tls": ["enabled": true,
                     "server_name": (tls["server_name"] as? String) ?? host]
         ]
+        // The account API may provide a private CA PEM or explicit SPKI pins.
+        // Previously these were accidentally stripped, causing an untrusted
+        // certificate error for otherwise legitimate private Hysteria2 nodes.
+        // Never permit certificate_path, client_key, or insecure bypass here.
+        var tlsSettings = reviewed["tls"] as! [String: Any]
+        if let rawCA = tls["certificate"] {
+            let lines: [String]
+            if let value = rawCA as? String {
+                lines = [value]
+            } else if let values = rawCA as? [String] {
+                lines = values
+            } else {
+                return nil
+            }
+            guard !lines.isEmpty, lines.count <= 8,
+                  lines.allSatisfy({ value in
+                    value.utf8.count <= 16384 &&
+                    value.contains("-----BEGIN CERTIFICATE-----") &&
+                    value.contains("-----END CERTIFICATE-----") &&
+                    !value.contains("PRIVATE KEY")
+                  }) else { return nil }
+            tlsSettings["certificate"] = lines
+        }
+        if let rawPins = tls["certificate_public_key_sha256"] {
+            guard let pins = rawPins as? [String],
+                  !pins.isEmpty, pins.count <= 8,
+                  pins.allSatisfy({ value in
+                    guard let bytes = Data(base64Encoded: value) else {
+                        return false
+                    }
+                    return bytes.count == 32
+                  }) else { return nil }
+            tlsSettings["certificate_public_key_sha256"] = pins
+        }
+        if tls["certificate_path"] != nil ||
+           tls["client_key"] != nil ||
+           tls["client_key_path"] != nil {
+            return nil
+        }
+        reviewed["tls"] = tlsSettings
         if let obfs = outbound["obfs"] as? [String: Any],
            obfs["type"] as? String == "salamander",
            let key = obfs["password"] as? String, !key.isEmpty {
