@@ -5,6 +5,8 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest import mock
+import subprocess
 
 HERE = Path(__file__).resolve().parent
 spec = importlib.util.spec_from_file_location("standalone", HERE / "standalone_connection_manager.py")
@@ -80,8 +82,45 @@ class StandaloneManagerTests(unittest.TestCase):
     def test_unimplemented_protocols_are_not_reported_ready(self):
         listed = {p["code"]: p for p in manager.list_protocols()["protocols"]}
         for code in ("wireguard", "amneziawg", "openvpn", "openconnect",
-                     "l2tp", "mieru", "trusttunnel", "naive"):
+                     "l2tp", "mieru", "trusttunnel"):
             self.assertNotEqual(listed[code]["state"], "proxy_engine_present")
+
+
+    def test_naive_local_proxy_config(self):
+        cfg = self.config({
+            "inbounds": [{"listen": "127.0.0.1", "listen_port": 10810, "type": "mixed"}],
+            "outbounds": [{"type": "naive", "server": "example.com", "server_port": 443}]
+        })
+        self.assertEqual(manager.validate("naive", cfg), 10810)
+        self.assertEqual(manager.EXECUTABLE["naive"], "sing-box")
+
+    def test_probe_verified_egress(self):
+        record = {"protocol": "v2ray", "port": 10808, "pid": 42}
+        result = subprocess.CompletedProcess([], 0, "203.0.113.12\\n", "")
+        with mock.patch.object(manager, "read_state", return_value=record), \
+             mock.patch.object(manager, "process_matches", return_value=True), \
+             mock.patch.object(manager.subprocess, "run", return_value=result) as run:
+            status = manager.probe("203.0.113.12")
+        self.assertEqual(status["state"], "egress_verified")
+        self.assertFalse(status["system_wide_vpn"])
+        command = run.call_args.args[0]
+        self.assertIn("socks5h://127.0.0.1:10808", command)
+        self.assertIn("--noproxy", command)
+
+    def test_probe_fails_closed_without_process(self):
+        with mock.patch.object(manager, "read_state", return_value=None):
+            with self.assertRaisesRegex(ValueError, "ENGINE_NOT_RUNNING"):
+                manager.probe()
+
+    def test_probe_ip_mismatch_is_not_verified(self):
+        record = {"protocol": "naive", "port": 10810, "pid": 42}
+        result = subprocess.CompletedProcess([], 0, "203.0.113.13\\n", "")
+        with mock.patch.object(manager, "read_state", return_value=record), \
+             mock.patch.object(manager, "process_matches", return_value=True), \
+             mock.patch.object(manager.subprocess, "run", return_value=result):
+            status = manager.probe("203.0.113.12")
+        self.assertEqual(status["state"], "egress_ip_mismatch")
+        self.assertFalse(status["verified_expected_egress"])
 
 
 if __name__ == "__main__":
