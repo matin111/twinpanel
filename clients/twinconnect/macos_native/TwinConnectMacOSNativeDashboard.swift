@@ -162,12 +162,13 @@ private final class TwinNativeGlassCard: NSView {
         wantsLayer = true
         // Actual AppKit vibrancy/blur, not a nearly opaque painted rectangle.
         // withinWindow works on Catalina without an app Metal renderer.
-        // HUD material creates a charcoal/black slab on Catalina.
-        // Sidebar material stays translucent and draws the branded art
-        // through the card instead of flattening its luminance.
+        // Catalina's vibrancy material is neutral GREY by design. Keep a
+        // small amount of real blur but do NOT let its opaque charcoal tint
+        // replace the tenant's blue/brand-colored glass surfaces.
         blur.material = .sidebar
         blur.blendingMode = .withinWindow
         blur.state = .active
+        blur.alphaValue = 0.14
         blur.wantsLayer = true
         addSubview(blur)
         tintOverlay.wantsLayer = true
@@ -192,44 +193,46 @@ private final class TwinNativeGlassCard: NSView {
     func apply(_ style: Style, accent: NSColor = NSColor(
         calibratedRed: 0.27, green: 0.67, blue: 0.74, alpha: 1),
         background: NSColor? = nil, surface: NSColor? = nil) {
-        // Every surface receives the authenticated tenant's primary_color.
-        // The neutral foundation keeps white text readable even for vivid
-        // panel colors such as purple, red, cyan or orange.
+        // Compose all surfaces from the panel's colors and the SAME dark
+        // blue foundation as the backdrop. Actual macOS vibrancy alone
+        // turns these surfaces grey on Catalina.
         let neutral: NSColor
         let strength: CGFloat
         switch style {
         case .panel:
-            neutral = NSColor(calibratedRed: 0.065, green: 0.145,
-                              blue: 0.185, alpha: 1)
-            strength = 0.20
+            neutral = NSColor(calibratedRed: 0.046, green: 0.158,
+                              blue: 0.207, alpha: 1)
+            strength = 0.24
         case .inset:
-            neutral = NSColor(calibratedRed: 0.095, green: 0.205,
-                              blue: 0.245, alpha: 1)
-            strength = 0.29
+            neutral = NSColor(calibratedRed: 0.070, green: 0.200,
+                              blue: 0.255, alpha: 1)
+            strength = 0.28
         case .metric:
-            neutral = NSColor(calibratedRed: 0.055, green: 0.145,
-                              blue: 0.190, alpha: 1)
+            neutral = NSColor(calibratedRed: 0.041, green: 0.159,
+                              blue: 0.223, alpha: 1)
             strength = 0.25
         case .sidebar:
-            neutral = NSColor(calibratedRed: 0.035, green: 0.106,
-                              blue: 0.135, alpha: 1)
-            strength = 0.15
+            neutral = NSColor(calibratedRed: 0.024, green: 0.109,
+                              blue: 0.151, alpha: 1)
+            strength = 0.18
         }
-        // Tenant-specified card_color overrides the fallback glass tint.
-        // Sidebar uses background_color if available; no opaque flat fills.
-        let supplied = style == .sidebar ? (background ?? surface) : surface
+        let supplied = style == .sidebar ?
+            (background ?? surface) : (surface ?? background)
         let foundation = supplied.flatMap {
-            neutral.blended(withFraction: 0.53, of: $0)
+            neutral.blended(withFraction: 0.38, of: $0)
         } ?? neutral
         let tone = foundation.blended(withFraction: strength, of: accent) ?? foundation
-        let upper = tone.blended(withFraction: 0.34, of: .white) ?? tone
-        let lower = tone.blended(withFraction: 0.09, of: .white) ?? tone
-        // Visible luminous glass rather than nearly black HUD plaques.
-        let topAlpha: CGFloat = style == .sidebar ? 0.66 : 0.54
+        let upper = tone.blended(withFraction: 0.18, of: .white) ?? tone
+        let lower = tone.blended(withFraction: 0.12, of: .black) ?? tone
+        // High-enough tinted overlay to defeat the grey vibrancy material,
+        // but still partially transparent over the artwork.
+        let topAlpha: CGFloat = style == .sidebar ? 0.90 : 0.81
+        let middleAlpha: CGFloat = style == .sidebar ? 0.82 : 0.70
+        let bottomAlpha: CGFloat = style == .sidebar ? 0.88 : 0.78
         glassGradient.colors = [
             upper.withAlphaComponent(topAlpha).cgColor,
-            tone.withAlphaComponent(0.28).cgColor,
-            lower.withAlphaComponent(0.43).cgColor
+            tone.withAlphaComponent(middleAlpha).cgColor,
+            lower.withAlphaComponent(bottomAlpha).cgColor
         ]
         upperEdge.colors = [
             accent.blended(withFraction: 0.42, of: .white)?
@@ -869,8 +872,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                    background: panelBackgroundColor(), surface: panelCardColor())
         side.translatesAutoresizingMaskIntoConstraints = false
         side.wantsLayer = true
-        side.layer?.borderColor = sea.withAlphaComponent(0.25).cgColor
-        side.layer?.borderWidth = 0.7
+        side.layer?.borderColor = tint().withAlphaComponent(0.22).cgColor
+        side.layer?.borderWidth = 0.6
 
         let content = stack(spacing: 12)
         content.alignment = .leading
