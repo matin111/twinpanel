@@ -207,6 +207,25 @@ class MetalFallbackInstallTests(unittest.TestCase):
                 settings = plistlib.load(handle)
             self.assertTrue(settings["com.apple.security.network.client"])
 
+    def test_node_aliases_and_account_scoped_selection_persist(self) -> None:
+        source = (SOURCE / "TwinConnectMacOSNativeDashboard.swift").read_text(
+            encoding="utf-8"
+        )
+        for token in (
+            '"fi": ["fin", "finland"',
+            '"de": ["des", "ger", "germany"',
+            'aliases[code]?.contains(plain)',
+            'import CryptoKit',
+            'SHA256.hash(data: Data(identity.utf8))',
+            'session.namespace + ":" + session.username.lowercased()',
+            'self.restoreCurrentSelection(session)',
+            'persistCurrentSelection()',
+            'self.persistCurrentSelection()',
+            'validIDs.contains($0.key)',
+        ):
+            self.assertIn(token, source)
+        self.assertNotIn('UserDefaults.standard.set(session.accessToken', source)
+
     def test_server_ui_hides_raw_country_codes_and_blank_hero(self) -> None:
         source = (SOURCE / "TwinConnectMacOSNativeDashboard.swift").read_text(
             encoding="utf-8"
