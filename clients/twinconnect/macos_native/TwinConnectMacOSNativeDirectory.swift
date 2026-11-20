@@ -115,6 +115,8 @@ struct TwinMacNativeSession {
     let apiOrigin: URL
     let brandName: String
     let accentHex: String
+    let backgroundHex: String?
+    let cardHex: String?
     let supportURL: URL?
     let renewalURL: URL?
     let websiteURL: URL?
@@ -353,6 +355,8 @@ final class TwinConnectMacOSNativeDirectory: NSObject, URLSessionTaskDelegate {
                             accessToken: token, apiOrigin: panel,
                             brandName: name.isEmpty ? "TwinConnect" : name,
                             accentHex: accent,
+                            backgroundHex: brand["background_color"] as? String,
+                            cardHex: brand["card_color"] as? String,
                             supportURL: self.publicURL(brand["telegram_url"] ?? brand["website_url"]),
                             renewalURL: self.publicURL(brand["renewal_url"]),
                             websiteURL: self.publicURL(brand["website_url"]),
