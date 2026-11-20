@@ -27,6 +27,7 @@ class MacStandalonePanelProfile {
     required String sessionToken,
     required String serverId,
     required String protocolCode,
+    required bool engineInstalled,
     int localPort = 10808,
   }) async {
     if (sessionToken.trim() != sessionToken || sessionToken.length < 40) {
@@ -34,6 +35,9 @@ class MacStandalonePanelProfile {
     }
     if (!supportedCodes.contains(protocolCode)) {
       throw const FormatException('MAC_STANDALONE_ENGINE_NOT_INTEGRATED');
+    }
+    if (!engineInstalled) {
+      throw const FormatException('MAC_STANDALONE_ENGINE_NOT_INSTALLED');
     }
     if (localPort < 1024 || localPort > 65535) {
       throw const FormatException('MAC_STANDALONE_LOCAL_PORT_INVALID');
