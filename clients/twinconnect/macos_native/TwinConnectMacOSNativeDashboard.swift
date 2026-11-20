@@ -65,6 +65,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     private var status = ""
     private var busy = false
     private var refreshGeneration = 0
+    private var nativeContentWidth: CGFloat = 1100
     // Match Flutter sections: Quick connect / Locations / Settings / Account.
     private var tab = 0
     private var country = "All countries"
@@ -307,7 +308,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         case 0:
             // The shared Flutter desktop layout uses two equally weighted
             // connection/network cards when the usable main column is >=740.
-            let availableWidth = (root.window?.contentView?.bounds.width ?? 1100) - 258 - 48
+            let availableWidth = nativeContentWidth - 258 - 48
             if availableWidth >= 790 {
                 let pair = stack(.horizontal, spacing: 14)
                 pair.alignment = .top
@@ -745,6 +746,20 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                 self.tab = 0
                 self.status = "Retrieving live subscription data…"
                 NSLog("TwinConnect AppKit: authenticated; showing dashboard shell")
+                // Match Flutter desktop's two equal cards on large displays
+                // without clipping them on smaller remote Mac desktops.
+                if let window = self.view.window {
+                    if let visible = (window.screen ?? NSScreen.main)?.visibleFrame,
+                       visible.width >= 1120 {
+                        window.setContentSize(NSSize(
+                            width: min(1240, visible.width - 32),
+                            height: min(800, visible.height - 32)
+                        ))
+                        window.center()
+                    }
+                    self.nativeContentWidth = window.contentView?.bounds.width
+                        ?? window.frame.width
+                }
                 // Present the dashboard first. Panel fetch must never gate
                 // rendering the tabs or make the content disappear.
                 self.view = self.build()
