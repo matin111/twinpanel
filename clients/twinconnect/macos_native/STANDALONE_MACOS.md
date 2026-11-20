@@ -10,13 +10,15 @@ real SOCKS/HTTP request through the proxy succeeds.
 
 The native Metal-free AppKit Locations screen receives live, authenticated
 panel server and protocol lists. In Quick Connect, after selecting an
-entitled Hysteria2 protocol and one of the assigned nodes, the **Test
-Hysteria2 proxy (not VPN)** button requests a fresh protocol catalog,
+entitled Hysteria2 protocol and one of the assigned nodes, the **primary Test
+Hysteria2 proxy** button requests a fresh protocol catalog,
 assigned server inventory and exact node profile through the authenticated
 native directory. The reviewed client outbound is executed as a private
 loopback SOCKS proxy, probes HTTPS egress, and then the helper stops the
-engine and deletes temporary credentials. The ordinary system-wide **Connect
-now** button remains disabled until a signed, verified PacketTunnel exists.
+engine and deletes temporary credentials. The **primary** Quick Connect button is a one-request proxy test on this
+unsigned cloud Mac, not a system VPN control. It guides the user to select
+Hysteria2 and a server first. A signed system-wide PacketTunnel VPN is not
+available in this unsigned build.
 Only Hysteria2 is implemented in AppKit at this stage; the Flutter UI has
 its own local-proxy test implementation. An installed engine alone is not
 proof of a working network connection.
