@@ -83,6 +83,12 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     private var protocolChipCodes = [String?]()
     private var activeProtocol: String?
     private var activeServer: String?
+    private var nodePingResults = [String: TwinMacNativePingResult]()
+    private var nodePingBusy = Set<String>()
+    private var nodePingQueue = [TwinMacNativeServer]()
+    private var pingAllBusy = false
+    private var pingGeneration = 0
+    private var didAutoPing = false
     private weak var usernameField: NSTextField?
     private weak var passwordField: NSSecureTextField?
 
@@ -583,7 +589,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
 
         let selectedServer = snapshot?.servers.first { $0.id == activeServer }
         let location = selectedServer.map {
-            flag($0.country) + " " + countryName($0.country)
+            flag($0.country) + " " + countryName($0.country) + " · " + $0.name
         } ?? "Choose location"
         let protocolName = snapshot?.protocols.first {
             $0.code == activeProtocol
@@ -602,12 +608,14 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     }
 
     private func networkMetric(_ title: String, value: String,
-                               subtitle: String = "") -> NSView {
+                               subtitle: String = "",
+                               valueColor: NSColor? = nil) -> NSView {
         let content = stack(spacing: 13)
         content.alignment = .leading
         content.addArrangedSubview(text(title, size: 11,
                                        weight: .semibold, color: muted))
-        content.addArrangedSubview(text(value, size: 22, weight: .bold))
+        content.addArrangedSubview(text(value, size: 22, weight: .bold,
+                                        color: valueColor))
         if !subtitle.isEmpty {
             content.addArrangedSubview(text(subtitle, size: 10, color: muted))
         }
@@ -636,15 +644,12 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                                        size: 12, color: muted))
 
         let selected = snapshot?.servers.first { $0.id == activeServer }
-        let reportedPing = selected?.latencyMs.map {
-            String($0) + " ms"
-        } ?? "—"
+        let reportedPing = pingText(selected)
 
         let network = stack(.horizontal, spacing: 10)
         network.distribution = .fillEqually
-        network.addArrangedSubview(networkMetric("ϟ  Server ping", value: reportedPing,
-            subtitle: selected?.latencyMs == nil ? "Round-trip time" :
-                "Panel-reported latency"))
+        network.addArrangedSubview(networkMetric("⚡  Server ping", value: reportedPing,
+            subtitle: pingDetails(selected), valueColor: pingColor(selected)))
         network.addArrangedSubview(networkMetric("◉  Public IP", value: "—"))
         content.addArrangedSubview(network)
         network.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
@@ -659,7 +664,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         traffic.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
 
         let location = selected.map {
-            flag($0.country) + "  " + countryName($0.country)
+            flag($0.country) + "  " + countryName($0.country) + " · " + $0.name
         } ?? "Select location"
         let change = button(location + "                   Locations  ›",
             action: #selector(showLocations(_:)), mutedButton: true)
@@ -670,6 +675,103 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
 
         // Offline mode never fabricates session bytes, handshakes or an IP.
         return card([content], radius: 25, padding: 20)
+    }
+
+    // Prefer a fresh local ICMP reply. A panel latency is identified as
+    // approximate and never presented as an on-device ping.
+    private func pingText(_ server: TwinMacNativeServer?) -> String {
+        guard let server = server else { return "— ms" }
+        if nodePingBusy.contains(server.id) { return "…" }
+        if let result = nodePingResults[server.id] {
+            if let rtt = result.measuredMs { return "\(rtt) ms" }
+            return result.errorCode == "NO_PROBE_ADDRESS" ? "No IP" : "— ms"
+        }
+        if let reported = server.latencyMs { return "≈\(reported) ms" }
+        return server.probeIP == nil ? "No IP" : "— ms"
+    }
+
+    private func pingColor(_ server: TwinMacNativeServer?) -> NSColor {
+        guard let server = server else { return muted }
+        let value: Int?
+        if let result = nodePingResults[server.id] {
+            value = result.measuredMs
+        } else {
+            value = server.latencyMs
+        }
+        guard let latency = value else { return muted }
+        if latency <= 300 {
+            return NSColor(calibratedRed: 0.21, green: 0.85, blue: 0.65, alpha: 1)
+        }
+        if latency <= 700 { return amber }
+        return NSColor(calibratedRed: 1.0, green: 0.41, blue: 0.48, alpha: 1)
+    }
+
+    private func pingDetails(_ server: TwinMacNativeServer?) -> String {
+        guard let server = server else { return "No location selected" }
+        if nodePingBusy.contains(server.id) { return "ICMP ping in progress" }
+        if let result = nodePingResults[server.id] {
+            if result.measuredMs != nil { return "ICMP round-trip time from this Mac" }
+            switch result.errorCode {
+            case "NO_PROBE_ADDRESS": return "Panel provided no public ping address"
+            case "ICMP_TIMEOUT_OR_BLOCKED": return "No ping reply (ICMP may be blocked)"
+            case "PING_PROGRAM_UNAVAILABLE": return "macOS ping executable unavailable"
+            default: return "ICMP reply could not be measured"
+            }
+        }
+        return server.latencyMs != nil ? "Approximate latency reported by panel" :
+            "ICMP has not been measured"
+    }
+
+    private func beginNodePing(_ server: TwinMacNativeServer) {
+        guard let current = accountSession,
+              !nodePingBusy.contains(server.id) else { return }
+        let generation = pingGeneration
+        let token = current.accessToken
+        nodePingBusy.insert(server.id)
+        TwinMacNativePing.probe(server.probeIP) { [weak self] result in
+            guard let self = self, self.pingGeneration == generation,
+                  self.accountSession?.accessToken == token else { return }
+            self.nodePingBusy.remove(server.id)
+            self.nodePingResults[server.id] = result
+            if self.pingAllBusy { self.startNextNodePings() }
+            self.view = self.build()
+        }
+    }
+
+    // At most four simultaneous ICMP processes, same concurrency as Windows.
+    private func startNextNodePings() {
+        while pingAllBusy && nodePingBusy.count < 4 && !nodePingQueue.isEmpty {
+            let server = nodePingQueue.removeFirst()
+            if !nodePingBusy.contains(server.id) {
+                beginNodePing(server)
+            }
+        }
+        if pingAllBusy && nodePingQueue.isEmpty && nodePingBusy.isEmpty {
+            pingAllBusy = false
+        }
+    }
+
+    private func pingNodes(_ nodes: [TwinMacNativeServer]) {
+        guard accountSession != nil, !pingAllBusy, !nodes.isEmpty else { return }
+        pingAllBusy = true
+        nodePingQueue = nodes
+        startNextNodePings()
+        view = build()
+    }
+
+    @objc private func pingAllServers(_ sender: NSButton) {
+        guard let nodes = snapshot?.servers, !nodes.isEmpty else { return }
+        pingNodes(nodes)
+    }
+
+    @objc private func pingOneServer(_ sender: NSButton) {
+        guard !pingAllBusy,
+              locationRowIDs.indices.contains(sender.tag),
+              let server = snapshot?.servers.first(where: {
+                  $0.id == locationRowIDs[sender.tag]
+              }), !nodePingBusy.contains(server.id) else { return }
+        beginNodePing(server)
+        view = build()
     }
 
     private func countryName(_ code: String) -> String {
@@ -741,10 +843,11 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         wrapper.addArrangedSubview(searchRow)
         searchRow.widthAnchor.constraint(equalTo: wrapper.widthAnchor).isActive = true
 
-        let ping = button("⚡  Ping all servers",
-                          action: #selector(unavailableConnect(_:)), mutedButton: true)
-        ping.isEnabled = false
-        ping.toolTip = "Live per-server ICMP testing is not yet available in native AppKit"
+        let ping = button(pingAllBusy ? "⚡  Testing server ping…" :
+                "⚡  Ping all servers",
+                action: #selector(pingAllServers(_:)), mutedButton: true)
+        ping.isEnabled = !pingAllBusy && !(snapshot?.servers.isEmpty ?? true)
+        ping.toolTip = "Send one ICMP echo to each public server probe IP"
         ping.heightAnchor.constraint(equalToConstant: 32).isActive = true
         wrapper.addArrangedSubview(ping)
         ping.widthAnchor.constraint(equalTo: wrapper.widthAnchor).isActive = true
@@ -797,19 +900,40 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             header.widthAnchor.constraint(equalTo: group.widthAnchor).isActive = true
             if expanded {
                 for server in items {
+                    let index = locationRowIDs.firstIndex(of: server.id) ?? -1
                     let indicator = server.online ? "● Online" : "○ Offline"
-                    let ping = server.latencyMs.map { " • \($0) ms (panel)" } ?? ""
                     let line = (activeServer == server.id ? "✓ " : "  ") +
-                        server.name + "    " + indicator + ping
+                        server.name + "    " + indicator
                     let choose = button(line,
                         action: #selector(selectLocationServer(_:)),
-                        tag: locationRowIDs.firstIndex(of: server.id) ?? -1,
-                        primary: activeServer == server.id,
+                        tag: index, primary: activeServer == server.id,
                         mutedButton: activeServer != server.id)
                     choose.alignment = .left
                     choose.heightAnchor.constraint(equalToConstant: 43).isActive = true
-                    group.addArrangedSubview(choose)
-                    choose.widthAnchor.constraint(equalTo: group.widthAnchor).isActive = true
+                    choose.setContentHuggingPriority(.defaultLow, for: .horizontal)
+
+                    let pingLabel = text(pingText(server), size: 11,
+                                         weight: .semibold, color: pingColor(server))
+                    pingLabel.toolTip = pingDetails(server)
+                    pingLabel.widthAnchor.constraint(equalToConstant: 76).isActive = true
+                    let probe = button(nodePingBusy.contains(server.id) ? "…" : "↻",
+                                       action: #selector(pingOneServer(_:)),
+                                       tag: index, mutedButton: true)
+                    probe.widthAnchor.constraint(equalToConstant: 40).isActive = true
+                    probe.heightAnchor.constraint(equalToConstant: 35).isActive = true
+                    probe.isEnabled = !pingAllBusy &&
+                        !nodePingBusy.contains(server.id) && server.probeIP != nil
+                    probe.toolTip = server.probeIP == nil ?
+                        "No public probe address supplied by the panel" :
+                        "Ping this server from your Mac"
+                    let serverRow = stack(.horizontal, spacing: 9)
+                    serverRow.alignment = .centerY
+                    serverRow.addArrangedSubview(choose)
+                    serverRow.addArrangedSubview(pingLabel)
+                    serverRow.addArrangedSubview(probe)
+                    group.addArrangedSubview(serverRow)
+                    serverRow.widthAnchor.constraint(equalTo: group.widthAnchor)
+                        .isActive = true
                 }
             }
             let row = card([group], radius: 17, padding: 11)
