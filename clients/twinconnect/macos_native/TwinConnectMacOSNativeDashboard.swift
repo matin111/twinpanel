@@ -76,6 +76,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     private var expandedCountries = Set<String>()
     private var locationCountryIDs = [String]()
     private var locationRowIDs = [String]()
+    private var locationSearch = ""
+    private var protocolChipCodes = [String?]()
     private var activeProtocol: String?
     private var activeServer: String?
     private weak var usernameField: NSTextField?
@@ -530,84 +532,143 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         return card([content], radius: 23, padding: 20)
     }
 
-    // Mirrors Flutter's grouped locations list. The server inventory is
-    // subscription-scoped, but it does not certify a specific protocol's
-    // profile on a specific node. Never pretend that it does.
-    private func locationsPage() -> NSView {
-        let wrapper = stack(spacing: 12)
-        wrapper.alignment = .width
-        let heading = stack(.horizontal, spacing: 12)
-        heading.addArrangedSubview(text("Locations", size: 20, weight: .bold))
-        heading.addArrangedSubview(button("↻",
-                                          action: #selector(refresh(_:))))
-        wrapper.addArrangedSubview(heading)
+    private func countryName(_ code: String) -> String {
+        Locale(identifier: "en_US").localizedString(forRegionCode: code.uppercased())
+            ?? code.uppercased()
+    }
 
-        let protocolChoice = NSPopUpButton(frame: .zero, pullsDown: false)
-        protocolChoice.addItem(withTitle: "All allowed protocols")
-        for item in snapshot?.protocols ?? [] {
-            protocolChoice.addItem(withTitle: item.name)
-            protocolChoice.lastItem?.representedObject = item.code
-        }
-        if let selected = activeProtocol,
-           let entry = protocolChoice.itemArray.first(where: {
-               ($0.representedObject as? String) == selected
-           }) {
-            protocolChoice.select(entry)
-        }
-        protocolChoice.target = self
-        protocolChoice.action = #selector(changeQuickProtocol(_:))
-        wrapper.addArrangedSubview(protocolChoice)
-
-        let serverRows = snapshot?.servers ?? []
-        let grouping = Dictionary(grouping: serverRows, by: { $0.country.uppercased() })
-        let countries = grouping.keys.sorted()
-        locationCountryIDs = countries
-        locationRowIDs = serverRows.map { $0.id }
-        if serverRows.isEmpty {
-            let explanation = snapshot?.errors["servers"] ??
-                (snapshot?.sectionsLoaded.contains("servers") == true
-                    ? "No assigned servers in this account."
-                    : "Refreshing your assigned servers…")
-            wrapper.addArrangedSubview(text(explanation, color: muted))
-        } else {
-            for (index, code) in countries.enumerated() {
-                let entries = grouping[code] ?? []
-                let expanded = expandedCountries.contains(code)
-                let group = stack(spacing: 7)
-                group.alignment = .width
-                let header = button(
-                    flag(code) + "    " + code + "    •    " +
-                    String(entries.count) + " servers    " + (expanded ? "⌃" : "⌄"),
-                    action: #selector(toggleLocationCountry(_:)), tag: index)
-                header.alignment = .left
-                group.addArrangedSubview(header)
-                if expanded {
-                    for entry in entries {
-                        let latency = entry.latencyMs.map { " • \($0) ms (panel)" } ?? ""
-                        let title = (activeServer == entry.id ? "✓  " : "☆  ") +
-                            entry.name + "     " +
-                            (entry.online ? "● Online" : "○ Offline") + latency
-                        let action = button(title,
-                            action: #selector(selectLocationServer(_:)),
-                            tag: locationRowIDs.firstIndex(of: entry.id) ?? -1,
-                            mutedButton: true)
-                        action.alignment = .left
-                        group.addArrangedSubview(action)
-                    }
-                }
-                wrapper.addArrangedSubview(card([group], radius: 17, padding: 12))
+    private func protocolChips() -> NSView {
+        let list = snapshot?.protocols ?? []
+        protocolChipCodes = [nil] + list.map { Optional($0.code) }
+        let options = [("All", Optional<String>.none)] +
+            list.map { ($0.name, Optional($0.code)) }
+        let group = stack(spacing: 7)
+        group.alignment = .width
+        // Use the same horizontal, wrapping protocol pills as Flutter.
+        // Fit by actual label width, not arbitrary protocol counts per row.
+        let width = max(430, nativeContentWidth - 258 - 102)
+        var row = stack(.horizontal, spacing: 7)
+        row.alignment = .centerY
+        var used: CGFloat = 0
+        for (index, option) in options.enumerated() {
+            let size = (option.0 as NSString).size(withAttributes: [
+                .font: NSFont.systemFont(ofSize: 11, weight: .semibold)
+            ]).width
+            let chipWidth = min(185, max(58, ceil(size) + 27))
+            if used + chipWidth > width && used > 0 {
+                group.addArrangedSubview(row)
+                row.widthAnchor.constraint(equalTo: group.widthAnchor).isActive = true
+                row = stack(.horizontal, spacing: 7)
+                row.alignment = .centerY
+                used = 0
             }
+            let selected = activeProtocol == option.1
+            let chip = button(option.0, action: #selector(selectProtocolChip(_:)),
+                              tag: index, primary: selected, mutedButton: !selected)
+            chip.font = .systemFont(ofSize: 11, weight: .medium)
+            chip.layer?.cornerRadius = 15
+            chip.heightAnchor.constraint(equalToConstant: 31).isActive = true
+            chip.widthAnchor.constraint(equalToConstant: chipWidth).isActive = true
+            row.addArrangedSubview(chip)
+            used += chipWidth + 7
         }
+        group.addArrangedSubview(row)
+        row.widthAnchor.constraint(equalTo: group.widthAnchor).isActive = true
+        return group
+    }
 
-        if activeProtocol != nil {
-            wrapper.addArrangedSubview(text(
-                "Node inventory is not proof of a valid profile for the selected protocol.",
-                size: 11, color: amber))
+    // Locations follow Flutter's Search -> protocol chips -> country accordion.
+    // All data is scoped to the authenticated panel session. Node inventory
+    // alone never guarantees a protocol-specific connection profile.
+    private func locationsPage() -> NSView {
+        let wrapper = stack(spacing: 14)
+        wrapper.alignment = .width
+
+        let searchRow = stack(.horizontal, spacing: 10)
+        searchRow.alignment = .centerY
+        let search = NSSearchField()
+        search.placeholderString = "Search servers"
+        search.stringValue = locationSearch
+        search.toolTip = "Press Return to filter by name or country"
+        search.target = self
+        search.action = #selector(searchLocations(_:))
+        search.translatesAutoresizingMaskIntoConstraints = false
+        search.heightAnchor.constraint(equalToConstant: 40).isActive = true
+        searchRow.addArrangedSubview(search)
+        searchRow.addArrangedSubview(button("↻", action: #selector(refresh(_:))))
+        wrapper.addArrangedSubview(searchRow)
+        searchRow.widthAnchor.constraint(equalTo: wrapper.widthAnchor).isActive = true
+
+        let ping = button("⚡  Ping all servers",
+                          action: #selector(unavailableConnect(_:)), mutedButton: true)
+        ping.isEnabled = false
+        ping.toolTip = "Live per-server ICMP testing is not yet available in native AppKit"
+        ping.heightAnchor.constraint(equalToConstant: 32).isActive = true
+        wrapper.addArrangedSubview(ping)
+        ping.widthAnchor.constraint(equalTo: wrapper.widthAnchor).isActive = true
+        wrapper.addArrangedSubview(protocolChips())
+
+        let visible = (snapshot?.servers ?? []).filter { server in
+            if locationSearch.isEmpty { return true }
+            let needle = locationSearch.localizedLowercase
+            return server.name.localizedLowercase.contains(needle) ||
+                countryName(server.country).localizedLowercase.contains(needle) ||
+                server.country.localizedLowercase.contains(needle)
         }
-        wrapper.addArrangedSubview(text(
-            "Assigned nodes are from your authenticated panel. VPN is unavailable.",
-            size: 11, color: muted))
-        return card([wrapper], radius: 22, padding: 19)
+        let grouped = Dictionary(grouping: visible) { $0.country.uppercased() }
+        let codes = grouped.keys.sorted {
+            countryName($0).localizedStandardCompare(countryName($1)) == .orderedAscending
+        }
+        locationCountryIDs = codes
+        locationRowIDs = visible.map { $0.id }
+
+        if codes.isEmpty {
+            let message: String
+            if let issue = snapshot?.errors["servers"] {
+                message = "Server list unavailable: " + issue
+            } else if snapshot?.sectionsLoaded.contains("servers") == true {
+                message = locationSearch.isEmpty ?
+                    "No servers assigned to this account." : "No matching locations."
+            } else {
+                message = "Loading assigned locations…"
+            }
+            wrapper.addArrangedSubview(card([text(message, color: muted)],
+                                             radius: 17, padding: 17))
+        }
+        for (index, code) in codes.enumerated() {
+            let items = grouped[code] ?? []
+            let expanded = expandedCountries.contains(code)
+            let group = stack(spacing: 10)
+            group.alignment = .width
+            let header = button(
+                flag(code) + "    " + countryName(code) + "     " +
+                String(items.count) + (items.count == 1 ? " server" : " servers") +
+                (expanded ? "    ⌃" : "    ⌄"),
+                action: #selector(toggleLocationCountry(_:)), tag: index)
+            header.alignment = .left
+            header.heightAnchor.constraint(equalToConstant: 49).isActive = true
+            group.addArrangedSubview(header)
+            header.widthAnchor.constraint(equalTo: group.widthAnchor).isActive = true
+            if expanded {
+                for server in items {
+                    let indicator = server.online ? "● Online" : "○ Offline"
+                    let ping = server.latencyMs.map { " • \($0) ms (panel)" } ?? ""
+                    let line = (activeServer == server.id ? "✓ " : "  ") +
+                        server.name + "    " + indicator + ping
+                    let choose = button(line,
+                        action: #selector(selectLocationServer(_:)),
+                        tag: locationRowIDs.firstIndex(of: server.id) ?? -1,
+                        primary: activeServer == server.id,
+                        mutedButton: activeServer != server.id)
+                    choose.alignment = .left
+                    choose.heightAnchor.constraint(equalToConstant: 43).isActive = true
+                    group.addArrangedSubview(choose)
+                    choose.widthAnchor.constraint(equalTo: group.widthAnchor).isActive = true
+                }
+            }
+            wrapper.addArrangedSubview(card([group], radius: 17, padding: 11))
+        }
+        return card([wrapper], radius: 23, padding: 19)
     }
 
     private func createTable() -> NSView {
@@ -944,6 +1005,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         expandedCountries.removeAll()
         locationCountryIDs.removeAll()
         locationRowIDs.removeAll()
+        protocolChipCodes.removeAll()
+        locationSearch = ""
         busy = false
         tab = 0
         status = ""
@@ -952,6 +1015,17 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
 
     @objc private func changeTab(_ sender: NSButton) {
         tab = sender.tag
+        view = build()
+    }
+
+    @objc private func searchLocations(_ sender: NSSearchField) {
+        locationSearch = sender.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        view = build()
+    }
+
+    @objc private func selectProtocolChip(_ sender: NSButton) {
+        guard protocolChipCodes.indices.contains(sender.tag) else { return }
+        activeProtocol = protocolChipCodes[sender.tag]
         view = build()
     }
 
