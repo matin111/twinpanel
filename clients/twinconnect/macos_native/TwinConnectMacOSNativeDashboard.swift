@@ -142,7 +142,8 @@ private final class TwinNativeGlassCard: NSView {
     }
     required init?(coder: NSCoder) { return nil }
     func apply(_ style: Style, accent: NSColor = NSColor(
-        calibratedRed: 0.27, green: 0.67, blue: 0.74, alpha: 1)) {
+        calibratedRed: 0.27, green: 0.67, blue: 0.74, alpha: 1),
+        background: NSColor? = nil, surface: NSColor? = nil) {
         // Every surface receives the authenticated tenant's primary_color.
         // The neutral foundation keeps white text readable even for vivid
         // panel colors such as purple, red, cyan or orange.
@@ -166,7 +167,13 @@ private final class TwinNativeGlassCard: NSView {
                               blue: 0.135, alpha: 1)
             strength = 0.15
         }
-        let tone = neutral.blended(withFraction: strength, of: accent) ?? neutral
+        // Tenant-specified card_color overrides the fallback glass tint.
+        // Sidebar uses background_color if available; no opaque flat fills.
+        let supplied = style == .sidebar ? (background ?? surface) : surface
+        let foundation = supplied.flatMap {
+            neutral.blended(withFraction: 0.53, of: $0)
+        } ?? neutral
+        let tone = foundation.blended(withFraction: strength, of: accent) ?? foundation
         let upper = tone.blended(withFraction: 0.15, of: .white) ?? tone
         let lower = tone.blended(withFraction: 0.17, of: .black) ?? tone
         glassGradient.colors = [
@@ -349,18 +356,28 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         }
     }
 
-    private func tint() -> NSColor {
-        guard let hex = accountSession?.accentHex,
+    private func panelHexColor(_ hex: String?) -> NSColor? {
+        guard let hex = hex,
               hex.range(of: "^#[0-9a-fA-F]{6}$",
                         options: .regularExpression) != nil,
-              let value = UInt32(hex.dropFirst(), radix: 16) else { return teal }
-        let proposed = NSColor(calibratedRed: CGFloat((value >> 16) & 255) / 255,
-                               green: CGFloat((value >> 8) & 255) / 255,
-                               blue: CGFloat(value & 255) / 255,
-                               alpha: 1)
-        // Respect the exact primary_color supplied by this account's panel.
-        // Never silently remap a reseller's selected violet or other hue.
-        return proposed
+              let value = UInt32(hex.dropFirst(), radix: 16) else { return nil }
+        return NSColor(calibratedRed: CGFloat((value >> 16) & 255) / 255,
+                       green: CGFloat((value >> 8) & 255) / 255,
+                       blue: CGFloat(value & 255) / 255, alpha: 1)
+    }
+
+    private func panelBackgroundColor() -> NSColor? {
+        panelHexColor(accountSession?.backgroundHex)
+    }
+
+    private func panelCardColor() -> NSColor? {
+        panelHexColor(accountSession?.cardHex)
+    }
+
+    private func tint() -> NSColor {
+        // The panel's primary_color is authoritative. Invalid/missing
+        // values fall back to the default accent instead of assuming a tenant.
+        return panelHexColor(accountSession?.accentHex) ?? teal
     }
 
     private func text(_ string: String, size: CGFloat = 13,
@@ -406,7 +423,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                       padding: CGFloat = 21,
                       style: TwinNativeGlassCard.Style = .panel) -> NSView {
         let box = TwinNativeGlassCard(frame: .zero)
-        box.apply(style, accent: tint())
+        box.apply(style, accent: tint(),
+                  background: panelBackgroundColor(), surface: panelCardColor())
         box.translatesAutoresizingMaskIntoConstraints = false
         box.wantsLayer = true
         box.layer?.cornerRadius = radius
@@ -511,7 +529,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     private func build() -> NSView {
         let root = TwinNativeBackdrop(frame:
             NSRect(x: 0, y: 0, width: 1180, height: 740))
-        root.base = base.blended(withFraction: 0.22, of: tint()) ?? base
+        root.base = (panelBackgroundColor() ?? base)
+            .blended(withFraction: 0.22, of: tint()) ?? base
         root.glow = tint()
         if accountSession == nil {
             buildLogin(in: root)
@@ -788,7 +807,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
 
     private func buildSidebar() -> NSView {
         let side = TwinNativeGlassCard(frame: .zero)
-        side.apply(.sidebar, accent: tint())
+        side.apply(.sidebar, accent: tint(),
+                   background: panelBackgroundColor(), surface: panelCardColor())
         side.translatesAutoresizingMaskIntoConstraints = false
         side.wantsLayer = true
         side.layer?.borderColor = sea.withAlphaComponent(0.25).cgColor
