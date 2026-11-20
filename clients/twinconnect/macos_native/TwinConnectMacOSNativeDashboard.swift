@@ -82,6 +82,10 @@ private final class TwinNativeGlassCard: NSView {
 // Replicates the *disconnected* state of the shared Flutter
 // TwinConnectWaveIndicator. No fake activity or synthetic RX/TX animation.
 private final class TwinNativeNetworkFabric: NSView {
+    // The Windows reference keeps the illustration blank when disconnected.
+    // This can become true only after verified signed system-tunnel activation.
+    // A successful one-shot SOCKS test must never enable the VPN animation.
+    var tunnelConnected = false
     override var isOpaque: Bool { false }
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
@@ -96,6 +100,7 @@ private final class TwinNativeNetworkFabric: NSView {
         NSColor(calibratedRed: 0.54, green: 0.82, blue: 0.84,
                 alpha: 0.28).setStroke()
         outline.stroke()
+        guard tunnelConnected else { return }
         // Retina vector network strands modeled after the Windows dashboard.
         // Purely decorative; the actual VPN status is never inferred from them.
         let cx = rect.midX
