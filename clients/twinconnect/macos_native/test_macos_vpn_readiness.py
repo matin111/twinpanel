@@ -36,6 +36,9 @@ class MacOSVPNReadinessTests(unittest.TestCase):
             app = Path(temp) / "Runner.app"
             ext = app / "Contents/PlugIns/PacketTunnel.appex"
             ext.mkdir(parents=True)
+            # The synthetic app also needs Contents, just like a real bundle.
+            (app / "Contents").mkdir(parents=True, exist_ok=True)
+            (ext / "Contents").mkdir(parents=True, exist_ok=True)
             with (app / "Contents/Info.plist").open("wb") as f:
                 plistlib.dump({"TwinConnectKeychainAccessGroup": "TEAM.keychain"}, f)
             with (ext / "Contents/Info.plist").open("wb") as f:
