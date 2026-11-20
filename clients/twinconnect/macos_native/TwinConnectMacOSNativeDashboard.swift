@@ -289,7 +289,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             sidebar.leadingAnchor.constraint(equalTo: root.leadingAnchor),
             sidebar.topAnchor.constraint(equalTo: root.topAnchor),
             sidebar.bottomAnchor.constraint(equalTo: root.bottomAnchor),
-            sidebar.widthAnchor.constraint(equalToConstant: 234)
+            sidebar.widthAnchor.constraint(equalToConstant: 258)
         ])
         let workspace = stack(spacing: 17)
         // A vertical NSStackView with .leading alignment gives its NSView
@@ -307,8 +307,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         case 0:
             // The shared Flutter desktop layout uses two equally weighted
             // connection/network cards when the usable main column is >=740.
-            let availableWidth = (view.window?.contentView?.bounds.width ?? 1100) - 234 - 48
-            if availableWidth >= 740 {
+            let availableWidth = (root.window?.contentView?.bounds.width ?? 1100) - 258 - 48
+            if availableWidth >= 790 {
                 let pair = stack(.horizontal, spacing: 14)
                 pair.alignment = .top
                 pair.distribution = .fillEqually
@@ -369,7 +369,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         let side = NSView()
         side.translatesAutoresizingMaskIntoConstraints = false
         side.wantsLayer = true
-        side.layer?.backgroundColor = base.withAlphaComponent(0.90).cgColor
+        side.layer?.backgroundColor = base.withAlphaComponent(0.12).cgColor
         side.layer?.borderColor = tint().withAlphaComponent(0.18).cgColor
         side.layer?.borderWidth = 1
         let content = stack(spacing: 15)
@@ -377,8 +377,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         content.addArrangedSubview(logo)
         content.addArrangedSubview(text(accountSession?.brandName ?? "TwinConnect",
                                         size: 18, weight: .bold))
-        content.addArrangedSubview(text("YOUR SECURE WORKSPACE",
-                                        size: 9, weight: .bold, color: muted))
+        content.addArrangedSubview(text("TwinConnect",
+                                        size: 10, weight: .medium, color: muted))
         content.setCustomSpacing(26, after: logo)
         let navs = [
             ("⚡", "Quick connect"), ("◎", "Locations"),
