@@ -194,5 +194,21 @@ class StandaloneManagerTests(unittest.TestCase):
         self.assertEqual(log.read_text(), "")
 
 
+    def test_tls_diagnostics_distinguish_hostname_ca_and_expiry(self):
+        log = self.root / "engine.log"
+        cases = {
+            "x509: certificate is valid for good.example, not bad.example":
+                "TLS_CERTIFICATE_HOSTNAME_MISMATCH",
+            "x509: certificate signed by unknown authority":
+                "TLS_CERTIFICATE_UNTRUSTED_CA",
+            "x509: certificate has expired or is not yet valid":
+                "TLS_CERTIFICATE_EXPIRED_OR_CLOCK",
+        }
+        with mock.patch.object(manager, "STATE", self.root):
+            for message, expected in cases.items():
+                log.write_text(message)
+                self.assertEqual(manager.engine_failure_category(), expected)
+
+
 if __name__ == "__main__":
     unittest.main()
