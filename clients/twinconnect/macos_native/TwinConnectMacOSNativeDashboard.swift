@@ -1167,7 +1167,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         // Mirror the original Windows primary button. An unsigned macOS
         // build cannot connect a system VPN, so this button must NEVER
         // silently launch the Hysteria2 diagnostic SOCKS engine.
-        let connect = button("ϟ    Connect now     ›",
+        let connect = button("ϟ    Check TUN readiness     ›",
                              action: #selector(unavailableConnect(_:)), primary: true)
         connect.isEnabled = accountSession != nil && !cliTunCheckBusy
         connect.toolTip = "Validate the selected Hysteria2 TUN profile without changing routes or starting VPN."
