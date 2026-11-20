@@ -107,7 +107,7 @@ class MetalFallbackInstallTests(unittest.TestCase):
         self.assertIn("enter.widthAnchor.constraint(equalTo: form.widthAnchor)", login_code)
         self.assertIn('placeholder: "Username"', login_code)
         self.assertIn('placeholder: "Password"', login_code)
-        self.assertNotIn("Welcome back", login_code)
+        self.assertIn('text("Welcome back", size: 27, weight: .bold)', login_code)
         self.assertNotIn("Secure app login", login_code)
         self.assertNotIn("TwinConnect app credentials", login_code)
         self.assertIn("NSGradient(colors:", generated)
