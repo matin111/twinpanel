@@ -373,46 +373,76 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         let side = NSView()
         side.translatesAutoresizingMaskIntoConstraints = false
         side.wantsLayer = true
+        // Flutter shares its ambient gradient with the side navigation.
         side.layer?.backgroundColor = base.withAlphaComponent(0.12).cgColor
         side.layer?.borderColor = tint().withAlphaComponent(0.18).cgColor
         side.layer?.borderWidth = 1
-        let content = stack(spacing: 15)
-        let logo = pill("∞", color: sea)
+
+        let content = stack(spacing: 12)
+        content.alignment = .width
+        let logo = NSView()
+        logo.wantsLayer = true
+        logo.layer?.cornerRadius = 13
+        logo.layer?.backgroundColor = tint().cgColor
+        logo.layer?.borderColor = sea.withAlphaComponent(0.38).cgColor
+        logo.layer?.borderWidth = 1
+        logo.translatesAutoresizingMaskIntoConstraints = false
+        logo.widthAnchor.constraint(equalToConstant: 42).isActive = true
+        logo.heightAnchor.constraint(equalToConstant: 42).isActive = true
+        let infinity = text("∞", size: 26, weight: .bold)
+        infinity.translatesAutoresizingMaskIntoConstraints = false
+        logo.addSubview(infinity)
+        NSLayoutConstraint.activate([
+            infinity.centerXAnchor.constraint(equalTo: logo.centerXAnchor),
+            infinity.centerYAnchor.constraint(equalTo: logo.centerYAnchor)
+        ])
         content.addArrangedSubview(logo)
         content.addArrangedSubview(text(accountSession?.brandName ?? "TwinConnect",
-                                        size: 18, weight: .bold))
-        content.addArrangedSubview(text("TwinConnect",
-                                        size: 10, weight: .medium, color: muted))
-        content.setCustomSpacing(26, after: logo)
+                                        size: 17, weight: .bold))
+        content.setCustomSpacing(35, after: logo)
+
         let navs = [
             ("⚡", "Quick connect"), ("◎", "Locations"),
             ("⚙", "Settings"), ("◉", "Account")
         ]
-        for (index, item) in navs.enumerated() {
-            let prefix = item.0 + "   "
-            let entry = button(prefix + item.1, action: #selector(changeTab(_:)),
-                               tag: index, primary: tab == index, mutedButton: true)
-            entry.alignment = .left
-            content.addArrangedSubview(entry)
-            entry.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
+        for (index, entry) in navs.enumerated() {
+            let control = button(entry.0 + "    " + entry.1,
+                action: #selector(changeTab(_:)), tag: index,
+                primary: tab == index, mutedButton: true)
+            control.alignment = .left
+            control.heightAnchor.constraint(equalToConstant: 54).isActive = true
+            content.addArrangedSubview(control)
+            control.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
         }
-        content.addArrangedSubview(separator())
-        content.addArrangedSubview(text("Offline — no verified VPN",
-                                        size: 11, color: amber))
-        if let data = snapshot {
-            content.addArrangedSubview(text(
-                "Panel API: \(data.sectionsLoaded.count)/4 sections",
-                size: 11, color: data.errors.isEmpty ? sea : amber))
-        } else {
-            content.addArrangedSubview(text(
-                "Panel login accepted • loading data",
-                size: 11, color: sea))
+
+        let quick = stack(.horizontal, spacing: 5)
+        quick.distribution = .fillEqually
+        if accountSession?.supportURL != nil {
+            quick.addArrangedSubview(button("Support",
+                action: #selector(openSupport(_:)), mutedButton: true))
         }
-        content.addArrangedSubview(button("↻  Refresh",
-                                          action: #selector(refresh(_:))))
-        content.addArrangedSubview(button("Sign out",
-                                          action: #selector(signOut(_:))))
-        spaced(side, content, inset: 21)
+        if accountSession?.renewalURL != nil {
+            quick.addArrangedSubview(button("Renew",
+                action: #selector(openRenewal(_:)), mutedButton: true))
+        }
+        if accountSession?.supportURL != nil ||
+           accountSession?.renewalURL != nil {
+            content.addArrangedSubview(card([quick], radius: 14, padding: 7))
+        }
+
+        // Keep account details at the bottom, like the Windows sidebar.
+        let flexSpacer = NSView()
+        flexSpacer.translatesAutoresizingMaskIntoConstraints = false
+        flexSpacer.setContentHuggingPriority(.defaultLow, for: .vertical)
+        content.addArrangedSubview(flexSpacer)
+        let summary = stack(spacing: 5)
+        summary.addArrangedSubview(text(accountSession?.username ?? "",
+                                        size: 11, weight: .semibold))
+        summary.addArrangedSubview(text("Signed in", size: 10, color: muted))
+        content.addArrangedSubview(card([summary], radius: 18, padding: 12))
+        content.addArrangedSubview(button("Sign out", action: #selector(signOut(_:)),
+                                         mutedButton: true))
+        spaced(side, content, inset: 17)
         return side
     }
 
