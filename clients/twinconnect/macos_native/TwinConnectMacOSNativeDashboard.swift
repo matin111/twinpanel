@@ -413,6 +413,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     private var didAutoPing = false
     private var localProxyBusy = false
     private var localProxyStatus = ""
+    private var cliTunCheckBusy = false
     private weak var usernameField: NSTextField?
     private weak var passwordField: NSSecureTextField?
 
@@ -1168,8 +1169,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         // silently launch the Hysteria2 diagnostic SOCKS engine.
         let connect = button("ϟ    Connect now     ›",
                              action: #selector(unavailableConnect(_:)), primary: true)
-        connect.isEnabled = accountSession != nil
-        connect.toolTip = "VPN unavailable until a signed PacketTunnel is installed. No local proxy starts here."
+        connect.isEnabled = accountSession != nil && !cliTunCheckBusy
+        connect.toolTip = "Validate the selected Hysteria2 TUN profile without changing routes or starting VPN."
         connect.heightAnchor.constraint(equalToConstant: 54).isActive = true
         connect.layer?.cornerRadius = 17
         connect.layer?.borderColor = sea.withAlphaComponent(0.9).cgColor
@@ -1190,8 +1191,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         // Diagnostics, emergency shutdown and technical warnings belong
         // in Settings. This visual dashboard has the same clean composition
         // as Windows; no SOCKS process starts from Quick Connect.
-        if !status.isEmpty && status.contains("Connection unavailable") {
-            let advisory = text("A signed macOS VPN extension is required.",
+        if !status.isEmpty && (status.contains("TUN") || status.contains("Connection unavailable")) {
+            let advisory = text(status,
                                 size: 10, color: amber)
             main.addArrangedSubview(advisory)
         }
@@ -2721,11 +2722,99 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         }
     }
 
+    /// First-stage CLI TUN integration: validate only. Running a privileged
+    /// tunnel and routing system traffic requires a separately protected helper.
+    /// Never report Connected after a config check.
     @objc private func unavailableConnect(_ sender: NSButton) {
-        // Never launch diagnostic SOCKS from the visually identical Windows
-        // Connect action. Users must explicitly choose diagnostics in Settings.
-        status = "Connection unavailable: Apple-signed PacketTunnel required."
+        guard !cliTunCheckBusy, let session = accountSession else { return }
+        guard activeProtocol == "hysteria2",
+              let serverID = activeServer,
+              snapshot?.protocols.contains(where: {
+                  $0.code == "hysteria2" && $0.configured
+              }) == true else {
+            status = "TUN preflight: select an entitled Hysteria2 server in Locations."
+            view = build()
+            return
+        }
+        cliTunCheckBusy = true
+        status = "TUN preflight: retrieving authorized profile…"
         view = build()
+        directory.prepareUnroutedHysteria2TUN(session, serverID: serverID) {
+            [weak self] result in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                guard self.accountSession?.accessToken == session.accessToken else {
+                    self.cliTunCheckBusy = false
+                    return
+                }
+                switch result {
+                case .failure:
+                    self.cliTunCheckBusy = false
+                    self.status = "TUN preflight blocked: profile or entitlement unavailable."
+                    self.view = self.build()
+                case .success(let profile):
+                    DispatchQueue.global(qos: .userInitiated).async {
+                        let checked = self.checkUnroutedTUNProfile(profile)
+                        DispatchQueue.main.async { [weak self] in
+                            guard let self = self else { return }
+                            self.cliTunCheckBusy = false
+                            guard self.accountSession?.accessToken == session.accessToken else { return }
+                            self.status = checked ?
+                                "TUN configuration valid. VPN offline; privileged engine not started." :
+                                "TUN validation failed. VPN remains offline."
+                            self.view = self.build()
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Config never reaches a shell. Private temporary data is removed on all
+    /// exits; no system route, DNS, or proxy is modified.
+    private func checkUnroutedTUNProfile(_ profile: Data) -> Bool {
+        let root = NSHomeDirectory() + "/twinpanel/clients/twinconnect"
+        #if arch(arm64)
+        let architecture = "arm64"
+        #else
+        let architecture = "amd64"
+        #endif
+        let binary = root + "/macos_native/build/singbox/" +
+            architecture + "/sing-box"
+        guard FileManager.default.isExecutableFile(atPath: binary) else { return false }
+        let folder = FileManager.default.temporaryDirectory
+            .appendingPathComponent("twinconnect-tun-preflight-" + UUID().uuidString,
+                                    isDirectory: true)
+        do {
+            try FileManager.default.createDirectory(at: folder,
+                withIntermediateDirectories: false,
+                attributes: [.posixPermissions: 0o700])
+        } catch { return false }
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let configURL = folder.appendingPathComponent("config.json")
+        guard FileManager.default.createFile(atPath: configURL.path,
+            contents: profile, attributes: [.posixPermissions: 0o600]) else { return false }
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: binary)
+        task.arguments = ["check", "-c", configURL.path]
+        task.standardOutput = Pipe()
+        task.standardError = Pipe()
+        do {
+            try task.run()
+            // Validation is bounded; timed out processes are terminated.
+            let finished = DispatchSemaphore(value: 0)
+            task.terminationHandler = { _ in finished.signal() }
+            if !task.isRunning {
+                // Avoid racing terminationHandler installation for very fast checks.
+                return task.terminationStatus == 0
+            }
+            if finished.wait(timeout: .now() + 15) == .timedOut {
+                if task.isRunning { task.terminate() }
+                task.waitUntilExit()
+                return false
+            }
+            return task.terminationStatus == 0
+        } catch { return false }
     }
 
     @objc private func openSupport(_ sender: NSButton) {
