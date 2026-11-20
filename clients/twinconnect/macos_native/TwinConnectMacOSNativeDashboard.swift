@@ -416,12 +416,44 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             (snapshot?.servers.first { $0.id == activeServer }?.name ?? "Not selected"),
             size: 12, color: muted))
         selection.addArrangedSubview(text("Protocol: " +
-            (activeProtocol ?? "Not selected"), size: 12, color: muted))
+            (snapshot?.protocols.first { $0.code == activeProtocol }?.name ??
+                "Not selected"), size: 12, color: muted))
         content.addArrangedSubview(selection)
-        let power = card([content], radius: 28, padding: 23)
-        power.widthAnchor.constraint(equalTo: content.widthAnchor,
-                                     constant: 46).isActive = false
-        return power
+        let pickers = stack(.horizontal, spacing: 18)
+        let locationPicker = NSPopUpButton(frame: .zero, pullsDown: false)
+        locationPicker.addItem(withTitle: "Select location")
+        for item in snapshot?.servers ?? [] {
+            locationPicker.addItem(withTitle: flag(item.country) + "  " + item.name)
+            locationPicker.lastItem?.representedObject = item.id
+        }
+        if let selected = activeServer,
+           let match = locationPicker.itemArray.first(where: {
+               ($0.representedObject as? String) == selected
+           }) {
+            locationPicker.select(match)
+        }
+        locationPicker.target = self
+        locationPicker.action = #selector(changeQuickServer(_:))
+        locationPicker.widthAnchor.constraint(equalToConstant: 265).isActive = true
+        let protocolPicker = NSPopUpButton(frame: .zero, pullsDown: false)
+        protocolPicker.addItem(withTitle: "Select protocol")
+        for item in snapshot?.protocols ?? [] {
+            protocolPicker.addItem(withTitle: item.name)
+            protocolPicker.lastItem?.representedObject = item.code
+        }
+        if let selected = activeProtocol,
+           let match = protocolPicker.itemArray.first(where: {
+               ($0.representedObject as? String) == selected
+           }) {
+            protocolPicker.select(match)
+        }
+        protocolPicker.target = self
+        protocolPicker.action = #selector(changeQuickProtocol(_:))
+        protocolPicker.widthAnchor.constraint(equalToConstant: 230).isActive = true
+        pickers.addArrangedSubview(locationPicker)
+        pickers.addArrangedSubview(protocolPicker)
+        content.addArrangedSubview(pickers)
+        return card([content], radius: 28, padding: 23)
     }
 
     private func locationsPage() -> NSView {
@@ -660,6 +692,18 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
 
     @objc private func changeTab(_ sender: NSButton) {
         tab = sender.tag
+        view = build()
+    }
+
+    @objc private func changeQuickServer(_ sender: NSPopUpButton) {
+        activeServer = sender.selectedItem?.representedObject as? String
+        status = "Location selected. VPN connection remains unavailable."
+        view = build()
+    }
+
+    @objc private func changeQuickProtocol(_ sender: NSPopUpButton) {
+        activeProtocol = sender.selectedItem?.representedObject as? String
+        status = "Protocol selected. VPN connection remains unavailable."
         view = build()
     }
 
