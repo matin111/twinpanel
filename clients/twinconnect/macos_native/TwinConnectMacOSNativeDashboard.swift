@@ -69,6 +69,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     private var snapshot: TwinMacNativeSnapshot?
     private var status = ""
     private var busy = false
+    private var refreshGeneration = 0
     // Match Flutter sections: Quick connect / Locations / Settings / Account.
     private var tab = 0
     private var country = "All countries"
@@ -314,7 +315,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             workspace.addArrangedSubview(text(status, size: 11, color: muted))
         }
         workspace.addArrangedSubview(text(
-            "Live account data from your panel  •  macOS native graphics",
+            "Native macOS • panel data is read-only • VPN requires signed PacketTunnel",
             size: 11, color: muted))
         // Keep the dashboard visible even before the account snapshot arrives
         // or when its contents exceed the macOS window height.
@@ -381,6 +382,15 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         content.addArrangedSubview(separator())
         content.addArrangedSubview(text("Offline — no verified VPN",
                                         size: 11, color: amber))
+        if let data = snapshot {
+            content.addArrangedSubview(text(
+                "Panel API: \(data.sectionsLoaded.count)/4 sections",
+                size: 11, color: data.errors.isEmpty ? sea : amber))
+        } else {
+            content.addArrangedSubview(text(
+                "Panel login accepted • loading data",
+                size: 11, color: sea))
+        }
         content.addArrangedSubview(button("↻  Refresh",
                                           action: #selector(refresh(_:))))
         content.addArrangedSubview(button("Sign out",
@@ -469,6 +479,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         pickers.addArrangedSubview(locationPicker)
         pickers.addArrangedSubview(protocolPicker)
         content.addArrangedSubview(pickers)
+        content.addArrangedSubview(homeSubscriptionSummary())
         return card([content], radius: 28, padding: 23)
     }
 
@@ -495,6 +506,11 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         wrapper.addArrangedSubview(text(
             "Select a location to remember it in this window; VPN remains disabled.",
             size: 11, color: muted))
+        if let data = snapshot, let failure = data.errors["servers"] {
+            wrapper.addArrangedSubview(text(
+                "Server inventory unavailable: " + failure,
+                size: 12, color: amber))
+        }
         return card([wrapper])
     }
 
@@ -562,27 +578,41 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         let group = stack(spacing: 13)
         group.addArrangedSubview(text("Your subscription",
                                        size: 20, weight: .bold))
-        group.addArrangedSubview(pill(snapshot?.account.status ?? "Loading",
+        group.addArrangedSubview(pill(snapshot?.account?.status ?? "Account not loaded",
                                        color: muted))
         group.addArrangedSubview(text("User: " +
             (accountSession?.username ?? ""), color: muted))
         if let data = snapshot {
-            let used = ByteCountFormatter.string(fromByteCount:
-                data.account.usedBytes, countStyle: .file)
-            let limit = data.account.limitBytes == 0 ? "Unlimited" :
-                ByteCountFormatter.string(fromByteCount: data.account.limitBytes,
-                                          countStyle: .file)
-            let expiry = data.account.expiresAt.map {
-                DateFormatter.localizedString(from: $0, dateStyle: .medium,
-                                              timeStyle: .none)
-            } ?? "No fixed expiry"
             group.addArrangedSubview(separator())
-            group.addArrangedSubview(text("Plan: " + data.planName))
-            group.addArrangedSubview(text("Traffic: " + used + " / " + limit))
-            group.addArrangedSubview(text("Expires: " + expiry))
-            group.addArrangedSubview(text("Device limit: " + String(data.deviceLimit)))
-            group.addArrangedSubview(text("Allowed protocols: " +
-                String(data.protocols.count), color: muted))
+            group.addArrangedSubview(text("Plan: " + (data.planName ?? "Not available")))
+            group.addArrangedSubview(text("Device limit: " +
+                (data.deviceLimit.map { String($0) } ?? "—")))
+            if let account = data.account {
+                let used = ByteCountFormatter.string(fromByteCount:
+                    account.usedBytes, countStyle: .file)
+                let limit = account.limitBytes == 0 ? "Unlimited" :
+                    ByteCountFormatter.string(fromByteCount:
+                        account.limitBytes, countStyle: .file)
+                let expiry = account.expiresAt.map {
+                    DateFormatter.localizedString(from: $0, dateStyle: .medium,
+                                                  timeStyle: .none)
+                } ?? "No fixed expiry"
+                group.addArrangedSubview(text("Traffic: " + used + " / " + limit))
+                group.addArrangedSubview(text("Expires: " + expiry))
+            } else {
+                group.addArrangedSubview(text("Account: " +
+                    (data.errors["account"] ?? "Loading…"), color: amber))
+            }
+            if data.sectionsLoaded.contains("protocols") {
+                group.addArrangedSubview(text("Reported protocols: " +
+                    String(data.protocols.count) +
+                    (data.sectionsLoaded.contains("plan") ? "" : " • plan not verified"),
+                    color: muted))
+            }
+            if data.sectionsLoaded.contains("servers") {
+                group.addArrangedSubview(text("Assigned servers: " +
+                    String(data.servers.count), color: muted))
+            }
         } else {
             group.addArrangedSubview(text("Loading live account details…",
                                            color: muted))
@@ -590,6 +620,53 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         group.addArrangedSubview(button("↻ Refresh account",
                                         action: #selector(refresh(_:))))
         return card([group])
+    }
+
+    private func homeSubscriptionSummary() -> NSView {
+        let items = stack(spacing: 9)
+        items.addArrangedSubview(text("Subscription details",
+                                      size: 17, weight: .semibold))
+        if let data = snapshot {
+            if let account = data.account {
+                let used = ByteCountFormatter.string(fromByteCount:
+                    account.usedBytes, countStyle: .file)
+                let quota = account.limitBytes == 0 ? "Unlimited" :
+                    ByteCountFormatter.string(fromByteCount:
+                        account.limitBytes, countStyle: .file)
+                items.addArrangedSubview(text("Data usage: " + used + " / " + quota,
+                                              size: 13))
+                if account.limitBytes > 0 {
+                    let percent = min(100, Int(Double(account.usedBytes) /
+                        Double(account.limitBytes) * 100))
+                    let progress = NSProgressIndicator()
+                    progress.isIndeterminate = false
+                    progress.minValue = 0
+                    progress.maxValue = 100
+                    progress.doubleValue = Double(percent)
+                    progress.style = .bar
+                    progress.translatesAutoresizingMaskIntoConstraints = false
+                    progress.widthAnchor.constraint(equalToConstant: 370).isActive = true
+                    items.addArrangedSubview(progress)
+                }
+                let expiry = account.expiresAt.map {
+                    DateFormatter.localizedString(from: $0, dateStyle: .medium,
+                                                  timeStyle: .none)
+                } ?? "No fixed expiry"
+                items.addArrangedSubview(text("Expires: " + expiry, color: muted))
+            } else {
+                items.addArrangedSubview(text(
+                    "Account: " + (data.errors["account"] ?? "Loading…"),
+                    size: 12, color: amber))
+            }
+            items.addArrangedSubview(text(
+                "Plan: " + (data.planName ?? "Not available") +
+                "  •  Devices: " +
+                (data.deviceLimit.map { String($0) } ?? "—"), color: muted))
+        } else {
+            items.addArrangedSubview(text("Loading account information from the panel…",
+                                          color: muted))
+        }
+        return card([items], radius: 20, padding: 17)
     }
 
     private func filteredServers() -> [TwinMacNativeServer] {
@@ -673,24 +750,33 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     private func refreshData() {
         guard let current = accountSession, !busy else { return }
         busy = true
-        directory.loadSnapshot(current) { [weak self] result in
+        refreshGeneration += 1
+        let generation = refreshGeneration
+        status = "Retrieving panel data…"
+        directory.loadSnapshot(current) { [weak self] data in
             guard let self = self else { return }
-            guard self.accountSession?.accessToken == current.accessToken else { return }
-            self.busy = false
-            switch result {
-            case .failure(let error):
-                self.snapshot = nil
-                self.status = "Could not refresh panel data: " + error.localizedDescription
-                if error.localizedDescription == "APP_LOGIN_INVALID" ||
-                   error.localizedDescription == "APP_NOT_AUTHORIZED" {
-                    self.accountSession = nil
+            guard self.refreshGeneration == generation,
+                  self.accountSession?.accessToken == current.accessToken else {
+                return
+            }
+            self.snapshot = data
+            self.busy = !data.isComplete
+            let count = data.sectionsLoaded.count
+            if data.isComplete {
+                if data.errors.isEmpty {
+                    self.status = "Panel synchronized: 4 of 4 sections."
+                } else {
+                    let details = data.errors.keys.sorted().map { name in
+                        name + ": " + (data.errors[name] ?? "unavailable")
+                    }.joined(separator: " · ")
+                    self.status = "Panel: \(count)/4 sections loaded. " + details
                 }
-            case .success(let data):
-                self.snapshot = data
-                self.status = "Account and node information refreshed."
+            } else {
+                self.status = "Panel: \(count)/4 sections loaded…"
             }
             self.view = self.build()
-            NSLog("TwinConnect AppKit: refreshed dashboard; data available: %@", self.snapshot == nil ? "NO" : "YES")
+            NSLog("TwinConnect AppKit: panel sections loaded %d/4; completed: %@",
+                  count, data.isComplete ? "YES" : "NO")
         }
     }
 
@@ -701,6 +787,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     }
 
     @objc private func signOut(_ sender: NSButton) {
+        refreshGeneration += 1
         accountSession = nil
         snapshot = nil
         activeProtocol = nil
