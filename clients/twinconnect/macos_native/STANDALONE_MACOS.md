@@ -28,6 +28,41 @@ python3 macos_native/standalone_connection_manager.py list
 python3 -m unittest -v macos_native/test_standalone_connection_manager.py
 ```
 
+## Prepare an existing profile without editing server credentials
+
+For Xray or sing-box **client JSON** (not the server-side inbound
+configuration), the preparation tool strips the old TUN inbound, system DNS
+and routing rules, creates a private per-request loopback SOCKS/mixed
+profile, and leaves remote outbounds, secrets, TLS and transport data intact.
+Do not paste client secrets into chat or GitHub issues.
+
+```sh
+python3 macos_native/prepare_standalone_profile.py \
+  hysteria2 /path/to/private-existing-client.json --port 10808
+```
+
+The command prints a **local prepared JSON path**. Use that returned path
+to start the matching engine (never commit that private file):
+
+```sh
+python3 macos_native/standalone_connection_manager.py \
+  start hysteria2 '/Users/macvps/Library/Application Support/TwinConnect/standalone/prepared/YOUR_GENERATED_FILE.json'
+python3 macos_native/standalone_connection_manager.py probe
+python3 macos_native/standalone_connection_manager.py stop
+```
+
+Supported preparation protocol codes are `v2ray`, `hysteria2`,
+`tuic`, `anytls`, `naive`, `shadowtls`, `snell`, `socks5`.
+The selected outbound must be explicitly tagged in sing-box. ShadowTLS
+requires its paired Shadowsocks outbound using `detour`. The generated
+minimal routing deliberately selects the matching remote outbound,
+rather than a direct outbound. Some profiles need additional DNS or
+routing options and can be rejected by the native engine: fix these in
+the **test copy**, not the existing account configuration.
+
+This verifies only the selected application's proxied HTTPS request.
+Other macOS apps remain on the original network route.
+
 Install the required engine binary using the existing repository tooling.
 Pass a **local file on disk**, containing the actual account's JSON config,
 with **exactly one** loopback SOCKS, HTTP or mixed inbound, and an outbound
