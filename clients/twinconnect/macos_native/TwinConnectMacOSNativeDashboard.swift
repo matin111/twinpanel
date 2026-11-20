@@ -81,6 +81,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     private var locationRowIDs = [String]()
     private var locationSearch = ""
     private var protocolChipCodes = [String?]()
+    private var showAllProtocolChips = false
     private var activeProtocol: String?
     private var activeServer: String?
     private var nodePingResults = [String: TwinMacNativePingResult]()
@@ -895,11 +896,26 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             ?? code.uppercased()
     }
 
+    private func friendlyServerName(_ server: TwinMacNativeServer,
+                                    index: Int) -> String {
+        let trimmed = server.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let code = server.country.lowercased()
+        let plain = trimmed.lowercased()
+        if plain == code || plain == countryName(code).lowercased() ||
+           plain == "server" || plain.isEmpty {
+            return countryName(code) + "  ·  Server " + String(index + 1)
+        }
+        return trimmed
+    }
+
     private func protocolChips() -> NSView {
         let list = snapshot?.protocols ?? []
-        protocolChipCodes = [nil] + list.map { Optional($0.code) }
+        let favorites = Set(["hysteria2", "v2ray", "wireguard", "openvpn"])
         let options = [("All", Optional<String>.none)] +
-            list.map { ($0.name, Optional($0.code)) }
+            list.filter { showAllProtocolChips || favorites.contains($0.code) ||
+                          $0.code == activeProtocol }
+                .map { ($0.name, Optional($0.code)) }
+        protocolChipCodes = options.map { $0.1 }
         let group = stack(spacing: 7)
         group.alignment = .leading
         // Use the same horizontal, wrapping protocol pills as Flutter.
@@ -932,6 +948,14 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         }
         group.addArrangedSubview(row)
         row.widthAnchor.constraint(equalTo: group.widthAnchor).isActive = true
+        if list.count > options.count - 1 || showAllProtocolChips {
+            let more = button(showAllProtocolChips ? "Show fewer protocols  ⌃" :
+                              "All protocols (" + String(list.count) + ")  ⌄",
+                              action: #selector(toggleAllProtocolChips(_:)),
+                              mutedButton: true)
+            more.heightAnchor.constraint(equalToConstant: 33).isActive = true
+            group.addArrangedSubview(more)
+        }
         return group
     }
 
@@ -1049,14 +1073,15 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             header.widthAnchor.constraint(equalTo: group.widthAnchor).isActive = true
 
             if expanded {
-                for server in items {
+                for (position, server) in items.enumerated() {
                     let serverIndex = locationRowIDs.firstIndex(of: server.id) ?? -1
                     let selected = activeServer == server.id
                     let stateColor = server.online ? sea : muted
 
                     let info = stack(spacing: 6)
                     info.alignment = .leading
-                    let name = text(server.name, size: 14, weight: .semibold)
+                    let name = text(friendlyServerName(server, index: position),
+                                    size: 14, weight: .semibold)
                     name.lineBreakMode = .byTruncatingTail
                     name.maximumNumberOfLines = 1
                     name.toolTip = server.name
@@ -1707,6 +1732,11 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
 
     @objc private func searchLocations(_ sender: NSSearchField) {
         locationSearch = sender.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        view = build()
+    }
+
+    @objc private func toggleAllProtocolChips(_ sender: NSButton) {
+        showAllProtocolChips.toggle()
         view = build()
     }
 
