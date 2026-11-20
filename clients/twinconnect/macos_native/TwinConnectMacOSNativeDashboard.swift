@@ -1733,8 +1733,13 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         let root = NSHomeDirectory() +
             "/twinpanel/clients/twinconnect"
         let manager = root + "/macos_native/standalone_connection_manager.py"
+        #if arch(arm64)
+        let archName = "arm64"
+        #else
+        let archName = "amd64"
+        #endif
         let executable = root + "/macos_native/build/singbox/" +
-            (ProcessInfo.processInfo.machineArchitecture) + "/sing-box"
+            archName + "/sing-box"
         guard FileManager.default.isExecutableFile(atPath: executable),
               FileManager.default.fileExists(atPath: manager) else {
             return "Proxy engine not installed on this Mac"
