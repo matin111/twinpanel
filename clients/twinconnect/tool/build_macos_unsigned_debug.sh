@@ -8,6 +8,9 @@ cd "$(dirname "$0")/.."
 workspace="macos/Runner.xcworkspace"
 test -d "$workspace" || { echo "Missing macOS workspace" >&2; exit 1; }
 log="${TWINCONNECT_BUILD_LOG:-$HOME/twinconnect-unsigned-macos-build.log}"
+if [ "${TWINCONNECT_SKIP_APPKIT_RELINK:-0}" != "1" ]; then
+  ruby tool/link_macos_tracked_appkit_sources.rb
+fi
 if xcodebuild \
   -workspace "$workspace" \
   -scheme Runner \
@@ -18,6 +21,7 @@ if xcodebuild \
   build > "$log" 2>&1; then
   echo 'UNSIGNED BUILD SUCCEEDED (VPN extension not provisioned)'
   echo "Build log: $log"
+  echo "NOTE: use the actual Runner.app output path; do not open Index.noindex copies."
 else
   code=$?
   echo "UNSIGNED BUILD FAILED (exit $code)" >&2
