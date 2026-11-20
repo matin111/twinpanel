@@ -14,6 +14,47 @@ private final class TwinNativeBackdrop: NSView {
     // All highlights derive from the authenticated panel theme.
     var base = NSColor(calibratedRed: 0.032, green: 0.11, blue: 0.145, alpha: 1)
     var glow = NSColor(calibratedRed: 0.10, green: 0.47, blue: 0.55, alpha: 1)
+    private let ambientAura = CAGradientLayer()
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        wantsLayer = true
+        layer?.masksToBounds = true
+        ambientAura.type = .radial
+        ambientAura.startPoint = CGPoint(x: 0.73, y: 0.79)
+        ambientAura.endPoint = CGPoint(x: 1.40, y: 1.37)
+        ambientAura.locations = [0, 0.45, 1]
+        ambientAura.opacity = 0.20
+        layer?.insertSublayer(ambientAura, at: 0)
+    }
+
+    required init?(coder: NSCoder) { return nil }
+
+    func beginAmbientMotion() {
+        // Ambient motion is decoration ONLY. It is not a fake VPN handshake,
+        // download activity, or an offline "connected" animation.
+        ambientAura.colors = [
+            glow.withAlphaComponent(0.30).cgColor,
+            glow.withAlphaComponent(0.12).cgColor,
+            glow.withAlphaComponent(0).cgColor
+        ]
+        guard !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion,
+              ambientAura.animation(forKey: "ambientBreath") == nil
+        else { return }
+        let breathe = CABasicAnimation(keyPath: "opacity")
+        breathe.fromValue = 0.12
+        breathe.toValue = 0.36
+        breathe.duration = 9
+        breathe.autoreverses = true
+        breathe.repeatCount = .infinity
+        breathe.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        ambientAura.add(breathe, forKey: "ambientBreath")
+    }
+
+    override func layout() {
+        super.layout()
+        ambientAura.frame = bounds
+    }
 
     private func radialLight(_ context: CGContext, center: CGPoint,
                              radius: CGFloat, tint: NSColor, opacity: CGFloat) {
@@ -593,6 +634,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         root.base = configuredBackground.blended(
             withFraction: 0.19, of: tint()) ?? base
         root.glow = tint()
+        root.beginAmbientMotion()
         if accountSession == nil {
             buildLogin(in: root)
         } else {
