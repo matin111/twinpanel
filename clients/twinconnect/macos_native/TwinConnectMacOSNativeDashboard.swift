@@ -867,8 +867,11 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         let selectedLocation = snapshot?.servers.first { $0.id == activeServer }
         let selectedFlag = selectedLocation.map { flag($0.country) } ?? "🌐"
         for (index, label) in navs.enumerated() {
+            // Center the whole icon + label group inside each navigation
+            // card. Leading alignment plus whitespace in the title pushed
+            // all labels against the left edge on Catalina.
             let buttonTitle = index == 1 ?
-                "   " + selectedFlag + "     Locations" : "     " + label
+                selectedFlag + "   Locations" : label
             let control = button(buttonTitle,
                 action: #selector(changeTab(_:)), tag: index,
                 primary: tab == index, mutedButton: true)
@@ -878,7 +881,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                 control.imageScaling = .scaleProportionallyDown
                 control.contentTintColor = tab == index ? NSColor.white : sea
             }
-            control.alignment = .left
+            control.alignment = .center
             control.font = NSFont.systemFont(ofSize: 13, weight: .semibold)
             control.heightAnchor.constraint(equalToConstant: 54).isActive = true
             control.layer?.cornerRadius = 16
