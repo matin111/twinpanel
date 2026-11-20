@@ -100,23 +100,15 @@ class MacStandalonePanelProfile {
       throw const FormatException('MAC_STANDALONE_LOCAL_PORT_INVALID');
     }
 
-    final Map<String, dynamic> signedTunnelConfig;
-    switch (protocolCode) {
-      case 'hysteria2':
-        signedTunnelConfig = SingBoxMacConfig.composeHysteria2(item: item);
-      case 'tuic':
-        signedTunnelConfig = SingBoxMacConfig.composeTuic(item: item);
-      case 'anytls':
-        signedTunnelConfig = SingBoxMacConfig.composeAnyTls(item: item);
-      case 'naive':
-        signedTunnelConfig = SingBoxMacConfig.composeNaive(item: item);
-      case 'snell':
-        signedTunnelConfig = SingBoxMacConfig.composeSnell(item: item);
-      case 'socks5':
-        signedTunnelConfig = SingBoxMacConfig.composeSocks5(item: item);
-      default:
-        throw const FormatException('MAC_STANDALONE_ENGINE_NOT_INTEGRATED');
-    }
+    final signedTunnelConfig = switch (protocolCode) {
+      'hysteria2' => SingBoxMacConfig.composeHysteria2(item: item),
+      'tuic' => SingBoxMacConfig.composeTuic(item: item),
+      'anytls' => SingBoxMacConfig.composeAnyTls(item: item),
+      'naive' => SingBoxMacConfig.composeNaive(item: item),
+      'snell' => SingBoxMacConfig.composeSnell(item: item),
+      'socks5' => SingBoxMacConfig.composeSocks5(item: item),
+      _ => throw const FormatException('MAC_STANDALONE_ENGINE_NOT_INTEGRATED'),
+    };
 
     final outboundRows = signedTunnelConfig['outbounds'];
     if (outboundRows is! List || outboundRows.length != 1 ||
