@@ -128,7 +128,17 @@ class MetalFallbackInstallTests(unittest.TestCase):
         # Regression: a login must show the AppKit dashboard even if
         # subscription refresh fails or takes time. Layout must not collapse.
         self.assertIn("sidebar.translatesAutoresizingMaskIntoConstraints = false", generated)
-        self.assertIn("workspace.alignment = .width", generated)
+        self.assertIn("workspace.alignment = .leading", generated)
+        self.assertIn("column.alignment = .leading", generated)
+        self.assertNotIn(".alignment = .width", generated)
+        self.assertIn("result.alignment = axis == .vertical ? .leading : .centerY", generated)
+        self.assertIn("func addPage(_ page: NSView)", generated)
+        self.assertIn("page.widthAnchor.constraint(equalTo: workspace.widthAnchor)", generated)
+        self.assertIn("row.widthAnchor.constraint(equalTo: wrapper.widthAnchor)", generated)
+        self.assertIn("killSwitch.widthAnchor.constraint(equalTo: section.widthAnchor)", generated)
+        self.assertIn("heroCard.widthAnchor.constraint(equalTo: content.widthAnchor)", generated)
+        self.assertIn("reservedCard.widthAnchor.constraint(equalTo: content.widthAnchor)", generated)
+        self.assertIn("usageCard.widthAnchor.constraint(equalTo: items.widthAnchor)", generated)
         self.assertIn("scroll.hasVerticalScroller = true", generated)
         self.assertIn("scroll.documentView = document", generated)
         self.assertIn("document.widthAnchor.constraint(equalTo: scroll.contentView.widthAnchor)", generated)
