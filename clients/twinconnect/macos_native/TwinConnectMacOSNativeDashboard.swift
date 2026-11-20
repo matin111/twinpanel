@@ -481,9 +481,18 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         let headerSpace = NSView()
         headerSpace.setContentHuggingPriority(.defaultLow, for: .horizontal)
         heading.addArrangedSubview(headerSpace)
-        heading.addArrangedSubview(pill("● Offline", color: muted))
-        workspace.addArrangedSubview(heading)
-        heading.widthAnchor.constraint(equalTo: workspace.widthAnchor).isActive = true
+        // The Windows reference has its only offline badge above the hero,
+        // not a duplicate badge in the page title.
+        // Keep the title outside the scroll view so it never scrolls offscreen.
+        root.addSubview(heading)
+        heading.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            heading.leadingAnchor.constraint(equalTo: sidebar.trailingAnchor,
+                                             constant: 24),
+            heading.trailingAnchor.constraint(equalTo: root.trailingAnchor,
+                                              constant: -24),
+            heading.topAnchor.constraint(equalTo: root.topAnchor, constant: 21)
+        ])
         // NSStackView's .width alignment equalizes widths without fixing
         // horizontal origins. That caused Locations, Settings, and Account
         // panels to collect along the right edge of the macOS viewport.
@@ -537,16 +546,17 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             workspace.trailingAnchor.constraint(equalTo: document.trailingAnchor,
                                                 constant: -24),
             workspace.topAnchor.constraint(equalTo: document.topAnchor,
-                                           constant: 24),
+                                           constant: 4),
             workspace.bottomAnchor.constraint(equalTo: document.bottomAnchor,
-                                              constant: -24)
+                                              constant: -18)
         ])
         scroll.documentView = document
         root.addSubview(scroll)
         NSLayoutConstraint.activate([
             scroll.leadingAnchor.constraint(equalTo: sidebar.trailingAnchor),
             scroll.trailingAnchor.constraint(equalTo: root.trailingAnchor),
-            scroll.topAnchor.constraint(equalTo: root.topAnchor),
+            scroll.topAnchor.constraint(equalTo: heading.bottomAnchor,
+                                          constant: 11),
             scroll.bottomAnchor.constraint(equalTo: root.bottomAnchor),
             document.widthAnchor.constraint(equalTo: scroll.contentView.widthAnchor),
             document.heightAnchor.constraint(greaterThanOrEqualTo:
