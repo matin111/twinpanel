@@ -35,6 +35,24 @@ private final class TwinNativeBackdrop: NSView {
     }
 }
 
+private final class TwinNativePremiumButton: NSButton {
+    private let accentGradient = CAGradientLayer()
+    func setAccentGradient(_ top: NSColor, _ bottom: NSColor) {
+        wantsLayer = true
+        accentGradient.colors = [top.cgColor, bottom.cgColor]
+        accentGradient.startPoint = CGPoint(x: 0, y: 0.5)
+        accentGradient.endPoint = CGPoint(x: 1, y: 0.5)
+        accentGradient.cornerRadius = layer?.cornerRadius ?? 14
+        accentGradient.frame = bounds
+        layer?.insertSublayer(accentGradient, at: 0)
+    }
+    override func layout() {
+        super.layout()
+        accentGradient.frame = bounds
+        accentGradient.cornerRadius = layer?.cornerRadius ?? 14
+    }
+}
+
 // Uses Core Animation's vector gradient, not a raster image or Metal shader.
 // Keeps the Windows-style translucent depth on macOS cloud hosts without Metal.
 private final class TwinNativeGlassCard: NSView {
@@ -315,7 +333,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     private func button(_ title: String, action: Selector, tag: Int = 0,
                         primary: Bool = false, mutedButton: Bool = false)
                         -> NSButton {
-        let control = NSButton(title: title, target: self, action: action)
+        let control = TwinNativePremiumButton(title: title, target: self,
+                                               action: action)
         control.isBordered = false
         control.bezelStyle = .rounded
         control.tag = tag
@@ -334,6 +353,12 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             sea.withAlphaComponent(0.82).cgColor :
             NSColor(calibratedRed: 0.51, green: 0.77,
                     blue: 0.83, alpha: 0.40).cgColor
+        if primary {
+            control.setAccentGradient(
+                tint().blended(withFraction: 0.18, of: .white) ?? tint(),
+                NSColor(calibratedRed: 0.21, green: 0.58,
+                        blue: 0.58, alpha: 1))
+        }
         control.attributedTitle = NSAttributedString(
             string: title,
             attributes: [.foregroundColor: color,
@@ -789,6 +814,10 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         connect.heightAnchor.constraint(equalToConstant: 54).isActive = true
         connect.layer?.cornerRadius = 17
         connect.layer?.borderColor = sea.withAlphaComponent(0.9).cgColor
+        connect.layer?.shadowColor = sea.cgColor
+        connect.layer?.shadowOpacity = 0.17
+        connect.layer?.shadowRadius = 10
+        connect.layer?.shadowOffset = CGSize(width: 0, height: -2)
         connect.widthAnchor.constraint(equalToConstant: 255).isActive = true
         // On unsigned cloud Macs the system VPN remains disabled. Offer a
         // separate, explicitly labelled, one-request local SOCKS egress test.
