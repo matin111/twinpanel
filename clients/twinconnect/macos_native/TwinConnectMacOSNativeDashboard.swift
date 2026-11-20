@@ -660,6 +660,34 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             NSRect(x: 0, y: 0, width: 330, height: 165))
         fabric.translatesAutoresizingMaskIntoConstraints = false
         fabric.heightAnchor.constraint(equalToConstant: 165).isActive = true
+        // The old backdrop was an empty rectangle. This status overlay is
+        // explicitly a selectable local proxy test, not a connected VPN.
+        let fabricInfo = stack(spacing: 9)
+        fabricInfo.alignment = .centerX
+        let heroIcon = text("◎", size: 33, weight: .light, color: sea)
+        heroIcon.alignment = .center
+        fabricInfo.addArrangedSubview(heroIcon)
+        let heroTitle = text("LOCAL PROXY TEST", size: 13,
+                             weight: .bold, color: .white)
+        heroTitle.alignment = .center
+        fabricInfo.addArrangedSubview(heroTitle)
+        let previewServer = snapshot?.servers.first { $0.id == activeServer }
+        let preview = previewServer.map {
+            flag($0.country) + " " + countryName($0.country) +
+            "  ·  " + (activeProtocol ?? "Choose protocol")
+        } ?? "Choose a server in Locations"
+        let heroSubtitle = text(preview, size: 11, color: muted)
+        heroSubtitle.alignment = .center
+        fabricInfo.addArrangedSubview(heroSubtitle)
+        fabric.addSubview(fabricInfo)
+        NSLayoutConstraint.activate([
+            fabricInfo.centerXAnchor.constraint(equalTo: fabric.centerXAnchor),
+            fabricInfo.centerYAnchor.constraint(equalTo: fabric.centerYAnchor),
+            fabricInfo.leadingAnchor.constraint(
+                greaterThanOrEqualTo: fabric.leadingAnchor, constant: 12),
+            fabricInfo.trailingAnchor.constraint(
+                lessThanOrEqualTo: fabric.trailingAnchor, constant: -12)
+        ])
         main.addArrangedSubview(fabric)
         fabric.widthAnchor.constraint(equalTo: main.widthAnchor).isActive = true
 
@@ -706,7 +734,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
 
         let selectedServer = snapshot?.servers.first { $0.id == activeServer }
         let location = selectedServer.map {
-            flag($0.country) + " " + countryName($0.country) + " · " + $0.name
+            flag($0.country) + " " + countryName($0.country)
         } ?? "Choose location"
         let protocolName = snapshot?.protocols.first {
             $0.code == activeProtocol
@@ -781,7 +809,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         traffic.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
 
         let location = selected.map {
-            flag($0.country) + "  " + countryName($0.country) + " · " + $0.name
+            flag($0.country) + "  " + countryName($0.country)
         } ?? "Select location"
         let change = button(location + "                   Locations  ›",
             action: #selector(showLocations(_:)), mutedButton: true)
