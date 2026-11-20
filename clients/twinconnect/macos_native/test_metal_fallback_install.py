@@ -327,6 +327,22 @@ class MetalFallbackInstallTests(unittest.TestCase):
         self.assertIn('networkMetric("Public IP", value: "—")', source)
         self.assertNotIn('pill("Tunnel active", color: sea)', source)
 
+    def test_emergency_stop_and_offline_animation_are_safe(self) -> None:
+        source = (SOURCE / "TwinConnectMacOSNativeDashboard.swift").read_text(
+            encoding="utf-8"
+        )
+        for token in (
+            'var tunnelConnected = false',
+            'guard tunnelConnected else { return }',
+            '"■  Stop local proxy"',
+            '#selector(stopLocalProxyNow(_:))',
+            'private func stopLocalProxyNow',
+            'self.runLocalManager(["stop"], root: root)',
+            'Local proxy stopped. System VPN remains offline.',
+        ):
+            self.assertIn(token, source)
+        self.assertNotIn('fabric.tunnelConnected = true', source)
+
     def test_windows_visual_parity_has_vector_hero_and_real_network_state(self) -> None:
         source = (SOURCE / "TwinConnectMacOSNativeDashboard.swift").read_text(
             encoding="utf-8"
