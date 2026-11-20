@@ -514,6 +514,21 @@ class MetalFallbackInstallTests(unittest.TestCase):
         self.assertIn("link.setAccentGradient(", sidebar)
         self.assertNotIn("-> NSButton {\n        let control = TwinNativePremiumButton", source)
 
+    def test_sidebar_navigation_labels_are_centered_not_left_aligned(self) -> None:
+        source = (SOURCE / "TwinConnectMacOSNativeDashboard.swift").read_text(
+            encoding="utf-8"
+        )
+        sidebar = source.split("    private func buildSidebar() -> NSView {", 1)[1].split(
+            "    private func connectPage() -> NSView {", 1
+        )[0]
+        nav = sidebar.split('let navs = ["Quick connect"', 1)[1].split(
+            "let quick = stack(", 1
+        )[0]
+        self.assertIn('selectedFlag + "   Locations" : label', nav)
+        self.assertIn('control.alignment = .center', nav)
+        self.assertNotIn('control.alignment = .left', nav)
+        self.assertNotIn('"     " + label', nav)
+
     def test_sidebar_matches_windows_navigation_and_country_flag(self) -> None:
         source = (SOURCE / "TwinConnectMacOSNativeDashboard.swift").read_text(
             encoding="utf-8"
@@ -524,7 +539,8 @@ class MetalFallbackInstallTests(unittest.TestCase):
         for token in (
             'let selectedLocation = snapshot?.servers.first { $0.id == activeServer }',
             'let selectedFlag = selectedLocation.map { flag($0.country) } ?? "🌐"',
-            '"   " + selectedFlag + "     Locations"',
+            'selectedFlag + "   Locations" : label',
+            'control.alignment = .center',
             'if index != 1 {',
             'control.setAccentGradient(',
             'link.setAccentGradient(',
