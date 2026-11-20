@@ -168,7 +168,7 @@ class StandaloneManagerTests(unittest.TestCase):
                              "ENGINE_REMOTE_CONNECTION_REFUSED")
             logfile.write_text("tls: x509: certificate signed by unknown authority\n")
             self.assertEqual(manager.engine_failure_category(),
-                             "ENGINE_REMOTE_TLS_CERTIFICATE_FAILURE")
+                             "TLS_CERTIFICATE_UNTRUSTED_CA")
 
     def test_start_truncates_stale_engine_log(self):
         log = self.root / "engine.log"
