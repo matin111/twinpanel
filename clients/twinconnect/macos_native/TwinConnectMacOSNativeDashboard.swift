@@ -113,19 +113,39 @@ private final class TwinNativeBackdrop: NSView {
 
 private final class TwinNativePremiumButton: NSButton {
     private let accentGradient = CAGradientLayer()
+    private let glassEdge = CAGradientLayer()
+    private var glassLayersAttached = false
+
     func setAccentGradient(_ top: NSColor, _ bottom: NSColor) {
         wantsLayer = true
+        // A transparent gradient cannot look like glass if the parent layer
+        // carries the old opaque button paint underneath it.
+        layer?.backgroundColor = NSColor.clear.cgColor
         accentGradient.colors = [top.cgColor, bottom.cgColor]
-        accentGradient.startPoint = CGPoint(x: 0, y: 0.5)
-        accentGradient.endPoint = CGPoint(x: 1, y: 0.5)
-        accentGradient.cornerRadius = layer?.cornerRadius ?? 14
-        accentGradient.frame = bounds
-        layer?.insertSublayer(accentGradient, at: 0)
+        accentGradient.startPoint = CGPoint(x: 0, y: 1)
+        accentGradient.endPoint = CGPoint(x: 1, y: 0)
+        accentGradient.locations = [0, 1]
+        glassEdge.colors = [
+            NSColor.white.withAlphaComponent(0.35).cgColor,
+            NSColor.white.withAlphaComponent(0.025).cgColor
+        ]
+        glassEdge.startPoint = CGPoint(x: 0, y: 0.5)
+        glassEdge.endPoint = CGPoint(x: 1, y: 0.5)
+        if !glassLayersAttached {
+            layer?.insertSublayer(accentGradient, at: 0)
+            layer?.insertSublayer(glassEdge, above: accentGradient)
+            glassLayersAttached = true
+        }
+        needsLayout = true
     }
+
     override func layout() {
         super.layout()
+        let radius = layer?.cornerRadius ?? 14
         accentGradient.frame = bounds
-        accentGradient.cornerRadius = layer?.cornerRadius ?? 14
+        accentGradient.cornerRadius = radius
+        glassEdge.frame = NSRect(x: 1, y: max(0, bounds.height - 1.5),
+                                width: max(0, bounds.width - 2), height: 1)
     }
 }
 
@@ -519,15 +539,10 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         control.layer?.borderWidth = 1
         let color = primary ? NSColor.white :
             NSColor(calibratedWhite: 0.94, alpha: 1)
-        let background = primary
-            ? tint().withAlphaComponent(0.86)
-            : NSColor(calibratedRed: 0.16, green: 0.29,
-                      blue: 0.34, alpha: mutedButton ? 0.72 : 0.91)
-        control.layer?.backgroundColor = background.cgColor
-        control.layer?.borderColor = primary ?
-            sea.withAlphaComponent(0.82).cgColor :
-            NSColor(calibratedRed: 0.51, green: 0.77,
-                    blue: 0.83, alpha: 0.40).cgColor
+        // Never paint an opaque backing behind translucent button glass.
+        control.layer?.backgroundColor = NSColor.clear.cgColor
+        control.layer?.borderColor = tint().withAlphaComponent(
+            primary ? 0.53 : 0.25).cgColor
         // Every clickable surface is glass, and all chroma comes from the
         // authenticated panel brand rather than a hard-coded cyan scheme.
         let brand = tint()
@@ -539,8 +554,9 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             (brand.blended(withFraction: 0.18, of: .black) ?? brand) :
             (NSColor(calibratedRed: 0.09, green: 0.17, blue: 0.22, alpha: 1)
                 .blended(withFraction: 0.22, of: brand) ?? brand)
-        control.setAccentGradient(upper.withAlphaComponent(0.72),
-                                  lower.withAlphaComponent(0.65))
+        control.setAccentGradient(
+            upper.withAlphaComponent(primary ? 0.64 : 0.36),
+            lower.withAlphaComponent(primary ? 0.52 : 0.27))
         control.layer?.borderColor = brand.withAlphaComponent(
             primary ? 0.74 : 0.38).cgColor
         control.attributedTitle = NSAttributedString(
@@ -952,17 +968,19 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             if tab == index {
                 control.setAccentGradient(
                     (tint().blended(withFraction: 0.26, of: .white) ?? tint())
-                        .withAlphaComponent(0.84),
+                        .withAlphaComponent(0.70),
                     (tint().blended(withFraction: 0.16, of: .black) ?? tint())
-                        .withAlphaComponent(0.76))
-                control.layer?.borderColor = sea.withAlphaComponent(0.83).cgColor
+                        .withAlphaComponent(0.54))
+                control.layer?.borderColor = tint().withAlphaComponent(0.48).cgColor
             } else {
                 control.setAccentGradient(
-                    NSColor(calibratedRed: 0.14, green: 0.25, blue: 0.30, alpha: 1)
-                        .blended(withFraction: 0.30, of: tint()) ?? tint(),
-                    NSColor(calibratedRed: 0.09, green: 0.17, blue: 0.21, alpha: 1)
+                    (NSColor(calibratedRed: 0.14, green: 0.25, blue: 0.30, alpha: 1)
+                        .blended(withFraction: 0.30, of: tint()) ?? tint())
+                        .withAlphaComponent(0.38),
+                    (NSColor(calibratedRed: 0.09, green: 0.17, blue: 0.21, alpha: 1)
                         .blended(withFraction: 0.19, of: tint()) ?? tint())
-                control.layer?.borderColor = sea.withAlphaComponent(0.36).cgColor
+                        .withAlphaComponent(0.26))
+                control.layer?.borderColor = tint().withAlphaComponent(0.22).cgColor
             }
             content.addArrangedSubview(control)
             control.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
@@ -985,10 +1003,12 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             link.layer?.cornerRadius = 12
             link.layer?.borderColor = sea.withAlphaComponent(0.35).cgColor
             link.setAccentGradient(
-                NSColor(calibratedRed: 0.15, green: 0.27, blue: 0.32, alpha: 1)
-                    .blended(withFraction: 0.32, of: tint()) ?? tint(),
-                NSColor(calibratedRed: 0.09, green: 0.19, blue: 0.23, alpha: 1)
+                (NSColor(calibratedRed: 0.15, green: 0.27, blue: 0.32, alpha: 1)
+                    .blended(withFraction: 0.32, of: tint()) ?? tint())
+                    .withAlphaComponent(0.39),
+                (NSColor(calibratedRed: 0.09, green: 0.19, blue: 0.23, alpha: 1)
                     .blended(withFraction: 0.20, of: tint()) ?? tint())
+                    .withAlphaComponent(0.27))
             quick.addArrangedSubview(link)
         }
         if accountSession?.supportURL != nil ||
