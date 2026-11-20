@@ -134,7 +134,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     private var locationRowIDs = [String]()
     private var locationSearch = ""
     private var protocolChipCodes = [String?]()
-    private var showAllProtocolChips = false
+    private var showAllProtocolChips = true
     private var activeProtocol: String?
     private var activeServer: String?
     private var nodePingResults = [String: TwinMacNativePingResult]()
@@ -1201,23 +1201,36 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             let group = stack(spacing: 12)
             group.alignment = .leading
 
-            let header = button(
-                flag(code) + "   " + countryName(code) +
-                "     ·     " + String(items.count) +
-                (items.count == 1 ? " server" : " servers") +
-                (selectedHere ? "     ✓ Selected" : "") +
-                (expanded ? "       ⌃" : "       ⌄"),
-                action: #selector(toggleLocationCountry(_:)), tag: countryIndex,
-                primary: false, mutedButton: true)
-            header.alignment = .left
-            header.font = NSFont.systemFont(ofSize: 14, weight: .semibold)
-            header.heightAnchor.constraint(equalToConstant: 54).isActive = true
-            header.layer?.cornerRadius = 14
-            header.layer?.borderColor = (selectedHere ? sea : tint())
-                .withAlphaComponent(selectedHere ? 0.65 : 0.18).cgColor
-            group.addArrangedSubview(header)
-            header.widthAnchor.constraint(equalTo: group.widthAnchor).isActive = true
-
+            let countryHeader = stack(.horizontal, spacing: 10)
+            countryHeader.alignment = .centerY
+            let countryFlag = text(flag(code), size: 22, weight: .medium)
+            countryHeader.addArrangedSubview(countryFlag)
+            let countryInfo = stack(spacing: 4)
+            countryInfo.alignment = .leading
+            countryInfo.addArrangedSubview(text(countryName(code), size: 14,
+                                                weight: .semibold))
+            countryInfo.addArrangedSubview(text(
+                String(items.count) + (items.count == 1 ? " server" : " servers") +
+                (selectedHere ? "    ·    Selected" : ""),
+                size: 10, color: selectedHere ? sea : muted))
+            countryHeader.addArrangedSubview(countryInfo)
+            let headerSpacer = NSView()
+            headerSpacer.setContentHuggingPriority(.defaultLow,
+                                                   for: .horizontal)
+            countryHeader.addArrangedSubview(headerSpacer)
+            let expand = button(expanded ? "⌃" : "⌄",
+                                action: #selector(toggleLocationCountry(_:)),
+                                tag: countryIndex, mutedButton: true)
+            expand.widthAnchor.constraint(equalToConstant: 40).isActive = true
+            expand.heightAnchor.constraint(equalToConstant: 34).isActive = true
+            expand.toolTip = (expanded ? "Collapse " : "Expand ") + countryName(code)
+            countryHeader.addArrangedSubview(expand)
+            let headerCard = card([countryHeader], radius: 15, padding: 12)
+            headerCard.layer?.borderColor = (selectedHere ? sea : tint())
+                .withAlphaComponent(selectedHere ? 0.67 : 0.22).cgColor
+            group.addArrangedSubview(headerCard)
+            headerCard.widthAnchor.constraint(equalTo: group.widthAnchor)
+                .isActive = true
             if expanded {
                 for (position, server) in items.enumerated() {
                     let serverIndex = locationRowIDs.firstIndex(of: server.id) ?? -1
