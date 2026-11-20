@@ -870,19 +870,42 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             // Center the whole icon + label group inside each navigation
             // card. Leading alignment plus whitespace in the title pushed
             // all labels against the left edge on Catalina.
-            let buttonTitle = index == 1 ?
-                selectedFlag + "   Locations" : label
-            let control = button(buttonTitle,
+            // NSButton's imageLeft cell keeps the image anchored to the
+            // leading edge even when its title is centered. Use one centered
+            // overlay for BOTH glyph and text, preserving the real button hit
+            // target and accessibility title.
+            let control = button(label,
                 action: #selector(changeTab(_:)), tag: index,
                 primary: tab == index, mutedButton: true)
-            if index != 1 {
-                control.image = sidebarIcon(index)
-                control.imagePosition = .imageLeft
-                control.imageScaling = .scaleProportionallyDown
-                control.contentTintColor = tab == index ? NSColor.white : sea
+            control.title = ""
+            control.attributedTitle = NSAttributedString(string: "")
+            control.setAccessibilityLabel(label)
+            let centeredLabel = stack(.horizontal, spacing: 12)
+            centeredLabel.alignment = .centerY
+            if index == 1 {
+                centeredLabel.addArrangedSubview(
+                    text(selectedFlag, size: 21, weight: .medium))
+            } else {
+                let glyph = NSImageView(image: sidebarIcon(index))
+                glyph.imageScaling = .scaleProportionallyDown
+                glyph.contentTintColor = tab == index ? NSColor.white : tint()
+                glyph.translatesAutoresizingMaskIntoConstraints = false
+                glyph.widthAnchor.constraint(equalToConstant: 23).isActive = true
+                glyph.heightAnchor.constraint(equalToConstant: 23).isActive = true
+                centeredLabel.addArrangedSubview(glyph)
             }
-            control.alignment = .center
-            control.font = NSFont.systemFont(ofSize: 13, weight: .semibold)
+            centeredLabel.addArrangedSubview(
+                text(label, size: 13, weight: .semibold))
+            centeredLabel.setContentHuggingPriority(.required, for: .horizontal)
+            control.addSubview(centeredLabel)
+            NSLayoutConstraint.activate([
+                centeredLabel.centerXAnchor.constraint(equalTo: control.centerXAnchor),
+                centeredLabel.centerYAnchor.constraint(equalTo: control.centerYAnchor),
+                centeredLabel.leadingAnchor.constraint(
+                    greaterThanOrEqualTo: control.leadingAnchor, constant: 12),
+                centeredLabel.trailingAnchor.constraint(
+                    lessThanOrEqualTo: control.trailingAnchor, constant: -12)
+            ])
             control.heightAnchor.constraint(equalToConstant: 54).isActive = true
             control.layer?.cornerRadius = 16
             control.layer?.borderWidth = 1
