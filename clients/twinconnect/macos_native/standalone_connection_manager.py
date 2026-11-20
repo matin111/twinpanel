@@ -117,6 +117,40 @@ def process_matches(item: dict) -> bool:
     return bool(cmd and item.get("executable") in cmd and item.get("config") in cmd)
 
 
+def process_start_signature(pid: int) -> str | None:
+    """Tie owner liveness to a process birth time, not just a reusable PID."""
+    if type(pid) is not int or pid <= 1:
+        return None
+    try:
+        reply = subprocess.run(
+            ["/bin/ps", "-p", str(pid), "-o", "lstart="],
+            check=False, capture_output=True, text=True, timeout=3
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    value = reply.stdout.strip()
+    return value if reply.returncode == 0 and value else None
+
+
+def watch_owner(owner_pid: int, engine_pid: int, started: str) -> dict:
+    """Fail closed if the owning GUI quits/crashes, without touching the OS network."""
+    for _ in range(86400):
+        item = read_state()
+        if not item or item.get("pid") != engine_pid:
+            return {"state": "watcher_finished"}
+        if item.get("owner_pid") != owner_pid or item.get("owner_started") != started:
+            return {"state": "watcher_replaced"}
+        if not process_matches(item):
+            return {"state": "engine_not_running"}
+        if process_start_signature(owner_pid) != started:
+            try:
+                return stop()
+            except (ValueError, OSError):
+                return {"state": "stop_failed_state_preserved"}
+        time.sleep(1)
+    return {"state": "watcher_lifetime_expired"}
+
+
 def save_state(item: dict) -> None:
     STATE.mkdir(parents=True, exist_ok=True, mode=0o700)
     os.chmod(STATE, 0o700)
@@ -128,7 +162,7 @@ def save_state(item: dict) -> None:
     os.replace(tmp, state_path())
 
 
-def start(protocol: str, config: Path) -> dict:
+def start(protocol: str, config: Path, owner_pid: int | None = None) -> dict:
     if protocol not in PROTOCOLS:
         fail("UNKNOWN_PROTOCOL")
     exe = binary_for(protocol)
@@ -137,6 +171,13 @@ def start(protocol: str, config: Path) -> dict:
     existing = read_state()
     if existing and process_matches(existing):
         fail("OTHER_ENGINE_ALREADY_RUNNING")
+    # UI probes are attached to their real macOS app process so that
+    # a crash cannot leave a background SOCKS engine behind.
+    owner_started = None
+    if owner_pid is not None:
+        owner_started = process_start_signature(owner_pid)
+        if not owner_started:
+            fail("PROXY_OWNER_NOT_RUNNING")
     config = config.expanduser().resolve(strict=True)
     port = validate(protocol, config)
     STATE.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -159,7 +200,24 @@ def start(protocol: str, config: Path) -> dict:
         record = {"protocol": protocol, "pid": proc.pid, "port": port,
                   "mode": "local_proxy_only", "config": str(config),
                   "executable": str(exe)}
+        if owner_pid is not None:
+            record["owner_pid"] = owner_pid
+            record["owner_started"] = owner_started
         save_state(record)
+        if owner_pid is not None:
+            # Separate watchdog survives a GUI crash; never requires root.
+            try:
+                subprocess.Popen(
+                    [sys.executable, str(Path(__file__).resolve()),
+                     "watch-owner", str(owner_pid), str(proc.pid), owner_started],
+                    stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL, close_fds=True,
+                    start_new_session=True
+                )
+            except OSError:
+                # Fail closed rather than launching an unwatched GUI proxy.
+                stop()
+                fail("PROXY_WATCHDOG_START_FAILED")
         return {"state": "process_running_unverified", "protocol": protocol,
                 "pid": proc.pid, "proxy": f"127.0.0.1:{port}",
                 "note": "Test with curl --socks5-hostname; no full-tunnel or remote handshake is implied"}
@@ -356,6 +414,11 @@ def main() -> int:
     run = sub.add_parser("start")
     run.add_argument("protocol", choices=PROTOCOLS)
     run.add_argument("config", type=Path)
+    run.add_argument("--owner-pid", type=int, default=None)
+    watcher = sub.add_parser("watch-owner", help=argparse.SUPPRESS)
+    watcher.add_argument("owner_pid", type=int)
+    watcher.add_argument("engine_pid", type=int)
+    watcher.add_argument("owner_started")
     args = parser.parse_args()
     try:
         result = (list_protocols() if args.action == "list" else
@@ -363,7 +426,9 @@ def main() -> int:
                   {"state": "diagnosis", "reason": engine_failure_category()} if args.action == "diagnose" else
                   stop() if args.action == "stop" else
                   probe(args.expected_ip) if args.action == "probe" else
-                  start(args.protocol, args.config))
+                  watch_owner(args.owner_pid, args.engine_pid, args.owner_started)
+                      if args.action == "watch-owner" else
+                  start(args.protocol, args.config, args.owner_pid))
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return 0
     except (ValueError, OSError, subprocess.SubprocessError) as error:
