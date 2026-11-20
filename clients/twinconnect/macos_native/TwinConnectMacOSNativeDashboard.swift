@@ -666,10 +666,22 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         let leftGap = NSView()
         let rightGap = NSView()
         buttonRow.addArrangedSubview(leftGap)
-        let connect = button("ϟ    Connect now     ›",
-            action: #selector(unavailableConnect(_:)), primary: true)
-        connect.isEnabled = false
-        connect.toolTip = "VPN startup requires an installed and signed Packet Tunnel"
+        // The cloud Mac has no signed system VPN. Make the PRIMARY action
+        // useful in a clearly labelled, limited one-shot SOCKS test mode.
+        // In particular never present this as an active full-tunnel VPN.
+        let canTestProxy = activeProtocol == "hysteria2" &&
+            activeServer != nil &&
+            (snapshot?.protocols.contains {
+                $0.code == "hysteria2" && $0.configured
+            } ?? false)
+        let connect = button(localProxyBusy ? "ϟ    Testing proxy…" :
+                             canTestProxy ? "ϟ    Test Hysteria2 proxy     ›" :
+                                            "ϟ    Choose server & Hysteria2     ›",
+                             action: #selector(primaryProxyAction(_:)), primary: true)
+        connect.isEnabled = !localProxyBusy && accountSession != nil
+        connect.toolTip = canTestProxy ?
+            "One proxied HTTPS request; not a system-wide VPN connection." :
+            "Select Hysteria2 and an assigned server in Locations to test local proxy."
         connect.heightAnchor.constraint(equalToConstant: 53).isActive = true
         connect.widthAnchor.constraint(equalToConstant: 255).isActive = true
         // On unsigned cloud Macs the system VPN remains disabled. Offer a
@@ -681,18 +693,9 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         leftGap.widthAnchor.constraint(equalTo: rightGap.widthAnchor).isActive = true
         main.addArrangedSubview(buttonRow)
         buttonRow.widthAnchor.constraint(equalTo: main.widthAnchor).isActive = true
-        let proxyTest = button(localProxyBusy ? "Testing Hysteria2…" :
-                               "Test Hysteria2 proxy (not VPN)",
-                               action: #selector(testNativeHysteria2Proxy(_:)),
-                               mutedButton: true)
-        proxyTest.isEnabled = !localProxyBusy && accountSession != nil &&
-            activeServer != nil && activeProtocol == "hysteria2" &&
-            (snapshot?.protocols.contains {
-                $0.code == "hysteria2" && $0.configured
-            } ?? false)
-        proxyTest.toolTip = "One HTTPS request via local SOCKS. No system route changes."
-        main.addArrangedSubview(proxyTest)
-        proxyTest.widthAnchor.constraint(equalTo: main.widthAnchor).isActive = true
+        main.addArrangedSubview(text(
+            "Proxy test only — system VPN, Kill Switch and DNS protection remain OFF.",
+            size: 11, color: amber))
         if !localProxyStatus.isEmpty {
             main.addArrangedSubview(text(localProxyStatus, size: 11, color: muted))
         }
@@ -1685,6 +1688,30 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         if list.indices.contains(row) { activeServer = list[row].id }
     }
 
+
+    @objc private func primaryProxyAction(_ sender: NSButton) {
+        guard accountSession != nil, !localProxyBusy else { return }
+        guard activeProtocol == "hysteria2" else {
+            localProxyStatus = "Select Hysteria2 from Locations first. Other protocols are not yet available in AppKit proxy mode."
+            tab = 1
+            view = build()
+            return
+        }
+        guard activeServer != nil else {
+            localProxyStatus = "Choose a subscription server in Locations first."
+            tab = 1
+            view = build()
+            return
+        }
+        guard snapshot?.protocols.contains(where: {
+            $0.code == "hysteria2" && $0.configured
+        }) == true else {
+            localProxyStatus = "Hysteria2 is not enabled/configured for this subscription."
+            view = build()
+            return
+        }
+        testNativeHysteria2Proxy(sender)
+    }
 
     @objc private func testNativeHysteria2Proxy(_ sender: NSButton) {
         guard !localProxyBusy,
