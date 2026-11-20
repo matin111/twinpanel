@@ -7,6 +7,7 @@ on:
     paths:
       - 'clients/twinconnect/macos_native/standalone_connection_manager.py'
       - 'clients/twinconnect/macos_native/test_standalone_connection_manager.py'
+      - 'clients/twinconnect/macos_native/install_standalone_engines.sh'
       - '.github/workflows/twinconnect-macos-standalone-manager.yml'
   workflow_dispatch:
 
@@ -21,6 +22,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Validate unsigned standalone connection manager
         run: |
+          bash -n clients/twinconnect/macos_native/install_standalone_engines.sh
           python3 -m unittest -v clients/twinconnect/macos_native/test_standalone_connection_manager.py
           python3 clients/twinconnect/macos_native/standalone_connection_manager.py list
           echo "No VPN system routes, DNS or Apple signing was changed."
