@@ -56,7 +56,7 @@ private final class TwinNativePremiumButton: NSButton {
 // Uses Core Animation's vector gradient, not a raster image or Metal shader.
 // Keeps the Windows-style translucent depth on macOS cloud hosts without Metal.
 private final class TwinNativeGlassCard: NSView {
-    enum Style { case panel, inset, metric }
+    enum Style { case panel, inset, metric, sidebar }
     private let glassGradient = CAGradientLayer()
     private let upperEdge = CAGradientLayer()
     override init(frame: NSRect) {
@@ -99,6 +99,12 @@ private final class TwinNativeGlassCard: NSView {
                 NSColor(calibratedRed: 0.104, green: 0.258, blue: 0.314, alpha: 0.97),
                 NSColor(calibratedRed: 0.074, green: 0.179, blue: 0.239, alpha: 0.98),
                 NSColor(calibratedRed: 0.055, green: 0.153, blue: 0.203, alpha: 0.99)
+            ]
+        case .sidebar:
+            stops = [
+                NSColor(calibratedRed: 0.055, green: 0.178, blue: 0.227, alpha: 0.99),
+                NSColor(calibratedRed: 0.052, green: 0.155, blue: 0.193, alpha: 0.99),
+                NSColor(calibratedRed: 0.032, green: 0.106, blue: 0.143, alpha: 0.99)
             ]
         }
         glassGradient.colors = stops.map { $0.cgColor }
@@ -424,7 +430,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
 
     private func build() -> NSView {
         let root = TwinNativeBackdrop(frame:
-            NSRect(x: 0, y: 0, width: 1150, height: 750))
+            NSRect(x: 0, y: 0, width: 1180, height: 740))
         root.base = base
         root.glow = tint()
         if accountSession == nil {
@@ -699,14 +705,12 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     }
 
     private func buildSidebar() -> NSView {
-        let side = NSView()
+        let side = TwinNativeGlassCard(frame: .zero)
+        side.apply(.sidebar)
         side.translatesAutoresizingMaskIntoConstraints = false
         side.wantsLayer = true
-        // Flutter shares its ambient gradient with the side navigation.
-        side.layer?.backgroundColor = NSColor(calibratedRed: 0.062,
-            green: 0.139, blue: 0.17, alpha: 0.80).cgColor
-        side.layer?.borderColor = sea.withAlphaComponent(0.26).cgColor
-        side.layer?.borderWidth = 1
+        side.layer?.borderColor = sea.withAlphaComponent(0.25).cgColor
+        side.layer?.borderWidth = 0.7
 
         let content = stack(spacing: 12)
         content.alignment = .leading
@@ -717,8 +721,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         logo.layer?.borderColor = sea.withAlphaComponent(0.38).cgColor
         logo.layer?.borderWidth = 1
         logo.translatesAutoresizingMaskIntoConstraints = false
-        logo.widthAnchor.constraint(equalToConstant: 42).isActive = true
-        logo.heightAnchor.constraint(equalToConstant: 42).isActive = true
+        logo.widthAnchor.constraint(equalToConstant: 47).isActive = true
+        logo.heightAnchor.constraint(equalToConstant: 47).isActive = true
         if let tenantLogo = tenantLogo {
             let image = NSImageView(image: tenantLogo)
             image.imageScaling = .scaleProportionallyUpOrDown
@@ -749,7 +753,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         content.addArrangedSubview(logoRow)
         logoRow.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
         let brand = text(accountSession?.brandName ?? "TwinConnect",
-                         size: 17, weight: .bold)
+                         size: 18, weight: .bold)
         brand.alignment = .center
         content.addArrangedSubview(brand)
         brand.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
