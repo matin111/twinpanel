@@ -151,6 +151,9 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         box.layer?.borderWidth = 1
         box.layer?.borderColor = tint().withAlphaComponent(0.22).cgColor
         let column = stack(spacing: 13)
+        // Let every glass panel fill the available width; plain NSView
+        // children have no intrinsic width and otherwise disappear.
+        column.alignment = .width
         for child in children { column.addArrangedSubview(child) }
         spaced(box, column, inset: padding)
         return box
@@ -401,7 +404,9 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
 
     private func connectPage() -> NSView {
         let content = stack(spacing: 13)
+        content.alignment = .width
         let centered = stack(spacing: 9)
+        centered.alignment = .centerX
         let offline = pill("●  You are offline", color: muted)
         centered.addArrangedSubview(offline)
         let emblem = TwinNativePowerRing(frame:
@@ -485,6 +490,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
 
     private func locationsPage() -> NSView {
         let wrapper = stack(spacing: 12)
+        wrapper.alignment = .width
         let title = stack(.horizontal, spacing: 14)
         title.addArrangedSubview(text("Available locations",
                                        size: 20, weight: .bold))
@@ -546,6 +552,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
 
     private func settingsPage() -> NSView {
         let group = stack(spacing: 15)
+        group.alignment = .width
         group.addArrangedSubview(text("Preferences",
                                        size: 20, weight: .bold))
         group.addArrangedSubview(text(
@@ -576,6 +583,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
 
     private func accountPage() -> NSView {
         let group = stack(spacing: 13)
+        group.alignment = .width
         group.addArrangedSubview(text("Your subscription",
                                        size: 20, weight: .bold))
         group.addArrangedSubview(pill(snapshot?.account?.status ?? "Account not loaded",
@@ -624,6 +632,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
 
     private func homeSubscriptionSummary() -> NSView {
         let items = stack(spacing: 9)
+        items.alignment = .width
         items.addArrangedSubview(text("Subscription details",
                                       size: 17, weight: .semibold))
         if let data = snapshot {
