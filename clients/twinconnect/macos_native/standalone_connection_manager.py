@@ -177,13 +177,54 @@ def status() -> dict:
 
 
 
-def probe(expected_ip: str | None = None) -> dict:
-    """Verify a real HTTPS request through the managed local SOCKS proxy.
+def proxy_failure_category(code: int) -> str:
+    """Classify curl failure without exposing a remote host or credential."""
+    return {
+        5: "PROXY_DNS_LOOKUP_FAILED",
+        6: "REMOTE_DNS_LOOKUP_FAILED",
+        7: "PROXY_TCP_UNREACHABLE",
+        22: "PROXY_HTTPS_HTTP_ERROR",
+        28: "PROXY_OR_REMOTE_TIMEOUT",
+        35: "PROXY_TLS_HANDSHAKE_FAILED",
+        52: "PROXY_EMPTY_RESPONSE",
+        55: "PROXY_UPLOAD_FAILED",
+        56: "PROXY_DOWNLOAD_FAILED",
+        60: "PROXY_REMOTE_CERTIFICATE_INVALID",
+        97: "PROXY_SOCKS_HANDSHAKE_FAILED",
+    }.get(code, "PROXY_EGRESS_REQUEST_FAILED")
 
-    Success proves proxy egress only; it does not assert system-wide tunneling.
-    Requiring expected_ip avoids mistaking an unintended direct route for the
-    intended VPN endpoint.
+
+def engine_failure_category() -> str:
+    """Report only a safe fixed category derived from local engine logs.
+
+    Never return log lines; engines may include auth secrets, URLs or SNI.
     """
+    try:
+        with (STATE / "engine.log").open("rb") as stream:
+            stream.seek(max(0, stream.seek(0, os.SEEK_END) - 65536))
+            data = stream.read().decode("utf-8", errors="replace").lower()
+    except OSError:
+        return "ENGINE_LOG_UNAVAILABLE"
+    for needle, code in (
+        ("address already in use", "PROXY_LOCAL_PORT_OCCUPIED"),
+        ("permission denied", "ENGINE_PERMISSION_DENIED"),
+        ("unknown outbound type", "ENGINE_UNSUPPORTED_OUTBOUND"),
+        ("unknown field", "ENGINE_CONFIG_UNSUPPORTED_FIELD"),
+        ("invalid config", "ENGINE_CONFIG_INVALID"),
+        ("timeout", "ENGINE_REMOTE_TIMEOUT"),
+        ("certificate", "ENGINE_REMOTE_TLS_CERTIFICATE_FAILURE"),
+        ("quic", "ENGINE_QUIC_TRANSPORT_FAILURE"),
+        ("handshake", "ENGINE_REMOTE_HANDSHAKE_FAILURE"),
+        ("network is unreachable", "ENGINE_REMOTE_NETWORK_UNREACHABLE"),
+        ("no such host", "ENGINE_REMOTE_DNS_FAILURE"),
+    ):
+        if needle in data:
+            return code
+    return "ENGINE_FAILURE_NOT_CLASSIFIED"
+
+
+def probe(expected_ip: str | None = None) -> dict:
+    """Verify proxied HTTPS egress, never claim a system-wide VPN."""
     item = read_state()
     if not item or not process_matches(item):
         fail("ENGINE_NOT_RUNNING")
@@ -206,7 +247,7 @@ def probe(expected_ip: str | None = None) -> dict:
     except (OSError, subprocess.TimeoutExpired):
         fail("PROXY_EGRESS_REQUEST_FAILED")
     if response.returncode != 0:
-        fail("PROXY_EGRESS_REQUEST_FAILED")
+        fail(proxy_failure_category(response.returncode))
     try:
         ip = ipaddress.ip_address(response.stdout.strip())
     except ValueError:
@@ -224,6 +265,7 @@ def probe(expected_ip: str | None = None) -> dict:
         "system_wide_vpn": False,
         "note": "Only this SOCKS proxy HTTPS request was tested; other apps and DNS are not tunneled",
     }
+
 
 
 def stop() -> dict:
@@ -251,6 +293,7 @@ def main() -> int:
     sub = parser.add_subparsers(dest="action", required=True)
     sub.add_parser("list")
     sub.add_parser("status")
+    sub.add_parser("diagnose")
     sub.add_parser("stop")
     check = sub.add_parser("probe")
     check.add_argument("--expected-ip", default=None)
@@ -261,6 +304,7 @@ def main() -> int:
     try:
         result = (list_protocols() if args.action == "list" else
                   status() if args.action == "status" else
+                  {"state": "diagnosis", "reason": engine_failure_category()} if args.action == "diagnose" else
                   stop() if args.action == "stop" else
                   probe(args.expected_ip) if args.action == "probe" else
                   start(args.protocol, args.config))
