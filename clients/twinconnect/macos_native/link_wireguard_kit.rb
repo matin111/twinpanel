@@ -52,9 +52,9 @@ if existing
     File.join(existing.relative_path, 'Package.swift'), File.dirname(project_path)
   )
   text = File.read(existing_manifest)
-  if text.start_with?("// swift-tools-version:5.3\\n")
+  if text.start_with?("// swift-tools-version:5.3\n")
     File.write(existing_manifest, text.sub(
-      "// swift-tools-version:5.3\\n", "// swift-tools-version:5.7\\n"
+      "// swift-tools-version:5.3\n", "// swift-tools-version:5.7\n"
     ))
     puts "Prepared existing WireGuardKit manifest: #{existing_manifest}"
   end
