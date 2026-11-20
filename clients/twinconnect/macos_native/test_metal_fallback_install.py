@@ -151,7 +151,11 @@ class MetalFallbackInstallTests(unittest.TestCase):
         self.assertIn('addPage(pair)', generated)
         self.assertIn('if availableWidth >= 790', generated)
         self.assertIn('sidebar.widthAnchor.constraint(equalToConstant: 258)', generated)
-        self.assertIn('Test Hysteria2 proxy', generated)
+        # Hysteria2 SOCKS testing is a Settings-only diagnostic. The
+        # Windows-like primary Connect button must never start a local proxy.
+        self.assertIn('button("Test Hysteria2 SOCKS"', generated)
+        self.assertIn('"ϟ    Connect now     ›"', generated)
+        self.assertIn('action: #selector(unavailableConnect(_:)), primary: true', generated)
         self.assertIn('primaryProxyAction(_ sender: NSButton)', generated)
         self.assertIn('prepareLocalHysteria2', generated)
         # Regression: a login must show the AppKit dashboard even if
