@@ -392,6 +392,30 @@ class MetalFallbackInstallTests(unittest.TestCase):
         ):
             self.assertIn(token, source)
 
+    def test_windows_network_cards_have_icon_plates_and_location_bar(self) -> None:
+        source = (SOURCE / "TwinConnectMacOSNativeDashboard.swift").read_text(
+            encoding="utf-8"
+        )
+        metric = source.split("    private func networkMetric(", 1)[1].split(
+            "    private func networkStatusPage()", 1
+        )[0]
+        status = source.split("    private func networkStatusPage() -> NSView {", 1)[1].split(
+            "    // Prefer a fresh local ICMP", 1
+        )[0]
+        for token in (
+            "iconPlate.layer?.cornerRadius = 9",
+            "iconPlate.widthAnchor.constraint(equalToConstant: 30)",
+            "iconPlate.layer?.borderColor = sea.withAlphaComponent(0.34)",
+        ):
+            self.assertIn(token, metric)
+        for token in (
+            "let locationRow = stack(.horizontal, spacing: 9)",
+            'let change = button("Locations  ›"',
+            "let locationCard = card([locationRow], radius: 13, padding: 8,",
+        ):
+            self.assertIn(token, status)
+        self.assertNotIn('button(location + "     ·     Locations', status)
+
     def test_emergency_stop_and_offline_animation_are_safe(self) -> None:
         source = (SOURCE / "TwinConnectMacOSNativeDashboard.swift").read_text(
             encoding="utf-8"
