@@ -195,6 +195,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         // children have no intrinsic width and otherwise disappear.
         column.alignment = .leading
         for child in children {
+            child.translatesAutoresizingMaskIntoConstraints = false
+            child.setContentHuggingPriority(.defaultLow, for: .horizontal)
             column.addArrangedSubview(child)
             // In AppKit a child NSView without an intrinsic width can shrink
             // to its title: every panel uses the full width of its column.
@@ -361,6 +363,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         // panels to collect along the right edge of the macOS viewport.
         // Anchor every page to the leading edge and the full content width.
         func addPage(_ page: NSView) {
+            page.translatesAutoresizingMaskIntoConstraints = false
+            page.setContentHuggingPriority(.defaultLow, for: .horizontal)
             workspace.addArrangedSubview(page)
             page.widthAnchor.constraint(equalTo: workspace.widthAnchor)
                 .isActive = true
