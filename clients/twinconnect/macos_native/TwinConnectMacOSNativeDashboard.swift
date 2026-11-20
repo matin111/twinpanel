@@ -9,28 +9,90 @@ private final class TwinNativeFlippedDocument: NSView {
 }
 
 private final class TwinNativeBackdrop: NSView {
+    // A resolution-independent illustrated background: no Metal, remote
+    // image, or external asset is needed on Catalina cloud Macs.
     var base = NSColor(calibratedRed: 0.032, green: 0.11, blue: 0.145, alpha: 1)
     var glow = NSColor(calibratedRed: 0.10, green: 0.47, blue: 0.55, alpha: 1)
 
+    private func radialLight(_ context: CGContext, center: CGPoint,
+                             radius: CGFloat, tint: NSColor, opacity: CGFloat) {
+        let clear = tint.withAlphaComponent(0).cgColor
+        let strong = tint.withAlphaComponent(opacity).cgColor
+        guard let gradient = CGGradient(
+            colorsSpace: CGColorSpaceCreateDeviceRGB(),
+            colors: [strong, tint.withAlphaComponent(opacity * 0.38).cgColor,
+                     clear] as CFArray,
+            locations: [0, 0.47, 1]
+        ) else { return }
+        context.drawRadialGradient(
+            gradient, startCenter: center, startRadius: 0,
+            endCenter: center, endRadius: radius,
+            options: [.drawsBeforeStartLocation, .drawsAfterEndLocation]
+        )
+    }
+
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
+        let area = bounds
         NSGradient(colors: [
             base,
-            base.blended(withFraction: 0.38, of: glow) ?? base,
-            base.blended(withFraction: 0.16, of: glow) ?? base
-        ])?.draw(in: bounds, angle: -25)
-        let area = bounds
-        for index in 0..<9 {
-            let y = area.height * (0.17 + CGFloat(index) * 0.083)
-            let curve = NSBezierPath()
-            curve.move(to: CGPoint(x: -40, y: y))
-            curve.curve(to: CGPoint(x: area.width + 40, y: y + 100),
-                        controlPoint1: CGPoint(x: area.width * 0.26, y: y + 110),
-                        controlPoint2: CGPoint(x: area.width * 0.72, y: y - 130))
-            let light = glow.withAlphaComponent(0.035 + CGFloat(index % 3) * 0.009)
-            light.setStroke()
-            curve.lineWidth = 1
-            curve.stroke()
+            base.blended(withFraction: 0.20, of: glow) ?? base,
+            base.blended(withFraction: 0.08, of: .black) ?? base
+        ])?.draw(in: area, angle: -32)
+
+        // Three muted pools of branded light give the same cinematic depth
+        // as the Windows artwork without flattening the foreground cards.
+        if let ctx = NSGraphicsContext.current?.cgContext {
+            ctx.saveGState()
+            radialLight(ctx,
+                center: CGPoint(x: area.width * 0.79, y: area.height * 0.89),
+                radius: max(area.width, area.height) * 0.64,
+                tint: glow, opacity: 0.29)
+            radialLight(ctx,
+                center: CGPoint(x: area.width * 0.19, y: area.height * 0.11),
+                radius: max(area.width, area.height) * 0.49,
+                tint: glow, opacity: 0.16)
+            radialLight(ctx,
+                center: CGPoint(x: area.width * 0.52, y: area.height * 0.49),
+                radius: max(area.width, area.height) * 0.35,
+                tint: glow.blended(withFraction: 0.25, of: .white) ?? glow,
+                opacity: 0.075)
+            ctx.restoreGState()
+        }
+
+        // Fine orbital contours are intentionally sparse and low contrast.
+        for index in 0..<11 {
+            let t = CGFloat(index) / 10
+            let path = NSBezierPath()
+            path.move(to: CGPoint(x: -area.width * 0.04,
+                                  y: area.height * (0.22 + t * 0.64)))
+            path.curve(
+                to: CGPoint(x: area.width * 1.08,
+                            y: area.height * (0.16 + t * 0.77)),
+                controlPoint1: CGPoint(x: area.width * 0.28,
+                                      y: area.height * (0.46 + t * 0.39)),
+                controlPoint2: CGPoint(x: area.width * 0.71,
+                                      y: area.height * (0.06 + t * 0.87))
+            )
+            path.lineWidth = index.isMultiple(of: 4) ? 1.05 : 0.55
+            glow.withAlphaComponent(
+                index.isMultiple(of: 4) ? 0.125 : 0.058
+            ).setStroke()
+            path.stroke()
+        }
+
+        // A small constellation texture remains stable on every repaint.
+        for index in 0..<26 {
+            let x = CGFloat((index * 97 + 23) % 263) / 263
+            let y = CGFloat((index * 71 + 41) % 239) / 239
+            let radius: CGFloat = index.isMultiple(of: 5) ? 1.25 : 0.7
+            let dot = NSBezierPath(ovalIn: NSRect(
+                x: area.width * x - radius,
+                y: area.height * y - radius,
+                width: radius * 2, height: radius * 2))
+            glow.withAlphaComponent(index.isMultiple(of: 5) ? 0.20 : 0.11)
+                .setFill()
+            dot.fill()
         }
     }
 }
