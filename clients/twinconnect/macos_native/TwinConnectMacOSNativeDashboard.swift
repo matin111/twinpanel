@@ -434,7 +434,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         }
         locationPicker.target = self
         locationPicker.action = #selector(changeQuickServer(_:))
-        locationPicker.widthAnchor.constraint(equalToConstant: 265).isActive = true
+        locationPicker.widthAnchor.constraint(equalToConstant: 220).isActive = true
         let protocolPicker = NSPopUpButton(frame: .zero, pullsDown: false)
         protocolPicker.addItem(withTitle: "Select protocol")
         for item in snapshot?.protocols ?? [] {
@@ -449,7 +449,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         }
         protocolPicker.target = self
         protocolPicker.action = #selector(changeQuickProtocol(_:))
-        protocolPicker.widthAnchor.constraint(equalToConstant: 230).isActive = true
+        protocolPicker.widthAnchor.constraint(equalToConstant: 190).isActive = true
         pickers.addArrangedSubview(locationPicker)
         pickers.addArrangedSubview(protocolPicker)
         content.addArrangedSubview(pickers)
@@ -507,7 +507,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         scroller.hasVerticalScroller = true
         scroller.translatesAutoresizingMaskIntoConstraints = false
         scroller.heightAnchor.constraint(equalToConstant: 330).isActive = true
-        scroller.widthAnchor.constraint(greaterThanOrEqualToConstant: 520)
+        scroller.widthAnchor.constraint(greaterThanOrEqualToConstant: 390)
             .isActive = true
         return scroller
     }
