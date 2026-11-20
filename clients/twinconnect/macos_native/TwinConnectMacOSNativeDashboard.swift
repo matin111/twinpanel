@@ -807,17 +807,35 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     private func networkMetric(_ title: String, value: String,
                                subtitle: String = "",
                                valueColor: NSColor? = nil) -> NSView {
-        let content = stack(spacing: 13)
+        let content = stack(spacing: 12)
         content.alignment = .leading
-        content.addArrangedSubview(text(title, size: 11,
-                                       weight: .semibold, color: muted))
-        content.addArrangedSubview(text(value, size: 22, weight: .bold,
-                                        color: valueColor))
+        let iconName: String
+        if title.contains("ping") { iconName = "ϟ" }
+        else if title.contains("IP") { iconName = "◎" }
+        else if title.contains("Download") { iconName = "↓" }
+        else { iconName = "↑" }
+        let heading = stack(.horizontal, spacing: 8)
+        let symbol = text(iconName, size: 17, weight: .bold, color: sea)
+        heading.addArrangedSubview(symbol)
+        heading.addArrangedSubview(text(title, size: 11,
+                                       weight: .medium, color: muted))
+        content.addArrangedSubview(heading)
+        let number = text(value, size: 23, weight: .bold,
+                          color: valueColor ?? NSColor.white)
+        number.lineBreakMode = .byTruncatingTail
+        number.maximumNumberOfLines = 1
+        number.toolTip = value
+        content.addArrangedSubview(number)
         if !subtitle.isEmpty {
-            content.addArrangedSubview(text(subtitle, size: 10, color: muted))
+            let subtitleText = text(subtitle, size: 10, color: muted)
+            subtitleText.lineBreakMode = .byTruncatingTail
+            subtitleText.maximumNumberOfLines = 2
+            subtitleText.toolTip = subtitle
+            content.addArrangedSubview(subtitleText)
         }
-        let panel = card([content], radius: 16, padding: 13)
-        panel.heightAnchor.constraint(greaterThanOrEqualToConstant: 97).isActive = true
+        let panel = card([content], radius: 17, padding: 16)
+        panel.heightAnchor.constraint(greaterThanOrEqualToConstant: 131)
+            .isActive = true
         return panel
     }
 
@@ -845,17 +863,17 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
 
         let network = stack(.horizontal, spacing: 10)
         network.distribution = .fillEqually
-        network.addArrangedSubview(networkMetric("⚡  Server ping", value: reportedPing,
+        network.addArrangedSubview(networkMetric("Server ping", value: reportedPing,
             subtitle: pingDetails(selected), valueColor: pingColor(selected)))
-        network.addArrangedSubview(networkMetric("◉  Public IP", value: "—"))
+        network.addArrangedSubview(networkMetric("Public IP", value: "—"))
         content.addArrangedSubview(network)
         network.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
 
         let traffic = stack(.horizontal, spacing: 10)
         traffic.distribution = .fillEqually
-        traffic.addArrangedSubview(networkMetric("↓  Download", value: "—",
+        traffic.addArrangedSubview(networkMetric("Download", value: "—",
                                                   subtitle: "Session total: —"))
-        traffic.addArrangedSubview(networkMetric("↑  Upload", value: "—",
+        traffic.addArrangedSubview(networkMetric("Upload", value: "—",
                                                   subtitle: "Session total: —"))
         content.addArrangedSubview(traffic)
         traffic.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
@@ -863,7 +881,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         let location = selected.map {
             flag($0.country) + "  " + countryName($0.country)
         } ?? "Select location"
-        let change = button(location + "                   Locations  ›",
+        let change = button(location + "     ·     Locations   ›",
             action: #selector(showLocations(_:)), mutedButton: true)
         change.alignment = .left
         change.heightAnchor.constraint(equalToConstant: 45).isActive = true
