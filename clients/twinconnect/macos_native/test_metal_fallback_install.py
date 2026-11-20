@@ -264,6 +264,30 @@ class MetalFallbackInstallTests(unittest.TestCase):
         self.assertNotIn('pingMs = 100', directory)
         self.assertNotIn('server.id.hashValue', directory)
 
+    def test_windows_country_groups_and_fastest_use_real_icmp(self) -> None:
+        source = (SOURCE / "TwinConnectMacOSNativeDashboard.swift").read_text(
+            encoding="utf-8"
+        )
+        section = source.split(
+            "    private func locationsPage() -> NSView {", 1
+        )[1].split("    private func createTable() -> NSView {", 1)[0]
+        for token in (
+            'let countryHeader = stack(.horizontal, spacing: 10)',
+            'let countryFlag = text(flag(code), size: 22',
+            'let countryInfo = stack(spacing: 4)',
+            'let headerCard = card([countryHeader]',
+            'selectedHere ? "    ·    Selected" : ""',
+            'selectFastestMeasuredServer(_:)',
+            'nodePingResults[server.id]?.measuredMs != nil',
+            '"✦  Fastest server  ·  Measure ping first"',
+            'fastestButton.isEnabled = fastest != nil',
+            'let select = button(selected ? "✓" : "›"',
+        ):
+            self.assertIn(token, section)
+        self.assertIn('expandedCountries.insert(best.country.uppercased())',
+                      source)
+        self.assertNotIn('fakeLatency', section)
+
     def test_windows_visual_parity_has_vector_hero_and_real_network_state(self) -> None:
         source = (SOURCE / "TwinConnectMacOSNativeDashboard.swift").read_text(
             encoding="utf-8"
