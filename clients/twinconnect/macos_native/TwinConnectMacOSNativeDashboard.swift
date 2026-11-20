@@ -2,6 +2,7 @@
 // The visual design mirrors the Flutter desktop/mobile experience while
 // strictly keeping VPN unavailable until a signed and verified PacketTunnel.
 import Cocoa
+import CryptoKit
 
 private final class TwinNativeFlippedDocument: NSView {
     override var isFlipped: Bool { true }
@@ -919,6 +920,37 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         view = build()
     }
 
+    private func selectionPreferenceKey(_ session: TwinMacNativeSession) -> String {
+        // Tenant-scoped and account-scoped; never place credentials or
+        // usernames in UserDefaults keys.
+        let identity = session.namespace + ":" + session.username.lowercased()
+        let digest = SHA256.hash(data: Data(identity.utf8))
+        let hex = digest.map { String(format: "%02x", $0) }.joined()
+        return "twinconnect.macos.selection.v1." + hex
+    }
+
+    private func persistCurrentSelection() {
+        guard let session = accountSession else { return }
+        let key = selectionPreferenceKey(session)
+        UserDefaults.standard.set([
+            "server": activeServer ?? "",
+            "protocol": activeProtocol ?? ""
+        ], forKey: key)
+    }
+
+    private func restoreCurrentSelection(_ session: TwinMacNativeSession) {
+        guard let record = UserDefaults.standard.dictionary(
+            forKey: selectionPreferenceKey(session)) else {
+            activeServer = nil
+            activeProtocol = nil
+            return
+        }
+        let savedServer = record["server"] as? String ?? ""
+        let savedProtocol = record["protocol"] as? String ?? ""
+        activeServer = savedServer.isEmpty ? nil : savedServer
+        activeProtocol = savedProtocol.isEmpty ? nil : savedProtocol
+    }
+
     private func countryName(_ code: String) -> String {
         Locale(identifier: "en_US").localizedString(forRegionCode: code.uppercased())
             ?? code.uppercased()
@@ -927,10 +959,25 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     private func friendlyServerName(_ server: TwinMacNativeServer,
                                     index: Int) -> String {
         let trimmed = server.name.trimmingCharacters(in: .whitespacesAndNewlines)
-        let code = server.country.lowercased()
         let plain = trimmed.lowercased()
+        let code = server.country.lowercased()
+        let aliases: [String: Set<String>] = [
+            "fi": ["fin", "finland", "fi", "fin1", "fin-1"],
+            "de": ["des", "ger", "germany", "de", "de1", "de-1"],
+            "ca": ["can", "canada", "ca"],
+            "tr": ["tur", "turkey", "turkiye", "tr"],
+            "us": ["usa", "united states", "us"],
+            "gb": ["uk", "eng", "england", "united kingdom", "gb"],
+            "fr": ["fra", "france", "fr"],
+            "hk": ["hongkong", "hong kong", "hk"],
+            "ir": ["iran", "ir"],
+            "nl": ["netherlands", "nld", "nl"]
+        ]
+        // Only change the PRESENTATION. The real node ID and server config
+        // still come from the authorized panel record.
         if plain == code || plain == countryName(code).lowercased() ||
-           plain == "server" || plain.isEmpty {
+           plain == "server" || plain.isEmpty ||
+           (aliases[code]?.contains(plain) ?? false) {
             return countryName(code) + "  ·  Server " + String(index + 1)
         }
         return trimmed
@@ -1610,6 +1657,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                 self.status = "Sign-in failed: " + error.localizedDescription
             case .success(let session):
                 self.accountSession = session
+                self.restoreCurrentSelection(session)
                 self.snapshot = nil
                 self.pingGeneration += 1
                 self.nodePingResults.removeAll()
@@ -1689,11 +1737,13 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                let selected = self.activeProtocol,
                !data.protocols.contains(where: { $0.code == selected }) {
                 self.activeProtocol = nil
+                self.persistCurrentSelection()
             }
             if data.sectionsLoaded.contains("servers"),
                let selected = self.activeServer,
                !data.servers.contains(where: { $0.id == selected }) {
                 self.activeServer = nil
+                self.persistCurrentSelection()
             }
             self.busy = !data.isComplete
             let count = data.sectionsLoaded.count
@@ -1771,6 +1821,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     @objc private func selectProtocolChip(_ sender: NSButton) {
         guard protocolChipCodes.indices.contains(sender.tag) else { return }
         activeProtocol = protocolChipCodes[sender.tag]
+        persistCurrentSelection()
         view = build()
     }
 
@@ -1786,18 +1837,21 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     @objc private func selectLocationServer(_ sender: NSButton) {
         guard locationRowIDs.indices.contains(sender.tag) else { return }
         activeServer = locationRowIDs[sender.tag]
+        persistCurrentSelection()
         status = "Location selected. A signed VPN engine is required to connect."
         view = build()
     }
 
     @objc private func changeQuickServer(_ sender: NSPopUpButton) {
         activeServer = sender.selectedItem?.representedObject as? String
+        persistCurrentSelection()
         status = "Location selected. VPN connection remains unavailable."
         view = build()
     }
 
     @objc private func changeQuickProtocol(_ sender: NSPopUpButton) {
         activeProtocol = sender.selectedItem?.representedObject as? String
+        persistCurrentSelection()
         status = "Protocol selected. VPN connection remains unavailable."
         view = build()
     }
