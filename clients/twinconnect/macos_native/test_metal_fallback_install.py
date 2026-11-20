@@ -132,10 +132,10 @@ class MetalFallbackInstallTests(unittest.TestCase):
         self.assertIn("pingColor(server)", generated)
         self.assertIn("pingDetails(selected)", generated)
         self.assertIn("sidebarIcon(_ kind: Int)", generated)
-        self.assertIn("control.image = sidebarIcon(index)", generated)
+        self.assertIn("let glyph = NSImageView(image: sidebarIcon(index))", generated)
         self.assertIn("link.image = sidebarIcon(kind)", generated)
         self.assertIn("link.imagePosition = .imageAbove", generated)
-        self.assertIn("control.contentTintColor", generated)
+        self.assertIn("glyph.contentTintColor", generated)
         self.assertIn("No public probe address supplied by the panel", generated)
         self.assertNotIn('action: #selector(unavailableConnect(_:)), mutedButton: true)\\n        ping.isEnabled = false', generated)
         self.assertIn("protocolChips()", generated)
@@ -514,6 +514,27 @@ class MetalFallbackInstallTests(unittest.TestCase):
         self.assertIn("link.setAccentGradient(", sidebar)
         self.assertNotIn("-> NSButton {\n        let control = TwinNativePremiumButton", source)
 
+    def test_appkit_glass_uses_real_blur_and_transparent_overlays(self) -> None:
+        source = (SOURCE / "TwinConnectMacOSNativeDashboard.swift").read_text(
+            encoding="utf-8"
+        )
+        glass = source.split("private final class TwinNativeGlassCard: NSView {", 1)[1].split(
+            "private final class TwinNativeNetworkFabric:", 1
+        )[0]
+        for token in (
+            "private let blur = NSVisualEffectView(frame: .zero)",
+            "blur.material = .hudWindow",
+            "blur.blendingMode = .withinWindow",
+            "blur.state = .active",
+            "tintOverlay.layer?.addSublayer(glassGradient)",
+            "blur.layer?.masksToBounds = true",
+            "tintOverlay.layer?.masksToBounds = true",
+            "upper.withAlphaComponent(0.53).cgColor",
+            "tone.withAlphaComponent(0.36).cgColor",
+            "lower.withAlphaComponent(0.59).cgColor",
+        ):
+            self.assertIn(token, glass)
+
     def test_sidebar_navigation_labels_are_centered_not_left_aligned(self) -> None:
         source = (SOURCE / "TwinConnectMacOSNativeDashboard.swift").read_text(
             encoding="utf-8"
@@ -524,8 +545,8 @@ class MetalFallbackInstallTests(unittest.TestCase):
         nav = sidebar.split('let navs = ["Quick connect"', 1)[1].split(
             "let quick = stack(", 1
         )[0]
-        self.assertIn('selectedFlag + "   Locations" : label', nav)
-        self.assertIn('control.alignment = .center', nav)
+        self.assertIn('text(selectedFlag, size: 21, weight: .medium)', nav)
+        self.assertIn('centeredLabel.centerXAnchor.constraint(equalTo: control.centerXAnchor)', nav)
         self.assertNotIn('control.alignment = .left', nav)
         self.assertNotIn('"     " + label', nav)
 
@@ -539,9 +560,9 @@ class MetalFallbackInstallTests(unittest.TestCase):
         for token in (
             'let selectedLocation = snapshot?.servers.first { $0.id == activeServer }',
             'let selectedFlag = selectedLocation.map { flag($0.country) } ?? "🌐"',
-            'selectedFlag + "   Locations" : label',
-            'control.alignment = .center',
-            'if index != 1 {',
+            'text(selectedFlag, size: 21, weight: .medium)',
+            'centeredLabel.centerXAnchor.constraint(equalTo: control.centerXAnchor)',
+            'if index == 1 {',
             'control.setAccentGradient(',
             'link.setAccentGradient(',
             'control.layer?.cornerRadius = 16',
