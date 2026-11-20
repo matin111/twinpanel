@@ -128,7 +128,10 @@ private final class TwinNativeGlassCard: NSView {
         wantsLayer = true
         // Actual AppKit vibrancy/blur, not a nearly opaque painted rectangle.
         // withinWindow works on Catalina without an app Metal renderer.
-        blur.material = .hudWindow
+        // HUD material creates a charcoal/black slab on Catalina.
+        // Sidebar material stays translucent and draws the branded art
+        // through the card instead of flattening its luminance.
+        blur.material = .sidebar
         blur.blendingMode = .withinWindow
         blur.state = .active
         blur.wantsLayer = true
@@ -185,12 +188,14 @@ private final class TwinNativeGlassCard: NSView {
             neutral.blended(withFraction: 0.53, of: $0)
         } ?? neutral
         let tone = foundation.blended(withFraction: strength, of: accent) ?? foundation
-        let upper = tone.blended(withFraction: 0.15, of: .white) ?? tone
-        let lower = tone.blended(withFraction: 0.17, of: .black) ?? tone
+        let upper = tone.blended(withFraction: 0.34, of: .white) ?? tone
+        let lower = tone.blended(withFraction: 0.09, of: .white) ?? tone
+        // Visible luminous glass rather than nearly black HUD plaques.
+        let topAlpha: CGFloat = style == .sidebar ? 0.66 : 0.54
         glassGradient.colors = [
-            upper.withAlphaComponent(0.53).cgColor,
-            tone.withAlphaComponent(0.36).cgColor,
-            lower.withAlphaComponent(0.59).cgColor
+            upper.withAlphaComponent(topAlpha).cgColor,
+            tone.withAlphaComponent(0.28).cgColor,
+            lower.withAlphaComponent(0.43).cgColor
         ]
         upperEdge.colors = [
             accent.blended(withFraction: 0.42, of: .white)?
@@ -446,11 +451,14 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         box.translatesAutoresizingMaskIntoConstraints = false
         box.wantsLayer = true
         box.layer?.cornerRadius = radius
-        box.layer?.borderWidth = 1
-        box.layer?.borderColor = sea.withAlphaComponent(0.35).cgColor
+        // Nested data tiles should read as one interface, not a maze of
+        // thick outlines. Only top-level panels receive a stronger edge.
+        box.layer?.borderWidth = style == .panel ? 0.8 : 0.45
+        box.layer?.borderColor = tint().withAlphaComponent(
+            style == .panel ? 0.35 : 0.17).cgColor
         box.layer?.shadowColor = NSColor.black.cgColor
-        box.layer?.shadowOpacity = 0.13
-        box.layer?.shadowRadius = 12
+        box.layer?.shadowOpacity = style == .panel ? 0.10 : 0.025
+        box.layer?.shadowRadius = style == .panel ? 14 : 5
         box.layer?.shadowOffset = CGSize(width: 0, height: -3)
         let column = stack(spacing: 13)
         // Let every glass panel fill the available width; plain NSView
@@ -1182,13 +1190,13 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             idleLine.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
         }
         let panel = card([content], radius: 17, padding: 14, style: .metric)
-        panel.heightAnchor.constraint(greaterThanOrEqualToConstant: 137)
+        panel.heightAnchor.constraint(greaterThanOrEqualToConstant: 126)
             .isActive = true
         return panel
     }
 
     private func networkStatusPage() -> NSView {
-        let content = stack(spacing: 17)
+        let content = stack(spacing: 13)
         content.alignment = .leading
         let header = stack(.horizontal, spacing: 9)
         header.addArrangedSubview(text("Network status", size: 17,
@@ -1255,6 +1263,12 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         content.addArrangedSubview(locationCard)
         locationCard.widthAnchor.constraint(equalTo: content.widthAnchor)
             .isActive = true
+        // The previous equal-height dashboard stretched this single
+        // location row into a huge empty rectangle.
+        locationCard.heightAnchor.constraint(equalToConstant: 55).isActive = true
+        let flexibleBottom = NSView()
+        flexibleBottom.setContentHuggingPriority(.defaultLow, for: .vertical)
+        content.addArrangedSubview(flexibleBottom)
 
         // Offline mode never fabricates session bytes, handshakes or an IP.
         return card([content], radius: 25, padding: 20, style: .panel)
