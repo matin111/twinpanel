@@ -657,7 +657,7 @@ class MetalFallbackInstallTests(unittest.TestCase):
             'for index in 0..<17',
             'NSColor(calibratedRed: 0.24, green: 0.88, blue: 0.83,',
             'control.layer?.borderColor = primary ?',
-            'box.layer?.shadowOpacity = 0.13',
+            'box.layer?.shadowOpacity = style == .panel ? 0.10 : 0.025',
             'let iconName: String',
             'selected ? "✓" : "›"',
             'pingDetails(server)',
