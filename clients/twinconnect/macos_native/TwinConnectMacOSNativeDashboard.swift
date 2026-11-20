@@ -621,14 +621,14 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     // 0 bolt, 1 location, 2 settings, 3 account, 4 support,
     // 5 renewal, 6 website.
     private func sidebarIcon(_ kind: Int) -> NSImage {
-        let output = NSImage(size: NSSize(width: 19, height: 19),
+        let output = NSImage(size: NSSize(width: 23, height: 23),
                              flipped: false) { rect in
             let unit = rect.width / 20
             func pt(_ x: CGFloat, _ y: CGFloat) -> NSPoint {
                 NSPoint(x: x * unit, y: y * unit)
             }
             let path = NSBezierPath()
-            path.lineWidth = 1.7 * unit
+            path.lineWidth = 1.85 * unit
             path.lineCapStyle = .round
             path.lineJoinStyle = .round
             switch kind {
@@ -651,14 +651,16 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                 path.appendOval(in: NSRect(x: 8 * unit, y: 10 * unit,
                                           width: 4 * unit, height: 4 * unit))
             case 2:
-                path.appendOval(in: NSRect(x: 7 * unit, y: 7 * unit,
-                                          width: 6 * unit, height: 6 * unit))
-                for index in 0..<8 {
-                    let angle = Double(index) * Double.pi / 4
-                    let dx = CGFloat(cos(angle))
-                    let dy = CGFloat(sin(angle))
-                    path.move(to: pt(10 + dx * 6, 10 + dy * 6))
-                    path.line(to: pt(10 + dx * 9, 10 + dy * 9))
+                // Windows sidebar uses the three horizontal sliders icon.
+                for (y, knob) in [(CGFloat(5), CGFloat(7)),
+                                  (CGFloat(10), CGFloat(13)),
+                                  (CGFloat(15), CGFloat(8))] {
+                    path.move(to: pt(2, y))
+                    path.line(to: pt(18, y))
+                    path.appendOval(in: NSRect(x: (knob - 1.8) * unit,
+                                              y: (y - 1.8) * unit,
+                                              width: 3.6 * unit,
+                                              height: 3.6 * unit))
                 }
             case 3:
                 path.appendOval(in: NSRect(x: 7 * unit, y: 11 * unit,
@@ -760,20 +762,36 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         content.setCustomSpacing(31, after: brand)
 
         let navs = ["Quick connect", "Locations", "Settings", "Account"]
+        let selectedLocation = snapshot?.servers.first { $0.id == activeServer }
+        let selectedFlag = selectedLocation.map { flag($0.country) } ?? "🌐"
         for (index, label) in navs.enumerated() {
-            let control = button("    " + label,
+            let buttonTitle = index == 1 ?
+                "   " + selectedFlag + "     Locations" : "     " + label
+            let control = button(buttonTitle,
                 action: #selector(changeTab(_:)), tag: index,
                 primary: tab == index, mutedButton: true)
-            control.image = sidebarIcon(index)
-            control.imagePosition = .imageLeft
-            control.imageScaling = .scaleProportionallyDown
-            control.contentTintColor = tab == index ? NSColor.white : sea
+            if index != 1 {
+                control.image = sidebarIcon(index)
+                control.imagePosition = .imageLeft
+                control.imageScaling = .scaleProportionallyDown
+                control.contentTintColor = tab == index ? NSColor.white : sea
+            }
             control.alignment = .left
+            control.font = NSFont.systemFont(ofSize: 13, weight: .semibold)
             control.heightAnchor.constraint(equalToConstant: 54).isActive = true
-            control.layer?.cornerRadius = 17
-            control.layer?.borderColor = tab == index ?
-                sea.withAlphaComponent(0.85).cgColor :
-                sea.withAlphaComponent(0.32).cgColor
+            control.layer?.cornerRadius = 16
+            control.layer?.borderWidth = 1
+            if tab == index {
+                control.setAccentGradient(
+                    NSColor(calibratedRed: 0.31, green: 0.73, blue: 0.82, alpha: 1),
+                    NSColor(calibratedRed: 0.22, green: 0.57, blue: 0.61, alpha: 1))
+                control.layer?.borderColor = sea.withAlphaComponent(0.83).cgColor
+            } else {
+                control.setAccentGradient(
+                    NSColor(calibratedRed: 0.17, green: 0.34, blue: 0.40, alpha: 1),
+                    NSColor(calibratedRed: 0.11, green: 0.27, blue: 0.32, alpha: 1))
+                control.layer?.borderColor = sea.withAlphaComponent(0.36).cgColor
+            }
             content.addArrangedSubview(control)
             control.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
         }
@@ -791,8 +809,12 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             link.imagePosition = .imageAbove
             link.imageScaling = .scaleProportionallyDown
             link.contentTintColor = sea
-            link.heightAnchor.constraint(equalToConstant: 56).isActive = true
-            link.layer?.cornerRadius = 11
+            link.heightAnchor.constraint(equalToConstant: 62).isActive = true
+            link.layer?.cornerRadius = 12
+            link.layer?.borderColor = sea.withAlphaComponent(0.35).cgColor
+            link.setAccentGradient(
+                NSColor(calibratedRed: 0.19, green: 0.38, blue: 0.44, alpha: 1),
+                NSColor(calibratedRed: 0.12, green: 0.29, blue: 0.34, alpha: 1))
             quick.addArrangedSubview(link)
         }
         if accountSession?.supportURL != nil ||
@@ -849,7 +871,20 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             .isActive = true
         content.addArrangedSubview(settingsRow)
         settingsRow.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
-        spaced(side, content, inset: 17)
+        // Independent vertical safe-areas match the Windows navigation:
+        // branding starts below the title bar; the language/gear controls
+        // float above the bottom edge rather than touching the window.
+        content.translatesAutoresizingMaskIntoConstraints = false
+        side.addSubview(content)
+        NSLayoutConstraint.activate([
+            content.leadingAnchor.constraint(equalTo: side.leadingAnchor,
+                                             constant: 17),
+            content.trailingAnchor.constraint(equalTo: side.trailingAnchor,
+                                              constant: -17),
+            content.topAnchor.constraint(equalTo: side.topAnchor, constant: 27),
+            content.bottomAnchor.constraint(equalTo: side.bottomAnchor,
+                                            constant: -46)
+        ])
         return side
     }
 
