@@ -1375,6 +1375,12 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             case .success(let session):
                 self.accountSession = session
                 self.snapshot = nil
+                self.pingGeneration += 1
+                self.nodePingResults.removeAll()
+                self.nodePingBusy.removeAll()
+                self.nodePingQueue.removeAll()
+                self.pingAllBusy = false
+                self.didAutoPing = false
                 self.tenantLogo = nil
                 self.logoGeneration += 1
                 let logoVersion = self.logoGeneration
@@ -1428,6 +1434,21 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                 return
             }
             self.snapshot = data
+            if data.sectionsLoaded.contains("servers") {
+                let validIDs = Set(data.servers.map { $0.id })
+                self.nodePingResults = self.nodePingResults.filter {
+                    validIDs.contains($0.key)
+                }
+                // Like the Windows client, automatically probe up to 24
+                // public node addresses without delaying authenticated UI.
+                if !self.didAutoPing {
+                    self.didAutoPing = true
+                    let targets = Array(data.servers.filter {
+                        $0.probeIP != nil
+                    }.prefix(24))
+                    self.pingNodes(targets)
+                }
+            }
             if data.sectionsLoaded.contains("protocols"),
                let selected = self.activeProtocol,
                !data.protocols.contains(where: { $0.code == selected }) {
@@ -1466,6 +1487,12 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
 
     @objc private func signOut(_ sender: NSButton) {
         refreshGeneration += 1
+        pingGeneration += 1
+        nodePingResults.removeAll()
+        nodePingBusy.removeAll()
+        nodePingQueue.removeAll()
+        pingAllBusy = false
+        didAutoPing = false
         logoGeneration += 1
         tenantLogo = nil
         accountSession = nil
