@@ -378,7 +378,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
 
     private func button(_ title: String, action: Selector, tag: Int = 0,
                         primary: Bool = false, mutedButton: Bool = false)
-                        -> NSButton {
+                        -> TwinNativePremiumButton {
         let control = TwinNativePremiumButton(title: title, target: self,
                                                action: action)
         control.isBordered = false
