@@ -121,13 +121,24 @@ private final class TwinNativeGlassCard: NSView {
     enum Style: Equatable { case panel, inset, metric, sidebar }
     private let glassGradient = CAGradientLayer()
     private let upperEdge = CAGradientLayer()
+    private let blur = NSVisualEffectView(frame: .zero)
+    private let tintOverlay = NSView(frame: .zero)
     override init(frame: NSRect) {
         super.init(frame: frame)
         wantsLayer = true
+        // Actual AppKit vibrancy/blur, not a nearly opaque painted rectangle.
+        // withinWindow works on Catalina without an app Metal renderer.
+        blur.material = .hudWindow
+        blur.blendingMode = .withinWindow
+        blur.state = .active
+        blur.wantsLayer = true
+        addSubview(blur)
+        tintOverlay.wantsLayer = true
+        addSubview(tintOverlay)
         glassGradient.startPoint = CGPoint(x: 0, y: 1)
         glassGradient.endPoint = CGPoint(x: 1, y: 0)
         glassGradient.locations = [0, 0.55, 1]
-        layer?.insertSublayer(glassGradient, at: 0)
+        tintOverlay.layer?.addSublayer(glassGradient)
         // One-pixel specular edge, following the Windows card vocabulary.
         upperEdge.colors = [
             NSColor(calibratedRed: 0.44, green: 0.91, blue: 0.94,
@@ -137,7 +148,7 @@ private final class TwinNativeGlassCard: NSView {
         ]
         upperEdge.startPoint = CGPoint(x: 0, y: 0.5)
         upperEdge.endPoint = CGPoint(x: 1, y: 0.5)
-        layer?.addSublayer(upperEdge)
+        tintOverlay.layer?.addSublayer(upperEdge)
         apply(.panel)
     }
     required init?(coder: NSCoder) { return nil }
@@ -177,9 +188,9 @@ private final class TwinNativeGlassCard: NSView {
         let upper = tone.blended(withFraction: 0.15, of: .white) ?? tone
         let lower = tone.blended(withFraction: 0.17, of: .black) ?? tone
         glassGradient.colors = [
-            upper.withAlphaComponent(0.85).cgColor,
-            tone.withAlphaComponent(0.80).cgColor,
-            lower.withAlphaComponent(0.88).cgColor
+            upper.withAlphaComponent(0.53).cgColor,
+            tone.withAlphaComponent(0.36).cgColor,
+            lower.withAlphaComponent(0.59).cgColor
         ]
         upperEdge.colors = [
             accent.blended(withFraction: 0.42, of: .white)?
@@ -190,8 +201,15 @@ private final class TwinNativeGlassCard: NSView {
     }
     override func layout() {
         super.layout()
+        blur.frame = bounds
+        tintOverlay.frame = bounds
+        let radius = layer?.cornerRadius ?? 20
+        blur.layer?.cornerRadius = radius
+        blur.layer?.masksToBounds = true
+        tintOverlay.layer?.cornerRadius = radius
+        tintOverlay.layer?.masksToBounds = true
         glassGradient.frame = bounds
-        glassGradient.cornerRadius = layer?.cornerRadius ?? 20
+        glassGradient.cornerRadius = radius
         upperEdge.frame = NSRect(x: 1, y: bounds.height - 1.5,
                                  width: max(0, bounds.width - 2), height: 1)
     }
