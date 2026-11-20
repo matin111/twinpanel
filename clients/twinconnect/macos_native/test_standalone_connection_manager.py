@@ -210,5 +210,65 @@ class StandaloneManagerTests(unittest.TestCase):
                 self.assertEqual(manager.engine_failure_category(), expected)
 
 
+    def test_stop_waits_until_engine_exits_before_deleting_state(self):
+        record = {"protocol": "hysteria2", "pid": 4242,
+                  "executable": "/safe/sing-box", "config": "/private/test.json"}
+        with mock.patch.object(manager, "read_state", return_value=record), \
+             mock.patch.object(manager, "process_matches",
+                               side_effect=[True, True, False]), \
+             mock.patch.object(manager.os, "kill") as kill, \
+             mock.patch.object(manager.time, "sleep"), \
+             mock.patch.object(manager, "state_path",
+                               return_value=self.root / "current.json"):
+            (self.root / "current.json").write_text("{}")
+            result = manager.stop()
+        self.assertEqual(result["state"], "stopped")
+        kill.assert_called_once_with(4242, manager.signal.SIGTERM)
+        self.assertFalse((self.root / "current.json").exists())
+
+    def test_stop_escalates_only_validated_owned_process(self):
+        record = {"protocol": "hysteria2", "pid": 4242}
+        with mock.patch.object(manager, "read_state", return_value=record), \
+             mock.patch.object(manager, "process_matches",
+                               side_effect=[True] * 32 + [False]), \
+             mock.patch.object(manager.os, "kill") as kill, \
+             mock.patch.object(manager.time, "sleep"), \
+             mock.patch.object(manager, "state_path",
+                               return_value=self.root / "current.json"):
+            (self.root / "current.json").write_text("{}")
+            result = manager.stop()
+        self.assertEqual(result["state"], "stopped")
+        self.assertEqual(kill.call_args_list, [
+            mock.call(4242, manager.signal.SIGTERM),
+            mock.call(4242, manager.signal.SIGKILL)
+        ])
+
+    def test_stop_keeps_state_when_engine_refuses_to_exit(self):
+        record = {"protocol": "hysteria2", "pid": 4242}
+        state = self.root / "current.json"
+        state.write_text("{}")
+        with mock.patch.object(manager, "read_state", return_value=record), \
+             mock.patch.object(manager, "process_matches", return_value=True), \
+             mock.patch.object(manager.os, "kill"), \
+             mock.patch.object(manager.time, "sleep"), \
+             mock.patch.object(manager, "state_path", return_value=state):
+            with self.assertRaisesRegex(
+                ValueError, "ENGINE_STILL_RUNNING_STATE_PRESERVED"
+            ):
+                manager.stop()
+        self.assertTrue(state.exists())
+
+    def test_stop_stale_record_never_kills_unknown_pid(self):
+        record = {"protocol": "hysteria2", "pid": 4242}
+        with mock.patch.object(manager, "read_state", return_value=record), \
+             mock.patch.object(manager, "process_matches", return_value=False), \
+             mock.patch.object(manager.os, "kill") as kill, \
+             mock.patch.object(manager, "state_path",
+                               return_value=self.root / "current.json"):
+            result = manager.stop()
+        self.assertEqual(result["state"], "stopped")
+        kill.assert_not_called()
+
+
 if __name__ == "__main__":
     unittest.main()
