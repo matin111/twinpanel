@@ -105,7 +105,13 @@ class MetalFallbackInstallTests(unittest.TestCase):
         self.assertIn("Locations", generated)
         self.assertIn("Settings", generated)
         self.assertIn("Account", generated)
-        self.assertIn("TwinNativePowerRing", generated)
+        self.assertIn("TwinNativeNetworkFabric", generated)
+        self.assertNotIn("TwinNativePowerRing", generated)
+        self.assertIn('pair.distribution = .fillEqually', generated)
+        self.assertIn('workspace.addArrangedSubview(pair)', generated)
+        self.assertIn('if availableWidth >= 790', generated)
+        self.assertIn('sidebar.widthAnchor.constraint(equalToConstant: 258)', generated)
+        self.assertIn('Connect now', generated)
         # Regression: a login must show the AppKit dashboard even if
         # subscription refresh fails or takes time. Layout must not collapse.
         self.assertIn("sidebar.translatesAutoresizingMaskIntoConstraints = false", generated)
