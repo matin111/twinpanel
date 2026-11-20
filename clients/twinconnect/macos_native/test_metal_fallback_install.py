@@ -236,8 +236,8 @@ class MetalFallbackInstallTests(unittest.TestCase):
             'friendlyServerName(server, index: position)',
             'showAllProtocolChips.toggle()',
             '"All protocols (" + String(list.count)',
-            '"LOCAL PROXY TEST"',
-            'fabric.addSubview(fabricInfo)',
+            'private final class TwinNativeNetworkFabric: NSView',
+            'let centerBody = NSBezierPath(roundedRect:',
             'previewServer = snapshot?.servers.first',
         ):
             self.assertIn(token, source)
@@ -253,7 +253,7 @@ class MetalFallbackInstallTests(unittest.TestCase):
         )[1].split("    private func createTable() -> NSView {", 1)[0]
         for token in (
             '"Server locations"', '"Search by server or country"',
-            '"PROTOCOLS"', '"ICMP LATENCY"', '"✓  Selected"',
+            '"PROTOCOLS"', 'selected ? "✓" : "›"',
             'server.online', 'pingText(server)', 'pingColor(server)',
             'pingDetails(server)', 'pingOneServer(_:)',
             'selectLocationServer(_:)', 'toggleLocationCountry(_:)',
@@ -263,6 +263,29 @@ class MetalFallbackInstallTests(unittest.TestCase):
             self.assertIn(token, directory)
         self.assertNotIn('pingMs = 100', directory)
         self.assertNotIn('server.id.hashValue', directory)
+
+    def test_windows_visual_parity_has_vector_hero_and_real_network_state(self) -> None:
+        source = (SOURCE / "TwinConnectMacOSNativeDashboard.swift").read_text(
+            encoding="utf-8"
+        )
+        for token in (
+            'let centerBody = NSBezierPath(roundedRect:',
+            'for index in 0..<17',
+            'NSColor(calibratedRed: 0.24, green: 0.88, blue: 0.83,',
+            'control.layer?.borderColor = primary ?',
+            'box.layer?.shadowOpacity = 0.13',
+            'let iconName: String',
+            'selected ? "✓" : "›"',
+            'pingDetails(server)',
+            'Proxy test only — system VPN, Kill Switch and DNS protection remain OFF.',
+            'pill("Disconnected", color: muted)',
+            'networkMetric("Public IP", value: "—")',
+            'networkMetric("Download", value: "—"',
+            'networkMetric("Upload", value: "—"',
+        ):
+            self.assertIn(token, source)
+        self.assertNotIn('pill("● Online", color: sea)', source)
+        self.assertNotIn('startVPNTunnel(', source)
 
     def test_appkit_hysteria_keeps_authenticated_ca_without_tls_bypass(self) -> None:
         source = (self.root / "macos_native/TwinConnectMacOSNativeDirectory.swift").read_text(
