@@ -123,5 +123,34 @@ class StandaloneManagerTests(unittest.TestCase):
         self.assertFalse(status["verified_expected_egress"])
 
 
+    def test_proxy_failure_codes_do_not_expose_remote_details(self):
+        self.assertEqual(manager.proxy_failure_category(7),
+                         "PROXY_TCP_UNREACHABLE")
+        self.assertEqual(manager.proxy_failure_category(28),
+                         "PROXY_OR_REMOTE_TIMEOUT")
+        self.assertEqual(manager.proxy_failure_category(97),
+                         "PROXY_SOCKS_HANDSHAKE_FAILED")
+        self.assertEqual(manager.proxy_failure_category(123456),
+                         "PROXY_EGRESS_REQUEST_FAILED")
+
+    def test_probe_curl_failure_reports_safe_status_only(self):
+        record = {"protocol": "hysteria2", "port": 17089, "pid": 42}
+        result = subprocess.CompletedProcess([], 28, "", "remote.example secret=hello")
+        with mock.patch.object(manager, "read_state", return_value=record), \
+             mock.patch.object(manager, "process_matches", return_value=True), \
+             mock.patch.object(manager.subprocess, "run", return_value=result):
+            with self.assertRaisesRegex(ValueError, "^PROXY_OR_REMOTE_TIMEOUT$"):
+                manager.probe()
+
+    def test_diagnosis_classifies_logs_without_returning_secrets(self):
+        logfile = self.root / "engine.log"
+        logfile.write_text(
+            "private-token=secret-value\ntransport QUIC handshake timeout\n")
+        with mock.patch.object(manager, "STATE", self.root):
+            reason = manager.engine_failure_category()
+        self.assertEqual(reason, "ENGINE_REMOTE_TIMEOUT")
+        self.assertNotIn("secret-value", reason)
+
+
 if __name__ == "__main__":
     unittest.main()
