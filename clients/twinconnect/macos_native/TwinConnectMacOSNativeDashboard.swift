@@ -70,6 +70,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     private var busy = false
     private var refreshGeneration = 0
     private var nativeContentWidth: CGFloat = 1100
+    private var observesWindowSize = false
     private var tenantLogo: NSImage?
     private var logoGeneration = 0
     // Match Flutter sections: Quick connect / Locations / Settings / Account.
@@ -94,6 +95,36 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
 
     override func loadView() {
         view = build()
+    }
+
+    override func viewDidAppear() {
+        super.viewDidAppear()
+        if !observesWindowSize {
+            observesWindowSize = true
+            NotificationCenter.default.addObserver(
+                self, selector: #selector(nativeWindowResized(_:)),
+                name: NSWindow.didResizeNotification, object: nil)
+        }
+        if let current = view.window?.contentView?.bounds.width {
+            nativeContentWidth = current
+        }
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
+
+    @objc private func nativeWindowResized(_ notification: Notification) {
+        guard let source = notification.object as? NSWindow,
+              source === view.window, accountSession != nil else { return }
+        let latest = source.contentView?.bounds.width ?? source.frame.width
+        let wasWide = nativeContentWidth - 306 >= 790
+        let becomesWide = latest - 306 >= 790
+        let significant = abs(latest - nativeContentWidth) > 120
+        nativeContentWidth = latest
+        if tab == 0 && (wasWide != becomesWide || significant) {
+            view = build()
+        }
     }
 
     private func tint() -> NSColor {
