@@ -608,8 +608,8 @@ class MetalFallbackInstallTests(unittest.TestCase):
             "blur.layer?.masksToBounds = true",
             "tintOverlay.layer?.masksToBounds = true",
             "upper.withAlphaComponent(topAlpha).cgColor",
-            "tone.withAlphaComponent(0.28).cgColor",
-            "lower.withAlphaComponent(0.43).cgColor",
+            "tone.withAlphaComponent(middleAlpha).cgColor",
+            "lower.withAlphaComponent(bottomAlpha).cgColor",
         ):
             self.assertIn(token, glass)
 
