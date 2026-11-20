@@ -96,6 +96,16 @@ class MetalFallbackInstallTests(unittest.TestCase):
         self.assertIn("Settings", generated)
         self.assertIn("Account", generated)
         self.assertIn("TwinNativePowerRing", generated)
+        # Regression: a login must show the AppKit dashboard even if
+        # subscription refresh fails or takes time. Layout must not collapse.
+        self.assertIn("sidebar.translatesAutoresizingMaskIntoConstraints = false", generated)
+        self.assertIn("workspace.alignment = .width", generated)
+        self.assertIn("scroll.hasVerticalScroller = true", generated)
+        self.assertIn("scroll.documentView = document", generated)
+        self.assertIn("document.widthAnchor.constraint(equalTo: scroll.contentView.widthAnchor)", generated)
+        self.assertIn("document.heightAnchor.constraint(greaterThanOrEqualTo:", generated)
+        self.assertIn("self.view = self.build()\\n                self.refreshData()", generated)
+        self.assertIn("Could not refresh panel data:", generated)
         login_code = generated.split("private func buildLogin(in root: NSView) {", 1)[1].split(
             "private func buildShell(in root: NSView) {", 1
         )[0]
