@@ -976,6 +976,21 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         view = build()
     }
 
+    @objc private func selectFastestMeasuredServer(_ sender: NSButton) {
+        guard let servers = snapshot?.servers else { return }
+        let eligible = servers.filter {
+            $0.online && nodePingResults[$0.id]?.measuredMs != nil
+        }
+        guard let best = eligible.min(by: {
+            (nodePingResults[$0.id]?.measuredMs ?? Int.max) <
+                (nodePingResults[$1.id]?.measuredMs ?? Int.max)
+        }) else { return }
+        activeServer = best.id
+        expandedCountries.insert(best.country.uppercased())
+        persistCurrentSelection()
+        view = build()
+    }
+
     @objc private func pingAllServers(_ sender: NSButton) {
         guard let nodes = snapshot?.servers, !nodes.isEmpty else { return }
         pingNodes(nodes)
@@ -1157,6 +1172,26 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         let chips = protocolChips()
         wrapper.addArrangedSubview(chips)
         chips.widthAnchor.constraint(equalTo: wrapper.widthAnchor).isActive = true
+
+        // A fastest-node action must use real local ICMP measurements,
+        // never panel estimates or synthetic timers.
+        let fastest = (snapshot?.servers ?? []).filter { server in
+            server.online && nodePingResults[server.id]?.measuredMs != nil
+        }.min {
+            (nodePingResults[$0.id]?.measuredMs ?? Int.max) <
+                (nodePingResults[$1.id]?.measuredMs ?? Int.max)
+        }
+        let fastestButton = button(
+            fastest.map {
+                "✦  Fastest measured: " + countryName($0.country) +
+                "  ·  " + pingText($0)
+            } ?? "✦  Fastest server  ·  Measure ping first",
+            action: #selector(selectFastestMeasuredServer(_:)),
+            mutedButton: true)
+        fastestButton.isEnabled = fastest != nil
+        fastestButton.heightAnchor.constraint(equalToConstant: 39).isActive = true
+        fastestButton.toolTip = "Choose the lowest real ICMP RTT among online nodes"
+        wrapper.addArrangedSubview(fastestButton)
 
         let visible = (snapshot?.servers ?? []).filter { server in
             if locationSearch.isEmpty { return true }
