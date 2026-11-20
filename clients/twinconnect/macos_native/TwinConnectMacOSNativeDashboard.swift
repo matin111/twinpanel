@@ -763,7 +763,9 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         connect.toolTip = canTestProxy ?
             "One proxied HTTPS request; not a system-wide VPN connection." :
             "Select Hysteria2 and an assigned server in Locations to test local proxy."
-        connect.heightAnchor.constraint(equalToConstant: 53).isActive = true
+        connect.heightAnchor.constraint(equalToConstant: 54).isActive = true
+        connect.layer?.cornerRadius = 17
+        connect.layer?.borderColor = sea.withAlphaComponent(0.9).cgColor
         connect.widthAnchor.constraint(equalToConstant: 255).isActive = true
         // On unsigned cloud Macs the system VPN remains disabled. Offer a
         // separate, explicitly labelled, one-request local SOCKS egress test.
@@ -1587,11 +1589,22 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         let items = stack(spacing: 8)
         items.alignment = .leading
         let header = stack(.horizontal, spacing: 9)
-        header.addArrangedSubview(text("✓  Subscription details",
-                                       size: 12, weight: .semibold))
-        header.addArrangedSubview(button("↻",
-                                         action: #selector(refresh(_:)), mutedButton: true))
+        header.addArrangedSubview(text("◈  Subscription details",
+                                       size: 13, weight: .semibold))
+        let space = NSView()
+        space.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        header.addArrangedSubview(space)
+        let limitLabel = snapshot?.account.map {
+            $0.limitBytes == 0 ? "Unlimited" : "Limited"
+        } ?? "—"
+        header.addArrangedSubview(text(limitLabel, size: 10, color: sea))
+        let reload = button("↻", action: #selector(refresh(_:)),
+                            mutedButton: true)
+        reload.widthAnchor.constraint(equalToConstant: 32).isActive = true
+        reload.heightAnchor.constraint(equalToConstant: 32).isActive = true
+        header.addArrangedSubview(reload)
         items.addArrangedSubview(header)
+        header.widthAnchor.constraint(equalTo: items.widthAnchor).isActive = true
 
         let account = snapshot?.account
         let used = account.map {
@@ -1603,8 +1616,16 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                                           countStyle: .file)
         } ?? "—"
         let usage = stack(spacing: 7)
-        usage.addArrangedSubview(text("Data usage     " + used + " / " + quota,
-                                      size: 11))
+        let usageHeading = stack(.horizontal, spacing: 8)
+        usageHeading.addArrangedSubview(text("◌  Data usage", size: 11,
+                                             color: muted))
+        let usageFiller = NSView()
+        usageFiller.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        usageHeading.addArrangedSubview(usageFiller)
+        usageHeading.addArrangedSubview(text(used + " / " + quota,
+                                            size: 12, weight: .semibold))
+        usage.addArrangedSubview(usageHeading)
+        usageHeading.widthAnchor.constraint(equalTo: usage.widthAnchor).isActive = true
         let progress = NSProgressIndicator()
         progress.isIndeterminate = false
         progress.minValue = 0
@@ -1663,7 +1684,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             items.addArrangedSubview(text("Account: " + error,
                                           size: 10, color: amber))
         }
-        return card([items], radius: 20, padding: 12)
+        return card([items], radius: 20, padding: 14)
     }
 
     private func filteredServers() -> [TwinMacNativeServer] {
