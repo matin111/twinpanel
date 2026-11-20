@@ -405,7 +405,7 @@ class MetalFallbackInstallTests(unittest.TestCase):
             'side.apply(.sidebar, accent: tint(),',
             'background: panelBackgroundColor(), surface: panelCardColor()',
             'let brand = tint()',
-            'control.setAccentGradient(upper.withAlphaComponent(0.90)',
+            'control.setAccentGradient(upper.withAlphaComponent(0.72)',
             'enum Style: Equatable { case panel, inset, metric, sidebar }',
         ):
             self.assertIn(token, source)
