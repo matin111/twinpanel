@@ -206,6 +206,27 @@ class MetalFallbackInstallTests(unittest.TestCase):
                 settings = plistlib.load(handle)
             self.assertTrue(settings["com.apple.security.network.client"])
 
+    def test_refreshes_modified_appkit_source_without_duplicate_swift_types(self) -> None:
+        self.assertEqual(self.install().returncode, 0)
+        dashboard_path = self.root / "macos_native/TwinConnectMacOSNativeDashboard.swift"
+        original = dashboard_path.read_text(encoding="utf-8")
+        dashboard_path.write_text(
+            original + "\n// UPDATED_TRACKED_APPKIT_SOURCE_SENTINEL\n",
+            encoding="utf-8",
+        )
+        self.assertEqual(self.install().returncode, 0)
+        generated = self.window.read_text(encoding="utf-8")
+        self.assertEqual(
+            generated.count("UPDATED_TRACKED_APPKIT_SOURCE_SENTINEL"), 1
+        )
+        self.assertEqual(
+            generated.count("// TWINCONNECT_MACOS_NATIVE_DASHBOARD_V1"), 1
+        )
+        self.assertEqual(self.install().returncode, 0)
+        self.assertEqual(
+            self.window.read_text(encoding="utf-8"), generated
+        )
+
     def test_replaces_old_diagnostics_only_fallback(self) -> None:
         first = self.install()
         self.assertEqual(first.returncode, 0, first.stderr)
