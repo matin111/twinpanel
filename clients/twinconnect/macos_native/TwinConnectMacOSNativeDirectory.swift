@@ -27,11 +27,24 @@ struct TwinMacNativeServer {
     let latencyMs: Int?
 }
 
+// Mirrors the already defined Flutter ReservedRenewalSnapshot JSON contract.
+// Optional reservation data never contaminates current consumption totals.
+struct TwinMacReservedRenewal {
+    let status: String
+    let planName: String
+    let trafficBytes: Int64
+    let durationDays: Int
+    let reservedAt: Date
+    var needsReview: Bool { status == "needs_review" }
+}
+
 struct TwinMacNativeAccount {
     let status: String
     let usedBytes: Int64
     let limitBytes: Int64
     let expiresAt: Date?
+    let activationDurationDays: Int?
+    let reservedRenewal: TwinMacReservedRenewal?
 }
 
 struct TwinMacNativeSnapshot {
@@ -423,9 +436,38 @@ final class TwinConnectMacOSNativeDirectory: NSObject, URLSessionTaskDelegate {
                         return
                     }
                 }
+                var reserved: TwinMacReservedRenewal?
+                if let next = raw["reserved_renewal"] as? [String: Any],
+                   let renewalStatus = next["status"] as? String,
+                   ["reserved", "needs_review"].contains(renewalStatus),
+                   let planName = next["plan_name"] as? String,
+                   !planName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                   planName.count <= 160,
+                   let traffic = next["traffic_bytes"] as? NSNumber,
+                   traffic.int64Value >= 0,
+                   let days = next["duration_days"] as? Int, days >= 0,
+                   let created = next["reserved_at"] as? String {
+                    let formatter = ISO8601DateFormatter()
+                    formatter.formatOptions = [.withInternetDateTime,
+                                               .withFractionalSeconds]
+                    var parsed = formatter.date(from: created)
+                    if parsed == nil {
+                        formatter.formatOptions = [.withInternetDateTime]
+                        parsed = formatter.date(from: created)
+                    }
+                    if let parsed = parsed {
+                        reserved = TwinMacReservedRenewal(
+                            status: renewalStatus, planName: planName,
+                            trafficBytes: traffic.int64Value,
+                            durationDays: days, reservedAt: parsed)
+                    }
+                }
+                let activationDays = raw["activation_duration_days"] as? Int
                 account = TwinMacNativeAccount(
                     status: status, usedBytes: used.int64Value,
-                    limitBytes: limit.int64Value, expiresAt: expiry
+                    limitBytes: limit.int64Value, expiresAt: expiry,
+                    activationDurationDays: activationDays,
+                    reservedRenewal: reserved
                 )
                 publish("account")
             }
