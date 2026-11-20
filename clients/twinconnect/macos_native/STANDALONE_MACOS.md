@@ -8,11 +8,15 @@ real SOCKS/HTTP request through the proxy succeeds.
 
 ## AppKit Hysteria2 failure diagnostics
 
-When a proxied HTTPS request fails, Quick Connect now displays a **fixed,
-redacted diagnostic code**, e.g. `PROXY_OR_REMOTE_TIMEOUT`,
-`PROXY_TCP_UNREACHABLE`, or `PROXY_SOCKS_HANDSHAKE_FAILED` instead
-of an uninformative generic failure. Engine failures may be classified
-without printing remote addresses or passwords. The standalone CLI also
+When a proxied HTTPS request fails, Quick Connect now displays **separate fixed,
+redacted curl and sing-box diagnostic codes**, e.g. `PROXY_OR_REMOTE_TIMEOUT`,
+`PROXY_TCP_UNREACHABLE`, or `PROXY_SOCKS_HANDSHAKE_FAILED` (curl error 97) instead
+of an uninformative generic failure. Engine failures (e.g. `HYSTERIA2_REMOTE_AUTH_REJECTED`,
+`ENGINE_REMOTE_TIMEOUT`, `ENGINE_REMOTE_TLS_CERTIFICATE_FAILURE`) may be classified
+without printing remote addresses or passwords. Each new test truncates the
+previous engine log so a stale error is not misattributed to a new server.
+Curl error 97 alone does **not** establish whether SOCKS negotiation,
+Hysteria2 authentication, or the remote transport caused the failure. The standalone CLI also
 supports `python3 macos_native/standalone_connection_manager.py diagnose`.
 Do not paste raw `engine.log` into chat or an issue; it can contain private
 connection details. These codes are diagnostics, not proof of successful
