@@ -49,6 +49,28 @@ class MacOSCLITunRunnerTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     runner.validate_config(p)
 
+    def test_rejects_symlinked_config(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config = self.make_config(tmp)
+            alias = Path(tmp) / "alias.json"
+            alias.symlink_to(config)
+            with self.assertRaises(ValueError):
+                runner.validate_config(alias)
+
+    def test_rejects_malformed_experimental_settings(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config = self.make_config(tmp, experimental=None)
+            with self.assertRaises(ValueError):
+                runner.validate_config(config)
+
+    def test_native_account_tun_uses_existing_entitled_profile(self):
+        native = (Path(__file__).resolve().parent /
+                  "TwinConnectMacOSNativeDirectory.swift").read_text(encoding="utf-8")
+        self.assertIn("func prepareUnroutedHysteria2TUN(", native)
+        self.assertIn("prepareLocalHysteria2(session, serverID: serverID)", native)
+        self.assertIn('"auto_route": false', native)
+        self.assertIn('"auto_redirect": false', native)
+
     def test_remote_access_blocks_before_child_process(self):
         with mock.patch.object(runner.os, "geteuid", return_value=0), \
              mock.patch.dict(runner.os.environ, {"SSH_CONNECTION": "remote"}, clear=True), \
