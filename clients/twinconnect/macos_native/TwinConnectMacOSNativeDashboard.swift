@@ -881,22 +881,13 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         let leftGap = NSView()
         let rightGap = NSView()
         buttonRow.addArrangedSubview(leftGap)
-        // The cloud Mac has no signed system VPN. Make the PRIMARY action
-        // useful in a clearly labelled, limited one-shot SOCKS test mode.
-        // In particular never present this as an active full-tunnel VPN.
-        let canTestProxy = activeProtocol == "hysteria2" &&
-            activeServer != nil &&
-            (snapshot?.protocols.contains {
-                $0.code == "hysteria2" && $0.configured
-            } ?? false)
-        let connect = button(localProxyBusy ? "ϟ    Testing proxy…" :
-                             canTestProxy ? "ϟ    Test Hysteria2 proxy     ›" :
-                                            "ϟ    Choose server & Hysteria2     ›",
-                             action: #selector(primaryProxyAction(_:)), primary: true)
-        connect.isEnabled = !localProxyBusy && accountSession != nil
-        connect.toolTip = canTestProxy ?
-            "One proxied HTTPS request; not a system-wide VPN connection." :
-            "Select Hysteria2 and an assigned server in Locations to test local proxy."
+        // Mirror the original Windows primary button. An unsigned macOS
+        // build cannot connect a system VPN, so this button must NEVER
+        // silently launch the Hysteria2 diagnostic SOCKS engine.
+        let connect = button("ϟ    Connect now     ›",
+                             action: #selector(unavailableConnect(_:)), primary: true)
+        connect.isEnabled = accountSession != nil
+        connect.toolTip = "VPN unavailable until a signed PacketTunnel is installed. No local proxy starts here."
         connect.heightAnchor.constraint(equalToConstant: 54).isActive = true
         connect.layer?.cornerRadius = 17
         connect.layer?.borderColor = sea.withAlphaComponent(0.9).cgColor
@@ -914,24 +905,13 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         leftGap.widthAnchor.constraint(equalTo: rightGap.widthAnchor).isActive = true
         main.addArrangedSubview(buttonRow)
         buttonRow.widthAnchor.constraint(equalTo: main.widthAnchor).isActive = true
-        // Keep the emergency stop visible but use one compact control row;
-        // technical warnings belong in a tooltip and Settings, not a large
-        // warning block that shifts the Windows-matched subscription card.
-        let proxyTools = stack(.horizontal, spacing: 8)
-        let stopProxy = button("■  Stop proxy",
-                               action: #selector(stopLocalProxyNow(_:)),
-                               mutedButton: true)
-        stopProxy.heightAnchor.constraint(equalToConstant: 34).isActive = true
-        stopProxy.widthAnchor.constraint(equalToConstant: 124).isActive = true
-        stopProxy.toolTip = "Emergency stop for local SOCKS proxy. Does not touch DNS or routes."
-        proxyTools.addArrangedSubview(stopProxy)
-        let proxyHint = text("Local proxy test only · VPN offline",
-                             size: 10, color: amber)
-        proxyTools.addArrangedSubview(proxyHint)
-        main.addArrangedSubview(proxyTools)
-        proxyTools.widthAnchor.constraint(equalTo: main.widthAnchor).isActive = true
-        if !localProxyStatus.isEmpty {
-            main.addArrangedSubview(text(localProxyStatus, size: 11, color: muted))
+        // Diagnostics, emergency shutdown and technical warnings belong
+        // in Settings. This visual dashboard has the same clean composition
+        // as Windows; no SOCKS process starts from Quick Connect.
+        if !status.isEmpty && status.contains("Connection unavailable") {
+            let advisory = text("A signed macOS VPN extension is required.",
+                                size: 10, color: amber)
+            main.addArrangedSubview(advisory)
         }
 
 
@@ -1607,6 +1587,32 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                                     state: "Dark")
         section.addArrangedSubview(appearance)
         appearance.widthAnchor.constraint(equalTo: section.widthAnchor).isActive = true
+
+        // Independent diagnostics; cannot be confused with the Connect
+        // action. Keep verified emergency stop available at all times.
+        section.addArrangedSubview(text("Local proxy diagnostics",
+                                        size: 18, weight: .semibold))
+        section.addArrangedSubview(text(
+            "Only a single HTTPS request uses Hysteria2. This is not a system VPN.",
+            size: 11, color: amber))
+        let proxyActions = stack(.horizontal, spacing: 10)
+        proxyActions.distribution = .fillEqually
+        let testProxy = button("Test Hysteria2 SOCKS",
+                               action: #selector(primaryProxyAction(_:)),
+                               mutedButton: true)
+        testProxy.heightAnchor.constraint(equalToConstant: 44).isActive = true
+        testProxy.isEnabled = !localProxyBusy
+        proxyActions.addArrangedSubview(testProxy)
+        let stopProxy = button("■  Stop local proxy",
+                               action: #selector(stopLocalProxyNow(_:)),
+                               mutedButton: true)
+        stopProxy.heightAnchor.constraint(equalToConstant: 44).isActive = true
+        proxyActions.addArrangedSubview(stopProxy)
+        section.addArrangedSubview(proxyActions)
+        proxyActions.widthAnchor.constraint(equalTo: section.widthAnchor).isActive = true
+        if !localProxyStatus.isEmpty {
+            section.addArrangedSubview(text(localProxyStatus, size: 11, color: muted))
+        }
 
         let actions = stack(.horizontal, spacing: 10)
         actions.distribution = .fillEqually
@@ -2404,7 +2410,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     }
 
     @objc private func unavailableConnect(_ sender: NSButton) {
-        // Defensive: never claim a live VPN or request private profiles here.
+        // Never launch diagnostic SOCKS from the visually identical Windows
+        // Connect action. Users must explicitly choose diagnostics in Settings.
         status = "Connection unavailable: Apple-signed PacketTunnel required."
         view = build()
     }
