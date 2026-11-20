@@ -451,13 +451,13 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     }
 
     private func pill(_ value: String, color: NSColor? = nil) -> NSView {
-        let background = NSView()
-        background.wantsLayer = true
+        let background = TwinNativeGlassCard(frame: .zero)
+        background.apply(.inset, accent: color ?? tint(),
+                         background: panelBackgroundColor(),
+                         surface: panelCardColor())
         background.layer?.cornerRadius = 13
-        background.layer?.backgroundColor = (color ?? tint())
-            .withAlphaComponent(0.16).cgColor
         background.layer?.borderColor = (color ?? tint())
-            .withAlphaComponent(0.32).cgColor
+            .withAlphaComponent(0.37).cgColor
         background.layer?.borderWidth = 1
         let label = text(value, size: 12, weight: .semibold,
                          color: color ?? sea)
@@ -529,9 +529,10 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     private func build() -> NSView {
         let root = TwinNativeBackdrop(frame:
             NSRect(x: 0, y: 0, width: 1180, height: 740))
-        root.base = (panelBackgroundColor()?
-            .blended(withFraction: 0.60, of: base) ?? base)
-            .blended(withFraction: 0.19, of: tint()) ?? base
+        let configuredBackground = panelBackgroundColor()?
+            .blended(withFraction: 0.60, of: base) ?? base
+        root.base = configuredBackground.blended(
+            withFraction: 0.19, of: tint()) ?? base
         root.glow = tint()
         if accountSession == nil {
             buildLogin(in: root)
