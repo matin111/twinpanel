@@ -765,7 +765,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     }
 
     private func connectPage() -> NSView {
-        let main = stack(spacing: 11)
+        let main = stack(spacing: 10)
         main.alignment = .leading
 
         let offlineRow = stack(.horizontal, spacing: 8)
@@ -782,7 +782,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         let fabric = TwinNativeNetworkFabric(frame:
             NSRect(x: 0, y: 0, width: 330, height: 165))
         fabric.translatesAutoresizingMaskIntoConstraints = false
-        fabric.heightAnchor.constraint(equalToConstant: 165).isActive = true
+        fabric.heightAnchor.constraint(equalToConstant: 162).isActive = true
         // The old backdrop was an empty rectangle. This status overlay is
         // explicitly a selectable local proxy test, not a connected VPN.
         // The vector illustration itself remains in the hero; the current
@@ -833,18 +833,22 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         leftGap.widthAnchor.constraint(equalTo: rightGap.widthAnchor).isActive = true
         main.addArrangedSubview(buttonRow)
         buttonRow.widthAnchor.constraint(equalTo: main.widthAnchor).isActive = true
-        // Always expose an explicit stop control, including while a probe
-        // is still running. It only stops this app's verified local process.
-        let stopProxy = button("■  Stop local proxy",
+        // Keep the emergency stop visible but use one compact control row;
+        // technical warnings belong in a tooltip and Settings, not a large
+        // warning block that shifts the Windows-matched subscription card.
+        let proxyTools = stack(.horizontal, spacing: 8)
+        let stopProxy = button("■  Stop proxy",
                                action: #selector(stopLocalProxyNow(_:)),
                                mutedButton: true)
-        stopProxy.heightAnchor.constraint(equalToConstant: 35).isActive = true
-        stopProxy.toolTip = "Stop this app's managed local SOCKS process; does not alter network settings."
-        main.addArrangedSubview(stopProxy)
-        stopProxy.widthAnchor.constraint(equalTo: main.widthAnchor).isActive = true
-        main.addArrangedSubview(text(
-            "Proxy test only — system VPN, Kill Switch and DNS protection remain OFF.",
-            size: 11, color: amber))
+        stopProxy.heightAnchor.constraint(equalToConstant: 34).isActive = true
+        stopProxy.widthAnchor.constraint(equalToConstant: 124).isActive = true
+        stopProxy.toolTip = "Emergency stop for local SOCKS proxy. Does not touch DNS or routes."
+        proxyTools.addArrangedSubview(stopProxy)
+        let proxyHint = text("Local proxy test only · VPN offline",
+                             size: 10, color: amber)
+        proxyTools.addArrangedSubview(proxyHint)
+        main.addArrangedSubview(proxyTools)
+        proxyTools.widthAnchor.constraint(equalTo: main.widthAnchor).isActive = true
         if !localProxyStatus.isEmpty {
             main.addArrangedSubview(text(localProxyStatus, size: 11, color: muted))
         }
@@ -864,19 +868,10 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             $0.code == activeProtocol
         }?.name ?? "Choose protocol"
 
-        let footer = stack(.horizontal, spacing: 9)
-        footer.distribution = .fillEqually
-        footer.addArrangedSubview(compactMetric("Location", value: location))
-        footer.addArrangedSubview(compactMetric("Public IP", value: "—"))
-        footer.addArrangedSubview(compactMetric("Protocol", value: protocolName))
-        main.addArrangedSubview(footer)
-        footer.widthAnchor.constraint(equalTo: main.widthAnchor).isActive = true
-        let changeSelection = button("Change location or protocol   ›",
-            action: #selector(showLocations(_:)), mutedButton: true)
-        changeSelection.heightAnchor.constraint(equalToConstant: 42).isActive = true
-        main.addArrangedSubview(changeSelection)
-        changeSelection.widthAnchor.constraint(equalTo: main.widthAnchor).isActive = true
-        return card([main], radius: 27, padding: 17)
+        // The Windows Quick Connect layout has no redundant three-tile
+        // location/IP/protocol footer. Selection is available in the
+        // Network status location bar; keep this pane compact and unclipped.
+        return card([main], radius: 25, padding: 15)
     }
 
     private func networkMetric(_ title: String, value: String,
