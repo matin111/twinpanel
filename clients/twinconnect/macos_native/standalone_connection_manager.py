@@ -142,7 +142,9 @@ def start(protocol: str, config: Path) -> dict:
     STATE.mkdir(parents=True, exist_ok=True, mode=0o700)
     os.chmod(STATE, 0o700)
     logpath = STATE / "engine.log"
-    logfd = os.open(logpath, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
+    # Keep this attempt's errors separate from earlier server/protocol tests.
+    # A single managed engine is allowed at a time. Never return raw logs.
+    logfd = os.open(logpath, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
     args = ([str(exe), "run", "-config", str(config)] if protocol == "v2ray"
             else [str(exe), "run", "-c", str(config)])
     try:
@@ -205,18 +207,30 @@ def engine_failure_category() -> str:
             data = stream.read().decode("utf-8", errors="replace").lower()
     except OSError:
         return "ENGINE_LOG_UNAVAILABLE"
+    # Check specific errors before generic QUIC/handshake text. Match only
+    # known fixed phrases and return a fixed code, never any user data.
     for needle, code in (
         ("address already in use", "PROXY_LOCAL_PORT_OCCUPIED"),
+        ("operation not permitted", "ENGINE_PERMISSION_DENIED"),
         ("permission denied", "ENGINE_PERMISSION_DENIED"),
         ("unknown outbound type", "ENGINE_UNSUPPORTED_OUTBOUND"),
         ("unknown field", "ENGINE_CONFIG_UNSUPPORTED_FIELD"),
         ("invalid config", "ENGINE_CONFIG_INVALID"),
-        ("timeout", "ENGINE_REMOTE_TIMEOUT"),
-        ("certificate", "ENGINE_REMOTE_TLS_CERTIFICATE_FAILURE"),
-        ("quic", "ENGINE_QUIC_TRANSPORT_FAILURE"),
-        ("handshake", "ENGINE_REMOTE_HANDSHAKE_FAILURE"),
+        ("authentication failed", "HYSTERIA2_REMOTE_AUTH_REJECTED"),
+        ("unauthorized", "HYSTERIA2_REMOTE_AUTH_REJECTED"),
+        ("certificate verify failed", "ENGINE_REMOTE_TLS_CERTIFICATE_FAILURE"),
+        ("certificate signed by unknown authority", "ENGINE_REMOTE_TLS_CERTIFICATE_FAILURE"),
+        ("x509:", "ENGINE_REMOTE_TLS_CERTIFICATE_FAILURE"),
+        ("tls: failed", "ENGINE_REMOTE_TLS_HANDSHAKE_FAILED"),
+        ("connection refused", "ENGINE_REMOTE_CONNECTION_REFUSED"),
         ("network is unreachable", "ENGINE_REMOTE_NETWORK_UNREACHABLE"),
+        ("no route to host", "ENGINE_REMOTE_NETWORK_UNREACHABLE"),
         ("no such host", "ENGINE_REMOTE_DNS_FAILURE"),
+        ("context deadline exceeded", "ENGINE_REMOTE_TIMEOUT"),
+        ("i/o timeout", "ENGINE_REMOTE_TIMEOUT"),
+        ("timeout", "ENGINE_REMOTE_TIMEOUT"),
+        ("handshake failed", "ENGINE_REMOTE_HANDSHAKE_FAILURE"),
+        ("quic", "ENGINE_QUIC_TRANSPORT_FAILURE"),
     ):
         if needle in data:
             return code
