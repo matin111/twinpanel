@@ -44,9 +44,21 @@ def validate_config(config: Path) -> dict:
         raise ValueError("auto_redirect must be false")
     if tun.get("strict_route", False) is not False:
         raise ValueError("strict_route must be false")
-    experimental = data.get("experimental", {})\n    if not isinstance(experimental, dict):\n        raise ValueError("Invalid experimental settings")\n    cache_file = experimental.get("cache_file", {})\n    if not isinstance(cache_file, dict):\n        raise ValueError("Invalid cache settings")\n    if cache_file.get("enabled"):
+    experimental = data.get("experimental", {})
+    if not isinstance(experimental, dict):
+        raise ValueError("Invalid experimental settings")
+    cache_file = experimental.get("cache_file", {})
+    if not isinstance(cache_file, dict):
+        raise ValueError("Invalid cache settings")
+    if cache_file.get("enabled"):
         raise ValueError("Persistent cache disabled for diagnostic")
-    # Restrict diagnostic to an explicitly no-route macOS interface.\n    if tun.get("interface_name") and not isinstance(tun["interface_name"], str):\n        raise ValueError("Invalid interface name")\n    route = data.get("route", {})\n    if not isinstance(route, dict):\n        raise ValueError("Invalid route")\n    # Avoid system-wide changes through platform-specific settings.
+    # Restrict diagnostic to an explicitly no-route macOS interface.
+    if tun.get("interface_name") and not isinstance(tun["interface_name"], str):
+        raise ValueError("Invalid interface name")
+    route = data.get("route", {})
+    if not isinstance(route, dict):
+        raise ValueError("Invalid route")
+    # Avoid system-wide changes through platform-specific settings.
     if "platform" in tun or "route_address_set" in tun or "route_exclude_address_set" in tun:
         raise ValueError("Platform route modifiers not allowed")
     return data
@@ -78,7 +90,9 @@ def run_diagnostic(binary: Path, config: Path, seconds: int) -> int:
     try:
         while proc.poll() is None and time.monotonic() < deadline:
             time.sleep(0.2)
-        if proc.returncode is not None:\n            return proc.returncode if proc.returncode != 0 else 1\n        return 0
+        if proc.returncode is not None:
+            return proc.returncode if proc.returncode != 0 else 1
+        return 0
     finally:
         if proc.poll() is None:
             os.killpg(proc.pid, signal.SIGTERM)
@@ -98,7 +112,8 @@ def main() -> int:
     try:
         if not 1 <= args.seconds <= MAX_SECONDS:
             raise ValueError("seconds must be between 1 and 120")
-        # Validate the literal path first; resolve() would hide symlinks.\n        config = args.config.expanduser().absolute()
+        # Validate the literal path first; resolve() would hide symlinks.
+        config = args.config.expanduser().absolute()
         validate_config(config)
         binary = engine_path()
         subprocess.run([str(binary), "check", "-c", str(config)], check=True, timeout=20)
