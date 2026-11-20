@@ -69,6 +69,9 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     // Match Flutter sections: Quick connect / Locations / Settings / Account.
     private var tab = 0
     private var country = "All countries"
+    private var expandedCountries = Set<String>()
+    private var locationCountryIDs = [String]()
+    private var locationRowIDs = [String]()
     private var activeProtocol: String?
     private var activeServer: String?
     private weak var usernameField: NSTextField?
@@ -488,36 +491,84 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         return card([content], radius: 23, padding: 20)
     }
 
+    // Mirrors Flutter's grouped locations list. The server inventory is
+    // subscription-scoped, but it does not certify a specific protocol's
+    // profile on a specific node. Never pretend that it does.
     private func locationsPage() -> NSView {
         let wrapper = stack(spacing: 12)
         wrapper.alignment = .width
-        let title = stack(.horizontal, spacing: 14)
-        title.addArrangedSubview(text("Available locations",
-                                       size: 20, weight: .bold))
-        title.addArrangedSubview(button("↻ Refresh",
-                                        action: #selector(refresh(_:))))
-        wrapper.addArrangedSubview(title)
-        wrapper.addArrangedSubview(text(
-            "Panel-reported node status and latency, not an active VPN ping.",
-            size: 12, color: muted))
-        let selector = NSPopUpButton(frame: .zero, pullsDown: false)
-        let countries = Set(snapshot?.servers.map { $0.country } ?? [])
-        selector.addItems(withTitles: ["All countries"] + countries.sorted())
-        selector.selectItem(withTitle: country)
-        selector.target = self
-        selector.action = #selector(changeCountry(_:))
-        wrapper.addArrangedSubview(selector)
-        let table = createTable()
-        wrapper.addArrangedSubview(table)
-        wrapper.addArrangedSubview(text(
-            "Select a location to remember it in this window; VPN remains disabled.",
-            size: 11, color: muted))
-        if let data = snapshot, let failure = data.errors["servers"] {
-            wrapper.addArrangedSubview(text(
-                "Server inventory unavailable: " + failure,
-                size: 12, color: amber))
+        let heading = stack(.horizontal, spacing: 12)
+        heading.addArrangedSubview(text("Locations", size: 20, weight: .bold))
+        heading.addArrangedSubview(button("↻",
+                                          action: #selector(refresh(_:))))
+        wrapper.addArrangedSubview(heading)
+
+        let protocolChoice = NSPopUpButton(frame: .zero, pullsDown: false)
+        protocolChoice.addItem(withTitle: "All allowed protocols")
+        for item in snapshot?.protocols ?? [] {
+            protocolChoice.addItem(withTitle: item.name)
+            protocolChoice.lastItem?.representedObject = item.code
         }
-        return card([wrapper])
+        if let selected = activeProtocol,
+           let entry = protocolChoice.itemArray.first(where: {
+               ($0.representedObject as? String) == selected
+           }) {
+            protocolChoice.select(entry)
+        }
+        protocolChoice.target = self
+        protocolChoice.action = #selector(changeQuickProtocol(_:))
+        wrapper.addArrangedSubview(protocolChoice)
+
+        let serverRows = snapshot?.servers ?? []
+        let grouping = Dictionary(grouping: serverRows, by: { $0.country.uppercased() })
+        let countries = grouping.keys.sorted()
+        locationCountryIDs = countries
+        locationRowIDs = serverRows.map { $0.id }
+        if serverRows.isEmpty {
+            let explanation = snapshot?.errors["servers"] ??
+                (snapshot?.sectionsLoaded.contains("servers") == true
+                    ? "No assigned servers in this account."
+                    : "Refreshing your assigned servers…")
+            wrapper.addArrangedSubview(text(explanation, color: muted))
+        } else {
+            for (index, code) in countries.enumerated() {
+                let entries = grouping[code] ?? []
+                let expanded = expandedCountries.contains(code)
+                let group = stack(spacing: 7)
+                group.alignment = .width
+                let header = button(
+                    flag(code) + "    " + code + "    •    " +
+                    String(entries.count) + " servers    " + (expanded ? "⌃" : "⌄"),
+                    action: #selector(toggleLocationCountry(_:)), tag: index)
+                header.alignment = .left
+                group.addArrangedSubview(header)
+                if expanded {
+                    for entry in entries {
+                        let latency = entry.latencyMs.map { " • \($0) ms (panel)" } ?? ""
+                        let title = (activeServer == entry.id ? "✓  " : "☆  ") +
+                            entry.name + "     " +
+                            (entry.online ? "● Online" : "○ Offline") + latency
+                        let action = button(title,
+                            action: #selector(selectLocationServer(_:)),
+                            tag: locationRowIDs.firstIndex(of: entry.id) ?? -1,
+                            mutedButton: true)
+                        action.alignment = .left
+                        group.addArrangedSubview(action)
+                    }
+                }
+                wrapper.addArrangedSubview(card([group], radius: 17, padding: 12))
+            }
+        }
+
+        if activeProtocol != nil {
+            wrapper.addArrangedSubview(text(
+                "Node inventory is not proof of a valid profile for the selected protocol.",
+                size: 11, color: amber))
+        }
+        wrapper.addArrangedSubview(text(
+            "Assigned nodes are from your authenticated panel. VPN is unavailable.",
+            size: 11, color: muted))
+        return card([wrapper], radius: 22, padding: 19)
     }
 
     private func createTable() -> NSView {
@@ -851,6 +902,9 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         activeProtocol = nil
         activeServer = nil
         country = "All countries"
+        expandedCountries.removeAll()
+        locationCountryIDs.removeAll()
+        locationRowIDs.removeAll()
         busy = false
         tab = 0
         status = ""
@@ -859,6 +913,22 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
 
     @objc private func changeTab(_ sender: NSButton) {
         tab = sender.tag
+        view = build()
+    }
+
+    @objc private func toggleLocationCountry(_ sender: NSButton) {
+        guard locationCountryIDs.indices.contains(sender.tag) else { return }
+        let code = locationCountryIDs[sender.tag]
+        if !expandedCountries.insert(code).inserted {
+            expandedCountries.remove(code)
+        }
+        view = build()
+    }
+
+    @objc private func selectLocationServer(_ sender: NSButton) {
+        guard locationRowIDs.indices.contains(sender.tag) else { return }
+        activeServer = locationRowIDs[sender.tag]
+        status = "Location selected. A signed VPN engine is required to connect."
         view = build()
     }
 
