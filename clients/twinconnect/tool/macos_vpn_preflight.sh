@@ -7,6 +7,15 @@ fail=0
 check() { if eval "$2"; then printf 'PASS %s\n' "$1"; else printf 'FAIL %s\n' "$1"; fail=1; fi; }
 printf '%s\n' 'TwinConnect macOS PacketTunnel readiness preflight'
 check 'Xcode command-line tools' 'xcode-select -p >/dev/null 2>&1'
+host_version="$(sw_vers -productVersion 2>/dev/null || printf unknown)"
+host_major="$(printf '%s' "$host_version" | cut -d. -f1)"
+printf 'INFO host macOS version: %s\n' "$host_version"
+if [ "$host_major" -ge 11 ] 2>/dev/null; then
+  printf '%s\n' 'PASS host supports the macOS 11+ PacketTunnel deployment target'
+else
+  printf '%s\n' 'FAIL host macOS is below the PacketTunnel deployment target (11.0)'
+  fail=1
+fi
 check 'macOS Flutter project' 'test -d macos/Runner.xcodeproj'
 check 'PacketTunnel Xcode target' 'grep -q "PacketTunnel" macos/Runner.xcodeproj/project.pbxproj'
 check 'Network Extension requested by extension' '/usr/libexec/PlistBuddy -c "Print :com.apple.developer.networking.networkextension:0" macos_native/PacketTunnel.entitlements 2>/dev/null | grep -qx "packet-tunnel-provider"'
