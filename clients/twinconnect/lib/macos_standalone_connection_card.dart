@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 
+import 'protocols.dart';
 import 'macos_standalone_panel_profile.dart';
 import 'macos_standalone_proxy_runtime.dart';
 import 'server_inventory.dart';
