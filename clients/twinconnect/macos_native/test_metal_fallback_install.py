@@ -207,6 +207,24 @@ class MetalFallbackInstallTests(unittest.TestCase):
                 settings = plistlib.load(handle)
             self.assertTrue(settings["com.apple.security.network.client"])
 
+    def test_server_ui_hides_raw_country_codes_and_blank_hero(self) -> None:
+        source = (SOURCE / "TwinConnectMacOSNativeDashboard.swift").read_text(
+            encoding="utf-8"
+        )
+        for token in (
+            'friendlyServerName(_ server: TwinMacNativeServer,',
+            '"  ·  Server " + String(index + 1)',
+            'friendlyServerName(server, index: position)',
+            'showAllProtocolChips.toggle()',
+            '"All protocols (" + String(list.count)',
+            '"LOCAL PROXY TEST"',
+            'fabric.addSubview(fabricInfo)',
+            'previewServer = snapshot?.servers.first',
+        ):
+            self.assertIn(token, source)
+        self.assertIn('pingDetails(server)', source)
+        self.assertIn('selectLocationServer(_:)', source)
+
     def test_server_directory_uses_real_ping_and_selection_cards(self) -> None:
         source = (SOURCE / "TwinConnectMacOSNativeDashboard.swift").read_text(
             encoding="utf-8"
