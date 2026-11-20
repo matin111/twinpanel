@@ -118,7 +118,7 @@ private final class TwinNativePremiumButton: NSButton {
 // Uses Core Animation's vector gradient, not a raster image or Metal shader.
 // Keeps the Windows-style translucent depth on macOS cloud hosts without Metal.
 private final class TwinNativeGlassCard: NSView {
-    enum Style { case panel, inset, metric, sidebar }
+    enum Style: Equatable { case panel, inset, metric, sidebar }
     private let glassGradient = CAGradientLayer()
     private let upperEdge = CAGradientLayer()
     override init(frame: NSRect) {
@@ -529,8 +529,9 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     private func build() -> NSView {
         let root = TwinNativeBackdrop(frame:
             NSRect(x: 0, y: 0, width: 1180, height: 740))
-        root.base = (panelBackgroundColor() ?? base)
-            .blended(withFraction: 0.22, of: tint()) ?? base
+        root.base = (panelBackgroundColor()?
+            .blended(withFraction: 0.60, of: base) ?? base)
+            .blended(withFraction: 0.19, of: tint()) ?? base
         root.glow = tint()
         if accountSession == nil {
             buildLogin(in: root)
