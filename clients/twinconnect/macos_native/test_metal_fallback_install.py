@@ -115,7 +115,8 @@ class MetalFallbackInstallTests(unittest.TestCase):
         self.assertIn("document.widthAnchor.constraint(equalTo: scroll.contentView.widthAnchor)", generated)
         self.assertIn("document.heightAnchor.constraint(greaterThanOrEqualTo:", generated)
         self.assertIn("self.view = self.build()\n                self.refreshData()", generated)
-        self.assertIn("Could not refresh panel data:", generated)
+        self.assertIn("Panel synchronized: 4 of 4 sections.", generated)
+        self.assertIn("data.errors.keys.sorted()", generated)
         login_code = generated.split("private func buildLogin(in root: NSView) {", 1)[1].split(
             "private func buildShell(in root: NSView) {", 1
         )[0]
