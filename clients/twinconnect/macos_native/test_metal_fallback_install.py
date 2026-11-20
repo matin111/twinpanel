@@ -306,6 +306,27 @@ class MetalFallbackInstallTests(unittest.TestCase):
         self.assertIn("usageCard.widthAnchor.constraint(equalTo: items.widthAnchor)",
                       source)
 
+    def test_premium_glass_cards_and_gradient_buttons_use_live_appkit_layout(self) -> None:
+        source = (SOURCE / "TwinConnectMacOSNativeDashboard.swift").read_text(
+            encoding="utf-8"
+        )
+        for token in (
+            "private final class TwinNativeGlassCard: NSView",
+            "private final class TwinNativePremiumButton: NSButton",
+            "private let glassGradient = CAGradientLayer()",
+            "private let accentGradient = CAGradientLayer()",
+            "glassGradient.frame = bounds",
+            "accentGradient.frame = bounds",
+            "let box = TwinNativeGlassCard(frame: .zero)",
+            "let control = TwinNativePremiumButton(title: title",
+            "control.setAccentGradient(",
+            "control.layer?.shadowOpacity = 0.17",
+        ):
+            self.assertIn(token, source)
+        self.assertIn('pill("Disconnected", color: muted)', source)
+        self.assertIn('networkMetric("Public IP", value: "—")', source)
+        self.assertNotIn('pill("Tunnel active", color: sea)', source)
+
     def test_windows_visual_parity_has_vector_hero_and_real_network_state(self) -> None:
         source = (SOURCE / "TwinConnectMacOSNativeDashboard.swift").read_text(
             encoding="utf-8"
