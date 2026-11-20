@@ -9,15 +9,15 @@ private final class TwinNativeFlippedDocument: NSView {
 }
 
 private final class TwinNativeBackdrop: NSView {
-    var base = NSColor(calibratedRed: 0.059, green: 0.091, blue: 0.125, alpha: 1)
-    var glow = NSColor(calibratedRed: 0.32, green: 0.55, blue: 0.64, alpha: 1)
+    var base = NSColor(calibratedRed: 0.032, green: 0.11, blue: 0.145, alpha: 1)
+    var glow = NSColor(calibratedRed: 0.10, green: 0.47, blue: 0.55, alpha: 1)
 
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
         NSGradient(colors: [
             base,
-            base.blended(withFraction: 0.23, of: glow) ?? base,
-            base.blended(withFraction: 0.10, of: glow) ?? base
+            base.blended(withFraction: 0.38, of: glow) ?? base,
+            base.blended(withFraction: 0.16, of: glow) ?? base
         ])?.draw(in: bounds, angle: -25)
         let area = bounds
         for index in 0..<9 {
@@ -192,10 +192,10 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     private weak var usernameField: NSTextField?
     private weak var passwordField: NSSecureTextField?
 
-    private let base = NSColor(calibratedRed: 0.059, green: 0.091, blue: 0.125, alpha: 1)
-    private let panelColor = NSColor(calibratedRed: 0.11, green: 0.17, blue: 0.21, alpha: 0.83)
+    private let base = NSColor(calibratedRed: 0.035, green: 0.105, blue: 0.143, alpha: 1)
+    private let panelColor = NSColor(calibratedRed: 0.09, green: 0.19, blue: 0.24, alpha: 0.85)
     private let muted = NSColor(calibratedRed: 0.69, green: 0.79, blue: 0.82, alpha: 1)
-    private let teal = NSColor(calibratedRed: 0.33, green: 0.57, blue: 0.65, alpha: 1)
+    private let teal = NSColor(calibratedRed: 0.27, green: 0.67, blue: 0.74, alpha: 1)
     private let sea = NSColor(calibratedRed: 0.40, green: 0.72, blue: 0.70, alpha: 1)
     private let amber = NSColor(calibratedRed: 1.0, green: 0.78, blue: 0.51, alpha: 1)
 
