@@ -68,8 +68,44 @@ final class TwinConnectMacOSVPNBridge {
     }
 
     private static func wireGuardBackendReady() -> Bool {
-        // WireGuardKit's Go bridge is not in the shipping PacketTunnel.
+        // Only a deliberately provisioned signed build can request a VPN.
+        // The unsigned CI preview must remain fail-closed even when the Go
+        // symbols are compiled into PacketTunnel.
+        #if TWINCONNECT_SIGNED_WIREGUARD
+        guard let bundle = extensionBundle(),
+              bundle.object(forInfoDictionaryKey:
+                  "TwinConnectWireGuardBackendLinked") as? Bool == true,
+              let executable = bundle.executableURL,
+              FileManager.default.isExecutableFile(atPath: executable.path),
+              let task = SecTaskCreateFromSelf(kCFAllocatorDefault),
+              let appEntitlements = SecTaskCopyValueForEntitlement(task,
+                  "com.apple.developer.networking.networkextension" as CFString,
+                  nil) as? [String],
+              appEntitlements.contains("packet-tunnel-provider") else {
+            return false
+        }
+        // Verify the embedded extension was signed with packet-tunnel-provider.
+        var code: SecStaticCode?
+        guard SecStaticCodeCreateWithPath(bundle.bundleURL as CFURL,
+                                          SecCSFlags(), &code) == errSecSuccess,
+              let code else { return false }
+        var signing: CFDictionary?
+        guard SecStaticCodeCheckValidity(code, SecCSFlags(), nil) == errSecSuccess,
+              SecCodeCopySigningInformation(code,
+                                            SecCSFlags(rawValue: kSecCSSigningInformation),
+                                            &signing) == errSecSuccess,
+              let info = signing as? [String: Any],
+              let entitlements = info[kSecCodeInfoEntitlementsDict as String]
+                  as? [String: Any],
+              let modes = entitlements[
+                  "com.apple.developer.networking.networkextension"] as? [String],
+              modes.contains("packet-tunnel-provider") else {
+            return false
+        }
+        return true
+        #else
         return false
+        #endif
     }
 
     private static func libboxBackendReady() -> Bool {
