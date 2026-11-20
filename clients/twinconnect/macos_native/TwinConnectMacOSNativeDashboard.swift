@@ -70,6 +70,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     private var busy = false
     private var refreshGeneration = 0
     private var nativeContentWidth: CGFloat = 1100
+    private var tenantLogo: NSImage?
+    private var logoGeneration = 0
     // Match Flutter sections: Quick connect / Locations / Settings / Account.
     private var tab = 0
     private var country = "All countries"
@@ -400,13 +402,26 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         logo.translatesAutoresizingMaskIntoConstraints = false
         logo.widthAnchor.constraint(equalToConstant: 42).isActive = true
         logo.heightAnchor.constraint(equalToConstant: 42).isActive = true
-        let infinity = text("∞", size: 26, weight: .bold)
-        infinity.translatesAutoresizingMaskIntoConstraints = false
-        logo.addSubview(infinity)
-        NSLayoutConstraint.activate([
-            infinity.centerXAnchor.constraint(equalTo: logo.centerXAnchor),
-            infinity.centerYAnchor.constraint(equalTo: logo.centerYAnchor)
-        ])
+        if let tenantLogo = tenantLogo {
+            let image = NSImageView(image: tenantLogo)
+            image.imageScaling = .scaleProportionallyUpOrDown
+            image.translatesAutoresizingMaskIntoConstraints = false
+            logo.addSubview(image)
+            NSLayoutConstraint.activate([
+                image.leadingAnchor.constraint(equalTo: logo.leadingAnchor, constant: 3),
+                image.trailingAnchor.constraint(equalTo: logo.trailingAnchor, constant: -3),
+                image.topAnchor.constraint(equalTo: logo.topAnchor, constant: 3),
+                image.bottomAnchor.constraint(equalTo: logo.bottomAnchor, constant: -3)
+            ])
+        } else {
+            let infinity = text("∞", size: 26, weight: .bold)
+            infinity.translatesAutoresizingMaskIntoConstraints = false
+            logo.addSubview(infinity)
+            NSLayoutConstraint.activate([
+                infinity.centerXAnchor.constraint(equalTo: logo.centerXAnchor),
+                infinity.centerYAnchor.constraint(equalTo: logo.centerYAnchor)
+            ])
+        }
         let logoRow = stack(.horizontal, spacing: 0)
         let startSpace = NSView()
         let endSpace = NSView()
@@ -447,8 +462,13 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             quick.addArrangedSubview(button("Renew",
                 action: #selector(openRenewal(_:)), mutedButton: true))
         }
+        if accountSession?.websiteURL != nil {
+            quick.addArrangedSubview(button("Website",
+                action: #selector(openWebsite(_:)), mutedButton: true))
+        }
         if accountSession?.supportURL != nil ||
-           accountSession?.renewalURL != nil {
+           accountSession?.renewalURL != nil ||
+           accountSession?.websiteURL != nil {
             let links = card([quick], radius: 14, padding: 7)
             content.addArrangedSubview(links)
             links.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
@@ -1152,6 +1172,19 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             case .success(let session):
                 self.accountSession = session
                 self.snapshot = nil
+                self.tenantLogo = nil
+                self.logoGeneration += 1
+                let logoVersion = self.logoGeneration
+                self.directory.loadBrandLogo(session) { [weak self] data in
+                    guard let self = self,
+                          self.logoGeneration == logoVersion,
+                          self.accountSession?.accessToken == session.accessToken
+                    else { return }
+                    if let bytes = data, let image = NSImage(data: bytes) {
+                        self.tenantLogo = image
+                        self.view = self.build()
+                    }
+                }
                 self.tab = 0
                 self.status = "Retrieving live subscription data…"
                 NSLog("TwinConnect AppKit: authenticated; showing dashboard shell")
@@ -1220,6 +1253,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
 
     @objc private func signOut(_ sender: NSButton) {
         refreshGeneration += 1
+        logoGeneration += 1
+        tenantLogo = nil
         accountSession = nil
         snapshot = nil
         activeProtocol = nil
@@ -1308,6 +1343,10 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
 
     @objc private func openRenewal(_ sender: NSButton) {
         if let url = accountSession?.renewalURL { NSWorkspace.shared.open(url) }
+    }
+
+    @objc private func openWebsite(_ sender: NSButton) {
+        if let url = accountSession?.websiteURL { NSWorkspace.shared.open(url) }
     }
 
     @objc private func copyDiagnostics(_ sender: NSButton) {
