@@ -1,0 +1,26 @@
+name: TwinConnect macOS Unsigned Standalone Manager Tests
+
+on:
+  push:
+    branches:
+      - feat/twinconnect-macos-packet-tunnel-foundation-20261116
+    paths:
+      - 'clients/twinconnect/macos_native/standalone_connection_manager.py'
+      - 'clients/twinconnect/macos_native/test_standalone_connection_manager.py'
+      - '.github/workflows/twinconnect-macos-standalone-manager.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test-unsigned-local-proxy:
+    runs-on: macos-15
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate unsigned standalone connection manager
+        run: |
+          python3 -m unittest -v clients/twinconnect/macos_native/test_standalone_connection_manager.py
+          python3 clients/twinconnect/macos_native/standalone_connection_manager.py list
+          echo "No VPN system routes, DNS or Apple signing was changed."
