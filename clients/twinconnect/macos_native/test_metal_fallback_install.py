@@ -149,7 +149,7 @@ class MetalFallbackInstallTests(unittest.TestCase):
         prior = self.window.read_text(encoding="utf-8")
         self.assertEqual(prior.count("self.titleVisibility = .hidden"), 1)
         self.window.write_text(
-            prior.replace("      self.titleVisibility = .hidden\\n", "", 1),
+            prior.replace("      self.titleVisibility = .hidden\n", "", 1),
             encoding="utf-8"
         )
         fixed = self.install()
