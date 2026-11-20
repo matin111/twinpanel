@@ -14,7 +14,7 @@ The central registry tracks 15 protocol codes:
 
 The unsigned local process backend can run a correctly installed Xray or
 sing-box binary for **loopback SOCKS/HTTP/mixed proxy mode**, currently
-`v2ray`, `hysteria2`, `tuic`, `anytls`, `shadowtls`,
+`v2ray`, `hysteria2`, `tuic`, `anytls`, `naive`, `shadowtls`,
 `snell`, and `socks5`. Other engines fail explicitly as not integrated.
 Some upstream protocol support depends on the exact sing-box build and may
 be rejected by that binary. The manager does not claim a handshake or
@@ -36,11 +36,12 @@ matching the requested protocol.
 ```sh
 python3 macos_native/standalone_connection_manager.py start v2ray /path/to/local-xray-socks.json
 python3 macos_native/standalone_connection_manager.py status
-curl -4 --socks5-hostname 127.0.0.1:10808 --max-time 12 https://api.ipify.org
+python3 macos_native/standalone_connection_manager.py probe
+python3 macos_native/standalone_connection_manager.py probe --expected-ip 203.0.113.12
 python3 macos_native/standalone_connection_manager.py stop
 ```
 
-Substitute the port in your local inbound. A response from the proxy test
+Replace 203.0.113.12 with the expected real public server exit IP before running the expected-IP probe. A response from the proxy test
 must be checked against the expected egress; process_running_unverified
 does **not** imply that a remote server was reached.
 
