@@ -402,7 +402,7 @@ class MetalFallbackInstallTests(unittest.TestCase):
             'private func panelCardColor() -> NSColor?',
             'return panelHexColor(accountSession?.accentHex) ?? teal',
             'box.apply(style, accent: tint(),',
-            'side.apply(.sidebar, accent: tint(),',
+            'side.layer?.backgroundColor = NSColor.clear.cgColor',
             'background: panelBackgroundColor(), surface: panelCardColor()',
             'let brand = tint()',
             'upper.withAlphaComponent(primary ? 0.64 : 0.36)',
@@ -455,7 +455,7 @@ class MetalFallbackInstallTests(unittest.TestCase):
             'enum Style: Equatable { case panel, inset, metric, sidebar }',
             'private let upperEdge = CAGradientLayer()',
             'box.apply(style, accent: tint(),',
-            'side.apply(.sidebar, accent: tint(),',
+            'side.layer?.backgroundColor = NSColor.clear.cgColor',
             'return card([items], radius: 20, padding: 14, style: .inset)',
             'let panel = card([content], radius: 17, padding: 14, style: .metric)',
         ):
@@ -627,6 +627,28 @@ class MetalFallbackInstallTests(unittest.TestCase):
         self.assertIn('centeredLabel.centerXAnchor.constraint(equalTo: control.centerXAnchor)', nav)
         self.assertNotIn('control.alignment = .left', nav)
         self.assertNotIn('"     " + label', nav)
+
+    def test_sidebar_and_main_area_share_one_continuous_backdrop(self) -> None:
+        source = (SOURCE / "TwinConnectMacOSNativeDashboard.swift").read_text(
+            encoding="utf-8"
+        )
+        shell = source.split("    private func buildShell(in root: NSView) {", 1)[1].split(
+            "    // Native vector glyphs", 1
+        )[0]
+        sidebar = source.split("    private func buildSidebar() -> NSView {", 1)[1].split(
+            "    private func connectPage() -> NSView {", 1
+        )[0]
+        self.assertIn("let root = TwinNativeBackdrop(frame:", source)
+        self.assertIn("let sidebar = buildSidebar()", shell)
+        self.assertIn("root.addSubview(sidebar)", shell)
+        self.assertIn("let side = NSView(frame: .zero)", sidebar)
+        self.assertIn("side.layer?.backgroundColor = NSColor.clear.cgColor", sidebar)
+        self.assertIn("side.layer?.borderWidth = 0", sidebar)
+        self.assertNotIn("let side = TwinNativeGlassCard(frame: .zero)", sidebar)
+        self.assertNotIn("side.apply(.sidebar", sidebar)
+        self.assertNotIn("side.layer?.shadowOpacity", sidebar)
+        self.assertIn("scroll.drawsBackground = false", shell)
+        self.assertIn("scroll.leadingAnchor.constraint(equalTo: sidebar.trailingAnchor)", shell)
 
     def test_sidebar_matches_windows_navigation_and_country_flag(self) -> None:
         source = (SOURCE / "TwinConnectMacOSNativeDashboard.swift").read_text(
