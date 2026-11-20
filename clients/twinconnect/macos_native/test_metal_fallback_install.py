@@ -288,6 +288,24 @@ class MetalFallbackInstallTests(unittest.TestCase):
                       source)
         self.assertNotIn('fakeLatency', section)
 
+    def test_subscription_card_fills_entire_quick_connect_column(self) -> None:
+        source = (SOURCE / "TwinConnectMacOSNativeDashboard.swift").read_text(
+            encoding="utf-8"
+        )
+        connect = source.split(
+            "    private func connectPage() -> NSView {", 1
+        )[1].split("    private func networkMetric(", 1)[0]
+        self.assertIn(
+            "subscription.widthAnchor.constraint(equalTo: main.widthAnchor)",
+            connect,
+        )
+        self.assertIn(
+            "changeSelection.widthAnchor.constraint(equalTo: main.widthAnchor)",
+            connect,
+        )
+        self.assertIn("usageCard.widthAnchor.constraint(equalTo: items.widthAnchor)",
+                      source)
+
     def test_windows_visual_parity_has_vector_hero_and_real_network_state(self) -> None:
         source = (SOURCE / "TwinConnectMacOSNativeDashboard.swift").read_text(
             encoding="utf-8"
