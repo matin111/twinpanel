@@ -424,6 +424,33 @@ class MetalFallbackInstallTests(unittest.TestCase):
         self.assertIn('surface: panelCardColor()', pill)
         self.assertNotIn('let background = NSView()', pill)
 
+    def test_background_has_safe_ambient_motion_without_fake_vpn(self) -> None:
+        source = (SOURCE / "TwinConnectMacOSNativeDashboard.swift").read_text(
+            encoding="utf-8"
+        )
+        backdrop = source.split(
+            "private final class TwinNativeBackdrop: NSView {", 1
+        )[1].split("private final class TwinNativePremiumButton:", 1)[0]
+        fabric = source.split(
+            "private final class TwinNativeNetworkFabric: NSView {", 1
+        )[1].split("class TwinConnectMacOSNativeDashboard:", 1)[0]
+        for token in (
+            "private let ambientAura = CAGradientLayer()",
+            "ambientAura.type = .radial",
+            'func beginAmbientMotion() {',
+            "NSWorkspace.shared.accessibilityDisplayShouldReduceMotion",
+            'CABasicAnimation(keyPath: "opacity")',
+            "breathe.duration = 9",
+            "breathe.autoreverses = true",
+            "breathe.repeatCount = .infinity",
+            'ambientAura.add(breathe, forKey: "ambientBreath")',
+        ):
+            self.assertIn(token, backdrop)
+        self.assertIn("root.beginAmbientMotion()", source)
+        self.assertIn("guard tunnelConnected else { return }", fabric)
+        self.assertNotIn("fabric.tunnelConnected = true", source)
+        self.assertNotIn("startVPNTunnel(", source)
+
     def test_windows_background_is_cinematic_and_metal_free(self) -> None:
         source = (SOURCE / "TwinConnectMacOSNativeDashboard.swift").read_text(
             encoding="utf-8"
