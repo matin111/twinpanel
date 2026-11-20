@@ -6,6 +6,26 @@ install routes, or activate Kill Switch. Never label it as connected until a
 real SOCKS/HTTP request through the proxy succeeds.
 
 
+## AppKit cloud Mac: real Hysteria2 proxy test from selected account/server
+
+The native Metal-free AppKit Locations screen receives live, authenticated
+panel server and protocol lists. In Quick Connect, after selecting an
+entitled Hysteria2 protocol and one of the assigned nodes, the **Test
+Hysteria2 proxy (not VPN)** button requests a fresh protocol catalog,
+assigned server inventory and exact node profile through the authenticated
+native directory. The reviewed client outbound is executed as a private
+loopback SOCKS proxy, probes HTTPS egress, and then the helper stops the
+engine and deletes temporary credentials. The ordinary system-wide **Connect
+now** button remains disabled until a signed, verified PacketTunnel exists.
+Only Hysteria2 is implemented in AppKit at this stage; the Flutter UI has
+its own local-proxy test implementation. An installed engine alone is not
+proof of a working network connection.
+
+After pulling GitHub changes, recompile unsigned with
+`bash tool/build_macos_unsigned_debug.sh` and relaunch the fresh Debug
+app under Xcode DerivedData `Build/Products/Debug/twinconnect.app`
+(not `Index.noindex/Build/Products`).
+
 ## TwinConnect Flutter login -> panel -> local proxy (development)
 
 The macOS Flutter connection page now has a dedicated
