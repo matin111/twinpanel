@@ -2203,7 +2203,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         // Only a single managed engine is permitted; don't interrupt existing
         // user-owned processes. Manager start refuses an existing instance.
         let started = runLocalManager([
-            "start", "hysteria2", file.path
+            "start", "hysteria2", file.path, "--owner-pid",
+            String(ProcessInfo.processInfo.processIdentifier)
         ], root: root)
         guard started.0 == 0 else {
             let diagnosis = runLocalManager(["diagnose"], root: root)
