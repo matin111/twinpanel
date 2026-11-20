@@ -517,6 +517,25 @@ class MetalFallbackInstallTests(unittest.TestCase):
         self.assertIn("link.setAccentGradient(", sidebar)
         self.assertNotIn("-> NSButton {\n        let control = TwinNativePremiumButton", source)
 
+    def test_cards_and_sidebar_keep_panel_blue_without_grey_cast(self) -> None:
+        source = (SOURCE / "TwinConnectMacOSNativeDashboard.swift").read_text(
+            encoding="utf-8"
+        )
+        glass = source.split("private final class TwinNativeGlassCard: NSView {", 1)[1].split(
+            "private final class TwinNativeNetworkFabric:", 1
+        )[0]
+        for token in (
+            "blur.alphaValue = 0.14",
+            "let supplied = style == .sidebar ?",
+            "(background ?? surface) : (surface ?? background)",
+            "style == .sidebar ? 0.90 : 0.81",
+            "style == .sidebar ? 0.82 : 0.70",
+            "style == .sidebar ? 0.88 : 0.78",
+            "tone.withAlphaComponent(middleAlpha).cgColor",
+        ):
+            self.assertIn(token, glass)
+        self.assertNotIn("style == .sidebar ? 0.66 : 0.54", glass)
+
     def test_dashboard_glass_is_bright_and_location_bar_does_not_expand(self) -> None:
         source = (SOURCE / "TwinConnectMacOSNativeDashboard.swift").read_text(
             encoding="utf-8"
@@ -529,9 +548,9 @@ class MetalFallbackInstallTests(unittest.TestCase):
         )[0]
         for token in (
             'blur.material = .sidebar',
-            'style == .sidebar ? 0.66 : 0.54',
-            'tone.withAlphaComponent(0.28).cgColor',
-            'lower.withAlphaComponent(0.43).cgColor',
+            'style == .sidebar ? 0.90 : 0.81',
+            'tone.withAlphaComponent(middleAlpha).cgColor',
+            'lower.withAlphaComponent(bottomAlpha).cgColor',
         ):
             self.assertIn(token, glass)
         self.assertNotIn('blur.material = .hudWindow', glass)
