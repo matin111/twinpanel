@@ -18,6 +18,8 @@ NATIVE_FILES = (
     "TwinConnectMacOSLibboxControl.swift",
     "TwinConnectMacOSMieruControl.swift",
     "TwinConnectMacOSMetalFallback.swift",
+    "TwinConnectMacOSNativeDirectory.swift",
+    "TwinConnectMacOSNativeDashboard.swift",
 )
 
 MAIN_WINDOW = """import Cocoa
@@ -49,6 +51,7 @@ class MetalFallbackInstallTests(unittest.TestCase):
             shutil.copy2(SOURCE / name, native / name)
         self.window = runner / "MainFlutterWindow.swift"
         self.window.write_text(MAIN_WINDOW, encoding="utf-8")
+        (runner / "Info.plist").write_bytes(plistlib.dumps({"CFBundleName": "twinconnect"}))
         for name in ("DebugProfile.entitlements", "Release.entitlements"):
             (runner / name).write_bytes(plistlib.dumps({
                 "com.apple.security.app-sandbox": True
@@ -81,9 +84,20 @@ class MetalFallbackInstallTests(unittest.TestCase):
             generated
         )
         self.assertIn("VPN connection is unavailable in this mode", generated)
+        self.assertIn("TWINCONNECT_MACOS_NATIVE_DIRECTORY_V1", generated)
+        self.assertIn("TWINCONNECT_MACOS_NATIVE_DASHBOARD_V1", generated)
+        self.assertIn("v1/central-app/public/login", generated)
+        self.assertIn("v1/central-app/session/servers", generated)
+        self.assertIn("v1/central-app/session/protocols", generated)
+        self.assertIn("v1/central-app/session/plan", generated)
+        self.assertIn("VPN connection is not available", generated)
+        self.assertNotIn("startVPNTunnel(", generated.split("// TWINCONNECT_MACOS_METAL_FALLBACK_V1", 1)[-1])
         self.assertIn("TwinConnectMacOSVPNBridge.register(", generated)
         self.assertIn("RegisterGeneratedPlugins(registry: flutterViewController)",
                       generated)
+        with (self.root / "macos/Runner/Info.plist").open("rb") as handle:
+            info = plistlib.load(handle)
+        self.assertEqual(info["TwinConnectDirectoryURL"], "https://panel.matindnspro.sbs")
         again = self.install()
         self.assertEqual(again.returncode, 0, again.stderr)
         self.assertEqual(self.window.read_text(encoding="utf-8"), generated)
@@ -91,6 +105,23 @@ class MetalFallbackInstallTests(unittest.TestCase):
             with (self.root / "macos/Runner" / name).open("rb") as handle:
                 settings = plistlib.load(handle)
             self.assertTrue(settings["com.apple.security.network.client"])
+
+    def test_replaces_old_diagnostics_only_fallback(self) -> None:
+        first = self.install()
+        self.assertEqual(first.returncode, 0, first.stderr)
+        previous = self.window.read_text(encoding="utf-8")
+        older = previous.split("// TWINCONNECT_MACOS_METAL_FALLBACK_V1", 1)[0]
+        self.window.write_text(
+            older + "// TWINCONNECT_MACOS_METAL_FALLBACK_V1\\n" +
+            "final class TwinConnectMacOSMetalFallback: NSViewController {}\\n",
+            encoding="utf-8"
+        )
+        refreshed = self.install()
+        self.assertEqual(refreshed.returncode, 0, refreshed.stderr)
+        migrated = self.window.read_text(encoding="utf-8")
+        self.assertNotIn("NSViewController {}", migrated)
+        self.assertIn("TwinConnectMacOSNativeDashboard {}", migrated)
+        self.assertEqual(migrated.count("class TwinConnectMacOSMetalFallback"), 1)
 
     def test_unknown_flutter_window_template_aborts_without_changes(self) -> None:
         self.window.write_text(
