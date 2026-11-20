@@ -436,6 +436,30 @@ class MetalFallbackInstallTests(unittest.TestCase):
             self.assertIn(token, source)
         self.assertNotIn('fabric.tunnelConnected = true', source)
 
+    def test_sidebar_matches_windows_navigation_and_country_flag(self) -> None:
+        source = (SOURCE / "TwinConnectMacOSNativeDashboard.swift").read_text(
+            encoding="utf-8"
+        )
+        sidebar = source.split("    private func buildSidebar() -> NSView {", 1)[1].split(
+            "    private func connectPage() -> NSView {", 1
+        )[0]
+        for token in (
+            'let selectedLocation = snapshot?.servers.first { $0.id == activeServer }',
+            'let selectedFlag = selectedLocation.map { flag($0.country) } ?? "🌐"',
+            '"   " + selectedFlag + "     Locations"',
+            'if index != 1 {',
+            'control.setAccentGradient(',
+            'link.setAccentGradient(',
+            'control.layer?.cornerRadius = 16',
+            'content.topAnchor.constraint(equalTo: side.topAnchor, constant: 27)',
+            'content.bottomAnchor.constraint(equalTo: side.bottomAnchor,',
+            'constant: -46',
+        ):
+            self.assertIn(token, sidebar)
+        self.assertNotIn('spaced(side, content, inset: 17)', sidebar)
+        self.assertIn('NSSize(width: 23, height: 23)', source)
+        self.assertIn('// Windows sidebar uses the three horizontal sliders icon.', source)
+
     def test_windows_sidebar_language_and_account_logout(self) -> None:
         source = (SOURCE / "TwinConnectMacOSNativeDashboard.swift").read_text(
             encoding="utf-8"
