@@ -458,78 +458,132 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     }
 
     private func connectPage() -> NSView {
-        let content = stack(spacing: 12)
-        content.alignment = .centerX
-        content.addArrangedSubview(pill("⏻  You are offline", color: muted))
+        let main = stack(spacing: 11)
+        main.alignment = .width
+
+        let offlineRow = stack(.horizontal, spacing: 8)
+        let leadingSpace = NSView()
+        let trailingSpace = NSView()
+        offlineRow.addArrangedSubview(leadingSpace)
+        offlineRow.addArrangedSubview(pill("◌  You are offline", color: muted))
+        offlineRow.addArrangedSubview(trailingSpace)
+        leadingSpace.widthAnchor.constraint(equalTo: trailingSpace.widthAnchor)
+            .isActive = true
+        main.addArrangedSubview(offlineRow)
+        offlineRow.widthAnchor.constraint(equalTo: main.widthAnchor).isActive = true
 
         let fabric = TwinNativeNetworkFabric(frame:
-            NSRect(x: 0, y: 0, width: 342, height: 178))
+            NSRect(x: 0, y: 0, width: 330, height: 165))
         fabric.translatesAutoresizingMaskIntoConstraints = false
-        fabric.widthAnchor.constraint(equalToConstant: 342).isActive = true
-        fabric.heightAnchor.constraint(equalToConstant: 178).isActive = true
-        content.addArrangedSubview(fabric)
+        fabric.heightAnchor.constraint(equalToConstant: 165).isActive = true
+        main.addArrangedSubview(fabric)
+        fabric.widthAnchor.constraint(equalTo: main.widthAnchor).isActive = true
 
-        // Exact Windows call-to-action hierarchy. The button stays disabled
-        // until an Apple-signed PacketTunnel is proven ready.
-        let connectButton = button("⚡    Connect now    ›",
+        let buttonRow = stack(.horizontal, spacing: 0)
+        let leftGap = NSView()
+        let rightGap = NSView()
+        buttonRow.addArrangedSubview(leftGap)
+        let connect = button("ϟ    Connect now     ›",
             action: #selector(unavailableConnect(_:)), primary: true)
-        connectButton.isEnabled = false
-        connectButton.widthAnchor.constraint(equalToConstant: 266).isActive = true
-        connectButton.heightAnchor.constraint(equalToConstant: 59).isActive = true
-        content.addArrangedSubview(connectButton)
+        connect.isEnabled = false
+        connect.toolTip = "VPN startup requires an installed and signed Packet Tunnel"
+        connect.heightAnchor.constraint(equalToConstant: 53).isActive = true
+        connect.widthAnchor.constraint(equalToConstant: 255).isActive = true
+        buttonRow.addArrangedSubview(connect)
+        buttonRow.addArrangedSubview(rightGap)
+        leftGap.widthAnchor.constraint(equalTo: rightGap.widthAnchor).isActive = true
+        main.addArrangedSubview(buttonRow)
+        buttonRow.widthAnchor.constraint(equalTo: main.widthAnchor).isActive = true
 
-        let subscription = homeSubscriptionSummary()
-        content.addArrangedSubview(subscription)
-        subscription.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
-        content.addArrangedSubview(text(
-            "A signed macOS Packet Tunnel is required to connect.",
-            size: 10, color: amber))
-        return card([content], radius: 28, padding: 17)
+        main.addArrangedSubview(homeSubscriptionSummary())
+
+        let selectedServer = snapshot?.servers.first { $0.id == activeServer }
+        let location = selectedServer.map {
+            flag($0.country) + " " + countryName($0.country)
+        } ?? "Choose location"
+        let protocolName = snapshot?.protocols.first {
+            $0.code == activeProtocol
+        }?.name ?? "Choose protocol"
+
+        let footer = stack(.horizontal, spacing: 9)
+        footer.distribution = .fillEqually
+        footer.addArrangedSubview(compactMetric("Location", value: location))
+        footer.addArrangedSubview(compactMetric("Public IP", value: "—"))
+        footer.addArrangedSubview(compactMetric("Protocol", value: protocolName))
+        main.addArrangedSubview(footer)
+        footer.widthAnchor.constraint(equalTo: main.widthAnchor).isActive = true
+        main.addArrangedSubview(button("Change location or protocol   ›",
+            action: #selector(showLocations(_:)), mutedButton: true))
+        return card([main], radius: 27, padding: 17)
     }
 
-    // Layout parity with Flutter's independent "Network status" panel.
-    // No traffic totals, IP or ping are fabricated in unsigned AppKit mode.
-    private func networkStatusPage() -> NSView {
+    private func networkMetric(_ title: String, value: String,
+                               subtitle: String = "") -> NSView {
         let content = stack(spacing: 13)
         content.alignment = .width
-        let header = stack(.horizontal, spacing: 12)
+        content.addArrangedSubview(text(title, size: 11,
+                                       weight: .semibold, color: muted))
+        content.addArrangedSubview(text(value, size: 22, weight: .bold))
+        if !subtitle.isEmpty {
+            content.addArrangedSubview(text(subtitle, size: 10, color: muted))
+        }
+        let panel = card([content], radius: 16, padding: 13)
+        panel.heightAnchor.constraint(greaterThanOrEqualToConstant: 97).isActive = true
+        return panel
+    }
+
+    private func networkStatusPage() -> NSView {
+        let content = stack(spacing: 16)
+        content.alignment = .width
+        let header = stack(.horizontal, spacing: 9)
         header.addArrangedSubview(text("Network status", size: 17,
                                        weight: .semibold))
+        let spacer = NSView()
+        spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        header.addArrangedSubview(spacer)
         header.addArrangedSubview(pill("Disconnected", color: muted))
         content.addArrangedSubview(header)
+        header.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
+
         content.addArrangedSubview(separator())
-        content.addArrangedSubview(text("Connected for   00:00:00",
-                                       color: muted))
+        content.addArrangedSubview(text("◷  Connected for    00:00:00",
+                                       size: 12, color: muted))
 
-        let metrics = stack(.horizontal, spacing: 13)
         let selected = snapshot?.servers.first { $0.id == activeServer }
-        let reportedPing = selected?.latencyMs.map { String($0) + " ms (panel)" }
-            ?? "—"
-        for (title, value) in [
-            ("Server ping", reportedPing),
-            ("Public IP", "—")
-        ] {
-            let metric = stack(spacing: 8)
-            metric.addArrangedSubview(text(title, size: 11, color: muted))
-            metric.addArrangedSubview(text(value, size: 17, weight: .bold))
-            metrics.addArrangedSubview(card([metric], radius: 17, padding: 15))
-        }
-        content.addArrangedSubview(metrics)
+        let reportedPing = selected?.latencyMs.map {
+            String($0) + " ms"
+        } ?? "—"
 
-        let traffic = stack(.horizontal, spacing: 13)
-        for (title, value) in [
-            ("↓ Download", "—"), ("↑ Upload", "—")
-        ] {
-            let metric = stack(spacing: 8)
-            metric.addArrangedSubview(text(title, size: 11, color: muted))
-            metric.addArrangedSubview(text(value, size: 17, weight: .bold))
-            traffic.addArrangedSubview(card([metric], radius: 17, padding: 15))
-        }
+        let network = stack(.horizontal, spacing: 10)
+        network.distribution = .fillEqually
+        network.addArrangedSubview(networkMetric("ϟ  Server ping", value: reportedPing,
+            subtitle: selected?.latencyMs == nil ? "Round-trip time" :
+                "Panel-reported latency"))
+        network.addArrangedSubview(networkMetric("◉  Public IP", value: "—"))
+        content.addArrangedSubview(network)
+        network.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
+
+        let traffic = stack(.horizontal, spacing: 10)
+        traffic.distribution = .fillEqually
+        traffic.addArrangedSubview(networkMetric("↓  Download", value: "—",
+                                                  subtitle: "Session total: —"))
+        traffic.addArrangedSubview(networkMetric("↑  Upload", value: "—",
+                                                  subtitle: "Session total: —"))
         content.addArrangedSubview(traffic)
-        content.addArrangedSubview(text(
-            "No VPN interface or verified network traffic in native graphics mode.",
-            size: 11, color: amber))
-        return card([content], radius: 23, padding: 20)
+        traffic.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
+
+        let location = selected.map {
+            flag($0.country) + "  " + countryName($0.country)
+        } ?? "Select location"
+        let change = button(location + "                   Locations  ›",
+            action: #selector(showLocations(_:)), mutedButton: true)
+        change.alignment = .left
+        change.heightAnchor.constraint(equalToConstant: 45).isActive = true
+        content.addArrangedSubview(change)
+        change.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
+
+        // Offline mode never fabricates session bytes, handshakes or an IP.
+        return card([content], radius: 25, padding: 20)
     }
 
     private func countryName(_ code: String) -> String {
@@ -1010,6 +1064,11 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         busy = false
         tab = 0
         status = ""
+        view = build()
+    }
+
+    @objc private func showLocations(_ sender: NSButton) {
+        tab = 1
         view = build()
     }
 
