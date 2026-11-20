@@ -56,26 +56,59 @@ private final class TwinNativePremiumButton: NSButton {
 // Uses Core Animation's vector gradient, not a raster image or Metal shader.
 // Keeps the Windows-style translucent depth on macOS cloud hosts without Metal.
 private final class TwinNativeGlassCard: NSView {
+    enum Style { case panel, inset, metric }
     private let glassGradient = CAGradientLayer()
+    private let upperEdge = CAGradientLayer()
     override init(frame: NSRect) {
         super.init(frame: frame)
         wantsLayer = true
-        glassGradient.colors = [
-            NSColor(calibratedRed: 0.12, green: 0.26, blue: 0.32,
-                    alpha: 0.96).cgColor,
-            NSColor(calibratedRed: 0.085, green: 0.175, blue: 0.22,
-                    alpha: 0.95).cgColor
-        ]
-        glassGradient.startPoint = CGPoint(x: 0.0, y: 1.0)
-        glassGradient.endPoint = CGPoint(x: 1.0, y: 0.0)
-        glassGradient.cornerRadius = 20
+        glassGradient.startPoint = CGPoint(x: 0, y: 1)
+        glassGradient.endPoint = CGPoint(x: 1, y: 0)
+        glassGradient.locations = [0, 0.55, 1]
         layer?.insertSublayer(glassGradient, at: 0)
+        // One-pixel specular edge, following the Windows card vocabulary.
+        upperEdge.colors = [
+            NSColor(calibratedRed: 0.44, green: 0.91, blue: 0.94,
+                    alpha: 0.24).cgColor,
+            NSColor(calibratedRed: 0.44, green: 0.91, blue: 0.94,
+                    alpha: 0.025).cgColor
+        ]
+        upperEdge.startPoint = CGPoint(x: 0, y: 0.5)
+        upperEdge.endPoint = CGPoint(x: 1, y: 0.5)
+        layer?.addSublayer(upperEdge)
+        apply(.panel)
     }
     required init?(coder: NSCoder) { return nil }
+    func apply(_ style: Style) {
+        let stops: [NSColor]
+        switch style {
+        case .panel:
+            stops = [
+                NSColor(calibratedRed: 0.108, green: 0.236, blue: 0.291, alpha: 0.98),
+                NSColor(calibratedRed: 0.083, green: 0.189, blue: 0.241, alpha: 0.98),
+                NSColor(calibratedRed: 0.062, green: 0.150, blue: 0.198, alpha: 0.98)
+            ]
+        case .inset:
+            stops = [
+                NSColor(calibratedRed: 0.142, green: 0.320, blue: 0.372, alpha: 0.97),
+                NSColor(calibratedRed: 0.109, green: 0.258, blue: 0.309, alpha: 0.96),
+                NSColor(calibratedRed: 0.088, green: 0.203, blue: 0.266, alpha: 0.96)
+            ]
+        case .metric:
+            stops = [
+                NSColor(calibratedRed: 0.104, green: 0.258, blue: 0.314, alpha: 0.97),
+                NSColor(calibratedRed: 0.074, green: 0.179, blue: 0.239, alpha: 0.98),
+                NSColor(calibratedRed: 0.055, green: 0.153, blue: 0.203, alpha: 0.99)
+            ]
+        }
+        glassGradient.colors = stops.map { $0.cgColor }
+    }
     override func layout() {
         super.layout()
         glassGradient.frame = bounds
         glassGradient.cornerRadius = layer?.cornerRadius ?? 20
+        upperEdge.frame = NSRect(x: 1, y: bounds.height - 1.5,
+                                 width: max(0, bounds.width - 2), height: 1)
     }
 }
 
@@ -293,8 +326,10 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     }
 
     private func card(_ children: [NSView], radius: CGFloat = 22,
-                      padding: CGFloat = 21) -> NSView {
+                      padding: CGFloat = 21,
+                      style: TwinNativeGlassCard.Style = .panel) -> NSView {
         let box = TwinNativeGlassCard(frame: .zero)
+        box.apply(style)
         box.translatesAutoresizingMaskIntoConstraints = false
         box.wantsLayer = true
         box.layer?.cornerRadius = radius
@@ -917,7 +952,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         // The Windows Quick Connect layout has no redundant three-tile
         // location/IP/protocol footer. Selection is available in the
         // Network status location bar; keep this pane compact and unclipped.
-        return card([main], radius: 25, padding: 15)
+        return card([main], radius: 25, padding: 15, style: .panel)
     }
 
     private func networkMetric(_ title: String, value: String,
@@ -960,7 +995,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             content.addArrangedSubview(idleLine)
             idleLine.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
         }
-        let panel = card([content], radius: 17, padding: 14)
+        let panel = card([content], radius: 17, padding: 14, style: .metric)
         panel.heightAnchor.constraint(greaterThanOrEqualToConstant: 137)
             .isActive = true
         return panel
@@ -1027,7 +1062,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         change.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
 
         // Offline mode never fabricates session bytes, handshakes or an IP.
-        return card([content], radius: 25, padding: 20)
+        return card([content], radius: 25, padding: 20, style: .panel)
     }
 
     // Prefer a fresh local ICMP reply. A panel latency is identified as
@@ -1855,7 +1890,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         }
         usage.addArrangedSubview(text("Remaining: " + remaining,
                                       size: 10, color: sea))
-        let usageCard = card([usage], radius: 13, padding: 10)
+        let usageCard = card([usage], radius: 13, padding: 10, style: .inset)
         items.addArrangedSubview(usageCard)
         usageCard.widthAnchor.constraint(equalTo: items.widthAnchor).isActive = true
 
@@ -1889,7 +1924,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             items.addArrangedSubview(text("Account: " + error,
                                           size: 10, color: amber))
         }
-        return card([items], radius: 20, padding: 14)
+        return card([items], radius: 20, padding: 14, style: .inset)
     }
 
     private func filteredServers() -> [TwinMacNativeServer] {
