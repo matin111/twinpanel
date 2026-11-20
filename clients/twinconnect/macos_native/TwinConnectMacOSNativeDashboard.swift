@@ -517,8 +517,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             (brand.blended(withFraction: 0.18, of: .black) ?? brand) :
             (NSColor(calibratedRed: 0.09, green: 0.17, blue: 0.22, alpha: 1)
                 .blended(withFraction: 0.22, of: brand) ?? brand)
-        control.setAccentGradient(upper.withAlphaComponent(0.90),
-                                  lower.withAlphaComponent(0.82))
+        control.setAccentGradient(upper.withAlphaComponent(0.72),
+                                  lower.withAlphaComponent(0.65))
         control.layer?.borderColor = brand.withAlphaComponent(
             primary ? 0.74 : 0.38).cgColor
         control.attributedTitle = NSAttributedString(
@@ -929,8 +929,10 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             control.layer?.borderWidth = 1
             if tab == index {
                 control.setAccentGradient(
-                    tint().blended(withFraction: 0.26, of: .white) ?? tint(),
-                    tint().blended(withFraction: 0.16, of: .black) ?? tint())
+                    (tint().blended(withFraction: 0.26, of: .white) ?? tint())
+                        .withAlphaComponent(0.84),
+                    (tint().blended(withFraction: 0.16, of: .black) ?? tint())
+                        .withAlphaComponent(0.76))
                 control.layer?.borderColor = sea.withAlphaComponent(0.83).cgColor
             } else {
                 control.setAccentGradient(
