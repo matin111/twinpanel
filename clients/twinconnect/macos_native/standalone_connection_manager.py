@@ -290,11 +290,46 @@ def probe(expected_ip: str | None = None) -> dict:
 
 
 def stop() -> dict:
+    """Stop only the exact process this manager started.
+
+    Never remove the state record while a matching process is still live:
+    that would leave an unmanaged proxy which the user cannot disconnect.
+    Never touch the system proxy, default route, DNS, or unrelated processes.
+    """
     item = read_state()
-    if item and process_matches(item):
-        os.kill(item["pid"], signal.SIGTERM)
-    state_path().unlink(missing_ok=True)
-    return {"state": "stop_requested" if item else "stopped"}
+    if not item:
+        return {"state": "stopped"}
+    if not process_matches(item):
+        state_path().unlink(missing_ok=True)
+        return {"state": "stopped", "reason": "ENGINE_NOT_RUNNING"}
+    pid = item["pid"]
+    try:
+        os.kill(pid, signal.SIGTERM)
+    except ProcessLookupError:
+        state_path().unlink(missing_ok=True)
+        return {"state": "stopped"}
+    except PermissionError:
+        fail("ENGINE_STOP_PERMISSION_DENIED")
+    for _ in range(30):
+        if not process_matches(item):
+            state_path().unlink(missing_ok=True)
+            return {"state": "stopped"}
+        time.sleep(0.1)
+    # A still-matching engine belongs to this manager. Give SIGKILL only
+    # to that validated PID, never to a process group or a recycled PID.
+    if process_matches(item):
+        try:
+            os.kill(pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        except PermissionError:
+            fail("ENGINE_STOP_PERMISSION_DENIED")
+    for _ in range(15):
+        if not process_matches(item):
+            state_path().unlink(missing_ok=True)
+            return {"state": "stopped"}
+        time.sleep(0.1)
+    fail("ENGINE_STILL_RUNNING_STATE_PRESERVED")
 
 
 def list_protocols() -> dict:
