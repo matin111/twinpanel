@@ -284,6 +284,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
 
     private func buildShell(in root: NSView) {
         let sidebar = buildSidebar()
+        sidebar.translatesAutoresizingMaskIntoConstraints = false
         root.addSubview(sidebar)
         NSLayoutConstraint.activate([
             sidebar.leadingAnchor.constraint(equalTo: root.leadingAnchor),
@@ -292,6 +293,9 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             sidebar.widthAnchor.constraint(equalToConstant: 234)
         ])
         let workspace = stack(spacing: 17)
+        // A vertical NSStackView with .leading alignment gives its NSView
+        // cards no full-width constraint. They can collapse to zero width.
+        workspace.alignment = .width
         let heading = stack(.horizontal, spacing: 12)
         let titles = ["Quick connect", "Locations", "Settings", "Account"]
         heading.addArrangedSubview(text(titles[tab], size: 26, weight: .bold))
@@ -312,22 +316,44 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         workspace.addArrangedSubview(text(
             "Live account data from your panel  •  macOS native graphics",
             size: 11, color: muted))
-        let area = NSView()
-        area.translatesAutoresizingMaskIntoConstraints = false
-        spaced(area, workspace, inset: 24)
-        root.addSubview(area)
+        // Keep the dashboard visible even before the account snapshot arrives
+        // or when its contents exceed the macOS window height.
+        let scroll = NSScrollView()
+        scroll.translatesAutoresizingMaskIntoConstraints = false
+        scroll.drawsBackground = false
+        scroll.hasVerticalScroller = true
+        scroll.autohidesScrollers = true
+        scroll.borderType = .noBorder
+
+        let document = NSView()
+        document.translatesAutoresizingMaskIntoConstraints = false
+        document.addSubview(workspace)
         NSLayoutConstraint.activate([
-            area.leadingAnchor.constraint(equalTo: sidebar.trailingAnchor),
-            area.trailingAnchor.constraint(equalTo: root.trailingAnchor),
-            area.topAnchor.constraint(equalTo: root.topAnchor),
-            area.bottomAnchor.constraint(equalTo: root.bottomAnchor)
+            workspace.leadingAnchor.constraint(equalTo: document.leadingAnchor,
+                                               constant: 24),
+            workspace.trailingAnchor.constraint(equalTo: document.trailingAnchor,
+                                                constant: -24),
+            workspace.topAnchor.constraint(equalTo: document.topAnchor,
+                                           constant: 24),
+            workspace.bottomAnchor.constraint(equalTo: document.bottomAnchor,
+                                              constant: -24)
         ])
-        workspace.widthAnchor.constraint(equalTo: area.widthAnchor,
-                                         constant: -48).isActive = true
+        scroll.documentView = document
+        root.addSubview(scroll)
+        NSLayoutConstraint.activate([
+            scroll.leadingAnchor.constraint(equalTo: sidebar.trailingAnchor),
+            scroll.trailingAnchor.constraint(equalTo: root.trailingAnchor),
+            scroll.topAnchor.constraint(equalTo: root.topAnchor),
+            scroll.bottomAnchor.constraint(equalTo: root.bottomAnchor),
+            document.widthAnchor.constraint(equalTo: scroll.contentView.widthAnchor),
+            document.heightAnchor.constraint(greaterThanOrEqualTo:
+                                             scroll.contentView.heightAnchor)
+        ])
     }
 
     private func buildSidebar() -> NSView {
         let side = NSView()
+        side.translatesAutoresizingMaskIntoConstraints = false
         side.wantsLayer = true
         side.layer?.backgroundColor = base.withAlphaComponent(0.90).cgColor
         side.layer?.borderColor = tint().withAlphaComponent(0.18).cgColor
@@ -633,7 +659,12 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                 self.snapshot = nil
                 self.tab = 0
                 self.status = "Retrieving live subscription data…"
+                NSLog("TwinConnect AppKit: authenticated; showing dashboard shell")
+                // Present the dashboard first. Panel fetch must never gate
+                // rendering the tabs or make the content disappear.
+                self.view = self.build()
                 self.refreshData()
+                return
             }
             self.view = self.build()
         }
@@ -659,6 +690,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                 self.status = "Account and node information refreshed."
             }
             self.view = self.build()
+            NSLog("TwinConnect AppKit: refreshed dashboard; data available: %@", self.snapshot == nil ? "NO" : "YES")
         }
     }
 
