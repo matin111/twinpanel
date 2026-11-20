@@ -112,8 +112,8 @@ class MetalFallbackInstallTests(unittest.TestCase):
         previous = self.window.read_text(encoding="utf-8")
         older = previous.split("// TWINCONNECT_MACOS_METAL_FALLBACK_V1", 1)[0]
         self.window.write_text(
-            older + "// TWINCONNECT_MACOS_METAL_FALLBACK_V1\\n" +
-            "final class TwinConnectMacOSMetalFallback: NSViewController {}\\n",
+            older + "// TWINCONNECT_MACOS_METAL_FALLBACK_V1\n" +
+            "final class TwinConnectMacOSMetalFallback: NSViewController {}\n",
             encoding="utf-8"
         )
         refreshed = self.install()
