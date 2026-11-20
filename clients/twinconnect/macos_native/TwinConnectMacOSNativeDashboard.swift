@@ -629,7 +629,9 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         content.addArrangedSubview(header)
         header.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
 
-        content.addArrangedSubview(separator())
+        let divider = separator()
+        content.addArrangedSubview(divider)
+        divider.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
         content.addArrangedSubview(text("◷  Connected for    00:00:00",
                                        size: 12, color: muted))
 
