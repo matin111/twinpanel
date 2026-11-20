@@ -87,6 +87,30 @@ Do not paste actual client configurations into public issues or CI logs.
 Only one managed engine can run at a time. The app's Flutter buttons are
 **not yet connected** to this standalone process manager.
 
+
+## One-command real egress smoke test (recommended)
+
+With an **existing private client JSON** locally on the Mac, test a single
+protocol through its loopback proxy without changing macOS routing:
+
+```sh
+python3 macos_native/smoke_test_standalone_proxy.py \
+  hysteria2 "/absolute/path/to/private-client.json"
+```
+
+The runner creates a private transformed profile, starts the native engine,
+makes an HTTPS request **through SOCKS5**, reports the public exit IP, then
+stops the managed engine and deletes the temporary credential-bearing profile
+even if the probe raises an error. It will refuse to start if another managed
+engine is already running. A `test_passed` response means proxied egress was
+reachable, **not** that macOS is connected system-wide.
+
+For a known exit IP, use `--expected-ip IP`. Do not put a secret or
+subscription URL into the command; pass the path of a client JSON file.
+Do not use a server inbound configuration. The path may contain spaces,
+so quote it. This script **does not** fetch credentials from the panel.
+For servers with a dynamic exit IP, omit `--expected-ip`.
+
 ## Remote Mac safety
 
 Keep the macOS server's original default route (for example `en0`)
