@@ -89,6 +89,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     private var pingAllBusy = false
     private var pingGeneration = 0
     private var didAutoPing = false
+    private var localProxyBusy = false
+    private var localProxyStatus = ""
     private weak var usernameField: NSTextField?
     private weak var passwordField: NSSecureTextField?
 
@@ -670,11 +672,31 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         connect.toolTip = "VPN startup requires an installed and signed Packet Tunnel"
         connect.heightAnchor.constraint(equalToConstant: 53).isActive = true
         connect.widthAnchor.constraint(equalToConstant: 255).isActive = true
+        // On unsigned cloud Macs the system VPN remains disabled. Offer a
+        // separate, explicitly labelled, one-request local SOCKS egress test.
+        // Never label proxy egress as a connected system VPN.
+
         buttonRow.addArrangedSubview(connect)
         buttonRow.addArrangedSubview(rightGap)
         leftGap.widthAnchor.constraint(equalTo: rightGap.widthAnchor).isActive = true
         main.addArrangedSubview(buttonRow)
         buttonRow.widthAnchor.constraint(equalTo: main.widthAnchor).isActive = true
+        let proxyTest = button(localProxyBusy ? "Testing Hysteria2…" :
+                               "Test Hysteria2 proxy (not VPN)",
+                               action: #selector(testNativeHysteria2Proxy(_:)),
+                               mutedButton: true)
+        proxyTest.isEnabled = !localProxyBusy && accountSession != nil &&
+            activeServer != nil && activeProtocol == "hysteria2" &&
+            (snapshot?.protocols.contains {
+                $0.code == "hysteria2" && $0.configured
+            } ?? false)
+        proxyTest.toolTip = "One HTTPS request via local SOCKS. No system route changes."
+        main.addArrangedSubview(proxyTest)
+        proxyTest.widthAnchor.constraint(equalTo: main.widthAnchor).isActive = true
+        if !localProxyStatus.isEmpty {
+            main.addArrangedSubview(text(localProxyStatus, size: 11, color: muted))
+        }
+
 
         main.addArrangedSubview(homeSubscriptionSummary())
 
@@ -1587,6 +1609,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         logoGeneration += 1
         tenantLogo = nil
         accountSession = nil
+        localProxyStatus = ""
         snapshot = nil
         activeProtocol = nil
         activeServer = nil
@@ -1660,6 +1683,118 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         let row = sender.selectedRow
         let list = filteredServers()
         if list.indices.contains(row) { activeServer = list[row].id }
+    }
+
+
+    @objc private func testNativeHysteria2Proxy(_ sender: NSButton) {
+        guard !localProxyBusy,
+              let session = accountSession,
+              let serverID = activeServer,
+              activeProtocol == "hysteria2",
+              snapshot?.protocols.contains(where: {
+                  $0.code == "hysteria2" && $0.configured
+              }) == true else { return }
+        localProxyBusy = true
+        localProxyStatus = "Checking current panel permissions…"
+        view = build()
+        directory.prepareLocalHysteria2(session, serverID: serverID) {
+            [weak self] response in
+            guard let self = self else { return }
+            guard self.accountSession?.accessToken == session.accessToken else {
+                self.localProxyBusy = false
+                return
+            }
+            switch response {
+            case .failure(let error):
+                self.localProxyBusy = false
+                self.localProxyStatus = "Proxy test blocked: " + error.localizedDescription
+                self.view = self.build()
+            case .success(let bytes):
+                self.localProxyStatus = "Sending a test request via Hysteria2…"
+                self.view = self.build()
+                DispatchQueue.global(qos: .userInitiated).async {
+                    let result = self.oneShotHysteria2Probe(bytes)
+                    DispatchQueue.main.async { [weak self] in
+                        guard let self = self else { return }
+                        self.localProxyBusy = false
+                        guard self.accountSession?.accessToken == session.accessToken
+                        else { return }
+                        self.localProxyStatus = result
+                        self.view = self.build()
+                    }
+                }
+            }
+        }
+    }
+
+    /// Never changes a system route. Reuses the standalone manager's verified
+    /// local SOCKS process and cleans up test credentials even on failure.
+    private func oneShotHysteria2Probe(_ config: Data) -> String {
+        let root = NSHomeDirectory() +
+            "/twinpanel/clients/twinconnect"
+        let manager = root + "/macos_native/standalone_connection_manager.py"
+        let executable = root + "/macos_native/build/singbox/" +
+            (ProcessInfo.processInfo.machineArchitecture) + "/sing-box"
+        guard FileManager.default.isExecutableFile(atPath: executable),
+              FileManager.default.fileExists(atPath: manager) else {
+            return "Proxy engine not installed on this Mac"
+        }
+        let folder = FileManager.default.temporaryDirectory
+            .appendingPathComponent("twinconnect-local-" + UUID().uuidString,
+                                    isDirectory: true)
+        do {
+            try FileManager.default.createDirectory(
+                at: folder, withIntermediateDirectories: false,
+                attributes: [.posixPermissions: 0o700])
+        } catch {
+            return "Could not prepare private proxy test directory"
+        }
+        let file = folder.appendingPathComponent("client.json")
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let created = FileManager.default.createFile(
+            atPath: file.path, contents: config,
+            attributes: [.posixPermissions: 0o600])
+        guard created else { return "Could not write private proxy test profile" }
+        // Only a single managed engine is permitted; don't interrupt existing
+        // user-owned processes. Manager start refuses an existing instance.
+        let started = runLocalManager([
+            "start", "hysteria2", file.path
+        ], root: root)
+        guard started.0 == 0 else {
+            return "Proxy startup failed (see local engine log)"
+        }
+        defer { _ = runLocalManager(["stop"], root: root) }
+        let response = runLocalManager(["probe"], root: root)
+        guard response.0 == 0,
+              let data = response.1.data(using: .utf8),
+              let json = (try? JSONSerialization.jsonObject(with: data))
+                  as? [String: Any],
+              json["state"] as? String == "proxy_egress_reachable",
+              let address = json["egress_ip"] as? String
+        else {
+            return "Hysteria2 proxy test failed; VPN remains offline"
+        }
+        return "Proxied HTTPS exit: " + address + " (not a system VPN)"
+    }
+
+    private func runLocalManager(_ args: [String], root: String) -> (Int32, String) {
+        let program = Process()
+        program.executableURL = URL(fileURLWithPath: "/usr/bin/python3")
+        program.arguments = [
+            root + "/macos_native/standalone_connection_manager.py"
+        ] + args
+        let output = Pipe()
+        program.standardOutput = output
+        program.standardError = Pipe() // Never show credentials or errors in UI
+        do {
+            try program.run()
+            program.waitUntilExit()
+            let bytes = output.fileHandleForReading.readDataToEndOfFile()
+            return (program.terminationStatus,
+                    String(data: bytes, encoding: .utf8) ?? "")
+        } catch {
+            return (-1, "")
+        }
     }
 
     @objc private func unavailableConnect(_ sender: NSButton) {
