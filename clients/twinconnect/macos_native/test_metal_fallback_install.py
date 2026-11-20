@@ -405,7 +405,7 @@ class MetalFallbackInstallTests(unittest.TestCase):
             'side.apply(.sidebar, accent: tint(),',
             'background: panelBackgroundColor(), surface: panelCardColor()',
             'let brand = tint()',
-            'control.setAccentGradient(upper.withAlphaComponent(0.72)',
+            'upper.withAlphaComponent(primary ? 0.64 : 0.36)',
             'enum Style: Equatable { case panel, inset, metric, sidebar }',
         ):
             self.assertIn(token, source)
@@ -547,6 +547,32 @@ class MetalFallbackInstallTests(unittest.TestCase):
                       source)
         self.assertIn('style == .panel ? 0.10 : 0.025', source)
 
+    def test_all_mac_buttons_have_clear_backing_and_nonopaque_glass(self) -> None:
+        source = (SOURCE / "TwinConnectMacOSNativeDashboard.swift").read_text(
+            encoding="utf-8"
+        )
+        button = source.split("private final class TwinNativePremiumButton: NSButton {", 1)[1].split(
+            "private final class TwinNativeGlassCard:", 1
+        )[0]
+        factory = source.split("    private func button(", 1)[1].split(
+            "    private func separator()", 1
+        )[0]
+        sidebar = source.split("    private func buildSidebar() -> NSView {", 1)[1].split(
+            "    private func connectPage() -> NSView {", 1
+        )[0]
+        self.assertIn("layer?.backgroundColor = NSColor.clear.cgColor", button)
+        self.assertIn("control.layer?.backgroundColor = NSColor.clear.cgColor", factory)
+        self.assertIn("upper.withAlphaComponent(primary ? 0.64 : 0.36)", factory)
+        self.assertIn("lower.withAlphaComponent(primary ? 0.52 : 0.27)", factory)
+        self.assertIn("private var glassLayersAttached = false", button)
+        self.assertIn("if !glassLayersAttached {", button)
+        self.assertIn("private let glassEdge = CAGradientLayer()", button)
+        self.assertIn(".withAlphaComponent(0.70)", sidebar)
+        self.assertIn(".withAlphaComponent(0.38)", sidebar)
+        self.assertIn(".withAlphaComponent(0.39)", sidebar)
+        self.assertNotIn("control.layer?.backgroundColor = background.cgColor", source)
+        self.assertNotIn("blur.material = .hudWindow", source)
+
     def test_appkit_glass_uses_real_blur_and_transparent_overlays(self) -> None:
         source = (SOURCE / "TwinConnectMacOSNativeDashboard.swift").read_text(
             encoding="utf-8"
@@ -656,7 +682,7 @@ class MetalFallbackInstallTests(unittest.TestCase):
             'let centerBody = NSBezierPath(roundedRect:',
             'for index in 0..<17',
             'NSColor(calibratedRed: 0.24, green: 0.88, blue: 0.83,',
-            'control.layer?.borderColor = primary ?',
+            'control.layer?.backgroundColor = NSColor.clear.cgColor',
             'box.layer?.shadowOpacity = style == .panel ? 0.10 : 0.025',
             'let iconName: String',
             'selected ? "✓" : "›"',
