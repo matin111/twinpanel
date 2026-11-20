@@ -79,6 +79,7 @@ class MetalFallbackInstallTests(unittest.TestCase):
             generated.index("FlutterViewController()")
         )
         self.assertIn("metal.makeCommandQueue() != nil else", generated)
+        self.assertIn("self.titleVisibility = .hidden", generated)
         self.assertIn(
             "self.contentViewController = TwinConnectMacOSMetalFallback()",
             generated
@@ -95,6 +96,20 @@ class MetalFallbackInstallTests(unittest.TestCase):
         self.assertIn("Settings", generated)
         self.assertIn("Account", generated)
         self.assertIn("TwinNativePowerRing", generated)
+        login_code = generated.split("private func buildLogin(in root: NSView) {", 1)[1].split(
+            "private func buildShell(in root: NSView) {", 1
+        )[0]
+        self.assertIn("glass.centerXAnchor.constraint(equalTo: root.centerXAnchor)", login_code)
+        self.assertIn("glass.centerYAnchor.constraint(equalTo: root.centerYAnchor)", login_code)
+        self.assertIn("form.widthAnchor.constraint(equalTo: glass.widthAnchor", login_code)
+        self.assertIn("username.widthAnchor.constraint(equalTo: form.widthAnchor)", login_code)
+        self.assertIn("password.widthAnchor.constraint(equalTo: form.widthAnchor)", login_code)
+        self.assertIn("enter.widthAnchor.constraint(equalTo: form.widthAnchor)", login_code)
+        self.assertIn('placeholder: "Username"', login_code)
+        self.assertIn('placeholder: "Password"', login_code)
+        self.assertNotIn("Welcome back", login_code)
+        self.assertNotIn("Secure app login", login_code)
+        self.assertNotIn("TwinConnect app credentials", login_code)
         self.assertIn("NSGradient(colors:", generated)
         self.assertIn("VPN connection remains unavailable", generated)
         self.assertNotIn("startVPNTunnel(", generated.split("// TWINCONNECT_MACOS_METAL_FALLBACK_V1", 1)[-1])
@@ -128,6 +143,21 @@ class MetalFallbackInstallTests(unittest.TestCase):
         self.assertNotIn("NSViewController {}", migrated)
         self.assertIn("TwinConnectMacOSNativeDashboard {}", migrated)
         self.assertEqual(migrated.count("class TwinConnectMacOSMetalFallback"), 1)
+
+    def test_migrates_old_window_title_visibility_without_duplicates(self) -> None:
+        self.assertEqual(self.install().returncode, 0)
+        prior = self.window.read_text(encoding="utf-8")
+        self.assertEqual(prior.count("self.titleVisibility = .hidden"), 1)
+        self.window.write_text(
+            prior.replace("      self.titleVisibility = .hidden\\n", "", 1),
+            encoding="utf-8"
+        )
+        fixed = self.install()
+        self.assertEqual(fixed.returncode, 0, fixed.stderr)
+        revised = self.window.read_text(encoding="utf-8")
+        self.assertEqual(revised.count("self.titleVisibility = .hidden"), 1)
+        self.assertEqual(self.install().returncode, 0)
+        self.assertEqual(self.window.read_text(encoding="utf-8"), revised)
 
     def test_unknown_flutter_window_template_aborts_without_changes(self) -> None:
         self.window.write_text(
