@@ -2212,8 +2212,14 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                 cause == "UNKNOWN_PROXY_FAILURE" ? safeManagerReason(started.2) : cause
             )
         }
-        defer { _ = runLocalManager(["stop"], root: root) }
         let response = runLocalManager(["probe"], root: root)
+        // Never report successful proxy egress as completed until the
+        // temporary engine is actually stopped and verified by the manager.
+        let stopped = runLocalManager(["stop"], root: root)
+        guard stopped.0 == 0 else {
+            return "Proxy stop failed: " + safeManagerReason(stopped.2) +
+                " — use Stop local proxy before retrying"
+        }
         guard response.0 == 0,
               let data = response.1.data(using: .utf8),
               let json = (try? JSONSerialization.jsonObject(with: data))
