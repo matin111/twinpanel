@@ -14,7 +14,6 @@ from pathlib import Path
 import re
 import subprocess
 import sys
-import tempfile
 
 BASE = Path("/Library/PrivilegedHelperTools/TwinConnectCisco")
 CHECKPOINT = BASE / "network-checkpoint.json"
@@ -151,20 +150,32 @@ def restore() -> None:
     if network_service_for_device(saved["interface"]) != saved["service"]:
         raise ValueError("CISCO_NETWORK_SERVICE_CHANGED")
     service = saved["service"]
-    if saved["mode"] == "manual":
-        command(NETWORKSETUP, "-setmanual", service,
-                saved["ip"], saved["mask"], saved["gateway"])
-    else:
-        command(NETWORKSETUP, "-setdhcp", service)
-    command(NETWORKSETUP, "-setdnsservers", service,
-            *(saved["dns"] if saved["dns"] else ["Empty"]))
-    current = capture()
-    if (current["mode"] != saved["mode"] or
-            (saved["mode"] == "manual" and
-             (current["ip"], current["mask"], current["gateway"]) !=
-             (saved["ip"], saved["mask"], saved["gateway"])) or
-            current["dns"] != saved["dns"]):
-        raise ValueError("CISCO_NETWORK_RESTORE_UNVERIFIED")
+    # A VPN can temporarily replace the default route. Verification must
+    # target the original service directly, not whichever interface is primary.
+    def matches() -> bool:
+        details = command(NETWORKSETUP, "-getinfo", service)
+        fields = dict(re.findall(r"(?m)^([^:\\n]+):\\s*([^\\n]+)$", details))
+        original_mode = ("Manual Configuration" in details if saved["mode"] == "manual"
+                         else "DHCP Configuration" in details)
+        addr_match = (saved["mode"] != "manual" or
+                      (fields.get("IP address"), fields.get("Subnet mask"),
+                       fields.get("Router")) ==
+                      (saved["ip"], saved["mask"], saved["gateway"]))
+        dns_raw = command(NETWORKSETUP, "-getdnsservers", service).strip()
+        current_dns = ([] if dns_raw.lower().startswith("there aren't any dns servers")
+                       else [x.strip() for x in dns_raw.splitlines() if x.strip()])
+        return original_mode and addr_match and current_dns == saved["dns"]
+
+    if not matches():
+        if saved["mode"] == "manual":
+            command(NETWORKSETUP, "-setmanual", service,
+                    saved["ip"], saved["mask"], saved["gateway"])
+        else:
+            command(NETWORKSETUP, "-setdhcp", service)
+        command(NETWORKSETUP, "-setdnsservers", service,
+                *(saved["dns"] if saved["dns"] else ["Empty"]))
+        if not matches():
+            raise ValueError("CISCO_NETWORK_RESTORE_UNVERIFIED")
     CHECKPOINT.unlink()
     print("CISCO_NETWORK_RESTORED_VERIFIED", flush=True)
 
