@@ -80,7 +80,7 @@ case "$arch" in
 esac
 [[ -f "$engine" && -x "$engine" && ! -L "$engine" ]] ||
   { echo "SINGBOX_ENGINE_MISSING" >&2; exit 2; }
-for f in unsigned_tun_daemon.py unsigned_tun_policy.py; do
+for f in unsigned_tun_daemon.py unsigned_tun_policy.py unsigned_tun_watchdog.py; do
   [[ -f "macos_native/$f" && ! -L "macos_native/$f" ]] ||
     { echo "MISSING_SAFE_TUN_SOURCE: $f" >&2; exit 2; }
 done
@@ -95,9 +95,10 @@ if [[ "$action" == "stage" ]]; then
   install -o root -g wheel -m 0755 "$engine" "$root/sing-box"
   install -o root -g wheel -m 0644 macos_native/unsigned_tun_daemon.py "$root/unsigned_tun_daemon.py"
   install -o root -g wheel -m 0644 macos_native/unsigned_tun_policy.py "$root/unsigned_tun_policy.py"
+  install -o root -g wheel -m 0644 macos_native/unsigned_tun_watchdog.py "$root/unsigned_tun_watchdog.py"
 else
   # Never swap helper source behind root ownership on activation.
-  for f in sing-box unsigned_tun_daemon.py unsigned_tun_policy.py; do
+  for f in sing-box unsigned_tun_daemon.py unsigned_tun_policy.py unsigned_tun_watchdog.py; do
     [[ -f "$root/$f" && ! -L "$root/$f" && "$(stat -f %u "$root/$f")" == 0 ]] ||
       { echo "TRUSTED_STAGED_FILE_MISSING" >&2; exit 2; }
   done
