@@ -118,6 +118,24 @@ class CiscoRecoveryTests(unittest.TestCase):
             "185.236.39.36", "255.255.255.240", "185.236.39.33")
         self.assertFalse(recovery.CHECKPOINT.exists())
 
+    def test_watcher_does_nothing_without_checkpoint(self):
+        with mock.patch.object(recovery, "restore") as restore, \
+             mock.patch.object(recovery.os, "kill") as kill:
+            recovery.watch(12345, 120)
+            restore.assert_not_called()
+            kill.assert_not_called()
+
+    def test_orphan_stopper_rejects_unrelated_process(self):
+        with mock.patch.object(recovery, "read_checkpoint",
+                               return_value=dict(STATIC, tunnel_pid=2345)), \
+             mock.patch.object(recovery.subprocess, "run",
+                               return_value=mock.Mock(
+                                   returncode=0,
+                                   stdout="/usr/bin/python3 arbitrary_script.py")), \
+             mock.patch.object(recovery.os, "kill") as kill:
+            recovery.stop_orphaned_tunnel()
+            kill.assert_not_called()
+
     def test_bad_mode_does_not_change_network(self):
         entry = dict(STATIC, mode="invalid")
         recovery.CHECKPOINT.write_text(json.dumps(entry))
