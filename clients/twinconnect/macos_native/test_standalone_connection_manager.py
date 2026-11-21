@@ -205,6 +205,34 @@ class StandaloneManagerTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "^PROXY_OR_REMOTE_TIMEOUT$"):
                 manager.probe()
 
+    def test_curl_tcp_error_identifies_missing_local_socks_listener(self):
+        record = {"protocol": "shadowtls", "port": 17089, "pid": 42}
+        failed = subprocess.CompletedProcess([], 7, "", "PRIVATE_HOST")
+        with mock.patch.object(manager, "read_state", return_value=record), \
+             mock.patch.object(manager, "process_matches", return_value=True), \
+             mock.patch.object(manager.subprocess, "run", return_value=failed), \
+             mock.patch.object(manager.socket, "create_connection",
+                               side_effect=ConnectionRefusedError()):
+            with self.assertRaisesRegex(
+                ValueError, "^LOCAL_SOCKS_LISTENER_UNREACHABLE$"
+            ):
+                manager.probe()
+
+    def test_curl_tcp_error_with_listener_identifies_upstream_failure(self):
+        record = {"protocol": "shadowtls", "port": 17089, "pid": 42}
+        failed = subprocess.CompletedProcess([], 7, "", "PRIVATE_HOST")
+        connection = mock.MagicMock()
+        with mock.patch.object(manager, "read_state", return_value=record), \
+             mock.patch.object(manager, "process_matches", return_value=True), \
+             mock.patch.object(manager.subprocess, "run", return_value=failed), \
+             mock.patch.object(manager.socket, "create_connection",
+                               return_value=connection) as connect:
+            with self.assertRaisesRegex(
+                ValueError, "^SOCKS_UPSTREAM_TCP_FAILED$"
+            ):
+                manager.probe()
+        connect.assert_called_once_with(("127.0.0.1", 17089), timeout=0.7)
+
     def test_diagnosis_classifies_logs_without_returning_secrets(self):
         logfile = self.root / "engine.log"
         logfile.write_text(
