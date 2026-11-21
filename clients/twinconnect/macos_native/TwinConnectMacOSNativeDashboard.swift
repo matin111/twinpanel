@@ -3236,6 +3236,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             status = activeProtocol == nil || activeServer == nil ?
                 "Connection unavailable: select a server and protocol in Locations." :
                 "Connection unavailable: this protocol needs a supported, entitled proxy profile."
+            localProxyStatus = status
             view = build()
             return
         }
@@ -3243,6 +3244,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         localProxyGeneration += 1
         let generation = localProxyGeneration
         status = "Checking authorized " + selectedProtocol + " profile…"
+        localProxyStatus = status
         view = build()
         directory.prepareLocalSingBox(
             session, serverID: serverID, protocolCode: selectedProtocol) {
@@ -3258,9 +3260,14 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                     reason.range(of: "^[A-Z0-9_]{3,64}$",
                                  options: .regularExpression) != nil ?
                     reason : "PROFILE_REQUEST_FAILED")
+                // Expose this failure in Settings and Copy diagnostics. Most
+                // denied profiles never start an engine, so CLI diagnose
+                // cannot explain them after the fact.
+                self.localProxyStatus = self.status
                 self.view = self.build()
             case .success(let profile):
                 self.status = "Verifying " + selectedProtocol + " HTTPS exit…"
+                self.localProxyStatus = self.status
                 self.view = self.build()
                 DispatchQueue.global(qos: .userInitiated).async {
                     let outcome = self.startVerifiedLocalProxy(
@@ -3335,8 +3342,18 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             String(ProcessInfo.processInfo.processIdentifier)
         ], root: root)
         guard started.0 == 0 else {
+            let reason = safeManagerReason(started.2)
+            // Startup can terminate before writing a state file; 'status'
+            // will then be 'stopped' and a later diagnose may be stale.
+            // Capture the safe, categorized engine fault immediately.
+            let diagnostic = runLocalManager(["diagnose"], root: root)
+            let category = safeManagerReason(diagnostic.1)
+            let specific = category == "ENGINE_FAILURE_NOT_CLASSIFIED" ||
+                           category == "ENGINE_LOG_UNAVAILABLE" ||
+                           category == "UNKNOWN_PROXY_FAILURE" ?
+                "" : " · " + category
             return (false, "Local proxy startup failed: " +
-                safeManagerReason(started.2), nil)
+                reason + specific, nil)
         }
         let tested = runLocalManager(["probe"], root: root)
         if tested.0 == 0,
@@ -3499,6 +3516,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             "Protocol selected: " + (activeProtocol ?? "none"),
             "Proxy verified protocol: " + (verifiedProxyProtocol ?? "none"),
             "Server selected: " + (activeServer == nil ? "no" : "yes"),
+            "Last connection status: " +
+                (status.isEmpty ? "not attempted" : status),
             "TUN preflight: " + (status.contains("TUN") ? status : "not run"),
             "Local SOCKS test: " + (localProxyStatus.isEmpty ? "not run" : localProxyStatus)
         ].joined(separator: "\n")
