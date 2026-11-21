@@ -68,6 +68,43 @@ class TUNDaemonControlTests(unittest.TestCase):
             self.assertEqual(session.status()["state"], "stopped")
             terminate.assert_called_once_with(20099, server.signal.SIGTERM)
 
+    def test_console_logout_stops_engine_and_clears_owner(self):
+        session = server.Session()
+        proc = mock.Mock()
+        proc.poll.return_value = None
+        proc.pid = 20098
+        session.process = proc
+        session.owner = 501
+        session.started = 10
+        with mock.patch.object(server.os, "stat") as stat_call, \
+             mock.patch.object(server.os, "killpg") as kill, \
+             mock.patch.object(server.time, "monotonic", return_value=20):
+            stat_call.return_value.st_uid = 502
+            self.assertEqual(session.status()["state"], "stopped")
+            kill.assert_called_once_with(proc.pid, server.signal.SIGTERM)
+            self.assertIsNone(session.owner)
+
+    def test_console_same_owner_keeps_engine(self):
+        session = server.Session()
+        proc = mock.Mock()
+        proc.poll.return_value = None
+        session.process = proc
+        session.owner = 501
+        session.started = 10
+        with mock.patch.object(server.os, "stat") as stat_call, \
+             mock.patch.object(server.time, "monotonic", return_value=20), \
+             mock.patch.object(server.os, "killpg") as kill:
+            stat_call.return_value.st_uid = 501
+            self.assertEqual(session.status()["state"], "engine_running_unverified")
+            kill.assert_not_called()
+
+    def test_untrusted_fake_socket_rejected_without_send(self):
+        with tempfile.TemporaryDirectory() as folder:
+            fake = Path(folder) / "fake.sock"
+            fake.write_text("not an actual UNIX domain socket")
+            with self.assertRaisesRegex(ValueError, "TUN_SERVICE_UNTRUSTED"):
+                client.query("start", {"outbounds": []}, socket_path=fake)
+
     def test_request_limits_and_actions(self):
         self.assertEqual(server.decode_request(b'{"action":"stop"}')["action"], "stop")
         for request in (b"", b'{"action":"shell"}', b'{"action":"status"' ,
