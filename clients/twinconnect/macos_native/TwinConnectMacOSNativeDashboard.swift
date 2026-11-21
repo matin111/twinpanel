@@ -593,6 +593,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     // Never label engine start as verified system VPN.
     private var fullTunActive = false
     private var fullTunBusy = false
+    private var fullTunStatusPollBusy = false
+    private var fullTunStatusLastPoll = Date.distantPast
     // This is set only after a successful HTTPS probe and is independent
     // of the protocol currently highlighted in the location picker.
     private var verifiedProxyProtocol: String?
@@ -3445,6 +3447,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     }
 
     @objc private func refreshTrafficMetrics() {
+        refreshFullTunStatus()
         guard tab == 0, localProxyActive, !trafficPollBusy else { return }
         if let startedAt = localProxyStartedAt {
             let elapsed = max(0, Int(Date().timeIntervalSince(startedAt)))
@@ -3656,6 +3659,30 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                             "TUN start rejected; no connection confirmed."
                         self.view = self.build()
                     }
+                }
+            }
+        }
+    }
+
+    private func refreshFullTunStatus() {
+        guard fullTunActive, !fullTunBusy, !fullTunStatusPollBusy,
+              Date().timeIntervalSince(fullTunStatusLastPoll) >= 5 else { return }
+        fullTunStatusLastPoll = Date()
+        fullTunStatusPollBusy = true
+        let generation = localProxyGeneration
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            guard let self = self else { return }
+            let result = self.runFullTunClient("status")
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                self.fullTunStatusPollBusy = false
+                guard self.fullTunActive,
+                      self.localProxyGeneration == generation else { return }
+                if result.0 != 0 ||
+                   !self.tunResponseIs(result.1, state: "engine_running_unverified") {
+                    self.fullTunActive = false
+                    self.status = "TUN service stopped or unavailable."
+                    self.view = self.build()
                 }
             }
         }
