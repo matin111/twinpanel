@@ -24,6 +24,31 @@ class CiscoTunnelTests(unittest.TestCase):
         enabled = mock.patch.object(tun, "CISCO_TUNNEL_ENABLED", True)
         enabled.start()
         self.addCleanup(enabled.stop)
+        # Offline unit tests must never touch or save real macOS network state.
+        for method in ("snapshot_network", "restore_network",
+                       "start_network_watchdog"):
+            patcher = mock.patch.object(tun, method)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+    def test_checkpoint_and_restore_wrap_successful_console_trial(self):
+        with mock.patch.object(tun.os, "geteuid", return_value=0), \
+             mock.patch.object(tun.os.path, "isfile", return_value=True), \
+             mock.patch.object(tun.os, "access", return_value=True), \
+             mock.patch.object(tun, "trusted_script", return_value=True), \
+             mock.patch.object(tun, "trusted_openconnect_dependencies", return_value=True), \
+             mock.patch.object(tun.subprocess, "Popen") as launch:
+            child = launch.return_value
+            child.stdin = mock.Mock()
+            child.poll.return_value = 0
+            child.wait.return_value = 0
+            profile = {"host": "vpn.example.com", "port": 443,
+                       "username": "alice", "password": "example",
+                       "servercert": "sha256:" + "a" * 64}
+            self.assertEqual(tun.run(profile, "console-test"), 0)
+            tun.snapshot_network.assert_called_once_with()
+            tun.start_network_watchdog.assert_called_once_with(True)
+            tun.restore_network.assert_called_once_with()
 
     def test_production_interlock_blocks_tunnel_before_network_changes(self):
         with mock.patch.object(tun, "CISCO_TUNNEL_ENABLED", False), \
