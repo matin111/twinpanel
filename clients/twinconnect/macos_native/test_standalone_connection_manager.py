@@ -221,6 +221,61 @@ class StandaloneManagerTests(unittest.TestCase):
             self.assertEqual(manager.engine_failure_category(),
                              "TLS_CERTIFICATE_UNTRUSTED_CA")
 
+    def test_diagnose_distinguishes_empty_stale_and_missing_logs(self):
+        with mock.patch.object(manager, "STATE", self.root):
+            self.assertEqual(manager.diagnose()["engine_log_state"],
+                             "missing_or_unreadable")
+            self.assertEqual(manager.diagnose()["engine_log_age"], "missing")
+            log = self.root / "engine.log"
+            log.touch()
+            diagnosis = manager.diagnose()
+            self.assertEqual(diagnosis["engine_log_state"], "empty")
+            self.assertEqual(diagnosis["reason"],
+                             "ENGINE_FAILURE_NOT_CLASSIFIED")
+            self.assertEqual(diagnosis["engine_log_age"], "less_than_minute")
+            log.write_text("Unknown panic details account_password=SECRET")
+            diagnosis = manager.diagnose()
+            self.assertEqual(diagnosis["engine_log_state"], "nonempty")
+            self.assertNotIn("SECRET", str(diagnosis))
+            import os
+            old = manager.time.time() - 4000
+            os.utime(log, (old, old))
+            self.assertEqual(manager.diagnose()["engine_log_age"],
+                             "older_than_hour")
+
+    def test_silent_naive_early_exit_reports_specific_safe_code(self):
+        cfg = self.config({
+            "inbounds": [{"type": "mixed", "listen": "127.0.0.1",
+                          "listen_port": 17893}],
+            "outbounds": [{"type": "naive", "tag": "proxy",
+                           "server": "example.com", "server_port": 443}],
+            "route": {"final": "proxy"},
+        })
+        exe = self.root / "sing-box"
+        exe.touch()
+        proc = mock.Mock()
+        proc.pid = 11111
+        proc.poll.return_value = 1
+        with mock.patch.object(manager, "STATE", self.root / "state"), \
+             mock.patch.object(manager, "binary_for", return_value=exe), \
+             mock.patch.object(manager, "read_state", return_value=None), \
+             mock.patch.object(manager.subprocess, "Popen", return_value=proc), \
+             mock.patch.object(manager.time, "sleep"):
+            with self.assertRaisesRegex(
+                ValueError, "^ENGINE_EXITED_WITHOUT_LOG$"
+            ):
+                manager.start("naive", cfg)
+        proc.poll.return_value = -11
+        with mock.patch.object(manager, "STATE", self.root / "state"), \
+             mock.patch.object(manager, "binary_for", return_value=exe), \
+             mock.patch.object(manager, "read_state", return_value=None), \
+             mock.patch.object(manager.subprocess, "Popen", return_value=proc), \
+             mock.patch.object(manager.time, "sleep"):
+            with self.assertRaisesRegex(
+                ValueError, "^ENGINE_TERMINATED_BY_SIGNAL$"
+            ):
+                manager.start("naive", cfg)
+
     def test_naive_early_exit_returns_safe_cronet_diagnostic(self):
         cfg = self.config({
             "inbounds": [{"type": "mixed", "listen": "127.0.0.1",
