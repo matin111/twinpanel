@@ -21,6 +21,7 @@ from cisco_openconnect_auth import validate, binary
 
 SCRIPT = "/Library/PrivilegedHelperTools/TwinConnectCisco/vpnc-script"
 ISOLATED_OPENCONNECT = "/Library/PrivilegedHelperTools/TwinConnectCisco/openconnect-runtime/bin/openconnect"
+CISCO_TUNNEL_ENABLED = False  # Must remain off until crash-safe route/IP/DNS restoration exists.
 
 
 def trusted_script(path: str) -> bool:
@@ -145,7 +146,8 @@ def run(profile: dict, management_ip: str) -> int:
     # Safety interlock after the November 2026 macOS static IPv4 -> DHCP
     # incident. Do not permit privileged connections until network state
     # snapshot, verified restoration and crash recovery are implemented.
-    raise ValueError("CISCO_TUNNEL_DISABLED_PENDING_NETWORK_RECOVERY")
+    if not CISCO_TUNNEL_ENABLED:
+        raise ValueError("CISCO_TUNNEL_DISABLED_PENDING_NETWORK_RECOVERY")
     exe = ISOLATED_OPENCONNECT
     if not trusted_script(SCRIPT):
         raise ValueError("CISCO_TRUSTED_VPN_SCRIPT_REQUIRED")
