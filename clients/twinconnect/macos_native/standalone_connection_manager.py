@@ -85,12 +85,22 @@ def validate(protocol: str, filename: Path) -> int:
         expected = {"socks5": "socks", "shadowtls": "shadowtls"}.get(protocol, protocol)
         if expected not in types:
             fail("PROTOCOL_OUTBOUND_MISSING")
-    if protocol in {"tuic", "anytls", "socks5", "snell"}:
+    if protocol in {"tuic", "anytls", "socks5", "snell", "naive", "shadowtls"}:
         # These newly integrated GUI profiles are one outbound only. Extra
         # rules or a direct fallback could silently bypass the chosen proxy.
         if set(obj) - {"log", "inbounds", "outbounds", "route"}:
             fail("UNEXPECTED_PROXY_CONFIG_SECTION")
-        if len(outbounds) != 1 or not isinstance(outbounds[0], dict):
+        if protocol == "shadowtls":
+            if len(outbounds) != 2 or not all(isinstance(row, dict) for row in outbounds):
+                fail("SHADOWTLS_CHAIN_REQUIRED")
+            ss, outer = outbounds
+            if ss.get("type") != "shadowsocks" or ss.get("tag") != "proxy" or \
+                    ss.get("detour") != "shadowtls-transport" or \
+                    outer.get("type") != "shadowtls" or \
+                    outer.get("tag") != "shadowtls-transport" or \
+                    outer.get("version") != 3:
+                fail("SHADOWTLS_CHAIN_INVALID")
+        elif len(outbounds) != 1 or not isinstance(outbounds[0], dict):
             fail("SINGLE_VERIFIED_OUTBOUND_REQUIRED")
         if outbounds[0].get("tag") != "proxy":
             fail("VERIFIED_PROXY_TAG_REQUIRED")
