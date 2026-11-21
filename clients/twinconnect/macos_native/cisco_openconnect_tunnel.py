@@ -114,6 +114,18 @@ ROUTE = "/sbin/route"
 ROUTE_GET = re.compile(r"^\s*(gateway|interface):\s*(\S+)\s*$", re.M)
 
 
+def start_network_watchdog(console_trial: bool) -> None:
+    if not trusted_root_owned_path(NETWORK_GUARD):
+        raise ValueError("CISCO_NETWORK_GUARD_UNTRUSTED")
+    watchdog = subprocess.Popen(
+        ["/usr/bin/python3", NETWORK_GUARD, "watch", str(os.getpid()),
+         "135" if console_trial else "600"],
+        stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL, start_new_session=True)
+    if watchdog.poll() is not None:
+        raise ValueError("CISCO_NETWORK_WATCHDOG_UNAVAILABLE")
+
+
 def management_route(ip: str) -> tuple[str, str]:
     try:
         address = ipaddress.ip_address(ip)
@@ -178,17 +190,8 @@ def run(profile: dict, management_ip: str) -> int:
         # either the management-route edit or vpnc-script can change it.
         snapshot_network()
         checkpointed = True
-        if not trusted_root_owned_path(NETWORK_GUARD):
-            raise ValueError("CISCO_NETWORK_GUARD_UNTRUSTED")
-        # Independent root watchdog outlives a crashed GUI or launcher.
-        # The 120s console trial gets a 135s hard recovery deadline.
-        watchdog = subprocess.Popen(
-            ["/usr/bin/python3", NETWORK_GUARD, "watch", str(os.getpid()),
-             "135" if console_trial else "600"],
-            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL, start_new_session=True)
-        if watchdog.poll() is not None:
-            raise ValueError("CISCO_NETWORK_WATCHDOG_UNAVAILABLE")
+        # Independent watchdog outlives a crashed GUI or launcher.
+        start_network_watchdog(console_trial)
         if not local_desktop:
             route_add = subprocess.run(
                 [ROUTE, "-n", "add", "-host", management_ip, gateway],
