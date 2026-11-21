@@ -24,6 +24,9 @@ class CiscoTunnelTests(unittest.TestCase):
         enabled = mock.patch.object(tun, "CISCO_TUNNEL_ENABLED", True)
         enabled.start()
         self.addCleanup(enabled.stop)
+        legacy = mock.patch.object(tun, "CISCO_UNPROTECTED_CONSOLE_TEST_ALLOWED", True)
+        legacy.start()
+        self.addCleanup(legacy.stop)
         # Offline unit tests must never touch or save real macOS network state.
         for method in ("snapshot_network", "restore_network",
                        "start_network_watchdog", "record_tunnel_pid"):
@@ -50,6 +53,23 @@ class CiscoTunnelTests(unittest.TestCase):
             tun.start_network_watchdog.assert_called_once_with(True)
             tun.record_tunnel_pid.assert_called_once_with(child.pid)
             tun.restore_network.assert_called_once_with()
+
+    def test_console_trial_denied_without_protected_management_route(self):
+        # Even if the generic feature gate is enabled, an unprotected remote
+        # console trial must not snapshot, alter routes or launch OpenConnect.
+        with mock.patch.object(tun, "CISCO_UNPROTECTED_CONSOLE_TEST_ALLOWED", False), \
+             mock.patch.object(tun.os, "geteuid", return_value=0), \
+             mock.patch.object(tun, "trusted_script", return_value=True), \
+             mock.patch.object(tun.os.path, "isfile", return_value=True), \
+             mock.patch.object(tun.os, "access", return_value=True), \
+             mock.patch.object(tun, "trusted_openconnect_dependencies", return_value=True), \
+             mock.patch.object(tun.subprocess, "Popen") as launch:
+            with self.assertRaisesRegex(
+                ValueError, "CISCO_CONSOLE_MANAGEMENT_ROUTE_REQUIRED"
+            ):
+                tun.run({}, "console-test")
+            tun.snapshot_network.assert_not_called()
+            launch.assert_not_called()
 
     def test_production_interlock_blocks_tunnel_before_network_changes(self):
         with mock.patch.object(tun, "CISCO_TUNNEL_ENABLED", False), \
