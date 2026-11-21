@@ -24,6 +24,10 @@ PY
 user="macvps"
 id "$user" >/dev/null
 base="/Library/PrivilegedHelperTools/TwinConnectCisco"
+[[ -d "$base" && ! -L "$base" && "$(stat -f '%Su' "$base")" == root &&
+   "$(stat -f '%Lp' "$base")" == 755 ]] || {
+  echo "CISCO_HELPER_DIRECTORY_UNSAFE" >&2; exit 1;
+}
 runner="$base/cisco_openconnect_tunnel.py"
 auth="$base/cisco_openconnect_auth.py"
 for f in "$runner" "$auth"; do
@@ -35,7 +39,7 @@ for f in "$runner" "$auth"; do
   [[ "$mode" == 755 ]] || { echo "CISCO_HELPER_PERMISSIONS_INVALID" >&2; exit 1; }
 done
 # Confirm this macOS sudoers actually includes drop-in files before editing.
-grep -Eq '^[[:space:]]*#(include|includedir|@includedir)[[:space:]]+(/private)?/etc/sudoers.d' /etc/sudoers || {
+grep -Eq '^[[:space:]]*(#includedir|@includedir)[[:space:]]+(/private)?/etc/sudoers.d' /etc/sudoers || {
   echo "CISCO_SUDOERS_INCLUDE_NOT_CONFIRMED" >&2; exit 1;
 }
 mkdir -p /private/etc/sudoers.d
