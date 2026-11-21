@@ -782,20 +782,24 @@ async def reconcile_cisco_quota_runtime_once() -> dict:
         db.close()
 
 
-async def reconcile_quota_runtime_once() -> dict:
+async def reconcile_quota_runtime_once(
+    *, include_cisco: bool = True, include_xray: bool = True,
+) -> dict:
     db = SessionLocal()
     results: list[dict] = []
     try:
+        # Fast Xray and slow Cisco sweeps must never write Xray counters
+        # concurrently. Select only the nodes required by this collector.
+        predicates = []
+        if include_cisco:
+            predicates.extend((Node.enable_cisco.is_(True), Node.agent_url == "local://core"))
+        if include_xray:
+            predicates.append(Node.enable_v2ray.is_(True))
+        if not predicates:
+            return {"ok": True, "nodes": []}
         nodes = (
             db.query(Node)
-            .filter(
-                Node.retired_at.is_(None),
-                or_(
-                    Node.enable_cisco.is_(True),
-                    Node.enable_v2ray.is_(True),
-                    Node.agent_url == "local://core",
-                ),
-            )
+            .filter(Node.retired_at.is_(None), or_(*predicates))
             .order_by(Node.id.asc())
             .all()
         )
@@ -803,9 +807,9 @@ async def reconcile_quota_runtime_once() -> dict:
         for node in nodes:
             node_id = int(node.id)
 
-            if bool(getattr(node, "enable_cisco", False)) or str(
+            if include_cisco and (bool(getattr(node, "enable_cisco", False)) or str(
                 getattr(node, "agent_url", "") or ""
-            ) == "local://core":
+            ) == "local://core"):
                 ok, observed, error = await _collect_node_users(node, db)
                 if ok:
                     try:
@@ -835,7 +839,7 @@ async def reconcile_quota_runtime_once() -> dict:
                         }
                     )
 
-            if bool(getattr(node, "enable_v2ray", False)):
+            if include_xray and bool(getattr(node, "enable_v2ray", False)):
                 ok, epoch, observed, error = await _collect_xray_users(node, db)
                 if ok:
                     try:
