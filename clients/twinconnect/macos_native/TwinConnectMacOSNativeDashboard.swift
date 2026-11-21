@@ -2901,7 +2901,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     }
 
     @objc private func changeQuickServer(_ sender: NSPopUpButton) {
-        guard !localProxyBusy else { return }
+        guard !localProxyBusy, !ciscoTunnelBusy,
+              ciscoTunnelTask == nil else { return }
         let chosen = sender.selectedItem?.representedObject as? String
         if activeServer != chosen && localProxyActive {
             activeServer = chosen
@@ -2916,7 +2917,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     }
 
     @objc private func changeQuickProtocol(_ sender: NSPopUpButton) {
-        guard !localProxyBusy else { return }
+        guard !localProxyBusy, !ciscoTunnelBusy,
+              ciscoTunnelTask == nil else { return }
         let chosen = sender.selectedItem?.representedObject as? String
         if activeProtocol != chosen && localProxyActive {
             activeProtocol = chosen
@@ -2936,9 +2938,20 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     }
 
     @objc private func selectRow(_ sender: NSTableView) {
+        guard !localProxyBusy, !ciscoTunnelBusy,
+              ciscoTunnelTask == nil else { return }
         let row = sender.selectedRow
         let list = filteredServers()
-        if list.indices.contains(row) { activeServer = list[row].id }
+        guard list.indices.contains(row) else { return }
+        let chosen = list[row].id
+        if chosen == activeServer { return }
+        activeServer = chosen
+        persistCurrentSelection()
+        if localProxyActive {
+            stopVerifiedLocalProxy()
+            return
+        }
+        view = build()
     }
 
 
