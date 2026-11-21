@@ -2860,7 +2860,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
 
     @objc private func selectProtocolChip(_ sender: NSButton) {
         guard protocolChipCodes.indices.contains(sender.tag),
-              !localProxyBusy else { return }
+              !localProxyBusy, !ciscoTunnelBusy,
+              ciscoTunnelTask == nil else { return }
         let chosen = protocolChipCodes[sender.tag]
         if activeProtocol != chosen && localProxyActive {
             activeProtocol = chosen
@@ -2884,7 +2885,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
 
     @objc private func selectLocationServer(_ sender: NSButton) {
         guard locationRowIDs.indices.contains(sender.tag),
-              !localProxyBusy else { return }
+              !localProxyBusy, !ciscoTunnelBusy,
+              ciscoTunnelTask == nil else { return }
         let chosen = locationRowIDs[sender.tag]
         if activeServer != chosen && localProxyActive {
             activeServer = chosen
