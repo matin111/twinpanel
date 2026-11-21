@@ -57,7 +57,7 @@ if [[ "$action" == "stop" || "$action" == "remove" ]]; then
     /bin/rm -f "$plist"
     /bin/rm -rf "$root"
   fi
-  echo "LOCAL_TUN_${action^^}_REQUESTED; CHECK_NETWORK_MANUALLY"
+  echo "LOCAL_TUN_STOP_OR_REMOVE_REQUESTED; CHECK_NETWORK_MANUALLY"
   exit 0
 fi
 
@@ -66,8 +66,11 @@ fi
 if [[ -e "$plist" ]]; then
   echo "EXISTING_LAUNCHD_PLIST_REFUSED; stop and remove first" >&2; exit 2
 fi
-if [[ -e "$root" ]]; then
+if [[ "$action" == "stage" && -e "$root" ]]; then
   echo "EXISTING_TUN_RUNTIME_REFUSED; stop and remove first" >&2; exit 2
+fi
+if [[ "$action" == "activate" && ! -d "$root" ]]; then
+  echo "STAGE_BEFORE_ACTIVATE" >&2; exit 2
 fi
 arch="$(uname -m)"
 case "$arch" in
@@ -83,14 +86,22 @@ for f in unsigned_tun_daemon.py unsigned_tun_policy.py; do
 done
 # macOS /usr/bin/python3 may be older than the code's Python 3.10 syntax.
 [[ -x /usr/bin/python3 ]] || { echo "SYSTEM_PYTHON_REQUIRED" >&2; exit 2; }
-/usr/bin/python3 -c 'import sys; assert sys.version_info >= (3,10)' ||
-  { echo "PYTHON_310_OR_NEWER_REQUIRED_FOR_DAEMON" >&2; exit 2; }
+/usr/bin/python3 -c 'import sys; assert sys.version_info >= (3,9)' ||
+  { echo "PYTHON_39_OR_NEWER_REQUIRED_FOR_DAEMON" >&2; exit 2; }
 
-mkdir -m 0700 "$root"
-chown root:wheel "$root"
-install -o root -g wheel -m 0755 "$engine" "$root/sing-box"
-install -o root -g wheel -m 0644 macos_native/unsigned_tun_daemon.py "$root/unsigned_tun_daemon.py"
-install -o root -g wheel -m 0644 macos_native/unsigned_tun_policy.py "$root/unsigned_tun_policy.py"
+if [[ "$action" == "stage" ]]; then
+  mkdir -m 0700 "$root"
+  chown root:wheel "$root"
+  install -o root -g wheel -m 0755 "$engine" "$root/sing-box"
+  install -o root -g wheel -m 0644 macos_native/unsigned_tun_daemon.py "$root/unsigned_tun_daemon.py"
+  install -o root -g wheel -m 0644 macos_native/unsigned_tun_policy.py "$root/unsigned_tun_policy.py"
+else
+  # Never swap helper source behind root ownership on activation.
+  for f in sing-box unsigned_tun_daemon.py unsigned_tun_policy.py; do
+    [[ -f "$root/$f" && ! -L "$root/$f" && "$(stat -f %u "$root/$f")" == 0 ]] ||
+      { echo "TRUSTED_STAGED_FILE_MISSING" >&2; exit 2; }
+  done
+fi
 # install is staging only: NO activation, no root background service.
 if [[ "$action" == "stage" ]]; then
   echo "LOCAL_TUN_FILES_STAGED; SERVICE_NOT_STARTED; ROUTES_UNCHANGED"
