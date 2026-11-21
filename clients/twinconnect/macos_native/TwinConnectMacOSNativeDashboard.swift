@@ -2816,12 +2816,17 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         verifiedProxyProtocol = nil
         localProxyExitIP = nil
         resetTrafficMetrics()
-        // Logout is not a VPN stop command; stop the managed loopback
-        // listener without modifying network routes or system proxies.
+        // Always request removal of both connection modes on logout.
+        // The root daemon independently enforces TUN ownership.
+        fullTunActive = false
+        fullTunBusy = false
         DispatchQueue.global(qos: .utility).async { [weak self] in
             guard let self = self else { return }
             _ = self.runLocalManager(
                 ["stop"], root: self.localRuntimeRoot())
+            if self.fullTunServicePresent() {
+                _ = self.runFullTunClient("stop")
+            }
         }
         localProxyStatus = ""
         snapshot = nil
