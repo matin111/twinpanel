@@ -142,6 +142,10 @@ def management_route(ip: str) -> tuple[str, str]:
 def run(profile: dict, management_ip: str) -> int:
     if os.geteuid() != 0:
         raise ValueError("CISCO_ROOT_REQUIRED")
+    # Safety interlock after the November 2026 macOS static IPv4 -> DHCP
+    # incident. Do not permit privileged connections until network state
+    # snapshot, verified restoration and crash recovery are implemented.
+    raise ValueError("CISCO_TUNNEL_DISABLED_PENDING_NETWORK_RECOVERY")
     exe = ISOLATED_OPENCONNECT
     if not trusted_script(SCRIPT):
         raise ValueError("CISCO_TRUSTED_VPN_SCRIPT_REQUIRED")
