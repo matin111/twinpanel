@@ -136,6 +136,59 @@ class CiscoRecoveryTests(unittest.TestCase):
             recovery.stop_orphaned_tunnel()
             kill.assert_not_called()
 
+    def test_watchdog_recovers_after_launcher_crash(self):
+        # Simulates a dead launcher and a surviving OpenConnect child.
+        recovery.CHECKPOINT.write_text(json.dumps(STATIC))
+        class Clock:
+            def __init__(self):
+                self.now = 0
+            def monotonic(self):
+                return self.now
+            def sleep(self, seconds):
+                self.now += seconds
+        clock = Clock()
+        with mock.patch("time.monotonic", side_effect=clock.monotonic), \
+             mock.patch("time.sleep", side_effect=clock.sleep), \
+             mock.patch.object(recovery.os, "kill", side_effect=ProcessLookupError), \
+             mock.patch.object(recovery, "stop_orphaned_tunnel") as stop, \
+             mock.patch.object(recovery, "restore") as restore:
+            recovery.watch(12345, 120)
+            stop.assert_called_once_with()
+            restore.assert_called_once_with()
+
+    def test_watchdog_recovers_at_deadline(self):
+        # A live launcher past the deadline receives SIGTERM first.
+        recovery.CHECKPOINT.write_text(json.dumps(STATIC))
+        class Clock:
+            def __init__(self):
+                self.now = 0
+            def monotonic(self):
+                return self.now
+            def sleep(self, seconds):
+                self.now += seconds
+        clock = Clock()
+        with mock.patch("time.monotonic", side_effect=clock.monotonic), \
+             mock.patch("time.sleep", side_effect=clock.sleep), \
+             mock.patch.object(recovery.os, "kill") as kill, \
+             mock.patch.object(recovery, "stop_orphaned_tunnel") as stop, \
+             mock.patch.object(recovery, "restore") as restore:
+            recovery.watch(12345, 10)
+            self.assertTrue(any(call.args[0] == 12345 and
+                                call.args[1] != 0 for call in kill.call_args_list))
+            stop.assert_called_once_with()
+            restore.assert_called_once_with()
+
+    def test_failed_restoration_preserves_checkpoint(self):
+        recovery.CHECKPOINT.write_text(json.dumps(STATIC))
+        with mock.patch.object(recovery.os, "geteuid", return_value=0), \
+             mock.patch.object(recovery, "network_service_for_device", return_value="Ethernet"), \
+             mock.patch.object(recovery, "read_checkpoint", return_value=STATIC), \
+             mock.patch.object(recovery, "command", side_effect=ValueError(
+                 "CISCO_NETWORK_COMMAND_FAILED")):
+            with self.assertRaisesRegex(ValueError, "CISCO_NETWORK_COMMAND_FAILED"):
+                recovery.restore()
+        self.assertTrue(recovery.CHECKPOINT.exists())
+
     def test_bad_mode_does_not_change_network(self):
         entry = dict(STATIC, mode="invalid")
         recovery.CHECKPOINT.write_text(json.dumps(entry))
