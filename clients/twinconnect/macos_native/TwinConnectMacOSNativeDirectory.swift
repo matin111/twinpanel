@@ -873,7 +873,9 @@ final class TwinConnectMacOSNativeDirectory: NSObject, URLSessionTaskDelegate {
             prepareLocalHysteria2(session, serverID: serverID, completion: completion)
             return
         }
-        let supported: Set<String> = ["tuic", "anytls", "socks5", "snell"]
+        let supported: Set<String> = [
+            "tuic", "anytls", "socks5", "snell", "naive", "shadowtls"
+        ]
         guard supported.contains(protocolCode),
               serverID.range(of: "^[0-9]{1,20}$",
                              options: .regularExpression) != nil else {
@@ -947,6 +949,9 @@ final class TwinConnectMacOSNativeDirectory: NSObject, URLSessionTaskDelegate {
     // arbitrary dialer options. Rebuild only known outbound fields.
     private func reviewedSingBoxProxyConfig(_ item: [String: Any],
                                             protocolCode: String) -> Data? {
+        if protocolCode == "shadowtls" {
+            return reviewedShadowTLSProxyConfig(item)
+        }
         var source: Any? = item["outbound"] ??
             item["singbox_outbound"] ?? item["config"]
         if let text = source as? String, text.utf8.count < 131072 {
@@ -1032,6 +1037,30 @@ final class TwinConnectMacOSNativeDirectory: NSObject, URLSessionTaskDelegate {
                 else { return nil }
                 reviewed["mode"] = mode
             }
+        } else if protocolCode == "naive" {
+            guard let user = outbound["username"] as? String,
+                  let password = outbound["password"] as? String,
+                  !user.isEmpty, !password.isEmpty,
+                  user.utf8.count <= 1024, password.utf8.count <= 4096,
+                  let tls = outbound["tls"] as? [String: Any],
+                  let checkedTLS = safeOutboundTLS(tls, server: host),
+                  (outbound["insecure_concurrency"] as? Int ?? 0) == 0,
+                  outbound["extra_headers"] == nil else { return nil }
+            reviewed["username"] = user
+            reviewed["password"] = password
+            reviewed["tls"] = checkedTLS
+            reviewed["insecure_concurrency"] = 0
+            for key in ["quic", "udp_over_tcp"] {
+                if let flag = outbound[key] as? Bool {
+                    if flag { reviewed[key] = true }
+                } else if outbound[key] != nil { return nil }
+            }
+            if let cc = outbound["quic_congestion_control"] as? String {
+                guard outbound["quic"] as? Bool == true,
+                      ["bbr", "bbr2", "cubic", "reno"].contains(cc)
+                else { return nil }
+                reviewed["quic_congestion_control"] = cc
+            } else if outbound["quic_congestion_control"] != nil { return nil }
         } else {
             guard let password = outbound["password"] as? String,
                   !password.isEmpty, password.utf8.count <= 4096,
@@ -1084,6 +1113,84 @@ final class TwinConnectMacOSNativeDirectory: NSObject, URLSessionTaskDelegate {
             "route": ["final": "proxy"]
         ]
         return try? JSONSerialization.data(withJSONObject: config)
+    }
+
+    private func reviewedShadowTLSProxyConfig(_ item: [String: Any])
+        -> Data? {
+        var source: Any? = item["config"] ??
+            item["singbox_outbound"] ?? item["outbound"]
+        if let raw = source as? String, raw.utf8.count <= 131072 {
+            source = try? JSONSerialization.jsonObject(with: Data(raw.utf8))
+        }
+        guard let structure = source as? [String: Any],
+              let rows = structure["outbounds"] as? [[String: Any]],
+              rows.count == 2,
+              let ss = rows.first(where: { $0["type"] as? String == "shadowsocks" }),
+              let transport = rows.first(where: { $0["type"] as? String == "shadowtls" }),
+              let tag = transport["tag"] as? String, !tag.isEmpty,
+              let ssTag = ss["tag"] as? String, !ssTag.isEmpty,
+              tag != ssTag,
+              ss["detour"] as? String == tag,
+              (structure["route"] as? [String: Any])?["final"] as? String == ssTag,
+              let method = ss["method"] as? String,
+              ["aes-128-gcm", "aes-256-gcm", "chacha20-ietf-poly1305",
+               "2022-blake3-aes-128-gcm", "2022-blake3-aes-256-gcm",
+               "2022-blake3-chacha20-poly1305"].contains(method),
+              let ssPassword = ss["password"] as? String,
+              !ssPassword.isEmpty, ssPassword.utf8.count <= 4096,
+              ss["server"] == nil, ss["server_port"] == nil,
+              ss["plugin"] == nil, ss["tls"] == nil,
+              Set(ss.keys).isSubset(of: [
+                  "type", "tag", "detour", "method", "password"
+              ]),
+              Set(transport.keys).isSubset(of: [
+                  "type", "tag", "version", "server", "server_port",
+                  "password", "tls"
+              ]),
+              transport["version"] as? Int == 3,
+              let host = transport["server"] as? String,
+              let port = transport["server_port"] as? Int,
+              (1...65535).contains(port),
+              let transportPassword = transport["password"] as? String,
+              !transportPassword.isEmpty,
+              transportPassword.utf8.count <= 4096,
+              let tls = transport["tls"] as? [String: Any],
+              let checkedTLS = safeOutboundTLS(tls, server: host),
+              host.utf8.count <= 255, host.utf8.count >= 3,
+              !host.contains("/"), !host.contains(" "),
+              !host.contains("@"), !host.contains("%"),
+              safeProxyRemoteHost(host)
+        else { return nil }
+
+        let reviewed: [String: Any] = [
+            "log": ["level": "error"],
+            "inbounds": [[
+                "type": "mixed", "tag": "local-proxy",
+                "listen": "127.0.0.1", "listen_port": 17089
+            ]],
+            "outbounds": [
+                [
+                    "type": "shadowsocks", "tag": "proxy",
+                    "method": method, "password": ssPassword,
+                    "detour": "shadowtls-transport"
+                ],
+                [
+                    "type": "shadowtls", "tag": "shadowtls-transport",
+                    "version": 3, "server": host, "server_port": port,
+                    "password": transportPassword, "tls": checkedTLS
+                ]
+            ],
+            "route": ["final": "proxy"]
+        ]
+        return try? JSONSerialization.data(withJSONObject: reviewed)
+    }
+
+    private func safeProxyRemoteHost(_ host: String) -> Bool {
+        let domainName = host.range(
+            of: "^[A-Za-z0-9-]+(\\.[A-Za-z0-9-]+)+$",
+            options: .regularExpression) != nil &&
+            host.rangeOfCharacter(from: .letters) != nil
+        return TwinMacNativePing.validatedPublicIP(host) != nil || domainName
     }
 
     private func safeOutboundTLS(_ tls: [String: Any],
