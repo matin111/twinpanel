@@ -167,6 +167,10 @@ class Session:
             encoded = json.dumps(profile, separators=(",", ":")).encode("utf-8")
             if len(encoded) > MAX_REQUEST - 1024:
                 raise ValueError("TUN_CONFIG_TOO_LARGE")
+            # Existing utun routes may belong to another VPN: do not mistake
+            # that routing for TwinConnect's tunnel.
+            if observe_route()["route_state"] == "utun_route_observed_unverified":
+                raise ValueError("EXISTING_TUN_ROUTE_AMBIGUOUS")
             path = TRUSTED_ROOT / ("active-" + secrets.token_hex(16) + ".json")
             fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY | os.O_NOFOLLOW, 0o600)
             try:
@@ -202,9 +206,19 @@ class Session:
                     self.cleanup()
                     raise ValueError("TUN_WATCHDOG_START_FAILED")
                 watcher.stdout.close()
-                if child.poll() is not None:
-                    self.cleanup()
-                    raise ValueError("TUN_ENGINE_EXITED_EARLY")
+                # The engine process existing is insufficient. Verify that
+                # macOS installed a utun route, with a short bounded startup
+                # window; never treat this as proof of remote HTTPS egress.
+                route_observed = False
+                for _ in range(12):
+                    if child.poll() is not None or watcher.poll() is not None:
+                        break
+                    if observe_route()["route_state"] == "utun_route_observed_unverified":
+                        route_observed = True
+                        break
+                    time.sleep(0.25)
+                if not route_observed:
+                    raise ValueError("TUN_ROUTE_NOT_ESTABLISHED")
                 return self.status()
             except BaseException:
                 self.cleanup()
