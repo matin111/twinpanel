@@ -569,6 +569,16 @@ def probe(expected_ip: str | None = None) -> dict:
     except (OSError, subprocess.TimeoutExpired):
         fail("PROXY_EGRESS_REQUEST_FAILED")
     if response.returncode != 0:
+        # curl exit 7 is ambiguous: either no local SOCKS listener or an
+        # upstream TCP connection failed through a healthy listener. Check
+        # loopback only; never probe a public host outside the proxy.
+        if response.returncode == 7:
+            try:
+                with socket.create_connection(("127.0.0.1", port), timeout=0.7):
+                    pass
+            except OSError:
+                fail("LOCAL_SOCKS_LISTENER_UNREACHABLE")
+            fail("SOCKS_UPSTREAM_TCP_FAILED")
         fail(proxy_failure_category(response.returncode))
     try:
         ip = ipaddress.ip_address(response.stdout.strip())
