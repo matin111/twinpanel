@@ -2815,7 +2815,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         DispatchQueue.global(qos: .utility).async { [weak self] in
             guard let self = self else { return }
             _ = self.runLocalManager(
-                ["stop"], root: localRuntimeRoot())
+                ["stop"], root: self.localRuntimeRoot())
         }
         localProxyStatus = ""
         snapshot = nil
