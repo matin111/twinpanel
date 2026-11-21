@@ -19,7 +19,7 @@ MAX_BYTES = 262144
 
 
 def encode_request(action: str, config: object = None) -> bytes:
-    if action not in ("status", "start", "stop"):
+    if action not in ("status", "probe", "start", "stop"):
         raise ValueError("INVALID_ACTION")
     request: dict = {"action": action}
     if action == "start":
@@ -66,7 +66,7 @@ def query(action: str, config: object = None,
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=("status", "start", "stop"))
+    parser.add_argument("action", choices=("status", "probe", "start", "stop"))
     args = parser.parse_args()
     try:
         config = None
