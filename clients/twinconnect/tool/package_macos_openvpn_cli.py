@@ -35,7 +35,7 @@ def inspect_arch(path: Path, arch: str) -> None:
 def bundled_name(path: str) -> str:
     """Give every Homebrew install name a stable collision-free filename."""
     original = Path(path)
-    digest = hashlib.sha256(str(original.resolve(strict=True)).encode()).hexdigest()[:16]
+    digest = hashlib.sha256(str(original).encode()).hexdigest()[:16]
     return digest + "-" + original.name
 
 
