@@ -174,7 +174,15 @@ def restore() -> None:
             command(NETWORKSETUP, "-setdhcp", service)
         command(NETWORKSETUP, "-setdnsservers", service,
                 *(saved["dns"] if saved["dns"] else ["Empty"]))
-        if not matches():
+        # SystemConfiguration can publish changed settings asynchronously.
+        # Allow a short verified settle window, never erase the checkpoint
+        # before the original IPv4/DNS values are observable.
+        import time
+        for _ in range(5):
+            if matches():
+                break
+            time.sleep(1)
+        else:
             raise ValueError("CISCO_NETWORK_RESTORE_UNVERIFIED")
     CHECKPOINT.unlink()
     print("CISCO_NETWORK_RESTORED_VERIFIED", flush=True)
