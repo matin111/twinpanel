@@ -1418,15 +1418,14 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         // Preserve the Windows primary action label. Diagnostics belong only
         // in Settings, and must never masquerade as a successful VPN connection.
         let connect = button(activeProtocol == "cisco" ?
-                             (ciscoAuthBusy ? "Verifying Cisco…" :
-                                              "Verify Cisco login") :
+                             "Cisco VPN unavailable" :
                              (localProxyActive ? "ϟ    Disconnect     ›" :
                                                  "ϟ    Connect     ›"),
                              action: #selector(requestVPNConnection(_:)), primary: true)
         connect.isEnabled = accountSession != nil && !localProxyBusy &&
-            (activeProtocol != "cisco" || (!ciscoAuthBusy && activeServer != nil))
+            activeProtocol != "cisco"
         connect.toolTip = activeProtocol == "cisco" ?
-            "Checks OpenConnect credentials only; no system VPN tunnel." :
+            "Cisco needs a privileged network tunnel. Login test is in Settings." :
             "Unsigned macOS: local SOCKS proxy only; no system VPN."
         connect.heightAnchor.constraint(equalToConstant: 54).isActive = true
         connect.layer?.cornerRadius = 17
@@ -1455,12 +1454,12 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         leftGap.widthAnchor.constraint(equalTo: rightGap.widthAnchor).isActive = true
         main.addArrangedSubview(buttonRow)
         buttonRow.widthAnchor.constraint(equalTo: main.widthAnchor).isActive = true
-        // Cisco uses OpenConnect, not the SOCKS proxy launcher. Offer the
-        // panel-authorized login check directly for a selected Cisco location.
-        // An unsigned application cannot claim that this creates a VPN tunnel.
-        if activeProtocol == "cisco" && !ciscoAuthStatus.isEmpty {
-            main.addArrangedSubview(text(ciscoAuthStatus, size: 11,
-                                         color: muted))
+        // Cisco auth-only checks are diagnostics, never the primary connection.
+        if activeProtocol == "cisco" {
+            main.addArrangedSubview(text(
+                "Cisco VPN is not available in this unsigned build. " +
+                "Use Settings to test authentication only.",
+                size: 11, color: muted))
         }
         // Diagnostics, emergency shutdown and technical warnings belong
         // in Settings. This visual dashboard has the same clean composition
@@ -1570,50 +1569,46 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         content.addArrangedSubview(header)
         header.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
 
-        // Windows layout: timing and manual refresh share a single row.
-        // The timer remains at zero until a real PacketTunnel is connected.
-        let timing = stack(.horizontal, spacing: 8)
-        let uptime = text(
-            localProxyActive ? "◷  " + connectedProtocolTitle + " session" :
-                               "◷  00:00:00",
-            size: 12, color: muted)
-        proxyUptimeText = uptime
-        timing.addArrangedSubview(uptime)
-        let timingSpace = NSView()
-        timingSpace.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        timing.addArrangedSubview(timingSpace)
-        let timingRefresh = button("↻", action: #selector(refresh(_:)),
-                                   mutedButton: true)
-        timingRefresh.widthAnchor.constraint(equalToConstant: 35).isActive = true
-        timingRefresh.heightAnchor.constraint(equalToConstant: 32).isActive = true
-        timingRefresh.toolTip = "Refresh actual subscription and ping status"
-        timing.addArrangedSubview(timingRefresh)
-        content.addArrangedSubview(timing)
-        timing.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
-
         let selected = snapshot?.servers.first { $0.id == activeServer }
-        let reportedPing = pingText(selected)
-
-        let network = stack(.horizontal, spacing: 10)
-        network.distribution = .fillEqually
-        network.addArrangedSubview(networkMetric("Server ping", value: reportedPing,
-            valueColor: pingColor(selected)))
-        network.addArrangedSubview(networkMetric(
-            localProxyActive ? "Exit IP" : "Public IP",
-            value: localProxyActive ? (localProxyExitIP ?? "—") : "—"))
-        content.addArrangedSubview(network)
-        network.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
-
-        let traffic = stack(.horizontal, spacing: 10)
-        traffic.distribution = .fillEqually
-        traffic.addArrangedSubview(networkMetric("Download",
-            value: localProxyActive ? downloadSpeed : "—",
-            subtitle: localProxyActive ? "Total: " + downloadedTotal : ""))
-        traffic.addArrangedSubview(networkMetric("Upload",
-            value: localProxyActive ? uploadSpeed : "—",
-            subtitle: localProxyActive ? "Total: " + uploadedTotal : ""))
-        content.addArrangedSubview(traffic)
-        traffic.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
+        if localProxyActive {
+            // Proxy diagnostics only; never claim system-wide VPN traffic.
+            let timing = stack(.horizontal, spacing: 8)
+            let uptime = text("◷  " + connectedProtocolTitle + " proxy session",
+                              size: 12, color: muted)
+            proxyUptimeText = uptime
+            timing.addArrangedSubview(uptime)
+            let timingSpace = NSView()
+            timingSpace.setContentHuggingPriority(.defaultLow, for: .horizontal)
+            timing.addArrangedSubview(timingSpace)
+            content.addArrangedSubview(timing)
+            timing.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
+            let network = stack(.horizontal, spacing: 10)
+            network.distribution = .fillEqually
+            network.addArrangedSubview(networkMetric("Server ping",
+                value: pingText(selected), valueColor: pingColor(selected)))
+            network.addArrangedSubview(networkMetric("Exit IP",
+                value: localProxyExitIP ?? "—"))
+            content.addArrangedSubview(network)
+            network.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
+            let traffic = stack(.horizontal, spacing: 10)
+            traffic.distribution = .fillEqually
+            traffic.addArrangedSubview(networkMetric("Download",
+                value: downloadSpeed, subtitle: "Total: " + downloadedTotal))
+            traffic.addArrangedSubview(networkMetric("Upload",
+                value: uploadSpeed, subtitle: "Total: " + uploadedTotal))
+            content.addArrangedSubview(traffic)
+            traffic.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
+        } else {
+            // Hide non-existent exit IP, throughput and uptime entirely.
+            content.addArrangedSubview(text(
+                "No active VPN tunnel. Select a supported protocol to connect.",
+                size: 13, color: muted))
+            if activeProtocol == "cisco" {
+                content.addArrangedSubview(text(
+                    "Cisco login was verified, but a system tunnel is not installed.",
+                    size: 12, color: amber))
+            }
+        }
 
         let location = selected.map {
             flag($0.country) + "  " + countryName($0.country)
@@ -3377,7 +3372,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             return
         }
         if activeProtocol == "cisco" {
-            testCiscoAuthentication(sender)
+            status = "Cisco VPN requires a provisioned network tunnel."
+            view = build()
             return
         }
         let enabled: Set<String> = [
