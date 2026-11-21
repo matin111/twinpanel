@@ -97,7 +97,7 @@ def state_path() -> Path:
 
 def measured_runtime_config(protocol: str, source: Path) -> tuple[Path, int | None, str | None]:
     """Prepare a private authenticated loopback counter without editing source."""
-    if protocol != "hysteria2":
+    if protocol not in SINGBOX:
         return source, None, None
     config = json.loads(source.read_text(encoding="utf-8"))
     if "experimental" in config:
