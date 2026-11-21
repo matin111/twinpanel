@@ -958,7 +958,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         workspace.alignment = .leading
         let heading = stack(.horizontal, spacing: 12)
         heading.alignment = .centerY
-        let titles = ["Quick connect", "Locations", "Settings", "My account"]
+        let titles = ["Quick Connect", "Locations", "Settings", "My Account"]
         heading.addArrangedSubview(text(titles[tab], size: 25, weight: .bold))
         let headerSpace = NSView()
         headerSpace.setContentHuggingPriority(.defaultLow, for: .horizontal)
@@ -1207,7 +1207,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         brand.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
         content.setCustomSpacing(31, after: brand)
 
-        let navs = ["Quick connect", "Locations", "Settings", "Account"]
+        let navs = ["Quick Connect", "Locations", "Settings", "Account"]
         let selectedLocation = snapshot?.servers.first { $0.id == activeServer }
         let selectedFlag = selectedLocation.map { flag($0.country) } ?? "🌐"
         for (index, label) in navs.enumerated() {
@@ -1424,10 +1424,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         // Preserve the Windows primary action label. Diagnostics belong only
         // in Settings, and must never masquerade as a successful VPN connection.
         let connect = button(activeProtocol == "cisco" ?
-                             (ciscoTunnelTask != nil ? "Stop Cisco process" :
-                                                       "Cisco temporarily unavailable") :
-                             (localProxyActive ? "ϟ    Disconnect     ›" :
-                                                 "ϟ    Connect     ›"),
+                             (ciscoTunnelTask != nil ? "Disconnect" : "Connect") :
+                             (localProxyActive ? "Disconnect" : "Connect"),
                              action: #selector(requestVPNConnection(_:)), primary: true)
         connect.isEnabled = accountSession != nil && !localProxyBusy &&
             (activeProtocol != "cisco" || ciscoTunnelTask != nil)
@@ -1461,14 +1459,6 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         leftGap.widthAnchor.constraint(equalTo: rightGap.widthAnchor).isActive = true
         main.addArrangedSubview(buttonRow)
         buttonRow.widthAnchor.constraint(equalTo: main.widthAnchor).isActive = true
-        // Cisco status comes from the privileged engine, never the login test.
-        if activeProtocol == "cisco" {
-            main.addArrangedSubview(text(
-                ciscoTunnelStatus.isEmpty ?
-                "Cisco needs an installed privileged helper and route protection." :
-                ciscoTunnelStatus,
-                size: 11, color: muted))
-        }
         // Diagnostics, emergency shutdown and technical warnings belong
         // in Settings. This visual dashboard has the same clean composition
         // as Windows; no SOCKS process starts from Quick Connect.
@@ -1565,7 +1555,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         let content = stack(spacing: 13)
         content.alignment = .leading
         let header = stack(.horizontal, spacing: 9)
-        header.addArrangedSubview(text("Network status", size: 17,
+        header.addArrangedSubview(text("Network", size: 17,
                                        weight: .semibold))
         let spacer = NSView()
         spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
@@ -1592,9 +1582,9 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             timing.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
             let network = stack(.horizontal, spacing: 10)
             network.distribution = .fillEqually
-            network.addArrangedSubview(networkMetric("Server ping",
+            network.addArrangedSubview(networkMetric("Ping",
                 value: pingText(selected), valueColor: pingColor(selected)))
-            network.addArrangedSubview(networkMetric("Exit IP",
+            network.addArrangedSubview(networkMetric("IP Address",
                 value: localProxyExitIP ?? "—"))
             content.addArrangedSubview(network)
             network.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
@@ -1611,9 +1601,9 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             // Never imply an exit IP or throughput has been verified offline.
             let network = stack(.horizontal, spacing: 10)
             network.distribution = .fillEqually
-            network.addArrangedSubview(networkMetric("Server ping",
+            network.addArrangedSubview(networkMetric("Ping",
                 value: pingText(selected), valueColor: pingColor(selected)))
-            network.addArrangedSubview(networkMetric("Exit IP", value: "—"))
+            network.addArrangedSubview(networkMetric("IP Address", value: "—"))
             content.addArrangedSubview(network)
             network.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
 
@@ -1626,16 +1616,6 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             content.addArrangedSubview(traffic)
             traffic.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
 
-            if activeProtocol == "cisco" {
-                content.addArrangedSubview(text(
-                    ciscoTunnelStatus.isEmpty ?
-                    "Cisco tunnel not verified." : ciscoTunnelStatus,
-                    size: 12, color: amber))
-            } else {
-                content.addArrangedSubview(text(
-                    "Disconnected · Traffic and exit IP not yet verified.",
-                    size: 11, color: muted))
-            }
         }
 
         let location = selected.map {
