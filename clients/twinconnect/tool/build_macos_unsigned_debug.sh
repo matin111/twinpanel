@@ -19,9 +19,46 @@ if xcodebuild \
   CODE_SIGNING_ALLOWED=NO \
   CODE_SIGNING_REQUIRED=NO \
   build > "$log" 2>&1; then
-  echo 'UNSIGNED BUILD SUCCEEDED (VPN extension not provisioned)'
+  # Resolve the real built product from Xcode build settings, not a guessed
+  # DerivedData path (especially not Index.noindex/Build/Products).
+  # Package both real engines into Runner.app; fail the build if either is
+  # missing so we never claim to have a portable standalone client.
+  built_app="$(python3 - "$workspace" <<'PY'
+import json
+import subprocess
+import sys
+command = [
+    "xcodebuild", "-workspace", sys.argv[1], "-scheme", "Runner",
+    "-configuration", "Debug", "-destination", "platform=macOS",
+    "CODE_SIGNING_ALLOWED=NO", "CODE_SIGNING_REQUIRED=NO",
+    "-showBuildSettings", "-json",
+]
+try:
+    result = subprocess.run(command, check=True, capture_output=True,
+                            text=True, timeout=120)
+    rows = json.loads(result.stdout)
+    targets = [row["buildSettings"] for row in rows
+               if row.get("target") == "Runner"]
+    if len(targets) != 1:
+        raise ValueError("RUNNER_BUILD_SETTINGS_AMBIGUOUS")
+    import os
+    settings = targets[0]
+    app = os.path.join(settings["TARGET_BUILD_DIR"],
+                       settings["FULL_PRODUCT_NAME"])
+    if not app.endswith(".app") or not os.path.isdir(app):
+        raise ValueError("RUNNER_PRODUCT_NOT_FOUND")
+    print(app)
+except Exception as exc:
+    print("RUNNER_PRODUCT_RESOLUTION_FAILED: " + type(exc).__name__,
+          file=sys.stderr)
+    sys.exit(3)
+PY
+  )" || exit 3
+  bash tool/package_macos_local_proxy_runtime.sh "$built_app"
+  echo "UNSIGNED BUILD + LOCAL PROXY ENGINE PACKAGING SUCCEEDED"
+  echo "Runner.app: $built_app"
   echo "Build log: $log"
-  echo "NOTE: use the actual Runner.app output path; do not open Index.noindex copies."
+  echo "NOTE: local SOCKS/HTTP proxy only. System VPN extension not provisioned."
 else
   code=$?
   echo "UNSIGNED BUILD FAILED (exit $code)" >&2
