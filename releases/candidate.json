@@ -1,8 +1,8 @@
 {
-  "version": "1.1.6",
-  "source_sha": "42af0a22fba307c1915ef0a0b830199df891ea7c",
+  "version": "1.1.7",
+  "source_sha": "d4fb8a146c8d3b0fea3dc751a027f022b3ac1f81",
   "notes": {
-    "fa": "بهبود خطای ارتباط در صفحه کدهای تخفیف: نمایش پیام خطای واقعی در پنجره ساخت، حفظ همه فیلدها و پلن‌های انتخاب‌شده در صورت عدم اتصال، امکان تلاش مجدد دستی، تکرار امن دریافت فهرست‌ها و جلوگیری از نمایش آمار صفر گمراه‌کننده. تمام قابلیت‌های نسخه 1.1.5 محفوظ است.",
-    "en": "Improved discount-code network failure UX: errors appear inside the editor, all fields and selected plans remain intact after a failed request, manual retry is supported, read-only list fetches retry safely and failed lists no longer show misleading zero counts. All v1.1.5 functionality is preserved."
+    "fa": "افزودن کد تخفیف به تمدید اشتراک در ربات تلگرام با اعتبارسنجی مخصوص تمدید و پلن، نمایش قیمت اصلی و مبلغ نهایی قبل از پرداخت و حفظ پرداخت کیف پول و تمدید رزروی. اصلاح دکمه دانلود در منوی ربات و حفظ امکانات نسخه 1.1.6.",
+    "en": "Renewal promo codes in Telegram checkout with correct renewal/plan eligibility, original and discounted totals, wallet checkout and reserved renewal preserved. Restores the main-menu download button and all v1.1.6 features."
   }
 }
