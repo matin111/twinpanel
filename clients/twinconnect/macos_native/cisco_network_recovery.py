@@ -123,9 +123,12 @@ def capture() -> dict:
 
 
 def snapshot() -> dict:
-    data = capture()
+    # A previous incomplete VPN session owns this checkpoint. Reject new
+    # sessions BEFORE reading the possibly corrupted live network state.
     if CHECKPOINT.exists():
         raise ValueError("CISCO_NETWORK_CHECKPOINT_EXISTS")
+    data = capture()
+    # Retain O_EXCL below to reject concurrent creators even after capture.
     fd = os.open(str(CHECKPOINT), os.O_WRONLY | os.O_CREAT | os.O_EXCL |
                  getattr(os, "O_NOFOLLOW", 0), 0o600)
     try:
