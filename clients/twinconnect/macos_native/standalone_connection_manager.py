@@ -148,9 +148,12 @@ def record_attempt(protocol: str, reason: str) -> dict:
 def last_attempt() -> dict:
     import re
     path = attempt_path()
+    # Reject symlinks even when their target does not exist.
+    if path.is_symlink():
+        fail("INVALID_ATTEMPT_RECORD")
     if not path.exists():
         return {"state": "not_recorded"}
-    if path.is_symlink() or path.stat().st_size > 1024:
+    if path.stat().st_size > 1024:
         fail("INVALID_ATTEMPT_RECORD")
     try:
         record = json.loads(path.read_text(encoding="utf-8"))
