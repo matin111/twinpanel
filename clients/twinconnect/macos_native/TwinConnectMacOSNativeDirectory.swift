@@ -1333,7 +1333,8 @@ final class TwinConnectMacOSNativeDirectory: NSObject, URLSessionTaskDelegate {
               ss["server"] == nil, ss["server_port"] == nil,
               ss["plugin"] == nil, ss["tls"] == nil,
               Set(ss.keys).isSubset(of: [
-                  "type", "tag", "detour", "method", "password"
+                  "type", "tag", "detour", "method", "password",
+                  "udp_over_tcp"
               ]),
               Set(transport.keys).isSubset(of: [
                   "type", "tag", "version", "server", "server_port",
@@ -1347,13 +1348,40 @@ final class TwinConnectMacOSNativeDirectory: NSObject, URLSessionTaskDelegate {
               !transportPassword.isEmpty,
               transportPassword.utf8.count <= 4096,
               let tls = transport["tls"] as? [String: Any],
-              let checkedTLS = safeOutboundTLS(tls, server: host),
+              let sni = tls["server_name"] as? String,
+              safeProxyRemoteHost(sni),
               host.utf8.count <= 255, host.utf8.count >= 3,
               !host.contains("/"), !host.contains(" "),
               !host.contains("@"), !host.contains("%"),
               safeProxyRemoteHost(host)
         else { return nil }
 
+        // The server may publish 'insecure': true for its generic
+        // sing-box TLS profile. ShadowTLS authenticates a public decoy TLS
+        // hostname: require platform CA validation instead of inheriting
+        // a trust bypass. If that certificate cannot be verified the
+        // proxy handshake will fail closed (not silently go direct).
+        var trustedTLS = tls
+        trustedTLS["insecure"] = false
+        guard let checkedTLS = safeOutboundTLS(trustedTLS, server: host)
+        else { return nil }
+
+        var inner: [String: Any] = [
+            "type": "shadowsocks", "tag": "proxy",
+            "method": method, "password": ssPassword,
+            "detour": "shadowtls-transport"
+        ]
+        // Both the legacy shared-inner and per-user SS2022 profiles from
+        // TwinPanel use UDP-over-TCP v2. Preserve it after exact validation;
+        // omitting it can make UDP requests fail through the ShadowTLS chain.
+        if let rawUot = ss["udp_over_tcp"] {
+            guard let uot = rawUot as? [String: Any],
+                  Set(uot.keys) == Set(["enabled", "version"]),
+                  uot["enabled"] as? Bool == true,
+                  uot["version"] as? Int == 2
+            else { return nil }
+            inner["udp_over_tcp"] = ["enabled": true, "version": 2]
+        }
         let reviewed: [String: Any] = [
             "log": ["level": "error"],
             "inbounds": [[
@@ -1361,11 +1389,7 @@ final class TwinConnectMacOSNativeDirectory: NSObject, URLSessionTaskDelegate {
                 "listen": "127.0.0.1", "listen_port": 17089
             ]],
             "outbounds": [
-                [
-                    "type": "shadowsocks", "tag": "proxy",
-                    "method": method, "password": ssPassword,
-                    "detour": "shadowtls-transport"
-                ],
+                inner,
                 [
                     "type": "shadowtls", "tag": "shadowtls-transport",
                     "version": 3, "server": host, "server_port": port,
