@@ -14,7 +14,7 @@ class OpenVPNPackagingTests(unittest.TestCase):
 
     def test_dep_closure_rewrites_homebrew_paths(self):
         source = PACKAGER.read_text(encoding="utf-8")
-        self.assertIn('"install_name_tool", "-change"', source)
+        self.assertIn('"/usr/bin/install_name_tool", "-change"', source)
         self.assertIn('"UNRELOCATED_HOMEBREW_DYLIB"', source)
         self.assertIn('MAX_LIBRARIES = 96', source)
 
