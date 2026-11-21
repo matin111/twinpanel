@@ -19,10 +19,22 @@ import sys
 
 from cisco_openconnect_auth import validate, binary
 
-SCRIPTS = (
-    "/opt/homebrew/etc/vpnc/vpnc-script",
-    "/usr/local/etc/vpnc/vpnc-script",
-)
+SCRIPT = "/Library/PrivilegedHelperTools/TwinConnectCisco/vpnc-script"
+
+
+def trusted_script(path: str) -> bool:
+    # Never let root launch the Homebrew copy owned by a normal user.
+    try:
+        st = os.lstat(path)
+        parent = os.lstat(os.path.dirname(path))
+    except OSError:
+        return False
+    import stat
+    return (stat.S_ISREG(st.st_mode) and st.st_uid == 0 and
+            not st.st_mode & 0o022 and
+            stat.S_ISDIR(parent.st_mode) and parent.st_uid == 0 and
+            not parent.st_mode & 0o022 and
+            bool(st.st_mode & 0o100))
 ROUTE = "/sbin/route"
 ROUTE_GET = re.compile(r"^\s*(gateway|interface):\s*(\S+)\s*$", re.M)
 
@@ -59,9 +71,9 @@ def run(profile: dict, management_ip: str) -> int:
     if os.geteuid() != 0:
         raise ValueError("CISCO_ROOT_REQUIRED")
     exe = binary()
-    script = next((path for path in SCRIPTS if os.path.isfile(path)), None)
-    if exe is None or script is None:
-        raise ValueError("CISCO_ENGINE_UNAVAILABLE")
+    if exe is None or not trusted_script(SCRIPT):
+        raise ValueError("CISCO_TRUSTED_VPN_SCRIPT_REQUIRED")
+    script = SCRIPT
     # "desktop" is an explicit installer-authorized mode for a locally
     # controlled Mac. It is never selected automatically on a remote Mac.
     local_desktop = management_ip == "desktop"
