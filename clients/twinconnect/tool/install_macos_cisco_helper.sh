@@ -10,7 +10,7 @@ if [[ "$EUID" -ne 0 ]]; then
   echo "Run this script explicitly with sudo; it will not prompt or elevate itself." >&2
   exit 1
 fi
-base="/usr/local/libexec/twinconnect"
+base="/Library/PrivilegedHelperTools/TwinConnectCisco"
 install -d -o root -g wheel -m 0755 "$base"
 for filename in cisco_openconnect_auth.py cisco_openconnect_tunnel.py; do
   install -o root -g wheel -m 0755 "macos_native/$filename" "$base/$filename"
