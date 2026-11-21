@@ -78,6 +78,8 @@ class CiscoRecoveryTests(unittest.TestCase):
         commands = []
         def fake_command(*args):
             commands.append(args)
+            if args == (recovery.ROUTE, "-n", "get", "default"):
+                return "gateway: 198.51.100.33\\ninterface: en0\\n".replace("\\n", "\n")
             if "-getinfo" in args:
                 return ("Manual Configuration\nIP address: 198.51.100.36\n"
                         "Subnet mask: 255.255.255.240\nRouter: 198.51.100.33\n")
@@ -96,6 +98,8 @@ class CiscoRecoveryTests(unittest.TestCase):
         recovery.CHECKPOINT.write_text(json.dumps(STATIC))
         restored = [False]
         def fake_command(*args):
+            if args == (recovery.ROUTE, "-n", "get", "default"):
+                return "gateway: 198.51.100.33\\ninterface: en0\\n".replace("\\n", "\n")
             if "-getinfo" in args:
                 if not restored[0]:
                     return ("DHCP Configuration\nIP address: 169.254.111.69\n"
@@ -177,6 +181,32 @@ class CiscoRecoveryTests(unittest.TestCase):
                                 call.args[1] != 0 for call in kill.call_args_list))
             stop.assert_called_once_with()
             restore.assert_called_once_with()
+
+    def test_default_route_check_rejects_vpn_gateway(self):
+        wrong = "route to: default\ngateway: 10.99.0.1\ninterface: utun4\n"
+        with mock.patch.object(recovery, "command", return_value=wrong):
+            self.assertFalse(recovery.default_route_matches(STATIC))
+
+    def test_unrestored_default_route_keeps_checkpoint(self):
+        recovery.CHECKPOINT.write_text(json.dumps(STATIC))
+        def fake_command(*args):
+            if args == (recovery.ROUTE, "-n", "get", "default"):
+                return "gateway: 10.99.0.1\ninterface: utun4\n"
+            if "-getinfo" in args:
+                return ("Manual Configuration\nIP address: 198.51.100.36\n"
+                        "Subnet mask: 255.255.255.240\nRouter: 198.51.100.33\n")
+            if "-getdnsservers" in args:
+                return "198.51.100.19\n"
+            raise AssertionError(args)
+        with mock.patch.object(recovery.os, "geteuid", return_value=0), \
+             mock.patch.object(recovery, "network_service_for_device", return_value="Ethernet"), \
+             mock.patch.object(recovery, "read_checkpoint", return_value=STATIC), \
+             mock.patch.object(recovery, "command", side_effect=fake_command):
+            with self.assertRaisesRegex(
+                ValueError, "CISCO_NETWORK_DEFAULT_ROUTE_UNVERIFIED"
+            ):
+                recovery.restore()
+        self.assertTrue(recovery.CHECKPOINT.exists())
 
     def test_failed_restoration_preserves_checkpoint(self):
         recovery.CHECKPOINT.write_text(json.dumps(STATIC))
