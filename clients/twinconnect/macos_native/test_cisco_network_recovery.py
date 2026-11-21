@@ -73,6 +73,15 @@ class CiscoRecoveryTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "CISCO_NETWORK_CHECKPOINT_EXISTS"):
                 recovery.snapshot()
 
+    def test_existing_checkpoint_is_rejected_before_corrupt_network_capture(self):
+        recovery.CHECKPOINT.write_text(json.dumps(STATIC))
+        with mock.patch.object(recovery, "capture",
+                               side_effect=ValueError("CISCO_NETWORK_INVALID_IPV4")) as capture:
+            with self.assertRaisesRegex(ValueError, "CISCO_NETWORK_CHECKPOINT_EXISTS"):
+                recovery.snapshot()
+            capture.assert_not_called()
+        self.assertEqual(json.loads(recovery.CHECKPOINT.read_text()), STATIC)
+
     def test_restore_preserves_unchanged_configuration(self):
         recovery.CHECKPOINT.write_text(json.dumps(STATIC))
         commands = []
