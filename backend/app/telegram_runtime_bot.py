@@ -101,6 +101,7 @@ class LinkState(StatesGroup):
 
 
 class RenewalPaymentState(StatesGroup):
+    discount = State()
     proof = State()
     receipt = State()
 
@@ -568,6 +569,19 @@ def renewal_confirm_keyboard(sub_id, plan_id, nonce):
             ],
         ]
     )
+
+
+def renewal_coupon_keyboard(order_id):
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(
+            text="🎟 کد تخفیف",
+            callback_data=f"renewcoupon:enter:{int(order_id)}",
+        )],
+        [InlineKeyboardButton(
+            text="ادامه بدون کد",
+            callback_data=f"renewcoupon:skip:{int(order_id)}",
+        )],
+    ])
 
 
 def renewal_payment_methods_keyboard(
@@ -1885,8 +1899,86 @@ async def renewal_create_order(callback: CallbackQuery):
     await callback.answer()
     await show_navigation_page(
         callback.message,
-        choose_payment_text(order.get("id"), order.get("amount_toman"), renewal=True),
-        reply_markup=renewal_payment_methods_keyboard(int(order["id"]), methods),
+        "✅ <b>سفارش تمدید ساخته شد</b>\n\n"
+        f"شماره سفارش: <b>#{int(order['id'])}</b>\n"
+        f"مبلغ: <b>{_fmt_money(order.get('amount_toman'))} تومان</b>\n\n"
+        "کد تخفیف دارید؟",
+        reply_markup=renewal_coupon_keyboard(int(order["id"])),
+    )
+
+
+@router.callback_query(F.data.startswith("renewcoupon:enter:"))
+async def renewal_coupon_enter(callback: CallbackQuery, state: FSMContext):
+    try:
+        order_id = int((callback.data or "").rsplit(":", 1)[-1])
+    except (ValueError, IndexError):
+        await callback.answer("سفارش نامعتبر است", show_alert=True)
+        return
+    await state.set_state(RenewalPaymentState.discount)
+    await state.update_data(renewal_discount_order_id=order_id)
+    await callback.answer()
+    await callback.message.edit_text(
+        "🎟 <b>کد تخفیف تمدید</b>\n\nکد را ارسال کنید.",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[[
+            InlineKeyboardButton(text="ادامه بدون کد", callback_data=f"renewcoupon:skip:{order_id}")
+        ]]),
+    )
+
+
+@router.callback_query(F.data.startswith("renewcoupon:skip:"))
+async def renewal_coupon_skip(callback: CallbackQuery, state: FSMContext):
+    try:
+        order_id = int((callback.data or "").rsplit(":", 1)[-1])
+        token = await _telegram_session_token(callback.from_user.id)
+        orders, methods_data = await asyncio.gather(
+            request("GET", "/v1/store/orders/me", token=token),
+            request("GET", "/v1/payments/methods"),
+        )
+        order = next((x for x in orders if int(x.get("id") or 0) == order_id), None)
+        if not order or order.get("status") != "pending_payment":
+            raise ValueError("سفارش قابل پرداخت پیدا نشد")
+    except Exception as exc:
+        await callback.answer(str(exc)[:180], show_alert=True)
+        return
+    await state.clear()
+    await callback.answer()
+    await callback.message.edit_text(
+        choose_payment_text(order_id, order.get("amount_toman"), renewal=True),
+        reply_markup=renewal_payment_methods_keyboard(order_id, methods_data.get("methods") or []),
+    )
+
+
+@router.message(RenewalPaymentState.discount)
+async def renewal_coupon_submit(message: Message, state: FSMContext):
+    data = await state.get_data()
+    order_id = int(data.get("renewal_discount_order_id") or 0)
+    code = str(message.text or "").strip()
+    if not order_id:
+        await state.clear()
+        await message.answer("سفارش تمدید پیدا نشد؛ دوباره تمدید را شروع کنید.")
+        return
+    if not code:
+        await message.answer("کد تخفیف را وارد کنید.")
+        return
+    try:
+        token = await _telegram_session_token(message.from_user.id)
+        result = await request(
+            "POST", f"/v1/discounts/store/orders/{order_id}/apply",
+            token=token, payload={"code": code},
+        )
+        methods_data = await request("GET", "/v1/payments/methods")
+    except Exception as exc:
+        await message.answer("❌ کد تخفیف اعمال نشد: " + escape(str(exc)[:220]))
+        return
+    await state.clear()
+    await message.answer(
+        "✅ <b>کد تخفیف تمدید اعمال شد</b>\n"
+        f"کد: <code>{escape(str(result.get('code') or code))}</code>\n"
+        f"قیمت اصلی: <b>{_fmt_money(result.get('base_amount_toman'))} تومان</b>\n"
+        f"تخفیف: <b>{_fmt_money(result.get('discount_amount_toman'))} تومان</b>\n"
+        f"مبلغ نهایی: <b>{_fmt_money(result.get('final_amount_toman'))} تومان</b>\n\n"
+        "روش پرداخت را انتخاب کنید:",
+        reply_markup=renewal_payment_methods_keyboard(order_id, methods_data.get("methods") or []),
     )
 
 
