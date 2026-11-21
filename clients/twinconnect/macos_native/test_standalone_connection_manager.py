@@ -221,6 +221,62 @@ class StandaloneManagerTests(unittest.TestCase):
             self.assertEqual(manager.engine_failure_category(),
                              "TLS_CERTIFICATE_UNTRUSTED_CA")
 
+    def test_naive_early_exit_returns_safe_cronet_diagnostic(self):
+        cfg = self.config({
+            "inbounds": [{"type": "mixed", "listen": "127.0.0.1",
+                          "listen_port": 17891}],
+            "outbounds": [{"type": "naive", "tag": "proxy",
+                           "server": "example.com", "server_port": 443}],
+            "route": {"final": "proxy"},
+        })
+        fake_executable = self.root / "sing-box"
+        fake_executable.write_text("")
+        proc = mock.Mock()
+        proc.pid = 34567
+        proc.poll.return_value = 1
+
+        def failed_engine(_args, **kwargs):
+            kwargs["stdout"].write(
+                "FATAL[0000] initialize outbound: cronet: library not found\n"
+                "Authorization=SECRET_CONNECTION_TOKEN\n"
+            )
+            kwargs["stdout"].flush()
+            return proc
+
+        with mock.patch.object(manager, "STATE", self.root / "state"), \
+             mock.patch.object(manager, "binary_for", return_value=fake_executable), \
+             mock.patch.object(manager, "read_state", return_value=None), \
+             mock.patch.object(manager.subprocess, "Popen",
+                               side_effect=failed_engine), \
+             mock.patch.object(manager.time, "sleep"):
+            with self.assertRaisesRegex(
+                ValueError, "^NAIVE_CRONET_LIBRARY_MISSING$"
+            ) as failure:
+                manager.start("naive", cfg)
+            self.assertNotIn("SECRET_CONNECTION_TOKEN", str(failure.exception))
+
+    def test_safe_naive_fatal_categories_do_not_echo_private_logs(self):
+        logfile = self.root / "engine.log"
+        cases = {
+            "FATAL[0000] cronet: library not found secret=TOP_SECRET":
+                "NAIVE_CRONET_LIBRARY_MISSING",
+            "FATAL[0000] unsupported on naive outbound secret=TOP_SECRET":
+                "NAIVE_TLS_OPTION_UNSUPPORTED",
+            "FATAL[0000] invalid certificate secret=TOP_SECRET":
+                "NAIVE_TLS_CERTIFICATE_INVALID",
+            "FATAL[0000] unknown field tls.foo secret=TOP_SECRET":
+                "ENGINE_CONFIG_UNSUPPORTED_FIELD",
+            "FATAL[0000] unexpected failure at server TOP_SECRET":
+                "ENGINE_STARTUP_FATAL_UNCLASSIFIED",
+        }
+        with mock.patch.object(manager, "STATE", self.root):
+            for log, expected in cases.items():
+                with self.subTest(log=expected):
+                    logfile.write_text(log)
+                    category = manager.engine_failure_category()
+                    self.assertEqual(category, expected)
+                    self.assertNotIn("TOP_SECRET", category)
+
     def test_start_truncates_stale_engine_log(self):
         log = self.root / "engine.log"
         log.write_text("STALE_SECRET_OLD_QUIC_TIMEOUT")
