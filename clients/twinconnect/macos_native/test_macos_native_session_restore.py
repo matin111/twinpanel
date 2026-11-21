@@ -199,7 +199,7 @@ class NativeSessionRestoreTests(unittest.TestCase):
         self.assertIn('let security = params["security"]', directory)
         self.assertIn('let transport = params["type"]', directory)
         self.assertIn('let sni = params["sni"]', directory)
-        self.assertIn('url.queryItems.count', directory.replace('queryItems.count', 'url.queryItems.count') if False else directory)
+        self.assertIn('queryItems.count <= 24', directory)
         self.assertIn('"protocol": "socks"', directory)
         self.assertIn('"listen": "127.0.0.1", "port": 17089', directory)
         self.assertIn('"protocol": "vless"', directory)
