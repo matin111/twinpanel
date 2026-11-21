@@ -20,6 +20,7 @@ import sys
 from cisco_openconnect_auth import validate, binary
 
 SCRIPT = "/Library/PrivilegedHelperTools/TwinConnectCisco/vpnc-script"
+ISOLATED_OPENCONNECT = "/Library/PrivilegedHelperTools/TwinConnectCisco/openconnect-runtime/bin/openconnect"
 
 
 def trusted_script(path: str) -> bool:
@@ -69,6 +70,7 @@ def trusted_openconnect_dependencies(executable: str) -> bool:
     visited = set()
     while pending:
         current = pending.pop()
+        current = os.path.realpath(current)
         if current in visited:
             continue
         visited.add(current)
@@ -88,8 +90,18 @@ def trusted_openconnect_dependencies(executable: str) -> bool:
                 continue
             if dependency.startswith(("/usr/lib/", "/System/Library/")):
                 continue
+            if dependency.startswith("@loader_path/"):
+                resolved = os.path.realpath(os.path.join(
+                    os.path.dirname(current), dependency[len("@loader_path/"):]))
+                root = "/Library/PrivilegedHelperTools/TwinConnectCisco/openconnect-runtime/"
+                if not resolved.startswith(root):
+                    return False
+                pending.append(resolved)
+                continue
             if not dependency.startswith("/"):
-                # Reject @rpath, @loader_path and unresolved references.
+                # Reject @rpath, @executable_path and unresolved references.
+                return False
+            if dependency.startswith(("/usr/local/", "/opt/homebrew/")):
                 return False
             pending.append(dependency)
     return True
@@ -130,9 +142,11 @@ def management_route(ip: str) -> tuple[str, str]:
 def run(profile: dict, management_ip: str) -> int:
     if os.geteuid() != 0:
         raise ValueError("CISCO_ROOT_REQUIRED")
-    exe = binary()
-    if exe is None or not trusted_script(SCRIPT):
+    exe = ISOLATED_OPENCONNECT
+    if not trusted_script(SCRIPT):
         raise ValueError("CISCO_TRUSTED_VPN_SCRIPT_REQUIRED")
+    if not os.path.isfile(exe) or not os.access(exe, os.X_OK):
+        raise ValueError("CISCO_ISOLATED_OPENCONNECT_MISSING")
     if not trusted_openconnect_dependencies(exe):
         raise ValueError("CISCO_UNTRUSTED_OPENCONNECT_DEPENDENCIES")
     script = SCRIPT
