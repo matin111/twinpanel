@@ -57,6 +57,7 @@ def watch(parent: int, engine: int, lifetime: int) -> None:
                               flags=select.KQ_EV_ADD | select.KQ_EV_ENABLE,
                               fflags=select.KQ_NOTE_EXIT)
         queue.control([event], 0, 0)
+        print("WATCHDOG_READY", flush=True)
         deadline = time.monotonic() + lifetime
         while process_alive(engine):
             remaining = deadline - time.monotonic()
