@@ -1339,8 +1339,10 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         // Windows layout: timing and manual refresh share a single row.
         // The timer remains at zero until a real PacketTunnel is connected.
         let timing = stack(.horizontal, spacing: 8)
-        timing.addArrangedSubview(text("◷  Connected for    00:00:00",
-                                       size: 12, color: muted))
+        timing.addArrangedSubview(text(
+            localProxyActive ? "◷  Local SOCKS verified · VPN offline" :
+                               "◷  Connected for    00:00:00",
+            size: 12, color: muted))
         let timingSpace = NSView()
         timingSpace.setContentHuggingPriority(.defaultLow, for: .horizontal)
         timing.addArrangedSubview(timingSpace)
@@ -1980,7 +1982,9 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         section.addArrangedSubview(text("Local proxy diagnostics",
                                         size: 18, weight: .semibold))
         section.addArrangedSubview(text(
-            "Only a single HTTPS request uses Hysteria2. This is not a system VPN.",
+            "Connect can verify a local Hysteria2 SOCKS proxy at 127.0.0.1:17089. "
+            + "Configure individual apps to use it; macOS routing/DNS are unchanged. "
+            + "This is not a system-wide VPN.",
             size: 11, color: amber))
         let proxyActions = stack(.horizontal, spacing: 10)
         proxyActions.distribution = .fillEqually
@@ -1988,7 +1992,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                                action: #selector(primaryProxyAction(_:)),
                                mutedButton: true)
         testProxy.heightAnchor.constraint(equalToConstant: 44).isActive = true
-        testProxy.isEnabled = !localProxyBusy
+        testProxy.isEnabled = !localProxyBusy && !localProxyActive
         proxyActions.addArrangedSubview(testProxy)
         let stopProxy = button("■  Stop local proxy",
                                action: #selector(stopLocalProxyNow(_:)),
