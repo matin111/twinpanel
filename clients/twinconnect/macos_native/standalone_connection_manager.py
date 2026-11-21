@@ -345,7 +345,13 @@ def start(protocol: str, config: Path, owner_pid: int | None = None) -> dict:
             )
         time.sleep(0.6)
         if proc.poll() is not None:
-            fail("ENGINE_EXITED_EARLY_CHECK_LOCAL_LOG")
+            # Engine logs for this attempt were truncated before launch.
+            # Classify before discarding the temporary config; never return
+            # its log text because it can contain subscription credentials.
+            category = engine_failure_category()
+            fail(category if category not in (
+                "ENGINE_LOG_UNAVAILABLE", "ENGINE_FAILURE_NOT_CLASSIFIED"
+            ) else "ENGINE_EXITED_EARLY_CHECK_LOCAL_LOG")
         record = {"protocol": protocol, "pid": proc.pid, "port": port,
                   "mode": "local_proxy_only", "config": str(runtime),
                   "executable": str(exe)}
@@ -432,11 +438,25 @@ def engine_failure_category() -> str:
     # Check specific errors before generic QUIC/handshake text. Match only
     # known fixed phrases and return a fixed code, never any user data.
     for needle, code in (
+        ("cronet: library not found", "NAIVE_CRONET_LIBRARY_MISSING"),
+        ("libcronet.dylib", "NAIVE_CRONET_LIBRARY_MISSING"),
+        ("libcronet.so", "NAIVE_CRONET_LIBRARY_MISSING"),
+        ("libcronet.dll", "NAIVE_CRONET_LIBRARY_MISSING"),
+        ("cronet: unable to load", "NAIVE_CRONET_LIBRARY_MISSING"),
+        ("cronet: failed to initialize", "NAIVE_CRONET_INITIALIZATION_FAILED"),
+        ("unsupported on naive outbound", "NAIVE_TLS_OPTION_UNSUPPORTED"),
+        ("not supported on naive outbound", "NAIVE_TLS_OPTION_UNSUPPORTED"),
+        ("failed to parse certificate", "NAIVE_TLS_CERTIFICATE_INVALID"),
+        ("invalid certificate", "NAIVE_TLS_CERTIFICATE_INVALID"),
+        ("failed to parse pem", "NAIVE_TLS_CERTIFICATE_INVALID"),
+        ("cannot parse certificate", "NAIVE_TLS_CERTIFICATE_INVALID"),
         ("address already in use", "PROXY_LOCAL_PORT_OCCUPIED"),
         ("operation not permitted", "ENGINE_PERMISSION_DENIED"),
         ("permission denied", "ENGINE_PERMISSION_DENIED"),
         ("unknown outbound type", "ENGINE_UNSUPPORTED_OUTBOUND"),
         ("unknown field", "ENGINE_CONFIG_UNSUPPORTED_FIELD"),
+        ("invalid field", "ENGINE_CONFIG_UNSUPPORTED_FIELD"),
+        ("invalid character", "ENGINE_CONFIG_INVALID_JSON"),
         ("invalid config", "ENGINE_CONFIG_INVALID"),
         ("authentication failed", "HYSTERIA2_REMOTE_AUTH_REJECTED"),
         ("unauthorized", "HYSTERIA2_REMOTE_AUTH_REJECTED"),
@@ -460,9 +480,14 @@ def engine_failure_category() -> str:
         ("timeout", "ENGINE_REMOTE_TIMEOUT"),
         ("handshake failed", "ENGINE_REMOTE_HANDSHAKE_FAILURE"),
         ("quic", "ENGINE_QUIC_TRANSPORT_FAILURE"),
+        ("panic:", "ENGINE_PROCESS_PANIC"),
     ):
         if needle in data:
             return code
+    # Do not return raw fatal lines, which could include tokenized
+    # endpoints or inline certificates.
+    if "fatal[" in data or "fatal:" in data:
+        return "ENGINE_STARTUP_FATAL_UNCLASSIFIED"
     return "ENGINE_FAILURE_NOT_CLASSIFIED"
 
 
