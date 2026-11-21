@@ -47,7 +47,8 @@ class NativeSessionRestoreTests(unittest.TestCase):
             "private func networkMetric(", 1)[0]
         settings = dashboard.split("private func settingsPage() -> NSView {", 1)[1].split(
             "private func expiryText(", 1)[0]
-        self.assertIn('button("ϟ    Connect     ›"', home)
+        self.assertIn('"ϟ    Connect     ›"', home)
+        self.assertIn('"ϟ    Disconnect     ›"', home)
         self.assertIn('action: #selector(requestVPNConnection(_:))', home)
         self.assertNotIn('Check TUN readiness', home)
         self.assertIn('"Check TUN readiness"', settings)
@@ -56,7 +57,13 @@ class NativeSessionRestoreTests(unittest.TestCase):
             "@objc private func requestVPNConnection(", 1
         )[1].split("@objc private func unavailableConnect(", 1)[0]
         self.assertNotIn("prepareUnroutedHysteria2TUN", handler)
-        self.assertIn("No VPN was started.", handler)
+        self.assertIn("prepareLocalHysteria2", handler)
+        self.assertIn("startVerifiedLocalProxy(profile)", handler)
+        self.assertIn("Local proxy", handler)
+        self.assertIn("stopVerifiedLocalProxy()", handler)
+        self.assertNotIn("setGlobalProxy", handler)
+        self.assertNotIn("startVPNTunnel", handler)
+        self.assertIn("No system VPN was running.", dashboard)
 
 
 if __name__ == "__main__":
