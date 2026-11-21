@@ -107,8 +107,8 @@ class TUNDaemonControlTests(unittest.TestCase):
 
     def test_route_observer_reports_utun_without_claiming_egress(self):
         response = mock.Mock(returncode=0, stdout=(
-            "   route to: 1.1.1.1\\n"
-            "interface: utun5\\n"))
+            "   route to: 1.1.1.1\n"
+            "interface: utun5\n"))
         with mock.patch.object(server.platform, "system", return_value="Darwin"), \
              mock.patch.object(server.subprocess, "run", return_value=response):
             self.assertEqual(
@@ -116,7 +116,7 @@ class TUNDaemonControlTests(unittest.TestCase):
                 "utun_route_observed_unverified")
 
     def test_route_observer_distinguishes_direct_egress(self):
-        response = mock.Mock(returncode=0, stdout="interface: en0\\n")
+        response = mock.Mock(returncode=0, stdout="interface: en0\n")
         with mock.patch.object(server.platform, "system", return_value="Darwin"), \
              mock.patch.object(server.subprocess, "run", return_value=response):
             self.assertEqual(server.observe_route()["route_state"],
