@@ -20,6 +20,28 @@ class MacStandaloneProxyRuntime {
   final Directory engineRoot;
   final String curlExecutable;
 
+  /// Resolve engines from the installed app first, not the developer's
+  /// ~/twinpanel checkout. The executable sits in Contents/MacOS while
+  /// packaged runtimes live in Contents/Resources/twinconnect-runtime.
+  static Directory? packagedEngineRoot({String? executablePath}) {
+    if (!Platform.isMacOS) return null;
+    final executable = File(executablePath ?? Platform.resolvedExecutable);
+    final macOSDirectory = executable.parent;
+    if (macOSDirectory.uri.pathSegments
+        .where((segment) => segment.isNotEmpty).lastOrNull != 'MacOS') {
+      return null;
+    }
+    final contentsDirectory = macOSDirectory.parent;
+    if (contentsDirectory.uri.pathSegments
+        .where((segment) => segment.isNotEmpty).lastOrNull != 'Contents') {
+      return null;
+    }
+    final root = Directory(
+      '${contentsDirectory.path}/Resources/twinconnect-runtime/macos_native/build',
+    );
+    return root.existsSync() ? root : null;
+  }
+
   bool _busy = false;
 
   Future<MacStandaloneProbeResult> probe(
