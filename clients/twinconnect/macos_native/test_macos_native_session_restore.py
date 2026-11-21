@@ -164,6 +164,37 @@ class NativeSessionRestoreTests(unittest.TestCase):
         self.assertIn('"PROTOCOL_NOT_ALLOWED"', directory)
         self.assertIn('"PROFILES_NOT_READY"', directory)
 
+    def test_naive_tcp_panel_profile_keeps_ca_and_ignores_inert_quic_tuning(self):
+        directory = DIRECTORY.read_text(encoding="utf-8")
+        backend = (DIRECTORY.parents[2] / "backend" / "app" /
+                   "singbox_subscription_accounts.py").read_text(encoding="utf-8")
+        self.assertIn('"quic_congestion_control": str(inbound.get(', backend)
+        self.assertIn('"quic_congestion_control") or "bbr"', backend)
+        # The backend publishes congestion control in TCP mode too.
+        self.assertIn('if str(inbound.get("network") or "").lower() == "udp":', backend)
+        self.assertIn('out["quic"] = True', backend)
+        self.assertIn('if outbound["quic"] as? Bool == true {', directory)
+        self.assertIn('reviewed["quic_congestion_control"] = cc', directory)
+        self.assertIn('"server_name": sni, "certificate": authority', directory)
+        self.assertIn('let authority = checkedTLS["certificate"] as? [String]',
+                      directory)
+        self.assertIn('!authority.isEmpty', directory)
+        self.assertIn('reviewed["insecure_concurrency"] = 0', directory)
+        self.assertIn('outbound["extra_headers"] == nil', directory)
+        self.assertIn('tls["insecure"] as? Bool != true', directory)
+        self.assertIn('let checkedTLS = safeOutboundTLS(tls, server: host)',
+                      directory)
+
+    def test_bad_node_profile_has_distinct_safe_failure_codes(self):
+        directory = DIRECTORY.read_text(encoding="utf-8")
+        for code in ("LOCAL_NODE_PROFILE_MISSING",
+                     "LOCAL_NODE_PROFILE_AMBIGUOUS",
+                     "LOCAL_PROFILE_INVALID"):
+            self.assertIn(f'"{code}"', directory)
+        self.assertIn("guard !matches.isEmpty else", directory)
+        self.assertIn("guard matches.count == 1 else", directory)
+        self.assertIn("self.reviewedSingBoxProxyConfig(", directory)
+
     def test_naive_and_shadowtls_are_strict_verified_local_only(self):
         directory = DIRECTORY.read_text(encoding="utf-8")
         dashboard = DASHBOARD.read_text(encoding="utf-8")
