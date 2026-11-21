@@ -2,6 +2,7 @@
 // Matches the tenant API contract; secrets live in memory only, never logs or defaults.
 import Foundation
 import Darwin
+import Security
 
 struct TwinMacNativePingResult {
     let measuredMs: Int?
@@ -176,6 +177,53 @@ enum TwinMacNativeError: LocalizedError {
     var errorDescription: String? {
         if case .failure(let message) = self { return message }
         return "UNKNOWN_ERROR"
+    }
+}
+
+// A rotating refresh token belongs only in macOS Keychain, never in
+// UserDefaults, the filesystem, process arguments, or diagnostic text.
+private struct TwinMacSavedRefresh: Codable {
+    let username: String
+    let namespace: String
+    let origin: String
+    let token: String
+}
+
+private enum TwinMacNativeKeychain {
+    private static let service = "com.twinconnect.macos.appkit.refresh.v1"
+    private static let account = "active-account"
+
+    private static var key: [String: Any] {
+        [kSecClass as String: kSecClassGenericPassword,
+         kSecAttrService as String: service,
+         kSecAttrAccount as String: account]
+    }
+
+    static func load() -> TwinMacSavedRefresh? {
+        var query = key
+        query[kSecReturnData as String] = true
+        query[kSecMatchLimit as String] = kSecMatchLimitOne
+        var item: CFTypeRef?
+        guard SecItemCopyMatching(query as CFDictionary, &item) == errSecSuccess,
+              let data = item as? Data else { return nil }
+        return try? JSONDecoder().decode(TwinMacSavedRefresh.self, from: data)
+    }
+
+    @discardableResult
+    static func save(_ value: TwinMacSavedRefresh) -> Bool {
+        guard let data = try? JSONEncoder().encode(value) else { return false }
+        var item = key
+        item[kSecValueData as String] = data
+        // Update in place when possible. Removing old login is unnecessary.
+        let status = SecItemUpdate(key as CFDictionary,
+                                   [kSecValueData as String: data] as CFDictionary)
+        if status == errSecSuccess { return true }
+        guard status == errSecItemNotFound else { return false }
+        return SecItemAdd(item as CFDictionary, nil) == errSecSuccess
+    }
+
+    static func clear() {
+        SecItemDelete(key as CFDictionary)
     }
 }
 
@@ -361,29 +409,125 @@ final class TwinConnectMacOSNativeDirectory: NSObject, URLSessionTaskDelegate {
                             completion(.failure(TwinMacNativeError.failure("INVALID_SESSION_RESPONSE")))
                             return
                         }
-                        let owner = (brand["owner_type"] as? String) ?? ""
-                        let prefix = (brand["app_username_prefix"] as? String) ?? ""
-                        if owner == "reseller" && (prefix.isEmpty || !username.hasPrefix(prefix)) {
-                            completion(.failure(TwinMacNativeError.failure("RESELLER_PREFIX_MISMATCH")))
+                        guard let session = self.makeSession(
+                            brand: brand, token: token,
+                            namespace: namespace, username: username, panel: panel
+                        ) else {
+                            completion(.failure(TwinMacNativeError.failure("INVALID_SESSION_BRAND")))
                             return
                         }
-                        let name = (brand["brand_name"] as? String) ?? "TwinConnect"
-                        let accent = (brand["primary_color"] as? String) ?? "#7C3AED"
-                        completion(.success(TwinMacNativeSession(
-                            namespace: namespace, username: username,
-                            accessToken: token, apiOrigin: panel,
-                            brandName: name.isEmpty ? "TwinConnect" : name,
-                            accentHex: accent,
-                            backgroundHex: brand["background_color"] as? String,
-                            cardHex: brand["card_color"] as? String,
-                            supportURL: self.publicURL(brand["telegram_url"] ?? brand["website_url"]),
-                            renewalURL: self.publicURL(brand["renewal_url"]),
-                            websiteURL: self.publicURL(brand["website_url"]),
-                            logoURL: self.publicURL(brand["logo_url"])
-                        )))
+                        if let refresh = info["refresh_token"] as? String,
+                           (40...3000).contains(refresh.count) {
+                            let saved = TwinMacSavedRefresh(
+                                username: username, namespace: namespace,
+                                origin: panel.absoluteString, token: refresh)
+                            DispatchQueue.global(qos: .utility).async {
+                                _ = TwinMacNativeKeychain.save(saved)
+                            }
+                        }
+                        completion(.success(session))
                     }
                 }
             }
+        }
+    }
+
+    private func makeSession(brand: [String: Any], token: String,
+                             namespace: String, username: String,
+                             panel: URL) -> TwinMacNativeSession? {
+        guard (brand["namespace"] as? String)?.uppercased() == namespace,
+              token.count >= 40 else { return nil }
+        let owner = (brand["owner_type"] as? String) ?? ""
+        let prefix = (brand["app_username_prefix"] as? String) ?? ""
+        guard owner != "reseller" ||
+              (!prefix.isEmpty && username.hasPrefix(prefix)) else { return nil }
+        let name = (brand["brand_name"] as? String) ?? "TwinConnect"
+        return TwinMacNativeSession(
+            namespace: namespace, username: username,
+            accessToken: token, apiOrigin: panel,
+            brandName: name.isEmpty ? "TwinConnect" : name,
+            accentHex: (brand["primary_color"] as? String) ?? "#7C3AED",
+            backgroundHex: brand["background_color"] as? String,
+            cardHex: brand["card_color"] as? String,
+            supportURL: publicURL(brand["telegram_url"] ?? brand["website_url"]),
+            renewalURL: publicURL(brand["renewal_url"]),
+            websiteURL: publicURL(brand["website_url"]),
+            logoURL: publicURL(brand["logo_url"])
+        )
+    }
+
+    // Restores only a rotating refresh token. The account password is never
+    // persisted, and the token is validated by the authenticated panel again.
+    func restoreSavedSession(
+        completion: @escaping (Result<TwinMacNativeSession, Error>) -> Void
+    ) {
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            guard let saved = TwinMacNativeKeychain.load() else {
+                DispatchQueue.main.async {
+                    completion(.failure(TwinMacNativeError.failure("NO_SAVED_SESSION")))
+                }
+                return
+            }
+            DispatchQueue.main.async {
+                guard let self = self,
+                      self.userNamespace(saved.username) == saved.namespace,
+                      let panel = self.safeOrigin(saved.origin),
+                      (40...3000).contains(saved.token.count) else {
+                    TwinMacNativeKeychain.clear()
+                    completion(.failure(TwinMacNativeError.failure("INVALID_SAVED_SESSION")))
+                    return
+                }
+                self.request(self.endpoint(panel, "v1/central-app/session/refresh"),
+                             payload: ["refresh_token": saved.token]) { response in
+                    guard case .success(let value) = response,
+                          let newToken = value["session_token"] as? String,
+                          newToken.count >= 40,
+                          let nextRefresh = value["refresh_token"] as? String,
+                          (40...3000).contains(nextRefresh.count) else {
+                        if case .failure(let error) = response {
+                            if ["APP_LOGIN_INVALID", "APP_NOT_AUTHORIZED"].contains(
+                                error.localizedDescription) {
+                                TwinMacNativeKeychain.clear()
+                            }
+                            completion(.failure(error))
+                        } else {
+                            completion(.failure(TwinMacNativeError.failure(
+                                "INVALID_REFRESH_RESPONSE")))
+                        }
+                        return
+                    }
+                    self.request(self.endpoint(panel, "v1/central-app/session/brand"),
+                                 payload: nil, bearer: newToken) { brandResult in
+                        guard case .success(let brand) = brandResult,
+                              let session = self.makeSession(
+                                brand: brand, token: newToken,
+                                namespace: saved.namespace,
+                                username: saved.username, panel: panel
+                              ) else {
+                            if case .failure(let error) = brandResult {
+                                completion(.failure(error))
+                            } else {
+                                completion(.failure(TwinMacNativeError.failure(
+                                    "INVALID_SESSION_BRAND")))
+                            }
+                            return
+                        }
+                        let next = TwinMacSavedRefresh(
+                            username: saved.username, namespace: saved.namespace,
+                            origin: panel.absoluteString, token: nextRefresh)
+                        DispatchQueue.global(qos: .utility).async {
+                            _ = TwinMacNativeKeychain.save(next)
+                        }
+                        completion(.success(session))
+                    }
+                }
+            }
+        }
+    }
+
+    func clearSavedSession() {
+        DispatchQueue.global(qos: .utility).async {
+            TwinMacNativeKeychain.clear()
         }
     }
 
