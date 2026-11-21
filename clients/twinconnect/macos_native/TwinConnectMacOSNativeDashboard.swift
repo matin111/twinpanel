@@ -581,6 +581,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     private var localProxyStatus = ""
     private var ciscoAuthBusy = false
     private var ciscoAuthStatus = ""
+    private let ciscoSafetyHold = true // Static-IP recovery not yet verified.
     private var ciscoTunnelBusy = false
     private var ciscoTunnelStatus = ""
     private var ciscoTunnelTask: Process?
@@ -1423,16 +1424,15 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         // Preserve the Windows primary action label. Diagnostics belong only
         // in Settings, and must never masquerade as a successful VPN connection.
         let connect = button(activeProtocol == "cisco" ?
-                             (ciscoTunnelBusy ? "Cisco connecting…" :
-                              (ciscoTunnelTask != nil ? "Stop Cisco process" :
-                                                       "Connect Cisco")) :
+                             (ciscoTunnelTask != nil ? "Stop Cisco process" :
+                                                       "Cisco temporarily unavailable") :
                              (localProxyActive ? "ϟ    Disconnect     ›" :
                                                  "ϟ    Connect     ›"),
                              action: #selector(requestVPNConnection(_:)), primary: true)
         connect.isEnabled = accountSession != nil && !localProxyBusy &&
-            (activeProtocol != "cisco" || !ciscoTunnelBusy)
+            (activeProtocol != "cisco" || ciscoTunnelTask != nil)
         connect.toolTip = activeProtocol == "cisco" ?
-            "Requires installed root-owned helper, explicit management route and authorized sudo." :
+            "Disabled after macOS network configuration loss; network recovery must be verified first." :
             "Unsigned macOS: local SOCKS proxy only; no system VPN."
         connect.heightAnchor.constraint(equalToConstant: 54).isActive = true
         connect.layer?.cornerRadius = 17
@@ -2995,6 +2995,11 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         if let existing = ciscoTunnelTask {
             ciscoTunnelStatus = "Stopping Cisco tunnel…"
             existing.terminate()
+            view = build()
+            return
+        }
+        if ciscoSafetyHold {
+            ciscoTunnelStatus = "CISCO_TUNNEL_DISABLED_PENDING_NETWORK_RECOVERY"
             view = build()
             return
         }
