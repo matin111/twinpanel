@@ -3747,11 +3747,26 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                 reason + specific, nil)
         }
         let tested = runLocalManager(["probe"], root: root)
+        // A successful curl alone is insufficient: the engine may exit
+        // between the HTTPS probe and updating the Connect button.
+        // Recheck the exact managed protocol before showing Disconnect.
+        let stillRunning = runLocalManager(["status"], root: root)
+        let activeState: [String: Any]? = {
+            guard stillRunning.0 == 0,
+                  let data = stillRunning.1.data(using: .utf8) else {
+                return nil
+            }
+            return (try? JSONSerialization.jsonObject(with: data))
+                as? [String: Any]
+        }()
         if tested.0 == 0,
            let bytes = tested.1.data(using: .utf8),
            let result = (try? JSONSerialization.jsonObject(with: bytes))
                as? [String: Any],
            result["state"] as? String == "proxy_egress_reachable",
+           result["protocol"] as? String == protocolCode,
+           activeState?["state"] as? String == "process_running_unverified",
+           activeState?["protocol"] as? String == protocolCode,
            let exitIP = result["egress_ip"] as? String,
            TwinMacNativePing.validatedPublicIP(exitIP) != nil {
             recordProxyAttempt(protocolCode, "PROXY_EGRESS_VERIFIED")
