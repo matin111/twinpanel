@@ -133,6 +133,56 @@ class NativeSessionRestoreTests(unittest.TestCase):
         self.assertIn('localProxyActive ? "ϟ    Disconnect', dashboard)
         self.assertNotIn('localProxyActive ? "Proxy" : "Disconnected"', dashboard)
 
+    def test_cisco_requires_authorized_selected_server_and_real_profile(self):
+        directory = DIRECTORY.read_text(encoding="utf-8")
+        section = directory.split("func prepareCiscoAuthentication(", 1)[1]
+        section = section.split("// Never execute remote-provided routes", 1)[0]
+        self.assertIn('v1/central-app/session/protocols', section)
+        self.assertIn('v1/central-app/session/servers', section)
+        self.assertIn('v1/central-app/session/profiles', section)
+        self.assertIn('payload: ["protocol": "cisco"]', section)
+        self.assertIn('self.validEnvelope(response, session.namespace)', section)
+        self.assertIn('CISCO_PROTOCOL_NOT_ALLOWED', section)
+        self.assertIn('SERVER_NOT_ALLOWED', section)
+        self.assertIn('CISCO_PROFILE_UNAVAILABLE', section)
+        self.assertIn('CISCO_PROFILE_INVALID', section)
+        self.assertIn('candidates.count == 1', section)
+        self.assertIn('let profile = self.reviewedCiscoAuthProfile(candidates[0])',
+                      section)
+
+    def test_cisco_authentication_only_is_visible_but_never_vpn_connected(self):
+        dashboard = DASHBOARD.read_text(encoding="utf-8")
+        settings = dashboard.split("private func settingsPage() -> NSView {", 1)[1]
+        settings = settings.split("private func expiryText(", 1)[0]
+        self.assertIn('Test Cisco authentication (no VPN)', settings)
+        self.assertIn('action: #selector(testCiscoAuthentication(_:))', settings)
+        self.assertIn('activeProtocol == "cisco"', settings)
+        self.assertIn('directory.prepareCiscoAuthentication(', dashboard)
+        self.assertIn('let input = Pipe()', dashboard)
+        self.assertIn('input.fileHandleForWriting.write(profile)', dashboard)
+        self.assertIn('input.fileHandleForWriting.closeFile()', dashboard)
+        self.assertIn('"authenticate"', dashboard)
+        self.assertIn('obj["state"] as? String == "cisco_authentication_verified"',
+                      dashboard)
+        self.assertIn('obj["vpn_connected"] as? Bool == false', dashboard)
+        self.assertIn('Cisco authentication verified — VPN offline; no tunnel.',
+                      dashboard)
+        self.assertNotIn('"cisco", "tuic"', dashboard)
+        self.assertIn('if activeProtocol == "cisco" {', dashboard)
+
+    def test_cisco_pin_never_allows_insecure_cert(self):
+        directory = DIRECTORY.read_text(encoding="utf-8")
+        guard = directory.split(
+            "private func reviewedCiscoAuthProfile(", 1)[1].split(
+                "// Never execute remote-provided routes", 1)[0]
+        self.assertIn('safeProxyRemoteHost(host)', guard)
+        self.assertIn('pin-sha256:[A-Za-z0-9+/]{43}=', guard)
+        self.assertIn('password.rangeOfCharacter(from: .controlCharacters)',
+                      guard)
+        self.assertNotIn('no-cert-check', guard.split(
+            'return try? JSONSerialization.data(withJSONObject: reviewed)', 1)[0])
+        self.assertIn('"protocol": "cisco"', guard)
+
     def test_entitled_singbox_protocols_bound_to_selected_server(self):
         directory = DIRECTORY.read_text(encoding="utf-8")
         dashboard = DASHBOARD.read_text(encoding="utf-8")
