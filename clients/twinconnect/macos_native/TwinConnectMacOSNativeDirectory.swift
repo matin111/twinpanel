@@ -972,6 +972,118 @@ final class TwinConnectMacOSNativeDirectory: NSObject, URLSessionTaskDelegate {
         }
     }
 
+    // Cisco / AnyConnect has its own OpenConnect engine, not a sing-box
+    // outbound. Authenticate only: without a privileged macOS tunnel runtime,
+    // success must not be interpreted as VPN traffic flowing.
+    func prepareCiscoAuthentication(_ session: TwinMacNativeSession,
+                                    serverID: String,
+                                    completion: @escaping (Result<Data, Error>) -> Void) {
+        guard serverID.range(of: "^[0-9]{1,20}$",
+                             options: .regularExpression) != nil else {
+            completion(.failure(TwinMacNativeError.failure("INVALID_SERVER_ID")))
+            return
+        }
+        let panel = session.apiOrigin
+        let token = session.accessToken
+        request(endpoint(panel, "v1/central-app/session/protocols"),
+                payload: nil, bearer: token) { [weak self] catalogResult in
+            guard let self = self else { return }
+            guard case .success(let catalog) = catalogResult,
+                  self.validEnvelope(catalog, session.namespace),
+                  let protocols = catalog["protocols"] as? [[String: Any]],
+                  protocols.count <= 16,
+                  protocols.filter({
+                      ($0["code"] as? String) == "cisco" &&
+                      ($0["selected"] as? Bool) == true &&
+                      ($0["config_record_present"] as? Bool) == true
+                  }).count == 1 else {
+                completion(.failure(TwinMacNativeError.failure(
+                    "CISCO_PROTOCOL_NOT_ALLOWED")))
+                return
+            }
+            self.request(self.endpoint(panel, "v1/central-app/session/servers"),
+                         payload: nil, bearer: token, maxBytes: 131072) { inventoryResult in
+                guard case .success(let inventory) = inventoryResult,
+                      self.validEnvelope(inventory, session.namespace),
+                      let servers = inventory["servers"] as? [[String: Any]],
+                      servers.filter({
+                          ($0["id"] as? String) == serverID
+                      }).count == 1 else {
+                    completion(.failure(TwinMacNativeError.failure("SERVER_NOT_ALLOWED")))
+                    return
+                }
+                self.request(self.endpoint(panel, "v1/central-app/session/profiles"),
+                             payload: ["protocol": "cisco"], bearer: token,
+                             maxBytes: 1048576) { profilesResult in
+                    guard case .success(let response) = profilesResult,
+                          self.validEnvelope(response, session.namespace),
+                          response["protocol"] as? String == "cisco",
+                          let items = response["items"] as? [[String: Any]],
+                          items.count <= 200 else {
+                        completion(.failure(TwinMacNativeError.failure(
+                            "CISCO_PROFILE_UNAVAILABLE")))
+                        return
+                    }
+                    let candidates = items.filter { item in
+                        if let id = item["node_id"] as? String {
+                            return id == serverID
+                        }
+                        if let id = item["node_id"] as? Int {
+                            return String(id) == serverID
+                        }
+                        return false
+                    }
+                    guard candidates.count == 1,
+                          let profile = self.reviewedCiscoAuthProfile(candidates[0])
+                    else {
+                        completion(.failure(TwinMacNativeError.failure(
+                            "CISCO_PROFILE_INVALID")))
+                        return
+                    }
+                    completion(.success(profile))
+                }
+            }
+        }
+    }
+
+    private func reviewedCiscoAuthProfile(_ item: [String: Any]) -> Data? {
+        let rawHost = (item["host"] as? String) ??
+                      (item["server"] as? String) ??
+                      (item["server_ip"] as? String) ??
+                      (item["endpoint"] as? String)
+        guard let host = rawHost, !host.contains(":"),
+              safeProxyRemoteHost(host),
+              let username = (item["username"] as? String) ??
+                             (item["user"] as? String),
+              !username.isEmpty, username.utf8.count <= 256,
+              !username.hasPrefix("-"),
+              username.rangeOfCharacter(from: .controlCharacters) == nil,
+              let password = item["password"] as? String,
+              !password.isEmpty, password.utf8.count <= 4096,
+              password.rangeOfCharacter(from: .controlCharacters) == nil
+        else { return nil }
+        let port = (item["port"] as? Int) ??
+                   (item["server_port"] as? Int) ?? 443
+        guard (1...65535).contains(port) else { return nil }
+        let pin = (item["servercert"] as? String) ??
+                  (item["server_certificate"] as? String) ??
+                  (item["server_cert_fingerprint"] as? String) ??
+                  (item["certificate_fingerprint"] as? String)
+        if let pin = pin {
+            // Explicit pinned trust only: never use --no-cert-check or TOFU.
+            // Without a pin, OpenConnect uses the system CA store.
+            guard pin.range(
+                of: "^(sha256:[0-9a-fA-F]{64}|pin-sha256:[A-Za-z0-9+/]{43}=)$",
+                options: .regularExpression) != nil else { return nil }
+        }
+        var reviewed: [String: Any] = [
+            "protocol": "cisco", "host": host, "port": port,
+            "username": username, "password": password
+        ]
+        if let pin = pin { reviewed["servercert"] = pin }
+        return try? JSONSerialization.data(withJSONObject: reviewed)
+    }
+
     // Never execute remote-provided routes, inbounds, local listeners or
     // arbitrary dialer options. Rebuild only known outbound fields.
     // Conservative Xray client: the first supported real inbound for the
