@@ -23,6 +23,7 @@ import subprocess
 import sys
 import threading
 import time
+import urllib.request
 
 from unsigned_tun_policy import (TRUSTED_ROOT, trusted_root_file,
                                  validate_full_tun_config)
@@ -95,6 +96,43 @@ def observe_route() -> dict:
     if interface.startswith("utun") and interface[4:].isdigit():
         return {"route_state": "utun_route_observed_unverified"}
     return {"route_state": "not_utun_route"}
+
+
+def probe_system_https() -> dict:
+    """Probe HTTPS via macOS system networking without proxy env overrides.
+
+    This checks the OS transport, not a loopback SOCKS proxy. The route must
+    already point at utun; DNS and public exit IP remain unverified here.
+    No profile credentials or response contents are persisted.
+    """
+    if observe_route().get("route_state") != "utun_route_observed_unverified":
+        return {"https_state": "tun_route_not_observed"}
+    request = urllib.request.Request(
+        "https://www.cloudflare.com/cdn-cgi/trace",
+        headers={"User-Agent": "TwinConnect-TUN-Health/1.0"})
+    try:
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        with opener.open(request, timeout=5) as reply:
+            if reply.status != 200:
+                return {"https_state": "http_status_failed"}
+            raw = reply.read(4097)
+        if len(raw) > 4096:
+            return {"https_state": "invalid_response"}
+        rows = {}
+        for line in raw.decode("utf-8", errors="strict").splitlines():
+            key, sep, value = line.partition("=")
+            if sep and key in ("ip", "warp", "loc"):
+                rows[key] = value
+        if "ip" not in rows or not (3 <= len(rows["ip"]) <= 64):
+            return {"https_state": "invalid_response"}
+        import ipaddress
+        if not ipaddress.ip_address(rows["ip"]).is_global:
+            return {"https_state": "invalid_response"}
+        return {"https_state": "system_https_reachable",
+                "observed_exit_ip": rows["ip"],
+                "system_vpn_verified": False}
+    except (OSError, ValueError, UnicodeError, TimeoutError):
+        return {"https_state": "unreachable"}
 
 
 class Session:
@@ -238,7 +276,7 @@ def decode_request(raw: bytes) -> dict:
         raise ValueError("TUN_REQUEST_SIZE_INVALID")
     value = json.loads(raw)
     if not isinstance(value, dict) or value.get("action") not in (
-        "status", "start", "stop"):
+        "status", "probe", "start", "stop"):
         raise ValueError("TUN_REQUEST_ACTION_INVALID")
     return value
 
@@ -267,6 +305,12 @@ def handle(conn: socket.socket, session: Session) -> None:
         action = request["action"]
         if action == "status":
             result = session.status()
+        elif action == "probe":
+            result = session.status()
+            if result["state"] == "engine_running_unverified":
+                result.update(probe_system_https())
+            else:
+                result["https_state"] = "engine_not_running"
         elif action == "start":
             result = session.start(uid, request.get("config"))
         else:
