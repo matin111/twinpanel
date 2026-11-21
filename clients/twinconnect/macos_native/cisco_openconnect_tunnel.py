@@ -26,6 +26,7 @@ SCRIPT = "/Library/PrivilegedHelperTools/TwinConnectCisco/vpnc-script"
 ISOLATED_OPENCONNECT = "/Library/PrivilegedHelperTools/TwinConnectCisco/openconnect-runtime/bin/openconnect"
 NETWORK_GUARD = "/Library/PrivilegedHelperTools/TwinConnectCisco/cisco_network_recovery.py"
 CISCO_TUNNEL_ENABLED = False  # Must remain off until crash-safe route/IP/DNS restoration exists.
+CISCO_UNPROTECTED_CONSOLE_TEST_ALLOWED = False  # Strict production safety interlock.
 
 
 def trusted_script(path: str) -> bool:
@@ -175,6 +176,11 @@ def run(profile: dict, management_ip: str) -> int:
     # Console trial is explicitly provisioned by the administrator.
     # Automatically stop after two minutes, even if the app disappears.
     console_trial = management_ip == "console-test"
+    # The legacy console-test shortcut has no pinned management-client route.
+    # It must never run on an externally managed VPS, even if another
+    # safety switch is later enabled. Keep it only for mocked offline tests.
+    if console_trial and not CISCO_UNPROTECTED_CONSOLE_TEST_ALLOWED:
+        raise ValueError("CISCO_CONSOLE_MANAGEMENT_ROUTE_REQUIRED")
     local_desktop = management_ip == "desktop" or console_trial
     gateway = ""
     if not local_desktop:
