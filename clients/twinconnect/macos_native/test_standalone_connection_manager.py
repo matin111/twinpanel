@@ -86,6 +86,40 @@ class StandaloneManagerTests(unittest.TestCase):
             self.assertNotEqual(listed[code]["state"], "proxy_engine_present")
 
 
+    def test_safe_last_attempt_is_available_when_engine_stopped(self):
+        with mock.patch.object(manager, "STATE", self.root / "state"):
+            self.assertEqual(manager.last_attempt(), {"state": "not_recorded"})
+            recorded = manager.record_attempt("naive", "LOCAL_PROFILE_INVALID")
+            self.assertEqual(recorded, {
+                "state": "last_attempt",
+                "protocol": "naive",
+                "reason": "LOCAL_PROFILE_INVALID",
+            })
+            self.assertEqual(manager.last_attempt(), recorded)
+            self.assertEqual(manager.status(), {"state": "stopped"})
+            self.assertEqual(
+                manager.attempt_path().stat().st_mode & 0o777, 0o600)
+            self.assertEqual(manager.STATE.stat().st_mode & 0o777, 0o700)
+            with self.assertRaisesRegex(ValueError, "INVALID_ATTEMPT_CODE"):
+                manager.record_attempt("naive", "user@example.com?token=SECRET")
+            with self.assertRaisesRegex(ValueError, "UNKNOWN_PROTOCOL"):
+                manager.record_attempt("unknown", "CONNECT_REQUESTED")
+            self.assertEqual(manager.last_attempt(), recorded)
+
+    def test_last_attempt_cannot_be_symlink_or_untrusted_record(self):
+        with mock.patch.object(manager, "STATE", self.root / "state"):
+            manager.record_attempt("tuic", "CONNECT_REQUESTED")
+            attempt = manager.attempt_path()
+            attempt.unlink()
+            attempt.symlink_to(self.root / "secret")
+            with self.assertRaisesRegex(ValueError, "INVALID_ATTEMPT_RECORD"):
+                manager.last_attempt()
+            attempt.unlink()
+            attempt.write_text('{"state":"last_attempt","protocol":"naive",'
+                               '"reason":"https://token.example"}')
+            with self.assertRaisesRegex(ValueError, "INVALID_ATTEMPT_RECORD"):
+                manager.last_attempt()
+
     def test_naive_local_proxy_config(self):
         cfg = self.config({
             "inbounds": [{"listen": "127.0.0.1", "listen_port": 10810, "type": "mixed"}],
