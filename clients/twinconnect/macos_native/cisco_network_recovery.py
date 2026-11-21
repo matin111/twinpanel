@@ -49,6 +49,26 @@ def default_interface() -> str:
     return match.group(1)
 
 
+def default_route_matches(saved: dict) -> bool:
+    """Verify that macOS has returned traffic to the original uplink.
+
+    Never add/delete a route here: blindly replacing a live default route can
+    disconnect a remotely administered Mac. On mismatch keep the checkpoint
+    for explicit, controlled recovery rather than claiming success.
+    """
+    if saved.get("mode") != "manual":
+        # DHCP restores can legitimately learn a different gateway.
+        return True
+    try:
+        output = command(ROUTE, "-n", "get", "default")
+    except (ValueError, OSError, subprocess.TimeoutExpired):
+        return False
+    fields = dict(re.findall(
+        r"(?m)^\\s*(gateway|interface):\\s*(\\S+)\\s*$", output))
+    return (fields.get("gateway") == saved.get("gateway") and
+            fields.get("interface") == saved.get("interface"))
+
+
 def network_service_for_device(device: str) -> str:
     # The first line of a two-line entry contains the network service name;
     # the next reports the actual device bound to that service.
@@ -225,6 +245,10 @@ def restore() -> None:
             time.sleep(1)
         else:
             raise ValueError("CISCO_NETWORK_RESTORE_UNVERIFIED")
+    if not default_route_matches(saved):
+        # Never delete the only recovery snapshot when the original uplink
+        # is still not the active default route.
+        raise ValueError("CISCO_NETWORK_DEFAULT_ROUTE_UNVERIFIED")
     CHECKPOINT.unlink()
     print("CISCO_NETWORK_RESTORED_VERIFIED", flush=True)
 
