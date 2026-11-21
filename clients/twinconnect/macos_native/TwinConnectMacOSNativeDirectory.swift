@@ -1007,7 +1007,8 @@ final class TwinConnectMacOSNativeDirectory: NSObject, URLSessionTaskDelegate {
                   value.utf8.count <= 2048 else { return nil }
             params[item.name] = value
         }
-        guard let transport = params["type"],
+        guard params["encryption"] == "none",
+              let transport = params["type"],
               let security = params["security"],
               let sni = params["sni"], !sni.isEmpty,
               sni.utf8.count <= 255, !sni.contains("/"),
@@ -1046,7 +1047,7 @@ final class TwinConnectMacOSNativeDirectory: NSObject, URLSessionTaskDelegate {
                   pub.range(of: "^[A-Za-z0-9_-]+$",
                             options: .regularExpression) != nil,
                   let sid = params["sid"],
-                  sid.utf8.count <= 16,
+                  !sid.isEmpty, sid.utf8.count <= 16,
                   sid.range(of: "^[A-Fa-f0-9]*$",
                             options: .regularExpression) != nil else { return nil }
             var reality: [String: Any] = [
