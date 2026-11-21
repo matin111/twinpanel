@@ -64,7 +64,7 @@ def default_route_matches(saved: dict) -> bool:
     except (ValueError, OSError, subprocess.TimeoutExpired):
         return False
     fields = dict(re.findall(
-        r"(?m)^\\s*(gateway|interface):\\s*(\\S+)\\s*$", output))
+        r"(?m)^\s*(gateway|interface):\s*(\S+)\s*$", output))
     return (fields.get("gateway") == saved.get("gateway") and
             fields.get("interface") == saved.get("interface"))
 
