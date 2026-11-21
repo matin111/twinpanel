@@ -676,6 +676,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     }
 
     deinit {
+        ciscoTunnelTask?.terminate()
         trafficTimer?.invalidate()
         NotificationCenter.default.removeObserver(self)
     }
@@ -2759,6 +2760,12 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     }
 
     @objc private func signOut(_ sender: NSButton) {
+        // Never keep a privileged Cisco session after account logout.
+        ciscoTunnelGeneration += 1
+        ciscoTunnelTask?.terminate()
+        ciscoTunnelTask = nil
+        ciscoTunnelBusy = false
+        ciscoTunnelStatus = ""
         directory.clearSavedSession()
         refreshGeneration += 1
         pingGeneration += 1
@@ -2944,8 +2951,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     // The root-owned launcher must be installed separately by an administrator.
     // Do not elevate a writable script from the user's checkout.
     private func ciscoInstalledHelper() -> String? {
-        let path = "/usr/local/libexec/twinconnect/cisco_openconnect_tunnel.py"
-        let companion = "/usr/local/libexec/twinconnect/cisco_openconnect_auth.py"
+        let path = "/Library/PrivilegedHelperTools/TwinConnectCisco/cisco_openconnect_tunnel.py"
+        let companion = "/Library/PrivilegedHelperTools/TwinConnectCisco/cisco_openconnect_auth.py"
         for candidate in [path, companion] {
             guard let attr = try? FileManager.default.attributesOfItem(atPath: candidate),
                   let owner = attr[.ownerAccountID] as? NSNumber,
