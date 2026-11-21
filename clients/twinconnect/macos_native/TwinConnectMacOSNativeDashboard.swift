@@ -1424,7 +1424,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         // in Settings, and must never masquerade as a successful VPN connection.
         let connect = button(activeProtocol == "cisco" ?
                              (ciscoTunnelBusy ? "Cisco connecting…" :
-                              (ciscoTunnelTask != nil ? "Disconnect Cisco" :
+                              (ciscoTunnelTask != nil ? "Stop Cisco process" :
                                                        "Connect Cisco")) :
                              (localProxyActive ? "ϟ    Disconnect     ›" :
                                                  "ϟ    Connect     ›"),
@@ -2239,6 +2239,15 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         if !ciscoAuthStatus.isEmpty {
             section.addArrangedSubview(text(ciscoAuthStatus, size: 11,
                                            color: muted))
+        }
+
+        // A Cisco task can survive a location change. Keep an explicit
+        // emergency stop independent of the currently selected protocol.
+        if ciscoTunnelTask != nil {
+            let stopCisco = button("■  Stop Cisco process",
+                action: #selector(requestCiscoTunnel(_:)), mutedButton: true)
+            stopCisco.heightAnchor.constraint(equalToConstant: 44).isActive = true
+            section.addArrangedSubview(stopCisco)
         }
 
         // Independent local proxy diagnostics and emergency stop.
@@ -3525,6 +3534,11 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         }
         if activeProtocol == "cisco" {
             requestCiscoTunnel(sender)
+            return
+        }
+        if ciscoTunnelTask != nil || ciscoTunnelBusy {
+            status = "Stop the Cisco process before switching transports."
+            view = build()
             return
         }
         let enabled: Set<String> = [
