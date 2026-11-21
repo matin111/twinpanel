@@ -214,7 +214,12 @@ class _MacStandaloneConnectionCardState
       if (!mounted) return;
       final reason = error is FormatException
           ? error.message : 'MAC_PROXY_CONNECTION_FAILED';
-      setState(() => _message = 'Connect failed: $reason');
+      setState(() {
+        // If the backend failed to stop during rollback, retain the
+        // Disconnect control rather than orphaning a running listener.
+        _proxyConnected = _managed?.connectedLocally ?? false;
+        _message = 'Connect failed: $reason';
+      });
     } finally {
       if (mounted) setState(() => _running = false);
     }
