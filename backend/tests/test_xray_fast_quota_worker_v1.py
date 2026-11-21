@@ -24,10 +24,10 @@ def source(path: Path) -> str:
 def test_fast_xray_worker_is_independent_and_30_second_cadence():
     runtime = source(RUNTIME)
     assert "async def _fast_xray_accounting_worker()" in runtime
-    assert "interval_seconds = 30.0" in runtime
     assert "name=\"xray-fast-accounting\"" in runtime
-    assert "_run_quota_reconcile_process(xray_only=True)" in runtime
-    assert "timeout=90 if xray_only else PROCESS_TIMEOUT_SECONDS" in runtime
+    assert '"--xray-loop"' in runtime
+    assert "process.stdout.readline(), timeout=120.0" in runtime
+    assert "await _terminate_process(process)" in runtime
 
 
 def test_fast_and_slow_processes_have_distinct_writers():
@@ -45,3 +45,11 @@ def test_collector_protocol_selection_is_explicit():
     assert "if include_xray and bool(getattr(node, \"enable_v2ray\", False)):" in collector
     assert "if include_cisco and (bool(getattr(node, \"enable_cisco\", False))" in collector
     assert "db.commit()" in collector
+
+
+def test_persistent_worker_reuses_interpreter_and_throttles_cycles():
+    script = source(PROCESS)
+    assert "async def _xray_loop()" in script
+    assert "await _main(xray_only=True)" in script
+    assert "max(3.0, 30.0 - elapsed)" in script
+    assert 'if "--xray-loop" in sys.argv[1:]:' in script
