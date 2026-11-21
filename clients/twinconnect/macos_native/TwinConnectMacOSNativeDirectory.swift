@@ -1608,6 +1608,80 @@ final class TwinConnectMacOSNativeDirectory: NSObject, URLSessionTaskDelegate {
         }
     }
 
+    // Prepare a full-TUN candidate from the current tenant's reviewed
+    // sing-box profile. This DOES NOT launch TUN or touch system networking.
+    // A separately installed, authorized and recoverable privileged helper
+    // is still required before a local Mac can use this configuration.
+    func prepareFullTUNCandidate(_ session: TwinMacNativeSession,
+                                 serverID: String, protocolCode: String,
+                                 completion: @escaping (Result<Data, Error>) -> Void) {
+        let supported: Set<String> = [
+            "hysteria2", "tuic", "anytls", "socks5", "snell",
+            "naive", "shadowtls"
+        ]
+        guard supported.contains(protocolCode) else {
+            completion(.failure(TwinMacNativeError.failure("TUN_PROTOCOL_NOT_SUPPORTED")))
+            return
+        }
+        prepareLocalSingBox(session, serverID: serverID,
+                            protocolCode: protocolCode) { result in
+            switch result {
+            case .failure(let error):
+                completion(.failure(error))
+            case .success(let proxyData):
+                guard let parsed = try? JSONSerialization.jsonObject(with: proxyData),
+                      let proxy = parsed as? [String: Any],
+                      let incoming = proxy["inbounds"] as? [[String: Any]],
+                      incoming.count == 1,
+                      incoming[0]["type"] as? String == "mixed",
+                      incoming[0]["listen"] as? String == "127.0.0.1",
+                      let outbounds = proxy["outbounds"] as? [[String: Any]],
+                      !outbounds.isEmpty,
+                      let route = proxy["route"] as? [String: Any],
+                      route.count == 1,
+                      route["final"] as? String == "proxy",
+                      proxy["dns"] == nil,
+                      proxy["experimental"] == nil,
+                      proxy["ntp"] == nil,
+                      outbounds.filter({ $0["tag"] as? String == "proxy" }).count == 1,
+                      let first = outbounds.first,
+                      first["tag"] as? String == "proxy",
+                      !outbounds.contains(where: {
+                          let kind = $0["type"] as? String
+                          return kind == "direct" || kind == "block" ||
+                                 kind == "dns"
+                      }) else {
+                    completion(.failure(TwinMacNativeError.failure("TUN_PROFILE_INVALID")))
+                    return
+                }
+                // Preserve the complete already-reviewed ShadowTLS detour
+                // and the remote credentials without exposing them to logs.
+                let config: [String: Any] = [
+                    "log": ["level": "error"],
+                    "inbounds": [[
+                        "type": "tun",
+                        "tag": "twinconnect-tun",
+                        "interface_name": "twinconnect",
+                        "address": ["172.19.0.1/30"],
+                        "auto_route": true,
+                        "auto_redirect": false,
+                        "strict_route": false,
+                        "stack": "system"
+                    ]],
+                    "outbounds": outbounds,
+                    "route": ["final": "proxy"]
+                ]
+                guard let encoded = try? JSONSerialization.data(withJSONObject: config)
+                else {
+                    completion(.failure(TwinMacNativeError.failure(
+                        "TUN_CONFIG_ENCODING_FAILED")))
+                    return
+                }
+                completion(.success(encoded))
+            }
+        }
+    }
+
     private func localHysteria2Config(_ item: [String: Any]) -> Data? {
         var value: Any? = item["outbound"] ?? item["singbox_outbound"] ?? item["config"]
         if let text = value as? String, let data = text.data(using: .utf8) {
