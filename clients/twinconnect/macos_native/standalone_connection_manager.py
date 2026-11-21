@@ -431,10 +431,10 @@ def start(protocol: str, config: Path, owner_pid: int | None = None) -> dict:
         if owner_pid is not None:
             record["owner_pid"] = owner_pid
             record["owner_started"] = owner_started
-        save_state(record)
-        # A running PID is not a usable SOCKS proxy. Wait for the listener
-        # before allowing the AppKit Connect action to probe or show success.
+        # A running PID is not a usable SOCKS proxy. Wait before publishing
+        # the state so failures cannot leave a false "running" record.
         wait_for_local_listener(proc, port)
+        save_state(record)
         if metrics_port is not None:
             # sing-box has parsed its runtime settings. Do not retain the
             # customer's Hysteria2 credentials on disk for the session.
