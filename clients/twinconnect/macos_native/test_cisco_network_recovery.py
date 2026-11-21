@@ -86,6 +86,7 @@ class CiscoRecoveryTests(unittest.TestCase):
             return ""
         with mock.patch.object(recovery.os, "geteuid", return_value=0), \
              mock.patch.object(recovery, "network_service_for_device", return_value="Ethernet"), \
+             mock.patch.object(recovery, "read_checkpoint", return_value=STATIC), \
              mock.patch.object(recovery, "command", side_effect=fake_command):
             recovery.restore()
         self.assertFalse(recovery.CHECKPOINT.exists())
@@ -108,6 +109,7 @@ class CiscoRecoveryTests(unittest.TestCase):
             return ""
         with mock.patch.object(recovery.os, "geteuid", return_value=0), \
              mock.patch.object(recovery, "network_service_for_device", return_value="Ethernet"), \
+             mock.patch.object(recovery, "read_checkpoint", return_value=STATIC), \
              mock.patch.object(recovery, "command", side_effect=fake_command) as command:
             recovery.restore()
         self.assertTrue(restored[0])
@@ -120,6 +122,8 @@ class CiscoRecoveryTests(unittest.TestCase):
         entry = dict(STATIC, mode="invalid")
         recovery.CHECKPOINT.write_text(json.dumps(entry))
         with mock.patch.object(recovery.os, "geteuid", return_value=0), \
+             mock.patch.object(recovery.os, "lstat",
+                               return_value=mock.Mock(st_uid=0, st_mode=0o100600)), \
              mock.patch.object(recovery, "command") as command:
             with self.assertRaisesRegex(ValueError, "CISCO_NETWORK_CHECKPOINT_INVALID"):
                 recovery.restore()
