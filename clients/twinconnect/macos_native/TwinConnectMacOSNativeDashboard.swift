@@ -2768,9 +2768,30 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                     return
                 }
                 switch result {
-                case .failure:
+                case .failure(let error):
                     self.cliTunCheckBusy = false
-                    self.status = "TUN preflight blocked: profile or entitlement unavailable."
+                    // Only expose stable diagnostic identifiers, never API
+                    // response bodies or profile credentials in the UI.
+                    let rawCode = error.localizedDescription
+                    let safeCode = rawCode.range(
+                        of: "^[A-Z0-9_]{3,64}$", options: .regularExpression
+                    ) != nil ? rawCode : "UNEXPECTED_PROFILE_ERROR"
+                    let hint: String
+                    switch safeCode {
+                    case "PROFILES_NOT_READY":
+                        hint = "The panel has not generated this Hysteria2 profile."
+                    case "PROTOCOL_NOT_SELECTED", "PROTOCOL_NOT_ALLOWED":
+                        hint = "Hysteria2 is not entitled for this account."
+                    case "SERVER_NOT_ALLOWED":
+                        hint = "This server is not in the current account inventory."
+                    case "HYSTERIA2_PROFILE_INVALID":
+                        hint = "The selected server profile cannot be converted to sing-box."
+                    case "NETWORK_UNAVAILABLE":
+                        hint = "The panel could not be reached."
+                    default:
+                        hint = "Check the account, server, and panel connection."
+                    }
+                    self.status = "TUN preflight blocked (" + safeCode + "): " + hint
                     self.view = self.build()
                 case .success(let profile):
                     DispatchQueue.global(qos: .userInitiated).async {
@@ -2850,11 +2871,19 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     }
 
     @objc private func copyDiagnostics(_ sender: NSButton) {
+        let hysteriaAvailable = snapshot?.protocols.contains(where: {
+            $0.code == "hysteria2" && $0.configured
+        }) == true
         let report = [
-            "TwinConnect native AppKit UI (Flutter/Metal unavailable)",
-            "VPN: unavailable — unsigned Network Extension",
+            "TwinConnect macOS diagnostics (no credentials included)",
+            "System VPN: offline — unsigned Network Extension",
             "App account: " + (accountSession == nil ? "signed out" : "signed in"),
-            "Server inventory: " + (snapshot == nil ? "not loaded" : "panel loaded")
+            "Panel: " + String(snapshot?.sectionsLoaded.count ?? 0) + "/4 sections loaded",
+            "Hysteria2 entitled/configured: " + (hysteriaAvailable ? "yes" : "no"),
+            "Protocol selected: " + (activeProtocol ?? "none"),
+            "Server selected: " + (activeServer == nil ? "no" : "yes"),
+            "TUN preflight: " + (status.contains("TUN") ? status : "not run"),
+            "Local SOCKS test: " + (localProxyStatus.isEmpty ? "not run" : localProxyStatus)
         ].joined(separator: "\n")
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(report, forType: .string)
