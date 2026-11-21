@@ -1368,6 +1368,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         case "anytls": return "AnyTLS"
         case "socks5": return "SOCKS5"
         case "snell": return "Snell"
+        case "naive": return "Naive"
+        case "shadowtls": return "ShadowTLS"
         default: return "Proxy"
         }
     }
@@ -2900,7 +2902,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     @objc private func primaryProxyAction(_ sender: NSButton) {
         guard accountSession != nil, !localProxyBusy else { return }
         guard let selected = activeProtocol,
-              ["hysteria2", "tuic", "anytls", "socks5", "snell"]
+              ["hysteria2", "tuic", "anytls", "socks5",
+               "snell", "naive", "shadowtls"]
                 .contains(selected) else {
             localProxyStatus = "Select a supported proxy protocol in Locations."
             tab = 1
@@ -2928,7 +2931,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
               let session = accountSession,
               let serverID = activeServer,
               let selected = activeProtocol,
-              ["hysteria2", "tuic", "anytls", "socks5", "snell"]
+              ["hysteria2", "tuic", "anytls", "socks5",
+               "snell", "naive", "shadowtls"]
                 .contains(selected),
               snapshot?.protocols.contains(where: {
                   $0.code == selected && $0.configured
@@ -3218,7 +3222,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             return
         }
         let enabled: Set<String> = [
-            "hysteria2", "tuic", "anytls", "socks5", "snell"
+            "hysteria2", "tuic", "anytls", "socks5",
+            "snell", "naive", "shadowtls"
         ]
         guard let selectedProtocol = activeProtocol,
               enabled.contains(selectedProtocol),
