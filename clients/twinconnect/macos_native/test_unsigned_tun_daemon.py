@@ -168,6 +168,11 @@ class TUNDaemonControlTests(unittest.TestCase):
         self.assertIn("stopFullTun()", section)
         self.assertIn("self.startVerifiedLocalProxy(", section)
 
+    def test_app_refreshes_stale_tun_state(self):
+        self.assertIn("private func refreshFullTunStatus()", DASHBOARD)
+        self.assertIn('self.runFullTunClient("status")', DASHBOARD)
+        self.assertIn('self.status = "TUN service stopped or unavailable."', DASHBOARD)
+
     def test_unverified_engine_is_not_claimed_as_vpn_connected(self):
         self.assertIn("TUN engine running; system VPN NOT verified.", DASHBOARD)
         self.assertIn('"system_vpn_verified": False', (DIR /
