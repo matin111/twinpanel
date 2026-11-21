@@ -309,14 +309,63 @@ private final class TwinNativeGlassCard: NSView {
     }
 }
 
-// Replicates the *disconnected* state of the shared Flutter
-// TwinConnectWaveIndicator. No fake activity or synthetic RX/TX animation.
+// Lightweight vector hero: visible while offline, subtly animated only
+// when the verified Hysteria2 SOCKS listener is active. It never signals VPN.
 private final class TwinNativeNetworkFabric: NSView {
-    // The Windows reference keeps the illustration blank when disconnected.
-    // This can become true only after verified signed system-tunnel activation.
-    // A successful one-shot SOCKS test must never enable the VPN animation.
-    var tunnelConnected = false
+    var proxyActive = false {
+        didSet { needsDisplay = true; updatePulse() }
+    }
+    private let halo = CAShapeLayer()
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        wantsLayer = true
+        layer?.masksToBounds = true
+        halo.fillColor = NSColor.clear.cgColor
+        halo.strokeColor = NSColor(calibratedRed: 0.35, green: 0.94,
+                                   blue: 0.84, alpha: 0.80).cgColor
+        halo.lineWidth = 1.8
+        halo.opacity = 0
+        layer?.addSublayer(halo)
+    }
+
+    required init?(coder: NSCoder) { return nil }
     override var isOpaque: Bool { false }
+
+    override func layout() {
+        super.layout()
+        halo.frame = bounds
+        let radius = min(bounds.height * 0.35, 54)
+        halo.path = CGPath(ellipseIn: CGRect(
+            x: bounds.midX - radius, y: bounds.midY - radius,
+            width: radius * 2, height: radius * 2), transform: nil)
+    }
+
+    private func updatePulse() {
+        halo.removeAllAnimations()
+        halo.opacity = proxyActive ? 0.62 : 0
+        guard proxyActive,
+              !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else { return }
+        // Two Core Animation properties only: no high-frequency AppKit redraw
+        // or artificial download/upload animation on the cloud Mac.
+        let breathe = CABasicAnimation(keyPath: "transform.scale")
+        breathe.fromValue = 0.88
+        breathe.toValue = 1.22
+        breathe.duration = 3.4
+        breathe.autoreverses = true
+        breathe.repeatCount = .infinity
+        breathe.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        halo.add(breathe, forKey: "networkPulse")
+        let shimmer = CABasicAnimation(keyPath: "opacity")
+        shimmer.fromValue = 0.24
+        shimmer.toValue = 0.73
+        shimmer.duration = 3.4
+        shimmer.autoreverses = true
+        shimmer.repeatCount = .infinity
+        shimmer.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        halo.add(shimmer, forKey: "networkGlow")
+    }
+
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
         let rect = bounds.insetBy(dx: 1.5, dy: 1.5)
@@ -326,69 +375,58 @@ private final class TwinNativeNetworkFabric: NSView {
             NSColor(calibratedRed: 0.09, green: 0.208, blue: 0.263, alpha: 1),
             NSColor(calibratedRed: 0.067, green: 0.149, blue: 0.196, alpha: 1)
         ])?.draw(in: outline, angle: -40)
-        outline.lineWidth = 1
         NSColor(calibratedRed: 0.54, green: 0.82, blue: 0.84,
-                alpha: 0.28).setStroke()
+                alpha: 0.26).setStroke()
+        outline.lineWidth = 1
         outline.stroke()
-        guard tunnelConnected else { return }
-        // Retina vector network strands modeled after the Windows dashboard.
-        // Purely decorative; the actual VPN status is never inferred from them.
+
         let cx = rect.midX
         let cy = rect.midY
-        let center = CGPoint(x: cx, y: cy)
-        for radius in [CGFloat(24), 40, 63] {
+        let accent = NSColor(calibratedRed: 0.30, green: 0.90,
+                             blue: 0.83, alpha: 1)
+        for radius in [CGFloat(25), 44, 64] {
             let ring = NSBezierPath(ovalIn: NSRect(
                 x: cx - radius, y: cy - radius,
                 width: radius * 2, height: radius * 2))
-            NSColor(calibratedRed: 0.30, green: 0.82, blue: 0.83,
-                    alpha: 0.10).setStroke()
+            accent.withAlphaComponent(proxyActive ? 0.25 : 0.11).setStroke()
             ring.lineWidth = 1
             ring.stroke()
         }
-        for index in 0..<17 {
-            let t = CGFloat(index) / 16
-            let spread = (t - 0.5) * min(rect.height * 0.66, 105)
+        // A clean bilateral network drawing, not an empty dark rectangle.
+        for index in 0..<13 {
+            let t = CGFloat(index) / 12
+            let spread = (t - 0.5) * rect.height * 0.70
             for side in [CGFloat(-1), CGFloat(1)] {
-                let path = NSBezierPath()
-                let edgeX = cx + side * rect.width * 0.43
-                path.move(to: CGPoint(x: cx + side * 13, y: cy + spread * 0.13))
-                path.curve(to: CGPoint(x: edgeX, y: cy + spread),
-                           controlPoint1: CGPoint(x: cx + side * rect.width * 0.20,
-                                                  y: cy + spread * 0.25),
-                           controlPoint2: CGPoint(x: cx + side * rect.width * 0.31,
-                                                  y: cy + spread * 0.92))
-                path.lineWidth = index.isMultiple(of: 4) ? 1.35 : 0.65
-                NSColor(calibratedRed: 0.24, green: 0.88, blue: 0.83,
-                        alpha: index.isMultiple(of: 4) ? 0.63 : 0.27).setStroke()
-                path.stroke()
+                let strand = NSBezierPath()
+                let x = cx + side * rect.width * 0.42
+                strand.move(to: CGPoint(x: cx + side * 16, y: cy + spread * 0.11))
+                strand.curve(to: CGPoint(x: x, y: cy + spread),
+                             controlPoint1: CGPoint(x: cx + side * rect.width * 0.19,
+                                                    y: cy + spread * 0.30),
+                             controlPoint2: CGPoint(x: cx + side * rect.width * 0.33,
+                                                    y: cy + spread * 0.90))
+                strand.lineWidth = index.isMultiple(of: 3) ? 1.15 : 0.65
+                accent.withAlphaComponent(
+                    proxyActive ? (index.isMultiple(of: 3) ? 0.75 : 0.40) :
+                                  (index.isMultiple(of: 3) ? 0.32 : 0.16)
+                ).setStroke()
+                strand.stroke()
             }
         }
-        for (x, y, radius) in [
-            (-0.41, 0.00, 3.8), (-0.31, 0.12, 2.9), (-0.19, -0.12, 2.3),
-            (0.19, 0.08, 2.6), (0.31, -0.16, 2.7), (0.41, 0.00, 3.8)
-        ] {
-            let dot = NSBezierPath(ovalIn: NSRect(
-                x: cx + CGFloat(x) * rect.width - CGFloat(radius),
-                y: cy + CGFloat(y) * rect.height - CGFloat(radius),
-                width: CGFloat(radius) * 2, height: CGFloat(radius) * 2))
-            NSColor(calibratedRed: 0.35, green: 0.96, blue: 0.84,
-                    alpha: 0.90).setFill()
-            dot.fill()
-        }
-        let centerBody = NSBezierPath(roundedRect: NSRect(
-            x: center.x - 19, y: center.y - 25, width: 38, height: 50),
+        let hub = NSBezierPath(roundedRect: NSRect(
+            x: cx - 21, y: cy - 24, width: 42, height: 48),
             xRadius: 13, yRadius: 13)
         NSColor(calibratedRed: 0.04, green: 0.20, blue: 0.25, alpha: 1).setFill()
-        centerBody.fill()
-        centerBody.lineWidth = 1.6
-        NSColor(calibratedRed: 0.34, green: 0.94, blue: 0.82, alpha: 0.87).setStroke()
-        centerBody.stroke()
-        for delta in [-8.0, 0.0, 8.0] {
-            let dash = NSBezierPath()
-            dash.move(to: CGPoint(x: cx - 8, y: cy + CGFloat(delta)))
-            dash.line(to: CGPoint(x: cx + 8, y: cy + CGFloat(delta)))
-            dash.lineWidth = 1.25
-            dash.stroke()
+        hub.fill()
+        accent.withAlphaComponent(proxyActive ? 0.96 : 0.59).setStroke()
+        hub.lineWidth = 1.7
+        hub.stroke()
+        for offset in [-9.0, 0.0, 9.0] {
+            let segment = NSBezierPath()
+            segment.move(to: CGPoint(x: cx - 9, y: cy + CGFloat(offset)))
+            segment.line(to: CGPoint(x: cx + 9, y: cy + CGFloat(offset)))
+            segment.lineWidth = 1.3
+            segment.stroke()
         }
     }
 }
@@ -1189,6 +1227,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         let fabric = TwinNativeNetworkFabric(frame:
             NSRect(x: 0, y: 0, width: 330, height: 165))
         fabric.translatesAutoresizingMaskIntoConstraints = false
+        fabric.proxyActive = localProxyActive
         fabric.heightAnchor.constraint(equalToConstant: 162).isActive = true
         // The old backdrop was an empty rectangle. This status overlay is
         // explicitly a selectable local proxy test, not a connected VPN.
