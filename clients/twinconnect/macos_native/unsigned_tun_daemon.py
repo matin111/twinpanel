@@ -166,7 +166,7 @@ class Session:
                     start_new_session=True)
                 self.watchdog = watcher
                 ready, _, _ = select.select([watcher.stdout], [], [], 3.0)
-                if not ready or watcher.stdout.readline() != b"WATCHDOG_READY\\n":
+                if not ready or watcher.stdout.readline() != b"WATCHDOG_READY\n":
                     self.cleanup()
                     raise ValueError("TUN_WATCHDOG_START_FAILED")
                 watcher.stdout.close()
