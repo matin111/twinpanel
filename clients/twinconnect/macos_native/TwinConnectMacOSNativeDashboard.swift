@@ -532,6 +532,10 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     private weak var uploadSpeedText: NSTextField?
     private weak var downloadedTotalText: NSTextField?
     private weak var uploadedTotalText: NSTextField?
+    private weak var downloadChart: TwinNativeTrafficSparkline?
+    private weak var uploadChart: TwinNativeTrafficSparkline?
+    private var downloadHistory = [Double]()
+    private var uploadHistory = [Double]()
     private weak var proxyUptimeText: NSTextField?
     private var cliTunCheckBusy = false
     private weak var usernameField: NSTextField?
@@ -1421,15 +1425,15 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             if title == "Upload" { uploadedTotalText = subtitleText }
         }
         if title == "Download" || title == "Upload" {
-            // A neutral divider represents unavailable traffic while offline,
-            // never a fabricated chart or session throughput.
-            let idleLine = NSView()
-            idleLine.translatesAutoresizingMaskIntoConstraints = false
-            idleLine.wantsLayer = true
-            idleLine.layer?.backgroundColor = sea.withAlphaComponent(0.28).cgColor
-            idleLine.heightAnchor.constraint(equalToConstant: 1).isActive = true
-            content.addArrangedSubview(idleLine)
-            idleLine.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
+            let chart = TwinNativeTrafficSparkline()
+            chart.translatesAutoresizingMaskIntoConstraints = false
+            chart.accent = tint().blended(withFraction: 0.38, of: .green) ?? tint()
+            chart.samples = title == "Download" ? downloadHistory : uploadHistory
+            chart.heightAnchor.constraint(equalToConstant: 28).isActive = true
+            content.addArrangedSubview(chart)
+            chart.widthAnchor.constraint(equalTo: content.widthAnchor).isActive = true
+            if title == "Download" { downloadChart = chart }
+            if title == "Upload" { uploadChart = chart }
         }
         let panel = card([content], radius: 17, padding: 14, style: .metric)
         panel.heightAnchor.constraint(greaterThanOrEqualToConstant: 126)
@@ -2957,6 +2961,10 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         uploadSpeed = "—"
         downloadedTotal = "—"
         uploadedTotal = "—"
+        downloadHistory.removeAll()
+        uploadHistory.removeAll()
+        downloadChart?.samples = []
+        uploadChart?.samples = []
         downloadSpeedText?.stringValue = "—"
         uploadSpeedText?.stringValue = "—"
         downloadedTotalText?.stringValue = ""
@@ -3026,10 +3034,20 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                 if let previous = self.lastTraffic,
                    down >= previous.download, up >= previous.upload {
                     let seconds = max(now.timeIntervalSince(previous.at), 0.25)
-                    self.downloadSpeed = self.transferRate(
-                        Double(down - previous.download) / seconds)
-                    self.uploadSpeed = self.transferRate(
-                        Double(up - previous.upload) / seconds)
+                    let downRate = Double(down - previous.download) / seconds
+                    let upRate = Double(up - previous.upload) / seconds
+                    self.downloadSpeed = self.transferRate(downRate)
+                    self.uploadSpeed = self.transferRate(upRate)
+                    self.downloadHistory.append(downRate)
+                    self.uploadHistory.append(upRate)
+                    if self.downloadHistory.count > 36 {
+                        self.downloadHistory.removeFirst()
+                    }
+                    if self.uploadHistory.count > 36 {
+                        self.uploadHistory.removeFirst()
+                    }
+                    self.downloadChart?.samples = self.downloadHistory
+                    self.uploadChart?.samples = self.uploadHistory
                 } else {
                     self.downloadSpeed = "—"
                     self.uploadSpeed = "—"
