@@ -63,7 +63,29 @@ class NativeSessionRestoreTests(unittest.TestCase):
         self.assertIn("stopVerifiedLocalProxy()", handler)
         self.assertNotIn("setGlobalProxy", handler)
         self.assertNotIn("startVPNTunnel", handler)
-        self.assertIn("No system VPN was running.", dashboard)
+        self.assertIn('self.localProxyStatus = "Disconnected."', dashboard)
+
+    def test_animation_and_real_traffic_metrics_are_proxy_scoped(self):
+        dashboard = DASHBOARD.read_text(encoding="utf-8")
+        hero = dashboard.split("private final class TwinNativeNetworkFabric", 1)[1].split(
+            "class TwinConnectMacOSNativeDashboard", 1)[0]
+        self.assertIn("private let halo = CAShapeLayer()", hero)
+        self.assertIn("CABasicAnimation", hero)
+        self.assertIn("accessibilityDisplayShouldReduceMotion", hero)
+        self.assertIn("fabric.proxyActive = localProxyActive", dashboard)
+        self.assertIn('runLocalManager(["traffic"], root: root)', dashboard)
+        self.assertIn("private func refreshTrafficMetrics()", dashboard)
+        self.assertIn("downloadedTotalText?.stringValue", dashboard)
+        self.assertIn("downloadSpeedText?.stringValue", dashboard)
+        self.assertIn("self.trafficPollBusy = false", dashboard)
+        self.assertIn("localProxyGeneration == generation", dashboard)
+        self.assertNotIn("Local SOCKS proxy active (not VPN)", dashboard)
+        self.assertNotIn("ICMP has not been measured", dashboard)
+        self.assertIn('"◉  Proxy active"', dashboard)
+        self.assertIn('"ϟ    Connect     ›"', dashboard)
+        monitor = dashboard.split("private func refreshTrafficMetrics()", 1)[1].split(
+            "private func runLocalManager(", 1)[0]
+        self.assertNotIn("self.view = self.build()", monitor)
 
 
 if __name__ == "__main__":
