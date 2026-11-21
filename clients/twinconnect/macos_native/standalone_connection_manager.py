@@ -145,6 +145,43 @@ def record_attempt(protocol: str, reason: str) -> dict:
     return record
 
 
+def log_age_bucket(path: Path) -> str:
+    """Coarse diagnostic freshness; never returns raw log content."""
+    try:
+        if path.is_symlink():
+            return "unsafe"
+        age = max(0.0, time.time() - path.stat().st_mtime)
+    except OSError:
+        return "missing"
+    if age < 60:
+        return "less_than_minute"
+    if age < 600:
+        return "one_to_ten_minutes"
+    if age < 3600:
+        return "ten_to_sixty_minutes"
+    return "older_than_hour"
+
+
+def diagnose() -> dict:
+    """Distinguish absent/empty/stale startup logs without disclosing them."""
+    path = STATE / "engine.log"
+    reason = engine_failure_category()
+    if path.is_symlink():
+        log_state = "unsafe_symlink"
+    else:
+        try:
+            log_state = "empty" if path.stat().st_size == 0 else "nonempty"
+        except OSError:
+            log_state = "missing_or_unreadable"
+    return {
+        "state": "diagnosis",
+        "reason": reason,
+        "engine_log_state": log_state,
+        "engine_log_age": log_age_bucket(path),
+        "last_attempt_age": log_age_bucket(attempt_path()),
+    }
+
+
 def last_attempt() -> dict:
     import re
     path = attempt_path()
@@ -165,7 +202,8 @@ def last_attempt() -> dict:
     if protocol not in PROTOCOLS or not isinstance(reason, str) or not re.fullmatch(
             r"[A-Z][A-Z0-9_]{2,63}", reason):
         fail("INVALID_ATTEMPT_RECORD")
-    return {"state": "last_attempt", "protocol": protocol, "reason": reason}
+    return {"state": "last_attempt", "protocol": protocol, "reason": reason,
+            "age": log_age_bucket(path)}
 
 
 def measured_runtime_config(protocol: str, source: Path) -> tuple[Path, int | None, str | None]:
@@ -344,14 +382,23 @@ def start(protocol: str, config: Path, owner_pid: int | None = None) -> dict:
                 start_new_session=True, close_fds=True
             )
         time.sleep(0.6)
-        if proc.poll() is not None:
-            # Engine logs for this attempt were truncated before launch.
-            # Classify before discarding the temporary config; never return
-            # its log text because it can contain subscription credentials.
+        exit_code = proc.poll()
+        if exit_code is not None:
+            # An immediate native crash can occur before any log is written.
+            # Only return fixed identifiers, never credentials or log lines.
             category = engine_failure_category()
-            fail(category if category not in (
-                "ENGINE_LOG_UNAVAILABLE", "ENGINE_FAILURE_NOT_CLASSIFIED"
-            ) else "ENGINE_EXITED_EARLY_CHECK_LOCAL_LOG")
+            if category in ("ENGINE_LOG_UNAVAILABLE",
+                            "ENGINE_FAILURE_NOT_CLASSIFIED"):
+                try:
+                    wrote_log = logpath.stat().st_size > 0
+                except OSError:
+                    wrote_log = False
+                category = ("ENGINE_EXITED_WITHOUT_LOG"
+                            if not wrote_log else
+                            "ENGINE_STARTUP_LOG_UNRECOGNIZED")
+                if exit_code < 0:
+                    category = "ENGINE_TERMINATED_BY_SIGNAL"
+            fail(category)
         record = {"protocol": protocol, "pid": proc.pid, "port": port,
                   "mode": "local_proxy_only", "config": str(runtime),
                   "executable": str(exe)}
@@ -439,6 +486,11 @@ def engine_failure_category() -> str:
     # known fixed phrases and return a fixed code, never any user data.
     for needle, code in (
         ("cronet: library not found", "NAIVE_CRONET_LIBRARY_MISSING"),
+        ("library not loaded:", "ENGINE_NATIVE_LIBRARY_NOT_LOADED"),
+        ("dyld: library", "ENGINE_NATIVE_LIBRARY_NOT_LOADED"),
+        ("symbol not found:", "ENGINE_NATIVE_SYMBOL_NOT_FOUND"),
+        ("bad cpu type in executable", "ENGINE_CPU_ARCHITECTURE_MISMATCH"),
+        ("illegal instruction", "ENGINE_CPU_INSTRUCTION_UNSUPPORTED"),
         ("libcronet.dylib", "NAIVE_CRONET_LIBRARY_MISSING"),
         ("libcronet.so", "NAIVE_CRONET_LIBRARY_MISSING"),
         ("libcronet.dll", "NAIVE_CRONET_LIBRARY_MISSING"),
@@ -622,7 +674,7 @@ def main() -> int:
         result = (list_protocols() if args.action == "list" else
                   status() if args.action == "status" else
                   traffic() if args.action == "traffic" else
-                  {"state": "diagnosis", "reason": engine_failure_category()} if args.action == "diagnose" else
+                  diagnose() if args.action == "diagnose" else
                   last_attempt() if args.action == "last-attempt" else
                   record_attempt(args.protocol, args.reason)
                       if args.action == "record-attempt" else
