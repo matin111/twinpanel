@@ -3182,7 +3182,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     }
 
     // Unsigned macOS cannot start the Network Extension. The primary button
-    // may start a real, verified Hysteria2 SOCKS listener on loopback only.
+    // may start a real, verified sing-box SOCKS listener on loopback only.
     // Never change the Mac's routes, DNS, or system proxy on a remote VPS.
     // Do not label a SOCKS listener as a connected system VPN.
     @objc private func requestVPNConnection(_ sender: NSButton) {
@@ -3191,24 +3191,29 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             stopVerifiedLocalProxy()
             return
         }
-        guard activeProtocol == "hysteria2",
+        let enabled: Set<String> = [
+            "hysteria2", "tuic", "anytls", "socks5", "snell"
+        ]
+        guard let selectedProtocol = activeProtocol,
+              enabled.contains(selectedProtocol),
               let serverID = activeServer,
               let session = accountSession,
               snapshot?.protocols.contains(where: {
-                  $0.code == "hysteria2" && $0.configured
+                  $0.code == selectedProtocol && $0.configured
               }) == true else {
             status = activeProtocol == nil || activeServer == nil ?
-                "Connection unavailable: select Hysteria2 and an entitled server in Locations." :
-                "Connection unavailable: unsigned macOS supports a verified Hysteria2 SOCKS proxy only, not a system VPN."
+                "Connection unavailable: select a server and protocol in Locations." :
+                "Connection unavailable: this protocol needs a supported, entitled proxy profile."
             view = build()
             return
         }
         localProxyBusy = true
         localProxyGeneration += 1
         let generation = localProxyGeneration
-        status = "Local proxy: fetching authorized Hysteria2 profile…"
+        status = "Checking authorized " + selectedProtocol + " profile…"
         view = build()
-        directory.prepareLocalHysteria2(session, serverID: serverID) {
+        directory.prepareLocalSingBox(
+            session, serverID: serverID, protocolCode: selectedProtocol) {
             [weak self] response in
             guard let self = self,
                   self.localProxyGeneration == generation,
@@ -3223,10 +3228,11 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                     reason : "PROFILE_REQUEST_FAILED")
                 self.view = self.build()
             case .success(let profile):
-                self.status = "Local proxy: verifying outgoing Hysteria2 HTTPS…"
+                self.status = "Verifying " + selectedProtocol + " HTTPS exit…"
                 self.view = self.build()
                 DispatchQueue.global(qos: .userInitiated).async {
-                    let outcome = self.startVerifiedLocalProxy(profile)
+                    let outcome = self.startVerifiedLocalProxy(
+                        profile, protocolCode: selectedProtocol)
                     DispatchQueue.main.async { [weak self] in
                         guard let self = self else { return }
                         // A session change means this engine cannot be retained
@@ -3270,7 +3276,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     /// An actual remote HTTPS request must succeed before proxy mode becomes
     /// active. The verified listener remains running until Disconnect, logout,
     /// or the owner-process watchdog stops it; no system traffic is rerouted.
-    private func startVerifiedLocalProxy(_ config: Data)
+    private func startVerifiedLocalProxy(_ config: Data,
+                                         protocolCode: String = "hysteria2")
         -> (Bool, String, String?) {
         let root = NSHomeDirectory() + "/twinpanel/clients/twinconnect"
         let folder = FileManager.default.temporaryDirectory
@@ -3290,7 +3297,7 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
             return (false, "Local proxy could not prepare its profile.", nil)
         }
         let started = runLocalManager([
-            "start", "hysteria2", profile.path, "--owner-pid",
+            "start", protocolCode, profile.path, "--owner-pid",
             String(ProcessInfo.processInfo.processIdentifier)
         ], root: root)
         guard started.0 == 0 else {
@@ -3305,8 +3312,8 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
            result["state"] as? String == "proxy_egress_reachable",
            let exitIP = result["egress_ip"] as? String,
            TwinMacNativePing.validatedPublicIP(exitIP) != nil {
-            return (true, "Local proxy verified: " + exitIP +
-                " — SOCKS 127.0.0.1:17089 (not a system VPN)", exitIP)
+            return (true, protocolCode.uppercased() + " proxy verified: " +
+                exitIP + " — SOCKS 127.0.0.1:17089", exitIP)
         }
         let diagnosis = runLocalManager(["diagnose"], root: root)
         let why = safeManagerReason(tested.2)
