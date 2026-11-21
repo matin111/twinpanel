@@ -80,7 +80,7 @@ class NativeSessionRestoreTests(unittest.TestCase):
         self.assertIn("self.trafficPollBusy = false", dashboard)
         self.assertIn("localProxyGeneration == generation", dashboard)
         self.assertNotIn("Local SOCKS proxy active (not VPN)", dashboard)
-        self.assertNotIn("ICMP has not been measured", dashboard)
+        self.assertNotIn("subtitle: pingDetails(selected)", dashboard)
         self.assertIn('"◉  Proxy active"', dashboard)
         self.assertIn('"ϟ    Connect     ›"', dashboard)
         monitor = dashboard.split("private func refreshTrafficMetrics()", 1)[1].split(
