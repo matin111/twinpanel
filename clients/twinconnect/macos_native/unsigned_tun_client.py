@@ -38,10 +38,9 @@ def query(action: str, config: object = None,
         info = socket_path.lstat()
     except OSError:
         raise ValueError("TUN_SERVICE_UNAVAILABLE") from None
-    # Never send VPN credentials to a user's fake socket. The trusted local
-    # service binds /var/run with root ownership and validates peer UID.
-    if (not stat.S_ISSOCK(info.st_mode) or info.st_uid != 0 or
-            info.st_mode & 0o022):
+    # Only the fixed root-owned service socket is accepted. It is mode 0666;
+    # the daemon authenticates the console user using getpeereid.
+    if not stat.S_ISSOCK(info.st_mode) or info.st_uid != 0:
         raise ValueError("TUN_SERVICE_UNTRUSTED")
     data = encode_request(action, config)
     with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as client:
