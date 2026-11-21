@@ -35,6 +35,66 @@ def trusted_script(path: str) -> bool:
             stat.S_ISDIR(parent.st_mode) and parent.st_uid == 0 and
             not parent.st_mode & 0o022 and
             bool(st.st_mode & 0o100))
+def trusted_root_owned_path(path: str) -> bool:
+    """Check real file and every parent against modification by non-root users."""
+    import stat
+    if not os.path.isabs(path):
+        return False
+    real = os.path.realpath(path)
+    cursor = real
+    try:
+        while True:
+            info = os.lstat(cursor)
+            if info.st_uid != 0 or info.st_mode & 0o022:
+                return False
+            if cursor == real and not stat.S_ISREG(info.st_mode):
+                return False
+            if cursor != real and not stat.S_ISDIR(info.st_mode):
+                return False
+            parent = os.path.dirname(cursor)
+            if cursor == parent:
+                return True
+            cursor = parent
+    except OSError:
+        return False
+
+
+def trusted_openconnect_dependencies(executable: str) -> bool:
+    """Refuse elevated Homebrew dylibs, including indirect dependencies.
+
+    This is an admission check, not an installer or a claim that arbitrary
+    plugins loaded at runtime are safe. Distribution requires a signed bundle.
+    """
+    pending = [executable]
+    visited = set()
+    while pending:
+        current = pending.pop()
+        if current in visited:
+            continue
+        visited.add(current)
+        if len(visited) > 128 or not trusted_root_owned_path(current):
+            return False
+        try:
+            output = subprocess.run(
+                ["/usr/bin/otool", "-L", current], capture_output=True,
+                text=True, timeout=8, check=False)
+        except (OSError, subprocess.TimeoutExpired):
+            return False
+        if output.returncode:
+            return False
+        for line in output.stdout.splitlines()[1:]:
+            dependency = line.strip().split(" (", 1)[0]
+            if not dependency:
+                continue
+            if dependency.startswith(("/usr/lib/", "/System/Library/")):
+                continue
+            if not dependency.startswith("/"):
+                # Reject @rpath, @loader_path and unresolved references.
+                return False
+            pending.append(dependency)
+    return True
+
+
 ROUTE = "/sbin/route"
 ROUTE_GET = re.compile(r"^\s*(gateway|interface):\s*(\S+)\s*$", re.M)
 
@@ -73,6 +133,8 @@ def run(profile: dict, management_ip: str) -> int:
     exe = binary()
     if exe is None or not trusted_script(SCRIPT):
         raise ValueError("CISCO_TRUSTED_VPN_SCRIPT_REQUIRED")
+    if not trusted_openconnect_dependencies(exe):
+        raise ValueError("CISCO_UNTRUSTED_OPENCONNECT_DEPENDENCIES")
     script = SCRIPT
     # Console trial is explicitly provisioned by the administrator.
     # Automatically stop after two minutes, even if the app disappears.
