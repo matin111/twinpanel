@@ -7,7 +7,14 @@ version="26.11.9"
 base="https://github.com/XTLS/Xray-core/releases/download/v${version}"
 dest="$root/macos_native/build/xray"
 mkdir -p "$dest"
-for arch in arm64 amd64; do
+# Only install the architecture of this Mac; attempting arm64 on Intel
+# cloud Macs makes an otherwise successful verification fail.
+case "$(uname -m)" in
+  x86_64) arch="amd64" ;;
+  arm64) arch="arm64" ;;
+  *) echo "Unsupported macOS CPU architecture" >&2; exit 1 ;;
+esac
+for arch in "$arch"; do
   case "$arch" in
     arm64)
       archive_name="Xray-macos-arm64-v8a.zip"
@@ -27,4 +34,4 @@ for arch in arm64 amd64; do
   chmod +x "$dest/$arch/xray"
   file "$dest/$arch/xray"
 done
-"$dest/arm64/xray" version
+"$dest/$arch/xray" version
