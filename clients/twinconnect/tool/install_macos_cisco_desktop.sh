@@ -20,7 +20,7 @@ done
 for path in "/usr/local/bin/openconnect" "/opt/homebrew/bin/openconnect"; do
   if [[ -x "$path" ]]; then found=1; break; fi
 done
-if [[ "${found:-}" != 1 || ! -f /usr/local/etc/vpnc/vpnc-script ]]; then
+if [[ "${found:-}" != 1 ]] || { [[ ! -f /usr/local/etc/vpnc/vpnc-script ]] && [[ ! -f /opt/homebrew/etc/vpnc/vpnc-script ]]; }; then
   echo "CISCO_ENGINE_REQUIREMENTS_MISSING: install OpenConnect and vpnc-script first." >&2
   exit 1
 fi
