@@ -589,6 +589,10 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     private let proxyAttemptQueue = DispatchQueue(
         label: "com.twinconnect.macos.proxy-attempt", qos: .utility)
     private var localProxyActive = false
+    // Experimental, separately installed root-owned local-console TUN service.
+    // Never label engine start as verified system VPN.
+    private var fullTunActive = false
+    private var fullTunBusy = false
     // This is set only after a successful HTTPS probe and is independent
     // of the protocol currently highlighted in the location picker.
     private var verifiedProxyProtocol: String?
@@ -1429,13 +1433,15 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         // in Settings, and must never masquerade as a successful VPN connection.
         let connect = button(activeProtocol == "cisco" ?
                              (ciscoTunnelTask != nil ? "Disconnect" : "Connect") :
-                             (localProxyActive ? "Disconnect" : "Connect"),
+                             (localProxyActive || fullTunActive ? "Disconnect" : "Connect"),
                              action: #selector(requestVPNConnection(_:)), primary: true)
-        connect.isEnabled = accountSession != nil && !localProxyBusy &&
+        connect.isEnabled = accountSession != nil && !localProxyBusy && !fullTunBusy &&
             (activeProtocol != "cisco" || ciscoTunnelTask != nil)
         connect.toolTip = activeProtocol == "cisco" ?
             "Disabled after macOS network configuration loss; network recovery must be verified first." :
-            "Unsigned macOS: local SOCKS proxy only; no system VPN."
+            (fullTunActive ? "TUN engine started; network egress NOT verified." :
+                (fullTunServicePresent() ? "Experimental local-console TUN service." :
+                    "Unsigned macOS: local SOCKS proxy only; no system VPN."))
         connect.heightAnchor.constraint(equalToConstant: 54).isActive = true
         connect.layer?.cornerRadius = 17
         if localProxyActive {
@@ -3558,6 +3564,121 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
         return NSHomeDirectory() + "/twinpanel/clients/twinconnect"
     }
 
+    // This is a socket presence check only. The daemon performs peer-UID
+    // authorization and root-owned profile checks independently.
+    private func fullTunServicePresent() -> Bool {
+        let socket = "/var/run/twinconnect-tun.sock"
+        guard let attributes = try? FileManager.default.attributesOfItem(
+            atPath: socket) else { return false }
+        return attributes[.type] as? FileAttributeType == .typeSocket
+    }
+
+    private func runFullTunClient(_ action: String, profile: Data? = nil)
+        -> (Int32, String) {
+        let script = localRuntimeRoot() +
+            "/macos_native/unsigned_tun_client.py"
+        guard FileManager.default.isReadableFile(atPath: script) else {
+            return (1, "")
+        }
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/bin/python3")
+        task.arguments = [script, action]
+        let out = Pipe()
+        task.standardOutput = out
+        task.standardError = Pipe()
+        if let profile = profile {
+            let input = Pipe()
+            task.standardInput = input
+            do {
+                try task.run()
+                input.fileHandleForWriting.write(profile)
+                input.fileHandleForWriting.closeFile()
+            } catch { return (1, "") }
+        } else {
+            task.standardInput = FileHandle.nullDevice
+            do { try task.run() } catch { return (1, "") }
+        }
+        task.waitUntilExit()
+        let output = out.fileHandleForReading.readDataToEndOfFile()
+        return (task.terminationStatus,
+                String(data: output, encoding: .utf8) ?? "")
+    }
+
+    private func tunResponseIs(_ raw: String, state: String) -> Bool {
+        guard let data = raw.data(using: .utf8),
+              let response = (try? JSONSerialization.jsonObject(with: data))
+                  as? [String: Any] else { return false }
+        return response["state"] as? String == state &&
+               response["system_vpn_verified"] as? Bool == false
+    }
+
+    private func startFullTun(_ session: TwinMacNativeSession,
+                              serverID: String, protocolCode: String) {
+        fullTunBusy = true
+        localProxyGeneration += 1
+        let generation = localProxyGeneration
+        status = "Authorizing local TUN profile…"
+        view = build()
+        directory.prepareFullTUNCandidate(
+            session, serverID: serverID, protocolCode: protocolCode) {
+            [weak self] result in
+            guard let self = self else { return }
+            switch result {
+            case .failure:
+                self.fullTunBusy = false
+                self.status = "TUN profile unavailable; no network changes."
+                self.view = self.build()
+            case .success(let profile):
+                self.status = "Starting local-console TUN engine…"
+                self.view = self.build()
+                DispatchQueue.global(qos: .userInitiated).async {
+                    let response = self.runFullTunClient("start", profile: profile)
+                    DispatchQueue.main.async { [weak self] in
+                        guard let self = self else { return }
+                        self.fullTunBusy = false
+                        guard generation == self.localProxyGeneration,
+                              self.accountSession?.accessToken == session.accessToken else {
+                            DispatchQueue.global(qos: .utility).async {
+                                _ = self.runFullTunClient("stop")
+                            }
+                            return
+                        }
+                        self.fullTunActive = response.0 == 0 &&
+                            self.tunResponseIs(response.1,
+                                               state: "engine_running_unverified")
+                        self.status = self.fullTunActive ?
+                            "TUN engine running; system VPN NOT verified." :
+                            "TUN start rejected; no connection confirmed."
+                        self.view = self.build()
+                    }
+                }
+            }
+        }
+    }
+
+    private func stopFullTun() {
+        guard !fullTunBusy else { return }
+        fullTunBusy = true
+        status = "Stopping local TUN engine…"
+        view = build()
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard let self = self else { return }
+            let response = self.runFullTunClient("stop")
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                self.fullTunBusy = false
+                if response.0 == 0 &&
+                   self.tunResponseIs(response.1, state: "stopped") {
+                    self.fullTunActive = false
+                    self.status = "TUN stopped."
+                } else {
+                    self.status = "TUN stop unverified; check local service."
+                }
+                self.view = self.build()
+            }
+        }
+    }
+
     private func runLocalManager(_ args: [String], root: String)
         -> (Int32, String, String) {
         let program = Process()
@@ -3587,7 +3708,11 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
     // Never change the Mac's routes, DNS, or system proxy on a remote VPS.
     // Do not label a SOCKS listener as a connected system VPN.
     @objc private func requestVPNConnection(_ sender: NSButton) {
-        guard accountSession != nil, !localProxyBusy else { return }
+        guard accountSession != nil, !localProxyBusy, !fullTunBusy else { return }
+        if fullTunActive {
+            stopFullTun()
+            return
+        }
         if localProxyActive {
             stopVerifiedLocalProxy()
             return
@@ -3620,6 +3745,12 @@ class TwinConnectMacOSNativeDashboard: NSViewController, NSTableViewDataSource,
                 recordProxyAttempt(code, "SELECTION_NOT_READY")
             }
             view = build()
+            return
+        }
+        // An installed root-owned daemon is opt-in on a recoverable local Mac.
+        // On remote VPS or without that daemon the existing proxy path remains.
+        if fullTunServicePresent() && selectedProtocol != "v2ray" {
+            startFullTun(session, serverID: serverID, protocolCode: selectedProtocol)
             return
         }
         localProxyBusy = true
