@@ -105,6 +105,43 @@ class TUNDaemonControlTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "TUN_SERVICE_UNTRUSTED"):
                 client.query("start", {"outbounds": []}, socket_path=fake)
 
+    def test_route_observer_reports_utun_without_claiming_egress(self):
+        response = mock.Mock(returncode=0, stdout=(
+            "   route to: 1.1.1.1\\n"
+            "interface: utun5\\n"))
+        with mock.patch.object(server.platform, "system", return_value="Darwin"), \
+             mock.patch.object(server.subprocess, "run", return_value=response):
+            self.assertEqual(
+                server.observe_route()["route_state"],
+                "utun_route_observed_unverified")
+
+    def test_route_observer_distinguishes_direct_egress(self):
+        response = mock.Mock(returncode=0, stdout="interface: en0\\n")
+        with mock.patch.object(server.platform, "system", return_value="Darwin"), \
+             mock.patch.object(server.subprocess, "run", return_value=response):
+            self.assertEqual(server.observe_route()["route_state"],
+                             "not_utun_route")
+
+    def test_route_observer_handles_failures(self):
+        with mock.patch.object(server.platform, "system", return_value="Darwin"), \
+             mock.patch.object(server.subprocess, "run",
+                               side_effect=server.subprocess.TimeoutExpired("route", 3)):
+            self.assertEqual(server.observe_route()["route_state"], "unavailable")
+
+    def test_start_fail_closed_on_preexisting_tun_route(self):
+        session = server.Session()
+        with mock.patch.object(server, "observe_route",
+                return_value={"route_state": "utun_route_observed_unverified"}), \
+             mock.patch.object(server.os, "open") as open_file:
+            with self.assertRaisesRegex(ValueError, "EXISTING_TUN_ROUTE_AMBIGUOUS"):
+                session.start(501, {"inbounds": [], "outbounds": []})
+            open_file.assert_not_called()
+
+    def test_daemon_never_claims_route_as_verified_vpn(self):
+        source = (DIR / "unsigned_tun_daemon.py").read_text()
+        self.assertIn('"system_vpn_verified": False', source)
+        self.assertIn("TUN_ROUTE_NOT_ESTABLISHED", source)
+
     def test_request_limits_and_actions(self):
         self.assertEqual(server.decode_request(b'{"action":"stop"}')["action"], "stop")
         for request in (b"", b'{"action":"shell"}', b'{"action":"status"' ,
