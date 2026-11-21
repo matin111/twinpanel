@@ -100,11 +100,35 @@ class NativeSessionRestoreTests(unittest.TestCase):
         self.assertIn("localProxyGeneration == generation", dashboard)
         self.assertNotIn("Local SOCKS proxy active (not VPN)", dashboard)
         self.assertNotIn("subtitle: pingDetails(selected)", dashboard)
-        self.assertIn('"◉  Proxy active"', dashboard)
+        self.assertIn('connectedProtocolTitle + " active"', dashboard)
         self.assertIn('"ϟ    Connect     ›"', dashboard)
         monitor = dashboard.split("private func refreshTrafficMetrics()", 1)[1].split(
             "private func runLocalManager(", 1)[0]
         self.assertNotIn("self.view = self.build()", monitor)
+
+    def test_connected_protocol_label_matches_verified_engine_not_picker(self):
+        dashboard = DASHBOARD.read_text(encoding="utf-8")
+        self.assertIn("private var verifiedProxyProtocol: String?", dashboard)
+        self.assertIn("private var connectedProtocolTitle: String", dashboard)
+        for code, label in [
+            ("hysteria2", "Hysteria2"),
+            ("tuic", "TUIC"),
+            ("anytls", "AnyTLS"),
+            ("socks5", "SOCKS5"),
+            ("snell", "Snell"),
+        ]:
+            self.assertIn(f'case "{code}": return "{label}"', dashboard)
+        self.assertIn('connectedProtocolTitle + " · Proxy"', dashboard)
+        self.assertIn('connectedProtocolTitle + " active"', dashboard)
+        self.assertIn('connectedProtocolTitle + " session"', dashboard)
+        self.assertIn('self.verifiedProxyProtocol = outcome.0 ?', dashboard)
+        self.assertIn('selectedProtocol : nil', dashboard)
+        self.assertIn('self.verifiedProxyProtocol = nil', dashboard)
+        self.assertIn('verifiedProxyProtocol = nil', dashboard)
+        self.assertIn('"Proxy verified protocol: " + (verifiedProxyProtocol ?? "none")',
+                      dashboard)
+        self.assertIn('localProxyActive ? "ϟ    Disconnect', dashboard)
+        self.assertNotIn('localProxyActive ? "Proxy" : "Disconnected"', dashboard)
 
     def test_entitled_singbox_protocols_bound_to_selected_server(self):
         directory = DIRECTORY.read_text(encoding="utf-8")
